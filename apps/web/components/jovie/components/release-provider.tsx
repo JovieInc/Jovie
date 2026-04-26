@@ -14,6 +14,11 @@ interface ReleaseLike {
   readonly title: string;
   readonly artworkUrl?: string | null;
   readonly artistNames?: readonly string[];
+  readonly releaseDate?: string;
+  readonly releaseType?: string;
+  readonly spotifyPopularity?: number | null;
+  readonly totalTracks?: number;
+  readonly totalDurationMs?: number | null;
 }
 
 function releaseMatches(release: ReleaseLike, lowerQuery: string): boolean {
@@ -24,12 +29,40 @@ function releaseMatches(release: ReleaseLike, lowerQuery: string): boolean {
   );
 }
 
+function shortMonth(iso?: string): string | undefined {
+  if (!iso) return undefined;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return undefined;
+  return date.toLocaleString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function releaseTypeLabel(type?: string): string {
+  if (!type) return 'Release';
+  const lower = type.toLowerCase();
+  if (lower === 'album') return 'Album';
+  if (lower === 'single') return 'Single';
+  if (lower === 'ep') return 'EP';
+  return type;
+}
+
 function toEntityRef(release: ReleaseLike): EntityRef {
+  const dateLabel = shortMonth(release.releaseDate);
+  const typeLabel = releaseTypeLabel(release.releaseType);
+  const subtitle = dateLabel ? `${typeLabel} · ${dateLabel}` : typeLabel;
   return {
     kind: 'release',
     id: release.id,
     label: release.title,
     thumbnail: release.artworkUrl ?? undefined,
+    meta: {
+      kind: 'release',
+      subtitle,
+      releaseDate: release.releaseDate,
+      releaseType: release.releaseType,
+      spotifyPopularity: release.spotifyPopularity ?? null,
+      totalTracks: release.totalTracks,
+      totalDurationMs: release.totalDurationMs ?? null,
+    },
   };
 }
 

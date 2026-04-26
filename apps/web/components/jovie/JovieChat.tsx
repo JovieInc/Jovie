@@ -3,7 +3,7 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { ImagePlus } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAppFlag } from '@/lib/flags/client';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
 
@@ -46,6 +46,9 @@ export function JovieChat({
   const imageFileInputRef = useRef<HTMLInputElement>(null);
   // Track message IDs that were loaded from persistence to skip entrance animation
   const knownMessageIdsRef = useRef<Set<string>>(new Set());
+  // Variant F: dim suggestion chips while the slash picker is open so they
+  // don't compete with the morphing surface.
+  const [composerPickerOpen, setComposerPickerOpen] = useState(false);
   const {
     input,
     setInput,
@@ -312,6 +315,8 @@ export function JovieChat({
     onRemoveLastChip: chipTray.removeLast,
     onAddSkill: chipTray.addSkill,
     onAddEntity: chipTray.addEntity,
+    onPickerOpenChange: setComposerPickerOpen,
+    profileId,
   } as const;
 
   const greetingName = displayName?.trim() || username?.trim() || null;
@@ -509,8 +514,27 @@ export function JovieChat({
         </div>
       ) : (
         <div className='flex flex-1 flex-col overflow-hidden'>
-          <div className='flex-1 overflow-y-auto px-4 sm:px-6'>
-            <div className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col items-center justify-center gap-6 py-8'>
+          <div className='relative flex-1 overflow-y-auto px-4 sm:px-6'>
+            {/* Variant F: giant 'j' ornament behind empty thread.
+                Positioned absolute so it doesn't shift the welcome heading. */}
+            <div
+              aria-hidden
+              className='pointer-events-none absolute inset-0 flex items-center justify-center select-none'
+              style={{
+                fontFamily:
+                  'var(--font-display, "Satoshi", -apple-system, system-ui, sans-serif)',
+                fontWeight: 600,
+                fontSize: 'clamp(180px, 38vw, 360px)',
+                color: 'rgba(255,255,255,0.018)',
+                letterSpacing: '-0.08em',
+                lineHeight: 0.8,
+                transform: 'translateY(-12px)',
+              }}
+              data-testid='chat-empty-thread-ornament'
+            >
+              j
+            </div>
+            <div className='relative mx-auto flex min-h-full w-full max-w-[44rem] flex-col items-center justify-center gap-6 py-8'>
               <h1 className='text-balance text-center text-[2rem] font-semibold leading-[1.1] tracking-[-0.035em] text-primary-token sm:text-[2.5rem] md:text-[3rem]'>
                 {emptyStateHeading}
               </h1>
@@ -520,6 +544,7 @@ export function JovieChat({
                   isFirstSession={isFirstSession}
                   latestReleaseTitle={latestReleaseTitle}
                   layout='rail'
+                  dimmed={composerPickerOpen}
                 />
                 {chatError && (
                   <div className='mt-2.5 w-full'>

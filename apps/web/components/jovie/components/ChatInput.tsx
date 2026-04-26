@@ -1,18 +1,10 @@
 'use client';
 
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  SimpleTooltip,
-} from '@jovie/ui';
-import { ArrowUp, ImagePlus, Loader2, Mic, MicOff, Plus } from 'lucide-react';
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useTheme } from 'next-themes';
+import { motion, useReducedMotion } from 'motion/react';
 import {
   forwardRef,
   useCallback,
+  useEffect,
   useImperativeHandle,
   useRef,
   useState,
@@ -27,196 +19,39 @@ import {
   useTextareaAutosize,
 } from '../hooks/useTextareaAutosize';
 import { MAX_MESSAGE_LENGTH } from '../types';
+import {
+  ComposerAttachButton,
+  ComposerMicButton,
+  ComposerSendButton,
+} from './ChatComposerToolbar';
 import { ChipTray } from './ChipTray';
+import {
+  SPRING_HEIGHT,
+  TRANSITION_REVEAL,
+  TRANSITION_SURFACE,
+} from './chat-motion';
 import {
   CHAT_PROMPT_RAIL_CLASS,
   CHAT_PROMPT_RAIL_MASK_STYLE,
   CHAT_PROMPT_RAIL_SCROLL_CLASS,
   getChatPromptPillClass,
 } from './chat-prompt-styles';
+import { EntityPreviewPane } from './EntityPreviewPane';
 import { ImagePreviewStrip } from './ImagePreviewStrip';
-import { SlashCommandMenu, type SlashMenuMode } from './SlashCommandMenu';
+import {
+  activeEntityFor,
+  SlashCommandMenu,
+  useSlashItems,
+} from './SlashCommandMenu';
 import { detectSlashTriggerAt } from './slash-trigger';
-
-/** DESIGN.md standard easing */
-const EASE_INTERACTIVE = [0.25, 0.46, 0.45, 0.94] as const;
-
-/** Spring config for layout (height) transitions — physical feel */
-const SPRING_LAYOUT = {
-  type: 'spring' as const,
-  stiffness: 500,
-  damping: 30,
-  mass: 0.8,
-};
-
-/** Fast cross-fade for icon morphs (100ms) */
-const TRANSITION_FAST = { duration: 0.1, ease: EASE_INTERACTIVE };
-
-// ─── Sub-components ──────────────────────────────────────────────
+import { useChatPicker } from './useChatPicker';
 
 interface ChatQuickAction {
   readonly label: string;
   readonly prompt: string;
 }
 
-interface SendStopButtonProps {
-  readonly canSend: boolean;
-  readonly isStreaming: boolean;
-  readonly isLoading: boolean;
-  readonly isSubmitting: boolean;
-  readonly isCompact: boolean;
-  readonly reducedMotion: boolean | null;
-  readonly onMouseDown: (event: React.MouseEvent<HTMLButtonElement>) => void;
-  readonly onStop?: () => void;
-}
-
-function getButtonIcon(
-  showStop: boolean,
-  isLoading: boolean,
-  isSubmitting: boolean,
-  isCompact: boolean
-): { key: string; icon: React.ReactNode } {
-  const iconSize = isCompact ? 'h-3.5 w-3.5' : 'h-4 w-4';
-  if (showStop) {
-    return {
-      key: 'stop',
-      icon: (
-        <span
-          className={cn(
-            'block rounded-[2px] bg-current',
-            isCompact ? 'h-2.5 w-2.5' : 'h-3 w-3'
-          )}
-        />
-      ),
-    };
-  }
-  if (isLoading || isSubmitting) {
-    return {
-      key: 'loading',
-      icon: <Loader2 className={cn('animate-spin', iconSize)} />,
-    };
-  }
-  return { key: 'send', icon: <ArrowUp className={iconSize} /> };
-}
-
-function SendStopButton({
-  canSend,
-  isStreaming,
-  isLoading,
-  isSubmitting,
-  isCompact,
-  reducedMotion,
-  onMouseDown,
-  onStop,
-}: SendStopButtonProps) {
-  const showStop = isStreaming && onStop;
-  const { key, icon } = getButtonIcon(
-    Boolean(showStop),
-    isLoading,
-    isSubmitting,
-    isCompact
-  );
-  const motionInit = reducedMotion ? undefined : { scale: 0.5, opacity: 0 };
-
-  return (
-    <SimpleTooltip content={showStop ? 'Stop generating' : 'Send message'}>
-      <button
-        type={showStop ? 'button' : 'submit'}
-        onMouseDown={onMouseDown}
-        onClick={showStop ? onStop : undefined}
-        disabled={!showStop && !canSend}
-        className={cn(
-          'flex shrink-0 items-center justify-center rounded-full border transition-[background-color,border-color,color,box-shadow] duration-fast',
-          showStop || canSend
-            ? 'border-(--linear-btn-primary-border) bg-(--linear-btn-primary-bg) text-(--linear-btn-primary-fg) shadow-[0_1px_1px_rgba(0,0,0,0.06),0_6px_16px_-10px_rgba(0,0,0,0.24)] hover:bg-(--linear-btn-primary-hover)'
-            : 'cursor-not-allowed border-(--linear-app-frame-seam) bg-surface-0 text-tertiary-token',
-          isCompact ? 'h-8 w-8' : 'h-9 w-9'
-        )}
-        aria-label={showStop ? 'Stop generating' : 'Send message'}
-      >
-        <AnimatePresence mode='wait' initial={false}>
-          <motion.span
-            key={key}
-            initial={motionInit}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={motionInit}
-            transition={TRANSITION_FAST}
-            className='flex items-center justify-center'
-          >
-            {icon}
-          </motion.span>
-        </AnimatePresence>
-      </button>
-    </SimpleTooltip>
-  );
-}
-
-interface AttachDropdownProps {
-  readonly isCompact: boolean;
-  readonly isImageProcessing: boolean;
-  readonly isLoading: boolean;
-  readonly isSubmitting: boolean;
-  readonly plusMenuOpen: boolean;
-  readonly onOpenChange: (open: boolean) => void;
-  readonly onMouseDown: (event: React.MouseEvent<HTMLButtonElement>) => void;
-  readonly onImageAttach: () => void;
-}
-
-function AttachDropdown({
-  isCompact,
-  isImageProcessing,
-  isLoading,
-  isSubmitting,
-  plusMenuOpen,
-  onOpenChange,
-  onMouseDown,
-  onImageAttach,
-}: AttachDropdownProps) {
-  return (
-    <DropdownMenu open={plusMenuOpen} onOpenChange={onOpenChange}>
-      <DropdownMenuTrigger asChild>
-        <button
-          type='button'
-          onMouseDown={onMouseDown}
-          disabled={isImageProcessing || isLoading || isSubmitting}
-          className={cn(
-            'flex shrink-0 items-center justify-center rounded-full',
-            'border border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token transition-[background-color,border-color,color,box-shadow]',
-            'hover:border-default hover:bg-surface-1 hover:text-primary-token hover:shadow-[var(--linear-app-card-shadow)]',
-            'disabled:opacity-50 disabled:cursor-not-allowed',
-            isCompact ? 'h-8 w-8' : 'h-9 w-9'
-          )}
-          aria-label='Attachment options'
-        >
-          {isImageProcessing ? (
-            <Loader2
-              className={cn(
-                'animate-spin',
-                isCompact ? 'h-4 w-4' : 'h-[18px] w-[18px]'
-              )}
-            />
-          ) : (
-            <Plus className={cn(isCompact ? 'h-4 w-4' : 'h-[18px] w-[18px]')} />
-          )}
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align='start' side='top' sideOffset={8}>
-        <DropdownMenuItem
-          onSelect={() => {
-            onImageAttach();
-          }}
-        >
-          <ImagePlus className='mr-2 h-4 w-4' />
-          Attach image
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
-// ─── Main ChatInput ──────────────────────────────────────────────
-
-interface ChatInputProps {
+export interface ChatInputProps {
   readonly value: string;
   readonly onChange: (value: string) => void;
   readonly onSubmit: (e?: React.FormEvent) => void;
@@ -243,7 +78,41 @@ interface ChatInputProps {
   readonly onAddEntity?: (
     mention: Omit<import('@/lib/chat/tokens').EntityMentionToken, 'type'>
   ) => void;
+  /**
+   * Notifies the surrounding chrome (suggestion chips, etc) when the slash
+   * picker opens or closes so it can dim out neighbouring affordances per
+   * Variant F.
+   */
+  readonly onPickerOpenChange?: (open: boolean) => void;
+  /**
+   * Required when chips/entity-pickers are wired up — used by the inline
+   * slash picker to scope `useReleasesQuery` to the active creator.
+   */
+  readonly profileId?: string;
 }
+
+type SurfaceMode = 'empty' | 'typing' | 'root' | 'entity';
+
+interface SurfaceGeometry {
+  readonly width: number | string;
+  readonly maxWidth: number | string;
+  readonly borderRadius: number;
+}
+
+function geometryFor(mode: SurfaceMode, stacked: boolean): SurfaceGeometry {
+  if (stacked) {
+    if (mode === 'empty')
+      return { width: '100%', maxWidth: '100%', borderRadius: 999 };
+    return { width: '100%', maxWidth: '100%', borderRadius: 18 };
+  }
+  if (mode === 'empty') return { width: 440, maxWidth: 440, borderRadius: 999 };
+  if (mode === 'typing') return { width: 440, maxWidth: 440, borderRadius: 24 };
+  if (mode === 'root') return { width: 520, maxWidth: 520, borderRadius: 20 };
+  return { width: 760, maxWidth: '100%', borderRadius: 20 };
+}
+
+const SURFACE_BG =
+  'linear-gradient(180deg, rgba(255,255,255,0.018) 0%, transparent 40%), #16161a';
 
 export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
   function ChatInput(
@@ -269,6 +138,8 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       onRemoveLastChip,
       onAddSkill,
       onAddEntity,
+      onPickerOpenChange,
+      profileId,
     },
     ref
   ) {
@@ -279,7 +150,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const hasAttachButton = Boolean(onImageAttach);
     const hasPendingImages = (pendingImages?.length ?? 0) > 0;
     const canSend =
-      (value.trim() || hasPendingImages) &&
+      Boolean(value.trim() || hasPendingImages) &&
       !isLoading &&
       !isSubmitting &&
       !isOverLimit &&
@@ -287,19 +158,28 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
 
     const [plusMenuOpen, setPlusMenuOpen] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
-    const { resolvedTheme } = useTheme();
-    const isDark = resolvedTheme === 'dark';
+    const [isViewportNarrow, setIsViewportNarrow] = useState(false);
+
+    // Variant F's "compact" rule fires below ~900px viewport (or any time the
+    // composer was already rendered in the compact follow-up variant). At that
+    // size the entity surface stacks rail-on-top instead of two columns.
+    useEffect(() => {
+      if (typeof window === 'undefined') return;
+      const mq = window.matchMedia('(max-width: 899px)');
+      const update = () => setIsViewportNarrow(mq.matches);
+      update();
+      mq.addEventListener('change', update);
+      return () => mq.removeEventListener('change', update);
+    }, []);
 
     const isCompact = variant === 'compact';
+    const isStacked = isCompact || isViewportNarrow;
     const maxHeight = isCompact ? 128 : 192;
     const minHeight = 28;
 
-    // Internal textarea ref for width measurement
     const internalTextareaRef = useRef<HTMLTextAreaElement>(null);
-    // Forward the ref to the parent while keeping internal access
     useImperativeHandle(ref, () => internalTextareaRef.current!, []);
 
-    // Smooth textarea height measurement (no height:'auto' trick)
     const { measuredHeight, isAtMaxHeight, containerRef, hiddenDivRef } =
       useTextareaAutosize({
         value,
@@ -308,79 +188,64 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         textareaRef: internalTextareaRef,
       });
 
-    // Dictation baseline snapshot
     const dictationBaselineRef = useRef('');
 
-    // Slash-command trigger detection. Opens the menu when the text ending at
-    // the caret matches `/<query>` at a word boundary (start-of-input or after
-    // whitespace). The query is everything after the `/` up to the caret.
-    // Mode switches to an entity kind when the user picks a skill with a
-    // required slot (orchestrated by the skill-select handler below).
-    const [slashMenuMode, setSlashMenuMode] = useState<SlashMenuMode | null>(
-      null
+    const picker = useChatPicker();
+    // Picker queries scope to this profile's catalog when present; absent
+    // profileId yields an empty release set (artist search is global).
+    const pickerProfileId = profileId ?? '';
+    const { items: pickerItems, sections: _sections } = useSlashItems(
+      picker.state,
+      pickerProfileId
     );
-    const [slashQuery, setSlashQuery] = useState('');
-    // Index in `value` where the `/` was typed — we slice it out when a pick
-    // commits, preserving any text the user typed outside the trigger.
-    const slashStartRef = useRef<number | null>(null);
+    const activeEntity = activeEntityFor(picker.state, pickerItems);
 
-    const detectSlashTrigger = useCallback(
-      (text: string, caret: number) => detectSlashTriggerAt(text, caret),
-      []
-    );
-
+    // Slash trigger detection: open root picker when `/` follows a word
+    // boundary; switch to entity picker when a skill commit demands it.
     const handleChange = useCallback(
       (next: string) => {
         onChange(next);
         const el = internalTextareaRef.current;
         const caret = el?.selectionStart ?? next.length;
-        const trigger = detectSlashTrigger(next, caret);
+        const trigger = detectSlashTriggerAt(next, caret);
         if (trigger) {
-          slashStartRef.current = trigger.startIdx;
-          setSlashQuery(trigger.query);
-          // Only auto-open in 'all' mode; if user is mid-entity-pick, keep scope.
-          setSlashMenuMode(prev => prev ?? 'all');
-        } else if (slashMenuMode === 'all') {
-          // Slash trigger gone (user deleted `/` or inserted whitespace) — close.
-          setSlashMenuMode(null);
-          slashStartRef.current = null;
+          if (
+            picker.state.status === 'closed' ||
+            picker.state.status === 'root'
+          ) {
+            picker.openRoot(trigger.startIdx, trigger.query);
+          } else {
+            // entity mode: only update query (kind stays locked)
+            picker.setQuery(trigger.query);
+          }
+        } else if (picker.state.status === 'root') {
+          picker.close();
         }
       },
-      [onChange, detectSlashTrigger, slashMenuMode]
+      [onChange, picker]
     );
 
     const stripSlashQuery = useCallback(() => {
-      const startIdx = slashStartRef.current;
-      if (startIdx === null) return;
-      // Remove `/query` from the textarea; the chip is now the real token.
+      if (picker.state.status === 'closed') return;
+      const startIdx = picker.state.startIdx;
       const el = internalTextareaRef.current;
       const caret = el?.selectionStart ?? value.length;
       const nextValue = value.slice(0, startIdx) + value.slice(caret);
       onChange(nextValue);
-      slashStartRef.current = null;
-      setSlashQuery('');
-    }, [onChange, value]);
-
-    const closeSlashMenu = useCallback(() => {
-      setSlashMenuMode(null);
-      slashStartRef.current = null;
-      setSlashQuery('');
-    }, []);
+    }, [onChange, picker.state, value]);
 
     const handleSelectSkill = useCallback(
       (skill: import('@/lib/commands/registry').SkillCommand) => {
         onAddSkill?.(skill.id);
         stripSlashQuery();
         const requiredSlot = skill.entitySlots.find(s => s.required);
-        if (requiredSlot) {
-          // Two-step picker: reopen menu scoped to the required entity kind.
-          setSlashMenuMode(requiredSlot.kind);
-          setSlashQuery('');
+        if (requiredSlot && picker.state.status !== 'closed') {
+          picker.openEntity(requiredSlot.kind, picker.state.startIdx, '');
         } else {
-          closeSlashMenu();
+          picker.close();
         }
       },
-      [onAddSkill, stripSlashQuery, closeSlashMenu]
+      [onAddSkill, stripSlashQuery, picker]
     );
 
     const handleSelectEntity = useCallback(
@@ -391,9 +256,9 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
           label: entity.label,
         });
         stripSlashQuery();
-        closeSlashMenu();
+        picker.close();
       },
-      [onAddEntity, stripSlashQuery, closeSlashMenu]
+      [onAddEntity, stripSlashQuery, picker]
     );
 
     const {
@@ -421,11 +286,11 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       [onSubmit]
     );
 
-    // IME-safe Enter handling + backspace-on-empty removes the last chip
-    // (Linear-style: chips feel attached to the end of the input).
     const handleKeyDown = useCallback(
       (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (e.nativeEvent.isComposing) return;
+        // While the picker is open, swallow Enter — SlashCommandMenu owns it.
+        if (picker.state.status !== 'closed' && e.key === 'Enter') return;
         if (e.key === 'Enter' && !e.shiftKey && canSend) {
           e.preventDefault();
           onSubmit();
@@ -441,289 +306,471 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
           onRemoveLastChip();
         }
       },
-      [onSubmit, canSend, value, chips, onRemoveLastChip]
+      [onSubmit, canSend, value, chips, onRemoveLastChip, picker.state]
     );
 
-    // Focus retention on toolbar button clicks
-    const handleMouseDown = useCallback(
+    const handlePreserveFocus = useCallback(
       (event: React.MouseEvent<HTMLButtonElement>) => {
         event.preventDefault();
       },
       []
     );
 
-    // isExpanded drives footer visibility (independent of measuredHeight)
-    const isExpanded =
-      isFocused ||
-      plusMenuOpen ||
-      isListening ||
-      Boolean(value.trim()) ||
-      hasPendingImages;
+    // Resolve the surface mode from textarea + picker state.
+    const hasText = Boolean(value.trim()) || hasPendingImages;
+    const isExpanded = isFocused || plusMenuOpen || isListening || hasText;
+    let surfaceMode: SurfaceMode = 'empty';
+    if (picker.state.status === 'entity') surfaceMode = 'entity';
+    else if (picker.state.status === 'root') surfaceMode = 'root';
+    else if (hasText || isFocused) surfaceMode = 'typing';
+
+    const geometry = geometryFor(surfaceMode, isStacked);
+    const showInlinePicker = picker.state.status === 'root' && !isStacked;
+    const showEntitySurface = picker.state.status === 'entity';
+    const dockClass =
+      surfaceMode === 'entity' && !isStacked
+        ? 'flex justify-end'
+        : 'flex justify-center';
 
     const hasQuickActions =
       Boolean(onQuickActionSelect) && (quickActions?.length ?? 0) > 0;
 
-    // Both collapsed and expanded resolve to 32px radius for a pill shape.
-    const borderRadius = isCompact ? 26 : 30;
+    // Container the slash key listener cares about when the picker is closed.
+    // (The active-listener inside SlashCommandMenu only mounts while open.)
 
-    // Shadow states
-    let boxShadow = isDark
-      ? '0 2px 8px -4px rgba(0,0,0,0.28)'
-      : '0 2px 8px -4px rgba(15,23,42,0.07)';
-    if (isOverLimit) {
-      boxShadow = 'none';
-    } else if (isExpanded) {
-      boxShadow = isDark
-        ? '0 4px 16px -6px rgba(0,0,0,0.32)'
-        : '0 4px 16px -6px rgba(15,23,42,0.09)';
-    }
+    // Refocus textarea when the picker closes so typing can continue.
+    useEffect(() => {
+      if (picker.state.status === 'closed' && isFocused) {
+        internalTextareaRef.current?.focus();
+      }
+    }, [picker.state.status, isFocused]);
 
-    // Border style by state
-    let borderClass = 'border-black/6 dark:border-white/[0.07]';
-    if (isOverLimit) {
-      borderClass =
-        'border-error focus-within:border-error focus-within:ring-2 focus-within:ring-error/20';
-    } else if (isExpanded) {
-      borderClass = 'border-black/8 dark:border-white/[0.09]';
-    }
+    useEffect(() => {
+      onPickerOpenChange?.(picker.state.status !== 'closed');
+    }, [picker.state.status, onPickerOpenChange]);
 
     return (
       <form onSubmit={handleFormSubmit}>
-        <motion.div
-          animate={reducedMotion ? undefined : { borderRadius, boxShadow }}
-          transition={
-            reducedMotion
-              ? undefined
-              : { duration: 0.15, ease: EASE_INTERACTIVE }
-          }
-          className={cn(
-            'overflow-hidden border transition-[border-color,background-color,box-shadow] duration-normal',
-            // Always one elevation above the content surface — shadow is animated via motion.div
-            'bg-surface-1',
-            borderClass
-          )}
-          style={reducedMotion ? { borderRadius, boxShadow } : { borderRadius }}
-        >
-          {/* Image previews */}
-          {hasPendingImages && onRemoveImage && (
-            <div className='px-4 pt-3'>
-              <ImagePreviewStrip
-                images={pendingImages ?? []}
-                onRemove={onRemoveImage}
-              />
-            </div>
-          )}
-
-          {/* Chip tray — rendered above the textarea when chips are present */}
-          {chips && chips.length > 0 && onRemoveChipAt && (
-            <div className='px-4 pt-3'>
-              <ChipTray chips={chips} onRemoveAt={onRemoveChipAt} />
-            </div>
-          )}
-
-          {/* Textarea row */}
-          <div
-            ref={containerRef}
+        <div className={dockClass}>
+          <motion.div
+            data-testid='chat-composer-surface'
+            data-surface-mode={surfaceMode}
+            data-compact={isCompact ? 'true' : 'false'}
+            animate={
+              reducedMotion
+                ? undefined
+                : {
+                    width: geometry.width,
+                    maxWidth: geometry.maxWidth,
+                    borderRadius: geometry.borderRadius,
+                  }
+            }
+            transition={reducedMotion ? undefined : TRANSITION_SURFACE}
+            style={{
+              background: SURFACE_BG,
+              borderRadius: geometry.borderRadius,
+              width: geometry.width,
+              maxWidth: geometry.maxWidth,
+            }}
             className={cn(
-              'relative flex items-center gap-2 px-4 py-3',
-              isExpanded && 'pb-3'
+              'overflow-hidden border border-white/[0.10] shadow-[0_1px_0_rgba(255,255,255,0.045)_inset,0_0_0_0.5px_rgba(255,255,255,0.02),0_1px_2px_rgba(0,0,0,0.3),0_6px_16px_-6px_rgba(0,0,0,0.45)]',
+              isExpanded &&
+                'shadow-[0_1px_0_rgba(255,255,255,0.06)_inset,0_0_0_0.5px_rgba(255,255,255,0.04),0_2px_4px_rgba(0,0,0,0.35),0_24px_56px_-20px_rgba(0,0,0,0.55)] border-white/[0.14]',
+              isOverLimit && 'border-error',
+              showEntitySurface && !isStacked ? 'flex' : 'flex flex-col'
             )}
           >
-            {/* Hidden measurement div */}
-            <div ref={hiddenDivRef} style={HIDDEN_DIV_STYLES} aria-hidden />
-            {hasAttachButton && onImageAttach && (
-              <AttachDropdown
-                isCompact={isCompact}
-                isImageProcessing={isImageProcessing}
-                isLoading={isLoading}
-                isSubmitting={isSubmitting}
-                plusMenuOpen={plusMenuOpen}
-                onOpenChange={setPlusMenuOpen}
-                onMouseDown={handleMouseDown}
-                onImageAttach={onImageAttach}
-              />
-            )}
-
-            {/* Animated textarea */}
-            <motion.textarea
-              ref={internalTextareaRef}
-              value={value}
-              onChange={e => handleChange(e.target.value)}
-              placeholder={placeholder}
-              rows={1}
-              animate={reducedMotion ? undefined : { height: measuredHeight }}
-              transition={reducedMotion ? undefined : SPRING_LAYOUT}
-              className={cn(
-                'min-w-0 flex-1 resize-none bg-transparent',
-                'text-primary-token placeholder:text-tertiary-token',
-                'focus:outline-none',
-                'py-1.5 text-sm leading-6',
-                isAtMaxHeight && 'overflow-y-auto',
-                isAtMaxHeight &&
-                  'shadow-[inset_0_8px_6px_-6px_rgba(0,0,0,0.06)] dark:shadow-[inset_0_8px_6px_-6px_rgba(0,0,0,0.2)]'
-              )}
-              style={
-                reducedMotion
-                  ? {
-                      height: measuredHeight,
-                      overflow: isAtMaxHeight ? 'auto' : 'hidden',
-                    }
-                  : { overflow: isAtMaxHeight ? 'auto' : 'hidden' }
-              }
-              onKeyDown={handleKeyDown}
-              onPaste={onPaste}
-              onFocus={() => setIsFocused(true)}
-              onBlur={() => setIsFocused(false)}
-              maxLength={MAX_MESSAGE_LENGTH + 100}
-              aria-label='Chat message input'
-              aria-describedby={isNearLimit ? 'char-limit-status' : undefined}
-            />
-
-            {/* Slash command menu — opens when user types `/` at word boundary */}
-            {slashMenuMode && onAddSkill && onAddEntity ? (
-              <SlashCommandMenu
-                open
-                anchorRef={internalTextareaRef}
-                query={slashQuery}
-                mode={slashMenuMode}
-                onSelectSkill={handleSelectSkill}
-                onSelectEntity={handleSelectEntity}
-                onClose={closeSlashMenu}
-              />
-            ) : null}
-
-            {/* Mic toggle */}
-            {hasDictation && (
-              <SimpleTooltip
-                content={isListening ? 'Stop dictation' : 'Dictate message'}
-              >
-                <button
-                  type='button'
-                  onMouseDown={handleMouseDown}
-                  onClick={handleMicToggle}
-                  disabled={isLoading || isSubmitting}
-                  className={cn(
-                    'flex shrink-0 items-center justify-center rounded-full border transition-[background-color,border-color,color,box-shadow]',
-                    isListening
-                      ? 'border-error/20 bg-error/10 text-error'
-                      : 'border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token hover:border-default hover:bg-surface-1 hover:text-primary-token hover:shadow-[var(--linear-app-card-shadow)]',
-                    'disabled:opacity-50 disabled:cursor-not-allowed',
-                    isCompact ? 'h-8 w-8' : 'h-9 w-9'
-                  )}
-                  aria-label={
-                    isListening ? 'Stop dictation' : 'Dictate message'
-                  }
-                  aria-pressed={isListening}
-                >
-                  {isListening ? (
-                    <MicOff
-                      className={cn(isCompact ? 'h-3.5 w-3.5' : 'h-4 w-4')}
-                    />
+            {showEntitySurface && !isStacked ? (
+              <div className='flex w-full'>
+                <aside className='flex w-[264px] shrink-0 flex-col border-r border-white/[0.055]'>
+                  <SlashCommandMenu
+                    profileId={pickerProfileId}
+                    state={picker.state}
+                    onSelectSkill={handleSelectSkill}
+                    onSelectEntity={handleSelectEntity}
+                    onSetSelected={picker.setSelected}
+                    onMoveSelected={picker.moveSelected}
+                    onClose={picker.close}
+                    variant='rail'
+                  />
+                </aside>
+                <div className='flex min-w-0 flex-1 flex-col'>
+                  {activeEntity ? (
+                    <EntityPreviewPane entity={activeEntity} />
                   ) : (
-                    <Mic
-                      className={cn(isCompact ? 'h-3.5 w-3.5' : 'h-4 w-4')}
-                    />
-                  )}
-                </button>
-              </SimpleTooltip>
-            )}
-
-            {/* Send / Stop button */}
-            <SendStopButton
-              canSend={Boolean(canSend)}
-              isStreaming={isStreaming}
-              isLoading={isLoading}
-              isSubmitting={isSubmitting}
-              isCompact={isCompact}
-              reducedMotion={reducedMotion}
-              onMouseDown={handleMouseDown}
-              onStop={onStop}
-            />
-          </div>
-
-          {/* Expandable footer with smooth reveal */}
-          <AnimatePresence initial={false}>
-            {isExpanded && (
-              <motion.div
-                initial={reducedMotion ? undefined : { height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={reducedMotion ? undefined : { height: 0, opacity: 0 }}
-                transition={
-                  reducedMotion
-                    ? { duration: 0 }
-                    : { duration: 0.15, ease: EASE_INTERACTIVE }
-                }
-                style={{ overflow: 'hidden' }}
-              >
-                <div className='border-t border-black/6 px-3 pb-3 pt-2.5 dark:border-white/8'>
-                  {/* Quick actions first (actionable), then keyboard hint */}
-                  {hasQuickActions && quickActions ? (
-                    <div className='mb-2'>
-                      <div
-                        className={CHAT_PROMPT_RAIL_SCROLL_CLASS}
-                        style={CHAT_PROMPT_RAIL_MASK_STYLE}
-                        data-testid='chat-input-quick-actions'
-                      >
-                        <div className={CHAT_PROMPT_RAIL_CLASS}>
-                          {quickActions.map(action => (
-                            <button
-                              key={action.label}
-                              type='button'
-                              onMouseDown={handleMouseDown}
-                              onClick={() =>
-                                onQuickActionSelect?.(action.prompt)
-                              }
-                              className={cn(
-                                getChatPromptPillClass('compact'),
-                                'min-w-[124px] max-w-[172px]'
-                              )}
-                            >
-                              <span className='truncate'>{action.label}</span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
+                    <div className='flex-1 px-6 py-[22px] text-[12px] text-tertiary-token'>
+                      Pick a{' '}
+                      {picker.state.kind === 'release'
+                        ? 'release'
+                        : 'reference'}{' '}
+                      to preview.
                     </div>
-                  ) : null}
-
-                  <div className='flex items-center justify-end'>
-                    <span className='text-2xs text-tertiary-token'>
-                      ⏎ to send · Shift+Enter for newline
-                    </span>
+                  )}
+                  <div className='border-t border-white/[0.055]'>
+                    <InputRow
+                      containerRef={containerRef}
+                      hiddenDivRef={hiddenDivRef}
+                      internalTextareaRef={internalTextareaRef}
+                      value={value}
+                      onChange={handleChange}
+                      handleKeyDown={handleKeyDown}
+                      onPaste={onPaste}
+                      placeholder={placeholder}
+                      isAtMaxHeight={isAtMaxHeight}
+                      measuredHeight={measuredHeight}
+                      reducedMotion={reducedMotion}
+                      isNearLimit={isNearLimit}
+                      hasAttachButton={hasAttachButton}
+                      onImageAttach={onImageAttach}
+                      isImageProcessing={isImageProcessing}
+                      isLoading={isLoading}
+                      isSubmitting={isSubmitting}
+                      plusMenuOpen={plusMenuOpen}
+                      setPlusMenuOpen={setPlusMenuOpen}
+                      handlePreserveFocus={handlePreserveFocus}
+                      hasDictation={hasDictation}
+                      isListening={isListening}
+                      handleMicToggle={handleMicToggle}
+                      canSend={canSend}
+                      isStreaming={isStreaming}
+                      isCompact={isCompact}
+                      onStop={onStop}
+                      setIsFocused={setIsFocused}
+                      hasPendingImages={hasPendingImages}
+                      pendingImages={pendingImages}
+                      onRemoveImage={onRemoveImage}
+                      chips={chips}
+                      onRemoveChipAt={onRemoveChipAt}
+                      isPillMode={false}
+                    />
                   </div>
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+              </div>
+            ) : (
+              <>
+                {/* STACKED entity mode: rail (full width) above optional preview, above input */}
+                {showEntitySurface && isStacked ? (
+                  <div className='flex flex-col'>
+                    <div className='border-b border-white/[0.055]'>
+                      <SlashCommandMenu
+                        profileId={pickerProfileId}
+                        state={picker.state}
+                        onSelectSkill={handleSelectSkill}
+                        onSelectEntity={handleSelectEntity}
+                        onSetSelected={picker.setSelected}
+                        onMoveSelected={picker.moveSelected}
+                        onClose={picker.close}
+                        variant='rail'
+                      />
+                    </div>
+                    {activeEntity ? (
+                      <div className='border-b border-white/[0.055]'>
+                        <EntityPreviewPane entity={activeEntity} />
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
 
-          {/* Character limit with smooth reveal */}
-          <AnimatePresence initial={false}>
-            {isNearLimit && (
-              <motion.output
-                id='char-limit-status'
-                aria-live='polite'
-                initial={reducedMotion ? undefined : { height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={reducedMotion ? undefined : { height: 0, opacity: 0 }}
-                transition={
-                  reducedMotion
-                    ? { duration: 0 }
-                    : { duration: 0.15, ease: EASE_INTERACTIVE }
-                }
-                style={{ overflow: 'hidden' }}
-                className={cn(
-                  'block px-4 pb-1.5 text-xs',
-                  isOverLimit ? 'text-error' : 'text-tertiary-token'
-                )}
-              >
-                {isOverLimit
-                  ? `Message is ${characterCount - MAX_MESSAGE_LENGTH} characters over the limit (${characterCount}/${MAX_MESSAGE_LENGTH})`
-                  : `${characterCount}/${MAX_MESSAGE_LENGTH} characters`}
-              </motion.output>
+                {/* ROOT inline picker (above input) */}
+                {showInlinePicker ? (
+                  <SlashCommandMenu
+                    profileId={pickerProfileId}
+                    state={picker.state}
+                    onSelectSkill={handleSelectSkill}
+                    onSelectEntity={handleSelectEntity}
+                    onSetSelected={picker.setSelected}
+                    onMoveSelected={picker.moveSelected}
+                    onClose={picker.close}
+                    variant='inline'
+                  />
+                ) : null}
+
+                {/* STACKED root picker (also stacks above input) */}
+                {picker.state.status === 'root' && isStacked ? (
+                  <div className='border-b border-white/[0.055]'>
+                    <SlashCommandMenu
+                      profileId={pickerProfileId}
+                      state={picker.state}
+                      onSelectSkill={handleSelectSkill}
+                      onSelectEntity={handleSelectEntity}
+                      onSetSelected={picker.setSelected}
+                      onMoveSelected={picker.moveSelected}
+                      onClose={picker.close}
+                      variant='rail'
+                    />
+                  </div>
+                ) : null}
+
+                <InputRow
+                  containerRef={containerRef}
+                  hiddenDivRef={hiddenDivRef}
+                  internalTextareaRef={internalTextareaRef}
+                  value={value}
+                  onChange={handleChange}
+                  handleKeyDown={handleKeyDown}
+                  onPaste={onPaste}
+                  placeholder={placeholder}
+                  isAtMaxHeight={isAtMaxHeight}
+                  measuredHeight={measuredHeight}
+                  reducedMotion={reducedMotion}
+                  isNearLimit={isNearLimit}
+                  hasAttachButton={hasAttachButton}
+                  onImageAttach={onImageAttach}
+                  isImageProcessing={isImageProcessing}
+                  isLoading={isLoading}
+                  isSubmitting={isSubmitting}
+                  plusMenuOpen={plusMenuOpen}
+                  setPlusMenuOpen={setPlusMenuOpen}
+                  handlePreserveFocus={handlePreserveFocus}
+                  hasDictation={hasDictation}
+                  isListening={isListening}
+                  handleMicToggle={handleMicToggle}
+                  canSend={canSend}
+                  isStreaming={isStreaming}
+                  isCompact={isCompact}
+                  onStop={onStop}
+                  setIsFocused={setIsFocused}
+                  hasPendingImages={hasPendingImages}
+                  pendingImages={pendingImages}
+                  onRemoveImage={onRemoveImage}
+                  chips={chips}
+                  onRemoveChipAt={onRemoveChipAt}
+                  isPillMode={surfaceMode === 'empty'}
+                  hasBorderTop={picker.state.status !== 'closed'}
+                />
+              </>
             )}
-          </AnimatePresence>
-        </motion.div>
+          </motion.div>
+        </div>
+
+        {hasQuickActions && quickActions && surfaceMode === 'typing' ? (
+          <motion.div
+            initial={reducedMotion ? undefined : { opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={reducedMotion ? undefined : TRANSITION_REVEAL}
+            className='mt-2 flex justify-center'
+          >
+            <div
+              className={CHAT_PROMPT_RAIL_SCROLL_CLASS}
+              style={CHAT_PROMPT_RAIL_MASK_STYLE}
+              data-testid='chat-input-quick-actions'
+            >
+              <div className={CHAT_PROMPT_RAIL_CLASS}>
+                {quickActions.map(action => (
+                  <button
+                    key={action.label}
+                    type='button'
+                    onMouseDown={handlePreserveFocus}
+                    onClick={() => onQuickActionSelect?.(action.prompt)}
+                    className={cn(
+                      getChatPromptPillClass('compact'),
+                      'min-w-[124px] max-w-[172px]'
+                    )}
+                  >
+                    <span className='truncate'>{action.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        ) : null}
+
+        {isNearLimit ? (
+          <output
+            id='char-limit-status'
+            aria-live='polite'
+            className={cn(
+              'mt-1 block text-center text-xs',
+              isOverLimit ? 'text-error' : 'text-tertiary-token'
+            )}
+          >
+            {isOverLimit
+              ? `Message is ${characterCount - MAX_MESSAGE_LENGTH} characters over the limit (${characterCount}/${MAX_MESSAGE_LENGTH})`
+              : `${characterCount}/${MAX_MESSAGE_LENGTH} characters`}
+          </output>
+        ) : null}
       </form>
     );
   }
 );
+
+interface InputRowProps {
+  readonly containerRef: React.RefObject<HTMLDivElement | null>;
+  readonly hiddenDivRef: React.RefObject<HTMLDivElement | null>;
+  readonly internalTextareaRef: React.RefObject<HTMLTextAreaElement | null>;
+  readonly value: string;
+  readonly onChange: (value: string) => void;
+  readonly handleKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+  readonly onPaste?: (e: React.ClipboardEvent) => void;
+  readonly placeholder: string;
+  readonly isAtMaxHeight: boolean;
+  readonly measuredHeight: number;
+  readonly reducedMotion: boolean | null;
+  readonly isNearLimit: boolean;
+  readonly hasAttachButton: boolean;
+  readonly onImageAttach?: () => void;
+  readonly isImageProcessing: boolean;
+  readonly isLoading: boolean;
+  readonly isSubmitting: boolean;
+  readonly plusMenuOpen: boolean;
+  readonly setPlusMenuOpen: (open: boolean) => void;
+  readonly handlePreserveFocus: (
+    event: React.MouseEvent<HTMLButtonElement>
+  ) => void;
+  readonly hasDictation: boolean;
+  readonly isListening: boolean;
+  readonly handleMicToggle: () => void;
+  readonly canSend: boolean;
+  readonly isStreaming: boolean;
+  readonly isCompact: boolean;
+  readonly onStop?: () => void;
+  readonly setIsFocused: (focused: boolean) => void;
+  readonly hasPendingImages: boolean;
+  readonly pendingImages?: import('../hooks/useChatImageAttachments').PendingImage[];
+  readonly onRemoveImage?: (id: string) => void;
+  readonly chips?: readonly import('../hooks/useChipTray').TrayChip[];
+  readonly onRemoveChipAt?: (index: number) => void;
+  /** Empty state: pill-shape, single-line clipped, vertical-center icons. */
+  readonly isPillMode?: boolean;
+  /** Add hairline divider above the input (when picker sits above it). */
+  readonly hasBorderTop?: boolean;
+}
+
+function InputRow({
+  containerRef,
+  hiddenDivRef,
+  internalTextareaRef,
+  value,
+  onChange,
+  handleKeyDown,
+  onPaste,
+  placeholder,
+  isAtMaxHeight,
+  measuredHeight,
+  reducedMotion,
+  isNearLimit,
+  hasAttachButton,
+  onImageAttach,
+  isImageProcessing,
+  isLoading,
+  isSubmitting,
+  plusMenuOpen,
+  setPlusMenuOpen,
+  handlePreserveFocus,
+  hasDictation,
+  isListening,
+  handleMicToggle,
+  canSend,
+  isStreaming,
+  isCompact,
+  onStop,
+  setIsFocused,
+  hasPendingImages,
+  pendingImages,
+  onRemoveImage,
+  chips,
+  onRemoveChipAt,
+  isPillMode = false,
+  hasBorderTop = false,
+}: InputRowProps) {
+  return (
+    <div className={cn(hasBorderTop && 'border-t border-white/[0.055]')}>
+      {hasPendingImages && onRemoveImage ? (
+        <div className='px-4 pt-3'>
+          <ImagePreviewStrip
+            images={pendingImages ?? []}
+            onRemove={onRemoveImage}
+          />
+        </div>
+      ) : null}
+
+      {chips && chips.length > 0 && onRemoveChipAt ? (
+        <div className='px-4 pt-3'>
+          <ChipTray chips={chips} onRemoveAt={onRemoveChipAt} />
+        </div>
+      ) : null}
+
+      <div
+        ref={containerRef}
+        className={cn(
+          'relative flex gap-1',
+          isPillMode
+            ? 'items-center px-[7px] py-[7px] pl-4'
+            : 'items-end px-2 py-[10px] pl-[18px]'
+        )}
+      >
+        <div ref={hiddenDivRef} style={HIDDEN_DIV_STYLES} aria-hidden />
+        {hasAttachButton && onImageAttach ? (
+          <ComposerAttachButton
+            isCompact={isCompact}
+            isImageProcessing={isImageProcessing}
+            isLoading={isLoading}
+            isSubmitting={isSubmitting}
+            plusMenuOpen={plusMenuOpen}
+            onOpenChange={setPlusMenuOpen}
+            onMouseDown={handlePreserveFocus}
+            onImageAttach={onImageAttach}
+          />
+        ) : null}
+
+        <motion.textarea
+          ref={internalTextareaRef}
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          placeholder={placeholder}
+          rows={1}
+          animate={
+            reducedMotion || isPillMode ? undefined : { height: measuredHeight }
+          }
+          transition={reducedMotion ? undefined : SPRING_HEIGHT}
+          className={cn(
+            'min-w-0 flex-1 resize-none bg-transparent',
+            'text-[14.5px] leading-[1.55] tracking-[-0.006em] text-primary-token placeholder:text-quaternary-token',
+            'focus:outline-none',
+            isPillMode
+              ? 'overflow-hidden whitespace-nowrap py-[7px] px-1'
+              : 'py-2 px-1',
+            isAtMaxHeight && 'overflow-y-auto'
+          )}
+          style={
+            reducedMotion
+              ? {
+                  height: isPillMode ? undefined : measuredHeight,
+                  overflow: isAtMaxHeight ? 'auto' : 'hidden',
+                }
+              : { overflow: isAtMaxHeight ? 'auto' : 'hidden' }
+          }
+          onKeyDown={handleKeyDown}
+          onPaste={onPaste}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+          maxLength={MAX_MESSAGE_LENGTH + 100}
+          aria-label='Chat message input'
+          aria-describedby={isNearLimit ? 'char-limit-status' : undefined}
+        />
+
+        {hasDictation ? (
+          <ComposerMicButton
+            isCompact={isCompact}
+            isListening={isListening}
+            isLoading={isLoading}
+            isSubmitting={isSubmitting}
+            onMouseDown={handlePreserveFocus}
+            onToggle={handleMicToggle}
+          />
+        ) : null}
+
+        <ComposerSendButton
+          canSend={canSend}
+          isStreaming={isStreaming}
+          isLoading={isLoading}
+          isSubmitting={isSubmitting}
+          isCompact={isCompact}
+          reducedMotion={reducedMotion}
+          onMouseDown={handlePreserveFocus}
+          onStop={onStop}
+        />
+      </div>
+    </div>
+  );
+}
