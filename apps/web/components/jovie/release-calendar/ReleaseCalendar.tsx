@@ -39,7 +39,7 @@ function buildWeeks(plan: DemoMoment[]): WeekColumn[] {
     DEMO_PLAN_START_FRIDAY,
     ...planFridays,
     ...tourFridays,
-  ].sort();
+  ].sort((a, b) => a.localeCompare(b));
   const start = allFridays[0] ?? DEMO_PLAN_START_FRIDAY;
   const end = allFridays.at(-1) ?? DEMO_PLAN_START_FRIDAY;
   const buffer = addDaysIso(end, 7);
@@ -80,7 +80,7 @@ export function ReleaseCalendar({
   const weeks = useMemo(() => buildWeeks(plan), [plan]);
   const [movedSlug, setMovedSlug] = useState<string | null>(null);
   const weekRefs = useRef<Map<string, HTMLDivElement>>(new Map());
-  const movedTimerRef = useRef<number | null>(null);
+  const movedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const handle = () => {
@@ -100,18 +100,18 @@ export function ReleaseCalendar({
         });
       });
       if (movedTimerRef.current !== null) {
-        window.clearTimeout(movedTimerRef.current);
+        globalThis.clearTimeout(movedTimerRef.current);
       }
-      movedTimerRef.current = window.setTimeout(() => {
+      movedTimerRef.current = globalThis.setTimeout(() => {
         setMovedSlug(null);
         movedTimerRef.current = null;
       }, MOVED_BADGE_DURATION_MS);
     };
-    window.addEventListener(RELEASE_PLAN_MOVE_REMIX_NEAR_LA, handle);
+    globalThis.addEventListener(RELEASE_PLAN_MOVE_REMIX_NEAR_LA, handle);
     return () => {
-      window.removeEventListener(RELEASE_PLAN_MOVE_REMIX_NEAR_LA, handle);
+      globalThis.removeEventListener(RELEASE_PLAN_MOVE_REMIX_NEAR_LA, handle);
       if (movedTimerRef.current !== null) {
-        window.clearTimeout(movedTimerRef.current);
+        globalThis.clearTimeout(movedTimerRef.current);
         movedTimerRef.current = null;
       }
     };
