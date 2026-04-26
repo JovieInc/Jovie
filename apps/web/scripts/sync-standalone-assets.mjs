@@ -8,10 +8,12 @@ import {
   realpathSync,
   rmSync,
 } from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
+const require = createRequire(import.meta.url);
 const appRoot = path.resolve(scriptDir, '..');
 const standaloneOutputRoot = path.join(appRoot, '.next', 'standalone');
 const standaloneRoot = path.join(standaloneOutputRoot, 'apps', 'web');
@@ -29,6 +31,8 @@ const copyTargets = [
     destination: path.join(standaloneNextRoot, 'static'),
   },
 ];
+
+const standaloneRuntimePackages = ['@swc/helpers'];
 
 if (!existsSync(standaloneRoot)) {
   throw new Error(
@@ -86,6 +90,22 @@ function materializeSymlinks(rootDir) {
   return materialized;
 }
 
+function copyRuntimePackageToStandalone(packageName) {
+  const packageJsonPath = require.resolve(`${packageName}/package.json`, {
+    paths: [path.dirname(require.resolve('next/package.json'))],
+  });
+  const packageRoot = path.dirname(packageJsonPath);
+  const destination = path.join(
+    standaloneRoot,
+    'node_modules',
+    ...packageName.split('/')
+  );
+
+  rmSync(destination, { force: true, recursive: true });
+  mkdirSync(path.dirname(destination), { recursive: true });
+  cpSync(packageRoot, destination, { recursive: true, dereference: true });
+}
+
 for (const target of copyTargets) {
   if (!existsSync(target.source)) {
     throw new Error(`Missing ${target.label} source at ${target.source}`);
@@ -94,6 +114,10 @@ for (const target of copyTargets) {
   rmSync(target.destination, { force: true, recursive: true });
   mkdirSync(path.dirname(target.destination), { recursive: true });
   cpSync(target.source, target.destination, { recursive: true });
+}
+
+for (const packageName of standaloneRuntimePackages) {
+  copyRuntimePackageToStandalone(packageName);
 }
 
 const symlinkCount = countSymlinks(standaloneOutputRoot);
