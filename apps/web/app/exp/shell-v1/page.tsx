@@ -10009,7 +10009,7 @@ function LyricsView({
             <div className='mt-5 flex items-center justify-center gap-2'>
               <button
                 type='button'
-                className='inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-cyan-500 text-on-primary text-[12.5px] font-caption tracking-[-0.005em] transition-colors duration-150 ease-out hover:bg-cyan-400'
+                className='inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-white text-black text-[12.5px] font-caption tracking-[-0.005em] hover:brightness-110 active:scale-[0.99] transition-all duration-150 ease-out'
               >
                 <Sparkles className='h-3.5 w-3.5' strokeWidth={2.25} />
                 Transcribe with Jovie
