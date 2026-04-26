@@ -110,7 +110,8 @@ type CanvasView =
   | 'tracks'
   | 'tasks'
   | 'library'
-  | 'lyrics';
+  | 'lyrics'
+  | 'settings';
 
 // Pill-based filter system (Linear/Notion style). Each pill targets a
 // single field with an `is` / `is not` operator and one or more OR-combined
@@ -1386,6 +1387,20 @@ export default function ShellV1Experiment() {
   }, []);
   const mounted = loaderPhase !== 'bloom';
 
+  // ScreeningRoom mode — chrome (sidebar, header, subheader, audio bar)
+  // fades to 0 over 600ms while staying mounted. The canvas takes over.
+  // Triggers when we're in a "full-screen canvas" view (lyrics today,
+  // video viewer next). Exit via Esc (handled per view) or the floating
+  // restore button bottom-right.
+  const cinematic = view === 'lyrics';
+  const cinematicStyle = cinematic
+    ? {
+        opacity: 0,
+        pointerEvents: 'none' as const,
+        transition: `opacity 600ms ${EASE_CINEMATIC}`,
+      }
+    : { transition: `opacity 600ms ${EASE_CINEMATIC}` };
+
   const pct =
     (currentTimeSec / (playingRelease?.durationSec ?? TRACK.duration)) * 100;
 
@@ -1429,6 +1444,9 @@ export default function ShellV1Experiment() {
       } else if (e.key === 'w' || e.key === 'W') {
         e.preventDefault();
         setWaveformOn(v => !v);
+      } else if (e.key === 'Escape' && view === 'lyrics') {
+        e.preventDefault();
+        setView('demo');
       }
     }
     function onKeyUp(e: KeyboardEvent) {
@@ -1447,7 +1465,7 @@ export default function ShellV1Experiment() {
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('keyup', onKeyUp);
     };
-  }, []);
+  }, [view]);
 
   return (
     <div
@@ -1492,17 +1510,19 @@ export default function ShellV1Experiment() {
         }
       `}</style>
       {/* Docked sidebar — always mounted; width + opacity animate so the
-          canvas slides over smoothly when the user pins/unpins. */}
+          canvas slides over smoothly when the user pins/unpins. Dims to 0
+          when ScreeningRoom mode is active (cinematic). */}
       <div
         className='hidden lg:flex h-full overflow-hidden shrink-0'
         style={{
           width: sidebarMode === 'docked' ? 224 : 0,
-          opacity: sidebarMode === 'docked' ? 1 : 0,
+          opacity: cinematic ? 0 : sidebarMode === 'docked' ? 1 : 0,
           transform:
             sidebarMode === 'docked' ? 'translateX(0)' : 'translateX(-12px)',
-          transition: `width ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, opacity ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, transform ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
+          pointerEvents: cinematic ? 'none' : undefined,
+          transition: `width ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, opacity 600ms ${EASE_CINEMATIC}, transform ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
         }}
-        aria-hidden={sidebarMode !== 'docked'}
+        aria-hidden={sidebarMode !== 'docked' || cinematic}
       >
         <Sidebar
           variant='docked'
@@ -1556,32 +1576,36 @@ export default function ShellV1Experiment() {
 
       <div className='flex min-h-0 min-w-0 flex-1 flex-col lg:gap-2'>
         <main className='flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-0 lg:rounded-[var(--linear-app-shell-radius)] lg:border lg:border-(--linear-app-shell-border) lg:bg-(--linear-app-content-surface) lg:shadow-[var(--linear-app-shell-shadow)]'>
-          <Header
-            sidebarMode={sidebarMode}
-            onToggleSidebar={() =>
-              setSidebarMode(m => (m === 'docked' ? 'floating' : 'docked'))
-            }
-            searchOpen={searchOpen}
-            searchPills={searchPills}
-            onSearchOpenChange={setSearchOpen}
-            onPillsChange={setSearchPills}
-            artistOptions={artistOptions}
-            titleOptions={titleOptions}
-            albumOptions={albumOptions}
-            view={view}
-          />
-          <CanvasSubheader
-            subviews={subviewsForView(view, RELEASES, TRACKS, TASKS)}
-            subview={subview}
-            onSubview={setSubview}
-            rightRailOpen={selectedReleaseId !== null}
-            onToggleRightRail={() =>
-              setSelectedReleaseId(id =>
-                id === null ? (RELEASES[0]?.id ?? null) : null
-              )
-            }
-            onOpenSearch={() => setSearchOpen(true)}
-          />
+          <div style={cinematicStyle}>
+            <Header
+              sidebarMode={sidebarMode}
+              onToggleSidebar={() =>
+                setSidebarMode(m => (m === 'docked' ? 'floating' : 'docked'))
+              }
+              searchOpen={searchOpen}
+              searchPills={searchPills}
+              onSearchOpenChange={setSearchOpen}
+              onPillsChange={setSearchPills}
+              artistOptions={artistOptions}
+              titleOptions={titleOptions}
+              albumOptions={albumOptions}
+              view={view}
+            />
+          </div>
+          <div style={cinematicStyle}>
+            <CanvasSubheader
+              subviews={subviewsForView(view, RELEASES, TRACKS, TASKS)}
+              subview={subview}
+              onSubview={setSubview}
+              rightRailOpen={selectedReleaseId !== null}
+              onToggleRightRail={() =>
+                setSelectedReleaseId(id =>
+                  id === null ? (RELEASES[0]?.id ?? null) : null
+                )
+              }
+              onOpenSearch={() => setSearchOpen(true)}
+            />
+          </div>
           <div
             className='flex-1 min-h-0 overflow-hidden grid'
             style={{
@@ -1669,6 +1693,8 @@ export default function ShellV1Experiment() {
                 />
               ) : view === 'library' ? (
                 <LibraryShellEmbed />
+              ) : view === 'settings' ? (
+                <SettingsView />
               ) : (
                 <TasksView
                   tasks={
@@ -1726,11 +1752,12 @@ export default function ShellV1Experiment() {
         )}
 
         <div
-          aria-hidden={barCollapsed}
+          aria-hidden={barCollapsed || cinematic}
           className='overflow-hidden transition-[max-height,opacity] duration-150 ease-out'
           style={{
-            maxHeight: barCollapsed ? 0 : 80,
-            opacity: barCollapsed ? 0 : 1,
+            maxHeight: barCollapsed || cinematic ? 0 : 80,
+            opacity: barCollapsed || cinematic ? 0 : 1,
+            pointerEvents: cinematic ? 'none' : undefined,
           }}
         >
           <AudioBar
@@ -1794,6 +1821,22 @@ export default function ShellV1Experiment() {
 
       <JovieOverlay listening={jovieListening} />
       <ShellLoader phase={loaderPhase} />
+      {/* ScreeningRoom restore button — appears bottom-right when in
+          cinematic mode. Click or Esc returns to chrome view. */}
+      <button
+        type='button'
+        onClick={() => setView('demo')}
+        aria-label='Exit screening room (Esc)'
+        className='fixed bottom-4 right-4 z-50 inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[11.5px] font-caption uppercase tracking-[0.06em] text-tertiary-token bg-(--linear-app-content-surface)/85 backdrop-blur-xl border border-(--linear-app-shell-border) hover:text-primary-token hover:bg-surface-1 transition-colors duration-150 ease-out'
+        style={{
+          opacity: cinematic ? 1 : 0,
+          pointerEvents: cinematic ? 'auto' : 'none',
+          transition: `opacity 600ms ${EASE_CINEMATIC}`,
+        }}
+      >
+        <X className='h-3 w-3' strokeWidth={2.25} />
+        Exit cinema
+      </button>
       <ContextMenuOverlay
         state={contextMenu}
         onClose={() => setContextMenu(null)}
@@ -2347,6 +2390,7 @@ function breadcrumbForView(
     tasks: 'Tasks',
     library: 'Library',
     lyrics: 'Lyrics',
+    settings: 'Settings',
   };
   return [{ label: map[view], emphasis: true }];
 }
@@ -4131,6 +4175,7 @@ function VariantPicker({
             'tracks',
             'tasks',
             'library',
+            'settings',
             'lyrics',
           ] as CanvasView[]
         ).map(v => (
@@ -4826,6 +4871,353 @@ function LibraryShellEmbed() {
       <LibraryV1Page />
     </div>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Settings — Linear-style two-pane layout. Left rail of section nav,
+// right pane is the active section's content. Lives inside the shell so
+// the sidebar / audio bar / now-playing card all stay (and the focus
+// stays on what's being changed).
+//
+// The 14-tab list in the existing /app/settings is collapsed into 6
+// real groups: Account, Profile, Workspace, Billing, Channels, Danger.
+// Anything that overlapped (analytics + audience + retargeting-ads were
+// all engagement insights; touring + payments were both scheduling /
+// money) folds into a single home.
+// ---------------------------------------------------------------------------
+
+type SettingsSectionId =
+  | 'account'
+  | 'profile'
+  | 'workspace'
+  | 'billing'
+  | 'channels'
+  | 'danger';
+
+const SETTINGS_SECTIONS: Array<{
+  id: SettingsSectionId;
+  label: string;
+  description: string;
+}> = [
+  {
+    id: 'account',
+    label: 'Account',
+    description: 'Email, password, two-factor, sessions',
+  },
+  {
+    id: 'profile',
+    label: 'Profile',
+    description: 'Public artist profile, bio, links',
+  },
+  {
+    id: 'workspace',
+    label: 'Workspace',
+    description: 'Members, invites, roles',
+  },
+  {
+    id: 'billing',
+    label: 'Billing',
+    description: 'Plan, payment method, invoices',
+  },
+  {
+    id: 'channels',
+    label: 'Channels',
+    description: 'Spotify, Apple Music, social posting',
+  },
+  {
+    id: 'danger',
+    label: 'Danger zone',
+    description: 'Delete account, reset workspace',
+  },
+];
+
+function SettingsView() {
+  const [section, setSection] = useState<SettingsSectionId>('account');
+  return (
+    <div className='h-full grid' style={{ gridTemplateColumns: '220px 1fr' }}>
+      <aside className='border-r border-(--linear-app-shell-border) bg-(--surface-0) overflow-y-auto py-3 px-2 space-y-px'>
+        <p className='text-[10px] uppercase tracking-[0.08em] text-quaternary-token font-semibold px-2 pt-1 pb-2'>
+          Settings
+        </p>
+        {SETTINGS_SECTIONS.map(s => {
+          const active = section === s.id;
+          return (
+            <button
+              key={s.id}
+              type='button'
+              onClick={() => setSection(s.id)}
+              className={cn(
+                'w-full flex flex-col items-start gap-0.5 px-2.5 py-1.5 rounded-md text-left transition-colors duration-150 ease-out',
+                active
+                  ? 'bg-surface-1/80 text-primary-token'
+                  : 'text-secondary-token hover:bg-surface-1/50 hover:text-primary-token'
+              )}
+            >
+              <span
+                className={cn(
+                  'text-[12.5px] font-medium tracking-[-0.005em]',
+                  s.id === 'danger' && 'text-rose-300/90'
+                )}
+              >
+                {s.label}
+              </span>
+              <span className='text-[10.5px] text-quaternary-token leading-tight'>
+                {s.description}
+              </span>
+            </button>
+          );
+        })}
+      </aside>
+      <div className='overflow-y-auto'>
+        <SettingsSection id={section} />
+      </div>
+    </div>
+  );
+}
+
+function SettingsSection({ id }: { id: SettingsSectionId }) {
+  const meta = SETTINGS_SECTIONS.find(s => s.id === id);
+  if (!meta) return null;
+  return (
+    <article className='max-w-2xl mx-auto px-8 pt-8 pb-12'>
+      <h1
+        className={cn(
+          'text-[24px] font-display tracking-[-0.018em] leading-tight',
+          id === 'danger' ? 'text-rose-300' : 'text-primary-token'
+        )}
+      >
+        {meta.label}
+      </h1>
+      <p className='mt-1.5 text-[12.5px] text-tertiary-token'>
+        {meta.description}
+      </p>
+
+      <div className='mt-6 space-y-4'>
+        {settingsRowsFor(id).map(row => (
+          <SettingsRow key={row.label} {...row} />
+        ))}
+      </div>
+    </article>
+  );
+}
+
+function SettingsRow({
+  label,
+  description,
+  control,
+  tone,
+}: {
+  label: string;
+  description?: string;
+  control: React.ReactNode;
+  tone?: 'default' | 'danger';
+}) {
+  return (
+    <div
+      className={cn(
+        'flex items-center gap-4 px-4 py-3 rounded-md border border-(--linear-app-shell-border)/70 bg-(--surface-0)/40',
+        tone === 'danger' && 'border-rose-500/25 bg-rose-500/[0.03]'
+      )}
+    >
+      <div className='flex-1 min-w-0'>
+        <p
+          className={cn(
+            'text-[13px] font-medium',
+            tone === 'danger' ? 'text-rose-300/90' : 'text-primary-token'
+          )}
+        >
+          {label}
+        </p>
+        {description && (
+          <p className='text-[11.5px] text-tertiary-token mt-0.5'>
+            {description}
+          </p>
+        )}
+      </div>
+      <div className='shrink-0'>{control}</div>
+    </div>
+  );
+}
+
+function settingsRowsFor(id: SettingsSectionId): Array<{
+  label: string;
+  description?: string;
+  control: React.ReactNode;
+  tone?: 'default' | 'danger';
+}> {
+  const valueText = (value: string) => (
+    <span className='text-[12.5px] text-tertiary-token tabular-nums'>
+      {value}
+    </span>
+  );
+  const editBtn = (
+    <button
+      type='button'
+      className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-150 ease-out'
+    >
+      Edit
+    </button>
+  );
+  switch (id) {
+    case 'account':
+      return [
+        {
+          label: 'Email',
+          description: 'For sign-in and account notifications',
+          control: valueText('tim@timwhite.co'),
+        },
+        {
+          label: 'Password',
+          description: 'Change password or reset',
+          control: editBtn,
+        },
+        {
+          label: 'Two-factor authentication',
+          description: 'Required for production workspaces',
+          control: (
+            <span className='inline-flex items-center gap-1.5 h-6 px-2 rounded text-[10.5px] uppercase tracking-[0.06em] text-tertiary-token bg-(--surface-1)/60 border border-(--linear-app-shell-border)'>
+              <span className='h-1.5 w-1.5 rounded-full bg-cyan-300/80' />
+              Enabled
+            </span>
+          ),
+        },
+        {
+          label: 'Active sessions',
+          description: '3 devices · 1 in this browser',
+          control: editBtn,
+        },
+      ];
+    case 'profile':
+      return [
+        {
+          label: 'Handle',
+          description: 'jov.ie/timwhite — public artist URL',
+          control: valueText('@timwhite'),
+        },
+        {
+          label: 'Display name',
+          control: valueText('Tim White'),
+        },
+        {
+          label: 'Bio',
+          description: 'Up to 280 characters, plain text',
+          control: editBtn,
+        },
+        {
+          label: 'External links',
+          description: '5 links · drag to reorder',
+          control: editBtn,
+        },
+      ];
+    case 'workspace':
+      return [
+        {
+          label: 'Workspace name',
+          control: valueText('Tim White Music'),
+        },
+        {
+          label: 'Members',
+          description: '1 owner · 0 collaborators · invite up to 4 more',
+          control: editBtn,
+        },
+        {
+          label: 'Default release timezone',
+          control: valueText('Pacific Time'),
+        },
+      ];
+    case 'billing':
+      return [
+        {
+          label: 'Plan',
+          description: 'Free during reverse trial · 14 days left',
+          control: (
+            <button
+              type='button'
+              className='inline-flex items-center h-7 px-3 rounded-md text-[12px] font-medium bg-cyan-300 text-black hover:bg-cyan-200 transition-colors duration-150 ease-out'
+            >
+              Upgrade to Pro
+            </button>
+          ),
+        },
+        {
+          label: 'Payment method',
+          control: valueText('—'),
+        },
+        {
+          label: 'Invoices',
+          description: 'Receipts for any past charges',
+          control: editBtn,
+        },
+      ];
+    case 'channels':
+      return [
+        {
+          label: 'Spotify for Artists',
+          description: 'Auto-pitch playlists, push Canvas, sync streams',
+          control: (
+            <span className='inline-flex items-center gap-1.5 h-6 px-2 rounded text-[10.5px] uppercase tracking-[0.06em] text-tertiary-token bg-(--surface-1)/60 border border-(--linear-app-shell-border)'>
+              <span className='h-1.5 w-1.5 rounded-full bg-cyan-300/80' />
+              Connected
+            </span>
+          ),
+        },
+        {
+          label: 'Apple Music for Artists',
+          description: 'Pull listener insights, schedule promo content',
+          control: (
+            <button
+              type='button'
+              className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-150 ease-out'
+            >
+              Connect
+            </button>
+          ),
+        },
+        {
+          label: 'Instagram + TikTok',
+          description: 'Cross-post reels and lyric clips from the library',
+          control: (
+            <button
+              type='button'
+              className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-150 ease-out'
+            >
+              Connect
+            </button>
+          ),
+        },
+      ];
+    case 'danger':
+      return [
+        {
+          label: 'Reset workspace',
+          description: 'Wipe all releases, tracks, and tasks. Cannot undo.',
+          control: (
+            <button
+              type='button'
+              className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-rose-300/90 hover:text-rose-200 border border-rose-500/30 bg-(--surface-0) hover:bg-rose-500/10 transition-colors duration-150 ease-out'
+            >
+              Reset workspace
+            </button>
+          ),
+          tone: 'danger',
+        },
+        {
+          label: 'Delete account',
+          description: 'Permanently delete your Jovie account. Cannot undo.',
+          control: (
+            <button
+              type='button'
+              className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-rose-300/90 hover:text-rose-200 border border-rose-500/30 bg-(--surface-0) hover:bg-rose-500/10 transition-colors duration-150 ease-out'
+            >
+              Delete account
+            </button>
+          ),
+          tone: 'danger',
+        },
+      ];
+    default:
+      return [];
+  }
 }
 
 function ReleasesView({
