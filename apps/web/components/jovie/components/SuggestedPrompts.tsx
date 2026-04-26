@@ -136,8 +136,11 @@ export function SuggestedPrompts({
     FEEDBACK_SUGGESTION,
   ];
 
+  // `inert` removes the subtree from the tab order AND blocks pointer events,
+  // so dimmed chips can't be reached by Tab/Shift+Tab while the slash picker
+  // is open. `aria-hidden` on the wrapper hides them from SR.
   const dimClass = dimmed
-    ? 'pointer-events-none opacity-0 transition-opacity duration-200 ease-out'
+    ? 'opacity-0 transition-opacity duration-200 ease-out'
     : 'opacity-100 transition-opacity duration-200 ease-out';
 
   if (layout === 'grid') {
@@ -151,6 +154,7 @@ export function SuggestedPrompts({
       <div
         className={cn('mx-auto w-full max-w-[35rem]', dimClass)}
         aria-hidden={dimmed}
+        inert={dimmed}
         data-testid='suggested-prompts-grid'
       >
         <div className='grid grid-cols-[repeat(auto-fit,minmax(10.75rem,1fr))] gap-2'>
@@ -189,6 +193,7 @@ export function SuggestedPrompts({
           dimClass
         )}
         aria-hidden={dimmed}
+        inert={dimmed}
         data-testid='suggested-prompts-flat'
       >
         {allSuggestions.map(suggestion => {
@@ -216,7 +221,11 @@ export function SuggestedPrompts({
   }
 
   return (
-    <div className={cn('w-full max-w-[46rem]', dimClass)} aria-hidden={dimmed}>
+    <div
+      className={cn('w-full max-w-[46rem]', dimClass)}
+      aria-hidden={dimmed}
+      inert={dimmed}
+    >
       <div
         className={cn(
           CHAT_PROMPT_RAIL_SCROLL_CLASS,
