@@ -130,7 +130,7 @@ export function RightDrawer({
           'border-l border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)',
           'shadow-[var(--linear-app-drawer-shadow)]',
           'pb-[env(safe-area-inset-bottom)]',
-          'transition-transform duration-300 ease-out',
+          'transition-transform duration-cinematic ease-cinematic',
           isOpen ? 'translate-x-0' : 'translate-x-full pointer-events-none',
           className
         )}
@@ -152,7 +152,7 @@ export function RightDrawer({
         'z-10 shrink-0 h-full min-h-0 flex flex-col',
         'outline-none focus:outline-none focus:ring-0',
         hasHydrated
-          ? 'transition-[width,opacity] duration-300 ease-out'
+          ? 'transition-[width,opacity] duration-cinematic ease-cinematic'
           : 'transition-none',
         'overflow-hidden',
         isOpen
