@@ -62,7 +62,6 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleDashed,
-  CircleDot,
   Circle as CircleIcon,
   CircleSlash,
   Copy,
@@ -8619,57 +8618,47 @@ function TaskListItem({
       onContextMenu={e => onContextMenu?.(e, task)}
       data-focused={isFocused || isSelected || undefined}
       className={cn(
-        'group/row relative flex items-center gap-3 h-[44px] px-2 rounded-md cursor-pointer transition-colors duration-150 ease-out',
+        'group/row relative flex items-start gap-3 py-2 pl-2 pr-3 rounded-md cursor-pointer transition-colors duration-150 ease-out',
         !isFocused && !isSelected && 'hover:bg-surface-1/40',
         SELECTED_ROW_CLASSES
       )}
     >
-      <div className='shrink-0'>
-        <StatusIcon status={task.status} />
+      <div className='shrink-0 pt-0.5'>
+        <StatusIcon
+          status={task.status}
+          agentRunning={
+            task.assignee === 'jovie' && task.status === 'in_progress'
+          }
+        />
       </div>
-      <div className='flex-1 min-w-0'>
+      <div className='flex-1 min-w-0 flex flex-col gap-1'>
+        {/* Title — full width, no right-side icons stealing space. */}
+        <span
+          className={cn(
+            'truncate text-[12.5px] font-caption tracking-[-0.012em]',
+            task.status === 'done' || task.status === 'cancelled'
+              ? 'text-tertiary-token line-through decoration-quaternary-token/50'
+              : 'text-primary-token'
+          )}
+        >
+          {onOpenRelease
+            ? renderWithEntities(task.title, RELEASES, onOpenRelease)
+            : task.title}
+        </span>
+        {/* Meta row — due date + label pills on the left, priority +
+            assignee on the right. Equal vertical position across
+            every task so columns feel anchored. */}
         <div className='flex items-center gap-2 min-w-0'>
-          <span
-            className={cn(
-              'truncate text-[12.5px] font-caption tracking-[-0.012em]',
-              task.status === 'done' || task.status === 'cancelled'
-                ? 'text-tertiary-token line-through decoration-quaternary-token/50'
-                : 'text-primary-token'
-            )}
-          >
-            {onOpenRelease
-              ? renderWithEntities(task.title, RELEASES, onOpenRelease)
-              : task.title}
+          {task.dueIso && (
+            <DueChip dueIso={task.dueIso} muted={task.status === 'done'} />
+          )}
+          {task.labels.length > 0 && <LabelPills labels={task.labels} />}
+          <span className='ml-auto inline-flex items-center gap-2 shrink-0'>
+            <PriorityGlyph priority={task.priority} />
+            <AssigneeChip assignee={task.assignee} />
           </span>
         </div>
-        {(task.dueIso || task.labels.length > 0) && (
-          <div className='mt-0.5 flex items-center gap-2 text-[10.5px] text-quaternary-token/85 min-w-0'>
-            {/* Reserve a fixed-width slot for the date so weird-length
-                strings ("tomorrow" vs "in 2w" vs "5d ago") don't push
-                the labels around row to row. */}
-            <span
-              className={cn(
-                'tabular-nums shrink-0 inline-block w-[60px]',
-                task.dueIso && isDueSoon(task.dueIso) && task.status !== 'done'
-                  ? 'text-amber-400/90'
-                  : 'text-tertiary-token'
-              )}
-            >
-              {task.dueIso ? relativeDate(task.dueIso) : ''}
-            </span>
-            {task.dueIso && task.labels.length > 0 && (
-              <span aria-hidden='true' className='text-quaternary-token/50'>
-                ·
-              </span>
-            )}
-            {task.labels.length > 0 && (
-              <span className='truncate'>{task.labels.join(' · ')}</span>
-            )}
-          </div>
-        )}
       </div>
-      <PriorityGlyph priority={task.priority} />
-      <AssigneeChip assignee={task.assignee} />
     </li>
   );
 }
@@ -8794,7 +8783,79 @@ function _DetailRow({
   );
 }
 
-function StatusIcon({ status }: { status: TaskStatus }) {
+// "Due in 3d" / "Due tomorrow" / "Due today" / "Due 5d ago" — full
+// phrasing instead of a bare "in 3d" so the row reads like English.
+// Soon-due tasks (≤ 2 days) get an amber tone to signal urgency.
+function DueChip({ dueIso, muted }: { dueIso: string; muted?: boolean }) {
+  const ms = new Date(dueIso).getTime() - new Date('2026-04-25').getTime();
+  const days = Math.round(ms / 86400000);
+  let label: string;
+  if (days === 0) label = 'Due today';
+  else if (days === 1) label = 'Due tomorrow';
+  else if (days === -1) label = 'Due yesterday';
+  else if (days > 0)
+    label = `Due in ${days < 7 ? `${days}d` : `${Math.round(days / 7)}w`}`;
+  else
+    label = `Due ${Math.abs(days) < 7 ? `${Math.abs(days)}d` : `${Math.round(Math.abs(days) / 7)}w`} ago`;
+  const soon = !muted && days >= 0 && days <= 2;
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center h-[18px] px-1.5 rounded text-[10px] font-caption uppercase tracking-[0.04em] whitespace-nowrap shrink-0 tabular-nums',
+        muted
+          ? 'text-quaternary-token/70'
+          : soon
+            ? 'text-amber-300/90'
+            : 'text-tertiary-token'
+      )}
+    >
+      {label}
+    </span>
+  );
+}
+
+// Label badges. First label is always visible. ≥ 2 labels collapse the
+// rest into a "+N" chip that swaps to the full set on hover.
+function LabelPills({ labels }: { labels: string[] }) {
+  const first = labels[0];
+  const rest = labels.slice(1);
+  return (
+    <div className='group/labels flex items-center gap-1 min-w-0'>
+      <LabelPill>{first}</LabelPill>
+      {rest.length > 0 && (
+        <>
+          <span
+            className='inline-flex items-center h-[18px] px-1.5 rounded text-[10px] font-caption text-quaternary-token bg-(--surface-1)/60 border border-(--linear-app-shell-border)/50 group-hover/labels:hidden'
+            aria-hidden='true'
+          >
+            +{rest.length}
+          </span>
+          {rest.map(l => (
+            <span key={l} className='hidden group-hover/labels:inline-flex'>
+              <LabelPill>{l}</LabelPill>
+            </span>
+          ))}
+        </>
+      )}
+    </div>
+  );
+}
+
+function LabelPill({ children }: { children: React.ReactNode }) {
+  return (
+    <span className='inline-flex items-center h-[18px] px-1.5 rounded text-[10px] font-caption text-tertiary-token bg-(--surface-1)/40 border border-(--linear-app-shell-border)/50 whitespace-nowrap'>
+      {children}
+    </span>
+  );
+}
+
+function StatusIcon({
+  status,
+  agentRunning,
+}: {
+  status: TaskStatus;
+  agentRunning?: boolean;
+}) {
   switch (status) {
     case 'backlog':
       return (
@@ -8811,8 +8872,32 @@ function StatusIcon({ status }: { status: TaskStatus }) {
         />
       );
     case 'in_progress':
+      // Half-filled circle: left half solid cyan, right half dotted
+      // outline. When an agent is actively running the task we add a
+      // subtle pulse so the row reads as "live".
       return (
-        <CircleDot className='h-3.5 w-3.5 text-cyan-400' strokeWidth={2.25} />
+        <svg
+          viewBox='0 0 14 14'
+          className={cn(
+            'h-3.5 w-3.5 text-cyan-400',
+            agentRunning && 'animate-pulse'
+          )}
+          aria-label={
+            agentRunning ? 'In progress, agent running' : 'In progress'
+          }
+          role='img'
+        >
+          <title>In progress</title>
+          <path d='M7 1 A6 6 0 0 0 7 13 Z' fill='currentColor' />
+          <path
+            d='M7 1 A6 6 0 0 1 7 13'
+            fill='none'
+            stroke='currentColor'
+            strokeWidth={1.5}
+            strokeDasharray='1.5 1.7'
+            strokeLinecap='round'
+          />
+        </svg>
       );
     case 'done':
       return (
