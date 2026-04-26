@@ -32,7 +32,7 @@ const copyTargets = [
   },
 ];
 
-const standaloneRuntimePackages = ['@swc/helpers'];
+const standaloneRuntimePackages = ['@next/env', '@swc/helpers'];
 
 if (!existsSync(standaloneRoot)) {
   throw new Error(
