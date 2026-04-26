@@ -90,6 +90,62 @@ type TrackInfo = {
   version: string;
 };
 
+// Live-editable palette. The page wrapper writes these as CSS custom
+// properties so the dev picker can mutate them in real time.
+type Palette = {
+  page: string;
+  surface0: string;
+  surface1: string;
+  surface2: string;
+  contentSurface: string;
+  border: string;
+};
+const PALETTE_PRESETS: Record<string, Palette> = {
+  'Cool Black': {
+    page: '#08090b',
+    surface0: '#0c0e11',
+    surface1: '#13161b',
+    surface2: '#191d23',
+    contentSurface: '#0d0f13',
+    border: '#1a1d23',
+  },
+  Carbon: {
+    page: '#06070a',
+    surface0: '#0a0b0e',
+    surface1: '#101216',
+    surface2: '#161a20',
+    contentSurface: '#0a0c0f',
+    border: '#171a20',
+  },
+  Obsidian: {
+    // Inkier than Carbon, a touch more blue at the elevated surfaces.
+    page: '#04060a',
+    surface0: '#080a0f',
+    surface1: '#0d1118',
+    surface2: '#131822',
+    contentSurface: '#070a10',
+    border: '#141823',
+  },
+  Graphite: {
+    // Slightly lighter / more readable while staying cool.
+    page: '#0a0c0f',
+    surface0: '#0e1115',
+    surface1: '#161a20',
+    surface2: '#1d2229',
+    contentSurface: '#0f1216',
+    border: '#1d2128',
+  },
+  Slate: {
+    // Mid-cool — same family as Cool Black with a hair more saturation.
+    page: '#070a0e',
+    surface0: '#0a0d12',
+    surface1: '#11151c',
+    surface2: '#171c25',
+    contentSurface: '#0b0e14',
+    border: '#181d26',
+  },
+};
+
 // Most transitions snap (150ms ease-out). Layout transformations get
 // a cinematic curve — the kind of thing you only get on macOS / Apple
 // surfaces, where the system invests motion budget in revealing structure.
@@ -842,6 +898,9 @@ export default function ShellV1Experiment() {
   const [currentTimeSec, setCurrentTimeSec] = useState(78);
   // Push-to-talk Jovie: hold ⌘J anywhere to dictate. Mock for the design pass.
   const [jovieListening, setJovieListening] = useState(false);
+  const [palette, setPalette] = useState<Palette>(
+    PALETTE_PRESETS['Cool Black']
+  );
   // Search state lives at the page level so click-artist / click-title in
   // any view can populate it and open the breadcrumb-takeover.
   const [searchOpen, setSearchOpen] = useState(false);
@@ -963,18 +1022,17 @@ export default function ShellV1Experiment() {
       // Keep the change tiny — only a few units of hue + a touch more density.
       style={
         {
-          // Near-neutral cool grays. Tiny blue lift only — read as black at
-          // first glance; "electric" only via the cyan accent on selection.
-          '--linear-bg-page': '#08090b',
-          '--linear-bg-surface-0': '#0c0e11',
-          '--linear-bg-surface-1': '#13161b',
-          '--linear-bg-surface-2': '#191d23',
-          '--linear-app-content-surface': '#0d0f13',
-          '--linear-app-shell-border': '#1a1d23',
+          // Live-editable palette tokens (controlled by the dev picker).
+          '--linear-bg-page': palette.page,
+          '--linear-bg-surface-0': palette.surface0,
+          '--linear-bg-surface-1': palette.surface1,
+          '--linear-bg-surface-2': palette.surface2,
+          '--linear-app-content-surface': palette.contentSurface,
+          '--linear-app-shell-border': palette.border,
           '--linear-app-shell-radius': '12px',
           opacity: mounted ? 1 : 0,
           transform: mounted ? 'scale(1)' : 'scale(0.985)',
-          transition: `opacity 600ms ${EASE_CINEMATIC}, transform 600ms ${EASE_CINEMATIC}`,
+          transition: `opacity 600ms ${EASE_CINEMATIC}, transform 600ms ${EASE_CINEMATIC}, background-color 200ms ease-out`,
         } as React.CSSProperties
       }
       className='flex h-dvh w-full overflow-hidden bg-(--linear-bg-page) lg:gap-2 lg:p-2'
@@ -1153,6 +1211,8 @@ export default function ShellV1Experiment() {
         onWaveform={() => setWaveformOn(v => !v)}
         view={view}
         onView={setView}
+        palette={palette}
+        onPalette={setPalette}
       />
 
       <JovieOverlay listening={jovieListening} />
@@ -2637,6 +2697,8 @@ function VariantPicker({
   onWaveform,
   view,
   onView,
+  palette,
+  onPalette,
 }: {
   variant: Variant;
   onVariant: (v: Variant) => void;
@@ -2648,6 +2710,8 @@ function VariantPicker({
   onWaveform: () => void;
   view: CanvasView;
   onView: (v: CanvasView) => void;
+  palette: Palette;
+  onPalette: (p: Palette) => void;
 }) {
   // Picker is dev-only chrome — start collapsed so it doesn't cover the
   // top-right corner of the actual UI being designed.
@@ -2751,6 +2815,78 @@ function VariantPicker({
           offLabel='Waveform off'
           shortcut='W'
         />
+      </div>
+      <PalettePanel palette={palette} onPalette={onPalette} />
+    </div>
+  );
+}
+
+function PalettePanel({
+  palette,
+  onPalette,
+}: {
+  palette: Palette;
+  onPalette: (p: Palette) => void;
+}) {
+  const tokens: Array<{ key: keyof Palette; label: string }> = [
+    { key: 'page', label: 'Page' },
+    { key: 'contentSurface', label: 'Canvas' },
+    { key: 'surface0', label: 'Surface 0' },
+    { key: 'surface1', label: 'Surface 1' },
+    { key: 'surface2', label: 'Surface 2' },
+    { key: 'border', label: 'Border' },
+  ];
+  return (
+    <div className='border-t border-subtle mt-2 pt-2 px-1'>
+      <p className='text-[10px] uppercase tracking-wider text-tertiary-token px-1 pb-1.5 font-semibold'>
+        Palette
+      </p>
+      <div className='flex flex-wrap gap-1 px-1 pb-2'>
+        {Object.keys(PALETTE_PRESETS).map(name => {
+          const isCurrent =
+            JSON.stringify(PALETTE_PRESETS[name]) === JSON.stringify(palette);
+          return (
+            <button
+              key={name}
+              type='button'
+              onClick={() => onPalette(PALETTE_PRESETS[name])}
+              className={cn(
+                'h-5 px-1.5 rounded text-[10px] font-caption transition-colors duration-150 ease-out',
+                isCurrent
+                  ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
+                  : 'text-tertiary-token border border-(--linear-app-shell-border) hover:text-primary-token hover:bg-surface-1'
+              )}
+            >
+              {name}
+            </button>
+          );
+        })}
+      </div>
+      <div className='space-y-1 px-1 pb-1'>
+        {tokens.map(t => (
+          <div key={t.key} className='flex items-center gap-2'>
+            <label className='flex items-center gap-2 cursor-pointer flex-1 min-w-0'>
+              <input
+                type='color'
+                value={palette[t.key]}
+                onChange={e =>
+                  onPalette({ ...palette, [t.key]: e.target.value })
+                }
+                className='h-5 w-5 rounded border border-(--linear-app-shell-border) bg-transparent cursor-pointer shrink-0 [appearance:none] [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded [&::-webkit-color-swatch]:border-none'
+              />
+              <span className='text-[11px] text-secondary-token flex-1 min-w-0 truncate'>
+                {t.label}
+              </span>
+            </label>
+            <input
+              type='text'
+              value={palette[t.key]}
+              onChange={e => onPalette({ ...palette, [t.key]: e.target.value })}
+              className='w-[70px] shrink-0 h-5 px-1.5 rounded text-[10px] tabular-nums text-tertiary-token bg-surface-1 border border-(--linear-app-shell-border) outline-none focus:text-primary-token focus:border-cyan-500/40'
+              spellCheck={false}
+            />
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -4182,12 +4318,36 @@ function TracksView({
     return sortDir === 'asc' ? arr : arr.reverse();
   }, [filtered, sortBy, sortDir, keyMode]);
 
+  // While the user is keyboard-navigating, suppress competing highlights
+  // (the playing-row indicator) so focus is the only visual signal.
+  // Mouse movement re-enables them; arrow-key activity restarts the timer.
+  const [keyboardNav, setKeyboardNav] = useState(false);
+  const kbTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function bumpKeyboardNav() {
+    setKeyboardNav(true);
+    if (kbTimer.current) clearTimeout(kbTimer.current);
+    kbTimer.current = setTimeout(() => setKeyboardNav(false), 1500);
+  }
+  useEffect(() => {
+    function onMouse() {
+      if (kbTimer.current) clearTimeout(kbTimer.current);
+      setKeyboardNav(false);
+    }
+    window.addEventListener('mousemove', onMouse);
+    return () => {
+      window.removeEventListener('mousemove', onMouse);
+      if (kbTimer.current) clearTimeout(kbTimer.current);
+    };
+  }, []);
+
   function handleKey(e: React.KeyboardEvent) {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
+      bumpKeyboardNav();
       setFocusedIndex(i => Math.min(sorted.length - 1, i + 1));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
+      bumpKeyboardNav();
       setFocusedIndex(i => Math.max(0, i - 1));
     } else if (e.code === 'Space') {
       e.preventDefault();
@@ -4275,6 +4435,7 @@ function TracksView({
               isPlaying={t.id === playingId && isPlaying}
               isCurrentTrack={t.id === playingId}
               isFocused={i === focusedIndex}
+              muteHighlight={keyboardNav && i !== focusedIndex}
               currentTimeSec={t.id === playingId ? currentTimeSec : 0}
               keyMode={keyMode}
               onSelect={() => setFocusedIndex(i)}
@@ -4306,6 +4467,7 @@ function TrackRow({
   isPlaying,
   isCurrentTrack,
   isFocused,
+  muteHighlight,
   currentTimeSec,
   keyMode,
   onSelect,
@@ -4318,6 +4480,7 @@ function TrackRow({
   isPlaying: boolean;
   isCurrentTrack: boolean;
   isFocused: boolean;
+  muteHighlight: boolean;
   currentTimeSec: number;
   keyMode: 'normal' | 'camelot';
   onSelect: () => void;
@@ -4325,6 +4488,9 @@ function TrackRow({
   onSeek: (sec: number) => void;
   onFilter: (field: 'artist' | 'title' | 'album', value: string) => void;
 }) {
+  // While the user is keyboard-navigating other rows, mute the now-playing
+  // signals here so focus is the only competing visual.
+  const showPlayingBars = isPlaying && !muteHighlight;
   return (
     // biome-ignore lint/a11y/noNoninteractiveElementInteractions: parent section delegates ↑/↓/Space; row click is a focus convenience
     // biome-ignore lint/a11y/useKeyWithClickEvents: same
@@ -4342,13 +4508,13 @@ function TrackRow({
         <span
           className={cn(
             'text-[11px] tabular-nums text-quaternary-token transition-opacity duration-150 ease-out',
-            (isCurrentTrack || isPlaying) && 'opacity-0',
+            showPlayingBars && 'opacity-0',
             !isCurrentTrack && 'group-hover/row:opacity-0'
           )}
         >
           {index}
         </span>
-        {isPlaying && <PlayingBars />}
+        {showPlayingBars && <PlayingBars />}
         <button
           type='button'
           onClick={e => {
