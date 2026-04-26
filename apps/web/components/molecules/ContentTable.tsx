@@ -3,7 +3,7 @@ import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { cn } from '@/lib/utils';
 
 export const CONTENT_TABLE_WRAPPER_CLASS = 'overflow-x-auto px-4 py-4 sm:px-6';
-export const CONTENT_TABLE_CLASS = 'w-full text-[12px] text-secondary-token';
+export const CONTENT_TABLE_CLASS = 'w-full text-xs text-secondary-token';
 export const CONTENT_TABLE_HEAD_ROW_CLASS = 'border-b border-subtle text-left';
 export const CONTENT_TABLE_HEAD_CELL_CLASS =
   'pb-2 pr-3 text-2xs font-semibold tracking-[0.01em] text-tertiary-token';
@@ -58,7 +58,7 @@ export function ContentTableStateRow({
             <span className='sr-only'>{loadingLabel}</span>
           </output>
         ) : (
-          <p className='text-[12px] leading-[18px] text-secondary-token'>
+          <p className='text-xs leading-[18px] text-secondary-token'>
             {emptyMessage}
           </p>
         )}

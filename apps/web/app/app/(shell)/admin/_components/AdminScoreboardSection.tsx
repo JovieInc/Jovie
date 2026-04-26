@@ -44,9 +44,7 @@ function HeroMetric({ label, value, ariaLabel, subtitle }: HeroMetricProps) {
       <p className='text-[36px] font-bold leading-none tracking-[-0.03em] text-primary-token tabular-nums'>
         {value}
       </p>
-      <p className='mt-1.5 text-[13px] font-book text-tertiary-token'>
-        {label}
-      </p>
+      <p className='mt-1.5 text-app font-book text-tertiary-token'>{label}</p>
       {subtitle}
     </section>
   );
@@ -74,11 +72,11 @@ function FunnelStep({
         />
       )}
       <li className='min-w-[100px] shrink-0 list-none'>
-        <p className='text-[11px] font-semibold text-tertiary-token'>{label}</p>
+        <p className='text-2xs font-semibold text-tertiary-token'>{label}</p>
         <p className='text-[24px] font-[620] leading-none tracking-[-0.028em] text-primary-token tabular-nums'>
           {count.toLocaleString('en-US')}
         </p>
-        <p className='mt-0.5 text-[12px] text-tertiary-token'>
+        <p className='mt-0.5 text-xs text-tertiary-token'>
           {conversionRate === null ? '\u2014' : formatPercent(conversionRate)}
         </p>
       </li>
@@ -158,9 +156,7 @@ export async function AdminScoreboardSection() {
           value={wowGrowth.label}
           ariaLabel={`Week over week growth: ${wowGrowth.label}`}
           subtitle={
-            <p
-              className={`mt-0.5 text-[13px] font-book ${wowGrowth.className}`}
-            >
+            <p className={`mt-0.5 text-app font-book ${wowGrowth.className}`}>
               {wowGrowth.label === '\u2014' ? '' : 'vs. prior week'}
             </p>
           }
@@ -169,7 +165,7 @@ export async function AdminScoreboardSection() {
 
       {/* Error state */}
       {metrics.errors.length > 0 && (
-        <p className='text-[12px] text-secondary-token'>
+        <p className='text-xs text-secondary-token'>
           {metrics.errors.join(' \u2014 ')}
         </p>
       )}
@@ -184,9 +180,7 @@ export async function AdminScoreboardSection() {
         />
         <div className='px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
           {isEmpty ? (
-            <p className='text-[13px] text-secondary-token'>
-              No funnel data yet
-            </p>
+            <p className='text-app text-secondary-token'>No funnel data yet</p>
           ) : (
             <ul className='flex items-center gap-3 overflow-x-auto'>
               {funnelSteps.map((step, i) => (

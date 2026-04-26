@@ -41,7 +41,7 @@ export function ContentMetricStat({
       {subtitle ? (
         <p
           className={cn(
-            'text-[12px] leading-[17px] text-secondary-token',
+            'text-xs leading-[17px] text-secondary-token',
             subtitleClassName
           )}
         >
