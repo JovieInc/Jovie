@@ -108,7 +108,7 @@ export function DrawerAnalyticsSummaryCard({
 
           {state === 'error' ? (
             <div className='flex min-h-[72px] items-center'>
-              <p className='text-[12px] leading-[18px] tracking-[0.01em] text-secondary-token'>
+              <p className='text-xs leading-[18px] tracking-[0.01em] text-secondary-token'>
                 {errorMessage}
               </p>
             </div>
@@ -124,7 +124,7 @@ export function DrawerAnalyticsSummaryCard({
 
           {state === 'ready' && metrics.length === 0 && emptyMessage ? (
             <div className='flex min-h-[72px] items-center'>
-              <p className='text-[12px] leading-[18px] tracking-[0.01em] text-secondary-token'>
+              <p className='text-xs leading-[18px] tracking-[0.01em] text-secondary-token'>
                 {emptyMessage}
               </p>
             </div>
