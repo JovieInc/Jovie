@@ -1390,6 +1390,62 @@ export default function ShellV1Experiment() {
     ]);
   };
 
+  // Drawer overflow menu — same shape as the row context menu, plus a
+  // Close item at the bottom (since the X button was merged into the
+  // overflow ellipsis).
+  const onDrawerMenu = (
+    e: React.MouseEvent<HTMLButtonElement>,
+    release: Release
+  ) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setContextMenu({
+      x: rect.right - 4,
+      y: rect.bottom + 6,
+      items: [
+        {
+          label: 'Play',
+          icon: Play,
+          shortcut: 'playPause',
+          onSelect: () => {
+            setPlayingReleaseId(release.id);
+            setIsPlaying(true);
+          },
+        },
+        {
+          label: 'Pin to top',
+          icon: Pin,
+          onSelect: noop(`pin ${release.id}`),
+        },
+        { kind: 'separator' },
+        {
+          label: 'Copy smart link',
+          icon: LinkIcon,
+          shortcut: '⌘L',
+          onSelect: noop(`copy link ${release.id}`),
+        },
+        {
+          label: 'Duplicate',
+          icon: Copy,
+          shortcut: '⌘D',
+          onSelect: noop(`duplicate ${release.id}`),
+        },
+        {
+          label: 'Archive',
+          icon: Archive,
+          tone: 'danger',
+          onSelect: noop(`archive ${release.id}`),
+        },
+        { kind: 'separator' },
+        {
+          label: 'Close drawer',
+          icon: X,
+          shortcut: 'closeOverlay',
+          onSelect: () => setSelectedReleaseId(null),
+        },
+      ],
+    });
+  };
+
   const onTrackContextMenu = (e: React.MouseEvent, track: Track) => {
     openContextMenu(e, [
       {
@@ -1691,6 +1747,25 @@ export default function ShellV1Experiment() {
           outline: 1.5px solid rgba(103, 232, 249, 0.45);
           outline-offset: 1px;
         }
+        /* Calm-breath: replaces animate-pulse + animate-ping for ambient
+           "Jovie is working" affordances. Slower (3.6s vs 2s), narrower
+           opacity range (0.85↔0.55 vs 0.5↔1), and the halo never fully
+           expands so peripheral motion stays subliminal instead of
+           pulling focus. */
+        @keyframes calm-breath {
+          0%, 100% { opacity: 0.9; }
+          50% { opacity: 0.55; }
+        }
+        @keyframes calm-halo {
+          0% { transform: scale(0.95); opacity: 0.45; }
+          100% { transform: scale(1.35); opacity: 0; }
+        }
+        .anim-calm-breath {
+          animation: calm-breath 3.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        .anim-calm-halo {
+          animation: calm-halo 3.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
       `}</style>
       {/* Docked sidebar — always mounted; width + opacity animate so the
           canvas slides over smoothly when the user pins/unpins. Dims to 0
@@ -1847,17 +1922,8 @@ export default function ShellV1Experiment() {
               }
             />
           </div>
-          <div
-            className='flex-1 min-h-0 overflow-hidden grid'
-            style={{
-              gridTemplateColumns:
-                view === 'releases' && selectedReleaseId !== null
-                  ? '1fr 388px'
-                  : '1fr 0px',
-              transition: `grid-template-columns ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
-            }}
-          >
-            <div className='min-h-0 min-w-0 overflow-y-auto'>
+          <div className='relative flex-1 min-h-0 overflow-hidden flex'>
+            <div className='flex-1 min-h-0 min-w-0 overflow-y-auto'>
               {view === 'demo' ? (
                 <DemoContent />
               ) : view === 'releases' ? (
@@ -1976,24 +2042,44 @@ export default function ShellV1Experiment() {
                 />
               )}
             </div>
-            <ReleaseDrawer
-              release={
-                view === 'releases' && selectedReleaseId
-                  ? (RELEASES.find(r => r.id === selectedReleaseId) ?? null)
-                  : null
-              }
-              onClose={() => setSelectedReleaseId(null)}
-              onPlay={id => {
-                setPlayingReleaseId(id);
-                setIsPlaying(true);
+            {/* Drawer floats above the canvas — elevated, not pushed-aside.
+                Wrapper drives slide-in/out + drop shadow; inner drawer
+                handles its own opacity + slight translate. Pointer events
+                gate so the canvas is interactive while the drawer animates
+                away. */}
+            <div
+              aria-hidden={!(view === 'releases' && selectedReleaseId !== null)}
+              className='absolute inset-y-0 right-0 z-30 w-[412px] pointer-events-none'
+              style={{
+                transform:
+                  view === 'releases' && selectedReleaseId !== null
+                    ? 'translateX(0)'
+                    : 'translateX(calc(100% + 16px))',
+                transition: `transform ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
               }}
-              onSeek={(id, sec) => {
-                setPlayingReleaseId(id);
-                setCurrentTimeSec(sec);
-                setIsPlaying(true);
-              }}
-              onOpenTasks={() => setView('tasks')}
-            />
+            >
+              <div className='h-full pointer-events-auto shadow-[0_24px_48px_-16px_rgba(0,0,0,0.55),-1px_0_0_0_rgba(255,255,255,0.04)]'>
+                <ReleaseDrawer
+                  release={
+                    view === 'releases' && selectedReleaseId
+                      ? (RELEASES.find(r => r.id === selectedReleaseId) ?? null)
+                      : null
+                  }
+                  onClose={() => setSelectedReleaseId(null)}
+                  onPlay={id => {
+                    setPlayingReleaseId(id);
+                    setIsPlaying(true);
+                  }}
+                  onSeek={(id, sec) => {
+                    setPlayingReleaseId(id);
+                    setCurrentTimeSec(sec);
+                    setIsPlaying(true);
+                  }}
+                  onOpenTasks={() => setView('tasks')}
+                  onMenu={onDrawerMenu}
+                />
+              </div>
+            </div>
           </div>
         </main>
 
@@ -2788,7 +2874,7 @@ function SidebarThreadsSection({
                   className={cn(
                     'h-1.5 w-1.5 rounded-full shrink-0',
                     t.status === 'running'
-                      ? 'bg-cyan-300/85 animate-pulse'
+                      ? 'bg-cyan-300/85 anim-calm-breath'
                       : t.status === 'errored'
                         ? 'bg-rose-400/85'
                         : unread
@@ -5212,7 +5298,7 @@ function JovieOverlay({ listening }: { listening: boolean }) {
           <Mic className='h-3.5 w-3.5' strokeWidth={2.5} />
           <span
             aria-hidden='true'
-            className='absolute inset-0 rounded-full ring-2 ring-primary/40 animate-ping'
+            className='absolute inset-0 rounded-full ring-2 ring-primary/40 anim-calm-halo'
           />
         </span>
         <div className='flex-1 min-w-0'>
@@ -5228,7 +5314,7 @@ function JovieOverlay({ listening }: { listening: boolean }) {
           {[0, 1, 2, 3, 4].map(i => (
             <span
               key={i}
-              className='w-[2px] bg-primary-token rounded-sm animate-pulse'
+              className='w-[2px] bg-primary-token rounded-sm anim-calm-breath'
               style={{
                 height: `${30 + Math.abs(Math.sin(i * 1.7)) * 60}%`,
                 animationDelay: `${i * 90}ms`,
@@ -5946,7 +6032,7 @@ function EntityThreadGlyph({
         className='shrink-0 inline-flex items-center justify-center h-5 w-5 rounded text-cyan-300/85 hover:text-cyan-200 hover:bg-surface-1/60 transition-colors duration-150 ease-out'
       >
         <span className='relative inline-grid place-items-center h-3 w-3'>
-          <span className='absolute inset-0 rounded-full bg-cyan-300/30 animate-ping' />
+          <span className='absolute inset-0 rounded-full bg-cyan-300/30 anim-calm-halo' />
           <Sparkles className='relative h-3 w-3' strokeWidth={2.25} />
         </span>
         <span className='sr-only'>{thread.title}</span>
@@ -7322,7 +7408,7 @@ function AgentPulse() {
     <span
       aria-hidden='true'
       title='Agent working'
-      className='absolute inset-0 ring-1 ring-inset ring-primary-token/40 rounded animate-pulse pointer-events-none'
+      className='absolute inset-0 ring-1 ring-inset ring-primary-token/40 rounded anim-calm-breath pointer-events-none'
       style={{ animationDuration: '1600ms' }}
     />
   );
@@ -7417,12 +7503,14 @@ function ReleaseDrawer({
   onPlay,
   onSeek,
   onOpenTasks,
+  onMenu,
 }: {
   release: Release | null;
   onClose: () => void;
   onPlay?: (id: string) => void;
   onSeek?: (id: string, sec: number) => void;
   onOpenTasks?: () => void;
+  onMenu?: (e: React.MouseEvent<HTMLButtonElement>, r: Release) => void;
 }) {
   // Remember the last release so the slide-out can keep rendering content
   // while it's animating away (release becomes null right at close).
@@ -7459,7 +7547,12 @@ function ReleaseDrawer({
           callout, and the smart-link share row. Always visible. */}
       <div className='shrink-0 px-3 pt-3'>
         <div className='rounded-xl border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) shadow-[0_8px_24px_rgba(0,0,0,0.18)] overflow-hidden'>
-          <DrawerHero release={r} onClose={onClose} onPlay={onPlay} />
+          <DrawerHero
+            release={r}
+            onClose={onClose}
+            onPlay={onPlay}
+            onMenu={onMenu ? e => onMenu(e, r) : undefined}
+          />
         </div>
       </div>
 
@@ -7493,13 +7586,15 @@ function DrawerTabStrip({
   active: DrawerTab;
   onChange: (t: DrawerTab) => void;
 }) {
-  // Pill tabs sitting in a track. Active pill gets the surface fill;
-  // others stay flat. Tracks scrolls horizontally if the rail narrows.
+  // Pill tabs share the strip equally (flex-1) so the row reads as a
+  // proper segmented control. Active tab carries a brighter surface +
+  // a subtle ring for unmistakable selected state. Drops the bottom
+  // separator — the tab strip's own track is the divider.
   return (
-    <div className='shrink-0 px-2 pt-2 pb-2 border-b border-(--linear-app-shell-border)/60'>
+    <div className='shrink-0 px-2 pt-2 pb-2'>
       <div
         role='tablist'
-        className='inline-flex items-center gap-0.5 p-0.5 rounded-full bg-(--surface-0)/70 border border-(--linear-app-shell-border)/70'
+        className='flex items-center gap-0.5 p-0.5 rounded-full bg-(--surface-0)/70 border border-(--linear-app-shell-border)/70'
       >
         {tabs.map(t => {
           const on = active === t;
@@ -7511,9 +7606,9 @@ function DrawerTabStrip({
               aria-selected={on}
               onClick={() => onChange(t)}
               className={cn(
-                'h-7 px-3 rounded-full text-[11.5px] font-medium tracking-[-0.005em] transition-colors duration-150 ease-out',
+                'flex-1 h-7 px-3 rounded-full text-[11.5px] font-medium tracking-[-0.005em] transition-colors duration-150 ease-out',
                 on
-                  ? 'bg-(--surface-2) text-primary-token shadow-[0_1px_0_0_rgba(255,255,255,0.04)]'
+                  ? 'bg-(--surface-2) text-primary-token ring-1 ring-inset ring-white/10 shadow-[0_1px_0_0_rgba(255,255,255,0.05)]'
                   : 'text-tertiary-token hover:text-primary-token'
               )}
             >
@@ -7528,46 +7623,37 @@ function DrawerTabStrip({
 
 function DrawerHero({
   release,
-  onClose,
   onPlay,
+  onMenu,
 }: {
   release: Release;
   onClose: () => void;
   onPlay?: (id: string) => void;
+  onMenu?: (e: React.MouseEvent<HTMLButtonElement>) => void;
 }) {
   const status = statusFromRelease(release);
   const dropMeta = relativeDropMeta(release.releaseDate);
   return (
     <section className='group/drawer relative px-4 pt-4 pb-3'>
-      {/* Status pill + close + overflow live in the top-right corner so
-          they don't compete with the title. Status stays visible at all
-          times; close + overflow only show on hover for a calmer rest
-          state (Linear right-drawer pattern). */}
-      <div className='absolute right-3 top-3 flex items-center gap-1'>
+      {/* Status pill + single overflow menu in the top-right corner.
+          The menu owns Close (Esc still works); merging the X into the
+          menu cuts chrome and matches Linear's drawer pattern. */}
+      <div className='absolute right-3 top-3 flex items-center gap-1.5'>
         <StatusBadge status={status} />
-        <Tooltip label='More'>
+        <Tooltip label='Drawer actions'>
           <button
             type='button'
+            onClick={onMenu}
             className='h-6 w-6 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1/70 transition-colors duration-150 ease-out opacity-0 group-hover/drawer:opacity-100 focus-visible:opacity-100'
-            aria-label='More actions'
+            aria-label='Drawer actions'
+            aria-haspopup='menu'
           >
             <MoreHorizontal className='h-3.5 w-3.5' strokeWidth={2.25} />
-          </button>
-        </Tooltip>
-        <Tooltip label='Close' shortcut='closeOverlay'>
-          <button
-            type='button'
-            onClick={onClose}
-            className='h-6 w-6 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1/70 transition-colors duration-150 ease-out'
-            aria-label='Close drawer (Esc)'
-          >
-            <X className='h-3.5 w-3.5' strokeWidth={2.25} />
           </button>
         </Tooltip>
       </div>
 
       <div className='flex items-start gap-3'>
-        {/* Hover-play overlay on the artwork — replaces the action row. */}
         <button
           type='button'
           onClick={() => onPlay?.(release.id)}
@@ -7610,8 +7696,8 @@ function DrawerHero({
         </div>
       </div>
 
-      {/* Smart link — copy + open. Sits inside the hero card so the
-          most-shared affordance is one move from any drawer state. */}
+      {/* Smart link — copy + open. Pill-shaped to match the input language
+          and reinforce the share-this affordance. */}
       <div className='mt-4'>
         <DrawerSmartLinkRow release={release} />
       </div>
@@ -7673,7 +7759,7 @@ function DrawerSmartLinkRow({ release }: { release: Release }) {
   const [copied, setCopied] = useState(false);
   const url = `jov.ie/${release.artist.toLowerCase().replace(/\s+/g, '-')}/${release.id}`;
   return (
-    <div className='flex items-center gap-1.5 h-7 pl-2 pr-1 rounded-md border border-(--linear-app-shell-border) bg-(--surface-0)/60 text-[11.5px] text-tertiary-token'>
+    <div className='flex items-center gap-1.5 h-7 pl-3 pr-1 rounded-full border border-(--linear-app-shell-border) bg-(--surface-0)/60 text-[11.5px] text-tertiary-token'>
       <LinkIcon
         className='h-3 w-3 text-quaternary-token shrink-0'
         strokeWidth={2.25}
@@ -8130,7 +8216,7 @@ function ActivityHoverRow({
       />
       <span className='flex-1 text-left truncate'>{label}</span>
       {running && (
-        <span className='h-1.5 w-1.5 rounded-full bg-cyan-300/80 animate-pulse' />
+        <span className='h-1.5 w-1.5 rounded-full bg-cyan-300/80 anim-calm-breath' />
       )}
       <span className='text-[10.5px] uppercase tracking-[0.06em] text-quaternary-token group-hover/act:text-tertiary-token transition-colors duration-150 ease-out'>
         {meta}
@@ -8141,8 +8227,10 @@ function ActivityHoverRow({
 
 // Details tab — heavy metadata pane. Power users live here when they
 // need to edit. Uses a calm dl/dt/dd layout with inline-edit hover hint.
+// Hover row → cursor:pointer + pencil icon. Click or double-click → edit
+// inline (mock for the design pass; production would persist).
 function DrawerDetailsTab({ release }: { release: Release }) {
-  const rows: Array<{ label: string; value: string }> = [
+  const rows: Array<{ label: string; value: string; readOnly?: boolean }> = [
     { label: 'Title', value: release.title },
     { label: 'Artist', value: release.artist },
     { label: 'Album', value: release.album },
@@ -8163,8 +8251,9 @@ function DrawerDetailsTab({ release }: { release: Release }) {
       value: `${Math.floor(release.durationSec / 60)}:${String(
         release.durationSec % 60
       ).padStart(2, '0')}`,
+      readOnly: true,
     },
-    { label: 'ID', value: release.id },
+    { label: 'ID', value: release.id, readOnly: true },
   ];
   return (
     <div className='px-4 py-4'>
@@ -8173,31 +8262,103 @@ function DrawerDetailsTab({ release }: { release: Release }) {
       </p>
       <dl className='flex flex-col -mx-2'>
         {rows.map(row => (
-          <div
+          <DrawerDetailRow
             key={row.label}
-            className='group/row flex items-center gap-3 h-8 px-2 rounded-md hover:bg-surface-1/40 transition-colors duration-150 ease-out'
-          >
-            <dt className='w-[88px] shrink-0 text-[11px] text-quaternary-token'>
-              {row.label}
-            </dt>
-            <dd
-              className={cn(
-                'flex-1 min-w-0 text-[12.5px] text-secondary-token truncate',
-                row.label === 'Key' && 'font-mono tracking-wide',
-                (row.label === 'BPM' ||
-                  row.label === 'Length' ||
-                  row.label === 'ID') &&
-                  'tabular-nums'
-              )}
-            >
-              {row.value}
-            </dd>
-            <span className='text-[10px] uppercase tracking-[0.06em] text-quaternary-token opacity-0 group-hover/row:opacity-100 transition-opacity duration-150 ease-out'>
-              Edit
-            </span>
-          </div>
+            label={row.label}
+            value={row.value}
+            readOnly={row.readOnly}
+          />
         ))}
       </dl>
+    </div>
+  );
+}
+
+function DrawerDetailRow({
+  label,
+  value,
+  readOnly,
+}: {
+  label: string;
+  value: string;
+  readOnly?: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (editing) {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }
+  }, [editing]);
+  const enterEdit = () => {
+    if (readOnly) return;
+    setDraft(value);
+    setEditing(true);
+  };
+  const valueClass = cn(
+    'flex-1 min-w-0 text-[12.5px] text-secondary-token truncate',
+    label === 'Key' && 'font-mono tracking-wide',
+    (label === 'BPM' || label === 'Length' || label === 'ID') && 'tabular-nums'
+  );
+  if (editing) {
+    return (
+      <div className='flex items-center gap-3 h-8 px-2 rounded-md bg-surface-1/40'>
+        <dt className='w-[88px] shrink-0 text-[11px] text-quaternary-token'>
+          {label}
+        </dt>
+        <input
+          ref={inputRef}
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onBlur={() => setEditing(false)}
+          onKeyDown={e => {
+            if (e.key === 'Enter' || e.key === 'Escape') {
+              e.preventDefault();
+              setEditing(false);
+            }
+          }}
+          className={cn(
+            valueClass,
+            'bg-transparent outline-none border-b border-cyan-300/60 focus-visible:outline-none'
+          )}
+        />
+      </div>
+    );
+  }
+  return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: row is a click + double-click affordance into an inline edit input rendered conditionally above
+    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: same — keyboard path is the edit pencil button
+    // biome-ignore lint/a11y/useKeyWithClickEvents: keyboard activation is on the inner pencil button (which is a real <button>)
+    <div
+      className={cn(
+        'group/row flex items-center gap-3 h-8 px-2 rounded-md transition-colors duration-150 ease-out',
+        readOnly
+          ? 'hover:bg-transparent'
+          : 'cursor-pointer hover:bg-surface-1/40'
+      )}
+      onClick={readOnly ? undefined : enterEdit}
+      onDoubleClick={readOnly ? undefined : enterEdit}
+      title={readOnly ? undefined : 'Click to edit'}
+    >
+      <dt className='w-[88px] shrink-0 text-[11px] text-quaternary-token'>
+        {label}
+      </dt>
+      <dd className={valueClass}>{value}</dd>
+      {!readOnly && (
+        <button
+          type='button'
+          onClick={e => {
+            e.stopPropagation();
+            enterEdit();
+          }}
+          aria-label={`Edit ${label}`}
+          className='shrink-0 inline-flex items-center justify-center h-5 w-5 rounded text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 transition-opacity duration-150 ease-out'
+        >
+          <Pencil className='h-3 w-3' strokeWidth={2.25} />
+        </button>
+      )}
     </div>
   );
 }
@@ -9256,7 +9417,7 @@ function StatusIcon({
           viewBox='0 0 14 14'
           className={cn(
             'h-3.5 w-3.5 text-cyan-400',
-            agentRunning && 'animate-pulse'
+            agentRunning && 'anim-calm-breath'
           )}
           aria-label={
             agentRunning ? 'In progress, agent running' : 'In progress'
