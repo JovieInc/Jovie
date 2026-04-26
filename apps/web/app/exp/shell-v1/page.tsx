@@ -2200,21 +2200,22 @@ export default function ShellV1Experiment() {
 
       <JovieOverlay listening={jovieListening} />
       <ShellLoader phase={loaderPhase} />
-      {/* ScreeningRoom restore button — appears bottom-right when in
-          cinematic mode. Click or Esc returns to chrome view. */}
+      {/* ScreeningRoom exit — single icon in the top-right corner.
+          Click or Esc returns to chrome view. No text, no extra
+          surface — just a dim X that brightens on hover. */}
       <button
         type='button'
         onClick={() => setView('demo')}
         aria-label='Exit screening room (Esc)'
-        className='fixed bottom-4 right-4 z-50 inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[11.5px] font-caption uppercase tracking-[0.06em] text-tertiary-token bg-(--linear-app-content-surface)/85 backdrop-blur-xl border border-(--linear-app-shell-border) hover:text-primary-token hover:bg-surface-1 transition-colors duration-150 ease-out'
+        title='Exit screening room (Esc)'
+        className='fixed top-4 right-4 z-50 h-7 w-7 grid place-items-center rounded-md text-quaternary-token hover:text-primary-token hover:bg-surface-1/70 transition-colors duration-150 ease-out'
         style={{
           opacity: cinematic ? 1 : 0,
           pointerEvents: cinematic ? 'auto' : 'none',
           transition: `opacity 600ms ${EASE_CINEMATIC}`,
         }}
       >
-        <X className='h-3 w-3' strokeWidth={2.25} />
-        Exit cinema
+        <X className='h-4 w-4' strokeWidth={2.25} />
       </button>
       <ContextMenuOverlay
         state={contextMenu}
@@ -10087,19 +10088,18 @@ function LyricsView({
 
 function LyricsHeader({
   track,
-  editing,
-  onToggleEdit,
-  onClear,
-  showEditToggle,
 }: {
   track: TrackInfo;
-  editing: boolean;
-  onToggleEdit: () => void;
+  // Accept the legacy props but ignore them — Clear + Edit buttons
+  // were dropped (Clear was a dev preview, Edit lived in the per-row
+  // hover affordance once we added inline editing).
+  editing?: boolean;
+  onToggleEdit?: () => void;
   onClear?: () => void;
-  showEditToggle: boolean;
+  showEditToggle?: boolean;
 }) {
   return (
-    <div className='shrink-0 sticky top-0 z-10 bg-(--linear-app-content-surface) px-4 pt-3 pb-2 flex items-center gap-3 select-none border-b border-(--linear-app-shell-border)/50'>
+    <div className='shrink-0 sticky top-0 z-10 bg-(--linear-app-content-surface) px-4 pt-3 pb-2 flex items-baseline gap-3 select-none'>
       <span className='text-[10px] uppercase tracking-[0.12em] font-medium text-quaternary-token/85'>
         Lyrics
       </span>
@@ -10109,35 +10109,6 @@ function LyricsHeader({
       <span className='text-[11px] text-tertiary-token truncate'>
         {track.artist}
       </span>
-      <div className='ml-auto flex items-center gap-1'>
-        {onClear && (
-          <button
-            type='button'
-            onClick={onClear}
-            className='hidden md:inline-flex h-7 px-2 rounded-md text-[10.5px] uppercase tracking-[0.08em] text-quaternary-token/85 hover:text-secondary-token hover:bg-surface-1 transition-colors duration-150 ease-out'
-            title='Clear lyrics (preview empty state)'
-          >
-            Clear
-          </button>
-        )}
-        {showEditToggle && (
-          <button
-            type='button'
-            onClick={onToggleEdit}
-            aria-pressed={editing}
-            className={cn(
-              'inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[11.5px] font-caption tracking-[-0.005em] transition-colors duration-150 ease-out',
-              editing
-                ? 'bg-cyan-500/10 text-cyan-300 border border-cyan-500/30'
-                : 'text-secondary-token border border-(--linear-app-shell-border) hover:text-primary-token hover:bg-surface-1'
-            )}
-            title={editing ? 'Done editing' : 'Edit lyric timings'}
-          >
-            <Pencil className='h-3 w-3' strokeWidth={2.25} />
-            {editing ? 'Done' : 'Edit'}
-          </button>
-        )}
-      </div>
     </div>
   );
 }
