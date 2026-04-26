@@ -15,13 +15,14 @@
   ],
   "workspaces": {
     ".": {
-      "entry": ["scripts/knowledge/fetch.ts"]
+      "entry": ["scripts/**/*.{ts,mjs}"]
     },
     "apps/web": {
       "entry": [
         "instrumentation.{ts,js}",
         "next.config.{js,ts}",
-        "sentry.*.config.ts"
+        "sentry.*.config.ts",
+        "scripts/**/*.{ts,mjs,js}"
       ],
       "project": ["**/*.{ts,tsx,js,jsx,mjs}"],
       "ignore": [
@@ -33,7 +34,6 @@
       ],
       "ignoreDependencies": [
         "tw-animate-css",
-        "@clerk/backend",
         "@radix-ui/react-alert-dialog",
         "@radix-ui/react-avatar",
         "@radix-ui/react-checkbox",
@@ -45,8 +45,7 @@
         "@radix-ui/react-toggle",
         "@radix-ui/react-toggle-group",
         "@radix-ui/react-tooltip",
-        "@sentry/node",
-        "recharts"
+        "@sentry/node"
       ],
       "playwright": {
         "config": [
@@ -92,7 +91,6 @@
     "packages/ui": {
       "entry": ["atoms/*.{ts,tsx}", "lib/*.ts", "theme/*.ts"],
       "project": ["**/*.{ts,tsx}"],
-      "ignoreDependencies": ["@vitest/coverage-v8"],
       "vitest": {
         "config": ["vitest.config.mts"],
         "entry": ["**/*.test.{ts,tsx}"]
