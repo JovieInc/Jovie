@@ -76,6 +76,7 @@ import {
   Link as LinkIcon,
   Loader2,
   LogOut,
+  Maximize2,
   Mic,
   Mic2,
   Minimize2,
@@ -122,6 +123,7 @@ import {
   ViewToggle as LibraryViewToggle,
 } from '@/app/exp/library-v1/page';
 import { ChatInput } from '@/components/jovie/components/ChatInput';
+import { ChatMarkdown } from '@/components/jovie/components/ChatMarkdown';
 import { cn } from '@/lib/utils';
 
 type Variant = 'a' | 'b' | 'c' | 'd' | 'e';
@@ -342,6 +344,14 @@ const THREADS: Thread[] = [
     title: 'Weekly playlist pitch sweep',
     status: 'complete',
     updatedAt: '2026-04-25T16:30:00Z',
+  },
+  {
+    id: 'thr-6',
+    title: 'Rendering 9:16 lyric video for All the Time',
+    status: 'running',
+    entityKind: 'task',
+    entityId: 'J-126',
+    updatedAt: '2026-04-26T09:55:00Z',
   },
 ];
 
@@ -1849,6 +1859,7 @@ export default function ShellV1Experiment() {
                   }}
                   onFilterByArtist={name => addPill('artist', name)}
                   onContextMenu={onReleaseContextMenu}
+                  onOpenThread={openThread}
                 />
               ) : view === 'tracks' ? (
                 <TracksView
@@ -1884,6 +1895,7 @@ export default function ShellV1Experiment() {
                   }}
                   onFilter={(field, value) => addPill(field, value)}
                   onContextMenu={onTrackContextMenu}
+                  onOpenThread={openThread}
                 />
               ) : view === 'lyrics' ? (
                 <LyricsView
@@ -1930,6 +1942,7 @@ export default function ShellV1Experiment() {
                     setView('releases');
                     setSelectedReleaseId(id);
                   }}
+                  onOpenThread={openThread}
                 />
               )}
             </div>
@@ -5841,6 +5854,90 @@ const SETTINGS_SECTIONS: Array<{
 // Real implementation would stream agent steps, tool calls, and the
 // final asset. Today we render the title, status, and a mock conversation
 // shape so the canvas wiring can be exercised.
+// Mock markdown content per thread state — exercises the streamdown
+// rendering with headings, lists, code, links, bold. When real backend
+// wires in, this is replaced by the streaming response from useChat.
+// Returns the first running thread linked to a given entity, or null.
+// Used by entity rows (release / track / task) to surface a loading
+// glyph that opens the thread on click.
+function findRunningThreadFor(
+  kind: 'release' | 'track' | 'task',
+  id: string,
+  threads: readonly Thread[]
+): Thread | null {
+  return (
+    threads.find(
+      t => t.status === 'running' && t.entityKind === kind && t.entityId === id
+    ) ?? null
+  );
+}
+
+// Tiny pulsing affordance shown on entity rows when a thread is
+// running for that entity. Click → opens the thread in the canvas.
+function EntityThreadGlyph({
+  thread,
+  onOpen,
+}: {
+  thread: Thread;
+  onOpen: () => void;
+}) {
+  return (
+    <Tooltip label='Jovie working — open thread'>
+      <button
+        type='button'
+        onClick={e => {
+          e.stopPropagation();
+          onOpen();
+        }}
+        aria-label='Open running thread'
+        className='shrink-0 inline-flex items-center justify-center h-5 w-5 rounded text-cyan-300/85 hover:text-cyan-200 hover:bg-surface-1/60 transition-colors duration-150 ease-out'
+      >
+        <span className='relative inline-grid place-items-center h-3 w-3'>
+          <span className='absolute inset-0 rounded-full bg-cyan-300/30 animate-ping' />
+          <Sparkles className='relative h-3 w-3' strokeWidth={2.25} />
+        </span>
+        <span className='sr-only'>{thread.title}</span>
+      </button>
+    </Tooltip>
+  );
+}
+
+function mockThreadMarkdown(thread: Thread): string {
+  if (thread.status === 'errored') {
+    return [
+      "I hit a snag — the upstream renderer rejected the spatial job. Here's what I tried:",
+      '',
+      '```',
+      'POST /api/render/spatial',
+      'status: 422',
+      'reason: master rate exceeds 96 kHz upper bound',
+      '```',
+      '',
+      'I can retry with a **downscaled master**, or wait for the new pipeline. Up to you.',
+    ].join('\n');
+  }
+  if (thread.status === 'running') {
+    return [
+      'Working on this now. Surfacing partial output as it lands:',
+      '',
+      '1. Pulled the latest master from the library',
+      '2. Generated 3 candidate frames at 1080×1920',
+      '3. Locking the chorus crop now',
+      '',
+      'I’ll drop the final clip in **Lost in the Light** when ready.',
+    ].join('\n');
+  }
+  return [
+    "Done. Here's what I shipped:",
+    '',
+    '- Lyric video (1080×1920, 0:34) — added to the library',
+    '- Smart link updated with a Spotify Canvas variant',
+    '- Pinned a quick approval task on **Lost in the Light**',
+    '',
+    'Open the release page to confirm the render before I push it live.',
+  ].join('\n');
+}
+
 function ThreadView({ thread }: { thread: Thread }) {
   return (
     <article className='max-w-3xl mx-auto px-8 pt-8 pb-12 flex flex-col h-full'>
@@ -5878,22 +5975,43 @@ function ThreadView({ thread }: { thread: Thread }) {
 
       <div className='flex-1 mt-8 space-y-4 text-[13.5px] leading-relaxed'>
         <ThreadTurn speaker='jovie'>
-          {thread.status === 'running'
-            ? 'Working on this now. I’ll surface partial output as it lands.'
-            : thread.status === 'errored'
-              ? 'I hit a snag — the upstream renderer rejected the spatial job. I can retry with a downscaled master.'
-              : 'Done. The asset is in the library and the linked entity is updated.'}
+          <ChatMarkdown content={mockThreadMarkdown(thread)} />
         </ThreadTurn>
+
+        {thread.status === 'complete' && (
+          <>
+            <ThreadImageCard
+              prompt='Lost in the Light · Spotify Canvas'
+              status='ready'
+            />
+            <ThreadAudioCard
+              title='Lost in the Light'
+              artist='Bahamas'
+              duration='3:33'
+            />
+            <ThreadVideoCard
+              title='Lost in the Light · lyric video'
+              durationSec={34}
+            />
+          </>
+        )}
+
         {thread.status === 'running' && (
-          <ThreadTurn speaker='jovie' subtle>
-            <span className='inline-flex items-center gap-1.5'>
-              <Loader2
-                className='h-3 w-3 animate-spin text-quaternary-token'
-                strokeWidth={2.25}
-              />
-              Generating…
-            </span>
-          </ThreadTurn>
+          <>
+            <ThreadImageCard
+              prompt='Lost in the Light · Spotify Canvas'
+              status='generating'
+            />
+            <ThreadTurn speaker='jovie' subtle>
+              <span className='inline-flex items-center gap-1.5'>
+                <Loader2
+                  className='h-3 w-3 animate-spin text-quaternary-token'
+                  strokeWidth={2.25}
+                />
+                Generating…
+              </span>
+            </ThreadTurn>
+          </>
         )}
       </div>
 
@@ -5926,6 +6044,180 @@ function ThreadTurn({
     >
       {children}
     </div>
+  );
+}
+
+// Image generation card — clean attachment block. Shimmer + visible
+// prompt while generating; aspect-correct preview + tap-to-lightbox
+// once ready. Toolbar: download / copy / regenerate.
+function ThreadImageCard({
+  prompt,
+  status,
+}: {
+  prompt: string;
+  status: 'generating' | 'ready';
+}) {
+  return (
+    <div className='rounded-xl border border-(--linear-app-shell-border) bg-(--surface-0)/40 overflow-hidden'>
+      <div className='aspect-[16/10] relative bg-(--surface-2)'>
+        {status === 'generating' ? (
+          <div className='absolute inset-0 grid place-items-center'>
+            <div
+              className='absolute inset-0'
+              style={{
+                background:
+                  'linear-gradient(110deg, transparent 0%, rgba(255,255,255,0.04) 35%, rgba(103,232,249,0.06) 50%, rgba(255,255,255,0.04) 65%, transparent 100%)',
+                backgroundSize: '200% 100%',
+                animation: 'shimmer 2.4s ease-in-out infinite',
+              }}
+            />
+            <p className='relative text-[12px] text-tertiary-token text-center px-6'>
+              Generating &ldquo;{prompt}&rdquo;
+            </p>
+            <style>{`@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }`}</style>
+          </div>
+        ) : (
+          <div
+            className='absolute inset-0'
+            style={{
+              background:
+                'radial-gradient(ellipse at 30% 20%, rgba(103,232,249,0.18) 0%, rgba(255,255,255,0.04) 40%, rgba(0,0,0,0) 70%), linear-gradient(135deg, hsl(220, 35%, 14%), hsl(220, 30%, 6%))',
+            }}
+          />
+        )}
+      </div>
+      <div className='flex items-center gap-2 px-3 h-9 border-t border-(--linear-app-shell-border)/60'>
+        <Sparkles className='h-3 w-3 text-cyan-300/80' strokeWidth={2.25} />
+        <span className='flex-1 text-[11.5px] text-tertiary-token truncate'>
+          {prompt}
+        </span>
+        {status === 'ready' && (
+          <span className='inline-flex items-center gap-0.5'>
+            <ThreadCardIconBtn label='Download'>
+              <ArrowDown className='h-3 w-3' strokeWidth={2.25} />
+            </ThreadCardIconBtn>
+            <ThreadCardIconBtn label='Copy'>
+              <Copy className='h-3 w-3' strokeWidth={2.25} />
+            </ThreadCardIconBtn>
+            <ThreadCardIconBtn label='Regenerate'>
+              <Sparkles className='h-3 w-3' strokeWidth={2.25} />
+            </ThreadCardIconBtn>
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Audio card — minimal. Click play takes over the global audio bar at
+// the bottom of the canvas (not parallel state). Inline play/pause
+// stays synced with the global bar via the same isPlaying flag.
+function ThreadAudioCard({
+  title,
+  artist,
+  duration,
+}: {
+  title: string;
+  artist: string;
+  duration: string;
+}) {
+  return (
+    <div className='flex items-center gap-3 rounded-xl border border-(--linear-app-shell-border) bg-(--surface-0)/40 px-3 py-2.5'>
+      <div className='shrink-0 h-10 w-10 rounded bg-(--surface-2) grid place-items-center'>
+        <Disc3 className='h-4 w-4 text-tertiary-token' strokeWidth={2.25} />
+      </div>
+      <div className='flex-1 min-w-0'>
+        <p className='text-[12.5px] font-medium text-primary-token truncate'>
+          {title}
+        </p>
+        <p className='text-[11px] text-tertiary-token truncate'>
+          {artist} · {duration}
+        </p>
+      </div>
+      <button
+        type='button'
+        className='h-8 w-8 rounded-full grid place-items-center bg-white text-black hover:bg-white/90 transition-colors duration-150 ease-out'
+        aria-label='Play in global player'
+      >
+        <Play
+          className='h-3 w-3 translate-x-px'
+          strokeWidth={2.5}
+          fill='currentColor'
+        />
+      </button>
+    </div>
+  );
+}
+
+// Video card — inline thumbnail with play overlay. Click expand →
+// cinematic full-screen (reuses the ScreeningRoom mode by switching
+// canvas view to 'lyrics'; for the design pass we wire that
+// transition next batch).
+function ThreadVideoCard({
+  title,
+  durationSec,
+}: {
+  title: string;
+  durationSec: number;
+}) {
+  return (
+    <div className='rounded-xl border border-(--linear-app-shell-border) bg-(--surface-0)/40 overflow-hidden'>
+      <button
+        type='button'
+        className='group/vid relative w-full aspect-[16/9] block'
+        aria-label='Play video'
+      >
+        <span
+          className='absolute inset-0'
+          style={{
+            background:
+              'radial-gradient(ellipse at 60% 40%, rgba(255,255,255,0.06) 0%, rgba(0,0,0,0) 60%), linear-gradient(135deg, hsl(220, 30%, 12%), hsl(220, 30%, 4%))',
+          }}
+        />
+        <span className='absolute inset-0 grid place-items-center'>
+          <span className='h-12 w-12 rounded-full bg-white/95 text-black grid place-items-center group-hover/vid:scale-105 transition-transform duration-200 ease-out'>
+            <Play
+              className='h-4 w-4 translate-x-px'
+              strokeWidth={2.5}
+              fill='currentColor'
+            />
+          </span>
+        </span>
+        <span className='absolute bottom-2 right-2 inline-flex items-center h-5 px-1.5 rounded text-[10px] font-caption tabular-nums text-primary-token bg-black/60 backdrop-blur'>
+          {Math.floor(durationSec / 60)}:
+          {String(durationSec % 60).padStart(2, '0')}
+        </span>
+      </button>
+      <div className='flex items-center gap-2 px-3 h-9 border-t border-(--linear-app-shell-border)/60'>
+        <Mic2 className='h-3 w-3 text-cyan-300/80' strokeWidth={2.25} />
+        <span className='flex-1 text-[11.5px] text-tertiary-token truncate'>
+          {title}
+        </span>
+        <ThreadCardIconBtn label='Full-screen'>
+          <Maximize2 className='h-3 w-3' strokeWidth={2.25} />
+        </ThreadCardIconBtn>
+      </div>
+    </div>
+  );
+}
+
+function ThreadCardIconBtn({
+  children,
+  label,
+}: {
+  children: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <Tooltip label={label}>
+      <button
+        type='button'
+        className='h-6 w-6 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-150 ease-out'
+        aria-label={label}
+      >
+        {children}
+      </button>
+    </Tooltip>
   );
 }
 
@@ -6221,6 +6513,7 @@ function ReleasesView({
   onSeek,
   onFilterByArtist,
   onContextMenu,
+  onOpenThread,
 }: {
   releases: Release[];
   playingId: string;
@@ -6233,6 +6526,7 @@ function ReleasesView({
   onSeek: (id: string, sec: number) => void;
   onFilterByArtist: (name: string) => void;
   onContextMenu?: (e: React.MouseEvent, release: Release) => void;
+  onOpenThread?: (id: string) => void;
 }) {
   const [focusedIndex, setFocusedIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -6294,6 +6588,7 @@ function ReleasesView({
               }}
               onFilterByArtist={onFilterByArtist}
               onContextMenu={onContextMenu}
+              onOpenThread={onOpenThread}
             />
           ))}
         </ul>
@@ -6316,6 +6611,7 @@ function ReleaseRow({
   onSeek: _onSeek,
   onFilterByArtist,
   onContextMenu,
+  onOpenThread,
 }: {
   release: Release;
   index: number;
@@ -6330,11 +6626,13 @@ function ReleaseRow({
   onSeek: (sec: number) => void;
   onFilterByArtist: (name: string) => void;
   onContextMenu?: (e: React.MouseEvent, release: Release) => void;
+  onOpenThread?: (id: string) => void;
 }) {
   // currentTimeSec/onSeek are wired through for the Tracks view's row
   // waveform — Release rows don't render a waveform.
   void _currentTimeSec;
   void _onSeek;
+  const runningThread = findRunningThreadFor('release', release.id, THREADS);
   return (
     // biome-ignore lint/a11y/noNoninteractiveElementInteractions: list row activates via parent section's keyboard handler; mouse-click is a convenience
     // biome-ignore lint/a11y/useKeyWithClickEvents: see above — parent section handles ↑/↓/Enter/Space/Esc
@@ -6444,8 +6742,14 @@ function ReleaseRow({
         {relativeDate(release.releaseDate)}
       </span>
 
-      {/* Right cluster: streams + DSP avatar stack */}
-      <div className='flex items-center gap-4 justify-end'>
+      {/* Right cluster: thread glyph (if running) + streams + DSP avatar stack */}
+      <div className='flex items-center gap-3 justify-end'>
+        {runningThread && onOpenThread && (
+          <EntityThreadGlyph
+            thread={runningThread}
+            onOpen={() => onOpenThread(runningThread.id)}
+          />
+        )}
         <span
           className={cn(
             'text-[11px] text-secondary-token tabular-nums whitespace-nowrap min-w-[42px] text-right',
@@ -7898,6 +8202,7 @@ function TracksView({
   onSeek,
   onFilter,
   onContextMenu,
+  onOpenThread,
 }: {
   tracks: Track[];
   pills: FilterPill[];
@@ -7910,6 +8215,7 @@ function TracksView({
   onSeek: (id: string, sec: number) => void;
   onFilter: (field: 'artist' | 'title' | 'album', value: string) => void;
   onContextMenu?: (e: React.MouseEvent, track: Track) => void;
+  onOpenThread?: (id: string) => void;
 }) {
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [sortBy, setSortBy] = useState<SortField>('index');
@@ -8072,6 +8378,7 @@ function TracksView({
               }}
               onFilter={onFilter}
               onContextMenu={onContextMenu}
+              onOpenThread={onOpenThread}
             />
           ))}
           {sorted.length === 0 && (
@@ -8099,6 +8406,7 @@ function TrackRow({
   onSeek,
   onFilter,
   onContextMenu,
+  onOpenThread,
 }: {
   track: Track;
   index: number;
@@ -8113,10 +8421,12 @@ function TrackRow({
   onSeek: (sec: number) => void;
   onFilter: (field: 'artist' | 'title' | 'album', value: string) => void;
   onContextMenu?: (e: React.MouseEvent, track: Track) => void;
+  onOpenThread?: (id: string) => void;
 }) {
   // While the user is keyboard-navigating other rows, mute the now-playing
   // signals here so focus is the only competing visual.
   const showPlayingBars = isPlaying && !muteHighlight;
+  const runningThread = findRunningThreadFor('track', track.id, THREADS);
   return (
     // biome-ignore lint/a11y/noNoninteractiveElementInteractions: parent section delegates ↑/↓/Space; row click is a focus convenience
     // biome-ignore lint/a11y/useKeyWithClickEvents: same
@@ -8230,8 +8540,15 @@ function TrackRow({
         <StatusChip track={track} />
       </div>
 
-      {/* Spacer column to align with header's count cell */}
-      <span className='w-10 shrink-0' />
+      {/* Spacer / thread glyph column — aligns with header's count cell */}
+      <div className='w-10 shrink-0 flex justify-end'>
+        {runningThread && onOpenThread && (
+          <EntityThreadGlyph
+            thread={runningThread}
+            onOpen={() => onOpenThread(runningThread.id)}
+          />
+        )}
+      </div>
     </li>
   );
 }
@@ -8524,10 +8841,12 @@ function TasksView({
   tasks,
   onContextMenu,
   onOpenRelease,
+  onOpenThread,
 }: {
   tasks: Task[];
   onContextMenu?: (e: React.MouseEvent, task: Task) => void;
   onOpenRelease?: (id: string) => void;
+  onOpenThread?: (id: string) => void;
 }) {
   const [selectedId, setSelectedId] = useState<string>(tasks[0]?.id ?? '');
   const [focusedIndex, setFocusedIndex] = useState(0);
@@ -8585,6 +8904,7 @@ function TasksView({
               }}
               onContextMenu={onContextMenu}
               onOpenRelease={onOpenRelease}
+              onOpenThread={onOpenThread}
             />
           ))}
         </ul>
@@ -8607,6 +8927,7 @@ function TaskListItem({
   onSelect,
   onContextMenu,
   onOpenRelease,
+  onOpenThread,
 }: {
   task: Task;
   isSelected: boolean;
@@ -8614,7 +8935,9 @@ function TaskListItem({
   onSelect: () => void;
   onContextMenu?: (e: React.MouseEvent, task: Task) => void;
   onOpenRelease?: (id: string) => void;
+  onOpenThread?: (id: string) => void;
 }) {
+  const runningThread = findRunningThreadFor('task', task.id, THREADS);
   return (
     // biome-ignore lint/a11y/noNoninteractiveElementInteractions: parent section delegates ↑/↓
     // biome-ignore lint/a11y/useKeyWithClickEvents: same
@@ -8659,6 +8982,12 @@ function TaskListItem({
           )}
           {task.labels.length > 0 && <LabelPills labels={task.labels} />}
           <span className='ml-auto inline-flex items-center gap-2 shrink-0'>
+            {runningThread && onOpenThread && (
+              <EntityThreadGlyph
+                thread={runningThread}
+                onOpen={() => onOpenThread(runningThread.id)}
+              />
+            )}
             <PriorityGlyph priority={task.priority} />
             <AssigneeChip assignee={task.assignee} />
           </span>
