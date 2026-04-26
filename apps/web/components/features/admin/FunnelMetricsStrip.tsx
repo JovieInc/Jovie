@@ -76,7 +76,7 @@ function PlaceholderMetricCard({
 }: Readonly<PlaceholderMetricCardProps>) {
   return (
     <ContentSurfaceCard className='space-y-2 p-4'>
-      <p className='text-[11px] font-medium tracking-[0.04em] text-tertiary-token'>
+      <p className='text-2xs font-medium tracking-[0.04em] text-tertiary-token'>
         {title}
       </p>
       <div className='flex items-center justify-between gap-3'>
@@ -85,12 +85,12 @@ function PlaceholderMetricCard({
         </p>
         <Link
           href={APP_ROUTES.SETTINGS_BILLING}
-          className='text-[12px] font-medium text-primary-token transition-colors hover:text-secondary-token'
+          className='text-xs font-medium text-primary-token transition-colors hover:text-secondary-token'
         >
           Configure
         </Link>
       </div>
-      <p className='text-[12px] leading-[17px] text-secondary-token'>
+      <p className='text-xs leading-[17px] text-secondary-token'>
         {description}
       </p>
     </ContentSurfaceCard>
