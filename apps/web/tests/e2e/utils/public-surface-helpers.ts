@@ -361,7 +361,6 @@ async function runHeaderNavigationInteraction(page: Page) {
   const triggers = await visibleLocators(page, [
     'button[aria-label*="menu" i]',
     'button[aria-label*="navigation" i]',
-    '[data-testid*="nav"] button',
   ]);
 
   if (triggers.length === 0) {
