@@ -319,7 +319,7 @@ export const SidebarMenuSubButton = React.forwardRef<
         '[&>span:last-child]:truncate [&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:text-sidebar-item-icon [&>svg]:transition-colors',
         'data-[active=true]:bg-sidebar-accent-active data-[active=true]:text-sidebar-item-foreground data-[active=true]:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-frame-seam)_82%,transparent)]',
         'data-[active=true]:[&>svg]:text-sidebar-item-foreground hover:[&>svg]:text-sidebar-item-foreground',
-        size === 'sm' && 'min-h-6 text-[12px]',
+        size === 'sm' && 'min-h-6 text-xs',
         'group-data-[collapsible=icon]:hidden',
         className
       )}

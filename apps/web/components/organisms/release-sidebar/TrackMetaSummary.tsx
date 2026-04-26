@@ -32,7 +32,7 @@ const VARIANT_STYLES: Record<
   compact: {
     container: 'space-y-1',
     number: 'text-2xs',
-    title: 'text-[12px]',
+    title: 'text-xs',
     meta: 'text-2xs',
   },
   drawer: {

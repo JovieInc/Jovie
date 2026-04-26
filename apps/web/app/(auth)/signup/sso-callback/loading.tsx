@@ -9,7 +9,7 @@ export default function SsoCallbackLoading() {
     <div className='min-h-dvh grid place-items-center bg-base'>
       <div className='flex flex-col items-center gap-4 animate-in fade-in duration-500 ease-out'>
         <LoadingSpinner size='md' tone='muted' label='Signing you in' />
-        <p className='text-[13px] text-tertiary-token'>Signing you in…</p>
+        <p className='text-app text-tertiary-token'>Signing you in…</p>
       </div>
     </div>
   );

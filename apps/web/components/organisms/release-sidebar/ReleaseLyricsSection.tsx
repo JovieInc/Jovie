@@ -193,7 +193,7 @@ export function ReleaseLyricsSection({
           onChange={event => setDraftLyrics(event.target.value)}
           rows={draftLyrics ? 10 : 4}
           disabled={!isEditable || isSaving}
-          className='min-h-[140px] resize-y border-(--linear-app-frame-seam) bg-surface-0 text-[12px]'
+          className='min-h-[140px] resize-y border-(--linear-app-frame-seam) bg-surface-0 text-xs'
         />
         {/* Auto-save status indicator */}
         {saveStatus !== 'idle' && (

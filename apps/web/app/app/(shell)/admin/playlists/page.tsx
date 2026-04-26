@@ -234,7 +234,7 @@ export default async function AdminPlaylistsPage({
     >
       {/* Playlist list */}
       {playlists.length === 0 ? (
-        <div className='py-16 text-center text-[13px] text-white/40'>
+        <div className='py-16 text-center text-app text-white/40'>
           {tab === 'pending'
             ? 'No pending playlists. Next one generates at 6:00 AM UTC.'
             : `No ${tab} playlists.`}
@@ -245,10 +245,10 @@ export default async function AdminPlaylistsPage({
             <ContentSurfaceCard key={playlist.id} className='p-4'>
               <div className='flex items-start justify-between'>
                 <div>
-                  <h3 className='text-[15px] font-medium text-white'>
+                  <h3 className='text-mid font-medium text-white'>
                     {playlist.title}
                   </h3>
-                  <p className='mt-1 text-[13px] text-white/40'>
+                  <p className='mt-1 text-app text-white/40'>
                     {playlist.trackCount} tracks
                     {playlist.genreTags?.length
                       ? ` \u2022 ${playlist.genreTags.join(', ')}`
@@ -268,7 +268,7 @@ export default async function AdminPlaylistsPage({
                       />
                       <button
                         type='submit'
-                        className='rounded-md bg-[#1DB954] px-3 py-1.5 text-[13px] font-medium text-white hover:opacity-90'
+                        className='rounded-md bg-[#1DB954] px-3 py-1.5 text-app font-medium text-white hover:opacity-90'
                       >
                         Approve
                       </button>
@@ -281,7 +281,7 @@ export default async function AdminPlaylistsPage({
                       />
                       <button
                         type='submit'
-                        className='rounded-md bg-white/5 px-3 py-1.5 text-[13px] font-book text-white/60 hover:bg-white/10'
+                        className='rounded-md bg-white/5 px-3 py-1.5 text-app font-book text-white/60 hover:bg-white/10'
                       >
                         Reject
                       </button>
@@ -294,7 +294,7 @@ export default async function AdminPlaylistsPage({
                     href={`https://open.spotify.com/playlist/${playlist.spotifyPlaylistId}`}
                     target='_blank'
                     rel='noopener noreferrer'
-                    className='text-[13px] text-[#1DB954] hover:underline'
+                    className='text-app text-[#1DB954] hover:underline'
                   >
                     View on Spotify
                   </a>

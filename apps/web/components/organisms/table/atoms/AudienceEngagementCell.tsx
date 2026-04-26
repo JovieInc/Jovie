@@ -42,7 +42,7 @@ export function AudienceEngagementCell({
           className
         )}
       >
-        <span className='tabular-nums font-[450]'>{visits}</span>
+        <span className='tabular-nums font-book'>{visits}</span>
         <IconComponent
           className={cn('h-4 w-4 shrink-0', color)}
           aria-hidden='true'

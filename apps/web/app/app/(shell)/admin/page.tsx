@@ -111,15 +111,15 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                       <card.icon className='h-4 w-4' aria-hidden='true' />
                     </div>
                     <div>
-                      <p className='text-[14px] font-semibold tracking-[-0.01em] text-primary-token'>
+                      <p className='text-sm font-semibold tracking-[-0.01em] text-primary-token'>
                         {card.title}
                       </p>
-                      <p className='mt-1 text-[13px] leading-[19px] text-secondary-token'>
+                      <p className='mt-1 text-app leading-[19px] text-secondary-token'>
                         {card.description}
                       </p>
                     </div>
                   </div>
-                  <span className='inline-flex items-center gap-2 text-[12px] font-semibold text-secondary-token transition-colors group-hover:text-primary-token'>
+                  <span className='inline-flex items-center gap-2 text-xs font-semibold text-secondary-token transition-colors group-hover:text-primary-token'>
                     Open
                     <ArrowRight className='h-3.5 w-3.5' aria-hidden='true' />
                   </span>
