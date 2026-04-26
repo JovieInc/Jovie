@@ -102,7 +102,7 @@ export function DrawerLoadingSkeleton({
                 {['tab-1', 'tab-2', 'tab-3', 'tab-4'].map(tabId => (
                   <div
                     key={tabId}
-                    className='h-[26px] flex-1 rounded-[8px] skeleton'
+                    className='h-[26px] flex-1 rounded-lg skeleton'
                   />
                 ))}
               </div>
