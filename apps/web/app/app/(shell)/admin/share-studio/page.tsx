@@ -143,7 +143,7 @@ function SamplePicker(
   }>
 ) {
   return (
-    <ContentSurfaceCard className='space-y-2.5 rounded-[12px] p-3.5'>
+    <ContentSurfaceCard className='space-y-2.5 rounded-xl p-3.5'>
       <p className='text-xs font-semibold text-primary-token'>{props.label}</p>
       <div className='flex flex-wrap gap-2'>
         {props.items.map(item => {
@@ -218,7 +218,7 @@ function PayloadCard(
           <Image
             src={props.context.asset.url}
             alt={`${props.context.title} story preview`}
-            className='aspect-[9/16] w-full rounded-[12px] border border-subtle object-cover'
+            className='aspect-[9/16] w-full rounded-xl border border-subtle object-cover'
             width={1080}
             height={1920}
           />
@@ -258,7 +258,7 @@ function PayloadBlock(props: Readonly<{ label: string; value: string }>) {
   return (
     <div className='space-y-1.5'>
       <p className='text-xs font-semibold text-primary-token'>{props.label}</p>
-      <pre className='overflow-x-auto rounded-[12px] border border-subtle bg-surface-0 px-3 py-2 text-2xs leading-[1.5] text-secondary-token whitespace-pre-wrap'>
+      <pre className='overflow-x-auto rounded-xl border border-subtle bg-surface-0 px-3 py-2 text-2xs leading-[1.5] text-secondary-token whitespace-pre-wrap'>
         {props.value}
       </pre>
     </div>
