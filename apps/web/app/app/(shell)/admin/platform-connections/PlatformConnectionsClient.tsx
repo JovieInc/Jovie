@@ -164,7 +164,7 @@ function SpotifyTabContent({
   else if (currentUser.hasSpotify) connectButtonLabel = 'Reconnect Spotify';
 
   return (
-    <div className='divide-y divide-(--linear-app-frame-seam) rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-1'>
+    <div className='divide-y divide-(--linear-app-frame-seam) rounded-lg border border-(--linear-app-frame-seam) bg-surface-1'>
       <div className='flex flex-wrap items-center justify-between gap-3 px-4 py-3'>
         <div className='flex min-w-0 flex-wrap items-center gap-2'>
           <StatusBadge
@@ -343,7 +343,7 @@ function EngineTabContent({
 
   return (
     <>
-      <div className='divide-y divide-(--linear-app-frame-seam) rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-1'>
+      <div className='divide-y divide-(--linear-app-frame-seam) rounded-lg border border-(--linear-app-frame-seam) bg-surface-1'>
         <div className='flex flex-wrap items-center justify-between gap-3 px-4 py-3'>
           <div className='flex min-w-0 flex-wrap items-center gap-2'>
             <StatusBadge

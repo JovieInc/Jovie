@@ -177,7 +177,7 @@ export function DrawerEditableTextField({
             placeholder={placeholder ?? emptyLabel}
             aria-label={`Edit ${label}`}
             className={cn(
-              'h-8 w-full rounded-[8px] border-(--linear-app-frame-seam) bg-surface-0 px-2.5 text-app text-primary-token',
+              'h-8 w-full rounded-lg border-(--linear-app-frame-seam) bg-surface-0 px-2.5 text-app text-primary-token',
               monospace && 'font-mono tracking-[0.02em]',
               inputClassName
             )}
@@ -196,7 +196,7 @@ export function DrawerEditableTextField({
                   // text area so editable and static rows share the same
                   // visual grid.
                   'h-auto px-0 py-0 rounded-[6px] hover:bg-surface-0'
-                : 'h-8 rounded-[8px] px-2.5 hover:bg-surface-0',
+                : 'h-8 rounded-lg px-2.5 hover:bg-surface-0',
               density === 'inline' ? undefined : inputClassName,
               'border border-transparent bg-transparent shadow-none',
               !hasValue && 'text-tertiary-token'
