@@ -115,11 +115,11 @@ export function ChatAlbumArtCard({ result, profileId }: ChatAlbumArtCardProps) {
 
   if (!result.success) {
     return (
-      <output className='block rounded-xl border border-subtle bg-surface-1 p-3 text-[13px] text-primary-token'>
+      <output className='block rounded-xl border border-subtle bg-surface-1 p-3 text-app text-primary-token'>
         <span className='block font-medium'>Album Art Failed</span>
         <span className='mt-1 block text-secondary-token'>{result.error}</span>
         {result.retryable ? (
-          <span className='mt-2 block text-[12px] text-tertiary-token'>
+          <span className='mt-2 block text-xs text-tertiary-token'>
             Retry from chat when the provider is available.
           </span>
         ) : null}
@@ -130,7 +130,7 @@ export function ChatAlbumArtCard({ result, profileId }: ChatAlbumArtCardProps) {
   if (result.state === 'needs_release_target') {
     return (
       <div className='rounded-xl border border-subtle bg-surface-1 p-3'>
-        <div className='text-[13px] font-medium text-primary-token'>
+        <div className='text-app font-medium text-primary-token'>
           Choose Release
         </div>
         <div className='mt-2 flex flex-wrap gap-2'>
@@ -169,10 +169,10 @@ export function ChatAlbumArtCard({ result, profileId }: ChatAlbumArtCardProps) {
     <div className='rounded-xl border border-subtle bg-surface-1 p-3'>
       <div className='flex items-center justify-between gap-3'>
         <div className='min-w-0'>
-          <div className='truncate text-[13px] font-medium text-primary-token'>
+          <div className='truncate text-app font-medium text-primary-token'>
             {result.releaseTitle}
           </div>
-          <div className='truncate text-[12px] text-secondary-token'>
+          <div className='truncate text-xs text-secondary-token'>
             {hasAppliedSelectedCandidate ? 'Artwork Applied' : 'Select Artwork'}
           </div>
         </div>
@@ -241,7 +241,7 @@ export function ChatAlbumArtCard({ result, profileId }: ChatAlbumArtCardProps) {
         </Button>
       </div>
       {applyMutation.isError || createMutation.isError ? (
-        <output className='mt-2 block text-[12px] text-red-500'>
+        <output className='mt-2 block text-xs text-red-500'>
           Could not apply artwork. Try again.
         </output>
       ) : null}
