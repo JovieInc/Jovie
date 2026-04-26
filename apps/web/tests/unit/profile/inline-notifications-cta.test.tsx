@@ -176,9 +176,7 @@ describe('ProfileInlineNotificationsCTA flow', () => {
 
     render(<ProfileInlineNotificationsCTA artist={makeArtist()} />);
 
-    fireEvent.click(
-      screen.getByRole('button', { name: /turn on notifications/i })
-    );
+    fireEvent.click(screen.getByRole('button', { name: /turn on alerts/i }));
     fireEvent.click(await screen.findByRole('switch', { name: /new music/i }));
 
     expect(await screen.findByTestId('mobile-email-input')).toBeInTheDocument();
@@ -201,9 +199,7 @@ describe('ProfileInlineNotificationsCTA flow', () => {
 
     render(<ProfileInlineNotificationsCTA artist={makeArtist()} />);
 
-    fireEvent.click(
-      screen.getByRole('button', { name: /turn on notifications/i })
-    );
+    fireEvent.click(screen.getByRole('button', { name: /turn on alerts/i }));
     fireEvent.click(await screen.findByRole('switch', { name: /new music/i }));
     fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
 
@@ -266,9 +262,7 @@ describe('ProfileInlineNotificationsCTA flow', () => {
 
     render(<ProfileInlineNotificationsCTA artist={makeArtist()} />);
 
-    fireEvent.click(
-      screen.getByRole('button', { name: /turn on notifications/i })
-    );
+    fireEvent.click(screen.getByRole('button', { name: /turn on alerts/i }));
     fireEvent.click(await screen.findByRole('switch', { name: /new music/i }));
     fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
     fireEvent.click(await screen.findByRole('button', { name: /^verify$/i }));
@@ -292,7 +286,7 @@ describe('ProfileInlineNotificationsCTA flow', () => {
     expect(screen.getByText('Sent by Test Artist')).toBeInTheDocument();
   });
 
-  it('shows the loading skeleton while notification hydration is checking', async () => {
+  it('renders nothing while notification hydration is checking', async () => {
     mockUseSubscriptionForm.mockReturnValue(
       buildFormState({
         hydrationStatus: 'checking',
@@ -303,13 +297,13 @@ describe('ProfileInlineNotificationsCTA flow', () => {
       '@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA'
     );
 
-    render(
+    const { container } = render(
       <ProfileInlineNotificationsCTA
         artist={makeArtist()}
         presentation='inline'
       />
     );
 
-    expect(screen.getByText('Loading subscription form')).toBeInTheDocument();
+    expect(container).toBeEmptyDOMElement();
   });
 });

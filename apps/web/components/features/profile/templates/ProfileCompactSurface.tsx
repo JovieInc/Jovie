@@ -271,15 +271,10 @@ function resolveStatusPill(params: {
     params.profileSettings
   );
   if (releaseVisibility?.show && params.latestRelease) {
-    return releaseVisibility.isCountdown
-      ? {
-          icon: Bell,
-          label: 'New Release',
-        }
-      : {
-          icon: Bell,
-          label: 'New Release',
-        };
+    return {
+      icon: Bell,
+      label: 'New Release',
+    };
   }
 
   return {

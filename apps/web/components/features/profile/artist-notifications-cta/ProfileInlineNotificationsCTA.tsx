@@ -57,6 +57,56 @@ function birthdayDigitsToStorage(digits: string): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+const MAX_BIRTHDAY_AGE_YEARS = 120;
+
+function isValidBirthdayDigits(digits: string): boolean {
+  if (digits.length !== 8) {
+    return false;
+  }
+
+  const month = Number.parseInt(digits.slice(0, 2), 10);
+  const day = Number.parseInt(digits.slice(2, 4), 10);
+  const year = Number.parseInt(digits.slice(4, 8), 10);
+
+  if (
+    !Number.isFinite(month) ||
+    !Number.isFinite(day) ||
+    !Number.isFinite(year)
+  ) {
+    return false;
+  }
+
+  if (month < 1 || month > 12) return false;
+  if (day < 1 || day > 31) return false;
+  if (year < 1) return false;
+
+  // Construct a UTC date and verify each component round-trips so that
+  // impossible dates like Feb 30 or month 13 are rejected.
+  const utcMillis = Date.UTC(year, month - 1, day);
+  if (Number.isNaN(utcMillis)) return false;
+
+  const constructed = new Date(utcMillis);
+  if (
+    constructed.getUTCFullYear() !== year ||
+    constructed.getUTCMonth() !== month - 1 ||
+    constructed.getUTCDate() !== day
+  ) {
+    return false;
+  }
+
+  const now = Date.now();
+  if (utcMillis > now) return false;
+
+  const oldestAllowed = Date.UTC(
+    new Date(now).getUTCFullYear() - MAX_BIRTHDAY_AGE_YEARS,
+    new Date(now).getUTCMonth(),
+    new Date(now).getUTCDate()
+  );
+  if (utcMillis < oldestAllowed) return false;
+
+  return true;
+}
+
 function getTriggerClassName(
   variant: ProfileInlineNotificationsCTAProps['variant']
 ) {
@@ -358,6 +408,13 @@ export function ProfileInlineNotificationsCTA({
         }
         setCanEditPreferences(true);
         setStep('preferences');
+        return;
+      }
+
+      if (!isValidBirthdayDigits(digits)) {
+        // Real birthday validation: rejects impossible dates (Feb 30, month 13),
+        // future dates, and dates more than 120 years in the past.
+        setBirthdayHintShown(true);
         return;
       }
 

@@ -80,8 +80,9 @@ export async function updateProfileRecords({
       : null;
 
   const finalTheme =
-    nextAvatarUrl !== null
-      ? await buildThemeWithProfileAccent({
+    nextAvatarUrl === null
+      ? mergedTheme
+      : await buildThemeWithProfileAccent({
           existingTheme:
             mergedTheme ??
             (existingProfile?.theme as
@@ -89,8 +90,7 @@ export async function updateProfileRecords({
               | null
               | undefined),
           sourceUrl: nextAvatarUrl,
-        })
-      : mergedTheme;
+        });
 
   const finalProfileUpdates = {
     ...dbProfileUpdates,

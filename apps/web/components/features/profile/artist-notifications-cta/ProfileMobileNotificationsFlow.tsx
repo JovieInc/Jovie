@@ -360,7 +360,6 @@ export function ProfileMobileNotificationsFlow({
   canEditPreferences = false,
   canGoBackFromPreferences = false,
   artistEmailOptIn = false,
-  artistEmailReady = false,
   showArtistEmailSection = false,
   onClose,
   onBack,
@@ -386,6 +385,12 @@ export function ProfileMobileNotificationsFlow({
 
   useEffect(() => {
     if (!open) {
+      return;
+    }
+
+    // Inline presentations live inside an existing layout — they should not
+    // hijack body scroll the way overlay/modal presentations do.
+    if (presentation === 'inline') {
       return;
     }
 
@@ -436,7 +441,7 @@ export function ProfileMobileNotificationsFlow({
       document.documentElement.style.overflow = originalHtmlOverflow;
       window.scrollTo(0, scrollY);
     };
-  }, [open]);
+  }, [open, presentation]);
 
   useEffect(() => {
     if (!open) {
@@ -670,9 +675,8 @@ export function ProfileMobileNotificationsFlow({
                       Sent by {artistName}
                     </p>
                     <p className='text-[14px] leading-6 text-white/58'>
-                      {artistEmailReady
-                        ? `Share your email with ${artistName} to receive occasional emails about related things.`
-                        : `Share your email with ${artistName} to receive occasional emails about related things.`}
+                      Share your email with {artistName} to receive occasional
+                      emails about related things.
                     </p>
                   </div>
 

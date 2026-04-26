@@ -4,7 +4,7 @@
  * Centralized profile update operations.
  */
 
-import { sql as drizzleSql, eq } from 'drizzle-orm';
+import { sql as drizzleSql, eq, type SQL } from 'drizzle-orm';
 import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -22,15 +22,8 @@ const VIEW_FLUSH_THRESHOLD = 10;
 // TTL for view counts in Redis (1 hour) - ensures eventual consistency
 const VIEW_COUNT_TTL_SECONDS = 3600;
 
-/**
- * Update a profile by ID.
- *
- * @param profileId - The profile ID to update
- * @param updates - The fields to update
- * @returns Updated profile or null if not found
- */
-export async function updateProfileById(
-  profileId: string,
+async function applyProfileUpdate(
+  whereClause: SQL,
   updates: ProfileUpdateData
 ): Promise<ProfileData | null> {
   const [existingProfile] = await db
@@ -39,7 +32,7 @@ export async function updateProfileById(
       theme: creatorProfiles.theme,
     })
     .from(creatorProfiles)
-    .where(eq(creatorProfiles.id, profileId))
+    .where(whereClause)
     .limit(1);
 
   const mergedTheme =
@@ -63,7 +56,7 @@ export async function updateProfileById(
       ...(finalTheme === undefined ? {} : { theme: finalTheme }),
       updatedAt: new Date(),
     })
-    .where(eq(creatorProfiles.id, profileId))
+    .where(whereClause)
     .returning();
 
   if (updated?.usernameNormalized) {
@@ -71,6 +64,20 @@ export async function updateProfileById(
   }
 
   return updated ?? null;
+}
+
+/**
+ * Update a profile by ID.
+ *
+ * @param profileId - The profile ID to update
+ * @param updates - The fields to update
+ * @returns Updated profile or null if not found
+ */
+export async function updateProfileById(
+  profileId: string,
+  updates: ProfileUpdateData
+): Promise<ProfileData | null> {
+  return applyProfileUpdate(eq(creatorProfiles.id, profileId), updates);
 }
 
 /**
@@ -95,44 +102,7 @@ export async function updateProfileByClerkId(
     throw new TypeError('User not found');
   }
 
-  const [existingProfile] = await db
-    .select({
-      avatarUrl: creatorProfiles.avatarUrl,
-      theme: creatorProfiles.theme,
-    })
-    .from(creatorProfiles)
-    .where(eq(creatorProfiles.userId, user.id))
-    .limit(1);
-
-  const mergedTheme =
-    updates.theme &&
-    typeof updates.theme === 'object' &&
-    !Array.isArray(updates.theme)
-      ? mergeProfileTheme(existingProfile?.theme, updates.theme)
-      : undefined;
-  const finalTheme =
-    updates.avatarUrl && updates.avatarUrl !== existingProfile?.avatarUrl
-      ? await buildThemeWithProfileAccent({
-          existingTheme: mergedTheme ?? existingProfile?.theme,
-          sourceUrl: updates.avatarUrl,
-        })
-      : mergedTheme;
-
-  const [updated] = await db
-    .update(creatorProfiles)
-    .set({
-      ...updates,
-      ...(finalTheme === undefined ? {} : { theme: finalTheme }),
-      updatedAt: new Date(),
-    })
-    .where(eq(creatorProfiles.userId, user.id))
-    .returning();
-
-  if (updated?.usernameNormalized) {
-    await invalidateProfileCache(updated.usernameNormalized);
-  }
-
-  return updated ?? null;
+  return applyProfileUpdate(eq(creatorProfiles.userId, user.id), updates);
 }
 
 /**

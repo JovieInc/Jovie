@@ -76,8 +76,8 @@ export function CookieBannerSection() {
           setCustomize(true);
         },
       };
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new Event('jvconsent:ready'));
+      if (typeof globalThis.window !== 'undefined') {
+        globalThis.dispatchEvent(new Event('jvconsent:ready'));
       }
     }
   }, []);

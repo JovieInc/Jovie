@@ -30,6 +30,18 @@ const emailOtpSendLimiter = createRateLimiter({
   analytics: true,
 });
 
+// Server-side resend cooldown: enforces a single OTP send per email per
+// 30-second window so the UI cooldown ("Resend in Ns") cannot be bypassed
+// by callers that bypass the React state. Falls back to memory if Redis
+// is unavailable; in that case the limit is still enforced per-instance.
+const emailOtpResendCooldownLimiter = createRateLimiter({
+  name: 'Email OTP Resend Cooldown',
+  limit: 1,
+  window: '30 s',
+  prefix: 'notifications:email-otp:resend-cooldown',
+  analytics: true,
+});
+
 /**
  * POST handler for notification subscriptions
  * Implements server-side analytics tracking for subscription events
@@ -62,6 +74,14 @@ export async function POST(request: NextRequest) {
       : null;
 
   if (parsedEmail) {
+    // 30s per-email cooldown is checked first so a flood of resends can't
+    // burn the 5/10m budget. We always check the broader limiter too.
+    const cooldownResult =
+      await emailOtpResendCooldownLimiter.limit(parsedEmail);
+    if (!cooldownResult.success) {
+      return createRateLimitedResponse(cooldownResult);
+    }
+
     const emailLimitResult = await emailOtpSendLimiter.limit(parsedEmail);
     if (!emailLimitResult.success) {
       return createRateLimitedResponse(emailLimitResult);
