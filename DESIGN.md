@@ -405,20 +405,42 @@ Pure neutral HSL — no hue tint. Used across both systems.
 
 ## Motion
 
+### Two-tier intent (canonical)
+
+Most surfaces should pick from one of these two intent tokens, not from the
+raw scale below. The intent tokens encode "what the move means," which keeps
+the app feeling consistent even as new components land.
+
+| Token | Duration | Easing | Use for |
+|-------|----------|--------|---------|
+| **subtle** (`duration-subtle ease-subtle`) | 150ms | `cubic-bezier(0.25, 0.46, 0.45, 0.94)` | Hover, focus, color, icon swap, toast, button press, anything micro |
+| **cinematic** (`duration-cinematic ease-cinematic`) | 320ms | `cubic-bezier(0.32, 0.72, 0, 1)` | Side drawers, audio player open/close, modal entry, chat composer surface morph, anything reveal-class |
+
+**Rule of thumb:** if the user's eye has to track the move (panel sliding in,
+surface growing), it's cinematic. If the user notices it only as feedback
+(button color change, focus ring), it's subtle. Never invent a third tier
+for one-off cases — pick the closest intent and live with it.
+
+**Persistent ambient UI** (e.g. `PersistentAudioBar` mount-in) sits between
+the two; 200ms is acceptable but new components should choose one of the
+two intent tokens unless there's a reason.
+
+### Raw scale (legacy / specialized)
+
+Avoid in new code; prefer the intent tokens above.
+
 | Token | Duration | Usage |
 |-------|----------|-------|
 | instant | 50ms | Immediate feedback |
 | fast | 100ms | Hover states, toggles |
-| normal | 150ms | **THE standard** — buttons, transitions |
-| slow | 200ms | Panels, reveals |
-| slower | 250ms | Modals, drawers |
-| slowest | 300ms | Complex animations |
+| normal | 160ms | Buttons, transitions |
+| slow | 250ms | Panels, reveals |
+| slower / slowest | 350ms | Complex animations |
 
-**Easing:** `cubic-bezier(0.25, 0.46, 0.45, 0.94)` — `--ease-interactive`
+**Header blur:** 20px backdrop-filter.
 
-**Header blur:** 20px backdrop-filter
-
-**Reduced motion:** Respects `prefers-reduced-motion: reduce` — transitions drop to 0ms.
+**Reduced motion:** Respects `prefers-reduced-motion: reduce` — every
+duration token (subtle, cinematic, and raw scale) drops to 0ms automatically.
 
 ---
 

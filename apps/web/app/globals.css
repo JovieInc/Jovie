@@ -497,6 +497,14 @@ body {
   --transition-duration-slow: var(--duration-slow);
   --transition-duration-slower: var(--duration-slower);
   --transition-duration-slowest: var(--duration-slowest);
+  /* Two-tier intent durations + matching easings.
+     Use duration-subtle / ease-subtle for micro-interactions, and
+     duration-cinematic / ease-cinematic for high-impact reveals
+     (drawers, audio player, chat composer surface morph). See DESIGN.md. */
+  --transition-duration-subtle: var(--duration-subtle);
+  --transition-duration-cinematic: var(--duration-cinematic);
+  --ease-subtle: var(--ease-subtle);
+  --ease-cinematic: var(--ease-cinematic);
   /* Shadow tokens — register design-system.css shadows as Tailwind utilities */
   --shadow-sm: var(--shadow-sm);
   --shadow-md: var(--shadow-md);
