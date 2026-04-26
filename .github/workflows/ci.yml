@@ -855,10 +855,15 @@ jobs:
           export NEXT_PUBLIC_CLERK_MOCK=1
           export NEXT_PUBLIC_CLERK_PROXY_DISABLED=1
 
-          PORT=3000 pnpm --filter=@jovie/web exec next start &
+          if [ ! -f .next/standalone/apps/web/server.js ]; then
+            echo "Standalone server not found - public Lighthouse cannot start."
+            exit 1
+          fi
+
+          PORT=3000 node .next/standalone/apps/web/server.js &
           SERVER_PID=$!
 
-          echo "Waiting for server to start..."
+          echo "Waiting for standalone server..."
           SERVER_READY=false
           for i in {1..30}; do
             if curl -s http://localhost:3000 > /dev/null; then
