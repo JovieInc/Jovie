@@ -35,6 +35,7 @@ export function JovieChat({
   conversationId,
   onConversationCreate,
   initialQuery,
+  initialSkillId,
   onTitleChange,
   avatarUrl,
   username,
@@ -43,6 +44,7 @@ export function JovieChat({
   latestReleaseTitle,
 }: JovieChatProps) {
   const initialQuerySubmitted = useRef(false);
+  const initialSkillApplied = useRef(false);
   const imageFileInputRef = useRef<HTMLInputElement>(null);
   // Track message IDs that were loaded from persistence to skip entrance animation
   const knownMessageIdsRef = useRef<Set<string>>(new Set());
@@ -221,6 +223,23 @@ export function JovieChat({
       submitMessage(initialQuery);
     }
   }, [initialQuery, isLoadingConversation, submitMessage, notifyJankSend]);
+
+  // Pre-load a skill chip on mount when the chat was opened from cmd+k with
+  // `?skill=<id>`. We apply once and rely on the chip tray's normal
+  // backspace-to-remove behavior for undo. New conversations only — re-loading
+  // an existing thread shouldn't smuggle a chip into a finished context.
+  useEffect(() => {
+    if (
+      !initialSkillId ||
+      initialSkillApplied.current ||
+      conversationId ||
+      isLoadingConversation
+    ) {
+      return;
+    }
+    initialSkillApplied.current = true;
+    chipTray.addSkill(initialSkillId);
+  }, [initialSkillId, conversationId, isLoadingConversation, chipTray]);
 
   // Populate known message IDs from hydrated conversation to skip entrance animations
   useEffect(() => {

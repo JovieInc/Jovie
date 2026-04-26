@@ -11,6 +11,7 @@
  * additional wiring.
  */
 
+import { APP_ROUTES } from '@/constants/routes';
 import type { EntityKind } from '@/lib/chat/tokens';
 import type { ToolSchemaKey } from '@/lib/chat/tool-schemas';
 
@@ -56,10 +57,14 @@ export type Command = SkillCommand | NavCommand;
  * Registry entries. Seeded from `tool-schemas.ts` keys — one skill per tool.
  * Add new user-facing actions here, not in separate UI files.
  *
- * Scope for JOV-1791: chat-slash only. Nav and cmdk entries arrive with JOV-1792.
+ * Skills are cross-listed on both surfaces (chat slash inserts a chip;
+ * cmd+k navigates to chat with the skill chip pre-filled via `?skill=`).
+ * Nav entries are cmd+k-only — chat is for skills + entity references, not
+ * navigation.
  */
 
-const CHAT_SLASH: readonly CommandSurface[] = ['chat-slash'];
+const BOTH_SURFACES: readonly CommandSurface[] = ['chat-slash', 'cmdk'];
+const CMDK_ONLY: readonly CommandSurface[] = ['cmdk'];
 
 function skill(
   id: ToolSchemaKey,
@@ -74,11 +79,32 @@ function skill(
     label,
     description,
     iconName,
-    surfaces: CHAT_SLASH,
+    surfaces: BOTH_SURFACES,
     entitySlots,
   };
 }
 
+function nav(
+  id: string,
+  label: string,
+  description: string,
+  iconName: string,
+  href: string
+): NavCommand {
+  return {
+    kind: 'nav',
+    id,
+    label,
+    description,
+    iconName,
+    surfaces: CMDK_ONLY,
+    href,
+  };
+}
+
+// Nav entries mirror the primary dashboard sidebar (`dashboard-nav/config.ts`)
+// so cmd+k stays in lockstep with the visible chrome — when the sidebar adds
+// a route, this list should follow.
 export const COMMANDS: readonly Command[] = [
   skill(
     'generateAlbumArt',
@@ -110,6 +136,41 @@ export const COMMANDS: readonly Command[] = [
     'Send feedback',
     'Share feedback, report a bug, or request a feature.',
     'MessageSquare'
+  ),
+  nav(
+    'go-profile',
+    'Profile',
+    'Open your profile in the chat workspace.',
+    'UserCircle',
+    APP_ROUTES.CHAT_PROFILE_PANEL
+  ),
+  nav(
+    'go-releases',
+    'Releases',
+    'Manage your release catalog and smart links.',
+    'Music',
+    APP_ROUTES.DASHBOARD_RELEASES
+  ),
+  nav(
+    'go-audience',
+    'Audience',
+    'Understand your audience demographics.',
+    'Users',
+    APP_ROUTES.DASHBOARD_AUDIENCE
+  ),
+  nav(
+    'go-tasks',
+    'Tasks',
+    'Track release work and operations.',
+    'CheckSquare',
+    APP_ROUTES.TASKS
+  ),
+  nav(
+    'go-settings',
+    'Settings',
+    'Account, billing, and artist settings.',
+    'Settings',
+    APP_ROUTES.SETTINGS
   ),
 ];
 
