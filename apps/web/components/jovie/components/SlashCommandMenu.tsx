@@ -99,6 +99,7 @@ function fuzzyMatch(haystack: string, needle: string): boolean {
 function entityKindLabel(kind: EntityKind): string {
   if (kind === 'release') return 'Release';
   if (kind === 'artist') return 'Artist';
+  if (kind === 'event') return 'Event';
   return 'Track';
 }
 
@@ -154,8 +155,22 @@ export function useSlashItems(
       .map(artistResultToEntityRef);
 
     if (state.status === 'entity') {
-      const items: EntityRef[] =
-        state.kind === 'release' ? filteredReleases : artistEntities;
+      // Per-kind dispatch — `track` and `event` don't have providers wired
+      // here yet, so they show empty rather than silently falling through to
+      // the artist list (CodeRabbit Major flag on the prior `: artistEntities`
+      // fallback).
+      let items: EntityRef[];
+      let isLoading: boolean;
+      if (state.kind === 'release') {
+        items = filteredReleases;
+        isLoading = releaseLoading;
+      } else if (state.kind === 'artist') {
+        items = artistEntities;
+        isLoading = artistSearch.state === 'loading';
+      } else {
+        items = [];
+        isLoading = false;
+      }
       const slashItems: SlashMenuItem[] = items.map(e => ({
         kind: 'entity',
         entity: e,
@@ -167,14 +182,7 @@ export function useSlashItems(
           items: slashItems,
         },
       ];
-      return {
-        items: slashItems,
-        sections,
-        isLoading:
-          state.kind === 'release'
-            ? releaseLoading
-            : artistSearch.state === 'loading',
-      };
+      return { items: slashItems, sections, isLoading };
     }
 
     // root: skills + entity suggestions per kind
