@@ -80,9 +80,7 @@ export function AudienceLastActionCell({
         className='h-3.5 w-3.5 shrink-0 text-quaternary-token'
         aria-hidden='true'
       />
-      {actionLabel && (
-        <span className='truncate text-[12px]'>{actionLabel}</span>
-      )}
+      {actionLabel && <span className='truncate text-xs'>{actionLabel}</span>}
       {timeAgo && (
         <>
           {actionLabel && (

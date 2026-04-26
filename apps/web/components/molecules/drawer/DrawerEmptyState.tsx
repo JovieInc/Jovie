@@ -24,7 +24,7 @@ export function DrawerEmptyState({
     >
       <p
         className={cn(
-          'text-[12px] leading-[18px] tracking-[0.01em]',
+          'text-xs leading-[18px] tracking-[0.01em]',
           tone === 'error' ? 'text-error' : 'text-secondary-token'
         )}
       >

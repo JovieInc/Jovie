@@ -108,7 +108,7 @@ export function SidebarInstallBanner() {
           <div className='flex items-start gap-1.5 pr-7'>
             <RefreshCw className='mt-0.5 size-3 shrink-0 text-sidebar-item-icon/60' />
             <div className='min-w-0'>
-              <p className='text-[11px] font-medium tracking-[-0.01em] text-sidebar-item-foreground/75'>
+              <p className='text-2xs font-medium tracking-[-0.01em] text-sidebar-item-foreground/75'>
                 {title}
               </p>
               <p className='mt-0.5 text-[10px] leading-[1.35] text-sidebar-muted/80'>
@@ -147,7 +147,7 @@ export function SidebarInstallBanner() {
         <div className='flex items-start gap-1.5 pr-7'>
           <Download className='mt-0.5 size-3 shrink-0 text-sidebar-item-icon/60' />
           <div className='min-w-0'>
-            <p className='text-[11px] font-medium tracking-[-0.01em] text-sidebar-item-foreground/75'>
+            <p className='text-2xs font-medium tracking-[-0.01em] text-sidebar-item-foreground/75'>
               {TOAST_MESSAGES.PWA_INSTALL}
             </p>
             <p className='mt-0.5 text-[10px] leading-[1.35] text-sidebar-muted/80'>

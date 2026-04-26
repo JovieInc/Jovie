@@ -38,7 +38,7 @@ function LtvTooltipContent({
   readonly breakdown: LtvBreakdown;
 }) {
   return (
-    <div className='flex min-w-56 flex-col gap-1.5 text-[12px]'>
+    <div className='flex min-w-56 flex-col gap-1.5 text-xs'>
       <div className='flex items-center justify-between gap-4 border-b border-subtle pb-1.5'>
         <span className='font-caption text-primary-token'>Lifetime Value</span>
         <span className='font-caption text-primary-token'>
