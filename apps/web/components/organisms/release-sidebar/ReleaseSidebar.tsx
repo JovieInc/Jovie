@@ -749,7 +749,7 @@ export function ReleaseSidebar({
         <div data-testid='release-tasks-card'>
           {isTasksWorkspaceGateLoading ? (
             <div
-              className='animate-pulse px-1 py-1.5 text-[12px] text-secondary-token'
+              className='animate-pulse px-1 py-1.5 text-xs text-secondary-token'
               data-testid='release-tasks-loading-state'
             >
               Loading tasks...
