@@ -76,12 +76,14 @@ export default function AuthV1Page() {
 
   return (
     <div
-      className='auth-v1 min-h-dvh w-full grid place-items-center bg-(--linear-bg-page) text-primary-token px-6'
+      className='auth-v1 min-h-dvh w-full bg-(--linear-bg-page) text-primary-token grid lg:grid-cols-2'
       style={{
         ...CARBON_VARS,
         opacity: mounted ? 1 : 0,
         transform: mounted ? 'scale(1)' : 'scale(0.985)',
         transition: `opacity 600ms ${EASE_CINEMATIC}, transform 600ms ${EASE_CINEMATIC}`,
+        fontFamily:
+          'ui-sans-serif, -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif',
       }}
     >
       <style>{`
@@ -93,152 +95,306 @@ export default function AuthV1Page() {
         }
       `}</style>
 
-      <div
-        className='w-full max-w-[360px] flex flex-col items-center text-center'
-        style={{
-          fontFamily:
-            'ui-sans-serif, -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif',
-        }}
-      >
-        <JovieMark className='h-9 w-9 text-primary-token mb-6' />
+      {/* Left half — auth card. Centered vertically + horizontally. */}
+      <div className='min-h-dvh grid place-items-center px-6 py-10'>
+        <div className='w-full max-w-[360px] flex flex-col items-center text-center'>
+          <JovieMark className='h-9 w-9 text-primary-token mb-6' />
 
-        <h1
-          className='text-[24px] font-semibold leading-tight'
+          <h1
+            className='text-[24px] font-semibold leading-tight'
+            style={{ letterSpacing: '-0.02em' }}
+          >
+            {step === 'email'
+              ? mode === 'signup'
+                ? 'Create your account'
+                : 'Welcome back'
+              : step === 'otp'
+                ? 'Check your email'
+                : 'You’re in'}
+          </h1>
+          <p className='mt-2 text-[13px] text-tertiary-token max-w-[320px]'>
+            {step === 'email'
+              ? mode === 'signup'
+                ? 'A passwordless link to set up your artist workspace.'
+                : 'Sign in with the email you used to set up Jovie.'
+              : step === 'otp'
+                ? `We sent a six-digit code to ${email}.`
+                : mode === 'signup'
+                  ? 'Taking you to onboarding…'
+                  : 'Taking you to your dashboard…'}
+          </p>
+
+          <div className='mt-8 w-full'>
+            {step === 'email' && (
+              <form onSubmit={onSubmitEmail} className='flex flex-col gap-3'>
+                <label className='block text-left'>
+                  <span className='block text-[10.5px] uppercase tracking-[0.08em] text-quaternary-token font-semibold mb-1.5'>
+                    Email
+                  </span>
+                  <input
+                    ref={emailRef}
+                    type='email'
+                    required
+                    autoComplete='email'
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    placeholder='you@artistdomain.com'
+                    className='w-full h-10 px-3 rounded-md bg-(--surface-1)/80 border border-(--linear-app-shell-border) text-[14px] text-primary-token placeholder:text-quaternary-token outline-none focus:border-cyan-400/50 transition-colors duration-150 ease-out'
+                  />
+                </label>
+                <ContinueButton submitting={submitting}>
+                  Continue
+                </ContinueButton>
+              </form>
+            )}
+
+            {step === 'otp' && (
+              <form onSubmit={onSubmitOtp} className='flex flex-col gap-3'>
+                <div className='block text-left'>
+                  <span className='block text-[10.5px] uppercase tracking-[0.08em] text-quaternary-token font-semibold mb-1.5'>
+                    Verification code
+                  </span>
+                  <OtpInput value={otp} onChange={setOtp} firstRef={otpRef} />
+                </div>
+                <ContinueButton submitting={submitting}>
+                  {mode === 'signup' ? 'Create account' : 'Sign in'}
+                </ContinueButton>
+                <button
+                  type='button'
+                  onClick={() => setStep('email')}
+                  className='text-[11.5px] text-tertiary-token hover:text-primary-token mt-1 transition-colors duration-150 ease-out'
+                >
+                  Use a different email
+                </button>
+              </form>
+            )}
+
+            {step === 'success' && (
+              <div className='inline-flex items-center gap-2 text-[12.5px] text-tertiary-token'>
+                <Loader2
+                  className='h-3.5 w-3.5 animate-spin'
+                  strokeWidth={2.25}
+                />
+                Redirecting…
+              </div>
+            )}
+          </div>
+
+          {step === 'email' && (
+            <p className='mt-8 text-[12px] text-tertiary-token'>
+              {mode === 'signup' ? (
+                <>
+                  Already have an account?{' '}
+                  <button
+                    type='button'
+                    onClick={() => setMode('signin')}
+                    className='text-secondary-token hover:text-primary-token underline decoration-quaternary-token/60 underline-offset-[3px] hover:decoration-cyan-300/70 transition-colors duration-150 ease-out'
+                  >
+                    Sign in
+                  </button>
+                </>
+              ) : (
+                <>
+                  New to Jovie?{' '}
+                  <button
+                    type='button'
+                    onClick={() => setMode('signup')}
+                    className='text-secondary-token hover:text-primary-token underline decoration-quaternary-token/60 underline-offset-[3px] hover:decoration-cyan-300/70 transition-colors duration-150 ease-out'
+                  >
+                    Create account
+                  </button>
+                </>
+              )}
+            </p>
+          )}
+
+          <p className='mt-12 text-[10.5px] text-quaternary-token'>
+            By continuing you agree to the{' '}
+            <a
+              href='https://jov.ie/terms'
+              className='underline decoration-quaternary-token/40 underline-offset-[3px] hover:text-tertiary-token transition-colors duration-150 ease-out'
+            >
+              terms
+            </a>{' '}
+            and{' '}
+            <a
+              href='https://jov.ie/privacy'
+              className='underline decoration-quaternary-token/40 underline-offset-[3px] hover:text-tertiary-token transition-colors duration-150 ease-out'
+            >
+              privacy policy
+            </a>
+            .
+          </p>
+        </div>
+      </div>
+
+      {/* Right half — product bento. Hidden below lg. */}
+      <div className='hidden lg:flex min-h-dvh items-stretch p-6'>
+        <BentoShowcase />
+      </div>
+    </div>
+  );
+}
+
+function BentoShowcase() {
+  return (
+    <div className='flex-1 flex flex-col rounded-[var(--linear-app-shell-radius,12px)] border border-(--linear-app-shell-border) bg-(--surface-1)/60 px-12 py-14 overflow-hidden'>
+      <div className='shrink-0'>
+        <span className='text-[10.5px] uppercase tracking-[0.12em] text-quaternary-token font-semibold'>
+          Built for artists
+        </span>
+        <h2
+          className='mt-2 text-[28px] font-semibold leading-tight text-primary-token max-w-[420px]'
           style={{ letterSpacing: '-0.02em' }}
         >
-          {step === 'email'
-            ? mode === 'signup'
-              ? 'Create your account'
-              : 'Welcome back'
-            : step === 'otp'
-              ? 'Check your email'
-              : 'You’re in'}
-        </h1>
-        <p className='mt-2 text-[13px] text-tertiary-token max-w-[320px]'>
-          {step === 'email'
-            ? mode === 'signup'
-              ? 'A passwordless link to set up your artist workspace.'
-              : 'Sign in with the email you used to set up Jovie.'
-            : step === 'otp'
-              ? `We sent a six-digit code to ${email}.`
-              : mode === 'signup'
-                ? 'Taking you to onboarding…'
-                : 'Taking you to your dashboard…'}
-        </p>
-
-        <div className='mt-8 w-full'>
-          {step === 'email' && (
-            <form onSubmit={onSubmitEmail} className='flex flex-col gap-3'>
-              <label className='block text-left'>
-                <span className='block text-[10.5px] uppercase tracking-[0.08em] text-quaternary-token font-semibold mb-1.5'>
-                  Email
-                </span>
-                <input
-                  ref={emailRef}
-                  type='email'
-                  required
-                  autoComplete='email'
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  placeholder='you@artistdomain.com'
-                  className='w-full h-10 px-3 rounded-md bg-(--surface-1)/80 border border-(--linear-app-shell-border) text-[14px] text-primary-token placeholder:text-quaternary-token outline-none focus:border-cyan-400/50 transition-colors duration-150 ease-out'
-                />
-              </label>
-              <ContinueButton submitting={submitting}>Continue</ContinueButton>
-            </form>
-          )}
-
-          {step === 'otp' && (
-            <form onSubmit={onSubmitOtp} className='flex flex-col gap-3'>
-              <label className='block text-left'>
-                <span className='block text-[10.5px] uppercase tracking-[0.08em] text-quaternary-token font-semibold mb-1.5'>
-                  Verification code
-                </span>
-                <input
-                  ref={otpRef}
-                  type='text'
-                  inputMode='numeric'
-                  pattern='\d{6}'
-                  maxLength={6}
-                  required
-                  value={otp}
-                  onChange={e =>
-                    setOtp(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))
-                  }
-                  placeholder='000000'
-                  className='w-full h-10 px-3 rounded-md bg-(--surface-1)/80 border border-(--linear-app-shell-border) text-[16px] tracking-[0.4em] tabular-nums text-primary-token placeholder:text-quaternary-token outline-none focus:border-cyan-400/50 transition-colors duration-150 ease-out'
-                />
-              </label>
-              <ContinueButton submitting={submitting}>
-                {mode === 'signup' ? 'Create account' : 'Sign in'}
-              </ContinueButton>
-              <button
-                type='button'
-                onClick={() => setStep('email')}
-                className='text-[11.5px] text-tertiary-token hover:text-primary-token mt-1 transition-colors duration-150 ease-out'
-              >
-                Use a different email
-              </button>
-            </form>
-          )}
-
-          {step === 'success' && (
-            <div className='inline-flex items-center gap-2 text-[12.5px] text-tertiary-token'>
-              <Loader2
-                className='h-3.5 w-3.5 animate-spin'
-                strokeWidth={2.25}
-              />
-              Redirecting…
-            </div>
-          )}
-        </div>
-
-        {step === 'email' && (
-          <p className='mt-8 text-[12px] text-tertiary-token'>
-            {mode === 'signup' ? (
-              <>
-                Already have an account?{' '}
-                <button
-                  type='button'
-                  onClick={() => setMode('signin')}
-                  className='text-secondary-token hover:text-primary-token underline decoration-quaternary-token/60 underline-offset-[3px] hover:decoration-cyan-300/70 transition-colors duration-150 ease-out'
-                >
-                  Sign in
-                </button>
-              </>
-            ) : (
-              <>
-                New to Jovie?{' '}
-                <button
-                  type='button'
-                  onClick={() => setMode('signup')}
-                  className='text-secondary-token hover:text-primary-token underline decoration-quaternary-token/60 underline-offset-[3px] hover:decoration-cyan-300/70 transition-colors duration-150 ease-out'
-                >
-                  Create account
-                </button>
-              </>
-            )}
-          </p>
-        )}
-
-        <p className='mt-12 text-[10.5px] text-quaternary-token'>
-          By continuing you agree to the{' '}
-          <a
-            href='https://jov.ie/terms'
-            className='underline decoration-quaternary-token/40 underline-offset-[3px] hover:text-tertiary-token transition-colors duration-150 ease-out'
-          >
-            terms
-          </a>{' '}
-          and{' '}
-          <a
-            href='https://jov.ie/privacy'
-            className='underline decoration-quaternary-token/40 underline-offset-[3px] hover:text-tertiary-token transition-colors duration-150 ease-out'
-          >
-            privacy policy
-          </a>
-          .
+          The studio that ships releases for you.
+        </h2>
+        <p className='mt-3 text-[13.5px] text-tertiary-token max-w-[400px] leading-relaxed'>
+          Jovie writes pitches, schedules drops, generates reels and lyric
+          clips, and tells you what to ship next. You make the music.
         </p>
       </div>
+
+      {/* Product mock — Carbon palette stand-in for a screenshot. */}
+      <div className='mt-8 flex-1 grid place-items-center'>
+        <ProductMock />
+      </div>
+
+      {/* Trust bar — uppercase label + grayscale initial avatars. */}
+      <div className='shrink-0 mt-8 pt-6 border-t border-(--linear-app-shell-border)/70'>
+        <p className='text-[10.5px] uppercase tracking-[0.12em] text-quaternary-token font-semibold mb-3'>
+          Trusted by artists
+        </p>
+        <div className='flex items-center gap-2'>
+          {['BA', 'TW', 'SD', 'LF', 'GE', 'EC'].map(id => (
+            <span
+              key={id}
+              className='h-7 w-7 rounded-full grid place-items-center text-[10.5px] font-medium text-tertiary-token bg-(--surface-2)/70 border border-(--linear-app-shell-border)'
+            >
+              {id}
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProductMock() {
+  // Stand-in for a real screenshot — Carbon palette scene with a sidebar
+  // strip + canvas tiles. Keeps the bento honest without a binary asset
+  // dependency. Replace with a real screenshot import later.
+  return (
+    <div className='w-full max-w-[520px] aspect-[16/10] rounded-lg border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) shadow-[0_24px_80px_rgba(0,0,0,0.45)] overflow-hidden grid grid-cols-[80px_1fr]'>
+      {/* sidebar strip */}
+      <div className='border-r border-(--linear-app-shell-border)/70 bg-(--surface-0)/60 p-2 flex flex-col gap-1.5'>
+        {[0, 1, 2, 3, 4].map(i => (
+          <span
+            key={i}
+            className={cn(
+              'h-1.5 rounded-full',
+              i === 1 ? 'bg-cyan-300/60 w-2/3' : 'bg-white/15 w-3/4'
+            )}
+          />
+        ))}
+      </div>
+      {/* canvas */}
+      <div className='p-3 flex flex-col gap-2'>
+        <div className='h-2 w-1/3 rounded-full bg-white/30' />
+        <div className='h-1.5 w-1/2 rounded-full bg-white/12' />
+        <div className='mt-2 grid grid-cols-3 gap-2 flex-1'>
+          {[0, 1, 2, 3, 4, 5].map(i => (
+            <div
+              key={i}
+              className='rounded-md border border-(--linear-app-shell-border)/70 bg-(--surface-1)/40'
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Class OTP — six independent cells, autoadvance, paste, backspace.
+// Owns its own DOM refs so paste anywhere distributes across cells.
+function OtpInput({
+  value,
+  onChange,
+  firstRef,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+  firstRef: React.MutableRefObject<HTMLInputElement | null>;
+}) {
+  const refs = useRef<Array<HTMLInputElement | null>>([]);
+
+  function setAt(i: number, char: string) {
+    const sanitized = char.replace(/[^0-9]/g, '').slice(0, 1);
+    const arr = (value + '      ').slice(0, 6).split('');
+    arr[i] = sanitized || ' ';
+    const next = arr.join('').replace(/ /g, '').slice(0, 6);
+    onChange(next);
+    if (sanitized && i < 5) {
+      refs.current[i + 1]?.focus();
+      refs.current[i + 1]?.select();
+    }
+  }
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>, i: number) {
+    if (e.key === 'Backspace' && !value[i] && i > 0) {
+      e.preventDefault();
+      const arr = value.split('');
+      arr.splice(i - 1, 1);
+      onChange(arr.join(''));
+      refs.current[i - 1]?.focus();
+    } else if (e.key === 'ArrowLeft' && i > 0) {
+      e.preventDefault();
+      refs.current[i - 1]?.focus();
+      refs.current[i - 1]?.select();
+    } else if (e.key === 'ArrowRight' && i < 5) {
+      e.preventDefault();
+      refs.current[i + 1]?.focus();
+      refs.current[i + 1]?.select();
+    }
+  }
+
+  function onPaste(e: React.ClipboardEvent<HTMLInputElement>) {
+    e.preventDefault();
+    const pasted = e.clipboardData
+      .getData('text')
+      .replace(/[^0-9]/g, '')
+      .slice(0, 6);
+    if (!pasted) return;
+    onChange(pasted);
+    const last = Math.min(5, pasted.length - 1);
+    setTimeout(() => {
+      refs.current[last]?.focus();
+      refs.current[last]?.select();
+    }, 0);
+  }
+
+  return (
+    <div className='flex items-center gap-2 justify-between'>
+      {[0, 1, 2, 3, 4, 5].map(i => (
+        <input
+          key={i}
+          ref={el => {
+            refs.current[i] = el;
+            if (i === 0) firstRef.current = el;
+          }}
+          type='text'
+          inputMode='numeric'
+          pattern='[0-9]'
+          maxLength={1}
+          value={value[i] ?? ''}
+          onChange={e => setAt(i, e.target.value)}
+          onKeyDown={e => onKeyDown(e, i)}
+          onPaste={onPaste}
+          onFocus={e => e.currentTarget.select()}
+          aria-label={`Digit ${i + 1} of 6`}
+          className='h-11 w-full min-w-0 rounded-md bg-(--surface-1)/80 border border-(--linear-app-shell-border) text-[18px] tabular-nums font-mono text-center text-primary-token outline-none focus:border-cyan-400/50 transition-colors duration-150 ease-out'
+        />
+      ))}
     </div>
   );
 }
@@ -255,7 +411,7 @@ function ContinueButton({
       type='submit'
       disabled={submitting}
       className={cn(
-        'inline-flex items-center justify-center gap-1.5 h-10 px-4 rounded-md text-[13px] font-medium bg-cyan-300 text-black hover:bg-cyan-200 transition-colors duration-150 ease-out',
+        'inline-flex items-center justify-center gap-1.5 h-10 px-4 rounded-md text-[13px] font-medium bg-white text-black hover:bg-white/90 transition-colors duration-150 ease-out',
         submitting && 'opacity-70'
       )}
     >

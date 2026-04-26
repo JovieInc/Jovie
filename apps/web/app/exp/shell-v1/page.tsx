@@ -100,7 +100,25 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import LibraryV1Page from '@/app/exp/library-v1/page';
+import type {
+  Asset as LibraryAsset,
+  Filters as LibraryFiltersType,
+  SavedViewId as LibrarySavedViewId,
+  SortKey as LibrarySortKey,
+  ViewMode as LibraryViewMode,
+} from '@/app/exp/library-v1/page';
+import {
+  emptyFilters as emptyLibraryFilters,
+  generateAssets as generateLibraryAssets,
+  Drawer as LibraryDrawer,
+  EmptyState as LibraryEmptyState,
+  Grid as LibraryGrid,
+  LeftRail as LibraryLeftRail,
+  SortDropdown as LibrarySortDropdown,
+  StatusBar as LibraryStatusBar,
+  Table as LibraryTable,
+  ViewToggle as LibraryViewToggle,
+} from '@/app/exp/library-v1/page';
 import { cn } from '@/lib/utils';
 
 type Variant = 'a' | 'b' | 'c' | 'd' | 'e';
@@ -1182,6 +1200,34 @@ export default function ShellV1Experiment() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchPills, setSearchPills] = useState<FilterPill[]>([]);
   const [keyMode, setKeyMode] = useState<'normal' | 'camelot'>('normal');
+  // Library state — lifted to the shell so the sidebar (filters/saved
+  // views) and canvas (grid/table/drawer) share the same source of truth.
+  // Standalone /exp/library-v1 still owns its own state internally.
+  const libraryAllAssets = useMemo(() => generateLibraryAssets(), []);
+  const [librarySavedView, setLibrarySavedView] =
+    useState<LibrarySavedViewId>('all');
+  const [libraryFilters, setLibraryFilters] = useState<LibraryFiltersType>(() =>
+    emptyLibraryFilters()
+  );
+  const [librarySort, setLibrarySort] = useState<LibrarySortKey>('addedAt');
+  const [libraryViewMode, setLibraryViewMode] =
+    useState<LibraryViewMode>('grid');
+  const [librarySelectedId, setLibrarySelectedId] = useState<string | null>(
+    null
+  );
+  const [libraryDrawerOpen, setLibraryDrawerOpen] = useState(false);
+  const [libraryFavorites, setLibraryFavorites] = useState<Set<string>>(
+    () => new Set(libraryAllAssets.filter(a => a.favorite).map(a => a.id))
+  );
+  const toggleLibraryFavorite = (id: string) => {
+    setLibraryFavorites(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  const clearLibraryFilters = () => setLibraryFilters(emptyLibraryFilters());
   // Right-click context menu state. Lives at the shell level so only one
   // menu is open at a time and Esc / outside-click can dismiss globally.
   const [contextMenu, setContextMenu] = useState<{
@@ -1530,6 +1576,18 @@ export default function ShellV1Experiment() {
           onSelectView={setView}
           activeView={view}
           tight={sidebarTight}
+          libraryProps={
+            view === 'library'
+              ? {
+                  allAssets: libraryAllAssets,
+                  savedView: librarySavedView,
+                  onSavedView: setLibrarySavedView,
+                  filters: libraryFilters,
+                  onFilters: setLibraryFilters,
+                  onClearAll: clearLibraryFilters,
+                }
+              : undefined
+          }
         />
       </div>
 
@@ -1604,6 +1662,20 @@ export default function ShellV1Experiment() {
                 )
               }
               onOpenSearch={() => setSearchOpen(true)}
+              extraToolbar={
+                view === 'library' ? (
+                  <>
+                    <LibrarySortDropdown
+                      sort={librarySort}
+                      onSort={setLibrarySort}
+                    />
+                    <LibraryViewToggle
+                      view={libraryViewMode}
+                      onView={setLibraryViewMode}
+                    />
+                  </>
+                ) : undefined
+              }
             />
           </div>
           <div
@@ -1692,7 +1764,21 @@ export default function ShellV1Experiment() {
                   onSeek={sec => setCurrentTimeSec(sec)}
                 />
               ) : view === 'library' ? (
-                <LibraryShellEmbed />
+                <LibraryShellEmbed
+                  allAssets={libraryAllAssets}
+                  savedView={librarySavedView}
+                  filters={libraryFilters}
+                  sort={librarySort}
+                  viewMode={libraryViewMode}
+                  selectedId={librarySelectedId}
+                  drawerOpen={libraryDrawerOpen}
+                  favorites={libraryFavorites}
+                  searchText={searchPills.flatMap(p => p.values).join(' ')}
+                  onSelect={setLibrarySelectedId}
+                  onSetDrawerOpen={setLibraryDrawerOpen}
+                  onToggleFavorite={toggleLibraryFavorite}
+                  onClearFilters={clearLibraryFilters}
+                />
               ) : view === 'settings' ? (
                 <SettingsView />
               ) : (
@@ -1962,13 +2048,26 @@ function Sidebar({
   onSelectView,
   activeView,
   tight,
+  libraryProps,
 }: {
   variant: 'docked' | 'floating';
   onPin: () => void;
   onSelectView?: (v: CanvasView) => void;
   activeView?: CanvasView;
   tight?: boolean;
+  // When provided, the sidebar context-shifts into library mode: brand
+  // row swaps to a `← Library` back chip and the body becomes the
+  // library's saved-views + facet filters (lifted from /exp/library-v1).
+  libraryProps?: {
+    allAssets: LibraryAsset[];
+    savedView: LibrarySavedViewId;
+    onSavedView: (v: LibrarySavedViewId) => void;
+    filters: LibraryFiltersType;
+    onFilters: (f: LibraryFiltersType) => void;
+    onClearAll: () => void;
+  };
 }) {
+  const inLibraryMode = !!libraryProps;
   const collapsed = false;
   // Pin button stays visible briefly after the sidebar appears or when the
   // user hovers it. Otherwise it gets out of the way.
@@ -2005,21 +2104,42 @@ function Sidebar({
       onMouseMove={bumpPinVisibility}
     >
       {/* Brand row — Jovie wordmark doubles as the user-menu trigger.
-          Click anywhere on the row to drop the user menu. */}
+          Click anywhere on the row to drop the user menu. In library
+          (or settings) mode the brand row swaps to a `← Section` back
+          chip, mirroring the Linear settings nav pattern. */}
       <div className={cn('px-2', tight ? 'pt-2 pb-2' : 'pt-3 pb-4')}>
         <div className='relative flex items-center h-7 gap-2.5'>
-          <UserMenu>
-            <span className='flex-1 inline-flex items-center gap-2.5 h-7 pl-3 pr-2 rounded-md hover:bg-surface-1/60 transition-colors duration-150 ease-out cursor-pointer min-w-0'>
-              <JovieMark className='h-4 w-4 shrink-0 text-primary-token' />
-              <span className='text-[13.5px] font-semibold tracking-[-0.02em] text-primary-token flex-1 truncate'>
-                Jovie
-              </span>
-              <ChevronDown
-                className='h-3 w-3 text-quaternary-token shrink-0'
+          {inLibraryMode ? (
+            <button
+              type='button'
+              onClick={() => onSelectView?.('demo')}
+              className='flex-1 inline-flex items-center gap-2 h-7 pl-2.5 pr-2 rounded-md hover:bg-surface-1/60 transition-colors duration-150 ease-out cursor-pointer min-w-0 text-secondary-token hover:text-primary-token'
+            >
+              <ChevronLeft
+                className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
                 strokeWidth={2.25}
               />
-            </span>
-          </UserMenu>
+              <span
+                className='text-[13px] font-semibold tracking-[-0.012em] flex-1 truncate text-left'
+                style={{ letterSpacing: '-0.012em' }}
+              >
+                Library
+              </span>
+            </button>
+          ) : (
+            <UserMenu>
+              <span className='flex-1 inline-flex items-center gap-2.5 h-7 pl-3 pr-2 rounded-md hover:bg-surface-1/60 transition-colors duration-150 ease-out cursor-pointer min-w-0'>
+                <JovieMark className='h-4 w-4 shrink-0 text-primary-token' />
+                <span className='text-[13.5px] font-semibold tracking-[-0.02em] text-primary-token flex-1 truncate'>
+                  Jovie
+                </span>
+                <ChevronDown
+                  className='h-3 w-3 text-quaternary-token shrink-0'
+                  strokeWidth={2.25}
+                />
+              </span>
+            </UserMenu>
+          )}
           <button
             type='button'
             onClick={onPin}
@@ -2049,77 +2169,93 @@ function Sidebar({
         </div>
       </div>
 
-      <nav
-        className={cn(
-          'flex-1 overflow-y-auto px-2 pb-2',
-          tight ? 'space-y-3' : 'space-y-5'
-        )}
-      >
-        {/* Cross-context items (no label, just the items) */}
-        <div className='space-y-px'>
-          {CORE_ITEMS.map(item => {
-            const view: CanvasView | null =
-              item.label === 'Library'
-                ? 'library'
-                : item.label === 'Tasks'
-                  ? 'tasks'
-                  : null;
-            return (
-              <SidebarNavItem
-                key={item.label}
-                item={{
-                  ...item,
-                  active:
-                    view !== null && activeView === view ? true : item.active,
-                  onActivate:
-                    view && onSelectView ? () => onSelectView(view) : undefined,
-                }}
+      {inLibraryMode && libraryProps ? (
+        <nav className='flex-1 overflow-y-auto'>
+          <LibraryLeftRail
+            noChrome
+            savedView={libraryProps.savedView}
+            onSavedView={libraryProps.onSavedView}
+            assets={libraryProps.allAssets}
+            filters={libraryProps.filters}
+            onFilters={libraryProps.onFilters}
+            onClearAll={libraryProps.onClearAll}
+          />
+        </nav>
+      ) : (
+        <nav
+          className={cn(
+            'flex-1 overflow-y-auto px-2 pb-2',
+            tight ? 'space-y-3' : 'space-y-5'
+          )}
+        >
+          {/* Cross-context items (no label, just the items) */}
+          <div className='space-y-px'>
+            {CORE_ITEMS.map(item => {
+              const view: CanvasView | null =
+                item.label === 'Library'
+                  ? 'library'
+                  : item.label === 'Tasks'
+                    ? 'tasks'
+                    : null;
+              return (
+                <SidebarNavItem
+                  key={item.label}
+                  item={{
+                    ...item,
+                    active:
+                      view !== null && activeView === view ? true : item.active,
+                    onActivate:
+                      view && onSelectView
+                        ? () => onSelectView(view)
+                        : undefined,
+                  }}
+                  collapsed={collapsed}
+                  tight={tight}
+                />
+              );
+            })}
+          </div>
+
+          {/* Artists */}
+          <div className='space-y-3'>
+            {!collapsed && (
+              <div className='px-3 pb-1'>
+                <span className='text-[9.5px] font-medium uppercase tracking-[0.12em] text-quaternary-token/85'>
+                  Artists
+                </span>
+              </div>
+            )}
+            {ARTIST_WORKSPACES.map(ws => (
+              <Workspace
+                key={ws.id}
+                workspace={ws}
+                open={openWs[ws.id] ?? false}
+                onToggle={() =>
+                  setOpenWs(s => ({ ...s, [ws.id]: !(s[ws.id] ?? false) }))
+                }
                 collapsed={collapsed}
                 tight={tight}
               />
-            );
-          })}
-        </div>
+            ))}
+          </div>
 
-        {/* Artists */}
-        <div className='space-y-3'>
-          {!collapsed && (
-            <div className='px-3 pb-1'>
-              <span className='text-[9.5px] font-medium uppercase tracking-[0.12em] text-quaternary-token/85'>
-                Artists
-              </span>
-            </div>
-          )}
-          {ARTIST_WORKSPACES.map(ws => (
+          {/* Admin — separate, no section header */}
+          <div>
             <Workspace
-              key={ws.id}
-              workspace={ws}
-              open={openWs[ws.id] ?? false}
+              workspace={ADMIN_WORKSPACE}
+              open={openWs[ADMIN_WORKSPACE.id] ?? false}
               onToggle={() =>
-                setOpenWs(s => ({ ...s, [ws.id]: !(s[ws.id] ?? false) }))
+                setOpenWs(s => ({
+                  ...s,
+                  [ADMIN_WORKSPACE.id]: !(s[ADMIN_WORKSPACE.id] ?? false),
+                }))
               }
               collapsed={collapsed}
               tight={tight}
             />
-          ))}
-        </div>
-
-        {/* Admin — separate, no section header */}
-        <div>
-          <Workspace
-            workspace={ADMIN_WORKSPACE}
-            open={openWs[ADMIN_WORKSPACE.id] ?? false}
-            onToggle={() =>
-              setOpenWs(s => ({
-                ...s,
-                [ADMIN_WORKSPACE.id]: !(s[ADMIN_WORKSPACE.id] ?? false),
-              }))
-            }
-            collapsed={collapsed}
-            tight={tight}
-          />
-        </div>
-      </nav>
+          </div>
+        </nav>
+      )}
 
       {/* Reserve room at the bottom for the fixed now-playing card so the
           nav doesn't scroll behind it when the workspace lists get long. */}
@@ -2406,6 +2542,7 @@ function CanvasSubheader({
   rightRailOpen,
   onToggleRightRail,
   onOpenSearch,
+  extraToolbar,
 }: {
   subviews: { id: string; label: string; count?: number }[];
   subview: string;
@@ -2413,6 +2550,10 @@ function CanvasSubheader({
   rightRailOpen: boolean;
   onToggleRightRail: () => void;
   onOpenSearch: () => void;
+  // Optional view-specific toolbar slot, rendered inline before the
+  // shared search + panel-right buttons. Used by Library to host its
+  // sort dropdown + grid/table toggle without owning its own header.
+  extraToolbar?: React.ReactNode;
 }) {
   return (
     <div className='shrink-0 h-10 px-3 flex items-center gap-2 border-b border-(--linear-app-shell-border)/50'>
@@ -2446,7 +2587,8 @@ function CanvasSubheader({
           );
         })}
       </div>
-      <div className='ml-auto flex items-center gap-1'>
+      <div className='ml-auto flex items-center gap-1.5'>
+        {extraToolbar}
         <Tooltip label='Search' shortcut='search'>
           <button
             type='button'
@@ -2704,11 +2846,14 @@ function Header({
 function PageAction({ view }: { view: CanvasView }) {
   const action = pageActionForView(view);
   if (!action) return null;
+  // White tone by default. Cyan was overpowering — primary actions
+  // shouldn't compete with the brand mark or status badges. White on
+  // dark stays the visual anchor without screaming.
   return (
     <button
       type='button'
       onClick={action.onClick}
-      className='inline-flex items-center gap-1.5 h-7 px-3 rounded-md bg-cyan-300 text-black text-[12px] font-medium hover:bg-cyan-200 transition-colors duration-150 ease-out'
+      className='inline-flex items-center gap-1.5 h-7 px-3 rounded-md bg-white text-black text-[12px] font-medium hover:bg-white/90 transition-colors duration-150 ease-out'
     >
       {action.icon ? (
         <action.icon className='h-3.5 w-3.5' strokeWidth={2.5} />
@@ -4865,10 +5010,145 @@ function PillChip({
 // as /exp/library-v1, just rendered inside the shell's canvas instead of
 // owning the page. The library brings its own left rail (saved views +
 // filters), grid/table center, and right asset drawer.
-function LibraryShellEmbed() {
+// Same filter logic the standalone library uses, just driven by lifted
+// state from the shell. Saved view + facets compose with AND;
+// generated-by inverts; search text matches title + tags + alt. Defined
+// at module scope so the useMemo dep array stays clean.
+const LIBRARY_SAVED_PREDICATES: Record<
+  LibrarySavedViewId,
+  (a: LibraryAsset) => boolean
+> = {
+  all: () => true,
+  approved: a => a.status === 'approved',
+  reels: a => a.aspect === '9:16',
+  review: a => a.status === 'review',
+  'this-noise': a => a.release === 'this-noise',
+  'this-week': a => {
+    const days = (Date.now() - new Date(a.addedAt).getTime()) / 86400000;
+    return days <= 7 && a.generatedBy === 'jovie';
+  },
+};
+
+// Library canvas embedded inside the shell. No internal LeftRail, no
+// TopBar — those responsibilities lift up: filters live in the shell
+// sidebar (context-shifted), sort + view toggle live in the
+// CanvasSubheader, search lives in the shell header. We render just the
+// content + drawer + status bar.
+function LibraryShellEmbed({
+  allAssets,
+  savedView,
+  filters,
+  sort,
+  viewMode,
+  selectedId,
+  drawerOpen,
+  favorites,
+  searchText,
+  onSelect,
+  onSetDrawerOpen,
+  onToggleFavorite,
+  onClearFilters,
+}: {
+  allAssets: LibraryAsset[];
+  savedView: LibrarySavedViewId;
+  filters: LibraryFiltersType;
+  sort: LibrarySortKey;
+  viewMode: LibraryViewMode;
+  selectedId: string | null;
+  drawerOpen: boolean;
+  favorites: Set<string>;
+  searchText: string;
+  onSelect: (id: string | null) => void;
+  onSetDrawerOpen: (open: boolean) => void;
+  onToggleFavorite: (id: string) => void;
+  onClearFilters: () => void;
+}) {
+  const filteredAssets = useMemo(() => {
+    const savedPredicate = LIBRARY_SAVED_PREDICATES[savedView] ?? (() => true);
+    const q = searchText.trim().toLowerCase();
+    return allAssets
+      .filter(savedPredicate)
+      .filter(a => {
+        if (filters.types.size && !filters.types.has(a.type)) return false;
+        if (filters.aspects.size && !filters.aspects.has(a.aspect))
+          return false;
+        if (filters.releases.size && !filters.releases.has(a.release))
+          return false;
+        if (filters.statuses.size && !filters.statuses.has(a.status))
+          return false;
+        if (filters.channels.size) {
+          const hit = a.channels.some(c => filters.channels.has(c));
+          if (!hit) return false;
+        }
+        if (filters.generatedBy.size && !filters.generatedBy.has(a.generatedBy))
+          return false;
+        if (q) {
+          const hay = `${a.title} ${a.tags.join(' ')} ${a.alt}`.toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        if (sort === 'addedAt') return b.addedAt.localeCompare(a.addedAt);
+        if (sort === 'capturedAt')
+          return b.capturedAt.localeCompare(a.capturedAt);
+        if (sort === 'status') return a.status.localeCompare(b.status);
+        return b.popularity - a.popularity;
+      });
+  }, [allAssets, savedView, filters, sort, searchText]);
+
+  const selected = filteredAssets.find(a => a.id === selectedId) ?? null;
+
   return (
-    <div className='h-full w-full overflow-hidden'>
-      <LibraryV1Page />
+    <div
+      className='h-full w-full grid overflow-hidden'
+      style={{
+        gridTemplateColumns: drawerOpen ? '1fr 388px' : '1fr 0px',
+        transition:
+          'grid-template-columns 420ms cubic-bezier(0.32, 0.72, 0, 1)',
+      }}
+    >
+      <div className='flex flex-col min-w-0 overflow-hidden'>
+        <div className='flex-1 overflow-y-auto'>
+          {filteredAssets.length === 0 ? (
+            <LibraryEmptyState onClear={onClearFilters} />
+          ) : viewMode === 'grid' ? (
+            <LibraryGrid
+              assets={filteredAssets}
+              selectedId={selectedId}
+              favorites={favorites}
+              onSelect={id => {
+                onSelect(id);
+                onSetDrawerOpen(true);
+              }}
+              onToggleFavorite={onToggleFavorite}
+            />
+          ) : (
+            <LibraryTable
+              assets={filteredAssets}
+              selectedId={selectedId}
+              favorites={favorites}
+              onSelect={id => {
+                onSelect(id);
+                onSetDrawerOpen(true);
+              }}
+              onToggleFavorite={onToggleFavorite}
+            />
+          )}
+        </div>
+        <LibraryStatusBar
+          count={filteredAssets.length}
+          total={allAssets.length}
+          sort={sort}
+        />
+      </div>
+      <LibraryDrawer
+        asset={selected}
+        open={drawerOpen}
+        onClose={() => onSetDrawerOpen(false)}
+        favorites={favorites}
+        onToggleFavorite={onToggleFavorite}
+      />
     </div>
   );
 }

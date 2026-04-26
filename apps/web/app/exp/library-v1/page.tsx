@@ -59,7 +59,7 @@ const CARBON_VARS: React.CSSProperties = {
   ['--text-quaternary' as string]: 'rgba(255,255,255,0.32)',
 };
 
-type AssetType =
+export type AssetType =
   | 'cover'
   | 'reel'
   | 'visualizer'
@@ -68,9 +68,9 @@ type AssetType =
   | 'remix_art'
   | 'master';
 
-type Aspect = '1:1' | '9:16' | '16:9' | '4:5';
-type Status = 'approved' | 'review' | 'draft' | 'archived';
-type Channel =
+export type Aspect = '1:1' | '9:16' | '16:9' | '4:5';
+export type Status = 'approved' | 'review' | 'draft' | 'archived';
+export type Channel =
   | 'instagram'
   | 'tiktok'
   | 'youtube'
@@ -78,9 +78,9 @@ type Channel =
   | 'apple'
   | 'smartlink'
   | 'email';
-type GeneratedBy = 'jovie' | 'manual' | 'edited';
+export type GeneratedBy = 'jovie' | 'manual' | 'edited';
 
-interface Asset {
+export interface Asset {
   id: string;
   title: string;
   type: AssetType;
@@ -168,7 +168,7 @@ const TYPES: AssetType[] = [
 ];
 
 // Deterministic mock data — repeatable visuals across reloads.
-function generateAssets(): Asset[] {
+export function generateAssets(): Asset[] {
   const seeds: Array<
     Partial<Asset> & Pick<Asset, 'title' | 'type' | 'release'>
   > = [
@@ -427,9 +427,9 @@ function tagsFor(type: AssetType, release: string): string[] {
   return [...base, 'master'];
 }
 
-type SortKey = 'addedAt' | 'capturedAt' | 'status' | 'popularity';
-type ViewMode = 'grid' | 'table';
-type SavedViewId =
+export type SortKey = 'addedAt' | 'capturedAt' | 'status' | 'popularity';
+export type ViewMode = 'grid' | 'table';
+export type SavedViewId =
   | 'all'
   | 'approved'
   | 'reels'
@@ -475,7 +475,7 @@ const SAVED_VIEWS: SavedView[] = [
   },
 ];
 
-interface Filters {
+export interface Filters {
   types: Set<AssetType>;
   aspects: Set<Aspect>;
   releases: Set<string>;
@@ -484,7 +484,7 @@ interface Filters {
   generatedBy: Set<GeneratedBy>;
 }
 
-function emptyFilters(): Filters {
+export function emptyFilters(): Filters {
   return {
     types: new Set(),
     aspects: new Set(),
@@ -724,13 +724,14 @@ export default function LibraryV1Page() {
 // ---------------------------------------------------------------------------
 // Left rail — saved views + faceted filters with live counts
 // ---------------------------------------------------------------------------
-function LeftRail({
+export function LeftRail({
   savedView,
   onSavedView,
   assets,
   filters,
   onFilters,
   onClearAll,
+  noChrome,
 }: {
   savedView: SavedViewId;
   onSavedView: (v: SavedViewId) => void;
@@ -738,6 +739,10 @@ function LeftRail({
   filters: Filters;
   onFilters: (f: Filters) => void;
   onClearAll: () => void;
+  // When `noChrome` is true, drop the <aside> wrapper and the brand row.
+  // Returns just the body (Views + Filters) — for embedding inside the
+  // shell sidebar's context-shift body.
+  noChrome?: boolean;
 }) {
   function toggle<T>(set: Set<T>, value: T): Set<T> {
     const next = new Set(set);
@@ -755,20 +760,8 @@ function LeftRail({
     generatedBy: countBy(assets, a => a.generatedBy),
   };
 
-  return (
-    <aside className='h-full overflow-y-auto border-r border-(--linear-app-shell-border) bg-(--surface-0) flex flex-col'>
-      <div className='shrink-0 px-3 pt-3 pb-2'>
-        <div className='flex items-center gap-2 px-1 py-1'>
-          <JovieMark className='h-4 w-4 text-primary-token' />
-          <span
-            className='text-[13.5px] font-semibold text-primary-token'
-            style={{ letterSpacing: '-0.01em' }}
-          >
-            Library
-          </span>
-        </div>
-      </div>
-
+  const body = (
+    <>
       <div className='shrink-0 px-2 pb-2'>
         <SectionHead label='Views' />
         <div className='flex flex-col gap-px'>
@@ -910,6 +903,27 @@ function LeftRail({
           ))}
         </FacetGroup>
       </div>
+    </>
+  );
+
+  if (noChrome) {
+    return body;
+  }
+
+  return (
+    <aside className='h-full overflow-y-auto border-r border-(--linear-app-shell-border) bg-(--surface-0) flex flex-col'>
+      <div className='shrink-0 px-3 pt-3 pb-2'>
+        <div className='flex items-center gap-2 px-1 py-1'>
+          <JovieMark className='h-4 w-4 text-primary-token' />
+          <span
+            className='text-[13.5px] font-semibold text-primary-token'
+            style={{ letterSpacing: '-0.01em' }}
+          >
+            Library
+          </span>
+        </div>
+      </div>
+      {body}
     </aside>
   );
 }
@@ -1134,7 +1148,7 @@ function SearchInput({
   );
 }
 
-function SortDropdown({
+export function SortDropdown({
   sort,
   onSort,
 }: {
@@ -1197,7 +1211,7 @@ function SortDropdown({
   );
 }
 
-function ViewToggle({
+export function ViewToggle({
   view,
   onView,
 }: {
@@ -1251,7 +1265,7 @@ function GenerateButton() {
 // ---------------------------------------------------------------------------
 // Grid + table views
 // ---------------------------------------------------------------------------
-function Grid({
+export function Grid({
   assets,
   selectedId,
   favorites,
@@ -1408,7 +1422,7 @@ function Poster({ asset }: { asset: Asset }) {
   );
 }
 
-function Table({
+export function Table({
   assets,
   selectedId,
   favorites,
@@ -1547,7 +1561,7 @@ function Table({
 // ---------------------------------------------------------------------------
 // Right drawer — inline metadata, version stack, downloads, activity
 // ---------------------------------------------------------------------------
-function Drawer({
+export function Drawer({
   asset,
   open,
   onClose,
@@ -1968,7 +1982,7 @@ function SecondaryAction({
 // ---------------------------------------------------------------------------
 // Status bar + empty state
 // ---------------------------------------------------------------------------
-function StatusBar({
+export function StatusBar({
   count,
   total,
   sort,
@@ -1983,6 +1997,8 @@ function StatusBar({
     status: 'Status',
     popularity: 'Popularity',
   };
+  // Kbd hint footer was visual noise — those shortcuts surface in tooltips
+  // on the controls themselves, no need to repeat them here.
   return (
     <footer className='shrink-0 h-7 px-3 flex items-center gap-3 border-t border-(--linear-app-shell-border) text-[10.5px] uppercase tracking-[0.06em] text-quaternary-token bg-(--surface-0)/60'>
       <span className='tabular-nums'>
@@ -1990,27 +2006,11 @@ function StatusBar({
       </span>
       <span>·</span>
       <span>Sorted by {sortLabels[sort]}</span>
-      <span className='ml-auto'>
-        <kbd className='inline-flex items-center h-4 px-1 rounded text-[9.5px] font-caption uppercase text-quaternary-token bg-(--surface-2)/60 border border-(--linear-app-shell-border)'>
-          /
-        </kbd>{' '}
-        search
-        <span className='mx-2 opacity-40'>·</span>
-        <kbd className='inline-flex items-center h-4 px-1 rounded text-[9.5px] font-caption uppercase text-quaternary-token bg-(--surface-2)/60 border border-(--linear-app-shell-border)'>
-          ↵
-        </kbd>{' '}
-        inspect
-        <span className='mx-2 opacity-40'>·</span>
-        <kbd className='inline-flex items-center h-4 px-1 rounded text-[9.5px] font-caption uppercase text-quaternary-token bg-(--surface-2)/60 border border-(--linear-app-shell-border)'>
-          F
-        </kbd>{' '}
-        favorite
-      </span>
     </footer>
   );
 }
 
-function EmptyState({ onClear }: { onClear: () => void }) {
+export function EmptyState({ onClear }: { onClear: () => void }) {
   return (
     <div className='h-full grid place-items-center px-6'>
       <div className='max-w-md text-center'>
