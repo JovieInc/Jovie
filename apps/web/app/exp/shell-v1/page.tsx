@@ -32,9 +32,14 @@ import {
   AudioLines,
   AudioWaveform,
   BarChart3,
+  Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  CircleDashed,
+  CircleDot,
+  Circle as CircleIcon,
+  CircleSlash,
   Disc3,
   Heart,
   Inbox,
@@ -60,7 +65,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 type Variant = 'a' | 'b' | 'c' | 'd' | 'e';
-type CanvasView = 'demo' | 'releases' | 'tracks';
+type CanvasView = 'demo' | 'releases' | 'tracks' | 'tasks';
 
 // Pill-based filter system (Linear/Notion style). Each pill targets a
 // single field with an `is` / `is not` operator and one or more OR-combined
@@ -145,6 +150,22 @@ const PALETTE_PRESETS: Record<string, Palette> = {
     border: '#181d26',
   },
 };
+
+// Inline Jovie brand mark — small SVG so the experiment file stays
+// self-contained (the production Logo component imports next/image).
+function JovieMark({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox='0 0 353.68 347.97'
+      className={className}
+      fill='currentColor'
+      aria-hidden='true'
+    >
+      <title>Jovie</title>
+      <path d='m176.84,0l3.08.05c8.92,1.73,16.9,6.45,23.05,13.18,7.95,8.7,12.87,20.77,12.87,34.14s-4.92,25.44-12.87,34.14c-6.7,7.34-15.59,12.28-25.49,13.57h-.64s0,.01,0,.01h0c-22.2,0-42.3,8.84-56.83,23.13-14.5,14.27-23.49,33.99-23.49,55.77h0v.02c0,21.78,8.98,41.5,23.49,55.77,14.54,14.3,34.64,23.15,56.83,23.15v-.02h.01c22.2,0,42.3-8.84,56.83-23.13,14.51-14.27,23.49-33.99,23.49-55.77h0c0-17.55-5.81-33.75-15.63-46.82-10.08-13.43-24.42-23.61-41.05-28.62l-2.11-.64c4.36-2.65,8.34-5.96,11.84-9.78,9.57-10.47,15.5-24.89,15.5-40.77s-5.93-30.3-15.5-40.77c-1.44-1.57-2.95-3.06-4.55-4.44l7.67,1.58c40.44,8.35,75.81,30.3,100.91,60.75,24.66,29.91,39.44,68.02,39.44,109.5h0c0,48.05-19.81,91.55-51.83,123.05-31.99,31.46-76.19,50.92-125,50.92v.02h-.01c-48.79,0-93-19.47-125-50.94C19.81,265.54,0,222.04,0,173.99h0c0-48.05,19.81-91.56,51.83-123.05C83.84,19.47,128.04,0,176.84,0Z' />
+    </svg>
+  );
+}
 
 // Most transitions snap (150ms ease-out). Layout transformations get
 // a cinematic curve — the kind of thing you only get on macOS / Apple
@@ -833,6 +854,166 @@ const TRACKS: Track[] = [
   ...generateTracks(50),
 ];
 
+// --- Tasks mock -----------------------------------------------------------
+type TaskStatus = 'backlog' | 'todo' | 'in_progress' | 'done' | 'cancelled';
+type TaskPriority = 'urgent' | 'high' | 'medium' | 'low' | 'none';
+type TaskAssignee = 'you' | 'jovie';
+type Task = {
+  id: string; // J-NNN
+  title: string;
+  description?: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  assignee: TaskAssignee;
+  releaseId: string | null;
+  dueIso: string | null;
+  updatedIso: string;
+  labels: string[];
+};
+
+const TASKS: Task[] = [
+  {
+    id: 'J-128',
+    title: 'Confirm artwork for Lost in the Light',
+    description:
+      'Final mastered files came back. Need to approve the cover art crop for the Spotify Canvas before the smart link goes live next Friday.',
+    status: 'in_progress',
+    priority: 'high',
+    assignee: 'you',
+    releaseId: 'lost-in-the-light',
+    dueIso: '2026-04-30',
+    updatedIso: '2026-04-25',
+    labels: ['design', 'distribution'],
+  },
+  {
+    id: 'J-127',
+    title: 'Approve playlist pitch for Stronger Than That',
+    description:
+      'Jovie drafted a 3-paragraph pitch tuned for indie-folk Spotify editorial. Skim it, edit anything that feels off, and submit.',
+    status: 'todo',
+    priority: 'high',
+    assignee: 'you',
+    releaseId: 'stronger-than-that',
+    dueIso: '2026-04-28',
+    updatedIso: '2026-04-25',
+    labels: ['pitch'],
+  },
+  {
+    id: 'J-126',
+    title: 'Generate vertical lyric video for All the Time',
+    description:
+      'Stems are uploaded. Jovie will render a 9:16 lyric video with three style passes; pick one when ready.',
+    status: 'in_progress',
+    priority: 'medium',
+    assignee: 'jovie',
+    releaseId: 'all-the-time',
+    dueIso: '2026-05-02',
+    updatedIso: '2026-04-25',
+    labels: ['video', 'social'],
+  },
+  {
+    id: 'J-125',
+    title: 'Schedule Instagram teaser carousel',
+    status: 'todo',
+    priority: 'medium',
+    assignee: 'you',
+    releaseId: 'all-the-time',
+    dueIso: '2026-05-05',
+    updatedIso: '2026-04-24',
+    labels: ['social'],
+  },
+  {
+    id: 'J-124',
+    title: 'Reply to Tom (booking) about July Brooklyn show',
+    status: 'todo',
+    priority: 'urgent',
+    assignee: 'you',
+    releaseId: null,
+    dueIso: '2026-04-26',
+    updatedIso: '2026-04-25',
+    labels: ['inbox'],
+  },
+  {
+    id: 'J-123',
+    title: 'Backfill UPC for Sunshine on My Back',
+    description:
+      'TIDAL flagged the missing UPC. Jovie can pull it from the distributor — confirm the metadata is accurate before sync.',
+    status: 'backlog',
+    priority: 'medium',
+    assignee: 'jovie',
+    releaseId: 'sunshine-on-my-back',
+    dueIso: null,
+    updatedIso: '2026-04-23',
+    labels: ['distribution'],
+  },
+  {
+    id: 'J-122',
+    title: 'Outreach: Pitchfork rising column',
+    status: 'in_progress',
+    priority: 'low',
+    assignee: 'jovie',
+    releaseId: null,
+    dueIso: '2026-05-12',
+    updatedIso: '2026-04-22',
+    labels: ['press'],
+  },
+  {
+    id: 'J-121',
+    title: 'Tag Bittersweet stems for the remix pack',
+    status: 'todo',
+    priority: 'low',
+    assignee: 'you',
+    releaseId: 'bittersweet',
+    dueIso: null,
+    updatedIso: '2026-04-22',
+    labels: ['catalog'],
+  },
+  {
+    id: 'J-120',
+    title: 'Draft setlist for the May 18 acoustic set',
+    status: 'backlog',
+    priority: 'medium',
+    assignee: 'you',
+    releaseId: null,
+    dueIso: '2026-05-14',
+    updatedIso: '2026-04-21',
+    labels: ['live'],
+  },
+  {
+    id: 'J-119',
+    title: 'Confirm Apple Music spatial audio render',
+    status: 'done',
+    priority: 'low',
+    assignee: 'jovie',
+    releaseId: 'opening-act',
+    dueIso: null,
+    updatedIso: '2026-04-20',
+    labels: ['distribution'],
+  },
+  {
+    id: 'J-118',
+    title: 'Cancel: Old TikTok cross-post automation',
+    status: 'cancelled',
+    priority: 'none',
+    assignee: 'you',
+    releaseId: null,
+    dueIso: null,
+    updatedIso: '2026-04-18',
+    labels: [],
+  },
+  {
+    id: 'J-117',
+    title: 'Update bio on Spotify for Artists',
+    status: 'done',
+    priority: 'low',
+    assignee: 'you',
+    releaseId: null,
+    dueIso: null,
+    updatedIso: '2026-04-17',
+    labels: ['profile'],
+  },
+];
+
 function trackFromRelease(r: Release): TrackInfo {
   return {
     title: r.title,
@@ -1119,7 +1300,7 @@ export default function ShellV1Experiment() {
                   }}
                   onFilterByArtist={name => addPill('artist', name)}
                 />
-              ) : (
+              ) : view === 'tracks' ? (
                 <TracksView
                   tracks={TRACKS}
                   pills={searchPills}
@@ -1141,6 +1322,8 @@ export default function ShellV1Experiment() {
                   }}
                   onFilter={(field, value) => addPill(field, value)}
                 />
+              ) : (
+                <TasksView tasks={TASKS} />
               )}
             </div>
             {view === 'releases' && selectedReleaseId && (
@@ -1328,7 +1511,7 @@ function Sidebar({
       {/* Brand row — Jovie wordmark + pin toggle (floating mode only) */}
       <div className='px-2 pt-3 pb-4'>
         <div className='flex items-center h-7 gap-2.5 pl-3 pr-2'>
-          <span className='h-3.5 w-3.5 rounded-sm bg-primary shrink-0' />
+          <JovieMark className='h-4 w-4 shrink-0 text-primary-token' />
           <span className='text-[13.5px] font-semibold tracking-[-0.02em] text-primary-token flex-1'>
             Jovie
           </span>
@@ -1473,14 +1656,8 @@ function Workspace({
           transition: `max-height ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, opacity 200ms ease-out`,
         }}
       >
-        {/* Subtle inset wrapper — felt depth, not 3D. The items area sits
-            visually "lower" than the workspace header above it. */}
-        <div className='relative space-y-px pt-1.5 pb-0.5 [&_a:hover]:bg-surface-1/50'>
-          <span
-            aria-hidden='true'
-            className='pointer-events-none absolute inset-x-0 top-0 h-px bg-(--linear-app-shell-border)/40'
-            style={{ left: 'calc(0.75rem + 14px)', right: '0.5rem' }}
-          />
+        {/* Items area — separation is implied by the spacing alone. */}
+        <div className='relative space-y-px pt-1 pb-0.5 [&_a:hover]:bg-surface-1/50'>
           {workspace.items.map(item => (
             <SidebarNavItem
               key={item.label}
@@ -2757,7 +2934,7 @@ function VariantPicker({
         </button>
       </div>
       <div className='flex items-center gap-1 px-1 pb-2 border-b border-subtle'>
-        {(['demo', 'releases', 'tracks'] as CanvasView[]).map(v => (
+        {(['demo', 'releases', 'tracks', 'tasks'] as CanvasView[]).map(v => (
           <button
             key={v}
             type='button'
@@ -4785,4 +4962,394 @@ function ColumnLabel({
       </span>
     </button>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Tasks — Linear-inspired split-pane: list on the left, detail on the right.
+// Single-pane on narrower viewports; we keep the design at lg+ as the
+// primary experience.
+// ---------------------------------------------------------------------------
+
+function TasksView({ tasks }: { tasks: Task[] }) {
+  const [selectedId, setSelectedId] = useState<string>(tasks[0]?.id ?? '');
+  const [focusedIndex, setFocusedIndex] = useState(0);
+  const selected = tasks.find(t => t.id === selectedId) ?? tasks[0];
+
+  function handleKey(e: React.KeyboardEvent) {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const next = Math.min(tasks.length - 1, focusedIndex + 1);
+      setFocusedIndex(next);
+      setSelectedId(tasks[next].id);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const next = Math.max(0, focusedIndex - 1);
+      setFocusedIndex(next);
+      setSelectedId(tasks[next].id);
+    }
+  }
+
+  return (
+    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: list root delegates ↑/↓
+    <section
+      className='flex h-full focus:outline-none'
+      // biome-ignore lint/a11y/noNoninteractiveTabindex: keyboard entry point
+      tabIndex={0}
+      onKeyDown={handleKey}
+      aria-label='Tasks'
+    >
+      {/* List pane */}
+      <div className='w-[380px] shrink-0 flex flex-col border-r border-(--linear-app-shell-border)/60 min-h-0'>
+        <div className='shrink-0 px-3 pt-3 pb-2 flex items-center gap-2'>
+          <span className='text-[12.5px] font-caption text-primary-token tracking-[-0.012em]'>
+            All
+          </span>
+          <span className='text-[11px] tabular-nums text-quaternary-token'>
+            {tasks.length}
+          </span>
+          <button
+            type='button'
+            className='ml-auto h-6 px-2 rounded text-[10.5px] uppercase tracking-[0.08em] text-tertiary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-150 ease-out'
+          >
+            Filter
+          </button>
+        </div>
+        <ul className='flex-1 min-h-0 overflow-y-auto pb-3 px-1'>
+          {tasks.map((t, i) => (
+            <TaskListItem
+              key={t.id}
+              task={t}
+              isSelected={t.id === selectedId}
+              isFocused={i === focusedIndex}
+              onSelect={() => {
+                setFocusedIndex(i);
+                setSelectedId(t.id);
+              }}
+            />
+          ))}
+        </ul>
+      </div>
+
+      {/* Detail pane */}
+      <div className='flex-1 min-w-0 overflow-y-auto'>
+        {selected ? <TaskDetail task={selected} /> : null}
+      </div>
+    </section>
+  );
+}
+
+function TaskListItem({
+  task,
+  isSelected,
+  isFocused,
+  onSelect,
+}: {
+  task: Task;
+  isSelected: boolean;
+  isFocused: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: parent section delegates ↑/↓
+    // biome-ignore lint/a11y/useKeyWithClickEvents: same
+    <li
+      onClick={onSelect}
+      data-focused={isFocused || isSelected || undefined}
+      className={cn(
+        'group/row relative flex items-start gap-2.5 h-auto py-2 pl-2 pr-2 rounded-md cursor-pointer transition-colors duration-150 ease-out',
+        !isFocused && !isSelected && 'hover:bg-surface-1/40',
+        SELECTED_ROW_CLASSES
+      )}
+    >
+      <div className='shrink-0 pt-[3px]'>
+        <StatusIcon status={task.status} />
+      </div>
+      <div className='flex-1 min-w-0'>
+        <div className='flex items-baseline gap-1.5 min-w-0'>
+          <span className='text-[10.5px] tabular-nums text-quaternary-token shrink-0'>
+            {task.id}
+          </span>
+          <span
+            className={cn(
+              'truncate text-[12.5px] font-caption tracking-[-0.012em]',
+              task.status === 'done' || task.status === 'cancelled'
+                ? 'text-tertiary-token line-through decoration-quaternary-token/50'
+                : 'text-primary-token'
+            )}
+          >
+            {task.title}
+          </span>
+        </div>
+        <div className='mt-1 flex items-center gap-1.5 text-[10.5px] text-quaternary-token'>
+          <PriorityGlyph priority={task.priority} />
+          {task.dueIso && (
+            <>
+              <span aria-hidden='true'>·</span>
+              <span
+                className={cn(
+                  'tabular-nums',
+                  isDueSoon(task.dueIso) && task.status !== 'done'
+                    ? 'text-amber-400/90'
+                    : 'text-tertiary-token'
+                )}
+              >
+                {relativeDate(task.dueIso)}
+              </span>
+            </>
+          )}
+          {task.labels.length > 0 && (
+            <>
+              <span aria-hidden='true'>·</span>
+              <span className='truncate'>{task.labels.join(' · ')}</span>
+            </>
+          )}
+        </div>
+      </div>
+      <AssigneeChip assignee={task.assignee} />
+    </li>
+  );
+}
+
+function TaskDetail({ task }: { task: Task }) {
+  return (
+    <article className='max-w-3xl mx-auto px-8 pt-8 pb-12'>
+      <div className='flex items-center gap-2 text-[10.5px] uppercase tracking-[0.12em] text-quaternary-token/85 font-medium mb-3'>
+        <span>{task.id}</span>
+        <span>·</span>
+        <span>{statusLabel(task.status)}</span>
+        {task.releaseId && (
+          <>
+            <span>·</span>
+            <span className='text-cyan-300/85'>
+              {RELEASES.find(r => r.id === task.releaseId)?.title ??
+                task.releaseId}
+            </span>
+          </>
+        )}
+      </div>
+
+      <h1 className='text-[26px] font-display tracking-[-0.02em] text-primary-token leading-tight'>
+        {task.title}
+      </h1>
+
+      {task.description && (
+        <p className='mt-4 text-[14px] leading-[1.55] text-secondary-token max-w-prose'>
+          {task.description}
+        </p>
+      )}
+
+      <dl className='mt-8 grid grid-cols-2 gap-x-8 gap-y-3 max-w-md'>
+        <DetailRow label='Status'>
+          <span className='inline-flex items-center gap-1.5'>
+            <StatusIcon status={task.status} />
+            <span className='text-[12.5px] text-secondary-token'>
+              {statusLabel(task.status)}
+            </span>
+          </span>
+        </DetailRow>
+        <DetailRow label='Priority'>
+          <span className='inline-flex items-center gap-1.5'>
+            <PriorityGlyph priority={task.priority} />
+            <span className='text-[12.5px] text-secondary-token capitalize'>
+              {task.priority === 'none' ? '—' : task.priority}
+            </span>
+          </span>
+        </DetailRow>
+        <DetailRow label='Assignee'>
+          <AssigneeChip assignee={task.assignee} expanded />
+        </DetailRow>
+        <DetailRow label='Due'>
+          <span className='text-[12.5px] text-secondary-token tabular-nums'>
+            {task.dueIso
+              ? new Date(task.dueIso).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                })
+              : '—'}
+          </span>
+        </DetailRow>
+        {task.labels.length > 0 && (
+          <DetailRow label='Labels'>
+            <span className='inline-flex items-center gap-1 flex-wrap'>
+              {task.labels.map(l => (
+                <span
+                  key={l}
+                  className='inline-flex items-center h-[18px] px-1.5 rounded text-[10.5px] text-secondary-token border border-(--linear-app-shell-border) bg-surface-1/40'
+                >
+                  {l}
+                </span>
+              ))}
+            </span>
+          </DetailRow>
+        )}
+        {task.releaseId && (
+          <DetailRow label='Release'>
+            <span className='text-[12.5px] text-cyan-300/85'>
+              {RELEASES.find(r => r.id === task.releaseId)?.title ??
+                task.releaseId}
+            </span>
+          </DetailRow>
+        )}
+      </dl>
+
+      <div className='mt-8 border-t border-(--linear-app-shell-border)/50 pt-4 text-[11.5px] text-quaternary-token'>
+        Updated {relativeDate(task.updatedIso)}
+      </div>
+    </article>
+  );
+}
+
+function DetailRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <>
+      <dt className='text-[10.5px] uppercase tracking-[0.12em] text-quaternary-token/85 font-medium pt-1'>
+        {label}
+      </dt>
+      <dd className='min-w-0'>{children}</dd>
+    </>
+  );
+}
+
+function StatusIcon({ status }: { status: TaskStatus }) {
+  switch (status) {
+    case 'backlog':
+      return (
+        <CircleDashed
+          className='h-3.5 w-3.5 text-quaternary-token'
+          strokeWidth={2.25}
+        />
+      );
+    case 'todo':
+      return (
+        <CircleIcon
+          className='h-3.5 w-3.5 text-tertiary-token'
+          strokeWidth={2.25}
+        />
+      );
+    case 'in_progress':
+      return (
+        <CircleDot className='h-3.5 w-3.5 text-cyan-400' strokeWidth={2.25} />
+      );
+    case 'done':
+      return (
+        <span className='inline-flex items-center justify-center h-3.5 w-3.5 rounded-full bg-emerald-500/85 text-(--linear-bg-page)'>
+          <Check className='h-2.5 w-2.5' strokeWidth={3} />
+        </span>
+      );
+    case 'cancelled':
+      return (
+        <CircleSlash
+          className='h-3.5 w-3.5 text-quaternary-token/70'
+          strokeWidth={2.25}
+        />
+      );
+  }
+}
+
+function PriorityGlyph({ priority }: { priority: TaskPriority }) {
+  if (priority === 'none')
+    return <span className='inline-block h-2.5 w-3' aria-hidden='true' />;
+  if (priority === 'urgent')
+    return (
+      <span
+        title='Urgent'
+        className='inline-flex items-center justify-center h-3 px-1 rounded text-[8px] font-bold leading-none bg-rose-500/15 text-rose-300'
+      >
+        !
+      </span>
+    );
+  const bars = priority === 'high' ? 3 : priority === 'medium' ? 2 : 1;
+  return (
+    <span
+      className='inline-flex items-end gap-[2px] h-2.5'
+      title={`Priority: ${priority}`}
+    >
+      {[1, 2, 3].map(i => (
+        <span
+          key={i}
+          className={cn(
+            'w-[2px] rounded-sm',
+            i <= bars ? 'bg-secondary-token' : 'bg-quaternary-token/30'
+          )}
+          style={{ height: `${30 + i * 25}%` }}
+        />
+      ))}
+    </span>
+  );
+}
+
+function AssigneeChip({
+  assignee,
+  expanded,
+}: {
+  assignee: TaskAssignee;
+  expanded?: boolean;
+}) {
+  if (assignee === 'jovie') {
+    return (
+      <span
+        className={cn(
+          'inline-flex items-center gap-1.5 shrink-0',
+          expanded
+            ? 'text-[12.5px] text-secondary-token'
+            : 'text-[10.5px] text-tertiary-token'
+        )}
+        title='Assigned to Jovie'
+      >
+        <JovieMark
+          className={cn(expanded ? 'h-3.5 w-3.5' : 'h-3 w-3', 'text-cyan-400')}
+        />
+        {expanded && 'Jovie'}
+      </span>
+    );
+  }
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1.5 shrink-0',
+        expanded
+          ? 'text-[12.5px] text-secondary-token'
+          : 'text-[10.5px] text-tertiary-token'
+      )}
+      title='Assigned to you'
+    >
+      <span
+        className={cn(
+          'rounded-full bg-surface-2 border border-(--linear-app-shell-border) text-[8px] font-caption text-secondary-token grid place-items-center',
+          expanded ? 'h-5 w-5 text-[10px]' : 'h-3.5 w-3.5'
+        )}
+      >
+        TW
+      </span>
+      {expanded && 'Tim White'}
+    </span>
+  );
+}
+
+function statusLabel(s: TaskStatus): string {
+  switch (s) {
+    case 'backlog':
+      return 'Backlog';
+    case 'todo':
+      return 'Todo';
+    case 'in_progress':
+      return 'In progress';
+    case 'done':
+      return 'Done';
+    case 'cancelled':
+      return 'Cancelled';
+  }
+}
+
+function isDueSoon(iso: string, now = new Date('2026-04-25')) {
+  const d = new Date(iso);
+  const days = (d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
+  return days <= 3 && days >= -3;
 }
