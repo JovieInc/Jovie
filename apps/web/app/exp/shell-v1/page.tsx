@@ -37,7 +37,8 @@ const SHORTCUTS: Record<string, { keys: string; description: string }> = {
   searchSlash: { keys: '/', description: 'Open search (no modifier)' },
   toggleSidebar: { keys: '[', description: 'Toggle sidebar dock / float' },
   toggleSidebarTab: { keys: 'Tab', description: 'Toggle sidebar dock / float' },
-  toggleBar: { keys: '⌘\\', description: 'Toggle audio bar in / out' },
+  toggleBar: { keys: '`', description: 'Toggle audio bar in / out' },
+  toggleBarAlt: { keys: '⌘\\', description: 'Toggle audio bar (alt)' },
   toggleWaveform: { keys: 'W', description: 'Toggle waveform drawer' },
   playPause: { keys: 'Space', description: 'Play / pause current track' },
   jovieDictate: { keys: 'Hold ⌘J', description: 'Push-to-talk to Jovie' },
@@ -83,6 +84,7 @@ import {
   Pin,
   PinOff,
   Play,
+  Plus,
   Repeat,
   Search,
   Settings,
@@ -1418,7 +1420,10 @@ export default function ShellV1Experiment() {
       ) {
         e.preventDefault();
         setSidebarMode(m => (m === 'docked' ? 'floating' : 'docked'));
-      } else if ((e.metaKey || e.ctrlKey) && e.key === '\\') {
+      } else if (
+        ((e.metaKey || e.ctrlKey) && e.key === '\\') ||
+        e.key === '`'
+      ) {
         e.preventDefault();
         setBarCollapsed(v => !v);
       } else if (e.key === 'w' || e.key === 'W') {
@@ -1701,6 +1706,24 @@ export default function ShellV1Experiment() {
             />
           </div>
         </main>
+
+        {/* Peek-bottom restore affordance — when the audio bar is collapsed,
+            a 4px hairline strip at the bottom of the canvas pulses subtly
+            and expands the bar on hover/click. Combined with the ` shortcut
+            and the now-playing card, that's three discoverable paths back. */}
+        {barCollapsed && (
+          <button
+            type='button'
+            onClick={() => setBarCollapsed(false)}
+            aria-label='Show audio bar (`)'
+            className='group/peek shrink-0 h-2 -mt-1 px-2 hidden lg:flex items-end justify-center'
+          >
+            <span
+              aria-hidden='true'
+              className='h-[3px] w-[80px] rounded-full bg-cyan-300/30 group-hover/peek:bg-cyan-300/70 group-hover/peek:w-[120px] transition-[width,background-color] duration-200 ease-out'
+            />
+          </button>
+        )}
 
         <div
           aria-hidden={barCollapsed}
@@ -2155,7 +2178,7 @@ function SidebarNavItem({
   nested?: boolean;
   tight?: boolean;
 }) {
-  return (
+  const button = (
     <button
       type='button'
       onClick={item.onActivate}
@@ -2188,6 +2211,14 @@ function SidebarNavItem({
       />
       {!collapsed && <span className='truncate'>{item.label}</span>}
     </button>
+  );
+  // Tooltip on the right side of the rail. Sidebar nav doesn't currently
+  // have shortcut bindings (we'd need ⌘1/⌘2/etc.); for now the tooltip is
+  // label-only — kbd chips show up automatically once we wire shortcuts.
+  return (
+    <Tooltip label={item.label} side='right' block>
+      {button}
+    </Tooltip>
   );
 }
 
@@ -2465,12 +2496,12 @@ function subviewsForView(
       { id: 'all', label: 'All', count: tasks.length },
       {
         id: 'mine',
-        label: 'Mine',
+        label: 'Assigned to me',
         count: tasks.filter(t => t.assignee === 'you').length,
       },
       {
         id: 'jovie',
-        label: 'Jovie',
+        label: 'Assigned to Jovie',
         count: tasks.filter(t => t.assignee === 'jovie').length,
       },
     ];
@@ -2617,15 +2648,49 @@ function Header({
       </div>
 
       <div className='flex items-center gap-2 shrink-0'>
-        <button
-          type='button'
-          className='h-7 px-3 rounded-md bg-primary text-on-primary text-[12px] font-caption hover:opacity-90'
-        >
-          Share profile
-        </button>
+        <PageAction view={view} />
       </div>
     </header>
   );
+}
+
+// Primary per-view action button. Cyan-300 fill matches the brand accent
+// without the saturated emerald that read as system-y. Drops to nothing
+// for views that don't have a primary action (lyrics, demo, settings).
+function PageAction({ view }: { view: CanvasView }) {
+  const action = pageActionForView(view);
+  if (!action) return null;
+  return (
+    <button
+      type='button'
+      onClick={action.onClick}
+      className='inline-flex items-center gap-1.5 h-7 px-3 rounded-md bg-cyan-300 text-black text-[12px] font-medium hover:bg-cyan-200 transition-colors duration-150 ease-out'
+    >
+      {action.icon ? (
+        <action.icon className='h-3.5 w-3.5' strokeWidth={2.5} />
+      ) : null}
+      {action.label}
+    </button>
+  );
+}
+
+function pageActionForView(view: CanvasView): {
+  label: string;
+  icon?: typeof Plus;
+  onClick?: () => void;
+} | null {
+  switch (view) {
+    case 'library':
+      return { label: 'Generate', icon: Sparkles };
+    case 'releases':
+      return { label: 'New release', icon: Plus };
+    case 'tracks':
+      return { label: 'Upload', icon: Plus };
+    case 'tasks':
+      return { label: 'New task', icon: Plus };
+    default:
+      return null;
+  }
 }
 
 function UserMenu({ children }: { children: React.ReactNode }) {
@@ -3900,24 +3965,44 @@ function Tooltip({
   shortcut,
   side = 'bottom',
   className,
+  block,
 }: {
   children: React.ReactNode;
   label: string;
   shortcut?: keyof typeof SHORTCUTS;
-  side?: 'top' | 'bottom';
+  side?: 'top' | 'bottom' | 'right' | 'left';
   className?: string;
+  // Use `block` for full-width triggers (sidebar nav rows). Default is
+  // inline-flex which sizes to children — right for icon buttons.
+  block?: boolean;
 }) {
   const sc = shortcut ? SHORTCUTS[shortcut] : null;
+  // Per-side: position + enter/exit transform pair (Tailwind JIT needs the
+  // full class string at compile time so we list each variant out).
+  const sideClasses =
+    side === 'bottom'
+      ? 'top-full left-1/2 -translate-x-1/2 mt-1.5 translate-y-0.5 group-hover/tip:translate-y-0 group-focus-within/tip:translate-y-0'
+      : side === 'top'
+        ? 'bottom-full left-1/2 -translate-x-1/2 mb-1.5 -translate-y-0.5 group-hover/tip:translate-y-0 group-focus-within/tip:translate-y-0'
+        : side === 'right'
+          ? 'left-full top-1/2 -translate-y-1/2 ml-1.5 -translate-x-0.5 group-hover/tip:translate-x-0 group-focus-within/tip:translate-x-0'
+          : 'right-full top-1/2 -translate-y-1/2 mr-1.5 translate-x-0.5 group-hover/tip:translate-x-0 group-focus-within/tip:translate-x-0';
   return (
-    <span className={cn('relative inline-flex group/tip isolate', className)}>
+    <span
+      className={cn(
+        'relative group/tip isolate',
+        block ? 'flex w-full' : 'inline-flex',
+        className
+      )}
+    >
       {children}
       <span
         role='tooltip'
         className={cn(
-          'pointer-events-none absolute left-1/2 -translate-x-1/2 z-50 whitespace-nowrap',
-          'opacity-0 translate-y-0.5 group-hover/tip:opacity-100 group-hover/tip:translate-y-0 group-focus-within/tip:opacity-100 group-focus-within/tip:translate-y-0',
+          'pointer-events-none absolute z-50 whitespace-nowrap',
+          'opacity-0 group-hover/tip:opacity-100 group-focus-within/tip:opacity-100',
           'transition-[opacity,transform] duration-150 ease-out delay-[400ms] group-hover/tip:delay-[400ms] group-focus-within/tip:delay-[80ms]',
-          side === 'bottom' ? 'top-full mt-1.5' : 'bottom-full mb-1.5'
+          sideClasses
         )}
       >
         <span className='inline-flex items-center gap-2 h-6 px-2 rounded-md text-[11px] font-caption text-primary-token bg-(--linear-app-content-surface)/95 border border-(--linear-app-shell-border) backdrop-blur-xl shadow-[0_6px_20px_rgba(0,0,0,0.28)]'>
@@ -3946,7 +4031,7 @@ function IconBtn({
   onClick?: () => void;
   active?: boolean;
   shortcut?: keyof typeof SHORTCUTS;
-  tooltipSide?: 'top' | 'bottom';
+  tooltipSide?: 'top' | 'bottom' | 'right' | 'left';
 }) {
   // Flat at rest — Spotify-quiet. Hover lights up text + adds a subtle
   // surface-1 background so the button reads as clickable, hinting at
@@ -4094,7 +4179,32 @@ function VariantPicker({
         />
       </div>
       <PalettePanel palette={palette} onPalette={onPalette} />
+      <div className='border-t border-subtle mt-2 pt-2 px-2 pb-1'>
+        <p className='text-[10px] uppercase tracking-wider text-tertiary-token pb-1.5 font-semibold'>
+          Routes
+        </p>
+        <div className='space-y-px'>
+          <PickerLink href='/exp/onboarding-v1' label='Test onboarding' />
+          <PickerLink href='/exp/library-v1' label='Library standalone' />
+          <PickerLink href='/exp/auth-v1' label='Auth (signin / signup)' />
+        </div>
+      </div>
     </div>
+  );
+}
+
+function PickerLink({ href, label }: { href: string; label: string }) {
+  return (
+    <a
+      href={href}
+      className='flex items-center justify-between h-6 px-1.5 rounded text-[11px] text-secondary-token hover:bg-surface-1 hover:text-primary-token transition-colors duration-150 ease-out'
+    >
+      <span>{label}</span>
+      <ChevronRight
+        className='h-3 w-3 text-quaternary-token'
+        strokeWidth={2.25}
+      />
+    </a>
   );
 }
 
@@ -6807,9 +6917,6 @@ function TaskListItem({
       </div>
       <div className='flex-1 min-w-0'>
         <div className='flex items-center gap-2 min-w-0'>
-          <span className='text-[10.5px] tabular-nums text-quaternary-token/80 shrink-0'>
-            {task.id}
-          </span>
           <span
             className={cn(
               'truncate text-[12.5px] font-caption tracking-[-0.012em]',
@@ -6867,10 +6974,6 @@ function TaskDetail({
     : null;
   return (
     <article className='max-w-3xl mx-auto px-8 pt-8 pb-12'>
-      <div className='text-[10.5px] uppercase tracking-[0.12em] text-quaternary-token/85 font-medium mb-3 tabular-nums'>
-        {task.id}
-      </div>
-
       <h1 className='text-[26px] font-display tracking-[-0.02em] text-primary-token leading-tight'>
         {onOpenRelease
           ? renderWithEntities(task.title, RELEASES, onOpenRelease)
