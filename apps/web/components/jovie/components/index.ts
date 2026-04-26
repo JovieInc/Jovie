@@ -10,6 +10,12 @@ export { ErrorDisplay } from './ErrorDisplay';
 export { FeedbackForm } from './FeedbackForm';
 export { ImagePreviewStrip } from './ImagePreviewStrip';
 export { ScrollToBottom } from './ScrollToBottom';
+export {
+  activeEntityFor,
+  SlashCommandMenu,
+  useSlashItems,
+} from './SlashCommandMenu';
 export { SuggestedProfilesCarousel } from './SuggestedProfilesCarousel';
 export { SuggestedPrompts } from './SuggestedPrompts';
 export { TokenizedText } from './TokenizedText';
+export { useChatPicker } from './useChatPicker';

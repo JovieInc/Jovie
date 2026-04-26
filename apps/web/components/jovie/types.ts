@@ -36,6 +36,12 @@ export interface JovieChatProps {
   readonly onConversationCreate?: (conversationId: string) => void;
   /** Pre-fill and auto-submit a message on mount (e.g. from ?q= param) */
   readonly initialQuery?: string;
+  /**
+   * Pre-load a skill chip into the composer on mount (e.g. from cmd+k's
+   * `?skill=` handoff). Applied once; the composer treats it as if the user
+   * had picked the skill from the slash menu.
+   */
+  readonly initialSkillId?: string;
   /** Callback when the conversation title changes (e.g. after auto-generation) */
   readonly onTitleChange?: (title: string | null) => void;
   /** Artist display name for the welcome greeting */
