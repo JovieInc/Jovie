@@ -1721,20 +1721,21 @@ export default function ShellV1Experiment() {
         }}
       />
 
-      {/* Floating now-playing — visible only when the audio bar is
-          collapsed. Flat (no card chrome), aligned with the main
-          content's bottom edge. When the bar opens, this fades away
-          (same vocab as the bar disappearing) and a simplified
-          compact player slides into the sidebar bottom (rendered by
-          <Sidebar>'s nowPlaying slot). The two never appear together. */}
+      {/* Detailed now-playing — visible when the audio bar is OPEN.
+          Sits flush with the main content area's left edge (not under
+          the sidebar). Carries full info (album art + title + chips).
+          When the bar collapses, the COMPACT version takes over — it
+          renders inside the sidebar bottom slot. The two never appear
+          together. */}
       <div
-        aria-hidden={!barCollapsed}
-        className='hidden lg:block fixed left-2 bottom-2 z-30 w-[224px]'
+        aria-hidden={barCollapsed}
+        className='hidden lg:block fixed bottom-2 z-30 w-[224px]'
         style={{
-          opacity: barCollapsed ? 1 : 0,
-          transform: barCollapsed ? 'translateY(0)' : 'translateY(8px)',
-          pointerEvents: barCollapsed ? 'auto' : 'none',
-          transition: `opacity ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, transform ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
+          left: sidebarMode === 'docked' ? (sidebarTight ? 220 : 232) : 8,
+          opacity: barCollapsed ? 0 : 1,
+          transform: barCollapsed ? 'translateY(8px)' : 'translateY(0)',
+          pointerEvents: barCollapsed ? 'none' : 'auto',
+          transition: `opacity ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, transform ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, left ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
         }}
       >
         <div className='px-1 pb-0'>
@@ -2441,19 +2442,19 @@ function Sidebar({
         </nav>
       )}
 
-      {/* Sidebar-bottom now-playing — simplified compact player. Only
-          renders when the audio bar is open. The fixed bottom-left
-          floating card is the *other* state (bar collapsed). The two
-          are siblings: bar open → sidebar card; bar collapsed →
-          floating card. They never appear together. */}
+      {/* Sidebar-bottom now-playing — simplified compact player.
+          Visible only when the audio bar is COLLAPSED. The detailed
+          floating card (with chips) takes over when the bar opens, and
+          slides under the main content area's left edge. Two states,
+          two surfaces, never co-resident. */}
       <div
-        aria-hidden={nowPlaying?.barCollapsed !== false}
+        aria-hidden={nowPlaying?.barCollapsed === false}
         className='shrink-0 px-2 pb-2 pt-1 overflow-hidden'
         style={{
-          maxHeight: nowPlaying && !nowPlaying.barCollapsed ? 64 : 0,
-          opacity: nowPlaying && !nowPlaying.barCollapsed ? 1 : 0,
+          maxHeight: nowPlaying && nowPlaying.barCollapsed ? 64 : 0,
+          opacity: nowPlaying && nowPlaying.barCollapsed ? 1 : 0,
           transform:
-            nowPlaying && !nowPlaying.barCollapsed
+            nowPlaying && nowPlaying.barCollapsed
               ? 'translateY(0)'
               : 'translateY(8px)',
           transition: `max-height ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, opacity ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, transform ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
