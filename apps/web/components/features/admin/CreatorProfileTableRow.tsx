@@ -245,7 +245,7 @@ function CreatorProfileTableRowComponent({
         <div className='relative flex h-5 w-5 items-center justify-center border-0 bg-transparent p-0'>
           <span
             className={cn(
-              'select-none text-[11px] tabular-nums text-tertiary-token transition-opacity',
+              'select-none text-2xs tabular-nums text-tertiary-token transition-opacity',
               isChecked ? 'opacity-0' : 'opacity-100 group-hover:opacity-0'
             )}
             aria-hidden='true'
@@ -277,7 +277,7 @@ function CreatorProfileTableRowComponent({
           />
           <div className='min-w-0'>
             {displayName ? (
-              <div className='line-clamp-1 overflow-hidden text-ellipsis text-[13px] font-medium text-primary-token'>
+              <div className='line-clamp-1 overflow-hidden text-ellipsis text-app font-medium text-primary-token'>
                 {displayName}
               </div>
             ) : null}
@@ -286,8 +286,8 @@ function CreatorProfileTableRowComponent({
               className={cn(
                 'line-clamp-1 overflow-hidden text-ellipsis text-secondary-token transition-colors hover:text-primary-token',
                 displayName
-                  ? 'text-[12px]'
-                  : 'text-[13px] font-medium text-primary-token'
+                  ? 'text-xs'
+                  : 'text-app font-medium text-primary-token'
               )}
               onClick={event => event.stopPropagation()}
             >
@@ -301,7 +301,7 @@ function CreatorProfileTableRowComponent({
           <CreatorProfileSocialLinks socialLinks={profile.socialLinks} />
         </div>
       </td>
-      <td className='max-md:hidden whitespace-nowrap px-4 py-2.5 text-center align-middle text-[12px] text-tertiary-token md:table-cell'>
+      <td className='max-md:hidden whitespace-nowrap px-4 py-2.5 text-center align-middle text-xs text-tertiary-token md:table-cell'>
         {profile.createdAt ? dateFormatter.format(profile.createdAt) : '—'}
       </td>
       <td

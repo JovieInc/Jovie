@@ -64,9 +64,7 @@ export function AuthBackButton({
           }}
         >
           <ArrowLeft className='h-3.5 w-3.5' />
-          <span className='text-[12px] font-medium tracking-[-0.012em]'>
-            Back
-          </span>
+          <span className='text-xs font-medium tracking-[-0.012em]'>Back</span>
         </Link>
       </Button>
     );
@@ -81,7 +79,7 @@ export function AuthBackButton({
       className={controlClasses}
     >
       <ArrowLeft className='h-3.5 w-3.5' />
-      <span className='text-[12px] font-medium tracking-[-0.012em]'>Back</span>
+      <span className='text-xs font-medium tracking-[-0.012em]'>Back</span>
     </Button>
   );
 }

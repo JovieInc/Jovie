@@ -129,7 +129,7 @@ export const AudienceMobileCard = React.memo(function AudienceMobileCard({
         <div className='flex items-baseline justify-between gap-2'>
           <TruncatedText
             lines={1}
-            className='text-[15px] font-semibold leading-tight text-primary-token'
+            className='text-mid font-semibold leading-tight text-primary-token'
           >
             {displayName}
           </TruncatedText>

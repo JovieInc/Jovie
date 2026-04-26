@@ -14,7 +14,7 @@ import { fetchReleaseCreditsAction } from './release-credits-action';
 const LABEL_CLASSNAME =
   'text-[10px] font-[500] leading-[13px] tracking-[0.01em] text-quaternary-token';
 const VALUE_CLASSNAME =
-  'text-[12px] font-[460] leading-[16px] text-secondary-token';
+  'text-xs font-[460] leading-[16px] text-secondary-token';
 const ROW_CLASSNAME = 'rounded-none px-0 py-1 first:pt-0 last:pb-0';
 
 export interface ReleaseCreditsSectionProps {

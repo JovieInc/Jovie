@@ -93,11 +93,11 @@ export function BatchIngestForm({
               isOpen && 'rotate-90'
             )}
           />
-          <span className='text-[13px] font-medium text-primary-token'>
+          <span className='text-app font-medium text-primary-token'>
             Batch URL import
           </span>
           {summaryText && !isOpen && (
-            <span className='ml-auto text-[11px] text-tertiary-token'>
+            <span className='ml-auto text-2xs text-tertiary-token'>
               {summaryText}
             </span>
           )}
@@ -113,7 +113,7 @@ export function BatchIngestForm({
 https://open.spotify.com/artist/...
 https://www.instagram.com/artistname, https://artist-website.com'
           />
-          <div className='flex flex-col gap-2 text-[11px] text-tertiary-token sm:flex-row sm:items-center sm:justify-between'>
+          <div className='flex flex-col gap-2 text-2xs text-tertiary-token sm:flex-row sm:items-center sm:justify-between'>
             <span>
               {parsedCount} URL{parsedCount === 1 ? '' : 's'} parsed
             </span>
@@ -129,7 +129,7 @@ https://www.instagram.com/artistname, https://artist-website.com'
           </div>
 
           {result && (
-            <div className='space-y-2 rounded-lg bg-surface-0 p-3 text-[12px] text-secondary-token'>
+            <div className='space-y-2 rounded-lg bg-surface-0 p-3 text-xs text-secondary-token'>
               {/* Summary badges */}
               <div className='flex flex-wrap items-center gap-3'>
                 {result.summary.success > 0 && (

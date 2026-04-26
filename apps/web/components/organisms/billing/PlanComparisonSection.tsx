@@ -154,7 +154,7 @@ export function PlanComparisonSection({
 
               <div className='flex flex-1 flex-col px-4 py-4'>
                 <div>
-                  <h3 className='text-[15px] font-semibold tracking-[-0.018em] text-primary-token'>
+                  <h3 className='text-mid font-semibold tracking-[-0.018em] text-primary-token'>
                     {planData.name}
                   </h3>
                   <p className='text-app leading-[18px] text-tertiary-token'>

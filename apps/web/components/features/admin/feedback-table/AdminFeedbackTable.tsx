@@ -78,7 +78,7 @@ const columnHelper = createColumnHelper<FeedbackRow>();
 function renderUserCell({ getValue }: { getValue: () => any }) {
   const user = getValue() as FeedbackRow['user'];
   return (
-    <span className='text-[13px] font-medium text-primary-token'>
+    <span className='text-app font-medium text-primary-token'>
       {getFeedbackUserLabel(user)}
     </span>
   );
@@ -109,8 +109,8 @@ function renderStatusCell({ getValue }: { getValue: () => any }) {
     <span
       className={
         status === 'dismissed'
-          ? 'inline-flex min-h-[22px] items-center rounded bg-surface-0 px-1.5 py-0.5 text-[11px] font-medium tracking-[-0.01em] text-tertiary-token'
-          : 'inline-flex min-h-[22px] items-center rounded bg-surface-1 px-1.5 py-0.5 text-[11px] font-medium tracking-[-0.01em] text-secondary-token'
+          ? 'inline-flex min-h-[22px] items-center rounded bg-surface-0 px-1.5 py-0.5 text-2xs font-medium tracking-[-0.01em] text-tertiary-token'
+          : 'inline-flex min-h-[22px] items-center rounded bg-surface-1 px-1.5 py-0.5 text-2xs font-medium tracking-[-0.01em] text-secondary-token'
       }
     >
       {status}
@@ -366,7 +366,7 @@ export function AdminFeedbackTable({
                 title={getFeedbackUserLabel(selected.user)}
                 subtitle={selected.user.email ?? 'No email available'}
                 meta={
-                  <div className='space-y-1 text-[12px] leading-[16px] text-secondary-token'>
+                  <div className='space-y-1 text-xs leading-[16px] text-secondary-token'>
                     <p>
                       Source: {selected.source} ·{' '}
                       {new Date(selected.createdAtIso).toLocaleString()}
