@@ -98,6 +98,7 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import LibraryV1Page from '@/app/exp/library-v1/page';
 import { cn } from '@/lib/utils';
 
 type Variant = 'a' | 'b' | 'c' | 'd' | 'e';
@@ -1140,6 +1141,9 @@ export default function ShellV1Experiment() {
   const [sidebarMode, setSidebarMode] = useState<'docked' | 'floating'>(
     'docked'
   );
+  // Tighter, library-style sidebar density. Off = current shell sidebar
+  // (workspace dropdowns, h-7 items). On = flat, h-6 items, no nesting.
+  const [sidebarTight, setSidebarTight] = useState(false);
   const [peekOpen, setPeekOpen] = useState(false);
   const [barCollapsed, setBarCollapsed] = useState(false);
   const [isPlaying, setIsPlaying] = useState(true);
@@ -1500,6 +1504,7 @@ export default function ShellV1Experiment() {
           onPin={() => setSidebarMode('floating')}
           onSelectView={setView}
           activeView={view}
+          tight={sidebarTight}
         />
       </div>
 
@@ -1514,13 +1519,25 @@ export default function ShellV1Experiment() {
         }}
         onSelectView={setView}
         activeView={view}
+        tight={sidebarTight}
       />
 
       {/* Persistent now-playing card — pinned to bottom-left, survives sidebar
-          undocking. Elevated card treatment so it reads as a discrete object
-          rather than text floating on the page. */}
+          undocking. When the audio bar is open at the bottom of the canvas,
+          the card sits elevated as a discrete object. When the bar collapses
+          away, the chrome (border, bg, shadow) fades out so the contents
+          (album art + title + chips) drop into the page surface, especially
+          handy when the sidebar is also hidden — feels like an extension of
+          the canvas instead of a floating card. */}
       <div className='hidden lg:block fixed left-2 bottom-2 z-30 w-[224px] pointer-events-none'>
-        <div className='pointer-events-auto rounded-[var(--linear-app-shell-radius)] border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) shadow-[0_18px_60px_rgba(0,0,0,0.32)] px-2 pt-2.5 pb-2'>
+        <div
+          className={cn(
+            'pointer-events-auto rounded-[var(--linear-app-shell-radius)] border px-2 pt-2.5 pb-2 transition-[background-color,border-color,box-shadow] duration-300 ease-out',
+            barCollapsed
+              ? 'border-transparent bg-transparent shadow-none'
+              : 'border-(--linear-app-shell-border) bg-(--linear-app-content-surface) shadow-[0_18px_60px_rgba(0,0,0,0.32)]'
+          )}
+        >
           <SidebarNowPlaying
             collapsed={false}
             isPlaying={isPlaying}
@@ -1646,7 +1663,7 @@ export default function ShellV1Experiment() {
                   onSeek={sec => setCurrentTimeSec(sec)}
                 />
               ) : view === 'library' ? (
-                <LibraryStubView />
+                <LibraryShellEmbed />
               ) : (
                 <TasksView
                   tasks={
@@ -1748,6 +1765,8 @@ export default function ShellV1Experiment() {
         onView={setView}
         palette={palette}
         onPalette={setPalette}
+        sidebarTight={sidebarTight}
+        onSidebarTight={() => setSidebarTight(v => !v)}
       />
 
       <JovieOverlay listening={jovieListening} />
@@ -1800,6 +1819,7 @@ function FloatingSidebarLayer({
   onPin,
   onSelectView,
   activeView,
+  tight,
 }: {
   active: boolean;
   peekOpen: boolean;
@@ -1807,6 +1827,7 @@ function FloatingSidebarLayer({
   onPin: () => void;
   onSelectView?: (v: CanvasView) => void;
   activeView?: CanvasView;
+  tight?: boolean;
 }) {
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -1862,6 +1883,7 @@ function FloatingSidebarLayer({
           onPin={onPin}
           onSelectView={onSelectView}
           activeView={activeView}
+          tight={tight}
         />
       </div>
     </>
@@ -1873,11 +1895,13 @@ function Sidebar({
   onPin,
   onSelectView,
   activeView,
+  tight,
 }: {
   variant: 'docked' | 'floating';
   onPin: () => void;
   onSelectView?: (v: CanvasView) => void;
   activeView?: CanvasView;
+  tight?: boolean;
 }) {
   const collapsed = false;
   // Pin button stays visible briefly after the sidebar appears or when the
@@ -1907,13 +1931,16 @@ function Sidebar({
   return (
     // biome-ignore lint/a11y/noNoninteractiveElementInteractions: pin button visibility hint, decorative reveal only
     <aside
-      className='relative flex flex-col w-[224px] h-full shrink-0'
+      className={cn(
+        'relative flex flex-col h-full shrink-0',
+        tight ? 'w-[212px]' : 'w-[224px]'
+      )}
       onMouseEnter={bumpPinVisibility}
       onMouseMove={bumpPinVisibility}
     >
       {/* Brand row — Jovie wordmark doubles as the user-menu trigger.
           Click anywhere on the row to drop the user menu. */}
-      <div className='px-2 pt-3 pb-4'>
+      <div className={cn('px-2', tight ? 'pt-2 pb-2' : 'pt-3 pb-4')}>
         <div className='relative flex items-center h-7 gap-2.5'>
           <UserMenu>
             <span className='flex-1 inline-flex items-center gap-2.5 h-7 pl-3 pr-2 rounded-md hover:bg-surface-1/60 transition-colors duration-150 ease-out cursor-pointer min-w-0'>
@@ -1956,7 +1983,12 @@ function Sidebar({
         </div>
       </div>
 
-      <nav className='flex-1 overflow-y-auto px-2 pb-2 space-y-5'>
+      <nav
+        className={cn(
+          'flex-1 overflow-y-auto px-2 pb-2',
+          tight ? 'space-y-3' : 'space-y-5'
+        )}
+      >
         {/* Cross-context items (no label, just the items) */}
         <div className='space-y-px'>
           {CORE_ITEMS.map(item => {
@@ -1977,6 +2009,7 @@ function Sidebar({
                     view && onSelectView ? () => onSelectView(view) : undefined,
                 }}
                 collapsed={collapsed}
+                tight={tight}
               />
             );
           })}
@@ -2000,6 +2033,7 @@ function Sidebar({
                 setOpenWs(s => ({ ...s, [ws.id]: !(s[ws.id] ?? false) }))
               }
               collapsed={collapsed}
+              tight={tight}
             />
           ))}
         </div>
@@ -2016,6 +2050,7 @@ function Sidebar({
               }))
             }
             collapsed={collapsed}
+            tight={tight}
           />
         </div>
       </nav>
@@ -2032,11 +2067,13 @@ function Workspace({
   open,
   onToggle,
   collapsed,
+  tight,
 }: {
   workspace: Workspace;
   open: boolean;
   onToggle: () => void;
   collapsed: boolean;
+  tight?: boolean;
 }) {
   // Collapsed sidebar: render just an avatar; click cycles through items
   // visually (here we just show the avatar with a tone tooltip).
@@ -2058,7 +2095,10 @@ function Workspace({
       <button
         type='button'
         onClick={onToggle}
-        className='relative w-full flex items-center gap-2.5 h-7 pl-3 pr-2 rounded-md hover:bg-surface-1/70 transition-colors duration-150 ease-out'
+        className={cn(
+          'relative w-full flex items-center gap-2.5 pl-3 pr-2 rounded-md hover:bg-surface-1/70 transition-colors duration-150 ease-out',
+          tight ? 'h-6' : 'h-7'
+        )}
         aria-expanded={open}
       >
         {/* Chevron sits in the icon column — replaces the avatar */}
@@ -2077,7 +2117,7 @@ function Workspace({
       <div
         className='overflow-hidden'
         style={{
-          maxHeight: open ? workspace.items.length * 30 + 12 : 0,
+          maxHeight: open ? workspace.items.length * (tight ? 26 : 30) + 12 : 0,
           opacity: open ? 1 : 0,
           transition: `max-height ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, opacity 200ms ease-out`,
         }}
@@ -2090,6 +2130,7 @@ function Workspace({
               item={item}
               collapsed={false}
               nested
+              tight={tight}
             />
           ))}
           {workspace.items.length === 0 && (
@@ -2107,18 +2148,25 @@ function SidebarNavItem({
   item,
   collapsed,
   nested,
+  tight,
 }: {
   item: NavItem;
   collapsed: boolean;
   nested?: boolean;
+  tight?: boolean;
 }) {
   return (
     <button
       type='button'
       onClick={item.onActivate}
       className={cn(
-        'relative flex items-center gap-2.5 rounded-md text-[13px] w-full transition-colors duration-150 ease-out tracking-[-0.005em]',
-        collapsed ? 'h-8 w-10 mx-auto justify-center' : 'h-7 pl-3 pr-2',
+        'relative flex items-center rounded-md w-full transition-colors duration-150 ease-out tracking-[-0.005em]',
+        tight ? 'gap-2 text-[12.5px]' : 'gap-2.5 text-[13px]',
+        collapsed
+          ? 'h-8 w-10 mx-auto justify-center'
+          : tight
+            ? 'h-6 pl-2.5 pr-2'
+            : 'h-7 pl-3 pr-2',
         item.active
           ? 'text-primary-token bg-surface-1'
           : nested
@@ -2128,7 +2176,8 @@ function SidebarNavItem({
     >
       <item.icon
         className={cn(
-          'h-3.5 w-3.5 shrink-0',
+          'shrink-0',
+          tight ? 'h-3 w-3' : 'h-3.5 w-3.5',
           item.active
             ? 'text-primary-token'
             : nested
@@ -3934,6 +3983,8 @@ function VariantPicker({
   onView,
   palette,
   onPalette,
+  sidebarTight,
+  onSidebarTight,
 }: {
   variant: Variant;
   onVariant: (v: Variant) => void;
@@ -3947,6 +3998,8 @@ function VariantPicker({
   onView: (v: CanvasView) => void;
   palette: Palette;
   onPalette: (p: Palette) => void;
+  sidebarTight: boolean;
+  onSidebarTight: () => void;
 }) {
   // Picker is dev-only chrome — start collapsed so it doesn't cover the
   // top-right corner of the actual UI being designed.
@@ -4032,6 +4085,12 @@ function VariantPicker({
           onLabel='Waveform on'
           offLabel='Waveform off'
           shortcut='W'
+        />
+        <PickerToggle
+          on={sidebarTight}
+          onClick={onSidebarTight}
+          onLabel='Sidebar tight (library)'
+          offLabel='Sidebar roomy (default)'
         />
       </div>
       <PalettePanel palette={palette} onPalette={onPalette} />
@@ -4647,33 +4706,14 @@ function PillChip({
 // opens the drawer, Space plays/pauses the focused row, Esc closes drawer.
 // ---------------------------------------------------------------------------
 
-function LibraryStubView() {
-  // Placeholder canvas content. The full library lives at /exp/library-v1
-  // and will be folded into this shell after the design pass approves the
-  // unified shell-and-library experience.
+// Library lives inside the shell as a real canvas view — same component
+// as /exp/library-v1, just rendered inside the shell's canvas instead of
+// owning the page. The library brings its own left rail (saved views +
+// filters), grid/table center, and right asset drawer.
+function LibraryShellEmbed() {
   return (
-    <div className='h-full grid place-items-center px-6'>
-      <div className='max-w-md text-center'>
-        <div className='inline-grid place-items-center h-12 w-12 rounded-full bg-(--surface-1) border border-(--linear-app-shell-border) mx-auto'>
-          <LibraryIcon
-            className='h-5 w-5 text-quaternary-token'
-            strokeWidth={2.25}
-          />
-        </div>
-        <h2
-          className='mt-4 text-[15px] font-semibold text-primary-token'
-          style={{ letterSpacing: '-0.012em' }}
-        >
-          Library
-        </h2>
-        <p className='mt-1.5 text-[12.5px] text-tertiary-token'>
-          The full library prototype lives at{' '}
-          <code className='text-secondary-token bg-(--surface-1) px-1 py-0.5 rounded text-[11.5px]'>
-            /exp/library-v1
-          </code>
-          . It folds into this shell once the design is approved.
-        </p>
-      </div>
+    <div className='h-full w-full overflow-hidden'>
+      <LibraryV1Page />
     </div>
   );
 }
@@ -4707,10 +4747,10 @@ function ReleasesView({
   const containerRef = useRef<HTMLDivElement>(null);
 
   function handleKey(e: React.KeyboardEvent) {
-    if (e.key === 'ArrowDown' || e.key === 'j') {
+    if (e.key === 'ArrowDown' || e.key === 'k') {
       e.preventDefault();
       setFocusedIndex(i => Math.min(releases.length - 1, i + 1));
-    } else if (e.key === 'ArrowUp' || e.key === 'k') {
+    } else if (e.key === 'ArrowUp' || e.key === 'j') {
       e.preventDefault();
       setFocusedIndex(i => Math.max(0, i - 1));
     } else if (e.key === 'Enter') {
@@ -6105,11 +6145,11 @@ function TracksView({
   }, []);
 
   function handleKey(e: React.KeyboardEvent) {
-    if (e.key === 'ArrowDown' || e.key === 'j') {
+    if (e.key === 'ArrowDown' || e.key === 'k') {
       e.preventDefault();
       bumpKeyboardNav();
       setFocusedIndex(i => Math.min(sorted.length - 1, i + 1));
-    } else if (e.key === 'ArrowUp' || e.key === 'k') {
+    } else if (e.key === 'ArrowUp' || e.key === 'j') {
       e.preventDefault();
       bumpKeyboardNav();
       setFocusedIndex(i => Math.max(0, i - 1));
@@ -6668,12 +6708,12 @@ function TasksView({
   const selected = tasks.find(t => t.id === selectedId) ?? tasks[0];
 
   function handleKey(e: React.KeyboardEvent) {
-    if (e.key === 'ArrowDown' || e.key === 'j') {
+    if (e.key === 'ArrowDown' || e.key === 'k') {
       e.preventDefault();
       const next = Math.min(tasks.length - 1, focusedIndex + 1);
       setFocusedIndex(next);
       setSelectedId(tasks[next].id);
-    } else if (e.key === 'ArrowUp' || e.key === 'k') {
+    } else if (e.key === 'ArrowUp' || e.key === 'j') {
       e.preventDefault();
       const next = Math.max(0, focusedIndex - 1);
       setFocusedIndex(next);
@@ -6903,15 +6943,18 @@ function MetaPill({
   children: React.ReactNode;
   tone?: 'neutral' | 'amber' | 'cyan';
 }) {
+  // Flat at rest, border + subtle bg appears on hover. Tone modifiers
+  // affect text color only at rest; the surface stays clean.
   return (
     <span
       className={cn(
         'inline-flex items-center gap-1.5 h-[24px] px-2 rounded-md text-[11.5px] tracking-[-0.005em] border whitespace-nowrap',
+        'border-transparent bg-transparent transition-[background-color,border-color] duration-150 ease-out cursor-default',
         tone === 'amber'
-          ? 'border-amber-500/30 bg-amber-500/10 text-amber-300/90'
+          ? 'text-amber-300/85 hover:border-amber-500/30 hover:bg-amber-500/10'
           : tone === 'cyan'
-            ? 'border-cyan-500/30 bg-cyan-500/10 text-cyan-300/90'
-            : 'border-(--linear-app-shell-border) bg-surface-1/40 text-secondary-token'
+            ? 'text-cyan-300/85 hover:border-cyan-500/30 hover:bg-cyan-500/10'
+            : 'text-secondary-token hover:border-(--linear-app-shell-border) hover:bg-surface-1/40'
       )}
     >
       {children}
