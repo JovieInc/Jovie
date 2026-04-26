@@ -30,7 +30,7 @@ export function AccountDashboard() {
               <CreditCard className='h-7 w-7 text-[var(--accent-analytics)]' />
             </div>
             <div className='ml-4'>
-              <h3 className='text-[15px] font-semibold text-primary-token'>
+              <h3 className='text-mid font-semibold text-primary-token'>
                 Billing & Subscription
               </h3>
               <p className='text-app text-secondary-token'>
@@ -52,7 +52,7 @@ export function AccountDashboard() {
               <User className='h-7 w-7 text-[var(--accent-speed)]' />
             </div>
             <div className='ml-4'>
-              <h3 className='text-[15px] font-semibold text-primary-token'>
+              <h3 className='text-mid font-semibold text-primary-token'>
                 Creator Profile
               </h3>
               <p className='text-app text-secondary-token'>
@@ -76,7 +76,7 @@ export function AccountDashboard() {
               <Settings className='h-7 w-7 text-[var(--accent-conv)]' />
             </div>
             <div className='ml-4'>
-              <h3 className='text-[15px] font-semibold text-primary-token'>
+              <h3 className='text-mid font-semibold text-primary-token'>
                 General Settings
               </h3>
               <p className='text-app text-secondary-token'>
