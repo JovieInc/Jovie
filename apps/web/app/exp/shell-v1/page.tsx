@@ -23,6 +23,26 @@
 // There is room for ONE such hero gradient per screen — and really one per
 // app. If you want to add a second, kill the first.
 // ---------------------------------------------------------------------------
+// KEYBOARD SHORTCUT RULE
+// ---------------------------------------------------------------------------
+// Every keyboard shortcut MUST be discoverable in two places:
+//   1. The button or affordance it triggers — `title="Action (⌘K)"`,
+//      ideally rendered as a styled Tooltip with a kbd chip on the right.
+//   2. A central registry — see SHORTCUTS below — so we can ship a
+//      "keyboard shortcuts" sheet later without hunting for them.
+// Format: `⌘K`, `⌥/`, `Hold ⌘J`, `[`, `Esc`. Use `⌘` not `Cmd`, and `⌥`
+// not `Alt`, for visual density.
+const SHORTCUTS: Record<string, { keys: string; description: string }> = {
+  search: { keys: '⌘K', description: 'Open search / filter bar' },
+  searchSlash: { keys: '/', description: 'Open search (no modifier)' },
+  toggleSidebar: { keys: '[', description: 'Toggle sidebar dock / float' },
+  toggleSidebarTab: { keys: 'Tab', description: 'Toggle sidebar dock / float' },
+  toggleBar: { keys: '⌘\\', description: 'Toggle audio bar in / out' },
+  toggleWaveform: { keys: 'W', description: 'Toggle waveform drawer' },
+  playPause: { keys: 'Space', description: 'Play / pause current track' },
+  jovieDictate: { keys: 'Hold ⌘J', description: 'Push-to-talk to Jovie' },
+  closeOverlay: { keys: 'Esc', description: 'Close overlay / clear input' },
+};
 
 import {
   Activity,
@@ -49,6 +69,7 @@ import {
   Mic,
   Mic2,
   Minimize2,
+  PanelRight,
   Pause,
   Pencil,
   Pin,
@@ -1314,6 +1335,17 @@ export default function ShellV1Experiment() {
             titleOptions={titleOptions}
             albumOptions={albumOptions}
           />
+          <CanvasSubheader
+            view={view}
+            onView={setView}
+            rightRailOpen={selectedReleaseId !== null}
+            onToggleRightRail={() =>
+              setSelectedReleaseId(id =>
+                id === null ? (RELEASES[0]?.id ?? null) : null
+              )
+            }
+            onOpenSearch={() => setSearchOpen(true)}
+          />
           <div className='flex-1 min-h-0 overflow-hidden flex'>
             <div className='flex-1 min-h-0 min-w-0 overflow-y-auto'>
               {view === 'demo' ? (
@@ -1462,31 +1494,26 @@ export default function ShellV1Experiment() {
 function ShellLoader({ phase }: { phase: 'bloom' | 'reveal' | 'done' }) {
   if (phase === 'done') return null;
   const isReveal = phase === 'reveal';
+  // Calm bloom: logo holds centered, then fades + scales up subtly (no
+  // flight path). Background fades from solid to transparent so the app
+  // reveals underneath without the logo "going somewhere."
   return (
     <div
       aria-hidden='true'
-      className='fixed inset-0 z-[60] pointer-events-none'
+      className='fixed inset-0 z-[60] pointer-events-none grid place-items-center'
       style={{
         background: isReveal ? 'rgba(6,7,10,0)' : 'rgba(6,7,10,1)',
-        transition: `background-color 520ms ${EASE_CINEMATIC}`,
+        transition: `background-color 480ms ${EASE_CINEMATIC}`,
       }}
     >
       <div
-        className='absolute'
         style={{
-          // Centered during bloom; glides toward the sidebar's brand-row
-          // position during reveal (matches the live mark at left:8 + pl-3
-          // = 20px from page edge, top:~22px center).
-          top: isReveal ? '22px' : '50%',
-          left: isReveal ? '21px' : '50%',
-          transform: isReveal
-            ? 'translate(-50%, -50%) scale(0.21)'
-            : 'translate(-50%, -50%) scale(1)',
+          transform: isReveal ? 'scale(1.08)' : 'scale(1)',
           opacity: isReveal ? 0 : 1,
-          transition: `top 620ms ${EASE_CINEMATIC}, left 620ms ${EASE_CINEMATIC}, transform 620ms ${EASE_CINEMATIC}, opacity 460ms ${EASE_CINEMATIC} 240ms`,
+          transition: `transform 520ms ${EASE_CINEMATIC}, opacity 380ms ${EASE_CINEMATIC}`,
         }}
       >
-        <JovieMark className='h-16 w-16 text-primary-token' />
+        <JovieMark className='h-12 w-12 text-primary-token' />
       </div>
     </div>
   );
@@ -1597,17 +1624,26 @@ function Sidebar({
       onMouseEnter={bumpPinVisibility}
       onMouseMove={bumpPinVisibility}
     >
-      {/* Brand row — Jovie wordmark + pin toggle (floating mode only) */}
+      {/* Brand row — Jovie wordmark doubles as the user-menu trigger.
+          Click anywhere on the row to drop the user menu. */}
       <div className='px-2 pt-3 pb-4'>
-        <div className='flex items-center h-7 gap-2.5 pl-3 pr-2'>
-          <JovieMark className='h-4 w-4 shrink-0 text-primary-token' />
-          <span className='text-[13.5px] font-semibold tracking-[-0.02em] text-primary-token flex-1'>
-            Jovie
-          </span>
+        <div className='relative flex items-center h-7 gap-2.5'>
+          <UserMenu>
+            <span className='flex-1 inline-flex items-center gap-2.5 h-7 pl-3 pr-2 rounded-md hover:bg-surface-1/60 transition-colors duration-150 ease-out cursor-pointer min-w-0'>
+              <JovieMark className='h-4 w-4 shrink-0 text-primary-token' />
+              <span className='text-[13.5px] font-semibold tracking-[-0.02em] text-primary-token flex-1 truncate'>
+                Jovie
+              </span>
+              <ChevronDown
+                className='h-3 w-3 text-quaternary-token shrink-0'
+                strokeWidth={2.25}
+              />
+            </span>
+          </UserMenu>
           <button
             type='button'
             onClick={onPin}
-            className='h-6 w-6 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1 transition-[opacity,color,background-color] duration-300 ease-out'
+            className='absolute right-2 h-6 w-6 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1 transition-[opacity,color,background-color] duration-300 ease-out'
             style={{
               opacity: pinVisible ? 1 : 0,
               pointerEvents: pinVisible ? 'auto' : 'none',
@@ -1924,6 +1960,82 @@ const BREADCRUMB_TRAIL: Array<{ label: string; emphasis?: boolean }> = [
   { label: 'Dashboard', emphasis: true },
 ];
 
+// Subheader strip — view tabs left, view-scoped toolbar right.
+// Lives between the page header (breadcrumb) and the canvas content.
+function CanvasSubheader({
+  view,
+  onView,
+  rightRailOpen,
+  onToggleRightRail,
+  onOpenSearch,
+}: {
+  view: CanvasView;
+  onView: (v: CanvasView) => void;
+  rightRailOpen: boolean;
+  onToggleRightRail: () => void;
+  onOpenSearch: () => void;
+}) {
+  // Demo view stays accessible via the dev picker — not promoted into the
+  // primary tab strip. Lyrics is per-track and lives in the audio-bar
+  // affordance, not the canvas tabs.
+  const tabs: { id: CanvasView; label: string }[] = [
+    { id: 'releases', label: 'Releases' },
+    { id: 'tracks', label: 'Tracks' },
+    { id: 'tasks', label: 'Tasks' },
+  ];
+  return (
+    <div className='shrink-0 h-10 px-3 flex items-center gap-2 border-b border-(--linear-app-shell-border)/50'>
+      <div className='flex items-center gap-0.5'>
+        {tabs.map(t => {
+          const active = view === t.id;
+          return (
+            <button
+              key={t.id}
+              type='button'
+              onClick={() => onView(t.id)}
+              className={cn(
+                'h-7 px-2.5 rounded-md text-[12.5px] font-caption tracking-[-0.012em] transition-colors duration-150 ease-out',
+                active
+                  ? 'text-primary-token bg-surface-1/80'
+                  : 'text-tertiary-token hover:text-primary-token hover:bg-surface-1/50'
+              )}
+            >
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+      <div className='ml-auto flex items-center gap-1'>
+        <Tooltip label='Search' shortcut='search'>
+          <button
+            type='button'
+            onClick={onOpenSearch}
+            className='h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-150 ease-out'
+            aria-label='Search (⌘K)'
+          >
+            <Search className='h-3.5 w-3.5' strokeWidth={2.25} />
+          </button>
+        </Tooltip>
+        <Tooltip label={rightRailOpen ? 'Hide details' : 'Show details'}>
+          <button
+            type='button'
+            onClick={onToggleRightRail}
+            className={cn(
+              'h-7 w-7 rounded-md grid place-items-center transition-colors duration-150 ease-out',
+              rightRailOpen
+                ? 'text-primary-token bg-surface-1/60'
+                : 'text-quaternary-token hover:text-primary-token hover:bg-surface-1/60'
+            )}
+            aria-label='Toggle right rail'
+          >
+            <PanelRight className='h-3.5 w-3.5' strokeWidth={2.25} />
+          </button>
+        </Tooltip>
+      </div>
+    </div>
+  );
+}
+
 function Header({
   sidebarMode,
   onToggleSidebar,
@@ -1974,23 +2086,27 @@ function Header({
 
   return (
     <header className='shrink-0 h-12 px-3 flex items-center gap-2'>
-      <button
-        type='button'
-        onClick={onToggleSidebar}
-        className='h-7 w-7 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-150 ease-out shrink-0'
-        aria-label={
-          sidebarHidden
-            ? 'Dock sidebar ([)'
-            : 'Hide sidebar — peek on left edge ([)'
-        }
-        title={sidebarHidden ? 'Dock sidebar' : 'Hide sidebar (peek on hover)'}
+      <Tooltip
+        label={sidebarHidden ? 'Dock sidebar' : 'Hide sidebar'}
+        shortcut='toggleSidebar'
       >
-        {sidebarHidden ? (
-          <ChevronRight className='h-3.5 w-3.5' strokeWidth={2.25} />
-        ) : (
-          <ChevronLeft className='h-3.5 w-3.5' strokeWidth={2.25} />
-        )}
-      </button>
+        <button
+          type='button'
+          onClick={onToggleSidebar}
+          className='h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-150 ease-out shrink-0'
+          aria-label={
+            sidebarHidden
+              ? 'Dock sidebar ([)'
+              : 'Hide sidebar — peek on left edge ([)'
+          }
+        >
+          {sidebarHidden ? (
+            <ChevronRight className='h-3.5 w-3.5' strokeWidth={2.25} />
+          ) : (
+            <ChevronLeft className='h-3.5 w-3.5' strokeWidth={2.25} />
+          )}
+        </button>
+      </Tooltip>
       <div className='relative flex-1 min-w-0 h-7'>
         {/* Breadcrumb (visible when search is closed) */}
         <div
@@ -2053,29 +2169,19 @@ function Header({
         </div>
       </div>
 
-      <div className='flex items-center gap-1 shrink-0'>
+      <div className='flex items-center gap-2 shrink-0'>
         <button
           type='button'
-          onClick={() => onSearchOpenChange(true)}
-          className='h-7 w-7 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-150 ease-out'
-          aria-label='Search (⌘K)'
-          title='Search (⌘K)'
-        >
-          <Search className='h-3.5 w-3.5' strokeWidth={2.25} />
-        </button>
-        <button
-          type='button'
-          className='h-7 px-3 rounded-md bg-primary text-on-primary text-[12px] font-caption hover:opacity-90 ml-1'
+          className='h-7 px-3 rounded-md bg-primary text-on-primary text-[12px] font-caption hover:opacity-90'
         >
           Share profile
         </button>
-        <UserMenu />
       </div>
     </header>
   );
 }
 
-function UserMenu() {
+function UserMenu({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -2088,19 +2194,19 @@ function UserMenu() {
   }, [open]);
 
   return (
-    <div ref={ref} className='relative'>
+    <div ref={ref} className='relative flex-1 min-w-0'>
       <button
         type='button'
         onClick={() => setOpen(o => !o)}
-        className='h-7 w-7 rounded-full bg-surface-2 border border-(--linear-app-shell-border) text-secondary-token text-[11px] font-caption grid place-items-center hover:bg-surface-1 hover:text-primary-token transition-colors duration-150 ease-out'
+        className='w-full text-left'
         aria-label='Account menu'
         aria-expanded={open}
       >
-        TW
+        {children}
       </button>
       {open && (
-        <div className='absolute right-0 top-9 w-56 rounded-lg border border-subtle bg-(--linear-app-content-surface) shadow-[0_12px_40px_rgba(0,0,0,0.16)] p-1 z-50'>
-          <div className='px-2 py-2 border-b border-subtle mb-1'>
+        <div className='absolute left-0 top-9 w-[212px] rounded-lg border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) shadow-[0_12px_40px_rgba(0,0,0,0.32)] p-1 z-50'>
+          <div className='px-2 py-2 border-b border-(--linear-app-shell-border)/60 mb-1'>
             <div className='text-[12.5px] font-caption text-primary-token leading-tight'>
               Tim White
             </div>
@@ -2110,7 +2216,7 @@ function UserMenu() {
           </div>
           <MenuItem icon={Settings} label='Settings' />
           <MenuItem icon={Shield} label='Admin' />
-          <div className='border-t border-subtle my-1' />
+          <div className='border-t border-(--linear-app-shell-border)/60 my-1' />
           <MenuItem icon={LogOut} label='Sign out' />
         </div>
       )}
@@ -2128,7 +2234,7 @@ function MenuItem({
   return (
     <button
       type='button'
-      className='w-full flex items-center gap-2.5 px-2 h-7 rounded text-[12.5px] text-secondary-token hover:bg-surface-1 hover:text-primary-token'
+      className='w-full flex items-center gap-2.5 px-2 h-7 rounded-md text-[12.5px] text-secondary-token hover:bg-surface-1 hover:text-primary-token'
     >
       <Icon className='h-3.5 w-3.5' />
       {label}
@@ -2194,34 +2300,39 @@ function AudioBar({
   // player is, and what kind of artist control it surfaces.
   const transportButtons = (
     <div className='flex items-center gap-1.5 justify-self-center'>
-      <IconBtn label='Shuffle'>
+      <IconBtn label='Shuffle' tooltipSide='top'>
         <Shuffle className='h-3.5 w-3.5' strokeWidth={2.25} />
       </IconBtn>
-      <IconBtn label='Previous'>
+      <IconBtn label='Previous' tooltipSide='top'>
         <SkipBack className='h-4 w-4' strokeWidth={2.5} fill='currentColor' />
       </IconBtn>
-      <button
-        type='button'
-        onClick={onPlay}
-        className='h-8 w-8 rounded-full grid place-items-center bg-primary text-on-primary transition-transform duration-150 ease-out hover:scale-[1.04] active:scale-95'
-        aria-label={isPlaying ? 'Pause (space)' : 'Play (space)'}
-        title={isPlaying ? 'Pause (space)' : 'Play (space)'}
+      <Tooltip
+        label={isPlaying ? 'Pause' : 'Play'}
+        shortcut='playPause'
+        side='top'
       >
-        {isPlaying ? (
-          <Pause
-            className='h-3.5 w-3.5'
-            strokeWidth={2.5}
-            fill='currentColor'
-          />
-        ) : (
-          <Play
-            className='h-3.5 w-3.5 translate-x-px'
-            strokeWidth={2.5}
-            fill='currentColor'
-          />
-        )}
-      </button>
-      <IconBtn label='Next'>
+        <button
+          type='button'
+          onClick={onPlay}
+          className='h-8 w-8 rounded-full grid place-items-center bg-primary text-on-primary transition-transform duration-150 ease-out hover:scale-[1.04] active:scale-95'
+          aria-label={isPlaying ? 'Pause (space)' : 'Play (space)'}
+        >
+          {isPlaying ? (
+            <Pause
+              className='h-3.5 w-3.5'
+              strokeWidth={2.5}
+              fill='currentColor'
+            />
+          ) : (
+            <Play
+              className='h-3.5 w-3.5 translate-x-px'
+              strokeWidth={2.5}
+              fill='currentColor'
+            />
+          )}
+        </button>
+      </Tooltip>
+      <IconBtn label='Next' tooltipSide='top'>
         <SkipForward
           className='h-4 w-4'
           strokeWidth={2.5}
@@ -2234,13 +2345,20 @@ function AudioBar({
 
   const rightCluster = (
     <div className='flex items-center gap-1 justify-self-end'>
-      <IconBtn label='Lyrics' onClick={onOpenLyrics} active={lyricsActive}>
+      <IconBtn
+        label='Lyrics'
+        onClick={onOpenLyrics}
+        active={lyricsActive}
+        tooltipSide='top'
+      >
         <Mic2 className='h-3.5 w-3.5' strokeWidth={2.25} />
       </IconBtn>
       <IconBtn
-        label={waveformOn ? 'Hide waveform (W)' : 'Show waveform (W)'}
+        label={waveformOn ? 'Hide waveform' : 'Show waveform'}
+        shortcut='toggleWaveform'
         onClick={onToggleWaveform}
         active={waveformOn}
+        tooltipSide='top'
       >
         {waveformOn ? (
           <AudioLines className='h-3.5 w-3.5' strokeWidth={2.25} />
@@ -2248,10 +2366,15 @@ function AudioBar({
           <AudioWaveform className='h-3.5 w-3.5' strokeWidth={2.25} />
         )}
       </IconBtn>
-      <IconBtn label='Volume'>
+      <IconBtn label='Volume' tooltipSide='top'>
         <Volume2 className='h-3.5 w-3.5' strokeWidth={2.25} />
       </IconBtn>
-      <IconBtn label='Minimize player' onClick={onCollapse}>
+      <IconBtn
+        label='Minimize player'
+        shortcut='toggleBar'
+        onClick={onCollapse}
+        tooltipSide='top'
+      >
         <Minimize2 className='h-3.5 w-3.5' strokeWidth={2.25} />
       </IconBtn>
     </div>
@@ -2316,7 +2439,7 @@ function LoopBtn({
       type='button'
       onClick={onClick}
       className={cn(
-        'relative h-7 w-7 rounded grid place-items-center transition-colors duration-150 ease-out',
+        'relative h-7 w-7 rounded-md grid place-items-center transition-colors duration-150 ease-out',
         active
           ? 'text-primary-token'
           : 'text-quaternary-token hover:text-primary-token'
@@ -2923,35 +3046,86 @@ function TabletPlayerCard({
   );
 }
 
+// ---------------------------------------------------------------------------
+// Tooltip — small, dark, glassy popover with the action label + an optional
+// kbd chip on the right. Use the SHORTCUTS registry (top of file) for any
+// key combo so we have a single source of truth — see KEYBOARD SHORTCUT RULE.
+// CSS-only (no portal). Uses group/tip + delay-300 for a Linear-feeling
+// late reveal, snapping in over 120ms once it commits.
+// ---------------------------------------------------------------------------
+function Tooltip({
+  children,
+  label,
+  shortcut,
+  side = 'bottom',
+  className,
+}: {
+  children: React.ReactNode;
+  label: string;
+  shortcut?: keyof typeof SHORTCUTS;
+  side?: 'top' | 'bottom';
+  className?: string;
+}) {
+  const sc = shortcut ? SHORTCUTS[shortcut] : null;
+  return (
+    <span className={cn('relative inline-flex group/tip isolate', className)}>
+      {children}
+      <span
+        role='tooltip'
+        className={cn(
+          'pointer-events-none absolute left-1/2 -translate-x-1/2 z-50 whitespace-nowrap',
+          'opacity-0 translate-y-0.5 group-hover/tip:opacity-100 group-hover/tip:translate-y-0 group-focus-within/tip:opacity-100 group-focus-within/tip:translate-y-0',
+          'transition-[opacity,transform] duration-150 ease-out delay-[400ms] group-hover/tip:delay-[400ms] group-focus-within/tip:delay-[80ms]',
+          side === 'bottom' ? 'top-full mt-1.5' : 'bottom-full mb-1.5'
+        )}
+      >
+        <span className='inline-flex items-center gap-2 h-6 px-2 rounded-md text-[11px] font-caption text-primary-token bg-(--linear-app-content-surface)/95 border border-(--linear-app-shell-border) backdrop-blur-xl shadow-[0_6px_20px_rgba(0,0,0,0.28)]'>
+          <span className='leading-none'>{label}</span>
+          {sc && (
+            <kbd className='inline-flex items-center h-4 min-w-4 px-1 rounded-[3px] text-[9.5px] font-caption uppercase tracking-[0.04em] text-tertiary-token bg-surface-0/80 border border-(--linear-app-shell-border) leading-none'>
+              {sc.keys}
+            </kbd>
+          )}
+        </span>
+      </span>
+    </span>
+  );
+}
+
 function IconBtn({
   children,
   label,
   onClick,
   active,
+  shortcut,
+  tooltipSide = 'bottom',
 }: {
   children: React.ReactNode;
   label: string;
   onClick?: () => void;
   active?: boolean;
+  shortcut?: keyof typeof SHORTCUTS;
+  tooltipSide?: 'top' | 'bottom';
 }) {
   // Flat at rest — Spotify-quiet. Hover lights up text + adds a subtle
   // surface-1 background so the button reads as clickable, hinting at
   // the dropdown / popover that follows.
   return (
-    <button
-      type='button'
-      onClick={onClick}
-      className={cn(
-        'h-7 w-7 rounded-md grid place-items-center transition-colors duration-150 ease-out',
-        active
-          ? 'text-primary-token bg-surface-1/60'
-          : 'text-quaternary-token hover:text-primary-token hover:bg-surface-1/60'
-      )}
-      aria-label={label}
-      title={label}
-    >
-      {children}
-    </button>
+    <Tooltip label={label} shortcut={shortcut} side={tooltipSide}>
+      <button
+        type='button'
+        onClick={onClick}
+        className={cn(
+          'h-7 w-7 rounded-md grid place-items-center transition-colors duration-150 ease-out',
+          active
+            ? 'text-primary-token bg-surface-1/60'
+            : 'text-quaternary-token hover:text-primary-token hover:bg-surface-1/60'
+        )}
+        aria-label={label}
+      >
+        {children}
+      </button>
+    </Tooltip>
   );
 }
 
@@ -3012,7 +3186,7 @@ function VariantPicker({
         <button
           type='button'
           onClick={() => setOpen(false)}
-          className='h-5 w-5 grid place-items-center rounded text-quaternary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-150 ease-out'
+          className='h-5 w-5 grid place-items-center rounded-md text-quaternary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-150 ease-out'
           aria-label='Hide picker'
           title='Hide picker'
         >
@@ -3543,7 +3717,14 @@ function PillSearch({
           }
           className='flex-1 min-w-[120px] bg-transparent text-[13px] text-primary-token placeholder:text-tertiary-token outline-none'
         />
-        <kbd className='text-[10px] text-quaternary-token shrink-0'>esc</kbd>
+        <button
+          type='button'
+          onClick={onClose}
+          className='shrink-0 inline-flex items-center h-5 px-1.5 rounded text-[10px] font-caption uppercase tracking-[0.06em] text-quaternary-token border border-(--linear-app-shell-border)/70 hover:text-primary-token hover:border-(--linear-app-shell-border) transition-colors duration-150 ease-out'
+          aria-label='Close search'
+        >
+          Esc
+        </button>
       </div>
 
       {/* Suggestion dropdown */}
@@ -3717,15 +3898,7 @@ function ReleasesView({
       onKeyDown={handleKey}
       aria-label='Releases'
     >
-      <header className='shrink-0 px-6 pt-5 pb-4 flex items-baseline gap-3'>
-        <h1 className='text-[22px] font-display tracking-[-0.02em] text-primary-token leading-tight'>
-          Releases
-        </h1>
-        <span className='text-[12px] text-quaternary-token tabular-nums'>
-          {releases.length}
-        </span>
-      </header>
-      <div className='flex-1 min-h-0 overflow-y-auto px-3 pb-6'>
+      <div className='flex-1 min-h-0 overflow-y-auto px-3 pb-6 pt-3'>
         <ul className='space-y-px'>
           {releases.map((r, i) => (
             <ReleaseRow
@@ -4304,18 +4477,47 @@ function PlayingBars() {
       aria-label='Now playing'
       className='absolute inset-0 grid place-items-center'
     >
+      {/* Calmer EQ — fewer keyframes, tighter range (40-85% instead of
+          28-96%), slower durations. Reads as a now-playing indicator
+          without strobing in the user's peripheral vision. */}
+      <style>{`
+        @keyframes pb-eq-a {
+          0%, 100% { height: 50%; }
+          50%      { height: 80%; }
+        }
+        @keyframes pb-eq-b {
+          0%, 100% { height: 70%; }
+          50%      { height: 42%; }
+        }
+        @keyframes pb-eq-c {
+          0%, 100% { height: 55%; }
+          50%      { height: 78%; }
+        }
+      `}</style>
       <span className='flex items-end gap-[2px] h-3'>
-        {[0, 1, 2].map(i => (
-          <span
-            key={i}
-            className='w-[2px] bg-primary-token rounded-sm animate-pulse'
-            style={{
-              height: `${30 + i * 25}%`,
-              animationDelay: `${i * 120}ms`,
-              animationDuration: '900ms',
-            }}
-          />
-        ))}
+        <span
+          className='w-[2px] rounded-sm bg-primary-token'
+          style={{
+            animation: 'pb-eq-a 1400ms ease-in-out infinite',
+            willChange: 'height',
+          }}
+        />
+        <span
+          className='w-[2px] rounded-sm bg-primary-token'
+          style={{
+            animation: 'pb-eq-b 1100ms ease-in-out infinite',
+            animationDelay: '-220ms',
+            willChange: 'height',
+          }}
+        />
+        <span
+          className='w-[2px] rounded-sm bg-primary-token'
+          style={{
+            animation: 'pb-eq-c 1700ms ease-in-out infinite',
+            animationDelay: '-480ms',
+            willChange: 'height',
+          }}
+        />
       </span>
     </span>
   );
@@ -4366,7 +4568,7 @@ function ReleaseDrawer({
         <button
           type='button'
           onClick={onClose}
-          className='h-7 w-7 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-150 ease-out'
+          className='h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-150 ease-out'
           aria-label='Close drawer (Esc)'
           title='Close (Esc)'
         >
@@ -4598,11 +4800,13 @@ function TracksView({
       onKeyDown={handleKey}
       aria-label='Tracks'
     >
-      <div className='flex-1 min-h-0 overflow-y-auto px-1 pt-2'>
+      <div className='flex-1 min-h-0 overflow-y-auto px-1'>
         {/* Sticky column header strip — pinned for big libraries. Identity
             for the page lives in the breadcrumb; the row count + key-mode
-            toggle ride along on the same line as the column labels. */}
-        <div className='sticky top-0 z-10 bg-(--linear-app-content-surface)/95 backdrop-blur-md px-2 pt-2 pb-1.5 flex items-center gap-3 select-none border-b border-(--linear-app-shell-border)/50'>
+            toggle ride along on the same line as the column labels. Pinned
+            to top:0 with an opaque (not /95) background so rows can't peek
+            through above it during scroll. */}
+        <div className='sticky top-0 z-10 bg-(--linear-app-content-surface) px-2 pt-3 pb-1.5 flex items-center gap-3 select-none border-b border-(--linear-app-shell-border)/50'>
           <ColumnLabel
             field='index'
             label='#'
@@ -5035,13 +5239,16 @@ function ColumnLabel({
   sortDir: 'asc' | 'desc';
   onSort: (field: SortField) => void;
 }) {
-  const active = sortBy === field;
+  // 'index' is the natural default ordering — don't paint it as a user-
+  // chosen sort. Cyan only appears when the user has explicitly picked a
+  // column to sort by.
+  const active = sortBy === field && field !== 'index';
   return (
     <button
       type='button'
       onClick={() => onSort(field)}
       className={cn(
-        'group/col h-6 px-1 -mx-1 rounded text-[9.5px] uppercase tracking-[0.12em] font-medium transition-colors duration-150 ease-out',
+        'group/col h-6 px-1 -mx-1 rounded-md text-[9.5px] uppercase tracking-[0.12em] font-medium transition-colors duration-150 ease-out',
         flex ? 'flex-1 min-w-0' : (width ?? ''),
         'shrink-0 inline-flex items-center gap-1',
         align === 'right' && 'flex-row-reverse',
@@ -5116,7 +5323,7 @@ function TasksView({ tasks }: { tasks: Task[] }) {
           </span>
           <button
             type='button'
-            className='ml-auto h-6 px-2 rounded text-[10.5px] uppercase tracking-[0.08em] text-tertiary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-150 ease-out'
+            className='ml-auto h-6 px-2 rounded-md text-[10.5px] uppercase tracking-[0.08em] text-tertiary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-150 ease-out'
           >
             Filter
           </button>
@@ -5654,7 +5861,7 @@ function LyricsHeader({
   showEditToggle: boolean;
 }) {
   return (
-    <div className='shrink-0 sticky top-0 z-10 bg-(--linear-app-content-surface)/95 backdrop-blur-md px-4 pt-3 pb-2 flex items-center gap-3 select-none border-b border-(--linear-app-shell-border)/50'>
+    <div className='shrink-0 sticky top-0 z-10 bg-(--linear-app-content-surface) px-4 pt-3 pb-2 flex items-center gap-3 select-none border-b border-(--linear-app-shell-border)/50'>
       <span className='text-[10px] uppercase tracking-[0.12em] font-medium text-quaternary-token/85'>
         Lyrics
       </span>
@@ -5669,7 +5876,7 @@ function LyricsHeader({
           <button
             type='button'
             onClick={onClear}
-            className='hidden md:inline-flex h-7 px-2 rounded text-[10.5px] uppercase tracking-[0.08em] text-quaternary-token/85 hover:text-secondary-token hover:bg-surface-1 transition-colors duration-150 ease-out'
+            className='hidden md:inline-flex h-7 px-2 rounded-md text-[10.5px] uppercase tracking-[0.08em] text-quaternary-token/85 hover:text-secondary-token hover:bg-surface-1 transition-colors duration-150 ease-out'
             title='Clear lyrics (preview empty state)'
           >
             Clear
