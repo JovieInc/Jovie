@@ -686,7 +686,7 @@ export function ProfileDesktopSurface({
                       </span>
                     </div>
                     <Switch
-                      checked={false}
+                      checked={isSubscribed}
                       onCheckedChange={() => onModeSelect('subscribe')}
                       aria-label='Subscribe to other alerts'
                       className='data-[state=checked]:bg-[color:var(--profile-accent-primary)] data-[state=unchecked]:bg-white/14'

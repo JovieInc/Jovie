@@ -695,7 +695,7 @@ export function ReleaseSidebar({
           {isEditable ? (
             <DrawerSection
               title='Artwork'
-              surface='card'
+              surface='plain'
               defaultOpen={false}
               lazyMount
               testId='release-artwork-settings-card'
@@ -709,7 +709,7 @@ export function ReleaseSidebar({
           ) : null}
           <DrawerSection
             title='Lyrics'
-            surface='card'
+            surface='plain'
             defaultOpen={false}
             lazyMount
             testId='release-lyrics-card'
@@ -728,7 +728,7 @@ export function ReleaseSidebar({
           {(release.totalTracks ?? 0) > 0 ? (
             <DrawerSection
               title='Tracks'
-              surface='card'
+              surface='plain'
               defaultOpen={false}
               lazyMount
               testId='release-tracks-card'
