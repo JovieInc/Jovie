@@ -70,11 +70,13 @@ import {
   Heart,
   Inbox,
   LayoutDashboard,
+  Library as LibraryIcon,
   Link as LinkIcon,
   LogOut,
   Mic,
   Mic2,
   Minimize2,
+  MoreHorizontal,
   PanelRight,
   Pause,
   Pencil,
@@ -93,12 +95,19 @@ import {
   UserPlus,
   Users,
   Volume2,
+  X,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 type Variant = 'a' | 'b' | 'c' | 'd' | 'e';
-type CanvasView = 'demo' | 'releases' | 'tracks' | 'tasks' | 'lyrics';
+type CanvasView =
+  | 'demo'
+  | 'releases'
+  | 'tracks'
+  | 'tasks'
+  | 'library'
+  | 'lyrics';
 
 // Pill-based filter system (Linear/Notion style). Each pill targets a
 // single field with an `is` / `is not` operator and one or more OR-combined
@@ -236,6 +245,10 @@ type NavItem = {
   icon: typeof LayoutDashboard;
   label: string;
   active?: boolean;
+  // Optional: when present, clicking the item invokes this. Most sidebar
+  // items are visual placeholders in the design pass, but a few (Library)
+  // wire to the canvas view to demo the surface.
+  onActivate?: () => void;
 };
 type Workspace = {
   id: string;
@@ -248,6 +261,7 @@ type Workspace = {
 const CORE_ITEMS: NavItem[] = [
   { icon: Inbox, label: 'Inbox' },
   { icon: Activity, label: 'Tasks' },
+  { icon: LibraryIcon, label: 'Library' },
 ];
 
 const ARTIST_ITEMS: NavItem[] = [
@@ -492,7 +506,7 @@ const DSP_LABEL: Record<DspKey, string> = {
 const DSP_ORDER: DspKey[] = ['spotify', 'apple', 'youtube', 'tidal'];
 
 // --- Tracks mock (catalog rows for Tracks view) ----------------------------
-type TrackStatus = 'released' | 'scheduled' | 'draft';
+type TrackStatus = 'live' | 'scheduled' | 'draft' | 'announced' | 'hidden';
 type Track = {
   id: string;
   releaseId: string | null;
@@ -629,7 +643,15 @@ function generateTracks(n: number): Track[] {
     const energy = (((i * 7) % 9) + 1) as Track['energy'];
     const durationSec = 90 + ((i * 17) % 280);
     const status: TrackStatus =
-      i % 11 === 0 ? 'draft' : i % 13 === 0 ? 'scheduled' : 'released';
+      i % 17 === 0
+        ? 'hidden'
+        : i % 11 === 0
+          ? 'draft'
+          : i % 13 === 0
+            ? 'scheduled'
+            : i % 19 === 0
+              ? 'announced'
+              : 'live';
     const hasVideo = i % 6 === 0;
     const hasCanvas = i % 3 === 0;
     const bpmTone: Track['bpmTone'] =
@@ -689,7 +711,7 @@ const TRACKS: Track[] = [
     energy: 6,
     durationSec: 213,
     isrc: 'USRC12500001',
-    status: 'released',
+    status: 'live',
     hasVideo: true,
     hasCanvas: true,
     artwork: 'https://i.scdn.co/image/ab67616d0000b273e3a35b5fc62c33ec0c2eed62',
@@ -716,7 +738,7 @@ const TRACKS: Track[] = [
     energy: 8,
     durationSec: 348,
     isrc: 'USRC12500002',
-    status: 'released',
+    status: 'live',
     hasVideo: false,
     hasCanvas: true,
     artwork: 'https://i.scdn.co/image/ab67616d0000b273e3a35b5fc62c33ec0c2eed62',
@@ -743,7 +765,7 @@ const TRACKS: Track[] = [
     energy: 7,
     durationSec: 198,
     isrc: 'USRC12500003',
-    status: 'released',
+    status: 'live',
     hasVideo: false,
     hasCanvas: true,
     artwork: 'https://i.scdn.co/image/ab67616d0000b273ed7d40b86b3a39b3c1d8cea5',
@@ -795,7 +817,7 @@ const TRACKS: Track[] = [
     energy: 9,
     durationSec: 247,
     isrc: 'USRC12500005',
-    status: 'released',
+    status: 'live',
     hasVideo: true,
     hasCanvas: true,
     artwork: 'https://i.scdn.co/image/ab67616d0000b273e3a35b5fc62c33ec0c2eed62',
@@ -822,7 +844,7 @@ const TRACKS: Track[] = [
     energy: 5,
     durationSec: 184,
     isrc: 'USRC12500006',
-    status: 'released',
+    status: 'live',
     hasVideo: false,
     hasCanvas: false,
     artwork: 'https://i.scdn.co/image/ab67616d0000b273ed7d40b86b3a39b3c1d8cea5',
@@ -848,7 +870,7 @@ const TRACKS: Track[] = [
     energy: 3,
     durationSec: 232,
     isrc: 'USRC12500007',
-    status: 'released',
+    status: 'live',
     hasVideo: false,
     hasCanvas: true,
     artwork: 'https://i.scdn.co/image/ab67616d0000b27348fc7ad174126b1a51ea5b06',
@@ -1438,8 +1460,28 @@ export default function ShellV1Experiment() {
           transition: `opacity 600ms ${EASE_CINEMATIC}, transform 600ms ${EASE_CINEMATIC}, background-color 200ms ease-out`,
         } as React.CSSProperties
       }
-      className='flex h-dvh w-full overflow-hidden bg-(--linear-bg-page) lg:gap-2 lg:p-2'
+      className='shell-v1 flex h-dvh w-full overflow-hidden bg-(--linear-bg-page) lg:gap-2 lg:p-2'
     >
+      {/* Theme focus-visible globally inside this experiment so we never get
+          the browser's royal-blue ring on any tabbable element. Cyan-300 at
+          40% with offset matching the page surface — same hue as our hero
+          accent so focus reads as part of the theme, not a system overlay. */}
+      <style>{`
+        .shell-v1 :focus { outline: none; }
+        .shell-v1 :focus-visible {
+          outline: 1.5px solid rgba(103, 232, 249, 0.45);
+          outline-offset: 1px;
+          border-radius: 4px;
+        }
+        .shell-v1 button:focus-visible,
+        .shell-v1 [role='button']:focus-visible,
+        .shell-v1 input:focus-visible,
+        .shell-v1 textarea:focus-visible,
+        .shell-v1 [tabindex='0']:focus-visible {
+          outline: 1.5px solid rgba(103, 232, 249, 0.45);
+          outline-offset: 1px;
+        }
+      `}</style>
       {/* Docked sidebar — always mounted; width + opacity animate so the
           canvas slides over smoothly when the user pins/unpins. */}
       <div
@@ -1453,7 +1495,12 @@ export default function ShellV1Experiment() {
         }}
         aria-hidden={sidebarMode !== 'docked'}
       >
-        <Sidebar variant='docked' onPin={() => setSidebarMode('floating')} />
+        <Sidebar
+          variant='docked'
+          onPin={() => setSidebarMode('floating')}
+          onSelectView={setView}
+          activeView={view}
+        />
       </div>
 
       {/* Floating peek layer — always mounted; visibility driven by mode + hover */}
@@ -1465,6 +1512,8 @@ export default function ShellV1Experiment() {
           setPeekOpen(false);
           setSidebarMode('docked');
         }}
+        onSelectView={setView}
+        activeView={view}
       />
 
       {/* Persistent now-playing card — pinned to bottom-left, survives sidebar
@@ -1497,6 +1546,7 @@ export default function ShellV1Experiment() {
             artistOptions={artistOptions}
             titleOptions={titleOptions}
             albumOptions={albumOptions}
+            view={view}
           />
           <CanvasSubheader
             subviews={subviewsForView(view, RELEASES, TRACKS, TASKS)}
@@ -1510,8 +1560,17 @@ export default function ShellV1Experiment() {
             }
             onOpenSearch={() => setSearchOpen(true)}
           />
-          <div className='flex-1 min-h-0 overflow-hidden flex'>
-            <div className='flex-1 min-h-0 min-w-0 overflow-y-auto'>
+          <div
+            className='flex-1 min-h-0 overflow-hidden grid'
+            style={{
+              gridTemplateColumns:
+                view === 'releases' && selectedReleaseId !== null
+                  ? '1fr 388px'
+                  : '1fr 0px',
+              transition: `grid-template-columns ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
+            }}
+          >
+            <div className='min-h-0 min-w-0 overflow-y-auto'>
               {view === 'demo' ? (
                 <DemoContent />
               ) : view === 'releases' ? (
@@ -1547,13 +1606,17 @@ export default function ShellV1Experiment() {
               ) : view === 'tracks' ? (
                 <TracksView
                   tracks={
-                    subview === 'released'
-                      ? TRACKS.filter(t => t.status === 'released')
+                    subview === 'live'
+                      ? TRACKS.filter(t => t.status === 'live')
                       : subview === 'scheduled'
                         ? TRACKS.filter(t => t.status === 'scheduled')
-                        : subview === 'drafts'
-                          ? TRACKS.filter(t => t.status === 'draft')
-                          : TRACKS
+                        : subview === 'announced'
+                          ? TRACKS.filter(t => t.status === 'announced')
+                          : subview === 'drafts'
+                            ? TRACKS.filter(t => t.status === 'draft')
+                            : subview === 'hidden'
+                              ? TRACKS.filter(t => t.status === 'hidden')
+                              : TRACKS
                   }
                   pills={searchPills}
                   playingId={playingReleaseId}
@@ -1582,6 +1645,8 @@ export default function ShellV1Experiment() {
                   currentTimeSec={currentTimeSec}
                   onSeek={sec => setCurrentTimeSec(sec)}
                 />
+              ) : view === 'library' ? (
+                <LibraryStubView />
               ) : (
                 <TasksView
                   tasks={
@@ -1599,14 +1664,24 @@ export default function ShellV1Experiment() {
                 />
               )}
             </div>
-            {view === 'releases' && selectedReleaseId && (
-              <ReleaseDrawer
-                release={
-                  RELEASES.find(r => r.id === selectedReleaseId) ?? RELEASES[0]
-                }
-                onClose={() => setSelectedReleaseId(null)}
-              />
-            )}
+            <ReleaseDrawer
+              release={
+                view === 'releases' && selectedReleaseId
+                  ? (RELEASES.find(r => r.id === selectedReleaseId) ?? null)
+                  : null
+              }
+              onClose={() => setSelectedReleaseId(null)}
+              onPlay={id => {
+                setPlayingReleaseId(id);
+                setIsPlaying(true);
+              }}
+              onSeek={(id, sec) => {
+                setPlayingReleaseId(id);
+                setCurrentTimeSec(sec);
+                setIsPlaying(true);
+              }}
+              onOpenTasks={() => setView('tasks')}
+            />
           </div>
         </main>
 
@@ -1723,11 +1798,15 @@ function FloatingSidebarLayer({
   peekOpen,
   onSetPeekOpen,
   onPin,
+  onSelectView,
+  activeView,
 }: {
   active: boolean;
   peekOpen: boolean;
   onSetPeekOpen: (open: boolean) => void;
   onPin: () => void;
+  onSelectView?: (v: CanvasView) => void;
+  activeView?: CanvasView;
 }) {
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -1778,7 +1857,12 @@ function FloatingSidebarLayer({
         onMouseEnter={open}
         onMouseLeave={scheduleClose}
       >
-        <Sidebar variant='floating' onPin={onPin} />
+        <Sidebar
+          variant='floating'
+          onPin={onPin}
+          onSelectView={onSelectView}
+          activeView={activeView}
+        />
       </div>
     </>
   );
@@ -1787,9 +1871,13 @@ function FloatingSidebarLayer({
 function Sidebar({
   variant,
   onPin,
+  onSelectView,
+  activeView,
 }: {
   variant: 'docked' | 'floating';
   onPin: () => void;
+  onSelectView?: (v: CanvasView) => void;
+  activeView?: CanvasView;
 }) {
   const collapsed = false;
   // Pin button stays visible briefly after the sidebar appears or when the
@@ -1842,7 +1930,7 @@ function Sidebar({
           <button
             type='button'
             onClick={onPin}
-            className='absolute right-2 h-6 w-6 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1 transition-[opacity,color,background-color] duration-300 ease-out'
+            className='absolute right-2 h-5 w-5 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1 transition-[opacity,color,background-color] duration-300 ease-out'
             style={{
               opacity: pinVisible ? 1 : 0,
               pointerEvents: pinVisible ? 'auto' : 'none',
@@ -1860,9 +1948,9 @@ function Sidebar({
             tabIndex={pinVisible ? 0 : -1}
           >
             {variant === 'floating' ? (
-              <Pin className='h-3.5 w-3.5' strokeWidth={2.25} />
+              <Pin className='h-2.5 w-2.5' strokeWidth={2.25} />
             ) : (
-              <PinOff className='h-3.5 w-3.5' strokeWidth={2.25} />
+              <PinOff className='h-2.5 w-2.5' strokeWidth={2.25} />
             )}
           </button>
         </div>
@@ -1871,13 +1959,27 @@ function Sidebar({
       <nav className='flex-1 overflow-y-auto px-2 pb-2 space-y-5'>
         {/* Cross-context items (no label, just the items) */}
         <div className='space-y-px'>
-          {CORE_ITEMS.map(item => (
-            <SidebarNavItem
-              key={item.label}
-              item={item}
-              collapsed={collapsed}
-            />
-          ))}
+          {CORE_ITEMS.map(item => {
+            const view: CanvasView | null =
+              item.label === 'Library'
+                ? 'library'
+                : item.label === 'Tasks'
+                  ? 'tasks'
+                  : null;
+            return (
+              <SidebarNavItem
+                key={item.label}
+                item={{
+                  ...item,
+                  active:
+                    view !== null && activeView === view ? true : item.active,
+                  onActivate:
+                    view && onSelectView ? () => onSelectView(view) : undefined,
+                }}
+                collapsed={collapsed}
+              />
+            );
+          })}
         </div>
 
         {/* Artists */}
@@ -2013,6 +2115,7 @@ function SidebarNavItem({
   return (
     <button
       type='button'
+      onClick={item.onActivate}
       className={cn(
         'relative flex items-center gap-2.5 rounded-md text-[13px] w-full transition-colors duration-150 ease-out tracking-[-0.005em]',
         collapsed ? 'h-8 w-10 mx-auto justify-center' : 'h-7 pl-3 pr-2',
@@ -2151,13 +2254,22 @@ function Chip({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Mock breadcrumb derivation: hardcoded for now since the active item is
-// Dashboard under the Bahamas artist workspace. In production this would
-// come from useAuthRouteConfig.
-const BREADCRUMB_TRAIL: Array<{ label: string; emphasis?: boolean }> = [
-  { label: 'Bahamas' },
-  { label: 'Dashboard', emphasis: true },
-];
+// Breadcrumb is section-only — no artist segment. Filtering by artist
+// happens via the search-takeover (typing an artist name adds a pill),
+// not by routing. Returns a single-crumb trail keyed off the current view.
+function breadcrumbForView(
+  view: CanvasView
+): Array<{ label: string; emphasis?: boolean }> {
+  const map: Record<CanvasView, string> = {
+    demo: 'Dashboard',
+    releases: 'Releases',
+    tracks: 'Tracks',
+    tasks: 'Tasks',
+    library: 'Library',
+    lyrics: 'Lyrics',
+  };
+  return [{ label: map[view], emphasis: true }];
+}
 
 // Subheader strip — page-scoped subview tabs on the left, page toolbar on
 // the right. Releases / Tracks / Tasks live in the *nav* (left sidebar);
@@ -2273,9 +2385,9 @@ function subviewsForView(
     return [
       { id: 'all', label: 'All', count: tracks.length },
       {
-        id: 'released',
-        label: 'Released',
-        count: tracks.filter(t => t.status === 'released').length,
+        id: 'live',
+        label: 'Live',
+        count: tracks.filter(t => t.status === 'live').length,
       },
       {
         id: 'scheduled',
@@ -2283,9 +2395,19 @@ function subviewsForView(
         count: tracks.filter(t => t.status === 'scheduled').length,
       },
       {
+        id: 'announced',
+        label: 'Announced',
+        count: tracks.filter(t => t.status === 'announced').length,
+      },
+      {
         id: 'drafts',
         label: 'Drafts',
         count: tracks.filter(t => t.status === 'draft').length,
+      },
+      {
+        id: 'hidden',
+        label: 'Hidden',
+        count: tracks.filter(t => t.status === 'hidden').length,
       },
     ];
   }
@@ -2319,6 +2441,7 @@ function Header({
   artistOptions,
   titleOptions,
   albumOptions,
+  view,
 }: {
   sidebarMode: 'docked' | 'floating';
   onToggleSidebar: () => void;
@@ -2329,7 +2452,9 @@ function Header({
   artistOptions: string[];
   titleOptions: string[];
   albumOptions: string[];
+  view: CanvasView;
 }) {
+  const trail = breadcrumbForView(view);
   const sidebarHidden = sidebarMode === 'floating';
 
   // Cmd+K opens the search-takeover. Esc closes it.
@@ -2392,7 +2517,7 @@ function Header({
             transition: `opacity 250ms ${EASE_CINEMATIC}, transform 250ms ${EASE_CINEMATIC}`,
           }}
         >
-          {BREADCRUMB_TRAIL.map((crumb, i) => (
+          {trail.map((crumb, i) => (
             <span key={crumb.label} className='flex items-center gap-2'>
               {i > 0 && (
                 <span
@@ -3862,7 +3987,14 @@ function VariantPicker({
       </div>
       <div className='grid grid-cols-5 gap-0.5 px-1 pb-2 border-b border-subtle'>
         {(
-          ['demo', 'releases', 'tracks', 'tasks', 'lyrics'] as CanvasView[]
+          [
+            'demo',
+            'releases',
+            'tracks',
+            'tasks',
+            'library',
+            'lyrics',
+          ] as CanvasView[]
         ).map(v => (
           <button
             key={v}
@@ -4083,7 +4215,13 @@ const FIELD_LABEL: Record<FilterField, string> = {
   has: 'Has',
 };
 
-const STATUS_VALUES = ['released', 'scheduled', 'draft'] as const;
+const STATUS_VALUES = [
+  'live',
+  'scheduled',
+  'announced',
+  'draft',
+  'hidden',
+] as const;
 const HAS_VALUES = ['video', 'canvas'] as const;
 
 type Suggestion =
@@ -4509,6 +4647,37 @@ function PillChip({
 // opens the drawer, Space plays/pauses the focused row, Esc closes drawer.
 // ---------------------------------------------------------------------------
 
+function LibraryStubView() {
+  // Placeholder canvas content. The full library lives at /exp/library-v1
+  // and will be folded into this shell after the design pass approves the
+  // unified shell-and-library experience.
+  return (
+    <div className='h-full grid place-items-center px-6'>
+      <div className='max-w-md text-center'>
+        <div className='inline-grid place-items-center h-12 w-12 rounded-full bg-(--surface-1) border border-(--linear-app-shell-border) mx-auto'>
+          <LibraryIcon
+            className='h-5 w-5 text-quaternary-token'
+            strokeWidth={2.25}
+          />
+        </div>
+        <h2
+          className='mt-4 text-[15px] font-semibold text-primary-token'
+          style={{ letterSpacing: '-0.012em' }}
+        >
+          Library
+        </h2>
+        <p className='mt-1.5 text-[12.5px] text-tertiary-token'>
+          The full library prototype lives at{' '}
+          <code className='text-secondary-token bg-(--surface-1) px-1 py-0.5 rounded text-[11.5px]'>
+            /exp/library-v1
+          </code>
+          . It folds into this shell once the design is approved.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function ReleasesView({
   releases,
   playingId,
@@ -4538,10 +4707,10 @@ function ReleasesView({
   const containerRef = useRef<HTMLDivElement>(null);
 
   function handleKey(e: React.KeyboardEvent) {
-    if (e.key === 'ArrowDown') {
+    if (e.key === 'ArrowDown' || e.key === 'j') {
       e.preventDefault();
       setFocusedIndex(i => Math.min(releases.length - 1, i + 1));
-    } else if (e.key === 'ArrowUp') {
+    } else if (e.key === 'ArrowUp' || e.key === 'k') {
       e.preventDefault();
       setFocusedIndex(i => Math.max(0, i - 1));
     } else if (e.key === 'Enter') {
@@ -4789,11 +4958,13 @@ const DSP_COLOR: Record<DspKey, string> = {
   youtube: 'bg-red-500/90',
   tidal: 'bg-sky-400/90',
 };
+// Calm DSP status dots — live is the default state and stays neutral.
+// Errors retain a clear rose so they read as needing attention.
 const DSP_STATUS_DOT: Record<DspStatus, string> = {
-  live: 'bg-emerald-400',
-  pending: 'bg-amber-400',
-  error: 'bg-rose-500',
-  missing: 'bg-white/15',
+  live: 'bg-white/35',
+  pending: 'bg-amber-300/70',
+  error: 'bg-rose-400/85',
+  missing: 'bg-white/12',
 };
 function DspAvatarStack({ release }: { release: Release }) {
   // Sort: live first (in DSP_ORDER), then pending/error, then missing.
@@ -5293,7 +5464,62 @@ function agentLabel(s: ReleaseAgentState) {
   }
 }
 
+// First-class release detail rail. Always mounted when reachable so the
+// open/close transitions slide smoothly. Sticky surface uses grid resize +
+// inner translate-x so content doesn't reflow during the morph.
 function ReleaseDrawer({
+  release,
+  onClose,
+  onPlay,
+  onSeek,
+  onOpenTasks,
+}: {
+  release: Release | null;
+  onClose: () => void;
+  onPlay?: (id: string) => void;
+  onSeek?: (id: string, sec: number) => void;
+  onOpenTasks?: () => void;
+}) {
+  // Remember the last release so the slide-out can keep rendering content
+  // while it's animating away (release becomes null right at close).
+  const [sticky, setSticky] = useState<Release | null>(release);
+  useEffect(() => {
+    if (release) setSticky(release);
+  }, [release]);
+
+  const open = release !== null;
+  const r = release ?? sticky;
+  if (!r) return null;
+
+  return (
+    <aside
+      aria-hidden={!open}
+      className='hidden md:flex flex-col h-full overflow-hidden border-l border-(--linear-app-shell-border) bg-(--linear-app-content-surface)'
+      style={{
+        // Inner content slides 16px from the right while opacity fades.
+        // The grid-template-columns morph on the parent does the width work.
+        opacity: open ? 1 : 0,
+        transform: open ? 'translateX(0)' : 'translateX(16px)',
+        transition: `opacity 220ms ${EASE_CINEMATIC}, transform ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
+        width: '100%',
+        minWidth: 0,
+      }}
+    >
+      <DrawerHeader release={r} onClose={onClose} />
+      <div className='flex-1 min-h-0 overflow-y-auto'>
+        <DrawerHero release={r} onPlay={onPlay} />
+        <DrawerStatsRow release={r} />
+        <DrawerPerformance release={r} />
+        <DrawerDistribution release={r} />
+        <DrawerCues release={r} onSeek={onSeek} />
+        <DrawerTasksAgent release={r} onOpenTasks={onOpenTasks} />
+      </div>
+      <DrawerActions release={r} />
+    </aside>
+  );
+}
+
+function DrawerHeader({
   release,
   onClose,
 }: {
@@ -5301,127 +5527,482 @@ function ReleaseDrawer({
   onClose: () => void;
 }) {
   return (
-    <aside className='hidden md:flex flex-col w-[388px] shrink-0 border-l border-(--linear-app-shell-border) bg-(--linear-app-content-surface)'>
-      <header className='shrink-0 flex items-center gap-2 px-4 h-12 border-b border-subtle/60'>
-        <div className='flex-1 min-w-0'>
-          <div className='truncate text-[12px] font-caption text-primary-token tracking-[-0.012em]'>
-            {release.title}
-          </div>
-          <div className='truncate text-[10.5px] text-tertiary-token mt-0.5'>
-            {release.artist} · {release.type}
-          </div>
-        </div>
+    <header className='shrink-0 flex items-center gap-2 px-3 h-10 border-b border-(--linear-app-shell-border)/70 bg-(--surface-0)/50'>
+      <span className='text-[10px] uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
+        Release
+      </span>
+      <span className='text-[10.5px] tabular-nums text-quaternary-token/70 ml-1'>
+        ·
+      </span>
+      <span className='text-[10.5px] tabular-nums text-tertiary-token truncate'>
+        {release.id.replace(/-/g, ' ').slice(0, 16)}
+      </span>
+      <Tooltip label='Close' shortcut='closeOverlay'>
         <button
           type='button'
           onClick={onClose}
-          className='h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-150 ease-out'
+          className='ml-auto h-6 w-6 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-150 ease-out'
           aria-label='Close drawer (Esc)'
-          title='Close (Esc)'
         >
-          <ChevronRight className='h-3.5 w-3.5' strokeWidth={2.25} />
+          <X className='h-3.5 w-3.5' strokeWidth={2.25} />
         </button>
-      </header>
-
-      <div className='flex-1 min-h-0 overflow-y-auto p-4 space-y-5'>
-        <div className='flex items-start gap-3'>
-          <ArtworkThumb src={release.artwork} title={release.title} size={80} />
-          <div className='min-w-0 flex-1'>
-            <div className='text-[10px] uppercase tracking-[0.12em] text-quaternary-token/85 font-medium'>
-              {release.type}
-            </div>
-            <div className='text-[15px] font-caption text-primary-token tracking-[-0.015em] leading-tight mt-1'>
-              {release.title}
-            </div>
-            <div className='text-[12px] text-tertiary-token mt-0.5'>
-              {release.artist} · {release.album}
-            </div>
-            <div className='text-[11px] text-quaternary-token mt-1.5'>
-              {relativeDate(release.releaseDate)} ·{' '}
-              {new Date(release.releaseDate).toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric',
-              })}
-            </div>
-          </div>
-        </div>
-
-        <div className='space-y-2'>
-          <SectionLabel>Distribution</SectionLabel>
-          <ul className='space-y-1'>
-            {DSP_ORDER.map(dsp => (
-              <li
-                key={dsp}
-                className='flex items-center gap-2 text-[12.5px] text-secondary-token'
-              >
-                <span
-                  className={cn(
-                    'h-1.5 w-1.5 rounded-full',
-                    chipDot(dspTone(release.dsps[dsp]))
-                  )}
-                />
-                <span className='flex-1'>{DSP_LABEL[dsp]}</span>
-                <span className='text-[11px] text-quaternary-token capitalize'>
-                  {release.dsps[dsp]}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className='space-y-2'>
-          <SectionLabel>This week</SectionLabel>
-          <div className='flex items-baseline gap-2'>
-            <span className='text-[18px] font-caption text-primary-token tabular-nums tracking-[-0.015em]'>
-              {release.weeklyStreams.toLocaleString()}
-            </span>
-            <span className='text-[11px] text-tertiary-token'>streams</span>
-            <span
-              className={cn(
-                'text-[11px] tabular-nums ml-auto',
-                release.weeklyDelta > 0
-                  ? 'text-emerald-500'
-                  : release.weeklyDelta < 0
-                    ? 'text-rose-500'
-                    : 'text-tertiary-token'
-              )}
-            >
-              {release.weeklyDelta > 0 ? '+' : ''}
-              {release.weeklyDelta}%
-            </span>
-          </div>
-        </div>
-
-        {release.tasksOpen > 0 && (
-          <div className='space-y-2'>
-            <SectionLabel>Tasks</SectionLabel>
-            <div className='text-[12.5px] text-secondary-token'>
-              {release.tasksOpen} open
-            </div>
-          </div>
-        )}
-
-        {release.agent !== 'idle' && (
-          <div className='rounded-md border border-(--linear-app-shell-border) bg-surface-1/40 px-3 py-2'>
-            <div className='flex items-center gap-2'>
-              <span className='h-1.5 w-1.5 rounded-full bg-primary-token animate-pulse' />
-              <span className='text-[12px] text-secondary-token'>
-                {agentLabel(release.agent)}
-              </span>
-            </div>
-          </div>
-        )}
-      </div>
-    </aside>
+      </Tooltip>
+    </header>
   );
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
+function DrawerHero({
+  release,
+  onPlay,
+}: {
+  release: Release;
+  onPlay?: (id: string) => void;
+}) {
   return (
-    <div className='text-[9.5px] uppercase tracking-[0.12em] text-quaternary-token/85 font-medium'>
-      {children}
+    <section className='px-4 pt-4 pb-3'>
+      <div className='flex items-stretch gap-3'>
+        <div className='shrink-0'>
+          <ArtworkThumb src={release.artwork} title={release.title} size={88} />
+        </div>
+        <div className='flex-1 min-w-0 flex flex-col justify-between py-0.5'>
+          <div className='flex items-center gap-1.5'>
+            <TypeBadge type={release.type} />
+            <StatusBadge status={statusFromRelease(release)} />
+          </div>
+          <h2
+            className='text-[17px] font-semibold text-primary-token leading-tight'
+            style={{ letterSpacing: '-0.018em' }}
+          >
+            {release.title}
+          </h2>
+          <p className='text-[12px] text-tertiary-token truncate'>
+            {release.artist} · {release.album}
+          </p>
+        </div>
+      </div>
+
+      <div className='mt-3 flex items-center gap-1.5'>
+        <button
+          type='button'
+          onClick={() => onPlay?.(release.id)}
+          className='inline-flex items-center gap-1.5 h-7 px-3 rounded-md text-[12px] font-medium bg-cyan-300/95 text-black hover:bg-cyan-200 transition-colors duration-150 ease-out'
+        >
+          <Play
+            className='h-3 w-3 translate-x-px'
+            strokeWidth={2.5}
+            fill='currentColor'
+          />
+          Play
+        </button>
+        <button
+          type='button'
+          className='inline-flex items-center h-7 px-2.5 rounded-md text-[12px] text-secondary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 hover:text-primary-token transition-colors duration-150 ease-out'
+        >
+          Open
+        </button>
+        <button
+          type='button'
+          className='inline-flex items-center justify-center h-7 w-7 rounded-md text-tertiary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 hover:text-primary-token transition-colors duration-150 ease-out ml-auto'
+          aria-label='More'
+        >
+          <MoreHorizontal className='h-3.5 w-3.5' strokeWidth={2.25} />
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function DrawerStatsRow({ release }: { release: Release }) {
+  return (
+    <section className='px-4 pb-3'>
+      <div className='grid grid-cols-3 gap-2 rounded-md border border-(--linear-app-shell-border)/60 bg-(--surface-0)/50 px-3 py-2.5'>
+        <Stat label='BPM' value={String(release.bpm)} />
+        <Stat label='Key' value={release.key} mono />
+        <Stat
+          label='Length'
+          value={`${Math.floor(release.durationSec / 60)}:${String(
+            release.durationSec % 60
+          ).padStart(2, '0')}`}
+          tabular
+        />
+      </div>
+    </section>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  mono,
+  tabular,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+  tabular?: boolean;
+}) {
+  return (
+    <div className='flex flex-col gap-0.5'>
+      <span className='text-[9.5px] uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
+        {label}
+      </span>
+      <span
+        className={cn(
+          'text-[13px] text-primary-token',
+          mono && 'font-mono tracking-wide',
+          tabular && 'tabular-nums'
+        )}
+      >
+        {value}
+      </span>
     </div>
   );
+}
+
+function DrawerPerformance({ release }: { release: Release }) {
+  const sparkPoints = useMemo(
+    () => generateSparkline(release.waveformSeed, release.weeklyStreams),
+    [release.waveformSeed, release.weeklyStreams]
+  );
+  const trendUp = release.weeklyDelta > 0;
+  const trendFlat = release.weeklyDelta === 0;
+  return (
+    <DrawerSection label='Performance'>
+      <div className='flex items-baseline gap-2'>
+        <span className='text-[20px] font-semibold text-primary-token tabular-nums'>
+          {release.weeklyStreams.toLocaleString()}
+        </span>
+        <span className='text-[11px] text-tertiary-token'>streams · 7d</span>
+        <span
+          className={cn(
+            'ml-auto inline-flex items-center gap-0.5 text-[11px] tabular-nums',
+            trendFlat
+              ? 'text-tertiary-token'
+              : trendUp
+                ? 'text-cyan-200/85'
+                : 'text-rose-300/85'
+          )}
+        >
+          {trendUp ? (
+            <ArrowUp className='h-3 w-3' strokeWidth={2.25} />
+          ) : trendFlat ? null : (
+            <ArrowDown className='h-3 w-3' strokeWidth={2.25} />
+          )}
+          {Math.abs(release.weeklyDelta)}%
+        </span>
+      </div>
+      <Sparkline points={sparkPoints} trendUp={trendUp} trendFlat={trendFlat} />
+    </DrawerSection>
+  );
+}
+
+function Sparkline({
+  points,
+  trendUp,
+  trendFlat,
+}: {
+  points: number[];
+  trendUp: boolean;
+  trendFlat: boolean;
+}) {
+  const w = 340;
+  const h = 36;
+  const max = Math.max(...points, 1);
+  const min = Math.min(...points, 0);
+  const range = max - min || 1;
+  const path = points
+    .map((p, i) => {
+      const x = (i / (points.length - 1)) * w;
+      const y = h - ((p - min) / range) * h;
+      return `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
+    })
+    .join(' ');
+  const fillPath = `${path} L ${w} ${h} L 0 ${h} Z`;
+  const stroke = trendFlat
+    ? 'rgba(255,255,255,0.4)'
+    : trendUp
+      ? 'rgba(165,243,252,0.8)'
+      : 'rgba(253,164,175,0.8)';
+  const fill = trendFlat
+    ? 'rgba(255,255,255,0.06)'
+    : trendUp
+      ? 'rgba(103,232,249,0.10)'
+      : 'rgba(253,164,175,0.10)';
+  return (
+    <svg
+      viewBox={`0 0 ${w} ${h}`}
+      className='mt-2 w-full h-9 block'
+      preserveAspectRatio='none'
+      role='img'
+      aria-label='14-day stream sparkline'
+    >
+      <title>Stream trend, 14 days</title>
+      <path d={fillPath} fill={fill} />
+      <path d={path} fill='none' stroke={stroke} strokeWidth={1.5} />
+    </svg>
+  );
+}
+
+function generateSparkline(seed: number, target: number): number[] {
+  const points: number[] = [];
+  let v = target * 0.85;
+  for (let i = 0; i < 14; i++) {
+    const noise = ((seed * (i + 1) * 9301 + 49297) % 233280) / 233280;
+    v = v + (noise - 0.5) * target * 0.18;
+    points.push(Math.max(0, v));
+  }
+  // Anchor the last point near the actual current target so the chart
+  // doesn't lie about now.
+  points[points.length - 1] = target;
+  return points;
+}
+
+function DrawerDistribution({ release }: { release: Release }) {
+  const liveCount = (Object.keys(release.dsps) as DspKey[]).filter(
+    d => release.dsps[d] === 'live'
+  ).length;
+  return (
+    <DrawerSection
+      label='Distribution'
+      trailing={
+        <span className='text-[10.5px] tabular-nums text-tertiary-token'>
+          {liveCount}/{Object.keys(release.dsps).length} live
+        </span>
+      }
+    >
+      <ul className='flex flex-col'>
+        {DSP_ORDER.map(dsp => {
+          const status = release.dsps[dsp];
+          return (
+            <li
+              key={dsp}
+              className='flex items-center gap-2.5 h-7 text-[12.5px] text-secondary-token'
+            >
+              <span
+                className={cn(
+                  'h-[16px] w-[16px] rounded-full grid place-items-center text-[8px] font-semibold text-white shrink-0',
+                  status === 'missing'
+                    ? 'bg-quaternary-token/40 opacity-60'
+                    : DSP_COLOR[dsp]
+                )}
+              >
+                {DSP_GLYPH[dsp]}
+              </span>
+              <span className='flex-1'>{DSP_LABEL[dsp]}</span>
+              <span className='inline-flex items-center gap-1.5'>
+                <span
+                  className={cn(
+                    'h-1.5 w-1.5 rounded-full',
+                    DSP_STATUS_DOT[status]
+                  )}
+                />
+                <span className='text-[10.5px] uppercase tracking-[0.06em] text-quaternary-token'>
+                  {status}
+                </span>
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </DrawerSection>
+  );
+}
+
+function DrawerCues({
+  release,
+  onSeek,
+}: {
+  release: Release;
+  onSeek?: (id: string, sec: number) => void;
+}) {
+  const total = release.durationSec;
+  return (
+    <DrawerSection
+      label='Cues'
+      trailing={
+        <span className='text-[10.5px] tabular-nums text-tertiary-token'>
+          {release.cues.length}
+        </span>
+      }
+    >
+      {/* Mini timeline ribbon — cues plot against duration. */}
+      <div className='relative h-1 rounded-full bg-(--surface-2) mt-1'>
+        {release.cues.map(c => {
+          const pct = (c.at / total) * 100;
+          return (
+            <span
+              key={c.at}
+              aria-hidden='true'
+              className='absolute top-1/2 -translate-y-1/2 h-2 w-0.5 rounded-full bg-cyan-300/60'
+              style={{ left: `${pct}%` }}
+            />
+          );
+        })}
+      </div>
+      <ul className='mt-2 flex flex-col'>
+        {release.cues.map(c => (
+          <li key={c.at}>
+            <button
+              type='button'
+              onClick={() => onSeek?.(release.id, c.at)}
+              className='w-full flex items-center gap-2.5 h-7 px-1 rounded text-[12px] text-secondary-token hover:bg-surface-1/40 hover:text-primary-token transition-colors duration-150 ease-out'
+            >
+              <span className='tabular-nums text-[10.5px] text-quaternary-token w-9 text-left'>
+                {Math.floor(c.at / 60)}:{String(c.at % 60).padStart(2, '0')}
+              </span>
+              <span className='flex-1 text-left truncate'>{c.label}</span>
+              <span className='text-[10px] uppercase tracking-[0.06em] text-quaternary-token capitalize'>
+                {c.kind}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </DrawerSection>
+  );
+}
+
+function DrawerTasksAgent({
+  release,
+  onOpenTasks,
+}: {
+  release: Release;
+  onOpenTasks?: () => void;
+}) {
+  const showAgent = release.agent !== 'idle';
+  const showTasks = release.tasksOpen > 0;
+  if (!showAgent && !showTasks && !release.pitchReady) return null;
+  return (
+    <DrawerSection label='Activity'>
+      {showTasks && (
+        <button
+          type='button'
+          onClick={onOpenTasks}
+          className='w-full flex items-center gap-2.5 h-9 px-2.5 rounded-md border border-(--linear-app-shell-border)/70 bg-(--surface-0)/40 hover:bg-surface-1/50 text-secondary-token hover:text-primary-token transition-colors duration-150 ease-out'
+        >
+          <Activity
+            className='h-3.5 w-3.5 text-quaternary-token'
+            strokeWidth={2.25}
+          />
+          <span className='flex-1 text-left text-[12.5px]'>
+            {release.tasksOpen} open task{release.tasksOpen === 1 ? '' : 's'}
+          </span>
+          <ChevronRight
+            className='h-3 w-3 text-quaternary-token'
+            strokeWidth={2.25}
+          />
+        </button>
+      )}
+      {showAgent && (
+        <div className='flex items-center gap-2 mt-1.5 px-2.5 h-7 rounded-md border border-(--linear-app-shell-border)/70 bg-(--surface-0)/40'>
+          <span className='h-1.5 w-1.5 rounded-full bg-cyan-300/80 animate-pulse' />
+          <span className='text-[12px] text-secondary-token'>
+            Jovie · {agentLabel(release.agent)}
+          </span>
+        </div>
+      )}
+      <div className='flex items-center gap-2 mt-1.5 px-2.5 h-7 rounded-md border border-(--linear-app-shell-border)/70 bg-(--surface-0)/40'>
+        <Sparkles
+          className={cn(
+            'h-3 w-3',
+            release.pitchReady ? 'text-cyan-300/80' : 'text-quaternary-token'
+          )}
+          strokeWidth={2.25}
+        />
+        <span className='flex-1 text-[12px] text-secondary-token'>
+          {release.pitchReady
+            ? 'Editorial pitch ready to send'
+            : 'Pitch not ready yet'}
+        </span>
+        <button
+          type='button'
+          className='text-[10.5px] uppercase tracking-[0.06em] text-tertiary-token hover:text-primary-token transition-colors duration-150 ease-out'
+        >
+          {release.pitchReady ? 'Send' : 'Build'}
+        </button>
+      </div>
+    </DrawerSection>
+  );
+}
+
+function DrawerActions({ release }: { release: Release }) {
+  return (
+    <footer className='shrink-0 grid grid-cols-2 gap-1.5 p-3 border-t border-(--linear-app-shell-border)/70 bg-(--surface-0)/50'>
+      <button
+        type='button'
+        className='inline-flex items-center justify-center gap-1.5 h-7 rounded-md text-[12px] text-secondary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 hover:text-primary-token transition-colors duration-150 ease-out'
+      >
+        <LinkIcon className='h-3 w-3' strokeWidth={2.25} />
+        Smart link
+      </button>
+      <button
+        type='button'
+        className='inline-flex items-center justify-center gap-1.5 h-7 rounded-md text-[12px] text-secondary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 hover:text-primary-token transition-colors duration-150 ease-out'
+      >
+        <Copy className='h-3 w-3' strokeWidth={2.25} />
+        Duplicate
+      </button>
+      <button
+        type='button'
+        className='inline-flex items-center justify-center gap-1.5 h-7 rounded-md text-[12px] text-secondary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 hover:text-primary-token transition-colors duration-150 ease-out'
+      >
+        <ExternalLink className='h-3 w-3' strokeWidth={2.25} />
+        Open page
+      </button>
+      <button
+        type='button'
+        className='inline-flex items-center justify-center gap-1.5 h-7 rounded-md text-[12px] text-rose-300/85 border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-rose-500/10 hover:text-rose-200 transition-colors duration-150 ease-out'
+      >
+        <Archive className='h-3 w-3' strokeWidth={2.25} />
+        Archive
+      </button>
+      <span className='col-span-2 text-[10.5px] tabular-nums text-quaternary-token text-center pt-1'>
+        Drops{' '}
+        {new Date(release.releaseDate).toLocaleDateString(undefined, {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+        })}
+      </span>
+    </footer>
+  );
+}
+
+function DrawerSection({
+  label,
+  trailing,
+  children,
+}: {
+  label: string;
+  trailing?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className='px-4 py-3 border-t border-(--linear-app-shell-border)/60'>
+      <div className='flex items-center justify-between pb-1.5'>
+        <span className='text-[9.5px] uppercase tracking-[0.12em] text-quaternary-token font-semibold'>
+          {label}
+        </span>
+        {trailing}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+// Map the release's overall state to a TrackStatus for the badge. Real
+// implementation would derive this from a release-level enum, but the
+// drawer needs *something* visible today — this matches the data we have.
+function statusFromRelease(release: Release): TrackStatus {
+  const allLive = (Object.keys(release.dsps) as DspKey[]).every(
+    d => release.dsps[d] === 'live'
+  );
+  if (allLive) return 'live';
+  const anyPending = (Object.keys(release.dsps) as DspKey[]).some(
+    d => release.dsps[d] === 'pending'
+  );
+  if (anyPending) return 'scheduled';
+  return 'announced';
 }
 
 // ---------------------------------------------------------------------------
@@ -5524,11 +6105,11 @@ function TracksView({
   }, []);
 
   function handleKey(e: React.KeyboardEvent) {
-    if (e.key === 'ArrowDown') {
+    if (e.key === 'ArrowDown' || e.key === 'j') {
       e.preventDefault();
       bumpKeyboardNav();
       setFocusedIndex(i => Math.min(sorted.length - 1, i + 1));
-    } else if (e.key === 'ArrowUp') {
+    } else if (e.key === 'ArrowUp' || e.key === 'k') {
       e.preventDefault();
       bumpKeyboardNav();
       setFocusedIndex(i => Math.max(0, i - 1));
@@ -5884,38 +6465,75 @@ function ArtworkThumb({
 // Replaces the cryptic icon cluster with a single labeled chip. Has-video
 // / has-canvas indicators move into the detail panel where the user has
 // the room (and intent) to read them.
+//
+// All chips share the same surface + border so the visual differentiation
+// comes from the leading dot — calm and theme-matching. "Live" is the
+// default state and shouldn't shout; saturated tones are reserved for
+// states that genuinely need attention (Scheduled, Announced).
 function StatusChip({ track }: { track: Track }) {
-  const cfg = STATUS_CHIP[track.status];
+  return <StatusBadge status={track.status} />;
+}
+
+function StatusBadge({ status }: { status: TrackStatus }) {
+  const cfg = STATUS_CHIP[status];
   return (
     <span
-      className={cn(
-        'inline-flex items-center h-[18px] px-1.5 rounded text-[10px] font-caption uppercase tracking-[0.06em] border whitespace-nowrap',
-        cfg.cls
-      )}
+      className='inline-flex items-center gap-1.5 h-[18px] pl-1.5 pr-2 rounded border border-(--linear-app-shell-border)/70 bg-(--surface-1)/40 text-tertiary-token text-[10px] font-caption uppercase tracking-[0.06em] whitespace-nowrap'
       title={cfg.tooltip}
     >
-      {cfg.label}
+      <span
+        aria-hidden='true'
+        className={cn(
+          'h-1.5 w-1.5 rounded-full shrink-0',
+          cfg.dot,
+          cfg.dotBorder && `border ${cfg.dotBorder}`
+        )}
+      />
+      <span className={cfg.text}>{cfg.label}</span>
     </span>
   );
 }
+
 const STATUS_CHIP: Record<
   TrackStatus,
-  { label: string; cls: string; tooltip: string }
+  {
+    label: string;
+    dot: string;
+    dotBorder?: string;
+    text: string;
+    tooltip: string;
+  }
 > = {
-  released: {
+  live: {
     label: 'Live',
-    cls: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300/90',
-    tooltip: 'Live on DSPs',
+    dot: 'bg-white/35',
+    text: 'text-secondary-token',
+    tooltip: 'Live on DSPs — calm default state',
   },
   scheduled: {
-    label: 'Queued',
-    cls: 'border-amber-500/30 bg-amber-500/10 text-amber-300/90',
+    label: 'Scheduled',
+    dot: 'bg-amber-300/70',
+    text: 'text-secondary-token',
     tooltip: 'Scheduled for release',
+  },
+  announced: {
+    label: 'Announced',
+    dot: 'bg-cyan-300/75',
+    text: 'text-secondary-token',
+    tooltip: 'Publicly announced — not yet live',
   },
   draft: {
     label: 'Draft',
-    cls: 'border-(--linear-app-shell-border) bg-surface-1/40 text-tertiary-token',
+    dot: 'bg-white/15',
+    text: 'text-tertiary-token',
     tooltip: 'Draft — not yet released',
+  },
+  hidden: {
+    label: 'Hidden',
+    dot: 'bg-transparent',
+    dotBorder: 'border-quaternary-token/45 border-dashed',
+    text: 'text-quaternary-token',
+    tooltip: 'Pulled / hidden from listeners',
   },
 };
 
@@ -6050,12 +6668,12 @@ function TasksView({
   const selected = tasks.find(t => t.id === selectedId) ?? tasks[0];
 
   function handleKey(e: React.KeyboardEvent) {
-    if (e.key === 'ArrowDown') {
+    if (e.key === 'ArrowDown' || e.key === 'j') {
       e.preventDefault();
       const next = Math.min(tasks.length - 1, focusedIndex + 1);
       setFocusedIndex(next);
       setSelectedId(tasks[next].id);
-    } else if (e.key === 'ArrowUp') {
+    } else if (e.key === 'ArrowUp' || e.key === 'k') {
       e.preventDefault();
       const next = Math.max(0, focusedIndex - 1);
       setFocusedIndex(next);
