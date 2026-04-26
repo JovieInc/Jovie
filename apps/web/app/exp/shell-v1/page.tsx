@@ -1253,11 +1253,13 @@ export default function ShellV1Experiment() {
   );
   const [view, setView] = useState<CanvasView>('demo');
   // Subview is the page-scoped filter shown in the canvas subheader. Each
-  // canvas view defines its own subview list (see SUBVIEWS_BY_VIEW). Reset
-  // to 'all' when the canvas view itself changes.
-  const [subview, setSubview] = useState<string>('all');
+  // canvas view defines its own subview list. Reset to the canonical
+  // default for the new view: releases → 'releases', tracks/tasks → 'all'.
+  const defaultSubviewFor = (v: CanvasView) =>
+    v === 'releases' ? 'releases' : 'all';
+  const [subview, setSubview] = useState<string>(defaultSubviewFor('demo'));
   useEffect(() => {
-    setSubview('all');
+    setSubview(defaultSubviewFor(view));
   }, [view]);
   const [playingReleaseId, setPlayingReleaseId] = useState<string>(
     RELEASES[0].id
@@ -1906,6 +1908,11 @@ export default function ShellV1Experiment() {
                 )
               }
               onOpenSearch={() => setSearchOpen(true)}
+              onAddView={
+                view === 'releases'
+                  ? () => console.info('[shell-v1] save current filter as view')
+                  : undefined
+              }
               extraToolbar={
                 view === 'library' ? (
                   <>
@@ -1927,36 +1934,58 @@ export default function ShellV1Experiment() {
               {view === 'demo' ? (
                 <DemoContent />
               ) : view === 'releases' ? (
-                <ReleasesView
-                  releases={
-                    subview === 'singles'
-                      ? RELEASES.filter(r => r.type === 'Single')
-                      : subview === 'eps'
-                        ? RELEASES.filter(r => r.type === 'EP')
-                        : subview === 'albums'
-                          ? RELEASES.filter(r => r.type === 'Album')
-                          : RELEASES
-                  }
-                  playingId={playingReleaseId}
-                  isPlaying={isPlaying}
-                  currentTimeSec={currentTimeSec}
-                  selectedId={selectedReleaseId}
-                  drawerOpen={selectedReleaseId !== null}
-                  onSelect={setSelectedReleaseId}
-                  onPlay={(id, autoplay) => {
-                    setPlayingReleaseId(id);
-                    if (autoplay) setIsPlaying(true);
-                    else setIsPlaying(p => !p || playingReleaseId !== id);
-                  }}
-                  onSeek={(id, sec) => {
-                    setPlayingReleaseId(id);
-                    setCurrentTimeSec(sec);
-                    setIsPlaying(true);
-                  }}
-                  onFilterByArtist={name => addPill('artist', name)}
-                  onContextMenu={onReleaseContextMenu}
-                  onOpenThread={openThread}
-                />
+                subview === 'tracks' ? (
+                  // View-builder: under the Releases shell, switching to
+                  // the Tracks subview swaps the canvas to the tracks
+                  // table without changing breadcrumbs. Same data, finer
+                  // grain.
+                  <TracksView
+                    tracks={TRACKS}
+                    pills={searchPills}
+                    playingId={playingReleaseId}
+                    isPlaying={isPlaying}
+                    currentTimeSec={currentTimeSec}
+                    keyMode={keyMode}
+                    onKeyModeToggle={() =>
+                      setKeyMode(m => (m === 'normal' ? 'camelot' : 'normal'))
+                    }
+                    onPlay={id => {
+                      setPlayingReleaseId(id);
+                      setIsPlaying(true);
+                    }}
+                    onSeek={(id, sec) => {
+                      setPlayingReleaseId(id);
+                      setCurrentTimeSec(sec);
+                      setIsPlaying(true);
+                    }}
+                    onFilter={(field, value) => addPill(field, value)}
+                    onContextMenu={onTrackContextMenu}
+                    onOpenThread={openThread}
+                  />
+                ) : (
+                  <ReleasesView
+                    releases={RELEASES}
+                    playingId={playingReleaseId}
+                    isPlaying={isPlaying}
+                    currentTimeSec={currentTimeSec}
+                    selectedId={selectedReleaseId}
+                    drawerOpen={selectedReleaseId !== null}
+                    onSelect={setSelectedReleaseId}
+                    onPlay={(id, autoplay) => {
+                      setPlayingReleaseId(id);
+                      if (autoplay) setIsPlaying(true);
+                      else setIsPlaying(p => !p || playingReleaseId !== id);
+                    }}
+                    onSeek={(id, sec) => {
+                      setPlayingReleaseId(id);
+                      setCurrentTimeSec(sec);
+                      setIsPlaying(true);
+                    }}
+                    onFilterByArtist={name => addPill('artist', name)}
+                    onContextMenu={onReleaseContextMenu}
+                    onOpenThread={openThread}
+                  />
+                )
               ) : view === 'tracks' ? (
                 <TracksView
                   tracks={
@@ -3121,6 +3150,7 @@ function CanvasSubheader({
   onToggleRightRail,
   onOpenSearch,
   extraToolbar,
+  onAddView,
 }: {
   subviews: { id: string; label: string; count?: number }[];
   subview: string;
@@ -3132,6 +3162,10 @@ function CanvasSubheader({
   // shared search + panel-right buttons. Used by Library to host its
   // sort dropdown + grid/table toggle without owning its own header.
   extraToolbar?: React.ReactNode;
+  // When provided, renders a trailing "+" chip after the subview pills
+  // — entry point for saving the current filter combination as a new
+  // view. Releases and Library opt-in.
+  onAddView?: () => void;
 }) {
   return (
     <div className='shrink-0 h-10 px-3 flex items-center gap-2 border-b border-(--linear-app-shell-border)/50'>
@@ -3164,6 +3198,18 @@ function CanvasSubheader({
             </button>
           );
         })}
+        {onAddView && (
+          <Tooltip label='Save current filter as a view'>
+            <button
+              type='button'
+              onClick={onAddView}
+              aria-label='Add view'
+              className='h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1/50 transition-colors duration-150 ease-out'
+            >
+              <Plus className='h-3.5 w-3.5' strokeWidth={2.25} />
+            </button>
+          </Tooltip>
+        )}
       </div>
       <div className='ml-auto flex items-center gap-1.5'>
         {extraToolbar}
@@ -3206,23 +3252,15 @@ function subviewsForView(
   tasks: Task[]
 ): { id: string; label: string; count?: number }[] {
   if (view === 'releases') {
+    // View-builder: the two foundational catalog cuts (Releases, Tracks)
+    // are the defaults. Singles/EPs/Albums are no longer their own subviews
+    // — that filter belongs in a saved-view the user opts into. The "+"
+    // chip is the entry point for saving the current filter combination
+    // ("has video", "scheduled this month", "missing on Apple") as a
+    // first-class view.
     return [
-      { id: 'all', label: 'All', count: releases.length },
-      {
-        id: 'singles',
-        label: 'Singles',
-        count: releases.filter(r => r.type === 'Single').length,
-      },
-      {
-        id: 'eps',
-        label: 'EPs',
-        count: releases.filter(r => r.type === 'EP').length,
-      },
-      {
-        id: 'albums',
-        label: 'Albums',
-        count: releases.filter(r => r.type === 'Album').length,
-      },
+      { id: 'releases', label: 'Releases', count: releases.length },
+      { id: 'tracks', label: 'Tracks', count: tracks.length },
     ];
   }
   if (view === 'tracks') {
