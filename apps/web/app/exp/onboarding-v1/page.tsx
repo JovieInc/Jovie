@@ -347,27 +347,38 @@ function Composer({
   onPickPlan: (yes: boolean) => void;
 }) {
   if (step === 'handle') {
+    const hasHandle = handle.trim().length > 0;
     return (
       <form
         onSubmit={e => {
           e.preventDefault();
           onSubmitHandle();
         }}
-        className='flex items-center gap-2 h-12 px-3 rounded-xl border border-(--linear-app-shell-border) bg-surface-1/60 focus-within:border-cyan-500/40 focus-within:bg-surface-1 transition-colors duration-150 ease-out'
+        className='flex items-center gap-2 h-12 pl-3 pr-1.5 rounded-full border border-(--linear-app-shell-border) bg-surface-1/60 focus-within:border-white/20 focus-within:bg-surface-1 transition-colors duration-150 ease-out'
       >
-        <span className='text-[14px] text-tertiary-token'>jov.ie/</span>
+        <span className='text-[14px] text-tertiary-token tabular-nums'>
+          jov.ie/
+        </span>
         <FocusOnMountInput
           value={handle}
           onChange={setHandle}
-          placeholder='your-name'
-          className='flex-1 bg-transparent text-[14px] text-primary-token placeholder:text-tertiary-token outline-none'
+          placeholder='you'
+          className='flex-1 bg-transparent text-[14px] text-primary-token placeholder:text-quaternary-token outline-none'
         />
         <button
           type='submit'
-          disabled={!handle.trim()}
-          className='h-8 px-3 rounded-md bg-cyan-500 text-(--linear-bg-page) text-[12px] font-caption disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1.5 hover:bg-cyan-400 transition-colors duration-150 ease-out'
+          disabled={!hasHandle}
+          aria-hidden={!hasHandle}
+          tabIndex={hasHandle ? 0 : -1}
+          className={cn(
+            'h-9 rounded-full bg-white text-black text-[12.5px] font-caption tracking-[-0.005em] flex items-center gap-1.5 transition-all duration-200 ease-out',
+            hasHandle
+              ? 'opacity-100 translate-x-0 px-3.5 hover:brightness-110 active:scale-[0.98]'
+              : 'opacity-0 -translate-x-2 px-0 w-0 overflow-hidden pointer-events-none'
+          )}
         >
-          Claim <ArrowRight className='h-3.5 w-3.5' strokeWidth={2.5} />
+          <span className='whitespace-nowrap'>Claim</span>
+          <ArrowRight className='h-3 w-3' strokeWidth={2.5} />
         </button>
       </form>
     );
@@ -464,7 +475,7 @@ function Composer({
         <button
           type='button'
           onClick={() => onPickPlan(true)}
-          className='flex-1 h-11 rounded-xl bg-cyan-500 text-(--linear-bg-page) text-[13px] font-caption hover:bg-cyan-400 transition-colors duration-150 ease-out flex items-center justify-center gap-1.5'
+          className='flex-1 h-11 rounded-xl bg-white text-black text-[13px] font-caption tracking-[-0.005em] hover:brightness-110 active:scale-[0.99] transition-all duration-150 ease-out flex items-center justify-center gap-1.5'
         >
           Yes, start the trial{' '}
           <ArrowRight className='h-3.5 w-3.5' strokeWidth={2.5} />
@@ -828,7 +839,7 @@ function ReadyCard({ handle }: { handle: string }) {
       </p>
       <Link
         href='/exp/shell-v1'
-        className='mt-4 inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-cyan-500 text-(--linear-bg-page) text-[12.5px] font-caption hover:bg-cyan-400 transition-colors duration-150 ease-out'
+        className='mt-4 inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-white text-black text-[12.5px] font-caption tracking-[-0.005em] hover:brightness-110 active:scale-[0.99] transition-all duration-150 ease-out'
       >
         <LayoutDashboard className='h-3.5 w-3.5' strokeWidth={2.5} />
         Open dashboard
