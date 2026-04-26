@@ -1066,7 +1066,11 @@ export default function ShellV1Experiment() {
   const [isPlaying, setIsPlaying] = useState(true);
   const [loopMode, setLoopMode] = useState<'off' | 'track' | 'section'>('off');
   const [waveformOn, setWaveformOn] = useState(true);
-  const [mounted, setMounted] = useState(false);
+  // Cinematic cold-start: bloom (centered logo) → reveal (logo glides
+  // toward sidebar position, app fades in) → done.
+  const [loaderPhase, setLoaderPhase] = useState<'bloom' | 'reveal' | 'done'>(
+    'bloom'
+  );
   const [view, setView] = useState<CanvasView>('demo');
   const [playingReleaseId, setPlayingReleaseId] = useState<string>(
     RELEASES[0].id
@@ -1127,12 +1131,20 @@ export default function ShellV1Experiment() {
     ? trackFromRelease(playingRelease)
     : trackFromRelease(RELEASES[0]);
 
-  // One-shot cinematic shell entry: render hidden on first paint, then
-  // fade + lift on the next frame so the curve plays out.
+  // Cinematic cold-start sequence. Three phases, total ~900ms:
+  //   bloom  (0..380ms): black canvas + centered Jovie mark scales in
+  //   reveal (380..900): mark glides toward the sidebar position; the app
+  //                      fades in underneath at the same time
+  //   done             : overlay gone, sidebar mark in place
   useEffect(() => {
-    const id = requestAnimationFrame(() => setMounted(true));
-    return () => cancelAnimationFrame(id);
+    const t1 = setTimeout(() => setLoaderPhase('reveal'), 380);
+    const t2 = setTimeout(() => setLoaderPhase('done'), 900);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
   }, []);
+  const mounted = loaderPhase !== 'bloom';
 
   const pct =
     (currentTimeSec / (playingRelease?.durationSec ?? TRACK.duration)) * 100;
@@ -1244,9 +1256,10 @@ export default function ShellV1Experiment() {
       />
 
       {/* Persistent now-playing card — pinned to bottom-left, survives sidebar
-          undocking. Mirrors where it would sit inside the sidebar's bottom. */}
-      <div className='hidden lg:block fixed left-2 bottom-2 z-30 w-[224px] px-2 pt-3 pb-2 pointer-events-none'>
-        <div className='pointer-events-auto'>
+          undocking. Elevated card treatment so it reads as a discrete object
+          rather than text floating on the page. */}
+      <div className='hidden lg:block fixed left-2 bottom-2 z-30 w-[224px] pointer-events-none'>
+        <div className='pointer-events-auto rounded-[var(--linear-app-shell-radius)] border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) shadow-[0_18px_60px_rgba(0,0,0,0.32)] px-2 pt-2.5 pb-2'>
           <SidebarNowPlaying
             collapsed={false}
             isPlaying={isPlaying}
@@ -1397,6 +1410,45 @@ export default function ShellV1Experiment() {
       />
 
       <JovieOverlay listening={jovieListening} />
+      <ShellLoader phase={loaderPhase} />
+    </div>
+  );
+}
+
+// Cold-start loader. Black canvas with the Jovie mark blooming centered,
+// then gliding toward where it lives in the sidebar (~24px x 24px from
+// top-left of the page) while the app fades in underneath. The mark in
+// the sidebar takes over visually at the end. Pointer-events disabled
+// throughout so first interactions don't accidentally land on the overlay.
+function ShellLoader({ phase }: { phase: 'bloom' | 'reveal' | 'done' }) {
+  if (phase === 'done') return null;
+  const isReveal = phase === 'reveal';
+  return (
+    <div
+      aria-hidden='true'
+      className='fixed inset-0 z-[60] pointer-events-none'
+      style={{
+        background: isReveal ? 'rgba(6,7,10,0)' : 'rgba(6,7,10,1)',
+        transition: `background-color 520ms ${EASE_CINEMATIC}`,
+      }}
+    >
+      <div
+        className='absolute'
+        style={{
+          // Centered during bloom; glides toward the sidebar's brand-row
+          // position during reveal (matches the live mark at left:8 + pl-3
+          // = 20px from page edge, top:~22px center).
+          top: isReveal ? '22px' : '50%',
+          left: isReveal ? '21px' : '50%',
+          transform: isReveal
+            ? 'translate(-50%, -50%) scale(0.21)'
+            : 'translate(-50%, -50%) scale(1)',
+          opacity: isReveal ? 0 : 1,
+          transition: `top 620ms ${EASE_CINEMATIC}, left 620ms ${EASE_CINEMATIC}, transform 620ms ${EASE_CINEMATIC}, opacity 460ms ${EASE_CINEMATIC} 240ms`,
+        }}
+      >
+        <JovieMark className='h-16 w-16 text-primary-token' />
+      </div>
     </div>
   );
 }
@@ -2179,35 +2231,28 @@ function AudioBar({
   return (
     <section
       aria-label='Audio player'
-      className='group/bar shrink-0 hidden lg:flex flex-col px-4'
+      className='group/bar shrink-0 hidden lg:grid grid-cols-[1fr_minmax(360px,_720px)_1fr] gap-4 items-center px-4 py-2'
     >
-      {/* Waveform drawer — opens upward above the fixed control row. */}
-      <div
-        aria-hidden={!waveformOn}
-        className='overflow-hidden'
-        style={{
-          maxHeight: waveformOn ? 40 : 0,
-          opacity: waveformOn ? 1 : 0,
-          transform: waveformOn ? 'translateY(0)' : 'translateY(6px)',
-          transition: `max-height ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, opacity ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, transform ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
-        }}
-      >
-        <div className='grid grid-cols-[1fr_minmax(360px,_720px)_1fr] gap-4 items-center pt-2'>
-          <div />
-          {scrub}
-          <div />
+      <div />
+      {/* Center column: waveform drawer above, transport below. */}
+      <div className='flex flex-col items-center justify-center min-h-[52px]'>
+        <div
+          aria-hidden={!waveformOn}
+          className='w-full overflow-hidden'
+          style={{
+            maxHeight: waveformOn ? 40 : 0,
+            opacity: waveformOn ? 1 : 0,
+            transform: waveformOn ? 'translateY(0)' : 'translateY(6px)',
+            transition: `max-height ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, opacity ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, transform ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
+          }}
+        >
+          <div className='pt-1.5 pb-1.5'>{scrub}</div>
         </div>
-      </div>
-
-      {/* Fixed control row — never moves when the waveform opens. */}
-      <div
-        className='grid grid-cols-[1fr_minmax(360px,_720px)_1fr] gap-4 items-center'
-        style={{ height: 52 }}
-      >
-        <div />
         {transportButtons}
-        {rightCluster}
       </div>
+      {/* Right cluster vertically centers across the full bar height,
+          including the waveform drawer when it's open. */}
+      {rightCluster}
     </section>
   );
 }
