@@ -17,7 +17,13 @@
  *   - `SlashMenuItem` shape (for tests + sibling consumers)
  */
 
-import { Disc3, type LucideIcon, Music2, UserCircle } from 'lucide-react';
+import {
+  Calendar,
+  Disc3,
+  type LucideIcon,
+  Music2,
+  UserCircle,
+} from 'lucide-react';
 import { useEffect, useMemo } from 'react';
 import { InlinePalette } from '@/components/organisms/SharedCommandPalette';
 import type { EntityKind } from '@/lib/chat/tokens';
@@ -43,6 +49,7 @@ const KIND_ICON_MAP: Record<EntityKind, LucideIcon> = {
   release: Disc3,
   artist: UserCircle,
   track: Music2,
+  event: Calendar,
 };
 
 /**
@@ -71,6 +78,17 @@ interface SlashCommandMenuProps {
   readonly onMoveSelected: (delta: number, total: number) => void;
   readonly onClose: () => void;
   readonly variant?: 'inline' | 'rail';
+  /**
+   * Optional listbox id provided by the parent textarea so it can wire
+   * `aria-controls`. The picker forwards it onto the inner palette so the
+   * id stays stable across re-renders.
+   */
+  readonly listIdProp?: string;
+  /**
+   * Optional callback fired when the active row id changes so the parent
+   * textarea can mirror it onto `aria-activedescendant`.
+   */
+  readonly onActiveRowChange?: (id: string | null) => void;
 }
 
 function fuzzyMatch(haystack: string, needle: string): boolean {
@@ -269,6 +287,8 @@ export function SlashCommandMenu({
   onMoveSelected,
   onClose,
   variant = 'inline',
+  listIdProp,
+  onActiveRowChange,
 }: SlashCommandMenuProps) {
   const { items, sections, isLoading } = useSlashItems(state, profileId);
 
@@ -302,7 +322,10 @@ export function SlashCommandMenu({
   useEffect(() => {
     if (state.status === 'closed') return;
     function onKey(e: KeyboardEvent) {
-      if (e.isComposing) return;
+      // IME composition (Japanese, Chinese, Korean): the user is mid-glyph
+      // and Enter is "commit composition," not "submit." Bail before any
+      // navigation key handling so we never swallow the composition.
+      if (e.isComposing || e.keyCode === 229) return;
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         onMoveSelected(1, items.length);
@@ -340,6 +363,8 @@ export function SlashCommandMenu({
         variant={variant}
         header={<SlashHeader state={state} />}
         emptyHint={isLoading ? 'Searching…' : 'No matches'}
+        listIdProp={listIdProp}
+        onActiveRowChange={onActiveRowChange}
       />
     </div>
   );

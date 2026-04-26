@@ -210,6 +210,8 @@ interface PickerRowProps {
   readonly isActive: boolean;
   readonly onMouseEnter: (index: number) => void;
   readonly onCommit: (index: number) => void;
+  /** Optional id used by parent textarea's aria-activedescendant. */
+  readonly rowId?: string;
 }
 
 export function PickerRow({
@@ -218,11 +220,14 @@ export function PickerRow({
   isActive,
   onMouseEnter,
   onCommit,
+  rowId,
 }: PickerRowProps) {
   return (
     <button
       type='button'
-      role='menuitem'
+      role='option'
+      id={rowId}
+      aria-selected={isActive ? 'true' : 'false'}
       aria-current={isActive ? 'true' : undefined}
       onMouseEnter={() => onMouseEnter(index)}
       onMouseDown={e => {

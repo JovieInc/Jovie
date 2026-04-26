@@ -17,7 +17,7 @@
  * lives in `CmdKPalette.tsx` so each file stays under the LOC budget.
  */
 
-import { type ReactNode, useCallback, useMemo } from 'react';
+import { type ReactNode, useCallback, useEffect, useId, useMemo } from 'react';
 import { type EntityRef } from '@/lib/commands/entities';
 import { type NavCommand, type SkillCommand } from '@/lib/commands/registry';
 import { cn } from '@/lib/utils';
@@ -128,6 +128,8 @@ interface PaletteListProps {
   readonly setSelectedIndex: (idx: number) => void;
   readonly commitIndex: (idx: number) => void;
   readonly emptyHint: ReactNode;
+  /** When supplied, rows render with `id={listId}-row-{idx}` for aria-activedescendant. */
+  readonly listId?: string;
 }
 
 export function PaletteList({
@@ -136,6 +138,7 @@ export function PaletteList({
   setSelectedIndex,
   commitIndex,
   emptyHint,
+  listId,
 }: PaletteListProps) {
   if (sections.length === 0) {
     return (
@@ -172,6 +175,7 @@ export function PaletteList({
                   isActive={flatIdx === selectedIndex}
                   onMouseEnter={setSelectedIndex}
                   onCommit={commitIndex}
+                  rowId={listId ? `${listId}-row-${flatIdx}` : undefined}
                 />
               );
             })}
@@ -190,6 +194,17 @@ interface InlinePaletteProps {
   readonly variant: 'inline' | 'rail';
   readonly header?: ReactNode;
   readonly emptyHint?: ReactNode;
+  /**
+   * Optional listbox id. When supplied, the palette body becomes a real
+   * `role='listbox'` with this id so a parent textarea can wire
+   * `aria-controls` + `aria-activedescendant` for combobox semantics.
+   */
+  readonly listIdProp?: string;
+  /**
+   * Notifies the parent when the active row id changes so it can mirror it
+   * onto the textarea's `aria-activedescendant`.
+   */
+  readonly onActiveRowChange?: (id: string | null) => void;
 }
 
 /**
@@ -205,6 +220,8 @@ export function InlinePalette({
   variant,
   header,
   emptyHint = 'No matches',
+  listIdProp,
+  onActiveRowChange,
 }: InlinePaletteProps) {
   const flat = useMemo(() => flattenSections(sections), [sections]);
   const commitIndex = useCallback(
@@ -215,6 +232,30 @@ export function InlinePalette({
     [flat, onCommit]
   );
 
+  // Stable listbox id — parent textarea wires `aria-controls` to this. Falls
+  // back to a generated id when the parent doesn't supply one so the listbox
+  // role + ids are always consistent.
+  const generatedListId = useId();
+  const listId = listIdProp ?? generatedListId;
+
+  // Clamped active index — drives the row highlight, the
+  // aria-activedescendant id, and the Enter commit. Single source of truth
+  // so list shrink can't leave aria-activedescendant pointing past the end.
+  const activeIndex = useMemo<number | null>(() => {
+    if (flat.length === 0) return null;
+    return Math.max(0, Math.min(flat.length - 1, selectedIndex));
+  }, [flat.length, selectedIndex]);
+
+  const activeRowId = useMemo(
+    () => (activeIndex === null ? null : `${listId}-row-${activeIndex}`),
+    [activeIndex, listId]
+  );
+
+  useEffect(() => {
+    onActiveRowChange?.(activeRowId);
+    return () => onActiveRowChange?.(null);
+  }, [activeRowId, onActiveRowChange]);
+
   return (
     <div
       className={cn('flex flex-col', variant === 'rail' && 'h-full min-h-0')}
@@ -223,11 +264,13 @@ export function InlinePalette({
     >
       {header}
       <div
+        id={listId}
+        role='listbox'
+        aria-label='Slash command suggestions'
         className={cn(
           'flex-1 overflow-y-auto p-[5px]',
           variant === 'inline' && 'max-h-[260px]'
         )}
-        role='menu'
       >
         <PaletteList
           sections={sections}
@@ -235,6 +278,7 @@ export function InlinePalette({
           setSelectedIndex={setSelectedIndex}
           commitIndex={commitIndex}
           emptyHint={emptyHint}
+          listId={listId}
         />
       </div>
     </div>
