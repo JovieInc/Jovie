@@ -147,6 +147,7 @@ export function HomeTrustSection({
                 'h-[16px] w-auto sm:h-[18px]',
                 presentation === 'inline-strip' && 'opacity-75'
               )}
+              priority={isInlineStrip}
             />
           </div>
           <div

@@ -124,8 +124,10 @@ export function TheOrchardLogo(props: React.SVGProps<SVGSVGElement>) {
  */
 export function BlackHoleRecordingsLogo({
   className,
+  priority = false,
 }: Readonly<{
   readonly className?: string;
+  readonly priority?: boolean;
 }>) {
   return (
     <Image
@@ -135,7 +137,7 @@ export function BlackHoleRecordingsLogo({
       height={146}
       sizes='(min-width: 1024px) 140px, (min-width: 640px) 126px, 112px'
       className={cn('select-none brightness-0 invert', className)}
-      loading='lazy'
+      priority={priority}
     />
   );
 }
