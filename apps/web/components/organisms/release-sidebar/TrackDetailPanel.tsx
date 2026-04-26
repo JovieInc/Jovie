@@ -89,7 +89,7 @@ export function TrackDetailPanel({
           <CopyableUrlRow
             url={smartLinkUrl}
             size='md'
-            className='rounded-[8px]'
+            className='rounded-lg'
             surface='boxed'
             copyButtonTitle='Copy smart link'
             openButtonTitle='Open smart link'
