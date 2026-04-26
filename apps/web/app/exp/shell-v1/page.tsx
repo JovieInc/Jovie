@@ -1676,6 +1676,13 @@ export default function ShellV1Experiment() {
           activeThreadId={selectedThreadId}
           onSelectThread={openThread}
           onThreadContextMenu={onThreadContextMenu}
+          libraryAssetCount={libraryAllAssets.length}
+          nowPlaying={{
+            track: currentTrack,
+            isPlaying,
+            barCollapsed,
+            onPlay: () => setIsPlaying(p => !p),
+          }}
           libraryProps={
             view === 'library'
               ? {
@@ -1706,27 +1713,29 @@ export default function ShellV1Experiment() {
         activeThreadId={selectedThreadId}
         onSelectThread={openThread}
         onThreadContextMenu={onThreadContextMenu}
+        libraryAssetCount={libraryAllAssets.length}
+        nowPlaying={{
+          track: currentTrack,
+          isPlaying,
+          barCollapsed,
+          onPlay: () => setIsPlaying(p => !p),
+        }}
       />
 
-      {/* Compact now-playing — always visible, no card chrome. Position
-          glides between two anchors based on audio-bar state:
-          - Bar collapsed → sits at bottom-left of the sidebar zone
-            (translateX 0). Reads as the standalone "what's playing"
-            indicator while the bar is hidden.
-          - Bar open → slides right so its left edge aligns with the
-            main content area's left edge (sidebar width + gap). The
-            bar covers the rest of the row; the card stays visible to
-            its left as a peek.
-          When the sidebar is floating (peek mode), main content
-          extends to the page edge so no horizontal shift is needed. */}
+      {/* Floating now-playing — visible only when the audio bar is
+          collapsed. Flat (no card chrome), aligned with the main
+          content's bottom edge. When the bar opens, this fades away
+          (same vocab as the bar disappearing) and a simplified
+          compact player slides into the sidebar bottom (rendered by
+          <Sidebar>'s nowPlaying slot). The two never appear together. */}
       <div
+        aria-hidden={!barCollapsed}
         className='hidden lg:block fixed left-2 bottom-2 z-30 w-[224px]'
         style={{
-          transform:
-            !barCollapsed && sidebarMode === 'docked'
-              ? `translateX(${sidebarTight ? 220 : 232}px)`
-              : 'translateX(0)',
-          transition: `transform ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
+          opacity: barCollapsed ? 1 : 0,
+          transform: barCollapsed ? 'translateY(0)' : 'translateY(8px)',
+          pointerEvents: barCollapsed ? 'auto' : 'none',
+          transition: `opacity ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, transform ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
         }}
       >
         <div className='px-1 pb-0'>
@@ -2090,6 +2099,8 @@ function FloatingSidebarLayer({
   activeThreadId,
   onSelectThread,
   onThreadContextMenu,
+  libraryAssetCount,
+  nowPlaying,
 }: {
   active: boolean;
   peekOpen: boolean;
@@ -2101,6 +2112,13 @@ function FloatingSidebarLayer({
   activeThreadId?: string | null;
   onSelectThread?: (id: string) => void;
   onThreadContextMenu?: (e: React.MouseEvent, thread: Thread) => void;
+  libraryAssetCount: number;
+  nowPlaying?: {
+    track: TrackInfo;
+    isPlaying: boolean;
+    barCollapsed: boolean;
+    onPlay: () => void;
+  };
 }) {
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -2160,6 +2178,8 @@ function FloatingSidebarLayer({
           activeThreadId={activeThreadId}
           onSelectThread={onSelectThread}
           onThreadContextMenu={onThreadContextMenu}
+          libraryAssetCount={libraryAssetCount}
+          nowPlaying={nowPlaying}
         />
       </div>
     </>
@@ -2176,6 +2196,8 @@ function Sidebar({
   activeThreadId,
   onSelectThread,
   onThreadContextMenu,
+  libraryAssetCount,
+  nowPlaying,
 }: {
   variant: 'docked' | 'floating';
   onPin: () => void;
@@ -2196,6 +2218,18 @@ function Sidebar({
   activeThreadId?: string | null;
   onSelectThread?: (id: string) => void;
   onThreadContextMenu?: (e: React.MouseEvent, thread: Thread) => void;
+  // Asset count for the Library nav item — when 0, hide the row.
+  libraryAssetCount: number;
+  // Simplified now-playing pinned to the sidebar bottom. Only renders
+  // when the audio bar is open at the bottom of the canvas — that's
+  // when the floating bottom-left card disappears and is replaced by
+  // this in-sidebar row.
+  nowPlaying?: {
+    track: TrackInfo;
+    isPlaying: boolean;
+    barCollapsed: boolean;
+    onPlay: () => void;
+  };
 }) {
   const inLibraryMode = !!libraryProps;
   const collapsed = false;
@@ -2318,9 +2352,16 @@ function Sidebar({
             tight ? 'space-y-3' : 'space-y-5'
           )}
         >
-          {/* Cross-context items (no label, just the items) */}
+          {/* Cross-context items (no label, just the items). Tasks +
+              Library hide entirely when their underlying lists are
+              empty — no point taking sidebar real estate for nothing. */}
           <div className='space-y-px'>
-            {CORE_ITEMS.map(item => {
+            {CORE_ITEMS.filter(item => {
+              if (item.label === 'Tasks' && TASKS.length === 0) return false;
+              if (item.label === 'Library' && libraryAssetCount === 0)
+                return false;
+              return true;
+            }).map(item => {
               const view: CanvasView | null =
                 item.label === 'Library'
                   ? 'library'
@@ -2401,10 +2442,86 @@ function Sidebar({
         </nav>
       )}
 
-      {/* Reserve room at the bottom for the fixed now-playing card so the
-          nav doesn't scroll behind it when the workspace lists get long. */}
-      <div className='h-[88px] shrink-0' aria-hidden='true' />
+      {/* Sidebar-bottom now-playing — simplified compact player. Only
+          renders when the audio bar is open. The fixed bottom-left
+          floating card is the *other* state (bar collapsed). The two
+          are siblings: bar open → sidebar card; bar collapsed →
+          floating card. They never appear together. */}
+      <div
+        aria-hidden={nowPlaying?.barCollapsed !== false}
+        className='shrink-0 px-2 pb-2 pt-1 overflow-hidden'
+        style={{
+          maxHeight: nowPlaying && !nowPlaying.barCollapsed ? 64 : 0,
+          opacity: nowPlaying && !nowPlaying.barCollapsed ? 1 : 0,
+          transform:
+            nowPlaying && !nowPlaying.barCollapsed
+              ? 'translateY(0)'
+              : 'translateY(8px)',
+          transition: `max-height ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, opacity ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, transform ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
+        }}
+      >
+        {nowPlaying && (
+          <SidebarBottomNowPlaying
+            track={nowPlaying.track}
+            isPlaying={nowPlaying.isPlaying}
+            onPlay={nowPlaying.onPlay}
+          />
+        )}
+      </div>
     </aside>
+  );
+}
+
+// Simplified now-playing pinned to the sidebar bottom. Just album art +
+// title/artist + play button. No BPM/Key/Version chips — those live in
+// the right rail's Overview tab when you actually need them.
+function SidebarBottomNowPlaying({
+  track,
+  isPlaying,
+  onPlay,
+}: {
+  track: TrackInfo;
+  isPlaying: boolean;
+  onPlay: () => void;
+}) {
+  return (
+    <div className='flex items-center gap-2 h-12 px-1.5 rounded-md hover:bg-surface-1/40 transition-colors duration-150 ease-out'>
+      <div className='shrink-0 h-9 w-9 rounded overflow-hidden bg-surface-2'>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={track.artwork}
+          alt=''
+          className='h-full w-full object-cover'
+        />
+      </div>
+      <div className='min-w-0 flex-1'>
+        <div
+          className='truncate text-[12px] font-caption text-primary-token leading-tight'
+          style={{ letterSpacing: '-0.005em' }}
+        >
+          {track.title}
+        </div>
+        <div className='truncate text-[10.5px] text-tertiary-token leading-tight mt-0.5'>
+          {track.artist}
+        </div>
+      </div>
+      <button
+        type='button'
+        onClick={onPlay}
+        aria-label={isPlaying ? 'Pause' : 'Play'}
+        className='shrink-0 h-7 w-7 rounded-full grid place-items-center text-primary-token hover:bg-surface-1/70 transition-colors duration-150 ease-out'
+      >
+        {isPlaying ? (
+          <Pause className='h-3 w-3' strokeWidth={2.5} fill='currentColor' />
+        ) : (
+          <Play
+            className='h-3 w-3 translate-x-px'
+            strokeWidth={2.5}
+            fill='currentColor'
+          />
+        )}
+      </button>
+    </div>
   );
 }
 
@@ -2515,6 +2632,9 @@ function SidebarThreadsSection({
     [threads]
   );
   if (collapsed) return null;
+  // Empty Threads section reads as clutter — hide the whole block until
+  // there's at least one thread to show.
+  if (sorted.length === 0) return null;
   const visible = expanded ? sorted.slice(0, 10) : sorted.slice(0, 5);
   const hasMore = sorted.length > visible.length || !expanded;
   return (
