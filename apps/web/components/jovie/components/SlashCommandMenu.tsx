@@ -12,7 +12,7 @@ import {
   UserCircle,
 } from 'lucide-react';
 import Image from 'next/image';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useId, useMemo, useRef } from 'react';
 import type { EntityKind } from '@/lib/chat/tokens';
 import type { EntityRef, EntityRefMeta } from '@/lib/commands/entities';
 import { commandsForSurface, type SkillCommand } from '@/lib/commands/registry';
@@ -70,6 +70,24 @@ interface SlashCommandMenuProps {
    * the parent surface (rail) caps the size instead.
    */
   readonly variant?: 'inline' | 'rail';
+  /**
+   * Optional caller-owned id for the listbox. When provided, the parent
+   * surface (textarea) can wire `aria-controls` + `aria-activedescendant`
+   * with stable ids matching what the menu renders for each row. When
+   * absent, the menu generates its own id via `useId()`.
+   */
+  readonly listIdProp?: string;
+  /**
+   * Notifies the parent surface when the active row id changes so it can
+   * mirror it onto `aria-activedescendant`. Fires with `null` when the
+   * picker is closed or there are no rows.
+   */
+  readonly onActiveRowChange?: (rowId: string | null) => void;
+}
+
+/** Build the DOM id for a row given the listbox id and flat index. */
+export function rowIdFor(listId: string, flatIndex: number): string {
+  return `${listId}-row-${flatIndex}`;
 }
 
 function fuzzyMatch(haystack: string, needle: string): boolean {
@@ -261,6 +279,7 @@ interface RowProps {
   readonly item: SlashMenuItem;
   readonly index: number;
   readonly isActive: boolean;
+  readonly rowId: string;
   readonly onMouseEnter: (index: number) => void;
   readonly onCommit: (index: number) => void;
 }
@@ -269,21 +288,26 @@ function PickerRow({
   item,
   index,
   isActive,
+  rowId,
   onMouseEnter,
   onCommit,
 }: RowProps) {
+  // The row is a `div role='option'` (not a `<button>`) so the active
+  // descendant can be referenced by id without ever stealing focus from
+  // the textarea. Mouse-enter still updates selection; mouse-down commits.
   return (
-    <button
-      type='button'
-      role='menuitem'
-      aria-current={isActive ? 'true' : undefined}
+    <div
+      id={rowId}
+      role='option'
+      aria-selected={isActive}
+      tabIndex={-1}
       onMouseEnter={() => onMouseEnter(index)}
       onMouseDown={e => {
         e.preventDefault();
         onCommit(index);
       }}
       className={cn(
-        'flex w-full items-center gap-[10px] rounded-lg px-[9px] py-[7px] text-left transition-colors duration-fast',
+        'flex w-full cursor-pointer items-center gap-[10px] rounded-lg px-[9px] py-[7px] text-left transition-colors duration-fast',
         isActive
           ? 'bg-white/[0.06] shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.05)]'
           : 'hover:bg-white/[0.035]'
@@ -291,7 +315,7 @@ function PickerRow({
     >
       <RowVisual item={item} />
       <RowBody item={item} />
-    </button>
+    </div>
   );
 }
 
@@ -554,7 +578,10 @@ function SlashHeader({ state }: SlashHeaderProps) {
   if (state.status === 'entity') {
     const Icon = KIND_ICON_MAP[state.kind];
     return (
-      <div className='flex items-center gap-[10px] border-b border-white/[0.055] px-[18px] pb-3 pt-4 text-[13px] tracking-[-0.005em]'>
+      <div
+        role='presentation'
+        className='flex items-center gap-[10px] border-b border-white/[0.055] px-[18px] pb-3 pt-4 text-[13px] tracking-[-0.005em]'
+      >
         <span className='inline-flex items-center gap-1.5 rounded-[5px] border border-white/10 bg-white/[0.05] px-2 py-[2px] text-[11px] font-semibold uppercase tracking-[0.04em] text-primary-token shadow-[inset_0_0.5px_0_rgba(255,255,255,0.04)]'>
           <Icon className='h-3 w-3' strokeWidth={1.6} />
           {entityKindLabel(state.kind)}
@@ -568,7 +595,10 @@ function SlashHeader({ state }: SlashHeaderProps) {
     );
   }
   return (
-    <div className='flex items-center gap-[10px] border-b border-white/[0.055] px-[18px] pb-3 pt-4 text-[13px] tracking-[-0.005em]'>
+    <div
+      role='presentation'
+      className='flex items-center gap-[10px] border-b border-white/[0.055] px-[18px] pb-3 pt-4 text-[13px] tracking-[-0.005em]'
+    >
       <span className='inline-flex h-[21px] items-center rounded-[4px] bg-white/[0.06] px-1.5 text-[12.5px] font-semibold leading-none text-primary-token shadow-[inset_0_0.5px_0_rgba(255,255,255,0.06),inset_0_0_0_0.5px_rgba(255,255,255,0.04)]'>
         /
       </span>
@@ -598,19 +628,35 @@ export function SlashCommandMenu({
   onMoveSelected,
   onClose,
   variant = 'inline',
+  listIdProp,
+  onActiveRowChange,
 }: SlashCommandMenuProps) {
   const { items, sections, isLoading } = useSlashItems(state, profileId);
+  const fallbackListId = useId();
+  const listId = listIdProp ?? fallbackListId;
+  // Track the source of the most recent selection change. We only want to
+  // call scrollIntoView when the user moved via keyboard — mouse hover
+  // already implicitly puts the row under the cursor, so scrolling on hover
+  // would yank the list out from under them.
+  const lastSourceRef = useRef<'keyboard' | 'mouse'>('keyboard');
+  const listboxRef = useRef<HTMLDivElement | null>(null);
 
   // Keyboard nav lives at this layer: arrow keys drive the picker,
   // Enter commits the active item, Escape closes.
   useEffect(() => {
     if (state.status === 'closed') return;
     function onKey(e: KeyboardEvent) {
+      // IME composition (Japanese, Chinese, Korean): the user is mid-glyph
+      // and Enter is "commit composition", not "submit". Bail before any
+      // navigation key handling so we never swallow the composition.
+      if (e.isComposing || e.keyCode === 229) return;
       if (e.key === 'ArrowDown') {
         e.preventDefault();
+        lastSourceRef.current = 'keyboard';
         onMoveSelected(1, items.length);
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
+        lastSourceRef.current = 'keyboard';
         onMoveSelected(-1, items.length);
       } else if (e.key === 'Enter') {
         const item = items[state.status === 'closed' ? 0 : state.selectedIndex];
@@ -628,6 +674,42 @@ export function SlashCommandMenu({
     return () => globalThis.removeEventListener('keydown', onKey, true);
   }, [state, items, onMoveSelected, onSelectSkill, onSelectEntity, onClose]);
 
+  // Active row id (for parent surface aria-activedescendant). Falls back to
+  // null when no rows or picker is closed.
+  const activeRowId = useMemo(() => {
+    if (state.status === 'closed') return null;
+    if (items.length === 0) return null;
+    const idx = Math.max(0, Math.min(items.length - 1, state.selectedIndex));
+    return rowIdFor(listId, idx);
+  }, [state, items.length, listId]);
+
+  // Notify parent when active row id changes so it can mirror it onto the
+  // textarea's aria-activedescendant. Cleanup pushes `null` so the parent
+  // drops the attribute on unmount (e.g. picker closes, surface remounts).
+  useEffect(() => {
+    onActiveRowChange?.(activeRowId);
+    return () => {
+      onActiveRowChange?.(null);
+    };
+  }, [activeRowId, onActiveRowChange]);
+
+  // Active-row scroll-into-view. Only fires for keyboard navigation; mouse
+  // hover skips this branch via `lastSourceRef`. Confined to the listbox
+  // container — `block: 'nearest'` keeps the page from scrolling.
+  useEffect(() => {
+    if (state.status === 'closed') return;
+    if (!activeRowId) return;
+    if (lastSourceRef.current !== 'keyboard') return;
+    const list = listboxRef.current;
+    if (!list) return;
+    const row = list.querySelector<HTMLElement>(`#${CSS.escape(activeRowId)}`);
+    if (!row) return;
+    // Defensive: jsdom + some older Safari builds don't expose this on
+    // every element. Skip silently when missing.
+    if (typeof row.scrollIntoView !== 'function') return;
+    row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [activeRowId, state.status]);
+
   if (state.status === 'closed') return null;
 
   const handleCommit = (index: number) => {
@@ -635,6 +717,11 @@ export function SlashCommandMenu({
     if (!item) return;
     if (item.kind === 'skill' && item.skill) onSelectSkill(item.skill);
     else if (item.kind === 'entity' && item.entity) onSelectEntity(item.entity);
+  };
+
+  const handleMouseEnter = (index: number) => {
+    lastSourceRef.current = 'mouse';
+    onSetSelected(index);
   };
 
   const flatIndexFor = (sectionStartIdx: number, localIdx: number) =>
@@ -647,26 +734,49 @@ export function SlashCommandMenu({
     >
       {variant === 'inline' ? <SlashHeader state={state} /> : null}
       {variant === 'rail' ? <SlashHeader state={state} /> : null}
-      <div
-        className={cn(
-          'flex-1 overflow-y-auto p-[5px]',
-          variant === 'inline' && 'max-h-[260px]'
-        )}
-        role='menu'
-      >
-        {items.length === 0 ? (
+      {items.length === 0 ? (
+        <div
+          className={cn(
+            'flex-1 overflow-y-auto p-[5px]',
+            variant === 'inline' && 'max-h-[260px]'
+          )}
+          role='presentation'
+        >
           <div className='px-3 py-6 text-center text-xs text-tertiary-token'>
             {isLoading ? 'Searching…' : 'No matches'}
           </div>
-        ) : (
-          (() => {
+        </div>
+      ) : (
+        // Listbox container is a `<div>` with role='listbox' rather than a
+        // `<ul>` so biome's no-non-interactive-to-interactive rule is happy
+        // and so the implicit list semantics don't double up with the
+        // listbox semantics for assistive tech. Children are `<div>`s with
+        // role='option' for the same reason.
+        <div
+          ref={listboxRef}
+          id={listId}
+          role='listbox'
+          aria-label='Slash command suggestions'
+          className={cn(
+            'flex-1 overflow-y-auto p-[5px]',
+            variant === 'inline' && 'max-h-[260px]'
+          )}
+        >
+          {(() => {
             let cursor = 0;
             return sections.map(section => {
               const start = cursor;
               cursor += section.items.length;
+              // Section wrapper is presentational so the listbox sees a flat
+              // list of options. The visible label remains for sighted users
+              // but is hidden from SR via aria-hidden — the option labels
+              // themselves carry enough context.
               return (
-                <div key={section.id}>
-                  <div className='px-[10px] pb-[5px] pt-[11px] text-[9.5px] font-semibold uppercase tracking-[0.1em] text-quaternary-token'>
+                <div key={section.id} role='presentation'>
+                  <div
+                    aria-hidden='true'
+                    className='px-[10px] pb-[5px] pt-[11px] text-[9.5px] font-semibold uppercase tracking-[0.1em] text-quaternary-token'
+                  >
                     {section.label}
                   </div>
                   {section.items.map((item, localIdx) => {
@@ -680,8 +790,9 @@ export function SlashCommandMenu({
                         }
                         item={item}
                         index={flatIdx}
+                        rowId={rowIdFor(listId, flatIdx)}
                         isActive={flatIdx === state.selectedIndex}
-                        onMouseEnter={onSetSelected}
+                        onMouseEnter={handleMouseEnter}
                         onCommit={handleCommit}
                       />
                     );
@@ -689,9 +800,9 @@ export function SlashCommandMenu({
                 </div>
               );
             });
-          })()
-        )}
-      </div>
+          })()}
+        </div>
+      )}
     </div>
   );
 }

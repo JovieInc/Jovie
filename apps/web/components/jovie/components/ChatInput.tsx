@@ -5,6 +5,7 @@ import {
   forwardRef,
   useCallback,
   useEffect,
+  useId,
   useImperativeHandle,
   useRef,
   useState,
@@ -163,16 +164,16 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const isOverLimit = characterCount > MAX_MESSAGE_LENGTH;
     const hasAttachButton = Boolean(onImageAttach);
     const hasPendingImages = (pendingImages?.length ?? 0) > 0;
-    const canSend =
-      Boolean(value.trim() || hasPendingImages) &&
-      !isLoading &&
-      !isSubmitting &&
-      !isOverLimit &&
-      !isImageProcessing;
 
     const [plusMenuOpen, setPlusMenuOpen] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
     const [isViewportNarrow, setIsViewportNarrow] = useState(false);
+    // Stable id for the slash picker listbox; used for textarea ARIA wiring
+    // (`aria-controls`) and to compose row ids for `aria-activedescendant`.
+    const pickerListId = useId();
+    const [pickerActiveRowId, setPickerActiveRowId] = useState<string | null>(
+      null
+    );
 
     // Variant F's "compact" rule fires below ~900px viewport (or any time the
     // composer was already rendered in the compact follow-up variant). At that
@@ -213,6 +214,17 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       pickerProfileId
     );
     const activeEntity = activeEntityFor(picker.state, pickerItems);
+    const isPickerOpen = picker.state.status !== 'closed';
+    // Treat a lone leading "/" as picker bait, not a real message — the picker
+    // is open above it and Enter is committing the active row, not sending.
+    const sendBlockedByPicker = isPickerOpen && value.trim() === '/';
+    const canSend =
+      Boolean(value.trim() || hasPendingImages) &&
+      !isLoading &&
+      !isSubmitting &&
+      !isOverLimit &&
+      !isImageProcessing &&
+      !sendBlockedByPicker;
 
     // Slash trigger detection: open root picker when `/` follows a word
     // boundary; switch to entity picker when a skill commit demands it; or
@@ -368,18 +380,31 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     // (The active-listener inside SlashCommandMenu only mounts while open.)
 
     // Refocus textarea when the picker closes so typing can continue.
+    // We track "picker was open last render" to scope the focus restore: the
+    // AttachDropdown (Radix) also restores focus on close, and racing with it
+    // can leave focus on the dropdown trigger. Deferring to a 0ms timeout
+    // lets Radix run first, then we put focus back where it belongs.
+    const wasPickerOpenRef = useRef(isPickerOpen);
     useEffect(() => {
-      if (picker.state.status === 'closed' && isFocused) {
-        internalTextareaRef.current?.focus();
+      const wasOpen = wasPickerOpenRef.current;
+      wasPickerOpenRef.current = isPickerOpen;
+      if (!isPickerOpen && wasOpen && isFocused) {
+        const handle = setTimeout(() => {
+          internalTextareaRef.current?.focus();
+        }, 0);
+        return () => clearTimeout(handle);
       }
-    }, [picker.state.status, isFocused]);
+    }, [isPickerOpen, isFocused]);
 
     useEffect(() => {
       onPickerOpenChange?.(picker.state.status !== 'closed');
     }, [picker.state.status, onPickerOpenChange]);
 
     return (
-      <form onSubmit={handleFormSubmit}>
+      <form
+        onSubmit={handleFormSubmit}
+        aria-label='Compose a message — type / for skills and references'
+      >
         <div className={dockClass}>
           <motion.div
             data-testid='chat-composer-surface'
@@ -421,6 +446,8 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                     onMoveSelected={picker.moveSelected}
                     onClose={picker.close}
                     variant='rail'
+                    listIdProp={pickerListId}
+                    onActiveRowChange={setPickerActiveRowId}
                   />
                 </aside>
                 <div className='flex min-w-0 flex-1 flex-col'>
@@ -468,6 +495,10 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                       chips={chips}
                       onRemoveChipAt={onRemoveChipAt}
                       isPillMode={false}
+                      isPickerOpen={isPickerOpen}
+                      pickerListId={pickerListId}
+                      pickerActiveRowId={pickerActiveRowId}
+                      attachDisabledForPicker={isPickerOpen}
                     />
                   </div>
                 </div>
@@ -487,6 +518,8 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                         onMoveSelected={picker.moveSelected}
                         onClose={picker.close}
                         variant='rail'
+                        listIdProp={pickerListId}
+                        onActiveRowChange={setPickerActiveRowId}
                       />
                     </div>
                     {activeEntity ? (
@@ -508,6 +541,8 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                     onMoveSelected={picker.moveSelected}
                     onClose={picker.close}
                     variant='inline'
+                    listIdProp={pickerListId}
+                    onActiveRowChange={setPickerActiveRowId}
                   />
                 ) : null}
 
@@ -523,6 +558,8 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                       onMoveSelected={picker.moveSelected}
                       onClose={picker.close}
                       variant='rail'
+                      listIdProp={pickerListId}
+                      onActiveRowChange={setPickerActiveRowId}
                     />
                   </div>
                 ) : null}
@@ -563,6 +600,10 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   onRemoveChipAt={onRemoveChipAt}
                   isPillMode={surfaceMode === 'empty'}
                   hasBorderTop={picker.state.status !== 'closed'}
+                  isPickerOpen={isPickerOpen}
+                  pickerListId={pickerListId}
+                  pickerActiveRowId={pickerActiveRowId}
+                  attachDisabledForPicker={isPickerOpen}
                 />
               </>
             )}
@@ -660,6 +701,14 @@ interface InputRowProps {
   readonly isPillMode?: boolean;
   /** Add hairline divider above the input (when picker sits above it). */
   readonly hasBorderTop?: boolean;
+  /** True while slash picker is open — drives textarea combobox ARIA. */
+  readonly isPickerOpen: boolean;
+  /** id of the listbox the textarea controls (always set for stable ARIA). */
+  readonly pickerListId: string;
+  /** Active row id for `aria-activedescendant`; null when no row is active. */
+  readonly pickerActiveRowId: string | null;
+  /** Disable the attach dropdown trigger while the picker owns the keyboard. */
+  readonly attachDisabledForPicker: boolean;
 }
 
 function InputRow({
@@ -698,6 +747,10 @@ function InputRow({
   onRemoveChipAt,
   isPillMode = false,
   hasBorderTop = false,
+  isPickerOpen,
+  pickerListId,
+  pickerActiveRowId,
+  attachDisabledForPicker,
 }: InputRowProps) {
   return (
     <div className={cn(hasBorderTop && 'border-t border-white/[0.055]')}>
@@ -732,6 +785,7 @@ function InputRow({
             isImageProcessing={isImageProcessing}
             isLoading={isLoading}
             isSubmitting={isSubmitting}
+            disabled={attachDisabledForPicker}
             plusMenuOpen={plusMenuOpen}
             onOpenChange={setPlusMenuOpen}
             onMouseDown={handlePreserveFocus}
@@ -773,6 +827,17 @@ function InputRow({
           maxLength={MAX_MESSAGE_LENGTH + 100}
           aria-label='Chat message input'
           aria-describedby={isNearLimit ? 'char-limit-status' : undefined}
+          // WAI-ARIA combobox pattern: the textarea is the input that
+          // controls the listbox rendered by SlashCommandMenu. Focus stays
+          // on the textarea; selection is communicated via
+          // aria-activedescendant pointing to the row id.
+          role={isPickerOpen ? 'combobox' : undefined}
+          aria-expanded={isPickerOpen ? 'true' : 'false'}
+          aria-controls={isPickerOpen ? pickerListId : undefined}
+          aria-activedescendant={
+            isPickerOpen && pickerActiveRowId ? pickerActiveRowId : undefined
+          }
+          aria-autocomplete={isPickerOpen ? 'list' : undefined}
         />
 
         {hasDictation ? (
