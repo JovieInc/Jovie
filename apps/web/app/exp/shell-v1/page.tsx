@@ -1079,9 +1079,7 @@ export default function ShellV1Experiment() {
   const [currentTimeSec, setCurrentTimeSec] = useState(78);
   // Push-to-talk Jovie: hold ⌘J anywhere to dictate. Mock for the design pass.
   const [jovieListening, setJovieListening] = useState(false);
-  const [palette, setPalette] = useState<Palette>(
-    PALETTE_PRESETS['Cool Black']
-  );
+  const [palette, setPalette] = useState<Palette>(PALETTE_PRESETS.Carbon);
   // Search state lives at the page level so click-artist / click-title in
   // any view can populate it and open the breadcrumb-takeover.
   const [searchOpen, setSearchOpen] = useState(false);
@@ -2933,14 +2931,14 @@ function VariantPicker({
           <ChevronRight className='h-3 w-3' strokeWidth={2.25} />
         </button>
       </div>
-      <div className='flex items-center gap-1 px-1 pb-2 border-b border-subtle'>
+      <div className='grid grid-cols-4 gap-0.5 px-1 pb-2 border-b border-subtle'>
         {(['demo', 'releases', 'tracks', 'tasks'] as CanvasView[]).map(v => (
           <button
             key={v}
             type='button'
             onClick={() => onView(v)}
             className={cn(
-              'flex-1 rounded-md px-2 py-1 text-[12px] font-caption capitalize transition-colors duration-150 ease-out',
+              'min-w-0 rounded-md px-1 py-1 text-[11px] font-caption capitalize transition-colors duration-150 ease-out truncate',
               view === v
                 ? 'bg-primary text-on-primary'
                 : 'text-secondary-token hover:bg-surface-1 hover:text-primary-token'
@@ -3784,13 +3782,8 @@ function ReleaseRow({
       </div>
 
       {/* Artwork */}
-      <div className='relative h-10 w-10 rounded overflow-hidden shrink-0'>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={release.artwork}
-          alt=''
-          className='h-full w-full object-cover'
-        />
+      <div className='relative shrink-0'>
+        <ArtworkThumb src={release.artwork} title={release.title} size={40} />
         {release.agent !== 'idle' && <AgentPulse />}
       </div>
 
@@ -4313,14 +4306,7 @@ function ReleaseDrawer({
 
       <div className='flex-1 min-h-0 overflow-y-auto p-4 space-y-5'>
         <div className='flex items-start gap-3'>
-          <div className='relative h-20 w-20 rounded-md overflow-hidden shrink-0'>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={release.artwork}
-              alt=''
-              className='h-full w-full object-cover'
-            />
-          </div>
+          <ArtworkThumb src={release.artwork} title={release.title} size={80} />
           <div className='min-w-0 flex-1'>
             <div className='text-[10px] uppercase tracking-[0.12em] text-quaternary-token/85 font-medium'>
               {release.type}
@@ -5107,17 +5093,17 @@ function TaskListItem({
       onClick={onSelect}
       data-focused={isFocused || isSelected || undefined}
       className={cn(
-        'group/row relative flex items-start gap-2.5 h-auto py-2 pl-2 pr-2 rounded-md cursor-pointer transition-colors duration-150 ease-out',
+        'group/row relative flex items-center gap-3 h-[44px] px-2 rounded-md cursor-pointer transition-colors duration-150 ease-out',
         !isFocused && !isSelected && 'hover:bg-surface-1/40',
         SELECTED_ROW_CLASSES
       )}
     >
-      <div className='shrink-0 pt-[3px]'>
+      <div className='shrink-0'>
         <StatusIcon status={task.status} />
       </div>
       <div className='flex-1 min-w-0'>
-        <div className='flex items-baseline gap-1.5 min-w-0'>
-          <span className='text-[10.5px] tabular-nums text-quaternary-token shrink-0'>
+        <div className='flex items-center gap-2 min-w-0'>
+          <span className='text-[10.5px] tabular-nums text-quaternary-token/80 shrink-0'>
             {task.id}
           </span>
           <span
@@ -5131,14 +5117,12 @@ function TaskListItem({
             {task.title}
           </span>
         </div>
-        <div className='mt-1 flex items-center gap-1.5 text-[10.5px] text-quaternary-token'>
-          <PriorityGlyph priority={task.priority} />
-          {task.dueIso && (
-            <>
-              <span aria-hidden='true'>·</span>
+        {(task.dueIso || task.labels.length > 0) && (
+          <div className='mt-0.5 flex items-center gap-2 text-[10.5px] text-quaternary-token/85 min-w-0'>
+            {task.dueIso && (
               <span
                 className={cn(
-                  'tabular-nums',
+                  'tabular-nums shrink-0',
                   isDueSoon(task.dueIso) && task.status !== 'done'
                     ? 'text-amber-400/90'
                     : 'text-tertiary-token'
@@ -5146,103 +5130,82 @@ function TaskListItem({
               >
                 {relativeDate(task.dueIso)}
               </span>
-            </>
-          )}
-          {task.labels.length > 0 && (
-            <>
-              <span aria-hidden='true'>·</span>
+            )}
+            {task.labels.length > 0 && (
               <span className='truncate'>{task.labels.join(' · ')}</span>
-            </>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </div>
+      <PriorityGlyph priority={task.priority} />
       <AssigneeChip assignee={task.assignee} />
     </li>
   );
 }
 
 function TaskDetail({ task }: { task: Task }) {
+  const releaseTitle = task.releaseId
+    ? (RELEASES.find(r => r.id === task.releaseId)?.title ?? task.releaseId)
+    : null;
   return (
     <article className='max-w-3xl mx-auto px-8 pt-8 pb-12'>
-      <div className='flex items-center gap-2 text-[10.5px] uppercase tracking-[0.12em] text-quaternary-token/85 font-medium mb-3'>
-        <span>{task.id}</span>
-        <span>·</span>
-        <span>{statusLabel(task.status)}</span>
-        {task.releaseId && (
-          <>
-            <span>·</span>
-            <span className='text-cyan-300/85'>
-              {RELEASES.find(r => r.id === task.releaseId)?.title ??
-                task.releaseId}
-            </span>
-          </>
-        )}
+      <div className='text-[10.5px] uppercase tracking-[0.12em] text-quaternary-token/85 font-medium mb-3 tabular-nums'>
+        {task.id}
       </div>
 
       <h1 className='text-[26px] font-display tracking-[-0.02em] text-primary-token leading-tight'>
         {task.title}
       </h1>
 
+      {/* Horizontal metadata strip — one calm line of pills under the title. */}
+      <div className='mt-4 flex items-center gap-2 flex-wrap'>
+        <MetaPill>
+          <StatusIcon status={task.status} />
+          <span>{statusLabel(task.status)}</span>
+        </MetaPill>
+        {task.priority !== 'none' && (
+          <MetaPill>
+            <PriorityGlyph priority={task.priority} />
+            <span className='capitalize'>{task.priority}</span>
+          </MetaPill>
+        )}
+        <MetaPill>
+          <AssigneeChip assignee={task.assignee} expanded />
+        </MetaPill>
+        {task.dueIso && (
+          <MetaPill
+            tone={
+              isDueSoon(task.dueIso) && task.status !== 'done'
+                ? 'amber'
+                : 'neutral'
+            }
+          >
+            <span className='tabular-nums'>
+              Due{' '}
+              {new Date(task.dueIso).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+              })}
+            </span>
+          </MetaPill>
+        )}
+        {releaseTitle && (
+          <MetaPill tone='cyan'>
+            <span>{releaseTitle}</span>
+          </MetaPill>
+        )}
+        {task.labels.map(l => (
+          <MetaPill key={l}>
+            <span>{l}</span>
+          </MetaPill>
+        ))}
+      </div>
+
       {task.description && (
-        <p className='mt-4 text-[14px] leading-[1.55] text-secondary-token max-w-prose'>
+        <p className='mt-6 text-[14px] leading-[1.55] text-secondary-token max-w-prose'>
           {task.description}
         </p>
       )}
-
-      <dl className='mt-8 grid grid-cols-2 gap-x-8 gap-y-3 max-w-md'>
-        <DetailRow label='Status'>
-          <span className='inline-flex items-center gap-1.5'>
-            <StatusIcon status={task.status} />
-            <span className='text-[12.5px] text-secondary-token'>
-              {statusLabel(task.status)}
-            </span>
-          </span>
-        </DetailRow>
-        <DetailRow label='Priority'>
-          <span className='inline-flex items-center gap-1.5'>
-            <PriorityGlyph priority={task.priority} />
-            <span className='text-[12.5px] text-secondary-token capitalize'>
-              {task.priority === 'none' ? '—' : task.priority}
-            </span>
-          </span>
-        </DetailRow>
-        <DetailRow label='Assignee'>
-          <AssigneeChip assignee={task.assignee} expanded />
-        </DetailRow>
-        <DetailRow label='Due'>
-          <span className='text-[12.5px] text-secondary-token tabular-nums'>
-            {task.dueIso
-              ? new Date(task.dueIso).toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric',
-                })
-              : '—'}
-          </span>
-        </DetailRow>
-        {task.labels.length > 0 && (
-          <DetailRow label='Labels'>
-            <span className='inline-flex items-center gap-1 flex-wrap'>
-              {task.labels.map(l => (
-                <span
-                  key={l}
-                  className='inline-flex items-center h-[18px] px-1.5 rounded text-[10.5px] text-secondary-token border border-(--linear-app-shell-border) bg-surface-1/40'
-                >
-                  {l}
-                </span>
-              ))}
-            </span>
-          </DetailRow>
-        )}
-        {task.releaseId && (
-          <DetailRow label='Release'>
-            <span className='text-[12.5px] text-cyan-300/85'>
-              {RELEASES.find(r => r.id === task.releaseId)?.title ??
-                task.releaseId}
-            </span>
-          </DetailRow>
-        )}
-      </dl>
 
       <div className='mt-8 border-t border-(--linear-app-shell-border)/50 pt-4 text-[11.5px] text-quaternary-token'>
         Updated {relativeDate(task.updatedIso)}
@@ -5251,7 +5214,30 @@ function TaskDetail({ task }: { task: Task }) {
   );
 }
 
-function DetailRow({
+function MetaPill({
+  children,
+  tone = 'neutral',
+}: {
+  children: React.ReactNode;
+  tone?: 'neutral' | 'amber' | 'cyan';
+}) {
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1.5 h-[24px] px-2 rounded-md text-[11.5px] tracking-[-0.005em] border whitespace-nowrap',
+        tone === 'amber'
+          ? 'border-amber-500/30 bg-amber-500/10 text-amber-300/90'
+          : tone === 'cyan'
+            ? 'border-cyan-500/30 bg-cyan-500/10 text-cyan-300/90'
+            : 'border-(--linear-app-shell-border) bg-surface-1/40 text-secondary-token'
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+function _DetailRow({
   label,
   children,
 }: {
