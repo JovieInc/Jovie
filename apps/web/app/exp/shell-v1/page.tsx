@@ -6870,6 +6870,64 @@ function agentLabel(s: ReleaseAgentState) {
 // First-class release detail rail. Always mounted when reachable so the
 // open/close transitions slide smoothly. Sticky surface uses grid resize +
 // inner translate-x so content doesn't reflow during the morph.
+// Right rail variant B (sectioned tabs) — locked direction. Top half is
+// a clean, calm hero (artwork left, title prominent, type badge under
+// title, status chip top-right with subtle tone, hover-play overlay on
+// artwork, overflow menu top-right). Tabbed body reveals complexity:
+// Overview → Distribution → Activity → Details. Cues is tracks-only;
+// hidden when the entity is a release. Tab choice persists across
+// entities per kind so power users don't re-click on every nav.
+type DrawerTab = 'overview' | 'distribution' | 'cues' | 'activity' | 'details';
+type EntityKind = 'release' | 'track' | 'contact';
+
+const DEFAULT_TAB_FOR_KIND: Record<EntityKind, DrawerTab> = {
+  release: 'overview',
+  track: 'overview',
+  contact: 'overview',
+};
+
+const TABS_FOR_KIND: Record<EntityKind, DrawerTab[]> = {
+  release: ['overview', 'distribution', 'activity', 'details'],
+  track: ['overview', 'distribution', 'cues', 'activity', 'details'],
+  contact: ['overview', 'activity', 'details'],
+};
+
+const TAB_LABEL: Record<DrawerTab, string> = {
+  overview: 'Overview',
+  distribution: 'Distribution',
+  cues: 'Cues',
+  activity: 'Activity',
+  details: 'Details',
+};
+
+// Module-scoped tab persistence per entity kind. When a user picks
+// "Distribution" on one release, the next release opens on
+// "Distribution" too. Tracks remember independently (they have a Cues
+// tab releases don't).
+const REMEMBERED_TAB: Record<EntityKind, DrawerTab> = {
+  release: 'overview',
+  track: 'overview',
+  contact: 'overview',
+};
+
+function useRememberedTab(
+  kind: EntityKind
+): [DrawerTab, (t: DrawerTab) => void] {
+  const [tab, setTabLocal] = useState<DrawerTab>(REMEMBERED_TAB[kind]);
+  // Snap to remembered when entity kind changes.
+  useEffect(() => {
+    // Snap to remembered when entity kind changes. Tab is intentionally
+    // not in the dep array — this is a kind-change reaction, not a tab
+    // sync. The only place we read tab is in setTabLocal which is stable.
+    setTabLocal(REMEMBERED_TAB[kind] ?? DEFAULT_TAB_FOR_KIND[kind]);
+  }, [kind]);
+  const setTab = (t: DrawerTab) => {
+    REMEMBERED_TAB[kind] = t;
+    setTabLocal(t);
+  };
+  return [tab, setTab];
+}
+
 function ReleaseDrawer({
   release,
   onClose,
@@ -6892,6 +6950,10 @@ function ReleaseDrawer({
 
   const open = release !== null;
   const r = release ?? sticky;
+  const kind: EntityKind = 'release';
+  const [tab, setTab] = useRememberedTab(kind);
+  const tabs = TABS_FOR_KIND[kind];
+
   if (!r) return null;
 
   return (
@@ -6908,118 +6970,142 @@ function ReleaseDrawer({
         minWidth: 0,
       }}
     >
-      <DrawerHeader release={r} onClose={onClose} />
+      <DrawerHero release={r} onClose={onClose} onPlay={onPlay} />
+      <DrawerTabStrip tabs={tabs} active={tab} onChange={setTab} />
       <div className='flex-1 min-h-0 overflow-y-auto'>
-        <DrawerHero release={r} onPlay={onPlay} />
-        <DrawerStatsRow release={r} />
-        <DrawerPerformance release={r} />
-        <DrawerDistribution release={r} />
-        <DrawerCues release={r} onSeek={onSeek} />
-        <DrawerTasksAgent release={r} onOpenTasks={onOpenTasks} />
+        {tab === 'overview' && <DrawerOverviewTab release={r} />}
+        {tab === 'distribution' && <DrawerDistribution release={r} />}
+        {tab === 'cues' && <DrawerCues release={r} onSeek={onSeek} />}
+        {tab === 'activity' && (
+          <DrawerActivityTab release={r} onOpenTasks={onOpenTasks} />
+        )}
+        {tab === 'details' && <DrawerDetailsTab release={r} />}
       </div>
-      <DrawerActions release={r} />
     </aside>
   );
 }
 
-function DrawerHeader({
-  release,
-  onClose,
+function DrawerTabStrip({
+  tabs,
+  active,
+  onChange,
 }: {
-  release: Release;
-  onClose: () => void;
+  tabs: DrawerTab[];
+  active: DrawerTab;
+  onChange: (t: DrawerTab) => void;
 }) {
   return (
-    <header className='shrink-0 flex items-center gap-2 px-3 h-10 border-b border-(--linear-app-shell-border)/70 bg-(--surface-0)/50'>
-      <span className='text-[10px] uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
-        Release
-      </span>
-      <span className='text-[10.5px] tabular-nums text-quaternary-token/70 ml-1'>
-        ·
-      </span>
-      <span className='text-[10.5px] tabular-nums text-tertiary-token truncate'>
-        {release.id.replace(/-/g, ' ').slice(0, 16)}
-      </span>
-      <Tooltip label='Close' shortcut='closeOverlay'>
-        <button
-          type='button'
-          onClick={onClose}
-          className='ml-auto h-6 w-6 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-150 ease-out'
-          aria-label='Close drawer (Esc)'
-        >
-          <X className='h-3.5 w-3.5' strokeWidth={2.25} />
-        </button>
-      </Tooltip>
-    </header>
+    <div className='shrink-0 flex items-center gap-0.5 px-3 border-b border-(--linear-app-shell-border)/60'>
+      {tabs.map(t => {
+        const on = active === t;
+        return (
+          <button
+            key={t}
+            type='button'
+            onClick={() => onChange(t)}
+            className={cn(
+              'h-9 px-2.5 text-[11.5px] font-caption tracking-[-0.005em] transition-colors duration-150 ease-out border-b -mb-px',
+              on
+                ? 'text-primary-token border-cyan-300/70'
+                : 'text-tertiary-token border-transparent hover:text-primary-token'
+            )}
+          >
+            {TAB_LABEL[t]}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
 function DrawerHero({
   release,
+  onClose,
   onPlay,
 }: {
   release: Release;
+  onClose: () => void;
   onPlay?: (id: string) => void;
 }) {
+  const status = statusFromRelease(release);
   return (
-    <section className='px-4 pt-4 pb-3'>
-      <div className='flex items-stretch gap-3'>
-        <div className='shrink-0'>
+    <section className='shrink-0 relative pt-4 pb-4 px-4'>
+      {/* Status pill + close + overflow live in the top-right corner so
+          they don't compete with the title. Status stays visible at all
+          times; close + overflow only show on hover for a calmer rest
+          state (Linear right-drawer pattern). */}
+      <div className='absolute right-3 top-3 flex items-center gap-1'>
+        <StatusBadge status={status} />
+        <Tooltip label='More'>
+          <button
+            type='button'
+            className='h-6 w-6 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1/70 transition-colors duration-150 ease-out opacity-0 group-hover/drawer:opacity-100 focus-visible:opacity-100'
+            aria-label='More actions'
+          >
+            <MoreHorizontal className='h-3.5 w-3.5' strokeWidth={2.25} />
+          </button>
+        </Tooltip>
+        <Tooltip label='Close' shortcut='closeOverlay'>
+          <button
+            type='button'
+            onClick={onClose}
+            className='h-6 w-6 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1/70 transition-colors duration-150 ease-out'
+            aria-label='Close drawer (Esc)'
+          >
+            <X className='h-3.5 w-3.5' strokeWidth={2.25} />
+          </button>
+        </Tooltip>
+      </div>
+
+      <div className='flex items-start gap-3 group/drawer'>
+        {/* Hover-play overlay on the artwork — replaces the action row. */}
+        <button
+          type='button'
+          onClick={() => onPlay?.(release.id)}
+          aria-label={`Play ${release.title}`}
+          className='shrink-0 relative group/art rounded-md overflow-hidden focus-visible:outline-none'
+        >
           <ArtworkThumb src={release.artwork} title={release.title} size={88} />
-        </div>
-        <div className='flex-1 min-w-0 flex flex-col justify-between py-0.5'>
-          <div className='flex items-center gap-1.5'>
-            <TypeBadge type={release.type} />
-            <StatusBadge status={statusFromRelease(release)} />
-          </div>
+          <span
+            aria-hidden='true'
+            className='absolute inset-0 grid place-items-center bg-black/45 opacity-0 group-hover/art:opacity-100 transition-opacity duration-150 ease-out'
+          >
+            <span className='h-8 w-8 rounded-full bg-white text-black grid place-items-center'>
+              <Play
+                className='h-3.5 w-3.5 translate-x-px'
+                strokeWidth={2.5}
+                fill='currentColor'
+              />
+            </span>
+          </span>
+        </button>
+
+        <div className='flex-1 min-w-0 pt-1 pr-[88px]'>
           <h2
             className='text-[17px] font-semibold text-primary-token leading-tight'
             style={{ letterSpacing: '-0.018em' }}
           >
             {release.title}
           </h2>
-          <p className='text-[12px] text-tertiary-token truncate'>
+          <p className='mt-1 text-[12px] text-tertiary-token truncate'>
             {release.artist} · {release.album}
           </p>
+          <div className='mt-2'>
+            <TypeBadge type={release.type} />
+          </div>
         </div>
-      </div>
-
-      <div className='mt-3 flex items-center gap-1.5'>
-        <button
-          type='button'
-          onClick={() => onPlay?.(release.id)}
-          className='inline-flex items-center gap-1.5 h-7 px-3 rounded-md text-[12px] font-medium bg-cyan-300/95 text-black hover:bg-cyan-200 transition-colors duration-150 ease-out'
-        >
-          <Play
-            className='h-3 w-3 translate-x-px'
-            strokeWidth={2.5}
-            fill='currentColor'
-          />
-          Play
-        </button>
-        <button
-          type='button'
-          className='inline-flex items-center h-7 px-2.5 rounded-md text-[12px] text-secondary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 hover:text-primary-token transition-colors duration-150 ease-out'
-        >
-          Open
-        </button>
-        <button
-          type='button'
-          className='inline-flex items-center justify-center h-7 w-7 rounded-md text-tertiary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 hover:text-primary-token transition-colors duration-150 ease-out ml-auto'
-          aria-label='More'
-        >
-          <MoreHorizontal className='h-3.5 w-3.5' strokeWidth={2.25} />
-        </button>
       </div>
     </section>
   );
 }
 
-function DrawerStatsRow({ release }: { release: Release }) {
+// Overview tab — clean stats triad + compact performance + drop date.
+// No carded sections; sub-areas are separated by a hairline only.
+function DrawerOverviewTab({ release }: { release: Release }) {
   return (
-    <section className='px-4 pb-3'>
-      <div className='grid grid-cols-3 gap-2 rounded-md border border-(--linear-app-shell-border)/60 bg-(--surface-0)/50 px-3 py-2.5'>
-        <Stat label='BPM' value={String(release.bpm)} />
+    <div className='px-4 py-4 space-y-5'>
+      <div className='grid grid-cols-3 gap-3'>
+        <Stat label='BPM' value={String(release.bpm)} tabular />
         <Stat label='Key' value={release.key} mono />
         <Stat
           label='Length'
@@ -7029,7 +7115,32 @@ function DrawerStatsRow({ release }: { release: Release }) {
           tabular
         />
       </div>
-    </section>
+      <DrawerPerformance release={release} />
+      <DrawerDropDate release={release} />
+    </div>
+  );
+}
+
+function DrawerDropDate({ release }: { release: Release }) {
+  return (
+    <div className='flex items-center justify-between text-[11.5px] text-tertiary-token'>
+      <span className='inline-flex items-center gap-1.5'>
+        <span className='text-quaternary-token'>Drops</span>
+        <span className='text-secondary-token tabular-nums'>
+          {new Date(release.releaseDate).toLocaleDateString(undefined, {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          })}
+        </span>
+      </span>
+      <button
+        type='button'
+        className='text-[10.5px] uppercase tracking-[0.06em] text-quaternary-token hover:text-primary-token transition-colors duration-150 ease-out'
+      >
+        Reschedule
+      </button>
+    </div>
   );
 }
 
@@ -7069,8 +7180,14 @@ function DrawerPerformance({ release }: { release: Release }) {
   );
   const trendUp = release.weeklyDelta > 0;
   const trendFlat = release.weeklyDelta === 0;
+  // Streams + delta — wired to mock today; production will fill these in
+  // from real DSP analytics. Empty / loading state is a `—` placeholder
+  // (no skeleton) per the no-jank rule.
   return (
-    <DrawerSection label='Performance'>
+    <div>
+      <p className='text-[10px] uppercase tracking-[0.08em] text-quaternary-token font-semibold mb-2'>
+        7-day streams
+      </p>
       <div className='flex items-baseline gap-2'>
         <span className='text-[20px] font-semibold text-primary-token tabular-nums'>
           {release.weeklyStreams.toLocaleString()}
@@ -7095,7 +7212,7 @@ function DrawerPerformance({ release }: { release: Release }) {
         </span>
       </div>
       <Sparkline points={sparkPoints} trendUp={trendUp} trendFlat={trendFlat} />
-    </DrawerSection>
+    </div>
   );
 }
 
@@ -7165,49 +7282,52 @@ function DrawerDistribution({ release }: { release: Release }) {
     d => release.dsps[d] === 'live'
   ).length;
   return (
-    <DrawerSection
-      label='Distribution'
-      trailing={
+    <div className='px-4 py-4'>
+      <div className='flex items-center justify-between pb-2'>
+        <p className='text-[10px] uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
+          DSPs
+        </p>
         <span className='text-[10.5px] tabular-nums text-tertiary-token'>
           {liveCount}/{Object.keys(release.dsps).length} live
         </span>
-      }
-    >
-      <ul className='flex flex-col'>
+      </div>
+      <ul className='flex flex-col -mx-2'>
         {DSP_ORDER.map(dsp => {
           const status = release.dsps[dsp];
           return (
-            <li
-              key={dsp}
-              className='flex items-center gap-2.5 h-7 text-[12.5px] text-secondary-token'
-            >
-              <span
-                className={cn(
-                  'h-[16px] w-[16px] rounded-full grid place-items-center text-[8px] font-semibold text-white shrink-0',
-                  status === 'missing'
-                    ? 'bg-quaternary-token/40 opacity-60'
-                    : DSP_COLOR[dsp]
-                )}
+            <li key={dsp}>
+              <button
+                type='button'
+                className='w-full flex items-center gap-2.5 h-8 px-2 rounded-md text-[12.5px] text-secondary-token hover:bg-surface-1/40 hover:text-primary-token transition-colors duration-150 ease-out'
               >
-                {DSP_GLYPH[dsp]}
-              </span>
-              <span className='flex-1'>{DSP_LABEL[dsp]}</span>
-              <span className='inline-flex items-center gap-1.5'>
                 <span
                   className={cn(
-                    'h-1.5 w-1.5 rounded-full',
-                    DSP_STATUS_DOT[status]
+                    'h-[16px] w-[16px] rounded-full grid place-items-center text-[8px] font-semibold text-white shrink-0',
+                    status === 'missing'
+                      ? 'bg-quaternary-token/40 opacity-60'
+                      : DSP_COLOR[dsp]
                   )}
-                />
-                <span className='text-[10.5px] uppercase tracking-[0.06em] text-quaternary-token'>
-                  {status}
+                >
+                  {DSP_GLYPH[dsp]}
                 </span>
-              </span>
+                <span className='flex-1 text-left'>{DSP_LABEL[dsp]}</span>
+                <span className='inline-flex items-center gap-1.5'>
+                  <span
+                    className={cn(
+                      'h-1.5 w-1.5 rounded-full',
+                      DSP_STATUS_DOT[status]
+                    )}
+                  />
+                  <span className='text-[10.5px] uppercase tracking-[0.06em] text-quaternary-token'>
+                    {status}
+                  </span>
+                </span>
+              </button>
             </li>
           );
         })}
       </ul>
-    </DrawerSection>
+    </div>
   );
 }
 
@@ -7220,16 +7340,17 @@ function DrawerCues({
 }) {
   const total = release.durationSec;
   return (
-    <DrawerSection
-      label='Cues'
-      trailing={
+    <div className='px-4 py-4'>
+      <div className='flex items-center justify-between pb-2'>
+        <p className='text-[10px] uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
+          Cues
+        </p>
         <span className='text-[10.5px] tabular-nums text-tertiary-token'>
           {release.cues.length}
         </span>
-      }
-    >
+      </div>
       {/* Mini timeline ribbon — cues plot against duration. */}
-      <div className='relative h-1 rounded-full bg-(--surface-2) mt-1'>
+      <div className='relative h-1 rounded-full bg-(--surface-2)'>
         {release.cues.map(c => {
           const pct = (c.at / total) * 100;
           return (
@@ -7242,16 +7363,27 @@ function DrawerCues({
           );
         })}
       </div>
-      <ul className='mt-2 flex flex-col'>
+      <ul className='mt-3 flex flex-col -mx-2'>
         {release.cues.map(c => (
           <li key={c.at}>
             <button
               type='button'
               onClick={() => onSeek?.(release.id, c.at)}
-              className='w-full flex items-center gap-2.5 h-7 px-1 rounded text-[12px] text-secondary-token hover:bg-surface-1/40 hover:text-primary-token transition-colors duration-150 ease-out'
+              className='group/cue w-full flex items-center gap-2 h-8 px-2 rounded-md text-[12.5px] text-secondary-token hover:bg-surface-1/40 hover:text-primary-token transition-colors duration-150 ease-out'
             >
-              <span className='tabular-nums text-[10.5px] text-quaternary-token w-9 text-left'>
-                {Math.floor(c.at / 60)}:{String(c.at % 60).padStart(2, '0')}
+              {/* Hover-play affordance — replaces the timestamp on hover
+                  so the row reads like a track in a playlist. */}
+              <span className='relative w-9 shrink-0'>
+                <span className='absolute inset-0 grid place-items-start tabular-nums text-[10.5px] text-quaternary-token opacity-100 group-hover/cue:opacity-0 transition-opacity duration-150 ease-out'>
+                  {Math.floor(c.at / 60)}:{String(c.at % 60).padStart(2, '0')}
+                </span>
+                <span className='absolute inset-0 grid place-items-center text-primary-token opacity-0 group-hover/cue:opacity-100 transition-opacity duration-150 ease-out'>
+                  <Play
+                    className='h-3 w-3 translate-x-px'
+                    strokeWidth={2.5}
+                    fill='currentColor'
+                  />
+                </span>
               </span>
               <span className='flex-1 text-left truncate'>{c.label}</span>
               <span className='text-[10px] uppercase tracking-[0.06em] text-quaternary-token capitalize'>
@@ -7261,135 +7393,171 @@ function DrawerCues({
           </li>
         ))}
       </ul>
-    </DrawerSection>
+    </div>
   );
 }
 
-function DrawerTasksAgent({
+// Activity tab — flat hover rows, no per-item carding. Each row is a
+// chevron-led link into the related thread / task / pitch surface.
+function DrawerActivityTab({
   release,
   onOpenTasks,
 }: {
   release: Release;
   onOpenTasks?: () => void;
 }) {
-  const showAgent = release.agent !== 'idle';
-  const showTasks = release.tasksOpen > 0;
-  if (!showAgent && !showTasks && !release.pitchReady) return null;
   return (
-    <DrawerSection label='Activity'>
-      {showTasks && (
-        <button
-          type='button'
-          onClick={onOpenTasks}
-          className='w-full flex items-center gap-2.5 h-9 px-2.5 rounded-md border border-(--linear-app-shell-border)/70 bg-(--surface-0)/40 hover:bg-surface-1/50 text-secondary-token hover:text-primary-token transition-colors duration-150 ease-out'
-        >
-          <Activity
-            className='h-3.5 w-3.5 text-quaternary-token'
-            strokeWidth={2.25}
+    <div className='px-4 py-4'>
+      <div className='flex flex-col -mx-2'>
+        {release.tasksOpen > 0 && (
+          <ActivityHoverRow
+            icon={Activity}
+            label={`${release.tasksOpen} open task${release.tasksOpen === 1 ? '' : 's'}`}
+            meta='Tap to open in Tasks'
+            onClick={onOpenTasks}
           />
-          <span className='flex-1 text-left text-[12.5px]'>
-            {release.tasksOpen} open task{release.tasksOpen === 1 ? '' : 's'}
-          </span>
-          <ChevronRight
-            className='h-3 w-3 text-quaternary-token'
-            strokeWidth={2.25}
+        )}
+        {release.agent !== 'idle' && (
+          <ActivityHoverRow
+            icon={Sparkles}
+            iconAccent
+            label={`Jovie · ${agentLabel(release.agent)}`}
+            meta='Running'
+            running
           />
-        </button>
-      )}
-      {showAgent && (
-        <div className='flex items-center gap-2 mt-1.5 px-2.5 h-7 rounded-md border border-(--linear-app-shell-border)/70 bg-(--surface-0)/40'>
-          <span className='h-1.5 w-1.5 rounded-full bg-cyan-300/80 animate-pulse' />
-          <span className='text-[12px] text-secondary-token'>
-            Jovie · {agentLabel(release.agent)}
-          </span>
-        </div>
-      )}
-      <div className='flex items-center gap-2 mt-1.5 px-2.5 h-7 rounded-md border border-(--linear-app-shell-border)/70 bg-(--surface-0)/40'>
-        <Sparkles
-          className={cn(
-            'h-3 w-3',
-            release.pitchReady ? 'text-cyan-300/80' : 'text-quaternary-token'
-          )}
-          strokeWidth={2.25}
+        )}
+        <ActivityHoverRow
+          icon={Sparkles}
+          iconAccent={release.pitchReady}
+          label={
+            release.pitchReady ? 'Editorial pitch ready' : 'Pitch not ready yet'
+          }
+          meta={release.pitchReady ? 'Send' : 'Build'}
         />
-        <span className='flex-1 text-[12px] text-secondary-token'>
-          {release.pitchReady
-            ? 'Editorial pitch ready to send'
-            : 'Pitch not ready yet'}
-        </span>
-        <button
-          type='button'
-          className='text-[10.5px] uppercase tracking-[0.06em] text-tertiary-token hover:text-primary-token transition-colors duration-150 ease-out'
-        >
-          {release.pitchReady ? 'Send' : 'Build'}
-        </button>
+        <ActivityHoverRow icon={LinkIcon} label='Smart link' meta='Copy' />
+        <ActivityHoverRow icon={Copy} label='Duplicate release' meta='⌘D' />
+        <ActivityHoverRow
+          icon={ExternalLink}
+          label='Open public page'
+          meta='Open'
+        />
+        <ActivityHoverRow
+          icon={Archive}
+          label='Archive release'
+          meta=''
+          danger
+        />
       </div>
-    </DrawerSection>
+    </div>
   );
 }
 
-function DrawerActions({ release }: { release: Release }) {
-  return (
-    <footer className='shrink-0 grid grid-cols-2 gap-1.5 p-3 border-t border-(--linear-app-shell-border)/70 bg-(--surface-0)/50'>
-      <button
-        type='button'
-        className='inline-flex items-center justify-center gap-1.5 h-7 rounded-md text-[12px] text-secondary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 hover:text-primary-token transition-colors duration-150 ease-out'
-      >
-        <LinkIcon className='h-3 w-3' strokeWidth={2.25} />
-        Smart link
-      </button>
-      <button
-        type='button'
-        className='inline-flex items-center justify-center gap-1.5 h-7 rounded-md text-[12px] text-secondary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 hover:text-primary-token transition-colors duration-150 ease-out'
-      >
-        <Copy className='h-3 w-3' strokeWidth={2.25} />
-        Duplicate
-      </button>
-      <button
-        type='button'
-        className='inline-flex items-center justify-center gap-1.5 h-7 rounded-md text-[12px] text-secondary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 hover:text-primary-token transition-colors duration-150 ease-out'
-      >
-        <ExternalLink className='h-3 w-3' strokeWidth={2.25} />
-        Open page
-      </button>
-      <button
-        type='button'
-        className='inline-flex items-center justify-center gap-1.5 h-7 rounded-md text-[12px] text-rose-300/85 border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-rose-500/10 hover:text-rose-200 transition-colors duration-150 ease-out'
-      >
-        <Archive className='h-3 w-3' strokeWidth={2.25} />
-        Archive
-      </button>
-      <span className='col-span-2 text-[10.5px] tabular-nums text-quaternary-token text-center pt-1'>
-        Drops{' '}
-        {new Date(release.releaseDate).toLocaleDateString(undefined, {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric',
-        })}
-      </span>
-    </footer>
-  );
-}
-
-function DrawerSection({
+function ActivityHoverRow({
+  icon: Icon,
   label,
-  trailing,
-  children,
+  meta,
+  onClick,
+  running,
+  iconAccent,
+  danger,
 }: {
+  icon: typeof Activity;
   label: string;
-  trailing?: React.ReactNode;
-  children: React.ReactNode;
+  meta: string;
+  onClick?: () => void;
+  running?: boolean;
+  iconAccent?: boolean;
+  danger?: boolean;
 }) {
   return (
-    <section className='px-4 py-3 border-t border-(--linear-app-shell-border)/60'>
-      <div className='flex items-center justify-between pb-1.5'>
-        <span className='text-[9.5px] uppercase tracking-[0.12em] text-quaternary-token font-semibold'>
-          {label}
-        </span>
-        {trailing}
-      </div>
-      {children}
-    </section>
+    <button
+      type='button'
+      onClick={onClick}
+      className={cn(
+        'group/act flex items-center gap-2.5 h-8 px-2 rounded-md text-[12.5px] transition-colors duration-150 ease-out',
+        danger
+          ? 'text-rose-300/85 hover:bg-rose-500/10 hover:text-rose-200'
+          : 'text-secondary-token hover:bg-surface-1/50 hover:text-primary-token'
+      )}
+    >
+      <Icon
+        className={cn(
+          'h-3.5 w-3.5 shrink-0',
+          iconAccent ? 'text-cyan-300/85' : 'text-quaternary-token'
+        )}
+        strokeWidth={2.25}
+      />
+      <span className='flex-1 text-left truncate'>{label}</span>
+      {running && (
+        <span className='h-1.5 w-1.5 rounded-full bg-cyan-300/80 animate-pulse' />
+      )}
+      <span className='text-[10.5px] uppercase tracking-[0.06em] text-quaternary-token group-hover/act:text-tertiary-token transition-colors duration-150 ease-out'>
+        {meta}
+      </span>
+    </button>
+  );
+}
+
+// Details tab — heavy metadata pane. Power users live here when they
+// need to edit. Uses a calm dl/dt/dd layout with inline-edit hover hint.
+function DrawerDetailsTab({ release }: { release: Release }) {
+  const rows: Array<{ label: string; value: string }> = [
+    { label: 'Title', value: release.title },
+    { label: 'Artist', value: release.artist },
+    { label: 'Album', value: release.album },
+    { label: 'Type', value: release.type },
+    {
+      label: 'Release date',
+      value: new Date(release.releaseDate).toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      }),
+    },
+    { label: 'Version', value: release.version || '—' },
+    { label: 'BPM', value: String(release.bpm) },
+    { label: 'Key', value: release.key },
+    {
+      label: 'Length',
+      value: `${Math.floor(release.durationSec / 60)}:${String(
+        release.durationSec % 60
+      ).padStart(2, '0')}`,
+    },
+    { label: 'ID', value: release.id },
+  ];
+  return (
+    <div className='px-4 py-4'>
+      <p className='text-[10px] uppercase tracking-[0.08em] text-quaternary-token font-semibold mb-2'>
+        Metadata
+      </p>
+      <dl className='flex flex-col -mx-2'>
+        {rows.map(row => (
+          <div
+            key={row.label}
+            className='group/row flex items-center gap-3 h-8 px-2 rounded-md hover:bg-surface-1/40 transition-colors duration-150 ease-out'
+          >
+            <dt className='w-[88px] shrink-0 text-[11px] text-quaternary-token'>
+              {row.label}
+            </dt>
+            <dd
+              className={cn(
+                'flex-1 min-w-0 text-[12.5px] text-secondary-token truncate',
+                row.label === 'Key' && 'font-mono tracking-wide',
+                (row.label === 'BPM' ||
+                  row.label === 'Length' ||
+                  row.label === 'ID') &&
+                  'tabular-nums'
+              )}
+            >
+              {row.value}
+            </dd>
+            <span className='text-[10px] uppercase tracking-[0.06em] text-quaternary-token opacity-0 group-hover/row:opacity-100 transition-opacity duration-150 ease-out'>
+              Edit
+            </span>
+          </div>
+        ))}
+      </dl>
+    </div>
   );
 }
 
