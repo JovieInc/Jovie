@@ -3,7 +3,6 @@
 import { useParams, useSearchParams } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
 import {
-  getPreviewActiveMode,
   HOMEPAGE_PROFILE_PREVIEW_ARTIST,
   HOMEPAGE_PROFILE_PREVIEW_CONTACTS,
   HOMEPAGE_PROFILE_PREVIEW_RELEASES,
@@ -11,7 +10,10 @@ import {
   HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES,
   HOMEPAGE_PROFILE_SHOWCASE_STATES,
 } from '@/features/home/homepage-profile-preview-fixture';
-import type { ProfileShowcaseStateId } from '@/features/profile/contracts';
+import type {
+  ProfilePrimaryTab,
+  ProfileShowcaseStateId,
+} from '@/features/profile/contracts';
 import { ProfileCompactSurface } from '@/features/profile/templates/ProfileCompactSurface';
 
 const VALID_STATES = Object.keys(
@@ -27,6 +29,21 @@ function getLatestRelease(stateId: ProfileShowcaseStateId) {
       return HOMEPAGE_PROFILE_PREVIEW_RELEASES.live;
     default:
       return null;
+  }
+}
+
+function getPreviewActiveMode(
+  stateId: ProfileShowcaseStateId
+): ProfilePrimaryTab {
+  const drawerView = HOMEPAGE_PROFILE_SHOWCASE_STATES[stateId].drawerView;
+
+  switch (drawerView) {
+    case 'listen':
+    case 'subscribe':
+    case 'tour':
+      return drawerView;
+    default:
+      return 'profile';
   }
 }
 
@@ -99,6 +116,7 @@ export default function MarketingRenderPage() {
           onDrawerOpenChange={() => {}}
           onDrawerViewChange={() => {}}
           onModeSelect={() => {}}
+          onBack={() => {}}
           onOpenMenu={() => {}}
           onPlayClick={() => {}}
           onShare={() => {}}

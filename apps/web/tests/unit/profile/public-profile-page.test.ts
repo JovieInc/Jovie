@@ -141,12 +141,14 @@ describe('Public Profile Page Logic', () => {
   });
 
   describe('profile accent backfill', () => {
-    it('persists a newly derived accent into the stored theme payload', () => {
+    it('derives a non-persisted accent fallback during public profile render', () => {
       expect(PUBLIC_PROFILE_LOADER_SOURCE).toContain(
+        'ensureThemeHasProfileAccent'
+      );
+      expect(PUBLIC_PROFILE_LOADER_SOURCE).toContain('accentSourceUrl');
+      expect(PUBLIC_PROFILE_LOADER_SOURCE).not.toContain(
         'persistDerivedProfileAccent'
       );
-      expect(PUBLIC_PROFILE_LOADER_SOURCE).toContain('jsonb_set(');
-      expect(PUBLIC_PROFILE_LOADER_SOURCE).toContain("'{profileAccent}'");
     });
   });
 
@@ -522,7 +524,7 @@ describe('Public Profile Page Logic', () => {
       ['profile', 'Artist'],
       ['pay', 'Support'],
       ['listen', 'Listen now'],
-      ['subscribe', 'Turn on notifications'],
+      ['subscribe', 'Manage alerts'],
     ])('mode "%s" maps to subtitle "%s"', (mode, expectedSubtitle) => {
       expect(getProfileModeSubtitle(mode)).toBe(expectedSubtitle);
     });

@@ -4,6 +4,8 @@ export type NotificationSource = 'profile_inline' | 'tour_drawer';
 
 export interface ArtistNotificationsCTAProps {
   readonly artist: Artist;
+  readonly presentation?: 'overlay' | 'inline' | 'modal';
+  readonly portalContainer?: HTMLElement | null;
   /**
    * Controls the base rendering style when notifications are disabled or idle.
    * "link" matches the static profile button, "button" matches CTAButton.
@@ -24,6 +26,8 @@ export interface ArtistNotificationsCTAProps {
    * profile surfaces.
    */
   readonly hideListenFallback?: boolean;
+  readonly hideTrigger?: boolean;
+  readonly onFlowClosed?: () => void;
   /**
    * Analytics source identifier for tracking where subscriptions originate.
    * Defaults to 'profile_inline'. Tour drawer passes 'tour_drawer'.

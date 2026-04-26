@@ -46,6 +46,8 @@ export function ReleaseNotificationsProvider({
     state: notificationsState,
     subscribedChannels,
     subscriptionDetails,
+    contentPreferences,
+    artistEmail,
   } = notificationsController;
 
   const notificationsContextValue = useMemo(
@@ -61,6 +63,8 @@ export function ReleaseNotificationsProvider({
       setSubscribedChannels,
       subscriptionDetails,
       setSubscriptionDetails,
+      contentPreferences,
+      artistEmail,
       openSubscription,
       registerInputFocus,
       smsEnabled: false,
@@ -78,6 +82,8 @@ export function ReleaseNotificationsProvider({
       setSubscriptionDetails,
       subscribedChannels,
       subscriptionDetails,
+      contentPreferences,
+      artistEmail,
     ]
   );
 

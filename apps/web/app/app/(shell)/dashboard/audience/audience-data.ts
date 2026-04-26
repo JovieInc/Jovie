@@ -23,6 +23,11 @@ import { audienceMembers, clickEvents } from '@/lib/db/schema/analytics';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { tipAudience } from '@/lib/db/schema/tip-audience';
+import {
+  buildArtistEmailState,
+  isArtistEmailOptedIn,
+  readArtistEmailReadyFromSettings,
+} from '@/lib/notifications/artist-email';
 import { formatCountryLabel } from '@/lib/utils/audience';
 import { toISOStringOrNull } from '@/lib/utils/date';
 import { safeDecodeURIComponent } from '@/lib/utils/string-utils';
@@ -573,7 +578,12 @@ async function _fetchSubscribersData(
     SELECT ns.id, ns.email, ns.phone,
            ns.country_code AS "countryCode",
            ns.created_at  AS "createdAt",
-           ns.channel
+           ns.channel,
+           ns.name,
+           ns.birthday,
+           ns.artist_email_opt_in_at AS "artistEmailOptInAt",
+           ns.artist_email_opt_out_at AS "artistEmailOptOutAt",
+           ns.settings
     FROM (
       SELECT DISTINCT ON (COALESCE(ns_inner.phone, ns_inner.email))
         ns_inner.id,
@@ -581,7 +591,12 @@ async function _fetchSubscribersData(
         ns_inner.phone,
         ns_inner.country_code,
         ns_inner.created_at,
-        ns_inner.channel
+        ns_inner.channel,
+        ns_inner.name,
+        ns_inner.birthday,
+        ns_inner.artist_email_opt_in_at,
+        ns_inner.artist_email_opt_out_at,
+        cp.settings
       FROM notification_subscriptions ns_inner
       INNER JOIN creator_profiles cp ON ns_inner.creator_profile_id = cp.id
       INNER JOIN users u             ON cp.user_id = u.id
@@ -601,6 +616,11 @@ async function _fetchSubscribersData(
     countryCode: string | null;
     createdAt: Date | string;
     channel: string;
+    name: string | null;
+    birthday: string | null;
+    artistEmailOptInAt: Date | string | null;
+    artistEmailOptOutAt: Date | string | null;
+    settings: Record<string, unknown> | null;
   }>;
 
   const hasMore = allRows.length > safe.pageSize;
@@ -621,13 +641,22 @@ async function _fetchSubscribersData(
     const locationLabel = country ? formatCountryLabel(country) : 'Unknown';
     const createdAt = toISOStringOrNull(subscriber.createdAt);
     const type = subscriber.channel === 'email' ? 'email' : 'sms';
+    const artistEmailState = buildArtistEmailState(
+      isArtistEmailOptedIn(
+        subscriber.artistEmailOptInAt,
+        subscriber.artistEmailOptOutAt
+      ),
+      readArtistEmailReadyFromSettings(subscriber.settings)
+    );
     const displayName =
-      type === 'email' ? 'Email Subscriber' : 'SMS Subscriber';
+      subscriber.name?.trim() ||
+      (type === 'email' ? 'Email Subscriber' : 'SMS Subscriber');
 
     return {
       id: subscriber.id,
       type,
       displayName,
+      birthday: subscriber.birthday,
       locationLabel,
       geoCity: null,
       geoCountry: country,
@@ -637,8 +666,12 @@ async function _fetchSubscribersData(
       latestActions: [],
       referrerHistory: [],
       utmParams: {},
-      email: subscriber.email,
+      email: artistEmailState.visibleToArtist ? subscriber.email : null,
       phone: subscriber.phone,
+      jovieEmailSubscribed: type === 'email',
+      artistEmailOptedIn: artistEmailState.optedIn,
+      artistEmailPendingProvider: artistEmailState.pendingProvider,
+      emailVisibleToArtist: artistEmailState.visibleToArtist,
       spotifyConnected: false,
       purchaseCount: 0,
       tipAmountTotalCents: 0,

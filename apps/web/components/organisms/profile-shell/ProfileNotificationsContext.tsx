@@ -21,6 +21,8 @@ const FALLBACK_PROFILE_NOTIFICATIONS_CONTEXT: ProfileNotificationsContextValue =
     setSubscribedChannels: noop,
     subscriptionDetails: {},
     setSubscriptionDetails: noop,
+    contentPreferences: undefined,
+    artistEmail: undefined,
     openSubscription: noop,
     registerInputFocus: noop,
     smsEnabled: false,

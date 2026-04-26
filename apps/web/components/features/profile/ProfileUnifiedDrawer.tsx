@@ -10,6 +10,7 @@ import { ChannelIcon } from '@/features/profile/artist-contacts-button/ContactIc
 import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
 import { ArtistNotificationsCTA } from '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA';
 import { TwoStepNotificationsCTA } from '@/features/profile/artist-notifications-cta/TwoStepNotificationsCTA';
+import type { ProfileSurfacePresentation } from '@/features/profile/contracts';
 import { TourDrawerContent } from '@/features/profile/TourModePanel';
 import {
   extractVenmoUsername,
@@ -69,8 +70,6 @@ interface ProfileUnifiedDrawerProps {
   readonly shareContext: ShareContext;
   readonly enableDynamicEngagement?: boolean;
   readonly subscribeTwoStep?: boolean;
-  readonly hasAbout: boolean;
-  readonly hasTourDates: boolean;
   readonly hasTip: boolean;
   readonly hasContacts: boolean;
   readonly genres?: string[] | null;
@@ -79,8 +78,7 @@ interface ProfileUnifiedDrawerProps {
   readonly tourDates?: TourDateViewModel[];
   readonly hasReleases: boolean;
   readonly releases?: readonly PublicRelease[];
-  /** When provided, "Get Notified" closes drawer and triggers inline input reveal */
-  readonly onRevealNotifications?: () => void;
+  readonly presentation?: ProfileSurfacePresentation;
 }
 
 const PAY_AMOUNTS = [5, 10, 20];
@@ -172,8 +170,6 @@ export function ProfileUnifiedDrawer({
   shareContext,
   enableDynamicEngagement = false,
   subscribeTwoStep = false,
-  hasAbout,
-  hasTourDates,
   hasTip,
   hasContacts,
   genres,
@@ -182,7 +178,7 @@ export function ProfileUnifiedDrawer({
   tourDates = [],
   hasReleases,
   releases = [],
-  onRevealNotifications,
+  presentation = 'standalone',
 }: ProfileUnifiedDrawerProps) {
   const visibleReleases = useMemo(
     () => releases.filter(r => Boolean(r.slug)),
@@ -190,36 +186,10 @@ export function ProfileUnifiedDrawer({
   );
   const canOpenReleasesDrawer = hasReleases && visibleReleases.length > 0;
 
-  const releasesSubtitle = useMemo(() => {
-    if (visibleReleases.length === 0) return 'Discography';
-    const counts: Record<string, number> = {};
-    for (const r of visibleReleases) {
-      const type = r.releaseType === 'music_video' ? 'video' : r.releaseType;
-      counts[type] = (counts[type] ?? 0) + 1;
-    }
-    const labels: Record<string, string> = {
-      single: 'single',
-      ep: 'EP',
-      album: 'album',
-      compilation: 'compilation',
-      live: 'live',
-      mixtape: 'mixtape',
-      video: 'video',
-      other: 'release',
-    };
-    const parts = Object.entries(counts)
-      .filter(([, count]) => count > 0)
-      .map(
-        ([type, count]) =>
-          `${count} ${labels[type] ?? 'release'}${count > 1 ? 's' : ''}`
-      );
-    return parts.join(', ');
-  }, [visibleReleases]);
-
   const registryKey = view === 'releases' ? 'menu' : view;
   const meta =
     view === 'releases' && canOpenReleasesDrawer
-      ? { title: 'Releases', subtitle: releasesSubtitle }
+      ? { title: 'Releases', subtitle: undefined }
       : PROFILE_VIEW_REGISTRY[registryKey];
   const renderedView =
     view === 'releases' && !canOpenReleasesDrawer ? 'menu' : view;
@@ -307,9 +277,10 @@ export function ProfileUnifiedDrawer({
       open={open}
       onOpenChange={handleOpenChange}
       title={meta.title}
-      subtitle={meta.subtitle}
+      subtitle={'subtitle' in meta ? meta.subtitle : undefined}
       onBack={isSubView ? () => navigateTo('menu') : undefined}
       dataTestId='profile-menu-drawer'
+      presentation={presentation}
     >
       <AnimatePresence mode='wait' initial={false}>
         <motion.div
@@ -322,14 +293,9 @@ export function ProfileUnifiedDrawer({
           {renderedView === 'menu' && (
             <MenuView
               onNavigate={next => navigateTo(next as DrawerView)}
-              hasAbout={hasAbout}
               hasReleases={canOpenReleasesDrawer}
-              hasTourDates={hasTourDates}
               hasTip={hasTip}
               hasContacts={hasContacts}
-              isSubscribed={isSubscribed}
-              onRevealNotifications={onRevealNotifications}
-              onBeforeReveal={() => handleOpenChange(false)}
             />
           )}
 
@@ -370,7 +336,7 @@ export function ProfileUnifiedDrawer({
                 onClick={onUnsubscribe}
                 disabled={isUnsubscribing}
               >
-                <BellOff className='h-[16px] w-[16px] text-red-400/50' />
+                <BellOff className='size-4 text-red-400/50' />
                 {isUnsubscribing
                   ? 'Turning off\u2026'
                   : 'Turn off notifications'}
@@ -395,10 +361,15 @@ export function ProfileUnifiedDrawer({
           {renderedView === 'subscribe' && (
             <div data-testid='profile-mode-drawer-subscribe'>
               {subscribeTwoStep ? (
-                <TwoStepNotificationsCTA artist={artist} startExpanded />
+                <TwoStepNotificationsCTA
+                  artist={artist}
+                  startExpanded
+                  presentation='overlay'
+                />
               ) : (
                 <ArtistNotificationsCTA
                   artist={artist}
+                  presentation='overlay'
                   variant='button'
                   autoOpen
                   forceExpanded
@@ -447,7 +418,11 @@ export function ProfileUnifiedDrawer({
                 <PaySelector
                   amounts={PAY_AMOUNTS}
                   onContinue={handleTipAmountSelected}
+                  presentation='drawer'
+                  primaryLabel='Send payment'
                   paymentLabel='Venmo'
+                  showOtherPaymentOptions
+                  otherPaymentOptionsLabel='Other payment options'
                 />
               ) : (
                 <div className='rounded-[var(--profile-drawer-radius-mobile)] border border-white/8 bg-white/[0.035] px-4 py-5 text-center'>

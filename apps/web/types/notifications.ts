@@ -153,6 +153,12 @@ export interface NotificationContentPreferences {
   general?: boolean;
 }
 
+export interface NotificationArtistEmailState {
+  optedIn: boolean;
+  pendingProvider: boolean;
+  visibleToArtist: boolean;
+}
+
 /**
  * Content categories fans can subscribe to for notifications.
  * These control *what* the fan hears about (orthogonal to *how* — email/sms).
@@ -188,6 +194,7 @@ export interface NotificationStatusResponse {
   channels: NotificationSubscriptionState;
   details: NotificationContactValues;
   contentPreferences?: NotificationContentPreferences;
+  artistEmail?: NotificationArtistEmailState;
 }
 
 export type NotificationApiResponse<T> = T | NotificationErrorEnvelope;

@@ -7,12 +7,17 @@ import type {
   ProfileShowcaseState,
   ProfileShowcaseStateId,
 } from '@/features/profile/contracts';
+import type { PublicRelease } from '@/features/profile/releases/types';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
 
 const CREATED_AT = '2026-01-10T00:00:00.000Z';
+const MOCK_HOME_HERO_IMAGE_URL =
+  '/images/mock-profile/tim-white-dont-look-down-hero.jpg';
+const MOCK_HOME_CARD_IMAGE_URL =
+  '/images/mock-profile/tim-white-dont-look-down-card.jpg';
 
 type HomepageContactInput = {
   readonly id: string;
@@ -184,6 +189,24 @@ export const HOMEPAGE_PROFILE_PREVIEW_ARTIST: Artist = {
   created_at: CREATED_AT,
 };
 
+export const HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_ARTIST: Artist = {
+  ...HOMEPAGE_PROFILE_PREVIEW_ARTIST,
+  id: 'homepage-preview-artist-mock-home',
+  image_url: MOCK_HOME_HERO_IMAGE_URL,
+  tagline: "Don't Look Down",
+  settings: {
+    ...(HOMEPAGE_PROFILE_PREVIEW_ARTIST.settings ?? {}),
+    heroRoleLabel: 'DJ / Producer',
+  },
+  theme: {
+    profileAccent: {
+      version: 1,
+      primaryHex: '#ed9962',
+      sourceUrl: MOCK_HOME_HERO_IMAGE_URL,
+    },
+  },
+};
+
 export const HOMEPAGE_PROFILE_PREVIEW_SOCIAL_LINKS: readonly LegacySocialLink[] =
   [
     {
@@ -219,6 +242,30 @@ export const HOMEPAGE_PROFILE_PREVIEW_SOCIAL_LINKS: readonly LegacySocialLink[] 
       platform: 'venmo',
       url: 'https://venmo.com/u/timwhite',
       clicks: 302,
+      created_at: CREATED_AT,
+      is_visible: true,
+    },
+  ] as const;
+
+export const HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_SOCIAL_LINKS: readonly LegacySocialLink[] =
+  [
+    {
+      id: 'homepage-preview-mock-instagram',
+      artist_id: HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_ARTIST.id,
+      platform: 'instagram',
+      url: 'https://instagram.com/timwhitemusic',
+      clicks: 910,
+      created_at: CREATED_AT,
+      is_visible: true,
+    },
+    {
+      id: 'homepage-preview-mock-spotify',
+      artist_id: HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_ARTIST.id,
+      platform: 'spotify',
+      url:
+        HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_ARTIST.spotify_url ??
+        'https://open.spotify.com/artist/4u',
+      clicks: 1820,
       created_at: CREATED_AT,
       is_visible: true,
     },
@@ -315,6 +362,157 @@ export const HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES: readonly TourDateViewModel[] =
       createdAt: CREATED_AT,
       updatedAt: CREATED_AT,
     },
+    {
+      id: 'homepage-tour-3',
+      profileId: HOMEPAGE_PROFILE_PREVIEW_ARTIST.id,
+      externalId: 'tour-3',
+      provider: 'manual',
+      title: 'The Deep End Tour',
+      startDate: '2026-06-07T03:00:00.000Z',
+      startTime: '20:00',
+      timezone: 'America/New_York',
+      venueName: 'Brooklyn Steel',
+      city: 'Brooklyn',
+      region: 'NY',
+      country: 'US',
+      latitude: 40.7226,
+      longitude: -73.9389,
+      ticketUrl: 'https://tickets.example.com/brooklyn-steel',
+      ticketStatus: 'available',
+      lastSyncedAt: CREATED_AT,
+      createdAt: CREATED_AT,
+      updatedAt: CREATED_AT,
+    },
+    {
+      id: 'homepage-tour-4',
+      profileId: HOMEPAGE_PROFILE_PREVIEW_ARTIST.id,
+      externalId: 'tour-4',
+      provider: 'manual',
+      title: 'The Deep End Tour',
+      startDate: '2026-06-14T03:00:00.000Z',
+      startTime: '20:00',
+      timezone: 'America/Toronto',
+      venueName: 'The Danforth',
+      city: 'Toronto',
+      region: 'ON',
+      country: 'CA',
+      latitude: 43.6769,
+      longitude: -79.3573,
+      ticketUrl: 'https://tickets.example.com/the-danforth',
+      ticketStatus: 'available',
+      lastSyncedAt: CREATED_AT,
+      createdAt: CREATED_AT,
+      updatedAt: CREATED_AT,
+    },
+    {
+      id: 'homepage-tour-5',
+      profileId: HOMEPAGE_PROFILE_PREVIEW_ARTIST.id,
+      externalId: 'tour-5',
+      provider: 'manual',
+      title: 'The Deep End Tour',
+      startDate: '2026-06-21T03:00:00.000Z',
+      startTime: '20:00',
+      timezone: 'America/Los_Angeles',
+      venueName: 'The Echo',
+      city: 'Los Angeles',
+      region: 'CA',
+      country: 'US',
+      latitude: 34.0777,
+      longitude: -118.2606,
+      ticketUrl: 'https://tickets.example.com/the-echo',
+      ticketStatus: 'available',
+      lastSyncedAt: CREATED_AT,
+      createdAt: CREATED_AT,
+      updatedAt: CREATED_AT,
+    },
+    {
+      id: 'homepage-tour-6',
+      profileId: HOMEPAGE_PROFILE_PREVIEW_ARTIST.id,
+      externalId: 'tour-6',
+      provider: 'manual',
+      title: 'The Deep End Tour',
+      startDate: '2026-06-28T03:00:00.000Z',
+      startTime: '20:00',
+      timezone: 'America/Los_Angeles',
+      venueName: 'Rickshaw Stop',
+      city: 'San Francisco',
+      region: 'CA',
+      country: 'US',
+      latitude: 37.7749,
+      longitude: -122.4194,
+      ticketUrl: 'https://tickets.example.com/rickshaw-stop',
+      ticketStatus: 'available',
+      lastSyncedAt: CREATED_AT,
+      createdAt: CREATED_AT,
+      updatedAt: CREATED_AT,
+    },
+    {
+      id: 'homepage-tour-7',
+      profileId: HOMEPAGE_PROFILE_PREVIEW_ARTIST.id,
+      externalId: 'tour-7',
+      provider: 'manual',
+      title: 'The Deep End Tour',
+      startDate: '2026-07-05T03:00:00.000Z',
+      startTime: '20:00',
+      timezone: 'America/Los_Angeles',
+      venueName: 'Holocene',
+      city: 'Portland',
+      region: 'OR',
+      country: 'US',
+      latitude: 45.5231,
+      longitude: -122.6765,
+      ticketUrl: 'https://tickets.example.com/holocene',
+      ticketStatus: 'available',
+      lastSyncedAt: CREATED_AT,
+      createdAt: CREATED_AT,
+      updatedAt: CREATED_AT,
+    },
+    {
+      id: 'homepage-tour-8',
+      profileId: HOMEPAGE_PROFILE_PREVIEW_ARTIST.id,
+      externalId: 'tour-8',
+      provider: 'manual',
+      title: 'The Deep End Tour',
+      startDate: '2026-07-11T03:00:00.000Z',
+      startTime: '20:00',
+      timezone: 'America/Los_Angeles',
+      venueName: 'Barboza',
+      city: 'Seattle',
+      region: 'WA',
+      country: 'US',
+      latitude: 47.608,
+      longitude: -122.335,
+      ticketUrl: 'https://tickets.example.com/barboza',
+      ticketStatus: 'available',
+      lastSyncedAt: CREATED_AT,
+      createdAt: CREATED_AT,
+      updatedAt: CREATED_AT,
+    },
+  ] as const;
+
+export const HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_TOUR_DATES: readonly TourDateViewModel[] =
+  [
+    {
+      id: 'homepage-tour-mock-home-1',
+      profileId: HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_ARTIST.id,
+      externalId: 'tour-mock-home-1',
+      provider: 'manual',
+      title: "Don't Look Down Tour",
+      startDate: '2026-06-21',
+      startTime: '20:00',
+      timezone: 'America/Los_Angeles',
+      venueName: 'The Echo',
+      city: 'Los Angeles',
+      region: 'CA',
+      country: 'US',
+      latitude: 34.0777,
+      longitude: -118.2606,
+      ticketUrl: 'https://tickets.example.com/the-echo',
+      ticketStatus: 'available',
+      lastSyncedAt: CREATED_AT,
+      createdAt: CREATED_AT,
+      updatedAt: CREATED_AT,
+    },
   ] as const;
 
 export const HOMEPAGE_PROFILE_PREVIEW_RELEASES = {
@@ -341,6 +539,75 @@ export const HOMEPAGE_PROFILE_PREVIEW_RELEASES = {
   },
 } as const;
 
+export const HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_RELEASE = {
+  title: "Don't Look Down",
+  slug: 'dont-look-down',
+  artworkUrl: MOCK_HOME_CARD_IMAGE_URL,
+  releaseDate: '2025-10-01T07:00:00.000Z',
+  releaseType: 'single',
+  metadata: {
+    artistNames: ['Tim White'],
+  },
+} as const;
+
+export const HOMEPAGE_PROFILE_PREVIEW_DRAWER_RELEASES: readonly PublicRelease[] =
+  [
+    {
+      id: 'drawer-release-1',
+      title: "Don't Look Down",
+      slug: 'dont-look-down',
+      releaseType: 'single',
+      releaseDate: '2024-11-01T07:00:00.000Z',
+      artworkUrl: '/images/mock-profile/tim-white-dont-look-down-card.jpg',
+      artistNames: ['Tim White'],
+    },
+    {
+      id: 'drawer-release-2',
+      title: 'Holding On',
+      slug: 'holding-on',
+      releaseType: 'single',
+      releaseDate: '2023-10-01T07:00:00.000Z',
+      artworkUrl: '/images/mock-profile/drawer-releases/release-2.png',
+      artistNames: ['Tim White'],
+    },
+    {
+      id: 'drawer-release-3',
+      title: 'Lost in The Static',
+      slug: 'lost-in-the-static',
+      releaseType: 'ep',
+      releaseDate: '2022-08-15T07:00:00.000Z',
+      artworkUrl: '/images/mock-profile/drawer-releases/release-3.png',
+      artistNames: ['Tim White'],
+    },
+    {
+      id: 'drawer-release-4',
+      title: 'After Midnight',
+      slug: 'after-midnight',
+      releaseType: 'single',
+      releaseDate: '2021-06-11T07:00:00.000Z',
+      artworkUrl: '/images/mock-profile/drawer-releases/release-4.png',
+      artistNames: ['Tim White'],
+    },
+    {
+      id: 'drawer-release-5',
+      title: 'The Long Way Home',
+      slug: 'the-long-way-home',
+      releaseType: 'ep',
+      releaseDate: '2020-04-03T07:00:00.000Z',
+      artworkUrl: '/images/mock-profile/drawer-releases/release-5.png',
+      artistNames: ['Tim White'],
+    },
+    {
+      id: 'drawer-release-6',
+      title: 'Clear Skies',
+      slug: 'clear-skies',
+      releaseType: 'single',
+      releaseDate: '2019-02-08T07:00:00.000Z',
+      artworkUrl: '/images/mock-profile/drawer-releases/release-6.png',
+      artistNames: ['Tim White'],
+    },
+  ] as const;
+
 const HOMEPAGE_PROFILE_PREVIEW_ARTIST_SPOTIFY_ID =
   HOMEPAGE_PROFILE_PREVIEW_ARTIST.spotify_id;
 
@@ -365,6 +632,13 @@ export const HOMEPAGE_PROFILE_PREVIEW_PLAYLIST_FALLBACK = {
 export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
   Record<ProfileShowcaseStateId, ProfileShowcaseState>
 > = {
+  'mock-home': createQuietButtonShowcaseState({
+    id: 'mock-home',
+    latestReleaseKey: 'live',
+    label: 'Mock Home',
+    helper: 'Controlled preview state for pixel diff review.',
+    releaseActionLabel: 'Listen',
+  }),
   'streams-latest': createQuietButtonShowcaseState({
     id: 'streams-latest',
     latestReleaseKey: 'live',
@@ -426,8 +700,8 @@ export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
     id: 'fans-opt-in',
     latestReleaseKey: 'live',
     kind: 'input',
-    label: 'Turn On Notifications',
-    helper: 'Fans turn on notifications once. After that, Jovie keeps working.',
+    label: 'Turn On Alerts',
+    helper: 'Fans choose alert types once. After that, Jovie keeps working.',
     value: 'fan@example.com',
   }),
   'fans-confirmed': createSuccessStatusShowcaseState({

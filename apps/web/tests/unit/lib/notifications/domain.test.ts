@@ -14,6 +14,7 @@ vi.mock('@/lib/db', () => ({
   db: {
     select: vi.fn().mockReturnThis(),
     from: vi.fn().mockReturnThis(),
+    innerJoin: vi.fn().mockReturnThis(),
     leftJoin: vi.fn().mockReturnThis(),
     where: vi.fn().mockReturnThis(),
     limit: vi.fn().mockResolvedValue([]),
@@ -35,6 +36,9 @@ vi.mock('@/lib/db/schema', () => ({
     email: 'email',
     phone: 'phone',
     channel: 'channel',
+    preferences: 'preferences',
+    artistEmailOptInAt: 'artist_email_opt_in_at',
+    artistEmailOptOutAt: 'artist_email_opt_out_at',
   },
   users: {},
 }));
@@ -205,6 +209,16 @@ describe('notifications/domain', () => {
       });
 
       expect(result.body.success).toBe(false);
+    });
+
+    it('omits content preferences when no subscription exists', async () => {
+      const result = await getNotificationStatusDomain({
+        artist_id: '00000000-0000-4000-8000-000000000123',
+        email: 'test@example.com',
+      });
+
+      expect(result.body.success).toBe(true);
+      expect(result.body).not.toHaveProperty('contentPreferences');
     });
   });
 

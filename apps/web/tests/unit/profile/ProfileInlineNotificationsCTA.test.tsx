@@ -1,13 +1,16 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import React, { act } from 'react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import React from 'react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ProfileNotificationsContextValue } from '@/components/organisms/profile-shell/types';
 import { ProfileInlineNotificationsCTA } from '@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA';
 import type { Artist } from '@/types/db';
 
+const mockUseProfileNotifications = vi.fn();
 const mockUseSubscriptionForm = vi.fn();
+const mockUseUserSafe = vi.fn();
 const mockUpdateSubscriberNameMutation = vi.fn();
 const mockUpdateSubscriberBirthdayMutation = vi.fn();
-const mockUseReducedMotion = vi.fn(() => true);
+const mockUpdateContentPreferencesMutation = vi.fn();
 
 vi.mock('motion/react', async () => {
   await import('react');
@@ -24,29 +27,25 @@ vi.mock('motion/react', async () => {
         readonly children: React.ReactNode;
       }) => <div {...props}>{children}</div>,
     },
-    useReducedMotion: () => false,
+    useReducedMotion: () => true,
   };
 });
 
 vi.mock('@/hooks/useClerkSafe', () => ({
-  useUserSafe: () => ({
-    user: null,
-  }),
+  useUserSafe: (...args: unknown[]) => mockUseUserSafe(...args),
 }));
 
 vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
 }));
 
-vi.mock('@/lib/hooks/useReducedMotion', () => ({
-  useReducedMotion: (...args: unknown[]) => mockUseReducedMotion(...args),
-}));
-
-vi.mock('@/lib/queries/useNotificationStatusQuery', () => ({
-  useUpdateSubscriberBirthdayMutation: () =>
-    mockUpdateSubscriberBirthdayMutation(),
-  useUpdateSubscriberNameMutation: () => mockUpdateSubscriberNameMutation(),
-}));
+vi.mock(
+  '@/components/organisms/profile-shell/ProfileNotificationsContext',
+  () => ({
+    useProfileNotifications: (...args: unknown[]) =>
+      mockUseProfileNotifications(...args),
+  })
+);
 
 vi.mock(
   '@/features/profile/artist-notifications-cta/useSubscriptionForm',
@@ -56,28 +55,12 @@ vi.mock(
   })
 );
 
-vi.mock('@/features/auth/atoms/otp-input', () => ({
-  OtpInput: (props: {
-    'aria-label'?: string;
-    value?: string;
-    onChange?: (v: string) => void;
-    onComplete?: () => void;
-    disabled?: boolean;
-  }) => (
-    <input
-      data-testid='mock-otp-input'
-      aria-label={props['aria-label'] ?? 'otp'}
-      value={props.value}
-      onChange={e => {
-        const value = e.target.value;
-        props.onChange?.(value);
-        if (value.length === 6) {
-          props.onComplete?.();
-        }
-      }}
-      disabled={props.disabled}
-    />
-  ),
+vi.mock('@/lib/queries/useNotificationStatusQuery', () => ({
+  useUpdateContentPreferencesMutation: () =>
+    mockUpdateContentPreferencesMutation(),
+  useUpdateSubscriberBirthdayMutation: () =>
+    mockUpdateSubscriberBirthdayMutation(),
+  useUpdateSubscriberNameMutation: () => mockUpdateSubscriberNameMutation(),
 }));
 
 function makeArtist(overrides: Partial<Artist> = {}): Artist {
@@ -92,6 +75,64 @@ function makeArtist(overrides: Partial<Artist> = {}): Artist {
     is_featured: false,
     marketing_opt_out: false,
     created_at: new Date().toISOString(),
+    settings: null,
+    theme: null,
+    ...overrides,
+  } as Artist;
+}
+
+function buildProfileNotifications(
+  overrides: Partial<ProfileNotificationsContextValue> = {}
+): ProfileNotificationsContextValue {
+  return {
+    state: 'idle',
+    setState: vi.fn(),
+    hydrationStatus: 'done',
+    hasStoredContacts: false,
+    notificationsEnabled: true,
+    channel: 'email',
+    setChannel: vi.fn(),
+    subscribedChannels: {},
+    setSubscribedChannels: vi.fn(),
+    subscriptionDetails: {},
+    setSubscriptionDetails: vi.fn(),
+    contentPreferences: {
+      newMusic: true,
+      tourDates: true,
+      merch: true,
+      general: true,
+    },
+    artistEmail: {
+      optedIn: false,
+      pendingProvider: false,
+      visibleToArtist: false,
+    },
+    openSubscription: vi.fn(),
+    registerInputFocus: vi.fn(),
+    smsEnabled: false,
+    ...overrides,
+  };
+}
+
+function buildFormState(overrides: Record<string, unknown> = {}) {
+  return {
+    emailInput: '',
+    error: null,
+    otpCode: '',
+    isSubmitting: false,
+    resendCooldownEnd: 0,
+    isResending: false,
+    handleChannelChange: vi.fn(),
+    handleEmailChange: vi.fn(),
+    handleOtpChange: vi.fn(),
+    handleSubscribe: vi.fn().mockResolvedValue('error'),
+    handleVerifyOtp: vi.fn().mockResolvedValue('error'),
+    handleResendOtp: vi.fn().mockResolvedValue(true),
+    notificationsState: 'idle',
+    notificationsEnabled: true,
+    subscribedChannels: {},
+    openSubscription: vi.fn(),
+    hydrationStatus: 'done',
     ...overrides,
   };
 }
@@ -100,262 +141,240 @@ describe('ProfileInlineNotificationsCTA', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     document.body.innerHTML = '';
-    mockUseReducedMotion.mockReturnValue(true);
 
-    mockUseSubscriptionForm.mockReturnValue({
-      emailInput: '',
-      error: null,
-      errorOrigin: null,
-      otpCode: '',
-      otpStep: 'input',
-      isSubmitting: false,
-      resendCooldownEnd: 0,
-      isResending: false,
-      handleChannelChange: vi.fn(),
-      handleEmailChange: vi.fn(),
-      handleFieldBlur: vi.fn(),
-      handleOtpChange: vi.fn(),
-      handleSubscribe: vi.fn().mockResolvedValue(undefined),
-      handleVerifyOtp: vi.fn().mockResolvedValue(undefined),
-      handleResendOtp: vi.fn().mockResolvedValue(undefined),
-      notificationsState: 'success',
-      notificationsEnabled: true,
-      openSubscription: vi.fn(),
-      hydrationStatus: 'done',
-      subscribedChannels: { email: true },
-    });
-
+    mockUseUserSafe.mockReturnValue({ user: null });
+    mockUseProfileNotifications.mockReturnValue(buildProfileNotifications());
+    mockUseSubscriptionForm.mockReturnValue(buildFormState());
     mockUpdateSubscriberNameMutation.mockReturnValue({
       isPending: false,
       mutateAsync: vi.fn().mockResolvedValue(undefined),
     });
-
     mockUpdateSubscriberBirthdayMutation.mockReturnValue({
+      isPending: false,
+      mutateAsync: vi.fn().mockResolvedValue(undefined),
+    });
+    mockUpdateContentPreferencesMutation.mockReturnValue({
       isPending: false,
       mutateAsync: vi.fn().mockResolvedValue(undefined),
     });
   });
 
-  afterEach(() => {
-    vi.useRealTimers();
-  });
+  it('opens the shared full-screen flow from the trigger', async () => {
+    const formState = buildFormState();
+    mockUseSubscriptionForm.mockReturnValue(formState);
 
-  it('renders a subscribed-state button with compact success copy', () => {
     render(<ProfileInlineNotificationsCTA artist={makeArtist()} />);
 
+    fireEvent.click(screen.getByRole('button', { name: /turn on alerts/i }));
+
+    expect(formState.handleChannelChange).toHaveBeenCalledWith('email');
+    expect(formState.openSubscription).toHaveBeenCalled();
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByText('Alerts')).toBeInTheDocument();
+    expect(screen.getByText('Sent by Test Artist')).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: /manage notifications/i })
-    ).toBeInTheDocument();
-    expect(screen.getByText('Notifications on')).toBeInTheDocument();
+      screen.getByRole('switch', { name: /new music/i })
+    ).not.toBeChecked();
     expect(
-      screen.queryByText(/we'll notify you when/i)
+      screen.queryByRole('button', { name: /save & finish/i })
+    ).not.toBeInTheDocument();
+  }, 10_000);
+
+  it('prompts for email when an unsubscribed fan toggles an alert', async () => {
+    mockUseSubscriptionForm.mockReturnValue(buildFormState());
+
+    render(<ProfileInlineNotificationsCTA artist={makeArtist()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /turn on alerts/i }));
+    fireEvent.click(await screen.findByRole('switch', { name: /new music/i }));
+
+    expect(await screen.findByText('Enter your email')).toBeInTheDocument();
+  });
+
+  it('routes subscribed users into manage mode when a handler is provided', () => {
+    const onManageNotifications = vi.fn();
+
+    mockUseSubscriptionForm.mockReturnValue(
+      buildFormState({
+        notificationsState: 'success',
+        subscribedChannels: { email: true },
+      })
+    );
+
+    render(
+      <ProfileInlineNotificationsCTA
+        artist={makeArtist()}
+        onManageNotifications={onManageNotifications}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /manage alerts/i }));
+
+    expect(onManageNotifications).toHaveBeenCalledTimes(1);
+    expect(
+      screen.queryByTestId('profile-mobile-notifications-flow')
     ).not.toBeInTheDocument();
   });
 
-  it('opens preferences when the subscribed button is clicked', () => {
-    const onManageNotifications = vi.fn();
+  it('renders the split Jovie vs artist alerts screen for inline manage mode', async () => {
+    mockUseProfileNotifications.mockReturnValue(
+      buildProfileNotifications({
+        subscriptionDetails: { email: 'fan@test.com' },
+        artistEmail: {
+          optedIn: true,
+          pendingProvider: true,
+          visibleToArtist: false,
+        },
+      })
+    );
+    mockUseSubscriptionForm.mockReturnValue(
+      buildFormState({
+        notificationsState: 'success',
+        subscribedChannels: { email: true },
+      })
+    );
 
     render(
       <ProfileInlineNotificationsCTA
         artist={makeArtist()}
-        onManageNotifications={onManageNotifications}
+        presentation='inline'
       />
     );
 
-    fireEvent.click(
-      screen.getByRole('button', { name: /manage notifications/i })
-    );
-
-    expect(onManageNotifications).toHaveBeenCalledTimes(1);
-  });
-
-  it('opens preferences when keyboard focus tabs onto the subscribed button', () => {
-    const onManageNotifications = vi.fn();
-
-    render(
-      <ProfileInlineNotificationsCTA
-        artist={makeArtist()}
-        onManageNotifications={onManageNotifications}
-      />
-    );
-
-    const button = screen.getByRole('button', {
-      name: /manage notifications/i,
-    });
-
-    fireEvent.keyDown(window, { key: 'Tab' });
-    fireEvent.focus(button);
-
-    expect(onManageNotifications).toHaveBeenCalledTimes(1);
-  });
-
-  it('focuses the email input after the reveal transition completes', () => {
-    vi.useFakeTimers();
-    mockUseReducedMotion.mockReturnValue(false);
-
-    mockUseSubscriptionForm.mockReturnValue({
-      emailInput: '',
-      error: null,
-      errorOrigin: null,
-      otpCode: '',
-      otpStep: 'input',
-      isSubmitting: false,
-      resendCooldownEnd: 0,
-      isResending: false,
-      handleChannelChange: vi.fn(),
-      handleEmailChange: vi.fn(),
-      handleFieldBlur: vi.fn(),
-      handleOtpChange: vi.fn(),
-      handleSubscribe: vi.fn().mockResolvedValue(undefined),
-      handleVerifyOtp: vi.fn().mockResolvedValue(undefined),
-      handleResendOtp: vi.fn().mockResolvedValue(undefined),
-      notificationsState: 'idle',
-      notificationsEnabled: true,
-      openSubscription: vi.fn(),
-      hydrationStatus: 'done',
-      subscribedChannels: {},
-    });
-
-    render(<ProfileInlineNotificationsCTA artist={makeArtist()} />);
-
-    fireEvent.click(
-      screen.getByRole('button', { name: /turn on notifications/i })
-    );
-
-    const emailInput = screen.getByTestId('inline-email-input');
-
-    act(() => {
-      vi.advanceTimersByTime(250);
-    });
-
-    expect(emailInput).toHaveFocus();
-  });
-
-  it('does not auto-open preferences on pointer focus alone', () => {
-    const onManageNotifications = vi.fn();
-
-    render(
-      <ProfileInlineNotificationsCTA
-        artist={makeArtist()}
-        onManageNotifications={onManageNotifications}
-      />
-    );
-
-    const button = screen.getByRole('button', {
-      name: /manage notifications/i,
-    });
-
-    fireEvent.pointerDown(window);
-    fireEvent.focus(button);
-
-    expect(onManageNotifications).not.toHaveBeenCalled();
-  });
-
-  // Regression: OTP input never appeared when notificationsState became pending_confirmation
-  // Found by /investigate on 2026-04-10
-  it('renders OTP input when notificationsState is pending_confirmation after email submit', async () => {
-    // Start in idle state so the CTA button appears
-    mockUseSubscriptionForm.mockReturnValue({
-      emailInput: '',
-      error: null,
-      errorOrigin: null,
-      otpCode: '',
-      otpStep: 'input',
-      isSubmitting: false,
-      resendCooldownEnd: 0,
-      isResending: false,
-      handleChannelChange: vi.fn(),
-      handleEmailChange: vi.fn(),
-      handleFieldBlur: vi.fn(),
-      handleOtpChange: vi.fn(),
-      handleSubscribe: vi.fn().mockResolvedValue(undefined),
-      handleVerifyOtp: vi.fn().mockResolvedValue(undefined),
-      handleResendOtp: vi.fn().mockResolvedValue(undefined),
-      notificationsState: 'idle',
-      notificationsEnabled: true,
-      openSubscription: vi.fn(),
-      hydrationStatus: 'done',
-      subscribedChannels: {},
-    });
-
-    const { rerender } = render(
-      <ProfileInlineNotificationsCTA artist={makeArtist()} />
-    );
-
-    // Click "Turn on notifications" to advance to the email step
-    fireEvent.click(
-      screen.getByRole('button', { name: /turn on notifications/i })
-    );
-
-    // Now simulate the hook returning pending_confirmation after email submit
-    mockUseSubscriptionForm.mockReturnValue({
-      emailInput: 'test@example.com',
-      error: null,
-      errorOrigin: null,
-      otpCode: '',
-      otpStep: 'verify',
-      isSubmitting: false,
-      resendCooldownEnd: 0,
-      isResending: false,
-      handleChannelChange: vi.fn(),
-      handleEmailChange: vi.fn(),
-      handleFieldBlur: vi.fn(),
-      handleOtpChange: vi.fn(),
-      handleSubscribe: vi.fn().mockResolvedValue(undefined),
-      handleVerifyOtp: vi.fn().mockResolvedValue(undefined),
-      handleResendOtp: vi.fn().mockResolvedValue(undefined),
-      notificationsState: 'pending_confirmation',
-      notificationsEnabled: true,
-      openSubscription: vi.fn(),
-      hydrationStatus: 'done',
-      subscribedChannels: {},
-    });
-
-    rerender(<ProfileInlineNotificationsCTA artist={makeArtist()} />);
-
-    // The OTP input should be rendered
-    const otpInput = screen.getByTestId('mock-otp-input');
-    expect(otpInput).toBeInTheDocument();
+    expect(await screen.findByText('Alerts')).toBeInTheDocument();
+    expect(screen.getByText('Sent from Jovie')).toBeInTheDocument();
+    expect(screen.getByText('Sent by Test Artist')).toBeInTheDocument();
     expect(
-      screen.getByLabelText(/enter 6-digit verification code/i)
-    ).toBeInTheDocument();
-    await waitFor(() => {
-      expect(otpInput).toHaveFocus();
-    });
+      screen.getByRole('switch', { name: /subscribe to other alerts/i })
+    ).toBeChecked();
   });
 
-  it('does not create a reopen loop when focus returns after closing the drawer', () => {
-    const onManageNotifications = vi.fn();
-    const drawer = document.createElement('div');
-    drawer.setAttribute('data-testid', 'profile-menu-drawer');
-    const drawerButton = document.createElement('button');
-    drawer.appendChild(drawerButton);
-    document.body.appendChild(drawer);
+  it('switches inline auto-open flow into manage mode after subscribed status hydrates', async () => {
+    mockUseProfileNotifications.mockReturnValue(buildProfileNotifications());
+    mockUseSubscriptionForm.mockReturnValue(buildFormState());
 
-    render(
+    const view = render(
       <ProfileInlineNotificationsCTA
         artist={makeArtist()}
-        onManageNotifications={onManageNotifications}
+        presentation='inline'
       />
     );
 
-    const button = screen.getByRole('button', {
-      name: /manage notifications/i,
+    expect(await screen.findByText('Alerts')).toBeInTheDocument();
+
+    mockUseProfileNotifications.mockReturnValue(
+      buildProfileNotifications({
+        subscriptionDetails: { email: 'fan@test.com' },
+        artistEmail: {
+          optedIn: true,
+          pendingProvider: false,
+          visibleToArtist: true,
+        },
+      })
+    );
+    mockUseSubscriptionForm.mockReturnValue(
+      buildFormState({
+        notificationsState: 'success',
+        subscribedChannels: { email: true },
+      })
+    );
+
+    view.rerender(
+      <ProfileInlineNotificationsCTA
+        artist={makeArtist()}
+        presentation='inline'
+      />
+    );
+
+    expect(await screen.findByText('Alerts')).toBeInTheDocument();
+  });
+
+  it('switches overlay auto-open flow into manage mode after subscribed status hydrates', async () => {
+    mockUseProfileNotifications.mockReturnValue(buildProfileNotifications());
+    mockUseSubscriptionForm.mockReturnValue(buildFormState());
+
+    const view = render(
+      <ProfileInlineNotificationsCTA artist={makeArtist()} autoOpen />
+    );
+
+    expect(await screen.findByText('Alerts')).toBeInTheDocument();
+
+    mockUseProfileNotifications.mockReturnValue(
+      buildProfileNotifications({
+        subscriptionDetails: { email: 'fan@test.com' },
+        artistEmail: {
+          optedIn: true,
+          pendingProvider: false,
+          visibleToArtist: true,
+        },
+      })
+    );
+    mockUseSubscriptionForm.mockReturnValue(
+      buildFormState({
+        notificationsState: 'success',
+        subscribedChannels: { email: true },
+      })
+    );
+
+    view.rerender(
+      <ProfileInlineNotificationsCTA artist={makeArtist()} autoOpen />
+    );
+
+    expect(await screen.findByText('Alerts')).toBeInTheDocument();
+  });
+
+  it('submits Jovie preferences and artist email consent together', async () => {
+    const mutateAsync = vi.fn().mockResolvedValue(undefined);
+    mockUpdateContentPreferencesMutation.mockReturnValue({
+      isPending: false,
+      mutateAsync,
     });
-    const outsideButton = document.createElement('button');
-    document.body.appendChild(outsideButton);
+    mockUseProfileNotifications.mockReturnValue(
+      buildProfileNotifications({
+        subscriptionDetails: { email: 'fan@test.com' },
+        contentPreferences: {
+          newMusic: false,
+          tourDates: true,
+          merch: false,
+          general: true,
+        },
+      })
+    );
+    mockUseSubscriptionForm.mockReturnValue(
+      buildFormState({
+        notificationsState: 'success',
+        subscribedChannels: { email: true },
+      })
+    );
 
-    fireEvent.keyDown(window, { key: 'Tab' });
-    fireEvent.focus(button);
-    expect(onManageNotifications).toHaveBeenCalledTimes(1);
+    render(
+      <ProfileInlineNotificationsCTA
+        artist={makeArtist({
+          settings: { notifications: { artistEmailReady: false } },
+        })}
+        presentation='inline'
+      />
+    );
 
-    fireEvent.blur(button, { relatedTarget: drawerButton });
-    fireEvent.focus(button);
-    expect(onManageNotifications).toHaveBeenCalledTimes(1);
+    await screen.findByText('Alerts');
 
-    fireEvent.blur(button, { relatedTarget: outsideButton });
-    fireEvent.keyDown(window, { key: 'Tab' });
-    fireEvent.focus(button);
-    expect(onManageNotifications).toHaveBeenCalledTimes(2);
+    fireEvent.click(
+      screen.getByRole('switch', { name: /subscribe to other alerts/i })
+    );
+    fireEvent.click(screen.getByRole('button', { name: /save & finish/i }));
+
+    await waitFor(() => {
+      expect(mutateAsync).toHaveBeenCalledWith({
+        artistId: 'artist-1',
+        email: 'fan@test.com',
+        phone: undefined,
+        preferences: {
+          newMusic: false,
+          tourDates: true,
+          merch: false,
+        },
+        artistEmailOptIn: true,
+      });
+    });
   });
 });

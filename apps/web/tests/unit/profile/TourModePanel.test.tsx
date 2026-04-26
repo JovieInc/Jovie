@@ -141,78 +141,48 @@ describe('TourModePanel', () => {
     expect(screen.getByText('No upcoming events.')).toBeInTheDocument();
   });
 
-  // State 4: No geolocation — shows all dates without Near You
-  it('shows all dates under "All Dates" when no geolocation', () => {
+  it('renders the styled all-shows list when no geolocation is available', () => {
     locationMock.error = 'Location denied';
     render(<TourModePanel artist={artist} tourDates={[londonDate, nycDate]} />);
-    expect(screen.getByText('All Dates')).toBeInTheDocument();
+
+    expect(screen.getByTestId('tour-drawer-list')).toBeInTheDocument();
     expect(screen.getByText('The O2')).toBeInTheDocument();
     expect(screen.getByText('Madison Square Garden')).toBeInTheDocument();
-    // No "Events near you" section
-    expect(screen.queryByText('Events near you')).not.toBeInTheDocument();
+    expect(screen.getByText('Upcoming')).toBeInTheDocument();
   });
 
-  // State 1: Has nearby dates
-  it('shows "Events near you" and "All Dates" when user has nearby dates', () => {
+  it('highlights the nearest upcoming show when the user has nearby dates', () => {
     locationMock.location = { latitude: 51.507, longitude: -0.128 }; // London
     render(<TourModePanel artist={artist} tourDates={[londonDate, nycDate]} />);
-    expect(screen.getByText('Events near you')).toBeInTheDocument();
-    expect(screen.getByText('All Dates')).toBeInTheDocument();
-    // London appears in both sections (nearby + all dates)
-    const o2Elements = screen.getAllByText('The O2');
-    expect(o2Elements.length).toBeGreaterThanOrEqual(2);
-  });
 
-  // State 2: No nearby dates, conversion CTA
-  it('shows conversion CTA when user has location but no nearby dates', () => {
-    // User in middle of Pacific — nothing is nearby
-    locationMock.location = { latitude: 0, longitude: -160 };
-    render(<TourModePanel artist={artist} tourDates={[londonDate, nycDate]} />);
-    expect(screen.getByText('No events near you.')).toBeInTheDocument();
-    expect(screen.getByTestId('mock-notifications-cta')).toBeInTheDocument();
-    expect(screen.getByTestId('mock-notifications-cta')).toHaveAttribute(
-      'data-source',
-      'tour_drawer'
-    );
-  });
-
-  // Collapsible disclosure
-  it('shows collapsed disclosure that expands on click', () => {
-    locationMock.location = { latitude: 0, longitude: -160 };
-    render(<TourModePanel artist={artist} tourDates={[londonDate, nycDate]} />);
-    const disclosure = screen.getByRole('button', {
-      name: /events in other cities/,
-    });
-    expect(disclosure).toHaveAttribute('aria-expanded', 'false');
-
-    // Dates not visible when collapsed
-    expect(screen.queryByText('The O2')).not.toBeInTheDocument();
-
-    fireEvent.click(disclosure);
-    expect(disclosure).toHaveAttribute('aria-expanded', 'true');
-    // Dates now visible
+    expect(screen.getByText('Near You')).toBeInTheDocument();
     expect(screen.getByText('The O2')).toBeInTheDocument();
+    expect(screen.getByText('Madison Square Garden')).toBeInTheDocument();
   });
 
-  // State 5: Geo loading — shows all dates
-  it('shows all dates while geolocation is loading', () => {
+  it('falls back to an upcoming highlight when no nearby dates exist', () => {
+    locationMock.location = { latitude: 0, longitude: -160 };
+    render(<TourModePanel artist={artist} tourDates={[londonDate, nycDate]} />);
+
+    expect(screen.getByText('Upcoming')).toBeInTheDocument();
+    expect(screen.getByText('The O2')).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('mock-notifications-cta')
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the same list while geolocation is loading', () => {
     locationMock.isLoading = true;
     render(<TourModePanel artist={artist} tourDates={[londonDate, nycDate]} />);
-    // No "Events near you" while loading
-    expect(screen.queryByText('Events near you')).not.toBeInTheDocument();
-    expect(screen.getByText('All Dates')).toBeInTheDocument();
+
+    expect(screen.getByTestId('tour-drawer-list')).toBeInTheDocument();
     expect(screen.getByText('The O2')).toBeInTheDocument();
   });
 
-  // Date box renders month and day
   it('renders date box with month and day', () => {
     render(<TourModePanel artist={artist} tourDates={[londonDate]} />);
-    // Month is rendered in date box
+
     expect(screen.getByText('Apr')).toBeInTheDocument();
-    // Day is rendered (may vary by timezone, just check it's a number)
-    const dayElement = screen
-      .getAllByText(/^\d{1,2}$/)
-      .find(el => el.className.includes('font-bold'));
-    expect(dayElement).toBeTruthy();
+    expect(screen.getByText('25')).toBeInTheDocument();
   });
 });

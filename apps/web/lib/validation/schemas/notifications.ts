@@ -253,11 +253,18 @@ export const updateContentPreferencesSchema = z
     artist_id: uuidSchema,
     email: z.string().email().optional(),
     phone: z.string().min(1).max(64).optional(),
-    preferences: z.record(contentPreferenceKeySchema, z.boolean()),
+    preferences: z.record(contentPreferenceKeySchema, z.boolean()).optional(),
+    artist_email_opt_in: z.boolean().optional(),
   })
   .refine(
     data => Boolean(data.email) || Boolean(data.phone),
     'Email or phone is required'
+  )
+  .refine(
+    data =>
+      Boolean(data.preferences && Object.keys(data.preferences).length > 0) ||
+      typeof data.artist_email_opt_in === 'boolean',
+    'At least one preference change is required'
   );
 
 /**

@@ -1,37 +1,22 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Artist } from '@/types/db';
 
+const mockUseProfileNotifications = vi.fn();
 const mockUseSubscriptionForm = vi.fn();
+const mockUpdateSubscriberNameMutation = vi.fn();
+const mockUpdateSubscriberBirthdayMutation = vi.fn();
+const mockUpdateContentPreferencesMutation = vi.fn();
 
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({
-    push: vi.fn(),
-    replace: vi.fn(),
-    refresh: vi.fn(),
-    prefetch: vi.fn().mockResolvedValue(undefined),
-  }),
-}));
-
-vi.mock('@/lib/analytics', () => ({
-  track: vi.fn(),
-}));
-
-vi.mock('@/lib/hooks/useNotifications', () => ({
-  useNotifications: () => ({
-    info: vi.fn(),
-    success: vi.fn(),
-    error: vi.fn(),
-  }),
-}));
-
-vi.mock('@/hooks/useClerkSafe', () => ({
-  useUserSafe: () => ({
-    user: null,
-  }),
-}));
+vi.mock(
+  '@/components/organisms/profile-shell/ProfileNotificationsContext',
+  () => ({
+    useProfileNotifications: (...args: unknown[]) =>
+      mockUseProfileNotifications(...args),
+  })
+);
 
 vi.mock('@/features/auth/atoms/otp-input', () => ({
   OtpInput: ({
@@ -51,6 +36,32 @@ vi.mock('@/features/auth/atoms/otp-input', () => ({
   ),
 }));
 
+vi.mock(
+  '@/features/profile/artist-notifications-cta/useSubscriptionForm',
+  () => ({
+    useSubscriptionForm: (...args: unknown[]) =>
+      mockUseSubscriptionForm(...args),
+  })
+);
+
+vi.mock('@/hooks/useClerkSafe', () => ({
+  useUserSafe: () => ({
+    user: null,
+  }),
+}));
+
+vi.mock('@/lib/analytics', () => ({
+  track: vi.fn(),
+}));
+
+vi.mock('@/lib/queries/useNotificationStatusQuery', () => ({
+  useUpdateContentPreferencesMutation: () =>
+    mockUpdateContentPreferencesMutation(),
+  useUpdateSubscriberBirthdayMutation: () =>
+    mockUpdateSubscriberBirthdayMutation(),
+  useUpdateSubscriberNameMutation: () => mockUpdateSubscriberNameMutation(),
+}));
+
 vi.mock('motion/react', async importOriginal => {
   const actual = await importOriginal<typeof import('motion/react')>();
   return {
@@ -67,29 +78,6 @@ vi.mock('motion/react', async importOriginal => {
   };
 });
 
-vi.mock('@/lib/queries/useNotificationStatusQuery', () => ({
-  useUpdateSubscriberNameMutation: () => ({
-    mutateAsync: vi.fn(),
-  }),
-}));
-
-vi.mock(
-  '@/features/profile/artist-notifications-cta/useSubscriptionForm',
-  () => ({
-    useSubscriptionForm: (...args: unknown[]) =>
-      mockUseSubscriptionForm(...args),
-  })
-);
-
-vi.mock('@/features/profile/notifications', () => ({
-  CountrySelector: (props: Record<string, unknown>) => (
-    <div data-testid='country-selector' />
-  ),
-  COUNTRY_OPTIONS: [
-    { code: 'US', dialCode: '+1', label: 'United States', flag: 'US' },
-  ],
-}));
-
 const artist = {
   id: 'artist-1',
   handle: 'testartist',
@@ -99,40 +87,47 @@ const artist = {
   is_featured: false,
   marketing_opt_out: false,
   created_at: new Date().toISOString(),
+  settings: null,
+  theme: null,
 } as Artist;
+
+function buildProfileNotifications(overrides: Record<string, unknown> = {}) {
+  return {
+    contentPreferences: {
+      newMusic: true,
+      tourDates: false,
+      merch: true,
+      general: true,
+    },
+    artistEmail: {
+      optedIn: false,
+      pendingProvider: false,
+      visibleToArtist: false,
+    },
+    subscriptionDetails: {},
+    ...overrides,
+  };
+}
 
 function buildFormState(overrides: Record<string, unknown> = {}) {
   return {
-    country: { code: 'US', dialCode: '+1', label: 'United States', flag: 'US' },
-    setCountry: vi.fn(),
-    phoneInput: '',
     emailInput: '',
     error: null,
-    errorOrigin: null,
     otpCode: '',
-    otpStep: 'input' as const,
     isSubmitting: false,
-    isCountryOpen: false,
-    setIsCountryOpen: vi.fn(),
     resendCooldownEnd: 0,
     isResending: false,
-    notificationsState: 'editing',
+    notificationsState: 'idle',
     notificationsEnabled: true,
-    channel: 'sms' as const,
     subscribedChannels: {},
     handleChannelChange: vi.fn(),
-    handlePhoneChange: vi.fn(),
     handleEmailChange: vi.fn(),
-    handleFieldBlur: vi.fn(),
     handleOtpChange: vi.fn(),
     handleSubscribe: vi.fn().mockResolvedValue(undefined),
     handleVerifyOtp: vi.fn().mockResolvedValue(undefined),
     handleResendOtp: vi.fn().mockResolvedValue(undefined),
-    handleKeyDown: vi.fn(),
     openSubscription: vi.fn(),
-    registerInputFocus: vi.fn(),
     hydrationStatus: 'done' as const,
-    smsEnabled: true,
     ...overrides,
   };
 }
@@ -144,73 +139,71 @@ async function renderCTA(props: Record<string, unknown> = {}) {
   return render(<ArtistNotificationsCTA artist={artist} autoOpen {...props} />);
 }
 
-describe('ArtistNotificationsCTA SMS subscribe flow', () => {
+describe('ArtistNotificationsCTA SMS manage flow', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-  });
-
-  it('renders phone input with numeric inputMode when channel is sms', async () => {
-    mockUseSubscriptionForm.mockReturnValue(buildFormState({ channel: 'sms' }));
-    await renderCTA();
-
-    const input = screen.getByTestId('subscription-input');
-    expect(input).toHaveAttribute('inputMode', 'numeric');
-    expect(input).toHaveAttribute('placeholder', '(555) 123-4567');
-  });
-
-  it('renders channel toggle when sms is enabled', async () => {
-    mockUseSubscriptionForm.mockReturnValue(
-      buildFormState({ smsEnabled: true, channel: 'email' })
-    );
-    await renderCTA();
-
-    const toggle = screen.getByRole('button', {
-      name: 'Switch to text updates',
+    mockUseProfileNotifications.mockReturnValue(buildProfileNotifications());
+    mockUseSubscriptionForm.mockReturnValue(buildFormState());
+    mockUpdateSubscriberNameMutation.mockReturnValue({
+      isPending: false,
+      mutateAsync: vi.fn().mockResolvedValue(undefined),
     });
-    expect(toggle).toBeInTheDocument();
+    mockUpdateSubscriberBirthdayMutation.mockReturnValue({
+      isPending: false,
+      mutateAsync: vi.fn().mockResolvedValue(undefined),
+    });
+    mockUpdateContentPreferencesMutation.mockReturnValue({
+      isPending: false,
+      mutateAsync: vi.fn().mockResolvedValue(undefined),
+    });
   });
 
-  it('shows country selector when phone has digits', async () => {
-    mockUseSubscriptionForm.mockReturnValue(
-      buildFormState({ channel: 'sms', phoneInput: '555' })
-    );
+  it('removes the retired inline phone composer from the auto-open flow', async () => {
     await renderCTA();
 
-    expect(screen.getByTestId('country-selector')).toBeInTheDocument();
-  });
-
-  it('hides country selector when phone is empty', async () => {
-    mockUseSubscriptionForm.mockReturnValue(
-      buildFormState({ channel: 'sms', phoneInput: '' })
-    );
-    await renderCTA();
-
+    expect(await screen.findByText('Alerts')).toBeInTheDocument();
     expect(screen.queryByTestId('country-selector')).not.toBeInTheDocument();
+    expect(screen.queryByText('Stay in the Loop')).not.toBeInTheDocument();
   });
 
-  it('shows phone validation error', async () => {
-    mockUseSubscriptionForm.mockReturnValue(
-      buildFormState({
-        channel: 'sms',
-        error: 'Phone number is required',
+  it('keeps SMS subscribers on Jovie-only alert preferences', async () => {
+    const mutateAsync = vi.fn().mockResolvedValue(undefined);
+    mockUpdateContentPreferencesMutation.mockReturnValue({
+      isPending: false,
+      mutateAsync,
+    });
+    mockUseProfileNotifications.mockReturnValue(
+      buildProfileNotifications({
+        subscriptionDetails: { sms: '+15551234567' },
       })
     );
-    await renderCTA();
-
-    const alert = screen.getByRole('alert');
-    expect(alert).toBeInTheDocument();
-  });
-
-  it('calls handleSubscribe on Get Notified click in SMS mode', async () => {
-    const handleSubscribe = vi.fn().mockResolvedValue(undefined);
     mockUseSubscriptionForm.mockReturnValue(
-      buildFormState({ channel: 'sms', handleSubscribe })
+      buildFormState({
+        notificationsState: 'success',
+        subscribedChannels: { sms: true },
+      })
     );
+
     await renderCTA();
+
+    expect(await screen.findByText('Sent from Jovie')).toBeInTheDocument();
+    expect(screen.queryByText('Sent by Test Artist')).not.toBeInTheDocument();
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Get Notified' }));
+    await user.click(screen.getByRole('button', { name: 'Save & Finish' }));
 
-    expect(handleSubscribe).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(mutateAsync).toHaveBeenCalledWith({
+        artistId: 'artist-1',
+        email: undefined,
+        phone: '+15551234567',
+        preferences: {
+          newMusic: true,
+          tourDates: false,
+          merch: true,
+        },
+        artistEmailOptIn: undefined,
+      });
+    });
   });
 });

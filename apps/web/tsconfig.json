@@ -72,6 +72,8 @@
     "node_modules",
     // Next.js auto-generated validator file is noisy/unstable (unused @ts-expect-error); exclude for consistent typecheck.
     ".next/types/validator.ts",
+    ".next/dev/types/validator.ts",
+    ".next/dev/dev/types/validator.ts",
     "**/*.stories.*"
   ]
 }

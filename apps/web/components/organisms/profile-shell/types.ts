@@ -7,8 +7,10 @@ import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import type {
+  NotificationArtistEmailState,
   NotificationChannel,
   NotificationContactValues,
+  NotificationContentPreferences,
   NotificationSubscriptionState,
 } from '@/types/notifications';
 
@@ -28,6 +30,8 @@ export interface ProfileNotificationsContextValue {
   setSubscriptionDetails: React.Dispatch<
     React.SetStateAction<NotificationContactValues>
   >;
+  contentPreferences?: NotificationContentPreferences;
+  artistEmail?: NotificationArtistEmailState;
   openSubscription: (channel?: NotificationChannel) => void;
   /** Register a callback to focus the subscription input */
   registerInputFocus: (focusFn: (() => void) | null) => void;

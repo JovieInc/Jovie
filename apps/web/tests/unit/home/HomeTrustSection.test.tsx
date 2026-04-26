@@ -36,7 +36,7 @@ describe('HomeTrustSection', () => {
       'inline-strip'
     );
     expect(screen.getByText('Trusted by artists')).toBeInTheDocument();
-    expect(screen.getByAltText('Black Hole Recordings')).toBeInTheDocument();
+    expect(screen.getByLabelText('Black Hole Recordings')).toBeInTheDocument();
     expect(screen.getByLabelText('disco:wax')).toBeInTheDocument();
   });
 });

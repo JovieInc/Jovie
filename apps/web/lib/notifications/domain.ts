@@ -23,6 +23,13 @@ import {
   trackUnsubscribeSuccess,
 } from '@/lib/notifications/analytics';
 import {
+  buildArtistEmailState,
+  isArtistEmailOptedIn,
+  mergeJovieAlertPreferences,
+  pickJovieAlertPreferences,
+  readArtistEmailReadyFromSettings,
+} from '@/lib/notifications/artist-email';
+import {
   buildEmailOtpExpiry,
   EMAIL_OTP_TTL_MINUTES,
   generateEmailOtpCode,
@@ -549,6 +556,8 @@ function buildSubscriptionValues(params: {
     emailOtpExpiresAt: emailOtp?.otpExpiresAt,
     emailOtpLastSentAt: emailOtp ? new Date() : null,
     emailOtpAttempts: 0,
+    artistEmailOptInAt: null,
+    artistEmailOptOutAt: null,
   };
 }
 
@@ -1020,16 +1029,25 @@ function mergeSubscriptionRows(
     email: string | null;
     phone: string | null;
     preferences: FanNotificationPreferences | null;
+    artistEmailOptInAt: Date | null;
+    artistEmailOptOutAt: Date | null;
+    settings: Record<string, unknown> | null;
   }>
 ) {
   const channels: NotificationSubscriptionState = { email: false, sms: false };
   const details: NotificationContactValues = {};
   let mergedPrefs: FanNotificationPreferences | undefined;
+  let artistEmailReady = false;
+  let artistEmailOptedIn = false;
 
   for (const row of rows) {
     if (row.channel === 'email' && row.email) {
       channels.email = true;
       details.email = row.email;
+      artistEmailOptedIn = isArtistEmailOptedIn(
+        row.artistEmailOptInAt,
+        row.artistEmailOptOutAt
+      );
     }
 
     if (row.channel === 'sms' && row.phone) {
@@ -1040,9 +1058,18 @@ function mergeSubscriptionRows(
     if (!mergedPrefs && row.preferences) {
       mergedPrefs = row.preferences;
     }
+
+    if (!artistEmailReady) {
+      artistEmailReady = readArtistEmailReadyFromSettings(row.settings);
+    }
   }
 
-  return { channels, details, mergedPrefs };
+  return {
+    channels,
+    details,
+    mergedPrefs,
+    artistEmail: buildArtistEmailState(artistEmailOptedIn, artistEmailReady),
+  };
 }
 
 export const getNotificationStatusDomain = async (
@@ -1080,8 +1107,15 @@ export const getNotificationStatusDomain = async (
         email: notificationSubscriptions.email,
         phone: notificationSubscriptions.phone,
         preferences: notificationSubscriptions.preferences,
+        artistEmailOptInAt: notificationSubscriptions.artistEmailOptInAt,
+        artistEmailOptOutAt: notificationSubscriptions.artistEmailOptOutAt,
+        settings: creatorProfiles.settings,
       })
       .from(notificationSubscriptions)
+      .innerJoin(
+        creatorProfiles,
+        eq(creatorProfiles.id, notificationSubscriptions.creatorProfileId)
+      )
       .where(
         and(
           eq(notificationSubscriptions.creatorProfileId, artist_id),
@@ -1090,9 +1124,15 @@ export const getNotificationStatusDomain = async (
       )
       .limit(2);
 
-    const { channels, details, mergedPrefs } = mergeSubscriptionRows(rows);
+    const { channels, details, mergedPrefs, artistEmail } =
+      mergeSubscriptionRows(rows);
 
-    return buildStatusSuccessResponse(channels, details, mergedPrefs);
+    return buildStatusSuccessResponse(
+      channels,
+      details,
+      rows.length > 0 ? pickJovieAlertPreferences(mergedPrefs) : undefined,
+      artistEmail
+    );
   } catch (error) {
     captureError('Notifications Status Domain Error', error);
     return buildServerErrorResponse();
@@ -1120,13 +1160,20 @@ export const updateContentPreferencesDomain = async (
       return buildValidationErrorResponse('Invalid request data');
     }
 
-    const { artist_id, email, phone, preferences } = result.data;
+    const { artist_id, email, phone, preferences, artist_email_opt_in } =
+      result.data;
     const normalizedEmail = normalizeSubscriptionEmail(email) ?? null;
     const normalizedPhone = normalizeSubscriptionPhone(phone) ?? null;
 
     if (!normalizedEmail && !normalizedPhone) {
       return buildMissingIdentifierResponse(
         'Contact required to update preferences'
+      );
+    }
+
+    if (typeof artist_email_opt_in === 'boolean' && !normalizedEmail) {
+      return buildValidationErrorResponse(
+        'Email is required to manage artist alerts'
       );
     }
 
@@ -1144,6 +1191,7 @@ export const updateContentPreferencesDomain = async (
       .select({
         id: notificationSubscriptions.id,
         preferences: notificationSubscriptions.preferences,
+        channel: notificationSubscriptions.channel,
       })
       .from(notificationSubscriptions)
       .where(
@@ -1161,14 +1209,33 @@ export const updateContentPreferencesDomain = async (
     // Merge new preferences into each subscription row
     let totalUpdated = 0;
     for (const row of existing) {
-      const merged: FanNotificationPreferences = {
-        ...row.preferences,
-        ...preferences,
-      };
+      const nextValues: {
+        preferences?: FanNotificationPreferences;
+        artistEmailOptInAt?: Date | null;
+        artistEmailOptOutAt?: Date | null;
+      } = {};
+
+      if (preferences) {
+        nextValues.preferences = mergeJovieAlertPreferences(
+          row.preferences,
+          preferences
+        );
+      }
+
+      if (
+        row.channel === 'email' &&
+        typeof artist_email_opt_in === 'boolean' &&
+        normalizedEmail
+      ) {
+        nextValues.artistEmailOptInAt = artist_email_opt_in ? new Date() : null;
+        nextValues.artistEmailOptOutAt = artist_email_opt_in
+          ? null
+          : new Date();
+      }
 
       const [updated] = await db
         .update(notificationSubscriptions)
-        .set({ preferences: merged })
+        .set(nextValues)
         .where(eq(notificationSubscriptions.id, row.id))
         .returning({ id: notificationSubscriptions.id });
 

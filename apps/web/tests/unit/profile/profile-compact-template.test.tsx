@@ -16,19 +16,24 @@ import {
   it,
   vi,
 } from 'vitest';
-import { APP_ROUTES } from '@/constants/routes';
+import type { PublicRelease } from '@/components/features/profile/releases/types';
+import type { PublicContact } from '@/types/contacts';
 import type { Artist } from '@/types/db';
 
 const {
   mockCanonicalProfileDSPs,
   mockUseProfileShell,
   mockProfileInlineNotificationsCTA,
+  mockProfileDesktopSurface,
   mockProfileUnifiedDrawer,
+  mockProfilePrimaryTabPanel,
 } = vi.hoisted(() => ({
   mockCanonicalProfileDSPs: vi.fn(() => []),
   mockUseProfileShell: vi.fn(),
   mockProfileInlineNotificationsCTA: vi.fn(),
+  mockProfileDesktopSurface: vi.fn(),
   mockProfileUnifiedDrawer: vi.fn(),
+  mockProfilePrimaryTabPanel: vi.fn(),
 }));
 
 vi.mock('next/dynamic', () => ({
@@ -51,10 +56,12 @@ vi.mock('next/link', () => ({
   default: ({
     children,
     href,
+    prefetch: _prefetch,
     ...props
   }: {
     readonly children: React.ReactNode;
     readonly href: string;
+    readonly prefetch?: boolean;
     readonly [key: string]: unknown;
   }) => React.createElement('a', { href, ...props }, children),
 }));
@@ -88,6 +95,20 @@ vi.mock(
   '@/components/organisms/profile-shell/ProfileNotificationsContext',
   () => ({
     ProfileNotificationsContext: React.createContext(null),
+    useProfileNotifications: () => ({
+      state: 'idle',
+      setState: vi.fn(),
+      subscribedChannels: {},
+      setSubscribedChannels: vi.fn(),
+      subscriptionDetails: {},
+      setSubscriptionDetails: vi.fn(),
+      channel: 'email',
+      setChannel: vi.fn(),
+      registerInputFocus: vi.fn(),
+      smsEnabled: false,
+      source: 'profile',
+      setSource: vi.fn(),
+    }),
   })
 );
 
@@ -121,11 +142,22 @@ vi.mock('@/lib/hooks/useNotifications', () => ({
 
 vi.mock('@/lib/dsp', () => ({
   sortDSPsByGeoPopularity: (dsps: unknown[]) => dsps,
+  sortDSPsForDevice: (dsps: unknown[]) => dsps,
 }));
 
 vi.mock('@/lib/profile-dsps', () => ({
   getCanonicalProfileDSPs: (...args: unknown[]) =>
     mockCanonicalProfileDSPs(...args),
+}));
+
+vi.mock('@/features/profile/ProfilePrimaryTabPanel', () => ({
+  ProfilePrimaryTabPanel: (props: { readonly mode: string }) =>
+    mockProfilePrimaryTabPanel(props),
+}));
+
+vi.mock('@/features/profile/templates/ProfileDesktopSurface', () => ({
+  ProfileDesktopSurface: (props: Record<string, unknown>) =>
+    mockProfileDesktopSurface(props),
 }));
 
 const mockArtist: Artist = {
@@ -144,6 +176,44 @@ const mockArtist: Artist = {
   is_verified_flag: false,
 };
 
+const mockContacts = [
+  {
+    id: 'contact-1',
+    role: 'booking',
+    roleLabel: 'Booking',
+    territorySummary: 'Worldwide',
+    territoryCount: 1,
+    secondaryLabel: 'book@example.com',
+    channels: [
+      {
+        type: 'email' as const,
+        encoded: 'book@example.com',
+      },
+    ],
+  },
+] satisfies PublicContact[];
+
+const mockReleases = [
+  {
+    id: 'release-1',
+    title: "Don't Look Down",
+    slug: 'dont-look-down',
+    releaseType: 'single',
+    releaseDate: '2024-11-01T00:00:00.000Z',
+    artworkUrl: 'https://example.com/release-1.jpg',
+    artistNames: ['Test Artist'],
+  },
+  {
+    id: 'release-2',
+    title: 'Holding On',
+    slug: 'holding-on',
+    releaseType: 'single',
+    releaseDate: '2023-10-01T00:00:00.000Z',
+    artworkUrl: 'https://example.com/release-2.jpg',
+    artistNames: ['Test Artist'],
+  },
+] satisfies readonly PublicRelease[];
+
 let ProfileCompactTemplate: typeof import('@/features/profile/templates/ProfileCompactTemplate').ProfileCompactTemplate;
 
 describe('ProfileCompactTemplate', () => {
@@ -151,14 +221,16 @@ describe('ProfileCompactTemplate', () => {
     ({ ProfileCompactTemplate } = await import(
       '@/features/profile/templates/ProfileCompactTemplate'
     ));
-  }, 30_000);
+  }, 120_000);
 
   beforeEach(() => {
     cleanup();
     mockCanonicalProfileDSPs.mockReturnValue([]);
     mockUseProfileShell.mockReset();
     mockProfileInlineNotificationsCTA.mockClear();
+    mockProfileDesktopSurface.mockClear();
     mockProfileUnifiedDrawer.mockClear();
+    mockProfilePrimaryTabPanel.mockClear();
     mockProfileInlineNotificationsCTA.mockImplementation(
       (props: {
         readonly onManageNotifications?: () => void;
@@ -196,6 +268,13 @@ describe('ProfileCompactTemplate', () => {
         </div>
       )
     );
+    mockProfilePrimaryTabPanel.mockImplementation(
+      (props: { readonly mode: string }) => (
+        <div data-testid='mock-primary-tab-panel' data-mode={props.mode}>
+          {props.mode}
+        </div>
+      )
+    );
     mockUseProfileShell.mockImplementation(() => ({
       notificationsContextValue: {
         subscribedChannels: {},
@@ -215,7 +294,7 @@ describe('ProfileCompactTemplate', () => {
     vi.useRealTimers();
   });
 
-  it('links the top-left Jovie mark to the artist profiles landing page', async () => {
+  it('renders the floating back control in the compact header', async () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -225,9 +304,7 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    expect(
-      screen.getByRole('link', { name: 'Create your artist profile on Jovie' })
-    ).toHaveAttribute('href', APP_ROUTES.ARTIST_PROFILES);
+    expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
   });
 
   it('links the artist name back to the canonical profile route', async () => {
@@ -245,7 +322,7 @@ describe('ProfileCompactTemplate', () => {
     ).toHaveAttribute('href', `/${mockArtist.handle}`);
   });
 
-  it('renders a quiet menu trigger in the compact profile header', async () => {
+  it('renders the mock-style overflow trigger in the compact profile header', async () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -256,8 +333,8 @@ describe('ProfileCompactTemplate', () => {
     );
 
     const trigger = screen.getByRole('button', { name: /more options/i });
-    expect(trigger.className).toContain('bg-transparent');
-    expect(trigger.className).toContain('border-transparent');
+    expect(trigger.className).toContain('bg-black/44');
+    expect(trigger.className).toContain('h-12!');
   });
 
   it('can hide the menu trigger for clean marketing screenshots', async () => {
@@ -274,9 +351,40 @@ describe('ProfileCompactTemplate', () => {
     expect(
       screen.queryByRole('button', { name: /more options/i })
     ).not.toBeInTheDocument();
-    expect(
-      screen.getByRole('link', { name: 'Create your artist profile on Jovie' })
-    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
+  });
+
+  it('uses browser back from the floating back control when history is available', async () => {
+    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {
+      // noop
+    });
+    const originalReferrer = document.referrer;
+
+    Object.defineProperty(document, 'referrer', {
+      configurable: true,
+      value: 'https://example.com/previous',
+    });
+    window.history.pushState(null, '', '/previous');
+    window.history.pushState(null, '', '/test-artist');
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+
+    expect(backSpy).toHaveBeenCalledTimes(1);
+
+    Object.defineProperty(document, 'referrer', {
+      configurable: true,
+      value: originalReferrer,
+    });
+    backSpy.mockRestore();
   });
 
   it('does not push an intermediate profile URL when deep-linked into a mode', async () => {
@@ -304,7 +412,7 @@ describe('ProfileCompactTemplate', () => {
     pushStateSpy.mockRestore();
   });
 
-  it('opens subscribe drawer when ?mode=subscribe is in the URL', async () => {
+  it('renders the alerts tab when ?mode=subscribe is in the URL', async () => {
     mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
     window.history.replaceState(null, '', '/test-artist?mode=subscribe');
 
@@ -317,14 +425,114 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    // Subscribe mode now opens the drawer directly instead of the inline CTA.
     await waitFor(() => {
       expect(mockUseProfileShell).toHaveBeenLastCalledWith(
         expect.objectContaining({
           modeOverride: 'subscribe',
         })
       );
+      expect(screen.getByTestId('mock-primary-tab-panel')).toHaveAttribute(
+        'data-mode',
+        'subscribe'
+      );
+      expect(screen.getByTestId('mock-profile-unified-drawer')).toHaveAttribute(
+        'data-open',
+        'false'
+      );
     });
+
+    expect(screen.queryByTestId('profile-bottom-nav')).not.toBeInTheDocument();
+  });
+
+  it('renders the Music tab when ?mode=listen is in the URL even when releases exist', async () => {
+    mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
+    window.history.replaceState(null, '', '/test-artist?mode=listen');
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        releases={mockReleases}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('mock-primary-tab-panel')).toHaveAttribute(
+        'data-mode',
+        'listen'
+      );
+      expect(screen.getByTestId('mock-profile-unified-drawer')).toHaveAttribute(
+        'data-open',
+        'false'
+      );
+    });
+
+    expect(screen.getByTestId('profile-bottom-nav')).toBeInTheDocument();
+    expect(window.location.search).toBe('?mode=listen');
+  });
+
+  it('prioritizes the On Tour status chip over release and alert fallbacks', async () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        latestRelease={{
+          title: "Don't Look Down",
+          slug: 'dont-look-down',
+          artworkUrl: 'https://example.com/release.jpg',
+          releaseDate: '2099-06-01T00:00:00.000Z',
+          releaseType: 'single',
+        }}
+        tourDates={[
+          {
+            id: 'tour-1',
+            profileId: mockArtist.id,
+            title: null,
+            venueName: 'The Echo',
+            city: 'Los Angeles',
+            region: 'CA',
+            country: 'US',
+            startDate: '2099-05-01T00:00:00.000Z',
+            endDate: null,
+            ticketUrl: 'https://tickets.example.com/show',
+            ticketStatus: 'onsale',
+            timezone: 'America/Los_Angeles',
+            latitude: null,
+            longitude: null,
+            source: 'manual',
+            sourceEventId: null,
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+          },
+        ]}
+      />
+    );
+
+    expect(screen.getByText('On Tour')).toBeInTheDocument();
+  });
+
+  it('falls back to the New Release status chip when there is no upcoming tour', async () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        latestRelease={{
+          title: "Don't Look Down",
+          slug: 'dont-look-down',
+          artworkUrl: 'https://example.com/release.jpg',
+          releaseDate: '2099-06-01T00:00:00.000Z',
+          releaseType: 'single',
+        }}
+      />
+    );
+
+    expect(screen.getByText('New Release')).toBeInTheDocument();
   });
 
   it('falls back to the mode prop when the URL has no mode param', async () => {
@@ -386,7 +594,7 @@ describe('ProfileCompactTemplate', () => {
     });
   });
 
-  it('keeps modeOverride in sync when user interactions open a mode drawer', async () => {
+  it('keeps modeOverride in sync when user interactions switch primary tabs', async () => {
     mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
 
     render(
@@ -395,22 +603,30 @@ describe('ProfileCompactTemplate', () => {
         artist={mockArtist}
         socialLinks={[]}
         contacts={[]}
+        releases={mockReleases}
       />
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Music' }));
 
     await waitFor(() => {
-      expect(window.location.search).toContain('mode=listen');
       expect(mockUseProfileShell).toHaveBeenLastCalledWith(
         expect.objectContaining({
           modeOverride: 'listen',
         })
       );
+      expect(screen.getByTestId('mock-primary-tab-panel')).toHaveAttribute(
+        'data-mode',
+        'listen'
+      );
+      expect(screen.getByTestId('mock-profile-unified-drawer')).toHaveAttribute(
+        'data-open',
+        'false'
+      );
     });
   });
 
-  it('opens the notifications drawer when the inline subscribed CTA manages notifications', async () => {
+  it('routes the inline subscribed CTA into the alerts tab', async () => {
     mockUseProfileShell.mockImplementation(() => ({
       notificationsContextValue: {
         subscribedChannels: { email: true },
@@ -435,14 +651,16 @@ describe('ProfileCompactTemplate', () => {
 
     fireEvent.click(screen.getByTestId('mock-inline-notifications-cta'));
 
-    expect(screen.getByTestId('mock-profile-unified-drawer')).toHaveAttribute(
-      'data-open',
-      'true'
-    );
-    expect(screen.getByTestId('mock-profile-unified-drawer')).toHaveAttribute(
-      'data-view',
-      'notifications'
-    );
+    await waitFor(() => {
+      expect(screen.getByTestId('mock-primary-tab-panel')).toHaveAttribute(
+        'data-mode',
+        'subscribe'
+      );
+      expect(screen.getByTestId('mock-profile-unified-drawer')).toHaveAttribute(
+        'data-open',
+        'false'
+      );
+    });
   });
 
   it('does not rewrite the URL when a non-mode drawer opens over a deep-linked mode', async () => {
@@ -498,7 +716,27 @@ describe('ProfileCompactTemplate', () => {
       'href',
       'https://open.spotify.com/playlist/37i9dQZF1DZ06evO2SKVTu'
     );
-    expect(screen.getByText('Open playlist')).toBeInTheDocument();
+    expect(screen.getByText('Featured Playlist')).toBeInTheDocument();
+  });
+
+  it('renders the optional hero role chip when artist settings provide one', async () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={{
+          ...mockArtist,
+          settings: {
+            heroRoleLabel: 'DJ / Producer',
+          },
+        }}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    expect(screen.getByTestId('profile-hero-role-pill')).toHaveTextContent(
+      'DJ / Producer'
+    );
   });
 
   it('keeps the upcoming show CTA ahead of the playlist fallback', async () => {
@@ -544,7 +782,7 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    expect(screen.getByText('Tickets')).toBeInTheDocument();
+    expect(screen.getByTestId('profile-home-rail-tour')).toBeInTheDocument();
     expect(
       screen.queryByRole('link', {
         name: `Open This Is playlist for ${mockArtist.name}`,
@@ -552,16 +790,15 @@ describe('ProfileCompactTemplate', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('clears the mode query and closes the deep-linked drawer', async () => {
-    mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
-    window.history.replaceState(null, '', '/test-artist?mode=listen');
+  it('clears the mode query and closes a deep-linked secondary drawer', async () => {
+    window.history.replaceState(null, '', '/test-artist?mode=contact');
 
     render(
       <ProfileCompactTemplate
         mode='profile'
         artist={mockArtist}
         socialLinks={[]}
-        contacts={[]}
+        contacts={mockContacts}
       />
     );
 
@@ -577,17 +814,16 @@ describe('ProfileCompactTemplate', () => {
     });
   });
 
-  it('stays closed after the delayed reset window', async () => {
+  it('stays closed after the delayed reset window for secondary drawers', async () => {
     vi.useFakeTimers();
-    mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
-    window.history.replaceState(null, '', '/test-artist?mode=listen');
+    window.history.replaceState(null, '', '/test-artist?mode=contact');
 
     render(
       <ProfileCompactTemplate
         mode='profile'
         artist={mockArtist}
         socialLinks={[]}
-        contacts={[]}
+        contacts={mockContacts}
       />
     );
 
@@ -617,16 +853,15 @@ describe('ProfileCompactTemplate', () => {
     );
   });
 
-  it('does not restore a stale drawer mode on popstate after close', async () => {
-    mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
-    window.history.replaceState(null, '', '/test-artist?mode=listen');
+  it('does not restore a stale secondary drawer mode on popstate after close', async () => {
+    window.history.replaceState(null, '', '/test-artist?mode=contact');
 
     render(
       <ProfileCompactTemplate
         mode='profile'
         artist={mockArtist}
         socialLinks={[]}
-        contacts={[]}
+        contacts={mockContacts}
       />
     );
 

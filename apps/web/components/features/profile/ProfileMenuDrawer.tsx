@@ -43,7 +43,7 @@ interface ProfileMenuDrawerProps {
   readonly hasContacts: boolean;
 }
 
-const iconClass = 'h-[16px] w-[16px] text-white/40';
+const iconClass = 'size-4 text-white/40';
 
 export function ProfileMenuDrawer({
   open,
@@ -168,7 +168,7 @@ export function ProfileMenuDrawer({
               onClick={() => handleAction(onOpenSubscribe)}
             >
               <Bell className={iconClass} />
-              Turn on notifications
+              Turn on alerts
             </button>
           )}
         </div>
@@ -199,7 +199,7 @@ export function ProfileMenuDrawer({
             onClick={onUnsubscribe}
             disabled={isUnsubscribing}
           >
-            <BellOff className='h-[16px] w-[16px] text-red-400/50' />
+            <BellOff className='size-4 text-red-400/50' />
             {isUnsubscribing ? 'Turning off\u2026' : 'Turn off notifications'}
           </button>
         </div>
