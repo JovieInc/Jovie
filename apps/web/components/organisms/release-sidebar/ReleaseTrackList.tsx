@@ -247,7 +247,7 @@ function TrackListRow({
         onClick={handleTogglePlayback}
         disabled={!playableUrl && !isActiveTrack}
         className={cn(
-          'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[12px] font-caption tabular-nums transition-[background-color,color,border-color] duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
+          'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-caption tabular-nums transition-[background-color,color,border-color] duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
           isActiveTrack
             ? 'border border-(--linear-app-frame-seam) bg-surface-0 text-primary-token hover:bg-surface-1'
             : 'border border-transparent bg-transparent text-tertiary-token hover:bg-surface-0 hover:text-primary-token',
