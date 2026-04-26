@@ -49,6 +49,7 @@ import {
   Activity,
   Archive,
   ArrowDown,
+  ArrowRight,
   ArrowUp,
   ArrowUpDown,
   AudioLines,
@@ -73,6 +74,7 @@ import {
   LayoutDashboard,
   Library as LibraryIcon,
   Link as LinkIcon,
+  Loader2,
   LogOut,
   Mic,
   Mic2,
@@ -129,7 +131,8 @@ type CanvasView =
   | 'tasks'
   | 'library'
   | 'lyrics'
-  | 'settings';
+  | 'settings'
+  | 'thread';
 
 // Pill-based filter system (Linear/Notion style). Each pill targets a
 // single field with an `is` / `is not` operator and one or more OR-combined
@@ -284,6 +287,61 @@ const CORE_ITEMS: NavItem[] = [
   { icon: Inbox, label: 'Inbox' },
   { icon: Activity, label: 'Tasks' },
   { icon: LibraryIcon, label: 'Library' },
+];
+
+// Threads = jobs. Each Jovie action (UI button or chat message) creates
+// a thread that auto-renames as it runs. Status drives the dot color
+// (running = cyan pulse, complete = neutral, errored = rose). Click a
+// thread → opens it in the canvas; the related entity (track, release,
+// task) also gets a small loading glyph linked to the same thread.
+type ThreadStatus = 'running' | 'complete' | 'errored';
+type Thread = {
+  id: string;
+  title: string;
+  status: ThreadStatus;
+  entityKind?: 'release' | 'track' | 'task';
+  entityId?: string;
+  // ISO timestamp — most recent first when sorted descending.
+  updatedAt: string;
+};
+
+const THREADS: Thread[] = [
+  {
+    id: 'thr-1',
+    title: 'Generating lyric video for Lost in the Light',
+    status: 'running',
+    entityKind: 'release',
+    entityId: 'lost-in-the-light',
+    updatedAt: '2026-04-26T09:48:00Z',
+  },
+  {
+    id: 'thr-2',
+    title: 'Drafting Detroit booking pitch',
+    status: 'running',
+    updatedAt: '2026-04-26T09:31:00Z',
+  },
+  {
+    id: 'thr-3',
+    title: 'Spotify Canvas regenerated for Stronger Than That',
+    status: 'complete',
+    entityKind: 'release',
+    entityId: 'stronger-than-that',
+    updatedAt: '2026-04-26T08:12:00Z',
+  },
+  {
+    id: 'thr-4',
+    title: 'Apple Music spatial render',
+    status: 'errored',
+    entityKind: 'task',
+    entityId: 'J-119',
+    updatedAt: '2026-04-25T22:04:00Z',
+  },
+  {
+    id: 'thr-5',
+    title: 'Weekly playlist pitch sweep',
+    status: 'complete',
+    updatedAt: '2026-04-25T16:30:00Z',
+  },
 ];
 
 const ARTIST_ITEMS: NavItem[] = [
@@ -1200,6 +1258,11 @@ export default function ShellV1Experiment() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchPills, setSearchPills] = useState<FilterPill[]>([]);
   const [keyMode, setKeyMode] = useState<'normal' | 'camelot'>('normal');
+  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
+  const openThread = (id: string) => {
+    setSelectedThreadId(id);
+    setView('thread');
+  };
   // Library state — lifted to the shell so the sidebar (filters/saved
   // views) and canvas (grid/table/drawer) share the same source of truth.
   // Standalone /exp/library-v1 still owns its own state internally.
@@ -1576,6 +1639,8 @@ export default function ShellV1Experiment() {
           onSelectView={setView}
           activeView={view}
           tight={sidebarTight}
+          activeThreadId={selectedThreadId}
+          onSelectThread={openThread}
           libraryProps={
             view === 'library'
               ? {
@@ -1603,6 +1668,8 @@ export default function ShellV1Experiment() {
         onSelectView={setView}
         activeView={view}
         tight={sidebarTight}
+        activeThreadId={selectedThreadId}
+        onSelectThread={openThread}
       />
 
       {/* Persistent now-playing card — pinned to bottom-left, survives sidebar
@@ -1781,6 +1848,12 @@ export default function ShellV1Experiment() {
                 />
               ) : view === 'settings' ? (
                 <SettingsView />
+              ) : view === 'thread' ? (
+                <ThreadView
+                  thread={
+                    THREADS.find(t => t.id === selectedThreadId) ?? THREADS[0]
+                  }
+                />
               ) : (
                 <TasksView
                   tasks={
@@ -1972,6 +2045,8 @@ function FloatingSidebarLayer({
   onSelectView,
   activeView,
   tight,
+  activeThreadId,
+  onSelectThread,
 }: {
   active: boolean;
   peekOpen: boolean;
@@ -1980,6 +2055,8 @@ function FloatingSidebarLayer({
   onSelectView?: (v: CanvasView) => void;
   activeView?: CanvasView;
   tight?: boolean;
+  activeThreadId?: string | null;
+  onSelectThread?: (id: string) => void;
 }) {
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -2036,6 +2113,8 @@ function FloatingSidebarLayer({
           onSelectView={onSelectView}
           activeView={activeView}
           tight={tight}
+          activeThreadId={activeThreadId}
+          onSelectThread={onSelectThread}
         />
       </div>
     </>
@@ -2049,6 +2128,8 @@ function Sidebar({
   activeView,
   tight,
   libraryProps,
+  activeThreadId,
+  onSelectThread,
 }: {
   variant: 'docked' | 'floating';
   onPin: () => void;
@@ -2066,6 +2147,8 @@ function Sidebar({
     onFilters: (f: LibraryFiltersType) => void;
     onClearAll: () => void;
   };
+  activeThreadId?: string | null;
+  onSelectThread?: (id: string) => void;
 }) {
   const inLibraryMode = !!libraryProps;
   const collapsed = false;
@@ -2216,6 +2299,19 @@ function Sidebar({
             })}
           </div>
 
+          {/* Threads — auto-named jobs Jovie is running. Most recent
+              5 inline; the rest expand on demand. Status dot drives
+              tone (running cyan / complete neutral / errored rose). */}
+          <SidebarThreadsSection
+            threads={THREADS}
+            activeThreadId={
+              activeView === 'thread' ? (activeThreadId ?? null) : null
+            }
+            onSelect={onSelectThread}
+            tight={tight}
+            collapsed={collapsed}
+          />
+
           {/* Artists */}
           <div className='space-y-3'>
             {!collapsed && (
@@ -2342,6 +2438,100 @@ function Workspace({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// Threads section in the sidebar — most-recent 5 inline, status dot
+// per thread, "View all" expands to ~10 with internal scroll. Auto-named
+// titles already; truncation handles overflow. Status dot tones map to
+// running (cyan pulse) / complete (neutral) / errored (rose).
+function SidebarThreadsSection({
+  threads,
+  activeThreadId,
+  onSelect,
+  tight,
+  collapsed,
+}: {
+  threads: Thread[];
+  activeThreadId: string | null;
+  onSelect?: (id: string) => void;
+  tight?: boolean;
+  collapsed: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const sorted = useMemo(
+    () => [...threads].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+    [threads]
+  );
+  if (collapsed) return null;
+  const visible = expanded ? sorted.slice(0, 10) : sorted.slice(0, 5);
+  const hasMore = sorted.length > visible.length || !expanded;
+  return (
+    <div className='space-y-1'>
+      <div className='px-3 pt-1 pb-1 flex items-center justify-between'>
+        <span className='text-[9.5px] font-medium uppercase tracking-[0.12em] text-quaternary-token/85'>
+          Threads
+        </span>
+        {sorted.some(t => t.status === 'running') && (
+          <span className='inline-flex items-center gap-1 text-[9.5px] uppercase tracking-[0.08em] text-quaternary-token'>
+            <span className='h-1.5 w-1.5 rounded-full bg-cyan-300/80 animate-pulse' />
+            {sorted.filter(t => t.status === 'running').length}
+          </span>
+        )}
+      </div>
+      <div
+        className={cn(
+          'flex flex-col gap-px',
+          expanded && 'max-h-[320px] overflow-y-auto'
+        )}
+      >
+        {visible.map(t => {
+          const active = activeThreadId === t.id;
+          return (
+            <button
+              key={t.id}
+              type='button'
+              onClick={() => onSelect?.(t.id)}
+              className={cn(
+                'flex items-center gap-2 rounded-md text-left transition-colors duration-150 ease-out',
+                tight ? 'h-6 pl-2.5 pr-2' : 'h-7 pl-3 pr-2',
+                active
+                  ? 'bg-surface-1 text-primary-token'
+                  : 'text-tertiary-token hover:bg-surface-1/50 hover:text-primary-token'
+              )}
+            >
+              <span
+                className={cn(
+                  'h-1.5 w-1.5 rounded-full shrink-0',
+                  t.status === 'running'
+                    ? 'bg-cyan-300/80 animate-pulse'
+                    : t.status === 'errored'
+                      ? 'bg-rose-400/85'
+                      : 'bg-white/30'
+                )}
+              />
+              <span
+                className={cn(
+                  'flex-1 truncate',
+                  tight ? 'text-[12px]' : 'text-[12.5px]'
+                )}
+              >
+                {t.title}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      {hasMore && (
+        <button
+          type='button'
+          onClick={() => setExpanded(v => !v)}
+          className='w-full text-left px-3 py-1 text-[10.5px] uppercase tracking-[0.06em] text-quaternary-token hover:text-secondary-token transition-colors duration-150 ease-out'
+        >
+          {expanded ? 'Show less' : 'View all'}
+        </button>
+      )}
     </div>
   );
 }
@@ -2527,6 +2717,7 @@ function breadcrumbForView(
     library: 'Library',
     lyrics: 'Lyrics',
     settings: 'Settings',
+    thread: 'Thread',
   };
   return [{ label: map[view], emphasis: true }];
 }
@@ -2943,31 +3134,230 @@ function MenuItem({
   );
 }
 
+// Dashboard / Home — calm, anti-anxiety HUD with a single-action
+// suggestion carousel at center and the chat composer docked at the
+// bottom of the canvas. No widgets. No HUD overload. Just the most
+// important thing Jovie thinks you should do today.
+type JovieSuggestion = {
+  id: string;
+  kind: 'dsp' | 'geo' | 'booking' | 'release' | 'pitch';
+  title: string;
+  body: string;
+  action: string;
+  // Lower = more urgent. Sorted by confidence × impact (mocked here).
+  rank: number;
+};
+
+const SUGGESTIONS: JovieSuggestion[] = [
+  {
+    id: 'sug-1',
+    kind: 'booking',
+    title: 'Detroit listeners up 340% — book a show',
+    body: 'A promoter at the Magic Stick reached out yesterday. I have a draft pitch ready that ties to your Spotify growth there.',
+    action: 'Review pitch',
+    rank: 1,
+  },
+  {
+    id: 'sug-2',
+    kind: 'dsp',
+    title: 'Spotify claim — possible match',
+    body: '“Jovie Tim” on Spotify (1.2k monthly) shares your bio language and three of your collaborator credits. Confirm if this is yours.',
+    action: 'Confirm match',
+    rank: 2,
+  },
+  {
+    id: 'sug-3',
+    kind: 'release',
+    title: 'Lost in the Light needs Spotify Canvas',
+    body: 'Drops in 6 days. I have three Canvas options ready — pick one, or I’ll ship the lead pick on Wednesday.',
+    action: 'Pick Canvas',
+    rank: 3,
+  },
+  {
+    id: 'sug-4',
+    kind: 'pitch',
+    title: 'Editorial pitch ready for Stronger Than That',
+    body: 'I drafted the Spotify editorial pitch. It hits Indigo (folk-pop) and Fresh Finds. Send when you’re ready.',
+    action: 'Send pitch',
+    rank: 4,
+  },
+];
+
 function DemoContent() {
+  return <DashboardHome />;
+}
+
+function DashboardHome() {
+  const [index, setIndex] = useState(0);
+  const sorted = useMemo(
+    () => [...SUGGESTIONS].sort((a, b) => a.rank - b.rank),
+    []
+  );
+  const current = sorted[index] ?? sorted[0];
+  const hour = new Date().getHours();
+  const greeting =
+    hour < 5
+      ? 'Up late, Tim'
+      : hour < 12
+        ? 'Good morning, Tim'
+        : hour < 18
+          ? 'Afternoon, Tim'
+          : 'Evening, Tim';
+
   return (
-    <div className='p-6 space-y-4'>
-      <h1 className='text-2xl font-display tracking-tight text-primary-token'>
-        Welcome back, Bahamas
-      </h1>
-      <p className='text-[14px] text-secondary-token max-w-prose'>
-        This is a scratch route for the shell V1 design pass. Use the picker
-        top-right to compare the four audio bar treatments and the
-        collapse-into-siderail behavior. Real components are not wired — layout
-        chrome only.
-      </p>
-      <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3'>
-        {Array.from({ length: 9 }).map((_, i) => (
-          <div
-            // biome-ignore lint/suspicious/noArrayIndexKey: demo content
-            key={i}
-            className='aspect-[16/10] rounded-lg border border-subtle bg-surface-0/60 p-4 flex flex-col justify-end'
-          >
-            <div className='h-2 w-12 rounded-full bg-surface-1 mb-2' />
-            <div className='h-3 w-32 rounded-full bg-surface-1' />
+    <div className='h-full flex flex-col px-6 pb-4'>
+      {/* Greeting strip — one calm line, no bg, no widgets. */}
+      <div className='shrink-0 pt-12 pb-8 text-center'>
+        <h1
+          className='text-[22px] font-semibold text-primary-token'
+          style={{ letterSpacing: '-0.02em' }}
+        >
+          {greeting}
+        </h1>
+        <p className='mt-1.5 text-[13px] text-tertiary-token'>
+          Here’s the single most important thing today.
+        </p>
+      </div>
+
+      {/* Suggestion carousel — one card at a time. Prev/next + dots. */}
+      <div className='flex-1 grid place-items-center min-h-0'>
+        <div className='w-full max-w-[560px]'>
+          <SuggestionCard
+            suggestion={current}
+            count={sorted.length}
+            indexAt={index}
+          />
+          <div className='mt-3 flex items-center justify-between'>
+            <Tooltip label='Previous suggestion' shortcut='searchSlash'>
+              <button
+                type='button'
+                onClick={() =>
+                  setIndex(i => (i === 0 ? sorted.length - 1 : i - 1))
+                }
+                className='h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-150 ease-out'
+                aria-label='Previous'
+              >
+                <ChevronLeft className='h-3.5 w-3.5' strokeWidth={2.25} />
+              </button>
+            </Tooltip>
+            <div className='flex items-center gap-1.5'>
+              {sorted.map((s, i) => (
+                <button
+                  key={s.id}
+                  type='button'
+                  onClick={() => setIndex(i)}
+                  aria-label={`Suggestion ${i + 1} of ${sorted.length}`}
+                  className={cn(
+                    'h-1.5 rounded-full transition-[width,background-color] duration-200 ease-out',
+                    i === index
+                      ? 'w-6 bg-primary-token'
+                      : 'w-1.5 bg-quaternary-token/50 hover:bg-tertiary-token'
+                  )}
+                />
+              ))}
+            </div>
+            <Tooltip label='Next suggestion'>
+              <button
+                type='button'
+                onClick={() =>
+                  setIndex(i => (i === sorted.length - 1 ? 0 : i + 1))
+                }
+                className='h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-150 ease-out'
+                aria-label='Next'
+              >
+                <ChevronRight className='h-3.5 w-3.5' strokeWidth={2.25} />
+              </button>
+            </Tooltip>
           </div>
-        ))}
+
+          <div className='mt-6 flex items-center justify-center gap-4 text-[12px] text-tertiary-token'>
+            <button
+              type='button'
+              className='hover:text-primary-token transition-colors duration-150 ease-out underline decoration-quaternary-token/60 underline-offset-[3px] hover:decoration-cyan-300/70'
+            >
+              View all suggestions
+            </button>
+            <span className='text-quaternary-token/60'>·</span>
+            <button
+              type='button'
+              className='hover:text-primary-token transition-colors duration-150 ease-out underline decoration-quaternary-token/60 underline-offset-[3px] hover:decoration-cyan-300/70'
+            >
+              Ask Jovie
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Composer locked to the bottom of the canvas. Above audio bar
+          (audio bar is sibling, not parent). When you send a message the
+          carousel fades and the thread takes over — for now this is a
+          static composer. */}
+      <div className='shrink-0 mt-4 max-w-[560px] w-full mx-auto'>
+        <ChatComposer placeholder='Ask Jovie or type a command…' />
       </div>
     </div>
+  );
+}
+
+function SuggestionCard({
+  suggestion,
+  count,
+  indexAt,
+}: {
+  suggestion: JovieSuggestion;
+  count: number;
+  indexAt: number;
+}) {
+  const kindLabel: Record<JovieSuggestion['kind'], string> = {
+    dsp: 'DSP',
+    geo: 'Geography',
+    booking: 'Booking',
+    release: 'Release',
+    pitch: 'Pitch',
+  };
+  return (
+    <article
+      className='rounded-xl border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) px-6 py-6 shadow-[0_24px_60px_rgba(0,0,0,0.32)]'
+      style={{
+        opacity: 1,
+        transition: `opacity 220ms ${EASE_CINEMATIC}`,
+      }}
+      key={suggestion.id}
+    >
+      <div className='flex items-center justify-between'>
+        <span className='text-[10.5px] uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
+          {kindLabel[suggestion.kind]} · {indexAt + 1} of {count}
+        </span>
+        <span className='inline-flex items-center gap-1 text-[10.5px] uppercase tracking-[0.06em] text-tertiary-token'>
+          <Sparkles className='h-3 w-3 text-cyan-300/80' strokeWidth={2.25} />
+          Jovie
+        </span>
+      </div>
+      <h2
+        className='mt-4 text-[20px] font-semibold leading-snug text-primary-token'
+        style={{ letterSpacing: '-0.018em' }}
+      >
+        {suggestion.title}
+      </h2>
+      <p className='mt-2 text-[13.5px] leading-relaxed text-secondary-token'>
+        {suggestion.body}
+      </p>
+      <div className='mt-5 flex items-center gap-2'>
+        <button
+          type='button'
+          className='inline-flex items-center gap-1.5 h-8 px-3.5 rounded-md text-[12.5px] font-medium bg-white text-black hover:bg-white/90 transition-colors duration-150 ease-out'
+        >
+          {suggestion.action}
+          <ArrowRight className='h-3 w-3' strokeWidth={2.5} />
+        </button>
+        <button
+          type='button'
+          className='inline-flex items-center h-8 px-3 rounded-md text-[12.5px] text-tertiary-token hover:text-primary-token transition-colors duration-150 ease-out'
+        >
+          Dismiss
+        </button>
+      </div>
+    </article>
   );
 }
 
@@ -5210,6 +5600,127 @@ const SETTINGS_SECTIONS: Array<{
     description: 'Delete account, reset workspace',
   },
 ];
+
+// Thread view — stub of the chat thread that any Jovie job opens into.
+// Real implementation would stream agent steps, tool calls, and the
+// final asset. Today we render the title, status, and a mock conversation
+// shape so the canvas wiring can be exercised.
+function ThreadView({ thread }: { thread: Thread }) {
+  return (
+    <article className='max-w-3xl mx-auto px-8 pt-8 pb-12 flex flex-col h-full'>
+      <header className='shrink-0'>
+        <div className='flex items-center gap-2 text-[10.5px] uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
+          <span
+            className={cn(
+              'h-1.5 w-1.5 rounded-full',
+              thread.status === 'running'
+                ? 'bg-cyan-300/80 animate-pulse'
+                : thread.status === 'errored'
+                  ? 'bg-rose-400/85'
+                  : 'bg-white/30'
+            )}
+          />
+          {thread.status === 'running'
+            ? 'Running'
+            : thread.status === 'errored'
+              ? 'Errored'
+              : 'Complete'}
+        </div>
+        <h1
+          className='mt-2 text-[24px] font-semibold leading-tight text-primary-token'
+          style={{ letterSpacing: '-0.018em' }}
+        >
+          {thread.title}
+        </h1>
+        {thread.entityKind && thread.entityId && (
+          <p className='mt-1.5 text-[12.5px] text-tertiary-token'>
+            Linked to {thread.entityKind} ·{' '}
+            <span className='text-secondary-token'>{thread.entityId}</span>
+          </p>
+        )}
+      </header>
+
+      <div className='flex-1 mt-8 space-y-4 text-[13.5px] leading-relaxed'>
+        <ThreadTurn speaker='jovie'>
+          {thread.status === 'running'
+            ? 'Working on this now. I’ll surface partial output as it lands.'
+            : thread.status === 'errored'
+              ? 'I hit a snag — the upstream renderer rejected the spatial job. I can retry with a downscaled master.'
+              : 'Done. The asset is in the library and the linked entity is updated.'}
+        </ThreadTurn>
+        {thread.status === 'running' && (
+          <ThreadTurn speaker='jovie' subtle>
+            <span className='inline-flex items-center gap-1.5'>
+              <Loader2
+                className='h-3 w-3 animate-spin text-quaternary-token'
+                strokeWidth={2.25}
+              />
+              Generating…
+            </span>
+          </ThreadTurn>
+        )}
+      </div>
+
+      <footer className='shrink-0 mt-6 pt-4'>
+        <ChatComposer placeholder='Reply to this thread…' />
+      </footer>
+    </article>
+  );
+}
+
+function ThreadTurn({
+  speaker,
+  subtle,
+  children,
+}: {
+  speaker: 'jovie' | 'me';
+  subtle?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className={cn(
+        'rounded-md px-4 py-3',
+        speaker === 'jovie'
+          ? subtle
+            ? 'bg-transparent text-tertiary-token'
+            : 'bg-(--surface-1)/40 border border-(--linear-app-shell-border)/70 text-secondary-token'
+          : 'bg-(--surface-1)/70 text-primary-token'
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+function ChatComposer({ placeholder }: { placeholder: string }) {
+  const [value, setValue] = useState('');
+  return (
+    <form
+      onSubmit={e => {
+        e.preventDefault();
+        setValue('');
+      }}
+      className='flex items-center gap-2 h-11 px-3 rounded-lg border border-(--linear-app-shell-border) bg-(--surface-1)/60 focus-within:border-cyan-400/40 transition-colors duration-150 ease-out'
+    >
+      <input
+        type='text'
+        value={value}
+        onChange={e => setValue(e.target.value)}
+        placeholder={placeholder}
+        className='flex-1 min-w-0 bg-transparent border-0 outline-none text-[13.5px] text-primary-token placeholder:text-quaternary-token'
+      />
+      <button
+        type='submit'
+        disabled={!value.trim()}
+        className='inline-flex items-center justify-center h-7 w-7 rounded-md bg-white text-black text-[12px] font-medium hover:bg-white/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors duration-150 ease-out'
+        aria-label='Send'
+      >
+        <ArrowRight className='h-3.5 w-3.5' strokeWidth={2.5} />
+      </button>
+    </form>
+  );
+}
 
 function SettingsView() {
   const [section, setSection] = useState<SettingsSectionId>('account');
