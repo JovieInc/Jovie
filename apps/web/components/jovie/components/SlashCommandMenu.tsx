@@ -643,6 +643,16 @@ export function SlashCommandMenu({
 
   // Keyboard nav lives at this layer: arrow keys drive the picker,
   // Enter commits the active item, Escape closes.
+  // Single source of truth for "which row is highlighted right now."
+  // Clamped against the current items length so list shrink (e.g. query
+  // narrowing) doesn't let aria-activedescendant or the Enter handler
+  // dangle off the end. All consumers — aria-activedescendant, isActive
+  // highlight, Enter commit — derive from this.
+  const activeIndex = useMemo<number | null>(() => {
+    if (state.status === 'closed' || items.length === 0) return null;
+    return Math.max(0, Math.min(items.length - 1, state.selectedIndex));
+  }, [state, items.length]);
+
   useEffect(() => {
     if (state.status === 'closed') return;
     function onKey(e: KeyboardEvent) {
@@ -659,7 +669,7 @@ export function SlashCommandMenu({
         lastSourceRef.current = 'keyboard';
         onMoveSelected(-1, items.length);
       } else if (e.key === 'Enter') {
-        const item = items[state.status === 'closed' ? 0 : state.selectedIndex];
+        const item = activeIndex === null ? undefined : items[activeIndex];
         if (!item) return;
         e.preventDefault();
         if (item.kind === 'skill' && item.skill) onSelectSkill(item.skill);
@@ -672,16 +682,22 @@ export function SlashCommandMenu({
     }
     globalThis.addEventListener('keydown', onKey, true);
     return () => globalThis.removeEventListener('keydown', onKey, true);
-  }, [state, items, onMoveSelected, onSelectSkill, onSelectEntity, onClose]);
+  }, [
+    state.status,
+    items,
+    activeIndex,
+    onMoveSelected,
+    onSelectSkill,
+    onSelectEntity,
+    onClose,
+  ]);
 
-  // Active row id (for parent surface aria-activedescendant). Falls back to
-  // null when no rows or picker is closed.
-  const activeRowId = useMemo(() => {
-    if (state.status === 'closed') return null;
-    if (items.length === 0) return null;
-    const idx = Math.max(0, Math.min(items.length - 1, state.selectedIndex));
-    return rowIdFor(listId, idx);
-  }, [state, items.length, listId]);
+  // Active row id derived from the clamped index — keeps
+  // aria-activedescendant in sync with whichever row is actually highlighted.
+  const activeRowId = useMemo(
+    () => (activeIndex === null ? null : rowIdFor(listId, activeIndex)),
+    [activeIndex, listId]
+  );
 
   // Notify parent when active row id changes so it can mirror it onto the
   // textarea's aria-activedescendant. Cleanup pushes `null` so the parent
@@ -734,35 +750,31 @@ export function SlashCommandMenu({
     >
       {variant === 'inline' ? <SlashHeader state={state} /> : null}
       {variant === 'rail' ? <SlashHeader state={state} /> : null}
-      {items.length === 0 ? (
-        <div
-          className={cn(
-            'flex-1 overflow-y-auto p-[5px]',
-            variant === 'inline' && 'max-h-[260px]'
-          )}
-          role='presentation'
-        >
-          <div className='px-3 py-6 text-center text-xs text-tertiary-token'>
+      {/* Always render the listbox container so the textarea's
+          `aria-controls={listId}` always points at a real DOM node, even
+          when the picker is in its empty / loading state (Greptile P1 fix).
+          The "Searching…" / "No matches" message is rendered as an
+          aria-hidden presentational child inside the listbox. */}
+      <div
+        ref={listboxRef}
+        id={listId}
+        role='listbox'
+        aria-label='Slash command suggestions'
+        aria-busy={isLoading || undefined}
+        className={cn(
+          'flex-1 overflow-y-auto p-[5px]',
+          variant === 'inline' && 'max-h-[260px]'
+        )}
+      >
+        {items.length === 0 ? (
+          <div
+            aria-hidden='true'
+            className='px-3 py-6 text-center text-xs text-tertiary-token'
+          >
             {isLoading ? 'Searching…' : 'No matches'}
           </div>
-        </div>
-      ) : (
-        // Listbox container is a `<div>` with role='listbox' rather than a
-        // `<ul>` so biome's no-non-interactive-to-interactive rule is happy
-        // and so the implicit list semantics don't double up with the
-        // listbox semantics for assistive tech. Children are `<div>`s with
-        // role='option' for the same reason.
-        <div
-          ref={listboxRef}
-          id={listId}
-          role='listbox'
-          aria-label='Slash command suggestions'
-          className={cn(
-            'flex-1 overflow-y-auto p-[5px]',
-            variant === 'inline' && 'max-h-[260px]'
-          )}
-        >
-          {(() => {
+        ) : (
+          (() => {
             let cursor = 0;
             return sections.map(section => {
               const start = cursor;
@@ -791,7 +803,7 @@ export function SlashCommandMenu({
                         item={item}
                         index={flatIdx}
                         rowId={rowIdFor(listId, flatIdx)}
-                        isActive={flatIdx === state.selectedIndex}
+                        isActive={flatIdx === activeIndex}
                         onMouseEnter={handleMouseEnter}
                         onCommit={handleCommit}
                       />
@@ -800,9 +812,9 @@ export function SlashCommandMenu({
                 </div>
               );
             });
-          })()}
-        </div>
-      )}
+          })()
+        )}
+      </div>
     </div>
   );
 }
