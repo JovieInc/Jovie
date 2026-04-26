@@ -60,7 +60,7 @@ const METADATA_STACK_CLASSNAME = 'space-y-0.5';
 const METADATA_DISPLAY_VALUE_CLASSNAME =
   'text-[11.5px] font-book leading-[16px] text-primary-token';
 const METADATA_INPUT_CLASSNAME =
-  'h-7 rounded-[8px] border-subtle bg-surface-0 px-2.5 text-2xs font-book text-primary-token shadow-none';
+  'h-7 rounded-lg border-subtle bg-surface-0 px-2.5 text-2xs font-book text-primary-token shadow-none';
 
 function PopularityScore({ value }: { readonly value: number }) {
   const clamped = Math.max(0, Math.min(100, value));
