@@ -56,7 +56,7 @@ export function DmQueueCard({ lead, onMarkedSent }: DmQueueCardProps) {
     >
       <div className='flex items-start justify-between'>
         <div className='flex items-center gap-3'>
-          <div className='flex size-10 items-center justify-center rounded-[12px] bg-surface-0'>
+          <div className='flex size-10 items-center justify-center rounded-xl bg-surface-0'>
             <User className='size-5 text-tertiary-token' />
           </div>
           <div>

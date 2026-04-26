@@ -19,10 +19,7 @@ const ScreenshotGallery = dynamic(
     loading: () => (
       <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'>
         {SKELETON_KEYS.map(key => (
-          <ContentSurfaceCard
-            key={key}
-            className='space-y-3 rounded-[12px] p-3.5'
-          >
+          <ContentSurfaceCard key={key} className='space-y-3 rounded-xl p-3.5'>
             <Skeleton className='aspect-video w-full' rounded='lg' />
             <Skeleton className='h-4 w-3/4' />
             <Skeleton className='h-8 w-24' rounded='md' />
