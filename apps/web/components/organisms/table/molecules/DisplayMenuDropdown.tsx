@@ -184,7 +184,7 @@ export function DisplayMenuDropdown({
                 type='button'
                 onClick={() => onViewModeChange?.('list')}
                 className={cn(
-                  'relative z-10 inline-flex flex-1 items-center justify-center gap-1.5 rounded px-2.5 py-1 text-[12px] font-caption transition-colors duration-150',
+                  'relative z-10 inline-flex flex-1 items-center justify-center gap-1.5 rounded px-2.5 py-1 text-xs font-caption transition-colors duration-150',
                   viewMode === 'list'
                     ? 'text-primary-token'
                     : 'text-tertiary-token hover:text-secondary-token'
@@ -200,7 +200,7 @@ export function DisplayMenuDropdown({
                 type='button'
                 onClick={() => onViewModeChange?.('board')}
                 className={cn(
-                  'relative z-10 inline-flex flex-1 items-center justify-center gap-1.5 rounded px-2.5 py-1 text-[12px] font-caption transition-colors duration-150',
+                  'relative z-10 inline-flex flex-1 items-center justify-center gap-1.5 rounded px-2.5 py-1 text-xs font-caption transition-colors duration-150',
                   viewMode === 'board'
                     ? 'text-primary-token'
                     : 'text-tertiary-token hover:text-secondary-token'

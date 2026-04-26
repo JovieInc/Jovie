@@ -123,7 +123,7 @@ export function ResponsiveActionsCell({
           onClick={action.onClick}
           disabled={action.disabled}
           className={cn(
-            'inline-flex items-center gap-2 rounded-full border border-transparent px-2.5 py-1.5 text-[12px] font-caption tracking-[-0.01em] transition-[background-color,border-color,color,box-shadow] duration-150 ease-out',
+            'inline-flex items-center gap-2 rounded-full border border-transparent px-2.5 py-1.5 text-xs font-caption tracking-[-0.01em] transition-[background-color,border-color,color,box-shadow] duration-150 ease-out',
             action.destructive
               ? 'text-destructive hover:border-destructive/20 hover:bg-destructive/10 hover:text-destructive [&_svg]:text-destructive'
               : 'text-secondary-token hover:border-subtle hover:bg-surface-1 hover:text-primary-token',
