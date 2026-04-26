@@ -46,6 +46,7 @@ const SHORTCUTS: Record<string, { keys: string; description: string }> = {
 
 import {
   Activity,
+  Archive,
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
@@ -53,6 +54,7 @@ import {
   AudioWaveform,
   BarChart3,
   Check,
+  CheckCircle2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -60,11 +62,15 @@ import {
   CircleDot,
   Circle as CircleIcon,
   CircleSlash,
+  Copy,
   Disc3,
+  ExternalLink,
+  Flag,
   GripVertical,
   Heart,
   Inbox,
   LayoutDashboard,
+  Link as LinkIcon,
   LogOut,
   Mic,
   Mic2,
@@ -83,6 +89,8 @@ import {
   SkipBack,
   SkipForward,
   Sparkles,
+  Trash2,
+  UserPlus,
   Users,
   Volume2,
 } from 'lucide-react';
@@ -1121,6 +1129,13 @@ export default function ShellV1Experiment() {
     'bloom'
   );
   const [view, setView] = useState<CanvasView>('demo');
+  // Subview is the page-scoped filter shown in the canvas subheader. Each
+  // canvas view defines its own subview list (see SUBVIEWS_BY_VIEW). Reset
+  // to 'all' when the canvas view itself changes.
+  const [subview, setSubview] = useState<string>('all');
+  useEffect(() => {
+    setSubview('all');
+  }, [view]);
   const [playingReleaseId, setPlayingReleaseId] = useState<string>(
     RELEASES[0].id
   );
@@ -1138,6 +1153,154 @@ export default function ShellV1Experiment() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchPills, setSearchPills] = useState<FilterPill[]>([]);
   const [keyMode, setKeyMode] = useState<'normal' | 'camelot'>('normal');
+  // Right-click context menu state. Lives at the shell level so only one
+  // menu is open at a time and Esc / outside-click can dismiss globally.
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    items: ContextMenuItem[];
+  } | null>(null);
+  const openContextMenu = (e: React.MouseEvent, items: ContextMenuItem[]) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ x: e.clientX, y: e.clientY, items });
+  };
+
+  // Mock action — design pass surfaces Esc + dismissal but doesn't mutate
+  // the data set. Console-noop keeps the menu interactive.
+  const noop = (label: string) => () => console.info(`[shell-v1] ${label}`);
+
+  const onReleaseContextMenu = (e: React.MouseEvent, release: Release) => {
+    openContextMenu(e, [
+      {
+        label: 'Play',
+        icon: Play,
+        shortcut: 'playPause',
+        onSelect: () => {
+          setPlayingReleaseId(release.id);
+          setIsPlaying(true);
+        },
+      },
+      {
+        label: 'Open release',
+        icon: ExternalLink,
+        onSelect: () => setSelectedReleaseId(release.id),
+      },
+      {
+        label: 'Pin to top',
+        icon: Pin,
+        onSelect: noop(`pin ${release.id}`),
+      },
+      { kind: 'separator' },
+      {
+        label: 'Copy smart link',
+        icon: LinkIcon,
+        shortcut: '⌘L',
+        onSelect: noop(`copy link ${release.id}`),
+      },
+      {
+        label: 'Duplicate',
+        icon: Copy,
+        shortcut: '⌘D',
+        onSelect: noop(`duplicate ${release.id}`),
+      },
+      { kind: 'separator' },
+      {
+        label: 'Archive',
+        icon: Archive,
+        tone: 'danger',
+        onSelect: noop(`archive ${release.id}`),
+      },
+    ]);
+  };
+
+  const onTrackContextMenu = (e: React.MouseEvent, track: Track) => {
+    openContextMenu(e, [
+      {
+        label: 'Play',
+        icon: Play,
+        shortcut: 'playPause',
+        onSelect: () => {
+          if (track.releaseId) {
+            setPlayingReleaseId(track.releaseId);
+            setIsPlaying(true);
+          }
+        },
+      },
+      {
+        label: 'Add to release',
+        icon: UserPlus,
+        onSelect: noop(`add ${track.id} to release`),
+      },
+      {
+        label: 'Edit metadata',
+        icon: Pencil,
+        shortcut: '⌘E',
+        onSelect: noop(`edit ${track.id}`),
+      },
+      { kind: 'separator' },
+      {
+        label: 'Copy share link',
+        icon: LinkIcon,
+        shortcut: '⌘L',
+        onSelect: noop(`copy link ${track.id}`),
+      },
+      {
+        label: 'Duplicate',
+        icon: Copy,
+        shortcut: '⌘D',
+        onSelect: noop(`duplicate ${track.id}`),
+      },
+      { kind: 'separator' },
+      {
+        label: 'Delete',
+        icon: Trash2,
+        tone: 'danger',
+        onSelect: noop(`delete ${track.id}`),
+      },
+    ]);
+  };
+
+  const onTaskContextMenu = (e: React.MouseEvent, task: Task) => {
+    openContextMenu(e, [
+      {
+        label: task.status === 'done' ? 'Mark in progress' : 'Mark complete',
+        icon: CheckCircle2,
+        shortcut: '⌘↵',
+        onSelect: noop(`toggle ${task.id}`),
+      },
+      {
+        label:
+          task.assignee === 'jovie' ? 'Reassign to me' : 'Reassign to Jovie',
+        icon: Sparkles,
+        onSelect: noop(`reassign ${task.id}`),
+      },
+      {
+        label: task.priority === 'high' ? 'Lower priority' : 'Raise priority',
+        icon: Flag,
+        onSelect: noop(`priority ${task.id}`),
+      },
+      { kind: 'separator' },
+      {
+        label: 'Open release',
+        icon: ExternalLink,
+        disabled: !task.releaseId,
+        onSelect: () => task.releaseId && setSelectedReleaseId(task.releaseId),
+      },
+      {
+        label: 'Copy task ID',
+        icon: Copy,
+        onSelect: noop(`copy id ${task.id}`),
+      },
+      { kind: 'separator' },
+      {
+        label: 'Delete',
+        icon: Trash2,
+        tone: 'danger',
+        onSelect: noop(`delete ${task.id}`),
+      },
+    ]);
+  };
 
   const artistOptions = useMemo(
     () =>
@@ -1336,8 +1499,9 @@ export default function ShellV1Experiment() {
             albumOptions={albumOptions}
           />
           <CanvasSubheader
-            view={view}
-            onView={setView}
+            subviews={subviewsForView(view, RELEASES, TRACKS, TASKS)}
+            subview={subview}
+            onSubview={setSubview}
             rightRailOpen={selectedReleaseId !== null}
             onToggleRightRail={() =>
               setSelectedReleaseId(id =>
@@ -1352,7 +1516,15 @@ export default function ShellV1Experiment() {
                 <DemoContent />
               ) : view === 'releases' ? (
                 <ReleasesView
-                  releases={RELEASES}
+                  releases={
+                    subview === 'singles'
+                      ? RELEASES.filter(r => r.type === 'Single')
+                      : subview === 'eps'
+                        ? RELEASES.filter(r => r.type === 'EP')
+                        : subview === 'albums'
+                          ? RELEASES.filter(r => r.type === 'Album')
+                          : RELEASES
+                  }
                   playingId={playingReleaseId}
                   isPlaying={isPlaying}
                   currentTimeSec={currentTimeSec}
@@ -1370,10 +1542,19 @@ export default function ShellV1Experiment() {
                     setIsPlaying(true);
                   }}
                   onFilterByArtist={name => addPill('artist', name)}
+                  onContextMenu={onReleaseContextMenu}
                 />
               ) : view === 'tracks' ? (
                 <TracksView
-                  tracks={TRACKS}
+                  tracks={
+                    subview === 'released'
+                      ? TRACKS.filter(t => t.status === 'released')
+                      : subview === 'scheduled'
+                        ? TRACKS.filter(t => t.status === 'scheduled')
+                        : subview === 'drafts'
+                          ? TRACKS.filter(t => t.status === 'draft')
+                          : TRACKS
+                  }
                   pills={searchPills}
                   playingId={playingReleaseId}
                   isPlaying={isPlaying}
@@ -1392,6 +1573,7 @@ export default function ShellV1Experiment() {
                     setIsPlaying(true);
                   }}
                   onFilter={(field, value) => addPill(field, value)}
+                  onContextMenu={onTrackContextMenu}
                 />
               ) : view === 'lyrics' ? (
                 <LyricsView
@@ -1401,7 +1583,20 @@ export default function ShellV1Experiment() {
                   onSeek={sec => setCurrentTimeSec(sec)}
                 />
               ) : (
-                <TasksView tasks={TASKS} />
+                <TasksView
+                  tasks={
+                    subview === 'mine'
+                      ? TASKS.filter(t => t.assignee === 'you')
+                      : subview === 'jovie'
+                        ? TASKS.filter(t => t.assignee === 'jovie')
+                        : TASKS
+                  }
+                  onContextMenu={onTaskContextMenu}
+                  onOpenRelease={id => {
+                    setView('releases');
+                    setSelectedReleaseId(id);
+                  }}
+                />
               )}
             </div>
             {view === 'releases' && selectedReleaseId && (
@@ -1482,6 +1677,10 @@ export default function ShellV1Experiment() {
 
       <JovieOverlay listening={jovieListening} />
       <ShellLoader phase={loaderPhase} />
+      <ContextMenuOverlay
+        state={contextMenu}
+        onClose={() => setContextMenu(null)}
+      />
     </div>
   );
 }
@@ -1960,47 +2159,53 @@ const BREADCRUMB_TRAIL: Array<{ label: string; emphasis?: boolean }> = [
   { label: 'Dashboard', emphasis: true },
 ];
 
-// Subheader strip — view tabs left, view-scoped toolbar right.
-// Lives between the page header (breadcrumb) and the canvas content.
+// Subheader strip — page-scoped subview tabs on the left, page toolbar on
+// the right. Releases / Tracks / Tasks live in the *nav* (left sidebar);
+// this strip is purely for sub-views OF the current page (e.g. Releases →
+// All / Singles / EPs / Albums).
 function CanvasSubheader({
-  view,
-  onView,
+  subviews,
+  subview,
+  onSubview,
   rightRailOpen,
   onToggleRightRail,
   onOpenSearch,
 }: {
-  view: CanvasView;
-  onView: (v: CanvasView) => void;
+  subviews: { id: string; label: string; count?: number }[];
+  subview: string;
+  onSubview: (id: string) => void;
   rightRailOpen: boolean;
   onToggleRightRail: () => void;
   onOpenSearch: () => void;
 }) {
-  // Demo view stays accessible via the dev picker — not promoted into the
-  // primary tab strip. Lyrics is per-track and lives in the audio-bar
-  // affordance, not the canvas tabs.
-  const tabs: { id: CanvasView; label: string }[] = [
-    { id: 'releases', label: 'Releases' },
-    { id: 'tracks', label: 'Tracks' },
-    { id: 'tasks', label: 'Tasks' },
-  ];
   return (
     <div className='shrink-0 h-10 px-3 flex items-center gap-2 border-b border-(--linear-app-shell-border)/50'>
-      <div className='flex items-center gap-0.5'>
-        {tabs.map(t => {
-          const active = view === t.id;
+      <div className='flex items-center gap-0.5 min-w-0'>
+        {subviews.map(t => {
+          const active = subview === t.id;
           return (
             <button
               key={t.id}
               type='button'
-              onClick={() => onView(t.id)}
+              onClick={() => onSubview(t.id)}
               className={cn(
-                'h-7 px-2.5 rounded-md text-[12.5px] font-caption tracking-[-0.012em] transition-colors duration-150 ease-out',
+                'h-7 px-2.5 rounded-md text-[12.5px] font-caption tracking-[-0.012em] transition-colors duration-150 ease-out inline-flex items-center gap-1.5',
                 active
                   ? 'text-primary-token bg-surface-1/80'
                   : 'text-tertiary-token hover:text-primary-token hover:bg-surface-1/50'
               )}
             >
-              {t.label}
+              <span>{t.label}</span>
+              {typeof t.count === 'number' && (
+                <span
+                  className={cn(
+                    'text-[10.5px] tabular-nums',
+                    active ? 'text-tertiary-token' : 'text-quaternary-token'
+                  )}
+                >
+                  {t.count}
+                </span>
+              )}
             </button>
           );
         })}
@@ -2034,6 +2239,74 @@ function CanvasSubheader({
       </div>
     </div>
   );
+}
+
+// Defines the per-page subview list. Subviews are filters scoped to the
+// current canvas view, with live counts. Returning [] hides the strip.
+function subviewsForView(
+  view: CanvasView,
+  releases: Release[],
+  tracks: Track[],
+  tasks: Task[]
+): { id: string; label: string; count?: number }[] {
+  if (view === 'releases') {
+    return [
+      { id: 'all', label: 'All', count: releases.length },
+      {
+        id: 'singles',
+        label: 'Singles',
+        count: releases.filter(r => r.type === 'Single').length,
+      },
+      {
+        id: 'eps',
+        label: 'EPs',
+        count: releases.filter(r => r.type === 'EP').length,
+      },
+      {
+        id: 'albums',
+        label: 'Albums',
+        count: releases.filter(r => r.type === 'Album').length,
+      },
+    ];
+  }
+  if (view === 'tracks') {
+    return [
+      { id: 'all', label: 'All', count: tracks.length },
+      {
+        id: 'released',
+        label: 'Released',
+        count: tracks.filter(t => t.status === 'released').length,
+      },
+      {
+        id: 'scheduled',
+        label: 'Scheduled',
+        count: tracks.filter(t => t.status === 'scheduled').length,
+      },
+      {
+        id: 'drafts',
+        label: 'Drafts',
+        count: tracks.filter(t => t.status === 'draft').length,
+      },
+    ];
+  }
+  if (view === 'tasks') {
+    return [
+      { id: 'all', label: 'All', count: tasks.length },
+      {
+        id: 'mine',
+        label: 'Mine',
+        count: tasks.filter(t => t.assignee === 'you').length,
+      },
+      {
+        id: 'jovie',
+        label: 'Jovie',
+        count: tasks.filter(t => t.assignee === 'jovie').length,
+      },
+    ];
+  }
+  // Demo / lyrics get no subview strip — return [] and the row collapses
+  // to just the right-side toolbar.
+  return [];
 }
 
 function Header({
@@ -3047,6 +3320,400 @@ function TabletPlayerCard({
 }
 
 // ---------------------------------------------------------------------------
+// Context menu — right-click on a Tracks / Releases / Tasks row opens this.
+// State lives at the shell level so only one menu is open at a time. Items
+// are passed in (label, icon, kbd shortcut, optional `tone` for destructive,
+// section dividers, disabled). Anchors to mouse pos with viewport clamping.
+// ---------------------------------------------------------------------------
+type ContextMenuItem =
+  | {
+      kind?: 'item';
+      label: string;
+      icon?: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+      shortcut?: keyof typeof SHORTCUTS | string;
+      onSelect: () => void;
+      disabled?: boolean;
+      tone?: 'default' | 'danger';
+    }
+  | { kind: 'separator' };
+
+function ContextMenuOverlay({
+  state,
+  onClose,
+}: {
+  state: { x: number; y: number; items: ContextMenuItem[] } | null;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [pos, setPos] = useState<{ left: number; top: number }>({
+    left: 0,
+    top: 0,
+  });
+
+  useEffect(() => {
+    if (!state) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose();
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [state, onClose]);
+
+  // Clamp to viewport — flip up / left if the menu would overflow.
+  useEffect(() => {
+    if (!state || !ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    const margin = 8;
+    let left = state.x;
+    let top = state.y;
+    if (left + rect.width + margin > window.innerWidth) {
+      left = Math.max(margin, window.innerWidth - rect.width - margin);
+    }
+    if (top + rect.height + margin > window.innerHeight) {
+      top = Math.max(margin, window.innerHeight - rect.height - margin);
+    }
+    setPos({ left, top });
+  }, [state]);
+
+  if (!state) return null;
+
+  return (
+    <div className='fixed inset-0 z-[60]'>
+      <button
+        type='button'
+        aria-label='Close menu'
+        tabIndex={-1}
+        className='absolute inset-0 cursor-default'
+        onClick={onClose}
+        onContextMenu={e => {
+          e.preventDefault();
+          onClose();
+        }}
+      />
+      <div
+        ref={ref}
+        role='menu'
+        className='absolute min-w-[200px] max-w-[280px] rounded-md border border-(--linear-app-shell-border) bg-(--linear-app-content-surface)/95 backdrop-blur-xl shadow-[0_12px_40px_rgba(0,0,0,0.45)] py-1'
+        style={{ left: pos.left, top: pos.top }}
+      >
+        {state.items.map(item => {
+          if (item.kind === 'separator') {
+            return (
+              <div
+                key={`sep-${state.items.indexOf(item)}`}
+                className='h-px my-1 bg-(--linear-app-shell-border)/70'
+              />
+            );
+          }
+          const Icon = item.icon;
+          const sc = item.shortcut
+            ? typeof item.shortcut === 'string' && !(item.shortcut in SHORTCUTS)
+              ? { keys: item.shortcut }
+              : SHORTCUTS[item.shortcut as keyof typeof SHORTCUTS]
+            : null;
+          return (
+            <button
+              key={item.label}
+              type='button'
+              role='menuitem'
+              disabled={item.disabled}
+              onClick={() => {
+                if (item.disabled) return;
+                item.onSelect();
+                onClose();
+              }}
+              className={cn(
+                'group/mi w-full flex items-center gap-2 h-7 px-2 mx-1 rounded text-[12.5px] text-left transition-colors duration-150 ease-out',
+                item.disabled
+                  ? 'text-quaternary-token cursor-not-allowed'
+                  : item.tone === 'danger'
+                    ? 'text-rose-300 hover:text-rose-200 hover:bg-rose-500/10'
+                    : 'text-secondary-token hover:text-primary-token hover:bg-surface-1/70'
+              )}
+              style={{ width: 'calc(100% - 8px)' }}
+            >
+              {Icon && (
+                <Icon className='h-3.5 w-3.5 shrink-0' strokeWidth={2.25} />
+              )}
+              <span className='flex-1 truncate'>{item.label}</span>
+              {sc && (
+                <kbd className='inline-flex items-center h-4 min-w-4 px-1 rounded-[3px] text-[9.5px] font-caption uppercase tracking-[0.04em] text-quaternary-token bg-(--surface-2)/70 border border-(--linear-app-shell-border) leading-none'>
+                  {sc.keys}
+                </kbd>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Entity references — hover any release / track / artist mention to surface
+// a popover seeded by the same data the entity's page header uses (artwork,
+// title, type, primary stat). The popover is bridged to the trigger by an
+// invisible padding zone so the cursor can move onto it without dismissing.
+// ---------------------------------------------------------------------------
+type EntityRefData =
+  | { kind: 'release'; release: Release }
+  | { kind: 'track'; track: Track }
+  | { kind: 'artist'; name: string; releases: number };
+
+function EntityRef({
+  children,
+  data,
+  onActivate,
+}: {
+  children: React.ReactNode;
+  data: EntityRefData;
+  onActivate?: () => void;
+}) {
+  return (
+    <span className='relative inline-block group/entity align-baseline'>
+      <button
+        type='button'
+        onClick={e => {
+          e.stopPropagation();
+          onActivate?.();
+        }}
+        className='inline align-baseline px-0.5 -mx-0.5 rounded-[3px] underline decoration-dotted decoration-quaternary-token/60 underline-offset-[3px] hover:decoration-cyan-300/70 hover:bg-cyan-400/[0.06] hover:text-primary-token transition-colors duration-150 ease-out'
+      >
+        {children}
+      </button>
+      {/* Popover wrapper — pt-1.5 acts as the bridge zone so the cursor can
+          travel from the trigger to the card body without dismissing. */}
+      <span
+        role='tooltip'
+        className={cn(
+          'pointer-events-none absolute left-0 top-full z-40 w-[300px] pt-1.5',
+          'opacity-0 translate-y-1 group-hover/entity:opacity-100 group-hover/entity:translate-y-0 group-focus-within/entity:opacity-100 group-focus-within/entity:translate-y-0',
+          'group-hover/entity:pointer-events-auto group-focus-within/entity:pointer-events-auto',
+          'transition-[opacity,transform] duration-150 ease-out delay-[280ms] group-hover/entity:delay-[280ms] group-focus-within/entity:delay-[80ms]'
+        )}
+      >
+        <span className='block rounded-lg border border-(--linear-app-shell-border) bg-(--linear-app-content-surface)/97 backdrop-blur-xl shadow-[0_18px_60px_rgba(0,0,0,0.45)] overflow-hidden'>
+          <EntityCard data={data} onActivate={onActivate} />
+        </span>
+      </span>
+    </span>
+  );
+}
+
+function EntityCard({
+  data,
+  onActivate,
+}: {
+  data: EntityRefData;
+  onActivate?: () => void;
+}) {
+  if (data.kind === 'release')
+    return <ReleaseCard release={data.release} onActivate={onActivate} />;
+  if (data.kind === 'track')
+    return <TrackCard track={data.track} onActivate={onActivate} />;
+  return <ArtistCard data={data} onActivate={onActivate} />;
+}
+
+function ReleaseCard({
+  release,
+  onActivate,
+}: {
+  release: Release;
+  onActivate?: () => void;
+}) {
+  const liveCount = (Object.keys(release.dsps) as DspKey[]).filter(
+    d => release.dsps[d] === 'live'
+  ).length;
+  return (
+    <span className='block'>
+      <span className='flex items-stretch gap-3 px-3 pt-3 pb-2.5'>
+        <ArtworkThumb src={release.artwork} title={release.title} size={56} />
+        <span className='flex-1 min-w-0 flex flex-col justify-center'>
+          <span className='flex items-center gap-1.5'>
+            <span
+              className='text-[13px] font-semibold text-primary-token truncate'
+              style={{ letterSpacing: '-0.012em' }}
+            >
+              {release.title}
+            </span>
+            <TypeBadge type={release.type} />
+          </span>
+          <span className='text-[11.5px] text-tertiary-token truncate mt-0.5'>
+            {release.artist} · {release.album}
+          </span>
+        </span>
+      </span>
+      <span className='block px-3 pb-3'>
+        <span className='grid grid-cols-3 gap-2 text-[10.5px] uppercase tracking-[0.06em] text-quaternary-token'>
+          <span className='flex flex-col gap-0.5'>
+            <span>BPM</span>
+            <span className='text-primary-token text-[12.5px] tabular-nums normal-case tracking-normal'>
+              {release.bpm}
+            </span>
+          </span>
+          <span className='flex flex-col gap-0.5'>
+            <span>Key</span>
+            <span className='text-primary-token text-[12.5px] font-mono tracking-wide normal-case'>
+              {release.key}
+            </span>
+          </span>
+          <span className='flex flex-col gap-0.5'>
+            <span>Weekly</span>
+            <span className='text-primary-token text-[12.5px] tabular-nums normal-case tracking-normal'>
+              {formatStreams(release.weeklyStreams)}
+            </span>
+          </span>
+        </span>
+      </span>
+      <span className='flex items-center justify-between gap-2 px-3 h-8 border-t border-(--linear-app-shell-border)/70 bg-(--surface-0)/50'>
+        <span className='text-[10.5px] tabular-nums text-tertiary-token'>
+          {liveCount}/{Object.keys(release.dsps).length} DSPs live · drops{' '}
+          {new Date(release.releaseDate).toLocaleDateString(undefined, {
+            month: 'short',
+            day: 'numeric',
+          })}
+        </span>
+        <button
+          type='button'
+          onClick={e => {
+            e.stopPropagation();
+            onActivate?.();
+          }}
+          className='inline-flex items-center gap-1 h-5 px-1.5 rounded text-[10.5px] uppercase tracking-[0.06em] text-tertiary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-150 ease-out'
+        >
+          Open
+          <ChevronRight className='h-3 w-3' strokeWidth={2.25} />
+        </button>
+      </span>
+    </span>
+  );
+}
+
+function TrackCard({
+  track,
+  onActivate,
+}: {
+  track: Track;
+  onActivate?: () => void;
+}) {
+  return (
+    <span className='block'>
+      <span className='flex items-stretch gap-3 px-3 pt-3 pb-2.5'>
+        <ArtworkThumb src={track.artwork} title={track.title} size={56} />
+        <span className='flex-1 min-w-0 flex flex-col justify-center'>
+          <span
+            className='text-[13px] font-semibold text-primary-token truncate'
+            style={{ letterSpacing: '-0.012em' }}
+          >
+            {track.title}
+          </span>
+          <span className='text-[11.5px] text-tertiary-token truncate mt-0.5'>
+            {track.artist} · {track.album}
+          </span>
+        </span>
+      </span>
+      <span className='flex items-center justify-between gap-2 px-3 h-8 border-t border-(--linear-app-shell-border)/70 bg-(--surface-0)/50'>
+        <span className='text-[10.5px] tabular-nums text-tertiary-token'>
+          {track.bpm} BPM · {track.keyNormal} ·{' '}
+          {Math.floor(track.durationSec / 60)}:
+          {String(track.durationSec % 60).padStart(2, '0')}
+        </span>
+        <button
+          type='button'
+          onClick={e => {
+            e.stopPropagation();
+            onActivate?.();
+          }}
+          className='inline-flex items-center gap-1 h-5 px-1.5 rounded text-[10.5px] uppercase tracking-[0.06em] text-tertiary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-150 ease-out'
+        >
+          Open
+          <ChevronRight className='h-3 w-3' strokeWidth={2.25} />
+        </button>
+      </span>
+    </span>
+  );
+}
+
+function ArtistCard({
+  data,
+  onActivate,
+}: {
+  data: { kind: 'artist'; name: string; releases: number };
+  onActivate?: () => void;
+}) {
+  return (
+    <span className='block'>
+      <span className='flex items-center gap-3 px-3 py-3'>
+        <span className='h-10 w-10 rounded-full bg-surface-2 grid place-items-center text-[14px] font-semibold text-primary-token shrink-0'>
+          {data.name.slice(0, 1)}
+        </span>
+        <span className='flex-1 min-w-0'>
+          <span
+            className='block text-[13px] font-semibold text-primary-token truncate'
+            style={{ letterSpacing: '-0.012em' }}
+          >
+            {data.name}
+          </span>
+          <span className='block text-[11.5px] text-tertiary-token truncate mt-0.5'>
+            {data.releases} release{data.releases === 1 ? '' : 's'}
+          </span>
+        </span>
+        <button
+          type='button'
+          onClick={e => {
+            e.stopPropagation();
+            onActivate?.();
+          }}
+          className='inline-flex items-center gap-1 h-5 px-1.5 rounded text-[10.5px] uppercase tracking-[0.06em] text-tertiary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-150 ease-out'
+        >
+          Open
+          <ChevronRight className='h-3 w-3' strokeWidth={2.25} />
+        </button>
+      </span>
+    </span>
+  );
+}
+
+// Render a string with any matching release titles wrapped in EntityRef.
+// Releases are matched by literal substring (case-insensitive). First match
+// wins so we don't double-wrap overlapping titles. Used in Task list /
+// detail to make "Confirm artwork for Lost in the Light" hoverable.
+function renderWithEntities(
+  text: string,
+  releases: Release[],
+  onOpenRelease: (id: string) => void
+): React.ReactNode {
+  const lower = text.toLowerCase();
+  let bestStart = -1;
+  let bestRelease: Release | null = null;
+  let bestEnd = 0;
+  for (const r of releases) {
+    const idx = lower.indexOf(r.title.toLowerCase());
+    if (idx >= 0 && (bestStart < 0 || idx < bestStart)) {
+      bestStart = idx;
+      bestEnd = idx + r.title.length;
+      bestRelease = r;
+    }
+  }
+  if (!bestRelease || bestStart < 0) return text;
+  const before = text.slice(0, bestStart);
+  const match = text.slice(bestStart, bestEnd);
+  const after = text.slice(bestEnd);
+  return (
+    <>
+      {before}
+      <EntityRef
+        data={{ kind: 'release', release: bestRelease }}
+        onActivate={() => bestRelease && onOpenRelease(bestRelease.id)}
+      >
+        {match}
+      </EntityRef>
+      {renderWithEntities(after, releases, onOpenRelease)}
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Tooltip — small, dark, glassy popover with the action label + an optional
 // kbd chip on the right. Use the SHORTCUTS registry (top of file) for any
 // key combo so we have a single source of truth — see KEYBOARD SHORTCUT RULE.
@@ -3853,6 +4520,7 @@ function ReleasesView({
   onPlay,
   onSeek,
   onFilterByArtist,
+  onContextMenu,
 }: {
   releases: Release[];
   playingId: string;
@@ -3864,6 +4532,7 @@ function ReleasesView({
   onPlay: (id: string, autoplay?: boolean) => void;
   onSeek: (id: string, sec: number) => void;
   onFilterByArtist: (name: string) => void;
+  onContextMenu?: (e: React.MouseEvent, release: Release) => void;
 }) {
   const [focusedIndex, setFocusedIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -3924,6 +4593,7 @@ function ReleasesView({
                 onSeek(r.id, sec);
               }}
               onFilterByArtist={onFilterByArtist}
+              onContextMenu={onContextMenu}
             />
           ))}
         </ul>
@@ -3945,6 +4615,7 @@ function ReleaseRow({
   onPlay,
   onSeek: _onSeek,
   onFilterByArtist,
+  onContextMenu,
 }: {
   release: Release;
   index: number;
@@ -3958,6 +4629,7 @@ function ReleaseRow({
   onPlay: () => void;
   onSeek: (sec: number) => void;
   onFilterByArtist: (name: string) => void;
+  onContextMenu?: (e: React.MouseEvent, release: Release) => void;
 }) {
   // currentTimeSec/onSeek are wired through for the Tracks view's row
   // waveform — Release rows don't render a waveform.
@@ -3968,6 +4640,7 @@ function ReleaseRow({
     // biome-ignore lint/a11y/useKeyWithClickEvents: see above — parent section handles ↑/↓/Enter/Space/Esc
     <li
       onClick={onSelect}
+      onContextMenu={e => onContextMenu?.(e, release)}
       data-selected={isSelected || undefined}
       data-focused={isFocused || undefined}
       className={cn(
@@ -4101,8 +4774,9 @@ function TypeBadge({ type }: { type: ReleaseType }) {
   );
 }
 
-// Stacked DSP avatar pile (Soundcloud / streaming-app style): tight overlap
-// at rest, fans out on row hover with each avatar's status ring visible.
+// DSP presence indicator — one primary glyph + "+N" pill, full list in a
+// hover popover (max-height with internal scroll for overflow). Replaces
+// the row-of-glyphs pattern that competed with the row's other affordances.
 const DSP_GLYPH: Record<DspKey, string> = {
   spotify: 'S',
   apple: 'A',
@@ -4115,38 +4789,110 @@ const DSP_COLOR: Record<DspKey, string> = {
   youtube: 'bg-red-500/90',
   tidal: 'bg-sky-400/90',
 };
+const DSP_STATUS_DOT: Record<DspStatus, string> = {
+  live: 'bg-emerald-400',
+  pending: 'bg-amber-400',
+  error: 'bg-rose-500',
+  missing: 'bg-white/15',
+};
 function DspAvatarStack({ release }: { release: Release }) {
+  // Sort: live first (in DSP_ORDER), then pending/error, then missing.
+  const ordered = [...DSP_ORDER].sort((a, b) => {
+    const rank = { live: 0, pending: 1, error: 1, missing: 2 } as const;
+    return rank[release.dsps[a]] - rank[release.dsps[b]];
+  });
+  const primary = ordered[0];
+  const primaryStatus = release.dsps[primary];
+  const liveCount = ordered.filter(d => release.dsps[d] === 'live').length;
+  const others = Math.max(0, ordered.length - 1);
+
   return (
-    <div className='flex items-center -space-x-1.5 group-hover/row:space-x-1 transition-[margin] duration-200 ease-out'>
-      {DSP_ORDER.map(dsp => {
-        const status = release.dsps[dsp];
-        const dim = status === 'missing';
-        return (
+    <div className='relative inline-flex items-center gap-1.5 group/dsps'>
+      <span
+        className={cn(
+          'relative h-[20px] w-[20px] rounded-full grid place-items-center text-[9px] font-semibold text-white shrink-0',
+          'ring-2 ring-(--linear-bg-page)',
+          primaryStatus === 'missing'
+            ? 'bg-quaternary-token/40 opacity-50'
+            : DSP_COLOR[primary]
+        )}
+      >
+        {DSP_GLYPH[primary]}
+        {primaryStatus === 'pending' && (
           <span
-            key={dsp}
-            title={`${DSP_LABEL[dsp]} · ${status}`}
-            className={cn(
-              'relative h-[18px] w-[18px] rounded-full grid place-items-center text-[8.5px] font-semibold text-white shrink-0',
-              'ring-2 ring-(--linear-bg-page) transition-[transform,opacity] duration-200 ease-out',
-              dim ? 'bg-quaternary-token/40 opacity-50' : DSP_COLOR[dsp]
-            )}
-          >
-            {DSP_GLYPH[dsp]}
-            {status === 'pending' && (
-              <span
-                aria-hidden='true'
-                className='absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-amber-400 ring-1 ring-(--linear-bg-page)'
-              />
-            )}
-            {status === 'error' && (
-              <span
-                aria-hidden='true'
-                className='absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-rose-500 ring-1 ring-(--linear-bg-page)'
-              />
-            )}
-          </span>
-        );
-      })}
+            aria-hidden='true'
+            className='absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-amber-400 ring-1 ring-(--linear-bg-page)'
+          />
+        )}
+        {primaryStatus === 'error' && (
+          <span
+            aria-hidden='true'
+            className='absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-rose-500 ring-1 ring-(--linear-bg-page)'
+          />
+        )}
+      </span>
+      {others > 0 && (
+        <span className='inline-flex items-center h-5 px-1.5 rounded text-[10.5px] font-caption tabular-nums text-tertiary-token bg-(--surface-1)/70 border border-(--linear-app-shell-border)'>
+          +{others}
+        </span>
+      )}
+
+      {/* Popover — opens on row/group hover, anchored bottom-right. */}
+      <div
+        role='tooltip'
+        className={cn(
+          'pointer-events-none absolute right-0 top-full mt-1.5 z-40 w-[220px]',
+          'opacity-0 translate-y-1 group-hover/dsps:opacity-100 group-hover/dsps:translate-y-0 group-hover/dsps:pointer-events-auto',
+          'transition-[opacity,transform] duration-150 ease-out delay-[400ms] group-hover/dsps:delay-[400ms]'
+        )}
+      >
+        <div className='rounded-md border border-(--linear-app-shell-border) bg-(--linear-app-content-surface)/95 backdrop-blur-xl shadow-[0_8px_28px_rgba(0,0,0,0.32)] overflow-hidden'>
+          <div className='flex items-center justify-between px-2.5 h-7 border-b border-(--linear-app-shell-border)/60'>
+            <span className='text-[10px] uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
+              Distribution
+            </span>
+            <span className='text-[10.5px] tabular-nums text-tertiary-token'>
+              {liveCount}/{ordered.length} live
+            </span>
+          </div>
+          <div className='max-h-[180px] overflow-y-auto'>
+            {ordered.map(dsp => {
+              const status = release.dsps[dsp];
+              return (
+                <div
+                  key={dsp}
+                  className='flex items-center gap-2 h-7 px-2.5 hover:bg-surface-1/40'
+                >
+                  <span
+                    className={cn(
+                      'h-[14px] w-[14px] rounded-full grid place-items-center text-[8px] font-semibold text-white shrink-0',
+                      status === 'missing'
+                        ? 'bg-quaternary-token/40 opacity-60'
+                        : DSP_COLOR[dsp]
+                    )}
+                  >
+                    {DSP_GLYPH[dsp]}
+                  </span>
+                  <span className='flex-1 text-[12px] text-secondary-token truncate'>
+                    {DSP_LABEL[dsp]}
+                  </span>
+                  <span className='inline-flex items-center gap-1.5'>
+                    <span
+                      className={cn(
+                        'h-1.5 w-1.5 rounded-full',
+                        DSP_STATUS_DOT[status]
+                      )}
+                    />
+                    <span className='text-[10.5px] uppercase tracking-[0.06em] text-quaternary-token'>
+                      {status}
+                    </span>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -4704,6 +5450,7 @@ function TracksView({
   onPlay,
   onSeek,
   onFilter,
+  onContextMenu,
 }: {
   tracks: Track[];
   pills: FilterPill[];
@@ -4715,6 +5462,7 @@ function TracksView({
   onPlay: (id: string) => void;
   onSeek: (id: string, sec: number) => void;
   onFilter: (field: 'artist' | 'title' | 'album', value: string) => void;
+  onContextMenu?: (e: React.MouseEvent, track: Track) => void;
 }) {
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [sortBy, setSortBy] = useState<SortField>('index');
@@ -4876,6 +5624,7 @@ function TracksView({
                 onSeek(t.id, sec);
               }}
               onFilter={onFilter}
+              onContextMenu={onContextMenu}
             />
           ))}
           {sorted.length === 0 && (
@@ -4902,6 +5651,7 @@ function TrackRow({
   onPlay,
   onSeek,
   onFilter,
+  onContextMenu,
 }: {
   track: Track;
   index: number;
@@ -4915,6 +5665,7 @@ function TrackRow({
   onPlay: () => void;
   onSeek: (sec: number) => void;
   onFilter: (field: 'artist' | 'title' | 'album', value: string) => void;
+  onContextMenu?: (e: React.MouseEvent, track: Track) => void;
 }) {
   // While the user is keyboard-navigating other rows, mute the now-playing
   // signals here so focus is the only competing visual.
@@ -4924,6 +5675,7 @@ function TrackRow({
     // biome-ignore lint/a11y/useKeyWithClickEvents: same
     <li
       onClick={onSelect}
+      onContextMenu={e => onContextMenu?.(e, track)}
       data-focused={isFocused || undefined}
       className={cn(
         'group/row relative flex items-center gap-3 h-[44px] pl-2 pr-3 rounded-md cursor-pointer transition-colors duration-150 ease-out focus:outline-none',
@@ -5284,7 +6036,15 @@ function ColumnLabel({
 // primary experience.
 // ---------------------------------------------------------------------------
 
-function TasksView({ tasks }: { tasks: Task[] }) {
+function TasksView({
+  tasks,
+  onContextMenu,
+  onOpenRelease,
+}: {
+  tasks: Task[];
+  onContextMenu?: (e: React.MouseEvent, task: Task) => void;
+  onOpenRelease?: (id: string) => void;
+}) {
   const [selectedId, setSelectedId] = useState<string>(tasks[0]?.id ?? '');
   const [focusedIndex, setFocusedIndex] = useState(0);
   const selected = tasks.find(t => t.id === selectedId) ?? tasks[0];
@@ -5339,6 +6099,8 @@ function TasksView({ tasks }: { tasks: Task[] }) {
                 setFocusedIndex(i);
                 setSelectedId(t.id);
               }}
+              onContextMenu={onContextMenu}
+              onOpenRelease={onOpenRelease}
             />
           ))}
         </ul>
@@ -5346,7 +6108,9 @@ function TasksView({ tasks }: { tasks: Task[] }) {
 
       {/* Detail pane */}
       <div className='flex-1 min-w-0 overflow-y-auto'>
-        {selected ? <TaskDetail task={selected} /> : null}
+        {selected ? (
+          <TaskDetail task={selected} onOpenRelease={onOpenRelease} />
+        ) : null}
       </div>
     </section>
   );
@@ -5357,17 +6121,22 @@ function TaskListItem({
   isSelected,
   isFocused,
   onSelect,
+  onContextMenu,
+  onOpenRelease,
 }: {
   task: Task;
   isSelected: boolean;
   isFocused: boolean;
   onSelect: () => void;
+  onContextMenu?: (e: React.MouseEvent, task: Task) => void;
+  onOpenRelease?: (id: string) => void;
 }) {
   return (
     // biome-ignore lint/a11y/noNoninteractiveElementInteractions: parent section delegates ↑/↓
     // biome-ignore lint/a11y/useKeyWithClickEvents: same
     <li
       onClick={onSelect}
+      onContextMenu={e => onContextMenu?.(e, task)}
       data-focused={isFocused || isSelected || undefined}
       className={cn(
         'group/row relative flex items-center gap-3 h-[44px] px-2 rounded-md cursor-pointer transition-colors duration-150 ease-out',
@@ -5391,7 +6160,9 @@ function TaskListItem({
                 : 'text-primary-token'
             )}
           >
-            {task.title}
+            {onOpenRelease
+              ? renderWithEntities(task.title, RELEASES, onOpenRelease)
+              : task.title}
           </span>
         </div>
         {(task.dueIso || task.labels.length > 0) && (
@@ -5426,7 +6197,13 @@ function TaskListItem({
   );
 }
 
-function TaskDetail({ task }: { task: Task }) {
+function TaskDetail({
+  task,
+  onOpenRelease,
+}: {
+  task: Task;
+  onOpenRelease?: (id: string) => void;
+}) {
   const releaseTitle = task.releaseId
     ? (RELEASES.find(r => r.id === task.releaseId)?.title ?? task.releaseId)
     : null;
@@ -5437,7 +6214,9 @@ function TaskDetail({ task }: { task: Task }) {
       </div>
 
       <h1 className='text-[26px] font-display tracking-[-0.02em] text-primary-token leading-tight'>
-        {task.title}
+        {onOpenRelease
+          ? renderWithEntities(task.title, RELEASES, onOpenRelease)
+          : task.title}
       </h1>
 
       {/* Horizontal metadata strip — one calm line of pills under the title. */}
@@ -5486,7 +6265,9 @@ function TaskDetail({ task }: { task: Task }) {
 
       {task.description && (
         <p className='mt-6 text-[14px] leading-[1.55] text-secondary-token max-w-prose'>
-          {task.description}
+          {onOpenRelease
+            ? renderWithEntities(task.description, RELEASES, onOpenRelease)
+            : task.description}
         </p>
       )}
 
