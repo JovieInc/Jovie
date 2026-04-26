@@ -163,7 +163,7 @@ describe('HomepageIntent', () => {
     try {
       const { rerender } = render(<HomepageIntent />);
       rerender(<HomepageIntent />);
-      vi.advanceTimersByTime(3000);
+      vi.advanceTimersByTime(8000);
       const viewed = mockTrack.mock.calls.filter(
         c => c[0] === 'homepage_viewed'
       );

@@ -33,6 +33,14 @@ const copyTargets = [
   },
 ];
 
+const optionalCopyTargets = [
+  {
+    label: 'standalone generated Next module aliases',
+    source: path.join(appRoot, '.next', 'node_modules'),
+    destination: path.join(standaloneNextRoot, 'node_modules'),
+  },
+];
+
 const standaloneRuntimePackages = [
   '@next/env',
   '@swc/helpers',
@@ -128,6 +136,16 @@ function copyRuntimePackageToStandalone(
 for (const target of copyTargets) {
   if (!existsSync(target.source)) {
     throw new Error(`Missing ${target.label} source at ${target.source}`);
+  }
+
+  rmSync(target.destination, { force: true, recursive: true });
+  mkdirSync(path.dirname(target.destination), { recursive: true });
+  cpSync(target.source, target.destination, { recursive: true });
+}
+
+for (const target of optionalCopyTargets) {
+  if (!existsSync(target.source)) {
+    continue;
   }
 
   rmSync(target.destination, { force: true, recursive: true });

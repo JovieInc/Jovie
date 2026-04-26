@@ -22,6 +22,7 @@ import {
 } from './intent-store';
 
 const INPUT_ID = 'homepage-intent-input';
+const HOMEPAGE_VIEWED_DELAY_MS = 8000;
 
 /**
  * Viewport gate: desktop (≥768px) gets an intercepted modal via `router.push`;
@@ -48,7 +49,11 @@ function buildAuthUrl(intentId: string): string {
   );
 }
 
-export function HomepageIntent() {
+export function HomepageIntent({
+  showIntro = true,
+}: Readonly<{
+  readonly showIntro?: boolean;
+}> = {}) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const pillRailRef = useRef<HTMLDivElement>(null);
@@ -67,7 +72,7 @@ export function HomepageIntent() {
         experimentId: HOMEPAGE_INTENT_EXPERIMENT_ID,
         variantId: HOMEPAGE_INTENT_VARIANT_ID,
       });
-    }, 3000);
+    }, HOMEPAGE_VIEWED_DELAY_MS);
 
     // Rehydrate any in-progress draft from a previous visit so the fan picks
     // up where they left off. Cleared on submit and on successful signup
@@ -237,15 +242,19 @@ export function HomepageIntent() {
         fontFeatureSettings: '"cv01", "ss03"',
       }}
     >
-      <h1
-        id='home-hero-heading'
-        className='homepage-hero-headline self-center text-center text-white'
-      >
-        {HERO_COPY.headline}
-      </h1>
-      <p className='homepage-hero-subhead mt-6 max-w-[680px] self-center text-center text-[17px] leading-[1.58] tracking-[-0.015em] text-white/68 sm:text-[18px]'>
-        {HERO_COPY.subhead}
-      </p>
+      {showIntro ? (
+        <>
+          <h1
+            id='home-hero-heading'
+            className='homepage-hero-headline self-center text-center text-white'
+          >
+            {HERO_COPY.headline}
+          </h1>
+          <p className='homepage-hero-subhead mt-6 max-w-[680px] self-center text-center text-[17px] leading-[1.58] tracking-[-0.015em] text-white/68 sm:text-[18px]'>
+            {HERO_COPY.subhead}
+          </p>
+        </>
+      ) : null}
 
       <label htmlFor={INPUT_ID} className='sr-only'>
         Ask Jovie

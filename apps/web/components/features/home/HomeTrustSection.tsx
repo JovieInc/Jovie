@@ -67,9 +67,9 @@ export function HomeTrustSection({
         <p
           className={cn(
             isInlineStrip
-              ? 'text-center text-[12px] font-medium tracking-[-0.01em] text-white/42'
+              ? 'sr-only'
               : 'text-center text-[12px] font-medium tracking-[0.02em] text-white/48',
-            labelMarginClass
+            !isInlineStrip && labelMarginClass
           )}
         >
           {label}
@@ -143,12 +143,16 @@ export function HomeTrustSection({
             )}
           >
             {isInlineStrip ? (
-              <span
-                role='img'
-                aria-label='Black Hole Recordings'
-                className='inline-flex select-none items-center justify-center whitespace-nowrap text-[12px] font-semibold tracking-[-0.02em] text-white/68 opacity-75 sm:text-[13px]'
-              >
-                Black Hole Recordings
+              <span className='inline-flex select-none items-center justify-center'>
+                <span role='img' aria-label='Black Hole Recordings' />
+                <span
+                  aria-hidden='true'
+                  className='inline-flex h-[16px] w-[128px] items-center justify-center gap-[3px] opacity-75'
+                >
+                  <span className='h-[2px] w-[34px] rounded-full bg-white/68' />
+                  <span className='size-[15px] rounded-full border border-white/58 shadow-[inset_0_0_0_3px_rgba(255,255,255,0.18)]' />
+                  <span className='h-[2px] w-[34px] rounded-full bg-white/68' />
+                </span>
               </span>
             ) : (
               <BlackHoleRecordingsLogo className='h-[16px] w-auto sm:h-[18px]' />
@@ -160,13 +164,21 @@ export function HomeTrustSection({
               presentation === 'inline-strip' && 'sm:px-1 lg:flex-1'
             )}
           >
-            <DiscoWaxLogo
-              className={cn(
-                discoWaxSize,
-                'sm:h-[18px]',
-                presentation === 'inline-strip' ? 'text-white/68' : undefined
-              )}
-            />
+            {isInlineStrip ? (
+              <span className='inline-flex select-none items-center justify-center'>
+                <span role='img' aria-label='disco:wax' />
+                <span
+                  aria-hidden='true'
+                  className='inline-flex h-[16px] w-[70px] items-center justify-center gap-[5px] opacity-75'
+                >
+                  <span className='h-[13px] w-[22px] rounded-[5px] bg-white/68' />
+                  <span className='size-[5px] rounded-full bg-white/68' />
+                  <span className='h-[13px] w-[30px] rounded-[5px] bg-white/68' />
+                </span>
+              </span>
+            ) : (
+              <DiscoWaxLogo className={cn(discoWaxSize, 'sm:h-[18px]')} />
+            )}
           </div>
         </div>
       </div>
