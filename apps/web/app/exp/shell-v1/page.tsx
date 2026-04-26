@@ -1708,24 +1708,28 @@ export default function ShellV1Experiment() {
         onThreadContextMenu={onThreadContextMenu}
       />
 
-      {/* Now-playing card — only shown when the audio bar is COLLAPSED.
-          When the bar is open it already shows what's playing; a second
-          card in the sidebar is redundant. When the bar collapses, the
-          card animates in (slide-up + fade + scale) as the elevated
-          stand-in for transport. Reverses cleanly on bar restore. */}
+      {/* Compact now-playing — always visible, no card chrome. Position
+          glides between two anchors based on audio-bar state:
+          - Bar collapsed → sits at bottom-left of the sidebar zone
+            (translateX 0). Reads as the standalone "what's playing"
+            indicator while the bar is hidden.
+          - Bar open → slides right so its left edge aligns with the
+            main content area's left edge (sidebar width + gap). The
+            bar covers the rest of the row; the card stays visible to
+            its left as a peek.
+          When the sidebar is floating (peek mode), main content
+          extends to the page edge so no horizontal shift is needed. */}
       <div
-        aria-hidden={!barCollapsed}
         className='hidden lg:block fixed left-2 bottom-2 z-30 w-[224px]'
         style={{
-          opacity: barCollapsed ? 1 : 0,
-          transform: barCollapsed
-            ? 'translateY(0) scale(1)'
-            : 'translateY(12px) scale(0.97)',
-          pointerEvents: barCollapsed ? 'auto' : 'none',
-          transition: `opacity ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, transform ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
+          transform:
+            !barCollapsed && sidebarMode === 'docked'
+              ? `translateX(${sidebarTight ? 220 : 232}px)`
+              : 'translateX(0)',
+          transition: `transform ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
         }}
       >
-        <div className='rounded-[var(--linear-app-shell-radius)] border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) shadow-[0_18px_60px_rgba(0,0,0,0.32)] px-2 pt-2.5 pb-2'>
+        <div className='px-1 pb-0'>
           <SidebarNowPlaying
             collapsed={false}
             isPlaying={isPlaying}
