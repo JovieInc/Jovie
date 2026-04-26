@@ -26,6 +26,9 @@
 
 import {
   Activity,
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
   AudioLines,
   AudioWaveform,
   BarChart3,
@@ -59,6 +62,24 @@ import { cn } from '@/lib/utils';
 type Variant = 'a' | 'b' | 'c' | 'd' | 'e';
 type CanvasView = 'demo' | 'releases' | 'tracks';
 
+// Pill-based filter system (Linear/Notion style). Each pill targets a
+// single field with an `is` / `is not` operator and one or more OR-combined
+// values. Cross-pill semantics are implicit AND.
+type FilterField =
+  | 'artist'
+  | 'title'
+  | 'album'
+  | 'status'
+  | 'bpm'
+  | 'key'
+  | 'has';
+type FilterPill = {
+  id: string;
+  field: FilterField;
+  op: 'is' | 'is not';
+  values: string[];
+};
+
 type TrackInfo = {
   title: string;
   artist: string;
@@ -74,6 +95,20 @@ type TrackInfo = {
 // surfaces, where the system invests motion budget in revealing structure.
 const EASE_CINEMATIC = 'cubic-bezier(0.32, 0.72, 0, 1)';
 const DURATION_CINEMATIC = 420;
+
+// Selected/focused row treatment — electric cyan accent. Calibrated to
+// stay invisible at low brightness (the "DJ on a red-eye flight" test):
+// no outline ring, no glow halo, just an inset 2px left bar plus a
+// barely-there 8% cyan bg tint. Hover bumps to 12%. Both data-focused
+// (keyboard) and data-selected (drawer open) trigger it.
+const SELECTED_ROW_CLASSES = [
+  'data-[focused]:bg-[rgb(34_211_238/0.08)]',
+  'data-[focused]:hover:bg-[rgb(34_211_238/0.12)]',
+  'data-[focused]:shadow-[inset_2px_0_0_0_rgb(34_211_238)]',
+  'data-[selected]:bg-[rgb(34_211_238/0.10)]',
+  'data-[selected]:hover:bg-[rgb(34_211_238/0.14)]',
+  'data-[selected]:shadow-[inset_2px_0_0_0_rgb(34_211_238)]',
+].join(' ');
 
 const TRACK = {
   title: 'Lost in the Light',
@@ -371,6 +406,164 @@ type Track = {
   cues: Cue[];
 };
 
+const ARTIST_POOL = [
+  'Bahamas',
+  'Sade',
+  'Frank Ocean',
+  'Anderson .Paak',
+  'Tim White',
+  'Erica Gibson',
+  'Tycho',
+  'Bonobo',
+  'Khruangbin',
+  'BADBADNOTGOOD',
+];
+const TITLE_POOL = [
+  'Lost in the Light',
+  'Stronger Than That',
+  'All the Time',
+  'Sunshine on My Back',
+  'Opening Act',
+  'Bittersweet',
+  'Late Night Drift',
+  'Slow Burn',
+  'High Tide',
+  'Echo Chamber',
+  'Ghost in the Garden',
+  'Paper Hearts',
+  'Velvet Sky',
+  'Hold the Line',
+  'Soft Landing',
+  'Midnight Oil',
+  'Forty Days',
+  'Outer Sun',
+  'Trade Winds',
+  'Summer Static',
+  'Mirage',
+  'Long Way Home',
+  'Underwater',
+  'Cold Coast',
+  'Open Door',
+  'Static Bloom',
+  'Cinnamon',
+  'Through the Rain',
+  'After Hours',
+  'Lift Off',
+  'Halfway There',
+  'Ferris Wheel',
+  'Magnetic',
+  'Daydream',
+  'Wide Open',
+  'Lower Skies',
+  'Stationary',
+  'Pacific',
+  'Outline',
+  'Quiet Now',
+];
+const ALBUM_POOL = [
+  'Earthtones',
+  'Bahamas Is Afie',
+  'Sad Hunk',
+  'Live to Be Free',
+  'Mid-set',
+  'B-sides',
+  '—',
+];
+const KEY_PAIRS: Array<[string, string]> = [
+  ['A min', '8A'],
+  ['D maj', '10B'],
+  ['F maj', '7B'],
+  ['C maj', '8B'],
+  ['G maj', '9B'],
+  ['B min', '10A'],
+  ['E min', '12A'],
+  ['F min', '4A'],
+  ['G min', '6A'],
+  ['Bb maj', '6B'],
+  ['Eb min', '2A'],
+  ['A maj', '11B'],
+];
+const ARTWORK_POOL = [
+  'https://i.scdn.co/image/ab67616d0000b273e3a35b5fc62c33ec0c2eed62',
+  'https://i.scdn.co/image/ab67616d0000b273ed7d40b86b3a39b3c1d8cea5',
+  'https://i.scdn.co/image/ab67616d0000b27348fc7ad174126b1a51ea5b06',
+];
+
+function pick<T>(arr: readonly T[], i: number): T {
+  return arr[Math.abs(i) % arr.length];
+}
+function generateTracks(n: number): Track[] {
+  const out: Track[] = [];
+  for (let i = 0; i < n; i++) {
+    // Roughly 1 in 5 tracks are collabs.
+    const isCollab = i % 5 === 4;
+    const aIdx = (i * 7 + 3) % ARTIST_POOL.length;
+    const bIdx = (aIdx + 3 + (i % 4)) % ARTIST_POOL.length;
+    const artist = isCollab
+      ? `${ARTIST_POOL[aIdx]} & ${ARTIST_POOL[bIdx]}`
+      : ARTIST_POOL[aIdx];
+    const titleBase = pick(TITLE_POOL, i * 11);
+    const versionTag =
+      i % 7 === 0
+        ? ' (Extended Mix)'
+        : i % 7 === 3
+          ? ' (Acoustic)'
+          : i % 7 === 5
+            ? ' (Live)'
+            : '';
+    const title = `${titleBase}${versionTag}`;
+    const album = pick(ALBUM_POOL, i * 3);
+    const bpm = 64 + Math.round(((i * 13) % 80) * 1.2);
+    const [keyN, keyC] = pick(KEY_PAIRS, i * 5);
+    const rating = (((i * 3) % 5) + 1) as Track['rating'];
+    const energy = (((i * 7) % 9) + 1) as Track['energy'];
+    const durationSec = 90 + ((i * 17) % 280);
+    const status: TrackStatus =
+      i % 11 === 0 ? 'draft' : i % 13 === 0 ? 'scheduled' : 'released';
+    const hasVideo = i % 6 === 0;
+    const hasCanvas = i % 3 === 0;
+    const bpmTone: Track['bpmTone'] =
+      bpm >= 124 ? 'high' : bpm <= 90 ? 'low' : 'mid';
+    out.push({
+      id: `track-${i}`,
+      releaseId: i < RELEASES.length ? RELEASES[i].id : null,
+      title,
+      artist,
+      album,
+      type: i % 8 === 0 ? 'Album' : i % 5 === 0 ? 'EP' : 'Single',
+      bpm,
+      keyNormal: keyN,
+      keyCamelot: keyC,
+      rating,
+      energy,
+      durationSec,
+      isrc:
+        status === 'draft' ? undefined : `USRC125${String(i).padStart(5, '0')}`,
+      status,
+      hasVideo,
+      hasCanvas,
+      artwork: pick(ARTWORK_POOL, i * 2),
+      bpmTone,
+      waveformSeed: i * 13 + 1,
+      cues: [
+        { at: 4 + (i % 6), kind: 'intro', label: 'Intro' },
+        { at: 24 + (i % 12), kind: 'verse', label: 'Verse' },
+        { at: 52 + (i % 18), kind: 'chorus', label: 'Chorus' },
+        ...(i % 3 === 0
+          ? [
+              {
+                at: 88 + (i % 20),
+                kind: 'drop' as CueKind,
+                label: 'Drop',
+              },
+            ]
+          : []),
+      ],
+    });
+  }
+  return out;
+}
+
 const TRACKS: Track[] = [
   {
     id: 'lost-in-the-light-track',
@@ -581,6 +774,7 @@ const TRACKS: Track[] = [
       { at: 30, kind: 'verse', label: 'Sketch' },
     ],
   },
+  ...generateTracks(50),
 ];
 
 function trackFromRelease(r: Release): TrackInfo {
@@ -651,8 +845,45 @@ export default function ShellV1Experiment() {
   // Search state lives at the page level so click-artist / click-title in
   // any view can populate it and open the breadcrumb-takeover.
   const [searchOpen, setSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchPills, setSearchPills] = useState<FilterPill[]>([]);
   const [keyMode, setKeyMode] = useState<'normal' | 'camelot'>('normal');
+
+  const artistOptions = useMemo(
+    () =>
+      Array.from(new Set(TRACKS.flatMap(t => t.artist.split(/ & | feat\. /)))),
+    []
+  );
+  const titleOptions = useMemo(
+    () => Array.from(new Set(TRACKS.map(t => t.title))).slice(0, 30),
+    []
+  );
+  const albumOptions = useMemo(
+    () => Array.from(new Set(TRACKS.map(t => t.album).filter(a => a !== '—'))),
+    []
+  );
+
+  function addPill(field: FilterField, value: string) {
+    setSearchPills(prev => {
+      // Merge into existing same-field same-op pill as an OR value.
+      const existing = prev.find(p => p.field === field && p.op === 'is');
+      if (existing) {
+        if (existing.values.includes(value)) return prev;
+        return prev.map(p =>
+          p.id === existing.id ? { ...p, values: [...p.values, value] } : p
+        );
+      }
+      return [
+        ...prev,
+        {
+          id: `${field}-${value}-${Date.now()}`,
+          field,
+          op: 'is',
+          values: [value],
+        },
+      ];
+    });
+    setSearchOpen(true);
+  }
   const playingRelease = RELEASES.find(r => r.id === playingReleaseId);
   const currentTrack: TrackInfo = playingRelease
     ? trackFromRelease(playingRelease)
@@ -689,7 +920,14 @@ export default function ShellV1Experiment() {
       if (e.code === 'Space') {
         e.preventDefault();
         setIsPlaying(p => !p);
-      } else if (e.key === '[') {
+      } else if (
+        e.key === '[' ||
+        (e.key === 'Tab' &&
+          !e.shiftKey &&
+          !e.metaKey &&
+          !e.ctrlKey &&
+          !e.altKey)
+      ) {
         e.preventDefault();
         setSidebarMode(m => (m === 'docked' ? 'floating' : 'docked'));
       } else if ((e.metaKey || e.ctrlKey) && e.key === '\\') {
@@ -720,12 +958,26 @@ export default function ShellV1Experiment() {
 
   return (
     <div
+      // Cool-tone palette override. Subtle blue-shift on the surface tokens
+      // so the grays feel electric / nightlife rather than corporate.
+      // Keep the change tiny — only a few units of hue + a touch more density.
+      style={
+        {
+          // Near-neutral cool grays. Tiny blue lift only — read as black at
+          // first glance; "electric" only via the cyan accent on selection.
+          '--linear-bg-page': '#08090b',
+          '--linear-bg-surface-0': '#0c0e11',
+          '--linear-bg-surface-1': '#13161b',
+          '--linear-bg-surface-2': '#191d23',
+          '--linear-app-content-surface': '#0d0f13',
+          '--linear-app-shell-border': '#1a1d23',
+          '--linear-app-shell-radius': '12px',
+          opacity: mounted ? 1 : 0,
+          transform: mounted ? 'scale(1)' : 'scale(0.985)',
+          transition: `opacity 600ms ${EASE_CINEMATIC}, transform 600ms ${EASE_CINEMATIC}`,
+        } as React.CSSProperties
+      }
       className='flex h-dvh w-full overflow-hidden bg-(--linear-bg-page) lg:gap-2 lg:p-2'
-      style={{
-        opacity: mounted ? 1 : 0,
-        transform: mounted ? 'scale(1)' : 'scale(0.985)',
-        transition: `opacity 600ms ${EASE_CINEMATIC}, transform 600ms ${EASE_CINEMATIC}`,
-      }}
     >
       {/* Docked sidebar — always mounted; width + opacity animate so the
           canvas slides over smoothly when the user pins/unpins. */}
@@ -777,9 +1029,12 @@ export default function ShellV1Experiment() {
               setSidebarMode(m => (m === 'docked' ? 'floating' : 'docked'))
             }
             searchOpen={searchOpen}
-            searchQuery={searchQuery}
+            searchPills={searchPills}
             onSearchOpenChange={setSearchOpen}
-            onSearchQueryChange={setSearchQuery}
+            onPillsChange={setSearchPills}
+            artistOptions={artistOptions}
+            titleOptions={titleOptions}
+            albumOptions={albumOptions}
           />
           <div className='flex-1 min-h-0 overflow-hidden flex'>
             <div className='flex-1 min-h-0 min-w-0 overflow-y-auto'>
@@ -804,14 +1059,12 @@ export default function ShellV1Experiment() {
                     setCurrentTimeSec(sec);
                     setIsPlaying(true);
                   }}
-                  onFilterByArtist={name => {
-                    setSearchQuery(`artist:${name}`);
-                    setSearchOpen(true);
-                  }}
+                  onFilterByArtist={name => addPill('artist', name)}
                 />
               ) : (
                 <TracksView
                   tracks={TRACKS}
+                  pills={searchPills}
                   playingId={playingReleaseId}
                   isPlaying={isPlaying}
                   currentTimeSec={currentTimeSec}
@@ -828,10 +1081,7 @@ export default function ShellV1Experiment() {
                     setCurrentTimeSec(sec);
                     setIsPlaying(true);
                   }}
-                  onFilter={(field, value) => {
-                    setSearchQuery(`${field}:${value}`);
-                    setSearchOpen(true);
-                  }}
+                  onFilter={(field, value) => addPill(field, value)}
                 />
               )}
             </div>
@@ -1352,19 +1602,24 @@ function Header({
   sidebarMode,
   onToggleSidebar,
   searchOpen,
-  searchQuery,
+  searchPills,
   onSearchOpenChange,
-  onSearchQueryChange,
+  onPillsChange,
+  artistOptions,
+  titleOptions,
+  albumOptions,
 }: {
   sidebarMode: 'docked' | 'floating';
   onToggleSidebar: () => void;
   searchOpen: boolean;
-  searchQuery: string;
+  searchPills: FilterPill[];
   onSearchOpenChange: (open: boolean) => void;
-  onSearchQueryChange: (q: string) => void;
+  onPillsChange: (next: FilterPill[]) => void;
+  artistOptions: string[];
+  titleOptions: string[];
+  albumOptions: string[];
 }) {
   const sidebarHidden = sidebarMode === 'floating';
-  const searchRef = useRef<HTMLInputElement>(null);
 
   // Cmd+K opens the search-takeover. Esc closes it.
   useEffect(() => {
@@ -1381,7 +1636,7 @@ function Header({
       } else if (e.key === 'Escape' && searchOpen) {
         e.preventDefault();
         onSearchOpenChange(false);
-        onSearchQueryChange('');
+        onPillsChange([]);
       } else if (!inField && e.key === '/') {
         e.preventDefault();
         onSearchOpenChange(true);
@@ -1389,15 +1644,7 @@ function Header({
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [searchOpen, onSearchOpenChange, onSearchQueryChange]);
-
-  // Focus the input when search opens.
-  useEffect(() => {
-    if (searchOpen) {
-      const id = requestAnimationFrame(() => searchRef.current?.focus());
-      return () => cancelAnimationFrame(id);
-    }
-  }, [searchOpen]);
+  }, [searchOpen, onSearchOpenChange, onPillsChange]);
 
   return (
     <header className='shrink-0 h-12 px-3 flex items-center gap-2'>
@@ -1454,7 +1701,7 @@ function Header({
           ))}
         </div>
 
-        {/* Search takeover */}
+        {/* Search takeover — pill-based filter bar */}
         <div
           aria-hidden={!searchOpen}
           className='absolute inset-0 flex items-center'
@@ -1465,22 +1712,18 @@ function Header({
             transition: `opacity 250ms ${EASE_CINEMATIC}, transform 250ms ${EASE_CINEMATIC}`,
           }}
         >
-          <Search
-            className='h-3.5 w-3.5 text-tertiary-token mr-2 shrink-0'
-            strokeWidth={2.25}
-          />
-          <input
-            ref={searchRef}
-            type='text'
-            placeholder='Search anything…'
-            value={searchQuery}
-            onChange={e => onSearchQueryChange(e.target.value)}
-            className='flex-1 bg-transparent text-[13px] text-primary-token placeholder:text-tertiary-token outline-none'
-            onBlur={() => {
-              if (!searchQuery) onSearchOpenChange(false);
+          <PillSearch
+            active={searchOpen}
+            pills={searchPills}
+            onPillsChange={onPillsChange}
+            artistOptions={artistOptions}
+            titleOptions={titleOptions}
+            albumOptions={albumOptions}
+            onClose={() => {
+              onSearchOpenChange(false);
+              onPillsChange([]);
             }}
           />
-          <kbd className='ml-2 text-[10px] text-quaternary-token'>esc</kbd>
         </div>
       </div>
 
@@ -2406,6 +2649,9 @@ function VariantPicker({
   view: CanvasView;
   onView: (v: CanvasView) => void;
 }) {
+  // Picker is dev-only chrome — start collapsed so it doesn't cover the
+  // top-right corner of the actual UI being designed.
+  const [open, setOpen] = useState(false);
   const variants: Array<{ id: Variant; name: string }> = useMemo(
     () => [
       { id: 'c', name: 'Filled (locked)' },
@@ -2417,11 +2663,35 @@ function VariantPicker({
     []
   );
 
+  if (!open) {
+    return (
+      <button
+        type='button'
+        onClick={() => setOpen(true)}
+        className='fixed top-3 right-3 z-50 h-7 px-2.5 rounded-md text-[10.5px] font-caption uppercase tracking-[0.08em] text-tertiary-token border border-(--linear-app-shell-border) bg-(--linear-app-content-surface)/85 backdrop-blur-xl hover:text-primary-token hover:bg-surface-1 transition-colors duration-150 ease-out'
+        title='Open dev picker'
+      >
+        dev
+      </button>
+    );
+  }
+
   return (
     <div className='fixed top-3 right-3 z-50 rounded-xl border border-subtle bg-(--linear-app-content-surface)/95 backdrop-blur-xl shadow-[0_12px_40px_rgba(0,0,0,0.12)] p-2 w-[240px]'>
-      <p className='text-[10px] uppercase tracking-wider text-tertiary-token px-2 pt-1 pb-1.5 font-semibold'>
-        Canvas
-      </p>
+      <div className='flex items-center justify-between px-2 pt-1 pb-1.5'>
+        <p className='text-[10px] uppercase tracking-wider text-tertiary-token font-semibold'>
+          Canvas
+        </p>
+        <button
+          type='button'
+          onClick={() => setOpen(false)}
+          className='h-5 w-5 grid place-items-center rounded text-quaternary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-150 ease-out'
+          aria-label='Hide picker'
+          title='Hide picker'
+        >
+          <ChevronRight className='h-3 w-3' strokeWidth={2.25} />
+        </button>
+      </div>
       <div className='flex items-center gap-1 px-1 pb-2 border-b border-subtle'>
         {(['demo', 'releases', 'tracks'] as CanvasView[]).map(v => (
           <button
@@ -2571,6 +2841,440 @@ function JovieOverlay({ listening }: { listening: boolean }) {
 }
 
 // ---------------------------------------------------------------------------
+// PillSearch — Linear/Notion-style filter chip experience.
+// - Type to see suggestions: matching field shortcuts AND matching values
+//   (artist, title, album) ranked by simple substring + initials match.
+// - Enter / click commits a pill into the bar.
+// - Pills support `is` ↔ `is not` op toggle (click the operator label) and
+//   merge when adding more values to the same field (artist is X or Y).
+// - Backspace at start of input → removes last pill.
+// - ↑/↓ navigates the suggestion list.
+// ---------------------------------------------------------------------------
+
+const FIELD_LABEL: Record<FilterField, string> = {
+  artist: 'Artist',
+  title: 'Title',
+  album: 'Album',
+  status: 'Status',
+  bpm: 'BPM',
+  key: 'Key',
+  has: 'Has',
+};
+
+const STATUS_VALUES = ['released', 'scheduled', 'draft'] as const;
+const HAS_VALUES = ['video', 'canvas'] as const;
+
+type Suggestion =
+  | { kind: 'value'; field: FilterField; value: string; score: number }
+  | { kind: 'field'; field: FilterField; score: number };
+
+function fuzzy(needle: string, hay: string): number {
+  if (!needle) return 1;
+  const n = needle.toLowerCase();
+  const h = hay.toLowerCase();
+  if (h === n) return 100;
+  if (h.startsWith(n)) return 80;
+  if (h.includes(n)) return 60;
+  // initials match: "fo" matches "Frank Ocean"
+  const initials = h
+    .split(/[^a-z0-9]+/)
+    .map(w => w[0])
+    .join('');
+  if (initials.startsWith(n)) return 70;
+  // char-in-order subsequence
+  let i = 0;
+  for (const c of h) {
+    if (c === n[i]) i++;
+    if (i === n.length) return 30;
+  }
+  return 0;
+}
+
+// Slash aliases — `/track` maps to title.
+const SLASH_ALIAS: Record<string, FilterField> = {
+  track: 'title',
+};
+
+type SlashParse =
+  | null
+  | { kind: 'choosing'; query: string }
+  | { kind: 'scoped'; field: FilterField; query: string };
+
+function parseSlash(text: string): SlashParse {
+  if (!text.startsWith('/')) return null;
+  const rest = text.slice(1);
+  const space = rest.indexOf(' ');
+  if (space === -1) return { kind: 'choosing', query: rest };
+  const cmd = rest.slice(0, space).toLowerCase();
+  const query = rest.slice(space + 1);
+  const aliased = SLASH_ALIAS[cmd];
+  if (aliased) return { kind: 'scoped', field: aliased, query };
+  const matched = (Object.keys(FIELD_LABEL) as FilterField[]).find(
+    f => f === cmd || FIELD_LABEL[f].toLowerCase() === cmd
+  );
+  if (matched) return { kind: 'scoped', field: matched, query };
+  return { kind: 'choosing', query: rest };
+}
+
+function fieldValueOptions(
+  field: FilterField,
+  artistOptions: string[],
+  titleOptions: string[],
+  albumOptions: string[]
+): string[] {
+  switch (field) {
+    case 'artist':
+      return artistOptions;
+    case 'title':
+      return titleOptions;
+    case 'album':
+      return albumOptions;
+    case 'status':
+      return [...STATUS_VALUES];
+    case 'has':
+      return [...HAS_VALUES];
+    case 'bpm':
+    case 'key':
+      return [];
+  }
+}
+
+function PillSearch({
+  active,
+  pills,
+  onPillsChange,
+  artistOptions,
+  titleOptions,
+  albumOptions,
+  onClose,
+}: {
+  active: boolean;
+  pills: FilterPill[];
+  onPillsChange: (next: FilterPill[]) => void;
+  artistOptions: string[];
+  titleOptions: string[];
+  albumOptions: string[];
+  onClose: () => void;
+}) {
+  const [text, setText] = useState('');
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [highlight, setHighlight] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (active) {
+      const id = requestAnimationFrame(() => inputRef.current?.focus());
+      return () => cancelAnimationFrame(id);
+    }
+  }, [active]);
+
+  function changeText(value: string) {
+    setText(value);
+    setHighlight(0);
+    // Open dropdown whenever there is content; close when empty.
+    setDropdownOpen(value.length > 0);
+  }
+
+  const suggestions = useMemo<Suggestion[]>(() => {
+    if (!text) return [];
+    const slash = parseSlash(text);
+
+    // Slash-mode: choosing a field after `/`
+    if (slash && slash.kind === 'choosing') {
+      const q = slash.query.toLowerCase();
+      const fields = Object.keys(FIELD_LABEL) as FilterField[];
+      const acc: Suggestion[] = [];
+      for (const f of fields) {
+        const labelMatch = fuzzy(q, FIELD_LABEL[f]);
+        const aliasMatch = Object.entries(SLASH_ALIAS).reduce(
+          (m, [alias, target]) =>
+            target === f ? Math.max(m, fuzzy(q, alias)) : m,
+          0
+        );
+        const score = Math.max(labelMatch, aliasMatch);
+        if (q === '') {
+          acc.push({ kind: 'field', field: f, score: 100 });
+        } else if (score > 0) {
+          acc.push({ kind: 'field', field: f, score });
+        }
+      }
+      return acc.sort((a, b) => b.score - a.score).slice(0, 8);
+    }
+
+    // Slash-mode: scoped value search e.g. "/artist Bah"
+    if (slash && slash.kind === 'scoped') {
+      const q = slash.query.toLowerCase().trim();
+      const opts = fieldValueOptions(
+        slash.field,
+        artistOptions,
+        titleOptions,
+        albumOptions
+      );
+      return opts
+        .map(v => ({
+          kind: 'value' as const,
+          field: slash.field,
+          value: v,
+          score: fuzzy(q, v),
+        }))
+        .filter(s => s.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 8);
+    }
+
+    // Free-text mode: fuzzy across all major axes.
+    const q = text.trim();
+    const out: Suggestion[] = [];
+    artistOptions.forEach(v => {
+      const s = fuzzy(q, v);
+      if (s > 0)
+        out.push({ kind: 'value', field: 'artist', value: v, score: s + 5 });
+    });
+    titleOptions.forEach(v => {
+      const s = fuzzy(q, v);
+      if (s > 0)
+        out.push({ kind: 'value', field: 'title', value: v, score: s });
+    });
+    albumOptions.forEach(v => {
+      const s = fuzzy(q, v);
+      if (s > 0)
+        out.push({ kind: 'value', field: 'album', value: v, score: s });
+    });
+    STATUS_VALUES.forEach(v => {
+      const s = fuzzy(q, v);
+      if (s > 0)
+        out.push({ kind: 'value', field: 'status', value: v, score: s });
+    });
+    HAS_VALUES.forEach(v => {
+      const s = fuzzy(q, v);
+      if (s > 0) out.push({ kind: 'value', field: 'has', value: v, score: s });
+    });
+    out.sort((a, b) => b.score - a.score);
+    return out.slice(0, 8);
+  }, [text, artistOptions, titleOptions, albumOptions]);
+
+  function commitSuggestion(sug: Suggestion) {
+    if (sug.kind === 'value') {
+      const merged = pills.map(p =>
+        p.field === sug.field && p.op === 'is' && !p.values.includes(sug.value)
+          ? { ...p, values: [...p.values, sug.value] }
+          : p
+      );
+      const hadField = pills.some(p => p.field === sug.field && p.op === 'is');
+      onPillsChange(
+        hadField
+          ? merged
+          : [
+              ...pills,
+              {
+                id: `${sug.field}-${sug.value}-${Date.now()}`,
+                field: sug.field,
+                op: 'is',
+                values: [sug.value],
+              },
+            ]
+      );
+      // After committing a pill: close the menu and clear text so the user
+      // can type freely (or hit `/` to summon the menu again).
+      setText('');
+      setDropdownOpen(false);
+      setHighlight(0);
+    } else {
+      // Field selected from slash menu → scope subsequent typing to it.
+      setText(`/${FIELD_LABEL[sug.field]} `);
+      setDropdownOpen(true);
+      setHighlight(0);
+    }
+  }
+
+  function togglePillOp(id: string) {
+    onPillsChange(
+      pills.map(p =>
+        p.id === id ? { ...p, op: p.op === 'is' ? 'is not' : 'is' } : p
+      )
+    );
+  }
+  function removePill(id: string) {
+    onPillsChange(pills.filter(p => p.id !== id));
+  }
+  function removeValue(pillId: string, value: string) {
+    onPillsChange(
+      pills
+        .map(p =>
+          p.id === pillId
+            ? { ...p, values: p.values.filter(v => v !== value) }
+            : p
+        )
+        .filter(p => p.values.length > 0)
+    );
+  }
+
+  function onInputKey(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlight(h => Math.min(suggestions.length - 1, h + 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlight(h => Math.max(0, h - 1));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const sug = suggestions[highlight];
+      if (sug) commitSuggestion(sug);
+    } else if (e.key === 'Backspace' && text === '' && pills.length > 0) {
+      e.preventDefault();
+      onPillsChange(pills.slice(0, -1));
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      if (text) {
+        changeText('');
+      } else {
+        onClose();
+      }
+    }
+  }
+
+  return (
+    <div className='relative w-full'>
+      <div className='flex items-center gap-1.5 flex-wrap min-h-7 pr-2'>
+        <Search
+          className='h-3.5 w-3.5 text-quaternary-token shrink-0'
+          strokeWidth={2.25}
+        />
+        {pills.map(p => (
+          <PillChip
+            key={p.id}
+            pill={p}
+            onToggleOp={() => togglePillOp(p.id)}
+            onRemove={() => removePill(p.id)}
+            onRemoveValue={v => removeValue(p.id, v)}
+          />
+        ))}
+        <input
+          ref={inputRef}
+          type='text'
+          value={text}
+          onChange={e => changeText(e.target.value)}
+          onKeyDown={onInputKey}
+          placeholder={
+            pills.length === 0
+              ? 'Type to filter — / for fields'
+              : 'and… (/ for fields)'
+          }
+          className='flex-1 min-w-[120px] bg-transparent text-[13px] text-primary-token placeholder:text-tertiary-token outline-none'
+        />
+        <kbd className='text-[10px] text-quaternary-token shrink-0'>esc</kbd>
+      </div>
+
+      {/* Suggestion dropdown */}
+      {active && dropdownOpen && suggestions.length > 0 && (
+        <div className='absolute left-0 right-0 top-9 z-40 rounded-lg border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) shadow-[0_18px_60px_rgba(0,0,0,0.32)] py-1 max-h-[320px] overflow-y-auto'>
+          {suggestions.map((sug, i) => (
+            <button
+              key={`${sug.kind}-${sug.kind === 'value' ? sug.field + sug.value : sug.field}`}
+              type='button'
+              onMouseEnter={() => setHighlight(i)}
+              onMouseDown={e => {
+                e.preventDefault();
+                commitSuggestion(sug);
+              }}
+              className={cn(
+                'w-full flex items-center gap-2 px-2.5 py-1.5 text-left text-[12.5px] transition-colors duration-100 ease-out',
+                i === highlight
+                  ? 'bg-cyan-500/10 text-primary-token'
+                  : 'text-secondary-token hover:bg-surface-1/60'
+              )}
+            >
+              <span
+                className={cn(
+                  'inline-flex items-center h-[18px] px-1.5 rounded text-[10px] font-caption uppercase tracking-[0.06em]',
+                  i === highlight
+                    ? 'bg-cyan-500/15 text-cyan-300'
+                    : 'bg-surface-1 text-tertiary-token'
+                )}
+              >
+                {FIELD_LABEL[sug.field]}
+              </span>
+              <span className='flex-1 truncate'>
+                {sug.kind === 'value' ? (
+                  sug.value
+                ) : (
+                  <span className='text-tertiary-token italic'>
+                    Filter by {FIELD_LABEL[sug.field].toLowerCase()}…
+                  </span>
+                )}
+              </span>
+              {i === highlight && (
+                <kbd className='text-[10px] text-quaternary-token shrink-0'>
+                  ↵
+                </kbd>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PillChip({
+  pill,
+  onToggleOp,
+  onRemove,
+  onRemoveValue,
+}: {
+  pill: FilterPill;
+  onToggleOp: () => void;
+  onRemove: () => void;
+  onRemoveValue: (value: string) => void;
+}) {
+  return (
+    <span className='group/pill inline-flex items-center h-[22px] rounded-md border border-cyan-500/30 bg-cyan-500/10 text-[11.5px] font-caption text-secondary-token tracking-[-0.005em] overflow-hidden'>
+      <span className='px-1.5 text-cyan-300/90 uppercase text-[10px] tracking-[0.06em] border-r border-cyan-500/20'>
+        {FIELD_LABEL[pill.field]}
+      </span>
+      <button
+        type='button'
+        onClick={onToggleOp}
+        className='px-1.5 text-tertiary-token hover:text-primary-token transition-colors duration-150 ease-out'
+        title='Toggle is / is not'
+      >
+        {pill.op}
+      </button>
+      <span className='inline-flex items-center gap-0.5 pr-0.5'>
+        {pill.values.map((v, i) => (
+          <span key={v} className='inline-flex items-center'>
+            {i > 0 && (
+              <span className='px-0.5 text-quaternary-token uppercase text-[10px]'>
+                or
+              </span>
+            )}
+            <span className='inline-flex items-center bg-cyan-500/15 px-1.5 h-[18px] rounded text-cyan-100/95'>
+              {v}
+              <button
+                type='button'
+                onClick={() => onRemoveValue(v)}
+                className='ml-1 text-cyan-300/70 hover:text-cyan-100 transition-colors duration-150 ease-out'
+                aria-label={`Remove ${v}`}
+              >
+                ×
+              </button>
+            </span>
+          </span>
+        ))}
+      </span>
+      <button
+        type='button'
+        onClick={onRemove}
+        className='px-1.5 text-cyan-300/70 hover:text-cyan-100 transition-colors duration-150 ease-out'
+        aria-label='Remove filter'
+      >
+        ×
+      </button>
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Releases — Apple Music-style row list with Linear-style stacked chip
 // expansion on the right rail. Keyboard-navigable: ↑/↓ moves focus, Enter
 // opens the drawer, Space plays/pauses the focused row, Esc closes drawer.
@@ -2632,16 +3336,13 @@ function ReleasesView({
       onKeyDown={handleKey}
       aria-label='Releases'
     >
-      <header className='shrink-0 px-6 pt-6 pb-4 flex items-end justify-between'>
-        <div>
-          <h1 className='text-[22px] font-display tracking-[-0.02em] text-primary-token leading-tight'>
-            Releases
-          </h1>
-          <p className='text-[12.5px] text-tertiary-token mt-0.5'>
-            {releases.length} releases · ↑/↓ navigate · Enter opens · Space
-            plays · hold ⌘J to ask Jovie
-          </p>
-        </div>
+      <header className='shrink-0 px-6 pt-5 pb-4 flex items-baseline gap-3'>
+        <h1 className='text-[22px] font-display tracking-[-0.02em] text-primary-token leading-tight'>
+          Releases
+        </h1>
+        <span className='text-[12px] text-quaternary-token tabular-nums'>
+          {releases.length}
+        </span>
       </header>
       <div className='flex-1 min-h-0 overflow-y-auto px-3 pb-6'>
         <ul className='space-y-px'>
@@ -2716,15 +3417,13 @@ function ReleaseRow({
       data-selected={isSelected || undefined}
       data-focused={isFocused || undefined}
       className={cn(
-        'group/row relative grid items-center gap-3 h-[52px] rounded-md pl-2 pr-3 cursor-pointer transition-colors duration-150 ease-out',
+        'group/row relative grid items-center gap-3 h-[52px] rounded-md pl-2 pr-3 cursor-pointer transition-colors duration-150 ease-out focus:outline-none',
         // [#] [art] [title/artist+badge fluid] [date] [right cluster: streams + DSP stack]
         drawerOpen
           ? 'grid-cols-[24px_40px_minmax(0,1fr)_auto]'
           : 'grid-cols-[24px_40px_minmax(0,1fr)_auto_auto]',
-        isSelected && 'bg-surface-1',
-        !isSelected && 'hover:bg-surface-1/50',
-        isFocused &&
-          'ring-1 ring-inset ring-(--linear-app-shell-border) ring-offset-0'
+        !isSelected && !isFocused && 'hover:bg-surface-1/50',
+        SELECTED_ROW_CLASSES
       )}
     >
       {/* Index / Play indicator column */}
@@ -3009,22 +3708,31 @@ function chipLabel(tone: 'green' | 'amber' | 'red' | 'neutral') {
 }
 
 // Inline per-row waveform (Lexicon DJ-inspired): low-contrast at rest,
-// brighter when this row's track is playing. Click anywhere to seek.
-// Cue markers sit just above the waveform as small color-coded ticks.
+// brighter when this row's track is playing. Click anywhere to seek. Cue
+// markers are vertical line overlays *on* the waveform — span its full
+// height with a subtle dot at the top edge.
 const ROW_WF_W = 600;
-const ROW_WF_H = 26;
-const ROW_WF_TOP = 6; // reserved for cue ticks
-const ROW_WF_WAVE_H = ROW_WF_H - ROW_WF_TOP;
-const ROW_WF_CY = ROW_WF_TOP + ROW_WF_WAVE_H / 2;
-const ROW_WF_AMP = ROW_WF_WAVE_H / 2 - 1;
+const ROW_WF_H = 24;
+const ROW_WF_CY = ROW_WF_H / 2;
+const ROW_WF_AMP = ROW_WF_H / 2 - 1;
 
-const CUE_TONE: Record<CueKind, string> = {
+// Cue marker colors. Subtle by default — color is the *only* signal of
+// section, so each is unmistakable but never loud.
+const CUE_TONE_LINE: Record<CueKind, string> = {
+  intro: 'bg-sky-400/45',
+  verse: 'bg-tertiary-token/40',
+  chorus: 'bg-emerald-400/55',
+  drop: 'bg-amber-400/65',
+  bridge: 'bg-violet-400/55',
+  outro: 'bg-quaternary-token/55',
+};
+const CUE_TONE_DOT: Record<CueKind, string> = {
   intro: 'bg-sky-400',
-  verse: 'bg-tertiary-token/70',
+  verse: 'bg-tertiary-token',
   chorus: 'bg-emerald-400',
   drop: 'bg-amber-400',
   bridge: 'bg-violet-400',
-  outro: 'bg-quaternary-token/80',
+  outro: 'bg-quaternary-token',
 };
 
 function rowWaveformPeaks(seed: number) {
@@ -3164,7 +3872,7 @@ function RowWaveform({
           <line
             x1={(playedPct / 100) * ROW_WF_W}
             x2={(playedPct / 100) * ROW_WF_W}
-            y1={ROW_WF_TOP - 2}
+            y1={0}
             y2={ROW_WF_H}
             stroke='currentColor'
             strokeWidth='1'
@@ -3174,21 +3882,33 @@ function RowWaveform({
         )}
       </svg>
 
-      {/* Cue ticks layered above the SVG so we can use Tailwind tokens */}
-      <div className='pointer-events-none absolute inset-x-0 top-0 h-[5px]'>
+      {/* Cue overlays — vertical line spans full waveform height + a small
+          dot at the top edge for color recognition. Subtle until hover. */}
+      <div className='pointer-events-none absolute inset-0'>
         {release.cues.map(c => {
           const left = (c.at / release.durationSec) * 100;
           return (
             <span
               key={`${release.id}-${c.label}-${c.at}`}
-              className={cn(
-                'absolute top-0 h-[5px] w-px rounded-sm transition-opacity duration-150 ease-out',
-                CUE_TONE[c.kind],
-                'opacity-60 group-hover/wf:opacity-100'
-              )}
-              style={{ left: `${left}%` }}
+              className='absolute inset-y-0'
+              style={{ left: `${left}%`, transform: 'translateX(-0.5px)' }}
               title={`${c.label} · ${formatTime(c.at)}`}
-            />
+            >
+              <span
+                className={cn(
+                  'absolute inset-y-0 w-px transition-opacity duration-150 ease-out',
+                  CUE_TONE_LINE[c.kind],
+                  'opacity-50 group-hover/wf:opacity-90'
+                )}
+              />
+              <span
+                className={cn(
+                  'absolute -top-px h-[3px] w-[3px] rounded-full -translate-x-[1px] transition-opacity duration-150 ease-out',
+                  CUE_TONE_DOT[c.kind],
+                  'opacity-80 group-hover/wf:opacity-100'
+                )}
+              />
+            </span>
           );
         })}
       </div>
@@ -3393,8 +4113,18 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 // status icons, and click-to-filter on artist + title.
 // ---------------------------------------------------------------------------
 
+type SortField =
+  | 'index'
+  | 'title'
+  | 'artist'
+  | 'bpm'
+  | 'key'
+  | 'energy'
+  | 'rating';
+
 function TracksView({
   tracks,
+  pills,
   playingId,
   isPlaying,
   currentTimeSec,
@@ -3405,6 +4135,7 @@ function TracksView({
   onFilter,
 }: {
   tracks: Track[];
+  pills: FilterPill[];
   playingId: string;
   isPlaying: boolean;
   currentTimeSec: number;
@@ -3415,17 +4146,52 @@ function TracksView({
   onFilter: (field: 'artist' | 'title' | 'album', value: string) => void;
 }) {
   const [focusedIndex, setFocusedIndex] = useState(0);
+  const [sortBy, setSortBy] = useState<SortField>('index');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
+  function toggleSort(field: SortField) {
+    if (field === sortBy) {
+      setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(field);
+      setSortDir('asc');
+    }
+  }
+
+  // Filter rows live from pill state. Pills compose with implicit AND;
+  // values inside a pill compose with implicit OR.
+  const filtered = useMemo(() => {
+    if (pills.length === 0) return tracks;
+    return tracks.filter(t =>
+      pills.every(p => {
+        const matches = p.values.some(v => trackMatchesPill(t, p.field, v));
+        return p.op === 'is' ? matches : !matches;
+      })
+    );
+  }, [tracks, pills]);
+
+  const sorted = useMemo(() => {
+    if (sortBy === 'index') return filtered;
+    const cmp = (a: Track, b: Track): number => {
+      const va = sortValue(a, sortBy, keyMode);
+      const vb = sortValue(b, sortBy, keyMode);
+      if (typeof va === 'number' && typeof vb === 'number') return va - vb;
+      return String(va).localeCompare(String(vb));
+    };
+    const arr = [...filtered].sort(cmp);
+    return sortDir === 'asc' ? arr : arr.reverse();
+  }, [filtered, sortBy, sortDir, keyMode]);
 
   function handleKey(e: React.KeyboardEvent) {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setFocusedIndex(i => Math.min(tracks.length - 1, i + 1));
+      setFocusedIndex(i => Math.min(sorted.length - 1, i + 1));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setFocusedIndex(i => Math.max(0, i - 1));
     } else if (e.code === 'Space') {
       e.preventDefault();
-      const t = tracks[focusedIndex];
+      const t = sorted[focusedIndex];
       if (t) onPlay(t.id);
     }
   }
@@ -3439,82 +4205,96 @@ function TracksView({
       onKeyDown={handleKey}
       aria-label='Tracks'
     >
-      <header className='shrink-0 px-6 pt-6 pb-3 flex items-end justify-between gap-3'>
-        <div>
-          <h1 className='text-[22px] font-display tracking-[-0.02em] text-primary-token leading-tight'>
-            Tracks
-          </h1>
-          <p className='text-[12.5px] text-tertiary-token mt-0.5'>
-            {tracks.length} tracks · click artist or title to filter · ↑/↓
-            navigate · Space plays · hold ⌘J to ask Jovie
-          </p>
+      <div className='flex-1 min-h-0 overflow-y-auto px-1 pt-2'>
+        {/* Sticky column header strip — pinned for big libraries. Identity
+            for the page lives in the breadcrumb; the row count + key-mode
+            toggle ride along on the same line as the column labels. */}
+        <div className='sticky top-0 z-10 bg-(--linear-app-content-surface)/95 backdrop-blur-md px-2 pt-2 pb-1.5 flex items-center gap-3 select-none border-b border-(--linear-app-shell-border)/50'>
+          <ColumnLabel
+            field='index'
+            label='#'
+            width='w-5'
+            align='right'
+            sortBy={sortBy}
+            sortDir={sortDir}
+            onSort={toggleSort}
+          />
+          <span className='w-7 shrink-0' />
+          <ColumnLabel
+            field='title'
+            label='Title'
+            flex
+            align='left'
+            sortBy={sortBy}
+            sortDir={sortDir}
+            onSort={toggleSort}
+          />
+          <ColumnLabel
+            field='artist'
+            label='Artist'
+            width='w-[170px]'
+            align='left'
+            sortBy={sortBy}
+            sortDir={sortDir}
+            onSort={toggleSort}
+          />
+          <ColumnLabel
+            field='bpm'
+            label='BPM'
+            width='w-[44px]'
+            align='right'
+            sortBy={sortBy}
+            sortDir={sortDir}
+            onSort={toggleSort}
+          />
+          <button
+            type='button'
+            onClick={onKeyModeToggle}
+            className='w-[58px] shrink-0 inline-flex items-center justify-end gap-1 text-[9.5px] uppercase tracking-[0.12em] font-medium text-quaternary-token/85 hover:text-secondary-token transition-colors duration-150 ease-out'
+            title={`Switch to ${keyMode === 'normal' ? 'Camelot' : 'standard'} key notation`}
+          >
+            {keyMode === 'normal' ? 'Key' : 'Cam'}
+          </button>
+          <span className='w-[176px] shrink-0 text-left text-[9.5px] uppercase tracking-[0.12em] font-medium text-quaternary-token/85'>
+            Waveform
+          </span>
+          <span className='w-[44px] shrink-0 text-right text-[9.5px] uppercase tracking-[0.12em] font-medium text-quaternary-token/85'>
+            State
+          </span>
+          <span className='w-10 shrink-0 text-right text-[10px] tabular-nums text-quaternary-token/70'>
+            {sorted.length}
+          </span>
         </div>
-        <button
-          type='button'
-          onClick={onKeyModeToggle}
-          className='h-7 px-2.5 rounded-md text-[11px] font-caption text-secondary-token border border-(--linear-app-shell-border) hover:bg-surface-1 hover:text-primary-token transition-colors duration-150 ease-out'
-          title={`Switch to ${keyMode === 'normal' ? 'Camelot' : 'standard'} key notation`}
-        >
-          Key: {keyMode === 'normal' ? 'Standard' : 'Camelot'}
-        </button>
-      </header>
 
-      <div className='flex-1 min-h-0 overflow-y-auto'>
-        <table className='w-full text-[12px] tracking-[-0.005em]'>
-          <colgroup>
-            <col style={{ width: 28 }} />
-            <col style={{ width: 32 }} />
-            <col />
-            <col />
-            <col style={{ width: 64 }} />
-            <col style={{ width: 56 }} />
-            <col style={{ width: 88 }} />
-            <col style={{ width: 64 }} />
-            <col style={{ width: 96 }} />
-            <col style={{ width: 56 }} />
-          </colgroup>
-          <thead>
-            <tr className='text-[10px] uppercase tracking-[0.08em] text-quaternary-token/85 font-medium'>
-              <th className='text-left pl-3 py-2'>#</th>
-              <th />
-              <th className='text-left py-2'>Title</th>
-              <th className='text-left py-2'>Artist</th>
-              <th className='text-right py-2 tabular-nums'>BPM</th>
-              <th className='text-right py-2 tabular-nums'>
-                {keyMode === 'normal' ? 'Key' : 'Cam'}
-              </th>
-              <th className='text-left py-2'>Energy</th>
-              <th className='text-left py-2'>Rating</th>
-              <th className='text-left py-2'>Waveform</th>
-              <th className='text-right pr-4 py-2'>State</th>
-            </tr>
-          </thead>
-          <tbody>
-            {tracks.map((t, i) => (
-              <TrackRow
-                key={t.id}
-                track={t}
-                index={i + 1}
-                zebra={i % 2 === 1}
-                isPlaying={t.id === playingId && isPlaying}
-                isCurrentTrack={t.id === playingId}
-                isFocused={i === focusedIndex}
-                currentTimeSec={t.id === playingId ? currentTimeSec : 0}
-                keyMode={keyMode}
-                onSelect={() => setFocusedIndex(i)}
-                onPlay={() => {
-                  setFocusedIndex(i);
-                  onPlay(t.id);
-                }}
-                onSeek={sec => {
-                  setFocusedIndex(i);
-                  onSeek(t.id, sec);
-                }}
-                onFilter={onFilter}
-              />
-            ))}
-          </tbody>
-        </table>
+        <ul className='space-y-px pb-3 pt-1'>
+          {sorted.map((t, i) => (
+            <TrackRow
+              key={t.id}
+              track={t}
+              index={i + 1}
+              isPlaying={t.id === playingId && isPlaying}
+              isCurrentTrack={t.id === playingId}
+              isFocused={i === focusedIndex}
+              currentTimeSec={t.id === playingId ? currentTimeSec : 0}
+              keyMode={keyMode}
+              onSelect={() => setFocusedIndex(i)}
+              onPlay={() => {
+                setFocusedIndex(i);
+                onPlay(t.id);
+              }}
+              onSeek={sec => {
+                setFocusedIndex(i);
+                onSeek(t.id, sec);
+              }}
+              onFilter={onFilter}
+            />
+          ))}
+          {sorted.length === 0 && (
+            <li className='px-3 py-8 text-center text-[12px] text-tertiary-token'>
+              No tracks match your filters.
+            </li>
+          )}
+        </ul>
       </div>
     </section>
   );
@@ -3523,7 +4303,6 @@ function TracksView({
 function TrackRow({
   track,
   index,
-  zebra,
   isPlaying,
   isCurrentTrack,
   isFocused,
@@ -3536,7 +4315,6 @@ function TrackRow({
 }: {
   track: Track;
   index: number;
-  zebra: boolean;
   isPlaying: boolean;
   isCurrentTrack: boolean;
   isFocused: boolean;
@@ -3548,140 +4326,99 @@ function TrackRow({
   onFilter: (field: 'artist' | 'title' | 'album', value: string) => void;
 }) {
   return (
-    <tr
+    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: parent section delegates ↑/↓/Space; row click is a focus convenience
+    // biome-ignore lint/a11y/useKeyWithClickEvents: same
+    <li
       onClick={onSelect}
       data-focused={isFocused || undefined}
       className={cn(
-        'group/row h-[40px] cursor-pointer transition-colors duration-150 ease-out',
-        zebra ? 'bg-surface-1/30' : 'bg-transparent',
-        'hover:bg-surface-1/60',
-        isFocused &&
-          'outline outline-1 -outline-offset-1 outline-(--linear-app-shell-border)'
+        'group/row relative flex items-center gap-3 h-[44px] pl-2 pr-3 rounded-md cursor-pointer transition-colors duration-150 ease-out focus:outline-none',
+        !isFocused && 'hover:bg-surface-1/40',
+        SELECTED_ROW_CLASSES
       )}
     >
       {/* # / Play */}
-      <td className='pl-3 align-middle'>
-        <div className='relative h-5 w-5 grid place-items-center'>
-          <span
-            className={cn(
-              'text-[11px] tabular-nums text-quaternary-token transition-opacity duration-150 ease-out',
-              (isCurrentTrack || isPlaying) && 'opacity-0',
-              !isCurrentTrack && 'group-hover/row:opacity-0'
-            )}
-          >
-            {index}
-          </span>
-          {isPlaying && <PlayingBars />}
-          <button
-            type='button'
-            onClick={e => {
-              e.stopPropagation();
-              onPlay();
-            }}
-            className={cn(
-              'absolute inset-0 grid place-items-center text-primary-token transition-opacity duration-150 ease-out',
-              isCurrentTrack
-                ? 'opacity-0'
-                : 'opacity-0 group-hover/row:opacity-100'
-            )}
-            aria-label={
-              isPlaying ? `Pause ${track.title}` : `Play ${track.title}`
-            }
-          >
-            {isPlaying ? (
-              <Pause
-                className='h-3 w-3'
-                fill='currentColor'
-                strokeWidth={2.5}
-              />
-            ) : (
-              <Play
-                className='h-3 w-3 translate-x-px'
-                fill='currentColor'
-                strokeWidth={2.5}
-              />
-            )}
-          </button>
-        </div>
-      </td>
-
-      {/* Cropped artwork sliver — Lexicon-style */}
-      <td className='align-middle'>
-        <div className='relative h-7 w-7 rounded-sm overflow-hidden'>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={track.artwork}
-            alt=''
-            className='h-full w-full object-cover'
-          />
-        </div>
-      </td>
-
-      {/* Title */}
-      <td className='align-middle'>
-        <button
-          type='button'
-          onClick={e => {
-            e.stopPropagation();
-            onFilter('title', track.title);
-          }}
-          className='block max-w-full truncate text-[12.5px] font-caption text-primary-token tracking-[-0.012em] hover:underline decoration-quaternary-token underline-offset-2'
-          title='Filter by title'
-        >
-          {track.title}
-        </button>
-      </td>
-
-      {/* Artist */}
-      <td className='align-middle'>
-        <button
-          type='button'
-          onClick={e => {
-            e.stopPropagation();
-            onFilter('artist', track.artist);
-          }}
-          className='block max-w-full truncate text-[12px] text-secondary-token hover:underline decoration-quaternary-token underline-offset-2'
-          title='Filter by artist'
-        >
-          {track.artist}
-        </button>
-      </td>
-
-      {/* BPM */}
-      <td className='align-middle text-right pr-2'>
+      <div className='relative w-5 shrink-0 grid place-items-center'>
         <span
           className={cn(
-            'text-[12px] tabular-nums',
-            track.bpmTone === 'high'
-              ? 'text-rose-400/90'
-              : track.bpmTone === 'low'
-                ? 'text-sky-400/90'
-                : 'text-secondary-token'
+            'text-[11px] tabular-nums text-quaternary-token transition-opacity duration-150 ease-out',
+            (isCurrentTrack || isPlaying) && 'opacity-0',
+            !isCurrentTrack && 'group-hover/row:opacity-0'
           )}
         >
-          {track.bpm}
+          {index}
         </span>
-      </td>
+        {isPlaying && <PlayingBars />}
+        <button
+          type='button'
+          onClick={e => {
+            e.stopPropagation();
+            onPlay();
+          }}
+          className={cn(
+            'absolute inset-0 grid place-items-center text-primary-token transition-opacity duration-150 ease-out',
+            isCurrentTrack
+              ? 'opacity-0'
+              : 'opacity-0 group-hover/row:opacity-100'
+          )}
+          aria-label={
+            isPlaying ? `Pause ${track.title}` : `Play ${track.title}`
+          }
+        >
+          {isPlaying ? (
+            <Pause className='h-3 w-3' fill='currentColor' strokeWidth={2.5} />
+          ) : (
+            <Play
+              className='h-3 w-3 translate-x-px'
+              fill='currentColor'
+              strokeWidth={2.5}
+            />
+          )}
+        </button>
+      </div>
 
-      {/* Key */}
-      <td className='align-middle text-right pr-2'>
-        <span className='text-[12px] tabular-nums text-secondary-token'>
+      {/* Artwork — small cropped sliver */}
+      <div className='relative h-7 w-7 rounded-sm overflow-hidden shrink-0'>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={track.artwork}
+          alt=''
+          className='h-full w-full object-cover'
+        />
+      </div>
+
+      {/* Title — bright, takes the negative space. Plain text — clicking
+          a row should select / play, not collapse the table. Click-to-
+          filter lives on the Releases list (stacked layout, intent is
+          clearer) and on the right rail when it lands. */}
+      <div className='flex-1 min-w-0'>
+        <span className='block w-full max-w-full truncate text-[13px] font-caption text-primary-token tracking-[-0.012em]'>
+          {track.title}
+        </span>
+      </div>
+
+      {/* Artist — its own column so the title isn't crammed. Same: plain
+          text, no click-to-filter on the table. */}
+      <div className='w-[170px] shrink-0 min-w-0'>
+        <span className='block w-full max-w-full truncate text-[12px] text-tertiary-token'>
+          {track.artist}
+        </span>
+      </div>
+
+      {/* BPM — heavier weight, monochrome, right-aligned */}
+      <span className='w-[44px] shrink-0 text-right text-[12.5px] tabular-nums font-semibold text-secondary-token tracking-[-0.01em]'>
+        {track.bpm}
+      </span>
+
+      {/* Key as a badge — quiet pill */}
+      <span className='w-[58px] shrink-0 flex justify-end'>
+        <span className='inline-flex items-center h-[18px] px-1.5 rounded text-[10.5px] font-caption tabular-nums text-secondary-token border border-(--linear-app-shell-border) bg-surface-1/40'>
           {keyMode === 'normal' ? track.keyNormal : track.keyCamelot}
         </span>
-      </td>
+      </span>
 
-      {/* Energy bars */}
-      <td className='align-middle'>
-        <EnergyBars value={track.energy} />
-      </td>
-
-      {/* Rating */}
-      <td className='align-middle'>
-        <RatingDots value={track.rating} />
-      </td>
-
-      {/* Mini waveform — click to seek */}
-      <td className='align-middle'>
+      {/* Mini waveform — wider (176px), cue markers as overlays */}
+      <div className='w-[176px] shrink-0'>
         <RowWaveform
           release={{
             id: track.id,
@@ -3694,17 +4431,20 @@ function TrackRow({
           isCurrentTrack={isCurrentTrack}
           onSeek={onSeek}
         />
-      </td>
+      </div>
 
       {/* Status icons cluster */}
-      <td className='align-middle text-right pr-4'>
+      <div className='w-[44px] shrink-0 text-right'>
         <StatusIcons track={track} />
-      </td>
-    </tr>
+      </div>
+
+      {/* Spacer column to align with header's count cell */}
+      <span className='w-10 shrink-0' />
+    </li>
   );
 }
 
-function EnergyBars({ value }: { value: number }) {
+function _EnergyBars({ value }: { value: number }) {
   return (
     <span
       className='inline-flex items-end gap-[2px] h-3'
@@ -3727,7 +4467,7 @@ function EnergyBars({ value }: { value: number }) {
   );
 }
 
-function RatingDots({ value }: { value: number }) {
+function _RatingDots({ value }: { value: number }) {
   return (
     <span
       className='inline-flex items-center gap-[3px]'
@@ -3770,5 +4510,113 @@ function StatusIcons({ track }: { track: Track }) {
         </span>
       )}
     </span>
+  );
+}
+
+function trackMatchesPill(
+  t: Track,
+  field: FilterField,
+  value: string
+): boolean {
+  const v = value.toLowerCase();
+  switch (field) {
+    case 'artist':
+      return t.artist.toLowerCase().includes(v);
+    case 'title':
+      return t.title.toLowerCase().includes(v);
+    case 'album':
+      return t.album.toLowerCase().includes(v);
+    case 'status':
+      return t.status === value;
+    case 'has':
+      return value === 'video'
+        ? t.hasVideo
+        : value === 'canvas'
+          ? t.hasCanvas
+          : false;
+    case 'bpm':
+      return String(t.bpm) === value;
+    case 'key':
+      return (
+        t.keyNormal.toLowerCase() === v || t.keyCamelot.toLowerCase() === v
+      );
+  }
+}
+
+function sortValue(
+  t: Track,
+  field: SortField,
+  keyMode: 'normal' | 'camelot'
+): string | number {
+  switch (field) {
+    case 'index':
+      return 0;
+    case 'title':
+      return t.title.toLowerCase();
+    case 'artist':
+      return t.artist.toLowerCase();
+    case 'bpm':
+      return t.bpm;
+    case 'key':
+      return keyMode === 'normal' ? t.keyNormal : t.keyCamelot;
+    case 'energy':
+      return t.energy;
+    case 'rating':
+      return t.rating;
+  }
+}
+
+function ColumnLabel({
+  field,
+  label,
+  width,
+  flex,
+  align,
+  sortBy,
+  sortDir,
+  onSort,
+}: {
+  field: SortField;
+  label: string;
+  width?: string;
+  flex?: boolean;
+  align: 'left' | 'right';
+  sortBy: SortField;
+  sortDir: 'asc' | 'desc';
+  onSort: (field: SortField) => void;
+}) {
+  const active = sortBy === field;
+  return (
+    <button
+      type='button'
+      onClick={() => onSort(field)}
+      className={cn(
+        'group/col h-6 px-1 -mx-1 rounded text-[9.5px] uppercase tracking-[0.12em] font-medium transition-colors duration-150 ease-out',
+        flex ? 'flex-1 min-w-0' : (width ?? ''),
+        'shrink-0 inline-flex items-center gap-1',
+        align === 'right' && 'flex-row-reverse',
+        active
+          ? 'text-cyan-300/90'
+          : 'text-quaternary-token/85 hover:text-secondary-token'
+      )}
+    >
+      <span>{label}</span>
+      <span
+        className={cn(
+          'inline-flex items-center transition-opacity duration-150 ease-out',
+          active ? 'opacity-100' : 'opacity-0 group-hover/col:opacity-60'
+        )}
+      >
+        {active ? (
+          sortDir === 'asc' ? (
+            <ArrowUp className='h-2.5 w-2.5' strokeWidth={2.5} />
+          ) : (
+            <ArrowDown className='h-2.5 w-2.5' strokeWidth={2.5} />
+          )
+        ) : (
+          <ArrowUpDown className='h-2.5 w-2.5' strokeWidth={2.25} />
+        )}
+      </span>
+    </button>
   );
 }
