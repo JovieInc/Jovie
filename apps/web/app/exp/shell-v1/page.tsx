@@ -7898,162 +7898,500 @@ function Stat({
   );
 }
 
+type RangeKey = '24h' | '7d' | '30d' | '90d' | 'YTD';
+const RANGES: Array<{ key: RangeKey; label: string; days: number }> = [
+  { key: '24h', label: '24h', days: 1 },
+  { key: '7d', label: '7d', days: 7 },
+  { key: '30d', label: '30d', days: 30 },
+  { key: '90d', label: '90d', days: 90 },
+  { key: 'YTD', label: 'YTD', days: 120 },
+];
+
 function DrawerPerformance({ release }: { release: Release }) {
-  // Until DSP stream data is wired we surface the metric we DO own —
-  // smart-link click-throughs. Same shape (number + delta + sparkline);
-  // labelling is the only thing that flips when stream data lands.
-  // weeklyStreams is reused as a stand-in for click count in the mock.
-  const sparkPoints = useMemo(
-    () => generateSparkline(release.waveformSeed, release.weeklyStreams),
-    [release.waveformSeed, release.weeklyStreams]
+  const [range, setRange] = useState<RangeKey>('7d');
+  const days = RANGES.find(r => r.key === range)?.days ?? 7;
+  const points = useMemo(
+    () => generatePerfPoints(release.waveformSeed, release.weeklyStreams, days),
+    [release.waveformSeed, release.weeklyStreams, days]
   );
+  const total = points.reduce((a, b) => a + b, 0);
   const trendUp = release.weeklyDelta > 0;
   const trendFlat = release.weeklyDelta === 0;
-  const clicks = Math.round(release.weeklyStreams * 0.18); // mock ratio
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+  const activeIdx = hoverIdx ?? points.length - 1;
+  const activeValue = points[activeIdx];
+  const clicks =
+    hoverIdx !== null ? activeValue : Math.round((total / days) * 7);
+  const valueLabel = hoverIdx !== null ? 'on day' : 'clicks';
+  const dayLabel =
+    hoverIdx !== null
+      ? formatDayOffset(activeIdx - (points.length - 1))
+      : `last ${range}`;
+
   return (
     <div>
-      <p className='text-[10px] uppercase tracking-[0.08em] text-quaternary-token font-semibold mb-2'>
-        Smart link · 7d
-      </p>
+      <div className='flex items-center justify-between mb-2'>
+        <p className='text-[10px] uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
+          Smart link
+        </p>
+        {/* Pill-shaped time-range selector — flush right. */}
+        <div className='flex items-center gap-0.5 p-0.5 rounded-full bg-(--surface-0)/70 border border-(--linear-app-shell-border)/70'>
+          {RANGES.map(r => {
+            const on = r.key === range;
+            return (
+              <button
+                key={r.key}
+                type='button'
+                onClick={() => {
+                  setRange(r.key);
+                  setHoverIdx(null);
+                }}
+                aria-pressed={on}
+                className={cn(
+                  'h-5 px-2 rounded-full text-[10px] font-medium tracking-[-0.005em] transition-colors duration-150 ease-out',
+                  on
+                    ? 'bg-(--surface-2) text-primary-token ring-1 ring-inset ring-white/10'
+                    : 'text-tertiary-token hover:text-primary-token'
+                )}
+              >
+                {r.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       <div className='flex items-baseline gap-2'>
         <span className='text-[20px] font-semibold text-primary-token tabular-nums'>
           {clicks.toLocaleString()}
         </span>
-        <span className='text-[11px] text-tertiary-token'>clicks</span>
-        <span
-          className={cn(
-            'ml-auto inline-flex items-center gap-0.5 text-[11px] tabular-nums',
-            trendFlat
-              ? 'text-tertiary-token'
-              : trendUp
-                ? 'text-cyan-200/85'
-                : 'text-rose-300/85'
-          )}
-        >
-          {trendUp ? (
-            <ArrowUp className='h-3 w-3' strokeWidth={2.25} />
-          ) : trendFlat ? null : (
-            <ArrowDown className='h-3 w-3' strokeWidth={2.25} />
-          )}
-          {Math.abs(release.weeklyDelta)}%
+        <span className='text-[11px] text-tertiary-token'>{valueLabel}</span>
+        <span className='text-[11px] text-quaternary-token tabular-nums'>
+          · {dayLabel}
         </span>
+        {hoverIdx === null && (
+          <span
+            className={cn(
+              'ml-auto inline-flex items-center gap-0.5 text-[11px] tabular-nums',
+              trendFlat
+                ? 'text-tertiary-token'
+                : trendUp
+                  ? 'text-cyan-200/85'
+                  : 'text-rose-300/85'
+            )}
+          >
+            {trendUp ? (
+              <ArrowUp className='h-3 w-3' strokeWidth={2.25} />
+            ) : trendFlat ? null : (
+              <ArrowDown className='h-3 w-3' strokeWidth={2.25} />
+            )}
+            {Math.abs(release.weeklyDelta)}%
+          </span>
+        )}
       </div>
-      <Sparkline points={sparkPoints} trendUp={trendUp} trendFlat={trendFlat} />
+      <Sparkline
+        points={points}
+        trendUp={trendUp}
+        trendFlat={trendFlat}
+        hoverIdx={hoverIdx}
+        onHover={setHoverIdx}
+      />
     </div>
   );
+}
+
+function formatDayOffset(offset: number): string {
+  if (offset === 0) return 'today';
+  if (offset === -1) return 'yesterday';
+  return `${Math.abs(offset)}d ago`;
 }
 
 function Sparkline({
   points,
   trendUp,
   trendFlat,
+  hoverIdx,
+  onHover,
 }: {
   points: number[];
   trendUp: boolean;
   trendFlat: boolean;
+  hoverIdx?: number | null;
+  onHover?: (idx: number | null) => void;
 }) {
   const w = 340;
-  const h = 36;
+  const h = 40;
   const max = Math.max(...points, 1);
   const min = Math.min(...points, 0);
   const range = max - min || 1;
+  const xFor = (i: number) => (i / (points.length - 1)) * w;
+  const yFor = (v: number) => h - ((v - min) / range) * h;
   const path = points
-    .map((p, i) => {
-      const x = (i / (points.length - 1)) * w;
-      const y = h - ((p - min) / range) * h;
-      return `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
-    })
+    .map(
+      (p, i) =>
+        `${i === 0 ? 'M' : 'L'} ${xFor(i).toFixed(1)} ${yFor(p).toFixed(1)}`
+    )
     .join(' ');
   const fillPath = `${path} L ${w} ${h} L 0 ${h} Z`;
   const stroke = trendFlat
     ? 'rgba(255,255,255,0.4)'
     : trendUp
-      ? 'rgba(165,243,252,0.8)'
-      : 'rgba(253,164,175,0.8)';
+      ? 'rgba(165,243,252,0.85)'
+      : 'rgba(253,164,175,0.85)';
   const fill = trendFlat
     ? 'rgba(255,255,255,0.06)'
     : trendUp
       ? 'rgba(103,232,249,0.10)'
       : 'rgba(253,164,175,0.10)';
+  const svgRef = useRef<SVGSVGElement>(null);
+  function handleMove(e: React.MouseEvent<SVGSVGElement>) {
+    if (!onHover) return;
+    const rect = svgRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const px = ((e.clientX - rect.left) / rect.width) * w;
+    const idx = Math.max(
+      0,
+      Math.min(points.length - 1, Math.round((px / w) * (points.length - 1)))
+    );
+    onHover(idx);
+  }
+  const playheadX = hoverIdx != null ? xFor(hoverIdx) : null;
+  const playheadY = hoverIdx != null ? yFor(points[hoverIdx]) : null;
   return (
+    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: chart canvas; hover is a mouse-only affordance and exact values are also surfaced in the static summary above
     <svg
+      ref={svgRef}
       viewBox={`0 0 ${w} ${h}`}
-      className='mt-2 w-full h-9 block'
+      className='mt-2 w-full h-10 block cursor-crosshair'
       preserveAspectRatio='none'
       role='img'
-      aria-label='14-day stream sparkline'
+      aria-label='Smart link clicks over time'
+      onMouseMove={handleMove}
+      onMouseLeave={() => onHover?.(null)}
     >
-      <title>Stream trend, 14 days</title>
+      <title>Smart link clicks</title>
       <path d={fillPath} fill={fill} />
       <path d={path} fill='none' stroke={stroke} strokeWidth={1.5} />
+      {playheadX != null && playheadY != null && (
+        <>
+          <line
+            x1={playheadX}
+            y1={0}
+            x2={playheadX}
+            y2={h}
+            stroke='rgba(255,255,255,0.30)'
+            strokeWidth={1}
+            vectorEffect='non-scaling-stroke'
+          />
+          <circle
+            cx={playheadX}
+            cy={playheadY}
+            r={3}
+            fill={stroke}
+            stroke='rgba(0,0,0,0.45)'
+            strokeWidth={1}
+            vectorEffect='non-scaling-stroke'
+          />
+        </>
+      )}
     </svg>
   );
 }
 
-function generateSparkline(seed: number, target: number): number[] {
+function generatePerfPoints(
+  seed: number,
+  target: number,
+  days: number
+): number[] {
+  // Per-day click count series. Deterministic noise around a smoothed
+  // ramp toward `target`, anchored at ~target on the last day.
   const points: number[] = [];
-  let v = target * 0.85;
-  for (let i = 0; i < 14; i++) {
-    const noise = ((seed * (i + 1) * 9301 + 49297) % 233280) / 233280;
-    v = v + (noise - 0.5) * target * 0.18;
-    points.push(Math.max(0, v));
+  const base = Math.max(target * 0.18, 1);
+  let v = base * 0.6;
+  for (let i = 0; i < days; i++) {
+    const noise = ((seed * (i + 7) * 9301 + 49297) % 233280) / 233280;
+    v = v + (noise - 0.5) * base * 0.4 + base * 0.01;
+    points.push(Math.max(0, Math.round(v)));
   }
-  // Anchor the last point near the actual current target so the chart
-  // doesn't lie about now.
-  points[points.length - 1] = target;
+  points[points.length - 1] = Math.round(base * (1 + (seed % 5) * 0.05));
   return points;
 }
 
+// Backwards-compat alias — old callers used `generateSparkline`.
+function _generateSparkline(seed: number, target: number): number[] {
+  return generatePerfPoints(seed, target, 14);
+}
+
+// 27 providers Jovie pulls from via music-fetch — covers streaming,
+// stores, social/embed sources, and a few regional majors. The drawer's
+// Distribution tab surfaces all of them so it's clear we can handle a
+// real-world (long, messy) catalog distribution.
+type ProviderGroup = 'streaming' | 'social' | 'store' | 'discovery';
+type Provider = {
+  id: string;
+  label: string;
+  group: ProviderGroup;
+  initial: string;
+  hue: number; // hsl hue for the avatar bg
+};
+const PROVIDERS: Provider[] = [
+  {
+    id: 'spotify',
+    label: 'Spotify',
+    group: 'streaming',
+    initial: 'S',
+    hue: 144,
+  },
+  {
+    id: 'apple',
+    label: 'Apple Music',
+    group: 'streaming',
+    initial: 'A',
+    hue: 350,
+  },
+  {
+    id: 'youtube-music',
+    label: 'YouTube Music',
+    group: 'streaming',
+    initial: 'Y',
+    hue: 0,
+  },
+  { id: 'tidal', label: 'Tidal', group: 'streaming', initial: 'T', hue: 200 },
+  {
+    id: 'amazon',
+    label: 'Amazon Music',
+    group: 'streaming',
+    initial: 'Z',
+    hue: 195,
+  },
+  { id: 'deezer', label: 'Deezer', group: 'streaming', initial: 'D', hue: 270 },
+  {
+    id: 'soundcloud',
+    label: 'SoundCloud',
+    group: 'streaming',
+    initial: 'S',
+    hue: 22,
+  },
+  {
+    id: 'pandora',
+    label: 'Pandora',
+    group: 'streaming',
+    initial: 'P',
+    hue: 220,
+  },
+  {
+    id: 'audiomack',
+    label: 'Audiomack',
+    group: 'streaming',
+    initial: 'A',
+    hue: 40,
+  },
+  {
+    id: 'anghami',
+    label: 'Anghami',
+    group: 'streaming',
+    initial: 'A',
+    hue: 290,
+  },
+  {
+    id: 'jiosaavn',
+    label: 'JioSaavn',
+    group: 'streaming',
+    initial: 'J',
+    hue: 28,
+  },
+  { id: 'kkbox', label: 'KKBox', group: 'streaming', initial: 'K', hue: 195 },
+  {
+    id: 'netease',
+    label: 'NetEase Cloud Music',
+    group: 'streaming',
+    initial: 'N',
+    hue: 0,
+  },
+  {
+    id: 'qq-music',
+    label: 'QQ Music',
+    group: 'streaming',
+    initial: 'Q',
+    hue: 130,
+  },
+  {
+    id: 'boomplay',
+    label: 'Boomplay',
+    group: 'streaming',
+    initial: 'B',
+    hue: 16,
+  },
+  {
+    id: 'yandex',
+    label: 'Yandex Music',
+    group: 'streaming',
+    initial: 'Y',
+    hue: 0,
+  },
+  {
+    id: 'iheart',
+    label: 'iHeartRadio',
+    group: 'discovery',
+    initial: 'I',
+    hue: 330,
+  },
+  { id: 'tiktok', label: 'TikTok', group: 'social', initial: 'T', hue: 350 },
+  {
+    id: 'meta',
+    label: 'Instagram / Facebook',
+    group: 'social',
+    initial: 'M',
+    hue: 280,
+  },
+  { id: 'youtube', label: 'YouTube', group: 'social', initial: 'Y', hue: 0 },
+  { id: 'bandcamp', label: 'Bandcamp', group: 'store', initial: 'B', hue: 200 },
+  { id: 'beatport', label: 'Beatport', group: 'store', initial: 'B', hue: 90 },
+  {
+    id: 'traxsource',
+    label: 'Traxsource',
+    group: 'store',
+    initial: 'T',
+    hue: 30,
+  },
+  {
+    id: 'beatsource',
+    label: 'Beatsource',
+    group: 'store',
+    initial: 'B',
+    hue: 50,
+  },
+  { id: 'medianet', label: 'MediaNet', group: 'store', initial: 'M', hue: 215 },
+  { id: '7digital', label: '7Digital', group: 'store', initial: '7', hue: 240 },
+  { id: 'napster', label: 'Napster', group: 'store', initial: 'N', hue: 195 },
+];
+const PROVIDER_GROUP_LABEL: Record<ProviderGroup, string> = {
+  streaming: 'Streaming',
+  social: 'Social',
+  store: 'Stores',
+  discovery: 'Discovery',
+};
+// Hash the release id + provider id into a deterministic status so each
+// release has a different distribution shape across providers.
+function providerStatus(releaseId: string, providerId: string): DspStatus {
+  let hash = 0;
+  const seed = `${releaseId}::${providerId}`;
+  for (let i = 0; i < seed.length; i++) {
+    hash = (hash << 5) - hash + seed.charCodeAt(i);
+    hash |= 0;
+  }
+  const bucket = Math.abs(hash) % 100;
+  if (bucket < 64) return 'live';
+  if (bucket < 78) return 'pending';
+  if (bucket < 86) return 'error';
+  return 'missing';
+}
+
 function DrawerDistribution({ release }: { release: Release }) {
-  const liveCount = (Object.keys(release.dsps) as DspKey[]).filter(
-    d => release.dsps[d] === 'live'
-  ).length;
+  const [filter, setFilter] = useState('');
+  const rows = useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    const all = PROVIDERS.map(p => ({
+      ...p,
+      status: providerStatus(release.id, p.id),
+    }));
+    return q
+      ? all.filter(
+          p => p.label.toLowerCase().includes(q) || p.group.includes(q)
+        )
+      : all;
+  }, [filter, release.id]);
+  const liveCount = rows.filter(r => r.status === 'live').length;
+  const grouped: Record<ProviderGroup, typeof rows> = {
+    streaming: [],
+    social: [],
+    store: [],
+    discovery: [],
+  };
+  for (const r of rows) grouped[r.group].push(r);
+
   return (
     <div className='px-4 py-4'>
       <div className='flex items-center justify-between pb-2'>
         <p className='text-[10px] uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
-          DSPs
+          Providers
         </p>
         <span className='text-[10.5px] tabular-nums text-tertiary-token'>
-          {liveCount}/{Object.keys(release.dsps).length} live
+          {liveCount}/{rows.length} live
         </span>
       </div>
-      <ul className='flex flex-col -mx-2'>
-        {DSP_ORDER.map(dsp => {
-          const status = release.dsps[dsp];
-          return (
-            <li key={dsp}>
-              <button
-                type='button'
-                className='w-full flex items-center gap-2.5 h-8 px-2 rounded-md text-[12.5px] text-secondary-token hover:bg-surface-1/40 hover:text-primary-token transition-colors duration-150 ease-out'
-              >
-                <span
-                  className={cn(
-                    'h-[16px] w-[16px] rounded-full grid place-items-center text-[8px] font-semibold text-white shrink-0',
-                    status === 'missing'
-                      ? 'bg-quaternary-token/40 opacity-60'
-                      : DSP_COLOR[dsp]
-                  )}
-                >
-                  {DSP_GLYPH[dsp]}
-                </span>
-                <span className='flex-1 text-left'>{DSP_LABEL[dsp]}</span>
-                <span className='inline-flex items-center gap-1.5'>
-                  <span
-                    className={cn(
-                      'h-1.5 w-1.5 rounded-full',
-                      DSP_STATUS_DOT[status]
-                    )}
-                  />
-                  <span className='text-[10.5px] uppercase tracking-[0.06em] text-quaternary-token'>
-                    {status}
-                  </span>
-                </span>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
+
+      {/* Search — matches the smart-link pill language. */}
+      <div className='flex items-center gap-1.5 h-7 pl-3 pr-2 rounded-full border border-(--linear-app-shell-border) bg-(--surface-0)/60 text-[11.5px] mb-2 focus-within:border-cyan-300/40'>
+        <Search className='h-3 w-3 text-quaternary-token shrink-0' />
+        <input
+          value={filter}
+          onChange={e => setFilter(e.target.value)}
+          placeholder='Filter providers'
+          className='flex-1 bg-transparent outline-none placeholder:text-quaternary-token text-secondary-token'
+        />
+        {filter && (
+          <button
+            type='button'
+            onClick={() => setFilter('')}
+            className='inline-flex items-center justify-center h-4 w-4 rounded text-quaternary-token hover:text-primary-token'
+            aria-label='Clear filter'
+          >
+            <X className='h-3 w-3' strokeWidth={2.25} />
+          </button>
+        )}
+      </div>
+
+      {(Object.keys(grouped) as ProviderGroup[]).map(group =>
+        grouped[group].length > 0 ? (
+          <div key={group} className='mb-3 last:mb-0'>
+            <p className='text-[9.5px] uppercase tracking-[0.10em] text-quaternary-token/85 font-medium px-2 pt-1.5 pb-0.5'>
+              {PROVIDER_GROUP_LABEL[group]}
+            </p>
+            <ul className='flex flex-col -mx-2'>
+              {grouped[group].map(p => (
+                <li key={p.id}>
+                  <button
+                    type='button'
+                    className='w-full flex items-center gap-2.5 h-7 px-2 rounded-md text-[12px] text-secondary-token hover:bg-surface-1/40 hover:text-primary-token transition-colors duration-150 ease-out'
+                  >
+                    <span
+                      className='h-[16px] w-[16px] rounded grid place-items-center text-[8.5px] font-semibold text-white shrink-0'
+                      style={{
+                        background:
+                          p.status === 'missing'
+                            ? 'rgba(255,255,255,0.08)'
+                            : `hsl(${p.hue}, 55%, 38%)`,
+                        opacity: p.status === 'missing' ? 0.55 : 1,
+                      }}
+                    >
+                      {p.initial}
+                    </span>
+                    <span className='flex-1 text-left truncate'>{p.label}</span>
+                    <span className='inline-flex items-center gap-1.5'>
+                      <span
+                        className={cn(
+                          'h-1.5 w-1.5 rounded-full',
+                          DSP_STATUS_DOT[p.status]
+                        )}
+                      />
+                      <span className='text-[10px] uppercase tracking-[0.06em] text-quaternary-token w-[44px] text-right'>
+                        {p.status}
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null
+      )}
+
+      {rows.length === 0 && (
+        <p className='text-[12px] text-quaternary-token text-center py-6'>
+          No providers match &ldquo;{filter}&rdquo;.
+        </p>
+      )}
     </div>
   );
 }
