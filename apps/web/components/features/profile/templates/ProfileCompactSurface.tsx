@@ -521,7 +521,12 @@ export function ProfileCompactSurface({
                 className={cn(isPreviewEmbedded ? 'space-y-1.5' : 'space-y-2')}
                 data-testid='profile-hero-identity-block'
               >
-                <IdentityHeading className='min-w-0'>
+                <IdentityHeading
+                  className='min-w-0'
+                  data-testid={
+                    renderMode === 'preview' ? undefined : 'profile-header'
+                  }
+                >
                   <Link
                     data-testid='profile-identity-link'
                     href={profileHref}
