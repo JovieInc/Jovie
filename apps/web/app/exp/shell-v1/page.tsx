@@ -1708,22 +1708,24 @@ export default function ShellV1Experiment() {
         onThreadContextMenu={onThreadContextMenu}
       />
 
-      {/* Persistent now-playing card — pinned to bottom-left, survives sidebar
-          undocking. When the audio bar is open at the bottom of the canvas,
-          the card sits elevated as a discrete object. When the bar collapses
-          away, the chrome (border, bg, shadow) fades out so the contents
-          (album art + title + chips) drop into the page surface, especially
-          handy when the sidebar is also hidden — feels like an extension of
-          the canvas instead of a floating card. */}
-      <div className='hidden lg:block fixed left-2 bottom-2 z-30 w-[224px] pointer-events-none'>
-        <div
-          className={cn(
-            'pointer-events-auto rounded-[var(--linear-app-shell-radius)] border px-2 pt-2.5 pb-2 transition-[background-color,border-color,box-shadow] duration-300 ease-out',
-            barCollapsed
-              ? 'border-transparent bg-transparent shadow-none'
-              : 'border-(--linear-app-shell-border) bg-(--linear-app-content-surface) shadow-[0_18px_60px_rgba(0,0,0,0.32)]'
-          )}
-        >
+      {/* Now-playing card — only shown when the audio bar is COLLAPSED.
+          When the bar is open it already shows what's playing; a second
+          card in the sidebar is redundant. When the bar collapses, the
+          card animates in (slide-up + fade + scale) as the elevated
+          stand-in for transport. Reverses cleanly on bar restore. */}
+      <div
+        aria-hidden={!barCollapsed}
+        className='hidden lg:block fixed left-2 bottom-2 z-30 w-[224px]'
+        style={{
+          opacity: barCollapsed ? 1 : 0,
+          transform: barCollapsed
+            ? 'translateY(0) scale(1)'
+            : 'translateY(12px) scale(0.97)',
+          pointerEvents: barCollapsed ? 'auto' : 'none',
+          transition: `opacity ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, transform ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
+        }}
+      >
+        <div className='rounded-[var(--linear-app-shell-radius)] border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) shadow-[0_18px_60px_rgba(0,0,0,0.32)] px-2 pt-2.5 pb-2'>
           <SidebarNowPlaying
             collapsed={false}
             isPlaying={isPlaying}
