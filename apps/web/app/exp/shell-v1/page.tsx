@@ -5905,13 +5905,7 @@ function EntityThreadGlyph({
 function mockThreadMarkdown(thread: Thread): string {
   if (thread.status === 'errored') {
     return [
-      "I hit a snag — the upstream renderer rejected the spatial job. Here's what I tried:",
-      '',
-      '```',
-      'POST /api/render/spatial',
-      'status: 422',
-      'reason: master rate exceeds 96 kHz upper bound',
-      '```',
+      'I hit a snag. The upstream renderer rejected the spatial job — master rate exceeds the 96 kHz upper bound.',
       '',
       'I can retry with a **downscaled master**, or wait for the new pipeline. Up to you.',
     ].join('\n');
@@ -6031,18 +6025,28 @@ function ThreadTurn({
   subtle?: boolean;
   children: React.ReactNode;
 }) {
+  // Notion-style: flat text, no card, no border. Speaker is implied by
+  // the small label above the body. The "me" turn gets a subtle left
+  // indent so it reads as a reply without needing chrome.
   return (
     <div
       className={cn(
-        'rounded-md px-4 py-3',
-        speaker === 'jovie'
-          ? subtle
-            ? 'bg-transparent text-tertiary-token'
-            : 'bg-(--surface-1)/40 border border-(--linear-app-shell-border)/70 text-secondary-token'
-          : 'bg-(--surface-1)/70 text-primary-token'
+        'group/turn',
+        speaker === 'me' &&
+          'pl-4 border-l border-(--linear-app-shell-border)/40'
       )}
     >
-      {children}
+      <p className='text-[10.5px] uppercase tracking-[0.08em] font-semibold text-quaternary-token mb-1.5 select-none'>
+        {speaker === 'jovie' ? 'Jovie' : 'You'}
+      </p>
+      <div
+        className={cn(
+          'text-[13.5px] leading-relaxed',
+          subtle ? 'text-tertiary-token' : 'text-secondary-token'
+        )}
+      >
+        {children}
+      </div>
     </div>
   );
 }
