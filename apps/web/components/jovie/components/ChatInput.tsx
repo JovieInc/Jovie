@@ -114,6 +114,20 @@ function geometryFor(mode: SurfaceMode, stacked: boolean): SurfaceGeometry {
 const SURFACE_BG =
   'linear-gradient(180deg, rgba(255,255,255,0.018) 0%, transparent 40%), #16161a';
 
+function pickerKindNoun(kind: import('@/lib/chat/tokens').EntityKind): string {
+  if (kind === 'release') return 'release';
+  if (kind === 'artist') return 'artist';
+  if (kind === 'event') return 'event';
+  return 'reference';
+}
+
+function pickerKindArticle(
+  kind: import('@/lib/chat/tokens').EntityKind
+): string {
+  // Vowel-initial nouns get "an"; everything else "a".
+  return kind === 'artist' || kind === 'event' ? 'an' : 'a';
+}
+
 export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
   function ChatInput(
     {
@@ -201,7 +215,9 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const activeEntity = activeEntityFor(picker.state, pickerItems);
 
     // Slash trigger detection: open root picker when `/` follows a word
-    // boundary; switch to entity picker when a skill commit demands it.
+    // boundary; switch to entity picker when a skill commit demands it; or
+    // jump straight to a kind-locked entity picker when the user typed a
+    // direct prefix like `/release ` or `/event `.
     const handleChange = useCallback(
       (next: string) => {
         onChange(next);
@@ -209,6 +225,19 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         const caret = el?.selectionStart ?? next.length;
         const trigger = detectSlashTriggerAt(next, caret);
         if (trigger) {
+          if (trigger.directKind) {
+            // Direct entry. Promote regardless of current status — the user
+            // either typed `/release ` from scratch (was 'closed' or 'root')
+            // or converted an existing `/foo` into `/release foo` while in
+            // root mode. The picker reducer accepts open-entity from any
+            // state.
+            picker.openEntity(
+              trigger.directKind,
+              trigger.startIdx,
+              trigger.query
+            );
+            return;
+          }
           if (
             picker.state.status === 'closed' ||
             picker.state.status === 'root'
@@ -399,11 +428,8 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                     <EntityPreviewPane entity={activeEntity} />
                   ) : (
                     <div className='flex-1 px-6 py-[22px] text-[12px] text-tertiary-token'>
-                      Pick a{' '}
-                      {picker.state.kind === 'release'
-                        ? 'release'
-                        : 'reference'}{' '}
-                      to preview.
+                      Pick {pickerKindArticle(picker.state.kind)}{' '}
+                      {pickerKindNoun(picker.state.kind)} to preview.
                     </div>
                   )}
                   <div className='border-t border-white/[0.055]'>

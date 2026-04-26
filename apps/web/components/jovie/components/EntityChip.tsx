@@ -22,6 +22,7 @@ const KIND_PREFIX: Record<EntityKind, string> = {
   release: 'Release',
   artist: 'Artist',
   track: 'Track',
+  event: 'Event',
 };
 
 export function EntityChip({

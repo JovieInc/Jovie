@@ -57,6 +57,7 @@ function eyebrowFor(entity: EntityRef): string {
   if (!meta) {
     if (entity.kind === 'release') return 'Release';
     if (entity.kind === 'artist') return 'Artist';
+    if (entity.kind === 'event') return 'Event';
     return 'Track';
   }
   if (meta.kind === 'release') {
@@ -67,6 +68,10 @@ function eyebrowFor(entity: EntityRef): string {
     if (meta.isYou) return 'Artist · You';
     if (meta.verified) return 'Artist · Verified';
     return 'Artist';
+  }
+  if (meta.kind === 'event') {
+    const type = meta.eventType ? capitalize(meta.eventType) : null;
+    return type ? `Event · ${type}` : 'Event';
   }
   if (meta.releaseTitle) return `Track · ${meta.releaseTitle}`;
   return 'Track';
@@ -170,15 +175,114 @@ function buildTrackStats(
   return out;
 }
 
+function eventTypeLabel(
+  type?: 'tour' | 'meetup' | 'guest' | 'charity' | 'other'
+): string | null {
+  if (!type) return null;
+  return capitalize(type);
+}
+
+function formatDoorsTime(iso: string | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  // Skip if the source had no time-of-day (midnight UTC is the typical
+  // marker for date-only). 00:00 doors is almost never a real datapoint.
+  if (d.getUTCHours() === 0 && d.getUTCMinutes() === 0) return null;
+  return d.toLocaleString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+function buildEventStats(
+  meta: Extract<EntityRefMeta, { kind: 'event' }>
+): StatChip[] {
+  const out: StatChip[] = [];
+  if (meta.city) out.push({ key: 'city', label: meta.city });
+  const doors = formatDoorsTime(meta.eventDate);
+  if (doors)
+    out.push({
+      key: 'doors',
+      label: (
+        <span className='inline-flex items-center gap-[3px]'>
+          Doors
+          <strong className='font-semibold tabular-nums text-primary-token'>
+            {doors}
+          </strong>
+        </span>
+      ),
+    });
+  if (typeof meta.capacity === 'number' && meta.capacity > 0) {
+    out.push({
+      key: 'capacity',
+      label: (
+        <span className='inline-flex items-center gap-[3px]'>
+          Capacity
+          <strong className='font-semibold tabular-nums text-primary-token'>
+            {meta.capacity.toLocaleString()}
+          </strong>
+        </span>
+      ),
+    });
+  }
+  if (meta.status) {
+    out.push({ key: 'status', label: meta.status, emphasis: 'solid' });
+  }
+  const typeLabel = eventTypeLabel(meta.eventType);
+  if (typeLabel) out.push({ key: 'type', label: typeLabel });
+  return out;
+}
+
 function statsFor(entity: EntityRef): StatChip[] {
   const meta = entity.meta;
   if (!meta) return [];
   if (meta.kind === 'release') return buildReleaseStats(meta);
   if (meta.kind === 'artist') return buildArtistStats(meta);
+  if (meta.kind === 'event') return buildEventStats(meta);
   return buildTrackStats(meta);
 }
 
+interface DateStampParts {
+  readonly month: string;
+  readonly day: string;
+}
+
+function dateStampParts(iso: string | undefined): DateStampParts | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const month = d.toLocaleString('en-US', { month: 'short' }).toUpperCase();
+  const day = d.getDate().toString();
+  return { month, day };
+}
+
+function EventDateArtwork({ stamp }: { readonly stamp: DateStampParts }) {
+  return (
+    <div
+      className='flex h-[72px] w-[72px] shrink-0 flex-col items-center justify-center rounded-[10px] shadow-[0_0_0_0.5px_rgba(255,255,255,0.06),inset_0_0.5px_0_rgba(255,255,255,0.08),0_12px_24px_-8px_rgba(0,0,0,0.55)]'
+      style={{ background: 'linear-gradient(180deg,#1a1a1f,#0a0a0c)' }}
+      data-testid='entity-preview-event-art'
+    >
+      <span className='font-display text-[10px] font-semibold uppercase tracking-[0.12em] text-tertiary-token'>
+        {stamp.month}
+      </span>
+      <span className='font-display text-[28px] font-bold leading-none tracking-[-0.02em] text-primary-token'>
+        {stamp.day}
+      </span>
+    </div>
+  );
+}
+
 function PreviewArtwork({ entity }: { readonly entity: EntityRef }) {
+  if (
+    entity.kind === 'event' &&
+    entity.meta?.kind === 'event' &&
+    !entity.thumbnail
+  ) {
+    const stamp = dateStampParts(entity.meta.eventDate);
+    if (stamp) return <EventDateArtwork stamp={stamp} />;
+  }
   if (entity.thumbnail) {
     return (
       <div className='relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-[10px] shadow-[0_0_0_0.5px_rgba(255,255,255,0.06),inset_0_0.5px_0_rgba(255,255,255,0.08),0_12px_24px_-8px_rgba(0,0,0,0.55)]'>

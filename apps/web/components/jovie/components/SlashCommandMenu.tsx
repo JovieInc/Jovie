@@ -17,6 +17,7 @@ import type { EntityKind } from '@/lib/chat/tokens';
 import type { EntityRef, EntityRefMeta } from '@/lib/commands/entities';
 import { commandsForSurface, type SkillCommand } from '@/lib/commands/registry';
 import { useArtistSearchQuery } from '@/lib/queries/useArtistSearchQuery';
+import { type EventRecord, useEventsQuery } from '@/lib/queries/useEventsQuery';
 import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
 import { cn } from '@/lib/utils';
 import { type PickerState } from './useChatPicker';
@@ -35,6 +36,7 @@ const KIND_ICON_MAP: Record<EntityKind, LucideIcon> = {
   release: Disc3,
   artist: UserCircle,
   track: Music2,
+  event: Calendar,
 };
 
 export interface SlashMenuItem {
@@ -78,7 +80,15 @@ function fuzzyMatch(haystack: string, needle: string): boolean {
 function entityKindLabel(kind: EntityKind): string {
   if (kind === 'release') return 'Release';
   if (kind === 'artist') return 'Artist';
+  if (kind === 'event') return 'Event';
   return 'Track';
+}
+
+function eventTypeLabel(
+  type?: 'tour' | 'meetup' | 'guest' | 'charity' | 'other'
+): string | null {
+  if (!type) return null;
+  return type.charAt(0).toUpperCase() + type.slice(1);
 }
 
 function formatRowMeta(entity: EntityRef): string | null {
@@ -88,6 +98,13 @@ function formatRowMeta(entity: EntityRef): string | null {
   if (meta.kind === 'artist') {
     if (meta.handle) return `@${meta.handle}${meta.isYou ? ' · You' : ''}`;
     return meta.subtitle ?? 'Artist';
+  }
+  if (meta.kind === 'event') {
+    const typeLabel = eventTypeLabel(meta.eventType);
+    if (meta.city && typeLabel) return `${meta.city} · ${typeLabel}`;
+    if (meta.city) return meta.city;
+    if (typeLabel) return typeLabel;
+    return meta.subtitle ?? 'Event';
   }
   return meta.subtitle ?? 'Track';
 }
@@ -140,6 +157,40 @@ function ArtistArt({ entity }: { readonly entity: EntityRef }) {
   );
 }
 
+function EventArt({ entity }: { readonly entity: EntityRef }) {
+  const meta = entity.meta?.kind === 'event' ? entity.meta : null;
+  const iso = meta?.eventDate;
+  let day: string | null = null;
+  let month: string | null = null;
+  if (iso) {
+    const d = new Date(iso);
+    if (!Number.isNaN(d.getTime())) {
+      day = d.getDate().toString();
+      month = d.toLocaleString('en-US', { month: 'short' }).toUpperCase();
+    }
+  }
+  if (!day || !month) {
+    return (
+      <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-gradient-to-b from-[#25252a] to-[#1c1c20] text-secondary-token shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.05)]'>
+        <Calendar className='h-[14px] w-[14px]' strokeWidth={1.5} />
+      </div>
+    );
+  }
+  return (
+    <div
+      className='flex h-9 w-9 shrink-0 flex-col items-center justify-center rounded-md shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.05)]'
+      style={{ background: 'linear-gradient(180deg,#1a1a1f,#0a0a0c)' }}
+    >
+      <span className='font-display text-[7px] font-semibold uppercase leading-none tracking-[0.1em] text-tertiary-token'>
+        {month}
+      </span>
+      <span className='mt-[1px] font-display text-[13px] font-bold leading-none tracking-[-0.02em] text-primary-token'>
+        {day}
+      </span>
+    </div>
+  );
+}
+
 function SkillArt({ skill }: { readonly skill: SkillCommand }) {
   const Icon = SKILL_ICON_MAP[skill.iconName] ?? Calendar;
   return (
@@ -161,6 +212,7 @@ function RowVisual({ item }: RowVisualProps) {
       return <ReleaseArt entity={item.entity} />;
     if (item.entity.kind === 'artist')
       return <ArtistArt entity={item.entity} />;
+    if (item.entity.kind === 'event') return <EventArt entity={item.entity} />;
     return (
       <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-gradient-to-b from-[#25252a] to-[#1c1c20] text-secondary-token shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.05)]'>
         <Music2 className='h-[14px] w-[14px]' strokeWidth={1.5} />
@@ -311,6 +363,33 @@ function releaseMatches(release: ReleaseLikeRow, lowerQuery: string): boolean {
   );
 }
 
+function eventRowMatches(event: EventRecord, lowerQuery: string): boolean {
+  if (!lowerQuery) return true;
+  if (event.title.toLowerCase().includes(lowerQuery)) return true;
+  if (event.city && event.city.toLowerCase().includes(lowerQuery)) return true;
+  return false;
+}
+
+function eventRowToEntity(event: EventRecord): EntityRef {
+  return {
+    kind: 'event',
+    id: event.id,
+    label: event.title,
+    thumbnail: undefined,
+    meta: {
+      kind: 'event',
+      subtitle: event.subtitle,
+      eventDate: event.eventDate,
+      venue: event.venue,
+      city: event.city,
+      provider: event.provider,
+      status: event.status,
+      capacity: event.capacity,
+      eventType: event.eventType,
+    },
+  };
+}
+
 /**
  * Build the flat list of menu items + grouped sections for the picker.
  *
@@ -331,6 +410,11 @@ export function useSlashItems(
   const { data: releaseData, isLoading: releaseLoading } =
     useReleasesQuery(profileId);
 
+  // Events also come from a creator-scoped local catalog (today: tour dates);
+  // substring filter same as releases.
+  const { data: eventData, isLoading: eventLoading } =
+    useEventsQuery(profileId);
+
   // Artist search is Spotify-global, debounced via TanStack Pacer.
   const artistSearch = useArtistSearchQuery({ limit: 8, minQueryLength: 1 });
   const artistSearchSearch = artistSearch.search;
@@ -345,10 +429,16 @@ export function useSlashItems(
       return { items: [], sections: [], isLoading: false };
     }
 
+    const lowerQuery = query.toLowerCase();
     const filteredReleases: EntityRef[] = (releaseData ?? [])
-      .filter(r => releaseMatches(r as ReleaseLikeRow, query.toLowerCase()))
+      .filter(r => releaseMatches(r as ReleaseLikeRow, lowerQuery))
       .slice(0, isEntity ? 8 : 4)
       .map(r => releaseRowToEntity(r as ReleaseLikeRow));
+
+    const filteredEvents: EntityRef[] = (eventData ?? [])
+      .filter(e => eventRowMatches(e, lowerQuery))
+      .slice(0, isEntity ? 8 : 4)
+      .map(eventRowToEntity);
 
     const artistEntities: EntityRef[] = artistSearch.results
       .slice(0, isEntity ? 8 : 4)
@@ -368,8 +458,11 @@ export function useSlashItems(
       }));
 
     if (state.status === 'entity') {
-      const items: EntityRef[] =
-        state.kind === 'release' ? filteredReleases : artistEntities;
+      let items: EntityRef[];
+      if (state.kind === 'release') items = filteredReleases;
+      else if (state.kind === 'event') items = filteredEvents;
+      else if (state.kind === 'artist') items = artistEntities;
+      else items = [];
       const slashItems: SlashMenuItem[] = items.map(e => ({
         kind: 'entity',
         entity: e,
@@ -381,13 +474,15 @@ export function useSlashItems(
           items: slashItems,
         },
       ];
+      let kindLoading = false;
+      if (state.kind === 'release') kindLoading = releaseLoading;
+      else if (state.kind === 'event') kindLoading = eventLoading;
+      else if (state.kind === 'artist')
+        kindLoading = artistSearch.state === 'loading';
       return {
         items: slashItems,
         sections,
-        isLoading:
-          state.kind === 'release'
-            ? releaseLoading
-            : artistSearch.state === 'loading',
+        isLoading: kindLoading,
       };
     }
 
@@ -422,11 +517,20 @@ export function useSlashItems(
       sections.push({ id: 'artist', label: 'Artists', items: groupItems });
       items.push(...groupItems);
     }
+    if (filteredEvents.length > 0) {
+      const groupItems: SlashMenuItem[] = filteredEvents.map(e => ({
+        kind: 'entity',
+        entity: e,
+      }));
+      sections.push({ id: 'event', label: 'Events', items: groupItems });
+      items.push(...groupItems);
+    }
 
     return {
       items,
       sections,
-      isLoading: releaseLoading || artistSearch.state === 'loading',
+      isLoading:
+        releaseLoading || eventLoading || artistSearch.state === 'loading',
     };
   }, [
     state,
@@ -434,6 +538,8 @@ export function useSlashItems(
     isEntity,
     releaseData,
     releaseLoading,
+    eventData,
+    eventLoading,
     artistSearch.results,
     artistSearch.state,
   ]);
@@ -470,7 +576,7 @@ function SlashHeader({ state }: SlashHeaderProps) {
         <span className='truncate text-primary-token'>{state.query}</span>
       ) : (
         <span className='truncate text-tertiary-token'>
-          type to filter skills, releases, artists
+          type to filter skills, releases, artists, events
         </span>
       )}
     </div>
