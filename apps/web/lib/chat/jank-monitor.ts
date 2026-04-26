@@ -259,6 +259,31 @@ export type JankMonitor = {
   reset(conversationId?: string | null): void;
 };
 
+function onScrollAnchorRestored(_conversationId: string | null): void {
+  // Currently a no-op — reserved for future symmetry.
+}
+
+function keyFor(id: string | null): string {
+  return id ?? '__unassigned__';
+}
+
+function detectReorder(
+  prev: readonly string[],
+  next: readonly string[]
+): boolean {
+  const prevSet = new Set(prev);
+  const nextSet = new Set(next);
+  const shared: string[] = [];
+  for (const id of prev) if (nextSet.has(id)) shared.push(id);
+  const sharedInNext: string[] = [];
+  for (const id of next) if (prevSet.has(id)) sharedInNext.push(id);
+  if (shared.length !== sharedInNext.length) return false;
+  for (let i = 0; i < shared.length; i++) {
+    if (shared[i] !== sharedInNext[i]) return true;
+  }
+  return false;
+}
+
 export function createJankMonitor(opts: CreateJankMonitorOptions): JankMonitor {
   const emit = opts.emit;
   const now = opts.now ?? (() => Date.now());
@@ -270,10 +295,6 @@ export function createJankMonitor(opts: CreateJankMonitorOptions): JankMonitor {
     opts.scrollInputGraceMs ?? DEFAULT_SCROLL_INPUT_GRACE_MS;
 
   const byConv = new Map<string, ConvState>();
-
-  function keyFor(id: string | null): string {
-    return id ?? '__unassigned__';
-  }
 
   function state(id: string | null): ConvState {
     const k = keyFor(id);
@@ -307,25 +328,6 @@ export function createJankMonitor(opts: CreateJankMonitorOptions): JankMonitor {
       ...extra,
     };
     emit(event, payload);
-  }
-
-  function detectReorder(
-    prev: readonly string[],
-    next: readonly string[]
-  ): boolean {
-    // Only compare ids present in both. If the only change is appended ids
-    // at the tail, that's not a reorder.
-    const prevSet = new Set(prev);
-    const nextSet = new Set(next);
-    const shared: string[] = [];
-    for (const id of prev) if (nextSet.has(id)) shared.push(id);
-    const sharedInNext: string[] = [];
-    for (const id of next) if (prevSet.has(id)) sharedInNext.push(id);
-    if (shared.length !== sharedInNext.length) return false;
-    for (let i = 0; i < shared.length; i++) {
-      if (shared[i] !== sharedInNext[i]) return true;
-    }
-    return false;
   }
 
   function observeMessages(
@@ -558,10 +560,6 @@ export function createJankMonitor(opts: CreateJankMonitorOptions): JankMonitor {
       previousState: 'stuck',
       nextState: 'unstuck',
     });
-  }
-
-  function onScrollAnchorRestored(_conversationId: string | null): void {
-    // Currently a no-op — reserved for future symmetry.
   }
 
   function getSummary(conversationId: string | null): JankSummary {
