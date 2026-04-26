@@ -62,7 +62,7 @@ export function ErrorDisplay({
         </div>
         <div className='min-w-0 flex-1 space-y-3'>
           <div className='space-y-1'>
-            <p className='text-[11px] font-semibold uppercase tracking-[0.16em] text-error'>
+            <p className='text-2xs font-semibold uppercase tracking-[0.16em] text-error'>
               Chat interrupted
             </p>
             <p className='text-sm font-medium text-primary-token'>
@@ -75,7 +75,7 @@ export function ErrorDisplay({
 
           {supportCode && (
             <div className='flex flex-wrap items-center gap-2 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2 text-xs text-tertiary-token'>
-              <span className='text-[10px] font-[510] tracking-[-0.01em] text-secondary-token'>
+              <span className='text-[10px] font-medium tracking-[-0.01em] text-secondary-token'>
                 Reference
               </span>
               <span className='font-mono text-primary-token'>
@@ -86,7 +86,7 @@ export function ErrorDisplay({
                 variant='ghost'
                 size='sm'
                 onClick={handleCopySupportCode}
-                className='ml-auto h-7 gap-1 rounded-[8px] px-2.5 text-[11px] font-[510] tracking-[-0.01em]'
+                className='ml-auto h-7 gap-1 rounded-[8px] px-2.5 text-2xs font-medium tracking-[-0.01em]'
                 aria-label='Copy support reference'
               >
                 <Copy className='h-3 w-3' />
@@ -102,7 +102,7 @@ export function ErrorDisplay({
               size='sm'
               onClick={onRetry}
               disabled={isLoading || isSubmitting}
-              className='h-9 gap-2 rounded-[10px] px-4 text-[11px] font-[510] tracking-[-0.01em]'
+              className='h-9 gap-2 rounded-[10px] px-4 text-2xs font-medium tracking-[-0.01em]'
             >
               <RefreshCw className='h-3.5 w-3.5' />
               Retry message
