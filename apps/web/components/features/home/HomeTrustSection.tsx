@@ -142,13 +142,17 @@ export function HomeTrustSection({
               presentation === 'inline-strip' && 'sm:px-1 lg:flex-1'
             )}
           >
-            <BlackHoleRecordingsLogo
-              className={cn(
-                'h-[16px] w-auto sm:h-[18px]',
-                presentation === 'inline-strip' && 'opacity-75'
-              )}
-              priority={isInlineStrip}
-            />
+            {isInlineStrip ? (
+              <span
+                role='img'
+                aria-label='Black Hole Recordings'
+                className='inline-flex select-none items-center justify-center whitespace-nowrap text-[12px] font-semibold tracking-[-0.02em] text-white/68 opacity-75 sm:text-[13px]'
+              >
+                Black Hole Recordings
+              </span>
+            ) : (
+              <BlackHoleRecordingsLogo className='h-[16px] w-auto sm:h-[18px]' />
+            )}
           </div>
           <div
             className={cn(
