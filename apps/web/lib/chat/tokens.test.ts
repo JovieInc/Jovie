@@ -112,6 +112,28 @@ describe('tokens: roundtrip', () => {
       '@release:rel_1[A] and @artist:art_2[B] and @track:trk_3[C]';
     expect(serializeTokens(parseTokens(original))).toBe(original);
   });
+
+  it('roundtrips an event entity', () => {
+    const original = '@event:evt_123[Brooklyn Steel]';
+    expect(serializeTokens(parseTokens(original))).toBe(original);
+  });
+
+  it('roundtrips a mixed message containing an event', () => {
+    const original =
+      'see you at @event:evt_123[Brooklyn Steel] with @artist:art_2[B]';
+    expect(serializeTokens(parseTokens(original))).toBe(original);
+  });
+
+  it('parses an event entity into the correct shape', () => {
+    expect(parseTokens('@event:evt_123[Brooklyn Steel]')).toEqual([
+      {
+        type: 'entity',
+        kind: 'event',
+        id: 'evt_123',
+        label: 'Brooklyn Steel',
+      },
+    ]);
+  });
 });
 
 describe('tokens: extractors', () => {

@@ -53,6 +53,17 @@ export type EntityRefMeta =
       readonly subtitle?: string;
       readonly durationMs?: number | null;
       readonly releaseTitle?: string;
+    }
+  | {
+      readonly kind: 'event';
+      readonly subtitle?: string;
+      readonly eventDate?: string;
+      readonly venue?: string;
+      readonly city?: string;
+      readonly provider?: string;
+      readonly status?: string;
+      readonly capacity?: number;
+      readonly eventType?: 'tour' | 'meetup' | 'guest' | 'charity' | 'other';
     };
 
 export interface EntityRef {

@@ -13,7 +13,7 @@
  * Pure functions — no React, no fetching. Safe to import from server code.
  */
 
-export type EntityKind = 'release' | 'artist' | 'track';
+export type EntityKind = 'release' | 'artist' | 'track' | 'event';
 
 export interface EntityMentionToken {
   readonly type: 'entity';
@@ -38,16 +38,17 @@ const ENTITY_KINDS: ReadonlySet<EntityKind> = new Set([
   'release',
   'artist',
   'track',
+  'event',
 ]);
 
 /**
  * Match an entity mention: @kind:id[label]
- * - kind: release | artist | track
+ * - kind: release | artist | track | event
  * - id: non-empty, no whitespace, no ] or [
  * - label: any sequence of (escaped char `\x`) or (non-] non-\ char)
  */
 const ENTITY_PATTERN =
-  /@(release|artist|track):([^\s[\]]+)\[((?:\\.|[^\]\\])*)\]/g;
+  /@(release|artist|track|event):([^\s[\]]+)\[((?:\\.|[^\]\\])*)\]/g;
 
 /** Match a skill invocation: /skill:id (id: word chars, digits, underscores) */
 const SKILL_PATTERN = /\/skill:([A-Za-z]\w*)/g;
