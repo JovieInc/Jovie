@@ -99,7 +99,11 @@ export async function waitForPublicSurfaceReady(
       .toBe(true);
   }
 
-  await waitForAnyVisible(page, surface.readySelectors);
+  await waitForAnyVisible(
+    page,
+    surface.readySelectors,
+    surface.readyVisibleTimeoutMs
+  );
 
   if (
     surface.expectedState === 'redirect' &&

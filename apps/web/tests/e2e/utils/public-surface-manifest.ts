@@ -42,6 +42,7 @@ export interface PublicSurfaceSpec {
   readonly path: string;
   readonly resolvePath?: () => string;
   readonly readySelectors: readonly string[];
+  readonly readyVisibleTimeoutMs?: number;
   readonly readyText?: RegExp;
   readonly mainSelector?: string;
   readonly mainVisibleTimeoutMs?: number;
@@ -487,6 +488,7 @@ const AUTH_SURFACES = [
       'input[type="email"]',
       '[data-clerk-component]',
     ],
+    readyVisibleTimeoutMs: 90_000,
     mainSelector: 'body',
     minMainTextLength: 40,
     allowMissingMain: true,
@@ -512,6 +514,7 @@ const AUTH_SURFACES = [
       'input[type="email"]',
       '[data-clerk-component]',
     ],
+    readyVisibleTimeoutMs: 90_000,
     mainSelector: 'body',
     minMainTextLength: 40,
     allowMissingMain: true,
