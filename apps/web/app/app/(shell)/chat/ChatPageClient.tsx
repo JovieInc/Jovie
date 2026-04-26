@@ -407,6 +407,10 @@ export function ChatPageClient({
   }, [headerActions, setHeaderBadge, setHeaderActions]);
 
   const rawQuery = useMemo(() => searchParams.get('q'), [searchParams]);
+  const initialSkillId = useMemo(
+    () => searchParams.get('skill') ?? undefined,
+    [searchParams]
+  );
 
   // Auto-open the profile drawer when redirected from /dashboard/profile (?panel=profile)
   useEffect(() => {
@@ -690,6 +694,7 @@ export function ChatPageClient({
             onConversationCreate={handleConversationCreate}
             onTitleChange={handleTitleChange}
             initialQuery={initialQuery ?? undefined}
+            initialSkillId={initialSkillId}
             displayName={activeProfile.displayName ?? undefined}
             avatarUrl={activeProfile.avatarUrl}
             username={activeProfile.username ?? undefined}

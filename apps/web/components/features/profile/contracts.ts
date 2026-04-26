@@ -48,7 +48,7 @@ export type ProfileV2OverlayMode =
 
 export type ProfileRenderMode = 'interactive' | 'preview';
 
-export type ProfileSurfacePresentation = 'standalone' | 'embedded';
+export type ProfileSurfacePresentation = 'standalone' | 'embedded' | 'modal';
 
 export const PROFILE_PRIMARY_TAB_KEYS = [
   'profile',
@@ -66,6 +66,7 @@ export interface ProfileRailCard {
 }
 
 export type ProfileShowcaseStateId =
+  | 'mock-home'
   | 'streams-latest'
   | 'streams-presave'
   | 'streams-release-day'

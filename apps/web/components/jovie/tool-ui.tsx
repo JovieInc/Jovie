@@ -145,7 +145,7 @@ function ToolStatusRow({
             title={getToolStatusTitle(event)}
             className={cn(
               'truncate font-semibold tracking-[-0.01em]',
-              isInline ? 'text-[12px]' : 'text-[13px]'
+              isInline ? 'text-xs' : 'text-app'
             )}
           >
             {getToolStatusTitle(event)}
@@ -154,9 +154,7 @@ function ToolStatusRow({
             <div
               className={cn(
                 'mt-0.5 text-secondary-token',
-                isInline
-                  ? 'line-clamp-2 text-[11px]'
-                  : 'line-clamp-2 text-[12px]'
+                isInline ? 'line-clamp-2 text-2xs' : 'line-clamp-2 text-xs'
               )}
             >
               {body}

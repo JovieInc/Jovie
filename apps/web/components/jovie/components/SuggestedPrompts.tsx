@@ -43,6 +43,11 @@ interface SuggestedPromptsProps {
   readonly latestReleaseTitle?: string | null;
   readonly canUseAdvancedTools?: boolean;
   readonly layout?: 'rail' | 'grid' | 'flat';
+  /**
+   * Variant F: while the slash picker is open, fade chips out (don't unmount)
+   * so they don't compete with the morphing surface behind them.
+   */
+  readonly dimmed?: boolean;
 }
 
 function SuggestionPill({
@@ -85,6 +90,7 @@ export function SuggestedPrompts({
   latestReleaseTitle,
   canUseAdvancedTools = false,
   layout = 'rail',
+  dimmed = false,
 }: SuggestedPromptsProps) {
   const promptSuggestions = isFirstSession
     ? FIRST_SESSION_SUGGESTIONS.map(suggestion => {
@@ -130,6 +136,13 @@ export function SuggestedPrompts({
     FEEDBACK_SUGGESTION,
   ];
 
+  // `inert` removes the subtree from the tab order AND blocks pointer events,
+  // so dimmed chips can't be reached by Tab/Shift+Tab while the slash picker
+  // is open. `aria-hidden` on the wrapper hides them from SR.
+  const dimClass = dimmed
+    ? 'opacity-0 transition-opacity duration-200 ease-out'
+    : 'opacity-100 transition-opacity duration-200 ease-out';
+
   if (layout === 'grid') {
     const primarySuggestions = promptSuggestions.slice(0, 3);
     const secondarySuggestions = allSuggestions.filter(
@@ -139,7 +152,9 @@ export function SuggestedPrompts({
 
     return (
       <div
-        className='mx-auto w-full max-w-[35rem]'
+        className={cn('mx-auto w-full max-w-[35rem]', dimClass)}
+        aria-hidden={dimmed}
+        inert={dimmed}
         data-testid='suggested-prompts-grid'
       >
         <div className='grid grid-cols-[repeat(auto-fit,minmax(10.75rem,1fr))] gap-2'>
@@ -173,7 +188,12 @@ export function SuggestedPrompts({
   if (layout === 'flat') {
     return (
       <div
-        className='mx-auto flex w-full max-w-[35rem] flex-col gap-1.5'
+        className={cn(
+          'mx-auto flex w-full max-w-[35rem] flex-col gap-1.5',
+          dimClass
+        )}
+        aria-hidden={dimmed}
+        inert={dimmed}
         data-testid='suggested-prompts-flat'
       >
         {allSuggestions.map(suggestion => {
@@ -201,7 +221,11 @@ export function SuggestedPrompts({
   }
 
   return (
-    <div className='w-full max-w-[46rem]'>
+    <div
+      className={cn('w-full max-w-[46rem]', dimClass)}
+      aria-hidden={dimmed}
+      inert={dimmed}
+    >
       <div
         className={cn(
           CHAT_PROMPT_RAIL_SCROLL_CLASS,

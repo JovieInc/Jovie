@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
 import { HomepageIntent } from '@/components/homepage/HomepageIntent';
+import { HERO_COPY } from '@/components/homepage/intent';
 import { ArtistProfileOutcomeDuo } from '@/components/marketing/artist-profile/ArtistProfileOutcomeDuo';
 import {
   HomepageV2CaptureReactivate,
@@ -177,8 +178,17 @@ export default function HomePage() {
           </div>
 
           <div className='relative z-[2] mx-auto flex w-full max-w-[1360px] min-w-0 flex-1 items-center justify-center px-5 pb-10 pt-[calc(var(--linear-header-height)+4rem)] sm:px-8 sm:pb-12 sm:pt-[calc(var(--linear-header-height)+4.75rem)] lg:px-12 lg:pb-14 lg:pt-[calc(var(--linear-header-height)+5.25rem)]'>
-            <div className='w-full min-w-0 max-w-[920px] motion-safe:animate-[homepageFadeIn_420ms_cubic-bezier(0.16,1,0.3,1)_both]'>
-              <HomepageIntent />
+            <div className='w-full min-w-0 max-w-[920px]'>
+              <h1
+                id='home-hero-heading'
+                className='homepage-hero-headline self-center text-center text-white'
+              >
+                {HERO_COPY.headline}
+              </h1>
+              <p className='homepage-hero-subhead mt-6 max-w-[680px] self-center text-center text-[17px] leading-[1.58] tracking-[-0.015em] text-white/68 sm:text-[18px]'>
+                {HERO_COPY.subhead}
+              </p>
+              <HomepageIntent showIntro={false} />
             </div>
           </div>
 

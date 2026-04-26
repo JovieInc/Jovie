@@ -146,10 +146,17 @@ function renderArtistLine(
     return releaseArtistListFormatter.format(normalizedNames);
   }
 
-  return releaseArtistListFormatter.formatToParts(normalizedNames).map(part =>
-    part.type === 'element' ? (
+  const partKeyCounts = new Map<string, number>();
+
+  return releaseArtistListFormatter.formatToParts(normalizedNames).map(part => {
+    const keyBase = `${part.type}:${part.value}`;
+    const occurrence = (partKeyCounts.get(keyBase) ?? 0) + 1;
+    partKeyCounts.set(keyBase, occurrence);
+    const key = `${keyBase}:${occurrence}`;
+
+    return part.type === 'element' ? (
       <button
-        key={`artist-${part.value}`}
+        key={key}
         type='button'
         onClick={() => onArtistClick(part.value)}
         className='rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-focus-ring)'
@@ -157,9 +164,9 @@ function renderArtistLine(
         {part.value}
       </button>
     ) : (
-      <span key={`sep-${part.value}`}>{part.value}</span>
-    )
-  );
+      <span key={key}>{part.value}</span>
+    );
+  });
 }
 
 function ReleaseEntityHeader({
@@ -600,6 +607,21 @@ export function ReleaseSidebar({
     onRescanIsrc?.();
   }, [isPlatformRescanDisabled, onRescanIsrc]);
 
+  const handleNavigateToFullTasksPage = useCallback(() => {
+    if (!release) {
+      return;
+    }
+
+    globalThis.location.href = APP_ROUTES.DASHBOARD_RELEASE_TASKS.replace(
+      '[releaseId]',
+      release.id
+    );
+  }, [release]);
+
+  const handleDismissTasksUpgrade = useCallback(() => {
+    setShowTasksUpgrade(false);
+  }, []);
+
   const platformCardActions = useMemo(() => {
     if (!isEditable) {
       return null;
@@ -673,7 +695,7 @@ export function ReleaseSidebar({
           {isEditable ? (
             <DrawerSection
               title='Artwork'
-              surface='card'
+              surface='plain'
               defaultOpen={false}
               lazyMount
               testId='release-artwork-settings-card'
@@ -687,7 +709,7 @@ export function ReleaseSidebar({
           ) : null}
           <DrawerSection
             title='Lyrics'
-            surface='card'
+            surface='plain'
             defaultOpen={false}
             lazyMount
             testId='release-lyrics-card'
@@ -706,7 +728,7 @@ export function ReleaseSidebar({
           {(release.totalTracks ?? 0) > 0 ? (
             <DrawerSection
               title='Tracks'
-              surface='card'
+              surface='plain'
               defaultOpen={false}
               lazyMount
               testId='release-tracks-card'
@@ -749,7 +771,7 @@ export function ReleaseSidebar({
         <div data-testid='release-tasks-card'>
           {isTasksWorkspaceGateLoading ? (
             <div
-              className='animate-pulse px-1 py-1.5 text-[12px] text-secondary-token'
+              className='animate-pulse px-1 py-1.5 text-xs text-secondary-token'
               data-testid='release-tasks-loading-state'
             >
               Loading tasks...
@@ -760,20 +782,14 @@ export function ReleaseSidebar({
               releaseId={release.id}
               variant='compact'
               releaseDate={release.releaseDate}
-              onNavigateToFullPage={() => {
-                globalThis.location.href =
-                  APP_ROUTES.DASHBOARD_RELEASE_TASKS.replace(
-                    '[releaseId]',
-                    release.id
-                  );
-              }}
+              onNavigateToFullPage={handleNavigateToFullTasksPage}
             />
           ) : null}
           {!isTasksWorkspaceGateLoading &&
           !canAccessTasksWorkspace &&
           showTasksUpgrade ? (
             <CompactReleasePlanUpgradeCard
-              onDismiss={() => setShowTasksUpgrade(false)}
+              onDismiss={handleDismissTasksUpgrade}
             />
           ) : null}
         </div>

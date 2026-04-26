@@ -4,8 +4,8 @@ import { ArrowUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
-import { track } from '@/lib/analytics';
 import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
+import { trackHomepageEvent } from './homepage-analytics';
 import {
   HERO_COPY,
   HOMEPAGE_INTENT_EXPERIMENT_ID,
@@ -22,6 +22,7 @@ import {
 } from './intent-store';
 
 const INPUT_ID = 'homepage-intent-input';
+const HOMEPAGE_VIEWED_DELAY_MS = 8000;
 
 /**
  * Viewport gate: desktop (≥768px) gets an intercepted modal via `router.push`;
@@ -48,7 +49,11 @@ function buildAuthUrl(intentId: string): string {
   );
 }
 
-export function HomepageIntent() {
+export function HomepageIntent({
+  showIntro = true,
+}: Readonly<{
+  readonly showIntro?: boolean;
+}> = {}) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const pillRailRef = useRef<HTMLDivElement>(null);
@@ -62,10 +67,12 @@ export function HomepageIntent() {
   useEffect(() => {
     if (viewedFiredRef.current) return;
     viewedFiredRef.current = true;
-    track('homepage_viewed', {
-      experimentId: HOMEPAGE_INTENT_EXPERIMENT_ID,
-      variantId: HOMEPAGE_INTENT_VARIANT_ID,
-    });
+    const viewedTimer = globalThis.window.setTimeout(() => {
+      trackHomepageEvent('homepage_viewed', {
+        experimentId: HOMEPAGE_INTENT_EXPERIMENT_ID,
+        variantId: HOMEPAGE_INTENT_VARIANT_ID,
+      });
+    }, HOMEPAGE_VIEWED_DELAY_MS);
 
     // Rehydrate any in-progress draft from a previous visit so the fan picks
     // up where they left off. Cleared on submit and on successful signup
@@ -74,6 +81,10 @@ export function HomepageIntent() {
     if (draft) {
       setValue(draft);
     }
+
+    return () => {
+      globalThis.window.clearTimeout(viewedTimer);
+    };
   }, []);
 
   const syncPillRailControls = useCallback(() => {
@@ -111,7 +122,10 @@ export function HomepageIntent() {
   const handlePillClick = useCallback((pill: HomepagePill) => {
     setActivePill(pill);
     setValue(pill.insertedPrompt);
-    track('homepage_pill_clicked', { pillId: pill.id, pillLabel: pill.label });
+    trackHomepageEvent('homepage_pill_clicked', {
+      pillId: pill.id,
+      pillLabel: pill.label,
+    });
     const input = inputRef.current;
     if (input) {
       input.focus();
@@ -142,7 +156,7 @@ export function HomepageIntent() {
       }
       if (!editedFiredRef.current && next.length > 0) {
         editedFiredRef.current = true;
-        track('homepage_prompt_edited', {
+        trackHomepageEvent('homepage_prompt_edited', {
           experimentId: HOMEPAGE_INTENT_EXPERIMENT_ID,
         });
       }
@@ -169,7 +183,7 @@ export function HomepageIntent() {
       persistHomepageIntent(intent);
     } catch (error) {
       persisted = false;
-      track('homepage_intent_persist_failed', {
+      trackHomepageEvent('homepage_intent_persist_failed', {
         reason: error instanceof Error ? error.message : 'unknown',
       });
     }
@@ -179,7 +193,7 @@ export function HomepageIntent() {
       ? 'desktop_modal'
       : 'mobile_fullpage';
 
-    track('homepage_prompt_submitted', {
+    trackHomepageEvent('homepage_prompt_submitted', {
       pillId: intent.pillId,
       pillUsed: intent.pillId !== null,
       promptLength: intent.finalPrompt.length,
@@ -228,15 +242,19 @@ export function HomepageIntent() {
         fontFeatureSettings: '"cv01", "ss03"',
       }}
     >
-      <h1
-        id='home-hero-heading'
-        className='homepage-hero-headline self-center text-center text-white'
-      >
-        {HERO_COPY.headline}
-      </h1>
-      <p className='homepage-hero-subhead mt-6 max-w-[680px] self-center text-center text-[17px] leading-[1.58] tracking-[-0.015em] text-white/68 sm:text-[18px]'>
-        {HERO_COPY.subhead}
-      </p>
+      {showIntro ? (
+        <>
+          <h1
+            id='home-hero-heading'
+            className='homepage-hero-headline self-center text-center text-white'
+          >
+            {HERO_COPY.headline}
+          </h1>
+          <p className='homepage-hero-subhead mt-6 max-w-[680px] self-center text-center text-[17px] leading-[1.58] tracking-[-0.015em] text-white/68 sm:text-[18px]'>
+            {HERO_COPY.subhead}
+          </p>
+        </>
+      ) : null}
 
       <label htmlFor={INPUT_ID} className='sr-only'>
         Ask Jovie

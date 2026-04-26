@@ -115,6 +115,9 @@ export function readProfileAccentTheme(
     return null;
   }
   const accentRecord = accent as Record<string, unknown>;
+  if (accentRecord.version !== 1) {
+    return null;
+  }
 
   const sourceUrl =
     typeof accentRecord.sourceUrl === 'string' &&
@@ -144,9 +147,10 @@ export function mergeProfileTheme(
   existingTheme: Record<string, unknown> | null | undefined,
   updates: Partial<ProfileThemeRecord>
 ): ProfileThemeRecord {
+  const { profileAccent: _profileAccent, ...safeUpdates } = updates;
   const merged = {
     ...existingTheme,
-    ...updates,
+    ...safeUpdates,
   } as ProfileThemeRecord;
 
   if (updates.profileAccent === undefined) {
@@ -162,6 +166,13 @@ export function mergeProfileTheme(
     });
     if (normalizedAccent) {
       merged.profileAccent = normalizedAccent;
+    } else {
+      const existingAccent = readProfileAccentTheme(existingTheme);
+      if (existingAccent) {
+        merged.profileAccent = existingAccent;
+      } else {
+        delete merged.profileAccent;
+      }
     }
   }
 
@@ -204,29 +215,30 @@ export function buildProfileAccentCssVars(
   return {
     '--profile-accent-primary': primaryHex,
     '--profile-accent-on-primary': contrastHex,
-    '--profile-accent-soft': hexToRgba(primaryHex, 0.18),
-    '--profile-accent-soft-strong': hexToRgba(primaryHex, 0.28),
+    '--profile-accent-soft': hexToRgba(primaryHex, 0.12),
+    '--profile-accent-soft-strong': hexToRgba(primaryHex, 0.18),
     '--profile-tab-active-bg': primaryHex,
     '--profile-tab-active-fg': contrastHex,
-    '--profile-status-pill-bg': hexToRgba(primaryHex, 0.2),
-    '--profile-status-pill-border': hexToRgba(primaryHex, 0.34),
+    '--profile-status-pill-bg': hexToRgba(primaryHex, 0.18),
+    '--profile-status-pill-border': hexToRgba(primaryHex, 0.28),
     '--profile-status-pill-fg': '#ffffff',
     '--profile-rail-dot-active': primaryHex,
-    '--profile-rail-dot-inactive': hexToRgba(primaryHex, 0.24),
-    '--profile-stage-glow-a': hexToRgba(glowStrong, 0.44),
-    '--profile-stage-glow-b': hexToRgba(glowSoft, 0.32),
+    '--profile-rail-dot-inactive': hexToRgba(primaryHex, 0.18),
+    '--profile-stage-glow-a': hexToRgba(glowStrong, 0.24),
+    '--profile-stage-glow-b': hexToRgba(glowSoft, 0.14),
     '--profile-panel-gradient': `linear-gradient(180deg, ${hexToRgba(
       glowStrong,
-      0.18
-    )}, ${hexToRgba(primaryHex, 0.06)} 24%, transparent 100%)`,
+      0.08
+    )}, ${hexToRgba(primaryHex, 0.02)} 24%, transparent 100%)`,
     '--profile-pearl-primary-bg': primaryHex,
     '--profile-pearl-primary-fg': contrastHex,
-    '--profile-pearl-bg': hexToRgba(primaryHex, 0.14),
-    '--profile-pearl-bg-hover': hexToRgba(primaryHex, 0.2),
-    '--profile-pearl-bg-active': hexToRgba(primaryHex, 0.28),
-    '--profile-pearl-border': hexToRgba(primaryHex, 0.3),
-    '--profile-composer-border': hexToRgba(primaryHex, 0.22),
-    '--profile-dock-border': hexToRgba(primaryHex, 0.18),
-    '--profile-dock-bg': hexToRgba(primaryHex, 0.14),
+    '--profile-pearl-bg': hexToRgba(primaryHex, 0.1),
+    '--profile-pearl-bg-hover': hexToRgba(primaryHex, 0.14),
+    '--profile-pearl-bg-active': hexToRgba(primaryHex, 0.2),
+    '--profile-pearl-border': hexToRgba(primaryHex, 0.22),
+    '--profile-composer-border': hexToRgba(primaryHex, 0.16),
+    '--profile-dock-border': hexToRgba(primaryHex, 0.12),
+    '--profile-dock-bg': hexToRgba(primaryHex, 0.08),
+    '--color-focus-ring': primaryHex,
   };
 }

@@ -492,7 +492,6 @@ const nextConfig = {
       '@radix-ui/react-radio-group',
       'recharts',
       '@tanstack/react-pacer',
-      '@sentry/nextjs',
       'clsx',
       'class-variance-authority',
       '@dnd-kit/core',
@@ -532,14 +531,17 @@ const withVercelToolbar = enableVercelToolbar
 // Apply plugins in order: bundle analyzer -> vercel toolbar -> sentry
 module.exports = withBundleAnalyzer(withVercelToolbar(nextConfig));
 
-// Sentry build plugin: only in production/CI (source map upload, tunnel route).
-// The Sentry runtime SDK (sentry.server.config.ts) works independently in dev.
+// Sentry build plugin: source map upload + tunnel route only when upload auth
+// exists. Generic CI public-audit builds run production standalone without
+// Sentry upload credentials; applying the plugin there has caused generated
+// interception helpers to be externalized without being copied into standalone.
+// The Sentry runtime SDK (sentry.server.config.ts) works independently.
 const { withSentryConfig } = require('@sentry/nextjs');
 
+const hasSentryAuthToken = Boolean(process.env.SENTRY_AUTH_TOKEN);
 const shouldUseSentryPlugin =
-  process.env.NODE_ENV === 'production' ||
-  process.env.CI === 'true' ||
-  !!process.env.VERCEL_ENV;
+  hasSentryAuthToken &&
+  (process.env.NODE_ENV === 'production' || !!process.env.VERCEL_ENV);
 
 module.exports = shouldUseSentryPlugin
   ? withSentryConfig(module.exports, {

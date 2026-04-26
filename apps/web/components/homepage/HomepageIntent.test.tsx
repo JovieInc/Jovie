@@ -8,8 +8,8 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush, prefetch: vi.fn() }),
 }));
 
-vi.mock('@/lib/analytics', () => ({
-  track: (...args: unknown[]) => mockTrack(...args),
+vi.mock('@/components/homepage/homepage-analytics', () => ({
+  trackHomepageEvent: (...args: unknown[]) => mockTrack(...args),
 }));
 
 import { HomepageIntent } from '@/components/homepage/HomepageIntent';
@@ -159,10 +159,18 @@ describe('HomepageIntent', () => {
   });
 
   it('7. homepage_viewed fires exactly once on mount', () => {
-    const { rerender } = render(<HomepageIntent />);
-    rerender(<HomepageIntent />);
-    const viewed = mockTrack.mock.calls.filter(c => c[0] === 'homepage_viewed');
-    expect(viewed.length).toBe(1);
+    vi.useFakeTimers();
+    try {
+      const { rerender } = render(<HomepageIntent />);
+      rerender(<HomepageIntent />);
+      vi.advanceTimersByTime(8000);
+      const viewed = mockTrack.mock.calls.filter(
+        c => c[0] === 'homepage_viewed'
+      );
+      expect(viewed.length).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('8. homepage_prompt_edited fires at most once per session', () => {

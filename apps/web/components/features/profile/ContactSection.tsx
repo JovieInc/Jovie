@@ -38,9 +38,9 @@ export function ContactSection({
 
   return (
     <main className='-mt-1 space-y-3' aria-labelledby='contact-title'>
-      <h1 id='contact-title' className='sr-only'>
+      <h2 id='contact-title' className='sr-only'>
         Contact {artistName}
-      </h1>
+      </h2>
       <div className='rounded-[var(--profile-inner-radius)] border border-[color:var(--profile-pearl-border)] bg-[var(--profile-pearl-bg)] p-2 shadow-[var(--profile-pearl-shadow)] backdrop-blur-xl'>
         <ProfileContactDrawerContent
           artistHandle={artistHandle}

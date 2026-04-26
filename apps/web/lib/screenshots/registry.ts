@@ -206,6 +206,15 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
     },
     ...ARTIST_PROFILE_SECTION_SCREENSHOT_SCENARIOS,
     {
+      id: 'tim-white-profile-mock-home-mobile',
+      title: 'Tim White Profile — Mock Home',
+      route: '/demo/showcase/tim-white-profile?state=mock-home',
+      waitFor: '[data-testid="homepage-phone-state-mock-home"]',
+      captureTarget: 'locator',
+      captureSelector: '[data-testid="homepage-phone-state-mock-home"]',
+      viewport: 'mobile',
+    },
+    {
       id: 'tim-white-profile-tour-mobile',
       title: 'Tim White Profile — Tour',
       route: '/demo/showcase/tim-white-profile?mode=tour',

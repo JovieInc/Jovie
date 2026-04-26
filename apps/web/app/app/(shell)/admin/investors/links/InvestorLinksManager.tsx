@@ -543,7 +543,7 @@ export function InvestorLinksManager() {
             <div
               // biome-ignore lint/suspicious/noArrayIndexKey: static skeleton placeholders never reorder
               key={`skeleton-${i}`}
-              className='h-11 animate-pulse rounded-[12px] bg-surface-0'
+              className='h-11 animate-pulse rounded-xl bg-surface-0'
             />
           ))}
         </div>

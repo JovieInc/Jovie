@@ -145,6 +145,10 @@ export interface CreatorProfile {
 export interface ArtistSettings extends Record<string, unknown> {
   exclude_self_from_analytics?: boolean;
   hometown?: string | null;
+  heroRoleLabel?: string | null;
+  notifications?: {
+    artistEmailReady?: boolean;
+  };
 }
 
 // Backwards compatibility - Artist interface mapped from CreatorProfile

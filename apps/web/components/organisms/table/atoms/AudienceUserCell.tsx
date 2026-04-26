@@ -95,7 +95,7 @@ export const AudienceUserCell = React.memo(function AudienceUserCell({
       <span
         className={cn(
           'truncate',
-          isAnonymous ? 'font-[400] text-secondary-token' : 'font-caption'
+          isAnonymous ? 'font-normal text-secondary-token' : 'font-caption'
         )}
       >
         {primaryLabel}

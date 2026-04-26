@@ -64,7 +64,7 @@ describe('ProfileShell notification trigger', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /get notified/i }));
+    fireEvent.click(screen.getByRole('button', { name: /turn on alerts/i }));
 
     expect(routerPushMock).toHaveBeenCalledWith('/testartist?mode=subscribe');
   });
@@ -85,7 +85,7 @@ describe('ProfileShell notification trigger', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /get notified/i }));
+    fireEvent.click(screen.getByRole('button', { name: /turn on alerts/i }));
 
     expect(routerPushMock).toHaveBeenCalledWith(
       '/testartist?mode=subscribe&source=someSource'

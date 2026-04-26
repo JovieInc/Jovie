@@ -1019,6 +1019,16 @@
   /* Linear: slowTransition */
   --duration-slowest: 350ms;
 
+  /* Two-tier intent vocabulary (DESIGN.md → Motion):
+     - SUBTLE   = micro-interactions: hover, focus, color, icon swap, toast.
+                  Aim for ≤150ms — anything more reads as "glitchy."
+     - CINEMATIC = high-impact reveals: side drawers, modals, audio player
+                  open/close, chat composer surface morph. 320ms feels
+                  intentional and gives the eye time to track the move.
+     Always prefer these over hardcoded numbers; they pick up reduced-motion. */
+  --duration-subtle: 150ms;
+  --duration-cinematic: 320ms;
+
   /* Easings - Linear uses cubic-bezier for smooth feel */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
@@ -1026,6 +1036,8 @@
   --ease-interactive: cubic-bezier(0.25, 0.46, 0.45, 0.94);
   --ease-linear: var(--ease-interactive);
   /* Legacy alias */
+  --ease-subtle: var(--ease-interactive);
+  --ease-cinematic: cubic-bezier(0.32, 0.72, 0, 1);
 
   /* Pre-composed transition patterns (extracted from Linear)
      Use duration custom properties so prefers-reduced-motion overrides work */
@@ -1054,6 +1066,8 @@
     --duration-slow: 0ms;
     --duration-slower: 0ms;
     --duration-slowest: 0ms;
+    --duration-subtle: 0ms;
+    --duration-cinematic: 0ms;
   }
 }
 

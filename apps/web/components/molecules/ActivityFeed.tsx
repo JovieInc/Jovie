@@ -140,7 +140,7 @@ export function ActivityFeed({
   if (events.length === 0) {
     return (
       <div className='flex min-h-[120px] items-center rounded-md bg-surface-1 px-2.5'>
-        <p className='text-[12px] leading-[17px] text-secondary-token'>
+        <p className='text-xs leading-[17px] text-secondary-token'>
           {emptyMessage}
         </p>
       </div>

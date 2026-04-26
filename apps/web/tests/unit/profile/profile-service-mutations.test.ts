@@ -133,7 +133,9 @@ describe('Profile Service Mutations', () => {
 
   describe('updateProfileById', () => {
     it('updates profile and invalidates cache', async () => {
-      queueSelectResults([{ avatarUrl: null, theme: null }]);
+      queueSelectResults([
+        { avatarUrl: null, theme: null, usernameNormalized: 'testartist' },
+      ]);
       createUpdateChain([mockUpdatedProfile]);
       mockInvalidateProfileCache.mockResolvedValue(undefined);
 
@@ -145,7 +147,35 @@ describe('Profile Service Mutations', () => {
       });
 
       expect(result).toEqual(mockUpdatedProfile);
-      expect(mockInvalidateProfileCache).toHaveBeenCalledWith('testartist');
+      expect(mockInvalidateProfileCache).toHaveBeenCalledWith(
+        'testartist',
+        'testartist'
+      );
+    });
+
+    it('invalidates both old and new profile cache keys after username changes', async () => {
+      queueSelectResults([
+        { avatarUrl: null, theme: null, usernameNormalized: 'oldartist' },
+      ]);
+      createUpdateChain([
+        {
+          ...mockUpdatedProfile,
+          usernameNormalized: 'newartist',
+        },
+      ]);
+      mockInvalidateProfileCache.mockResolvedValue(undefined);
+
+      const { updateProfileById } = await import(
+        '@/lib/services/profile/mutations'
+      );
+      await updateProfileById('profile-123', {
+        usernameNormalized: 'newartist',
+      });
+
+      expect(mockInvalidateProfileCache).toHaveBeenCalledWith(
+        'newartist',
+        'oldartist'
+      );
     });
 
     it('returns null when profile not found', async () => {

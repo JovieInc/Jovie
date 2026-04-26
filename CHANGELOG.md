@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.179] - 2026-04-26
+
+> Public artist profiles now ship with a full mobile/desktop refresh, photo-driven accents, a new home rail, and a guided alerts experience that stays consistent across live profiles, previews, and demo captures.
+
+### Added
+
+- Public profiles now include a refreshed home rail for releases, shows, alerts, and listening destinations.
+- Artists can collect richer alert preferences, including artist-email opt-in state, through a guided mobile flow.
+- Desktop profile views now use a dedicated surface that mirrors the refreshed mobile profile experience.
+- Profile accents now automatically adapt to artist photos and stay consistent across profile updates.
+- [internal] Added versioned `theme.profileAccent` support across upload, suggestion, ingestion, admin, dashboard, and public-profile mutation paths.
+- [internal] Added visual review tooling for mock-home profile captures and review matrices.
+
+### Changed
+
+- Public profiles now use a shared compact shell with a full-bleed hero, status pill, alerts CTA, quick social actions, and tabbed navigation.
+- Preview, demo, and live profile surfaces now stay visually aligned.
+- Alert and profile drawer flows now share a more consistent modal, embedded, and standalone presentation model.
+- Pay/tip drawers now support custom amount entry and drawer-specific presentation.
+- [internal] Rebuilt the compact profile template around shared primary-tab panel contracts and profile surface presentations.
+- [internal] Theme writes now merge rather than replace the full theme object, preserving persisted profile accent data.
+
+### Fixed
+
+- Alert resend cooldowns now block repeated resend actions instead of only changing the button label.
+- Profile username updates now invalidate both the old and new public profile cache keys.
+- Profile home rail pagination now tracks the visible card using viewport-relative positions.
+- Notification status responses no longer expose default content preferences for unsubscribed users.
+- Public render fallbacks now avoid noisy local image lookups while keeping neutral accents when no usable image is available.
+
 ## [26.4.178] - 2026-04-25
 
 > Closes two SonarCloud security hotspots on the bio-import sanitizer that shipped in 26.4.176. ReDoS-prone unbounded greedy quantifiers in the URL-stripping regex are now bounded; the bidi/zero-width char class is built via `new RegExp(string)` with `\u` escapes so the source file itself contains no bidi chars (trojan-source defense). No behavior change for real bios.
@@ -31,25 +61,6 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - `apps/web/lib/chat/system-prompt.ts` — instructs the model to call `importBioFromUrl` when the artist names or pastes a URL, then chain `proposeProfileEdit` with the returned candidate. Establishes the untrusted-content posture so injection attempts in fetched bios cannot redirect agent behavior.
 - `apps/web/lib/ai/tools/profile-edit.ts` — adds optional `sourceUrl` and `sourceTitle` fields on `proposeProfileEdit` so the confirmation card can surface provenance when the value originated from a URL import.
 - `apps/web/components/features/dashboard/organisms/ProfileEditPreviewCard.tsx` — renders an "Imported from {host}" line linking to the source URL above the diff. The host is the user-facing safety signal that prevents click-through approval of attacker-controlled bio content.
-
-## [26.4.174] - 2026-04-24
-
-> Public artist profiles now ship with a compact mock-inspired shell, a durable photo-driven accent system, and shared live/demo parity across the refreshed home, music, events, alerts, and about views.
-
-### Added
-
-- `apps/web/lib/profile/profile-theme.server.ts`, `profile-theme.ts`, and related mutation paths now support a versioned `theme.profileAccent` payload. Avatar-driven accent colors are extracted server-side, normalized for contrast, reused as CSS vars, and persisted across avatar upload, suggestion selection, ingestion, and admin/dashboard update flows.
-- `apps/web/components/features/profile/ProfileHomeRail.tsx` adds a manual horizontal Home rail with dot pagination, driven from existing profile resolver data so featured release, tour, alerts, and listen states can rotate without changing route semantics.
-
-### Changed
-
-- `apps/web/components/features/profile/templates/ProfileCompactSurface.tsx` and `ProfileCompactTemplate.tsx` were rebuilt into the new shared public shell: full-bleed hero, verified identity row, contextual status pill, notifications-first CTA, quick social actions, and the five-tab bottom nav mapping `Home`, `Music`, `Events`, `Alerts`, and `Profile` to the existing profile modes.
-- Preview and demo profile surfaces now use the same accent/theme contract and refreshed shell so homepage showcases and live `/:username` pages stay visually aligned.
-
-### Fixed
-
-- Theme writes now merge instead of replacing the entire theme object, preventing user theme changes from wiping persisted `profileAccent` data.
-- Public render fallback accent derivation now skips local and `/_next/image` sources, avoiding invalid-host fetch noise while preserving neutral fallbacks when no usable remote image exists.
 
 ## [26.4.173] - 2026-04-24
 

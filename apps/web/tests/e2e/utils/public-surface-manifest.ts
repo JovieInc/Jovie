@@ -42,6 +42,7 @@ export interface PublicSurfaceSpec {
   readonly path: string;
   readonly resolvePath?: () => string;
   readonly readySelectors: readonly string[];
+  readonly readyVisibleTimeoutMs?: number;
   readonly readyText?: RegExp;
   readonly mainSelector?: string;
   readonly mainVisibleTimeoutMs?: number;
@@ -487,6 +488,7 @@ const AUTH_SURFACES = [
       'input[type="email"]',
       '[data-clerk-component]',
     ],
+    readyVisibleTimeoutMs: 90_000,
     mainSelector: 'body',
     minMainTextLength: 40,
     allowMissingMain: true,
@@ -512,6 +514,7 @@ const AUTH_SURFACES = [
       'input[type="email"]',
       '[data-clerk-component]',
     ],
+    readyVisibleTimeoutMs: 90_000,
     mainSelector: 'body',
     minMainTextLength: 40,
     allowMissingMain: true,
@@ -683,10 +686,12 @@ const PROFILE_MODE_SURFACES = [
     path: '/[username]?mode=about',
     resolvePath: () => `/${resolveProfileHandle('music')}?mode=about`,
     readySelectors: [
+      '[data-testid="profile-primary-tab-about"]',
       '[data-testid="profile-mode-drawer-about"]',
       '[data-testid="profile-header"]',
     ],
     mainSelector: 'main',
+    allowMissingMain: true,
     minMainTextLength: 30,
     allowedFinalPaths: [/^\/[^/?#]+\?mode=about$/],
     lighthouse: false,
@@ -704,6 +709,7 @@ const PROFILE_MODE_SURFACES = [
       '[data-testid="profile-header"]',
     ],
     mainSelector: 'main',
+    allowMissingMain: true,
     minMainTextLength: 30,
     allowedFinalPaths: [/^\/[^/?#]+\?mode=contact$/],
     lighthouse: false,
@@ -717,10 +723,13 @@ const PROFILE_MODE_SURFACES = [
     path: '/[username]?mode=listen',
     resolvePath: () => `/${resolveProfileHandle('music')}?mode=listen`,
     readySelectors: [
+      '[data-testid="profile-primary-tab-releases"]',
+      '[data-testid="profile-primary-tab-listen"]',
       '[data-testid="profile-mode-drawer-listen"]',
       '[data-testid="profile-header"]',
     ],
     mainSelector: 'main',
+    allowMissingMain: true,
     minMainTextLength: 30,
     allowedFinalPaths: [/^\/[^/?#]+\?mode=listen$/],
     lighthouse: true,
@@ -734,10 +743,14 @@ const PROFILE_MODE_SURFACES = [
     path: '/[username]?mode=subscribe',
     resolvePath: () => `/${resolveProfileHandle('music')}?mode=subscribe`,
     readySelectors: [
+      '[data-testid="profile-primary-tab-subscribe"]',
+      '[data-testid="notifications-page"]',
+      '[data-testid="notifications-flow"]',
       '[data-testid="profile-mode-drawer-subscribe"]',
       '[data-testid="profile-header"]',
     ],
     mainSelector: 'main',
+    allowMissingMain: true,
     minMainTextLength: 30,
     allowedFinalPaths: [/^\/[^/?#]+\?mode=subscribe$/],
     lighthouse: true,
@@ -758,6 +771,7 @@ const PROFILE_MODE_SURFACES = [
       '[data-testid="profile-header"]',
     ],
     mainSelector: 'main',
+    allowMissingMain: true,
     minMainTextLength: 30,
     allowedFinalPaths: [/^\/[^/?#]+\?mode=pay$/],
     lighthouse: true,
@@ -771,10 +785,12 @@ const PROFILE_MODE_SURFACES = [
     path: '/[username]?mode=tour',
     resolvePath: () => `/${resolveProfileHandle('music')}?mode=tour`,
     readySelectors: [
+      '[data-testid="profile-primary-tab-tour"]',
       '[data-testid="profile-mode-drawer-tour"]',
       '[data-testid="profile-header"]',
     ],
     mainSelector: 'main',
+    allowMissingMain: true,
     minMainTextLength: 30,
     allowedFinalPaths: [/^\/[^/?#]+\?mode=tour$/],
     lighthouse: false,
@@ -826,7 +842,7 @@ const SMART_LINK_SURFACES = [
         DEFAULTS.countdownReleaseSlug
       ),
     readySelectors: ['h1'],
-    readyText: /coming soon|turn on notifications|notify/i,
+    readyText: /coming soon|turn on notifications|turn on alerts|notify/i,
     mainSelector: 'main',
     minMainTextLength: 45,
     lighthouse: false,

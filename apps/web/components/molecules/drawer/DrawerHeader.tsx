@@ -22,7 +22,7 @@ export function DrawerHeader({ title, actions, className }: DrawerHeaderProps) {
     >
       <div className='min-w-0 flex-1'>
         {typeof title === 'string' ? (
-          <p className='truncate text-[12px] font-semibold tracking-[-0.012em] text-primary-token'>
+          <p className='truncate text-xs font-semibold tracking-[-0.012em] text-primary-token'>
             {title}
           </p>
         ) : (

@@ -146,7 +146,7 @@ function CampaignDataTable({
   children: ReactNode;
 }>) {
   return (
-    <div className='overflow-hidden rounded-[12px] border border-subtle bg-surface-0'>
+    <div className='overflow-hidden rounded-xl border border-subtle bg-surface-0'>
       <table className='w-full text-sm'>{children}</table>
     </div>
   );

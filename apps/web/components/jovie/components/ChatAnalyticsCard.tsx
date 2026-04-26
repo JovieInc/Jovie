@@ -27,10 +27,10 @@ export function ChatAnalyticsCard({ result }: ChatAnalyticsCardProps) {
             <Sparkles className='h-3.5 w-3.5 text-secondary-token' />
           </div>
           <div>
-            <p className='text-[13px] font-[510] text-primary-token'>
+            <p className='text-app font-medium text-primary-token'>
               {result.title}
             </p>
-            <p className='text-[11px] text-tertiary-token'>
+            <p className='text-2xs text-tertiary-token'>
               {result.totalActive} active{' '}
               {result.totalActive === 1 ? 'signal' : 'signals'}
             </p>
@@ -51,10 +51,10 @@ export function ChatAnalyticsCard({ result }: ChatAnalyticsCardProps) {
               <InsightCategoryIcon category={insight.category} size='sm' />
             </span>
             <div className='min-w-0'>
-              <p className='text-[13px] font-[510] leading-snug text-primary-token'>
+              <p className='text-app font-medium leading-snug text-primary-token'>
                 {insight.title}
               </p>
-              <p className='mt-0.5 text-[13px] leading-snug text-secondary-token'>
+              <p className='mt-0.5 text-app leading-snug text-secondary-token'>
                 {insight.actionSuggestion ?? insight.description}
               </p>
             </div>

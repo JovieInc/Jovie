@@ -5,6 +5,7 @@ import { LogoLink } from '@/components/atoms/LogoLink';
 import { AuthActions } from '@/components/molecules/AuthActions';
 import { MobileNav } from '@/components/molecules/MobileNav';
 import { MarketingSignInLink } from '@/components/organisms/MarketingSignInLink';
+import { APP_ROUTES } from '@/constants/routes';
 import { cn } from '@/lib/utils';
 
 // Linear header structure: full-width header with centered ~1000px content
@@ -38,11 +39,18 @@ function PublicAuthActions({
   minimalVariant = 'link',
 }: PublicAuthActionsProps = {}) {
   if (minimal) {
-    return (
-      <MarketingSignInLink
-        variant={minimalVariant === 'pill' ? 'pill' : 'ghost'}
-      />
-    );
+    if (minimalVariant === 'pill') {
+      return (
+        <Link
+          href={APP_ROUTES.SIGNIN}
+          className='focus-ring-themed hidden h-[36px] items-center justify-center rounded-full border border-white/88 bg-white px-4 text-[13px] font-medium tracking-[-0.012em] text-black shadow-[0_8px_20px_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.72)] transition-colors duration-150 hover:bg-white/95 sm:inline-flex sm:h-[40px] sm:px-5 sm:text-[14px] sm:shadow-[0_10px_24px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.72)]'
+        >
+          Sign in
+        </Link>
+      );
+    }
+
+    return <MarketingSignInLink variant='ghost' />;
   }
   return (
     <div className='flex items-center gap-1'>

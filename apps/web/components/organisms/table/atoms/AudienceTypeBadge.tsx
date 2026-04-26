@@ -30,7 +30,7 @@ export function AudienceTypeBadge({ type, className }: AudienceTypeBadgeProps) {
       <span
         className={cn('h-2 w-2 shrink-0 rounded-full', TYPE_DOT_COLORS[type])}
       />
-      <span className='text-[12px] font-[400] text-secondary-token'>
+      <span className='text-xs font-normal text-secondary-token'>
         {TYPE_LABELS[type]}
       </span>
     </div>

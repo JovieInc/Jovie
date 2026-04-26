@@ -47,7 +47,7 @@ export function SettingsActionRow({
           {description ? (
             <p
               className={cn(
-                'mt-1 max-w-[56ch] text-[12px] leading-[16px] text-secondary-token',
+                'mt-1 max-w-[56ch] text-xs leading-[16px] text-secondary-token',
                 descriptionClassName
               )}
             >

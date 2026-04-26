@@ -1,22 +1,21 @@
-import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
+import type { ColumnDef } from '@tanstack/react-table';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { UnifiedTableSkeleton } from './UnifiedTableSkeleton';
 
 type Row = { id: string; title: string; count: number };
 
-const columnHelper = createColumnHelper<Row>();
-
-// biome-ignore lint/suspicious/noExplicitAny: columnHelper.accessor narrows per-column types; outer array must be widened in test fixtures.
-const COLUMNS: ColumnDef<Row, any>[] = [
-  columnHelper.accessor('title', {
+const COLUMNS: ColumnDef<Row, unknown>[] = [
+  {
+    accessorKey: 'title',
     id: 'title',
     header: 'Title',
-  }),
-  columnHelper.accessor('count', {
+  },
+  {
+    accessorKey: 'count',
     id: 'count',
     header: 'Count',
-  }),
+  },
 ];
 
 describe('UnifiedTableSkeleton', () => {

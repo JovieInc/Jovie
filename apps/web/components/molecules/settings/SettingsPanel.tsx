@@ -52,7 +52,7 @@ export function SettingsPanel({
             {description ? (
               <p
                 className={cn(
-                  'max-w-[56ch] text-[12px] leading-[16px] text-secondary-token',
+                  'max-w-[56ch] text-xs leading-[16px] text-secondary-token',
                   descriptionClassName
                 )}
               >

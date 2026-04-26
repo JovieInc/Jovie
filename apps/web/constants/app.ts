@@ -37,7 +37,7 @@ export const PAGE_SUBTITLES = {
   tip: 'Tip with Venmo',
   listen: 'Choose a Service',
   tour: 'Tour dates',
-  subscribe: 'Get notified',
+  subscribe: 'Manage Alerts',
   about: 'About',
   contact: 'Contact',
 } as const;

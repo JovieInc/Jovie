@@ -309,7 +309,7 @@ function TableSkeleton() {
         {TABLE_SKELETON_KEYS.map(skeletonKey => (
           <div
             key={skeletonKey}
-            className='h-11 animate-pulse rounded-[12px] bg-surface-0'
+            className='h-11 animate-pulse rounded-xl bg-surface-0'
           />
         ))}
       </div>

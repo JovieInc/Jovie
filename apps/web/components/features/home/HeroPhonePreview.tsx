@@ -77,7 +77,7 @@ export function HeroPhonePreview({ handle }: HeroPhonePreviewProps) {
             </div>
           </div>
 
-          {/* Profile mode content — "Turn on notifications" + social icons */}
+          {/* Profile mode content — alerts CTA + social icons */}
           <div
             className='relative overflow-hidden'
             style={{ height: PHONE_CONTENT_HEIGHT }}

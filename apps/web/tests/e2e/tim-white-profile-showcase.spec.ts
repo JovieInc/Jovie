@@ -69,24 +69,21 @@ test.describe('Tim White Profile Showcase', () => {
   test('supports single-state forcing for screenshot review', async ({
     page,
   }) => {
-    await page.goto(
-      '/demo/showcase/tim-white-profile?state=playlist-fallback',
-      {
-        waitUntil: 'domcontentloaded',
-      }
-    );
+    await page.goto('/demo/showcase/tim-white-profile?state=mock-home', {
+      waitUntil: 'domcontentloaded',
+    });
     await waitForHydration(page);
 
     await expect(
       page.getByTestId('demo-showcase-tim-white-profile-state')
     ).toBeVisible();
     await expect(
-      page.getByTestId('homepage-phone-state-playlist-fallback')
+      page.getByTestId('homepage-phone-state-mock-home')
     ).toBeVisible();
     await expect(
       page
-        .getByTestId('homepage-phone-state-playlist-fallback')
-        .getByTestId('profile-home-rail-playlist')
-    ).toHaveAttribute('data-state', 'playlist_fallback');
+        .getByTestId('homepage-phone-state-mock-home')
+        .getByTestId('profile-home-rail-release')
+    ).toHaveAttribute('data-state', 'release_live');
   });
 });

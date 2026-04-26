@@ -23,7 +23,14 @@ export function SubscribeView({
   subscribeTwoStep = false,
 }: SubscribeViewProps) {
   if (subscribeTwoStep) {
-    return <TwoStepNotificationsCTA artist={artist} />;
+    return <TwoStepNotificationsCTA artist={artist} presentation='overlay' />;
   }
-  return <ArtistNotificationsCTA artist={artist} variant='button' autoOpen />;
+  return (
+    <ArtistNotificationsCTA
+      artist={artist}
+      presentation='overlay'
+      variant='button'
+      autoOpen
+    />
+  );
 }
