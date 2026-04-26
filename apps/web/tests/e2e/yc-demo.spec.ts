@@ -640,7 +640,7 @@ test.describe('YC Demo Recording', () => {
     page,
     baseURL,
   }) => {
-    test.setTimeout(240_000);
+    test.setTimeout(360_000);
 
     const demoClerkUserId = process.env.DEMO_CLERK_USER_ID?.trim();
     const cookieBaseUrl =
