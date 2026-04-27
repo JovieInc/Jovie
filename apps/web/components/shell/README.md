@@ -16,6 +16,25 @@ look-and-feel; pieces graduate here once they've settled.
 | `EntityPopover` | Hover-anchored entity preview (release/artist/track/event/contact/teammate). Includes `EntityHoverLink`, `lookupArtistEntity`, `lookupReleaseEntityByAlbum`. | Yes — DrawerHero, lyrics breadcrumb, etc. |
 | `ShellDropdown` | Radix-backed dropdown with compound parts: `Header`, `Label`, `Item`, `EntityItem`, `CheckboxItem`, `RadioGroup`/`RadioItem`, `Sub`/`SubTrigger`/`SubContent`, `Separator`. Optional `searchable`. | Yes — overflow menus, sort/filter, palette switcher |
 
+## Lyrics
+
+| Component | Purpose |
+|-----------|---------|
+| `LyricsView` | Track-scoped cinematic lyrics with timed playhead, J/K nav, Enter-to-stamp, edit mode. Empty state with Transcribe / Paste affordances. Pure presentational; consumers control `lines` + `currentTimeSec` + `onSeek`. |
+| `LyricsHeader` | Sticky-top breadcrumb showing artist › track title. Artist becomes a button when `onArtistClick` is provided. |
+| `LyricRow` | Single lyric line — display mode (centered, fades dim siblings) or edit mode (grip + time-stamp + inline-editable text). |
+| `LyricsTimeline` | Sticky-bottom scrub bar with one cue dot per lyric line. Click anywhere to seek. NaN-safe duration handling. |
+
+## Now-playing
+
+| Component | Purpose |
+|-----------|---------|
+| `SidebarNowPlaying` | Floating now-playing card pinned to the canvas left-edge above the audio bar. Collapsed mode renders just the artwork (10×10) for icon-mode sidebars. Hides entirely when nothing's playing. |
+| `SidebarBottomNowPlaying` | Compact now-playing row mounted at the sidebar bottom. Artwork + title/artist + small play button. Hides entirely when nothing's playing. |
+| `ArtworkPlayOverlay` | Small play/pause button overlaid on album art. Shared between the two now-playing cards. |
+
+All three accept a `track: NowPlayingTrack` whose fields (`trackTitle`, `artistName`, `artworkUrl`) match `useTrackAudioPlayer().playbackState` directly.
+
 ## Brand chrome / loaders
 
 | Component | Purpose |

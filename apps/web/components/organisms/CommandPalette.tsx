@@ -62,6 +62,7 @@ function CommandPaletteInner({ profileId }: CommandPaletteInnerProps) {
 
   const { data: conversations } = useChatConversationsQuery({
     limit: RECENT_THREAD_LIMIT,
+    enabled: open,
   });
 
   // Recent threads + standalone "New thread" action are not part of the
