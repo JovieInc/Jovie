@@ -351,10 +351,7 @@ function WorkflowCell({
   }
 
   let textClass: string;
-  if (tone === 'destination') {
-    textClass =
-      'text-[15px] font-semibold tracking-[-0.03em] text-primary-token';
-  } else if (tone === 'audience') {
+  if (tone === 'audience') {
     textClass =
       'text-[14px] font-medium tracking-[-0.02em] text-secondary-token';
   } else if (tone === 'message') {

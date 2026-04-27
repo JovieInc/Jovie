@@ -12,7 +12,7 @@ import { EntityChip } from './EntityChip';
 function eventMatches(event: EventRecord, lowerQuery: string): boolean {
   if (!lowerQuery) return true;
   if (event.title.toLowerCase().includes(lowerQuery)) return true;
-  if (event.city && event.city.toLowerCase().includes(lowerQuery)) return true;
+  if (event.city?.toLowerCase().includes(lowerQuery)) return true;
   return false;
 }
 

@@ -1,5 +1,6 @@
+import type { ShortcutHint } from '@/lib/shortcuts';
 import { cn } from '@/lib/utils';
-import { type ShortcutHint, Tooltip } from './Tooltip';
+import { Tooltip } from './Tooltip';
 
 // IconBtn — h-7 w-7 grid place-items-center icon button with optional
 // Tooltip. Two tones:

@@ -1,13 +1,10 @@
+import type { ShortcutHint } from '@/lib/shortcuts';
 import { cn } from '@/lib/utils';
 
 // Tooltip — small, dark, glassy popover with the action label + an
 // optional kbd chip on the right. Pass a `shortcut` object to surface the
 // key combo. CSS-only (no portal); uses group/tip + delay for a Linear-
 // feeling late reveal that snaps in over 150ms once it commits.
-export interface ShortcutHint {
-  readonly keys: string;
-  readonly description: string;
-}
 
 export interface TooltipProps {
   readonly children: React.ReactNode;
