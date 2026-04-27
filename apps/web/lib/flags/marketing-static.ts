@@ -1,5 +1,3 @@
-const SHOW_FULL_HOMEPAGE_FOOTER = process.env.NODE_ENV !== 'production';
-
 /**
  * Static-only marketing flags.
  *
@@ -23,7 +21,7 @@ export const FEATURE_FLAGS = {
   SHOW_HOMEPAGE_V2_POWER_GRID: false,
   SHOW_HOMEPAGE_V2_PRICING: true,
   SHOW_HOMEPAGE_V2_FINAL_CTA: true,
-  SHOW_HOMEPAGE_V2_FOOTER_LINKS: SHOW_FULL_HOMEPAGE_FOOTER,
+  SHOW_HOMEPAGE_V2_FOOTER_LINKS: false,
 } as const;
 
 export type MarketingStaticFlagName = keyof typeof FEATURE_FLAGS;

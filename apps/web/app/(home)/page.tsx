@@ -1,14 +1,12 @@
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
-import type { CSSProperties } from 'react';
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
 import { HERO_COPY } from '@/components/homepage/intent';
 import { ArtistProfileOutcomeDuo } from '@/components/marketing/artist-profile/ArtistProfileOutcomeDuo';
 import {
   HomepageV2CaptureReactivate,
   HomepageV2FinalCta,
-  HomepageV2FooterLinks,
   HomepageV2PowerGrid,
   HomepageV2Pricing,
   HomepageV2Spotlight,
@@ -160,8 +158,6 @@ interface HeroMockupShot {
   readonly width: number;
   readonly height: number;
   readonly kind: HeroMockupKind;
-  readonly offsetY: string;
-  readonly rotate: string;
   readonly priority: boolean;
 }
 
@@ -174,8 +170,6 @@ const HERO_MOCKUP_SCREENSHOTS: readonly HeroMockupShot[] = [
     width: 780,
     height: 1688,
     kind: 'phone',
-    offsetY: '1.4rem',
-    rotate: '-2.5deg',
     priority: false,
   },
   {
@@ -186,8 +180,6 @@ const HERO_MOCKUP_SCREENSHOTS: readonly HeroMockupShot[] = [
     width: 2880,
     height: 1800,
     kind: 'desktop',
-    offsetY: '0rem',
-    rotate: '0deg',
     priority: true,
   },
   {
@@ -198,8 +190,6 @@ const HERO_MOCKUP_SCREENSHOTS: readonly HeroMockupShot[] = [
     width: 776,
     height: 1690,
     kind: 'phone',
-    offsetY: '2.1rem',
-    rotate: '2.2deg',
     priority: true,
   },
   {
@@ -210,8 +200,6 @@ const HERO_MOCKUP_SCREENSHOTS: readonly HeroMockupShot[] = [
     width: 2880,
     height: 1800,
     kind: 'desktop',
-    offsetY: '0.8rem',
-    rotate: '-0.8deg',
     priority: false,
   },
   {
@@ -222,8 +210,6 @@ const HERO_MOCKUP_SCREENSHOTS: readonly HeroMockupShot[] = [
     width: 780,
     height: 1688,
     kind: 'phone',
-    offsetY: '0.2rem',
-    rotate: '1.8deg',
     priority: false,
   },
   {
@@ -234,8 +220,6 @@ const HERO_MOCKUP_SCREENSHOTS: readonly HeroMockupShot[] = [
     width: 2880,
     height: 1800,
     kind: 'desktop',
-    offsetY: '1.5rem',
-    rotate: '0.6deg',
     priority: false,
   },
   {
@@ -246,8 +230,6 @@ const HERO_MOCKUP_SCREENSHOTS: readonly HeroMockupShot[] = [
     width: 776,
     height: 582,
     kind: 'panel',
-    offsetY: '2.3rem',
-    rotate: '-1.6deg',
     priority: false,
   },
   {
@@ -258,8 +240,6 @@ const HERO_MOCKUP_SCREENSHOTS: readonly HeroMockupShot[] = [
     width: 1842,
     height: 952,
     kind: 'desktop',
-    offsetY: '0.5rem',
-    rotate: '1deg',
     priority: false,
   },
 ] as const;
@@ -302,7 +282,7 @@ function HomepageHeroActions() {
         href={APP_ROUTES.ARTIST_PROFILES}
         className='public-action-secondary focus-ring-themed'
       >
-        Explore Product
+        Explore Profiles
       </Link>
     </div>
   );
@@ -322,30 +302,8 @@ function HomepageHeroMockupCarousel() {
                 aria-hidden={shot.isDuplicate ? true : undefined}
                 className={`homepage-hero-mockup homepage-hero-mockup--${shot.kind}`}
                 key={shot.carouselId}
-                style={
-                  {
-                    '--hero-mockup-y': shot.offsetY,
-                    '--hero-mockup-rotate': shot.rotate,
-                  } as CSSProperties
-                }
               >
                 <div className='homepage-hero-mockup__frame'>
-                  {shot.kind !== 'phone' ? (
-                    <div
-                      className='homepage-hero-mockup__bar'
-                      aria-hidden='true'
-                    >
-                      <span className='homepage-hero-mockup__dots'>
-                        <span />
-                        <span />
-                        <span />
-                      </span>
-                      <span className='homepage-hero-mockup__title'>
-                        {shot.title}
-                      </span>
-                      <span className='homepage-hero-mockup__spacer' />
-                    </div>
-                  ) : null}
                   <Image
                     src={shot.src}
                     alt={shot.isDuplicate ? '' : shot.alt}
@@ -442,9 +400,6 @@ export default function HomePage() {
         {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_PRICING ? <HomepageV2Pricing /> : null}
         {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_FINAL_CTA ? (
           <HomepageV2FinalCta />
-        ) : null}
-        {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_FOOTER_LINKS ? (
-          <HomepageV2FooterLinks />
         ) : null}
       </div>
     </>

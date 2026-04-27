@@ -25,7 +25,7 @@ export default function HomeLayout({
       <SkipToContent />
       <MarketingHeader
         logoSize='xs'
-        logoVariant='full'
+        logoVariant='word'
         variant='homepage'
         navLinks={HOME_NAV_LINKS}
       />
