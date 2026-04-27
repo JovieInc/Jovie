@@ -318,7 +318,7 @@ jobs:
     steps:
       - name: Slack notification on Knip failure
         if: ${{ needs.knip.result == 'failure' }}
-        uses: slackapi/slack-github-action@af78098f536edbc4de71162a307590698245be95 # v3.0.1
+        uses: slackapi/slack-github-action@03ea5433c137af7c0495bc0cad1af10403fc800c # v3.0.2
         with:
           channel-id: ${{ vars.SLACK_CI_CHANNEL_ID }}
           payload: |
@@ -339,7 +339,7 @@ jobs:
 
       - name: Slack notification on unit test failure
         if: ${{ needs.unit-tests.result == 'failure' }}
-        uses: slackapi/slack-github-action@af78098f536edbc4de71162a307590698245be95 # v3.0.1
+        uses: slackapi/slack-github-action@03ea5433c137af7c0495bc0cad1af10403fc800c # v3.0.2
         with:
           channel-id: ${{ vars.SLACK_CI_CHANNEL_ID }}
           payload: |
