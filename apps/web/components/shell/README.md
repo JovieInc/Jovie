@@ -25,6 +25,16 @@ look-and-feel; pieces graduate here once they've settled.
 | `LyricRow` | Single lyric line — display mode (centered, fades dim siblings) or edit mode (grip + time-stamp + inline-editable text). |
 | `LyricsTimeline` | Sticky-bottom scrub bar with one cue dot per lyric line. Click anywhere to seek. NaN-safe duration handling. |
 
+## Now-playing
+
+| Component | Purpose |
+|-----------|---------|
+| `SidebarNowPlaying` | Floating now-playing card pinned to the canvas left-edge above the audio bar. Collapsed mode renders just the artwork (10×10) for icon-mode sidebars. Hides entirely when nothing's playing. |
+| `SidebarBottomNowPlaying` | Compact now-playing row mounted at the sidebar bottom. Artwork + title/artist + small play button. Hides entirely when nothing's playing. |
+| `ArtworkPlayOverlay` | Small play/pause button overlaid on album art. Shared between the two now-playing cards. |
+
+All three accept a `track: NowPlayingTrack` whose fields (`trackTitle`, `artistName`, `artworkUrl`) match `useTrackAudioPlayer().playbackState` directly.
+
 ## Brand chrome / loaders
 
 | Component | Purpose |
