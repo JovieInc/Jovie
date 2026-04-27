@@ -1,0 +1,26 @@
+{
+  "rules": [
+    {
+      "id": "archive-to-ia-after-30d",
+      "enabled": true,
+      "conditions": {
+        "prefix": "archived/"
+      },
+      "storageClassTransitions": [
+        {
+          "condition": {
+            "type": "Age",
+            "maxAge": 2592000
+          },
+          "storageClass": "InfrequentAccess"
+        }
+      ],
+      "abortMultipartUploadsTransition": {
+        "condition": {
+          "type": "Age",
+          "maxAge": 86400
+        }
+      }
+    }
+  ]
+}
