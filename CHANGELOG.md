@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.180] - 2026-04-27
+
+> Reproducible Cloudflare R2 bucket configuration for the upcoming audio-asset upload pipeline.
+
+### Added
+
+- [internal] `infra/r2/cors.json` and `infra/r2/lifecycle.json` capture the deployed CORS rules and Infrequent-Access lifecycle for the `jovie-audio-{dev,staging,prod}` buckets, so the bucket configuration can be re-applied with `wrangler r2 bucket cors set` / `lifecycle set`.
+
 ## [26.4.179] - 2026-04-26
 
 > Public artist profiles now ship with a full mobile/desktop refresh, photo-driven accents, a new home rail, and a guided alerts experience that stays consistent across live profiles, previews, and demo captures.
