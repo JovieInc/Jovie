@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.182] - 2026-04-27
+
+> Press `?` anywhere in the dashboard to open the keyboard shortcuts help. Linear convention; complements the existing `Cmd+/`.
+
+### Added
+
+- Press `?` anywhere outside an input to open the keyboard shortcuts modal. The modal's `keyboard-shortcuts` row now lists both `⌘ /` and `?` so the new alternate is discoverable.
+
 ## [26.4.181] - 2026-04-27
 
 > Follow-up to v26.4.180. Tightens R2 bucket configuration based on bot review of #7845 — separates CORS rules per environment so localhost no longer hits production, and fixes a lifecycle bug where the orphan-multipart-upload sweep was scoped to a single prefix.
