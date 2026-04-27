@@ -62,7 +62,9 @@ export function SidebarThreadsSection({
   if (sorted.length === 0) return null;
 
   const visible = expanded ? sorted.slice(0, 10) : sorted.slice(0, 5);
-  const hasMore = sorted.length > visible.length || !expanded;
+  // Show toggle only when there's more than the collapsed slice. Avoids
+  // a "View all" → "no Show less" stuck state on 1–10 threads.
+  const hasMore = sorted.length > 5;
   const unreadCount = sorted.filter(t => t.unread).length;
 
   return (

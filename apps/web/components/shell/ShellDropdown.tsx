@@ -23,10 +23,13 @@ import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
 import { Check, ChevronRight, Link2, Search, X } from 'lucide-react';
 import {
   type ComponentPropsWithoutRef,
+  type CSSProperties,
   createContext,
   type ElementRef,
   forwardRef,
+  type MouseEvent,
   type ReactNode,
+  type RefObject,
   useCallback,
   useContext,
   useEffect,
@@ -35,6 +38,7 @@ import {
   useRef,
   useState,
 } from 'react';
+
 import { cn } from '@/lib/utils';
 import {
   EntityPopover,
@@ -333,7 +337,7 @@ function ShellDropdownRoot({
           alignOffset={alignOffset}
           collisionPadding={8}
           loop
-          style={widthStyle as React.CSSProperties}
+          style={widthStyle as CSSProperties}
           className={cn(CONTENT_CLASSES, contentClassName)}
           onCloseAutoFocus={() => {
             // When the menu closes, also close the entity popover.
@@ -377,7 +381,7 @@ function ShellDropdownRoot({
 // ---------------------------------------------------------------------------
 
 interface FilterInputProps {
-  readonly inputRef: React.RefObject<HTMLInputElement | null>;
+  readonly inputRef: RefObject<HTMLInputElement | null>;
   readonly value: string;
   readonly onChange: (next: string) => void;
   readonly placeholder: string;
@@ -442,8 +446,8 @@ interface HeaderProps {
   readonly title: string;
   readonly subtitle?: string;
   readonly avatar?: ReactNode;
-  readonly onMouseEnter?: (e: React.MouseEvent<HTMLDivElement>) => void;
-  readonly onMouseLeave?: (e: React.MouseEvent<HTMLDivElement>) => void;
+  readonly onMouseEnter?: (e: MouseEvent<HTMLDivElement>) => void;
+  readonly onMouseLeave?: (e: MouseEvent<HTMLDivElement>) => void;
   readonly entity?: EntityPopoverData;
 }
 
@@ -729,8 +733,10 @@ const ShellDropdownSubTrigger = forwardRef<
   ElementRef<typeof DropdownMenuPrimitive.SubTrigger>,
   SubTriggerProps
 >(({ label, icon: Icon, description }, ref) => {
-  const visible = useFilterMatch(label, description);
-  if (!visible) return null;
+  // Submenu triggers stay visible during filtering. The trigger label may
+  // not match the query, but its descendants might — hiding the trigger
+  // would cut off the only path to those matches. The submenu's own
+  // FilterContext gates its inner items independently.
   return (
     <DropdownMenuPrimitive.SubTrigger
       ref={ref}
@@ -796,7 +802,7 @@ function ShellDropdownSubContent({
   );
 
   const isEmpty = searchable && query.trim().length > 0 && visibleCount === 0;
-  const widthStyle = { ['--w' as string]: `${width}px` } as React.CSSProperties;
+  const widthStyle = { ['--w' as string]: `${width}px` } as CSSProperties;
 
   return (
     <DropdownMenuPrimitive.Portal>
