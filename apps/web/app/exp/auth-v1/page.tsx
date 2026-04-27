@@ -9,6 +9,13 @@
 
 import { ArrowRight, Loader2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { AuthGoogleIcon } from '@/components/features/auth/atoms/AuthGoogleIcon';
+import {
+  ArmadaMusicLogo,
+  AwalLogo,
+  BlackHoleRecordingsLogo,
+  TheOrchardLogo,
+} from '@/components/features/home/label-logos';
 import { cn } from '@/lib/utils';
 
 const EASE_CINEMATIC = 'cubic-bezier(0.32, 0.72, 0, 1)';
@@ -88,17 +95,22 @@ export default function AuthV1Page() {
     >
       <style>{`
         .auth-v1 :focus { outline: none; }
+        /* Soft cyan glow — same vocabulary as shell-v1. Inherits the
+           element's border-radius via box-shadow rather than outline. */
         .auth-v1 :focus-visible {
-          outline: 1.5px solid rgba(103, 232, 249, 0.45);
-          outline-offset: 1px;
-          border-radius: 4px;
+          outline: none;
+          box-shadow:
+            0 0 0 1px rgba(103, 232, 249, 0.18),
+            0 0 0 6px rgba(103, 232, 249, 0.08);
         }
       `}</style>
 
-      {/* Left half — auth card. Centered vertically + horizontally. */}
-      <div className='min-h-dvh grid place-items-center px-6 py-10'>
+      {/* Left half — auth card centered, legal pinned at the bottom so
+          it never competes with the form. Flex column instead of grid
+          place-items-center so we can mt-auto the legal strip. */}
+      <div className='min-h-dvh flex flex-col items-center justify-center px-6 py-10 relative'>
         <div className='w-full max-w-[360px] flex flex-col items-center text-center'>
-          <JovieMark className='h-9 w-9 text-primary-token mb-6' />
+          <JovieMark className='h-8 w-8 text-primary-token opacity-30 mb-7' />
 
           <h1
             className='text-[24px] font-semibold leading-tight'
@@ -126,36 +138,47 @@ export default function AuthV1Page() {
 
           <div className='mt-8 w-full'>
             {step === 'email' && (
-              <form onSubmit={onSubmitEmail} className='flex flex-col gap-3'>
-                <label className='block text-left'>
-                  <span className='block text-[10.5px] uppercase tracking-[0.08em] text-quaternary-token font-semibold mb-1.5'>
-                    Email
-                  </span>
+              <div className='flex flex-col gap-3'>
+                <GoogleButton
+                  onClick={() => {
+                    // Stub — production would call signIn('google') here.
+                    setSubmitting(true);
+                    setTimeout(() => {
+                      setSubmitting(false);
+                      const dest =
+                        mode === 'signup'
+                          ? '/exp/onboarding-v1'
+                          : '/exp/shell-v1';
+                      window.location.href = dest;
+                    }, 500);
+                  }}
+                  disabled={submitting}
+                >
+                  Continue with Google
+                </GoogleButton>
+                <OrDivider />
+                <form onSubmit={onSubmitEmail} className='flex flex-col gap-2'>
                   <input
                     ref={emailRef}
                     type='email'
                     required
                     autoComplete='email'
+                    aria-label='Email'
                     value={email}
                     onChange={e => setEmail(e.target.value)}
                     placeholder='you@artistdomain.com'
-                    className='w-full h-10 px-3 rounded-md bg-(--surface-1)/80 border border-(--linear-app-shell-border) text-[14px] text-primary-token placeholder:text-quaternary-token outline-none focus:border-cyan-400/50 transition-colors duration-150 ease-out'
+                    className='w-full h-10 px-4 rounded-full bg-(--surface-1)/80 border border-(--linear-app-shell-border) text-[13.5px] text-primary-token placeholder:text-quaternary-token outline-none focus:border-cyan-400/50 transition-colors duration-150 ease-out'
                   />
-                </label>
-                <ContinueButton submitting={submitting}>
-                  Continue
-                </ContinueButton>
-              </form>
+                  <ContinueButton submitting={submitting}>
+                    Continue
+                  </ContinueButton>
+                </form>
+              </div>
             )}
 
             {step === 'otp' && (
-              <form onSubmit={onSubmitOtp} className='flex flex-col gap-3'>
-                <div className='block text-left'>
-                  <span className='block text-[10.5px] uppercase tracking-[0.08em] text-quaternary-token font-semibold mb-1.5'>
-                    Verification code
-                  </span>
-                  <OtpInput value={otp} onChange={setOtp} firstRef={otpRef} />
-                </div>
+              <form onSubmit={onSubmitOtp} className='flex flex-col gap-2'>
+                <OtpInput value={otp} onChange={setOtp} firstRef={otpRef} />
                 <ContinueButton submitting={submitting}>
                   {mode === 'signup' ? 'Create account' : 'Sign in'}
                 </ContinueButton>
@@ -188,7 +211,7 @@ export default function AuthV1Page() {
                   <button
                     type='button'
                     onClick={() => setMode('signin')}
-                    className='text-secondary-token hover:text-primary-token underline decoration-quaternary-token/60 underline-offset-[3px] hover:decoration-cyan-300/70 transition-colors duration-150 ease-out'
+                    className='text-secondary-token hover:text-primary-token underline decoration-transparent underline-offset-[3px] hover:decoration-quaternary-token/60 transition-colors duration-150 ease-out'
                   >
                     Sign in
                   </button>
@@ -199,7 +222,7 @@ export default function AuthV1Page() {
                   <button
                     type='button'
                     onClick={() => setMode('signup')}
-                    className='text-secondary-token hover:text-primary-token underline decoration-quaternary-token/60 underline-offset-[3px] hover:decoration-cyan-300/70 transition-colors duration-150 ease-out'
+                    className='text-secondary-token hover:text-primary-token underline decoration-transparent underline-offset-[3px] hover:decoration-quaternary-token/60 transition-colors duration-150 ease-out'
                   >
                     Create account
                   </button>
@@ -207,25 +230,28 @@ export default function AuthV1Page() {
               )}
             </p>
           )}
-
-          <p className='mt-12 text-[10.5px] text-quaternary-token'>
-            By continuing you agree to the{' '}
-            <a
-              href='https://jov.ie/terms'
-              className='underline decoration-quaternary-token/40 underline-offset-[3px] hover:text-tertiary-token transition-colors duration-150 ease-out'
-            >
-              terms
-            </a>{' '}
-            and{' '}
-            <a
-              href='https://jov.ie/privacy'
-              className='underline decoration-quaternary-token/40 underline-offset-[3px] hover:text-tertiary-token transition-colors duration-150 ease-out'
-            >
-              privacy policy
-            </a>
-            .
-          </p>
         </div>
+
+        {/* Legal — aligned to the bento wrapper's bottom (p-6 = 24px),
+            not the page edge. Sitting flush with the page bottom made
+            the left column feel optically heavy. */}
+        <p className='absolute bottom-6 left-0 right-0 text-center text-[10.5px] text-quaternary-token px-6'>
+          By continuing you agree to the{' '}
+          <a
+            href='https://jov.ie/terms'
+            className='underline decoration-quaternary-token/40 underline-offset-[3px] hover:text-tertiary-token transition-colors duration-150 ease-out'
+          >
+            terms
+          </a>{' '}
+          and{' '}
+          <a
+            href='https://jov.ie/privacy'
+            className='underline decoration-quaternary-token/40 underline-offset-[3px] hover:text-tertiary-token transition-colors duration-150 ease-out'
+          >
+            privacy policy
+          </a>
+          .
+        </p>
       </div>
 
       {/* Right half — product bento. Hidden below lg. */}
@@ -240,18 +266,17 @@ function BentoShowcase() {
   return (
     <div className='flex-1 flex flex-col rounded-[var(--linear-app-shell-radius,12px)] border border-(--linear-app-shell-border) bg-(--surface-1)/60 px-12 py-14 overflow-hidden'>
       <div className='shrink-0'>
-        <span className='text-[10.5px] uppercase tracking-[0.12em] text-quaternary-token font-semibold'>
-          Built for artists
+        <span className='text-[10.5px] uppercase tracking-[0.14em] font-bold text-white/20'>
+          Meet Jovie
         </span>
         <h2
           className='mt-2 text-[28px] font-semibold leading-tight text-primary-token max-w-[420px]'
           style={{ letterSpacing: '-0.02em' }}
         >
-          The studio that ships releases for you.
+          Built for artists.
         </h2>
         <p className='mt-3 text-[13.5px] text-tertiary-token max-w-[400px] leading-relaxed'>
-          Jovie writes pitches, schedules drops, generates reels and lyric
-          clips, and tells you what to ship next. You make the music.
+          Release more music with less work.
         </p>
       </div>
 
@@ -260,20 +285,18 @@ function BentoShowcase() {
         <ProductMock />
       </div>
 
-      {/* Trust bar — uppercase label + grayscale initial avatars. */}
+      {/* Trust bar — record-label logos imported directly so all six
+          render as the real SVGs (HomeTrustSection's inline-strip mode
+          falls back to placeholder shapes for Black Hole + disco:wax). */}
       <div className='shrink-0 mt-8 pt-6 border-t border-(--linear-app-shell-border)/70'>
-        <p className='text-[10.5px] uppercase tracking-[0.12em] text-quaternary-token font-semibold mb-3'>
-          Trusted by artists
+        <p className='text-[10.5px] uppercase tracking-[0.14em] font-bold text-white/20 mb-5'>
+          Trusted by artists on
         </p>
-        <div className='flex items-center gap-2'>
-          {['BA', 'TW', 'SD', 'LF', 'GE', 'EC'].map(id => (
-            <span
-              key={id}
-              className='h-7 w-7 rounded-full grid place-items-center text-[10.5px] font-medium text-tertiary-token bg-(--surface-2)/70 border border-(--linear-app-shell-border)'
-            >
-              {id}
-            </span>
-          ))}
+        <div className='flex items-center justify-between gap-x-8 text-white/68'>
+          <AwalLogo className='h-[22px] w-auto select-none' />
+          <TheOrchardLogo className='h-[30px] w-auto select-none' />
+          <ArmadaMusicLogo className='h-[24px] w-auto select-none' />
+          <BlackHoleRecordingsLogo className='h-[18px] w-auto select-none' />
         </div>
       </div>
     </div>
@@ -392,9 +415,51 @@ function OtpInput({
           onPaste={onPaste}
           onFocus={e => e.currentTarget.select()}
           aria-label={`Digit ${i + 1} of 6`}
-          className='h-11 w-full min-w-0 rounded-md bg-(--surface-1)/80 border border-(--linear-app-shell-border) text-[18px] tabular-nums font-mono text-center text-primary-token outline-none focus:border-cyan-400/50 transition-colors duration-150 ease-out'
+          className='h-11 w-full min-w-0 rounded-xl bg-(--surface-1)/80 border border-(--linear-app-shell-border) text-[17px] tabular-nums font-mono text-center text-primary-token outline-none focus:border-cyan-400/50 transition-colors duration-150 ease-out'
         />
       ))}
+    </div>
+  );
+}
+
+// Google OAuth button — quieter than the primary white pill so the
+// two CTAs don't fight. Uses surface-1 bg + monochrome G icon. Same
+// pill geometry as ContinueButton for visual continuity.
+function GoogleButton({
+  children,
+  onClick,
+  disabled,
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type='button'
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        'inline-flex items-center justify-center gap-2 h-10 px-5 rounded-full text-[13px] font-medium text-primary-token bg-(--surface-1)/80 border border-(--linear-app-shell-border) hover:bg-(--surface-2)/80 hover:border-(--linear-app-shell-border) active:scale-[0.99] transition-all duration-150 ease-out',
+        disabled && 'opacity-70'
+      )}
+    >
+      <AuthGoogleIcon className='h-4 w-4 text-primary-token/80' />
+      {children}
+    </button>
+  );
+}
+
+// Calm "or" divider — hairline rules + small caption between two
+// auth options. No box, no background — same restraint as the rest.
+function OrDivider() {
+  return (
+    <div className='flex items-center gap-3 my-1' aria-hidden='true'>
+      <span className='flex-1 h-px bg-(--linear-app-shell-border)/70' />
+      <span className='text-[10.5px] uppercase tracking-[0.14em] font-bold text-white/20'>
+        or
+      </span>
+      <span className='flex-1 h-px bg-(--linear-app-shell-border)/70' />
     </div>
   );
 }
@@ -411,7 +476,10 @@ function ContinueButton({
       type='submit'
       disabled={submitting}
       className={cn(
-        'inline-flex items-center justify-center gap-1.5 h-10 px-4 rounded-md text-[13px] font-medium bg-white text-black hover:bg-white/90 transition-colors duration-150 ease-out',
+        // Match the shell's primary action: rounded-full pill, white tone,
+        // soft inner highlight + subtle drop shadow. Same vocabulary used
+        // by Open Jovie / Review pitch / Install.
+        'inline-flex items-center justify-center gap-1.5 h-10 px-5 rounded-full text-[13px] font-medium bg-white text-black hover:brightness-110 active:scale-[0.99] shadow-[0_4px_14px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.45)] transition-all duration-150 ease-out',
         submitting && 'opacity-70'
       )}
     >

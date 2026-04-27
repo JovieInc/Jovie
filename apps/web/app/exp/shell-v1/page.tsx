@@ -28,23 +28,10 @@
 // Every keyboard shortcut MUST be discoverable in two places:
 //   1. The button or affordance it triggers — `title="Action (⌘K)"`,
 //      ideally rendered as a styled Tooltip with a kbd chip on the right.
-//   2. A central registry — see SHORTCUTS below — so we can ship a
-//      "keyboard shortcuts" sheet later without hunting for them.
-// Format: `⌘K`, `⌥/`, `Hold ⌘J`, `[`, `Esc`. Use `⌘` not `Cmd`, and `⌥`
-// not `Alt`, for visual density.
-const SHORTCUTS: Record<string, { keys: string; description: string }> = {
-  search: { keys: '⌘K', description: 'Open search / filter bar' },
-  searchSlash: { keys: '/', description: 'Open search (no modifier)' },
-  toggleSidebar: { keys: '[', description: 'Toggle sidebar dock / float' },
-  toggleSidebarTab: { keys: 'Tab', description: 'Toggle sidebar dock / float' },
-  toggleBar: { keys: '`', description: 'Toggle audio bar in / out' },
-  toggleBarAlt: { keys: '⌘\\', description: 'Toggle audio bar (alt)' },
-  toggleWaveform: { keys: 'W', description: 'Toggle waveform drawer' },
-  toggleLyrics: { keys: 'L', description: 'Open / close the lyrics view' },
-  playPause: { keys: 'Space', description: 'Play / pause current track' },
-  jovieDictate: { keys: 'Hold ⌘J', description: 'Push-to-talk to Jovie' },
-  closeOverlay: { keys: 'Esc', description: 'Close overlay / clear input' },
-};
+//   2. A central registry — see SHORTCUTS in `@/lib/shortcuts` — so a
+//      "keyboard shortcuts" sheet can ship later without hunting them down.
+// Format: `⌘K`, `⌥/`, `Hold ⌘J`, `[`, `Esc`. Use `⌘` not `Cmd`, `⌥` not
+// `Alt`, for visual density.
 
 import {
   Activity,
@@ -62,6 +49,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   CircleDashed,
   Circle as CircleIcon,
   CircleSlash,
@@ -70,6 +58,7 @@ import {
   ExternalLink,
   Flag,
   GripVertical,
+  Hash,
   Heart,
   Inbox,
   LayoutDashboard,
@@ -82,6 +71,7 @@ import {
   Mic2,
   Minimize2,
   MoreHorizontal,
+  PanelLeft,
   PanelRight,
   Pause,
   Pencil,
@@ -101,10 +91,17 @@ import {
   Trash2,
   UserPlus,
   Users,
-  Volume2,
   X,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import type {
   Asset as LibraryAsset,
   Filters as LibraryFiltersType,
@@ -126,6 +123,42 @@ import {
 } from '@/app/exp/library-v1/page';
 import { ChatInput } from '@/components/jovie/components/ChatInput';
 import { ChatMarkdown } from '@/components/jovie/components/ChatMarkdown';
+import { EntityHoverLink } from '@/components/shell/EntityPopover';
+import {
+  type EntityPopoverData,
+  ShellDropdown,
+} from '@/components/shell/ShellDropdown';
+// ---------------------------------------------------------------------------
+// DESIGN RULE — NO AI-SLOP GRADIENTS ON UI CHROME
+// ---------------------------------------------------------------------------
+// Multi-stop purple/pink/blue gradients (violet-→fuchsia-→blue and friends)
+// are the #1 visual tell of AI-generated UI. They read as cheap and
+// undesigned, no matter how careful the rest of the work is.
+//
+// DO NOT use them on:
+//   • Brand marks, logos, avatars
+//   • Active/selected/hover states
+//   • Buttons, badges, pills, chips
+//   • Borders, dividers, accent bars
+//   • Progress hairlines or focus rings
+//
+// Use solid tokens (text-primary, bg-surface-1, etc.) or single-stop tonal
+// shifts of the same hue. If you reach for a gradient, audit the next day.
+//
+// EXCEPTION: the audio waveform's purple→pink→blue gradient is a deliberate
+// hero accent — it's content, not chrome (encodes frequency register), and
+// it's the *one* visual moment that's allowed to draw the eye this hard.
+// There is room for ONE such hero gradient per screen — and really one per
+// app. If you want to add a second, kill the first.
+// ---------------------------------------------------------------------------
+// KEYBOARD SHORTCUT RULE
+// ---------------------------------------------------------------------------
+// Every keyboard shortcut MUST be discoverable in two places:
+//   1. The button or affordance it triggers — `title="Action (⌘K)"`,
+//      ideally rendered as a styled Tooltip with a kbd chip on the right.
+//   2. A central registry — see SHORTCUTS in `@/lib/shortcuts` — so a
+//      "keyboard shortcuts" sheet can ship later without hunting them down.
+import { SHORTCUTS } from '@/lib/shortcuts';
 import { cn } from '@/lib/utils';
 
 type Variant = 'a' | 'b' | 'c' | 'd' | 'e';
@@ -137,7 +170,8 @@ type CanvasView =
   | 'library'
   | 'lyrics'
   | 'settings'
-  | 'thread';
+  | 'thread'
+  | 'onboarding';
 
 // Pill-based filter system (Linear/Notion style). Each pill targets a
 // single field with an `is` / `is not` operator and one or more OR-combined
@@ -158,6 +192,7 @@ type FilterPill = {
 };
 
 type TrackInfo = {
+  id: string;
   title: string;
   artist: string;
   album: string;
@@ -166,6 +201,8 @@ type TrackInfo = {
   key: string;
   version: string;
   durationSec: number;
+  isrc: string;
+  hasLyrics: boolean;
 };
 
 // Live-editable palette. The page wrapper writes these as CSS custom
@@ -195,15 +232,6 @@ const PALETTE_PRESETS: Record<string, Palette> = {
     contentSurface: '#0a0c0f',
     border: '#171a20',
   },
-  Obsidian: {
-    // Inkier than Carbon, a touch more blue at the elevated surfaces.
-    page: '#04060a',
-    surface0: '#080a0f',
-    surface1: '#0d1118',
-    surface2: '#131822',
-    contentSurface: '#070a10',
-    border: '#141823',
-  },
   Graphite: {
     // Slightly lighter / more readable while staying cool.
     page: '#0a0c0f',
@@ -212,15 +240,6 @@ const PALETTE_PRESETS: Record<string, Palette> = {
     surface2: '#1d2229',
     contentSurface: '#0f1216',
     border: '#1d2128',
-  },
-  Slate: {
-    // Mid-cool — same family as Cool Black with a hair more saturation.
-    page: '#070a0e',
-    surface0: '#0a0d12',
-    surface1: '#11151c',
-    surface2: '#171c25',
-    contentSurface: '#0b0e14',
-    border: '#181d26',
   },
 };
 
@@ -248,16 +267,24 @@ const DURATION_CINEMATIC = 420;
 
 // Selected/focused row treatment — electric cyan accent. Calibrated to
 // stay invisible at low brightness (the "DJ on a red-eye flight" test):
-// no outline ring, no glow halo, just an inset 2px left bar plus a
-// barely-there 8% cyan bg tint. Hover bumps to 12%. Both data-focused
-// (keyboard) and data-selected (drawer open) trigger it.
+// Selection language: a small pill-chip on the left edge (h-3.5 w-[3px]
+// rounded-full) plus a soft cyan bg tint. The inset 2px bar didn't follow
+// the row's rounded-md corners gracefully — the pill is its own rounded
+// shape, vertically centered, so it reads as a deliberate accent instead
+// of a slab against rounded corners. Both keyboard focus and drawer
+// selection trigger it.
 const SELECTED_ROW_CLASSES = [
-  'data-[focused]:bg-[rgb(34_211_238/0.08)]',
-  'data-[focused]:hover:bg-[rgb(34_211_238/0.12)]',
-  'data-[focused]:shadow-[inset_2px_0_0_0_rgb(34_211_238)]',
-  'data-[selected]:bg-[rgb(34_211_238/0.10)]',
-  'data-[selected]:hover:bg-[rgb(34_211_238/0.14)]',
-  'data-[selected]:shadow-[inset_2px_0_0_0_rgb(34_211_238)]',
+  'data-[focused]:bg-[rgb(34_211_238/0.06)]',
+  'data-[focused]:hover:bg-[rgb(34_211_238/0.10)]',
+  'data-[selected]:bg-[rgb(34_211_238/0.08)]',
+  'data-[selected]:hover:bg-[rgb(34_211_238/0.12)]',
+  // Pseudo-element pill chip
+  "before:content-['']",
+  'before:absolute before:left-0.5 before:top-1/2 before:-translate-y-1/2',
+  'before:h-3.5 before:w-[3px] before:rounded-full before:bg-cyan-300/0',
+  'data-[focused]:before:bg-cyan-300/85',
+  'data-[selected]:before:bg-cyan-300/85',
+  'before:transition-colors before:duration-150 before:ease-out',
 ].join(' ');
 
 const TRACK = {
@@ -288,9 +315,11 @@ type Workspace = {
   items: NavItem[];
 };
 
-// Core items that span all artists / contexts (search, inbox, tasks).
+// Core items that span all artists / contexts. Search lives at the top of
+// the sidebar (replaces the previous Inbox slot) so it's always one click
+// away — and the canvas-subheader search icon goes away too.
 const CORE_ITEMS: NavItem[] = [
-  { icon: Inbox, label: 'Inbox' },
+  { icon: Search, label: 'Search' },
   { icon: Activity, label: 'Tasks' },
   { icon: LibraryIcon, label: 'Library' },
 ];
@@ -604,6 +633,211 @@ const DSP_LABEL: Record<DspKey, string> = {
   tidal: 'TIDAL',
 };
 const DSP_ORDER: DspKey[] = ['spotify', 'apple', 'youtube', 'tidal'];
+
+// --- Entity popover demo data ----------------------------------------------
+// Adapter helpers + placeholder teammate/contact records that ShellDropdown
+// rows feed into the EntityPopover primitive. Releases / artists derive from
+// the existing RELEASES const so the popover always agrees with the table
+// surface.
+
+function releaseToEntityPopover(r: Release): EntityPopoverData {
+  return {
+    kind: 'release',
+    id: r.id,
+    label: r.title,
+    thumbnail: r.artwork,
+    artist: r.artist,
+    releaseType: r.type,
+    releaseDate: r.releaseDate,
+    totalTracks: r.type === 'Single' ? 1 : r.type === 'EP' ? 5 : 11,
+    durationSec: r.durationSec,
+    status:
+      r.dsps.spotify === 'live' ? 'Live' : r.pitchReady ? 'Ready' : 'Draft',
+  };
+}
+
+const ENTITY_RELEASES: EntityPopoverData[] = RELEASES.map(
+  releaseToEntityPopover
+);
+
+const ENTITY_ARTISTS: EntityPopoverData[] = [
+  {
+    kind: 'artist',
+    id: 'bahamas',
+    label: 'Bahamas',
+    handle: 'bahamasmusic',
+    followers: 482_000,
+    verified: true,
+    popularity: 64,
+  },
+  {
+    kind: 'artist',
+    id: 'sade',
+    label: 'Sade',
+    handle: 'sade',
+    followers: 9_400_000,
+    verified: true,
+    popularity: 81,
+  },
+  {
+    kind: 'artist',
+    id: 'frank-ocean',
+    label: 'Frank Ocean',
+    handle: 'frankocean',
+    followers: 14_200_000,
+    verified: true,
+    popularity: 88,
+  },
+  {
+    kind: 'artist',
+    id: 'tycho',
+    label: 'Tycho',
+    handle: 'tycho',
+    followers: 1_100_000,
+    verified: true,
+    popularity: 70,
+  },
+  {
+    kind: 'artist',
+    id: 'tim-white',
+    label: 'Tim White',
+    handle: 'timwhite',
+    followers: 1_240,
+    isYou: true,
+  },
+];
+
+// Placeholder teammates — extend EntityRefMeta with a real Teammate kind when
+// the contact/team domain ships. For now this lets us demo the canonical
+// "Assign to..." entity hover surface end-to-end.
+const ENTITY_TEAMMATES: EntityPopoverData[] = [
+  {
+    kind: 'teammate',
+    id: 'tw',
+    label: 'Tim White',
+    handle: 'timwhite',
+    role: 'Founder',
+    status: 'active',
+    email: 't@timwhite.co',
+  },
+  {
+    kind: 'teammate',
+    id: 'eg',
+    label: 'Erica Gibson',
+    handle: 'ericag',
+    role: 'A&R',
+    status: 'active',
+    email: 'erica@jov.ie',
+  },
+  {
+    kind: 'teammate',
+    id: 'jh',
+    label: 'Jonas Hart',
+    handle: 'jonash',
+    role: 'Producer',
+    status: 'idle',
+    email: 'jonas@jov.ie',
+  },
+  {
+    kind: 'teammate',
+    id: 'mw',
+    label: 'Maya Wren',
+    handle: 'mayawren',
+    role: 'Manager',
+    status: 'away',
+    email: 'maya@jov.ie',
+  },
+];
+
+const ENTITY_EVENTS: EntityPopoverData[] = [
+  {
+    kind: 'event',
+    id: 'detroit-2026',
+    label: 'Detroit · Movement Festival',
+    eventDate: '2026-05-23',
+    city: 'Detroit, MI',
+    capacity: 35_000,
+    status: 'Confirmed',
+    eventType: 'tour',
+  },
+  {
+    kind: 'event',
+    id: 'la-listening',
+    label: 'LA Listening Party',
+    eventDate: '2026-05-09',
+    city: 'Los Angeles, CA',
+    capacity: 120,
+    status: 'On sale',
+    eventType: 'meetup',
+  },
+];
+
+const ENTITY_TRACKS_DEMO: EntityPopoverData[] = [
+  {
+    kind: 'track',
+    id: 'lost-in-the-light-track',
+    label: 'Lost in the Light',
+    artist: 'Bahamas',
+    releaseTitle: 'Bahamas Is Afie',
+    durationSec: 213,
+    bpm: 96,
+    keyName: 'A min',
+  },
+  {
+    kind: 'track',
+    id: 'stronger-than-that-track',
+    label: 'Stronger Than That',
+    artist: 'Bahamas',
+    releaseTitle: 'Sad Hunk',
+    durationSec: 198,
+    bpm: 112,
+    keyName: 'D maj',
+  },
+];
+
+const ENTITY_CURRENT_USER: EntityPopoverData = {
+  kind: 'contact',
+  id: 'me',
+  label: 'Tim White',
+  handle: 'timwhite',
+  role: 'Founder',
+  status: 'You',
+};
+
+// Module-scoped context so menu components rendered deep in the tree can
+// route entity activations (clicked artist link in a release card, hovered
+// teammate name, etc.) back to the shell's view+drawer state without prop
+// drilling through every list/row.
+const EntityActivateContext = createContext<
+  ((entity: EntityPopoverData) => void) | undefined
+>(undefined);
+function useEntityActivate() {
+  return useContext(EntityActivateContext);
+}
+
+// Lookups so inline links in copy (release drawer artist/album, chat
+// @-mentions, etc.) can resolve to the same EntityPopoverData the dropdown
+// uses. Falls through to a minimal stub when the entity isn't in the demo.
+function lookupArtistEntity(name: string): EntityPopoverData {
+  const found = ENTITY_ARTISTS.find(
+    a => a.kind === 'artist' && a.label === name
+  );
+  if (found) return found;
+  return { kind: 'artist', id: `artist:${name}`, label: name };
+}
+function lookupReleaseEntityByAlbum(
+  album: string,
+  excludeId?: string
+): EntityPopoverData {
+  // Album titles are not always unique to a single release in the demo —
+  // pick the first match that isn't the current row. Falls through to a
+  // minimal stub so the popover still renders for off-roster album names.
+  const found = ENTITY_RELEASES.find(
+    r => r.kind === 'release' && r.label === album && r.id !== excludeId
+  );
+  if (found) return found;
+  return { kind: 'release', id: `release:${album}`, label: album };
+}
 
 // --- Tracks mock (catalog rows for Tracks view) ----------------------------
 type TrackStatus = 'live' | 'scheduled' | 'draft' | 'announced' | 'hidden';
@@ -1198,6 +1432,7 @@ const MOCK_LYRICS: LyricLine[] = [
 
 function trackFromRelease(r: Release): TrackInfo {
   return {
+    id: r.id,
     title: r.title,
     artist: r.artist,
     album: r.album,
@@ -1206,6 +1441,16 @@ function trackFromRelease(r: Release): TrackInfo {
     key: r.key,
     version: r.version,
     durationSec: r.durationSec,
+    // Synthesized ISRC for the design pass — real wiring lives in production.
+    // Format: country (2) + registrant (3) + year (2) + designation (5) = 12.
+    isrc: `USJV126${String(
+      Math.abs(
+        r.id.split('').reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 0)
+      ) % 100000
+    ).padStart(5, '0')}`,
+    // Only the canonical demo track has timed lyrics in MOCK_LYRICS; other
+    // releases play but expose no lyrics surface (Mic2 hides for them).
+    hasLyrics: r.id === 'lost-in-the-light',
   };
 }
 
@@ -1246,7 +1491,6 @@ export default function ShellV1Experiment() {
   );
   // Tighter, library-style sidebar density. Off = current shell sidebar
   // (workspace dropdowns, h-7 items). On = flat, h-6 items, no nesting.
-  const [sidebarTight, setSidebarTight] = useState(false);
   const [peekOpen, setPeekOpen] = useState(false);
   const [barCollapsed, setBarCollapsed] = useState(false);
   const [isPlaying, setIsPlaying] = useState(true);
@@ -1537,6 +1781,27 @@ export default function ShellV1Experiment() {
     ]);
   };
 
+  // Routes an entity activation (clicked artist link inside a release card,
+  // hovered chip in the drawer, etc.) to the right surface. Today only
+  // releases have a real surface — they open the right-rail. Other kinds
+  // log a noop so the action wires end-to-end without dead clicks.
+  const onEntityActivate = useCallback(
+    (entity: EntityPopoverData) => {
+      if (entity.kind === 'release') {
+        const match = RELEASES.find(
+          r => r.id === entity.id || r.title === entity.label
+        );
+        if (match) {
+          setView('releases');
+          setSelectedReleaseId(match.id);
+          return;
+        }
+      }
+      console.info(`[shell-v1] activate entity ${entity.kind}:${entity.id}`);
+    },
+    [setView, setSelectedReleaseId]
+  );
+
   const onTaskContextMenu = (e: React.MouseEvent, task: Task) => {
     openContextMenu(e, [
       {
@@ -1634,12 +1899,27 @@ export default function ShellV1Experiment() {
   }, []);
   const mounted = loaderPhase !== 'bloom';
 
+  // Force the sidebar to floating (and disable the peek hot zone) while
+  // the user is in onboarding. When they cross the threshold (setView
+  // back to 'demo' or similar), the sidebar reveals via its existing
+  // dock animation — no extra plumbing required.
+  useEffect(() => {
+    if (view === 'onboarding') {
+      setSidebarMode('floating');
+      setBarCollapsed(true);
+    }
+  }, [view]);
+
   // ScreeningRoom mode — chrome (sidebar, header, subheader, audio bar)
   // fades to 0 over 600ms while staying mounted. The canvas takes over.
   // Triggers when we're in a "full-screen canvas" view (lyrics today,
   // video viewer next). Exit via Esc (handled per view) or the floating
   // restore button bottom-right.
   const cinematic = view === 'lyrics';
+  // Onboarding takes over the entire canvas — sidebar collapses, audio
+  // bar hides, header chrome falls away. The chat IS the surface; the
+  // shell reveals itself only after the user crosses the onboarding line.
+  const onboardingActive = view === 'onboarding';
   const cinematicStyle = cinematic
     ? {
         opacity: 0,
@@ -1718,45 +1998,64 @@ export default function ShellV1Experiment() {
   }, [view]);
 
   return (
-    <div
-      // Cool-tone palette override. Subtle blue-shift on the surface tokens
-      // so the grays feel electric / nightlife rather than corporate.
-      // Keep the change tiny — only a few units of hue + a touch more density.
-      style={
-        {
-          // Live-editable palette tokens (controlled by the dev picker).
-          '--linear-bg-page': palette.page,
-          '--linear-bg-surface-0': palette.surface0,
-          '--linear-bg-surface-1': palette.surface1,
-          '--linear-bg-surface-2': palette.surface2,
-          '--linear-app-content-surface': palette.contentSurface,
-          '--linear-app-shell-border': palette.border,
-          '--linear-app-shell-radius': '12px',
-          opacity: mounted ? 1 : 0,
-          transform: mounted ? 'scale(1)' : 'scale(0.985)',
-          transition: `opacity 600ms ${EASE_CINEMATIC}, transform 600ms ${EASE_CINEMATIC}, background-color 200ms ease-out`,
-        } as React.CSSProperties
-      }
-      className='shell-v1 flex h-dvh w-full overflow-hidden bg-(--linear-bg-page) lg:gap-2 lg:p-2'
-    >
-      {/* Theme focus-visible globally inside this experiment so we never get
+    <EntityActivateContext.Provider value={onEntityActivate}>
+      <div
+        // Cool-tone palette override. Subtle blue-shift on the surface tokens
+        // so the grays feel electric / nightlife rather than corporate.
+        // Keep the change tiny — only a few units of hue + a touch more density.
+        style={
+          {
+            // Live-editable palette tokens (controlled by the dev picker).
+            '--linear-bg-page': palette.page,
+            '--linear-bg-surface-0': palette.surface0,
+            '--linear-bg-surface-1': palette.surface1,
+            '--linear-bg-surface-2': palette.surface2,
+            '--linear-app-content-surface': palette.contentSurface,
+            '--linear-app-shell-border': palette.border,
+            '--linear-app-shell-radius': '12px',
+            opacity: mounted ? 1 : 0,
+            transform: mounted ? 'scale(1)' : 'scale(0.985)',
+            transition: `opacity 600ms ${EASE_CINEMATIC}, transform 600ms ${EASE_CINEMATIC}, background-color 200ms ease-out`,
+          } as React.CSSProperties
+        }
+        className='shell-v1 flex h-dvh w-full overflow-hidden bg-(--linear-bg-page) lg:gap-2 lg:p-2'
+      >
+        {/* Theme focus-visible globally inside this experiment so we never get
           the browser's royal-blue ring on any tabbable element. Cyan-300 at
           40% with offset matching the page surface — same hue as our hero
           accent so focus reads as part of the theme, not a system overlay. */}
-      <style>{`
+        <style>{`
         .shell-v1 :focus { outline: none; }
+        /* Soft cyan glow instead of a harsh outline — uses box-shadow
+           so it inherits the element's border-radius automatically and
+           reads as a halo, not a hard ring. Two-stop shadow: tight inner
+           band + wider blur for the bloom. The transition lives on the
+           base element so the ring fades in/out instead of snapping. */
+        .shell-v1 button,
+        .shell-v1 [role='button'],
+        .shell-v1 input,
+        .shell-v1 textarea,
+        .shell-v1 select,
+        .shell-v1 [tabindex='0'] {
+          transition-property: box-shadow, border-color, background-color, color;
+          transition-duration: 150ms;
+          transition-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+        }
         .shell-v1 :focus-visible {
-          outline: 1.5px solid rgba(103, 232, 249, 0.45);
-          outline-offset: 1px;
-          border-radius: 4px;
+          outline: none;
+          box-shadow:
+            0 0 0 1px rgba(103, 232, 249, 0.18),
+            0 0 0 6px rgba(103, 232, 249, 0.08);
         }
         .shell-v1 button:focus-visible,
         .shell-v1 [role='button']:focus-visible,
         .shell-v1 input:focus-visible,
         .shell-v1 textarea:focus-visible,
         .shell-v1 [tabindex='0']:focus-visible {
-          outline: 1.5px solid rgba(103, 232, 249, 0.45);
-          outline-offset: 1px;
+          outline: none;
+          box-shadow:
+            0 0 0 1px rgba(103, 232, 249, 0.18),
+            0 0 0 6px rgba(103, 232, 249, 0.08);
         }
         /* Surgical opt-outs: text fields whose container already owns its
            own focus-within affordance (pill border, surface tint), where a
@@ -1813,27 +2112,86 @@ export default function ShellV1Experiment() {
           animation: calm-halo 3.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
         }
       `}</style>
-      {/* Docked sidebar — always mounted; width + opacity animate so the
+        {/* Docked sidebar — always mounted; width + opacity animate so the
           canvas slides over smoothly when the user pins/unpins. Dims to 0
           when ScreeningRoom mode is active (cinematic). */}
-      <div
-        className='hidden lg:flex h-full overflow-hidden shrink-0'
-        style={{
-          width: sidebarMode === 'docked' ? 224 : 0,
-          opacity: cinematic ? 0 : sidebarMode === 'docked' ? 1 : 0,
-          transform:
-            sidebarMode === 'docked' ? 'translateX(0)' : 'translateX(-12px)',
-          pointerEvents: cinematic ? 'none' : undefined,
-          transition: `width ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, opacity 600ms ${EASE_CINEMATIC}, transform ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
-        }}
-        aria-hidden={sidebarMode !== 'docked' || cinematic}
-      >
-        <Sidebar
-          variant='docked'
-          onPin={() => setSidebarMode('floating')}
+        <div
+          className='hidden lg:flex h-full overflow-hidden shrink-0'
+          style={{
+            width: sidebarMode === 'docked' && !onboardingActive ? 224 : 0,
+            opacity:
+              cinematic || onboardingActive
+                ? 0
+                : sidebarMode === 'docked'
+                  ? 1
+                  : 0,
+            transform:
+              sidebarMode === 'docked' && !onboardingActive
+                ? 'translateX(0)'
+                : 'translateX(-12px)',
+            pointerEvents: cinematic || onboardingActive ? 'none' : undefined,
+            transition: `width ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, opacity 600ms ${EASE_CINEMATIC}, transform ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
+          }}
+          aria-hidden={
+            sidebarMode !== 'docked' || cinematic || onboardingActive
+          }
+        >
+          <Sidebar
+            variant='docked'
+            onPin={() => setSidebarMode('floating')}
+            onSelectView={setView}
+            activeView={view}
+            tight={false}
+            threads={decoratedThreads}
+            activeThreadId={selectedThreadId}
+            onSelectThread={openThread}
+            onThreadContextMenu={onThreadContextMenu}
+            libraryAssetCount={libraryAllAssets.length}
+            nowPlaying={{
+              track: currentTrack,
+              isPlaying,
+              barCollapsed,
+              onPlay: () => setIsPlaying(p => !p),
+            }}
+            installBanner={{
+              open: installBannerOpen,
+              onDismiss: () => setInstallBannerOpen(false),
+            }}
+            libraryProps={
+              view === 'library'
+                ? {
+                    allAssets: libraryAllAssets,
+                    savedView: librarySavedView,
+                    onSavedView: setLibrarySavedView,
+                    filters: libraryFilters,
+                    onFilters: setLibraryFilters,
+                    onClearAll: clearLibraryFilters,
+                  }
+                : undefined
+            }
+            settingsProps={
+              view === 'settings'
+                ? {
+                    activeSection: settingsSection,
+                    onSelectSection: setSettingsSection,
+                  }
+                : undefined
+            }
+          />
+        </div>
+
+        {/* Floating peek layer — always mounted; visibility driven by mode + hover */}
+        <FloatingSidebarLayer
+          active={sidebarMode === 'floating' && !onboardingActive}
+          peekOpen={peekOpen}
+          onSetPeekOpen={setPeekOpen}
+          onPin={() => {
+            setPeekOpen(false);
+            setSidebarMode('docked');
+          }}
           onSelectView={setView}
           activeView={view}
-          tight={sidebarTight}
+          tight={false}
           threads={decoratedThreads}
           activeThreadId={selectedThreadId}
           onSelectThread={openThread}
@@ -1845,158 +2203,203 @@ export default function ShellV1Experiment() {
             barCollapsed,
             onPlay: () => setIsPlaying(p => !p),
           }}
-          libraryProps={
-            view === 'library'
-              ? {
-                  allAssets: libraryAllAssets,
-                  savedView: librarySavedView,
-                  onSavedView: setLibrarySavedView,
-                  filters: libraryFilters,
-                  onFilters: setLibraryFilters,
-                  onClearAll: clearLibraryFilters,
-                }
-              : undefined
-          }
-          settingsProps={
-            view === 'settings'
-              ? {
-                  activeSection: settingsSection,
-                  onSelectSection: setSettingsSection,
-                }
-              : undefined
-          }
+          installBanner={{
+            open: installBannerOpen,
+            onDismiss: () => setInstallBannerOpen(false),
+          }}
         />
-      </div>
 
-      {/* Floating peek layer — always mounted; visibility driven by mode + hover */}
-      <FloatingSidebarLayer
-        active={sidebarMode === 'floating'}
-        peekOpen={peekOpen}
-        onSetPeekOpen={setPeekOpen}
-        onPin={() => {
-          setPeekOpen(false);
-          setSidebarMode('docked');
-        }}
-        onSelectView={setView}
-        activeView={view}
-        tight={sidebarTight}
-        threads={decoratedThreads}
-        activeThreadId={selectedThreadId}
-        onSelectThread={openThread}
-        onThreadContextMenu={onThreadContextMenu}
-        libraryAssetCount={libraryAllAssets.length}
-        nowPlaying={{
-          track: currentTrack,
-          isPlaying,
-          barCollapsed,
-          onPlay: () => setIsPlaying(p => !p),
-        }}
-      />
-
-      {/* Detailed now-playing — visible when the audio bar is OPEN.
+        {/* Detailed now-playing — visible when the audio bar is OPEN.
           Sits flush with the main content area's left edge (not under
           the sidebar). Carries full info (album art + title + chips).
           When the bar collapses, the COMPACT version takes over — it
           renders inside the sidebar bottom slot. The two never appear
           together. */}
-      <div
-        aria-hidden={barCollapsed}
-        // Top edge sits on the audio bar's top hairline (8px shell padding
-        // + 62px card height + space-bottom = 80px audio-bar wrapper).
-        // Without this the card centered itself in dead space and visibly
-        // missed the canvas's horizontal divider.
-        className='hidden lg:block fixed bottom-[26px] z-30 w-[224px]'
-        style={{
-          left: sidebarMode === 'docked' ? (sidebarTight ? 220 : 232) : 8,
-          opacity: barCollapsed ? 0 : 1,
-          transform: barCollapsed ? 'translateY(8px)' : 'translateY(0)',
-          pointerEvents: barCollapsed ? 'none' : 'auto',
-          transition: `opacity ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, transform ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, left ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
-        }}
-      >
-        <div className='px-1 pb-0'>
-          <SidebarNowPlaying
-            collapsed={false}
-            isPlaying={isPlaying}
-            onPlay={() => setIsPlaying(p => !p)}
-            barCollapsed={barCollapsed}
-            onToggleBar={() => setBarCollapsed(v => !v)}
-            track={currentTrack}
-          />
+        <div
+          aria-hidden={barCollapsed}
+          // Sits inside the same 32px gutter the audio bar uses (px-8) so
+          // the album art aligns to a virtual grid as if the canvas's
+          // content area extended down past it.
+          className='hidden lg:block fixed bottom-[26px] z-30 w-[224px]'
+          style={{
+            left: sidebarMode === 'docked' ? 264 : 32,
+            opacity: barCollapsed ? 0 : 1,
+            transform: barCollapsed ? 'translateY(8px)' : 'translateY(0)',
+            pointerEvents: barCollapsed ? 'none' : 'auto',
+            transition: `opacity ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, transform ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, left ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
+          }}
+        >
+          <div className='px-1 pb-0'>
+            <SidebarNowPlaying
+              collapsed={false}
+              isPlaying={isPlaying}
+              onPlay={() => setIsPlaying(p => !p)}
+              barCollapsed={barCollapsed}
+              onToggleBar={() => setBarCollapsed(v => !v)}
+              track={currentTrack}
+            />
+          </div>
         </div>
-      </div>
 
-      <div className='flex min-h-0 min-w-0 flex-1 flex-col lg:gap-2'>
-        <main className='relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-0 lg:rounded-[var(--linear-app-shell-radius)] lg:border lg:border-(--linear-app-shell-border) lg:bg-(--linear-app-content-surface) lg:shadow-[var(--linear-app-shell-shadow)]'>
-          {/* Static grain overlay — adds a subtle paper roughness so the
+        <div
+          className='flex min-h-0 min-w-0 flex-1 flex-col lg:gap-2'
+          style={{
+            // Reserve room for the fixed-bottom AudioBar so canvas content
+            // never sits hidden underneath. Falls to 0 when collapsed.
+            paddingBottom:
+              barCollapsed || cinematic || onboardingActive ? 0 : 80,
+            transition:
+              cinematic || onboardingActive
+                ? `padding-bottom 600ms ${EASE_CINEMATIC}`
+                : 'padding-bottom 150ms ease-out',
+          }}
+        >
+          <main className='relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-0 lg:rounded-[var(--linear-app-shell-radius)] lg:border lg:border-(--linear-app-shell-border) lg:bg-(--linear-app-content-surface) lg:shadow-[var(--linear-app-shell-shadow)]'>
+            {/* Static grain overlay — adds a subtle paper roughness so the
               dark surface doesn't read as flat slab. Pointer-events off,
               no animation; GPU-composited at zero per-frame cost. */}
-          <div className='canvas-grain' aria-hidden='true' />
-          <InstallBanner
-            open={installBannerOpen}
-            onDismiss={() => setInstallBannerOpen(false)}
-          />
-          <div style={cinematicStyle}>
-            <Header
-              sidebarMode={sidebarMode}
-              onToggleSidebar={() =>
-                setSidebarMode(m => (m === 'docked' ? 'floating' : 'docked'))
-              }
-              searchOpen={searchOpen}
-              searchPills={searchPills}
-              onSearchOpenChange={setSearchOpen}
-              onPillsChange={setSearchPills}
-              artistOptions={artistOptions}
-              titleOptions={titleOptions}
-              albumOptions={albumOptions}
-              view={view}
-            />
-          </div>
-          <div style={cinematicStyle}>
-            <CanvasSubheader
-              subviews={subviewsForView(view, RELEASES, TRACKS, TASKS)}
-              subview={subview}
-              onSubview={setSubview}
-              rightRailOpen={selectedReleaseId !== null}
-              onToggleRightRail={() =>
-                setSelectedReleaseId(id =>
-                  id === null ? (RELEASES[0]?.id ?? null) : null
-                )
-              }
-              onOpenSearch={() => setSearchOpen(true)}
-              onAddView={
-                view === 'releases'
-                  ? () => console.info('[shell-v1] save current filter as view')
-                  : undefined
-              }
-              extraToolbar={
-                view === 'library' ? (
-                  <>
-                    <LibrarySortDropdown
-                      sort={librarySort}
-                      onSort={setLibrarySort}
+            <div className='canvas-grain' aria-hidden='true' />
+            {!onboardingActive && (
+              <div style={cinematicStyle}>
+                <Header
+                  sidebarMode={sidebarMode}
+                  onToggleSidebar={() =>
+                    setSidebarMode(m =>
+                      m === 'docked' ? 'floating' : 'docked'
+                    )
+                  }
+                  searchOpen={searchOpen}
+                  searchPills={searchPills}
+                  onSearchOpenChange={setSearchOpen}
+                  onPillsChange={setSearchPills}
+                  artistOptions={artistOptions}
+                  titleOptions={titleOptions}
+                  albumOptions={albumOptions}
+                  view={view}
+                  rightRailOpen={selectedReleaseId !== null}
+                  onToggleRightRail={() =>
+                    setSelectedReleaseId(id =>
+                      id === null ? (RELEASES[0]?.id ?? null) : null
+                    )
+                  }
+                />
+              </div>
+            )}
+            {!onboardingActive && (
+              <div style={cinematicStyle}>
+                <CanvasSubheader
+                  subviews={subviewsForView(view, RELEASES, TRACKS, TASKS)}
+                  subview={subview}
+                  onSubview={setSubview}
+                  onAddView={
+                    view === 'releases'
+                      ? () =>
+                          console.info('[shell-v1] save current filter as view')
+                      : undefined
+                  }
+                  extraToolbar={
+                    view === 'library' ? (
+                      <>
+                        <LibrarySortDropdown
+                          sort={librarySort}
+                          onSort={setLibrarySort}
+                        />
+                        <LibraryViewToggle
+                          view={libraryViewMode}
+                          onView={setLibraryViewMode}
+                        />
+                      </>
+                    ) : view === 'releases' ||
+                      view === 'tracks' ||
+                      view === 'tasks' ? (
+                      <>
+                        <CanvasFilterDropdown view={view} />
+                        <CanvasSortDropdown view={view} />
+                      </>
+                    ) : undefined
+                  }
+                />
+              </div>
+            )}
+            <div className='relative flex-1 min-h-0 overflow-hidden flex'>
+              <div className='flex-1 min-h-0 min-w-0 overflow-y-auto'>
+                {view === 'onboarding' ? (
+                  <OnboardingCanvas
+                    onComplete={() => {
+                      setView('demo');
+                      setSidebarMode('docked');
+                    }}
+                  />
+                ) : view === 'demo' ? (
+                  <DemoContent />
+                ) : view === 'releases' ? (
+                  subview === 'tracks' ? (
+                    // View-builder: under the Releases shell, switching to
+                    // the Tracks subview swaps the canvas to the tracks
+                    // table without changing breadcrumbs. Same data, finer
+                    // grain.
+                    <TracksView
+                      tracks={TRACKS}
+                      pills={searchPills}
+                      playingId={playingReleaseId}
+                      isPlaying={isPlaying}
+                      currentTimeSec={currentTimeSec}
+                      keyMode={keyMode}
+                      onKeyModeToggle={() =>
+                        setKeyMode(m => (m === 'normal' ? 'camelot' : 'normal'))
+                      }
+                      onPlay={id => {
+                        setPlayingReleaseId(id);
+                        setIsPlaying(true);
+                      }}
+                      onSeek={(id, sec) => {
+                        setPlayingReleaseId(id);
+                        setCurrentTimeSec(sec);
+                        setIsPlaying(true);
+                      }}
+                      onFilter={(field, value) => addPill(field, value)}
+                      onContextMenu={onTrackContextMenu}
+                      onOpenThread={openThread}
                     />
-                    <LibraryViewToggle
-                      view={libraryViewMode}
-                      onView={setLibraryViewMode}
+                  ) : (
+                    <ReleasesView
+                      releases={RELEASES}
+                      playingId={playingReleaseId}
+                      isPlaying={isPlaying}
+                      currentTimeSec={currentTimeSec}
+                      selectedId={selectedReleaseId}
+                      drawerOpen={selectedReleaseId !== null}
+                      onSelect={setSelectedReleaseId}
+                      onPlay={(id, autoplay) => {
+                        setPlayingReleaseId(id);
+                        if (autoplay) setIsPlaying(true);
+                        else setIsPlaying(p => !p || playingReleaseId !== id);
+                      }}
+                      onSeek={(id, sec) => {
+                        setPlayingReleaseId(id);
+                        setCurrentTimeSec(sec);
+                        setIsPlaying(true);
+                      }}
+                      onFilterByArtist={name => addPill('artist', name)}
+                      onContextMenu={onReleaseContextMenu}
+                      onOpenThread={openThread}
                     />
-                  </>
-                ) : undefined
-              }
-            />
-          </div>
-          <div className='relative flex-1 min-h-0 overflow-hidden flex'>
-            <div className='flex-1 min-h-0 min-w-0 overflow-y-auto'>
-              {view === 'demo' ? (
-                <DemoContent />
-              ) : view === 'releases' ? (
-                subview === 'tracks' ? (
-                  // View-builder: under the Releases shell, switching to
-                  // the Tracks subview swaps the canvas to the tracks
-                  // table without changing breadcrumbs. Same data, finer
-                  // grain.
+                  )
+                ) : view === 'tracks' ? (
                   <TracksView
-                    tracks={TRACKS}
+                    tracks={
+                      subview === 'live'
+                        ? TRACKS.filter(t => t.status === 'live')
+                        : subview === 'scheduled'
+                          ? TRACKS.filter(t => t.status === 'scheduled')
+                          : subview === 'announced'
+                            ? TRACKS.filter(t => t.status === 'announced')
+                            : subview === 'drafts'
+                              ? TRACKS.filter(t => t.status === 'draft')
+                              : subview === 'hidden'
+                                ? TRACKS.filter(t => t.status === 'hidden')
+                                : TRACKS
+                    }
                     pills={searchPills}
                     playingId={playingReleaseId}
                     isPlaying={isPlaying}
@@ -2018,181 +2421,138 @@ export default function ShellV1Experiment() {
                     onContextMenu={onTrackContextMenu}
                     onOpenThread={openThread}
                   />
-                ) : (
-                  <ReleasesView
-                    releases={RELEASES}
-                    playingId={playingReleaseId}
-                    isPlaying={isPlaying}
+                ) : view === 'lyrics' ? (
+                  <LyricsView
+                    track={currentTrack}
+                    durationSec={playingRelease?.durationSec ?? TRACK.duration}
                     currentTimeSec={currentTimeSec}
-                    selectedId={selectedReleaseId}
-                    drawerOpen={selectedReleaseId !== null}
-                    onSelect={setSelectedReleaseId}
-                    onPlay={(id, autoplay) => {
+                    onSeek={sec => setCurrentTimeSec(sec)}
+                  />
+                ) : view === 'library' ? (
+                  <LibraryShellEmbed
+                    allAssets={libraryAllAssets}
+                    savedView={librarySavedView}
+                    filters={libraryFilters}
+                    sort={librarySort}
+                    viewMode={libraryViewMode}
+                    selectedId={librarySelectedId}
+                    drawerOpen={libraryDrawerOpen}
+                    favorites={libraryFavorites}
+                    searchText={searchPills.flatMap(p => p.values).join(' ')}
+                    onSelect={setLibrarySelectedId}
+                    onSetDrawerOpen={setLibraryDrawerOpen}
+                    onToggleFavorite={toggleLibraryFavorite}
+                    onClearFilters={clearLibraryFilters}
+                  />
+                ) : view === 'settings' ? (
+                  <SettingsView section={settingsSection} />
+                ) : view === 'thread' ? (
+                  <ThreadView
+                    thread={
+                      THREADS.find(t => t.id === selectedThreadId) ?? THREADS[0]
+                    }
+                  />
+                ) : (
+                  <TasksView
+                    tasks={
+                      subview === 'mine'
+                        ? TASKS.filter(t => t.assignee === 'you')
+                        : subview === 'jovie'
+                          ? TASKS.filter(t => t.assignee === 'jovie')
+                          : TASKS
+                    }
+                    onContextMenu={onTaskContextMenu}
+                    onOpenRelease={id => {
+                      setView('releases');
+                      setSelectedReleaseId(id);
+                    }}
+                    onOpenThread={openThread}
+                  />
+                )}
+              </div>
+              {/* Drawer floats above the canvas — elevated, not pushed-aside.
+                Wrapper drives slide-in/out + drop shadow; inner drawer
+                handles its own opacity + slight translate. Pointer events
+                gate so the canvas is interactive while the drawer animates
+                away. */}
+              <div
+                aria-hidden={
+                  !(view === 'releases' && selectedReleaseId !== null)
+                }
+                className='absolute inset-y-0 right-0 z-30 w-[412px] pointer-events-none'
+                style={{
+                  transform:
+                    view === 'releases' && selectedReleaseId !== null
+                      ? 'translateX(0)'
+                      : 'translateX(calc(100% + 16px))',
+                  transition: `transform ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
+                }}
+              >
+                <div className='h-full pointer-events-auto shadow-[0_24px_48px_-16px_rgba(0,0,0,0.55),-1px_0_0_0_rgba(255,255,255,0.04)]'>
+                  <ReleaseDrawer
+                    release={
+                      view === 'releases' && selectedReleaseId
+                        ? (RELEASES.find(r => r.id === selectedReleaseId) ??
+                          null)
+                        : null
+                    }
+                    onClose={() => setSelectedReleaseId(null)}
+                    onPlay={id => {
                       setPlayingReleaseId(id);
-                      if (autoplay) setIsPlaying(true);
-                      else setIsPlaying(p => !p || playingReleaseId !== id);
+                      setIsPlaying(true);
                     }}
                     onSeek={(id, sec) => {
                       setPlayingReleaseId(id);
                       setCurrentTimeSec(sec);
                       setIsPlaying(true);
                     }}
-                    onFilterByArtist={name => addPill('artist', name)}
-                    onContextMenu={onReleaseContextMenu}
-                    onOpenThread={openThread}
+                    onOpenTasks={() => setView('tasks')}
+                    onMenu={onDrawerMenu}
+                    onEntityActivate={onEntityActivate}
                   />
-                )
-              ) : view === 'tracks' ? (
-                <TracksView
-                  tracks={
-                    subview === 'live'
-                      ? TRACKS.filter(t => t.status === 'live')
-                      : subview === 'scheduled'
-                        ? TRACKS.filter(t => t.status === 'scheduled')
-                        : subview === 'announced'
-                          ? TRACKS.filter(t => t.status === 'announced')
-                          : subview === 'drafts'
-                            ? TRACKS.filter(t => t.status === 'draft')
-                            : subview === 'hidden'
-                              ? TRACKS.filter(t => t.status === 'hidden')
-                              : TRACKS
-                  }
-                  pills={searchPills}
-                  playingId={playingReleaseId}
-                  isPlaying={isPlaying}
-                  currentTimeSec={currentTimeSec}
-                  keyMode={keyMode}
-                  onKeyModeToggle={() =>
-                    setKeyMode(m => (m === 'normal' ? 'camelot' : 'normal'))
-                  }
-                  onPlay={id => {
-                    setPlayingReleaseId(id);
-                    setIsPlaying(true);
-                  }}
-                  onSeek={(id, sec) => {
-                    setPlayingReleaseId(id);
-                    setCurrentTimeSec(sec);
-                    setIsPlaying(true);
-                  }}
-                  onFilter={(field, value) => addPill(field, value)}
-                  onContextMenu={onTrackContextMenu}
-                  onOpenThread={openThread}
-                />
-              ) : view === 'lyrics' ? (
-                <LyricsView
-                  track={currentTrack}
-                  durationSec={playingRelease?.durationSec ?? TRACK.duration}
-                  currentTimeSec={currentTimeSec}
-                  onSeek={sec => setCurrentTimeSec(sec)}
-                />
-              ) : view === 'library' ? (
-                <LibraryShellEmbed
-                  allAssets={libraryAllAssets}
-                  savedView={librarySavedView}
-                  filters={libraryFilters}
-                  sort={librarySort}
-                  viewMode={libraryViewMode}
-                  selectedId={librarySelectedId}
-                  drawerOpen={libraryDrawerOpen}
-                  favorites={libraryFavorites}
-                  searchText={searchPills.flatMap(p => p.values).join(' ')}
-                  onSelect={setLibrarySelectedId}
-                  onSetDrawerOpen={setLibraryDrawerOpen}
-                  onToggleFavorite={toggleLibraryFavorite}
-                  onClearFilters={clearLibraryFilters}
-                />
-              ) : view === 'settings' ? (
-                <SettingsView section={settingsSection} />
-              ) : view === 'thread' ? (
-                <ThreadView
-                  thread={
-                    THREADS.find(t => t.id === selectedThreadId) ?? THREADS[0]
-                  }
-                />
-              ) : (
-                <TasksView
-                  tasks={
-                    subview === 'mine'
-                      ? TASKS.filter(t => t.assignee === 'you')
-                      : subview === 'jovie'
-                        ? TASKS.filter(t => t.assignee === 'jovie')
-                        : TASKS
-                  }
-                  onContextMenu={onTaskContextMenu}
-                  onOpenRelease={id => {
-                    setView('releases');
-                    setSelectedReleaseId(id);
-                  }}
-                  onOpenThread={openThread}
-                />
-              )}
-            </div>
-            {/* Drawer floats above the canvas — elevated, not pushed-aside.
-                Wrapper drives slide-in/out + drop shadow; inner drawer
-                handles its own opacity + slight translate. Pointer events
-                gate so the canvas is interactive while the drawer animates
-                away. */}
-            <div
-              aria-hidden={!(view === 'releases' && selectedReleaseId !== null)}
-              className='absolute inset-y-0 right-0 z-30 w-[412px] pointer-events-none'
-              style={{
-                transform:
-                  view === 'releases' && selectedReleaseId !== null
-                    ? 'translateX(0)'
-                    : 'translateX(calc(100% + 16px))',
-                transition: `transform ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
-              }}
-            >
-              <div className='h-full pointer-events-auto shadow-[0_24px_48px_-16px_rgba(0,0,0,0.55),-1px_0_0_0_rgba(255,255,255,0.04)]'>
-                <ReleaseDrawer
-                  release={
-                    view === 'releases' && selectedReleaseId
-                      ? (RELEASES.find(r => r.id === selectedReleaseId) ?? null)
-                      : null
-                  }
-                  onClose={() => setSelectedReleaseId(null)}
-                  onPlay={id => {
-                    setPlayingReleaseId(id);
-                    setIsPlaying(true);
-                  }}
-                  onSeek={(id, sec) => {
-                    setPlayingReleaseId(id);
-                    setCurrentTimeSec(sec);
-                    setIsPlaying(true);
-                  }}
-                  onOpenTasks={() => setView('tasks')}
-                  onMenu={onDrawerMenu}
-                />
+                </div>
               </div>
             </div>
-          </div>
-        </main>
+            {/* Bottom-right corner restore — the only on-canvas affordance
+                back to the audio bar when it's collapsed. ChevronUp signals
+                the direction the bar will travel when revealed (up from the
+                bottom edge). */}
+            <Tooltip label='Show audio bar' shortcut='toggleBar' side='top'>
+              <button
+                type='button'
+                onClick={() => setBarCollapsed(false)}
+                aria-label='Show audio bar (`)'
+                className='absolute bottom-3 right-3 z-30 hidden lg:grid h-7 w-7 place-items-center rounded-md text-quaternary-token hover:text-primary-token hover:bg-surface-1/70 transition-[opacity,color,background-color] duration-150 ease-out'
+                style={{
+                  opacity:
+                    barCollapsed && !cinematic && !onboardingActive ? 1 : 0,
+                  pointerEvents:
+                    barCollapsed && !cinematic && !onboardingActive
+                      ? 'auto'
+                      : 'none',
+                }}
+              >
+                <ChevronUp className='h-4 w-4' strokeWidth={2.25} />
+              </button>
+            </Tooltip>
+          </main>
+        </div>
 
-        {/* Peek-bottom restore affordance — when the audio bar is collapsed,
-            a 4px hairline strip at the bottom of the canvas pulses subtly
-            and expands the bar on hover/click. Combined with the ` shortcut
-            and the now-playing card, that's three discoverable paths back. */}
-        {barCollapsed && (
-          <button
-            type='button'
-            onClick={() => setBarCollapsed(false)}
-            aria-label='Show audio bar (`)'
-            className='group/peek shrink-0 h-2 -mt-1 px-2 hidden lg:flex items-end justify-center'
-          >
-            <span
-              aria-hidden='true'
-              className='h-[3px] w-[80px] rounded-full bg-cyan-300/30 group-hover/peek:bg-cyan-300/70 group-hover/peek:w-[120px] transition-[width,background-color] duration-200 ease-out'
-            />
-          </button>
-        )}
-
+        {/* AudioBar — fixed full-viewport-width so the transport buttons stay
+            centered regardless of sidebar dock state, drawer open/close, or
+            canvas reflow. Earlier rendering inside the canvas column meant
+            buttons shifted horizontally whenever the column width changed. */}
         <div
-          aria-hidden={barCollapsed || cinematic}
-          className='overflow-hidden transition-[max-height,opacity] duration-150 ease-out'
+          aria-hidden={barCollapsed || cinematic || onboardingActive}
+          className='fixed inset-x-0 bottom-0 z-30 hidden lg:block overflow-hidden bg-(--linear-bg-page)'
           style={{
-            maxHeight: barCollapsed || cinematic ? 0 : 80,
-            opacity: barCollapsed || cinematic ? 0 : 1,
-            pointerEvents: cinematic ? 'none' : undefined,
+            maxHeight: barCollapsed || cinematic || onboardingActive ? 0 : 80,
+            opacity: barCollapsed || cinematic || onboardingActive ? 0 : 1,
+            pointerEvents: cinematic || onboardingActive ? 'none' : undefined,
+            transition:
+              cinematic || onboardingActive
+                ? `max-height 600ms ${EASE_CINEMATIC}, opacity 600ms ${EASE_CINEMATIC}`
+                : `max-height 150ms ease-out, opacity 150ms ease-out`,
           }}
         >
           <AudioBar
@@ -2213,13 +2573,26 @@ export default function ShellV1Experiment() {
             onOpenLyrics={() =>
               setView(v => (v === 'lyrics' ? 'demo' : 'lyrics'))
             }
+            track={currentTrack}
           />
         </div>
-      </div>
 
-      {/* Mobile/tablet floating playback cards (lg+ uses the full bar) */}
-      {!barCollapsed && (
-        <>
+        {/* Mobile/tablet floating playback cards (lg+ uses the full bar).
+            Always mounted; fades + drops 6px on collapse so the bar retires
+            instead of popping off. */}
+        <div
+          aria-hidden={barCollapsed || cinematic || onboardingActive}
+          style={{
+            opacity: barCollapsed || cinematic || onboardingActive ? 0 : 1,
+            transform:
+              barCollapsed || cinematic || onboardingActive
+                ? 'translateY(6px)'
+                : 'translateY(0)',
+            pointerEvents:
+              barCollapsed || cinematic || onboardingActive ? 'none' : 'auto',
+            transition: `opacity ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, transform ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
+          }}
+        >
           <MobilePlayerCard
             isPlaying={isPlaying}
             onPlay={() => setIsPlaying(p => !p)}
@@ -2232,54 +2605,52 @@ export default function ShellV1Experiment() {
             pct={pct}
             track={currentTrack}
           />
-        </>
-      )}
+        </div>
 
-      <VariantPicker
-        variant={variant}
-        onVariant={setVariant}
-        sidebarFloating={sidebarMode === 'floating'}
-        onSidebar={() =>
-          setSidebarMode(m => (m === 'docked' ? 'floating' : 'docked'))
-        }
-        barCollapsed={barCollapsed}
-        onBar={() => setBarCollapsed(v => !v)}
-        waveformOn={waveformOn}
-        onWaveform={() => setWaveformOn(v => !v)}
-        view={view}
-        onView={setView}
-        palette={palette}
-        onPalette={setPalette}
-        sidebarTight={sidebarTight}
-        onSidebarTight={() => setSidebarTight(v => !v)}
-        installBannerOpen={installBannerOpen}
-        onInstallBanner={() => setInstallBannerOpen(v => !v)}
-      />
+        <VariantPicker
+          variant={variant}
+          onVariant={setVariant}
+          sidebarFloating={sidebarMode === 'floating'}
+          onSidebar={() =>
+            setSidebarMode(m => (m === 'docked' ? 'floating' : 'docked'))
+          }
+          barCollapsed={barCollapsed}
+          onBar={() => setBarCollapsed(v => !v)}
+          waveformOn={waveformOn}
+          onWaveform={() => setWaveformOn(v => !v)}
+          view={view}
+          onView={setView}
+          palette={palette}
+          onPalette={setPalette}
+          installBannerOpen={installBannerOpen}
+          onInstallBanner={() => setInstallBannerOpen(v => !v)}
+        />
 
-      <JovieOverlay listening={jovieListening} />
-      <ShellLoader phase={loaderPhase} />
-      {/* ScreeningRoom exit — single icon in the top-right corner.
+        <JovieOverlay listening={jovieListening} />
+        <ShellLoader phase={loaderPhase} />
+        {/* ScreeningRoom exit — single icon in the top-right corner.
           Click or Esc returns to chrome view. No text, no extra
           surface — just a dim X that brightens on hover. */}
-      <button
-        type='button'
-        onClick={() => setView('demo')}
-        aria-label='Exit screening room (Esc)'
-        title='Exit screening room (Esc)'
-        className='fixed top-4 right-4 z-50 h-7 w-7 grid place-items-center rounded-md text-quaternary-token hover:text-primary-token hover:bg-surface-1/70 transition-colors duration-150 ease-out'
-        style={{
-          opacity: cinematic ? 1 : 0,
-          pointerEvents: cinematic ? 'auto' : 'none',
-          transition: `opacity 600ms ${EASE_CINEMATIC}`,
-        }}
-      >
-        <X className='h-4 w-4' strokeWidth={2.25} />
-      </button>
-      <ContextMenuOverlay
-        state={contextMenu}
-        onClose={() => setContextMenu(null)}
-      />
-    </div>
+        <button
+          type='button'
+          onClick={() => setView('demo')}
+          aria-label='Exit screening room (Esc)'
+          title='Exit screening room (Esc)'
+          className='fixed top-4 right-4 z-50 h-7 w-7 grid place-items-center rounded-md text-quaternary-token hover:text-primary-token hover:bg-surface-1/70 transition-colors duration-150 ease-out'
+          style={{
+            opacity: cinematic ? 1 : 0,
+            pointerEvents: cinematic ? 'auto' : 'none',
+            transition: `opacity 600ms ${EASE_CINEMATIC}`,
+          }}
+        >
+          <X className='h-4 w-4' strokeWidth={2.25} />
+        </button>
+        <ContextMenuOverlay
+          state={contextMenu}
+          onClose={() => setContextMenu(null)}
+        />
+      </div>
+    </EntityActivateContext.Provider>
   );
 }
 
@@ -2330,6 +2701,7 @@ function FloatingSidebarLayer({
   onThreadContextMenu,
   libraryAssetCount,
   nowPlaying,
+  installBanner,
 }: {
   active: boolean;
   peekOpen: boolean;
@@ -2349,6 +2721,7 @@ function FloatingSidebarLayer({
     barCollapsed: boolean;
     onPlay: () => void;
   };
+  installBanner?: { open: boolean; onDismiss: () => void };
 }) {
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -2411,6 +2784,7 @@ function FloatingSidebarLayer({
           onThreadContextMenu={onThreadContextMenu}
           libraryAssetCount={libraryAssetCount}
           nowPlaying={nowPlaying}
+          installBanner={installBanner}
         />
       </div>
     </>
@@ -2431,6 +2805,7 @@ function Sidebar({
   onThreadContextMenu,
   libraryAssetCount,
   nowPlaying,
+  installBanner,
 }: {
   variant: 'docked' | 'floating';
   onPin: () => void;
@@ -2471,6 +2846,9 @@ function Sidebar({
     barCollapsed: boolean;
     onPlay: () => void;
   };
+  // Optional install-prompt card pinned right above now-playing.
+  // Animated in/out by the parent toggling `open`.
+  installBanner?: { open: boolean; onDismiss: () => void };
 }) {
   const inLibraryMode = !!libraryProps;
   const inSettingsMode = !!settingsProps;
@@ -2528,13 +2906,16 @@ function Sidebar({
       {/* Brand row — Jovie wordmark doubles as the user-menu trigger.
           Click anywhere on the row to drop the user menu. In library
           (or settings) mode the brand row swaps to a `← Section` back
-          chip, mirroring the Linear settings nav pattern. */}
-      <div className={cn('px-2', tight ? 'pt-2 pb-2' : 'pt-3 pb-4')}>
-        <div className='relative flex items-center h-7 gap-2.5'>
+          chip, mirroring the Linear settings nav pattern.
+          Height matches the canvas breadcrumb header (h-10) so the
+          sidebar brand and breadcrumb share one visual row. */}
+      <div className='px-2 h-10 flex items-center shrink-0'>
+        <div className='relative flex items-center h-7 gap-2.5 w-full'>
           {inContextMode ? (
             <button
               type='button'
               onClick={() => onSelectView?.('demo')}
+              aria-label={`Back from ${contextLabel}`}
               className='flex-1 inline-flex items-center gap-2 h-7 pl-2.5 pr-2 rounded-md hover:bg-surface-1/60 transition-colors duration-150 ease-out cursor-pointer min-w-0 text-secondary-token hover:text-primary-token'
             >
               <ChevronLeft
@@ -2545,7 +2926,7 @@ function Sidebar({
                 className='text-[13px] font-semibold tracking-[-0.012em] flex-1 truncate text-left'
                 style={{ letterSpacing: '-0.012em' }}
               >
-                {contextLabel}
+                Back
               </span>
             </button>
           ) : (
@@ -2757,17 +3138,26 @@ function Sidebar({
         </nav>
       )}
 
+      {/* Install-prompt card — sits right above the now-playing slot.
+          Only renders when the parent toggles installBanner.open. */}
+      {installBanner && (
+        <InstallBanner
+          open={installBanner.open}
+          onDismiss={installBanner.onDismiss}
+        />
+      )}
+
       {/* Sidebar-bottom now-playing — simplified compact player.
           Visible only when the audio bar is COLLAPSED. The detailed
           floating card (with chips) takes over when the bar opens, and
           slides under the main content area's left edge. Two states,
           two surfaces, never co-resident.
-          Bottom inset is `pb-5` so the card's bottom edge lines up with
-          the main canvas's bottom (the canvas sits above the peek-bottom
-          strip + lg:gap-2, leaving ~20px between it and the page edge). */}
+          Bottom inset (`pb-7` = 28px) lines the card up 8px above the
+          main content area's bottom edge. The canvas sits ~20px above
+          the page edge (peek strip + lg:gap-2), so 20 + 8 = 28. */}
       <div
         aria-hidden={nowPlaying?.barCollapsed === false}
-        className='shrink-0 px-2 pb-5 pt-1 overflow-hidden'
+        className='shrink-0 px-2 pb-7 pt-1 overflow-hidden'
         style={{
           maxHeight: nowPlaying && nowPlaying.barCollapsed ? 64 : 0,
           opacity: nowPlaying && nowPlaying.barCollapsed ? 1 : 0,
@@ -2998,7 +3388,10 @@ function SidebarThreadsSection({
                 onClick={() => onSelect?.(t.id)}
                 className={cn(
                   'flex-1 flex items-center gap-2 min-w-0 text-left',
-                  tight ? 'h-6 pl-2.5 pr-2' : 'h-7 pl-3 pr-2'
+                  // Reserve right padding for the absolute-positioned
+                  // hover/active ellipsis button so the truncated title
+                  // never collides with the menu icon visually.
+                  tight ? 'h-6 pl-2.5 pr-7' : 'h-7 pl-3 pr-7'
                 )}
               >
                 <span
@@ -3025,18 +3418,45 @@ function SidebarThreadsSection({
               </button>
               {/* Hover ellipsis — opens the per-thread menu (Archive,
                   Copy as Markdown, Copy thread ID, Delete). Right-click
-                  the row anywhere also opens the same menu. */}
-              <button
-                type='button'
-                onClick={e => onThreadContextMenu?.(e, t)}
-                aria-label='Thread actions'
-                className={cn(
-                  'absolute right-1 top-1/2 -translate-y-1/2 h-5 w-5 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-opacity duration-150 ease-out',
-                  'opacity-0 group-hover/thread:opacity-100 focus-visible:opacity-100'
-                )}
+                  the row anywhere still goes through the legacy
+                  ContextMenuOverlay until that primitive is replaced. */}
+              <ShellDropdown
+                align='start'
+                side='right'
+                sideOffset={8}
+                width={196}
+                trigger={
+                  <button
+                    type='button'
+                    aria-label='Thread actions'
+                    className={cn(
+                      'absolute right-1 top-1/2 -translate-y-1/2 h-5 w-5 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-opacity duration-150 ease-out',
+                      'opacity-0 group-hover/thread:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 data-[state=open]:text-primary-token'
+                    )}
+                  >
+                    <MoreHorizontal className='h-3 w-3' strokeWidth={2.25} />
+                  </button>
+                }
               >
-                <MoreHorizontal className='h-3 w-3' strokeWidth={2.25} />
-              </button>
+                <ShellDropdown.Item
+                  icon={ExternalLink}
+                  label='View thread'
+                  onSelect={() => onSelect?.(t.id)}
+                />
+                <ShellDropdown.Item
+                  icon={Copy}
+                  label='Copy as Markdown'
+                  shortcut='⌘⇧C'
+                />
+                <ShellDropdown.Item icon={LinkIcon} label='Copy thread ID' />
+                <ShellDropdown.Separator />
+                <ShellDropdown.Item icon={Archive} label='Archive thread' />
+                <ShellDropdown.Item
+                  icon={Trash2}
+                  label='Delete thread'
+                  tone='danger'
+                />
+              </ShellDropdown>
             </div>
           );
         })}
@@ -3156,7 +3576,7 @@ function SidebarNowPlaying({
 
   return (
     <div className='px-1 flex items-center gap-2.5'>
-      <div className='relative h-12 w-12 rounded overflow-hidden shrink-0'>
+      <div className='relative h-9 w-9 rounded overflow-hidden shrink-0'>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={track.artwork}
@@ -3165,27 +3585,14 @@ function SidebarNowPlaying({
         />
         {overlay}
       </div>
-      <div className='min-w-0 flex-1 flex flex-col gap-1.5'>
-        <div className='min-w-0'>
-          <div className='truncate text-[12px] font-caption text-primary-token leading-[1.2]'>
-            {track.title}
-          </div>
-          <div className='truncate text-[11px] text-tertiary-token leading-[1.3] mt-0.5'>
-            {track.artist}
-          </div>
+      <div className='min-w-0 flex-1'>
+        <div className='truncate text-[12px] font-caption text-primary-token leading-[1.2]'>
+          {track.title}
         </div>
-        <div className='flex items-center gap-1 flex-wrap'>
-          <Chip>{track.bpm} BPM</Chip>
-          <Chip>{track.key}</Chip>
-          <Chip>{track.version}</Chip>
+        <div className='truncate text-[11px] text-tertiary-token leading-[1.3] mt-0.5'>
+          {track.artist}
         </div>
       </div>
-      {/* Timestamp vertically centers against the full card height —
-          matches the karaoke / right-edge button alignment in the
-          audio bar. */}
-      <span className='text-[10.5px] tabular-nums text-tertiary-token shrink-0 self-center'>
-        {formatTime(track.durationSec)}
-      </span>
     </div>
   );
 }
@@ -3219,14 +3626,6 @@ function ArtworkPlayOverlay({
   );
 }
 
-function Chip({ children }: { children: React.ReactNode }) {
-  return (
-    <span className='inline-flex items-center h-[18px] px-[7px] rounded text-[10px] font-caption text-secondary-token border border-(--linear-app-shell-border) bg-surface-1/40 tracking-[-0.01em]'>
-      {children}
-    </span>
-  );
-}
-
 // Breadcrumb is section-only — no artist segment. Filtering by artist
 // happens via the search-takeover (typing an artist name adds a pill),
 // not by routing. Returns a single-crumb trail keyed off the current view.
@@ -3242,6 +3641,7 @@ function breadcrumbForView(
     lyrics: 'Lyrics',
     settings: 'Settings',
     thread: 'Thread',
+    onboarding: 'Onboarding',
   };
   return [{ label: map[view], emphasis: true }];
 }
@@ -3254,18 +3654,12 @@ function CanvasSubheader({
   subviews,
   subview,
   onSubview,
-  rightRailOpen,
-  onToggleRightRail,
-  onOpenSearch,
   extraToolbar,
   onAddView,
 }: {
   subviews: { id: string; label: string; count?: number }[];
   subview: string;
   onSubview: (id: string) => void;
-  rightRailOpen: boolean;
-  onToggleRightRail: () => void;
-  onOpenSearch: () => void;
   // Optional view-specific toolbar slot, rendered inline before the
   // shared search + panel-right buttons. Used by Library to host its
   // sort dropdown + grid/table toggle without owning its own header.
@@ -3275,6 +3669,9 @@ function CanvasSubheader({
   // view. Releases and Library opt-in.
   onAddView?: () => void;
 }) {
+  // Collapse entirely when there's nothing to render — keeps thread,
+  // demo, and lyrics from carrying a 40px empty band under the header.
+  if (subviews.length === 0 && !extraToolbar && !onAddView) return null;
   return (
     <div className='shrink-0 h-10 px-3 flex items-center gap-2 border-b border-(--linear-app-shell-border)/50'>
       <div className='flex items-center gap-0.5 min-w-0'>
@@ -3319,35 +3716,158 @@ function CanvasSubheader({
           </Tooltip>
         )}
       </div>
-      <div className='ml-auto flex items-center gap-1.5'>
-        {extraToolbar}
-        <Tooltip label='Search' shortcut='search'>
-          <button
-            type='button'
-            onClick={onOpenSearch}
-            className='h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-150 ease-out'
-            aria-label='Search (⌘K)'
-          >
-            <Search className='h-3.5 w-3.5' strokeWidth={2.25} />
-          </button>
-        </Tooltip>
-        <Tooltip label={rightRailOpen ? 'Hide details' : 'Show details'}>
-          <button
-            type='button'
-            onClick={onToggleRightRail}
-            className={cn(
-              'h-7 w-7 rounded-md grid place-items-center transition-colors duration-150 ease-out',
-              rightRailOpen
-                ? 'text-primary-token bg-surface-1/60'
-                : 'text-quaternary-token hover:text-primary-token hover:bg-surface-1/60'
-            )}
-            aria-label='Toggle right rail'
-          >
-            <PanelRight className='h-3.5 w-3.5' strokeWidth={2.25} />
-          </button>
-        </Tooltip>
-      </div>
+      {extraToolbar && (
+        <div className='ml-auto flex items-center gap-1.5'>{extraToolbar}</div>
+      )}
     </div>
+  );
+}
+
+// Canvas Filter dropdown — showcase surface for searchable + nested
+// dropdown patterns. Lives in the subheader for releases / tracks / tasks.
+// State is local to the dropdown for the design pass; production will lift
+// it to the relevant view's filter state.
+function CanvasFilterDropdown({ view }: { view: CanvasView }) {
+  const [status, setStatus] = useState('all');
+  const [kind, setKind] = useState('all');
+  const [dateRange, setDateRange] = useState('any');
+  const [includeArchived, setIncludeArchived] = useState(false);
+  const [includeDrafts, setIncludeDrafts] = useState(true);
+  return (
+    <ShellDropdown
+      align='end'
+      side='bottom'
+      sideOffset={6}
+      width={232}
+      searchable
+      searchPlaceholder='Filter…'
+      trigger={
+        <Tooltip label='Filter'>
+          <button
+            type='button'
+            aria-label='Filter'
+            className='h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 data-[state=open]:text-primary-token data-[state=open]:bg-surface-1/60'
+          >
+            <Flag className='h-3.5 w-3.5' strokeWidth={2.25} />
+          </button>
+        </Tooltip>
+      }
+    >
+      <ShellDropdown.Label>Status</ShellDropdown.Label>
+      <ShellDropdown.RadioGroup value={status} onValueChange={setStatus}>
+        <ShellDropdown.RadioItem value='all' label='Any status' />
+        <ShellDropdown.RadioItem value='live' label='Live' />
+        <ShellDropdown.RadioItem value='scheduled' label='Scheduled' />
+        <ShellDropdown.RadioItem value='draft' label='Draft' />
+      </ShellDropdown.RadioGroup>
+      {view !== 'tasks' ? (
+        <>
+          <ShellDropdown.Separator />
+          <ShellDropdown.Label>Kind</ShellDropdown.Label>
+          <ShellDropdown.RadioGroup value={kind} onValueChange={setKind}>
+            <ShellDropdown.RadioItem value='all' label='Any kind' />
+            <ShellDropdown.RadioItem value='single' label='Single' />
+            <ShellDropdown.RadioItem value='ep' label='EP' />
+            <ShellDropdown.RadioItem value='album' label='Album' />
+          </ShellDropdown.RadioGroup>
+        </>
+      ) : null}
+      <ShellDropdown.Separator />
+      <ShellDropdown.Sub>
+        <ShellDropdown.SubTrigger
+          icon={Calendar}
+          label='Date range'
+          description={
+            dateRange === 'any'
+              ? 'Any date'
+              : dateRange === '7d'
+                ? 'Last 7 days'
+                : dateRange === '30d'
+                  ? 'Last 30 days'
+                  : 'Last 90 days'
+          }
+        />
+        <ShellDropdown.SubContent>
+          <ShellDropdown.RadioGroup
+            value={dateRange}
+            onValueChange={setDateRange}
+          >
+            <ShellDropdown.RadioItem value='any' label='Any date' />
+            <ShellDropdown.RadioItem value='7d' label='Last 7 days' />
+            <ShellDropdown.RadioItem value='30d' label='Last 30 days' />
+            <ShellDropdown.RadioItem value='90d' label='Last 90 days' />
+          </ShellDropdown.RadioGroup>
+        </ShellDropdown.SubContent>
+      </ShellDropdown.Sub>
+      <ShellDropdown.Separator />
+      <ShellDropdown.CheckboxItem
+        label='Include drafts'
+        checked={includeDrafts}
+        onCheckedChange={setIncludeDrafts}
+      />
+      <ShellDropdown.CheckboxItem
+        label='Include archived'
+        checked={includeArchived}
+        onCheckedChange={setIncludeArchived}
+      />
+    </ShellDropdown>
+  );
+}
+
+function CanvasSortDropdown({ view }: { view: CanvasView }) {
+  const [sortKey, setSortKey] = useState(
+    view === 'tasks' ? 'priority' : 'releaseDate'
+  );
+  const [descending, setDescending] = useState(true);
+  const fields =
+    view === 'tasks'
+      ? [
+          { value: 'priority', label: 'Priority' },
+          { value: 'dueDate', label: 'Due date' },
+          { value: 'updatedAt', label: 'Updated' },
+        ]
+      : [
+          { value: 'releaseDate', label: 'Release date' },
+          { value: 'title', label: 'Title' },
+          { value: 'streams', label: 'Weekly streams' },
+          { value: 'addedAt', label: 'Added' },
+        ];
+  return (
+    <ShellDropdown
+      align='end'
+      side='bottom'
+      sideOffset={6}
+      width={196}
+      trigger={
+        <Tooltip label='Sort'>
+          <button
+            type='button'
+            aria-label='Sort'
+            className='h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 data-[state=open]:text-primary-token data-[state=open]:bg-surface-1/60'
+          >
+            <ArrowUpDown className='h-3.5 w-3.5' strokeWidth={2.25} />
+          </button>
+        </Tooltip>
+      }
+    >
+      <ShellDropdown.Label>Sort by</ShellDropdown.Label>
+      <ShellDropdown.RadioGroup value={sortKey} onValueChange={setSortKey}>
+        {fields.map(f => (
+          <ShellDropdown.RadioItem
+            key={f.value}
+            value={f.value}
+            label={f.label}
+          />
+        ))}
+      </ShellDropdown.RadioGroup>
+      <ShellDropdown.Separator />
+      <ShellDropdown.CheckboxItem
+        label='Descending'
+        checked={descending}
+        onCheckedChange={setDescending}
+        shortcut='D'
+      />
+    </ShellDropdown>
   );
 }
 
@@ -3432,6 +3952,8 @@ function Header({
   titleOptions,
   albumOptions,
   view,
+  rightRailOpen,
+  onToggleRightRail,
 }: {
   sidebarMode: 'docked' | 'floating';
   onToggleSidebar: () => void;
@@ -3443,6 +3965,8 @@ function Header({
   titleOptions: string[];
   albumOptions: string[];
   view: CanvasView;
+  rightRailOpen: boolean;
+  onToggleRightRail: () => void;
 }) {
   const trail = breadcrumbForView(view);
   const sidebarHidden = sidebarMode === 'floating';
@@ -3473,7 +3997,7 @@ function Header({
   }, [searchOpen, onSearchOpenChange, onPillsChange]);
 
   return (
-    <header className='shrink-0 h-12 px-3 flex items-center gap-2'>
+    <header className='shrink-0 h-10 px-3 flex items-center gap-2'>
       <Tooltip
         label={sidebarHidden ? 'Dock sidebar' : 'Hide sidebar'}
         shortcut='toggleSidebar'
@@ -3488,11 +4012,7 @@ function Header({
               : 'Hide sidebar — peek on left edge ([)'
           }
         >
-          {sidebarHidden ? (
-            <ChevronRight className='h-3.5 w-3.5' strokeWidth={2.25} />
-          ) : (
-            <ChevronLeft className='h-3.5 w-3.5' strokeWidth={2.25} />
-          )}
+          <PanelLeft className='h-3.5 w-3.5' strokeWidth={2.25} />
         </button>
       </Tooltip>
       <div className='relative flex-1 min-w-0 h-7'>
@@ -3559,6 +4079,22 @@ function Header({
 
       <div className='flex items-center gap-2 shrink-0'>
         <PageAction view={view} />
+        <Tooltip label={rightRailOpen ? 'Hide details' : 'Show details'}>
+          <button
+            type='button'
+            onClick={onToggleRightRail}
+            className={cn(
+              'h-7 w-7 rounded-full grid place-items-center transition-colors duration-150 ease-out shrink-0',
+              rightRailOpen
+                ? 'text-primary-token bg-surface-1'
+                : 'text-quaternary-token hover:text-primary-token hover:bg-surface-1'
+            )}
+            aria-label='Toggle right rail'
+            aria-pressed={rightRailOpen}
+          >
+            <PanelRight className='h-3.5 w-3.5' strokeWidth={2.25} />
+          </button>
+        </Tooltip>
       </div>
     </header>
   );
@@ -3577,7 +4113,7 @@ function PageAction({ view }: { view: CanvasView }) {
     <button
       type='button'
       onClick={action.onClick}
-      className='inline-flex items-center gap-1.5 h-7 px-3 rounded-md bg-white text-black text-[12px] font-medium hover:bg-white/90 transition-colors duration-150 ease-out'
+      className='inline-flex items-center gap-1.5 h-7 px-3.5 rounded-full bg-white text-black text-[12px] font-medium hover:bg-white/90 transition-colors duration-150 ease-out'
     >
       {action.icon ? (
         <action.icon className='h-3.5 w-3.5' strokeWidth={2.5} />
@@ -3607,63 +4143,32 @@ function pageActionForView(view: CanvasView): {
 }
 
 function UserMenu({ children }: { children: React.ReactNode }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function onDocClick(e: MouseEvent) {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
-    }
-    if (open) document.addEventListener('mousedown', onDocClick);
-    return () => document.removeEventListener('mousedown', onDocClick);
-  }, [open]);
-
   return (
-    <div ref={ref} className='relative flex-1 min-w-0'>
-      <button
-        type='button'
-        onClick={() => setOpen(o => !o)}
-        className='w-full text-left'
-        aria-label='Account menu'
-        aria-expanded={open}
-      >
-        {children}
-      </button>
-      {open && (
-        <div className='absolute left-0 top-9 w-[212px] rounded-lg border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) shadow-[0_12px_40px_rgba(0,0,0,0.32)] p-1 z-50'>
-          <div className='px-2 py-2 border-b border-(--linear-app-shell-border)/60 mb-1'>
-            <div className='text-[12.5px] font-caption text-primary-token leading-tight'>
-              Tim White
-            </div>
-            <div className='text-[11px] text-tertiary-token leading-tight mt-0.5'>
-              t@timwhite.co
-            </div>
-          </div>
-          <MenuItem icon={Settings} label='Settings' />
-          <MenuItem icon={Shield} label='Admin' />
-          <div className='border-t border-(--linear-app-shell-border)/60 my-1' />
-          <MenuItem icon={LogOut} label='Sign out' />
-        </div>
-      )}
-    </div>
-  );
-}
-
-function MenuItem({
-  icon: Icon,
-  label,
-}: {
-  icon: typeof Settings;
-  label: string;
-}) {
-  return (
-    <button
-      type='button'
-      className='w-full flex items-center gap-2.5 px-2 h-7 rounded-md text-[12.5px] text-secondary-token hover:bg-surface-1 hover:text-primary-token'
+    <ShellDropdown
+      align='start'
+      side='bottom'
+      sideOffset={6}
+      width={212}
+      trigger={
+        <button
+          type='button'
+          className='w-full text-left flex-1 min-w-0'
+          aria-label='Account menu'
+        >
+          {children}
+        </button>
+      }
     >
-      <Icon className='h-3.5 w-3.5' />
-      {label}
-    </button>
+      <ShellDropdown.Header
+        title='Tim White'
+        subtitle='t@timwhite.co'
+        entity={ENTITY_CURRENT_USER}
+      />
+      <ShellDropdown.Item icon={Settings} label='Settings' shortcut='⌘,' />
+      <ShellDropdown.Item icon={Shield} label='Admin' />
+      <ShellDropdown.Separator />
+      <ShellDropdown.Item icon={LogOut} label='Sign out' tone='danger' />
+    </ShellDropdown>
   );
 }
 
@@ -3748,8 +4253,8 @@ function DashboardHome() {
         <div className='w-full max-w-[480px] flex flex-col items-center'>
           <div className='shrink-0 text-center pb-5'>
             <h1
-              className='text-[20px] font-semibold text-primary-token'
-              style={{ letterSpacing: '-0.018em' }}
+              className='text-[15px] font-medium text-tertiary-token'
+              style={{ letterSpacing: '-0.012em' }}
             >
               {greeting}
             </h1>
@@ -3773,22 +4278,9 @@ function DashboardHome() {
   );
 }
 
-// Apple-esque suggestion card. No caption, no top-right Jovie label —
-// the card IS Jovie. Title leads. Body is short. Primary action and
-// dismiss balance to the right edge so the eye lands on the action.
-// Per-kind eyebrow + accent. Calm, single-hue per type — gives the
-// card hierarchy without leaning on saturated chrome.
-const SUGGESTION_KIND: Record<
-  JovieSuggestion['kind'],
-  { label: string; tone: string }
-> = {
-  booking: { label: 'Booking', tone: 'text-amber-300/85' },
-  dsp: { label: 'Spotify', tone: 'text-emerald-300/85' },
-  release: { label: 'Release', tone: 'text-cyan-300/85' },
-  pitch: { label: 'Pitch', tone: 'text-fuchsia-300/85' },
-  geo: { label: 'Audience', tone: 'text-sky-300/85' },
-};
-
+// Apple-esque suggestion card. No eyebrow, no Jovie attribution, no
+// confidence percentage, no divider — the card IS the message. Title
+// leads, body is short, actions balance to the right edge.
 function SuggestionCard({
   suggestion,
   onDismiss,
@@ -3798,88 +4290,46 @@ function SuggestionCard({
   onDismiss?: () => void;
   onAct?: () => void;
 }) {
-  const meta = SUGGESTION_KIND[suggestion.kind];
   return (
     <article
       key={suggestion.id}
-      className='group/sug relative w-full rounded-[18px] overflow-hidden border border-white/[0.08] bg-(--linear-app-content-surface)'
+      className='group/sug relative w-full rounded-[18px] overflow-hidden border border-white/[0.05] bg-(--linear-app-content-surface)'
       style={{
-        // Layered material: subtle inner highlight on the top edge +
-        // soft drop shadow. Reads as a real pane, not a div.
         boxShadow:
-          'inset 0 1px 0 rgba(255,255,255,0.05), 0 1px 2px rgba(0,0,0,0.32), 0 24px 56px -20px rgba(0,0,0,0.55)',
+          'inset 0 1px 0 rgba(255,255,255,0.04), 0 1px 2px rgba(0,0,0,0.18), 0 16px 40px -16px rgba(0,0,0,0.4)',
         transition: `transform 240ms ${EASE_CINEMATIC}, box-shadow 240ms ${EASE_CINEMATIC}`,
       }}
     >
-      {/* Top hairline — full-width gradient that picks up the kind's
-          accent. Subtle (35% alpha) and only visible because the card
-          edge sits just above it. */}
-      <span
-        aria-hidden='true'
-        className='absolute inset-x-3 top-0 h-px'
-        style={{
-          background: `linear-gradient(90deg, transparent 0%, currentColor 50%, transparent 100%)`,
-        }}
-      >
-        <span className={cn('block h-full w-full opacity-35', meta.tone)} />
-      </span>
-
       <div className='px-7 py-6'>
-        {/* Eyebrow row — kind label + Jovie attribution. Two short
-            uppercase strings give the card an editorial / "this was
-            actually thought about" tone before the title lands. */}
-        <div className='flex items-center justify-between mb-3'>
-          <span
-            className={cn(
-              'inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.10em]',
-              meta.tone
-            )}
-          >
-            <span
-              aria-hidden='true'
-              className='h-1 w-1 rounded-full bg-current'
-            />
-            {meta.label}
-          </span>
-          <span className='inline-flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.10em] text-quaternary-token/85'>
-            <Sparkles className='h-2.5 w-2.5' strokeWidth={2.25} />
-            Surfaced by Jovie
-          </span>
-        </div>
-
         <h2
-          className='text-[22px] font-semibold leading-[1.2] text-primary-token'
-          style={{ letterSpacing: '-0.022em' }}
+          className='text-[17px] font-semibold leading-[1.3] text-primary-token'
+          style={{ letterSpacing: '-0.024em' }}
         >
           {suggestion.title}
         </h2>
-        <p className='mt-2.5 text-[13.5px] leading-[1.55] text-secondary-token'>
+        <p
+          className='mt-2 text-[12.5px] leading-[1.6] text-tertiary-token'
+          style={{ letterSpacing: '-0.003em' }}
+        >
           {suggestion.body}
         </p>
 
-        {/* Action row + a soft top divider so the buttons read as
-            anchored to the card, not floating in body whitespace. */}
-        <div className='mt-6 pt-4 border-t border-white/[0.05] flex items-center justify-between gap-2'>
-          <span className='text-[11px] text-quaternary-token tabular-nums'>
-            Confidence · 92%
-          </span>
-          <div className='flex items-center gap-1.5'>
-            <button
-              type='button'
-              onClick={onDismiss}
-              className='inline-flex items-center h-8 px-3 rounded-full text-[12.5px] text-tertiary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-150 ease-out'
-            >
-              Dismiss
-            </button>
-            <button
-              type='button'
-              onClick={onAct}
-              className='inline-flex items-center gap-1.5 h-8 px-4 rounded-full text-[12.5px] font-medium bg-white text-black hover:brightness-110 active:scale-[0.99] shadow-[0_4px_14px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.45)] transition-all duration-150 ease-out'
-            >
-              {suggestion.action}
-              <ArrowRight className='h-3 w-3' strokeWidth={2.5} />
-            </button>
-          </div>
+        <div className='mt-6 flex items-center justify-end gap-1'>
+          <button
+            type='button'
+            onClick={onDismiss}
+            className='inline-flex items-center h-7 px-3 rounded-full text-[11.5px] text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-150 ease-out'
+          >
+            Dismiss
+          </button>
+          <button
+            type='button'
+            onClick={onAct}
+            className='inline-flex items-center gap-1.5 h-7 px-3.5 rounded-full text-[12px] font-medium bg-white text-black hover:brightness-110 active:scale-[0.99] shadow-[0_4px_14px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.45)] transition-all duration-150 ease-out'
+          >
+            {suggestion.action}
+            <ArrowRight className='h-3 w-3' strokeWidth={2.5} />
+          </button>
         </div>
       </div>
     </article>
@@ -3920,6 +4370,7 @@ function AudioBar({
   onToggleWaveform,
   lyricsActive,
   onOpenLyrics,
+  track,
 }: {
   variant: Variant;
   isPlaying: boolean;
@@ -3932,6 +4383,9 @@ function AudioBar({
   onToggleWaveform: () => void;
   lyricsActive: boolean;
   onOpenLyrics: () => void;
+  // Track meta — chips (BPM / Key / Version) render on the right side
+  // of the bar so the now-playing card on the left stays clean.
+  track: TrackInfo;
 }) {
   // All variants share the V1a 64px / two-row Spotify shell.
   // What differs is the *scrub* — playing with how loud or quiet the
@@ -3982,17 +4436,24 @@ function AudioBar({
   );
 
   const rightCluster = (
-    <div className='flex items-center gap-1 justify-self-end'>
-      <IconBtn
-        label='Lyrics'
-        shortcut='toggleLyrics'
-        onClick={onOpenLyrics}
-        active={lyricsActive}
-        tooltipSide='top'
-        tone='ghost'
-      >
-        <Mic2 className='h-3.5 w-3.5' strokeWidth={2.25} />
-      </IconBtn>
+    <div className='flex items-center gap-1.5 justify-self-end'>
+      {waveformOn && (
+        <span className='hidden xl:inline-flex items-center mr-1 text-[10.5px] font-caption text-quaternary-token tracking-[-0.005em]'>
+          {track.bpm} BPM · {track.key} · {track.version}
+        </span>
+      )}
+      {track.hasLyrics && (
+        <IconBtn
+          label='Lyrics'
+          shortcut='toggleLyrics'
+          onClick={onOpenLyrics}
+          active={lyricsActive}
+          tooltipSide='top'
+          tone='ghost'
+        >
+          <Mic2 className='h-3.5 w-3.5' strokeWidth={2.25} />
+        </IconBtn>
+      )}
       <IconBtn
         label={waveformOn ? 'Hide waveform' : 'Show waveform'}
         shortcut='toggleWaveform'
@@ -4007,9 +4468,7 @@ function AudioBar({
           <AudioWaveform className='h-3.5 w-3.5' strokeWidth={2.25} />
         )}
       </IconBtn>
-      <IconBtn label='Volume' tooltipSide='top' tone='ghost'>
-        <Volume2 className='h-3.5 w-3.5' strokeWidth={2.25} />
-      </IconBtn>
+      <AudioBarOverflowMenu track={track} />
       <IconBtn
         label='Minimize player'
         shortcut='toggleBar'
@@ -4042,7 +4501,7 @@ function AudioBar({
   return (
     <section
       aria-label='Audio player'
-      className='group/bar shrink-0 hidden lg:grid grid-cols-[1fr_minmax(360px,_720px)_1fr] gap-4 items-center px-4 py-2'
+      className='group/bar shrink-0 hidden lg:grid grid-cols-[1fr_minmax(360px,_720px)_1fr] gap-4 items-center px-8 py-2'
     >
       <div />
       {/* Center column: waveform drawer above, transport below. */}
@@ -4065,6 +4524,122 @@ function AudioBar({
           including the waveform drawer when it's open. */}
       {rightCluster}
     </section>
+  );
+}
+
+// Audio bar overflow menu — the canonical track-entity action menu. Same
+// entries as the right-click context menu on a track row, plus playback
+// options that only make sense for the actively-playing track (Quality,
+// Playback rate, Add to queue). Ends with the release EntityItem so
+// hovering it reveals the parent release popover.
+function AudioBarOverflowMenu({ track }: { track: TrackInfo }) {
+  const [quality, setQuality] = useState('auto');
+  const [rate, setRate] = useState('1');
+  const onEntityActivate = useEntityActivate();
+  const parentRelease =
+    ENTITY_RELEASES.find(
+      r => r.kind === 'release' && r.label === track.album
+    ) ??
+    ENTITY_RELEASES.find(r => r.kind === 'release') ??
+    null;
+  const noop = (action: string) => () =>
+    console.info(`[shell-v1] ${action} ${track.id}`);
+  return (
+    <ShellDropdown
+      align='end'
+      side='top'
+      sideOffset={8}
+      width={224}
+      onEntityActivate={onEntityActivate}
+      trigger={
+        <button
+          type='button'
+          aria-label='More'
+          className='h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token transition-colors duration-150 ease-out data-[state=open]:text-primary-token'
+        >
+          <MoreHorizontal className='h-3.5 w-3.5' strokeWidth={2.25} />
+        </button>
+      }
+    >
+      <ShellDropdown.Item
+        icon={UserPlus}
+        label='Add to release'
+        onSelect={noop('add-to-release')}
+      />
+      <ShellDropdown.Item
+        icon={Pencil}
+        label='Edit metadata'
+        shortcut='⌘E'
+        onSelect={noop('edit-metadata')}
+      />
+      <ShellDropdown.Separator />
+      <ShellDropdown.Item
+        icon={Hash}
+        label='Copy ISRC'
+        description={track.isrc}
+        onSelect={noop(`copy-isrc ${track.isrc}`)}
+      />
+      <ShellDropdown.Item
+        icon={LinkIcon}
+        label='Copy share link'
+        shortcut='⌘L'
+        onSelect={noop('copy-share-link')}
+      />
+      <ShellDropdown.Item
+        icon={Copy}
+        label='Duplicate'
+        shortcut='⌘D'
+        onSelect={noop('duplicate')}
+      />
+      <ShellDropdown.Separator />
+      <ShellDropdown.Sub>
+        <ShellDropdown.SubTrigger icon={AudioLines} label='Quality' />
+        <ShellDropdown.SubContent>
+          <ShellDropdown.RadioGroup value={quality} onValueChange={setQuality}>
+            <ShellDropdown.RadioItem value='auto' label='Auto' />
+            <ShellDropdown.RadioItem value='lossless' label='Lossless' />
+            <ShellDropdown.RadioItem value='high' label='High' />
+            <ShellDropdown.RadioItem value='normal' label='Normal' />
+          </ShellDropdown.RadioGroup>
+        </ShellDropdown.SubContent>
+      </ShellDropdown.Sub>
+      <ShellDropdown.Sub>
+        <ShellDropdown.SubTrigger icon={Repeat} label='Playback rate' />
+        <ShellDropdown.SubContent>
+          <ShellDropdown.RadioGroup value={rate} onValueChange={setRate}>
+            <ShellDropdown.RadioItem value='0.5' label='0.5×' />
+            <ShellDropdown.RadioItem value='0.75' label='0.75×' />
+            <ShellDropdown.RadioItem value='1' label='1× · Normal' />
+            <ShellDropdown.RadioItem value='1.25' label='1.25×' />
+            <ShellDropdown.RadioItem value='1.5' label='1.5×' />
+            <ShellDropdown.RadioItem value='2' label='2×' />
+          </ShellDropdown.RadioGroup>
+        </ShellDropdown.SubContent>
+      </ShellDropdown.Sub>
+      <ShellDropdown.Item
+        icon={Plus}
+        label='Add to queue'
+        shortcut='Q'
+        onSelect={noop('add-to-queue')}
+      />
+      <ShellDropdown.Separator />
+      {parentRelease ? (
+        <ShellDropdown.EntityItem entity={parentRelease} />
+      ) : (
+        <ShellDropdown.Item
+          icon={LibraryIcon}
+          label='Show in library'
+          disabled
+        />
+      )}
+      <ShellDropdown.Separator />
+      <ShellDropdown.Item
+        icon={Trash2}
+        label='Delete'
+        tone='danger'
+        onSelect={noop('delete')}
+      />
+    </ShellDropdown>
   );
 }
 
@@ -4762,7 +5337,9 @@ function ContextMenuOverlay({
       <div
         ref={ref}
         role='menu'
-        className='absolute min-w-[200px] max-w-[280px] rounded-md border border-(--linear-app-shell-border) bg-(--linear-app-content-surface)/95 backdrop-blur-xl shadow-[0_12px_40px_rgba(0,0,0,0.45)] py-1'
+        // Chrome unified with ShellDropdown so click + right-click menus
+        // read as one system. rounded-xl, p-1 (4px), same shadow stack.
+        className='absolute min-w-[200px] max-w-[280px] rounded-xl border border-(--linear-app-shell-border) bg-(--linear-app-content-surface)/95 backdrop-blur-xl shadow-[0_12px_40px_rgba(0,0,0,0.32)] p-1'
         style={{ left: pos.left, top: pos.top }}
       >
         {state.items.map(item => {
@@ -4770,7 +5347,7 @@ function ContextMenuOverlay({
             return (
               <div
                 key={`sep-${state.items.indexOf(item)}`}
-                className='h-px my-1 bg-(--linear-app-shell-border)/70'
+                className='my-1 border-t border-(--linear-app-shell-border)/60'
               />
             );
           }
@@ -4792,21 +5369,30 @@ function ContextMenuOverlay({
                 onClose();
               }}
               className={cn(
-                'group/mi w-full flex items-center gap-2 h-7 px-2 mx-1 rounded text-[12.5px] text-left transition-colors duration-150 ease-out',
+                'relative group/mi w-full flex items-center gap-2.5 h-7 px-2 rounded-md text-[12.5px] font-caption text-left transition-colors duration-150 ease-out',
                 item.disabled
-                  ? 'text-quaternary-token cursor-not-allowed'
+                  ? 'opacity-50 cursor-not-allowed text-secondary-token'
                   : item.tone === 'danger'
-                    ? 'text-rose-300 hover:text-rose-200 hover:bg-rose-500/10'
-                    : 'text-secondary-token hover:text-primary-token hover:bg-surface-1/70'
+                    ? 'text-rose-300/90 hover:text-rose-200 hover:bg-rose-500/10'
+                    : 'text-secondary-token hover:text-primary-token hover:bg-surface-1'
               )}
-              style={{ width: 'calc(100% - 8px)' }}
             >
               {Icon && (
-                <Icon className='h-3.5 w-3.5 shrink-0' strokeWidth={2.25} />
+                <Icon
+                  className={cn(
+                    'h-3.5 w-3.5 shrink-0',
+                    item.disabled
+                      ? 'text-tertiary-token'
+                      : item.tone === 'danger'
+                        ? 'text-rose-300/70 group-hover/mi:text-rose-200'
+                        : 'text-tertiary-token group-hover/mi:text-primary-token'
+                  )}
+                  strokeWidth={2.25}
+                />
               )}
               <span className='flex-1 truncate'>{item.label}</span>
               {sc && (
-                <kbd className='inline-flex items-center h-4 min-w-4 px-1 rounded-[3px] text-[9.5px] font-caption uppercase tracking-[0.04em] text-quaternary-token bg-(--surface-2)/70 border border-(--linear-app-shell-border) leading-none'>
+                <kbd className='ml-auto inline-flex items-center h-4 min-w-4 px-1 rounded-[3px] text-[10px] font-caption uppercase tracking-[0.04em] text-tertiary-token bg-surface-0/80 border border-(--linear-app-shell-border)/60 leading-none'>
                   {sc.keys}
                 </kbd>
               )}
@@ -5206,8 +5792,6 @@ function VariantPicker({
   onView,
   palette,
   onPalette,
-  sidebarTight,
-  onSidebarTight,
   installBannerOpen,
   onInstallBanner,
 }: {
@@ -5223,8 +5807,6 @@ function VariantPicker({
   onView: (v: CanvasView) => void;
   palette: Palette;
   onPalette: (p: Palette) => void;
-  sidebarTight: boolean;
-  onSidebarTight: () => void;
   installBannerOpen: boolean;
   onInstallBanner: () => void;
 }) {
@@ -5315,12 +5897,6 @@ function VariantPicker({
           shortcut='W'
         />
         <PickerToggle
-          on={sidebarTight}
-          onClick={onSidebarTight}
-          onLabel='Sidebar tight (library)'
-          offLabel='Sidebar roomy (default)'
-        />
-        <PickerToggle
           on={installBannerOpen}
           onClick={onInstallBanner}
           onLabel='Install banner shown'
@@ -5328,17 +5904,176 @@ function VariantPicker({
         />
       </div>
       <PalettePanel palette={palette} onPalette={onPalette} />
+      <div className='border-t border-subtle mt-2 pt-2 px-1 pb-1'>
+        <p className='text-[10px] uppercase tracking-wider text-tertiary-token px-1 pb-1.5 font-semibold'>
+          Dropdown
+        </p>
+        <div className='px-1'>
+          <DropdownGalleryTrigger />
+        </div>
+      </div>
       <div className='border-t border-subtle mt-2 pt-2 px-2 pb-1'>
         <p className='text-[10px] uppercase tracking-wider text-tertiary-token pb-1.5 font-semibold'>
-          Routes
+          In shell
         </p>
         <div className='space-y-px'>
-          <PickerLink href='/exp/onboarding-v1' label='Test onboarding' />
-          <PickerLink href='/exp/library-v1' label='Library standalone' />
-          <PickerLink href='/exp/auth-v1' label='Auth (signin / signup)' />
+          <PickerAction
+            label='Onboarding'
+            onClick={() => onView('onboarding')}
+            active={view === 'onboarding'}
+          />
+        </div>
+        <p className='mt-2 text-[10px] uppercase tracking-wider text-tertiary-token pb-1.5 font-semibold'>
+          Standalone pages
+        </p>
+        <div className='space-y-px'>
+          <PickerLink href='/exp/home-v1' label='Marketing home' />
+          <PickerLink href='/exp/onboarding-v1' label='Onboarding' />
+          <PickerLink href='/exp/library-v1' label='Library' />
+          <PickerLink href='/exp/auth-v1' label='Sign in & sign up' />
         </div>
       </div>
     </div>
+  );
+}
+
+// DropdownGalleryTrigger — a single ShellDropdown trigger that opens a
+// gallery menu rendering one row per state in the matrix. Lives inside the
+// DEV picker so designers can scan every variant without manually invoking
+// each surface across the experiment. Strip when the migration PR lands.
+function DropdownGalleryTrigger() {
+  const [filterDescending, setFilterDescending] = useState(false);
+  const [sortKey, setSortKey] = useState('date-added');
+  const [quality, setQuality] = useState('auto');
+  const onEntityActivate = useEntityActivate();
+  return (
+    <ShellDropdown
+      align='start'
+      side='bottom'
+      width={240}
+      searchable
+      searchPlaceholder='Filter actions…'
+      onEntityActivate={onEntityActivate}
+      trigger={
+        <button
+          type='button'
+          className='w-full flex items-center justify-between h-6 px-2 rounded-md border border-(--linear-app-shell-border) bg-surface-0/40 text-[11px] font-caption text-secondary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-150 ease-out'
+        >
+          <span>Show dropdown gallery</span>
+          <ChevronDown
+            className='h-3 w-3 text-quaternary-token'
+            strokeWidth={2.25}
+          />
+        </button>
+      }
+    >
+      <ShellDropdown.Header
+        title='Tim White'
+        subtitle='t@timwhite.co · Founder'
+        entity={ENTITY_CURRENT_USER}
+      />
+      <ShellDropdown.Label>Items</ShellDropdown.Label>
+      <ShellDropdown.Item label='Plain item' />
+      <ShellDropdown.Item icon={Pencil} label='With leading icon' />
+      <ShellDropdown.Item
+        icon={Activity}
+        label='With description'
+        description='Two-line row with secondary copy'
+      />
+      <ShellDropdown.Item icon={Search} label='With shortcut' shortcut='⌘K' />
+      <ShellDropdown.Item
+        icon={Pin}
+        label='Disabled item'
+        disabled
+        shortcut='P'
+      />
+      <ShellDropdown.Item
+        icon={Trash2}
+        label='Danger item'
+        tone='danger'
+        shortcut='⌫'
+      />
+      <ShellDropdown.Separator />
+      <ShellDropdown.Label>Sort by</ShellDropdown.Label>
+      <ShellDropdown.RadioGroup value={sortKey} onValueChange={setSortKey}>
+        <ShellDropdown.RadioItem value='date-added' label='Date added' />
+        <ShellDropdown.RadioItem value='date-captured' label='Date captured' />
+        <ShellDropdown.RadioItem value='popularity' label='Popularity' />
+        <ShellDropdown.RadioItem value='status' label='Status' disabled />
+      </ShellDropdown.RadioGroup>
+      <ShellDropdown.Separator />
+      <ShellDropdown.CheckboxItem
+        label='Descending'
+        checked={filterDescending}
+        onCheckedChange={setFilterDescending}
+        shortcut='D'
+      />
+      <ShellDropdown.Separator />
+      <ShellDropdown.Label>Submenus</ShellDropdown.Label>
+      <ShellDropdown.Sub>
+        <ShellDropdown.SubTrigger icon={AudioLines} label='Quality' />
+        <ShellDropdown.SubContent>
+          <ShellDropdown.RadioGroup value={quality} onValueChange={setQuality}>
+            <ShellDropdown.RadioItem value='auto' label='Auto' />
+            <ShellDropdown.RadioItem value='lossless' label='Lossless' />
+            <ShellDropdown.RadioItem value='high' label='High' />
+            <ShellDropdown.RadioItem value='normal' label='Normal' />
+          </ShellDropdown.RadioGroup>
+        </ShellDropdown.SubContent>
+      </ShellDropdown.Sub>
+      <ShellDropdown.Sub>
+        <ShellDropdown.SubTrigger icon={UserPlus} label='Assign to teammate' />
+        <ShellDropdown.SubContent searchable searchPlaceholder='Filter people…'>
+          {ENTITY_TEAMMATES.map(t => (
+            <ShellDropdown.EntityItem key={t.id} entity={t} />
+          ))}
+        </ShellDropdown.SubContent>
+      </ShellDropdown.Sub>
+      <ShellDropdown.Sub>
+        <ShellDropdown.SubTrigger icon={Disc3} label='Move to release' />
+        <ShellDropdown.SubContent
+          searchable
+          searchPlaceholder='Filter releases…'
+        >
+          {ENTITY_RELEASES.map(r => (
+            <ShellDropdown.EntityItem key={r.id} entity={r} />
+          ))}
+        </ShellDropdown.SubContent>
+      </ShellDropdown.Sub>
+      <ShellDropdown.Sub>
+        <ShellDropdown.SubTrigger icon={Users} label='Set artist' />
+        <ShellDropdown.SubContent
+          searchable
+          searchPlaceholder='Filter artists…'
+        >
+          {ENTITY_ARTISTS.map(a => (
+            <ShellDropdown.EntityItem key={a.id} entity={a} />
+          ))}
+        </ShellDropdown.SubContent>
+      </ShellDropdown.Sub>
+      <ShellDropdown.Sub>
+        <ShellDropdown.SubTrigger icon={Calendar} label='Link to event' />
+        <ShellDropdown.SubContent>
+          {ENTITY_EVENTS.map(ev => (
+            <ShellDropdown.EntityItem key={ev.id} entity={ev} />
+          ))}
+        </ShellDropdown.SubContent>
+      </ShellDropdown.Sub>
+      <ShellDropdown.Sub>
+        <ShellDropdown.SubTrigger icon={AudioWaveform} label='Link to track' />
+        <ShellDropdown.SubContent>
+          {ENTITY_TRACKS_DEMO.map(t => (
+            <ShellDropdown.EntityItem key={t.id} entity={t} />
+          ))}
+        </ShellDropdown.SubContent>
+      </ShellDropdown.Sub>
+      <ShellDropdown.Separator />
+      <ShellDropdown.Item
+        icon={LogOut}
+        label='Destructive action'
+        tone='danger'
+      />
+    </ShellDropdown>
   );
 }
 
@@ -5357,6 +6092,37 @@ function PickerLink({ href, label }: { href: string; label: string }) {
   );
 }
 
+function PickerAction({
+  label,
+  onClick,
+  active,
+}: {
+  label: string;
+  onClick: () => void;
+  active?: boolean;
+}) {
+  return (
+    <button
+      type='button'
+      onClick={onClick}
+      className={cn(
+        'w-full flex items-center justify-between h-6 px-1.5 rounded text-[11px] transition-colors duration-150 ease-out',
+        active
+          ? 'bg-surface-1 text-primary-token'
+          : 'text-secondary-token hover:bg-surface-1 hover:text-primary-token'
+      )}
+    >
+      <span>{label}</span>
+      {active && (
+        <span
+          aria-hidden='true'
+          className='h-1.5 w-1.5 rounded-full bg-cyan-300/85'
+        />
+      )}
+    </button>
+  );
+}
+
 function PalettePanel({
   palette,
   onPalette,
@@ -5372,31 +6138,49 @@ function PalettePanel({
     { key: 'surface2', label: 'Surface 2' },
     { key: 'border', label: 'Border' },
   ];
+  const currentPresetName =
+    Object.entries(PALETTE_PRESETS).find(
+      ([, p]) => JSON.stringify(p) === JSON.stringify(palette)
+    )?.[0] ?? 'Custom';
   return (
     <div className='border-t border-subtle mt-2 pt-2 px-1'>
       <p className='text-[10px] uppercase tracking-wider text-tertiary-token px-1 pb-1.5 font-semibold'>
         Palette
       </p>
-      <div className='flex flex-wrap gap-1 px-1 pb-2'>
-        {Object.keys(PALETTE_PRESETS).map(name => {
-          const isCurrent =
-            JSON.stringify(PALETTE_PRESETS[name]) === JSON.stringify(palette);
-          return (
+      <div className='px-1 pb-2'>
+        <ShellDropdown
+          align='start'
+          side='bottom'
+          width='trigger'
+          trigger={
             <button
-              key={name}
               type='button'
-              onClick={() => onPalette(PALETTE_PRESETS[name])}
-              className={cn(
-                'h-5 px-1.5 rounded text-[10px] font-caption transition-colors duration-150 ease-out',
-                isCurrent
-                  ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
-                  : 'text-tertiary-token border border-(--linear-app-shell-border) hover:text-primary-token hover:bg-surface-1'
-              )}
+              className='w-full flex items-center justify-between h-6 px-2 rounded-md border border-(--linear-app-shell-border) bg-surface-0/40 text-[11px] font-caption text-secondary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-150 ease-out'
             >
-              {name}
+              <span className='flex items-center gap-1.5'>
+                <span className='h-1.5 w-1.5 rounded-full bg-cyan-300/85' />
+                {currentPresetName}
+              </span>
+              <ChevronDown
+                className='h-3 w-3 text-quaternary-token'
+                strokeWidth={2.25}
+              />
             </button>
-          );
-        })}
+          }
+        >
+          <ShellDropdown.Label>Preset</ShellDropdown.Label>
+          <ShellDropdown.RadioGroup
+            value={currentPresetName}
+            onValueChange={name => {
+              const preset = PALETTE_PRESETS[name];
+              if (preset) onPalette(preset);
+            }}
+          >
+            {Object.keys(PALETTE_PRESETS).map(name => (
+              <ShellDropdown.RadioItem key={name} value={name} label={name} />
+            ))}
+          </ShellDropdown.RadioGroup>
+        </ShellDropdown>
       </div>
       <div className='space-y-1 px-1 pb-1'>
         {tokens.map(t => (
@@ -5408,7 +6192,7 @@ function PalettePanel({
                 onChange={e =>
                   onPalette({ ...palette, [t.key]: e.target.value })
                 }
-                className='h-5 w-5 rounded border border-(--linear-app-shell-border) bg-transparent cursor-pointer shrink-0 [appearance:none] [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded [&::-webkit-color-swatch]:border-none'
+                className='h-5 w-5 rounded-md border border-(--linear-app-shell-border) bg-transparent cursor-pointer shrink-0 [appearance:none] [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded-[5px] [&::-webkit-color-swatch]:border-none'
               />
               <span className='text-[11px] text-secondary-token flex-1 min-w-0 truncate'>
                 {t.label}
@@ -5418,7 +6202,7 @@ function PalettePanel({
               type='text'
               value={palette[t.key]}
               onChange={e => onPalette({ ...palette, [t.key]: e.target.value })}
-              className='w-[70px] shrink-0 h-5 px-1.5 rounded text-[10px] tabular-nums text-tertiary-token bg-surface-1 border border-(--linear-app-shell-border) outline-none focus:text-primary-token focus:border-cyan-500/40'
+              className='w-[72px] shrink-0 h-5 px-2 rounded-md text-[10px] tabular-nums text-tertiary-token bg-surface-1 border border-(--linear-app-shell-border) outline-none focus:text-primary-token'
               spellCheck={false}
             />
           </div>
@@ -5468,6 +6252,10 @@ function PickerToggle({
 // install + dismiss). Positioned above the header so it never
 // fights the breadcrumb for attention. Slides in/out with the
 // same cinematic ease as other shell transitions.
+// Compact sidebar card — sits above the now-playing slot. Vertical
+// layout (icon + title, short body, single primary action) so it fits
+// in the 224px sidebar without truncation. Animates max-height +
+// opacity in/out on the same cinematic curve as the now-playing card.
 function InstallBanner({
   open,
   onDismiss,
@@ -5478,43 +6266,37 @@ function InstallBanner({
   return (
     <div
       aria-hidden={!open}
-      className='shrink-0 overflow-hidden'
+      className='shrink-0 overflow-hidden px-2'
       style={{
-        maxHeight: open ? 56 : 0,
+        maxHeight: open ? 140 : 0,
         opacity: open ? 1 : 0,
         transition: `max-height ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, opacity ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
       }}
     >
-      <div className='relative h-12 mx-3 mt-3 flex items-center gap-3 px-4 rounded-xl border border-(--linear-app-shell-border) bg-(--surface-1)/60 backdrop-blur-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_4px_12px_rgba(0,0,0,0.18)]'>
-        {/* Subtle accent ribbon along the left edge — single hue,
-            blends with the surface, signals "Jovie suggests" without
-            shouting. */}
-        <span
-          aria-hidden='true'
-          className='absolute left-0 top-2 bottom-2 w-[2px] rounded-full bg-cyan-300/60'
-        />
-        <span className='shrink-0 h-7 w-7 rounded-md bg-(--surface-2)/80 grid place-items-center text-cyan-300/85'>
-          <Sparkles className='h-3.5 w-3.5' strokeWidth={2.25} />
-        </span>
-        <div className='flex-1 min-w-0'>
-          <div className='text-[12.5px] font-medium text-primary-token leading-tight'>
-            Install Jovie for desktop
-          </div>
-          <div className='text-[11px] text-tertiary-token leading-tight mt-0.5 truncate'>
-            Native window, system shortcuts, push-to-talk in any app. macOS ·
-            Windows · Linux.
-          </div>
-        </div>
+      <div className='relative rounded-xl border border-(--linear-app-shell-border) bg-(--surface-1)/60 backdrop-blur-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_6px_18px_rgba(0,0,0,0.28)] px-3 pt-3 pb-3 mb-2'>
         <button
           type='button'
           onClick={onDismiss}
-          className='shrink-0 inline-flex items-center h-7 px-3 rounded-full text-[12px] text-tertiary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-150 ease-out'
+          aria-label='Dismiss install prompt'
+          className='absolute top-1.5 right-1.5 h-5 w-5 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-150 ease-out'
         >
-          Not now
+          <X className='h-3 w-3' strokeWidth={2.25} />
         </button>
+        <div className='flex items-center gap-1.5 mb-1 pr-5'>
+          <Sparkles
+            className='h-3 w-3 text-cyan-300/85 shrink-0'
+            strokeWidth={2.25}
+          />
+          <span className='text-[12px] font-medium text-primary-token tracking-[-0.005em]'>
+            Get Jovie for desktop
+          </span>
+        </div>
+        <p className='text-[11px] text-tertiary-token leading-snug mb-2.5'>
+          Push-to-talk in any app, native shortcuts.
+        </p>
         <button
           type='button'
-          className='shrink-0 inline-flex items-center gap-1.5 h-7 px-3.5 rounded-full text-[12px] font-medium bg-white text-black hover:brightness-110 active:scale-[0.99] transition-all duration-150 ease-out'
+          className='w-full inline-flex items-center justify-center gap-1.5 h-7 rounded-full text-[12px] font-medium bg-white text-black hover:brightness-110 active:scale-[0.99] transition-all duration-150 ease-out'
         >
           Install
           <ArrowDown className='h-3 w-3' strokeWidth={2.5} />
@@ -6405,13 +7187,15 @@ function ThreadView({ thread }: { thread: Thread }) {
     el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   };
   return (
-    <article className='h-full overflow-hidden flex flex-col'>
+    <article className='relative h-full overflow-hidden'>
       <div
         ref={scrollRef}
         onScroll={checkAtBottom}
-        className='flex-1 min-h-0 overflow-y-auto'
+        className='absolute inset-0 overflow-y-auto'
       >
-        <div className='max-w-3xl mx-auto px-8 pt-8 pb-6'>
+        {/* Bottom padding leaves room for the floating composer to sit
+            over the canvas without clipping the last message. */}
+        <div className='max-w-3xl mx-auto px-8 pt-6 pb-32'>
           <header>
             <h1
               className='text-[24px] font-semibold leading-tight text-primary-token'
@@ -6471,28 +7255,32 @@ function ThreadView({ thread }: { thread: Thread }) {
         </div>
       </div>
 
-      {/* Pinned composer + scroll-to-bottom affordance. Arrow truly
-          floats — sits ~48px above the composer with a heavy drop
-          shadow + backdrop blur so it reads as a lifted action chip,
-          not a chevron pinned to the input border. */}
-      <footer className='shrink-0 relative'>
-        <div className='max-w-3xl mx-auto px-8 pt-2 pb-4 relative'>
+      {/* Composer floats over the messages — ChatGPT / Claude pattern. A
+          subtle gradient fades the trailing message into the composer area
+          so the input never reads as a hard band. The composer itself
+          carries no full-width chrome; only the pill is opaque. */}
+      <div
+        aria-hidden='true'
+        className='pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-(--linear-app-content-surface) via-(--linear-app-content-surface)/80 to-transparent'
+      />
+      <div className='absolute inset-x-0 bottom-0'>
+        <div className='relative max-w-3xl mx-auto px-8 pb-4'>
           <button
             type='button'
             onClick={scrollToBottom}
             aria-label='Scroll to bottom'
             className={cn(
-              'absolute left-1/2 -translate-x-1/2 -top-12 h-9 w-9 rounded-full grid place-items-center text-secondary-token bg-(--linear-app-content-surface)/95 backdrop-blur-md border border-(--linear-app-shell-border) shadow-[0_12px_32px_rgba(0,0,0,0.5)] hover:text-primary-token hover:bg-surface-1 transition-all duration-200 ease-out z-10',
+              'absolute left-1/2 -translate-x-1/2 -top-10 h-8 w-8 rounded-full grid place-items-center text-secondary-token bg-(--linear-app-content-surface) border border-(--linear-app-shell-border) shadow-[0_2px_8px_rgba(0,0,0,0.18)] hover:text-primary-token hover:bg-surface-1 transition-all duration-200 ease-out z-10',
               atBottom
-                ? 'opacity-0 translate-y-3 pointer-events-none'
+                ? 'opacity-0 translate-y-2 pointer-events-none'
                 : 'opacity-100'
             )}
           >
-            <ArrowDown className='h-4 w-4' strokeWidth={2.25} />
+            <ArrowDown className='h-3.5 w-3.5' strokeWidth={2.25} />
           </button>
           <ChatComposer placeholder='Reply to this thread…' />
         </div>
-      </footer>
+      </div>
     </article>
   );
 }
@@ -6533,6 +7321,117 @@ function ThreadTurn({
     >
       {children}
     </div>
+  );
+}
+
+// Onboarding lives inside the shell. Initial state: just a centered
+// chat input + a quiet greeting. The user types their handle, hits
+// submit, and the composer cinematically docks to the bottom while
+// Jovie's confirmation streams in above. Same chat chrome as the rest
+// of the app — composer is the input mechanism, no special pill.
+function OnboardingCanvas({ onComplete }: { onComplete: () => void }) {
+  const [stage, setStage] = useState<'welcome' | 'ready'>('welcome');
+  const [handle, setHandle] = useState('');
+  const [draft, setDraft] = useState('');
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  function submit(e?: React.FormEvent | React.KeyboardEvent) {
+    e?.preventDefault?.();
+    if (stage !== 'welcome') return;
+    const cleaned = draft
+      .trim()
+      .toLowerCase()
+      .replace(/^@/, '')
+      .replace(/[^a-z0-9-_]/g, '');
+    if (!cleaned) return;
+    setHandle(cleaned);
+    setDraft('');
+    setStage('ready');
+  }
+
+  // Scroll messages into view when stage changes (welcome → ready).
+  // No-op on welcome since the scroll area is empty.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+  }, [stage]);
+
+  return (
+    <article className='relative h-full overflow-hidden flex flex-col'>
+      <div ref={scrollRef} className='flex-1 min-h-0 overflow-y-auto'>
+        <div className='max-w-2xl mx-auto px-8 pt-12 pb-6 space-y-4 text-[13.5px] leading-relaxed'>
+          {stage === 'ready' && (
+            <>
+              <ThreadTurn speaker='me'>{handle}</ThreadTurn>
+              <ThreadTurn speaker='jovie'>
+                <span className='text-primary-token'>jov.ie/{handle}</span> is
+                yours. We&apos;ll wire everything up from here.
+              </ThreadTurn>
+              <div className='pt-2 flex justify-end'>
+                <button
+                  type='button'
+                  onClick={onComplete}
+                  className='inline-flex items-center gap-1.5 h-8 px-4 rounded-full text-[12px] font-medium bg-white text-black hover:brightness-110 active:scale-[0.99] shadow-[0_4px_14px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.45)] transition-all duration-150 ease-out'
+                >
+                  Open Jovie
+                  <ArrowRight className='h-3 w-3' strokeWidth={2.5} />
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Welcome greeting — sits above the composer when we're in the
+          welcome state. Fades out when the user submits. */}
+      <div
+        className='shrink-0 px-8 text-center'
+        style={{
+          opacity: stage === 'welcome' ? 1 : 0,
+          maxHeight: stage === 'welcome' ? 100 : 0,
+          overflow: 'hidden',
+          transition: `opacity 300ms ${EASE_CINEMATIC}, max-height 600ms ${EASE_CINEMATIC}`,
+        }}
+      >
+        <JovieMark className='h-7 w-7 mx-auto mb-2 text-primary-token opacity-30' />
+        <h1
+          className='text-[14px] font-medium text-tertiary-token'
+          style={{ letterSpacing: '-0.01em' }}
+        >
+          Welcome to Jovie
+        </h1>
+      </div>
+
+      {/* Composer — always mounted, never remounts on stage change so
+          it doesn't lose focus mid-animation. Bottom padding animates
+          from a tall spacer (centered) to chat-pinned. */}
+      <footer className='shrink-0 px-8 pt-2'>
+        <div className='max-w-2xl mx-auto'>
+          <ChatInput
+            value={draft}
+            onChange={setDraft}
+            onSubmit={submit}
+            isLoading={false}
+            isSubmitting={false}
+            placeholder={
+              stage === 'welcome' ? 'Pick a handle…' : 'Talk to Jovie…'
+            }
+          />
+        </div>
+      </footer>
+
+      {/* Animated bottom spacer — tall when welcome (pushes composer
+          up to roughly center), thin when ready (composer locks to
+          the bottom of the canvas). */}
+      <div
+        className='shrink-0'
+        style={{
+          maxHeight: stage === 'welcome' ? 'calc(45vh - 80px)' : '16px',
+          transition: `max-height 600ms ${EASE_CINEMATIC}`,
+        }}
+      />
+    </article>
   );
 }
 
@@ -7002,14 +7901,49 @@ function ReleasesView({
 }) {
   const [focusedIndex, setFocusedIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const rowRefs = useRef<Array<HTMLLIElement | null>>([]);
+
+  // While the user is keyboard-navigating, suppress mouse-hover styles
+  // so only the focused row reads as active. Mouse movement re-enables
+  // hover; arrow-key activity restarts the suppression timer.
+  const [keyboardNav, setKeyboardNav] = useState(false);
+  const kbTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function bumpKeyboardNav() {
+    setKeyboardNav(true);
+    if (kbTimer.current) clearTimeout(kbTimer.current);
+    kbTimer.current = setTimeout(() => setKeyboardNav(false), 1500);
+  }
+  useEffect(() => {
+    function onMouse() {
+      if (kbTimer.current) clearTimeout(kbTimer.current);
+      setKeyboardNav(false);
+    }
+    window.addEventListener('mousemove', onMouse);
+    return () => {
+      window.removeEventListener('mousemove', onMouse);
+      if (kbTimer.current) clearTimeout(kbTimer.current);
+    };
+  }, []);
+
+  // Scroll the focused row into view when it changes — keeps off-screen
+  // rows visible as the user navigates with arrows / j-k.
+  useEffect(() => {
+    rowRefs.current[focusedIndex]?.scrollIntoView({ block: 'nearest' });
+  }, [focusedIndex]);
 
   function handleKey(e: React.KeyboardEvent) {
     if (e.key === 'ArrowDown' || e.key === 'k') {
       e.preventDefault();
-      setFocusedIndex(i => Math.min(releases.length - 1, i + 1));
+      bumpKeyboardNav();
+      const next = Math.min(releases.length - 1, focusedIndex + 1);
+      setFocusedIndex(next);
+      if (drawerOpen) onSelect(releases[next]?.id ?? null);
     } else if (e.key === 'ArrowUp' || e.key === 'j') {
       e.preventDefault();
-      setFocusedIndex(i => Math.max(0, i - 1));
+      bumpKeyboardNav();
+      const prev = Math.max(0, focusedIndex - 1);
+      setFocusedIndex(prev);
+      if (drawerOpen) onSelect(releases[prev]?.id ?? null);
     } else if (e.key === 'Enter') {
       e.preventDefault();
       onSelect(releases[focusedIndex]?.id ?? null);
@@ -7046,6 +7980,10 @@ function ReleasesView({
               isSelected={r.id === selectedId}
               isFocused={i === focusedIndex}
               drawerOpen={drawerOpen}
+              kbActive={keyboardNav}
+              rowRef={el => {
+                rowRefs.current[i] = el;
+              }}
               onSelect={() => {
                 setFocusedIndex(i);
                 onSelect(r.id);
@@ -7078,6 +8016,8 @@ function ReleaseRow({
   isSelected,
   isFocused,
   drawerOpen,
+  kbActive,
+  rowRef,
   onSelect,
   onPlay,
   onSeek: _onSeek,
@@ -7093,6 +8033,8 @@ function ReleaseRow({
   isSelected: boolean;
   isFocused: boolean;
   drawerOpen: boolean;
+  kbActive?: boolean;
+  rowRef?: (el: HTMLLIElement | null) => void;
   onSelect: () => void;
   onPlay: () => void;
   onSeek: (sec: number) => void;
@@ -7109,6 +8051,7 @@ function ReleaseRow({
     // biome-ignore lint/a11y/noNoninteractiveElementInteractions: list row activates via parent section's keyboard handler; mouse-click is a convenience
     // biome-ignore lint/a11y/useKeyWithClickEvents: see above — parent section handles ↑/↓/Enter/Space/Esc
     <li
+      ref={rowRef}
       onClick={onSelect}
       onContextMenu={e => onContextMenu?.(e, release)}
       data-selected={isSelected || undefined}
@@ -7119,7 +8062,9 @@ function ReleaseRow({
         drawerOpen
           ? 'grid-cols-[24px_40px_minmax(0,1fr)_auto]'
           : 'grid-cols-[24px_40px_minmax(0,1fr)_auto_auto]',
-        !isSelected && !isFocused && 'hover:bg-surface-1/50',
+        // Hover bg suppressed during keyboard nav so the row your mouse
+        // happens to be over doesn't compete with the focused row.
+        !isSelected && !isFocused && !kbActive && 'hover:bg-surface-1/50',
         SELECTED_ROW_CLASSES
       )}
     >
@@ -7232,8 +8177,80 @@ function ReleaseRow({
           {formatStreams(release.weeklyStreams)}
         </span>
         <DspAvatarStack release={release} />
+        <ReleaseRowMoreMenu release={release} />
       </div>
     </li>
+  );
+}
+
+// Per-row release "More" menu — entity-bearing submenus for "Move to release…"
+// (releases) and "Change artist…" (artists) demonstrate EntityItem hover
+// across the release surface.
+function ReleaseRowMoreMenu({ release }: { release: Release }) {
+  const onEntityActivate = useEntityActivate();
+  return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: wrapper exists to stop click/keydown bubbling so the menu trigger doesn't also trigger row-select; not itself an interactive element.
+    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: same — handlers are pass-through-blockers, not new interactions.
+    <div
+      onClick={e => e.stopPropagation()}
+      onKeyDown={e => e.stopPropagation()}
+    >
+      <ShellDropdown
+        align='end'
+        side='bottom'
+        sideOffset={6}
+        width={208}
+        onEntityActivate={onEntityActivate}
+        trigger={
+          <button
+            type='button'
+            aria-label='Release actions'
+            className={cn(
+              'h-5 w-5 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-opacity duration-150 ease-out',
+              'opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 data-[state=open]:text-primary-token'
+            )}
+          >
+            <MoreHorizontal className='h-3 w-3' strokeWidth={2.25} />
+          </button>
+        }
+      >
+        <ShellDropdown.Item icon={Play} label='Play' shortcut='Space' />
+        <ShellDropdown.Item icon={ExternalLink} label='Open release' />
+        <ShellDropdown.Separator />
+        <ShellDropdown.Sub>
+          <ShellDropdown.SubTrigger icon={Disc3} label='Move to release…' />
+          <ShellDropdown.SubContent
+            searchable
+            searchPlaceholder='Filter releases…'
+          >
+            {ENTITY_RELEASES.filter(r => r.id !== release.id).map(r => (
+              <ShellDropdown.EntityItem key={r.id} entity={r} />
+            ))}
+          </ShellDropdown.SubContent>
+        </ShellDropdown.Sub>
+        <ShellDropdown.Sub>
+          <ShellDropdown.SubTrigger icon={Users} label='Change artist…' />
+          <ShellDropdown.SubContent
+            searchable
+            searchPlaceholder='Filter artists…'
+          >
+            {ENTITY_ARTISTS.map(a => (
+              <ShellDropdown.EntityItem key={a.id} entity={a} />
+            ))}
+          </ShellDropdown.SubContent>
+        </ShellDropdown.Sub>
+        <ShellDropdown.Separator />
+        <ShellDropdown.Item
+          icon={LinkIcon}
+          label='Copy smart link'
+          shortcut='⌘L'
+        />
+        <ShellDropdown.Item icon={Copy} label='Duplicate' shortcut='⌘D' />
+        <ShellDropdown.Item icon={Pin} label='Pin to top' />
+        <ShellDropdown.Separator />
+        <ShellDropdown.Item icon={Archive} label='Archive' tone='danger' />
+      </ShellDropdown>
+    </div>
   );
 }
 
@@ -7848,6 +8865,7 @@ function ReleaseDrawer({
   onSeek,
   onOpenTasks,
   onMenu,
+  onEntityActivate,
 }: {
   release: Release | null;
   onClose: () => void;
@@ -7855,6 +8873,7 @@ function ReleaseDrawer({
   onSeek?: (id: string, sec: number) => void;
   onOpenTasks?: () => void;
   onMenu?: (e: React.MouseEvent<HTMLButtonElement>, r: Release) => void;
+  onEntityActivate?: (entity: EntityPopoverData) => void;
 }) {
   // Remember the last release so the slide-out can keep rendering content
   // while it's animating away (release becomes null right at close).
@@ -7874,11 +8893,11 @@ function ReleaseDrawer({
   return (
     <aside
       aria-hidden={!open}
-      // Linear-style: page background between the two elevated cards.
-      // Page bg is page (darkest), each card is contentSurface elevated
-      // with a thin border and a soft shadow. The gap between cards is
-      // intentional and reads as a structural separation.
-      className='hidden md:flex flex-col h-full overflow-hidden border-l border-(--linear-app-shell-border) bg-(--linear-bg-page)'
+      // Each card floats on the page bg as its own elevated peer — no
+      // dividing line between drawer and canvas, no shared border. The gap
+      // around the cards is the visual separator. Page bg is darkest;
+      // cards are contentSurface with a soft drop shadow.
+      className='hidden md:flex flex-col h-full overflow-hidden bg-(--linear-bg-page)'
       style={{
         opacity: open ? 1 : 0,
         transform: open ? 'translateX(0)' : 'translateX(16px)',
@@ -7887,23 +8906,25 @@ function ReleaseDrawer({
         minWidth: 0,
       }}
     >
-      {/* Hero card — elevated. Holds artwork, title, status, drop-in-N
-          callout, and the smart-link share row. Always visible. */}
-      <div className='shrink-0 px-3 pt-3'>
-        <div className='rounded-xl border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) shadow-[0_8px_24px_rgba(0,0,0,0.18)] overflow-hidden'>
+      {/* Hero card — elevated, no internal hairline separators. Holds
+          artwork, title, status, drop-in-N callout, smart link. */}
+      <div className='shrink-0 px-2 pt-2'>
+        <div className='rounded-xl bg-(--linear-app-content-surface) shadow-[0_12px_32px_-12px_rgba(0,0,0,0.45),0_2px_6px_rgba(0,0,0,0.22)] overflow-hidden'>
           <DrawerHero
             release={r}
             onClose={onClose}
             onPlay={onPlay}
             onMenu={onMenu ? e => onMenu(e, r) : undefined}
+            onEntityActivate={onEntityActivate}
           />
         </div>
       </div>
 
-      {/* Detail card — elevated. Pill tabs at the top, tab content
-          below. Each tab owns its own scroll. */}
-      <div className='flex-1 min-h-0 px-3 pt-3 pb-3 flex flex-col'>
-        <div className='flex-1 min-h-0 rounded-xl border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) shadow-[0_8px_24px_rgba(0,0,0,0.18)] flex flex-col overflow-hidden'>
+      {/* Detail card — elevated peer. Pill tabs + tab content. Same
+          shadow stack as the hero so the two read as siblings of the
+          page floor, not of each other. */}
+      <div className='flex-1 min-h-0 px-2 pt-2 pb-2 flex flex-col'>
+        <div className='flex-1 min-h-0 rounded-xl bg-(--linear-app-content-surface) shadow-[0_12px_32px_-12px_rgba(0,0,0,0.45),0_2px_6px_rgba(0,0,0,0.22)] flex flex-col overflow-hidden'>
           <DrawerTabStrip tabs={tabs} active={tab} onChange={setTab} />
           <div className='flex-1 min-h-0 overflow-y-auto'>
             {tab === 'overview' && <DrawerOverviewTab release={r} />}
@@ -7969,16 +8990,18 @@ function DrawerHero({
   release,
   onPlay,
   onMenu,
+  onEntityActivate,
 }: {
   release: Release;
   onClose: () => void;
   onPlay?: (id: string) => void;
   onMenu?: (e: React.MouseEvent<HTMLButtonElement>) => void;
+  onEntityActivate?: (entity: EntityPopoverData) => void;
 }) {
   const status = statusFromRelease(release);
   const dropMeta = relativeDropMeta(release.releaseDate);
   return (
-    <section className='group/drawer relative px-4 pt-4 pb-3'>
+    <section className='group/drawer relative px-3 pt-3 pb-3'>
       {/* Status pill + single overflow menu in the top-right corner.
           The menu owns Close (Esc still works); merging the X into the
           menu cuts chrome and matches Linear's drawer pattern. */}
@@ -8027,7 +9050,21 @@ function DrawerHero({
             {release.title}
           </h2>
           <p className='mt-1 text-[12px] text-tertiary-token truncate'>
-            {release.artist} · {release.album}
+            <EntityHoverLink
+              entity={lookupArtistEntity(release.artist)}
+              onActivate={onEntityActivate}
+              className='decoration-dotted'
+            >
+              {release.artist}
+            </EntityHoverLink>
+            <span className='mx-1 text-quaternary-token'>·</span>
+            <EntityHoverLink
+              entity={lookupReleaseEntityByAlbum(release.album, release.id)}
+              onActivate={onEntityActivate}
+              className='decoration-dotted'
+            >
+              {release.album}
+            </EntityHoverLink>
           </p>
           <div className='mt-2 flex items-center gap-1.5 flex-wrap'>
             <TypeBadge type={release.type} />
@@ -8099,17 +9136,41 @@ function DropDateChip({
   );
 }
 
+// Cross-fade between the rest icon and a confirmation glyph. Uses
+// monochrome white at high opacity for the confirm state — the cyan
+// accent was too attention-seeking for an action you fire constantly.
+function CopyToggleIcon({ copied }: { copied: boolean }) {
+  return (
+    <span className='relative inline-flex h-3 w-3 items-center justify-center'>
+      <Copy
+        className={cn(
+          'absolute inset-0 h-3 w-3 transition-[opacity,transform] duration-200 ease-out',
+          copied ? 'opacity-0 scale-75' : 'opacity-100 scale-100'
+        )}
+        strokeWidth={2.25}
+      />
+      <Check
+        className={cn(
+          'absolute inset-0 h-3 w-3 text-primary-token transition-[opacity,transform] duration-200 ease-out',
+          copied ? 'opacity-100 scale-100' : 'opacity-0 scale-75'
+        )}
+        strokeWidth={2.5}
+      />
+    </span>
+  );
+}
+
 function DrawerSmartLinkRow({ release }: { release: Release }) {
   const [copied, setCopied] = useState(false);
   const url = `jov.ie/${release.artist.toLowerCase().replace(/\s+/g, '-')}/${release.id}`;
   return (
-    <div className='flex items-center gap-1.5 h-7 pl-3 pr-1 rounded-full border border-(--linear-app-shell-border) bg-(--surface-0)/60 text-[11.5px] text-tertiary-token'>
+    <div className='flex items-center gap-1.5 h-7 pl-3 pr-1 rounded-full border border-(--linear-app-shell-border) bg-(--surface-0)/60 text-[11.5px] text-tertiary-token transition-colors duration-150 ease-out'>
       <LinkIcon
         className='h-3 w-3 text-quaternary-token shrink-0'
         strokeWidth={2.25}
       />
       <span className='flex-1 truncate font-mono tabular-nums'>{url}</span>
-      <Tooltip label={copied ? 'Copied!' : 'Copy smart link'}>
+      <Tooltip label={copied ? 'Copied' : 'Copy smart link'}>
         <button
           type='button'
           onClick={() => {
@@ -8118,15 +9179,9 @@ function DrawerSmartLinkRow({ release }: { release: Release }) {
           }}
           className='inline-flex items-center justify-center h-5 w-5 rounded text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-150 ease-out'
           aria-label='Copy smart link'
+          aria-live='polite'
         >
-          {copied ? (
-            <CheckCircle2
-              className='h-3 w-3 text-cyan-300'
-              strokeWidth={2.25}
-            />
-          ) : (
-            <Copy className='h-3 w-3' strokeWidth={2.25} />
-          )}
+          <CopyToggleIcon copied={copied} />
         </button>
       </Tooltip>
       <Tooltip label='Open smart link'>
@@ -8146,7 +9201,7 @@ function DrawerSmartLinkRow({ release }: { release: Release }) {
 // No carded sections; sub-areas are separated by a hairline only.
 function DrawerOverviewTab({ release }: { release: Release }) {
   return (
-    <div className='px-4 py-4 space-y-5'>
+    <div className='px-3 py-3 space-y-4'>
       <div className='grid grid-cols-3 gap-3'>
         <Stat label='BPM' value={String(release.bpm)} tabular />
         <Stat label='Key' value={release.key} mono />
@@ -8364,7 +9419,7 @@ function Sparkline({
   onHover?: (idx: number | null) => void;
 }) {
   const w = 340;
-  const h = 40;
+  const h = 120;
   const max = Math.max(...points, 1);
   const min = Math.min(...points, 0);
   const range = max - min || 1;
@@ -8406,7 +9461,7 @@ function Sparkline({
     <svg
       ref={svgRef}
       viewBox={`0 0 ${w} ${h}`}
-      className='mt-2 w-full h-10 block cursor-crosshair'
+      className='mt-3 w-full h-32 block cursor-crosshair'
       preserveAspectRatio='none'
       role='img'
       aria-label='Smart link clicks over time'
@@ -8816,8 +9871,8 @@ function DrawerActivityTab({
   onOpenTasks?: () => void;
 }) {
   return (
-    <div className='px-4 py-4'>
-      <div className='flex flex-col -mx-2'>
+    <div className='px-3 py-3'>
+      <div className='flex flex-col -mx-1'>
         {release.tasksOpen > 0 && (
           <ActivityHoverRow
             icon={Activity}
@@ -9001,10 +10056,7 @@ function DrawerDetailRow({
               setEditing(false);
             }
           }}
-          className={cn(
-            valueClass,
-            'bg-transparent outline-none border-b border-cyan-300/60 focus-visible:outline-none'
-          )}
+          className={cn(valueClass, 'bg-transparent outline-none')}
         />
       </div>
     );
@@ -9161,6 +10213,12 @@ function TracksView({
     };
   }, []);
 
+  // Scroll the focused row into view as the user navigates.
+  const rowRefs = useRef<Array<HTMLLIElement | null>>([]);
+  useEffect(() => {
+    rowRefs.current[focusedIndex]?.scrollIntoView({ block: 'nearest' });
+  }, [focusedIndex]);
+
   function handleKey(e: React.KeyboardEvent) {
     if (e.key === 'ArrowDown' || e.key === 'k') {
       e.preventDefault();
@@ -9250,6 +10308,10 @@ function TracksView({
               isCurrentTrack={t.id === playingId}
               isFocused={i === focusedIndex}
               muteHighlight={keyboardNav && i !== focusedIndex}
+              kbActive={keyboardNav}
+              rowRef={el => {
+                rowRefs.current[i] = el;
+              }}
               currentTimeSec={t.id === playingId ? currentTimeSec : 0}
               keyMode={keyMode}
               onSelect={() => setFocusedIndex(i)}
@@ -9284,6 +10346,8 @@ function TrackRow({
   isCurrentTrack,
   isFocused,
   muteHighlight,
+  kbActive,
+  rowRef,
   currentTimeSec,
   keyMode,
   onSelect,
@@ -9299,6 +10363,8 @@ function TrackRow({
   isCurrentTrack: boolean;
   isFocused: boolean;
   muteHighlight: boolean;
+  kbActive?: boolean;
+  rowRef?: (el: HTMLLIElement | null) => void;
   currentTimeSec: number;
   keyMode: 'normal' | 'camelot';
   onSelect: () => void;
@@ -9316,12 +10382,13 @@ function TrackRow({
     // biome-ignore lint/a11y/noNoninteractiveElementInteractions: parent section delegates ↑/↓/Space; row click is a focus convenience
     // biome-ignore lint/a11y/useKeyWithClickEvents: same
     <li
+      ref={rowRef}
       onClick={onSelect}
       onContextMenu={e => onContextMenu?.(e, track)}
       data-focused={isFocused || undefined}
       className={cn(
         'group/row relative flex items-center gap-3 h-[44px] pl-2 pr-3 rounded-md cursor-pointer transition-colors duration-150 ease-out focus:outline-none',
-        !isFocused && 'hover:bg-surface-1/40',
+        !isFocused && !kbActive && 'hover:bg-surface-1/40',
         SELECTED_ROW_CLASSES
       )}
     >
@@ -9740,14 +10807,43 @@ function TasksView({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [focusedIndex, setFocusedIndex] = useState(0);
   const selected = selectedId ? tasks.find(t => t.id === selectedId) : null;
+  const rowRefs = useRef<Array<HTMLLIElement | null>>([]);
+
+  // Suppress mouse-hover styles while keyboard nav is active (resumes
+  // on next mousemove). Same pattern as Releases/Tracks lists.
+  const [keyboardNav, setKeyboardNav] = useState(false);
+  const kbTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function bumpKeyboardNav() {
+    setKeyboardNav(true);
+    if (kbTimer.current) clearTimeout(kbTimer.current);
+    kbTimer.current = setTimeout(() => setKeyboardNav(false), 1500);
+  }
+  useEffect(() => {
+    function onMouse() {
+      if (kbTimer.current) clearTimeout(kbTimer.current);
+      setKeyboardNav(false);
+    }
+    window.addEventListener('mousemove', onMouse);
+    return () => {
+      window.removeEventListener('mousemove', onMouse);
+      if (kbTimer.current) clearTimeout(kbTimer.current);
+    };
+  }, []);
+
+  // Scroll focused row into view as the user navigates.
+  useEffect(() => {
+    rowRefs.current[focusedIndex]?.scrollIntoView({ block: 'nearest' });
+  }, [focusedIndex]);
 
   function handleKey(e: React.KeyboardEvent) {
     if (e.key === 'ArrowDown' || e.key === 'k') {
       e.preventDefault();
+      bumpKeyboardNav();
       const next = Math.min(tasks.length - 1, focusedIndex + 1);
       setFocusedIndex(next);
     } else if (e.key === 'ArrowUp' || e.key === 'j') {
       e.preventDefault();
+      bumpKeyboardNav();
       const next = Math.max(0, focusedIndex - 1);
       setFocusedIndex(next);
     } else if (e.key === 'Enter') {
@@ -9792,6 +10888,10 @@ function TasksView({
               task={t}
               isSelected={t.id === selectedId}
               isFocused={i === focusedIndex}
+              kbActive={keyboardNav}
+              rowRef={el => {
+                rowRefs.current[i] = el;
+              }}
               onSelect={() => {
                 setFocusedIndex(i);
                 setSelectedId(t.id);
@@ -9845,6 +10945,8 @@ function TaskListItem({
   task,
   isSelected,
   isFocused,
+  kbActive,
+  rowRef,
   onSelect,
   onContextMenu,
   onOpenRelease,
@@ -9853,6 +10955,8 @@ function TaskListItem({
   task: Task;
   isSelected: boolean;
   isFocused: boolean;
+  kbActive?: boolean;
+  rowRef?: (el: HTMLLIElement | null) => void;
   onSelect: () => void;
   onContextMenu?: (e: React.MouseEvent, task: Task) => void;
   onOpenRelease?: (id: string) => void;
@@ -9863,12 +10967,13 @@ function TaskListItem({
     // biome-ignore lint/a11y/noNoninteractiveElementInteractions: parent section delegates ↑/↓
     // biome-ignore lint/a11y/useKeyWithClickEvents: same
     <li
+      ref={rowRef}
       onClick={onSelect}
       onContextMenu={e => onContextMenu?.(e, task)}
       data-focused={isFocused || isSelected || undefined}
       className={cn(
         'group/row relative flex items-start gap-3 py-2 pl-2 pr-3 rounded-md cursor-pointer transition-colors duration-150 ease-out',
-        !isFocused && !isSelected && 'hover:bg-surface-1/40',
+        !isFocused && !isSelected && !kbActive && 'hover:bg-surface-1/40',
         SELECTED_ROW_CLASSES
       )}
     >
@@ -9911,10 +11016,88 @@ function TaskListItem({
             )}
             <PriorityGlyph priority={task.priority} />
             <AssigneeChip assignee={task.assignee} />
+            <TaskRowMoreMenu task={task} />
           </span>
         </div>
       </div>
     </li>
+  );
+}
+
+// Per-row "More" menu — click trigger opens a ShellDropdown with Assign /
+// Link / Status. The "Assign to…" submenu is the canonical EntityItem demo:
+// hover Tim White -> teammate entity popover anchors to the row.
+function TaskRowMoreMenu({ task }: { task: Task }) {
+  void task;
+  const onEntityActivate = useEntityActivate();
+  return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: wrapper exists to stop click/keydown bubbling so the menu trigger doesn't also trigger row-select; not itself an interactive element.
+    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: same — handlers are pass-through-blockers, not new interactions.
+    <div
+      onClick={e => e.stopPropagation()}
+      onKeyDown={e => e.stopPropagation()}
+    >
+      <ShellDropdown
+        align='end'
+        side='bottom'
+        sideOffset={6}
+        width={208}
+        onEntityActivate={onEntityActivate}
+        trigger={
+          <button
+            type='button'
+            aria-label='Task actions'
+            className={cn(
+              'h-5 w-5 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-opacity duration-150 ease-out',
+              'opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 data-[state=open]:text-primary-token'
+            )}
+          >
+            <MoreHorizontal className='h-3 w-3' strokeWidth={2.25} />
+          </button>
+        }
+      >
+        <ShellDropdown.Sub>
+          <ShellDropdown.SubTrigger icon={UserPlus} label='Assign to…' />
+          <ShellDropdown.SubContent
+            searchable
+            searchPlaceholder='Filter people…'
+          >
+            {ENTITY_TEAMMATES.map(t => (
+              <ShellDropdown.EntityItem key={t.id} entity={t} />
+            ))}
+          </ShellDropdown.SubContent>
+        </ShellDropdown.Sub>
+        <ShellDropdown.Sub>
+          <ShellDropdown.SubTrigger icon={LinkIcon} label='Link to…' />
+          <ShellDropdown.SubContent
+            searchable
+            searchPlaceholder='Filter entities…'
+          >
+            <ShellDropdown.Label>Releases</ShellDropdown.Label>
+            {ENTITY_RELEASES.slice(0, 4).map(r => (
+              <ShellDropdown.EntityItem key={r.id} entity={r} />
+            ))}
+            <ShellDropdown.Separator />
+            <ShellDropdown.Label>Events</ShellDropdown.Label>
+            {ENTITY_EVENTS.map(ev => (
+              <ShellDropdown.EntityItem key={ev.id} entity={ev} />
+            ))}
+            <ShellDropdown.Separator />
+            <ShellDropdown.Label>Tracks</ShellDropdown.Label>
+            {ENTITY_TRACKS_DEMO.map(t => (
+              <ShellDropdown.EntityItem key={t.id} entity={t} />
+            ))}
+          </ShellDropdown.SubContent>
+        </ShellDropdown.Sub>
+        <ShellDropdown.Separator />
+        <ShellDropdown.Item icon={Pin} label='Pin task' />
+        <ShellDropdown.Item icon={Copy} label='Copy task ID' shortcut='⌘⇧.' />
+        <ShellDropdown.Item icon={LinkIcon} label='Copy link' shortcut='⌘L' />
+        <ShellDropdown.Separator />
+        <ShellDropdown.Item icon={Archive} label='Archive' />
+        <ShellDropdown.Item icon={Trash2} label='Delete' tone='danger' />
+      </ShellDropdown>
+    </div>
   );
 }
 
@@ -10353,9 +11536,12 @@ function LyricsView({
           showEditToggle={false}
         />
         <div className='flex-1 min-h-0 grid place-items-center px-6'>
-          <div className='max-w-md w-full rounded-xl border border-(--linear-app-shell-border) bg-surface-0/60 px-6 py-8 text-center'>
-            <div className='mx-auto h-10 w-10 rounded-full bg-cyan-500/10 border border-cyan-500/30 grid place-items-center mb-4'>
-              <Mic2 className='h-4 w-4 text-cyan-300' strokeWidth={2.25} />
+          <div className='max-w-md w-full px-6 py-8 text-center'>
+            <div className='mx-auto h-10 w-10 grid place-items-center mb-4'>
+              <Mic2
+                className='h-4 w-4 text-quaternary-token'
+                strokeWidth={2.25}
+              />
             </div>
             <h2 className='text-[18px] font-display tracking-[-0.012em] text-primary-token'>
               No lyrics yet
@@ -10367,7 +11553,7 @@ function LyricsView({
             <div className='mt-5 flex items-center justify-center gap-2'>
               <button
                 type='button'
-                className='inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-white text-black text-[12.5px] font-caption tracking-[-0.005em] hover:brightness-110 active:scale-[0.99] transition-all duration-150 ease-out'
+                className='inline-flex items-center gap-1.5 h-8 px-4 rounded-full bg-white text-black text-[12.5px] font-caption tracking-[-0.005em] hover:brightness-110 active:scale-[0.99] transition-all duration-150 ease-out'
               >
                 <Sparkles className='h-3.5 w-3.5' strokeWidth={2.25} />
                 Transcribe with Jovie
@@ -10378,7 +11564,7 @@ function LyricsView({
                   setEmpty(false);
                   setEditing(true);
                 }}
-                className='inline-flex items-center h-8 px-3 rounded-md border border-(--linear-app-shell-border) bg-surface-1/60 text-[12.5px] font-caption text-secondary-token tracking-[-0.005em] transition-colors duration-150 ease-out hover:text-primary-token hover:bg-surface-1'
+                className='inline-flex items-center h-8 px-4 rounded-full border border-(--linear-app-shell-border) bg-surface-1/60 text-[12.5px] font-caption text-secondary-token tracking-[-0.005em] transition-colors duration-150 ease-out hover:text-primary-token hover:bg-surface-1'
               >
                 Paste lyrics
               </button>
@@ -10456,17 +11642,22 @@ function LyricsHeader({
   onClear?: () => void;
   showEditToggle?: boolean;
 }) {
+  const onEntityActivate = useEntityActivate();
   return (
-    <div className='shrink-0 sticky top-0 z-10 bg-(--linear-app-content-surface) px-4 pt-3 pb-2 flex items-baseline gap-3 select-none'>
-      <span className='text-[10px] uppercase tracking-[0.12em] font-medium text-quaternary-token/85'>
-        Lyrics
-      </span>
-      <span className='text-[12.5px] font-caption text-primary-token tracking-[-0.012em] truncate'>
-        {track.title}
-      </span>
-      <span className='text-[11px] text-tertiary-token truncate'>
+    <div className='shrink-0 sticky top-0 z-10 bg-(--linear-app-content-surface) px-4 pt-3 pb-2 flex items-center gap-1.5 select-none text-[12.5px] font-caption tracking-[-0.012em]'>
+      <EntityHoverLink
+        entity={lookupArtistEntity(track.artist)}
+        onActivate={onEntityActivate}
+        className='decoration-dotted text-tertiary-token hover:text-primary-token transition-colors duration-150 ease-out truncate'
+      >
         {track.artist}
-      </span>
+      </EntityHoverLink>
+      <ChevronRight
+        aria-hidden='true'
+        className='h-3 w-3 text-quaternary-token/60 shrink-0'
+        strokeWidth={2.25}
+      />
+      <span className='text-primary-token truncate'>{track.title}</span>
     </div>
   );
 }

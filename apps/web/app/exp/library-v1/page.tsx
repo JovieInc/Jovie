@@ -16,7 +16,6 @@
 import {
   ArrowDownToLine,
   ArrowUpDown,
-  CheckCircle2,
   ChevronDown,
   ChevronRight,
   Circle,
@@ -39,6 +38,7 @@ import {
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ShellDropdown } from '@/components/shell/ShellDropdown';
 import { cn } from '@/lib/utils';
 
 const EASE_CINEMATIC = 'cubic-bezier(0.32, 0.72, 0, 1)';
@@ -912,8 +912,10 @@ export function LeftRail({
 
   return (
     <aside className='h-full overflow-y-auto border-r border-(--linear-app-shell-border) bg-(--surface-0) flex flex-col'>
-      <div className='shrink-0 px-3 pt-3 pb-2'>
-        <div className='flex items-center gap-2 px-1 py-1'>
+      {/* Brand row height matches the canvas header (h-12) so the
+          sidebar wordmark and the canvas Library h1 share one row. */}
+      <div className='shrink-0 px-3 h-12 flex items-center'>
+        <div className='flex items-center gap-2 px-1'>
           <JovieMark className='h-4 w-4 text-primary-token' />
           <span
             className='text-[13.5px] font-semibold text-primary-token'
@@ -1155,7 +1157,6 @@ export function SortDropdown({
   sort: SortKey;
   onSort: (s: SortKey) => void;
 }) {
-  const [open, setOpen] = useState(false);
   const labels: Record<SortKey, string> = {
     addedAt: 'Date added',
     capturedAt: 'Date captured',
@@ -1163,51 +1164,32 @@ export function SortDropdown({
     popularity: 'Popularity',
   };
   return (
-    <div className='relative'>
-      <button
-        type='button'
-        onClick={() => setOpen(v => !v)}
-        className='inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[12px] text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-150 ease-out'
+    <ShellDropdown
+      align='end'
+      side='bottom'
+      sideOffset={6}
+      width={184}
+      trigger={
+        <button
+          type='button'
+          className='inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[12px] text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-150 ease-out data-[state=open]:text-primary-token'
+        >
+          <ArrowUpDown className='h-3 w-3' strokeWidth={2.25} />
+          <span>{labels[sort]}</span>
+          <ChevronDown className='h-3 w-3' strokeWidth={2.25} />
+        </button>
+      }
+    >
+      <ShellDropdown.Label>Sort by</ShellDropdown.Label>
+      <ShellDropdown.RadioGroup
+        value={sort}
+        onValueChange={v => onSort(v as SortKey)}
       >
-        <ArrowUpDown className='h-3 w-3' strokeWidth={2.25} />
-        <span>{labels[sort]}</span>
-        <ChevronDown className='h-3 w-3' strokeWidth={2.25} />
-      </button>
-      {open && (
-        <>
-          <button
-            type='button'
-            aria-label='Close menu'
-            tabIndex={-1}
-            className='fixed inset-0 z-40 cursor-default'
-            onClick={() => setOpen(false)}
-          />
-          <div className='absolute right-0 top-9 z-50 min-w-[180px] rounded-md border border-(--linear-app-shell-border) bg-(--linear-app-content-surface)/95 backdrop-blur-xl shadow-[0_12px_40px_rgba(0,0,0,0.32)] p-1'>
-            {(Object.keys(labels) as SortKey[]).map(k => (
-              <button
-                key={k}
-                type='button'
-                onClick={() => {
-                  onSort(k);
-                  setOpen(false);
-                }}
-                className={cn(
-                  'w-full text-left h-7 px-2 rounded text-[12px] flex items-center gap-2',
-                  k === sort
-                    ? 'text-primary-token bg-surface-1/60'
-                    : 'text-secondary-token hover:bg-surface-1/40 hover:text-primary-token'
-                )}
-              >
-                <span className='flex-1'>{labels[k]}</span>
-                {k === sort && (
-                  <CheckCircle2 className='h-3 w-3 text-cyan-300' />
-                )}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
+        {(Object.keys(labels) as SortKey[]).map(k => (
+          <ShellDropdown.RadioItem key={k} value={k} label={labels[k]} />
+        ))}
+      </ShellDropdown.RadioGroup>
+    </ShellDropdown>
   );
 }
 
@@ -2014,7 +1996,7 @@ export function EmptyState({ onClear }: { onClear: () => void }) {
   return (
     <div className='h-full grid place-items-center px-6'>
       <div className='max-w-md text-center'>
-        <div className='inline-grid place-items-center h-12 w-12 rounded-full bg-(--surface-1) border border-(--linear-app-shell-border) mx-auto'>
+        <div className='inline-grid place-items-center h-12 w-12 mx-auto'>
           <Circle
             className='h-5 w-5 text-quaternary-token'
             strokeWidth={2.25}
