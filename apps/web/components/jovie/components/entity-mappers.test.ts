@@ -1,22 +1,13 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import {
-  formatLongDate,
-  shortMonthDay,
-} from '@/components/jovie/components/entity-mappers';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { formatLongDate, shortMonthDay } from './entity-mappers';
 
 describe('shortMonthDay', () => {
-  const originalTz = process.env.TZ;
-
   beforeAll(() => {
-    process.env.TZ = 'America/Los_Angeles';
+    vi.stubEnv('TZ', 'America/Los_Angeles');
   });
 
   afterAll(() => {
-    if (originalTz === undefined) {
-      delete process.env.TZ;
-    } else {
-      process.env.TZ = originalTz;
-    }
+    vi.unstubAllEnvs();
   });
 
   it('formats a date-only ISO string correctly regardless of local TZ', () => {
@@ -38,18 +29,12 @@ describe('shortMonthDay', () => {
 });
 
 describe('formatLongDate', () => {
-  const originalTz = process.env.TZ;
-
   beforeAll(() => {
-    process.env.TZ = 'America/Los_Angeles';
+    vi.stubEnv('TZ', 'America/Los_Angeles');
   });
 
   afterAll(() => {
-    if (originalTz === undefined) {
-      delete process.env.TZ;
-    } else {
-      process.env.TZ = originalTz;
-    }
+    vi.unstubAllEnvs();
   });
 
   it('formats a date-only ISO string correctly regardless of local TZ', () => {
