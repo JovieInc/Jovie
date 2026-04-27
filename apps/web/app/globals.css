@@ -2331,3 +2331,80 @@ body {
   --color-accent: var(--color-accent);
   --color-accent-subtle: var(--color-accent-subtle);
 }
+
+/* ============================================
+   SHELL VISUAL ATOMS
+   ============================================
+   Animations used by the shell entity affordances:
+   - .anim-calm-breath  — ambient "Jovie is working" pulse used on
+     thread row indicators and the AgentPulse halo. Slower (3.6s) and
+     narrower opacity range (0.9 → 0.55) than animate-pulse so it stays
+     subliminal in peripheral vision.
+   - @keyframes pb-eq-* — three-bar equaliser used by PlayingBars.
+   - @keyframes dict-bar — DictationWaveform per-bar scaleY animation.
+   ============================================ */
+
+@keyframes calm-breath {
+  0%,
+  100% {
+    opacity: 0.9;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@layer components {
+  .anim-calm-breath {
+    animation: calm-breath 3.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .anim-calm-breath {
+      animation: none;
+    }
+  }
+}
+
+@keyframes pb-eq-a {
+  0%,
+  100% {
+    height: 50%;
+  }
+  50% {
+    height: 80%;
+  }
+}
+@keyframes pb-eq-b {
+  0%,
+  100% {
+    height: 70%;
+  }
+  50% {
+    height: 42%;
+  }
+}
+@keyframes pb-eq-c {
+  0%,
+  100% {
+    height: 55%;
+  }
+  50% {
+    height: 78%;
+  }
+}
+
+@keyframes dict-bar {
+  0%,
+  100% {
+    transform: scaleY(0.18);
+  }
+  25% {
+    transform: scaleY(0.62);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+  75% {
+    transform: scaleY(0.42);
+  }
+}
