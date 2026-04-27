@@ -73,6 +73,7 @@ vi.mock('@/lib/queries/useArtistSearchQuery', () => ({
     results: [],
     state: 'idle',
     search: vi.fn(),
+    clear: vi.fn(),
   }),
 }));
 
