@@ -1,7 +1,14 @@
 'use client';
 
 import { Search } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { cn } from '@/lib/utils';
 import {
   FIELD_LABEL,
@@ -27,7 +34,7 @@ export interface PillSearchProps {
   readonly titleOptions: readonly string[];
   /** Distinct album names. */
   readonly albumOptions: readonly string[];
-  /** Called when the user hits Esc on an empty input. */
+  /** Called when the user hits Esc on an empty input or focus leaves the surface. */
   readonly onClose: () => void;
 }
 
@@ -93,11 +100,22 @@ function fieldValueOptions(
       return STATUS_VALUES;
     case 'has':
       return HAS_VALUES;
-    case 'bpm':
-    case 'key':
-      return [];
   }
 }
+
+function newPillId(): string {
+  if (
+    typeof crypto !== 'undefined' &&
+    typeof crypto.randomUUID === 'function'
+  ) {
+    return crypto.randomUUID();
+  }
+  // Browser without randomUUID (rare, but pre-Safari 15.4 etc.) — fall back
+  // to a counter-based id that's still unique within the same module load.
+  newPillIdFallbackCounter += 1;
+  return `pill-${Date.now()}-${newPillIdFallbackCounter}`;
+}
+let newPillIdFallbackCounter = 0;
 
 /**
  * PillSearch — Linear/Notion-style pill-based filter input.
@@ -114,7 +132,9 @@ function fieldValueOptions(
  *
  * Keyboard inside the dropdown: ↑/↓ moves the highlight, Enter commits the
  * highlighted suggestion. Mouse hover updates the highlight; mouse-down
- * commits without losing focus on the input.
+ * commits without losing focus on the input. ARIA combobox-1.2 wired:
+ * input has role=combobox + aria-expanded/controls/activedescendant; the
+ * dropdown is role=listbox; each suggestion is role=option + aria-selected.
  */
 export function PillSearch({
   active,
@@ -129,6 +149,9 @@ export function PillSearch({
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const listboxId = useId();
+  const optionIdPrefix = useId();
 
   useEffect(() => {
     if (!active) return undefined;
@@ -231,7 +254,7 @@ export function PillSearch({
           : [
               ...pills,
               {
-                id: `${sug.field}-${sug.value}-${Date.now()}`,
+                id: newPillId(),
                 field: sug.field,
                 op: 'is',
                 values: [sug.value],
@@ -270,7 +293,7 @@ export function PillSearch({
     );
   }
 
-  function onInputKey(e: React.KeyboardEvent<HTMLInputElement>) {
+  function onInputKey(e: ReactKeyboardEvent<HTMLInputElement>) {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       setHighlight(h => Math.min(suggestions.length - 1, h + 1));
@@ -294,8 +317,13 @@ export function PillSearch({
     }
   }
 
+  const dropdownVisible = active && dropdownOpen && suggestions.length > 0;
+  const activeOptionId = dropdownVisible
+    ? `${optionIdPrefix}-${highlight}`
+    : undefined;
+
   return (
-    <div className='relative w-full'>
+    <div ref={wrapperRef} className='relative w-full'>
       <div className='flex items-center gap-1.5 flex-wrap min-h-7 pr-1'>
         <Search
           className='h-3.5 w-3.5 text-quaternary-token shrink-0'
@@ -316,13 +344,23 @@ export function PillSearch({
           value={text}
           onChange={e => changeText(e.target.value)}
           onKeyDown={onInputKey}
+          onBlur={e => {
+            const next = e.relatedTarget as Node | null;
+            if (next && wrapperRef.current?.contains(next)) return;
+            setDropdownOpen(false);
+          }}
+          role='combobox'
           aria-label='Filter tracks'
+          aria-expanded={dropdownVisible}
+          aria-controls={listboxId}
+          aria-autocomplete='list'
+          aria-activedescendant={activeOptionId}
           placeholder={
             pills.length === 0
               ? 'Type to filter — / for fields'
               : 'and… (/ for fields)'
           }
-          className='flex-1 min-w-[120px] bg-transparent text-[13px] text-primary-token placeholder:text-tertiary-token outline-none'
+          className='flex-1 min-w-[120px] bg-transparent text-[13px] text-primary-token placeholder:text-tertiary-token outline-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cyan-500/30 rounded-sm'
         />
         <button
           type='button'
@@ -334,50 +372,61 @@ export function PillSearch({
         </button>
       </div>
 
-      {active && dropdownOpen && suggestions.length > 0 && (
-        <div className='absolute left-0 right-0 top-9 z-40 rounded-lg border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) shadow-[0_18px_60px_rgba(0,0,0,0.32)] py-1 max-h-[320px] overflow-y-auto'>
-          {suggestions.map((sug, i) => (
-            <button
-              key={`${sug.kind}-${sug.kind === 'value' ? sug.field + sug.value : sug.field}`}
-              type='button'
-              onMouseEnter={() => setHighlight(i)}
-              onMouseDown={e => {
-                e.preventDefault();
-                commitSuggestion(sug);
-              }}
-              className={cn(
-                'w-full flex items-center gap-2 px-2.5 py-1.5 text-left text-[12.5px] transition-colors duration-100 ease-out',
-                i === highlight
-                  ? 'bg-cyan-500/10 text-primary-token'
-                  : 'text-secondary-token hover:bg-surface-1/60'
-              )}
-            >
-              <span
+      {dropdownVisible && (
+        <div
+          id={listboxId}
+          role='listbox'
+          tabIndex={-1}
+          className='absolute left-0 right-0 top-9 z-40 rounded-lg border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) shadow-[0_18px_60px_rgba(0,0,0,0.32)] py-1 max-h-[320px] overflow-y-auto'
+        >
+          {suggestions.map((sug, i) => {
+            const optionId = `${optionIdPrefix}-${i}`;
+            return (
+              <button
+                key={`${sug.kind}-${sug.kind === 'value' ? sug.field + sug.value : sug.field}`}
+                id={optionId}
+                role='option'
+                aria-selected={i === highlight}
+                type='button'
+                onMouseEnter={() => setHighlight(i)}
+                onMouseDown={e => {
+                  e.preventDefault();
+                  commitSuggestion(sug);
+                }}
                 className={cn(
-                  'inline-flex items-center h-[18px] px-1.5 rounded text-[10px] font-caption uppercase tracking-[0.06em]',
+                  'w-full flex items-center gap-2 px-2.5 py-1.5 text-left text-[12.5px] transition-colors duration-100 ease-out',
                   i === highlight
-                    ? 'bg-cyan-500/15 text-cyan-300'
-                    : 'bg-surface-1 text-tertiary-token'
+                    ? 'bg-cyan-500/10 text-primary-token'
+                    : 'text-secondary-token hover:bg-surface-1/60'
                 )}
               >
-                {FIELD_LABEL[sug.field]}
-              </span>
-              <span className='flex-1 truncate'>
-                {sug.kind === 'value' ? (
-                  sug.value
-                ) : (
-                  <span className='text-tertiary-token italic'>
-                    Filter by {FIELD_LABEL[sug.field].toLowerCase()}…
-                  </span>
+                <span
+                  className={cn(
+                    'inline-flex items-center h-[18px] px-1.5 rounded text-[10px] font-caption uppercase tracking-[0.06em]',
+                    i === highlight
+                      ? 'bg-cyan-500/15 text-cyan-300'
+                      : 'bg-surface-1 text-tertiary-token'
+                  )}
+                >
+                  {FIELD_LABEL[sug.field]}
+                </span>
+                <span className='flex-1 truncate'>
+                  {sug.kind === 'value' ? (
+                    sug.value
+                  ) : (
+                    <span className='text-tertiary-token italic'>
+                      Filter by {FIELD_LABEL[sug.field].toLowerCase()}…
+                    </span>
+                  )}
+                </span>
+                {i === highlight && (
+                  <kbd className='text-[10px] text-quaternary-token shrink-0'>
+                    ↵
+                  </kbd>
                 )}
-              </span>
-              {i === highlight && (
-                <kbd className='text-[10px] text-quaternary-token shrink-0'>
-                  ↵
-                </kbd>
-              )}
-            </button>
-          ))}
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

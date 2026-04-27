@@ -7,16 +7,12 @@
 
 /**
  * Filter axis. Each pill targets exactly one field with an `is` / `is not`
- * operator and one or more OR-combined values.
+ * operator and one or more OR-combined values. Only fields the component
+ * can actually complete are exposed here — `bpm` and `key` were dropped
+ * from the original shell-v1 set because they don't have value options
+ * and would land users in a dead-end state if surfaced via the slash menu.
  */
-export type FilterField =
-  | 'artist'
-  | 'title'
-  | 'album'
-  | 'status'
-  | 'bpm'
-  | 'key'
-  | 'has';
+export type FilterField = 'artist' | 'title' | 'album' | 'status' | 'has';
 
 export interface FilterPill {
   /** Stable identifier used for React keys and pill mutation callbacks. */
@@ -32,8 +28,6 @@ export const FIELD_LABEL: Record<FilterField, string> = {
   title: 'Title',
   album: 'Album',
   status: 'Status',
-  bpm: 'BPM',
-  key: 'Key',
   has: 'Has',
 };
 
