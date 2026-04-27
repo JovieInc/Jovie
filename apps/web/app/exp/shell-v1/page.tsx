@@ -265,7 +265,7 @@ const TRACK = {
   version: 'Album Version',
   bpm: 96,
   key: 'A min',
-  artwork: 'https://i.scdn.co/image/ab67616d0000b273e3a35b5fc62c33ec0c2eed62',
+  artwork: 'https://picsum.photos/seed/lost-in-the-light/400/400',
   currentTime: 78,
   duration: 213,
 };
@@ -431,7 +431,7 @@ const RELEASES: Release[] = [
     album: 'Bahamas Is Afie',
     type: 'Single',
     releaseDate: '2026-04-12',
-    artwork: 'https://i.scdn.co/image/ab67616d0000b273e3a35b5fc62c33ec0c2eed62',
+    artwork: 'https://picsum.photos/seed/lost-in-the-light/400/400',
     bpm: 96,
     key: 'A min',
     version: 'Album Version',
@@ -458,7 +458,7 @@ const RELEASES: Release[] = [
     album: 'Sad Hunk',
     type: 'EP',
     releaseDate: '2026-03-28',
-    artwork: 'https://i.scdn.co/image/ab67616d0000b273ed7d40b86b3a39b3c1d8cea5',
+    artwork: 'https://picsum.photos/seed/stronger-than-that/400/400',
     bpm: 112,
     key: 'D maj',
     version: 'Studio',
@@ -489,7 +489,7 @@ const RELEASES: Release[] = [
     album: 'Earthtones',
     type: 'Single',
     releaseDate: '2026-05-09',
-    artwork: 'https://i.scdn.co/image/ab67616d0000b27348fc7ad174126b1a51ea5b06',
+    artwork: 'https://picsum.photos/seed/all-the-time/400/400',
     bpm: 88,
     key: 'F maj',
     version: 'Single Edit',
@@ -520,7 +520,7 @@ const RELEASES: Release[] = [
     album: 'Earthtones',
     type: 'Album',
     releaseDate: '2026-02-04',
-    artwork: 'https://i.scdn.co/image/ab67616d0000b273e3a35b5fc62c33ec0c2eed62',
+    artwork: 'https://picsum.photos/seed/sunshine-on-my-back/400/400',
     bpm: 124,
     key: 'C maj',
     version: 'Album',
@@ -547,7 +547,7 @@ const RELEASES: Release[] = [
     album: 'Earthtones',
     type: 'Single',
     releaseDate: '2026-01-19',
-    artwork: 'https://i.scdn.co/image/ab67616d0000b273ed7d40b86b3a39b3c1d8cea5',
+    artwork: 'https://picsum.photos/seed/opening-act/400/400',
     bpm: 102,
     key: 'G maj',
     version: 'Studio',
@@ -573,7 +573,7 @@ const RELEASES: Release[] = [
     album: 'Bahamas Is Afie',
     type: 'Single',
     releaseDate: '2025-12-02',
-    artwork: 'https://i.scdn.co/image/ab67616d0000b27348fc7ad174126b1a51ea5b06',
+    artwork: 'https://picsum.photos/seed/bittersweet/400/400',
     bpm: 76,
     key: 'B min',
     version: 'Acoustic',
@@ -706,9 +706,12 @@ const KEY_PAIRS: Array<[string, string]> = [
   ['A maj', '11B'],
 ];
 const ARTWORK_POOL = [
-  'https://i.scdn.co/image/ab67616d0000b273e3a35b5fc62c33ec0c2eed62',
-  'https://i.scdn.co/image/ab67616d0000b273ed7d40b86b3a39b3c1d8cea5',
-  'https://i.scdn.co/image/ab67616d0000b27348fc7ad174126b1a51ea5b06',
+  'https://picsum.photos/seed/jovie-art-a/400/400',
+  'https://picsum.photos/seed/jovie-art-b/400/400',
+  'https://picsum.photos/seed/jovie-art-c/400/400',
+  'https://picsum.photos/seed/jovie-art-d/400/400',
+  'https://picsum.photos/seed/jovie-art-e/400/400',
+  'https://picsum.photos/seed/jovie-art-f/400/400',
 ];
 
 function pick<T>(arr: readonly T[], i: number): T {
@@ -812,7 +815,7 @@ const TRACKS: Track[] = [
     status: 'live',
     hasVideo: true,
     hasCanvas: true,
-    artwork: 'https://i.scdn.co/image/ab67616d0000b273e3a35b5fc62c33ec0c2eed62',
+    artwork: 'https://picsum.photos/seed/lost-in-the-light/400/400',
     bpmTone: 'mid',
     waveformSeed: 1,
     cues: [
@@ -839,7 +842,7 @@ const TRACKS: Track[] = [
     status: 'live',
     hasVideo: false,
     hasCanvas: true,
-    artwork: 'https://i.scdn.co/image/ab67616d0000b273e3a35b5fc62c33ec0c2eed62',
+    artwork: 'https://picsum.photos/seed/lost-in-the-light/400/400',
     bpmTone: 'high',
     waveformSeed: 2,
     cues: [
@@ -866,7 +869,7 @@ const TRACKS: Track[] = [
     status: 'live',
     hasVideo: false,
     hasCanvas: true,
-    artwork: 'https://i.scdn.co/image/ab67616d0000b273ed7d40b86b3a39b3c1d8cea5',
+    artwork: 'https://picsum.photos/seed/stronger-than-that/400/400',
     bpmTone: 'mid',
     waveformSeed: 7,
     cues: [
@@ -892,7 +895,7 @@ const TRACKS: Track[] = [
     status: 'scheduled',
     hasVideo: false,
     hasCanvas: false,
-    artwork: 'https://i.scdn.co/image/ab67616d0000b27348fc7ad174126b1a51ea5b06',
+    artwork: 'https://picsum.photos/seed/all-the-time/400/400',
     bpmTone: 'low',
     waveformSeed: 11,
     cues: [
@@ -918,7 +921,7 @@ const TRACKS: Track[] = [
     status: 'live',
     hasVideo: true,
     hasCanvas: true,
-    artwork: 'https://i.scdn.co/image/ab67616d0000b273e3a35b5fc62c33ec0c2eed62',
+    artwork: 'https://picsum.photos/seed/lost-in-the-light/400/400',
     bpmTone: 'high',
     waveformSeed: 17,
     cues: [
@@ -945,7 +948,7 @@ const TRACKS: Track[] = [
     status: 'live',
     hasVideo: false,
     hasCanvas: false,
-    artwork: 'https://i.scdn.co/image/ab67616d0000b273ed7d40b86b3a39b3c1d8cea5',
+    artwork: 'https://picsum.photos/seed/stronger-than-that/400/400',
     bpmTone: 'mid',
     waveformSeed: 23,
     cues: [
@@ -971,7 +974,7 @@ const TRACKS: Track[] = [
     status: 'live',
     hasVideo: false,
     hasCanvas: true,
-    artwork: 'https://i.scdn.co/image/ab67616d0000b27348fc7ad174126b1a51ea5b06',
+    artwork: 'https://picsum.photos/seed/all-the-time/400/400',
     bpmTone: 'low',
     waveformSeed: 31,
     cues: [
@@ -996,7 +999,7 @@ const TRACKS: Track[] = [
     status: 'draft',
     hasVideo: false,
     hasCanvas: false,
-    artwork: 'https://i.scdn.co/image/ab67616d0000b273e3a35b5fc62c33ec0c2eed62',
+    artwork: 'https://picsum.photos/seed/lost-in-the-light/400/400',
     bpmTone: 'mid',
     waveformSeed: 37,
     cues: [
@@ -1755,6 +1758,31 @@ export default function ShellV1Experiment() {
         .shell-v1 textarea[aria-label='Chat message input']:focus-visible {
           outline: none;
         }
+        /* Flatter, more subdued chat composer — drop the layered drop
+           shadow + soften the border so the pill recedes into the canvas
+           instead of floating above it. Inline styles on the surface
+           need the !important to win. */
+        .shell-v1 [data-testid='chat-composer-surface'] {
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.04),
+            0 1px 0 rgba(0, 0, 0, 0.18) !important;
+          border-color: rgba(255, 255, 255, 0.07) !important;
+        }
+        /* Subtle grain on the canvas content surface. Single static SVG
+           noise overlay rasterized once and GPU-composited per frame —
+           no animation, no per-frame work. ~5% mix-overlay so it reads
+           as paper roughness without coloring the design. Performance
+           cost ≈ 0 after first paint. */
+        .shell-v1 .canvas-grain {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          mix-blend-mode: overlay;
+          opacity: 0.06;
+          background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.6 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+          background-repeat: repeat;
+          background-size: 200px 200px;
+        }
         /* Calm-breath: replaces animate-pulse + animate-ping for ambient
            "Jovie is working" affordances. Slower (3.6s vs 2s), narrower
            opacity range (0.85↔0.55 vs 0.5↔1), and the halo never fully
@@ -1889,7 +1917,11 @@ export default function ShellV1Experiment() {
       </div>
 
       <div className='flex min-h-0 min-w-0 flex-1 flex-col lg:gap-2'>
-        <main className='flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-0 lg:rounded-[var(--linear-app-shell-radius)] lg:border lg:border-(--linear-app-shell-border) lg:bg-(--linear-app-content-surface) lg:shadow-[var(--linear-app-shell-shadow)]'>
+        <main className='relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-0 lg:rounded-[var(--linear-app-shell-radius)] lg:border lg:border-(--linear-app-shell-border) lg:bg-(--linear-app-content-surface) lg:shadow-[var(--linear-app-shell-shadow)]'>
+          {/* Static grain overlay — adds a subtle paper roughness so the
+              dark surface doesn't read as flat slab. Pointer-events off,
+              no animation; GPU-composited at zero per-frame cost. */}
+          <div className='canvas-grain' aria-hidden='true' />
           <div style={cinematicStyle}>
             <Header
               sidebarMode={sidebarMode}
@@ -6251,28 +6283,32 @@ function ThreadTurn({
   subtle?: boolean;
   children: React.ReactNode;
 }) {
-  // Notion-style: flat text, no card, no border. Speaker is implied by
-  // the small label above the body. The "me" turn gets a subtle left
-  // indent so it reads as a reply without needing chrome.
+  // iMessage pattern — no labels, no avatars. Speaker reads from
+  // alignment + bubble: Jovie is flat-text full-width on the left,
+  // "you" is a right-aligned bubble. Subtle running indicators (e.g.
+  // Generating…) stay flat regardless of speaker.
+  if (speaker === 'me') {
+    return (
+      <div className='flex justify-end'>
+        <div
+          className={cn(
+            'max-w-[75%] rounded-2xl rounded-br-md px-3.5 py-2 text-[13.5px] leading-relaxed bg-(--surface-1)/80 text-primary-token',
+            subtle && 'text-tertiary-token'
+          )}
+        >
+          {children}
+        </div>
+      </div>
+    );
+  }
   return (
     <div
       className={cn(
-        'group/turn',
-        speaker === 'me' &&
-          'pl-4 border-l border-(--linear-app-shell-border)/40'
+        'text-[13.5px] leading-relaxed',
+        subtle ? 'text-tertiary-token' : 'text-secondary-token'
       )}
     >
-      <p className='text-[10.5px] uppercase tracking-[0.08em] font-semibold text-quaternary-token mb-1.5 select-none'>
-        {speaker === 'jovie' ? 'Jovie' : 'You'}
-      </p>
-      <div
-        className={cn(
-          'text-[13.5px] leading-relaxed',
-          subtle ? 'text-tertiary-token' : 'text-secondary-token'
-        )}
-      >
-        {children}
-      </div>
+      {children}
     </div>
   );
 }
