@@ -21,10 +21,11 @@ const SELECTED_ROW_CLASSES = [
 /**
  * LyricRow — single line in the lyrics list.
  *
- * Display mode (when `editing` is false): one big centered line, full
- * brightness when active, soft fade for siblings. Click the line to seek.
- * Edit mode: grip + time-stamp + inline editable text. Stamp button writes
- * the current playhead to the line's startSec.
+ * Display mode: a full-width seek button styled like a centered lyric. Big
+ * for the active line, soft-faded otherwise.
+ *
+ * Edit mode: grip + time-stamp button + inline editable text. The input's
+ * focus event drives the row's `onFocus`; no row-level click handler.
  *
  * Pure presentational — caller owns line state, focus, edit mode.
  */
@@ -50,30 +51,32 @@ export function LyricRow({
   readonly onChangeText: (text: string) => void;
 }) {
   if (!editing) {
+    // Display mode — the entire row is a seek button. Native <button>
+    // gives proper keyboard + Enter/Space + focus ring for free.
     return (
-      // biome-ignore lint/a11y/noNoninteractiveElementInteractions: list row delegates seek; keyboard handled by parent section
-      // biome-ignore lint/a11y/useKeyWithClickEvents: parent section owns J/K/Enter; row click is a redundant pointer affordance
-      <li
-        onClick={onSeek}
-        data-focused={isFocused && !isActive ? '' : undefined}
-        className={cn(
-          'group/lyric text-center cursor-pointer select-none',
-          'transition-[color,opacity,transform] duration-[250ms] ease-out',
-          isActive
-            ? 'text-primary-token text-[28px] leading-[1.25] font-display tracking-[-0.018em] opacity-100'
-            : 'text-tertiary-token text-[20px] leading-[1.35] font-display tracking-[-0.012em] opacity-60 hover:opacity-90 hover:text-secondary-token'
-        )}
-      >
-        {line.text}
+      <li>
+        <button
+          type='button'
+          onClick={onSeek}
+          data-focused={isFocused && !isActive ? '' : undefined}
+          className={cn(
+            'group/lyric block w-full text-center cursor-pointer select-none bg-transparent border-0 p-0',
+            'transition-[color,opacity,transform] duration-[250ms] ease-out',
+            isActive
+              ? 'text-primary-token text-[28px] leading-[1.25] font-display tracking-[-0.018em] opacity-100'
+              : 'text-tertiary-token text-[20px] leading-[1.35] font-display tracking-[-0.012em] opacity-60 hover:opacity-90 hover:text-secondary-token'
+          )}
+        >
+          {line.text}
+        </button>
       </li>
     );
   }
 
+  // Edit mode — input owns focus; row has no click handler. Clicking the
+  // input naturally focuses it, which calls onFocus.
   return (
-    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: row click focuses the row; nested controls handle the real interactions
-    // biome-ignore lint/a11y/useKeyWithClickEvents: parent section owns J/K/Enter
     <li
-      onClick={onFocus}
       data-focused={isFocused && !isActive ? '' : undefined}
       data-selected={isActive ? '' : undefined}
       className={cn(
@@ -91,10 +94,7 @@ export function LyricRow({
       </span>
       <button
         type='button'
-        onClick={e => {
-          e.stopPropagation();
-          onStamp();
-        }}
+        onClick={onStamp}
         className={cn(
           'shrink-0 h-6 px-1.5 rounded text-[10.5px] tabular-nums font-caption transition-colors duration-150 ease-out',
           isActive
