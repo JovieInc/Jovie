@@ -58,7 +58,7 @@ interface CmdKPaletteProps {
   readonly onAdditionalSelect?: (id: string) => void;
 }
 
-function useCmdkData(profileId: string, query: string) {
+function useCmdkData(profileId: string, query: string, open: boolean) {
   const commands = useMemo<readonly Command[]>(
     () => commandsForSurface('cmdk'),
     []
@@ -72,7 +72,7 @@ function useCmdkData(profileId: string, query: string) {
     [commands]
   );
 
-  const { data: releaseData } = useReleasesQuery(profileId);
+  const { data: releaseData } = useReleasesQuery(profileId, { enabled: open });
   const releaseEntities = useMemo<EntityRef[]>(
     () =>
       (releaseData ?? [])
@@ -87,8 +87,9 @@ function useCmdkData(profileId: string, query: string) {
   const artistSearch = useArtistSearchQuery({ limit: 8, minQueryLength: 1 });
   const artistSearchSearch = artistSearch.search;
   useEffect(() => {
+    if (!open) return;
     artistSearchSearch(query);
-  }, [query, artistSearchSearch]);
+  }, [query, artistSearchSearch, open]);
   const artistEntities = useMemo<EntityRef[]>(
     () => artistSearch.results.map(artistResultToEntityRef),
     [artistSearch.results]
@@ -126,7 +127,7 @@ export function CmdKPalette({
     }
   }, [open]);
 
-  const registrySections = useCmdkData(profileId, query);
+  const registrySections = useCmdkData(profileId, query, open);
   const filteredAdditional = useMemo(
     () => filterAdditionalSections(query, additionalSectionsAfter),
     [query, additionalSectionsAfter]
