@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import type { EntityRef, EntityRefMeta } from '@/lib/commands/entities';
 import { cn } from '@/lib/utils';
+import { formatLongDate } from './entity-mappers';
 
 /**
  * Right-column preview pane for the chat composer's entity picker.
@@ -39,17 +40,6 @@ function compactNumber(value: number | undefined): string | null {
   if (value >= 10_000) return `${Math.round(value / 1000)}k`;
   if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
   return value.toString();
-}
-
-function formatLongDate(iso: string | undefined): string | null {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
 }
 
 function eyebrowFor(entity: EntityRef): string {

@@ -23,12 +23,36 @@ export interface ReleaseLikeRow {
   readonly totalDurationMs?: number | null;
 }
 
+function normalizeIso(iso: string): string {
+  // Date-only strings (YYYY-MM-DD) are parsed as UTC midnight by the spec,
+  // but older engines parsed them as local midnight. Appending T00:00:00Z
+  // makes the intent unambiguous across all runtimes.
+  return /^\d{4}-\d{2}-\d{2}$/.test(iso) ? `${iso}T00:00:00Z` : iso;
+}
+
 /** Format an ISO date as a short "Mon DD" label (e.g. "Mar 14"). */
 export function shortMonthDay(iso?: string): string | undefined {
   if (!iso) return undefined;
-  const date = new Date(iso);
+  const date = new Date(normalizeIso(iso));
   if (Number.isNaN(date.getTime())) return undefined;
-  return date.toLocaleString('en-US', { month: 'short', day: 'numeric' });
+  return date.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
+/** Format an ISO date as a long "Mon DD, YYYY" label (e.g. "Mar 14, 2026"). */
+export function formatLongDate(iso: string | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(normalizeIso(iso));
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
 }
 
 /** Capitalize a release type token (album/single/ep) into a display label. */
