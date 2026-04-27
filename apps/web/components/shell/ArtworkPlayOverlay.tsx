@@ -10,6 +10,9 @@ import { cn } from '@/lib/utils';
  * by default; the parent toggles `visible` based on context (e.g. when
  * the audio bar is collapsed and the artwork becomes the primary
  * playback affordance).
+ *
+ * When hidden, the overlay is opacity-0 AND pointer-events-none so the
+ * artwork click area below isn't silently shadowed by an invisible button.
  */
 export function ArtworkPlayOverlay({
   isPlaying,
@@ -28,17 +31,13 @@ export function ArtworkPlayOverlay({
       onClick={onPlay}
       className={cn(
         'absolute inset-0 grid place-items-center bg-black/50 text-white transition-opacity duration-150 ease-out hover:opacity-100',
-        visible ? 'opacity-100' : 'opacity-0',
+        visible ? 'opacity-100' : 'opacity-0 pointer-events-none',
         className
       )}
       aria-label={isPlaying ? 'Pause' : 'Play'}
       tabIndex={visible ? 0 : -1}
     >
-      {isPlaying ? (
-        <Pause className='h-3.5 w-3.5' />
-      ) : (
-        <Play className='h-3.5 w-3.5' />
-      )}
+      {isPlaying ? <Pause className='h-4 w-4' /> : <Play className='h-4 w-4' />}
     </button>
   );
 }

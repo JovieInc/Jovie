@@ -3,7 +3,7 @@
 import { Pause, Play } from 'lucide-react';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
-import type { NowPlayingTrack } from './SidebarNowPlaying';
+import type { NowPlayingTrack } from './now-playing.types';
 
 /**
  * SidebarBottomNowPlaying — compact now-playing row mounted at the

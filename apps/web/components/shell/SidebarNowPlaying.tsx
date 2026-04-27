@@ -4,16 +4,9 @@ import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { ArtworkPlayOverlay } from './ArtworkPlayOverlay';
 
-/**
- * Now-playing track shape — matches `useTrackAudioPlayer().playbackState`'s
- * field names so consumers can pass that object directly. All fields
- * nullable since the audio element emits null/empty before metadata loads.
- */
-export interface NowPlayingTrack {
-  readonly trackTitle: string | null | undefined;
-  readonly artistName: string | null | undefined;
-  readonly artworkUrl: string | null | undefined;
-}
+export type { NowPlayingTrack } from './now-playing.types';
+
+import type { NowPlayingTrack } from './now-playing.types';
 
 /**
  * SidebarNowPlaying — floating now-playing card pinned to the canvas
