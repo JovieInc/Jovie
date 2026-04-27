@@ -165,6 +165,7 @@ type TrackInfo = {
   bpm: number;
   key: string;
   version: string;
+  durationSec: number;
 };
 
 // Live-editable palette. The page wrapper writes these as CSS custom
@@ -1204,6 +1205,7 @@ function trackFromRelease(r: Release): TrackInfo {
     bpm: r.bpm,
     key: r.key,
     version: r.version,
+    durationSec: r.durationSec,
   };
 }
 
@@ -1256,6 +1258,9 @@ export default function ShellV1Experiment() {
     'bloom'
   );
   const [view, setView] = useState<CanvasView>('demo');
+  // Install / upgrade banner — togglable from the dev picker so the
+  // styled state is reviewable. Off by default.
+  const [installBannerOpen, setInstallBannerOpen] = useState(false);
   // Subview is the page-scoped filter shown in the canvas subheader. Each
   // canvas view defines its own subview list. Reset to the canonical
   // default for the new view: releases → 'releases', tracks/tasks → 'all'.
@@ -1753,10 +1758,14 @@ export default function ShellV1Experiment() {
           outline: 1.5px solid rgba(103, 232, 249, 0.45);
           outline-offset: 1px;
         }
-        /* Chat composer's textarea sits inside a pill that owns its own
-           focus-within state — we don't want a second cyan ring on the
-           inner textarea. */
+        /* Surgical opt-outs: text fields whose container already owns its
+           own focus-within affordance (pill border, surface tint), where a
+           second ring on the bare input reads as a stack of competing
+           borders. Keep the global focus-visible everywhere else for a11y. */
         .shell-v1 textarea[aria-label='Chat message input']:focus-visible {
+          outline: none;
+        }
+        .shell-v1 input[aria-label='Filter tracks']:focus-visible {
           outline: none;
         }
         /* Flatter, more subdued chat composer — drop the layered drop
@@ -1923,6 +1932,10 @@ export default function ShellV1Experiment() {
               dark surface doesn't read as flat slab. Pointer-events off,
               no animation; GPU-composited at zero per-frame cost. */}
           <div className='canvas-grain' aria-hidden='true' />
+          <InstallBanner
+            open={installBannerOpen}
+            onDismiss={() => setInstallBannerOpen(false)}
+          />
           <div style={cinematicStyle}>
             <Header
               sidebarMode={sidebarMode}
@@ -2239,6 +2252,8 @@ export default function ShellV1Experiment() {
         onPalette={setPalette}
         sidebarTight={sidebarTight}
         onSidebarTight={() => setSidebarTight(v => !v)}
+        installBannerOpen={installBannerOpen}
+        onInstallBanner={() => setInstallBannerOpen(v => !v)}
       />
 
       <JovieOverlay listening={jovieListening} />
@@ -2746,10 +2761,13 @@ function Sidebar({
           Visible only when the audio bar is COLLAPSED. The detailed
           floating card (with chips) takes over when the bar opens, and
           slides under the main content area's left edge. Two states,
-          two surfaces, never co-resident. */}
+          two surfaces, never co-resident.
+          Bottom inset is `pb-5` so the card's bottom edge lines up with
+          the main canvas's bottom (the canvas sits above the peek-bottom
+          strip + lg:gap-2, leaving ~20px between it and the page edge). */}
       <div
         aria-hidden={nowPlaying?.barCollapsed === false}
-        className='shrink-0 px-2 pb-2 pt-1 overflow-hidden'
+        className='shrink-0 px-2 pb-5 pt-1 overflow-hidden'
         style={{
           maxHeight: nowPlaying && nowPlaying.barCollapsed ? 64 : 0,
           opacity: nowPlaying && nowPlaying.barCollapsed ? 1 : 0,
@@ -3137,18 +3155,18 @@ function SidebarNowPlaying({
   }
 
   return (
-    <div className='px-1 space-y-2'>
-      <div className='flex items-center gap-2.5'>
-        <div className='relative h-9 w-9 rounded overflow-hidden shrink-0'>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={track.artwork}
-            alt=''
-            className='h-full w-full object-cover'
-          />
-          {overlay}
-        </div>
-        <div className='min-w-0 flex-1'>
+    <div className='px-1 flex items-center gap-2.5'>
+      <div className='relative h-12 w-12 rounded overflow-hidden shrink-0'>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={track.artwork}
+          alt=''
+          className='h-full w-full object-cover'
+        />
+        {overlay}
+      </div>
+      <div className='min-w-0 flex-1 flex flex-col gap-1.5'>
+        <div className='min-w-0'>
           <div className='truncate text-[12px] font-caption text-primary-token leading-[1.2]'>
             {track.title}
           </div>
@@ -3156,12 +3174,18 @@ function SidebarNowPlaying({
             {track.artist}
           </div>
         </div>
+        <div className='flex items-center gap-1 flex-wrap'>
+          <Chip>{track.bpm} BPM</Chip>
+          <Chip>{track.key}</Chip>
+          <Chip>{track.version}</Chip>
+        </div>
       </div>
-      <div className='flex items-center gap-1 flex-wrap'>
-        <Chip>{track.bpm} BPM</Chip>
-        <Chip>{track.key}</Chip>
-        <Chip>{track.version}</Chip>
-      </div>
+      {/* Timestamp vertically centers against the full card height —
+          matches the karaoke / right-edge button alignment in the
+          audio bar. */}
+      <span className='text-[10.5px] tabular-nums text-tertiary-token shrink-0 self-center'>
+        {formatTime(track.durationSec)}
+      </span>
     </div>
   );
 }
@@ -3752,6 +3776,19 @@ function DashboardHome() {
 // Apple-esque suggestion card. No caption, no top-right Jovie label —
 // the card IS Jovie. Title leads. Body is short. Primary action and
 // dismiss balance to the right edge so the eye lands on the action.
+// Per-kind eyebrow + accent. Calm, single-hue per type — gives the
+// card hierarchy without leaning on saturated chrome.
+const SUGGESTION_KIND: Record<
+  JovieSuggestion['kind'],
+  { label: string; tone: string }
+> = {
+  booking: { label: 'Booking', tone: 'text-amber-300/85' },
+  dsp: { label: 'Spotify', tone: 'text-emerald-300/85' },
+  release: { label: 'Release', tone: 'text-cyan-300/85' },
+  pitch: { label: 'Pitch', tone: 'text-fuchsia-300/85' },
+  geo: { label: 'Audience', tone: 'text-sky-300/85' },
+};
+
 function SuggestionCard({
   suggestion,
   onDismiss,
@@ -3761,40 +3798,89 @@ function SuggestionCard({
   onDismiss?: () => void;
   onAct?: () => void;
 }) {
+  const meta = SUGGESTION_KIND[suggestion.kind];
   return (
     <article
       key={suggestion.id}
-      className='w-full rounded-2xl border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) px-6 py-5'
+      className='group/sug relative w-full rounded-[18px] overflow-hidden border border-white/[0.08] bg-(--linear-app-content-surface)'
       style={{
-        opacity: 1,
-        transition: `opacity 220ms ${EASE_CINEMATIC}`,
+        // Layered material: subtle inner highlight on the top edge +
+        // soft drop shadow. Reads as a real pane, not a div.
+        boxShadow:
+          'inset 0 1px 0 rgba(255,255,255,0.05), 0 1px 2px rgba(0,0,0,0.32), 0 24px 56px -20px rgba(0,0,0,0.55)',
+        transition: `transform 240ms ${EASE_CINEMATIC}, box-shadow 240ms ${EASE_CINEMATIC}`,
       }}
     >
-      <h2
-        className='text-[19px] font-semibold leading-snug text-primary-token'
-        style={{ letterSpacing: '-0.018em' }}
+      {/* Top hairline — full-width gradient that picks up the kind's
+          accent. Subtle (35% alpha) and only visible because the card
+          edge sits just above it. */}
+      <span
+        aria-hidden='true'
+        className='absolute inset-x-3 top-0 h-px'
+        style={{
+          background: `linear-gradient(90deg, transparent 0%, currentColor 50%, transparent 100%)`,
+        }}
       >
-        {suggestion.title}
-      </h2>
-      <p className='mt-2 text-[13px] leading-relaxed text-secondary-token'>
-        {suggestion.body}
-      </p>
-      <div className='mt-5 flex items-center justify-end gap-1.5'>
-        <button
-          type='button'
-          onClick={onDismiss}
-          className='inline-flex items-center h-8 px-3 rounded-full text-[12.5px] text-tertiary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-150 ease-out'
+        <span className={cn('block h-full w-full opacity-35', meta.tone)} />
+      </span>
+
+      <div className='px-7 py-6'>
+        {/* Eyebrow row — kind label + Jovie attribution. Two short
+            uppercase strings give the card an editorial / "this was
+            actually thought about" tone before the title lands. */}
+        <div className='flex items-center justify-between mb-3'>
+          <span
+            className={cn(
+              'inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.10em]',
+              meta.tone
+            )}
+          >
+            <span
+              aria-hidden='true'
+              className='h-1 w-1 rounded-full bg-current'
+            />
+            {meta.label}
+          </span>
+          <span className='inline-flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.10em] text-quaternary-token/85'>
+            <Sparkles className='h-2.5 w-2.5' strokeWidth={2.25} />
+            Surfaced by Jovie
+          </span>
+        </div>
+
+        <h2
+          className='text-[22px] font-semibold leading-[1.2] text-primary-token'
+          style={{ letterSpacing: '-0.022em' }}
         >
-          Dismiss
-        </button>
-        <button
-          type='button'
-          onClick={onAct}
-          className='inline-flex items-center gap-1.5 h-8 px-4 rounded-full text-[12.5px] font-medium bg-white text-black hover:bg-white/90 transition-colors duration-150 ease-out'
-        >
-          {suggestion.action}
-          <ArrowRight className='h-3 w-3' strokeWidth={2.5} />
-        </button>
+          {suggestion.title}
+        </h2>
+        <p className='mt-2.5 text-[13.5px] leading-[1.55] text-secondary-token'>
+          {suggestion.body}
+        </p>
+
+        {/* Action row + a soft top divider so the buttons read as
+            anchored to the card, not floating in body whitespace. */}
+        <div className='mt-6 pt-4 border-t border-white/[0.05] flex items-center justify-between gap-2'>
+          <span className='text-[11px] text-quaternary-token tabular-nums'>
+            Confidence · 92%
+          </span>
+          <div className='flex items-center gap-1.5'>
+            <button
+              type='button'
+              onClick={onDismiss}
+              className='inline-flex items-center h-8 px-3 rounded-full text-[12.5px] text-tertiary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-150 ease-out'
+            >
+              Dismiss
+            </button>
+            <button
+              type='button'
+              onClick={onAct}
+              className='inline-flex items-center gap-1.5 h-8 px-4 rounded-full text-[12.5px] font-medium bg-white text-black hover:brightness-110 active:scale-[0.99] shadow-[0_4px_14px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.45)] transition-all duration-150 ease-out'
+            >
+              {suggestion.action}
+              <ArrowRight className='h-3 w-3' strokeWidth={2.5} />
+            </button>
+          </div>
+        </div>
       </div>
     </article>
   );
@@ -5122,6 +5208,8 @@ function VariantPicker({
   onPalette,
   sidebarTight,
   onSidebarTight,
+  installBannerOpen,
+  onInstallBanner,
 }: {
   variant: Variant;
   onVariant: (v: Variant) => void;
@@ -5137,6 +5225,8 @@ function VariantPicker({
   onPalette: (p: Palette) => void;
   sidebarTight: boolean;
   onSidebarTight: () => void;
+  installBannerOpen: boolean;
+  onInstallBanner: () => void;
 }) {
   // Picker is dev-only chrome — start collapsed so it doesn't cover the
   // top-right corner of the actual UI being designed.
@@ -5229,6 +5319,12 @@ function VariantPicker({
           onClick={onSidebarTight}
           onLabel='Sidebar tight (library)'
           offLabel='Sidebar roomy (default)'
+        />
+        <PickerToggle
+          on={installBannerOpen}
+          onClick={onInstallBanner}
+          onLabel='Install banner shown'
+          offLabel='Install banner hidden'
         />
       </div>
       <PalettePanel palette={palette} onPalette={onPalette} />
@@ -5367,6 +5463,67 @@ function PickerToggle({
 
 // Push-to-talk Jovie. Hold ⌘J anywhere to dictate. Mock for design pass —
 // wire to the chat input / command palette intent router in production.
+// Install / upgrade banner — calm strip at the top of the canvas.
+// Dark surface, subtle gradient accent, two affordances (primary
+// install + dismiss). Positioned above the header so it never
+// fights the breadcrumb for attention. Slides in/out with the
+// same cinematic ease as other shell transitions.
+function InstallBanner({
+  open,
+  onDismiss,
+}: {
+  open: boolean;
+  onDismiss: () => void;
+}) {
+  return (
+    <div
+      aria-hidden={!open}
+      className='shrink-0 overflow-hidden'
+      style={{
+        maxHeight: open ? 56 : 0,
+        opacity: open ? 1 : 0,
+        transition: `max-height ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, opacity ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
+      }}
+    >
+      <div className='relative h-12 mx-3 mt-3 flex items-center gap-3 px-4 rounded-xl border border-(--linear-app-shell-border) bg-(--surface-1)/60 backdrop-blur-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_4px_12px_rgba(0,0,0,0.18)]'>
+        {/* Subtle accent ribbon along the left edge — single hue,
+            blends with the surface, signals "Jovie suggests" without
+            shouting. */}
+        <span
+          aria-hidden='true'
+          className='absolute left-0 top-2 bottom-2 w-[2px] rounded-full bg-cyan-300/60'
+        />
+        <span className='shrink-0 h-7 w-7 rounded-md bg-(--surface-2)/80 grid place-items-center text-cyan-300/85'>
+          <Sparkles className='h-3.5 w-3.5' strokeWidth={2.25} />
+        </span>
+        <div className='flex-1 min-w-0'>
+          <div className='text-[12.5px] font-medium text-primary-token leading-tight'>
+            Install Jovie for desktop
+          </div>
+          <div className='text-[11px] text-tertiary-token leading-tight mt-0.5 truncate'>
+            Native window, system shortcuts, push-to-talk in any app. macOS ·
+            Windows · Linux.
+          </div>
+        </div>
+        <button
+          type='button'
+          onClick={onDismiss}
+          className='shrink-0 inline-flex items-center h-7 px-3 rounded-full text-[12px] text-tertiary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-150 ease-out'
+        >
+          Not now
+        </button>
+        <button
+          type='button'
+          className='shrink-0 inline-flex items-center gap-1.5 h-7 px-3.5 rounded-full text-[12px] font-medium bg-white text-black hover:brightness-110 active:scale-[0.99] transition-all duration-150 ease-out'
+        >
+          Install
+          <ArrowDown className='h-3 w-3' strokeWidth={2.5} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function JovieOverlay({ listening }: { listening: boolean }) {
   // 32-bar live waveform — each bar's height is driven by a layered
   // sine so the overall envelope reads as natural speech, not a
@@ -5777,7 +5934,7 @@ function PillSearch({
 
   return (
     <div className='relative w-full'>
-      <div className='flex items-center gap-1.5 flex-wrap min-h-7 pr-2'>
+      <div className='flex items-center gap-1.5 flex-wrap min-h-7 pr-1'>
         <Search
           className='h-3.5 w-3.5 text-quaternary-token shrink-0'
           strokeWidth={2.25}
@@ -5797,6 +5954,7 @@ function PillSearch({
           value={text}
           onChange={e => changeText(e.target.value)}
           onKeyDown={onInputKey}
+          aria-label='Filter tracks'
           placeholder={
             pills.length === 0
               ? 'Type to filter — / for fields'
@@ -5807,7 +5965,7 @@ function PillSearch({
         <button
           type='button'
           onClick={onClose}
-          className='shrink-0 inline-flex items-center h-5 px-1.5 rounded text-[10px] font-caption uppercase tracking-[0.06em] text-quaternary-token border border-(--linear-app-shell-border)/70 hover:text-primary-token hover:border-(--linear-app-shell-border) transition-colors duration-150 ease-out'
+          className='shrink-0 inline-flex items-center h-5 px-1.5 rounded text-[10px] font-caption uppercase tracking-[0.06em] text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-150 ease-out'
           aria-label='Close search'
         >
           Esc
@@ -6313,9 +6471,10 @@ function ThreadView({ thread }: { thread: Thread }) {
         </div>
       </div>
 
-      {/* Pinned composer + scroll-to-bottom affordance. Arrow sits flush
-          against the top edge of the input pill (partial overlap) — Claude
-          / ChatGPT pattern, not a floating chip in dead space. */}
+      {/* Pinned composer + scroll-to-bottom affordance. Arrow truly
+          floats — sits ~48px above the composer with a heavy drop
+          shadow + backdrop blur so it reads as a lifted action chip,
+          not a chevron pinned to the input border. */}
       <footer className='shrink-0 relative'>
         <div className='max-w-3xl mx-auto px-8 pt-2 pb-4 relative'>
           <button
@@ -6323,13 +6482,13 @@ function ThreadView({ thread }: { thread: Thread }) {
             onClick={scrollToBottom}
             aria-label='Scroll to bottom'
             className={cn(
-              'absolute left-1/2 -translate-x-1/2 -top-3 h-7 w-7 rounded-full grid place-items-center text-secondary-token bg-(--linear-app-content-surface) border border-(--linear-app-shell-border) shadow-[0_4px_14px_rgba(0,0,0,0.32)] hover:text-primary-token hover:bg-surface-1 transition-all duration-150 ease-out z-10',
+              'absolute left-1/2 -translate-x-1/2 -top-12 h-9 w-9 rounded-full grid place-items-center text-secondary-token bg-(--linear-app-content-surface)/95 backdrop-blur-md border border-(--linear-app-shell-border) shadow-[0_12px_32px_rgba(0,0,0,0.5)] hover:text-primary-token hover:bg-surface-1 transition-all duration-200 ease-out z-10',
               atBottom
-                ? 'opacity-0 translate-y-1 pointer-events-none'
+                ? 'opacity-0 translate-y-3 pointer-events-none'
                 : 'opacity-100'
             )}
           >
-            <ArrowDown className='h-3.5 w-3.5' strokeWidth={2.25} />
+            <ArrowDown className='h-4 w-4' strokeWidth={2.25} />
           </button>
           <ChatComposer placeholder='Reply to this thread…' />
         </div>
@@ -9574,21 +9733,30 @@ function TasksView({
   onOpenRelease?: (id: string) => void;
   onOpenThread?: (id: string) => void;
 }) {
-  const [selectedId, setSelectedId] = useState<string>(tasks[0]?.id ?? '');
+  // No default selection — the user lands on the calm list, gets a
+  // wide read of the queue, and dives in by clicking. j/k still
+  // navigates focus, but Enter is what commits a row to "selected"
+  // and reveals the detail pane.
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [focusedIndex, setFocusedIndex] = useState(0);
-  const selected = tasks.find(t => t.id === selectedId) ?? tasks[0];
+  const selected = selectedId ? tasks.find(t => t.id === selectedId) : null;
 
   function handleKey(e: React.KeyboardEvent) {
     if (e.key === 'ArrowDown' || e.key === 'k') {
       e.preventDefault();
       const next = Math.min(tasks.length - 1, focusedIndex + 1);
       setFocusedIndex(next);
-      setSelectedId(tasks[next].id);
     } else if (e.key === 'ArrowUp' || e.key === 'j') {
       e.preventDefault();
       const next = Math.max(0, focusedIndex - 1);
       setFocusedIndex(next);
-      setSelectedId(tasks[next].id);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const t = tasks[focusedIndex];
+      if (t) setSelectedId(t.id);
+    } else if (e.key === 'Escape' && selectedId) {
+      e.preventDefault();
+      setSelectedId(null);
     }
   }
 
@@ -9636,11 +9804,38 @@ function TasksView({
         </ul>
       </div>
 
-      {/* Detail pane */}
+      {/* Detail pane — empty until the user picks a task. Calm
+          read-then-dive pattern so the queue isn't ambushing them
+          with a default open pane the moment they land here. */}
       <div className='flex-1 min-w-0 overflow-y-auto'>
         {selected ? (
           <TaskDetail task={selected} onOpenRelease={onOpenRelease} />
-        ) : null}
+        ) : (
+          <div className='h-full grid place-items-center px-8'>
+            <div className='text-center max-w-sm'>
+              <p className='text-[13px] text-tertiary-token leading-relaxed'>
+                Pick a task from the list to see what it needs.
+              </p>
+              <p className='text-[11.5px] text-quaternary-token mt-2'>
+                <kbd className='inline-flex items-center h-4 px-1 rounded text-[10px] bg-(--surface-1)/60 border border-(--linear-app-shell-border) tabular-nums mr-1'>
+                  ↵
+                </kbd>
+                to open ·
+                <kbd className='inline-flex items-center h-4 px-1 rounded text-[10px] bg-(--surface-1)/60 border border-(--linear-app-shell-border) tabular-nums mx-1'>
+                  j
+                </kbd>
+                <kbd className='inline-flex items-center h-4 px-1 rounded text-[10px] bg-(--surface-1)/60 border border-(--linear-app-shell-border) tabular-nums mr-1'>
+                  k
+                </kbd>
+                to navigate ·
+                <kbd className='inline-flex items-center h-4 px-1 rounded text-[10px] bg-(--surface-1)/60 border border-(--linear-app-shell-border) tabular-nums ml-1'>
+                  esc
+                </kbd>{' '}
+                to close
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </section>
   );
