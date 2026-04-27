@@ -103,7 +103,7 @@ import {
   Volume2,
   X,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   Asset as LibraryAsset,
   Filters as LibraryFiltersType,
@@ -6111,69 +6111,122 @@ function mockThreadMarkdown(thread: Thread): string {
 }
 
 function ThreadView({ thread }: { thread: Thread }) {
+  // ChatGPT-pattern: composer stays pinned, messages scroll. The article
+  // is the height-bound parent; the middle div is the scroll boundary;
+  // the floating "scroll to bottom" arrow appears when the user has
+  // scrolled up and disappears when they're already at the bottom.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [atBottom, setAtBottom] = useState(true);
+  const checkAtBottom = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const dist = el.scrollHeight - el.scrollTop - el.clientHeight;
+    setAtBottom(dist < 24);
+  }, []);
+  // Recompute on mount + when the thread or its content height changes
+  // (image / audio / video cards mount async). Otherwise the arrow stays
+  // hidden when the thread loads taller than the viewport.
+  useEffect(() => {
+    checkAtBottom();
+    const el = scrollRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => checkAtBottom());
+    ro.observe(el);
+    if (el.firstElementChild) ro.observe(el.firstElementChild);
+    return () => ro.disconnect();
+  }, [checkAtBottom, thread.id]);
+  const scrollToBottom = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+  };
   return (
-    <article className='max-w-3xl mx-auto px-8 pt-8 pb-12 flex flex-col h-full'>
-      <header className='shrink-0'>
-        {/* No status eyebrow — status reads from the sidebar dot icon and
-            from the per-turn "Generating…" / error states inline below. */}
-        <h1
-          className='text-[24px] font-semibold leading-tight text-primary-token'
-          style={{ letterSpacing: '-0.018em' }}
-        >
-          {thread.title}
-        </h1>
-        {thread.entityKind && thread.entityId && (
-          <p className='mt-1.5 text-[12.5px] text-tertiary-token'>
-            Linked to {thread.entityKind} ·{' '}
-            <span className='text-secondary-token'>{thread.entityId}</span>
-          </p>
-        )}
-      </header>
+    <article className='h-full overflow-hidden flex flex-col'>
+      <div
+        ref={scrollRef}
+        onScroll={checkAtBottom}
+        className='flex-1 min-h-0 overflow-y-auto'
+      >
+        <div className='max-w-3xl mx-auto px-8 pt-8 pb-6'>
+          <header>
+            <h1
+              className='text-[24px] font-semibold leading-tight text-primary-token'
+              style={{ letterSpacing: '-0.018em' }}
+            >
+              {thread.title}
+            </h1>
+            {thread.entityKind && thread.entityId && (
+              <p className='mt-1.5 text-[12.5px] text-tertiary-token'>
+                Linked to {thread.entityKind} ·{' '}
+                <span className='text-secondary-token'>{thread.entityId}</span>
+              </p>
+            )}
+          </header>
 
-      <div className='flex-1 mt-8 space-y-4 text-[13.5px] leading-relaxed'>
-        <ThreadTurn speaker='jovie'>
-          <ChatMarkdown content={mockThreadMarkdown(thread)} />
-        </ThreadTurn>
-
-        {thread.status === 'complete' && (
-          <>
-            <ThreadImageCard
-              prompt='Lost in the Light · Spotify Canvas'
-              status='ready'
-            />
-            <ThreadAudioCard
-              title='Lost in the Light'
-              artist='Bahamas'
-              duration='3:33'
-            />
-            <ThreadVideoCard
-              title='Lost in the Light · lyric video'
-              durationSec={34}
-            />
-          </>
-        )}
-
-        {thread.status === 'running' && (
-          <>
-            <ThreadImageCard
-              prompt='Lost in the Light · Spotify Canvas'
-              status='generating'
-            />
-            <ThreadTurn speaker='jovie' subtle>
-              <span className='inline-flex items-center gap-1.5'>
-                <Loader2
-                  className='h-3 w-3 animate-spin text-quaternary-token'
-                  strokeWidth={2.25}
-                />
-                Generating…
-              </span>
+          <div className='mt-8 space-y-4 text-[13.5px] leading-relaxed'>
+            <ThreadTurn speaker='jovie'>
+              <ChatMarkdown content={mockThreadMarkdown(thread)} />
             </ThreadTurn>
-          </>
-        )}
+
+            {thread.status === 'complete' && (
+              <>
+                <ThreadImageCard
+                  prompt='Lost in the Light · Spotify Canvas'
+                  status='ready'
+                />
+                <ThreadAudioCard
+                  title='Lost in the Light'
+                  artist='Bahamas'
+                  duration='3:33'
+                />
+                <ThreadVideoCard
+                  title='Lost in the Light · lyric video'
+                  durationSec={34}
+                />
+              </>
+            )}
+
+            {thread.status === 'running' && (
+              <>
+                <ThreadImageCard
+                  prompt='Lost in the Light · Spotify Canvas'
+                  status='generating'
+                />
+                <ThreadTurn speaker='jovie' subtle>
+                  <span className='inline-flex items-center gap-1.5'>
+                    <Loader2
+                      className='h-3 w-3 animate-spin text-quaternary-token'
+                      strokeWidth={2.25}
+                    />
+                    Generating…
+                  </span>
+                </ThreadTurn>
+              </>
+            )}
+          </div>
+        </div>
       </div>
 
-      <footer className='shrink-0 mt-6 pt-4'>
-        <ChatComposer placeholder='Reply to this thread…' />
+      {/* Pinned composer + scroll-to-bottom affordance. The arrow floats
+          above the input, fades in when the user scrolls up, fades out
+          once they're back at the bottom. */}
+      <footer className='shrink-0 relative'>
+        <button
+          type='button'
+          onClick={scrollToBottom}
+          aria-label='Scroll to bottom'
+          className={cn(
+            'absolute left-1/2 -translate-x-1/2 -top-5 h-9 w-9 rounded-full grid place-items-center text-secondary-token bg-(--linear-app-content-surface) border border-(--linear-app-shell-border) shadow-[0_4px_16px_rgba(0,0,0,0.32)] hover:text-primary-token hover:bg-surface-1 transition-all duration-150 ease-out',
+            atBottom
+              ? 'opacity-0 translate-y-1 pointer-events-none'
+              : 'opacity-100 -translate-y-0'
+          )}
+        >
+          <ArrowDown className='h-4 w-4' strokeWidth={2.25} />
+        </button>
+        <div className='max-w-3xl mx-auto px-8 pt-3 pb-6'>
+          <ChatComposer placeholder='Reply to this thread…' />
+        </div>
       </footer>
     </article>
   );
