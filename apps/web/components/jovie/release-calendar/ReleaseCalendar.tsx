@@ -89,7 +89,7 @@ export function ReleaseCalendar({
       const nextRemix = next.find(m => m.momentType === 'remix');
       onPlanChange(next);
       if (!nextRemix) return;
-      if (prevRemix && prevRemix.friday === nextRemix.friday) return;
+      if (prevRemix?.friday === nextRemix.friday) return;
       setMovedSlug(nextRemix.slug);
       requestAnimationFrame(() => {
         const el = weekRefs.current.get(nextRemix.friday);

@@ -36,7 +36,7 @@ export type EntityPopoverData =
       readonly label: string;
       readonly thumbnail?: string;
       readonly artist?: string;
-      readonly releaseType?: 'Single' | 'EP' | 'Album' | string;
+      readonly releaseType?: string;
       readonly releaseDate?: string; // ISO
       readonly totalTracks?: number;
       readonly durationSec?: number;
