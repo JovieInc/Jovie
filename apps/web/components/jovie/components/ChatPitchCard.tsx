@@ -3,7 +3,7 @@
 import { Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { CopyToggleIcon } from '@/components/shell/CopyToggleIcon';
+import { CopyToggleIcon } from '@/components/atoms/CopyToggleIcon';
 import { PLATFORM_LIMITS } from '@/lib/services/pitch/types';
 import { cn } from '@/lib/utils';
 

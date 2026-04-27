@@ -9,8 +9,8 @@ import {
 } from '@jovie/ui';
 import { ExternalLink, MoreHorizontal, Trash2 } from 'lucide-react';
 import { type ReactNode, useCallback, useState } from 'react';
+import { CopyToggleIcon } from '@/components/atoms/CopyToggleIcon';
 import { SwipeToReveal } from '@/components/atoms/SwipeToReveal';
-import { CopyToggleIcon } from '@/components/shell/CopyToggleIcon';
 import {
   getDSPDeepLinkConfig,
   getSocialDeepLinkConfig,
