@@ -73,6 +73,9 @@ export interface AudioBarTrack {
 export function AudioBar({
   isPlaying,
   onPlay,
+  onShuffle,
+  onPrevious,
+  onNext,
   onCollapse,
   currentTime,
   duration,
@@ -89,6 +92,9 @@ export function AudioBar({
 }: {
   readonly isPlaying: boolean;
   readonly onPlay: () => void;
+  readonly onShuffle?: () => void;
+  readonly onPrevious?: () => void;
+  readonly onNext?: () => void;
   readonly onCollapse: () => void;
   readonly currentTime: number;
   readonly duration: number;
@@ -103,14 +109,22 @@ export function AudioBar({
   readonly track: AudioBarTrack;
   readonly className?: string;
 }) {
-  const pct = duration > 0 ? (currentTime / duration) * 100 : 0;
-
   const transportButtons = (
     <div className='flex items-center gap-1.5 justify-self-center'>
-      <IconBtn label='Shuffle' tooltipSide='top' tone='ghost'>
+      <IconBtn
+        label='Shuffle'
+        tooltipSide='top'
+        tone='ghost'
+        onClick={onShuffle}
+      >
         <Shuffle className='h-3.5 w-3.5' strokeWidth={2.25} />
       </IconBtn>
-      <IconBtn label='Previous' tooltipSide='top' tone='ghost'>
+      <IconBtn
+        label='Previous'
+        tooltipSide='top'
+        tone='ghost'
+        onClick={onPrevious}
+      >
         <SkipBack className='h-4 w-4' strokeWidth={2.5} fill='currentColor' />
       </IconBtn>
       <Tooltip
@@ -139,7 +153,7 @@ export function AudioBar({
           )}
         </button>
       </Tooltip>
-      <IconBtn label='Next' tooltipSide='top' tone='ghost'>
+      <IconBtn label='Next' tooltipSide='top' tone='ghost' onClick={onNext}>
         <SkipForward
           className='h-4 w-4'
           strokeWidth={2.5}
@@ -215,7 +229,6 @@ export function AudioBar({
             <ScrubGradient
               currentTime={currentTime}
               duration={duration}
-              pct={pct}
               cues={cues}
               loopMode={loopMode}
               loopSection={loopSection}

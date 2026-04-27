@@ -1,3 +1,6 @@
+'use client';
+
+import { useId } from 'react';
 import { formatTime } from '@/lib/format-time';
 import { cn } from '@/lib/utils';
 
@@ -54,7 +57,7 @@ const AUDIO_PEAK = makeAudio(320, 1);
 // Solid filled mirror waveform (Audacity / Logic look). Production
 // canonical — other variants from shell-v1 (hairlines / stereo / RMS /
 // dense bars) were dev-picker-only and intentionally not extracted.
-function filledStrands() {
+function filledStrandsPath(): string {
   const stride = SCRUB_W / AUDIO_PEAK.length;
   const top: string[] = [];
   const bot: string[] = [];
@@ -66,24 +69,23 @@ function filledStrands() {
     );
     bot.push(`L ${x.toFixed(2)} ${(WAVE_CY + half).toFixed(2)}`);
   });
-  const filled = `${top.join(' ')} ${bot.reverse().join(' ')} Z`;
-  return <path d={filled} fill='url(#scrub-grad)' />;
+  return `${top.join(' ')} ${bot.reverse().join(' ')} Z`;
 }
+
+const FILLED_PATH = filledStrandsPath();
 
 /**
  * ScrubGradient — waveform scrub bar with playhead, cue markers, and
  * optional loop-section overlay.
  *
- * Pure renderer: all state comes from props (currentTime, duration,
- * pct). The waveform geometry is deterministic and static — no
- * animation, no per-frame recompute.
+ * Pure renderer: all state comes from props. The playhead position is
+ * derived from `currentTime / duration` — single source of truth.
  *
  * @example
  * ```tsx
  * <ScrubGradient
  *   currentTime={78}
  *   duration={213}
- *   pct={(78 / 213) * 100}
  *   cues={[{ at: 12, label: 'Intro' }, { at: 31, label: 'Verse' }]}
  *   loopMode='off'
  * />
@@ -92,7 +94,6 @@ function filledStrands() {
 export function ScrubGradient({
   currentTime,
   duration,
-  pct,
   cues = [],
   loopMode = 'off',
   loopSection,
@@ -100,22 +101,34 @@ export function ScrubGradient({
 }: {
   readonly currentTime: number;
   readonly duration: number;
-  /** 0–100. The playhead position as a percent of duration. */
-  readonly pct: number;
   readonly cues?: readonly ScrubCue[];
   readonly loopMode?: 'off' | 'track' | 'section';
   /** Required when `loopMode === 'section'`. */
   readonly loopSection?: ScrubLoopSection;
   readonly className?: string;
 }) {
-  const playedX = (Math.max(0, Math.min(100, pct)) / 100) * SCRUB_W;
+  // useId() yields a per-instance prefix so multiple <ScrubGradient/>
+  // instances don't share DOM-global SVG paint-server / clip-path IDs.
+  const uid = useId().replace(/:/g, '-');
+  const gradId = `scrub-grad-${uid}`;
+  const edgeFadeId = `scrub-edge-fade-${uid}`;
+  const fadeMaskId = `scrub-fade-mask-${uid}`;
+  const playedClipId = `scrub-played-clip-${uid}`;
+
+  const safeDuration = Number.isFinite(duration) && duration > 0 ? duration : 0;
+  const safeCurrent = Number.isFinite(currentTime) ? currentTime : 0;
+  const pct =
+    safeDuration > 0
+      ? Math.max(0, Math.min(100, (safeCurrent / safeDuration) * 100))
+      : 0;
+  const playedX = (pct / 100) * SCRUB_W;
   const sectionFromX = loopSection ? (loopSection.from / 100) * SCRUB_W : 0;
   const sectionToX = loopSection ? (loopSection.to / 100) * SCRUB_W : 0;
 
   return (
     <div className={cn('flex w-full items-center gap-2', className)}>
       <span className={cn(TIME_LABEL, 'text-right')}>
-        {formatTime(currentTime)}
+        {formatTime(safeCurrent)}
       </span>
       <div className='relative flex-1 min-w-[60px] h-8'>
         <svg
@@ -125,38 +138,39 @@ export function ScrubGradient({
           aria-hidden='true'
         >
           <defs>
-            <linearGradient id='scrub-grad' x1='0' y1='0' x2='1' y2='0'>
+            <linearGradient id={gradId} x1='0' y1='0' x2='1' y2='0'>
               <stop offset='0%' stopColor='#a78bfa' />
               <stop offset='35%' stopColor='#c084fc' />
               <stop offset='60%' stopColor='#f472b6' />
               <stop offset='100%' stopColor='#60a5fa' />
             </linearGradient>
-            <linearGradient id='scrub-edge-fade' x1='0' y1='0' x2='1' y2='0'>
+            <linearGradient id={edgeFadeId} x1='0' y1='0' x2='1' y2='0'>
               <stop offset='0%' stopColor='white' stopOpacity='0' />
               <stop offset='10%' stopColor='white' stopOpacity='1' />
               <stop offset='90%' stopColor='white' stopOpacity='1' />
               <stop offset='100%' stopColor='white' stopOpacity='0' />
             </linearGradient>
-            <mask id='scrub-fade-mask'>
+            <mask id={fadeMaskId}>
               <rect
                 x='0'
                 y='0'
                 width={SCRUB_W}
                 height={SCRUB_H}
-                fill='url(#scrub-edge-fade)'
+                fill={`url(#${edgeFadeId})`}
               />
             </mask>
-          </defs>
-          <g mask='url(#scrub-fade-mask)' opacity={0.65}>
-            {filledStrands()}
-          </g>
-          {/* Played overlay — brighter strands up to the playhead. */}
-          <g mask='url(#scrub-fade-mask)'>
-            <clipPath id='scrub-played-clip'>
+            {/* Safari historically ignores clipPath defined outside <defs>. */}
+            <clipPath id={playedClipId}>
               <rect x='0' y='0' width={playedX} height={SCRUB_H} />
             </clipPath>
-            <g clipPath='url(#scrub-played-clip)' opacity={1}>
-              {filledStrands()}
+          </defs>
+          <g mask={`url(#${fadeMaskId})`} opacity={0.65}>
+            <path d={FILLED_PATH} fill={`url(#${gradId})`} />
+          </g>
+          {/* Played overlay — brighter strands up to the playhead. */}
+          <g mask={`url(#${fadeMaskId})`}>
+            <g clipPath={`url(#${playedClipId})`} opacity={1}>
+              <path d={FILLED_PATH} fill={`url(#${gradId})`} />
             </g>
           </g>
           {/* Cue dots — small markers above the waveform. */}
@@ -172,7 +186,7 @@ export function ScrubGradient({
                 className='text-quaternary-token'
               >
                 <title>
-                  {c.label} · {formatTime((c.at / 100) * duration)}
+                  {c.label} · {formatTime((c.at / 100) * safeDuration)}
                 </title>
               </circle>
             );
@@ -201,7 +215,7 @@ export function ScrubGradient({
           />
         </svg>
       </div>
-      <span className={TIME_LABEL}>{formatTime(duration)}</span>
+      <span className={TIME_LABEL}>{formatTime(safeDuration)}</span>
     </div>
   );
 }
