@@ -12,7 +12,11 @@ describe('shortMonthDay', () => {
   });
 
   afterAll(() => {
-    process.env.TZ = originalTz;
+    if (originalTz === undefined) {
+      delete process.env.TZ;
+    } else {
+      process.env.TZ = originalTz;
+    }
   });
 
   it('formats a date-only ISO string correctly regardless of local TZ', () => {
@@ -41,7 +45,11 @@ describe('formatLongDate', () => {
   });
 
   afterAll(() => {
-    process.env.TZ = originalTz;
+    if (originalTz === undefined) {
+      delete process.env.TZ;
+    } else {
+      process.env.TZ = originalTz;
+    }
   });
 
   it('formats a date-only ISO string correctly regardless of local TZ', () => {
