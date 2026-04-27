@@ -71,7 +71,6 @@ export interface DrawerHeroProps {
  *       onMenu={openMenu}
  *     />
  *   }
- *   /* ...other props... *\/
  * />
  * ```
  */
@@ -90,26 +89,7 @@ export function DrawerHero({
 }: DrawerHeroProps) {
   const hasTopRight = Boolean(statusBadge || onMenu);
   return (
-    <section className={cn('group/drawer relative px-3 pt-3 pb-3', className)}>
-      {hasTopRight && (
-        <div className='absolute right-3 top-3 flex items-center gap-1.5'>
-          {statusBadge}
-          {onMenu && (
-            <Tooltip label={menuLabel}>
-              <button
-                type='button'
-                onClick={onMenu}
-                className='h-6 w-6 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1/70 transition-colors duration-150 ease-out opacity-0 group-hover/drawer:opacity-100 focus-visible:opacity-100'
-                aria-label={menuLabel}
-                aria-haspopup='menu'
-              >
-                <MoreHorizontal className='h-3.5 w-3.5' strokeWidth={2.25} />
-              </button>
-            </Tooltip>
-          )}
-        </div>
-      )}
-
+    <section className={cn('group/drawer px-3 pt-3 pb-3', className)}>
       <div className='flex items-start gap-3'>
         {artwork &&
           (onPlay ? (
@@ -117,7 +97,7 @@ export function DrawerHero({
               type='button'
               onClick={onPlay}
               aria-label={playLabel ?? `Play ${title}`}
-              className='shrink-0 relative group/art rounded-lg overflow-hidden focus-visible:outline-none'
+              className='shrink-0 relative group/art rounded-lg overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token focus-visible:ring-offset-2'
             >
               {artwork}
               <span
@@ -137,17 +117,37 @@ export function DrawerHero({
             <div className='shrink-0 rounded-lg overflow-hidden'>{artwork}</div>
           ))}
 
-        <div className={cn('flex-1 min-w-0 pt-1', hasTopRight && 'pr-[88px]')}>
-          <h2
-            className='text-[17px] font-semibold text-primary-token leading-tight'
-            style={{ letterSpacing: '-0.018em' }}
-          >
-            {title}
-          </h2>
+        <div className='flex-1 min-w-0 pt-1'>
+          <div className='flex items-start gap-2'>
+            <h2 className='flex-1 min-w-0 text-[17px] font-semibold text-primary-token leading-tight tracking-[-0.018em]'>
+              {title}
+            </h2>
+            {hasTopRight && (
+              <div className='shrink-0 flex items-center gap-1.5'>
+                {statusBadge}
+                {onMenu && (
+                  <Tooltip label={menuLabel}>
+                    <button
+                      type='button'
+                      onClick={onMenu}
+                      className='h-6 w-6 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1/70 transition-colors duration-150 ease-out opacity-0 group-hover/drawer:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100'
+                      aria-label={menuLabel}
+                      aria-haspopup='menu'
+                    >
+                      <MoreHorizontal
+                        className='h-3.5 w-3.5'
+                        strokeWidth={2.25}
+                      />
+                    </button>
+                  </Tooltip>
+                )}
+              </div>
+            )}
+          </div>
           {subtitle && (
-            <p className='mt-1 text-[12px] text-tertiary-token truncate'>
+            <div className='mt-1 text-[12px] text-tertiary-token truncate'>
               {subtitle}
-            </p>
+            </div>
           )}
           {meta && (
             <div className='mt-2 flex items-center gap-1.5 flex-wrap'>
