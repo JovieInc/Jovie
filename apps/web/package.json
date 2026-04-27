@@ -229,7 +229,7 @@
     "@axe-core/playwright": "^4.11.1",
     "@biomejs/biome": "^2.4.8",
     "@chromatic-com/storybook": "^5.1.2",
-    "@clerk/backend": "^3.2.12",
+    "@clerk/backend": "^3.4.1",
     "@clerk/clerk-js": "^6.7.3",
     "@clerk/testing": "^2.0.16",
     "@lhci/cli": "^0.15.1",
