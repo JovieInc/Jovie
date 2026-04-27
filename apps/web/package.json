@@ -226,7 +226,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@axe-core/playwright": "^4.11.1",
+    "@axe-core/playwright": "^4.11.2",
     "@biomejs/biome": "^2.4.8",
     "@chromatic-com/storybook": "^5.1.2",
     "@clerk/backend": "^3.4.1",
