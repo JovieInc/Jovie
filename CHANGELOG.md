@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.181] - 2026-04-27
+
+> Follow-up to v26.4.180. Tightens R2 bucket configuration based on bot review of #7845 — separates CORS rules per environment so localhost no longer hits production, and fixes a lifecycle bug where the orphan-multipart-upload sweep was scoped to a single prefix.
+
+### Changed
+
+- [internal] Split `infra/r2/cors.json` into `cors-dev.json` / `cors-staging.json` / `cors-prod.json`. The prod bucket no longer accepts `http://localhost:3000`. Allowed headers tightened from `*` to the explicit set the AWS S3 SDK uses for browser-side multipart.
+
+### Fixed
+
+- [internal] `infra/r2/lifecycle.json` — `abortMultipartUploadsTransition` was nested inside the `archived/` prefix-scoped rule, so orphan multiparts targeting the actual upload path (`creator/<id>/raw/...`) were never aborted. Split into two rules: the IA transition stays prefix-scoped, the multipart abort runs against every prefix.
+
 ## [26.4.180] - 2026-04-27
 
 > Reproducible Cloudflare R2 bucket configuration for the upcoming audio-asset upload pipeline.

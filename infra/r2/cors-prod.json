@@ -1,0 +1,20 @@
+{
+  "rules": [
+    {
+      "allowed": {
+        "origins": ["https://jov.ie"],
+        "methods": ["GET", "PUT", "POST", "HEAD"],
+        "headers": [
+          "Content-Type",
+          "Content-MD5",
+          "Authorization",
+          "x-amz-content-sha256",
+          "x-amz-date",
+          "x-amz-acl"
+        ]
+      },
+      "exposeHeaders": ["ETag"],
+      "maxAgeSeconds": 3600
+    }
+  ]
+}
