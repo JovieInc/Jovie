@@ -7,15 +7,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@jovie/ui';
-import {
-  Check,
-  Copy,
-  ExternalLink,
-  MoreHorizontal,
-  Trash2,
-} from 'lucide-react';
+import { ExternalLink, MoreHorizontal, Trash2 } from 'lucide-react';
 import { type ReactNode, useCallback, useState } from 'react';
 import { SwipeToReveal } from '@/components/atoms/SwipeToReveal';
+import { CopyToggleIcon } from '@/components/shell/CopyToggleIcon';
 import {
   getDSPDeepLinkConfig,
   getSocialDeepLinkConfig,
@@ -115,11 +110,9 @@ export function SidebarLinkRow({
         )}
         aria-label={copied ? 'Copied!' : `Copy ${label} link`}
       >
-        {copied ? (
-          <Check className='h-4 w-4' aria-hidden='true' />
-        ) : (
-          <Copy className='h-4 w-4' aria-hidden='true' />
-        )}
+        <span aria-hidden='true' className='inline-flex'>
+          <CopyToggleIcon copied={copied} size='h-4 w-4' />
+        </span>
       </button>
       <button
         type='button'
@@ -210,11 +203,7 @@ export function SidebarLinkRow({
                 Open
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleCopy} disabled={!hasUrl}>
-                {copied ? (
-                  <Check className='h-3.5 w-3.5 text-success' />
-                ) : (
-                  <Copy className='h-3.5 w-3.5' />
-                )}
+                <CopyToggleIcon copied={copied} size='h-3.5 w-3.5' />
                 {copied ? 'Copied!' : 'Copy URL'}
               </DropdownMenuItem>
               {hasRemove && (
