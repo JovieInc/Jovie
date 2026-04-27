@@ -31,6 +31,13 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
     branches: [main]
+  # pull_request_target gives the dependabot-gate job access to the Jovie Bot
+  # App secrets (regular Actions secrets are hidden from dependabot's
+  # pull_request context). The dependabot-gate only sets a status — it does
+  # not check out fork code — so this trigger is safe.
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+    branches: [main]
   # NOTE: pull_request_review trigger removed — bot-submitted reviews
   # (CodeRabbit, Copilot) create action_required runs that clog the CI
   # queue. Fork PR approval is still enforced on PR open/sync events.
@@ -45,22 +52,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Fast path: Dependabot PRs are internal (not forks) but cannot access
-  # GitHub App secrets. Use GITHUB_TOKEN to set the commit status directly.
+  # Fast path: Dependabot PRs are internal (not forks) but pull_request runs
+  # in dependabot's restricted secret context. Run via pull_request_target so
+  # the Jovie Bot App private key is available — the branch ruleset requires
+  # the Fork PR Gate status to be set by jovie-bot specifically. No code from
+  # the head branch is checked out here, so pull_request_target is safe.
   dependabot-gate:
     name: Fork PR Gate
-    if: github.actor == 'dependabot[bot]'
+    if: github.event_name == 'pull_request_target' && github.actor == 'dependabot[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 1
-    permissions:
-      statuses: write
     steps:
+      - name: Generate Jovie Bot token
+        id: app-token
+        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859 # v3.0.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+
       - name: Auto-pass for Dependabot
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          SHA="${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}"
-          echo "Dependabot PR — auto-passing gate."
+          SHA="${{ github.event.pull_request.head.sha }}"
+          echo "Dependabot PR — auto-passing gate via jovie-bot."
           gh api repos/${{ github.repository }}/statuses/$SHA \
             -f state="success" \
             -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
@@ -69,7 +84,7 @@ jobs:
 
   fork-gate:
     name: Fork PR Gate
-    if: github.actor != 'copilot-swe-agent[bot]' && github.actor != 'dependabot[bot]'
+    if: github.event_name != 'pull_request_target' && github.actor != 'copilot-swe-agent[bot]' && github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:
