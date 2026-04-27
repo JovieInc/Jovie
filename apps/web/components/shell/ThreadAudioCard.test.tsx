@@ -15,6 +15,11 @@ describe('ThreadAudioCard', () => {
     expect(screen.getByText('Bahamas · 3:33')).toBeInTheDocument();
   });
 
+  it('disables the play button when no onPlay is provided', () => {
+    render(<ThreadAudioCard title='t' artist='a' duration='0:42' />);
+    expect(screen.getByRole('button', { name: /Play/ })).toBeDisabled();
+  });
+
   it('fires onPlay when the play button is clicked', () => {
     const onPlay = vi.fn();
     render(

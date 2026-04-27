@@ -22,6 +22,9 @@ function formatDuration(seconds: number): string {
  * cinematic full-screen (callers wire `onFullscreen` to their preferred
  * surface, e.g. the lyric-video player). Click the thumbnail itself to
  * fire `onPlay` for inline preview.
+ *
+ * Both buttons render as non-interactive when their handler is omitted
+ * so the UI never advertises a no-op action.
  */
 export function ThreadVideoCard({
   title,
@@ -29,15 +32,21 @@ export function ThreadVideoCard({
   onPlay,
   onFullscreen,
 }: ThreadVideoCardProps) {
+  const Thumb = onPlay ? 'button' : 'div';
   return (
     <div className='rounded-xl border border-(--linear-app-shell-border) bg-(--surface-0)/40 overflow-hidden'>
-      <button
-        type='button'
-        onClick={onPlay}
-        className='group/vid relative w-full aspect-[16/9] block'
-        aria-label={`Play ${title}`}
+      <Thumb
+        {...(onPlay
+          ? {
+              type: 'button' as const,
+              onClick: onPlay,
+              'aria-label': `Play ${title}`,
+            }
+          : {})}
+        className='group/vid relative w-full aspect-[16/9] block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token'
       >
         <span
+          aria-hidden='true'
           className='absolute inset-0'
           style={{
             background:
@@ -45,7 +54,13 @@ export function ThreadVideoCard({
           }}
         />
         <span className='absolute inset-0 grid place-items-center'>
-          <span className='h-12 w-12 rounded-full bg-white/95 text-black grid place-items-center group-hover/vid:scale-105 transition-transform duration-200 ease-out'>
+          <span
+            className={
+              onPlay
+                ? 'h-12 w-12 rounded-full bg-white/95 text-black grid place-items-center group-hover/vid:scale-105 transition-transform duration-200 ease-out'
+                : 'h-12 w-12 rounded-full bg-white/40 text-black grid place-items-center'
+            }
+          >
             <Play
               className='h-4 w-4 translate-x-px'
               strokeWidth={2.5}
@@ -56,15 +71,17 @@ export function ThreadVideoCard({
         <span className='absolute bottom-2 right-2 inline-flex items-center h-5 px-1.5 rounded text-[10px] font-caption tabular-nums text-primary-token bg-black/60 backdrop-blur'>
           {formatDuration(durationSec)}
         </span>
-      </button>
+      </Thumb>
       <div className='flex items-center gap-2 px-3 h-9 border-t border-(--linear-app-shell-border)/60'>
         <Mic2 className='h-3 w-3 text-cyan-300/80' strokeWidth={2.25} />
         <span className='flex-1 text-[11.5px] text-tertiary-token truncate'>
           {title}
         </span>
-        <ThreadCardIconBtn label='Full-screen' onClick={onFullscreen}>
-          <Maximize2 className='h-3 w-3' strokeWidth={2.25} />
-        </ThreadCardIconBtn>
+        {onFullscreen && (
+          <ThreadCardIconBtn label='Full-screen' onClick={onFullscreen}>
+            <Maximize2 className='h-3 w-3' strokeWidth={2.25} />
+          </ThreadCardIconBtn>
+        )}
       </div>
     </div>
   );

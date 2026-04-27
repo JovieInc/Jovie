@@ -14,6 +14,9 @@ export interface ThreadAudioCardProps {
  * bar at the bottom of the canvas (callers wire that up via `onPlay`).
  * Inline play/pause is intentionally one-shot — the global bar is the
  * single source of truth for playback state.
+ *
+ * The play button is disabled when no `onPlay` handler is supplied so
+ * the UI never advertises an action that does nothing.
  */
 export function ThreadAudioCard({
   title,
@@ -37,7 +40,8 @@ export function ThreadAudioCard({
       <button
         type='button'
         onClick={onPlay}
-        className='h-8 w-8 rounded-full grid place-items-center bg-white text-black hover:bg-white/90 transition-colors duration-150 ease-out'
+        disabled={!onPlay}
+        className='h-8 w-8 rounded-full grid place-items-center bg-white text-black hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors duration-150 ease-out'
         aria-label='Play in global player'
       >
         <Play

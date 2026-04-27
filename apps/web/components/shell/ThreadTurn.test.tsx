@@ -19,7 +19,7 @@ describe('ThreadTurn', () => {
     expect(root.className).toContain('text-secondary-token');
   });
 
-  it('uses the tertiary-token tone when subtle is set', () => {
+  it('uses the tertiary-token tone when subtle is set on jovie', () => {
     const { container } = render(
       <ThreadTurn speaker='jovie' subtle>
         Generating…
@@ -28,5 +28,18 @@ describe('ThreadTurn', () => {
     expect((container.firstElementChild as HTMLElement).className).toContain(
       'text-tertiary-token'
     );
+  });
+
+  it('flattens the me speaker when subtle is set', () => {
+    const { container } = render(
+      <ThreadTurn speaker='me' subtle>
+        Pending…
+      </ThreadTurn>
+    );
+    const root = container.firstElementChild as HTMLElement;
+    // No bubble chrome, no right-alignment when subtle
+    expect(root.className).not.toContain('justify-end');
+    expect(root.className).not.toContain('rounded-2xl');
+    expect(root.className).toContain('text-tertiary-token');
   });
 });

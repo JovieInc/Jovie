@@ -36,7 +36,9 @@ export interface ThreadViewProps {
  * scrolled up out of the bottom 24px and disappears once they're back
  * at the bottom — the at-bottom check is recomputed on mount, on
  * thread change, and via a ResizeObserver so async-mounted media cards
- * don't strand the arrow.
+ * don't strand the arrow. The arrow is removed from the DOM when
+ * hidden so keyboard users can't tab to an invisible control and
+ * screen readers don't announce it.
  *
  * @example
  * ```tsx
@@ -46,7 +48,7 @@ export interface ThreadViewProps {
  *   </ThreadTurn>
  *   {thread.status === 'complete' && (
  *     <>
- *       <ThreadImageCard prompt='…' status='ready' />
+ *       <ThreadImageCard prompt='…' status='ready' previewUrl={url} />
  *       <ThreadAudioCard title='…' artist='…' duration='3:33' />
  *     </>
  *   )}
@@ -118,19 +120,18 @@ export function ThreadView({
       />
       <div className='absolute inset-x-0 bottom-0'>
         <div className='relative max-w-3xl mx-auto px-8 pb-4'>
-          <button
-            type='button'
-            onClick={scrollToBottom}
-            aria-label='Scroll to bottom'
-            className={cn(
-              'absolute left-1/2 -translate-x-1/2 -top-10 h-8 w-8 rounded-full grid place-items-center text-secondary-token bg-(--linear-app-content-surface) border border-(--linear-app-shell-border) shadow-[0_2px_8px_rgba(0,0,0,0.18)] hover:text-primary-token hover:bg-surface-1 transition-all duration-200 ease-out z-10',
-              atBottom
-                ? 'opacity-0 translate-y-2 pointer-events-none'
-                : 'opacity-100'
-            )}
-          >
-            <ArrowDown className='h-3.5 w-3.5' strokeWidth={2.25} />
-          </button>
+          {!atBottom && (
+            <button
+              type='button'
+              onClick={scrollToBottom}
+              aria-label='Scroll to bottom'
+              className={cn(
+                'absolute left-1/2 -translate-x-1/2 -top-10 h-8 w-8 rounded-full grid place-items-center text-secondary-token bg-(--linear-app-content-surface) border border-(--linear-app-shell-border) shadow-[0_2px_8px_rgba(0,0,0,0.18)] hover:text-primary-token hover:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token transition-all duration-200 ease-out z-10'
+              )}
+            >
+              <ArrowDown className='h-3.5 w-3.5' strokeWidth={2.25} />
+            </button>
+          )}
           {composer ?? (
             <ThreadComposer
               placeholder={composerPlaceholder}

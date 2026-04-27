@@ -13,6 +13,11 @@ describe('ThreadVideoCard', () => {
     expect(screen.getByText('0:00')).toBeInTheDocument();
   });
 
+  it('renders the thumbnail as a non-button when onPlay is omitted', () => {
+    render(<ThreadVideoCard title='clip' durationSec={20} />);
+    expect(screen.queryByRole('button', { name: /Play/ })).toBeNull();
+  });
+
   it('fires onPlay when the thumbnail is clicked', () => {
     const onPlay = vi.fn();
     render(<ThreadVideoCard title='clip' durationSec={20} onPlay={onPlay} />);
@@ -20,7 +25,12 @@ describe('ThreadVideoCard', () => {
     expect(onPlay).toHaveBeenCalledOnce();
   });
 
-  it('fires onFullscreen when the maximise button is clicked', () => {
+  it('omits the full-screen toolbar button when onFullscreen is missing', () => {
+    render(<ThreadVideoCard title='clip' durationSec={20} />);
+    expect(screen.queryByRole('button', { name: 'Full-screen' })).toBeNull();
+  });
+
+  it('fires onFullscreen when the toolbar button is clicked', () => {
     const onFullscreen = vi.fn();
     render(
       <ThreadVideoCard

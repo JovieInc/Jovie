@@ -7,9 +7,11 @@ export interface ThreadComposerProps {
   readonly placeholder: string;
   /**
    * Called with the trimmed message text when the user submits. The
-   * composer clears its own internal state on submit, so callers don't
-   * need to track text. Returning a Promise is fine — the composer
-   * doesn't await it.
+   * composer clears its own internal state immediately on submit — make
+   * sure this callback is synchronous (or fire-and-forget). Returning a
+   * Promise is allowed but the composer does not await it; a rejected
+   * promise becomes an unhandled rejection, so callers should attach
+   * their own `.catch` if the side-effect can fail.
    */
   readonly onSubmit?: (text: string) => void;
   /** Forwarded to ChatInput when the surrounding shell is loading data. */
