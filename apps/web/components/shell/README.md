@@ -25,6 +25,14 @@ look-and-feel; pieces graduate here once they've settled.
 | `JovieOverlay` | Push-to-talk listening overlay with 32-bar waveform. |
 | `CopyToggleIcon` | Copy ↔ Check icon swap for clipboard buttons. |
 
+## Player
+
+| Component | Purpose |
+|-----------|---------|
+| `AudioBar` | Bottom-of-screen player chrome — transport, scrub, lyrics/waveform/minimize cluster. Filled-waveform variant only (alternates were dev-picker-only and intentionally not extracted). Pure presentational; wire `useTrackAudioPlayer()` props at the mount site. |
+| `LoopBtn` | Three-state loop toggle: off / track (1) / section (⤴). Used inside AudioBar's transport row. |
+| `ScrubGradient` | Waveform scrub bar with playhead, optional cue dots, and optional loop-section overlay. Static deterministic geometry — no animation. |
+
 ## Shared support modules
 
 | Module | Purpose |
