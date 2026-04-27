@@ -240,10 +240,13 @@ interface DateStampParts {
 
 function dateStampParts(iso: string | undefined): DateStampParts | null {
   if (!iso) return null;
-  const d = new Date(iso);
+  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? `${iso}T00:00:00Z` : iso;
+  const d = new Date(normalized);
   if (Number.isNaN(d.getTime())) return null;
-  const month = d.toLocaleString('en-US', { month: 'short' }).toUpperCase();
-  const day = d.getDate().toString();
+  const month = d
+    .toLocaleString('en-US', { month: 'short', timeZone: 'UTC' })
+    .toUpperCase();
+  const day = d.toLocaleString('en-US', { day: 'numeric', timeZone: 'UTC' });
   return { month, day };
 }
 
