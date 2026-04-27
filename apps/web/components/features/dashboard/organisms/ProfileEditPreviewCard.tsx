@@ -7,7 +7,7 @@
  * Allows the user to apply or cancel the change.
  */
 
-import { Check, Loader2, X } from 'lucide-react';
+import { Check, ExternalLink, Loader2, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import { usePreviewPanelContext } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
@@ -22,6 +22,19 @@ export interface ProfileEditPreview {
   currentValue: string | string[] | null;
   newValue: string | string[];
   reason?: string;
+  /** Provenance: the public URL the value was imported from. */
+  sourceUrl?: string;
+  /** Provenance: page title at the source URL. */
+  sourceTitle?: string;
+}
+
+function getSourceHost(sourceUrl: string | undefined): string | null {
+  if (!sourceUrl) return null;
+  try {
+    return new URL(sourceUrl).hostname.replace(/^www\./, '');
+  } catch {
+    return null;
+  }
 }
 
 interface ProfileEditPreviewCardProps {
@@ -139,6 +152,26 @@ export function ProfileEditPreviewCard({
               {preview.reason}
             </p>
           )}
+          {(() => {
+            const host = getSourceHost(preview.sourceUrl);
+            if (!host) return null;
+            return (
+              <p className='inline-flex items-center gap-1 text-2xs leading-[1.45] text-secondary-token'>
+                <ExternalLink className='h-3 w-3' />
+                <span>
+                  Imported from{' '}
+                  <a
+                    href={preview.sourceUrl}
+                    target='_blank'
+                    rel='noopener noreferrer'
+                    className='underline decoration-dotted underline-offset-2 hover:text-primary-token'
+                  >
+                    {host}
+                  </a>
+                </span>
+              </p>
+            );
+          })()}
         </div>
       </div>
 

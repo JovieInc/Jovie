@@ -25,6 +25,7 @@ export const APP_ROUTES = {
   DASHBOARD_TIPPING: '/app/dashboard/tipping',
   DASHBOARD_CONTACTS: '/app/dashboard/contacts',
   DASHBOARD_TOUR_DATES: '/app/dashboard/tour-dates',
+  DASHBOARD_RELEASE_PLAN: '/app/dashboard/release-plan',
   /** @deprecated Profile is now a drawer on the chat route. Use CHAT instead. */
   PROFILE: '/app/chat',
   CONTACTS: '/app/contacts',

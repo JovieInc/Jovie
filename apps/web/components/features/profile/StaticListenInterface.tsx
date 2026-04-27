@@ -15,7 +15,7 @@ import {
   sortDSPsForDevice,
 } from '@/lib/dsp';
 import { useAppFlag } from '@/lib/flags/client';
-import { detectPlatformFromUA } from '@/lib/utils';
+import { cn, detectPlatformFromUA } from '@/lib/utils';
 import { Artist } from '@/types/db';
 import type { ProfileRenderMode } from './contracts';
 
@@ -25,6 +25,11 @@ interface StaticListenInterfaceProps {
   readonly dspsOverride?: AvailableDSP[];
   readonly enableDynamicEngagement?: boolean;
   readonly renderMode?: ProfileRenderMode;
+  readonly containerClassName?: string;
+  readonly emptyStateClassName?: string;
+  readonly providerButtonClassName?: string;
+  readonly helpTextClassName?: string;
+  readonly hideHelpText?: boolean;
 }
 
 /**
@@ -41,6 +46,11 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
   dspsOverride,
   enableDynamicEngagement = false,
   renderMode = 'interactive',
+  containerClassName,
+  emptyStateClassName,
+  providerButtonClassName,
+  helpTextClassName,
+  hideHelpText = false,
 }: StaticListenInterfaceProps) {
   const enableDevicePriority = useAppFlag('IOS_APPLE_MUSIC_PRIORITY');
 
@@ -151,11 +161,16 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
   const isPreview = renderMode === 'preview';
 
   return (
-    <div className='w-full max-w-sm'>
+    <div className={cn('w-full max-w-sm', containerClassName)}>
       {/* DSP Buttons */}
       <div className='space-y-3'>
         {availableDSPs.length === 0 ? (
-          <div className='rounded-2xl border border-subtle bg-surface-1 p-5 shadow-sm text-center'>
+          <div
+            className={cn(
+              'rounded-2xl border border-subtle bg-surface-1 p-5 text-center shadow-sm',
+              emptyStateClassName
+            )}
+          >
             <p className='text-sm text-secondary-token'>
               Streaming links aren&apos;t available for this profile yet.
             </p>
@@ -178,7 +193,7 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
                 }}
                 label={isSelected ? `Opening ${dsp.name}...` : dsp.name}
                 iconPath={logoConfig?.iconPath}
-                className={buttonClassName}
+                className={cn(providerButtonClassName, buttonClassName)}
               />
             );
           })
@@ -186,11 +201,13 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
       </div>
 
       {/* Help text */}
-      <div className='mt-6 text-center'>
-        <p className='text-xs text-tertiary-token'>
-          Your preferred app opens first next time.
-        </p>
-      </div>
+      {hideHelpText ? null : (
+        <div className={cn('mt-6 text-center', helpTextClassName)}>
+          <p className='text-xs text-tertiary-token'>
+            Your preferred app opens first next time.
+          </p>
+        </div>
+      )}
     </div>
   );
 });

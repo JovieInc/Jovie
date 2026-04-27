@@ -1,18 +1,11 @@
 import 'server-only';
 
-import { sql as drizzleSql } from 'drizzle-orm';
 import { unstable_cache } from 'next/cache';
 import { cache } from 'react';
-import { db } from '@/lib/db';
 // eslint-disable-next-line no-restricted-imports -- Schema barrel import needed for the contact type alias
 import type { CreatorContact as DbCreatorContact } from '@/lib/db/schema';
 import type { DiscogRelease } from '@/lib/db/schema/content';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { calculateRequiredProfileCompletion } from '@/lib/profile/completion';
-import {
-  type ProfileThemeRecord,
-  readProfileAccentTheme,
-} from '@/lib/profile/profile-theme';
 import { ensureThemeHasProfileAccent } from '@/lib/profile/profile-theme.server';
 import { getProfileWithLinks as getCreatorProfileWithLinks } from '@/lib/services/profile';
 import { isDspPlatform } from '@/lib/services/social-links/types';
@@ -39,47 +32,6 @@ export interface PublicProfileLoaderResult {
   readonly latestRelease: DiscogRelease | null;
   readonly pressPhotos: PressPhoto[];
   readonly status: 'ok' | 'not_found' | 'error';
-}
-
-async function persistDerivedProfileAccent(params: {
-  profileId: string;
-  username: string;
-  existingTheme: Record<string, unknown> | null | undefined;
-  themeWithAccent: ProfileThemeRecord;
-}): Promise<void> {
-  if (readProfileAccentTheme(params.existingTheme)) {
-    return;
-  }
-
-  const profileAccent = readProfileAccentTheme(params.themeWithAccent);
-  if (!profileAccent) {
-    return;
-  }
-
-  try {
-    await db.execute(drizzleSql`
-      UPDATE ${creatorProfiles}
-      SET
-        theme = jsonb_set(
-          COALESCE(${creatorProfiles.theme}, '{}'::jsonb),
-          '{profileAccent}',
-          ${JSON.stringify(profileAccent)}::jsonb
-        ),
-        updated_at = NOW()
-      WHERE
-        ${creatorProfiles.id} = ${params.profileId}
-        AND (
-          ${creatorProfiles.theme} IS NULL
-          OR ${creatorProfiles.theme}->'profileAccent' IS NULL
-        )
-    `);
-  } catch (error) {
-    logger.warn('Failed to persist derived profile accent', {
-      username: params.username,
-      profileId: params.profileId,
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
 }
 
 function calculateProfileCompletion(result: {
@@ -164,19 +116,12 @@ const fetchProfileAndLinks = async (
       photoDownloadSizes.find(size => size.key === 'original')?.url ??
       mappedProfile.avatar_url ??
       null;
-    const themeWithAccent = await ensureThemeHasProfileAccent({
-      existingTheme: mappedProfile.theme,
-      sourceUrl: accentSourceUrl,
-    });
-    await persistDerivedProfileAccent({
-      profileId: mappedProfile.id,
-      username: mappedProfile.username_normalized,
-      existingTheme: mappedProfile.theme,
-      themeWithAccent,
-    });
     const profile = {
       ...mappedProfile,
-      theme: themeWithAccent,
+      theme: await ensureThemeHasProfileAccent({
+        existingTheme: mappedProfile.theme,
+        sourceUrl: accentSourceUrl,
+      }),
     };
 
     const links: LegacySocialLink[] =

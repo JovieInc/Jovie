@@ -461,6 +461,8 @@ const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
     readySelectors: {
       shell: ['[data-testid="profile-header"]'],
       content: [
+        '[data-testid="profile-primary-tab-releases"]',
+        '[data-testid="profile-primary-tab-listen"]',
         '[data-testid="profile-mode-drawer-listen"]',
         '[data-testid="profile-header"]',
       ],
@@ -509,6 +511,9 @@ const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
     readySelectors: {
       shell: ['[data-testid="profile-header"]'],
       content: [
+        '[data-testid="profile-primary-tab-subscribe"]',
+        '[data-testid="notifications-page"]',
+        '[data-testid="notifications-flow"]',
         '[data-testid="profile-mode-drawer-subscribe"]',
         '[data-testid="profile-header"]',
       ],
@@ -533,6 +538,7 @@ const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
     readySelectors: {
       shell: ['[data-testid="profile-header"]'],
       content: [
+        '[data-testid="profile-primary-tab-about"]',
         '[data-testid="profile-mode-drawer-about"]',
         '[data-testid="profile-header"]',
       ],
@@ -581,6 +587,7 @@ const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
     readySelectors: {
       shell: ['[data-testid="profile-header"]'],
       content: [
+        '[data-testid="profile-primary-tab-tour"]',
         '[data-testid="profile-mode-drawer-tour"]',
         '[data-testid="profile-header"]',
       ],

@@ -36,6 +36,14 @@ export const artistProvider: EntityProvider = {
         id: r.id,
         label: r.name,
         thumbnail: r.imageUrl,
+        meta: {
+          kind: 'artist',
+          subtitle: r.isClaimed ? 'You' : 'Spotify artist',
+          followers: r.followers,
+          popularity: r.popularity,
+          verified: r.verified,
+          isYou: r.isClaimed,
+        },
       }));
       return { items, isLoading: state === 'loading' };
     }, [results, state]);

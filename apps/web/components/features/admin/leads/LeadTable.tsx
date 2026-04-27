@@ -374,7 +374,7 @@ export function LeadTable({
         }
       />
       {isError && leads.length > 0 && (
-        <div className='flex items-center gap-2 border-b border-subtle bg-warning/5 px-4 py-2 text-[13px] text-warning'>
+        <div className='flex items-center gap-2 border-b border-subtle bg-warning/5 px-4 py-2 text-app text-warning'>
           <AlertTriangle className='h-3.5 w-3.5 shrink-0' />
           Unable to refresh leads. Showing cached data.
         </div>

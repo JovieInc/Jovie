@@ -29,6 +29,8 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
     'Internal release workflow (manual entry)',
   '/app/settings/retargeting-ads':
     'Legacy settings route redirected to Audience',
+  '/app/dashboard/release-plan':
+    'Release plan demo page (gated by RELEASE_PLAN_DEMO flag)',
 };
 
 interface ShellPage {

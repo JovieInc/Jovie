@@ -61,7 +61,15 @@ describe('POST /api/notifications/status', () => {
 
   it('returns notification status for valid request', async () => {
     mockGetNotificationStatus.mockResolvedValue({
-      body: { subscribed: true, preferences: {} },
+      body: {
+        subscribed: true,
+        preferences: {},
+        artistEmail: {
+          optedIn: true,
+          pendingProvider: true,
+          visibleToArtist: false,
+        },
+      },
       status: 200,
     });
 
@@ -82,5 +90,10 @@ describe('POST /api/notifications/status', () => {
 
     expect(response.status).toBe(200);
     expect(data.subscribed).toBe(true);
+    expect(data.artistEmail).toEqual({
+      optedIn: true,
+      pendingProvider: true,
+      visibleToArtist: false,
+    });
   });
 });

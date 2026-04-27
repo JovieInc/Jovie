@@ -379,6 +379,31 @@ describe('proxy.ts middleware', () => {
       expect(mocks.clerkMiddleware).not.toHaveBeenCalled();
     });
 
+    it('renders auth routes on production runtime when Clerk keys are missing', async () => {
+      mocks.isStagingHost.mockReturnValue(true);
+      mocks.resolveClerkKeys.mockReturnValue({
+        publishableKey: undefined,
+        secretKey: undefined,
+        status: 'staging_missing',
+      });
+      const originalNodeEnv = process.env.NODE_ENV;
+
+      try {
+        process.env.NODE_ENV = 'production';
+
+        const req = createUnauthenticatedRequest({
+          hostname: 'staging.jov.ie',
+          pathname: '/signup',
+        });
+        const res = await callMiddleware(req);
+
+        expect(res.status).toBe(200);
+        expect(mocks.clerkMiddleware).not.toHaveBeenCalled();
+      } finally {
+        process.env.NODE_ENV = originalNodeEnv;
+      }
+    });
+
     it('returns 503 for protected staging routes when staging Clerk keys are missing', async () => {
       mocks.isStagingHost.mockReturnValue(true);
       mocks.resolveClerkKeys.mockReturnValue({

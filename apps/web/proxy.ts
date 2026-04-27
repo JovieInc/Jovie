@@ -1188,7 +1188,10 @@ export default async function middleware(
     // Authenticated API routes (e.g. /api/chat) must NOT fall through here —
     // their route handlers call auth() and would throw "Clerk can't detect
     // usage of clerkMiddleware()" (JOV-1795) if Clerk context wasn't set up.
-    if (!pathInfo.isProtectedPath && !isClerkRequiredPath(pathname, pathInfo)) {
+    if (
+      pathInfo.isAuthPath ||
+      (!pathInfo.isProtectedPath && !isClerkRequiredPath(pathname, pathInfo))
+    ) {
       return handleRequest(req, null);
     }
 
@@ -1248,7 +1251,10 @@ export default async function middleware(
     : clerkProductionMiddleware;
 
   if (!selectedMiddleware) {
-    if (!pathInfo.isProtectedPath && !isClerkRequiredPath(pathname, pathInfo)) {
+    if (
+      pathInfo.isAuthPath ||
+      (!pathInfo.isProtectedPath && !isClerkRequiredPath(pathname, pathInfo))
+    ) {
       return handleRequest(req, null);
     }
 

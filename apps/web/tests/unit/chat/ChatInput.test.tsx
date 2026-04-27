@@ -1,4 +1,5 @@
 import { TooltipProvider } from '@jovie/ui';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ComponentProps, ReactNode } from 'react';
@@ -6,6 +7,20 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { ChatInput } from '@/components/jovie/components/ChatInput';
 import { fastRender } from '@/tests/utils/fast-render';
+
+function withProviders(ui: ReactNode) {
+  const client = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0 },
+      mutations: { retry: false },
+    },
+  });
+  return (
+    <QueryClientProvider client={client}>
+      <TooltipProvider>{ui}</TooltipProvider>
+    </QueryClientProvider>
+  );
+}
 
 vi.mock('motion/react', () => ({
   motion: {
@@ -75,9 +90,7 @@ describe('ChatInput', () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
     const { getByRole } = fastRender(
-      <TooltipProvider>
-        <ChatInput {...baseProps} onSubmit={onSubmit} />
-      </TooltipProvider>
+      withProviders(<ChatInput {...baseProps} onSubmit={onSubmit} />)
     );
 
     const textarea = getByRole('textbox', { name: /chat message input/i });
@@ -94,9 +107,7 @@ describe('ChatInput', () => {
     const user = userEvent.setup();
     const onImageAttach = vi.fn();
     const { getByRole } = fastRender(
-      <TooltipProvider>
-        <ChatInput {...baseProps} onImageAttach={onImageAttach} />
-      </TooltipProvider>
+      withProviders(<ChatInput {...baseProps} onImageAttach={onImageAttach} />)
     );
 
     const textarea = getByRole('textbox', { name: /chat message input/i });
@@ -113,7 +124,7 @@ describe('ChatInput', () => {
   it('reveals quick actions when the composer is focused', () => {
     const onQuickActionSelect = vi.fn();
     fastRender(
-      <TooltipProvider>
+      withProviders(
         <ChatInput
           {...baseProps}
           quickActions={[
@@ -125,7 +136,7 @@ describe('ChatInput', () => {
           onQuickActionSelect={onQuickActionSelect}
           variant='compact'
         />
-      </TooltipProvider>
+      )
     );
 
     fireEvent.focus(

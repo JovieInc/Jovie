@@ -75,7 +75,7 @@ export function SidebarUpgradeBanner() {
         <div className='flex items-start gap-1.5'>
           <BadgeCheck className='mt-0.5 size-3 shrink-0 text-sidebar-item-icon/60' />
           <div className='min-w-0'>
-            <p className='text-[11px] font-medium tracking-[-0.01em] text-sidebar-item-foreground/75'>
+            <p className='text-2xs font-medium tracking-[-0.01em] text-sidebar-item-foreground/75'>
               Get Verified — {priceLabel}
             </p>
             <p className='mt-0.5 text-[10px] leading-[1.35] text-sidebar-muted/80'>

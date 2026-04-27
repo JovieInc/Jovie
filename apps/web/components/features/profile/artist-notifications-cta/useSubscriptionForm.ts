@@ -60,8 +60,10 @@ interface UseSubscriptionFormReturn {
   handleEmailChange: (value: string) => void;
   handleFieldBlur: () => void;
   handleOtpChange: (value: string) => void;
-  handleSubscribe: () => Promise<void>;
-  handleVerifyOtp: (overrideCode?: string) => Promise<void>;
+  handleSubscribe: () => Promise<
+    'error' | 'pending_confirmation' | 'subscribed'
+  >;
+  handleVerifyOtp: (overrideCode?: string) => Promise<'error' | 'subscribed'>;
   handleResendOtp: () => Promise<boolean>;
   handleKeyDown: React.KeyboardEventHandler<HTMLInputElement>;
 
@@ -237,8 +239,10 @@ export function useSubscriptionForm({
     validateCurrent('blur');
   }, [channel, clearError, phoneInput, emailInput, validateCurrent]);
 
-  const handleConfirmSubscription = useCallback(async (): Promise<boolean> => {
-    if (isSubmitting) return false;
+  const handleConfirmSubscription = useCallback(async (): Promise<
+    'error' | 'pending_confirmation' | 'subscribed'
+  > => {
+    if (isSubmitting) return 'error';
 
     setIsSubmitting(true);
     clearError();
@@ -285,6 +289,7 @@ export function useSubscriptionForm({
         setOtpStep('verify');
         setResendCooldownEnd(Date.now() + OTP_RESEND_COOLDOWN_MS);
         showSuccess('Enter the 6-digit code we sent to your email.');
+        return 'pending_confirmation';
       } else {
         // Single opt-in: immediate success
         setSubscribedChannels(prev => ({ ...prev, [channel]: true }));
@@ -297,8 +302,8 @@ export function useSubscriptionForm({
 
         setNotificationsState('success');
         showSuccess(getNotificationSubscribeSuccessMessage(channel));
+        return 'subscribed';
       }
-      return true;
     } catch (err) {
       updateError(
         resolveInlineErrorMessage(err, NOTIFICATION_COPY.errors.subscribe),
@@ -319,7 +324,7 @@ export function useSubscriptionForm({
         source,
         handle: artist.handle,
       });
-      return false;
+      return 'error';
     } finally {
       setIsSubmitting(false);
     }
@@ -357,14 +362,14 @@ export function useSubscriptionForm({
 
   const handleVerifyOtp = useCallback(
     async (overrideCode?: string) => {
-      if (isSubmitting) return;
+      if (isSubmitting) return 'error' as const;
       const verificationCode = (overrideCode ?? otpCode)
         .replaceAll(/[^\d]/g, '')
         .slice(0, 6);
 
       if (verificationCode.length !== 6) {
         updateError('Enter the 6-digit code from your email', 'verify');
-        return;
+        return 'error' as const;
       }
 
       setIsSubmitting(true);
@@ -385,11 +390,13 @@ export function useSubscriptionForm({
         setSubscriptionDetails(prev => ({ ...prev, email: normalizedEmail }));
         setNotificationsState('success');
         showSuccess("You're all set. We'll keep you in the loop.");
+        return 'subscribed' as const;
       } catch (err) {
         updateError(
           resolveInlineErrorMessage(err, NOTIFICATION_COPY.errors.generic),
           'verify'
         );
+        return 'error' as const;
       } finally {
         setIsSubmitting(false);
       }
@@ -422,9 +429,9 @@ export function useSubscriptionForm({
       handle: artist.handle,
     });
 
-    const success = await handleConfirmSubscription();
+    const result = await handleConfirmSubscription();
 
-    if (success) {
+    if (result !== 'error') {
       track('otp_resend_success', {
         source,
         handle: artist.handle,
@@ -437,7 +444,7 @@ export function useSubscriptionForm({
     }
 
     setIsResending(false);
-    return success;
+    return result !== 'error';
   }, [
     artist.handle,
     clearError,
@@ -456,7 +463,7 @@ export function useSubscriptionForm({
   }, []);
 
   const handleSubscribe = useCallback(async () => {
-    if (isSubmitting) return;
+    if (isSubmitting) return 'error' as const;
 
     // Track button click intent (before validation)
     track('subscribe_click', {
@@ -472,7 +479,7 @@ export function useSubscriptionForm({
         source,
         handle: artist.handle,
       });
-      return;
+      return 'error' as const;
     }
 
     track('notifications_subscribe_attempt', {
@@ -481,7 +488,7 @@ export function useSubscriptionForm({
       handle: artist.handle,
     });
 
-    await handleConfirmSubscription();
+    return await handleConfirmSubscription();
   }, [
     artist.handle,
     channel,

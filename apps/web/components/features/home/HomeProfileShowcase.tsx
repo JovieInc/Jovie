@@ -1,16 +1,27 @@
 'use client';
 
+import Image from 'next/image';
 import { type ReactNode, useEffect, useRef } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
-import type { ProfileShowcaseStateId } from '@/features/profile/contracts';
+import type {
+  ProfilePrimaryTab,
+  ProfileShowcaseStateId,
+} from '@/features/profile/contracts';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
+import {
+  buildProfileAccentCssVars,
+  readProfileAccentTheme,
+} from '@/lib/profile/profile-theme';
 import { cn } from '@/lib/utils';
 import { ProfileCompactSurface } from '../profile/templates/ProfileCompactSurface';
 import { HomePhoneFrame } from './HomePhoneFrame';
 import {
-  getPreviewActiveMode,
   HOMEPAGE_PROFILE_PREVIEW_ARTIST,
   HOMEPAGE_PROFILE_PREVIEW_CONTACTS,
+  HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_ARTIST,
+  HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_RELEASE,
+  HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_SOCIAL_LINKS,
+  HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_TOUR_DATES,
   HOMEPAGE_PROFILE_PREVIEW_PLAYLIST_FALLBACK,
   HOMEPAGE_PROFILE_PREVIEW_RELEASES,
   HOMEPAGE_PROFILE_PREVIEW_SOCIAL_LINKS,
@@ -37,6 +48,8 @@ interface HomeProfileShowcaseProps {
   readonly stateId: ProfileShowcaseStateId;
   readonly compact?: boolean;
   readonly className?: string;
+  readonly phoneClassName?: string;
+  readonly referenceImageSrc?: string;
   readonly presentation?: HomeProfileShowcasePresentation;
   readonly overlayMode?: HomeProfileShowcaseOverlayMode;
   readonly cropAnchor?: HomeProfileShowcaseCropAnchor;
@@ -149,6 +162,10 @@ function HomeProfileOverlayCard({
 }
 
 function getLatestRelease(stateId: ProfileShowcaseStateId) {
+  if (stateId === 'mock-home') {
+    return HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_RELEASE;
+  }
+
   const state = HOMEPAGE_PROFILE_SHOWCASE_STATES[stateId];
 
   switch (state.latestReleaseKey) {
@@ -164,12 +181,32 @@ function getLatestRelease(stateId: ProfileShowcaseStateId) {
 
 function getTourDates(stateId: ProfileShowcaseStateId) {
   switch (stateId) {
+    case 'mock-home':
+      return [...HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_TOUR_DATES];
     case 'playlist-fallback':
     case 'listen-fallback':
       return [];
     default:
       return [...HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES];
   }
+}
+
+function getPreviewArtist(stateId: ProfileShowcaseStateId) {
+  return stateId === 'mock-home'
+    ? HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_ARTIST
+    : HOMEPAGE_PROFILE_PREVIEW_ARTIST;
+}
+
+function getPreviewSocialLinks(stateId: ProfileShowcaseStateId) {
+  return stateId === 'mock-home'
+    ? [...HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_SOCIAL_LINKS]
+    : [...HOMEPAGE_PROFILE_PREVIEW_SOCIAL_LINKS];
+}
+
+function getHeaderSocialLinksOverride(stateId: ProfileShowcaseStateId) {
+  return stateId === 'mock-home'
+    ? [...HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_SOCIAL_LINKS]
+    : undefined;
 }
 
 function getFeaturedPlaylistFallback(stateId: ProfileShowcaseStateId) {
@@ -186,6 +223,21 @@ function shouldResolveNearbyTour(stateId: ProfileShowcaseStateId) {
   return stateId === 'tour-nearby';
 }
 
+function getPreviewActiveMode(
+  stateId: ProfileShowcaseStateId
+): ProfilePrimaryTab {
+  const drawerView = HOMEPAGE_PROFILE_SHOWCASE_STATES[stateId].drawerView;
+
+  switch (drawerView) {
+    case 'listen':
+    case 'subscribe':
+    case 'tour':
+      return drawerView;
+    default:
+      return 'profile';
+  }
+}
+
 function ShowcaseSurface({
   stateId,
   hideJovieBranding,
@@ -196,20 +248,28 @@ function ShowcaseSurface({
   hideMoreMenu: boolean;
 }>) {
   const state = HOMEPAGE_PROFILE_SHOWCASE_STATES[stateId];
+  const artist = getPreviewArtist(stateId);
+  const profileAccentStyle = buildProfileAccentCssVars(
+    readProfileAccentTheme(artist.theme)
+  );
 
   return (
-    <div className='homepage-showcase-surface relative h-full w-full bg-black/96'>
+    <div
+      className='homepage-showcase-surface relative h-full w-full bg-black/96'
+      style={profileAccentStyle}
+    >
       <ProfileCompactSurface
         dataTestId='homepage-profile-preview'
         renderMode='preview'
         presentation='embedded'
-        artist={HOMEPAGE_PROFILE_PREVIEW_ARTIST}
-        socialLinks={[...HOMEPAGE_PROFILE_PREVIEW_SOCIAL_LINKS]}
+        artist={artist}
+        socialLinks={getPreviewSocialLinks(stateId)}
+        headerSocialLinksOverride={getHeaderSocialLinksOverride(stateId)}
         contacts={[...HOMEPAGE_PROFILE_PREVIEW_CONTACTS]}
         latestRelease={getLatestRelease(state.id)}
         profileSettings={{ showOldReleases: true }}
         featuredPlaylistFallback={getFeaturedPlaylistFallback(state.id)}
-        genres={HOMEPAGE_PROFILE_PREVIEW_ARTIST.genres ?? []}
+        genres={artist.genres ?? []}
         photoDownloadSizes={[]}
         pressPhotos={[]}
         allowPhotoDownloads={false}
@@ -223,10 +283,11 @@ function ShowcaseSurface({
         onDrawerOpenChange={() => {}}
         onDrawerViewChange={() => {}}
         onModeSelect={() => {}}
+        onBack={() => {}}
         onOpenMenu={() => {}}
         onPlayClick={() => {}}
         onShare={() => {}}
-        profileHref={`/${HOMEPAGE_PROFILE_PREVIEW_ARTIST.handle}`}
+        profileHref={`/${artist.handle}`}
         artistProfilesHref={APP_ROUTES.ARTIST_PROFILES}
         isSubscribed={
           state.id === 'fans-confirmed' ||
@@ -252,6 +313,8 @@ export function HomeProfileShowcase({
   stateId,
   compact = false,
   className,
+  phoneClassName,
+  referenceImageSrc,
   presentation = 'full-phone',
   overlayMode = 'auto',
   cropAnchor = 'center',
@@ -276,11 +339,26 @@ export function HomeProfileShowcase({
 
   let content: ReactNode = null;
 
-  if (presentation === 'full-phone' || presentation === 'beauty-shot') {
+  if (referenceImageSrc) {
+    content = (
+      <div
+        className={cn('mx-auto w-full max-w-[853px]')}
+        data-testid='homepage-mock-home-reference'
+      >
+        <Image
+          src={referenceImageSrc}
+          alt='Tim White mock home review'
+          width={853}
+          height={1844}
+          className='h-auto w-full'
+        />
+      </div>
+    );
+  } else if (presentation === 'full-phone' || presentation === 'beauty-shot') {
     content = (
       <HomePhoneFrame
         compact={compact}
-        className='homepage-showcase-phone-frame'
+        className={cn('homepage-showcase-phone-frame', phoneClassName)}
       >
         {shouldRenderSurface ? (
           <ShowcaseSurface

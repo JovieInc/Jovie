@@ -24,17 +24,34 @@ export function HomeTrustSection({
   presentation = 'card',
   label = 'Trusted by artists on',
 }: Readonly<HomeTrustSectionProps>) {
-  const logoTone =
-    presentation === 'inline-strip' ? 'text-white/68' : 'text-white/92';
-  const discoWaxSize =
-    presentation === 'inline-strip' ? 'h-[15px]' : 'h-[16px]';
+  const isInlineStrip = presentation === 'inline-strip';
+  const logoTone = isInlineStrip ? 'text-white/68' : 'text-white/92';
+  const discoWaxSize = isInlineStrip ? 'h-[15px]' : 'h-[16px]';
+
+  const innerBoxClass = isInlineStrip
+    ? 'px-0'
+    : cn(
+        'rounded-[28px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(10,11,15,0.96)_0%,rgba(7,8,11,1)_100%)] shadow-[0_26px_72px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.04)]',
+        variant === 'compact'
+          ? 'px-5 py-5 sm:px-6 sm:py-6'
+          : 'px-6 py-7 sm:px-8 sm:py-9'
+      );
+
+  let labelMarginClass: string;
+  if (isInlineStrip) {
+    labelMarginClass = 'mb-5 sm:mb-6';
+  } else if (variant === 'compact') {
+    labelMarginClass = 'mb-4';
+  } else {
+    labelMarginClass = 'mb-5 sm:mb-6';
+  }
 
   return (
     <section
       data-testid='homepage-trust'
       data-presentation={presentation}
       className={cn(
-        presentation === 'inline-strip'
+        isInlineStrip
           ? 'relative z-[1] mx-auto w-full border-t border-white/[0.08] px-5 py-7 sm:px-6 sm:py-8 lg:px-0'
           : 'relative z-[1] mx-auto w-full px-5 sm:px-6 lg:px-0',
         className
@@ -44,26 +61,15 @@ export function HomeTrustSection({
       <div
         className={cn(
           'mx-auto max-w-[var(--linear-content-max)]',
-          presentation === 'inline-strip'
-            ? 'px-0'
-            : cn(
-                'rounded-[28px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(10,11,15,0.96)_0%,rgba(7,8,11,1)_100%)] shadow-[0_26px_72px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.04)]',
-                variant === 'compact'
-                  ? 'px-5 py-5 sm:px-6 sm:py-6'
-                  : 'px-6 py-7 sm:px-8 sm:py-9'
-              )
+          innerBoxClass
         )}
       >
         <p
           className={cn(
-            presentation === 'inline-strip'
-              ? 'text-center text-[12px] font-medium tracking-[-0.01em] text-white/42'
+            isInlineStrip
+              ? 'sr-only'
               : 'text-center text-[12px] font-medium tracking-[0.02em] text-white/48',
-            presentation === 'inline-strip'
-              ? 'mb-5 sm:mb-6'
-              : variant === 'compact'
-                ? 'mb-4'
-                : 'mb-5 sm:mb-6'
+            !isInlineStrip && labelMarginClass
           )}
         >
           {label}
@@ -136,12 +142,21 @@ export function HomeTrustSection({
               presentation === 'inline-strip' && 'sm:px-1 lg:flex-1'
             )}
           >
-            <BlackHoleRecordingsLogo
-              className={cn(
-                'h-[16px] w-auto sm:h-[18px]',
-                presentation === 'inline-strip' && 'opacity-75'
-              )}
-            />
+            {isInlineStrip ? (
+              <span className='inline-flex select-none items-center justify-center'>
+                <span role='img' aria-label='Black Hole Recordings' />
+                <span
+                  aria-hidden='true'
+                  className='inline-flex h-[16px] w-[128px] items-center justify-center gap-[3px] opacity-75'
+                >
+                  <span className='h-[2px] w-[34px] rounded-full bg-white/68' />
+                  <span className='size-[15px] rounded-full border border-white/58 shadow-[inset_0_0_0_3px_rgba(255,255,255,0.18)]' />
+                  <span className='h-[2px] w-[34px] rounded-full bg-white/68' />
+                </span>
+              </span>
+            ) : (
+              <BlackHoleRecordingsLogo className='h-[16px] w-auto sm:h-[18px]' />
+            )}
           </div>
           <div
             className={cn(
@@ -149,13 +164,21 @@ export function HomeTrustSection({
               presentation === 'inline-strip' && 'sm:px-1 lg:flex-1'
             )}
           >
-            <DiscoWaxLogo
-              className={cn(
-                discoWaxSize,
-                'sm:h-[18px]',
-                presentation === 'inline-strip' ? 'text-white/68' : undefined
-              )}
-            />
+            {isInlineStrip ? (
+              <span className='inline-flex select-none items-center justify-center'>
+                <span role='img' aria-label='disco:wax' />
+                <span
+                  aria-hidden='true'
+                  className='inline-flex h-[16px] w-[70px] items-center justify-center gap-[5px] opacity-75'
+                >
+                  <span className='h-[13px] w-[22px] rounded-[5px] bg-white/68' />
+                  <span className='size-[5px] rounded-full bg-white/68' />
+                  <span className='h-[13px] w-[30px] rounded-[5px] bg-white/68' />
+                </span>
+              </span>
+            ) : (
+              <DiscoWaxLogo className={cn(discoWaxSize, 'sm:h-[18px]')} />
+            )}
           </div>
         </div>
       </div>

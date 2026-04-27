@@ -59,6 +59,42 @@ function StatusIcon({
   return <CheckCircle2 className='h-3.5 w-3.5' aria-hidden='true' />;
 }
 
+function QrPreviewPanel({
+  qrPreviewUrl,
+  isDrawer,
+}: Readonly<{ qrPreviewUrl: string | null; isDrawer: boolean }>) {
+  return (
+    <div
+      className={cn(
+        'shrink-0 rounded-[18px] border border-(--linear-app-frame-seam) bg-surface-0',
+        isDrawer
+          ? 'flex h-[156px] w-[156px] items-center justify-center p-3'
+          : 'flex h-[148px] w-[148px] items-center justify-center p-3'
+      )}
+    >
+      {qrPreviewUrl ? (
+        <Image
+          src={qrPreviewUrl}
+          alt='Payment QR code'
+          width={isDrawer ? 132 : 124}
+          height={isDrawer ? 132 : 124}
+          unoptimized
+          className='h-full w-full rounded-[10px] bg-white object-contain'
+        />
+      ) : (
+        <div className='space-y-2 text-center'>
+          <div className='mx-auto flex h-10 w-10 items-center justify-center rounded-xl border border-(--linear-app-frame-seam) bg-surface-1 text-tertiary-token'>
+            <Link2 className='h-4 w-4' aria-hidden='true' />
+          </div>
+          <p className='text-2xs leading-[14px] text-tertiary-token'>
+            QR unlocks when payments are live.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ProviderPill({
   provider,
 }: Readonly<{
@@ -310,34 +346,7 @@ export function ProfilePaySurface({
           isDrawer ? 'justify-end pt-0.5' : 'lg:justify-end'
         )}
       >
-        <div
-          className={cn(
-            'shrink-0 rounded-[18px] border border-(--linear-app-frame-seam) bg-surface-0',
-            isDrawer
-              ? 'flex h-[156px] w-[156px] items-center justify-center p-3'
-              : 'flex h-[148px] w-[148px] items-center justify-center p-3'
-          )}
-        >
-          {qrPreviewUrl ? (
-            <Image
-              src={qrPreviewUrl}
-              alt='Payment QR code'
-              width={isDrawer ? 132 : 124}
-              height={isDrawer ? 132 : 124}
-              unoptimized
-              className='h-full w-full rounded-[10px] bg-white object-contain'
-            />
-          ) : (
-            <div className='space-y-2 text-center'>
-              <div className='mx-auto flex h-10 w-10 items-center justify-center rounded-xl border border-(--linear-app-frame-seam) bg-surface-1 text-tertiary-token'>
-                <Link2 className='h-4 w-4' aria-hidden='true' />
-              </div>
-              <p className='text-2xs leading-[14px] text-tertiary-token'>
-                QR unlocks when payments are live.
-              </p>
-            </div>
-          )}
-        </div>
+        <QrPreviewPanel qrPreviewUrl={qrPreviewUrl} isDrawer={isDrawer} />
       </div>
     </div>
   );

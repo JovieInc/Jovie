@@ -22,10 +22,10 @@ export const TOOLBAR_MENU_ROW_SELECTED_CLASS =
   'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_72%,transparent)] text-primary-token';
 
 export const TOOLBAR_MENU_ITEM_CLASS =
-  'flex min-h-8 min-w-[13rem] items-center rounded-[8px] px-2.5 py-1.25 text-[12.5px] font-[500] leading-4 text-secondary-token outline-none transition-[background-color,color] duration-150 hover:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_60%,transparent)] hover:text-primary-token focus:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_60%,transparent)] focus:text-primary-token data-[highlighted]:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_60%,transparent)] data-[highlighted]:text-primary-token data-[disabled]:pointer-events-none data-[disabled]:opacity-45';
+  'flex min-h-8 min-w-[13rem] items-center rounded-lg px-2.5 py-1.25 text-[12.5px] font-[500] leading-4 text-secondary-token outline-none transition-[background-color,color] duration-150 hover:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_60%,transparent)] hover:text-primary-token focus:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_60%,transparent)] focus:text-primary-token data-[highlighted]:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_60%,transparent)] data-[highlighted]:text-primary-token data-[disabled]:pointer-events-none data-[disabled]:opacity-45';
 
 export const TOOLBAR_MENU_SUB_TRIGGER_CLASS =
-  'justify-between gap-2 rounded-[8px] px-2.5 py-1.25 text-[12.5px] font-[500] leading-4 text-secondary-token hover:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_60%,transparent)] hover:text-primary-token focus:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_60%,transparent)] focus:text-primary-token data-[state=open]:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_64%,transparent)] data-[state=open]:text-primary-token';
+  'justify-between gap-2 rounded-lg px-2.5 py-1.25 text-[12.5px] font-[500] leading-4 text-secondary-token hover:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_60%,transparent)] hover:text-primary-token focus:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_60%,transparent)] focus:text-primary-token data-[state=open]:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_64%,transparent)] data-[state=open]:text-primary-token';
 
 export const TOOLBAR_MENU_LEADING_VISUAL_CLASS =
   'flex h-4 w-[18px] shrink-0 items-center justify-center text-tertiary-token';

@@ -72,7 +72,7 @@ export function SettingsToggleRow(props: Readonly<SettingsToggleRowProps>) {
             <p
               id={descriptionId}
               className={cn(
-                'mt-1 text-[12px] leading-[16px]',
+                'mt-1 text-xs leading-[16px]',
                 props.gated ? 'text-quaternary-token' : 'text-secondary-token'
               )}
             >

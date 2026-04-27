@@ -178,7 +178,7 @@ export function ArtistHero({
               type='button'
               onClick={onBellClick}
               className={`${heroPearlClassName} inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-full px-4 text-mid font-semibold tracking-[-0.015em] text-white/88 transition-[background-color,border-color,color,opacity] hover:bg-white/12 hover:text-white hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]`}
-              aria-label={`Get notified about ${artist.name}`}
+              aria-label={`Manage alerts for ${artist.name}`}
             >
               <Bell className='h-[17px] w-[17px]' aria-hidden='true' />
               <span className='sr-only md:not-sr-only md:inline'>Notify</span>

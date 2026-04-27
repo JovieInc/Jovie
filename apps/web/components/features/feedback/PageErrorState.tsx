@@ -71,7 +71,7 @@ export function PageErrorState({
 
         <div className='space-y-1.5'>
           <h1 className='text-sm font-medium text-secondary-token'>{title}</h1>
-          <p className='text-[13px] text-tertiary-token'>{message}</p>
+          <p className='text-app text-tertiary-token'>{message}</p>
         </div>
 
         <div className='flex justify-center gap-3'>

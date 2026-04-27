@@ -7,6 +7,10 @@ import {
   type ProfileEditContext,
 } from '@/lib/ai/tools/profile-edit';
 
+interface ProfileEditInputSchema {
+  safeParse(input: unknown): { success: boolean };
+}
+
 const testContext: ProfileEditContext = {
   displayName: 'Test Artist',
   bio: 'A cool bio about this artist.',
@@ -36,6 +40,51 @@ async function executeTool(
     };
   };
 }
+
+describe('proposeProfileEdit input schema', () => {
+  function getSchema(): ProfileEditInputSchema {
+    const tool = createProfileEditTool(testContext);
+    const t = tool as unknown as {
+      inputSchema?: ProfileEditInputSchema;
+      parameters?: ProfileEditInputSchema;
+    };
+    const schema = t.inputSchema ?? t.parameters;
+    if (!schema) throw new Error('schema not exposed on tool');
+    return schema;
+  }
+
+  it('rejects sourceUrl with http scheme', () => {
+    const result = getSchema().safeParse({
+      field: 'bio',
+      newValue: 'x',
+      sourceUrl: 'http://example.com',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects sourceUrl with ftp scheme', () => {
+    const result = getSchema().safeParse({
+      field: 'bio',
+      newValue: 'x',
+      sourceUrl: 'ftp://example.com/file',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts sourceUrl with https scheme', () => {
+    const result = getSchema().safeParse({
+      field: 'bio',
+      newValue: 'x',
+      sourceUrl: 'https://timwhite.co/',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts proposal without sourceUrl', () => {
+    const result = getSchema().safeParse({ field: 'bio', newValue: 'x' });
+    expect(result.success).toBe(true);
+  });
+});
 
 describe('createProfileEditTool', () => {
   it('returns a tool with description and execute function', () => {

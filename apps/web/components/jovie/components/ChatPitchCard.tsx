@@ -90,7 +90,7 @@ function PitchBlock({
   return (
     <div className='rounded-lg border border-subtle bg-surface-1 p-2.5'>
       <div className='mb-1.5 flex items-center justify-between'>
-        <span className='text-[11px] font-medium text-secondary-token'>
+        <span className='text-2xs font-medium text-secondary-token'>
           {label}
         </span>
         <div className='flex items-center gap-1.5'>
@@ -107,7 +107,7 @@ function PitchBlock({
       </div>
       <p
         className={cn(
-          'text-[12px] leading-relaxed text-primary-token',
+          'text-xs leading-relaxed text-primary-token',
           !expanded && isLong && 'line-clamp-3'
         )}
       >
@@ -117,7 +117,7 @@ function PitchBlock({
         <button
           type='button'
           onClick={() => setExpanded(!expanded)}
-          className='mt-1 text-[11px] font-medium text-accent-token hover:underline'
+          className='mt-1 text-2xs font-medium text-accent-token hover:underline'
         >
           {expanded ? 'Show less' : 'Show more'}
         </button>
@@ -137,7 +137,7 @@ export function ChatPitchCard({
       <div className='mt-3 rounded-[20px] border border-(--linear-app-frame-seam) bg-surface-0 p-4'>
         <div className='mb-3 flex items-center gap-2'>
           <Sparkles className='h-4 w-4 animate-pulse text-accent-token' />
-          <span className='text-[13px] font-medium text-secondary-token'>
+          <span className='text-app font-medium text-secondary-token'>
             Generating pitches…
           </span>
         </div>
@@ -161,12 +161,12 @@ export function ChatPitchCard({
       <div className='mt-3 rounded-[20px] border border-red-500/20 bg-surface-0 p-4'>
         <div className='flex items-center gap-2'>
           <Sparkles className='h-4 w-4 text-red-500' />
-          <span className='text-[13px] font-medium text-red-500'>
+          <span className='text-app font-medium text-red-500'>
             Pitch generation failed
           </span>
         </div>
         {error && (
-          <p className='mt-1.5 text-[12px] text-secondary-token'>{error}</p>
+          <p className='mt-1.5 text-xs text-secondary-token'>{error}</p>
         )}
       </div>
     );
@@ -178,7 +178,7 @@ export function ChatPitchCard({
     <div className='mt-3 rounded-[20px] border border-(--linear-app-frame-seam) bg-surface-0 p-4'>
       <div className='mb-3 flex items-center gap-2'>
         <Sparkles className='h-4 w-4 text-accent-token' />
-        <span className='text-[13px] font-medium text-secondary-token'>
+        <span className='text-app font-medium text-secondary-token'>
           Pitch Builder{releaseTitle ? ` — ${releaseTitle}` : ''}
         </span>
       </div>

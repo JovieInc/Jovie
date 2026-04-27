@@ -51,7 +51,7 @@ export function ProfileNotificationsButton({
       ariaLabel={
         hasActiveSubscriptions
           ? 'Manage notification preferences'
-          : 'Get notified'
+          : 'Turn on alerts'
       }
       aria-pressed={isEditing}
       onClick={onClick}

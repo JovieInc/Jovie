@@ -3,8 +3,8 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { ImagePlus } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
-
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useAppFlag } from '@/lib/flags/client';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
 
 import {
@@ -19,6 +19,7 @@ import { ChatProvidersRegistrar } from './components/ChatProvidersRegistrar';
 import { ChatUsageAlert } from './components/ChatUsageAlert';
 import {
   useChatImageAttachments,
+  useChatJankMonitor,
   useJovieChat,
   useStickToBottom,
 } from './hooks';
@@ -34,6 +35,7 @@ export function JovieChat({
   conversationId,
   onConversationCreate,
   initialQuery,
+  initialSkillId,
   onTitleChange,
   avatarUrl,
   username,
@@ -42,9 +44,13 @@ export function JovieChat({
   latestReleaseTitle,
 }: JovieChatProps) {
   const initialQuerySubmitted = useRef(false);
+  const initialSkillApplied = useRef(false);
   const imageFileInputRef = useRef<HTMLInputElement>(null);
   // Track message IDs that were loaded from persistence to skip entrance animation
   const knownMessageIdsRef = useRef<Set<string>>(new Set());
+  // Variant F: dim suggestion chips while the slash picker is open so they
+  // don't compete with the morphing surface.
+  const [composerPickerOpen, setComposerPickerOpen] = useState(false);
   const {
     input,
     setInput,
@@ -56,6 +62,7 @@ export function JovieChat({
     isLoadingConversation,
     conversationTitle,
     status,
+    activeConversationId,
     inputRef,
     handleSubmit,
     handleRetry,
@@ -106,6 +113,43 @@ export function JovieChat({
     disabled: isLoading || isSubmitting,
   });
 
+  // ─── Synthetic thinking message (render-only) ───────────────────
+  // Append a placeholder when waiting for the AI to start responding.
+  // This is a displayMessages array, NOT a modification to the real messages.
+  const lastMessage = messages[messages.length - 1];
+  const displayMessages =
+    isLoading && lastMessage?.role === 'user'
+      ? [
+          ...messages,
+          {
+            id: THINKING_PLACEHOLDER_ID,
+            role: 'assistant' as const,
+            parts: [] as MessagePart[],
+            createdAt: new Date(),
+          },
+        ]
+      : messages;
+
+  // ─── Sticky scroll via ResizeObserver ────────────────────────────
+  const {
+    isStuckToBottom,
+    setStuckToBottom,
+    onScroll,
+    totalSizeRef,
+    scrollContainerRef,
+  } = useStickToBottom({ messageCount: displayMessages.length });
+
+  // ─── Chat jank instrumentation (flag-gated) ─────────────────
+  const jankMonitorEnabled = useAppFlag('CHAT_JANK_MONITOR');
+  const { onSend: notifyJankSend } = useChatJankMonitor({
+    conversationId: activeConversationId,
+    messages,
+    status,
+    isStuckToBottom,
+    scrollContainerRef,
+    enabled: jankMonitorEnabled,
+  });
+
   const openImagePicker = useCallback(() => {
     imageFileInputRef.current?.click();
   }, []);
@@ -136,10 +180,26 @@ export function JovieChat({
     (e?: React.FormEvent) => {
       if (isLoading || isSubmitting) return;
       const files = toFileUIParts();
+      notifyJankSend();
       handleSubmit(e, files.length > 0 ? files : undefined);
       clearImages();
     },
-    [handleSubmit, toFileUIParts, clearImages, isLoading, isSubmitting]
+    [
+      handleSubmit,
+      toFileUIParts,
+      clearImages,
+      isLoading,
+      isSubmitting,
+      notifyJankSend,
+    ]
+  );
+
+  const handleSuggestedPromptWithJank = useCallback(
+    (prompt: string) => {
+      notifyJankSend();
+      handleSuggestedPrompt(prompt);
+    },
+    [handleSuggestedPrompt, notifyJankSend]
   );
 
   // Notify parent when the conversation title changes
@@ -159,9 +219,27 @@ export function JovieChat({
       !isLoadingConversation
     ) {
       initialQuerySubmitted.current = true;
+      notifyJankSend();
       submitMessage(initialQuery);
     }
-  }, [initialQuery, isLoadingConversation, submitMessage]);
+  }, [initialQuery, isLoadingConversation, submitMessage, notifyJankSend]);
+
+  // Pre-load a skill chip on mount when the chat was opened from cmd+k with
+  // `?skill=<id>`. We apply once and rely on the chip tray's normal
+  // backspace-to-remove behavior for undo. New conversations only — re-loading
+  // an existing thread shouldn't smuggle a chip into a finished context.
+  useEffect(() => {
+    if (
+      !initialSkillId ||
+      initialSkillApplied.current ||
+      conversationId ||
+      isLoadingConversation
+    ) {
+      return;
+    }
+    initialSkillApplied.current = true;
+    chipTray.addSkill(initialSkillId);
+  }, [initialSkillId, conversationId, isLoadingConversation, chipTray]);
 
   // Populate known message IDs from hydrated conversation to skip entrance animations
   useEffect(() => {
@@ -171,32 +249,6 @@ export function JovieChat({
       }
     }
   }, [messages]);
-
-  // ─── Synthetic thinking message (render-only) ───────────────────
-  // Append a placeholder when waiting for the AI to start responding.
-  // This is a displayMessages array, NOT a modification to the real messages.
-  const lastMessage = messages[messages.length - 1];
-  const displayMessages =
-    isLoading && lastMessage?.role === 'user'
-      ? [
-          ...messages,
-          {
-            id: THINKING_PLACEHOLDER_ID,
-            role: 'assistant' as const,
-            parts: [] as MessagePart[],
-            createdAt: new Date(),
-          },
-        ]
-      : messages;
-
-  // ─── Sticky scroll via ResizeObserver ────────────────────────────
-  const {
-    isStuckToBottom,
-    setStuckToBottom,
-    onScroll,
-    totalSizeRef,
-    scrollContainerRef,
-  } = useStickToBottom({ messageCount: displayMessages.length });
 
   // Virtualizer
   const virtualizer = useVirtualizer({
@@ -282,6 +334,8 @@ export function JovieChat({
     onRemoveLastChip: chipTray.removeLast,
     onAddSkill: chipTray.addSkill,
     onAddEntity: chipTray.addEntity,
+    onPickerOpenChange: setComposerPickerOpen,
+    profileId,
   } as const;
 
   const greetingName = displayName?.trim() || username?.trim() || null;
@@ -472,24 +526,44 @@ export function JovieChat({
                 placeholder='Ask a follow-up...'
                 variant='compact'
                 quickActions={followUpQuickActions}
-                onQuickActionSelect={handleSuggestedPrompt}
+                onQuickActionSelect={handleSuggestedPromptWithJank}
               />
             </div>
           </div>
         </div>
       ) : (
         <div className='flex flex-1 flex-col overflow-hidden'>
-          <div className='flex-1 overflow-y-auto px-4 sm:px-6'>
-            <div className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col items-center justify-center gap-6 py-8'>
+          <div className='relative flex-1 overflow-y-auto px-4 sm:px-6'>
+            {/* Variant F: giant 'j' ornament behind empty thread.
+                Positioned absolute so it doesn't shift the welcome heading. */}
+            <div
+              aria-hidden
+              className='pointer-events-none absolute inset-0 flex items-center justify-center select-none'
+              style={{
+                fontFamily:
+                  'var(--font-display, "Satoshi", -apple-system, system-ui, sans-serif)',
+                fontWeight: 600,
+                fontSize: 'clamp(180px, 38vw, 360px)',
+                color: 'rgba(255,255,255,0.018)',
+                letterSpacing: '-0.08em',
+                lineHeight: 0.8,
+                transform: 'translateY(-12px)',
+              }}
+              data-testid='chat-empty-thread-ornament'
+            >
+              j
+            </div>
+            <div className='relative mx-auto flex min-h-full w-full max-w-[44rem] flex-col items-center justify-center gap-6 py-8'>
               <h1 className='text-balance text-center text-[2rem] font-semibold leading-[1.1] tracking-[-0.035em] text-primary-token sm:text-[2.5rem] md:text-[3rem]'>
                 {emptyStateHeading}
               </h1>
               <div className='mx-auto flex w-full max-w-[38rem] flex-col items-center gap-3'>
                 <SuggestedPrompts
-                  onSelect={handleSuggestedPrompt}
+                  onSelect={handleSuggestedPromptWithJank}
                   isFirstSession={isFirstSession}
                   latestReleaseTitle={latestReleaseTitle}
                   layout='rail'
+                  dimmed={composerPickerOpen}
                 />
                 {chatError && (
                   <div className='mt-2.5 w-full'>

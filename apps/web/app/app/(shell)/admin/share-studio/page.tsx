@@ -143,10 +143,8 @@ function SamplePicker(
   }>
 ) {
   return (
-    <ContentSurfaceCard className='space-y-2.5 rounded-[12px] p-3.5'>
-      <p className='text-[12px] font-semibold text-primary-token'>
-        {props.label}
-      </p>
+    <ContentSurfaceCard className='space-y-2.5 rounded-xl p-3.5'>
+      <p className='text-xs font-semibold text-primary-token'>{props.label}</p>
       <div className='flex flex-wrap gap-2'>
         {props.items.map(item => {
           const isSelected = item.key === props.selectedKey;
@@ -159,7 +157,7 @@ function SamplePicker(
                 props.paramKey,
                 item.key
               )}
-              className={`rounded-full border px-3 py-1.5 text-[12px] transition-colors ${
+              className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
                 isSelected
                   ? 'border-primary-token bg-primary-token/10 text-primary-token'
                   : 'border-subtle text-secondary-token hover:text-primary-token'
@@ -199,17 +197,17 @@ function PayloadCard(
     <ContentSurfaceCard className='space-y-4 rounded-[14px] p-4'>
       <div className='flex items-center justify-between gap-3'>
         <div>
-          <p className='text-[14px] font-semibold text-primary-token'>
+          <p className='text-sm font-semibold text-primary-token'>
             {props.title}
           </p>
-          <p className='text-[12px] text-secondary-token'>
+          <p className='text-xs text-secondary-token'>
             {buildDisplayUrl(new URL(props.context.canonicalUrl).pathname)}
           </p>
         </div>
         <a
           href={props.context.asset.url}
           download={props.context.asset.fileName}
-          className='text-[12px] text-secondary-token hover:text-primary-token'
+          className='text-xs text-secondary-token hover:text-primary-token'
         >
           Download Asset
         </a>
@@ -220,11 +218,11 @@ function PayloadCard(
           <Image
             src={props.context.asset.url}
             alt={`${props.context.title} story preview`}
-            className='aspect-[9/16] w-full rounded-[12px] border border-subtle object-cover'
+            className='aspect-[9/16] w-full rounded-xl border border-subtle object-cover'
             width={1080}
             height={1920}
           />
-          <p className='text-[12px] leading-[18px] text-secondary-token'>
+          <p className='text-xs leading-[18px] text-secondary-token'>
             Instagram fallback: download the story asset, copy the tracked
             canonical link, then add both manually in Stories when native file
             share is unavailable.
@@ -259,10 +257,8 @@ function PayloadCard(
 function PayloadBlock(props: Readonly<{ label: string; value: string }>) {
   return (
     <div className='space-y-1.5'>
-      <p className='text-[12px] font-semibold text-primary-token'>
-        {props.label}
-      </p>
-      <pre className='overflow-x-auto rounded-[12px] border border-subtle bg-surface-0 px-3 py-2 text-[11px] leading-[1.5] text-secondary-token whitespace-pre-wrap'>
+      <p className='text-xs font-semibold text-primary-token'>{props.label}</p>
+      <pre className='overflow-x-auto rounded-xl border border-subtle bg-surface-0 px-3 py-2 text-2xs leading-[1.5] text-secondary-token whitespace-pre-wrap'>
         {props.value}
       </pre>
     </div>
@@ -382,7 +378,7 @@ export default async function AdminShareStudioPage({
         description='Preview share payloads once blog, profile, release, and playlist content exists.'
         testId='admin-share-studio-page'
       >
-        <ContentSurfaceCard className='rounded-[14px] p-5 text-[13px] text-secondary-token'>
+        <ContentSurfaceCard className='rounded-[14px] p-5 text-app text-secondary-token'>
           Share Studio needs at least one real blog post, public profile,
           release, and published playlist to render previews.
         </ContentSurfaceCard>

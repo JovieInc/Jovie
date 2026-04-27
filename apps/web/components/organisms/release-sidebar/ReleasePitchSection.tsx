@@ -250,7 +250,7 @@ export function ReleasePitchSection({
             className='transition-opacity duration-150'
           >
             {activeText ? (
-              <p className='pr-12 text-[12px] leading-relaxed text-primary-token'>
+              <p className='pr-12 text-xs leading-relaxed text-primary-token'>
                 {typewriterText}
                 {isTyping && (
                   <motion.span

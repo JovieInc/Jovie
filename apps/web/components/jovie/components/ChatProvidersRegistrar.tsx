@@ -3,15 +3,17 @@
 import { useEffect, useMemo } from 'react';
 import { registerEntityProvider } from '@/lib/commands/entities';
 import { artistProvider } from './artist-provider';
+import { createEventProvider } from './event-provider';
 import { createReleaseProvider } from './release-provider';
 
 /**
- * Registers the EntityProviders for chat / command surfaces.
+ * Registers the EntityProviders for downstream cmd+k / non-chat surfaces.
  *
- * Must be mounted exactly once inside the Jovie chat container (somewhere
- * above `ChatInput` and `SlashCommandMenu`). The registry throws on duplicate
- * registration, so rendering this twice in one tree is a wiring bug, not a
- * runtime nicety — verified by `apps/web/lib/commands/entities.ts` throw.
+ * The chat composer's slash picker no longer reads from this registry —
+ * it calls `useReleasesQuery` / `useArtistSearchQuery` / `useEventsQuery`
+ * directly so hook order is stable from the very first render. This
+ * component still exists because the broader command palette (JOV-1792)
+ * does need the registry.
  */
 export function ChatProvidersRegistrar({
   profileId,
@@ -22,11 +24,16 @@ export function ChatProvidersRegistrar({
     () => createReleaseProvider(profileId),
     [profileId]
   );
+  const eventProvider = useMemo(
+    () => createEventProvider(profileId),
+    [profileId]
+  );
 
   useEffect(() => {
     registerEntityProvider(releaseProvider);
     registerEntityProvider(artistProvider);
-  }, [releaseProvider]);
+    registerEntityProvider(eventProvider);
+  }, [releaseProvider, eventProvider]);
 
   return null;
 }

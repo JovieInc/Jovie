@@ -1,11 +1,9 @@
 'use client';
 
+import { Play } from 'lucide-react';
 import { useMemo } from 'react';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
-import {
-  PROFILE_DRAWER_META_CLASS,
-  PROFILE_DRAWER_TITLE_CLASS,
-} from '../profile-drawer-classes';
+import { cn } from '@/lib/utils';
 import type { PublicRelease } from '../releases/types';
 
 const YEAR_HEADER_THRESHOLD = 15;
@@ -37,13 +35,6 @@ export interface ReleasesViewProps {
   readonly artistName: string;
 }
 
-/**
- * Body of the `releases` mode: discography rows grouped by year.
- *
- * Pure view component — no title or shell. Year-header grouping only
- * activates when there are enough releases across multiple years to make
- * the separation useful (see `YEAR_HEADER_THRESHOLD`).
- */
 export function ReleasesView({
   releases,
   artistHandle,
@@ -61,81 +52,111 @@ export function ReleasesView({
         )
         .filter(Boolean)
     );
+
     if (releases.length < YEAR_HEADER_THRESHOLD || years.size < 2) {
       return new Set<string>();
     }
+
     const headers = new Set<string>();
-    let prev: string | null = null;
+    let previousYear: string | null = null;
+
     for (const release of releases) {
       const year = release.releaseDate
         ? new Date(release.releaseDate).getUTCFullYear().toString()
         : null;
-      if (year && year !== prev) {
+      if (year && year !== previousYear) {
         headers.add(release.id);
-        prev = year;
+        previousYear = year;
       }
     }
+
     return headers;
   }, [releases]);
 
   return (
-    <div
-      className='flex flex-col gap-0.5'
-      data-testid='profile-mode-drawer-releases'
-    >
-      {releases.map(release => {
-        if (!release.slug) return null;
+    <div className='flex flex-col' data-testid='profile-mode-drawer-releases'>
+      {releases.map((release, index) => {
+        if (!release.slug) {
+          return null;
+        }
 
         const year = release.releaseDate
           ? new Date(release.releaseDate).getUTCFullYear().toString()
           : null;
         const showHeader = yearHeaderSet.has(release.id);
-
-        const collabs = release.artistNames
-          .filter(name => name.toLowerCase() !== ownerNameLower)
-          .join(', ');
-
-        const metaParts = [formatReleaseType(release.releaseType), year].filter(
-          Boolean
+        const collaborators = release.artistNames.filter(
+          name => name.toLowerCase() !== ownerNameLower
         );
-
-        const ariaLabel = collabs
-          ? `View ${release.title} by ${collabs}`
-          : `View ${release.title}`;
+        const meta = [
+          collaborators.length > 0 ? collaborators.join(', ') : null,
+          formatReleaseType(release.releaseType),
+          year,
+        ]
+          .filter(Boolean)
+          .join(' • ');
+        const ariaLabel =
+          collaborators.length > 0
+            ? `View ${release.title} by ${collaborators.join(', ')}`
+            : `View ${release.title}`;
 
         return (
           <div key={release.id}>
             {showHeader ? (
-              <div className='px-4 pb-1 pt-4 text-2xs font-caption text-white/30'>
+              <div className='font-caption px-1 pb-2 pt-5 text-[11px] font-medium uppercase tracking-[0.18em] text-white/24'>
                 {year}
               </div>
             ) : null}
+
             <a
               href={`/${artistHandle}/${release.slug}`}
-              className='flex items-center gap-3 rounded-xl px-4 py-3 transition-colors duration-150 ease-out hover:bg-white/[0.05] focus-visible:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-inset active:bg-white/[0.08]'
+              className={cn(
+                'group flex items-center gap-2.5 py-3 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent hover:bg-white/[0.02]',
+                index > 0 && 'border-t border-white/[0.075]'
+              )}
               aria-label={ariaLabel}
             >
-              <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-md'>
+              <div className='relative h-[50px] w-[50px] shrink-0 overflow-hidden rounded-[11px] bg-white/[0.04] shadow-[0_10px_22px_rgba(0,0,0,0.22)]'>
                 <ImageWithFallback
                   src={release.artworkUrl}
                   alt={release.title}
                   fill
-                  sizes='40px'
+                  sizes='50px'
                   className='object-cover'
                 />
               </div>
-              <div className='flex min-w-0 flex-1 flex-col gap-0.5'>
-                <span className={`truncate ${PROFILE_DRAWER_TITLE_CLASS}`}>
-                  {release.title}
-                </span>
-                <span className={PROFILE_DRAWER_META_CLASS}>
-                  {collabs ? `${collabs} \u00b7 ` : ''}
-                  {metaParts.join(' \u00b7 ')}
+
+              <div className='min-w-0 flex-1 space-y-px'>
+                <div className='flex items-center gap-1.25'>
+                  <span className='truncate text-[15px] font-medium leading-tight tracking-[-0.028em] text-white'>
+                    {release.title}
+                  </span>
+                  {index === 0 ? (
+                    <span className='inline-flex h-[15px] items-center rounded-full border border-white/8 bg-white px-1.25 text-[8px] font-semibold uppercase tracking-[0.04em] text-[#15161a]'>
+                      New
+                    </span>
+                  ) : null}
                   {release.releaseType === 'music_video' ? (
-                    <span className='ml-1.5 rounded-full bg-white/[0.08] px-1.5 py-0.5 text-3xs font-caption text-white/50'>
+                    <span className='inline-flex h-[15px] items-center rounded-full border border-white/8 bg-white/[0.04] px-1.25 text-[8px] font-semibold uppercase tracking-[0.04em] text-white/64'>
                       Video
                     </span>
                   ) : null}
+                </div>
+                <p className='text-2xs truncate text-[11.5px] font-medium tracking-[-0.01em] text-white/38'>
+                  {meta}
+                </p>
+              </div>
+
+              <div className='ml-1 flex shrink-0 items-center gap-3'>
+                <span className='flex h-[34px] w-[34px] items-center justify-center rounded-full border border-white/8 bg-white/[0.02] text-white/78 transition-[border-color,background-color] duration-200 group-hover:border-white/14 group-hover:bg-white/[0.05]'>
+                  <Play className='ml-0.5 h-3 w-3 fill-current' />
+                </span>
+                <span
+                  aria-hidden='true'
+                  className='flex items-center gap-[3px] text-white/24 transition-colors duration-200 group-hover:text-white/36'
+                >
+                  <span className='h-[3px] w-[3px] rounded-full bg-current' />
+                  <span className='h-[3px] w-[3px] rounded-full bg-current' />
+                  <span className='h-[3px] w-[3px] rounded-full bg-current' />
                 </span>
               </div>
             </a>

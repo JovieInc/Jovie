@@ -81,23 +81,23 @@ function ProfilePreviewCard({
           />
 
           <div className='text-center'>
-            <p className='text-[15px] font-semibold text-primary-token'>
+            <p className='text-mid font-semibold text-primary-token'>
               {displayName || username}
             </p>
-            <p className='text-[12px] text-tertiary-token'>@{username}</p>
+            <p className='text-xs text-tertiary-token'>@{username}</p>
           </div>
 
           <div className='w-full'>
             <div className='flex items-center justify-between rounded-[14px] border border-subtle bg-surface-1 px-3.5 py-2.5'>
-              <span className='text-[13px] text-secondary-token'>
+              <span className='text-app text-secondary-token'>
                 Jovie branding
               </span>
-              <span className='rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-tertiary-token'>
+              <span className='rounded-full bg-surface-2 px-2 py-0.5 text-2xs font-medium text-tertiary-token'>
                 Visible
               </span>
             </div>
             <div className='mt-2 flex justify-center'>
-              <span className='rounded-full bg-surface-2 px-3 py-1 text-[10px] font-medium text-tertiary-token'>
+              <span className='rounded-full bg-surface-2 px-3 py-1 text-3xs font-medium text-tertiary-token'>
                 Made with Jovie
               </span>
             </div>
@@ -108,7 +108,7 @@ function ProfilePreviewCard({
       {spotifyFollowers && spotifyFollowers > 0 ? (
         <ContentSurfaceCard className='mb-4 px-4 py-3'>
           <Sparkles className='mt-0.5 h-4 w-4 shrink-0 text-(--linear-accent)' />
-          <p className='text-[13px] text-secondary-token'>
+          <p className='text-app text-secondary-token'>
             You have{' '}
             <span className='font-medium text-primary-token'>
               {spotifyFollowers.toLocaleString()} Spotify followers
@@ -299,12 +299,10 @@ export function OnboardingCheckoutClient({
                   <item.icon className='h-4 w-4 text-(--linear-accent)' />
                 </div>
                 <div>
-                  <p className='text-[13px] font-medium text-primary-token'>
+                  <p className='text-app font-medium text-primary-token'>
                     {item.label}
                   </p>
-                  <p className='text-[12px] text-tertiary-token'>
-                    {item.detail}
-                  </p>
+                  <p className='text-xs text-tertiary-token'>{item.detail}</p>
                 </div>
               </div>
             ))}
@@ -325,7 +323,7 @@ export function OnboardingCheckoutClient({
           <span className='text-3xl font-semibold tracking-tight text-primary-token'>
             {formatPrice(currentAmount)}
           </span>
-          <span className='text-[14px] text-tertiary-token'>
+          <span className='text-sm text-tertiary-token'>
             /{interval === 'year' ? 'yr' : 'mo'}
           </span>
         </div>
@@ -333,7 +331,7 @@ export function OnboardingCheckoutClient({
         {/* Error message */}
         {error ? (
           <ContentSurfaceCard
-            className='mb-4 border-destructive/30 bg-destructive/5 px-4 py-3 text-[13px] text-destructive'
+            className='mb-4 border-destructive/30 bg-destructive/5 px-4 py-3 text-app text-destructive'
             role='alert'
           >
             {error}
@@ -359,7 +357,7 @@ export function OnboardingCheckoutClient({
           type='button'
           onClick={handleSkip}
           disabled={isLoading}
-          className='mt-4 w-full text-center text-[13px] text-tertiary-token hover:text-secondary-token transition-colors disabled:opacity-50'
+          className='mt-4 w-full text-center text-app text-tertiary-token hover:text-secondary-token transition-colors disabled:opacity-50'
         >
           {isDefaultUpsell
             ? 'Start free, upgrade anytime'

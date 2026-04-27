@@ -19,7 +19,7 @@ export default function ScreenshotsLoading() {
           {SKELETON_KEYS.map(key => (
             <ContentSurfaceCard
               key={key}
-              className='space-y-3 rounded-[12px] bg-surface-0 p-3.5'
+              className='space-y-3 rounded-xl bg-surface-0 p-3.5'
             >
               <div className='aspect-video w-full rounded-lg skeleton' />
               <div className='h-4 w-3/4 skeleton' />

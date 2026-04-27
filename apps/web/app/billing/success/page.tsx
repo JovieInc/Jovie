@@ -153,8 +153,8 @@ function FeatureCard({ icon: Icon, title, description }: UnlockTile) {
   return (
     <ContentSurfaceCard surface='nested' className='space-y-2 p-4 text-left'>
       <Icon className='h-5 w-5 text-accent' aria-hidden='true' />
-      <p className='text-[13px] font-semibold text-primary-token'>{title}</p>
-      <p className='text-[12px] leading-5 text-tertiary-token'>{description}</p>
+      <p className='text-app font-semibold text-primary-token'>{title}</p>
+      <p className='text-xs leading-5 text-tertiary-token'>{description}</p>
     </ContentSurfaceCard>
   );
 }
@@ -399,7 +399,7 @@ export default function CheckoutSuccessPage() {
 
             {feedback ? (
               <output
-                className='text-[13px] text-secondary-token'
+                className='text-app text-secondary-token'
                 aria-live='polite'
                 aria-atomic='true'
               >

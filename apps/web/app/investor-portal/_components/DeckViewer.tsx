@@ -22,7 +22,7 @@ interface DeckViewerProps {
 
 const deckButtonClass = cn(
   'flex items-center gap-1.5 rounded-[var(--radius-default)] px-3 py-1.5',
-  'text-[length:var(--text-sm)] font-[510] text-[var(--color-text-tertiary-token)]',
+  'text-[length:var(--text-sm)] font-medium text-[var(--color-text-tertiary-token)]',
   'hover:bg-[var(--color-interactive-hover)] hover:text-[var(--color-text-secondary-token)]',
   'active:scale-[0.97] focus-ring-themed transition-colors',
   'disabled:opacity-30 disabled:cursor-not-allowed'
@@ -150,7 +150,7 @@ export function DeckViewer({ slides }: DeckViewerProps) {
         onTouchEnd={handleTouchEnd}
       >
         <h2
-          className='mb-4 text-[length:var(--text-xl)] font-[680] text-[var(--color-text-primary-token)] sm:text-[length:var(--text-2xl)]'
+          className='mb-4 text-[length:var(--text-xl)] font-bold text-[var(--color-text-primary-token)] sm:text-[length:var(--text-2xl)]'
           style={{
             letterSpacing: 'var(--tracking-tight)',
             fontFeatureSettings: 'var(--font-features)',

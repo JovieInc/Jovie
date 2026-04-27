@@ -1,6 +1,6 @@
 {
   "name": "@jovie/web",
-  "version": "26.4.174",
+  "version": "26.4.179",
   "private": true,
   "sideEffects": false,
   "engines": {
@@ -47,6 +47,7 @@
     "test:lighthouse:dashboard:pr": "node scripts/lighthouse-dashboard-auth.cjs",
     "test:lighthouse:onboarding:pr": "LIGHTHOUSE_CONFIG=.lighthouserc.onboarding.pr.json LIGHTHOUSE_DASHBOARD_URLS=/onboarding node scripts/lighthouse-dashboard-auth.cjs",
     "test:lighthouse:admin:pr": "LIGHTHOUSE_CONFIG=.lighthouserc.admin.pr.json LIGHTHOUSE_DASHBOARD_URLS=/app/admin/growth,/app/admin/creators,/app/admin/users,/app/admin/releases LIGHTHOUSE_TEST_PERSONA=admin node scripts/lighthouse-dashboard-auth.cjs",
+    "test:lighthouse:chat:pr": "LIGHTHOUSE_CONFIG=.lighthouserc.chat.pr.json LIGHTHOUSE_DASHBOARD_URLS=/app/chat node scripts/lighthouse-dashboard-auth.cjs",
     "test:flaky": "tsx scripts/flaky-test-detector.ts",
     "test:e2e": "playwright test",
     "test:e2e:fast": "node scripts/run-playwright-fast.mjs",
@@ -135,6 +136,7 @@
     "qa:overnight:resume": "tsx scripts/overnight-qa-controller.ts --resume",
     "qa:overnight:status": "tsx scripts/overnight-qa-controller.ts --status",
     "qa:overnight:dry-run": "tsx scripts/overnight-qa-controller.ts --dry-run",
+    "profile:mock-diff": "tsx scripts/profile-mock-diff.ts",
     "perf:loop": "tsx scripts/performance-optimizer.ts",
     "perf:loop:end-user": "tsx scripts/performance-optimizer.ts --scope end-user",
     "perf:overnight": "tsx scripts/performance-overnight.ts",

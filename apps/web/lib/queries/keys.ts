@@ -242,6 +242,15 @@ export const queryKeys = {
       [...queryKeys.tourDates.all, 'analytics', tourDateId] as const,
   },
 
+  // Events queries (chat composer entity surface).
+  // Initially backed by the tour-dates loader; future event types will be
+  // mapped through the same query so consumers don't change.
+  events: {
+    all: ['events'] as const,
+    list: (profileId: string) =>
+      [...queryKeys.events.all, 'list', profileId] as const,
+  },
+
   // Handle/username availability queries
   handle: {
     all: ['handle'] as const,

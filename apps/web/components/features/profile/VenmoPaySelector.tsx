@@ -68,7 +68,11 @@ export default function VenmoPaySelector({
       <PaySelector
         amounts={amounts}
         onContinue={handleAmountSelected}
-        paymentLabel='Pay'
+        presentation='drawer'
+        primaryLabel='Send payment'
+        paymentLabel='Venmo'
+        showOtherPaymentOptions
+        otherPaymentOptionsLabel='Other payment options'
       />
     </section>
   );

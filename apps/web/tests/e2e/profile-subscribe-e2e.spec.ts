@@ -38,55 +38,75 @@ async function interceptAnalytics(page: Page) {
  * Navigate to the test profile, set mobile viewport, and wait for hydration.
  * Returns `false` if the notifications CTA is not present (caller should skip).
  */
-async function setupProfilePage(page: Page): Promise<boolean> {
+async function setupProfilePage(page: Page) {
   await interceptAnalytics(page);
   await page.setViewportSize({ width: 375, height: 812 });
 
-  const response = await smokeNavigate(page, `/${TEST_PROFILES.DUALIPA}`, {
-    timeout: 120_000,
-  });
+  const response = await smokeNavigate(
+    page,
+    `/${TEST_PROFILES.DUALIPA}?mode=subscribe`,
+    {
+      timeout: 120_000,
+    }
+  );
   expect(response?.status() ?? 0).toBeLessThan(500);
 
   await waitForHydration(page);
 
-  // Wait for the inline CTA wrapper to appear
-  const ctaVisible = await page
-    .locator('[data-testid="profile-inline-cta"]')
-    .isVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY })
-    .catch(() => false);
-
-  return ctaVisible;
-}
-
-/**
- * Click the "Turn on notifications" button and wait for the email input to
- * appear. Returns `false` if the button is not found.
- */
-async function clickTurnOnNotifications(page: Page): Promise<boolean> {
-  const btn = page.getByRole('button', { name: /turn on notifications/i });
-  const visible = await btn
-    .isVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY })
-    .catch(() => false);
-  if (!visible) return false;
-
-  await btn.click();
-
-  // Wait for the email input to render
   await page
-    .locator('[data-testid="inline-email-input"]')
+    .locator(
+      '[data-testid="profile-mobile-notifications-step-preferences"], [data-testid="profile-inline-notifications-trigger"]'
+    )
+    .first()
     .waitFor({ state: 'visible', timeout: SMOKE_TIMEOUTS.VISIBILITY });
-
-  return true;
 }
 
 /**
- * Type an email and submit via the circular arrow button.
+ * Open the full-screen notifications flow and advance to the email step.
+ * Returns `false` if the trigger is not found.
+ */
+async function clickTurnOnNotifications(page: Page) {
+  const preferencesStep = page.getByTestId(
+    'profile-mobile-notifications-step-preferences'
+  );
+  const preferencesVisible = await preferencesStep
+    .isVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY })
+    .catch(() => false);
+
+  if (!preferencesVisible) {
+    const btn = page.getByTestId('profile-inline-notifications-trigger');
+    await btn.waitFor({ state: 'visible', timeout: SMOKE_TIMEOUTS.VISIBILITY });
+    await btn.click();
+    await preferencesStep.waitFor({
+      state: 'visible',
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
+  }
+
+  await preferencesStep.getByRole('switch', { name: /new music/i }).click();
+
+  await page
+    .getByTestId('profile-mobile-notifications-step-email')
+    .waitFor({ state: 'visible', timeout: SMOKE_TIMEOUTS.VISIBILITY });
+  await page.getByTestId('mobile-email-input').waitFor({
+    state: 'visible',
+    timeout: SMOKE_TIMEOUTS.VISIBILITY,
+  });
+}
+
+/**
+ * Type an email and submit the email step.
  */
 async function submitEmail(page: Page, email: string) {
-  const input = page.locator('[data-testid="inline-email-input"]');
+  const emailStep = page.getByTestId('profile-mobile-notifications-step-email');
+  await emailStep.waitFor({
+    state: 'visible',
+    timeout: SMOKE_TIMEOUTS.VISIBILITY,
+  });
+  const input = page.getByTestId('mobile-email-input');
   await input.fill(email);
 
-  const submitBtn = page.getByRole('button', { name: /submit/i });
+  const submitBtn = emailStep.getByRole('button', { name: /^continue$/i });
   await submitBtn.click();
 }
 
@@ -95,10 +115,60 @@ async function expectSubscribeError(page: Page, message: string) {
     page
       .getByRole('alert')
       .or(page.getByRole('tooltip'))
-      .or(page.locator('[data-testid="profile-inline-cta"]'))
+      .or(page.getByTestId('profile-mobile-notifications-flow'))
   ).toContainText(message, {
     timeout: SMOKE_TIMEOUTS.VISIBILITY,
   });
+}
+
+async function completeNameStep(page: Page, name: string) {
+  const nameStep = page.getByTestId('profile-mobile-notifications-step-name');
+  await nameStep.waitFor({
+    state: 'visible',
+    timeout: SMOKE_TIMEOUTS.VISIBILITY,
+  });
+  await page.getByTestId('mobile-name-input').fill(name);
+  await nameStep.getByRole('button', { name: /^continue$/i }).click();
+}
+
+async function completeBirthdayStep(page: Page) {
+  const birthdayStep = page.getByTestId(
+    'profile-mobile-notifications-step-birthday'
+  );
+  await birthdayStep.waitFor({
+    state: 'visible',
+    timeout: SMOKE_TIMEOUTS.VISIBILITY,
+  });
+  await page.getByTestId('mobile-birthday-month').selectOption('04');
+  await page.getByTestId('mobile-birthday-day').selectOption('24');
+  await page.getByTestId('mobile-birthday-year').selectOption('1994');
+  await birthdayStep.getByRole('button', { name: /^continue$/i }).click();
+}
+
+async function enterOtpCode(page: Page, code: string) {
+  const otpStep = page.getByTestId('profile-mobile-notifications-step-otp');
+  const firstDigitInput = page.getByLabel('Digit 1 of 6');
+
+  await otpStep.waitFor({
+    state: 'visible',
+    timeout: SMOKE_TIMEOUTS.VISIBILITY,
+  });
+  await firstDigitInput.waitFor({
+    state: 'visible',
+    timeout: SMOKE_TIMEOUTS.VISIBILITY,
+  });
+
+  await firstDigitInput.click();
+  await firstDigitInput.pressSequentially(code);
+
+  const otpSubmitBtn = otpStep.getByRole('button', { name: /^verify$/i });
+  const canClickVerify = await otpSubmitBtn
+    .isEnabled({ timeout: 1000 })
+    .catch(() => false);
+
+  if (canClickVerify) {
+    await otpSubmitBtn.click();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -129,95 +199,59 @@ test.describe('Profile Subscribe Flow @smoke', () => {
       });
     });
 
-    // Mock name/birthday update endpoints (hit after OTP success)
-    await page.route('**/api/notifications/subscriber/name', async route => {
+    // Mock post-OTP enrichment endpoints.
+    await page.route('**/api/notifications/update-name', async route => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ success: true }),
       });
     });
-    await page.route(
-      '**/api/notifications/subscriber/birthday',
-      async route => {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ success: true }),
-        });
-      }
-    );
+    await page.route('**/api/notifications/update-birthday', async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true }),
+      });
+    });
+    await page.route('**/api/notifications/preferences', async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, updated: 1 }),
+      });
+    });
 
-    const ctaAvailable = await setupProfilePage(page);
-    if (!ctaAvailable) {
-      test.skip(true, 'Notifications CTA not available on test profile');
-      return;
-    }
-
-    const opened = await clickTurnOnNotifications(page);
-    if (!opened) {
-      test.skip(true, '"Turn on notifications" button not found');
-      return;
-    }
+    await setupProfilePage(page);
+    await clickTurnOnNotifications(page);
 
     // Type email and submit
     await submitEmail(page, 'test@example.com');
 
     // Wait for OTP step
-    const otpInput = page.locator('[data-testid="otp-autofill-input"]');
-    await otpInput.waitFor({
-      state: 'visible',
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
-    });
+    await enterOtpCode(page, '123456');
 
-    // Fill OTP code
-    await otpInput.fill('123456');
+    await completeNameStep(page, 'Alex');
+    await completeBirthdayStep(page);
 
-    // The OTP component auto-submits on complete, but click verify if needed
-    const otpSubmitBtn = page.getByRole('button', { name: /submit/i });
-    if (await otpSubmitBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await otpSubmitBtn.click();
-    }
+    await page
+      .getByTestId('profile-mobile-notifications-step-preferences')
+      .waitFor({ state: 'visible', timeout: SMOKE_TIMEOUTS.VISIBILITY });
+    await page
+      .getByTestId('profile-mobile-notifications-step-preferences')
+      .getByRole('button', { name: /save & finish/i })
+      .click();
 
-    // After OTP success, the flow goes to name step, then birthday, then done.
-    // Skip through name step (submit empty)
-    const nameInput = page.locator('[data-testid="inline-name-input"]');
-    const nameVisible = await nameInput
-      .isVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY })
-      .catch(() => false);
-    if (nameVisible) {
-      const nameSubmitBtn = page.getByRole('button', { name: /submit/i });
-      await nameSubmitBtn.click();
-    }
-
-    // Skip through birthday step (submit empty)
-    const birthdayInput = page.locator('[data-testid="inline-birthday-input"]');
-    const birthdayVisible = await birthdayInput
-      .isVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY })
-      .catch(() => false);
-    if (birthdayVisible) {
-      const birthdaySubmitBtn = page.getByRole('button', { name: /submit/i });
-      await birthdaySubmitBtn.click();
-    }
-
-    // Assert success state: "Notifications on" text visible
-    await expect(page.getByText('Notifications on')).toBeVisible({
+    await expect(
+      page.getByTestId('profile-mobile-notifications-step-done')
+    ).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
   });
 
   test('invalid email shows validation error', async ({ page }) => {
-    const ctaAvailable = await setupProfilePage(page);
-    if (!ctaAvailable) {
-      test.skip(true, 'Notifications CTA not available on test profile');
-      return;
-    }
-
-    const opened = await clickTurnOnNotifications(page);
-    if (!opened) {
-      test.skip(true, '"Turn on notifications" button not found');
-      return;
-    }
+    await setupProfilePage(page);
+    await clickTurnOnNotifications(page);
 
     // Type an invalid email and submit
     await submitEmail(page, 'notanemail');
@@ -244,35 +278,13 @@ test.describe('Profile Subscribe Flow @smoke', () => {
       });
     });
 
-    const ctaAvailable = await setupProfilePage(page);
-    if (!ctaAvailable) {
-      test.skip(true, 'Notifications CTA not available on test profile');
-      return;
-    }
-
-    const opened = await clickTurnOnNotifications(page);
-    if (!opened) {
-      test.skip(true, '"Turn on notifications" button not found');
-      return;
-    }
+    await setupProfilePage(page);
+    await clickTurnOnNotifications(page);
 
     await submitEmail(page, 'test@example.com');
 
     // Wait for OTP step
-    const otpInput = page.locator('[data-testid="otp-autofill-input"]');
-    await otpInput.waitFor({
-      state: 'visible',
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
-    });
-
-    // Fill wrong OTP
-    await otpInput.fill('000000');
-
-    // Click verify submit if available
-    const otpSubmitBtn = page.getByRole('button', { name: /submit/i });
-    if (await otpSubmitBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await otpSubmitBtn.click();
-    }
+    await enterOtpCode(page, '000000');
 
     await expectSubscribeError(page, 'Invalid verification code');
   });
@@ -298,34 +310,13 @@ test.describe('Profile Subscribe Flow @smoke', () => {
       });
     });
 
-    const ctaAvailable = await setupProfilePage(page);
-    if (!ctaAvailable) {
-      test.skip(true, 'Notifications CTA not available on test profile');
-      return;
-    }
-
-    const opened = await clickTurnOnNotifications(page);
-    if (!opened) {
-      test.skip(true, '"Turn on notifications" button not found');
-      return;
-    }
+    await setupProfilePage(page);
+    await clickTurnOnNotifications(page);
 
     await submitEmail(page, 'test@example.com');
 
     // Wait for OTP step
-    const otpInput = page.locator('[data-testid="otp-autofill-input"]');
-    await otpInput.waitFor({
-      state: 'visible',
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
-    });
-
-    // Fill OTP and trigger submit
-    await otpInput.fill('000000');
-
-    const otpSubmitBtn = page.getByRole('button', { name: /submit/i });
-    if (await otpSubmitBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await otpSubmitBtn.click();
-    }
+    await enterOtpCode(page, '000000');
 
     await expectSubscribeError(
       page,
@@ -334,17 +325,8 @@ test.describe('Profile Subscribe Flow @smoke', () => {
   });
 
   test('SMS path: toggle shows phone input', async ({ page }) => {
-    const ctaAvailable = await setupProfilePage(page);
-    if (!ctaAvailable) {
-      test.skip(true, 'Notifications CTA not available on test profile');
-      return;
-    }
-
-    const opened = await clickTurnOnNotifications(page);
-    if (!opened) {
-      test.skip(true, '"Turn on notifications" button not found');
-      return;
-    }
+    await setupProfilePage(page);
+    await clickTurnOnNotifications(page);
 
     // Look for a channel toggle button (Switch to text / SMS toggle)
     const smsToggle = page

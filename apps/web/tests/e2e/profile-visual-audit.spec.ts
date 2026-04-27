@@ -277,27 +277,39 @@ async function waitForVisibleSelector(
 
 async function ensureComposerVisible(page: import('@playwright/test').Page) {
   const composerSelectors = [
-    '[data-testid="subscription-pearl-composer"]',
-    '[data-testid="inline-email-input-composer"]',
+    '[data-testid="profile-mobile-notifications-flow"]',
+    '[data-testid="profile-mobile-notifications-step-preferences"]',
+    '[data-testid="profile-mobile-notifications-step-email"]',
   ] as const;
 
-  for (const selector of composerSelectors) {
-    const composer = page.locator(selector);
-    if ((await composer.count()) > 0) {
-      const visible = await composer
-        .first()
-        .isVisible()
-        .catch(() => false);
-      if (visible) {
-        return;
+  const hasVisibleComposer = async () => {
+    for (const selector of composerSelectors) {
+      const composer = page.locator(selector);
+      const count = await composer.count();
+      for (let index = count - 1; index >= 0; index -= 1) {
+        if (
+          await composer
+            .nth(index)
+            .isVisible()
+            .catch(() => false)
+        ) {
+          return true;
+        }
       }
     }
+
+    return false;
+  };
+
+  if (await hasVisibleComposer()) {
+    return;
   }
 
   const revealCandidates = [
     page.getByRole('button', {
-      name: /turn on notifications|get notified|manage notification preferences/i,
+      name: /turn on notifications|get notified|manage alerts|manage notification preferences/i,
     }),
+    page.locator('[data-testid="profile-inline-notifications-trigger"]'),
     page.locator('[data-testid="subscribe-cta-container"] button'),
     page.locator('[data-testid="notifications-page"] button'),
   ];
@@ -306,31 +318,37 @@ async function ensureComposerVisible(page: import('@playwright/test').Page) {
     const trigger = candidate.first();
     if (await trigger.isVisible().catch(() => false)) {
       await trigger.scrollIntoViewIfNeeded().catch(() => undefined);
-      await trigger.click();
+      try {
+        await trigger.click();
+      } catch {
+        if (await hasVisibleComposer()) {
+          return;
+        }
+        throw new Error('Failed to reveal the notifications composer');
+      }
       break;
     }
   }
 
-  for (const selector of composerSelectors) {
-    const composer = page.locator(selector).first();
-    const visible = await composer.isVisible().catch(() => false);
-    if (visible) {
-      return;
-    }
+  if (await hasVisibleComposer()) {
+    return;
   }
+
   await waitForVisibleSelector(
     page,
-    '[data-testid="subscription-pearl-composer"], [data-testid="inline-email-input-composer"]'
+    '[data-testid="profile-mobile-notifications-flow"], [data-testid="profile-mobile-notifications-step-preferences"], [data-testid="profile-mobile-notifications-step-email"]'
   );
 }
 
 async function focusComposerInput(page: import('@playwright/test').Page) {
-  const input = page
-    .locator(
-      '[data-testid="subscription-input"], [data-testid="inline-email-input"]'
-    )
-    .filter({ visible: true })
-    .first();
+  const preferencesStep = page
+    .getByTestId('profile-mobile-notifications-step-preferences')
+    .last();
+  if (await preferencesStep.isVisible().catch(() => false)) {
+    await preferencesStep.getByRole('switch', { name: /new music/i }).click();
+  }
+
+  const input = page.getByTestId('mobile-email-input').last();
   await input.waitFor({ state: 'visible', timeout: 15_000 });
   await input.focus();
 }

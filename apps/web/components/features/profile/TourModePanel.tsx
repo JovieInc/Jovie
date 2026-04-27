@@ -1,8 +1,8 @@
 'use client';
 
-import { ChevronRight, MapPin } from 'lucide-react';
+import { MapPin } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useId, useState } from 'react';
+import { useMemo } from 'react';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import {
   type TourDateWithProximity,
@@ -11,6 +11,7 @@ import {
 import { useTourDateTicketClick } from '@/hooks/useTourDateTicketClick';
 import { useUserLocation } from '@/hooks/useUserLocation';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
+import { cn } from '@/lib/utils';
 import { formatLocationString } from '@/lib/utils/string-utils';
 import type { Artist } from '@/types/db';
 import { ArtistNotificationsCTA } from './artist-notifications-cta/ArtistNotificationsCTA';
@@ -26,39 +27,79 @@ function getTicketStatusClassName(
   canBuyTickets: boolean
 ): string {
   if (ticketStatus === 'sold_out') {
-    return 'text-[rgb(118,114,255)]';
+    return 'border-white/8 bg-transparent text-white/38';
   }
-  return canBuyTickets ? 'text-white/62' : 'text-white/34';
+
+  return canBuyTickets
+    ? 'border-white/14 bg-white/[0.02] text-white'
+    : 'border-white/8 bg-transparent text-white/38';
 }
 
 function getTicketStatusLabel(
   ticketStatus: TourDateViewModel['ticketStatus'],
   canBuyTickets: boolean
 ): string {
-  if (ticketStatus === 'sold_out') return 'Sold out';
-  if (canBuyTickets) return 'Tickets';
-  return 'No tickets';
+  if (ticketStatus === 'sold_out') {
+    return 'Sold Out';
+  }
+
+  if (canBuyTickets) {
+    return 'Tickets';
+  }
+
+  return 'No Tickets';
 }
 
-/** Date box showing month + day stacked vertically, formatted in UTC to avoid timezone shift */
-function DateBox({ date }: { readonly date: string }) {
-  const parsedDate = new Date(date);
-  const monthLabel = new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    timeZone: 'UTC',
-  }).format(parsedDate);
-  const dayLabel = new Intl.DateTimeFormat('en-US', {
-    day: 'numeric',
-    timeZone: 'UTC',
-  }).format(parsedDate);
+function toDisplayDate(value: string) {
+  const parsed = new Date(value);
+
+  return {
+    month: new Intl.DateTimeFormat('en-US', {
+      month: 'short',
+      timeZone: 'UTC',
+    }).format(parsed),
+    day: new Intl.DateTimeFormat('en-US', {
+      day: '2-digit',
+      timeZone: 'UTC',
+    }).format(parsed),
+  };
+}
+
+function DateBox({
+  date,
+  featured,
+}: Readonly<{
+  readonly date: string;
+  readonly featured: boolean;
+}>) {
+  const displayDate = useMemo(() => toDisplayDate(date), [date]);
 
   return (
-    <div className='flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-xl border border-white/6'>
-      <span className='text-[0.7rem] font-semibold uppercase tracking-[0.06em] text-white/44'>
-        {monthLabel}
+    <div
+      className={cn(
+        'flex h-[68px] w-[54px] shrink-0 flex-col items-center justify-center rounded-[15px] border',
+        featured
+          ? 'border-[color:var(--profile-status-pill-border)] bg-[color:var(--profile-status-pill-bg)]'
+          : 'border-white/8 bg-white/[0.02]'
+      )}
+    >
+      <span
+        className={cn(
+          'text-[9px] font-semibold uppercase tracking-[0.1em]',
+          featured
+            ? 'text-[color:var(--profile-accent-primary)]'
+            : 'text-white/42'
+        )}
+      >
+        {displayDate.month}
       </span>
-      <span className='text-[1.2rem] font-bold leading-tight text-white/80'>
-        {dayLabel}
+      <span
+        className={cn(
+          'mt-1 text-[16px] font-semibold leading-none tracking-[-0.04em]',
+          featured ? 'text-[color:var(--profile-accent-primary)]' : 'text-white'
+        )}
+      >
+        {displayDate.day}
       </span>
     </div>
   );
@@ -66,124 +107,79 @@ function DateBox({ date }: { readonly date: string }) {
 
 function TourDateRow({
   artistHandle,
-  date,
-  distanceMiles,
-  showNearbyBadge,
-}: {
+  item,
+  featured,
+  nearby,
+}: Readonly<{
   readonly artistHandle: string;
-  readonly date: TourDateViewModel;
-  readonly distanceMiles: number | null;
-  readonly showNearbyBadge: boolean;
-}) {
-  const location = formatLocationString([date.city, date.region, date.country]);
+  readonly item: TourDateWithProximity;
+  readonly featured: boolean;
+  readonly nearby: boolean;
+}>) {
+  const location = formatLocationString([
+    item.date.city,
+    item.date.region,
+    !item.date.region ? item.date.country : null,
+  ]);
   const canBuyTickets =
-    Boolean(date.ticketUrl) &&
-    date.ticketStatus !== 'cancelled' &&
-    date.ticketStatus !== 'sold_out';
+    Boolean(item.date.ticketUrl) &&
+    item.date.ticketStatus !== 'cancelled' &&
+    item.date.ticketStatus !== 'sold_out';
   const handleTicketClick = useTourDateTicketClick(
     artistHandle,
-    date.id,
-    date.ticketUrl
-  );
-  const ticketStatusClassName = getTicketStatusClassName(
-    date.ticketStatus,
-    canBuyTickets
-  );
-  const ticketStatusLabel = getTicketStatusLabel(
-    date.ticketStatus,
-    canBuyTickets
+    item.date.id,
+    item.date.ticketUrl
   );
 
   return (
-    <div className='flex items-center gap-3 border-t border-white/6 py-3 first:border-t-0'>
-      <DateBox date={date.startDate} />
+    <div
+      className={cn(
+        'grid grid-cols-[54px_minmax(0,1fr)_auto] items-center gap-2 px-[13px] py-[13px]',
+        featured
+          ? 'rounded-[20px] border border-[color:var(--profile-status-pill-border)] bg-[linear-gradient(180deg,var(--profile-accent-soft-strong),var(--profile-accent-soft))] shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]'
+          : 'border-t border-white/[0.075] first:border-t-0'
+      )}
+    >
+      <DateBox date={item.date.startDate} featured={featured} />
 
-      <div className='min-w-0 flex-1'>
-        <p className='truncate text-[0.95rem] font-semibold tracking-[-0.02em] text-white'>
-          {date.venueName}
+      <div className='min-w-0'>
+        {featured ? (
+          <div className='mb-1 inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-[0.08em] text-[color:var(--profile-accent-primary)]'>
+            <MapPin className='h-[10px] w-[10px]' />
+            <span>{nearby ? 'Near You' : 'Upcoming'}</span>
+          </div>
+        ) : null}
+
+        <p className='truncate text-[15px] font-medium tracking-[-0.03em] text-white'>
+          {item.date.venueName}
         </p>
-        <p className='mt-0.5 truncate text-[0.85rem] text-white/44'>
+        <p className='mt-0.5 truncate text-[11.5px] font-medium tracking-[-0.01em] text-white/40'>
           {location}
         </p>
-        {showNearbyBadge && (
-          <p className='mt-1 inline-flex items-center gap-1 text-[0.78rem] font-medium text-white/54'>
-            <MapPin className='h-3 w-3' />
-            {distanceMiles === null
-              ? 'In your area'
-              : `${Math.round(distanceMiles)} mi away`}
-          </p>
-        )}
       </div>
 
-      <div className='shrink-0'>
-        {canBuyTickets ? (
-          <a
-            href={date.ticketUrl ?? undefined}
-            onClick={handleTicketClick}
-            target='_blank'
-            rel='noopener noreferrer'
-            className={`inline-flex items-center rounded-full border border-white/12 px-3 py-1 text-[0.82rem] font-semibold tracking-[-0.01em] transition-opacity hover:opacity-80 ${ticketStatusClassName}`}
-          >
-            {ticketStatusLabel}
-          </a>
-        ) : (
-          <span
-            className={`inline-flex items-center rounded-full border border-white/6 px-3 py-1 text-[0.82rem] font-semibold tracking-[-0.01em] ${ticketStatusClassName}`}
-          >
-            {ticketStatusLabel}
-          </span>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/** Section header in small caps */
-function SectionLabel({ children }: { readonly children: React.ReactNode }) {
-  return (
-    <p className='mb-2 text-[0.76rem] font-semibold uppercase tracking-[0.06em] text-white/34'>
-      {children}
-    </p>
-  );
-}
-
-/** Collapsible disclosure for other cities */
-function OtherCitiesDisclosure({
-  count,
-  expanded,
-  onToggle,
-  children,
-  listId,
-}: {
-  readonly count: number;
-  readonly expanded: boolean;
-  readonly onToggle: () => void;
-  readonly children: React.ReactNode;
-  readonly listId: string;
-}) {
-  return (
-    <div>
-      <button
-        type='button'
-        onClick={onToggle}
-        aria-expanded={expanded}
-        aria-controls={listId}
-        className='flex w-full items-center justify-between py-3 text-[0.85rem] font-semibold text-white/48 transition-colors hover:text-white/62 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20 focus-visible:ring-offset-2 focus-visible:ring-offset-[rgb(24,24,28)]'
-      >
-        <span>
-          {count} {count === 1 ? 'event' : 'events'} in other cities
-        </span>
-        <ChevronRight
-          className={`h-4 w-4 transition-transform duration-150 ${expanded ? 'rotate-90' : ''}`}
-        />
-      </button>
-      {expanded && (
-        <div
-          id={listId}
-          className='animate-in fade-in slide-in-from-top-1 duration-200'
+      {canBuyTickets ? (
+        <a
+          href={item.date.ticketUrl ?? undefined}
+          onClick={handleTicketClick}
+          target='_blank'
+          rel='noopener noreferrer'
+          className={cn(
+            'inline-flex h-[38px] shrink-0 items-center rounded-full border px-3 text-[13px] font-medium tracking-[-0.02em] transition-[border-color,background-color,opacity] duration-200 hover:opacity-90',
+            getTicketStatusClassName(item.date.ticketStatus, canBuyTickets)
+          )}
         >
-          {children}
-        </div>
+          {getTicketStatusLabel(item.date.ticketStatus, canBuyTickets)}
+        </a>
+      ) : (
+        <span
+          className={cn(
+            'inline-flex h-[38px] shrink-0 items-center rounded-full border px-3 text-[13px] font-medium tracking-[-0.02em]',
+            getTicketStatusClassName(item.date.ticketStatus, canBuyTickets)
+          )}
+        >
+          {getTicketStatusLabel(item.date.ticketStatus, canBuyTickets)}
+        </span>
       )}
     </div>
   );
@@ -193,23 +189,15 @@ function TourDatesContent({
   artist,
   nearby,
   allDates,
-  hasLocation,
-  isLocationLoading,
-}: {
+}: Readonly<{
   readonly artist: Artist;
   readonly nearby: TourDateWithProximity[];
   readonly allDates: TourDateWithProximity[];
-  readonly hasLocation: boolean;
-  readonly isLocationLoading: boolean;
-}) {
-  const [showAllDates, setShowAllDates] = useState(false);
-  const disclosureId = useId();
-
-  // State 3: No dates at all
+}>) {
   if (allDates.length === 0) {
     return (
       <div className='space-y-4'>
-        <p className='text-[1.02rem] font-semibold tracking-[-0.02em] text-white'>
+        <p className='text-[16px] font-medium tracking-[-0.03em] text-white'>
           No upcoming events.
         </p>
         <ArtistNotificationsCTA
@@ -217,97 +205,29 @@ function TourDatesContent({
           forceExpanded
           hideListenFallback
           source='tour_drawer'
+          presentation='overlay'
         />
       </div>
     );
   }
 
-  // State 4 & 5: No geolocation or still loading
-  // While geo is loading OR denied, show all dates without Near You section.
-  // This prevents the jarring flip from "All Dates" to "No events near you" CTA.
-  if (!hasLocation || isLocationLoading) {
-    return (
-      <div>
-        <SectionLabel>All Dates</SectionLabel>
-        {allDates.map(item => (
-          <TourDateRow
-            key={item.date.id}
-            artistHandle={artist.handle}
-            date={item.date}
-            distanceMiles={item.distanceMiles}
-            showNearbyBadge={false}
-          />
-        ))}
-      </div>
-    );
-  }
+  const nearbyIds = new Set(nearby.map(item => item.date.id));
+  const featuredId = nearby[0]?.date.id ?? allDates[0]?.date.id ?? null;
 
-  // State 1: Has nearby dates
-  if (nearby.length > 0) {
-    return (
-      <div className='space-y-5'>
-        <section>
-          <SectionLabel>Events near you</SectionLabel>
-          {nearby.map(item => (
-            <TourDateRow
-              key={`nearby-${item.date.id}`}
-              artistHandle={artist.handle}
-              date={item.date}
-              distanceMiles={item.distanceMiles}
-              showNearbyBadge
-            />
-          ))}
-        </section>
-
-        <section>
-          <SectionLabel>All Dates</SectionLabel>
-          {allDates.map(item => (
-            <TourDateRow
-              key={item.date.id}
-              artistHandle={artist.handle}
-              date={item.date}
-              distanceMiles={item.distanceMiles}
-              showNearbyBadge={false}
-            />
-          ))}
-        </section>
-      </div>
-    );
-  }
-
-  // State 2 & 2b: No nearby dates, but dates exist (CONVERSION STATE)
   return (
-    <div className='space-y-4'>
-      <section>
-        <p className='text-[1.02rem] font-semibold tracking-[-0.02em] text-white'>
-          No events near you.
-        </p>
-        <div className='mt-4'>
-          <ArtistNotificationsCTA
-            artist={artist}
-            forceExpanded
-            hideListenFallback
-            source='tour_drawer'
-          />
-        </div>
-      </section>
-
-      <OtherCitiesDisclosure
-        count={allDates.length}
-        expanded={showAllDates}
-        onToggle={() => setShowAllDates(prev => !prev)}
-        listId={disclosureId}
-      >
-        {allDates.map(item => (
-          <TourDateRow
-            key={item.date.id}
-            artistHandle={artist.handle}
-            date={item.date}
-            distanceMiles={item.distanceMiles}
-            showNearbyBadge={false}
-          />
-        ))}
-      </OtherCitiesDisclosure>
+    <div
+      className='overflow-hidden rounded-[24px] border border-white/[0.08] bg-white/[0.02]'
+      data-testid='tour-drawer-list'
+    >
+      {allDates.map(item => (
+        <TourDateRow
+          key={item.date.id}
+          artistHandle={artist.handle}
+          item={item}
+          featured={item.date.id === featuredId}
+          nearby={nearbyIds.has(item.date.id)}
+        />
+      ))}
     </div>
   );
 }
@@ -319,7 +239,7 @@ export function TourDrawerContent({
   readonly artist: Artist;
   readonly tourDates: TourDateViewModel[];
 }>) {
-  const { location, isLoading } = useUserLocation();
+  const { location } = useUserLocation();
   const { nearbyDates, allDates } = useTourDateProximity(tourDates, location);
 
   return (
@@ -328,8 +248,6 @@ export function TourDrawerContent({
         artist={artist}
         nearby={nearbyDates}
         allDates={allDates}
-        hasLocation={location !== null}
-        isLocationLoading={isLoading}
       />
     </div>
   );
@@ -341,24 +259,6 @@ export function TourModePanel({
 }: Readonly<TourModePanelProps>) {
   const isMobile = useBreakpointDown('md');
   const router = useRouter();
-  const hasNoDates = tourDates.length === 0;
-
-  if (hasNoDates) {
-    if (!isMobile) {
-      return <TourDrawerContent artist={artist} tourDates={tourDates} />;
-    }
-
-    return (
-      <ProfileDrawerShell
-        open
-        onOpenChange={open => !open && router.replace(`/${artist.handle}`)}
-        title='Tour Dates'
-        dataTestId='tour-drawer'
-      >
-        <TourDrawerContent artist={artist} tourDates={tourDates} />
-      </ProfileDrawerShell>
-    );
-  }
 
   if (!isMobile) {
     return (
@@ -372,9 +272,7 @@ export function TourModePanel({
     <ProfileDrawerShell
       open
       onOpenChange={open => !open && router.replace(`/${artist.handle}`)}
-      title='Tour Dates'
-      contentClassName='bg-[rgb(24,24,28)] border-white/8'
-      bodyClassName='bg-[rgb(24,24,28)] px-4 pt-2'
+      title='All Shows'
       dataTestId='tour-drawer'
     >
       <TourDrawerContent artist={artist} tourDates={tourDates} />

@@ -70,7 +70,11 @@ export function PayView({
     <PaySelector
       amounts={[...amounts]}
       onContinue={handleAmountSelected}
+      presentation='drawer'
+      primaryLabel='Send payment'
       paymentLabel='Venmo'
+      showOtherPaymentOptions
+      otherPaymentOptionsLabel='Other payment options'
     />
   );
 }

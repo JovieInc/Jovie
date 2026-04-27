@@ -71,7 +71,7 @@ export function CampaignSettingsPanel() {
         title='Growth Defaults'
         description='Set campaign qualification and send pacing defaults. Day-to-day operation lives in Admin Growth.'
       >
-        <div className='flex items-center gap-2 px-4 py-4 text-[13px] text-secondary-token sm:px-5'>
+        <div className='flex items-center gap-2 px-4 py-4 text-app text-secondary-token sm:px-5'>
           <Loader2 className='h-4 w-4 animate-spin' aria-hidden />
           Loading campaign settings...
         </div>
@@ -85,7 +85,7 @@ export function CampaignSettingsPanel() {
         title='Growth Defaults'
         description='Set campaign qualification and send pacing defaults. Day-to-day operation lives in Admin Growth.'
       >
-        <div className='px-4 py-4 text-[13px] text-destructive sm:px-5'>
+        <div className='px-4 py-4 text-app text-destructive sm:px-5'>
           {error instanceof Error
             ? error.message
             : 'Unable to load campaign settings. Please refresh and try again.'}
@@ -142,7 +142,7 @@ export function CampaignSettingsPanel() {
             <div className='space-y-2'>
               <label
                 htmlFor='settings-fit-score'
-                className='text-[13px] font-medium text-primary-token'
+                className='text-app font-medium text-primary-token'
               >
                 Minimum fit score
               </label>
@@ -160,7 +160,7 @@ export function CampaignSettingsPanel() {
                   {fitScoreThreshold}
                 </span>
               </div>
-              <p className='text-[12px] text-secondary-token'>
+              <p className='text-xs text-secondary-token'>
                 Only invite profiles with fit score {'>='} {fitScoreThreshold}
               </p>
             </div>
@@ -170,7 +170,7 @@ export function CampaignSettingsPanel() {
             <div className='space-y-2'>
               <label
                 htmlFor='settings-batch-size'
-                className='text-[13px] font-medium text-primary-token'
+                className='text-app font-medium text-primary-token'
               >
                 Batch size
               </label>
@@ -185,7 +185,7 @@ export function CampaignSettingsPanel() {
                 }
                 className='w-full'
               />
-              <p className='text-[12px] text-secondary-token'>
+              <p className='text-xs text-secondary-token'>
                 Maximum invites to send per batch
               </p>
             </div>
@@ -198,7 +198,7 @@ export function CampaignSettingsPanel() {
             <div className='space-y-2'>
               <label
                 htmlFor='settings-min-delay'
-                className='text-[13px] font-medium text-primary-token'
+                className='text-app font-medium text-primary-token'
               >
                 Min delay (seconds)
               </label>
@@ -227,7 +227,7 @@ export function CampaignSettingsPanel() {
             <div className='space-y-2'>
               <label
                 htmlFor='settings-max-delay'
-                className='text-[13px] font-medium text-primary-token'
+                className='text-app font-medium text-primary-token'
               >
                 Max delay (seconds)
               </label>
@@ -267,7 +267,7 @@ export function CampaignSettingsPanel() {
             name='AlertTriangle'
             className='mt-0.5 h-4 w-4 shrink-0 text-warning'
           />
-          <p className='text-[12px] text-warning'>
+          <p className='text-xs text-warning'>
             Delays are randomized between min and max to appear human-like. Stay
             under 50/hour to avoid spam filters.
           </p>

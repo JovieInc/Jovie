@@ -24,6 +24,18 @@ describe('profile theme helpers', () => {
     });
   });
 
+  it('rejects unsupported profile accent versions', () => {
+    expect(
+      readProfileAccentTheme({
+        profileAccent: {
+          version: 2,
+          primaryHex: '#d3834e',
+          sourceUrl: 'https://example.com/avatar.jpg',
+        },
+      })
+    ).toBeNull();
+  });
+
   it('preserves existing accent data when merging a theme mode change', () => {
     expect(
       mergeProfileTheme(
@@ -46,6 +58,43 @@ describe('profile theme helpers', () => {
     });
   });
 
+  it('does not preserve malformed profile accent updates', () => {
+    expect(
+      mergeProfileTheme(
+        {
+          profileAccent: {
+            version: 1,
+            primaryHex: '#d3834e',
+            sourceUrl: 'https://example.com/avatar.jpg',
+          },
+        },
+        {
+          profileAccent: {
+            version: 2,
+            primaryHex: '#invalid',
+            sourceUrl: '',
+          } as never,
+        }
+      )
+    ).toEqual({
+      profileAccent: {
+        version: 1,
+        primaryHex: '#d3834e',
+        sourceUrl: 'https://example.com/avatar.jpg',
+      },
+    });
+
+    expect(
+      mergeProfileTheme(null, {
+        profileAccent: {
+          version: 2,
+          primaryHex: '#invalid',
+          sourceUrl: '',
+        } as never,
+      })
+    ).toEqual({});
+  });
+
   it('maps accent tokens into the shared shell css vars', () => {
     const vars = buildProfileAccentCssVars({
       version: 1,
@@ -58,7 +107,27 @@ describe('profile theme helpers', () => {
       '--profile-status-pill-bg': expect.stringContaining('rgba'),
       '--profile-rail-dot-active': expect.stringMatching(/^#/),
       '--profile-dock-bg': expect.stringContaining('rgba'),
-      '--profile-pearl-primary-bg': expect.stringMatching(/^#/),
+      '--color-focus-ring': expect.stringMatching(/^#/),
     });
+  });
+
+  it('uses AA contrast text for medium-bright accent buttons', () => {
+    const vars = buildProfileAccentCssVars({
+      version: 1,
+      primaryHex: '#cf824c',
+      sourceUrl: 'https://example.com/avatar.jpg',
+    });
+
+    expect(vars['--profile-pearl-primary-fg']).toBe('#0f172a');
+  });
+
+  it('falls back to black when slate text is not AA-safe', () => {
+    const vars = buildProfileAccentCssVars({
+      version: 1,
+      primaryHex: '#888888',
+      sourceUrl: 'https://example.com/avatar.jpg',
+    });
+
+    expect(vars['--profile-pearl-primary-fg']).toBe('#000000');
   });
 });

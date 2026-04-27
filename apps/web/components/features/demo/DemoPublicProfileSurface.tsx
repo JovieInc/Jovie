@@ -6,7 +6,7 @@ import { DemoClientProviders } from './DemoClientProviders';
 
 const DEMO_PUBLIC_PROFILE = buildDemoProfile();
 const DEMO_PUBLIC_THEME = {
-  ...(DEMO_PUBLIC_PROFILE.theme ?? {}),
+  ...DEMO_PUBLIC_PROFILE.theme,
   profileAccent: {
     version: 1 as const,
     primaryHex: '#cf824c',

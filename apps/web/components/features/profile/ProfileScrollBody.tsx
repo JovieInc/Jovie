@@ -354,17 +354,19 @@ function SubscribeSection({
       className='space-y-3'
       data-testid='subscribe-cta-container'
     >
-      <SectionLabel>Get Notified</SectionLabel>
+      <SectionLabel>Alerts</SectionLabel>
       <div id='profile-subscribe-heading' className={panelClassName}>
         {subscribeTwoStep ? (
           <TwoStepNotificationsCTA
             artist={artist}
             startExpanded={subscribeModeActive}
+            presentation='overlay'
           />
         ) : (
           <ArtistNotificationsCTA
             key={subscribeModeActive ? 'subscribe-focus' : 'subscribe-default'}
             artist={artist}
+            presentation='overlay'
             variant='button'
             autoOpen={true}
             forceExpanded={true}

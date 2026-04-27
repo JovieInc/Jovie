@@ -45,7 +45,7 @@ describe('buildViewMetadata', () => {
       'Listen · The Weeknd · Jovie'
     );
     expect(buildViewMetadata('pay', BASELINE).title).toBe(
-      'Pay · The Weeknd · Jovie'
+      'Support · The Weeknd · Jovie'
     );
     // Base profile is artist-first.
     expect(buildViewMetadata('profile', BASELINE).title).toBe(
@@ -58,7 +58,7 @@ describe('buildViewMetadata', () => {
       'Stream or download on your favorite platform.'
     );
     expect(buildViewMetadata('subscribe', BASELINE).description).toBe(
-      'Get notified about new releases and shows.'
+      'Manage new music, shows, and merch alerts.'
     );
   });
 
