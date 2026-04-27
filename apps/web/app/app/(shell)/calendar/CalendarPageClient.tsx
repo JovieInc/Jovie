@@ -214,7 +214,7 @@ export function CalendarPageClient() {
                   'relative flex flex-col items-start gap-1 min-h-[88px] px-2 pt-2 pb-1.5 border-b border-r border-(--linear-app-shell-border)/40 text-left transition-colors duration-150 ease-out',
                   cell.inMonth
                     ? 'hover:bg-surface-1/40'
-                    : 'bg-surface-0/40 text-quaternary-token/70',
+                    : 'text-quaternary-token/70',
                   isSelected && 'bg-cyan-300/[0.06]',
                   cell.isToday &&
                     'before:absolute before:left-1.5 before:top-1.5 before:h-1.5 before:w-1.5 before:rounded-full before:bg-cyan-300'
