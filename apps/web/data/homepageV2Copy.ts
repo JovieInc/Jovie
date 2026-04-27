@@ -160,7 +160,7 @@ export const HOMEPAGE_V2_COPY: HomepageV2Copy = {
   finalCta: {
     headline: 'Start With the Next Drop.',
     body: 'Jovie handles the plan, assets, and follow-up from there.',
-    primaryCtaLabel: 'Start Free',
+    primaryCtaLabel: 'Start Free Trial',
     secondaryCtaLabel: 'See Pricing',
   },
   footerColumns: [
@@ -186,7 +186,7 @@ export const HOMEPAGE_V2_COPY: HomepageV2Copy = {
       title: 'Account',
       links: [
         { href: APP_ROUTES.SIGNIN, label: 'Log in' },
-        { href: APP_ROUTES.SIGNUP, label: 'Start Free' },
+        { href: APP_ROUTES.SIGNUP, label: 'Start Free Trial' },
       ],
     },
   ],

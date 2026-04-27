@@ -54,14 +54,19 @@ function PublicAuthActions({
   }
   return (
     <div className='flex items-center gap-1'>
-      <Link href='/signin' className='btn-linear-login focus-ring-themed'>
+      <Link
+        href={APP_ROUTES.SIGNIN}
+        className='btn-linear-login focus-ring-themed shrink-0 whitespace-nowrap'
+      >
         Log in
       </Link>
       <Link
-        href='/signup'
-        className={getLinearPillClassName({ className: 'focus-ring-themed' })}
+        href={APP_ROUTES.SIGNUP}
+        className={getLinearPillClassName({
+          className: 'focus-ring-themed shrink-0 whitespace-nowrap',
+        })}
       >
-        Sign up
+        Start Free Trial
       </Link>
     </div>
   );

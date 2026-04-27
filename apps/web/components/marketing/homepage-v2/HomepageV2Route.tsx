@@ -521,43 +521,122 @@ export function HomepageV2Pricing() {
   );
 }
 
+const HOMEPAGE_FINAL_CTA_ARCS = [
+  { radiusX: 70, radiusY: 245 },
+  { radiusX: 130, radiusY: 235 },
+  { radiusX: 195, radiusY: 225 },
+  { radiusX: 265, radiusY: 215 },
+  { radiusX: 340, radiusY: 205 },
+  { radiusX: 420, radiusY: 198 },
+  { radiusX: 505, radiusY: 192 },
+  { radiusX: 590, radiusY: 188 },
+] as const;
+
 export function HomepageV2FinalCta() {
   return (
     <section
       data-testid='homepage-v2-final-cta'
-      className='homepage-story-section homepage-story-final-cta relative overflow-hidden'
+      className='homepage-story-final-cta relative isolate min-h-[clamp(40rem,60vw,47.5rem)] overflow-hidden border-t border-white/8 bg-black'
     >
       <div
         aria-hidden='true'
-        className='pointer-events-none absolute left-1/2 top-1/2 h-[24rem] w-[38rem] -translate-x-1/2 -translate-y-1/2 blur-3xl'
+        className='pointer-events-none absolute inset-0'
         style={{
           background:
-            'radial-gradient(ellipse at center, oklch(18% 0.04 270 / 0.28), transparent 70%)',
+            'radial-gradient(80% 60% at 50% 0%, rgba(0,0,0,0) 0%, rgba(0,0,0,0.44) 80%)',
         }}
       />
-      <MarketingContainer width='page'>
-        <HomepageStoryHeader
-          align='center'
-          headline={HOMEPAGE_V2_COPY.finalCta.headline}
-          className='relative mx-auto max-w-[40rem]'
-          headlineClassName='text-[clamp(2.8rem,5vw,4.55rem)]'
-          headlineTestId='homepage-v2-final-cta-heading'
+      <div
+        aria-hidden='true'
+        className='pointer-events-none absolute inset-0'
+        style={{
+          background:
+            'radial-gradient(58% 58% at 50% 100%, rgba(69,82,178,0.34) 0%, rgba(19,28,82,0.24) 34%, rgba(0,0,0,0) 68%)',
+        }}
+      />
+      <svg
+        className='pointer-events-none absolute inset-x-0 bottom-0 h-[34rem] w-full'
+        viewBox='0 0 1200 540'
+        preserveAspectRatio='xMidYMax slice'
+        aria-hidden='true'
+      >
+        <defs>
+          <linearGradient
+            id='homepage-final-cta-ray-primary'
+            x1='0'
+            x2='0'
+            y1='0'
+            y2='1'
+          >
+            <stop offset='0%' stopColor='#0070f3' stopOpacity='0' />
+            <stop offset='55%' stopColor='#0070f3' stopOpacity='0.35' />
+            <stop offset='92%' stopColor='#ffffff' stopOpacity='0.95' />
+            <stop offset='100%' stopColor='#ffffff' stopOpacity='0.6' />
+          </linearGradient>
+          <linearGradient
+            id='homepage-final-cta-ray-secondary'
+            x1='0'
+            x2='0'
+            y1='0'
+            y2='1'
+          >
+            <stop offset='0%' stopColor='#0070f3' stopOpacity='0' />
+            <stop offset='70%' stopColor='#0070f3' stopOpacity='0.55' />
+            <stop offset='100%' stopColor='#dbeaff' stopOpacity='0.85' />
+          </linearGradient>
+        </defs>
+        <ellipse
+          cx='600'
+          cy='600'
+          rx='22'
+          ry='260'
+          stroke='url(#homepage-final-cta-ray-secondary)'
+          strokeWidth='2.2'
+          fill='none'
         />
-        <div className='relative mt-8 flex flex-wrap items-center justify-center gap-3'>
+        {HOMEPAGE_FINAL_CTA_ARCS.map((arc, index) => (
+          <ellipse
+            key={`${arc.radiusX}-${arc.radiusY}`}
+            cx='600'
+            cy='600'
+            rx={arc.radiusX}
+            ry={arc.radiusY}
+            stroke={
+              index % 2 === 0
+                ? 'url(#homepage-final-cta-ray-primary)'
+                : 'url(#homepage-final-cta-ray-secondary)'
+            }
+            strokeWidth={index < 4 ? 1.5 : 1.2}
+            fill='none'
+            opacity={1 - index * 0.05}
+          />
+        ))}
+        <rect
+          x='0'
+          y='538'
+          width='1200'
+          height='2'
+          fill='#0070f3'
+          opacity='0.3'
+        />
+      </svg>
+
+      <MarketingContainer width='page' className='relative z-10'>
+        <div className='mx-auto max-w-[680px] px-4 pt-[clamp(8.5rem,18vw,17.5rem)] text-center'>
+          <h2
+            data-testid='homepage-v2-final-cta-heading'
+            className='text-balance text-[clamp(2.25rem,5vw,4rem)] font-semibold leading-[0.98] tracking-[-0.06em] text-white'
+          >
+            Start using Jovie
+            <br />
+            today for free.
+          </h2>
           <Link
             href={APP_ROUTES.SIGNUP}
-            className='public-action-primary'
+            className='mt-7 inline-flex h-10 items-center justify-center rounded-full bg-white px-[22px] text-[13px] font-medium tracking-[-0.01em] text-black transition-colors hover:bg-white/88 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black'
             data-testid='homepage-v2-final-cta-primary'
           >
             {HOMEPAGE_V2_COPY.finalCta.primaryCtaLabel}
-          </Link>
-          <Link
-            href={APP_ROUTES.PRICING}
-            className='homepage-story-link px-3 py-2'
-            data-testid='homepage-v2-final-cta-secondary'
-          >
-            {HOMEPAGE_V2_COPY.finalCta.secondaryCtaLabel}
-            <ArrowRight className='h-3.5 w-3.5' strokeWidth={1.9} />
           </Link>
         </div>
       </MarketingContainer>

@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
+import Image from 'next/image';
+import Link from 'next/link';
+import type { CSSProperties } from 'react';
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
-import { HomepageIntent } from '@/components/homepage/HomepageIntent';
 import { HERO_COPY } from '@/components/homepage/intent';
 import { ArtistProfileOutcomeDuo } from '@/components/marketing/artist-profile/ArtistProfileOutcomeDuo';
 import {
@@ -13,6 +15,7 @@ import {
   HomepageV2SystemOverview,
 } from '@/components/marketing/homepage-v2/HomepageV2Route';
 import { APP_NAME, BASE_URL } from '@/constants/app';
+import { APP_ROUTES } from '@/constants/routes';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
 import {
@@ -147,6 +150,222 @@ const ORGANIZATION_SCHEMA = buildOrganizationSchema({
   sameAs: ['https://instagram.com/meetjovie'],
 });
 
+type HeroMockupKind = 'desktop' | 'phone' | 'panel';
+
+interface HeroMockupShot {
+  readonly id: string;
+  readonly src: string;
+  readonly alt: string;
+  readonly title: string;
+  readonly width: number;
+  readonly height: number;
+  readonly kind: HeroMockupKind;
+  readonly offsetY: string;
+  readonly rotate: string;
+  readonly priority: boolean;
+}
+
+const HERO_MOCKUP_SCREENSHOTS: readonly HeroMockupShot[] = [
+  {
+    id: 'profile-listen-phone',
+    src: '/product-screenshots/tim-white-profile-listen-phone.png',
+    alt: 'Mobile artist profile with streaming and fan actions',
+    title: 'Artist Profile',
+    width: 780,
+    height: 1688,
+    kind: 'phone',
+    offsetY: '1.4rem',
+    rotate: '-2.5deg',
+    priority: false,
+  },
+  {
+    id: 'releases-dashboard',
+    src: '/product-screenshots/releases-dashboard-full.png',
+    alt: 'Desktop release dashboard with tasks, assets, and launch planning',
+    title: 'Release Dashboard',
+    width: 2880,
+    height: 1800,
+    kind: 'desktop',
+    offsetY: '0rem',
+    rotate: '0deg',
+    priority: true,
+  },
+  {
+    id: 'release-detail-phone',
+    src: '/product-screenshots/release-sidebar-detail.png',
+    alt: 'Mobile release detail screen for launch planning',
+    title: 'Release Detail',
+    width: 776,
+    height: 1690,
+    kind: 'phone',
+    offsetY: '2.1rem',
+    rotate: '2.2deg',
+    priority: true,
+  },
+  {
+    id: 'audience-crm',
+    src: '/product-screenshots/audience-crm.png',
+    alt: 'Desktop audience CRM with fan segments and engagement signal',
+    title: 'Audience CRM',
+    width: 2880,
+    height: 1800,
+    kind: 'desktop',
+    offsetY: '0.8rem',
+    rotate: '-0.8deg',
+    priority: false,
+  },
+  {
+    id: 'release-page-phone',
+    src: '/product-screenshots/release-take-me-over-phone.png',
+    alt: 'Mobile release page preview for a single',
+    title: 'Release Page',
+    width: 780,
+    height: 1688,
+    kind: 'phone',
+    offsetY: '0.2rem',
+    rotate: '1.8deg',
+    priority: false,
+  },
+  {
+    id: 'profile-workspace',
+    src: '/product-screenshots/profile-desktop.png',
+    alt: 'Desktop artist profile management surface',
+    title: 'Profile Workspace',
+    width: 2880,
+    height: 1800,
+    kind: 'desktop',
+    offsetY: '1.5rem',
+    rotate: '0.6deg',
+    priority: false,
+  },
+  {
+    id: 'release-routing-panel',
+    src: '/product-screenshots/release-sidebar-platforms.png',
+    alt: 'Release platform routing controls for music destinations',
+    title: 'Release Routing',
+    width: 776,
+    height: 582,
+    kind: 'panel',
+    offsetY: '2.3rem',
+    rotate: '-1.6deg',
+    priority: false,
+  },
+  {
+    id: 'tracked-links',
+    src: '/product-screenshots/artist-spec-tracked-links-desktop.png',
+    alt: 'Desktop tracked links analytics for artist marketing',
+    title: 'Tracked Links',
+    width: 1842,
+    height: 952,
+    kind: 'desktop',
+    offsetY: '0.5rem',
+    rotate: '1deg',
+    priority: false,
+  },
+] as const;
+
+const HERO_MOCKUP_CAROUSEL = [
+  ...HERO_MOCKUP_SCREENSHOTS.map(shot => ({
+    ...shot,
+    carouselId: `${shot.id}-primary`,
+    isDuplicate: false,
+  })),
+  ...HERO_MOCKUP_SCREENSHOTS.map(shot => ({
+    ...shot,
+    carouselId: `${shot.id}-duplicate`,
+    isDuplicate: true,
+  })),
+] as const;
+
+function getHeroMockupSizes(kind: HeroMockupKind): string {
+  if (kind === 'phone') {
+    return '(min-width: 1024px) 12rem, 34vw';
+  }
+
+  if (kind === 'panel') {
+    return '(min-width: 1024px) 23rem, 68vw';
+  }
+
+  return '(min-width: 1024px) 42rem, 82vw';
+}
+
+function HomepageHeroActions() {
+  return (
+    <div className='homepage-hero-actions'>
+      <Link
+        href={APP_ROUTES.SIGNUP}
+        className='public-action-primary focus-ring-themed'
+      >
+        Start Free Trial
+      </Link>
+      <Link
+        href={APP_ROUTES.ARTIST_PROFILES}
+        className='public-action-secondary focus-ring-themed'
+      >
+        Explore Product
+      </Link>
+    </div>
+  );
+}
+
+function HomepageHeroMockupCarousel() {
+  return (
+    <section
+      className='homepage-hero-showcase'
+      aria-label='Jovie product screenshots'
+    >
+      <div className='homepage-hero-carousel__viewport'>
+        <div className='homepage-hero-carousel__track'>
+          {HERO_MOCKUP_CAROUSEL.map(shot => {
+            return (
+              <figure
+                aria-hidden={shot.isDuplicate ? true : undefined}
+                className={`homepage-hero-mockup homepage-hero-mockup--${shot.kind}`}
+                key={shot.carouselId}
+                style={
+                  {
+                    '--hero-mockup-y': shot.offsetY,
+                    '--hero-mockup-rotate': shot.rotate,
+                  } as CSSProperties
+                }
+              >
+                <div className='homepage-hero-mockup__frame'>
+                  {shot.kind !== 'phone' ? (
+                    <div
+                      className='homepage-hero-mockup__bar'
+                      aria-hidden='true'
+                    >
+                      <span className='homepage-hero-mockup__dots'>
+                        <span />
+                        <span />
+                        <span />
+                      </span>
+                      <span className='homepage-hero-mockup__title'>
+                        {shot.title}
+                      </span>
+                      <span className='homepage-hero-mockup__spacer' />
+                    </div>
+                  ) : null}
+                  <Image
+                    src={shot.src}
+                    alt={shot.isDuplicate ? '' : shot.alt}
+                    width={shot.width}
+                    height={shot.height}
+                    priority={shot.priority && !shot.isDuplicate}
+                    quality={85}
+                    sizes={getHeroMockupSizes(shot.kind)}
+                    className='homepage-hero-mockup__image'
+                  />
+                </div>
+              </figure>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function HomePage() {
   return (
     <>
@@ -156,7 +375,10 @@ export default function HomePage() {
       <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
       <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
 
-      <section className='homepage-hero-stage relative'>
+      <section
+        className='homepage-hero-stage relative'
+        aria-labelledby='home-hero-heading'
+      >
         <div
           data-testid='homepage-hero-shell'
           className='homepage-hero-shell relative flex min-h-[100svh] flex-col overflow-hidden rounded-b-[44px] text-primary-token sm:rounded-b-[56px] lg:rounded-b-[72px]'
@@ -177,8 +399,8 @@ export default function HomePage() {
             <div className='homepage-hero-shell__grid' />
           </div>
 
-          <div className='relative z-[2] mx-auto flex w-full max-w-[1360px] min-w-0 flex-1 items-center justify-center px-5 pb-10 pt-[calc(var(--linear-header-height)+4rem)] sm:px-8 sm:pb-12 sm:pt-[calc(var(--linear-header-height)+4.75rem)] lg:px-12 lg:pb-14 lg:pt-[calc(var(--linear-header-height)+5.25rem)]'>
-            <div className='w-full min-w-0 max-w-[920px]'>
+          <div className='relative z-[3] mx-auto flex w-full max-w-[1480px] min-w-0 flex-1 flex-col items-center justify-start px-5 pb-0 pt-[calc(var(--linear-header-height)+4.3rem)] sm:px-8 sm:pt-[calc(var(--linear-header-height)+4.8rem)] lg:px-12 lg:pt-[calc(var(--linear-header-height)+5.25rem)]'>
+            <div className='homepage-hero-copy w-full min-w-0'>
               <h1
                 id='home-hero-heading'
                 className='homepage-hero-headline self-center text-center text-white'
@@ -188,8 +410,9 @@ export default function HomePage() {
               <p className='homepage-hero-subhead mt-6 max-w-[680px] self-center text-center text-[17px] leading-[1.58] tracking-[-0.015em] text-white/68 sm:text-[18px]'>
                 {HERO_COPY.subhead}
               </p>
-              <HomepageIntent showIntro={false} />
+              <HomepageHeroActions />
             </div>
+            <HomepageHeroMockupCarousel />
           </div>
 
           <HomeTrustSection

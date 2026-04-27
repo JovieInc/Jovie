@@ -53,7 +53,7 @@ export function MarketingHeader({
       logoVariant={logoVariant}
       authMode='public-static'
       hideNav={variant === 'minimal'}
-      minimalAuth={variant === 'minimal' || variant === 'homepage'}
+      minimalAuth={variant === 'minimal'}
       minimalAuthVariant={variant === 'homepage' ? 'pill' : 'link'}
       includePublicLoginInMobileNav={variant !== 'homepage'}
       containerSize='homepage'
