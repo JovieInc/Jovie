@@ -265,14 +265,22 @@ export const OptimizedImage = React.memo(function OptimizedImage({
     return { defaultSizes, containerClasses };
   }, [sizes, fill, size, shape, className]);
 
+  const effectivePlaceholder = useMemo<'blur' | 'empty'>(() => {
+    if (placeholder !== 'blur') return placeholder;
+    if (fill) return 'blur';
+    const w = width ?? sizeDimensions[size];
+    const h = height ?? sizeDimensions[size];
+    return Math.min(w, h) < 40 ? 'empty' : 'blur';
+  }, [placeholder, fill, width, height, size]);
+
   const stableImageProps = useMemo(() => {
     return {
       src: imageSrc,
       alt: computedAlt,
       priority,
       quality,
-      placeholder,
-      ...(placeholder === 'blur' && { blurDataURL: defaultBlur }),
+      placeholder: effectivePlaceholder,
+      ...(effectivePlaceholder === 'blur' && { blurDataURL: defaultBlur }),
       ...(priority && { fetchPriority: 'high' as const }),
       style: {
         objectFit,
@@ -286,7 +294,7 @@ export const OptimizedImage = React.memo(function OptimizedImage({
     computedAlt,
     priority,
     quality,
-    placeholder,
+    effectivePlaceholder,
     defaultBlur,
     objectFit,
     objectPosition,
