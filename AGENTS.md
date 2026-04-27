@@ -412,6 +412,7 @@ grep -rn "PATTERN_YOU_FIXED" apps/web --include="*.tsx"
 - **NEVER** invent, substitute, or mix placeholder creator identities on the homepage or marketing demos when Tim White or a real featured creator from canonical data should be used
 - For Tim White specifically, agents must use the canonical homepage identity source instead of hardcoded fallback assets or guessed values
 - If Tim White appears in homepage mocks, use the correct founder photo and the correct Spotify artist ID: `4u`
+- Calvin Harris demo fixtures must not include `Blessings`, Clementine Douglas, or any Tim White credit. Those names create an obvious founder-identity collision and must be treated as forbidden in Calvin demo content.
 - When fixing one wrong Tim White reference, search for sibling homepage/demo references and fix all of them in the same pass
 
 **Why:** Using the wrong founder photo or wrong Spotify identity undermines trust in the product and makes the AI experience look careless.

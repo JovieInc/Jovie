@@ -77,6 +77,11 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 
 **Rule:** If the homepage uses Tim White, use a single canonical source for founder identity data across all homepage demos and mocks. Do not guess or hardcode alternate photos. Tim White's Spotify artist ID is `4u`, and sibling homepage references must be updated together.
 
+### Calvin Harris demo content must avoid founder-name collisions
+**Mistake:** A Calvin Harris demo release used `Blessings featuring Clementine Douglas` while the release landing demo also credited Tim White as producer. That mixed the real founder identity with an unrelated Tim White/Clementine/Calvin song context and made the demo look unsafe.
+
+**Rule:** Calvin Harris fixtures must not contain `Blessings`, Clementine Douglas, or any Tim White credit. Use current public Calvin material and the internal Calvin demo persona for Calvin demo screens, and add a regression test whenever this identity boundary is corrected.
+
 ### Human feedback about visual slop must become a repo rule immediately
 **Mistake:** A human explicitly rejected eyebrow labels and extra marketing chrome multiple times, but the next revision still reintroduced eyebrows, separators, and wrapper cards because the correction was treated as local taste feedback instead of a persistent rule.
 
