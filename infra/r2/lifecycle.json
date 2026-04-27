@@ -14,7 +14,12 @@
           },
           "storageClass": "InfrequentAccess"
         }
-      ],
+      ]
+    },
+    {
+      "id": "abort-orphan-multiparts-after-24h",
+      "enabled": true,
+      "conditions": {},
       "abortMultipartUploadsTransition": {
         "condition": {
           "type": "Age",
