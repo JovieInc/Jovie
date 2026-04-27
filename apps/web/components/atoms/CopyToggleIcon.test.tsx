@@ -1,14 +1,12 @@
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { CopyToggleIcon } from '../CopyToggleIcon';
+import { CopyToggleIcon } from './CopyToggleIcon';
 
 describe('CopyToggleIcon', () => {
   it('renders the copy icon when copied is false', () => {
     const { container } = render(<CopyToggleIcon copied={false} />);
     const svg = container.querySelector('svg');
     expect(svg).not.toBeNull();
-    // lucide-react adds a class with the icon name; cheap signal that we got
-    // the right icon without coupling to internal markup.
     expect(svg?.getAttribute('class')).toContain('lucide-copy');
   });
 
