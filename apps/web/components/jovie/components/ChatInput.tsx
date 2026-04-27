@@ -358,12 +358,16 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     );
 
     // Resolve the surface mode from textarea + picker state.
+    // Focus alone does NOT morph the surface — only actual text (or the
+    // picker / plus menu / dictation) flips us into 'typing' geometry.
+    // Otherwise tabbing into an empty pill kicks off a borderRadius
+    // animation from 999 → 24 with nothing to show for it.
     const hasText = Boolean(value.trim()) || hasPendingImages;
-    const isExpanded = isFocused || plusMenuOpen || isListening || hasText;
+    const isExpanded = plusMenuOpen || isListening || hasText || isFocused;
     let surfaceMode: SurfaceMode = 'empty';
     if (picker.state.status === 'entity') surfaceMode = 'entity';
     else if (picker.state.status === 'root') surfaceMode = 'root';
-    else if (hasText || isFocused) surfaceMode = 'typing';
+    else if (hasText || plusMenuOpen || isListening) surfaceMode = 'typing';
 
     const geometry = geometryFor(surfaceMode, isStacked);
     const showInlinePicker = picker.state.status === 'root' && !isStacked;

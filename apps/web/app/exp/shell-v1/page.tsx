@@ -97,6 +97,7 @@ import {
   SkipBack,
   SkipForward,
   Sparkles,
+  SquarePen,
   Trash2,
   UserPlus,
   Users,
@@ -2461,10 +2462,16 @@ function Sidebar({
   const inContextMode = inLibraryMode || inSettingsMode;
   const contextLabel = inLibraryMode ? 'Library' : 'Settings';
   const collapsed = false;
-  // Pin button stays visible briefly after the sidebar appears or when the
-  // user hovers it. Otherwise it gets out of the way.
+  // Header trailing-button affordance morphs through three states:
+  //   1. Hover: pin/unpin (transient hint, fades after 3s of inactivity)
+  //   2. Just opened (first 3s): pin/unpin always visible — the user
+  //      may want to dismiss the sidebar they just opened.
+  //   3. Settled: morphs into "New chat" — the primary write affordance
+  //      once the user has decided to keep the sidebar open.
   const [pinVisible, setPinVisible] = useState(true);
+  const [justOpened, setJustOpened] = useState(true);
   const pinTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const openTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function bumpPinVisibility() {
     setPinVisible(true);
@@ -2474,10 +2481,18 @@ function Sidebar({
 
   useEffect(() => {
     bumpPinVisibility();
+    setJustOpened(true);
+    if (openTimer.current) clearTimeout(openTimer.current);
+    openTimer.current = setTimeout(() => setJustOpened(false), 3000);
     return () => {
       if (pinTimer.current) clearTimeout(pinTimer.current);
+      if (openTimer.current) clearTimeout(openTimer.current);
     };
   }, [variant]);
+  // Once the user is settled in the sidebar, the trailing button is
+  // always visible (it's now "New chat", not a transient hint).
+  const trailingVisible = justOpened ? pinVisible : true;
+  const showPin = justOpened;
   // Per-workspace open state. Active workspace defaults open.
   const [openWs, setOpenWs] = useState<Record<string, boolean>>({
     bahamas: true,
@@ -2534,29 +2549,55 @@ function Sidebar({
           )}
           <button
             type='button'
-            onClick={onPin}
-            className='absolute right-2 h-5 w-5 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1 transition-[opacity,color,background-color] duration-300 ease-out'
+            onClick={() => {
+              if (showPin) onPin();
+              else onSelectView?.('demo');
+            }}
+            className='absolute right-2 h-5 w-5 rounded-full grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1 transition-[opacity,color,background-color] duration-300 ease-out'
             style={{
-              opacity: pinVisible ? 1 : 0,
-              pointerEvents: pinVisible ? 'auto' : 'none',
+              opacity: trailingVisible ? 1 : 0,
+              pointerEvents: trailingVisible ? 'auto' : 'none',
             }}
             aria-label={
-              variant === 'floating'
-                ? 'Dock sidebar'
-                : 'Float sidebar (auto-hide)'
+              showPin
+                ? variant === 'floating'
+                  ? 'Dock sidebar'
+                  : 'Float sidebar (auto-hide)'
+                : 'New chat'
             }
             title={
-              variant === 'floating'
-                ? 'Dock sidebar'
-                : 'Float sidebar (auto-hide)'
+              showPin
+                ? variant === 'floating'
+                  ? 'Dock sidebar'
+                  : 'Float sidebar (auto-hide)'
+                : 'New chat'
             }
-            tabIndex={pinVisible ? 0 : -1}
+            tabIndex={trailingVisible ? 0 : -1}
           >
-            {variant === 'floating' ? (
-              <Pin className='h-2.5 w-2.5' strokeWidth={2.25} />
-            ) : (
-              <PinOff className='h-2.5 w-2.5' strokeWidth={2.25} />
-            )}
+            {/* Crossfade between pin (just-opened) and SquarePen
+                (settled). Both icons live in the same slot; only one
+                is visible at a time, but the morph is a calm fade
+                rather than a snap. */}
+            <span className='relative h-2.5 w-2.5'>
+              <span
+                aria-hidden='true'
+                className='absolute inset-0 grid place-items-center transition-opacity duration-300 ease-out'
+                style={{ opacity: showPin ? 1 : 0 }}
+              >
+                {variant === 'floating' ? (
+                  <Pin className='h-2.5 w-2.5' strokeWidth={2.25} />
+                ) : (
+                  <PinOff className='h-2.5 w-2.5' strokeWidth={2.25} />
+                )}
+              </span>
+              <span
+                aria-hidden='true'
+                className='absolute inset-0 grid place-items-center transition-opacity duration-300 ease-out'
+                style={{ opacity: showPin ? 0 : 1 }}
+              >
+                <SquarePen className='h-2.5 w-2.5' strokeWidth={2.25} />
+              </span>
+            </span>
           </button>
         </div>
       </div>
@@ -3416,7 +3457,7 @@ function Header({
         <button
           type='button'
           onClick={onToggleSidebar}
-          className='h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-150 ease-out shrink-0'
+          className='h-7 w-7 rounded-full grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-150 ease-out shrink-0'
           aria-label={
             sidebarHidden
               ? 'Dock sidebar ([)'
@@ -3671,12 +3712,14 @@ function DashboardHome() {
         : hour < 18
           ? 'Afternoon, Tim'
           : 'Evening, Tim';
+  const advance = () => setIndex(i => (i + 1) % sorted.length);
 
   return (
     <div className='h-full flex flex-col px-6 pb-4'>
-      {/* Suggestion focus zone — greeting + intro + card all sit together
-          as one connected unit, vertically centered. The card is the hero;
-          the greeting is its setup, not a separate strip way up top. */}
+      {/* Suggestion focus zone — single hero card. No view-all, no
+          carousel chrome. The user can only advance by acting on the
+          card (Dismiss or its primary action), which forces a real
+          decision instead of letting them skim past. */}
       <div className='flex-1 grid place-items-center min-h-0'>
         <div className='w-full max-w-[480px] flex flex-col items-center'>
           <div className='shrink-0 text-center pb-5'>
@@ -3688,60 +3731,11 @@ function DashboardHome() {
             </h1>
           </div>
 
-          <SuggestionCard suggestion={current} />
-
-          {/* Tight control row — View all on the left, dot pagination
-              centered, prev/next on the right. One row, all aligned. */}
-          <div className='mt-4 flex items-center justify-between gap-3 w-full'>
-            <button
-              type='button'
-              className='text-[11.5px] text-tertiary-token hover:text-primary-token transition-colors duration-150 ease-out'
-            >
-              View all
-            </button>
-            <div className='flex items-center gap-1.5'>
-              {sorted.map((s, i) => (
-                <button
-                  key={s.id}
-                  type='button'
-                  onClick={() => setIndex(i)}
-                  aria-label={`Suggestion ${i + 1} of ${sorted.length}`}
-                  className={cn(
-                    'h-1 rounded-full transition-[width,background-color] duration-200 ease-out',
-                    i === index
-                      ? 'w-5 bg-primary-token'
-                      : 'w-1 bg-quaternary-token/45 hover:bg-tertiary-token'
-                  )}
-                />
-              ))}
-            </div>
-            <div className='flex items-center gap-0.5'>
-              <Tooltip label='Previous'>
-                <button
-                  type='button'
-                  onClick={() =>
-                    setIndex(i => (i === 0 ? sorted.length - 1 : i - 1))
-                  }
-                  className='h-6 w-6 rounded-full grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-150 ease-out'
-                  aria-label='Previous suggestion'
-                >
-                  <ChevronLeft className='h-3 w-3' strokeWidth={2.25} />
-                </button>
-              </Tooltip>
-              <Tooltip label='Next'>
-                <button
-                  type='button'
-                  onClick={() =>
-                    setIndex(i => (i === sorted.length - 1 ? 0 : i + 1))
-                  }
-                  className='h-6 w-6 rounded-full grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-150 ease-out'
-                  aria-label='Next suggestion'
-                >
-                  <ChevronRight className='h-3 w-3' strokeWidth={2.25} />
-                </button>
-              </Tooltip>
-            </div>
-          </div>
+          <SuggestionCard
+            suggestion={current}
+            onDismiss={advance}
+            onAct={advance}
+          />
         </div>
       </div>
 
@@ -3758,7 +3752,15 @@ function DashboardHome() {
 // Apple-esque suggestion card. No caption, no top-right Jovie label —
 // the card IS Jovie. Title leads. Body is short. Primary action and
 // dismiss balance to the right edge so the eye lands on the action.
-function SuggestionCard({ suggestion }: { suggestion: JovieSuggestion }) {
+function SuggestionCard({
+  suggestion,
+  onDismiss,
+  onAct,
+}: {
+  suggestion: JovieSuggestion;
+  onDismiss?: () => void;
+  onAct?: () => void;
+}) {
   return (
     <article
       key={suggestion.id}
@@ -3780,12 +3782,14 @@ function SuggestionCard({ suggestion }: { suggestion: JovieSuggestion }) {
       <div className='mt-5 flex items-center justify-end gap-1.5'>
         <button
           type='button'
+          onClick={onDismiss}
           className='inline-flex items-center h-8 px-3 rounded-full text-[12.5px] text-tertiary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-150 ease-out'
         >
           Dismiss
         </button>
         <button
           type='button'
+          onClick={onAct}
           className='inline-flex items-center gap-1.5 h-8 px-4 rounded-full text-[12.5px] font-medium bg-white text-black hover:bg-white/90 transition-colors duration-150 ease-out'
         >
           {suggestion.action}
@@ -5364,51 +5368,111 @@ function PickerToggle({
 // Push-to-talk Jovie. Hold ⌘J anywhere to dictate. Mock for design pass —
 // wire to the chat input / command palette intent router in production.
 function JovieOverlay({ listening }: { listening: boolean }) {
+  // 32-bar live waveform — each bar's height is driven by a layered
+  // sine so the overall envelope reads as natural speech, not a
+  // metronome. The bars use a CSS-only animation per bar with
+  // staggered delays + duration, so we get organic motion at zero
+  // JS cost. The whole strip cross-fades behind a dim backdrop on
+  // entry / exit (cinematic — same vocabulary as ScreeningRoom).
   return (
-    <div
-      aria-hidden={!listening}
-      className='fixed inset-x-0 bottom-32 z-50 flex justify-center pointer-events-none'
-      style={{
-        opacity: listening ? 1 : 0,
-        transform: listening ? 'translateY(0)' : 'translateY(8px)',
-        transition: `opacity 200ms ${EASE_CINEMATIC}, transform 200ms ${EASE_CINEMATIC}`,
-      }}
-    >
-      <div className='pointer-events-auto rounded-full backdrop-blur-2xl bg-(--linear-app-content-surface)/85 border border-(--linear-app-shell-border) shadow-[0_18px_60px_rgba(0,0,0,0.22)] px-4 py-2.5 flex items-center gap-3 min-w-[280px]'>
-        <span className='relative h-7 w-7 rounded-full bg-primary text-on-primary grid place-items-center'>
-          <Mic className='h-3.5 w-3.5' strokeWidth={2.5} />
-          <span
-            aria-hidden='true'
-            className='absolute inset-0 rounded-full ring-2 ring-primary/40 anim-calm-halo'
-          />
-        </span>
-        <div className='flex-1 min-w-0'>
-          <div className='text-[12.5px] font-caption text-primary-token leading-tight'>
-            Listening…
+    <>
+      {/* Backdrop dim — fades the entire shell when dictating so
+          the waveform owns the moment. Click to dismiss. */}
+      <div
+        aria-hidden='true'
+        className='fixed inset-0 z-40 bg-black pointer-events-none'
+        style={{
+          opacity: listening ? 0.55 : 0,
+          backdropFilter: listening ? 'blur(2px)' : 'blur(0)',
+          transition: `opacity 350ms ${EASE_CINEMATIC}, backdrop-filter 350ms ${EASE_CINEMATIC}`,
+        }}
+      />
+
+      <div
+        aria-hidden={!listening}
+        className='fixed inset-x-0 bottom-28 z-50 flex justify-center pointer-events-none px-6'
+        style={{
+          opacity: listening ? 1 : 0,
+          transform: listening
+            ? 'translateY(0) scale(1)'
+            : 'translateY(16px) scale(0.96)',
+          transition: `opacity 350ms ${EASE_CINEMATIC}, transform 350ms ${EASE_CINEMATIC}`,
+        }}
+      >
+        <div className='pointer-events-auto rounded-3xl backdrop-blur-2xl bg-(--linear-app-content-surface)/90 border border-(--linear-app-shell-border) shadow-[0_24px_72px_rgba(0,0,0,0.45)] px-6 py-5 flex flex-col items-center gap-4 w-[480px] max-w-full'>
+          <div className='flex items-center gap-3 self-start'>
+            <span className='relative h-8 w-8 rounded-full bg-primary text-on-primary grid place-items-center'>
+              <Mic className='h-3.5 w-3.5' strokeWidth={2.5} />
+              <span
+                aria-hidden='true'
+                className='absolute inset-0 rounded-full ring-2 ring-primary/40 anim-calm-halo'
+              />
+            </span>
+            <div className='flex-1 min-w-0'>
+              <div className='text-[14px] font-semibold text-primary-token leading-tight'>
+                Listening
+              </div>
+              <div className='text-[11.5px] text-tertiary-token leading-tight mt-0.5'>
+                &ldquo;play Take Me Over&rdquo; · &ldquo;find the extended
+                mix&rdquo;
+              </div>
+            </div>
+            <kbd className='text-[10px] text-quaternary-token tabular-nums shrink-0'>
+              hold ⌘J
+            </kbd>
           </div>
-          <div className='text-[10.5px] text-tertiary-token leading-tight mt-0.5'>
-            Try: &ldquo;play Take Me Over&rdquo; · &ldquo;find the extended
-            mix&rdquo;
-          </div>
+          <DictationWaveform active={listening} />
         </div>
-        <span className='flex items-end gap-[2px] h-4'>
-          {[0, 1, 2, 3, 4].map(i => (
+      </div>
+    </>
+  );
+}
+
+// 32-bar live waveform driven by staggered CSS keyframes so the
+// envelope reads as organic speech. Bars only animate when active
+// (paused otherwise) so the component costs nothing at rest.
+function DictationWaveform({ active }: { active: boolean }) {
+  const BARS = 32;
+  return (
+    <>
+      <style>{`
+        @keyframes dict-bar {
+          0%, 100% { transform: scaleY(0.18); }
+          25%      { transform: scaleY(0.62); }
+          50%      { transform: scaleY(1); }
+          75%      { transform: scaleY(0.42); }
+        }
+      `}</style>
+      <div
+        className='flex items-center justify-center gap-[3px] h-12 w-full'
+        aria-hidden='true'
+      >
+        {Array.from({ length: BARS }, (_, i) => {
+          // Deterministic per-bar duration / phase. Mid-strip bars
+          // reach taller — gives the strip a soft envelope.
+          const center = (BARS - 1) / 2;
+          const distance = Math.abs(i - center) / center;
+          const baseHeight = 32 + (1 - distance) * 16;
+          const duration = 720 + (i % 7) * 80;
+          const delay = (i * 47) % 600;
+          return (
             <span
               key={i}
-              className='w-[2px] bg-primary-token rounded-sm anim-calm-breath'
+              className='block w-[3px] rounded-full bg-cyan-300/85'
               style={{
-                height: `${30 + Math.abs(Math.sin(i * 1.7)) * 60}%`,
-                animationDelay: `${i * 90}ms`,
-                animationDuration: '700ms',
+                height: baseHeight,
+                transformOrigin: 'center',
+                animation: active
+                  ? `dict-bar ${duration}ms cubic-bezier(0.4, 0, 0.6, 1) ${delay}ms infinite`
+                  : 'none',
+                opacity: active ? 1 : 0.4,
+                transition: `opacity 350ms ${EASE_CINEMATIC}`,
               }}
             />
-          ))}
-        </span>
-        <kbd className='text-[10px] text-quaternary-token tabular-nums'>
-          hold ⌘J
-        </kbd>
+          );
+        })}
       </div>
-    </div>
+    </>
   );
 }
 
