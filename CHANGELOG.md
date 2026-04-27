@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.183] - 2026-04-27
+
+> Follow-up to v26.4.181. Allow `DELETE` in R2 CORS so the browser-side multipart-abort path works when a user cancels a half-finished upload.
+
+### Fixed
+
+- [internal] R2 CORS — added `DELETE` to allowed methods on all three env-specific CORS files. AWS S3's `AbortMultipartUpload` operation (which R2 supports) uses HTTP DELETE; without it, browser preflight for an in-flight upload cancel would fail. Object deletion stays server-side via signed URLs; this is for the upload-cancel path only.
+
 ## [26.4.182] - 2026-04-27
 
 > Press `?` anywhere in the dashboard to open the keyboard shortcuts help. Linear convention; complements the existing `Cmd+/`.
