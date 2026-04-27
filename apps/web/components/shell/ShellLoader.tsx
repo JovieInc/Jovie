@@ -1,3 +1,4 @@
+import { cn } from '@/lib/utils';
 import { JovieMark } from './JovieMark';
 
 // Cinematic ease — same curve used across the shell for layout-revealing
@@ -40,12 +41,12 @@ export function ShellLoader({
   return (
     <div
       aria-hidden='true'
-      className={
-        className ??
-        'fixed inset-0 z-[60] pointer-events-none grid place-items-center'
-      }
+      className={cn(
+        'fixed inset-0 z-[60] pointer-events-none grid place-items-center',
+        className
+      )}
       style={{
-        background: isReveal ? 'rgba(6,7,10,0)' : 'rgba(6,7,10,1)',
+        backgroundColor: isReveal ? 'rgba(6,7,10,0)' : 'rgba(6,7,10,1)',
         transition: `background-color 480ms ${EASE_CINEMATIC}`,
       }}
     >

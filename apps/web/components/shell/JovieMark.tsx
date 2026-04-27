@@ -7,6 +7,11 @@ import type { SVGAttributes } from 'react';
  * `currentColor` so it inherits the parent's text color. Use anywhere the
  * shell needs a small, standalone brand glyph (logo wells, splash, loaders).
  *
+ * Accessibility: the inline `<title>` provides the accessible name by default.
+ * If you want the icon hidden from assistive tech (e.g. when adjacent text
+ * already names the surface), pass `aria-hidden`. Don't hardcode it here —
+ * that would silently kill the title.
+ *
  * Note: production also has `BrandLogo` in `components/atoms/BrandLogo.tsx`
  * which wraps the same SVG path with size + tone presets. Prefer `BrandLogo`
  * when you want the existing tone/size API. Use `JovieMark` for shell
@@ -15,6 +20,7 @@ import type { SVGAttributes } from 'react';
  * @example
  * ```tsx
  * <JovieMark className="h-12 w-12 text-primary-token" />
+ * <JovieMark className="h-4 w-4" aria-hidden /> // adjacent label exists
  * ```
  */
 export function JovieMark({
@@ -26,7 +32,6 @@ export function JovieMark({
       viewBox='0 0 353.68 347.97'
       className={className}
       fill='currentColor'
-      aria-hidden='true'
       {...rest}
     >
       <title>Jovie</title>

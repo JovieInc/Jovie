@@ -16,8 +16,14 @@ describe('JovieMark', () => {
     expect(svg?.getAttribute('class')).toContain('custom');
   });
 
-  it('is hidden from assistive tech by default', () => {
+  it('does not hardcode aria-hidden so the <title> stays accessible', () => {
     const { container } = render(<JovieMark />);
+    const svg = container.querySelector('svg');
+    expect(svg?.getAttribute('aria-hidden')).toBeNull();
+  });
+
+  it('forwards aria-hidden when the consumer opts in', () => {
+    const { container } = render(<JovieMark aria-hidden />);
     const svg = container.querySelector('svg');
     expect(svg?.getAttribute('aria-hidden')).toBe('true');
   });

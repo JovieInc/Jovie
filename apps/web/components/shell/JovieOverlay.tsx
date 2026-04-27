@@ -1,4 +1,5 @@
 import { Mic } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 // Cinematic ease — same curve used across the shell for layout-revealing
 // transitions. Inlined here so this leaf has no cross-file dependency.
@@ -11,7 +12,8 @@ const EASE_CINEMATIC = 'cubic-bezier(0.32, 0.72, 0, 1)';
  * (hold `⌘J`). Dim backdrop, glassy panel pinned 7rem from the bottom, with
  * a 32-bar live waveform animating from staggered CSS keyframes. When
  * `listening` is false, the overlay collapses + fades out without unmounting,
- * so toggling is symmetric.
+ * so toggling is symmetric. Pointer events on the panel are disabled when
+ * not listening so the invisible-but-mounted area doesn't intercept clicks.
  *
  * Pure leaf — owns no state. The caller controls the `listening` flag.
  *
@@ -47,10 +49,10 @@ export function JovieOverlay({
 
       <div
         aria-hidden={!listening}
-        className={
-          className ??
-          'fixed inset-x-0 bottom-28 z-50 flex justify-center pointer-events-none px-6'
-        }
+        className={cn(
+          'fixed inset-x-0 bottom-28 z-50 flex justify-center pointer-events-none px-6',
+          className
+        )}
         style={{
           opacity: listening ? 1 : 0,
           transform: listening
@@ -59,7 +61,12 @@ export function JovieOverlay({
           transition: `opacity 350ms ${EASE_CINEMATIC}, transform 350ms ${EASE_CINEMATIC}`,
         }}
       >
-        <div className='pointer-events-auto rounded-3xl backdrop-blur-2xl bg-(--linear-app-content-surface)/90 border border-(--linear-app-shell-border) shadow-[0_24px_72px_rgba(0,0,0,0.45)] px-6 py-5 flex flex-col items-center gap-4 w-[480px] max-w-full'>
+        <div
+          className={cn(
+            'rounded-3xl backdrop-blur-2xl bg-(--linear-app-content-surface)/90 border border-(--linear-app-shell-border) shadow-[0_24px_72px_rgba(0,0,0,0.45)] px-6 py-5 flex flex-col items-center gap-4 w-[480px] max-w-full',
+            listening ? 'pointer-events-auto' : 'pointer-events-none'
+          )}
+        >
           <div className='flex items-center gap-3 self-start'>
             <span className='relative h-8 w-8 rounded-full bg-primary text-on-primary grid place-items-center'>
               <Mic className='h-3.5 w-3.5' strokeWidth={2.5} />
