@@ -4,9 +4,13 @@ import { useQuery } from '@tanstack/react-query';
 import { loadReleaseMatrix } from '@/app/app/(shell)/dashboard/releases/actions';
 import { queryKeys, STANDARD_NO_REMOUNT_CACHE } from '@/lib/queries';
 
+interface UseReleasesQueryOptions {
+  readonly enabled?: boolean;
+}
+
 export function useReleasesQuery(
   profileId: string,
-  { enabled = true }: { enabled?: boolean } = {}
+  { enabled = true }: UseReleasesQueryOptions = {}
 ) {
   return useQuery({
     queryKey: queryKeys.releases.matrix(profileId),
