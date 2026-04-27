@@ -130,7 +130,7 @@ export function ArtistArt({ entity }: { readonly entity: EntityRef }) {
 export function SkillArt({ skill }: { readonly skill: SkillCommand }) {
   const Icon = ICON_MAP[skill.iconName] ?? Calendar;
   return (
-    <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-gradient-to-b from-[#25252a] to-[#1c1c20] text-secondary-token shadow-[inset_0_0.5px_0_rgba(255,255,255,0.06),inset_0_0_0_0.5px_rgba(255,255,255,0.04)]'>
+    <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-surface-2 text-secondary-token shadow-[inset_0_0.5px_0_rgba(255,255,255,0.06),inset_0_0_0_0.5px_rgba(255,255,255,0.04)]'>
       <Icon className='h-[14px] w-[14px]' strokeWidth={1.5} />
     </div>
   );
@@ -139,7 +139,7 @@ export function SkillArt({ skill }: { readonly skill: SkillCommand }) {
 export function NavArt({ nav }: { readonly nav: NavCommand }) {
   const Icon = ICON_MAP[nav.iconName] ?? Calendar;
   return (
-    <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-gradient-to-b from-[#25252a] to-[#1c1c20] text-secondary-token shadow-[inset_0_0.5px_0_rgba(255,255,255,0.06),inset_0_0_0_0.5px_rgba(255,255,255,0.04)]'>
+    <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-surface-2 text-secondary-token shadow-[inset_0_0.5px_0_rgba(255,255,255,0.06),inset_0_0_0_0.5px_rgba(255,255,255,0.04)]'>
       <Icon className='h-[14px] w-[14px]' strokeWidth={1.5} />
     </div>
   );
@@ -152,7 +152,7 @@ export function RowVisual({ item }: { readonly item: PickerItem }) {
     return <ReleaseArt entity={item.entity} />;
   if (item.entity.kind === 'artist') return <ArtistArt entity={item.entity} />;
   return (
-    <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-gradient-to-b from-[#25252a] to-[#1c1c20] text-secondary-token shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.05)]'>
+    <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-surface-2 text-secondary-token shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.05)]'>
       <Music2 className='h-[14px] w-[14px]' strokeWidth={1.5} />
     </div>
   );
