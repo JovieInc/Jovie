@@ -86,10 +86,14 @@ function useCmdkData(profileId: string, query: string, open: boolean) {
 
   const artistSearch = useArtistSearchQuery({ limit: 8, minQueryLength: 1 });
   const artistSearchSearch = artistSearch.search;
+  const artistSearchClear = artistSearch.clear;
   useEffect(() => {
     if (!open) return;
     artistSearchSearch(query);
   }, [query, artistSearchSearch, open]);
+  useEffect(() => {
+    if (!open) artistSearchClear();
+  }, [open, artistSearchClear]);
   const artistEntities = useMemo<EntityRef[]>(
     () => artistSearch.results.map(artistResultToEntityRef),
     [artistSearch.results]
