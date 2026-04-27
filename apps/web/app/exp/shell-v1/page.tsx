@@ -1749,6 +1749,12 @@ export default function ShellV1Experiment() {
           outline: 1.5px solid rgba(103, 232, 249, 0.45);
           outline-offset: 1px;
         }
+        /* Chat composer's textarea sits inside a pill that owns its own
+           focus-within state — we don't want a second cyan ring on the
+           inner textarea. */
+        .shell-v1 textarea[aria-label='Chat message input']:focus-visible {
+          outline: none;
+        }
         /* Calm-breath: replaces animate-pulse + animate-ping for ambient
            "Jovie is working" affordances. Slower (3.6s vs 2s), narrower
            opacity range (0.85↔0.55 vs 0.5↔1), and the halo never fully
@@ -1857,7 +1863,11 @@ export default function ShellV1Experiment() {
           together. */}
       <div
         aria-hidden={barCollapsed}
-        className='hidden lg:block fixed bottom-2 z-30 w-[224px]'
+        // Top edge sits on the audio bar's top hairline (8px shell padding
+        // + 62px card height + space-bottom = 80px audio-bar wrapper).
+        // Without this the card centered itself in dead space and visibly
+        // missed the canvas's horizontal divider.
+        className='hidden lg:block fixed bottom-[26px] z-30 w-[224px]'
         style={{
           left: sidebarMode === 'docked' ? (sidebarTight ? 220 : 232) : 8,
           opacity: barCollapsed ? 0 : 1,
@@ -6207,24 +6217,24 @@ function ThreadView({ thread }: { thread: Thread }) {
         </div>
       </div>
 
-      {/* Pinned composer + scroll-to-bottom affordance. The arrow floats
-          above the input, fades in when the user scrolls up, fades out
-          once they're back at the bottom. */}
+      {/* Pinned composer + scroll-to-bottom affordance. Arrow sits flush
+          against the top edge of the input pill (partial overlap) — Claude
+          / ChatGPT pattern, not a floating chip in dead space. */}
       <footer className='shrink-0 relative'>
-        <button
-          type='button'
-          onClick={scrollToBottom}
-          aria-label='Scroll to bottom'
-          className={cn(
-            'absolute left-1/2 -translate-x-1/2 -top-5 h-9 w-9 rounded-full grid place-items-center text-secondary-token bg-(--linear-app-content-surface) border border-(--linear-app-shell-border) shadow-[0_4px_16px_rgba(0,0,0,0.32)] hover:text-primary-token hover:bg-surface-1 transition-all duration-150 ease-out',
-            atBottom
-              ? 'opacity-0 translate-y-1 pointer-events-none'
-              : 'opacity-100 -translate-y-0'
-          )}
-        >
-          <ArrowDown className='h-4 w-4' strokeWidth={2.25} />
-        </button>
-        <div className='max-w-3xl mx-auto px-8 pt-3 pb-6'>
+        <div className='max-w-3xl mx-auto px-8 pt-2 pb-4 relative'>
+          <button
+            type='button'
+            onClick={scrollToBottom}
+            aria-label='Scroll to bottom'
+            className={cn(
+              'absolute left-1/2 -translate-x-1/2 -top-3 h-7 w-7 rounded-full grid place-items-center text-secondary-token bg-(--linear-app-content-surface) border border-(--linear-app-shell-border) shadow-[0_4px_14px_rgba(0,0,0,0.32)] hover:text-primary-token hover:bg-surface-1 transition-all duration-150 ease-out z-10',
+              atBottom
+                ? 'opacity-0 translate-y-1 pointer-events-none'
+                : 'opacity-100'
+            )}
+          >
+            <ArrowDown className='h-3.5 w-3.5' strokeWidth={2.25} />
+          </button>
           <ChatComposer placeholder='Reply to this thread…' />
         </div>
       </footer>
