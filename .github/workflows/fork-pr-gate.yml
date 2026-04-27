@@ -48,7 +48,10 @@ on:
 permissions: {}
 
 concurrency:
-  group: fork-pr-gate-${{ github.event.pull_request.number || github.event.merge_group.head_sha }}
+  # Include the event name so pull_request and pull_request_target events for
+  # the same PR don't cancel each other (the dependabot path runs on
+  # pull_request_target, the rest runs on pull_request).
+  group: fork-pr-gate-${{ github.event_name }}-${{ github.event.pull_request.number || github.event.merge_group.head_sha }}
   cancel-in-progress: true
 
 jobs:
