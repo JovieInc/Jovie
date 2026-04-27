@@ -35,6 +35,12 @@ look-and-feel; pieces graduate here once they've settled.
 
 All three accept a `track: NowPlayingTrack` whose fields (`trackTitle`, `artistName`, `artworkUrl`) match `useTrackAudioPlayer().playbackState` directly.
 
+## Drawer
+
+| Component | Purpose |
+|-----------|---------|
+| `DrawerHero` | Header card for the right-rail drawer. Mounts inside `EntitySidebarShell.entityHeader`. Entity-agnostic — pass `title`, `subtitle`, `artwork`, `statusBadge`, `meta`, `trailing` slots. Optional `onPlay` overlay on artwork; optional overflow-menu button. |
+
 ## Brand chrome / loaders
 
 | Component | Purpose |
