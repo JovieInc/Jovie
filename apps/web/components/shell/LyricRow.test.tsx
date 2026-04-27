@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { LyricRow } from '../LyricRow';
+import { LyricRow } from './LyricRow';
 
 const baseProps = {
   line: { startSec: 30, text: 'You were humming a tune I forgot' },

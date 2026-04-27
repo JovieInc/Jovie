@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { LyricsHeader } from '../LyricsHeader';
+import { LyricsHeader } from './LyricsHeader';
 
 describe('LyricsHeader', () => {
   it('renders artist › title as a breadcrumb', () => {

@@ -65,10 +65,13 @@ export function LyricsView({
   const [focusedIndex, setFocusedIndex] = useState(0);
 
   const activeIndex = useMemo(() => {
+    // Scan every line — caller may have edited a stamp out of order
+    // (LyricsView allows mid-list reordering via stampLine), so we cannot
+    // rely on ascending order to early-exit. Linear scan is O(n) but n is
+    // typically <40 lyric lines per track.
     let idx = -1;
     for (let i = 0; i < lines.length; i++) {
       if (lines[i].startSec <= currentTimeSec) idx = i;
-      else break;
     }
     return idx;
   }, [lines, currentTimeSec]);

@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { LyricsView } from '../LyricsView';
+import { LyricsView } from './LyricsView';
 
 const lines = [
   { startSec: 6, text: 'I was sleeping in the back of the car' },
