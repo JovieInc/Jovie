@@ -1,8 +1,9 @@
 'use client';
 
-import { Check, Copy, Sparkles } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { CopyToggleIcon } from '@/components/atoms/CopyToggleIcon';
 import { PLATFORM_LIMITS } from '@/lib/services/pitch/types';
 import { cn } from '@/lib/utils';
 
@@ -70,11 +71,7 @@ function CopyButton({
       className='shrink-0 rounded-md p-1 text-tertiary-token transition-colors hover:bg-surface-2 hover:text-secondary-token'
       aria-label={`Copy ${platform} pitch`}
     >
-      {copied ? (
-        <Check className='h-3.5 w-3.5 text-green-500' />
-      ) : (
-        <Copy className='h-3.5 w-3.5' />
-      )}
+      <CopyToggleIcon copied={copied} size='h-3.5 w-3.5' />
     </button>
   );
 }
