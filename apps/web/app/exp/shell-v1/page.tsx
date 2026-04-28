@@ -131,6 +131,7 @@ import { ColumnLabel } from '@/components/shell/ColumnLabel';
 import { ContextMenuOverlay } from '@/components/shell/ContextMenuOverlay';
 import { CuesPanel } from '@/components/shell/CuesPanel';
 import { DictationWaveform } from '@/components/shell/DictationWaveform';
+import { DrawerHero as ProductionDrawerHero } from '@/components/shell/DrawerHero';
 import { DrawerTabStrip } from '@/components/shell/DrawerTabStrip';
 import { DropDateChip } from '@/components/shell/DropDateChip';
 import { DueChip } from '@/components/shell/DueChip';
@@ -8035,87 +8036,44 @@ function DrawerHero({
 }) {
   const status = statusFromRelease(release);
   const dropMeta = relativeDropMeta(release.releaseDate);
+  const smartLinkUrl = `jov.ie/${release.artist.toLowerCase().replace(/\s+/g, '-')}/${release.id}`;
   return (
-    <section className='group/drawer relative px-3 pt-3 pb-3'>
-      {/* Status pill + single overflow menu in the top-right corner.
-          The menu owns Close (Esc still works); merging the X into the
-          menu cuts chrome and matches Linear's drawer pattern. */}
-      <div className='absolute right-3 top-3 flex items-center gap-1.5'>
-        <StatusBadge status={status} />
-        <Tooltip label='Drawer actions'>
-          <button
-            type='button'
-            onClick={onMenu}
-            className='h-6 w-6 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1/70 transition-colors duration-150 ease-out opacity-0 group-hover/drawer:opacity-100 focus-visible:opacity-100'
-            aria-label='Drawer actions'
-            aria-haspopup='menu'
+    <ProductionDrawerHero
+      title={release.title}
+      subtitle={
+        <>
+          <EntityHoverLink
+            entity={lookupArtistEntity(release.artist)}
+            onActivate={onEntityActivate}
+            className='decoration-dotted'
           >
-            <MoreHorizontal className='h-3.5 w-3.5' strokeWidth={2.25} />
-          </button>
-        </Tooltip>
-      </div>
-
-      <div className='flex items-start gap-3'>
-        <button
-          type='button'
-          onClick={() => onPlay?.(release.id)}
-          aria-label={`Play ${release.title}`}
-          className='shrink-0 relative group/art rounded-lg overflow-hidden focus-visible:outline-none'
-        >
-          <ArtworkThumb src={release.artwork} title={release.title} size={88} />
-          <span
-            aria-hidden='true'
-            className='absolute inset-0 grid place-items-center bg-black/45 opacity-0 group-hover/art:opacity-100 transition-opacity duration-150 ease-out'
+            {release.artist}
+          </EntityHoverLink>
+          <span className='mx-1 text-quaternary-token'>·</span>
+          <EntityHoverLink
+            entity={lookupReleaseEntityByAlbum(release.album, release.id)}
+            onActivate={onEntityActivate}
+            className='decoration-dotted'
           >
-            <span className='h-8 w-8 rounded-full bg-white text-black grid place-items-center'>
-              <Play
-                className='h-3.5 w-3.5 translate-x-px'
-                strokeWidth={2.5}
-                fill='currentColor'
-              />
-            </span>
-          </span>
-        </button>
-
-        <div className='flex-1 min-w-0 pt-1 pr-[88px]'>
-          <h2
-            className='text-[17px] font-semibold text-primary-token leading-tight'
-            style={{ letterSpacing: '-0.018em' }}
-          >
-            {release.title}
-          </h2>
-          <p className='mt-1 text-[12px] text-tertiary-token truncate'>
-            <EntityHoverLink
-              entity={lookupArtistEntity(release.artist)}
-              onActivate={onEntityActivate}
-              className='decoration-dotted'
-            >
-              {release.artist}
-            </EntityHoverLink>
-            <span className='mx-1 text-quaternary-token'>·</span>
-            <EntityHoverLink
-              entity={lookupReleaseEntityByAlbum(release.album, release.id)}
-              onActivate={onEntityActivate}
-              className='decoration-dotted'
-            >
-              {release.album}
-            </EntityHoverLink>
-          </p>
-          <div className='mt-2 flex items-center gap-1.5 flex-wrap'>
-            <TypeBadge label={release.type} />
-            <DropDateChip tone={dropMeta.tone} label={dropMeta.label} />
-          </div>
-        </div>
-      </div>
-
-      {/* Smart link — copy + open. Pill-shaped to match the input language
-          and reinforce the share-this affordance. */}
-      <div className='mt-4'>
-        <SmartLinkRow
-          url={`jov.ie/${release.artist.toLowerCase().replace(/\s+/g, '-')}/${release.id}`}
-        />
-      </div>
-    </section>
+            {release.album}
+          </EntityHoverLink>
+        </>
+      }
+      artwork={
+        <ArtworkThumb src={release.artwork} title={release.title} size={88} />
+      }
+      statusBadge={<StatusBadge status={status} />}
+      meta={
+        <>
+          <TypeBadge label={release.type} />
+          <DropDateChip tone={dropMeta.tone} label={dropMeta.label} />
+        </>
+      }
+      trailing={<SmartLinkRow url={smartLinkUrl} />}
+      onPlay={onPlay ? () => onPlay(release.id) : undefined}
+      playLabel={`Play ${release.title}`}
+      onMenu={onMenu}
+    />
   );
 }
 
