@@ -811,10 +811,7 @@ function ArtistsBuilt({ variant }: { variant: Variant }) {
   }, []);
 
   return (
-    <section
-      className={cn('px-0 pt-2 pb-20', onCream ? '' : '')}
-      ref={containerRef}
-    >
+    <section className={cn('px-0 pt-2 pb-20')} ref={containerRef}>
       <div className='max-w-[1200px] mx-auto px-6 lg:px-8 mb-8'>
         <p
           className={cn(
