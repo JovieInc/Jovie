@@ -7403,8 +7403,16 @@ function ReleaseDrawer({
           <div className='flex-1 min-h-0 overflow-y-auto'>
             {tab === 'overview' && <DrawerOverviewTab release={r} />}
             {tab === 'distribution' && <DrawerDistribution release={r} />}
-            {tab === 'lyrics' && <DrawerLyricsTab release={r} />}
-            {tab === 'cues' && <DrawerCues release={r} onSeek={onSeek} />}
+            {tab === 'lyrics' && (
+              <LyricsList lines={MOCK_DRAWER_LYRICS} onEdit={() => undefined} />
+            )}
+            {tab === 'cues' && (
+              <CuesPanel
+                cues={r.cues}
+                durationSec={r.durationSec}
+                onSeek={onSeek ? sec => onSeek(r.id, sec) : undefined}
+              />
+            )}
             {tab === 'activity' && (
               <DrawerActivityTab release={r} onOpenTasks={onOpenTasks} />
             )}
@@ -7528,10 +7536,6 @@ const MOCK_DRAWER_LYRICS: readonly { at: number; text: string }[] = [
   { at: 81, text: 'I said the world is what you let go' },
   { at: 88, text: 'Both of us were right' },
 ];
-
-function DrawerLyricsTab({ release: _release }: { release: Release }) {
-  return <LyricsList lines={MOCK_DRAWER_LYRICS} onEdit={() => undefined} />;
-}
 
 type RangeKey = '24h' | '7d' | '30d' | '90d' | 'YTD';
 const RANGES: Array<{ key: RangeKey; label: string; days: number }> = [
@@ -7863,22 +7867,6 @@ function DrawerDistribution({ release }: { release: Release }) {
         </p>
       )}
     </div>
-  );
-}
-
-function DrawerCues({
-  release,
-  onSeek,
-}: {
-  release: Release;
-  onSeek?: (id: string, sec: number) => void;
-}) {
-  return (
-    <CuesPanel
-      cues={release.cues}
-      durationSec={release.durationSec}
-      onSeek={onSeek ? sec => onSeek(release.id, sec) : undefined}
-    />
   );
 }
 
