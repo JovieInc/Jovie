@@ -11,11 +11,22 @@ import {
 import { PageToolbarActionButton } from '@/components/organisms/table';
 import { cn } from '@/lib/utils';
 
+export type TaskSubviewId = 'all' | 'mine' | 'jovie';
+
+export interface TaskSubviewOption {
+  readonly id: TaskSubviewId;
+  readonly label: string;
+  readonly count: number;
+}
+
 export interface TaskWorkspaceHeaderBarProps {
   readonly mode: 'default' | 'search' | 'create';
   readonly search: string;
   readonly draftTitle: string;
   readonly taskCount: number;
+  readonly subviews: ReadonlyArray<TaskSubviewOption>;
+  readonly activeSubview: TaskSubviewId;
+  readonly onSubviewChange: (subview: TaskSubviewId) => void;
   readonly onSearchChange: (value: string) => void;
   readonly onDraftTitleChange: (value: string) => void;
   readonly onEnterSearch: () => void;
@@ -51,6 +62,9 @@ export function TaskWorkspaceHeaderBar({
   canSelectNext = false,
   onSelectPrevious,
   onSelectNext,
+  subviews,
+  activeSubview,
+  onSubviewChange,
 }: Readonly<TaskWorkspaceHeaderBarProps>) {
   const createFormId = 'task-workspace-create-form';
 
@@ -89,11 +103,12 @@ export function TaskWorkspaceHeaderBar({
           </form>
         )}
         {mode !== 'search' && mode !== 'create' && (
-          <div className='flex h-full items-center pl-1.5'>
-            <span className='text-[10.5px] font-semibold text-tertiary-token'>
-              {taskCount === 1 ? '1 Task' : `${taskCount} Tasks`}
-            </span>
-          </div>
+          <TaskSubviewTabs
+            subviews={subviews}
+            activeSubview={activeSubview}
+            onSubviewChange={onSubviewChange}
+            taskCount={taskCount}
+          />
         )}
       </div>
 
@@ -176,6 +191,73 @@ export function TaskWorkspaceHeaderBar({
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+export function TaskSubviewTabs({
+  subviews,
+  activeSubview,
+  onSubviewChange,
+  taskCount,
+  className,
+}: Readonly<{
+  subviews: ReadonlyArray<TaskSubviewOption>;
+  activeSubview: TaskSubviewId;
+  onSubviewChange: (subview: TaskSubviewId) => void;
+  taskCount?: number;
+  className?: string;
+}>) {
+  if (subviews.length === 0) {
+    return (
+      <div className={cn('flex h-full items-center pl-1.5', className)}>
+        {typeof taskCount === 'number' ? (
+          <span className='text-[10.5px] font-semibold text-tertiary-token'>
+            {taskCount === 1 ? '1 Task' : `${taskCount} Tasks`}
+          </span>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      role='tablist'
+      aria-label='Task subviews'
+      className={cn(
+        'flex min-w-0 items-center gap-0.5 overflow-x-auto pl-0.5',
+        className
+      )}
+    >
+      {subviews.map(subview => {
+        const isActive = activeSubview === subview.id;
+
+        return (
+          <button
+            key={subview.id}
+            type='button'
+            role='tab'
+            aria-selected={isActive}
+            onClick={() => onSubviewChange(subview.id)}
+            className={cn(
+              'inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-[12.5px] font-semibold tracking-[-0.012em] transition-[background-color,color]',
+              isActive
+                ? 'bg-surface-1 text-primary-token'
+                : 'text-tertiary-token hover:bg-surface-1/60 hover:text-primary-token'
+            )}
+          >
+            <span>{subview.label}</span>
+            <span
+              className={cn(
+                'text-[10.5px] tabular-nums',
+                isActive ? 'text-tertiary-token' : 'text-quaternary-token'
+              )}
+            >
+              {subview.count}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }

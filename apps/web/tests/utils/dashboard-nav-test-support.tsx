@@ -8,6 +8,8 @@ import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardData
 import { SidebarProvider } from '@/components/organisms/Sidebar';
 import { APP_ROUTES } from '@/constants/routes';
 import { DashboardNav } from '@/features/dashboard/dashboard-nav';
+import { AppFlagProvider } from '@/lib/flags/client';
+import { APP_FLAG_DEFAULTS, type AppFlagSnapshot } from '@/lib/flags/contracts';
 
 export const mockUsePathname = vi.fn<() => string>(() => APP_ROUTES.CHAT);
 export const mockUseTaskStatsQuery = vi.fn(() => ({ data: undefined }));
@@ -170,10 +172,12 @@ export function renderDashboardNav({
   renderFn = render,
   overrides = {},
   sidebarProps = {},
+  appFlags = {},
 }: Readonly<{
   renderFn?: RenderDashboardNavFn;
   overrides?: Partial<DashboardData>;
   sidebarProps?: ComponentProps<typeof SidebarProvider>;
+  appFlags?: Partial<AppFlagSnapshot>;
 }>) {
   const value: DashboardData = { ...baseDashboardData, ...overrides };
 
@@ -183,11 +187,13 @@ export function renderDashboardNav({
 
   return renderFn(
     <QueryClientProvider client={queryClient}>
-      <DashboardDataProvider value={value}>
-        <SidebarProvider {...sidebarProps}>
-          <DashboardNav />
-        </SidebarProvider>
-      </DashboardDataProvider>
+      <AppFlagProvider initialFlags={{ ...APP_FLAG_DEFAULTS, ...appFlags }}>
+        <DashboardDataProvider value={value}>
+          <SidebarProvider {...sidebarProps}>
+            <DashboardNav />
+          </SidebarProvider>
+        </DashboardDataProvider>
+      </AppFlagProvider>
     </QueryClientProvider>
   );
 }

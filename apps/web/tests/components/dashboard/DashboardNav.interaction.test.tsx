@@ -91,6 +91,21 @@ describe('DashboardNav interactions', () => {
     expect(mockRouterPush).not.toHaveBeenCalled();
   });
 
+  it('keeps the shell nav profile button wired to the same drawer action', async () => {
+    const user = userEvent.setup();
+
+    mockUsePathname.mockReturnValueOnce(APP_ROUTES.CHAT);
+    renderDashboardNav({
+      renderFn: render,
+      appFlags: { SHELL_CHAT_V1: true },
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Profile' }));
+
+    expect(mockTogglePreviewPanel).toHaveBeenCalledTimes(1);
+    expect(mockRouterPush).not.toHaveBeenCalled();
+  });
+
   it('profile button navigates to chat before opening the drawer off chat routes', async () => {
     const user = userEvent.setup();
 

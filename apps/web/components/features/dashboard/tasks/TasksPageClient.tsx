@@ -86,7 +86,12 @@ import type {
 } from '@/lib/tasks/types';
 import { getAccentCssVars } from '@/lib/ui/accent-palette';
 import { cn } from '@/lib/utils';
-import { TaskWorkspaceHeaderBar } from './TaskWorkspaceHeaderBar';
+import {
+  type TaskSubviewId,
+  type TaskSubviewOption,
+  TaskSubviewTabs,
+  TaskWorkspaceHeaderBar,
+} from './TaskWorkspaceHeaderBar';
 import {
   getTaskAssigneeVisual,
   getTaskPriorityVisual,
@@ -138,6 +143,34 @@ const MOBILE_TASK_SCOPE_OPTIONS = [
   ['open', 'Open'],
   ['done', 'Closed'],
 ] as const satisfies ReadonlyArray<readonly [MobileTaskScope, string]>;
+
+function getTaskSubviewForAssigneeFilter(
+  assigneeFilter: TaskAssigneeKind | 'all'
+): TaskSubviewId {
+  if (assigneeFilter === 'human') {
+    return 'mine';
+  }
+
+  if (assigneeFilter === 'jovie') {
+    return 'jovie';
+  }
+
+  return 'all';
+}
+
+function getAssigneeFilterForTaskSubview(
+  subview: TaskSubviewId
+): TaskAssigneeKind | 'all' {
+  if (subview === 'mine') {
+    return 'human';
+  }
+
+  if (subview === 'jovie') {
+    return 'jovie';
+  }
+
+  return 'all';
+}
 
 function isTaskClosed(task: Readonly<TaskView>): boolean {
   return task.status === 'done' || task.status === 'cancelled';
@@ -1171,29 +1204,54 @@ export function TasksPageClient() {
   // Fetch all tasks once — filter client-side for instant search
   const { data, isLoading, isError, refetch } = useTasksQuery(profileId);
 
-  const tasks = useMemo(() => {
+  const taskSubviewBaseTasks = useMemo(() => {
     const allTasks = data?.tasks ?? [];
     const searchLower = deferredSearch.trim().toLowerCase();
 
-    const filtered = allTasks.filter(task => {
+    return allTasks.filter(task => {
       if (searchLower && !task.title.toLowerCase().includes(searchLower))
         return false;
       if (statusFilter !== 'all' && task.status !== statusFilter) return false;
       if (priorityFilter !== 'all' && task.priority !== priorityFilter)
         return false;
-      if (assigneeFilter !== 'all' && task.assigneeKind !== assigneeFilter)
-        return false;
       return true;
     });
+  }, [data?.tasks, deferredSearch, statusFilter, priorityFilter]);
+  const taskSubviewOptions = useMemo<readonly TaskSubviewOption[]>(
+    () => [
+      { id: 'all', label: 'All', count: taskSubviewBaseTasks.length },
+      {
+        id: 'mine',
+        label: 'Assigned To Me',
+        count: taskSubviewBaseTasks.filter(
+          task => task.assigneeKind === 'human'
+        ).length,
+      },
+      {
+        id: 'jovie',
+        label: 'Assigned To Jovie',
+        count: taskSubviewBaseTasks.filter(
+          task => task.assigneeKind === 'jovie'
+        ).length,
+      },
+    ],
+    [taskSubviewBaseTasks]
+  );
+  const tasks = useMemo(() => {
+    const filtered =
+      assigneeFilter === 'all'
+        ? taskSubviewBaseTasks
+        : taskSubviewBaseTasks.filter(
+            task => task.assigneeKind === assigneeFilter
+          );
 
     return [...filtered].sort(compareTaskCompletionOrder);
-  }, [
-    data?.tasks,
-    deferredSearch,
-    statusFilter,
-    priorityFilter,
-    assigneeFilter,
-  ]);
+  }, [assigneeFilter, taskSubviewBaseTasks]);
+  const activeTaskSubview = getTaskSubviewForAssigneeFilter(assigneeFilter);
+  const setTaskSubview = useCallback((subview: TaskSubviewId) => {
+    setAssigneeFilter(getAssigneeFilterForTaskSubview(subview));
+    setMobileScope('all');
+  }, []);
   const mobileScopedTasks = useMemo(
     () => getMobileScopedTasks(tasks, mobileScope),
     [mobileScope, tasks]
@@ -1696,6 +1754,9 @@ export function TasksPageClient() {
             search={search}
             draftTitle={draftTitle}
             taskCount={visibleTasks.length}
+            subviews={taskSubviewOptions}
+            activeSubview={activeTaskSubview}
+            onSubviewChange={setTaskSubview}
             onSearchChange={value => {
               setSearch(value);
               if (headerMode === 'default') {
@@ -1785,6 +1846,12 @@ export function TasksPageClient() {
                       <Search className='h-4 w-4' />
                     </button>
                   </div>
+                  <TaskSubviewTabs
+                    subviews={taskSubviewOptions}
+                    activeSubview={activeTaskSubview}
+                    onSubviewChange={setTaskSubview}
+                    className='px-3 pb-1 pt-2'
+                  />
                   <MobileTaskScopeTabs
                     scope={mobileScope}
                     counts={mobileScopeCounts}

@@ -34,7 +34,7 @@ describe('DspAvatarStack', () => {
 
   it('shows the live count over the total', () => {
     render(<DspAvatarStack dsps={ITEMS} />);
-    expect(screen.getByText('1/3 live')).toBeInTheDocument();
+    expect(screen.getByText('1/3 Live')).toBeInTheDocument();
   });
 
   it('renders an overflow chip when more than one DSP is provided', () => {

@@ -11,6 +11,7 @@ import { Copy, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
+  type ComponentType,
   type MouseEvent,
   type ReactNode,
   useCallback,
@@ -24,6 +25,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/organisms/Sidebar';
+import { SidebarNavItem } from '@/components/shell/SidebarNavItem';
 import { BASE_URL } from '@/constants/domains';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import type { KeyboardShortcut } from '@/lib/keyboard-shortcuts';
@@ -46,6 +48,8 @@ interface NavMenuItemProps {
   readonly renderAsButton?: boolean;
   /** Hover/focus prefetch handler — wired by DashboardNav, not this component */
   readonly onPrefetch?: () => void;
+  /** Use the Shell V1 primitive for button-only rows. Links stay legacy. */
+  readonly useShellNavItem?: boolean;
 }
 
 /**
@@ -106,6 +110,7 @@ export function NavMenuItem({
   preventNavigation = false,
   renderAsButton = false,
   onPrefetch,
+  useShellNavItem = false,
 }: NavMenuItemProps) {
   const router = useRouter();
   const pendingNavigationRef = useRef(false);
@@ -273,39 +278,59 @@ export function NavMenuItem({
     showPendingShell,
   ]);
 
+  const ShellIcon = item.icon as ComponentType<{
+    readonly className?: string;
+    readonly strokeWidth?: number;
+  }>;
+  const shellNavItem =
+    useShellNavItem && renderAsButton && item.badge == null ? (
+      <SidebarNavItem
+        item={{
+          icon: ShellIcon,
+          label: item.name,
+          active: isActive,
+          onActivate: handleButtonClick,
+        }}
+        collapsed={false}
+        tight
+      />
+    ) : null;
+
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <SidebarMenuItem>
-          <SidebarMenuButton asChild isActive={isActive} tooltip={tooltip}>
-            {renderAsButton ? (
-              <button
-                type='button'
-                onClick={handleButtonClick}
-                onPointerDown={handlePressStart}
-                onMouseEnter={onPrefetch}
-                onFocus={onPrefetch}
-                aria-pressed={isActive}
-                className='flex w-full min-w-0 items-center group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:justify-center'
-              >
-                {innerContent}
-              </button>
-            ) : (
-              <Link
-                href={item.href}
-                prefetch={prefetch}
-                onClick={handleLinkClick}
-                onPointerDown={handlePressStart}
-                onMouseEnter={onPrefetch}
-                onFocus={onPrefetch}
-                aria-current={isActive ? 'page' : undefined}
-                aria-disabled={preventNavigation || undefined}
-                className='flex w-full min-w-0 items-center group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:justify-center'
-              >
-                {innerContent}
-              </Link>
-            )}
-          </SidebarMenuButton>
+          {shellNavItem ?? (
+            <SidebarMenuButton asChild isActive={isActive} tooltip={tooltip}>
+              {renderAsButton ? (
+                <button
+                  type='button'
+                  onClick={handleButtonClick}
+                  onPointerDown={handlePressStart}
+                  onMouseEnter={onPrefetch}
+                  onFocus={onPrefetch}
+                  aria-pressed={isActive}
+                  className='flex w-full min-w-0 items-center group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:justify-center'
+                >
+                  {innerContent}
+                </button>
+              ) : (
+                <Link
+                  href={item.href}
+                  prefetch={prefetch}
+                  onClick={handleLinkClick}
+                  onPointerDown={handlePressStart}
+                  onMouseEnter={onPrefetch}
+                  onFocus={onPrefetch}
+                  aria-current={isActive ? 'page' : undefined}
+                  aria-disabled={preventNavigation || undefined}
+                  className='flex w-full min-w-0 items-center group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:justify-center'
+                >
+                  {innerContent}
+                </Link>
+              )}
+            </SidebarMenuButton>
+          )}
           {item.badge != null && (
             <SidebarMenuBadge>{item.badge}</SidebarMenuBadge>
           )}

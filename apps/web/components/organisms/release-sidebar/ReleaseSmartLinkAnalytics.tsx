@@ -1,13 +1,14 @@
 'use client';
 
 import { CommonDropdown } from '@jovie/ui';
-import { Copy, ExternalLink, Link2, Share2 } from 'lucide-react';
+import { Share2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import {
   DrawerAnalyticsSummaryCard,
   DrawerInlineIconButton,
 } from '@/components/molecules/drawer';
+import { SmartLinkRow } from '@/components/shell/SmartLinkRow';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import {
   TEST_AUTH_BYPASS_MODE,
@@ -164,44 +165,25 @@ function ReleaseSmartLinkControl({
   return (
     <div className='space-y-1.5'>
       <div
-        className='flex h-9 items-center gap-1.5 rounded-full border border-subtle bg-surface-0 px-2.5'
+        className='flex items-center gap-1.5'
         data-testid='release-smart-link-control'
       >
-        <Link2
-          className='h-3 w-3 shrink-0 text-tertiary-token'
-          aria-hidden='true'
-        />
-        <span
-          className='min-w-0 flex-1 truncate font-mono text-[10.5px] leading-none tracking-[-0.01em] text-secondary-token'
-          title={smartLinkUrl}
-        >
-          {smartLinkLabel}
-        </span>
-        <DrawerInlineIconButton
-          onClick={async event => {
-            event.stopPropagation();
-            const copied = await copyToClipboard(smartLinkUrl);
-            if (copied) {
-              toast.success('Smart link copied');
-              return;
-            }
-            toast.error('Failed to copy link');
+        <SmartLinkRow
+          url={smartLinkLabel}
+          className='min-w-0 flex-1'
+          onCopy={() => {
+            void copyToClipboard(smartLinkUrl).then(copied => {
+              if (copied) {
+                toast.success('Smart link copied');
+                return;
+              }
+              toast.error('Failed to copy link');
+            });
           }}
-          title='Copy smart link'
-          className='h-7 w-7 rounded-full text-tertiary-token'
-        >
-          <Copy className='h-3 w-3' />
-        </DrawerInlineIconButton>
-        <DrawerInlineIconButton
-          onClick={event => {
-            event.stopPropagation();
+          onOpen={() => {
             globalThis.open(smartLinkUrl, '_blank', 'noopener,noreferrer');
           }}
-          title='Open smart link'
-          className='h-7 w-7 rounded-full text-tertiary-token'
-        >
-          <ExternalLink className='h-3 w-3' />
-        </DrawerInlineIconButton>
+        />
         <CommonDropdown
           variant='dropdown'
           size='compact'

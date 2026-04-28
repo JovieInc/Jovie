@@ -87,6 +87,7 @@ export function DashboardNav(_: DashboardNavProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const threadsEnabled = useAppFlag('THREADS_ENABLED');
+  const shellChatV1Enabled = useAppFlag('SHELL_CHAT_V1');
   const {
     isOpen: isPreviewOpen,
     open: openPreviewPanel,
@@ -258,6 +259,7 @@ export function DashboardNav(_: DashboardNavProps) {
           onClick={onClick}
           preventNavigation={demoUnavailable}
           renderAsButton={renderAsButton}
+          useShellNavItem={shellChatV1Enabled && renderAsButton}
           onNavigate={
             isReleasesItem && !isActive
               ? () => showPendingShell('releases')
@@ -282,6 +284,7 @@ export function DashboardNav(_: DashboardNavProps) {
       showPendingShell,
       isPreviewOpen,
       isDemo,
+      shellChatV1Enabled,
     ]
   );
 

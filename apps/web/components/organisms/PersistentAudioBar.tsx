@@ -7,12 +7,30 @@ import { toast } from 'sonner';
 import { SeekBar } from '@/components/atoms/SeekBar';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
+import { AudioBar, type AudioBarTrack } from '@/components/shell/AudioBar';
+import type { LoopMode } from '@/components/shell/LoopBtn';
+import { SidebarBottomNowPlaying } from '@/components/shell/SidebarBottomNowPlaying';
+import { SidebarNowPlaying } from '@/components/shell/SidebarNowPlaying';
+import { cn } from '@/lib/utils';
 import { formatDuration } from '@/lib/utils/formatDuration';
 
-export function PersistentAudioBar() {
+export type PersistentAudioBarVariant = 'legacy' | 'shellChatV1';
+
+interface PersistentAudioBarProps {
+  readonly variant?: PersistentAudioBarVariant;
+}
+
+const LOOP_SECTION = { from: 25, to: 55 };
+
+export function PersistentAudioBar({
+  variant = 'legacy',
+}: Readonly<PersistentAudioBarProps>) {
   const { playbackState, toggleTrack, seek, stop, onError } =
     useTrackAudioPlayer();
   const [imgError, setImgError] = useState(false);
+  const [barCollapsed, setBarCollapsed] = useState(false);
+  const [waveformOn, setWaveformOn] = useState(false);
+  const [loopMode, setLoopMode] = useState<LoopMode>('off');
 
   useEffect(() => {
     return onError(() => {
@@ -24,15 +42,32 @@ export function PersistentAudioBar() {
     setImgError(false);
   }, [playbackState.artworkUrl]);
 
+  useEffect(() => {
+    setBarCollapsed(false);
+  }, [playbackState.activeTrackId]);
+
   const handleToggle = useCallback(() => {
+    if (playbackState.playbackStatus === 'loading') return;
     if (!playbackState.activeTrackId || !playbackState.trackTitle) return;
     toggleTrack({
       id: playbackState.activeTrackId,
       title: playbackState.trackTitle,
     }).catch(() => {});
-  }, [playbackState.activeTrackId, playbackState.trackTitle, toggleTrack]);
+  }, [
+    playbackState.activeTrackId,
+    playbackState.playbackStatus,
+    playbackState.trackTitle,
+    toggleTrack,
+  ]);
 
-  if (!playbackState.activeTrackId) return null;
+  const handleCycleLoop = useCallback(() => {
+    setLoopMode(current =>
+      current === 'off' ? 'track' : current === 'track' ? 'section' : 'off'
+    );
+  }, []);
+
+  const activeTrackId = playbackState.activeTrackId;
+  if (!activeTrackId) return null;
 
   const isLoading = playbackState.playbackStatus === 'loading';
 
@@ -57,10 +92,13 @@ export function PersistentAudioBar() {
     playButtonIcon = <Pause className='h-3 w-3' />;
   }
 
-  return (
+  const legacyBar = (className?: string) => (
     <section
       aria-label='Audio player'
-      className='animate-in fade-in slide-in-from-bottom-2 duration-200 shrink-0 border-t border-subtle bg-(--linear-app-content-surface) backdrop-blur-xl px-3 py-2 max-lg:mb-[calc(3.5rem+env(safe-area-inset-bottom))]'
+      className={cn(
+        'animate-in fade-in slide-in-from-bottom-2 duration-200 shrink-0 border-t border-subtle bg-(--linear-app-content-surface) backdrop-blur-xl px-3 py-2 max-lg:mb-[calc(3.5rem+env(safe-area-inset-bottom))]',
+        className
+      )}
     >
       <div className='flex items-center gap-3'>
         {/* Artwork */}
@@ -144,5 +182,76 @@ export function PersistentAudioBar() {
         </button>
       </div>
     </section>
+  );
+
+  if (variant === 'legacy') {
+    return legacyBar();
+  }
+
+  const shellTrack: AudioBarTrack = {
+    id: activeTrackId,
+    title: playbackState.trackTitle ?? '',
+    artist: playbackState.artistName ?? '',
+  };
+  const nowPlayingTrack = {
+    trackTitle: playbackState.trackTitle,
+    artistName: playbackState.artistName,
+    artworkUrl: playbackState.artworkUrl,
+  };
+
+  return (
+    <>
+      <div
+        aria-hidden={barCollapsed}
+        className='hidden shrink-0 overflow-hidden border-t border-(--linear-app-shell-border) bg-(--linear-bg-page) lg:block'
+        style={{
+          maxHeight: barCollapsed ? 0 : 120,
+          opacity: barCollapsed ? 0 : 1,
+          pointerEvents: barCollapsed ? 'none' : 'auto',
+          transition: 'max-height 150ms ease-out, opacity 150ms ease-out',
+        }}
+      >
+        <div className='px-8 pt-2'>
+          <SidebarNowPlaying
+            track={nowPlayingTrack}
+            isPlaying={playbackState.isPlaying}
+            onPlay={handleToggle}
+            playOverlayVisible={false}
+            className='max-w-56'
+          />
+        </div>
+        <AudioBar
+          isPlaying={playbackState.isPlaying}
+          onPlay={handleToggle}
+          onCollapse={() => setBarCollapsed(true)}
+          currentTime={playbackState.currentTime}
+          duration={playbackState.duration}
+          loopMode={loopMode}
+          onCycleLoop={handleCycleLoop}
+          loopSection={loopMode === 'section' ? LOOP_SECTION : undefined}
+          waveformOn={waveformOn}
+          onToggleWaveform={() => setWaveformOn(current => !current)}
+          track={shellTrack}
+        />
+      </div>
+      <div
+        aria-hidden={!barCollapsed}
+        className='hidden shrink-0 overflow-hidden border-t border-(--linear-app-shell-border) bg-(--linear-app-content-surface) px-3 lg:block'
+        style={{
+          maxHeight: barCollapsed ? 64 : 0,
+          opacity: barCollapsed ? 1 : 0,
+          pointerEvents: barCollapsed ? 'auto' : 'none',
+          transition: 'max-height 150ms ease-out, opacity 150ms ease-out',
+        }}
+      >
+        <SidebarBottomNowPlaying
+          track={nowPlayingTrack}
+          isPlaying={playbackState.isPlaying}
+          onPlay={handleToggle}
+          className='my-2 max-w-64'
+        />
+      </div>
+      {legacyBar('lg:hidden')}
+    </>
   );
 }

@@ -1,5 +1,9 @@
 'use client';
 
+import { DropDateChip } from '@/components/shell/DropDateChip';
+import { MetaPill } from '@/components/shell/MetaPill';
+import { TypeBadge } from '@/components/shell/TypeBadge';
+import { dropDateMeta } from '@/lib/format-drop-date';
 import { formatReleaseDate } from './utils';
 
 const RELEASE_TYPE_LABELS: Record<string, string> = {
@@ -27,40 +31,39 @@ export function ReleaseFields({
   totalTracks,
   platformCount,
 }: ReleaseFieldsProps) {
-  const parts: string[] = [];
-  if (releaseType) {
-    parts.push(RELEASE_TYPE_LABELS[releaseType] ?? releaseType);
-  }
-  if (totalTracks != null && totalTracks > 0) {
-    parts.push(`${totalTracks} ${totalTracks === 1 ? 'track' : 'tracks'}`);
-  }
-  if (platformCount != null && platformCount > 0) {
-    parts.push(`${platformCount} ${platformCount === 1 ? 'DSP' : 'DSPs'}`);
-  }
+  const releaseTypeLabel = releaseType
+    ? (RELEASE_TYPE_LABELS[releaseType] ?? releaseType)
+    : null;
+  const trackLabel =
+    totalTracks != null && totalTracks > 0
+      ? `${totalTracks} ${totalTracks === 1 ? 'Track' : 'Tracks'}`
+      : null;
+  const platformLabel =
+    platformCount != null && platformCount > 0
+      ? `${platformCount} ${platformCount === 1 ? 'DSP' : 'DSPs'}`
+      : null;
+  const dropDate = releaseDate ? dropDateMeta(releaseDate) : null;
 
   return (
-    <div className='space-y-0.5'>
-      <p className='text-[11.5px] leading-[15px] text-secondary-token'>
-        {releaseDate ? (
-          <>
-            <span className='font-[500] text-quaternary-token'>Released</span>{' '}
-            {formatReleaseDate(releaseDate)}
-          </>
+    <div className='space-y-1.5'>
+      <div className='flex flex-wrap items-center gap-1.5'>
+        {releaseTypeLabel ? <TypeBadge label={releaseTypeLabel} /> : null}
+        {dropDate ? (
+          <DropDateChip tone={dropDate.tone} label={dropDate.label} />
         ) : (
-          <span className='text-tertiary-token'>No release date</span>
+          <MetaPill>No Release Date</MetaPill>
         )}
-      </p>
+      </div>
       {revealDate && (
         <p className='text-[10.5px] leading-[14px] text-quaternary-token'>
           <span className='font-[500]'>Reveals</span>{' '}
           {formatReleaseDate(revealDate)}
         </p>
       )}
-      {parts.length > 0 && (
-        <p className='text-[10.5px] leading-[14px] tracking-[0.01em] text-quaternary-token'>
-          {parts.join(' · ')}
-        </p>
-      )}
+      <div className='flex flex-wrap items-center gap-1'>
+        {trackLabel ? <MetaPill>{trackLabel}</MetaPill> : null}
+        {platformLabel ? <MetaPill>{platformLabel}</MetaPill> : null}
+      </div>
     </div>
   );
 }

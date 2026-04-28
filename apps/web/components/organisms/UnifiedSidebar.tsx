@@ -6,10 +6,17 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from '@jovie/ui';
-import { ArrowLeft, ChevronDown, Copy, SquarePen } from 'lucide-react';
+import {
+  ArrowLeft,
+  ChevronDown,
+  Copy,
+  Download,
+  RefreshCw,
+  SquarePen,
+} from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
@@ -24,6 +31,7 @@ import {
   SidebarMenuItem,
 } from '@/components/organisms/Sidebar';
 import { UserButton } from '@/components/organisms/user-button';
+import { InstallBanner } from '@/components/shell/InstallBanner';
 import { Tooltip } from '@/components/shell/Tooltip';
 import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
@@ -39,8 +47,16 @@ import { SidebarInstallBanner } from '@/features/feedback/SidebarInstallBanner';
 import { SidebarUpgradeBanner } from '@/features/feedback/SidebarUpgradeBanner';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import { useProfileData } from '@/hooks/useProfileData';
+import { usePWAInstall } from '@/hooks/usePWAInstall';
+import { env } from '@/lib/env-client';
 import { useAppFlag } from '@/lib/flags/client';
+import { TOAST_MESSAGES } from '@/lib/hooks/useNotifications';
+import {
+  useVersionMonitor,
+  type VersionMismatchInfo,
+} from '@/lib/hooks/useVersionMonitor';
 import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
+import { usePlanGate } from '@/lib/queries/usePlanGate';
 import { cn } from '@/lib/utils';
 import { ProfileSwitcher } from './ProfileSwitcher';
 import { SidebarBottomNowPlayingBridge } from './SidebarBottomNowPlayingBridge';
@@ -48,6 +64,9 @@ import { SidebarBottomNowPlayingBridge } from './SidebarBottomNowPlayingBridge';
 export interface UnifiedSidebarProps {
   readonly section: 'admin' | 'dashboard' | 'settings';
 }
+
+const VERSION_DISMISSAL_KEY = 'jovie-version-update-dismissed';
+const VERSION_NOTIFICATION_DELAY_MS = 10_000;
 
 /** Render a group of nav items */
 function SettingsNavGroup({
@@ -317,6 +336,107 @@ function SidebarHeaderNav({
   );
 }
 
+function ShellSidebarInstallBanner() {
+  const isPassiveRuntime = env.IS_TEST || env.IS_E2E;
+  const { isPro, isTrialing } = usePlanGate();
+  const isPaidPro = isPro && !isTrialing;
+  const pwaInstallEnabled = useAppFlag('PWA_INSTALL_BANNER');
+  const { canPrompt, isIOS, install, dismiss: dismissPwa } = usePWAInstall();
+  const [versionUpdate, setVersionUpdate] =
+    useState<VersionMismatchInfo | null>(null);
+  const [showVersionBanner, setShowVersionBanner] = useState(false);
+  const notificationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
+
+  const handleVersionMismatch = useCallback((info: VersionMismatchInfo) => {
+    try {
+      if (sessionStorage.getItem(VERSION_DISMISSAL_KEY)) return;
+    } catch {
+      // Session storage may be unavailable in restricted browsers.
+    }
+
+    setVersionUpdate(info);
+    if (notificationTimeoutRef.current) {
+      clearTimeout(notificationTimeoutRef.current);
+    }
+    notificationTimeoutRef.current = setTimeout(() => {
+      setShowVersionBanner(true);
+    }, VERSION_NOTIFICATION_DELAY_MS);
+  }, []);
+
+  useVersionMonitor({
+    onVersionMismatch: handleVersionMismatch,
+    enabled: !isPassiveRuntime,
+  });
+
+  useEffect(() => {
+    return () => {
+      if (notificationTimeoutRef.current) {
+        clearTimeout(notificationTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const dismissVersionUpdate = useCallback(() => {
+    try {
+      sessionStorage.setItem(VERSION_DISMISSAL_KEY, 'true');
+    } catch {
+      // Session storage may be unavailable in restricted browsers.
+    }
+    setShowVersionBanner(false);
+    setVersionUpdate(null);
+  }, []);
+
+  const reload = useCallback(() => {
+    globalThis.location.reload();
+  }, []);
+
+  if (isPassiveRuntime) {
+    return null;
+  }
+
+  if (showVersionBanner && versionUpdate) {
+    const title = versionUpdate.newVersion
+      ? `New Version Available (v${versionUpdate.newVersion})`
+      : 'New Version Available';
+
+    return (
+      <InstallBanner
+        open
+        icon={RefreshCw}
+        title={title}
+        description='An improved version of Jovie is available. Reload to update.'
+        ctaLabel='Reload'
+        ctaIcon={RefreshCw}
+        onCta={reload}
+        onDismiss={dismissVersionUpdate}
+        className='group-data-[collapsible=icon]:hidden'
+      />
+    );
+  }
+
+  if (!pwaInstallEnabled || !isPaidPro || !canPrompt) return null;
+
+  return (
+    <InstallBanner
+      open
+      icon={Download}
+      title={TOAST_MESSAGES.PWA_INSTALL}
+      description={
+        isIOS
+          ? TOAST_MESSAGES.PWA_INSTALL_IOS
+          : TOAST_MESSAGES.PWA_INSTALL_DESCRIPTION
+      }
+      ctaLabel={isIOS ? 'Dismiss' : 'Install'}
+      ctaIcon={isIOS ? null : Download}
+      onCta={isIOS ? dismissPwa : install}
+      onDismiss={dismissPwa}
+      className='group-data-[collapsible=icon]:hidden'
+    />
+  );
+}
+
 /**
  * UnifiedSidebar - Single sidebar component for all post-auth sections
  *
@@ -326,6 +446,7 @@ function SidebarHeaderNav({
  */
 export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
   const { isAdmin: isUserAdmin, creatorProfiles } = useDashboardData();
+  const shellChatV1Enabled = useAppFlag('SHELL_CHAT_V1');
   const pathname = usePathname();
   const isDemoRoute = isDemoRoutePath(pathname);
   const isInSettings = section === 'settings';
@@ -377,7 +498,11 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         <div className='mt-auto shrink-0'>
           <SidebarBottomNowPlayingBridge />
           {isDemoRoute ? null : <SidebarUpgradeBanner />}
-          <SidebarInstallBanner />
+          {shellChatV1Enabled ? (
+            <ShellSidebarInstallBanner />
+          ) : (
+            <SidebarInstallBanner />
+          )}
 
           {isUserAdmin && (
             <div className='pl-2 pr-3.5 pb-2 pt-1'>
