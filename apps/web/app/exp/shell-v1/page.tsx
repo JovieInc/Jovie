@@ -143,6 +143,7 @@ import { PickerLink } from '@/components/shell/PickerLink';
 import { PickerToggle } from '@/components/shell/PickerToggle';
 import { PlayingBars } from '@/components/shell/PlayingBars';
 import { PriorityGlyph } from '@/components/shell/PriorityGlyph';
+import { RowWaveform } from '@/components/shell/RowWaveform';
 import { SettingsRow } from '@/components/shell/SettingsRow';
 import {
   type EntityPopoverData,
@@ -151,7 +152,9 @@ import {
 import { ShellLoader } from '@/components/shell/ShellLoader';
 import { Stat } from '@/components/shell/Stat';
 import { StatusBadge } from '@/components/shell/StatusBadge';
+import { SuggestionCard } from '@/components/shell/SuggestionCard';
 import { ThreadCardIconBtn } from '@/components/shell/ThreadCardIconBtn';
+import { ThreadComposer } from '@/components/shell/ThreadComposer';
 import { ThreadTurn } from '@/components/shell/ThreadTurn';
 import { Tooltip } from '@/components/shell/Tooltip';
 import { TypeBadge } from '@/components/shell/TypeBadge';
@@ -4235,7 +4238,9 @@ function DashboardHome() {
           </div>
 
           <SuggestionCard
-            suggestion={current}
+            title={current.title}
+            body={current.body}
+            actionLabel={current.action}
             onDismiss={advance}
             onAct={advance}
           />
@@ -4255,61 +4260,6 @@ function DashboardHome() {
 // Apple-esque suggestion card. No eyebrow, no Jovie attribution, no
 // confidence percentage, no divider — the card IS the message. Title
 // leads, body is short, actions balance to the right edge.
-function SuggestionCard({
-  suggestion,
-  onDismiss,
-  onAct,
-}: {
-  suggestion: JovieSuggestion;
-  onDismiss?: () => void;
-  onAct?: () => void;
-}) {
-  return (
-    <article
-      key={suggestion.id}
-      className='group/sug relative w-full rounded-[18px] overflow-hidden border border-white/[0.05] bg-(--linear-app-content-surface)'
-      style={{
-        boxShadow:
-          'inset 0 1px 0 rgba(255,255,255,0.04), 0 1px 2px rgba(0,0,0,0.18), 0 16px 40px -16px rgba(0,0,0,0.4)',
-        transition: `transform 240ms ${EASE_CINEMATIC}, box-shadow 240ms ${EASE_CINEMATIC}`,
-      }}
-    >
-      <div className='px-7 py-6'>
-        <h2
-          className='text-[17px] font-semibold leading-[1.3] text-primary-token'
-          style={{ letterSpacing: '-0.024em' }}
-        >
-          {suggestion.title}
-        </h2>
-        <p
-          className='mt-2 text-[12.5px] leading-[1.6] text-tertiary-token'
-          style={{ letterSpacing: '-0.003em' }}
-        >
-          {suggestion.body}
-        </p>
-
-        <div className='mt-6 flex items-center justify-end gap-1'>
-          <button
-            type='button'
-            onClick={onDismiss}
-            className='inline-flex items-center h-7 px-3 rounded-full text-[11.5px] text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-150 ease-out'
-          >
-            Dismiss
-          </button>
-          <button
-            type='button'
-            onClick={onAct}
-            className='inline-flex items-center gap-1.5 h-7 px-3.5 rounded-full text-[12px] font-medium bg-white text-black hover:brightness-110 active:scale-[0.99] shadow-[0_4px_14px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.45)] transition-all duration-150 ease-out'
-          >
-            {suggestion.action}
-            <ArrowRight className='h-3 w-3' strokeWidth={2.5} />
-          </button>
-        </div>
-      </div>
-    </article>
-  );
-}
-
 // Variant F adoption — wraps the shipped ChatInput from
 // apps/web/components/jovie/components/ChatInput.tsx so /exp/shell-v1
 // gets the morphing pill surface, slash picker, chip tray, and motion
@@ -6874,7 +6824,7 @@ function ThreadView({ thread }: { thread: Thread }) {
           >
             <ArrowDown className='h-3.5 w-3.5' strokeWidth={2.25} />
           </button>
-          <ChatComposer placeholder='Reply to this thread…' />
+          <ThreadComposer placeholder='Reply to this thread…' />
         </div>
       </div>
     </article>
@@ -7144,26 +7094,6 @@ function ThreadVideoCard({
         </ThreadCardIconBtn>
       </div>
     </div>
-  );
-}
-
-function ChatComposer({ placeholder }: { placeholder: string }) {
-  // Same Variant F surface as the dashboard PillComposer. Reused here
-  // so the thread reply matches the home composer exactly.
-  const [value, setValue] = useState('');
-  return (
-    <ChatInput
-      value={value}
-      onChange={setValue}
-      onSubmit={e => {
-        e?.preventDefault();
-        setValue('');
-      }}
-      isLoading={false}
-      isSubmitting={false}
-      placeholder={placeholder}
-      shellChatV1
-    />
   );
 }
 
@@ -7988,220 +7918,6 @@ function chipLabel(tone: 'green' | 'amber' | 'red' | 'neutral') {
     default:
       return 'text-secondary-token';
   }
-}
-
-// Inline per-row waveform (Lexicon DJ-inspired): low-contrast at rest,
-// brighter when this row's track is playing. Click anywhere to seek. Cue
-// markers are vertical line overlays *on* the waveform — span its full
-// height with a subtle dot at the top edge.
-const ROW_WF_W = 600;
-const ROW_WF_H = 24;
-const ROW_WF_CY = ROW_WF_H / 2;
-const ROW_WF_AMP = ROW_WF_H / 2 - 1;
-
-// Cue marker colors. Subtle by default — color is the *only* signal of
-// section, so each is unmistakable but never loud.
-const CUE_TONE_LINE: Record<CueKind, string> = {
-  intro: 'bg-sky-400/45',
-  verse: 'bg-tertiary-token/40',
-  chorus: 'bg-emerald-400/55',
-  drop: 'bg-amber-400/65',
-  bridge: 'bg-violet-400/55',
-  outro: 'bg-quaternary-token/55',
-};
-const CUE_TONE_DOT: Record<CueKind, string> = {
-  intro: 'bg-sky-400',
-  verse: 'bg-tertiary-token',
-  chorus: 'bg-emerald-400',
-  drop: 'bg-amber-400',
-  bridge: 'bg-violet-400',
-  outro: 'bg-quaternary-token',
-};
-
-function rowWaveformPeaks(seed: number) {
-  return Array.from({ length: 120 }).map((_, i) => {
-    const a =
-      0.4 +
-      0.32 * Math.abs(Math.sin((i + seed * 11) * 0.18)) +
-      0.22 * Math.abs(Math.cos((i + seed * 7) * 0.31));
-    const noise = hash1d(i + seed * 1000);
-    return Math.max(0.08, Math.min(1, a * (0.55 + noise * 0.45)));
-  });
-}
-
-type RowWaveformDatum = {
-  id: string;
-  durationSec: number;
-  waveformSeed: number;
-  cues: Cue[];
-  title: string;
-};
-function RowWaveform({
-  release,
-  currentTimeSec,
-  isCurrentTrack,
-  onSeek,
-}: {
-  release: RowWaveformDatum;
-  currentTimeSec: number;
-  isCurrentTrack: boolean;
-  onSeek: (sec: number) => void;
-}) {
-  const peaks = useMemo(
-    () => rowWaveformPeaks(release.waveformSeed),
-    [release.waveformSeed]
-  );
-  const playedPct = isCurrentTrack
-    ? (currentTimeSec / release.durationSec) * 100
-    : 0;
-  const stride = ROW_WF_W / peaks.length;
-
-  function handleClick(e: React.MouseEvent<HTMLDivElement>) {
-    e.stopPropagation();
-    const rect = e.currentTarget.getBoundingClientRect();
-    const ratio = Math.max(
-      0,
-      Math.min(1, (e.clientX - rect.left) / rect.width)
-    );
-    onSeek(ratio * release.durationSec);
-  }
-
-  return (
-    // biome-ignore lint/a11y/useKeyWithClickEvents: scrub via mouse; keyboard seek lands in a follow-up
-    <div
-      role='slider'
-      aria-label={`Scrub ${release.title}`}
-      aria-valuemin={0}
-      aria-valuemax={release.durationSec}
-      aria-valuenow={Math.round(currentTimeSec)}
-      tabIndex={-1}
-      onClick={handleClick}
-      className='group/wf relative h-7 cursor-pointer'
-    >
-      <svg
-        viewBox={`0 0 ${ROW_WF_W} ${ROW_WF_H}`}
-        className='w-full h-full overflow-visible block'
-        preserveAspectRatio='none'
-        aria-hidden='true'
-      >
-        <defs>
-          <clipPath id={`wf-played-${release.id}`}>
-            <rect
-              x='0'
-              y='0'
-              width={(playedPct / 100) * ROW_WF_W}
-              height={ROW_WF_H}
-            />
-          </clipPath>
-        </defs>
-
-        {/* Base bars (unplayed / muted) */}
-        <g
-          className={cn(
-            'transition-opacity duration-150 ease-out',
-            isCurrentTrack
-              ? 'opacity-50'
-              : 'opacity-35 group-hover/wf:opacity-55'
-          )}
-        >
-          {peaks.map((h, i) => {
-            const x = i * stride + stride / 2;
-            const half = h * ROW_WF_AMP;
-            return (
-              <line
-                // biome-ignore lint/suspicious/noArrayIndexKey: stable peaks
-                key={i}
-                x1={x}
-                x2={x}
-                y1={ROW_WF_CY - half}
-                y2={ROW_WF_CY + half}
-                stroke='currentColor'
-                strokeWidth='1.2'
-                strokeLinecap='round'
-                vectorEffect='non-scaling-stroke'
-                className='text-tertiary-token'
-              />
-            );
-          })}
-        </g>
-
-        {/* Played bars (saturated) — only meaningful if this is the current track */}
-        {isCurrentTrack && (
-          <g clipPath={`url(#wf-played-${release.id})`}>
-            {peaks.map((h, i) => {
-              const x = i * stride + stride / 2;
-              const half = h * ROW_WF_AMP;
-              return (
-                <line
-                  // biome-ignore lint/suspicious/noArrayIndexKey: stable peaks
-                  key={i}
-                  x1={x}
-                  x2={x}
-                  y1={ROW_WF_CY - half}
-                  y2={ROW_WF_CY + half}
-                  stroke='currentColor'
-                  strokeWidth='1.4'
-                  strokeLinecap='round'
-                  vectorEffect='non-scaling-stroke'
-                  className='text-primary-token'
-                />
-              );
-            })}
-          </g>
-        )}
-
-        {/* Playhead */}
-        {isCurrentTrack && (
-          <line
-            x1={(playedPct / 100) * ROW_WF_W}
-            x2={(playedPct / 100) * ROW_WF_W}
-            y1={0}
-            y2={ROW_WF_H}
-            stroke='currentColor'
-            strokeWidth='1'
-            className='text-primary-token'
-            vectorEffect='non-scaling-stroke'
-          />
-        )}
-      </svg>
-
-      {/* Cue overlays — vertical line spans full waveform height + a small
-          dot at the top edge for color recognition. Subtle until hover. */}
-      <div className='pointer-events-none absolute inset-0'>
-        {release.cues.map(c => {
-          const left = (c.at / release.durationSec) * 100;
-          return (
-            <span
-              key={`${release.id}-${c.label}-${c.at}`}
-              className='absolute inset-y-0'
-              style={{ left: `${left}%`, transform: 'translateX(-0.5px)' }}
-              title={`${c.label} · ${formatTime(c.at)}`}
-            >
-              <span
-                className={cn(
-                  'absolute inset-y-0 w-px transition-opacity duration-150 ease-out',
-                  CUE_TONE_LINE[c.kind],
-                  'opacity-50 group-hover/wf:opacity-90'
-                )}
-              />
-              <span
-                className={cn(
-                  'absolute -top-px h-[3px] w-[3px] rounded-full -translate-x-[1px] transition-opacity duration-150 ease-out',
-                  CUE_TONE_DOT[c.kind],
-                  'opacity-80 group-hover/wf:opacity-100'
-                )}
-              />
-            </span>
-          );
-        })}
-      </div>
-
-      {/* Hover seek cursor */}
-      <div className='pointer-events-none absolute inset-0 opacity-0 group-hover/wf:opacity-100 transition-opacity duration-150 ease-out'>
-        <span className='absolute inset-y-1 left-1/2 w-px bg-primary-token/0' />
-      </div>
-    </div>
-  );
 }
 
 function agentLabel(s: ReleaseAgentState) {
@@ -9734,7 +9450,7 @@ function TrackRow({
         )}
       >
         <RowWaveform
-          release={{
+          track={{
             id: track.id,
             durationSec: track.durationSec,
             waveformSeed: track.waveformSeed,
