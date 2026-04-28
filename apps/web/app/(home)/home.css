@@ -123,47 +123,13 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-hero-stage {
-  background: #050608;
+  background: #000;
 }
 
 .homepage-hero-shell {
-  background:
-    radial-gradient(
-      74% 50% at 50% 28%,
-      rgba(60, 76, 128, 0.09) 0%,
-      rgba(5, 6, 8, 0) 62%
-    ),
-    #050608;
+  background: #000;
   contain: layout paint;
   box-shadow: none;
-}
-
-.homepage-hero-shell::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.038) 0%,
-    rgba(255, 255, 255, 0.008) 13%,
-    rgba(255, 255, 255, 0) 24%
-  );
-  z-index: 1;
-}
-
-.homepage-hero-shell::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: radial-gradient(
-    88% 84% at 50% 38%,
-    rgba(0, 0, 0, 0) 0%,
-    rgba(0, 0, 0, 0.08) 52%,
-    rgba(0, 0, 0, 0.58) 100%
-  );
-  z-index: 2;
 }
 
 .homepage-hero-shell__layer {
@@ -174,32 +140,9 @@ body:has(.home-viewport)::-webkit-scrollbar {
   backface-visibility: hidden;
 }
 
-.homepage-hero-shell__base {
-  background:
-    radial-gradient(
-      92% 76% at 50% 8%,
-      rgba(255, 255, 255, 0.055) 0%,
-      rgba(255, 255, 255, 0.015) 18%,
-      rgba(255, 255, 255, 0) 42%
-    ),
-    radial-gradient(
-      1200px 720px at 50% 18%,
-      rgba(44, 48, 96, 0.16) 0%,
-      rgba(15, 16, 24, 0.04) 48%,
-      rgba(5, 6, 8, 0) 74%
-    );
-}
-
+.homepage-hero-shell__base,
 .homepage-hero-shell__halo {
-  background: radial-gradient(
-    720px 420px at 50% 52%,
-    rgba(105, 111, 212, 0.14) 0%,
-    rgba(66, 72, 146, 0.08) 24%,
-    rgba(20, 22, 34, 0.02) 62%,
-    transparent 100%
-  );
-  mix-blend-mode: screen;
-  opacity: 0.2;
+  display: none;
 }
 
 .homepage-hero-shell__beam {
