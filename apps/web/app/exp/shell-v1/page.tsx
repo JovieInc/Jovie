@@ -4732,10 +4732,6 @@ function ReleaseRow({
   onContextMenu?: (e: React.MouseEvent, release: Release) => void;
   onOpenThread?: (id: string) => void;
 }) {
-  // currentTimeSec/onSeek are wired through for the Tracks view's row
-  // waveform — Release rows don't render a waveform.
-  void _currentTimeSec;
-  void _onSeek;
   const runningThread = findRunningThreadFor('release', release.id, THREADS);
   return (
     // biome-ignore lint/a11y/noNoninteractiveElementInteractions: list row activates via parent section's keyboard handler; mouse-click is a convenience
@@ -6357,8 +6353,7 @@ function TaskListItem({
 // Per-row "More" menu — click trigger opens a ShellDropdown with Assign /
 // Link / Status. The "Assign to…" submenu is the canonical EntityItem demo:
 // hover Tim White -> teammate entity popover anchors to the row.
-function TaskRowMoreMenu({ task }: { task: Task }) {
-  void task;
+function TaskRowMoreMenu({ task: _task }: { task: Task }) {
   const onEntityActivate = useEntityActivate();
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: wrapper exists to stop click/keydown bubbling so the menu trigger doesn't also trigger row-select; not itself an interactive element.
