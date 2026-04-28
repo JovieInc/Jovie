@@ -8779,7 +8779,7 @@ function TrackRow({
 
       {/* Status as a labeled chip — Live / Queued / Draft. */}
       <div className='w-[64px] shrink-0 flex justify-end'>
-        <StatusChip track={track} />
+        <StatusBadge status={track.status} />
       </div>
 
       {/* Spacer / thread glyph column — aligns with header's count cell */}
@@ -8895,53 +8895,6 @@ function ArtworkThumb({
 // comes from the leading dot — calm and theme-matching. "Live" is the
 // default state and shouldn't shout; saturated tones are reserved for
 // states that genuinely need attention (Scheduled, Announced).
-function StatusChip({ track }: { track: Track }) {
-  return <StatusBadge status={track.status} />;
-}
-
-const _STATUS_CHIP: Record<
-  TrackStatus,
-  {
-    label: string;
-    dot: string;
-    dotBorder?: string;
-    text: string;
-    tooltip: string;
-  }
-> = {
-  live: {
-    label: 'Live',
-    dot: 'bg-white/35',
-    text: 'text-secondary-token',
-    tooltip: 'Live on DSPs — calm default state',
-  },
-  scheduled: {
-    label: 'Scheduled',
-    dot: 'bg-amber-300/70',
-    text: 'text-secondary-token',
-    tooltip: 'Scheduled for release',
-  },
-  announced: {
-    label: 'Announced',
-    dot: 'bg-cyan-300/75',
-    text: 'text-secondary-token',
-    tooltip: 'Publicly announced — not yet live',
-  },
-  draft: {
-    label: 'Draft',
-    dot: 'bg-white/15',
-    text: 'text-tertiary-token',
-    tooltip: 'Draft — not yet released',
-  },
-  hidden: {
-    label: 'Hidden',
-    dot: 'bg-transparent',
-    dotBorder: 'border-quaternary-token/45 border-dashed',
-    text: 'text-quaternary-token',
-    tooltip: 'Pulled / hidden from listeners',
-  },
-};
-
 function trackMatchesPill(
   t: Track,
   field: FilterField,
