@@ -125,7 +125,6 @@ import { ChatInput } from '@/components/jovie/components/ChatInput';
 import { ChatMarkdown } from '@/components/jovie/components/ChatMarkdown';
 import { ActivityHoverRow } from '@/components/shell/ActivityHoverRow';
 import { AgentPulse } from '@/components/shell/AgentPulse';
-import { ArtworkPlayOverlay } from '@/components/shell/ArtworkPlayOverlay';
 import { AssigneeChip } from '@/components/shell/AssigneeChip';
 import { ColumnLabel } from '@/components/shell/ColumnLabel';
 import { ContextMenuOverlay } from '@/components/shell/ContextMenuOverlay';
@@ -158,7 +157,12 @@ import {
   ShellDropdown,
 } from '@/components/shell/ShellDropdown';
 import { ShellLoader } from '@/components/shell/ShellLoader';
+import { SidebarBottomNowPlaying } from '@/components/shell/SidebarBottomNowPlaying';
 import { SidebarNavItem } from '@/components/shell/SidebarNavItem';
+import {
+  type NowPlayingTrack,
+  SidebarNowPlaying,
+} from '@/components/shell/SidebarNowPlaying';
 import { SidebarThreadsSection } from '@/components/shell/SidebarThreadsSection';
 import { SmartLinkRow } from '@/components/shell/SmartLinkRow';
 import type { SparklineTrend } from '@/components/shell/Sparkline';
@@ -249,6 +253,12 @@ type TrackInfo = {
   isrc: string;
   hasLyrics: boolean;
 };
+
+const toNowPlayingTrack = (t: TrackInfo): NowPlayingTrack => ({
+  trackTitle: t.title,
+  artistName: t.artist,
+  artworkUrl: t.artwork,
+});
 
 // Live-editable palette. The page wrapper writes these as CSS custom
 // properties so the dev picker can mutate them in real time.
@@ -2265,9 +2275,8 @@ export default function ShellV1Experiment() {
               collapsed={false}
               isPlaying={isPlaying}
               onPlay={() => setIsPlaying(p => !p)}
-              barCollapsed={barCollapsed}
-              onToggleBar={() => setBarCollapsed(v => !v)}
-              track={currentTrack}
+              playOverlayVisible={barCollapsed}
+              track={toNowPlayingTrack(currentTrack)}
             />
           </div>
         </div>
@@ -3182,66 +3191,13 @@ function Sidebar({
       >
         {nowPlaying && (
           <SidebarBottomNowPlaying
-            track={nowPlaying.track}
+            track={toNowPlayingTrack(nowPlaying.track)}
             isPlaying={nowPlaying.isPlaying}
             onPlay={nowPlaying.onPlay}
           />
         )}
       </div>
     </aside>
-  );
-}
-
-// Simplified now-playing pinned to the sidebar bottom. Just album art +
-// title/artist + play button. No BPM/Key/Version chips — those live in
-// the right rail's Overview tab when you actually need them.
-function SidebarBottomNowPlaying({
-  track,
-  isPlaying,
-  onPlay,
-}: {
-  track: TrackInfo;
-  isPlaying: boolean;
-  onPlay: () => void;
-}) {
-  return (
-    <div className='flex items-center gap-2 h-12 px-1.5 rounded-md hover:bg-surface-1/40 transition-colors duration-150 ease-out'>
-      <div className='shrink-0 h-9 w-9 rounded overflow-hidden bg-surface-2'>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={track.artwork}
-          alt=''
-          className='h-full w-full object-cover'
-        />
-      </div>
-      <div className='min-w-0 flex-1'>
-        <div
-          className='truncate text-[12px] font-caption text-primary-token leading-tight'
-          style={{ letterSpacing: '-0.005em' }}
-        >
-          {track.title}
-        </div>
-        <div className='truncate text-[10.5px] text-tertiary-token leading-tight mt-0.5'>
-          {track.artist}
-        </div>
-      </div>
-      <button
-        type='button'
-        onClick={onPlay}
-        aria-label={isPlaying ? 'Pause' : 'Play'}
-        className='shrink-0 h-7 w-7 rounded-full grid place-items-center text-primary-token hover:bg-surface-1/70 transition-colors duration-150 ease-out'
-      >
-        {isPlaying ? (
-          <Pause className='h-3 w-3' strokeWidth={2.5} fill='currentColor' />
-        ) : (
-          <Play
-            className='h-3 w-3 translate-x-px'
-            strokeWidth={2.5}
-            fill='currentColor'
-          />
-        )}
-      </button>
-    </div>
   );
 }
 
@@ -3321,78 +3277,6 @@ function Workspace({
               No items yet
             </div>
           )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Threads section in the sidebar — most-recent 5 inline, status dot
-// per thread, "View all" expands to ~10 with internal scroll. Auto-named
-// titles already; truncation handles overflow. Status dot tones map to
-// running (cyan pulse) / complete (neutral) / errored (rose).
-function SidebarNowPlaying({
-  collapsed,
-  isPlaying,
-  onPlay,
-  barCollapsed,
-  track,
-}: {
-  collapsed: boolean;
-  isPlaying: boolean;
-  onPlay: () => void;
-  barCollapsed: boolean;
-  onToggleBar: () => void;
-  track: TrackInfo;
-}) {
-  // Play overlay shows on the album art only when the transport bar is hidden.
-  // When the bar is at the bottom of the screen, the overlay fades out (the
-  // bar handles transport). Hover always reveals it for affordance.
-  const overlay = (
-    <ArtworkPlayOverlay
-      isPlaying={isPlaying}
-      onPlay={onPlay}
-      visible={barCollapsed}
-    />
-  );
-
-  if (collapsed) {
-    return (
-      <div
-        className='relative h-10 w-10 mx-auto rounded-md overflow-hidden'
-        title={`${track.title} — ${track.artist} · ${track.bpm} BPM · ${track.key}`}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={track.artwork}
-          alt=''
-          className='h-full w-full object-cover'
-        />
-        {overlay}
-        {isPlaying && (
-          <span className='absolute bottom-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-emerald-400 ring-2 ring-(--linear-bg-page)' />
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div className='px-1 flex items-center gap-2.5'>
-      <div className='relative h-9 w-9 rounded overflow-hidden shrink-0'>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={track.artwork}
-          alt=''
-          className='h-full w-full object-cover'
-        />
-        {overlay}
-      </div>
-      <div className='min-w-0 flex-1'>
-        <div className='truncate text-[12px] font-caption text-primary-token leading-[1.2]'>
-          {track.title}
-        </div>
-        <div className='truncate text-[11px] text-tertiary-token leading-[1.3] mt-0.5'>
-          {track.artist}
         </div>
       </div>
     </div>
