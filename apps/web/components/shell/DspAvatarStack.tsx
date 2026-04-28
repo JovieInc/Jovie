@@ -41,6 +41,13 @@ const STATUS_RANK: Record<DspStatus, number> = {
   missing: 2,
 };
 
+const STATUS_LABEL: Record<DspStatus, string> = {
+  live: 'Live',
+  pending: 'Pending',
+  error: 'Error',
+  missing: 'Missing',
+};
+
 /**
  * DspAvatarStack — single primary DSP avatar + "+N" overflow chip with a
  * hover popover listing every DSP and its status.
@@ -129,7 +136,7 @@ export function DspAvatarStack({
               Distribution
             </span>
             <span className='text-[10.5px] tabular-nums text-tertiary-token'>
-              {liveCount}/{ordered.length} live
+              {liveCount}/{ordered.length} Live
             </span>
           </div>
           <div className='max-h-[180px] overflow-y-auto'>
@@ -159,7 +166,7 @@ export function DspAvatarStack({
                     )}
                   />
                   <span className='text-[10.5px] uppercase tracking-[0.06em] text-quaternary-token'>
-                    {dsp.status}
+                    {STATUS_LABEL[dsp.status]}
                   </span>
                 </span>
               </div>

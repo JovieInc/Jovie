@@ -31,11 +31,23 @@ import {
   DrawerSurfaceCard,
   DrawerTabbedCard,
   DrawerTabs,
-  EntityHeaderCard,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { convertToCommonDropdownItems } from '@/components/organisms/table';
+import { DrawerHero } from '@/components/shell/DrawerHero';
+import { DropDateChip } from '@/components/shell/DropDateChip';
+import {
+  type DspAvatarItem,
+  DspAvatarStack,
+  type DspStatus,
+} from '@/components/shell/DspAvatarStack';
+import { MetaPill } from '@/components/shell/MetaPill';
+import {
+  type ReleaseStatus,
+  StatusBadge,
+} from '@/components/shell/StatusBadge';
+import { TypeBadge } from '@/components/shell/TypeBadge';
 import { APP_ROUTES } from '@/constants/routes';
 import { buildReleaseActions } from '@/features/dashboard/organisms/releases/release-actions';
 import { CompactReleasePlanUpgradeCard } from '@/features/dashboard/tasks/TasksUpgradeInterstitial';
@@ -44,28 +56,73 @@ import {
   buildArtworkSizes,
 } from '@/features/release/AlbumArtworkContextMenu';
 import { copyToClipboard } from '@/hooks/useClipboard';
-import type { ProviderKey } from '@/lib/discography/types';
+import type { ProviderConfidence, ProviderKey } from '@/lib/discography/types';
+import { dropDateMeta } from '@/lib/format-drop-date';
 import { usePlanGate } from '@/lib/queries';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 import { ReleaseDspLinks } from './ReleaseDspLinks';
-import { ReleaseFields } from './ReleaseFields';
 import { ReleaseLyricsSection } from './ReleaseLyricsSection';
 import { ReleasePitchSection } from './ReleasePitchSection';
 import { ReleasePropertiesPanel } from './ReleasePropertiesPanel';
-import { useReleaseHeaderParts } from './ReleaseSidebarHeader';
 import { ReleaseSmartLinkAnalytics } from './ReleaseSmartLinkAnalytics';
 import { ReleaseTargetPlaylistsSection } from './ReleaseTargetPlaylistsSection';
 import { ReleaseTrackList } from './ReleaseTrackList';
 import type { Release, ReleaseSidebarProps } from './types';
 import { useReleaseSidebar } from './useReleaseSidebar';
 import { useTrackAudioPlayer } from './useTrackAudioPlayer';
+import { isValidUrl } from './utils';
 
 const RELEASE_SIDEBAR_CARD_CLASSNAME = 'overflow-hidden';
 const PLATFORM_RESCAN_COOLDOWN_MS = 5 * 60 * 1000;
 
 type ReleaseSidebarTab = 'overview' | 'dsps' | 'tasks' | 'pitch';
+
+const RELEASE_TYPE_LABELS: Record<string, string> = {
+  single: 'Single',
+  ep: 'EP',
+  album: 'Album',
+  compilation: 'Compilation',
+  live: 'Live',
+  mixtape: 'Mixtape',
+  music_video: 'Music Video',
+  other: 'Other',
+};
+
+const PROVIDER_COLOR_CLASS: Partial<Record<ProviderKey, string>> = {
+  spotify: 'bg-emerald-500/90',
+  apple_music: 'bg-rose-400/90',
+  youtube: 'bg-red-500/90',
+  youtube_music: 'bg-red-500/90',
+  soundcloud: 'bg-orange-400/90',
+  deezer: 'bg-violet-400/90',
+  tidal: 'bg-sky-400/90',
+  amazon_music: 'bg-blue-400/90',
+  bandcamp: 'bg-cyan-500/90',
+  beatport: 'bg-lime-400/90',
+  pandora: 'bg-blue-500/90',
+  napster: 'bg-indigo-400/90',
+  audiomack: 'bg-amber-400/90',
+  qobuz: 'bg-yellow-500/90',
+  anghami: 'bg-purple-400/90',
+  boomplay: 'bg-teal-500/90',
+  iheartradio: 'bg-red-600/90',
+  tiktok: 'bg-fuchsia-400/90',
+  amazon: 'bg-blue-400/90',
+  awa: 'bg-pink-400/90',
+  audius: 'bg-orange-500/90',
+  flo: 'bg-cyan-400/90',
+  gaana: 'bg-pink-500/90',
+  jio_saavn: 'bg-green-500/90',
+  joox: 'bg-emerald-400/90',
+  kkbox: 'bg-blue-600/90',
+  line_music: 'bg-green-400/90',
+  netease: 'bg-red-400/90',
+  qq_music: 'bg-green-600/90',
+  trebel: 'bg-amber-500/90',
+  yandex: 'bg-yellow-400/90',
+};
 
 function formatCooldown(remainingMs: number): string {
   if (remainingMs <= 0) return '';
@@ -97,9 +154,12 @@ function getPreviewAriaLabel(hasPreview: boolean, isPlaying: boolean): string {
 }
 
 interface ReleaseEntityHeaderProps {
-  readonly headerLabel: string;
   readonly release: Release;
   readonly artistName: string | null | undefined;
+  readonly providerConfig: Record<
+    ProviderKey,
+    { label: string; accent: string }
+  >;
   readonly onArtistClick?: (artistName: string) => void;
   readonly canUploadArtwork: boolean;
   readonly canRevertArtwork: boolean;
@@ -169,10 +229,76 @@ function renderArtistLine(
   });
 }
 
+function getReleaseTypeLabel(releaseType: string | undefined): string | null {
+  if (!releaseType) return null;
+  return RELEASE_TYPE_LABELS[releaseType] ?? releaseType;
+}
+
+function getShellReleaseStatus(release: Release): ReleaseStatus {
+  if (release.deletedAt) return 'hidden';
+  if (release.status === 'scheduled') return 'scheduled';
+  if (release.status === 'draft') return 'draft';
+  return 'live';
+}
+
+function getDspStatus({
+  url,
+  confidence,
+}: {
+  readonly url: string;
+  readonly confidence?: ProviderConfidence;
+}): DspStatus {
+  if (!url || !isValidUrl(url)) return 'error';
+
+  if (confidence === 'search_fallback' || confidence === 'unknown') {
+    return 'pending';
+  }
+
+  return 'live';
+}
+
+function getProviderGlyph(label: string, fallback: string): string {
+  return (label.match(/[a-z0-9]/iu)?.[0] ?? fallback[0] ?? '?').toUpperCase();
+}
+
+function getDspAvatarItems(
+  release: Release,
+  providerConfig: Record<ProviderKey, { label: string; accent: string }>
+): DspAvatarItem[] {
+  const linkedItems = release.providers.map(provider => {
+    const label = providerConfig[provider.key]?.label || provider.label;
+    return {
+      id: provider.key,
+      status: getDspStatus({
+        url: provider.url,
+        confidence: provider.confidence,
+      }),
+      label,
+      glyph: getProviderGlyph(label, provider.key),
+      colorClass: PROVIDER_COLOR_CLASS[provider.key] ?? 'bg-slate-500/90',
+    };
+  });
+
+  const missingItems = (release.providerCounts?.unresolvedProviders ?? [])
+    .filter(key => !release.providers.some(provider => provider.key === key))
+    .map(key => {
+      const label = providerConfig[key]?.label || key;
+      return {
+        id: key,
+        status: 'missing' as const,
+        label,
+        glyph: getProviderGlyph(label, key),
+        colorClass: PROVIDER_COLOR_CLASS[key] ?? 'bg-slate-500/90',
+      };
+    });
+
+  return [...linkedItems, ...missingItems];
+}
+
 function ReleaseEntityHeader({
-  headerLabel,
   release,
   artistName,
+  providerConfig,
   onArtistClick,
   canUploadArtwork,
   canRevertArtwork,
@@ -194,6 +320,15 @@ function ReleaseEntityHeader({
     onArtistClick
   );
   const hasActionBar = Boolean(actionBar);
+  const releaseTypeLabel = getReleaseTypeLabel(release.releaseType);
+  const releaseDate = release.releaseDate
+    ? dropDateMeta(release.releaseDate)
+    : null;
+  const dspItems = getDspAvatarItems(release, providerConfig);
+  const trackLabel =
+    release.totalTracks > 0
+      ? `${release.totalTracks} ${release.totalTracks === 1 ? 'Track' : 'Tracks'}`
+      : null;
 
   return (
     <DrawerSurfaceCard
@@ -201,95 +336,93 @@ function ReleaseEntityHeader({
       className={RELEASE_SIDEBAR_CARD_CLASSNAME}
       testId='release-header-card'
     >
-      <div className='relative p-2.5'>
+      <div className='relative'>
         {hasActionBar ? (
           <div className='absolute right-2.5 top-2.5'>{actionBar}</div>
         ) : null}
-        {headerLabel ? (
-          <p className='mb-1 truncate font-mono text-[10.5px] font-caption leading-none tracking-[0.025em] text-quaternary-token'>
-            {headerLabel}
-          </p>
-        ) : null}
-        <div className={cn('flex items-start gap-2.5', hasActionBar && 'pr-9')}>
-          <div className='group/artwork relative shrink-0'>
-            <AlbumArtworkContextMenu
-              title={release.title}
-              sizes={buildArtworkSizes(undefined, release.artworkUrl)}
-              allowDownloads={allowDownloads}
-              releaseId={release.id}
-              canRevert={canRevertArtwork}
-              onRevert={canRevertArtwork ? onArtworkRevert : undefined}
-            >
-              {canUploadArtwork && onArtworkUpload ? (
-                <AvatarUploadable
-                  src={release.artworkUrl}
-                  alt={artworkAlt}
-                  name={release.title}
-                  size='2xl'
-                  rounded='md'
-                  uploadable={canUploadArtwork}
-                  onUpload={onArtworkUpload}
-                  showHoverOverlay
-                />
-              ) : (
-                <DrawerMediaThumb
-                  src={release.artworkUrl}
-                  alt={artworkAlt}
-                  sizeClassName='h-[68px] w-[68px] rounded-[10px]'
-                  sizes='68px'
-                  fallback={
-                    <Icon
-                      name='Disc3'
-                      className='h-10 w-10 text-tertiary-token'
-                      aria-hidden='true'
-                    />
-                  }
-                />
-              )}
-            </AlbumArtworkContextMenu>
+        <DrawerHero
+          title={release.title}
+          subtitle={
+            artistLine ? (
+              <span className='line-clamp-2 block'>{artistLine}</span>
+            ) : null
+          }
+          artwork={
+            <div className='group/artwork relative shrink-0'>
+              <AlbumArtworkContextMenu
+                title={release.title}
+                sizes={buildArtworkSizes(undefined, release.artworkUrl)}
+                allowDownloads={allowDownloads}
+                releaseId={release.id}
+                canRevert={canRevertArtwork}
+                onRevert={canRevertArtwork ? onArtworkRevert : undefined}
+              >
+                {canUploadArtwork && onArtworkUpload ? (
+                  <AvatarUploadable
+                    src={release.artworkUrl}
+                    alt={artworkAlt}
+                    name={release.title}
+                    size='2xl'
+                    rounded='md'
+                    uploadable={canUploadArtwork}
+                    onUpload={onArtworkUpload}
+                    showHoverOverlay
+                  />
+                ) : (
+                  <DrawerMediaThumb
+                    src={release.artworkUrl}
+                    alt={artworkAlt}
+                    sizeClassName='h-[68px] w-[68px] rounded-[10px]'
+                    sizes='68px'
+                    fallback={
+                      <Icon
+                        name='Disc3'
+                        className='h-10 w-10 text-tertiary-token'
+                        aria-hidden='true'
+                      />
+                    }
+                  />
+                )}
+              </AlbumArtworkContextMenu>
 
-            <button
-              type='button'
-              onClick={onTogglePreview}
-              disabled={!previewUrl}
-              aria-pressed={isPlaying}
-              className={cn(
-                'absolute inset-0 flex items-center justify-center rounded-lg transition-all duration-160',
-                'bg-black/0 opacity-0',
-                'group-hover/artwork:bg-black/40 group-hover/artwork:opacity-100',
-                'aria-[pressed=true]:bg-black/40 aria-[pressed=true]:opacity-100',
-                'disabled:pointer-events-none disabled:hidden'
-              )}
-              aria-label={getPreviewAriaLabel(Boolean(previewUrl), isPlaying)}
-            >
-              {isPlaying ? (
-                <Pause className='h-5 w-5 text-white drop-shadow-sm' />
-              ) : (
-                <Play className='h-5 w-5 translate-x-px text-white drop-shadow-sm' />
-              )}
-            </button>
-          </div>
-
-          <EntityHeaderCard
-            title={release.title}
-            subtitle={
-              artistLine ? (
-                <span className='line-clamp-2 block'>{artistLine}</span>
-              ) : null
-            }
-            meta={
-              <ReleaseFields
-                releaseDate={release.releaseDate}
-                revealDate={release.revealDate}
-                releaseType={release.releaseType}
-                totalTracks={release.totalTracks}
-                platformCount={release.providers.length}
-              />
-            }
-            className='min-w-0 flex-1'
-            bodyClassName='pt-0'
-          />
-        </div>
+              <button
+                type='button'
+                onClick={onTogglePreview}
+                disabled={!previewUrl}
+                aria-pressed={isPlaying}
+                className={cn(
+                  'absolute inset-0 flex items-center justify-center rounded-lg transition-all duration-160',
+                  'bg-black/0 opacity-0',
+                  'group-hover/artwork:bg-black/40 group-hover/artwork:opacity-100',
+                  'aria-[pressed=true]:bg-black/40 aria-[pressed=true]:opacity-100',
+                  'disabled:pointer-events-none disabled:hidden'
+                )}
+                aria-label={getPreviewAriaLabel(Boolean(previewUrl), isPlaying)}
+              >
+                {isPlaying ? (
+                  <Pause className='h-5 w-5 text-white drop-shadow-sm' />
+                ) : (
+                  <Play className='h-5 w-5 translate-x-px text-white drop-shadow-sm' />
+                )}
+              </button>
+            </div>
+          }
+          meta={
+            <>
+              <StatusBadge status={getShellReleaseStatus(release)} />
+              {releaseTypeLabel ? <TypeBadge label={releaseTypeLabel} /> : null}
+              {releaseDate ? (
+                <DropDateChip
+                  tone={releaseDate.tone}
+                  label={releaseDate.label}
+                />
+              ) : null}
+              {trackLabel ? <MetaPill>{trackLabel}</MetaPill> : null}
+              <DspAvatarStack dsps={dspItems} />
+            </>
+          }
+          className={cn('pb-2.5', hasActionBar && '[&_h2]:pr-9')}
+        />
       </div>
       {footer ? (
         <div className='border-t border-(--linear-app-frame-seam) px-3 py-2.5'>
@@ -369,7 +502,6 @@ export function ReleaseSidebar({
     selectedProvider,
     setSelectedProvider,
     isEditable: _isEditable,
-    hasRelease,
     canUploadArtwork: _canUploadArtwork,
     canRevertArtwork: _canRevertArtwork,
     isAddingDspLink,
@@ -550,13 +682,6 @@ export function ReleaseSidebar({
     onRefresh,
     setIsAddingLink,
   ]);
-
-  const { headerLabel } = useReleaseHeaderParts({
-    release,
-    hasRelease,
-    onRefresh,
-    isRefreshing,
-  });
 
   const availablePlatformProviders = useMemo(() => {
     if (!release) {
@@ -835,9 +960,9 @@ export function ReleaseSidebar({
       entityHeader={
         release ? (
           <ReleaseEntityHeader
-            headerLabel={headerLabel}
             release={release}
             artistName={artistName}
+            providerConfig={providerConfig}
             onArtistClick={onArtistClick}
             canUploadArtwork={canUploadArtwork}
             canRevertArtwork={canRevertArtwork}

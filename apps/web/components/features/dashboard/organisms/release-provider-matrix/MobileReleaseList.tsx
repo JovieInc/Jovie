@@ -7,6 +7,7 @@ import {
   SwipeToRevealGroup,
 } from '@/components/atoms/SwipeToReveal';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
+import { TypeBadge } from '@/components/shell/TypeBadge';
 import { mobileReleaseTokens } from '@/features/dashboard/tokens';
 import { formatCompactReleaseArtistLine } from '@/lib/discography/formatting';
 import { getReleaseTypeStyle } from '@/lib/discography/release-type-styles';
@@ -237,15 +238,10 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
               {release.title}
             </TruncatedText>
             {/* Release type badge */}
-            <span
-              className={cn(
-                mobileReleaseTokens.row.typeBadge,
-                typeStyle.text,
-                typeStyle.bg
-              )}
-            >
-              {typeStyle.label}
-            </span>
+            <TypeBadge
+              label={typeStyle.label}
+              className={mobileReleaseTokens.row.typeBadge}
+            />
           </div>
           <div className={mobileReleaseTokens.row.subtitle}>
             {artistLine && <span>{artistLine}</span>}

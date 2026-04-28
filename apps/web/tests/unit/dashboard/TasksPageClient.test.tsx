@@ -120,6 +120,20 @@ const mockTaskTwo = {
   priority: 'medium',
 } as const;
 
+const mockJovieTask = {
+  ...mockTask,
+  id: 'task-jovie',
+  taskNumber: 3,
+  title: 'Review release plan in Jovie',
+  description: 'Let Jovie review release positioning.',
+  status: 'todo',
+  agentStatus: 'queued',
+  priority: 'low',
+  assigneeKind: 'jovie',
+  releaseId: null,
+  releaseTitle: null,
+} as const;
+
 const mockTaskDescriptionHelper = {
   title: 'Press Release',
   intro: [
@@ -165,6 +179,11 @@ let mockTasksData = [mockTask, mockTaskTwo];
 let mockCanShowTaskDocumentAlongsideReleaseSidebar = true;
 const mockUnifiedTable = vi.fn();
 
+function setHeaderActionsForTest(actions: React.ReactNode) {
+  mockSetHeaderActions(actions);
+  setHeaderActionsHost?.(actions);
+}
+
 vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
   DashboardDataContext: {
     Provider: ({ children }: { children: React.ReactNode }) => children,
@@ -183,10 +202,7 @@ vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
 
 vi.mock('@/contexts/HeaderActionsContext', () => ({
   useSetHeaderActions: () => ({
-    setHeaderActions: (actions: React.ReactNode) => {
-      mockSetHeaderActions(actions);
-      setHeaderActionsHost?.(actions);
-    },
+    setHeaderActions: setHeaderActionsForTest,
   }),
 }));
 
@@ -393,7 +409,7 @@ describe('TasksPageClient', () => {
   });
 
   afterEach(() => {
-    vi.runOnlyPendingTimers();
+    vi.clearAllTimers();
     vi.useRealTimers();
   });
 
@@ -404,6 +420,30 @@ describe('TasksPageClient', () => {
     expect(screen.queryByText('All Statuses')).not.toBeInTheDocument();
     expect(screen.queryByText('All Priorities')).not.toBeInTheDocument();
     expect(screen.queryByText('All Assignees')).not.toBeInTheDocument();
+  });
+
+  it('filters desktop tasks through the assignee subview tabs', () => {
+    mockTasksData = [mockTask, mockTaskTwo, mockJovieTask];
+
+    renderPage();
+
+    expect(screen.getByRole('tab', { name: 'All 3' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Assigned To Jovie 1' }));
+
+    const tableProps = mockUnifiedTable.mock.calls.at(-1)?.[0] as
+      | {
+          readonly data?: ReadonlyArray<typeof mockTask>;
+        }
+      | undefined;
+
+    expect(
+      screen.getByRole('tab', { name: 'Assigned To Jovie 1' })
+    ).toHaveAttribute('aria-selected', 'true');
+    expect(tableProps?.data?.map(task => task.id)).toEqual(['task-jovie']);
   });
 
   it('renders the task title editor as a textarea for wrapping document headings', () => {

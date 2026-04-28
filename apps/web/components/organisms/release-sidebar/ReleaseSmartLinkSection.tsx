@@ -1,6 +1,6 @@
 'use client';
 
-import { CopyableUrlRow } from '@/components/molecules/CopyableUrlRow';
+import { SmartLinkRow } from '@/components/shell/SmartLinkRow';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 
 interface ReleaseSmartLinkSectionProps {
@@ -11,17 +11,17 @@ export function ReleaseSmartLinkSection({
   smartLinkPath,
 }: ReleaseSmartLinkSectionProps) {
   const smartLinkUrl = `${getBaseUrl()}${smartLinkPath}`;
+  const smartLinkLabel = smartLinkUrl.replace(/^https?:\/\//u, '');
 
   return (
-    <CopyableUrlRow
-      url={smartLinkUrl}
-      displayValue={smartLinkPath}
-      size='md'
-      className='rounded-[10px]'
-      valueClassName='text-secondary-token'
-      copyButtonTitle='Copy link'
-      openButtonTitle='Open smart link'
-      surface='boxed'
+    <SmartLinkRow
+      url={smartLinkLabel}
+      onCopy={() => {
+        navigator.clipboard?.writeText(smartLinkUrl).catch(() => undefined);
+      }}
+      onOpen={() => {
+        globalThis.open(smartLinkUrl, '_blank', 'noopener,noreferrer');
+      }}
     />
   );
 }

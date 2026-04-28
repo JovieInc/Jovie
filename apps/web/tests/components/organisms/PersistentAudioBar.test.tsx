@@ -57,6 +57,8 @@ vi.mock('sonner', () => ({
 vi.mock('next/image', () => ({
   default: (props: Record<string, unknown>) => {
     const { src, alt, onError: onImgError, ...rest } = props;
+    delete rest.fill;
+    delete rest.unoptimized;
     return (
       <img
         src={src as string}
@@ -231,5 +233,39 @@ describe('PersistentAudioBar', () => {
     expect(
       screen.getByRole('region', { name: 'Audio player' })
     ).toBeInTheDocument();
+  });
+
+  it('renders the extracted shell V1 audio bar when requested', () => {
+    setPlaying({
+      artistName: 'DJ Cool',
+      artworkUrl: 'https://cdn.example.com/art.jpg',
+    });
+
+    render(<PersistentAudioBar variant='shellChatV1' />);
+
+    expect(
+      screen.getByRole('button', { name: 'Minimize player' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Loop: off' })
+    ).toBeInTheDocument();
+    expect(screen.getAllByText('Midnight Drive').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('DJ Cool').length).toBeGreaterThan(0);
+  });
+
+  it('shows the compact shell V1 now-playing row after minimizing', async () => {
+    const user = userEvent.setup();
+    setPlaying({ artistName: 'DJ Cool' });
+
+    render(<PersistentAudioBar variant='shellChatV1' />);
+
+    await user.click(screen.getByRole('button', { name: 'Minimize player' }));
+
+    await user.click(screen.getByRole('button', { name: 'Pause' }));
+
+    expect(toggleTrack).toHaveBeenCalledWith({
+      id: 'track-1',
+      title: 'Midnight Drive',
+    });
   });
 });

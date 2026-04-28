@@ -63,6 +63,13 @@ function createBaseProps() {
     search: '',
     draftTitle: '',
     taskCount: 2,
+    subviews: [
+      { id: 'all', label: 'All', count: 2 },
+      { id: 'mine', label: 'Assigned To Me', count: 1 },
+      { id: 'jovie', label: 'Assigned To Jovie', count: 1 },
+    ],
+    activeSubview: 'all',
+    onSubviewChange: vi.fn(),
     onSearchChange: vi.fn(),
     onDraftTitleChange: vi.fn(),
     onEnterSearch: vi.fn(),
@@ -88,11 +95,30 @@ describe('TaskWorkspaceHeaderBar', () => {
 
     const subheader = screen.getByTestId('tasks-workspace-subheader');
     expect(subheader).not.toHaveClass('border-b');
-    expect(screen.getByText('2 Tasks')).toBeInTheDocument();
+    expect(
+      screen.getByRole('tablist', { name: 'Task subviews' })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'All 2' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    expect(
+      screen.getByRole('tab', { name: 'Assigned To Me 1' })
+    ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Search tasks' })
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Filters' })).toBeInTheDocument();
+  });
+
+  it('emits subview changes from the compact tab strip', () => {
+    const props = createBaseProps();
+
+    render(<TaskWorkspaceHeaderBar {...props} mode='default' />);
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Assigned To Jovie 1' }));
+
+    expect(props.onSubviewChange).toHaveBeenCalledWith('jovie');
   });
 
   it('renders search mode controls without reintroducing the divider', () => {

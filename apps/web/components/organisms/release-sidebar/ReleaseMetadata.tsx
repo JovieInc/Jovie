@@ -16,6 +16,7 @@ import {
   DrawerPropertyRow,
   DrawerSurfaceCard,
 } from '@/components/molecules/drawer';
+import { TypeBadge } from '@/components/shell/TypeBadge';
 import { LINEAR_SURFACE } from '@/components/tokens/linear-surface';
 import { getReleaseTypeStyle } from '@/lib/discography/release-type-styles';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
@@ -75,12 +76,7 @@ function ReleaseTypeBadges({ release }: { readonly release: Release }) {
   const typeStyle = getReleaseTypeStyle(release.releaseType);
   return (
     <div className='flex flex-wrap items-center gap-1.5'>
-      <Badge
-        size='sm'
-        className={`${METADATA_BADGE_CLASSNAME} ${typeStyle.bg} ${typeStyle.text}`}
-      >
-        {typeStyle.label}
-      </Badge>
+      <TypeBadge label={typeStyle.label} className={METADATA_BADGE_CLASSNAME} />
       {release.isExplicit && (
         <Badge
           size='sm'
