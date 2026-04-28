@@ -5,7 +5,6 @@ import {
   Bell,
   CalendarDays,
   ChevronLeft,
-  House,
   type LucideIcon,
   MoreHorizontal,
   Music2,
@@ -85,11 +84,10 @@ const PRIMARY_TABS: ReadonlyArray<{
   label: string;
   icon: LucideIcon;
 }> = [
-  { mode: 'profile', label: 'Home', icon: House },
+  { mode: 'profile', label: 'Home', icon: UserRound },
   { mode: 'listen', label: 'Music', icon: Music2 },
   { mode: 'tour', label: 'Events', icon: CalendarDays },
   { mode: 'subscribe', label: 'Alerts', icon: Bell },
-  { mode: 'about', label: 'Profile', icon: UserRound },
 ];
 
 interface ProfileCompactSurfaceProps {
@@ -309,6 +307,7 @@ export function ProfileCompactSurface({
   const hasReleases = surfaceState.hasReleases;
   const { heroSubtitle } = surfaceState;
   const IdentityHeading = renderMode === 'preview' ? 'p' : 'h1';
+  const isMenuActive = drawerOpen && drawerView === 'menu';
   const topChromeButtonClassName =
     'h-11! w-11! border-transparent bg-black/34 text-white shadow-[0_16px_34px_rgba(0,0,0,0.28)] backdrop-blur-md hover:bg-black/46 active:scale-100';
   const socialIconClassName =
@@ -503,26 +502,21 @@ export function ProfileCompactSurface({
                   type='button'
                   onClick={openNotifications}
                   disabled={renderMode !== 'interactive'}
-                  className='flex min-h-[64px] w-full items-center gap-3 rounded-[20px] border border-white/10 bg-black/22 px-4 text-left text-white shadow-[0_14px_36px_rgba(0,0,0,0.24)] backdrop-blur-2xl transition-[background-color,border-color] duration-200 hover:bg-black/30 disabled:cursor-default disabled:hover:bg-black/22'
+                  className='flex min-h-[52px] w-full items-center gap-2.5 rounded-[18px] border border-white/10 bg-black/22 px-3.5 text-left text-white shadow-[0_12px_30px_rgba(0,0,0,0.22)] backdrop-blur-2xl transition-[background-color,border-color] duration-200 hover:bg-black/30 disabled:cursor-default disabled:hover:bg-black/22'
                   data-testid='profile-hero-alerts-row'
                 >
                   <span
-                    className='flex h-9 w-9 shrink-0 items-center justify-center text-white'
+                    className='flex h-7 w-7 shrink-0 items-center justify-center text-white'
                     aria-hidden='true'
                   >
-                    <Bell className='h-5 w-5' />
+                    <Bell className='h-4 w-4' />
                   </span>
-                  <span className='min-w-0 flex-1'>
-                    <span className='block text-[15px] font-semibold leading-5 tracking-[-0.025em]'>
-                      {isSubscribed ? 'Alerts On' : 'Alerts Off'}
-                    </span>
-                    <span className='mt-0.5 block truncate text-[12px] leading-5 text-white/60'>
-                      New music and shows
-                    </span>
+                  <span className='min-w-0 flex-1 truncate text-[14px] font-semibold leading-5 tracking-[-0.025em]'>
+                    {isSubscribed ? 'Alerts On' : 'Alerts Off'}
                   </span>
                   <span
                     className={cn(
-                      'relative h-8 w-[52px] shrink-0 rounded-full border p-0.5 transition-colors duration-200',
+                      'relative h-7 w-11 shrink-0 rounded-full border p-0.5 transition-colors duration-200',
                       isSubscribed
                         ? 'border-white/38 bg-white/26'
                         : 'border-white/20 bg-white/8'
@@ -531,8 +525,8 @@ export function ProfileCompactSurface({
                   >
                     <span
                       className={cn(
-                        'block h-7 w-7 rounded-full bg-white shadow-[0_8px_20px_rgba(0,0,0,0.22)] transition-transform duration-200',
-                        isSubscribed && 'translate-x-5'
+                        'block h-6 w-6 rounded-full bg-white shadow-[0_7px_18px_rgba(0,0,0,0.22)] transition-transform duration-200',
+                        isSubscribed && 'translate-x-4'
                       )}
                     />
                   </span>
@@ -595,47 +589,74 @@ export function ProfileCompactSurface({
           </div>
 
           {showBottomNav ? (
-            <div className='shrink-0 pt-1'>
+            <div className='shrink-0 pb-[max(env(safe-area-inset-bottom),12px)] pt-1'>
               <nav
-                className='mx-[-20px] border-t border-white/10 bg-black/54 px-3 pt-2 backdrop-blur-2xl'
+                className='rounded-[30px] border border-white/10 bg-black/58 px-2 py-2 shadow-[0_20px_54px_rgba(0,0,0,0.38)] backdrop-blur-2xl'
                 aria-label='Profile navigation'
                 data-testid='profile-bottom-nav'
               >
-                <div className='flex items-start gap-1 pb-6'>
+                <div className='grid grid-cols-5 items-center gap-1'>
                   {PRIMARY_TABS.map(tab => {
                     const Icon = tab.icon;
-                    const isActive = tab.mode === activePrimaryTab;
+                    const isActive =
+                      !isMenuActive && tab.mode === activePrimaryTab;
                     return (
                       <button
                         key={tab.mode}
                         type='button'
                         onClick={() => onModeSelect(tab.mode)}
                         className={cn(
-                          'relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-2 py-2.5 text-center transition-[background-color,color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
+                          'relative flex min-h-[52px] min-w-0 flex-col items-center justify-center gap-1 rounded-[22px] px-1.5 py-1.5 text-center transition-[background-color,color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
                           isActive
                             ? 'text-white'
                             : 'text-white/40 hover:text-white/62'
                         )}
                         aria-current={isActive ? 'page' : undefined}
                       >
-                        {isActive ? (
-                          <span
-                            className='absolute left-1/2 top-0 h-1 w-8 -translate-x-1/2 rounded-full bg-white'
-                            aria-hidden='true'
-                          />
-                        ) : null}
                         <Icon
                           className={cn(
-                            'h-5 w-5 shrink-0',
+                            'h-[19px] w-[19px] shrink-0',
                             isActive ? 'text-white' : 'text-white/52'
                           )}
                         />
-                        <span className='truncate text-[11px] font-semibold tracking-[-0.012em]'>
+                        <span
+                          className={cn(
+                            'truncate text-[11px] leading-none tracking-[-0.012em]',
+                            isActive ? 'font-semibold' : 'font-medium'
+                          )}
+                        >
                           {tab.label}
                         </span>
                       </button>
                     );
                   })}
+                  <button
+                    type='button'
+                    onClick={onOpenMenu}
+                    className={cn(
+                      'relative flex min-h-[52px] min-w-0 flex-col items-center justify-center gap-1 rounded-[22px] px-1.5 py-1.5 text-center transition-[background-color,color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
+                      isMenuActive
+                        ? 'text-white'
+                        : 'text-white/40 hover:text-white/62'
+                    )}
+                    aria-haspopup='dialog'
+                    aria-expanded={isMenuActive}
+                  >
+                    <MoreHorizontal
+                      className={cn(
+                        'h-[19px] w-[19px] shrink-0',
+                        isMenuActive ? 'text-white' : 'text-white/52'
+                      )}
+                    />
+                    <span
+                      className={cn(
+                        'truncate text-[11px] leading-none tracking-[-0.012em]',
+                        isMenuActive ? 'font-semibold' : 'font-medium'
+                      )}
+                    >
+                      More
+                    </span>
+                  </button>
                 </div>
               </nav>
             </div>

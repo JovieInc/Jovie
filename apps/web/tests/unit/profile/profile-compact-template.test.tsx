@@ -5,6 +5,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react';
 import React from 'react';
 import {
@@ -354,6 +355,40 @@ describe('ProfileCompactTemplate', () => {
     expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
   });
 
+  it('renders the compact bottom navigation with a real More action', async () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    const bottomNav = screen.getByTestId('profile-bottom-nav');
+    for (const label of ['Home', 'Music', 'Events', 'Alerts', 'More']) {
+      expect(
+        within(bottomNav).getByRole('button', { name: label })
+      ).toBeInTheDocument();
+    }
+    expect(
+      within(bottomNav).queryByRole('button', { name: 'Profile' })
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(within(bottomNav).getByRole('button', { name: 'More' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('mock-profile-unified-drawer')).toHaveAttribute(
+        'data-open',
+        'true'
+      );
+      expect(screen.getByTestId('mock-profile-unified-drawer')).toHaveAttribute(
+        'data-view',
+        'menu'
+      );
+    });
+  });
+
   it('uses browser back from the floating back control when history is available', async () => {
     const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {
       // noop
@@ -551,6 +586,58 @@ describe('ProfileCompactTemplate', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('opens the alerts tab from the compact hero alerts row', async () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    const alertsRow = screen.getByTestId('profile-hero-alerts-row');
+    expect(alertsRow).toHaveTextContent('Alerts Off');
+    expect(alertsRow).not.toHaveTextContent('New music and shows');
+
+    fireEvent.click(alertsRow);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('mock-primary-tab-panel')).toHaveAttribute(
+        'data-mode',
+        'subscribe'
+      );
+    });
+  });
+
+  it('shows the subscribed alerts state in the compact hero alerts row', async () => {
+    mockUseProfileShell.mockImplementation(() => ({
+      notificationsContextValue: {
+        subscribedChannels: { email: true },
+        subscriptionDetails: { email: 'fan@example.com' },
+        setSubscribedChannels: vi.fn(),
+        setSubscriptionDetails: vi.fn(),
+        setState: vi.fn(),
+      },
+      notificationsController: {
+        contentPreferences: null,
+      },
+    }));
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    expect(screen.getByTestId('profile-hero-alerts-row')).toHaveTextContent(
+      'Alerts On'
+    );
+  });
+
   it('falls back to the mode prop when the URL has no mode param', async () => {
     mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
 
@@ -695,7 +782,7 @@ describe('ProfileCompactTemplate', () => {
 
     pushStateSpy.mockClear();
 
-    fireEvent.click(screen.getByRole('button', { name: 'More options' }));
+    fireEvent.click(screen.getByRole('button', { name: 'More' }));
 
     expect(pushStateSpy).not.toHaveBeenCalled();
     expect(window.location.search).toBe('?mode=listen');
