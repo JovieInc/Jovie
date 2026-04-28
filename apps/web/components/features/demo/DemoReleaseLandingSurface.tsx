@@ -3,11 +3,12 @@
 import { useSearchParams } from 'next/navigation';
 import type { SmartLinkCreditGroup } from '@/app/[username]/[slug]/_lib/data';
 import { ReleaseLandingPage } from '@/app/r/[slug]/ReleaseLandingPage';
-import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
+import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
 import { DemoClientProviders } from './DemoClientProviders';
 import { DEMO_RELEASE_VIEW_MODELS } from './mock-release-data';
 
 const RELEASE = DEMO_RELEASE_VIEW_MODELS[0];
+const ARTIST = INTERNAL_DJ_DEMO_PERSONA.profile;
 const PROVIDER_ACCENTS: Record<string, string> = {
   spotify: '#1DB954',
   apple_music: '#FA2D48',
@@ -17,26 +18,13 @@ const PROVIDER_ACCENTS: Record<string, string> = {
 const DEFAULT_PROVIDER_ACCENT = '#5E6AD2';
 const DEMO_CREDITS: readonly SmartLinkCreditGroup[] = [
   {
-    role: 'featured_artist',
-    label: 'Featured artist',
-    entries: [
-      {
-        artistId: 'credit-feature-1',
-        name: 'Clementine Douglas',
-        handle: null,
-        role: 'featured_artist',
-        position: 1,
-      },
-    ],
-  },
-  {
     role: 'producer',
     label: 'Producer',
     entries: [
       {
         artistId: 'credit-producer-1',
-        name: 'Tim White',
-        handle: TIM_WHITE_PROFILE.handle,
+        name: ARTIST.displayName,
+        handle: ARTIST.handle,
         role: 'producer',
         position: 1,
       },
@@ -58,7 +46,7 @@ export function DemoReleaseLandingSurface() {
               data-testid='demo-release-creator-capture'
             >
               <div className='rounded-[24px] border border-white/8 bg-white/[0.04] p-4'>
-                <p className='text-center text-[12px] font-semibold tracking-[0.12em] text-white/45 uppercase'>
+                <p className='text-center text-[12px] font-semibold text-white/45'>
                   Creator Activation
                 </p>
                 <div className='mt-4 rounded-[20px] bg-white/[0.05] px-4 py-5 text-center'>
@@ -66,12 +54,12 @@ export function DemoReleaseLandingSurface() {
                     {RELEASE.title}
                   </p>
                   <p className='mt-1 text-[12px] text-white/58'>
-                    {TIM_WHITE_PROFILE.name}
+                    {ARTIST.displayName}
                   </p>
                 </div>
                 <div className='mt-5 flex justify-center'>
                   <a
-                    href={`/${TIM_WHITE_PROFILE.handle}/take-me-over/sounds`}
+                    href={`/${ARTIST.handle}/${RELEASE.slug}/sounds`}
                     className='inline-flex min-h-12 items-center justify-center rounded-full bg-white px-6 py-3 text-[15px] font-[600] tracking-[-0.02em] text-black'
                   >
                     Use this sound
@@ -96,9 +84,9 @@ export function DemoReleaseLandingSurface() {
             previewUrl: RELEASE.previewUrl ?? null,
           }}
           artist={{
-            name: TIM_WHITE_PROFILE.name,
-            handle: TIM_WHITE_PROFILE.handle,
-            avatarUrl: TIM_WHITE_PROFILE.avatarSrc,
+            name: ARTIST.displayName,
+            handle: ARTIST.handle,
+            avatarUrl: ARTIST.avatarSrc,
           }}
           providers={RELEASE.providers.map(provider => ({
             key: provider.key,
@@ -107,7 +95,7 @@ export function DemoReleaseLandingSurface() {
             url: provider.url,
           }))}
           credits={[...DEMO_CREDITS]}
-          soundsUrl={`/${TIM_WHITE_PROFILE.handle}/take-me-over/sounds`}
+          soundsUrl={`/${ARTIST.handle}/${RELEASE.slug}/sounds`}
           initialMenuOpen={false}
         />
       </div>

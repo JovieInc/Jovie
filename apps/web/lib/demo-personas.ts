@@ -222,39 +222,40 @@ export const INTERNAL_DJ_DEMO_PERSONA: DemoPersona = {
   ],
   releases: [
     {
-      id: 'calvin-blessings',
-      title: 'Blessings featuring Clementine Douglas',
-      slug: 'blessings-featuring-clementine-douglas',
+      id: 'calvin-im-not-alone-remixes',
+      title: "I'm Not Alone Remixes",
+      slug: 'im-not-alone-remixes',
       releaseType: 'single',
-      releaseDate: '2025-06-09',
+      releaseDate: '2025-08-08',
       artworkUrl: '/images/demo/artwork-1.png',
       totalTracks: 1,
-      totalDurationMs: 221000,
+      totalDurationMs: 232000,
       upc: '194399301001',
       label: 'Columbia',
       spotifyPopularity: 84,
-      artistNames: ['Calvin Harris', 'Clementine Douglas'],
+      artistNames: ['Calvin Harris'],
       genres: ['Dance', 'House'],
-      primaryIsrc: 'GBARL2500601',
+      primaryIsrc: 'GBARL2500808',
       providerUrls: {
         spotify:
-          'https://open.spotify.com/search/Blessings%20Calvin%20Harris%20Clementine%20Douglas',
+          'https://open.spotify.com/search/I%27m%20Not%20Alone%20Remixes%20Calvin%20Harris',
         apple_music:
-          'https://music.apple.com/us/search?term=Blessings%20Calvin%20Harris%20Clementine%20Douglas',
+          'https://music.apple.com/us/search?term=I%27m%20Not%20Alone%20Remixes%20Calvin%20Harris',
         youtube_music:
-          'https://music.youtube.com/search?q=Blessings+Calvin+Harris+Clementine+Douglas',
+          'https://music.youtube.com/search?q=I%27m+Not+Alone+Remixes+Calvin+Harris',
         amazon_music:
-          'https://music.amazon.com/search/Blessings%20Calvin%20Harris%20Clementine%20Douglas',
-        tidal: 'https://listen.tidal.com/search?q=Blessings%20Calvin%20Harris',
+          'https://music.amazon.com/search/I%27m%20Not%20Alone%20Remixes%20Calvin%20Harris',
+        tidal:
+          'https://listen.tidal.com/search?q=I%27m%20Not%20Alone%20Remixes%20Calvin%20Harris',
       },
       tracks: [
         {
-          title: 'Blessings featuring Clementine Douglas',
-          slug: 'blessings-featuring-clementine-douglas',
+          title: "I'm Not Alone Remixes",
+          slug: 'im-not-alone-remixes',
           trackNumber: 1,
           discNumber: 1,
-          durationMs: 221000,
-          isrc: 'GBARL2500601',
+          durationMs: 232000,
+          isrc: 'GBARL2500808',
         },
       ],
     },

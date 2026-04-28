@@ -170,6 +170,8 @@ const { DemoReleasesExperience } = await import(
   '@/features/demo/DemoReleasesExperience'
 );
 
+const LEADING_RELEASE_TITLE = "I'm Not Alone Remixes";
+
 function renderDemo() {
   return render(
     <NuqsTestingAdapter>
@@ -232,21 +234,17 @@ describe('DemoReleasesExperience', () => {
 
     // The sidebar nav has a Releases tab and it appears in the breadcrumb
     expect(screen.getAllByText('Releases').length).toBeGreaterThan(0);
-    await openReleaseDrawer('Blessings featuring Clementine Douglas');
+    await openReleaseDrawer(LEADING_RELEASE_TITLE);
 
     // Release titles should appear in the list
     expect(
-      screen.getAllByText(
-        hasTextContent('Blessings featuring Clementine Douglas')
-      ).length
+      screen.getAllByText(hasTextContent(LEADING_RELEASE_TITLE)).length
     ).toBeGreaterThan(1);
 
     // Selecting a row should surface the release details alongside the table.
     await waitFor(() => {
       expect(
-        screen.getAllByText(
-          hasTextContent('Blessings featuring Clementine Douglas')
-        ).length
+        screen.getAllByText(hasTextContent(LEADING_RELEASE_TITLE)).length
       ).toBeGreaterThan(1);
     });
   });
@@ -258,9 +256,8 @@ describe('DemoReleasesExperience', () => {
 
     // The table should contain mock release titles
     expect(
-      within(releasesMatrix).getAllByText(
-        hasTextContent('Blessings featuring Clementine Douglas')
-      ).length
+      within(releasesMatrix).getAllByText(hasTextContent(LEADING_RELEASE_TITLE))
+        .length
     ).toBeGreaterThan(0);
   });
 

@@ -3,6 +3,7 @@ import {
   DEMO_RELEASE_SIDEBAR_FIXTURES,
   DEMO_RELEASE_VIEW_MODELS,
 } from '@/features/demo/mock-release-data';
+import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
 
 describe('mock release data', () => {
   it('keeps the 96 Months sidebar fixture sparse relative to the full release', () => {
@@ -19,5 +20,17 @@ describe('mock release data', () => {
       1, 2, 3, 9, 11, 13,
     ]);
     expect(tracks?.length ?? 0).toBeLessThan(release?.totalTracks ?? 0);
+  });
+
+  it('keeps the Calvin fixtures clear of the Tim White founder collision', () => {
+    const fixtureText = JSON.stringify({
+      persona: INTERNAL_DJ_DEMO_PERSONA,
+      releases: DEMO_RELEASE_VIEW_MODELS,
+      sidebars: DEMO_RELEASE_SIDEBAR_FIXTURES,
+    });
+
+    expect(fixtureText).not.toContain('Blessings');
+    expect(fixtureText).not.toContain('Clementine Douglas');
+    expect(fixtureText).not.toContain('Tim White');
   });
 });

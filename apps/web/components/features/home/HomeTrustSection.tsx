@@ -3,7 +3,6 @@ import {
   ArmadaMusicLogo,
   AwalLogo,
   BlackHoleRecordingsLogo,
-  DiscoWaxLogo,
   TheOrchardLogo,
   UniversalMusicGroupLogo,
 } from './label-logos';
@@ -26,8 +25,6 @@ export function HomeTrustSection({
 }: Readonly<HomeTrustSectionProps>) {
   const isInlineStrip = presentation === 'inline-strip';
   const logoTone = isInlineStrip ? 'text-white/68' : 'text-white/92';
-  const discoWaxSize = isInlineStrip ? 'h-[15px]' : 'h-[16px]';
-
   const innerBoxClass = isInlineStrip
     ? 'px-0'
     : cn(
@@ -66,10 +63,8 @@ export function HomeTrustSection({
       >
         <p
           className={cn(
-            isInlineStrip
-              ? 'sr-only'
-              : 'text-center text-[12px] font-medium tracking-[0.02em] text-white/48',
-            !isInlineStrip && labelMarginClass
+            'text-center text-[12px] font-medium tracking-[0.02em] text-white/48',
+            labelMarginClass
           )}
         >
           {label}
@@ -77,7 +72,7 @@ export function HomeTrustSection({
         <div
           className={cn(
             presentation === 'inline-strip'
-              ? 'grid grid-cols-2 items-center justify-items-center gap-x-6 gap-y-5 sm:flex sm:flex-wrap sm:items-center sm:justify-center sm:gap-x-7 sm:gap-y-4 lg:flex-nowrap lg:gap-x-10'
+              ? 'flex flex-wrap items-center justify-center gap-x-8 gap-y-5 sm:gap-x-10 sm:gap-y-4 lg:flex-nowrap lg:gap-x-10'
               : 'grid grid-cols-2 items-center justify-items-center gap-x-6 gap-y-6 sm:flex sm:flex-wrap sm:items-center sm:justify-center sm:gap-x-10 sm:gap-y-5 lg:flex-nowrap lg:justify-between',
             variant === 'compact' &&
               presentation !== 'inline-strip' &&
@@ -92,7 +87,7 @@ export function HomeTrustSection({
           >
             <AwalLogo
               className={cn(
-                'h-[20px] w-auto select-none sm:h-[22px]',
+                'h-[20px] w-auto max-w-[36vw] select-none sm:h-[22px]',
                 logoTone
               )}
             />
@@ -105,7 +100,7 @@ export function HomeTrustSection({
           >
             <TheOrchardLogo
               className={cn(
-                'h-[28px] w-auto select-none sm:h-[31px]',
+                'h-[28px] w-auto max-w-[34vw] select-none sm:h-[31px]',
                 logoTone
               )}
             />
@@ -118,7 +113,9 @@ export function HomeTrustSection({
           >
             <UniversalMusicGroupLogo
               className={cn(
-                'h-[14px] w-auto select-none sm:h-[16px]',
+                isInlineStrip
+                  ? 'h-auto w-[168px] max-w-[42vw] select-none sm:w-[188px]'
+                  : 'h-[14px] w-auto max-w-[72vw] select-none sm:h-[16px]',
                 logoTone
               )}
             />
@@ -131,7 +128,7 @@ export function HomeTrustSection({
           >
             <ArmadaMusicLogo
               className={cn(
-                'h-[22px] w-auto select-none sm:h-[24px]',
+                'h-[22px] w-auto max-w-[38vw] select-none sm:h-[24px]',
                 logoTone
               )}
             />
@@ -142,43 +139,12 @@ export function HomeTrustSection({
               presentation === 'inline-strip' && 'sm:px-1 lg:flex-1'
             )}
           >
-            {isInlineStrip ? (
-              <span className='inline-flex select-none items-center justify-center'>
-                <span role='img' aria-label='Black Hole Recordings' />
-                <span
-                  aria-hidden='true'
-                  className='inline-flex h-[16px] w-[128px] items-center justify-center gap-[3px] opacity-75'
-                >
-                  <span className='h-[2px] w-[34px] rounded-full bg-white/68' />
-                  <span className='size-[15px] rounded-full border border-white/58 shadow-[inset_0_0_0_3px_rgba(255,255,255,0.18)]' />
-                  <span className='h-[2px] w-[34px] rounded-full bg-white/68' />
-                </span>
-              </span>
-            ) : (
-              <BlackHoleRecordingsLogo className='h-[16px] w-auto sm:h-[18px]' />
-            )}
-          </div>
-          <div
-            className={cn(
-              'flex min-w-0 items-center justify-center',
-              presentation === 'inline-strip' && 'sm:px-1 lg:flex-1'
-            )}
-          >
-            {isInlineStrip ? (
-              <span className='inline-flex select-none items-center justify-center'>
-                <span role='img' aria-label='disco:wax' />
-                <span
-                  aria-hidden='true'
-                  className='inline-flex h-[16px] w-[70px] items-center justify-center gap-[5px] opacity-75'
-                >
-                  <span className='h-[13px] w-[22px] rounded-[5px] bg-white/68' />
-                  <span className='size-[5px] rounded-full bg-white/68' />
-                  <span className='h-[13px] w-[30px] rounded-[5px] bg-white/68' />
-                </span>
-              </span>
-            ) : (
-              <DiscoWaxLogo className={cn(discoWaxSize, 'sm:h-[18px]')} />
-            )}
+            <BlackHoleRecordingsLogo
+              className={cn(
+                'h-[16px] w-auto sm:h-[18px]',
+                isInlineStrip && 'opacity-75'
+              )}
+            />
           </div>
         </div>
       </div>

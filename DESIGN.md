@@ -49,6 +49,14 @@ CSS variables: `--font-satoshi`, `--font-dm-sans` (set by `next/font/local`). Sc
 
 **Font:** Inter Variable (self-hosted, weight range 100–900)
 
+**Hero exception (homepage `(home)/*`):** the homepage hero H1 uses **Satoshi
+Variable** at 80px / weight 600 / letter-spacing -0.045em. Satoshi is loaded
+globally in `app/layout.tsx` so the variable resolves outside the marketing
+wrapper. Everything else on the homepage (subhead, CTAs, body, section
+headings) stays Inter. This deviation is approved as of 2026-04-28 — the
+hero needed a wider, heavier display character to match the Frame.io-inspired
+poster composition; Inter at 80px reads narrow and tech-y in this context.
+
 ### Font Weights
 
 | Name | Value | Usage |
@@ -653,6 +661,7 @@ All full-screen takeover screens (offline, global error, root error, public erro
 | 2026-04-11 | No brand color (Apple approach) | White-on-black CTAs. Accent colors are supporting cast for feature differentiation only. Restraint is the brand. |
 | 2026-04-22 | Homepage migrated from System A to System B | Chat-intake is product, not marketing. Satoshi-editorial typography on a utility entrypoint was a category error. Lovable, v0, Bolt, and ChatGPT all use one system across homepage and product. System A scope shrinks to editorial surfaces (blog, pricing, changelog, support, legal). Full System A retirement deferred 3 months pending shipping data. |
 | 2026-04-22 | Homepage hero typography: Inter 40→48→56px, weight 680 (Linear bold / `font-bold` token) | Replaces Satoshi 800 marketing display. Product-powerful without tipping into marketing-shout. Letter-spacing -2.5% at display sizes. `--font-weight-bold` resolves to 680 (verified at runtime); the plan's initial "try 590 first, 680 if too muted" landed on 680. |
+| 2026-04-28 | Homepage hero H1 exception in System B: Satoshi 80px / 600 / -0.045em | Supersedes the 2026-04-22 Inter-only hero decision for `(home)` H1 only. Subhead, CTAs, body, and section headings on the homepage stay Inter. Driven by Frame.io-inspired hero composition where Inter at 80px reads narrow; Satoshi at 600/-0.045em matches Frame.io's FrameGothic computed style spec (verified by getComputedStyle). |
 | 2026-04-11 | Canonical 1200px width for all marketing | Fixed inconsistent widths (header 1200px, hero 1120px). Everything boxed at 1200px now. |
 | 2026-04-11 | Ban emoji-on-colored-square icons | Replaced with accent color on card title text. Icon-on-square reads as AI slop and cheapens the brand. |
 | 2026-04-11 | Ban gold colors | Gold signals prestige-seeking. Not appropriate for Jovie's DJ audience. |

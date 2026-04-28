@@ -49,12 +49,12 @@ describe('HomepageIntent', () => {
     render(<HomepageIntent />);
     expect(
       screen.getByRole('heading', {
-        name: 'Release more music with less work.',
+        name: 'Drop more music, with less work.',
       })
     ).toBeTruthy();
     expect(
       screen.getByText(
-        'Plan releases, create assets, pitch playlists, and promote every drop from one AI workspace.'
+        'Release music faster and grow your audience effortlessly.'
       )
     ).toBeTruthy();
     expect(getInput()).toBeTruthy();
