@@ -76,7 +76,7 @@ function unwrapNextImageUrl(url: string | null | undefined): string | null {
   }
 }
 
-function toDateValue(value: ProfileSurfaceDateInput) {
+export function toProfileSurfaceDateValue(value: ProfileSurfaceDateInput) {
   if (!value) {
     return null;
   }
@@ -98,7 +98,7 @@ function toDateValue(value: ProfileSurfaceDateInput) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function startOfLocalDay(date: Date) {
+export function startOfProfileSurfaceLocalDay(date: Date) {
   const normalized = new Date(date);
   normalized.setHours(0, 0, 0, 0);
   return normalized;
@@ -108,19 +108,20 @@ function getUpcomingTourDates(
   tourDates: readonly TourDateViewModel[],
   now = new Date()
 ) {
-  const today = startOfLocalDay(now);
+  const today = startOfProfileSurfaceLocalDay(now);
 
   return [...tourDates]
     .filter(tourDate => {
-      const start = toDateValue(tourDate.startDate);
+      const start = toProfileSurfaceDateValue(tourDate.startDate);
       return (
-        start !== null && startOfLocalDay(start).getTime() >= today.getTime()
+        start !== null &&
+        startOfProfileSurfaceLocalDay(start).getTime() >= today.getTime()
       );
     })
     .sort(
       (left, right) =>
-        (toDateValue(left.startDate)?.getTime() ?? 0) -
-        (toDateValue(right.startDate)?.getTime() ?? 0)
+        (toProfileSurfaceDateValue(left.startDate)?.getTime() ?? 0) -
+        (toProfileSurfaceDateValue(right.startDate)?.getTime() ?? 0)
     );
 }
 
@@ -135,7 +136,7 @@ function readHeroRoleLabel(artist: Artist) {
 }
 
 export function formatProfileSurfaceMonth(date: ProfileSurfaceDateInput) {
-  const resolved = toDateValue(date);
+  const resolved = toProfileSurfaceDateValue(date);
   if (!resolved) return 'Soon';
   return new Intl.DateTimeFormat('en-US', {
     month: 'short',
@@ -143,7 +144,7 @@ export function formatProfileSurfaceMonth(date: ProfileSurfaceDateInput) {
 }
 
 export function formatProfileSurfaceDay(date: ProfileSurfaceDateInput) {
-  const resolved = toDateValue(date);
+  const resolved = toProfileSurfaceDateValue(date);
   if (!resolved) return '—';
   return new Intl.DateTimeFormat('en-US', {
     day: '2-digit',

@@ -7,6 +7,10 @@ import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { ReleaseCountdown } from '@/components/features/release/ReleaseCountdown';
 import { profileSecondaryPillClassName } from '@/features/profile/artist-notifications-cta/shared';
 import type { ProfileRenderMode } from '@/features/profile/contracts';
+import {
+  startOfProfileSurfaceLocalDay as startOfLocalDay,
+  toProfileSurfaceDateValue as toDateValue,
+} from '@/features/profile/profile-surface-state';
 import { useTourDateProximity } from '@/hooks/useTourDateProximity';
 import type { UserLocation } from '@/hooks/useUserLocation';
 import { useUserLocation } from '@/hooks/useUserLocation';
@@ -389,34 +393,6 @@ const CTA_PILL_CLASS_NAME = cn(
   profileSecondaryPillClassName,
   'h-7 rounded-full border-white/14 bg-white text-2xs font-semibold text-black shadow-[0_10px_24px_rgba(255,255,255,0.16)] hover:bg-white hover:text-black'
 );
-
-function toDateValue(value: Date | string | null | undefined) {
-  if (!value) {
-    return null;
-  }
-
-  if (value instanceof Date) {
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? null : date;
-  }
-
-  const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  const date = dateOnlyMatch
-    ? new Date(
-        Number(dateOnlyMatch[1]),
-        Number(dateOnlyMatch[2]) - 1,
-        Number(dateOnlyMatch[3])
-      )
-    : new Date(value);
-
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function startOfLocalDay(date: Date) {
-  const normalized = new Date(date);
-  normalized.setHours(0, 0, 0, 0);
-  return normalized;
-}
 
 function getReleaseArtistNames(
   release: ProfilePrimaryActionCardRelease | null | undefined

@@ -12,6 +12,10 @@ import {
   type ProfilePrimaryActionCardRelease,
   resolveProfilePrimaryActionCardState,
 } from '@/features/profile/ProfilePrimaryActionCard';
+import {
+  startOfProfileSurfaceLocalDay as startOfLocalDay,
+  toProfileSurfaceDateValue as toDateValue,
+} from '@/features/profile/profile-surface-state';
 import { useTourDateProximity } from '@/hooks/useTourDateProximity';
 import type { UserLocation } from '@/hooks/useUserLocation';
 import { useUserLocation } from '@/hooks/useUserLocation';
@@ -46,34 +50,6 @@ type FeaturedRailKind =
   | 'playlist_fallback'
   | 'listen_fallback'
   | 'none';
-
-function toDateValue(value: Date | string | null | undefined) {
-  if (!value) {
-    return null;
-  }
-
-  if (value instanceof Date) {
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? null : date;
-  }
-
-  const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  const date = dateOnlyMatch
-    ? new Date(
-        Number(dateOnlyMatch[1]),
-        Number(dateOnlyMatch[2]) - 1,
-        Number(dateOnlyMatch[3])
-      )
-    : new Date(value);
-
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function startOfLocalDay(date: Date) {
-  const normalized = new Date(date);
-  normalized.setHours(0, 0, 0, 0);
-  return normalized;
-}
 
 function getUpcomingTourDates(
   tourDates: readonly TourDateViewModel[],
