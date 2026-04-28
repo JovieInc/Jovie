@@ -38,14 +38,11 @@ import {
   Archive,
   ArrowRight,
   ArrowUpDown,
-  AudioLines,
-  AudioWaveform,
   BarChart3,
   Calendar,
   CheckCircle2,
   ChevronDown,
   ChevronLeft,
-  ChevronRight,
   ChevronUp,
   Copy,
   Disc3,
@@ -139,9 +136,6 @@ import {
   PerformanceCard,
   type PerformanceRangeKey,
 } from '@/components/shell/PerformanceCard';
-import { PickerAction } from '@/components/shell/PickerAction';
-import { PickerLink } from '@/components/shell/PickerLink';
-import { PickerToggle } from '@/components/shell/PickerToggle';
 import { PillSearch } from '@/components/shell/PillSearch';
 import { PlayingBars } from '@/components/shell/PlayingBars';
 import { PriorityGlyph } from '@/components/shell/PriorityGlyph';
@@ -1537,7 +1531,7 @@ function formatStreams(n: number) {
 }
 
 export default function ShellV1Experiment() {
-  const [variant, setVariant] = useState<Variant>('a');
+  const [_variant, _setVariant] = useState<Variant>('a');
   const [sidebarMode, setSidebarMode] = useState<'docked' | 'floating'>(
     'docked'
   );
@@ -1578,7 +1572,7 @@ export default function ShellV1Experiment() {
   const [lyricsLines, setLyricsLines] = useState<LyricLine[]>(MOCK_LYRICS);
   // Push-to-talk Jovie: hold ⌘J anywhere to dictate. Mock for the design pass.
   const [jovieListening, setJovieListening] = useState(false);
-  const [palette, setPalette] = useState<Palette>(PALETTE_PRESETS.Carbon);
+  const [palette, _setPalette] = useState<Palette>(PALETTE_PRESETS.Carbon);
   // Search state lives at the page level so click-artist / click-title in
   // any view can populate it and open the breadcrumb-takeover.
   const [searchOpen, setSearchOpen] = useState(false);
@@ -2666,25 +2660,6 @@ export default function ShellV1Experiment() {
             track={toNowPlayingTrack(currentTrack)}
           />
         </div>
-
-        <VariantPicker
-          variant={variant}
-          onVariant={setVariant}
-          sidebarFloating={sidebarMode === 'floating'}
-          onSidebar={() =>
-            setSidebarMode(m => (m === 'docked' ? 'floating' : 'docked'))
-          }
-          barCollapsed={barCollapsed}
-          onBar={() => setBarCollapsed(v => !v)}
-          waveformOn={waveformOn}
-          onWaveform={() => setWaveformOn(v => !v)}
-          view={view}
-          onView={setView}
-          palette={palette}
-          onPalette={setPalette}
-          installBannerOpen={installBannerOpen}
-          onInstallBanner={() => setInstallBannerOpen(v => !v)}
-        />
 
         <JovieOverlay listening={jovieListening} />
         <ShellLoader phase={loaderPhase} />
@@ -3956,400 +3931,6 @@ function renderWithEntities(
       </EntityHoverLink>
       {renderWithEntities(after, releases, onOpenRelease)}
     </>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Tooltip — small, dark, glassy popover with the action label + an optional
-// kbd chip on the right. Use the SHORTCUTS registry (top of file) for any
-// key combo so we have a single source of truth — see KEYBOARD SHORTCUT RULE.
-// CSS-only (no portal). Uses group/tip + delay-300 for a Linear-feeling
-// late reveal, snapping in over 120ms once it commits.
-// ---------------------------------------------------------------------------
-function VariantPicker({
-  variant,
-  onVariant,
-  sidebarFloating,
-  onSidebar,
-  barCollapsed,
-  onBar,
-  waveformOn,
-  onWaveform,
-  view,
-  onView,
-  palette,
-  onPalette,
-  installBannerOpen,
-  onInstallBanner,
-}: {
-  variant: Variant;
-  onVariant: (v: Variant) => void;
-  sidebarFloating: boolean;
-  onSidebar: () => void;
-  barCollapsed: boolean;
-  onBar: () => void;
-  waveformOn: boolean;
-  onWaveform: () => void;
-  view: CanvasView;
-  onView: (v: CanvasView) => void;
-  palette: Palette;
-  onPalette: (p: Palette) => void;
-  installBannerOpen: boolean;
-  onInstallBanner: () => void;
-}) {
-  // Picker is dev-only chrome — start collapsed so it doesn't cover the
-  // top-right corner of the actual UI being designed.
-  const [open, setOpen] = useState(false);
-  // Filled is the locked waveform style; the picker no longer offers
-  // alternates. Variant prop kept for type stability.
-  void variant;
-  void onVariant;
-
-  if (!open) {
-    return (
-      <button
-        type='button'
-        onClick={() => setOpen(true)}
-        className='fixed top-3 right-3 z-50 h-7 px-2.5 rounded-md text-[10.5px] font-caption uppercase tracking-[0.08em] text-tertiary-token border border-(--linear-app-shell-border) bg-(--linear-app-content-surface)/85 backdrop-blur-xl hover:text-primary-token hover:bg-surface-1 transition-colors duration-150 ease-out'
-        title='Open dev picker'
-      >
-        dev
-      </button>
-    );
-  }
-
-  return (
-    <div className='fixed top-3 right-3 z-50 rounded-xl border border-subtle bg-(--linear-app-content-surface)/95 backdrop-blur-xl shadow-[0_12px_40px_rgba(0,0,0,0.12)] p-2 w-[240px]'>
-      <div className='flex items-center justify-between px-2 pt-1 pb-1.5'>
-        <p className='text-[10px] uppercase tracking-wider text-tertiary-token font-semibold'>
-          Canvas
-        </p>
-        <button
-          type='button'
-          onClick={() => setOpen(false)}
-          className='h-5 w-5 grid place-items-center rounded-md text-quaternary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-150 ease-out'
-          aria-label='Hide picker'
-          title='Hide picker'
-        >
-          <ChevronRight className='h-3 w-3' strokeWidth={2.25} />
-        </button>
-      </div>
-      <div className='grid grid-cols-5 gap-0.5 px-1 pb-2 border-b border-subtle'>
-        {(
-          [
-            'demo',
-            'releases',
-            'tracks',
-            'tasks',
-            'library',
-            'settings',
-            'lyrics',
-          ] as CanvasView[]
-        ).map(v => (
-          <button
-            key={v}
-            type='button'
-            onClick={() => onView(v)}
-            className={cn(
-              'min-w-0 rounded-md px-1 py-1 text-[11px] font-caption capitalize transition-colors duration-150 ease-out truncate',
-              view === v
-                ? 'bg-primary text-on-primary'
-                : 'text-secondary-token hover:bg-surface-1 hover:text-primary-token'
-            )}
-          >
-            {v}
-          </button>
-        ))}
-      </div>
-      <div className='border-t border-subtle mt-2 pt-2 px-1 space-y-0.5'>
-        <PickerToggle
-          on={!sidebarFloating}
-          onClick={onSidebar}
-          onLabel='Sidebar docked'
-          offLabel='Sidebar floating (peek)'
-          shortcut='['
-        />
-        <PickerToggle
-          on={!barCollapsed}
-          onClick={onBar}
-          onLabel='Bar visible'
-          offLabel='Bar in siderail'
-          shortcut='⌘\\'
-        />
-        <PickerToggle
-          on={waveformOn}
-          onClick={onWaveform}
-          onLabel='Waveform on'
-          offLabel='Waveform off'
-          shortcut='W'
-        />
-        <PickerToggle
-          on={installBannerOpen}
-          onClick={onInstallBanner}
-          onLabel='Install banner shown'
-          offLabel='Install banner hidden'
-        />
-      </div>
-      <PalettePanel palette={palette} onPalette={onPalette} />
-      <div className='border-t border-subtle mt-2 pt-2 px-1 pb-1'>
-        <p className='text-[10px] uppercase tracking-wider text-tertiary-token px-1 pb-1.5 font-semibold'>
-          Dropdown
-        </p>
-        <div className='px-1'>
-          <DropdownGalleryTrigger />
-        </div>
-      </div>
-      <div className='border-t border-subtle mt-2 pt-2 px-2 pb-1'>
-        <p className='text-[10px] uppercase tracking-wider text-tertiary-token pb-1.5 font-semibold'>
-          In shell
-        </p>
-        <div className='space-y-px'>
-          <PickerAction
-            label='Onboarding'
-            onClick={() => onView('onboarding')}
-            active={view === 'onboarding'}
-          />
-        </div>
-        <p className='mt-2 text-[10px] uppercase tracking-wider text-tertiary-token pb-1.5 font-semibold'>
-          Standalone pages
-        </p>
-        <div className='space-y-px'>
-          <PickerLink href='/exp/home-v1' label='Marketing home' />
-          <PickerLink href='/exp/onboarding-v1' label='Onboarding' />
-          <PickerLink href='/exp/library-v1' label='Library' />
-          <PickerLink href='/exp/auth-v1' label='Sign in & sign up' />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// DropdownGalleryTrigger — a single ShellDropdown trigger that opens a
-// gallery menu rendering one row per state in the matrix. Lives inside the
-// DEV picker so designers can scan every variant without manually invoking
-// each surface across the experiment. Strip when the migration PR lands.
-function DropdownGalleryTrigger() {
-  const [filterDescending, setFilterDescending] = useState(false);
-  const [sortKey, setSortKey] = useState('date-added');
-  const [quality, setQuality] = useState('auto');
-  const onEntityActivate = useEntityActivate();
-  return (
-    <ShellDropdown
-      align='start'
-      side='bottom'
-      width={240}
-      searchable
-      searchPlaceholder='Filter actions…'
-      onEntityActivate={onEntityActivate}
-      trigger={
-        <button
-          type='button'
-          className='w-full flex items-center justify-between h-6 px-2 rounded-md border border-(--linear-app-shell-border) bg-surface-0/40 text-[11px] font-caption text-secondary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-150 ease-out'
-        >
-          <span>Show dropdown gallery</span>
-          <ChevronDown
-            className='h-3 w-3 text-quaternary-token'
-            strokeWidth={2.25}
-          />
-        </button>
-      }
-    >
-      <ShellDropdown.Header
-        title='Tim White'
-        subtitle='t@timwhite.co · Founder'
-        entity={ENTITY_CURRENT_USER}
-      />
-      <ShellDropdown.Label>Items</ShellDropdown.Label>
-      <ShellDropdown.Item label='Plain item' />
-      <ShellDropdown.Item icon={Pencil} label='With leading icon' />
-      <ShellDropdown.Item
-        icon={Activity}
-        label='With description'
-        description='Two-line row with secondary copy'
-      />
-      <ShellDropdown.Item icon={Search} label='With shortcut' shortcut='⌘K' />
-      <ShellDropdown.Item
-        icon={Pin}
-        label='Disabled item'
-        disabled
-        shortcut='P'
-      />
-      <ShellDropdown.Item
-        icon={Trash2}
-        label='Danger item'
-        tone='danger'
-        shortcut='⌫'
-      />
-      <ShellDropdown.Separator />
-      <ShellDropdown.Label>Sort by</ShellDropdown.Label>
-      <ShellDropdown.RadioGroup value={sortKey} onValueChange={setSortKey}>
-        <ShellDropdown.RadioItem value='date-added' label='Date added' />
-        <ShellDropdown.RadioItem value='date-captured' label='Date captured' />
-        <ShellDropdown.RadioItem value='popularity' label='Popularity' />
-        <ShellDropdown.RadioItem value='status' label='Status' disabled />
-      </ShellDropdown.RadioGroup>
-      <ShellDropdown.Separator />
-      <ShellDropdown.CheckboxItem
-        label='Descending'
-        checked={filterDescending}
-        onCheckedChange={setFilterDescending}
-        shortcut='D'
-      />
-      <ShellDropdown.Separator />
-      <ShellDropdown.Label>Submenus</ShellDropdown.Label>
-      <ShellDropdown.Sub>
-        <ShellDropdown.SubTrigger icon={AudioLines} label='Quality' />
-        <ShellDropdown.SubContent>
-          <ShellDropdown.RadioGroup value={quality} onValueChange={setQuality}>
-            <ShellDropdown.RadioItem value='auto' label='Auto' />
-            <ShellDropdown.RadioItem value='lossless' label='Lossless' />
-            <ShellDropdown.RadioItem value='high' label='High' />
-            <ShellDropdown.RadioItem value='normal' label='Normal' />
-          </ShellDropdown.RadioGroup>
-        </ShellDropdown.SubContent>
-      </ShellDropdown.Sub>
-      <ShellDropdown.Sub>
-        <ShellDropdown.SubTrigger icon={UserPlus} label='Assign to teammate' />
-        <ShellDropdown.SubContent searchable searchPlaceholder='Filter people…'>
-          {ENTITY_TEAMMATES.map(t => (
-            <ShellDropdown.EntityItem key={t.id} entity={t} />
-          ))}
-        </ShellDropdown.SubContent>
-      </ShellDropdown.Sub>
-      <ShellDropdown.Sub>
-        <ShellDropdown.SubTrigger icon={Disc3} label='Move to release' />
-        <ShellDropdown.SubContent
-          searchable
-          searchPlaceholder='Filter releases…'
-        >
-          {ENTITY_RELEASES.map(r => (
-            <ShellDropdown.EntityItem key={r.id} entity={r} />
-          ))}
-        </ShellDropdown.SubContent>
-      </ShellDropdown.Sub>
-      <ShellDropdown.Sub>
-        <ShellDropdown.SubTrigger icon={Users} label='Set artist' />
-        <ShellDropdown.SubContent
-          searchable
-          searchPlaceholder='Filter artists…'
-        >
-          {ENTITY_ARTISTS.map(a => (
-            <ShellDropdown.EntityItem key={a.id} entity={a} />
-          ))}
-        </ShellDropdown.SubContent>
-      </ShellDropdown.Sub>
-      <ShellDropdown.Sub>
-        <ShellDropdown.SubTrigger icon={Calendar} label='Link to event' />
-        <ShellDropdown.SubContent>
-          {ENTITY_EVENTS.map(ev => (
-            <ShellDropdown.EntityItem key={ev.id} entity={ev} />
-          ))}
-        </ShellDropdown.SubContent>
-      </ShellDropdown.Sub>
-      <ShellDropdown.Sub>
-        <ShellDropdown.SubTrigger icon={AudioWaveform} label='Link to track' />
-        <ShellDropdown.SubContent>
-          {ENTITY_TRACKS_DEMO.map(t => (
-            <ShellDropdown.EntityItem key={t.id} entity={t} />
-          ))}
-        </ShellDropdown.SubContent>
-      </ShellDropdown.Sub>
-      <ShellDropdown.Separator />
-      <ShellDropdown.Item
-        icon={LogOut}
-        label='Destructive action'
-        tone='danger'
-      />
-    </ShellDropdown>
-  );
-}
-
-function PalettePanel({
-  palette,
-  onPalette,
-}: {
-  palette: Palette;
-  onPalette: (p: Palette) => void;
-}) {
-  const tokens: Array<{ key: keyof Palette; label: string }> = [
-    { key: 'page', label: 'Page' },
-    { key: 'contentSurface', label: 'Canvas' },
-    { key: 'surface0', label: 'Surface 0' },
-    { key: 'surface1', label: 'Surface 1' },
-    { key: 'surface2', label: 'Surface 2' },
-    { key: 'border', label: 'Border' },
-  ];
-  const currentPresetName =
-    Object.entries(PALETTE_PRESETS).find(
-      ([, p]) => JSON.stringify(p) === JSON.stringify(palette)
-    )?.[0] ?? 'Custom';
-  return (
-    <div className='border-t border-subtle mt-2 pt-2 px-1'>
-      <p className='text-[10px] uppercase tracking-wider text-tertiary-token px-1 pb-1.5 font-semibold'>
-        Palette
-      </p>
-      <div className='px-1 pb-2'>
-        <ShellDropdown
-          align='start'
-          side='bottom'
-          width='trigger'
-          trigger={
-            <button
-              type='button'
-              className='w-full flex items-center justify-between h-6 px-2 rounded-md border border-(--linear-app-shell-border) bg-surface-0/40 text-[11px] font-caption text-secondary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-150 ease-out'
-            >
-              <span className='flex items-center gap-1.5'>
-                <span className='h-1.5 w-1.5 rounded-full bg-cyan-300/85' />
-                {currentPresetName}
-              </span>
-              <ChevronDown
-                className='h-3 w-3 text-quaternary-token'
-                strokeWidth={2.25}
-              />
-            </button>
-          }
-        >
-          <ShellDropdown.Label>Preset</ShellDropdown.Label>
-          <ShellDropdown.RadioGroup
-            value={currentPresetName}
-            onValueChange={name => {
-              const preset = PALETTE_PRESETS[name];
-              if (preset) onPalette(preset);
-            }}
-          >
-            {Object.keys(PALETTE_PRESETS).map(name => (
-              <ShellDropdown.RadioItem key={name} value={name} label={name} />
-            ))}
-          </ShellDropdown.RadioGroup>
-        </ShellDropdown>
-      </div>
-      <div className='space-y-1 px-1 pb-1'>
-        {tokens.map(t => (
-          <div key={t.key} className='flex items-center gap-2'>
-            <label className='flex items-center gap-2 cursor-pointer flex-1 min-w-0'>
-              <input
-                type='color'
-                value={palette[t.key]}
-                onChange={e =>
-                  onPalette({ ...palette, [t.key]: e.target.value })
-                }
-                className='h-5 w-5 rounded-md border border-(--linear-app-shell-border) bg-transparent cursor-pointer shrink-0 [appearance:none] [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded-[5px] [&::-webkit-color-swatch]:border-none'
-              />
-              <span className='text-[11px] text-secondary-token flex-1 min-w-0 truncate'>
-                {t.label}
-              </span>
-            </label>
-            <input
-              type='text'
-              value={palette[t.key]}
-              onChange={e => onPalette({ ...palette, [t.key]: e.target.value })}
-              className='w-[72px] shrink-0 h-5 px-2 rounded-md text-[10px] tabular-nums text-tertiary-token bg-surface-1 border border-(--linear-app-shell-border) outline-none focus:text-primary-token'
-              spellCheck={false}
-            />
-          </div>
-        ))}
-      </div>
-    </div>
   );
 }
 
