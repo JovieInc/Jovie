@@ -54,7 +54,7 @@ export function LatestReleaseCard({
   const showDrawer = isMobile && artist && dsps && dsps.length > 0;
 
   const listenButtonClass =
-    'shrink-0 rounded-full bg-btn-primary px-3.5 py-1.5 text-sm font-medium text-btn-primary-foreground transition-[transform,opacity] duration-normal ease-out hover:opacity-90 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2';
+    'shrink-0 rounded-full bg-btn-primary px-3.5 py-1.5 text-sm font-medium text-btn-primary-foreground transition-opacity duration-normal ease-out hover:opacity-90 active:opacity-[0.85] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2';
 
   return (
     <div className='flex items-center gap-3 rounded-2xl border border-subtle bg-surface-1 p-3 shadow-sm'>

@@ -661,15 +661,19 @@ export function ProfileCompactTemplate({
       >
         <div className='absolute inset-0' aria-hidden='true'>
           <div className='absolute inset-[-10%]'>
-            <ImageWithFallback
-              src={heroImageUrl}
-              alt={`${artist.name} background`}
-              fill
-              sizes='(max-width: 767px) 100vw, 680px'
-              className='scale-[1.05] object-cover opacity-28 blur-[84px] saturate-[0.88]'
-              fallbackVariant='avatar'
-              fallbackClassName='bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_48%)]'
-            />
+            {heroImageUrl ? (
+              <ImageWithFallback
+                src={heroImageUrl}
+                alt={`${artist.name} background`}
+                fill
+                sizes='(max-width: 767px) 100vw, 680px'
+                className='scale-[1.05] object-cover opacity-28 blur-[84px] saturate-[0.88]'
+                fallbackVariant='avatar'
+                fallbackClassName='bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_48%)]'
+              />
+            ) : (
+              <div className='h-full w-full bg-[radial-gradient(circle_at_top,var(--profile-stage-glow-a),transparent_44%)] opacity-50' />
+            )}
           </div>
           <div className='absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_26%),linear-gradient(180deg,rgba(6,8,13,0.34)_0%,rgba(7,8,10,0.82)_42%,rgba(8,9,10,0.98)_100%)]' />
         </div>

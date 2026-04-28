@@ -53,8 +53,7 @@ describe('profile shell token contract', () => {
       PROFILE_COMPACT_SURFACE,
       'utf8'
     );
-    expect(compactSurfaceContents).toContain('--profile-dock-border');
-    expect(compactSurfaceContents).toContain('--profile-tab-active-bg');
-    expect(compactSurfaceContents).toContain('--profile-status-pill-bg');
+    expect(compactSurfaceContents).toContain('--profile-content-bg');
+    expect(compactSurfaceContents).toContain('--profile-stage-bg');
   });
 });

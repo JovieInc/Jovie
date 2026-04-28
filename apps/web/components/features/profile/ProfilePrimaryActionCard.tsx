@@ -7,6 +7,10 @@ import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { ReleaseCountdown } from '@/components/features/release/ReleaseCountdown';
 import { profileSecondaryPillClassName } from '@/features/profile/artist-notifications-cta/shared';
 import type { ProfileRenderMode } from '@/features/profile/contracts';
+import {
+  startOfProfileSurfaceLocalDay as startOfLocalDay,
+  toProfileSurfaceDateValue as toDateValue,
+} from '@/features/profile/profile-surface-state';
 import { useTourDateProximity } from '@/hooks/useTourDateProximity';
 import type { UserLocation } from '@/hooks/useUserLocation';
 import { useUserLocation } from '@/hooks/useUserLocation';
@@ -106,7 +110,7 @@ function buildCardStyles(
   return {
     isShowcase,
     shellClassName: cn(
-      'group flex w-full items-center gap-3 rounded-[var(--profile-action-radius)] border border-white/[0.08] bg-white/[0.05] text-left backdrop-blur-2xl transition-[background-color,transform,box-shadow] duration-150 hover:bg-white/[0.08] active:scale-[0.985]',
+      'group flex w-full items-center gap-3 rounded-[var(--profile-action-radius)] border border-white/[0.08] bg-white/[0.05] text-left backdrop-blur-2xl transition-[background-color,box-shadow,opacity] duration-150 hover:bg-white/[0.08] active:opacity-[0.9]',
       isShowcase
         ? 'min-h-[92px] px-4 py-3.5 shadow-[0_22px_58px_rgba(0,0,0,0.34)]'
         : 'min-h-[64px] px-3 py-2.5',
@@ -389,34 +393,6 @@ const CTA_PILL_CLASS_NAME = cn(
   profileSecondaryPillClassName,
   'h-7 rounded-full border-white/14 bg-white text-2xs font-semibold text-black shadow-[0_10px_24px_rgba(255,255,255,0.16)] hover:bg-white hover:text-black'
 );
-
-function toDateValue(value: Date | string | null | undefined) {
-  if (!value) {
-    return null;
-  }
-
-  if (value instanceof Date) {
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? null : date;
-  }
-
-  const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  const date = dateOnlyMatch
-    ? new Date(
-        Number(dateOnlyMatch[1]),
-        Number(dateOnlyMatch[2]) - 1,
-        Number(dateOnlyMatch[3])
-      )
-    : new Date(value);
-
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function startOfLocalDay(date: Date) {
-  const normalized = new Date(date);
-  normalized.setHours(0, 0, 0, 0);
-  return normalized;
-}
 
 function getReleaseArtistNames(
   release: ProfilePrimaryActionCardRelease | null | undefined

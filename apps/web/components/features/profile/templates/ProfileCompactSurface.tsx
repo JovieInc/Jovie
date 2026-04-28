@@ -13,12 +13,11 @@ import {
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
-import { profileHeroMorphPillClassName } from '@/features/profile/artist-notifications-cta/shared';
 import type {
   ProfileMode,
   ProfilePreviewNotificationsState,
@@ -30,19 +29,18 @@ import { ProfileHomeRail } from '@/features/profile/ProfileHomeRail';
 import type { ProfilePrimaryActionCardRelease } from '@/features/profile/ProfilePrimaryActionCard';
 import { ProfilePrimaryTabPanel } from '@/features/profile/ProfilePrimaryTabPanel';
 import type { DrawerView } from '@/features/profile/ProfileUnifiedDrawer';
+import { resolveProfileSurfaceState } from '@/features/profile/profile-surface-state';
 import { getProfileModeDefinition } from '@/features/profile/registry';
 import type { PublicRelease } from '@/features/profile/releases/types';
 import { SubscriptionConfirmedBanner } from '@/features/profile/SubscriptionConfirmedBanner';
 import type { UserLocation } from '@/hooks/useUserLocation';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
-import { getProfileReleaseVisibility } from '@/lib/profile/release-visibility';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import { buildProfileShareContext } from '@/lib/share/context';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { cn } from '@/lib/utils';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
-import { getHeaderSocialLinks } from '@/lib/utils/context-aware-links';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
@@ -146,70 +144,6 @@ interface ProfileCompactSurfaceProps {
   readonly headerSocialLinksOverride?: readonly LegacySocialLink[];
 }
 
-function unwrapNextImageUrl(url: string | null | undefined): string | null {
-  if (!url) return null;
-
-  try {
-    const parsed = new URL(url, 'http://localhost');
-    if (parsed.pathname !== '/_next/image') {
-      return url;
-    }
-
-    return parsed.searchParams.get('url') ?? url;
-  } catch {
-    return url;
-  }
-}
-
-function toDateValue(value: Date | string | null | undefined) {
-  if (!value) {
-    return null;
-  }
-
-  if (value instanceof Date) {
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? null : date;
-  }
-
-  const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  const date = dateOnlyMatch
-    ? new Date(
-        Number(dateOnlyMatch[1]),
-        Number(dateOnlyMatch[2]) - 1,
-        Number(dateOnlyMatch[3])
-      )
-    : new Date(value);
-
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function startOfLocalDay(date: Date) {
-  const normalized = new Date(date);
-  normalized.setHours(0, 0, 0, 0);
-  return normalized;
-}
-
-function getUpcomingTourDate(
-  tourDates: readonly TourDateViewModel[]
-): TourDateViewModel | null {
-  const today = startOfLocalDay(new Date());
-
-  return (
-    [...tourDates]
-      .filter(tourDate => {
-        const start = toDateValue(tourDate.startDate);
-        return (
-          start !== null && startOfLocalDay(start).getTime() >= today.getTime()
-        );
-      })
-      .sort(
-        (left, right) =>
-          (toDateValue(left.startDate)?.getTime() ?? 0) -
-          (toDateValue(right.startDate)?.getTime() ?? 0)
-      )[0] ?? null
-  );
-}
-
 function resolveActivePrimaryTab(params: {
   readonly mode: ProfileMode;
   readonly drawerOpen: boolean;
@@ -244,46 +178,6 @@ function resolveActivePrimaryTab(params: {
     default:
       return 'profile';
   }
-}
-
-function resolveStatusPill(params: {
-  latestRelease?: ProfileCompactSurfaceProps['latestRelease'];
-  profileSettings?: ProfileCompactSurfaceProps['profileSettings'];
-  upcomingTourDate: TourDateViewModel | null;
-  isSubscribed: boolean;
-}) {
-  if (params.upcomingTourDate) {
-    return {
-      icon: CalendarDays,
-      label: 'On Tour',
-    };
-  }
-
-  const releaseVisibility = getProfileReleaseVisibility(
-    params.latestRelease,
-    params.profileSettings
-  );
-  if (releaseVisibility?.show && params.latestRelease) {
-    return {
-      icon: Bell,
-      label: 'New Release',
-    };
-  }
-
-  return {
-    icon: Bell,
-    label: params.isSubscribed ? 'Alerts On' : 'Alerts Ready',
-  };
-}
-
-function readHeroRoleLabel(artist: Artist) {
-  const label = artist.settings?.heroRoleLabel;
-  if (typeof label !== 'string') {
-    return null;
-  }
-
-  const trimmed = label.trim();
-  return trimmed.length > 0 ? trimmed : null;
 }
 
 export function ProfileCompactSurface({
@@ -325,6 +219,7 @@ export function ProfileCompactSurface({
   isUnsubscribing = false,
   onManageNotifications,
   onRegisterReveal,
+  onRevealNotifications,
   previewNotificationsState = {
     kind: 'button',
     tone: 'quiet',
@@ -336,6 +231,7 @@ export function ProfileCompactSurface({
 }: Readonly<ProfileCompactSurfaceProps>) {
   const [notificationsPortalContainer, setNotificationsPortalContainer] =
     useState<HTMLDivElement | null>(null);
+  const notificationsRevealRef = useRef<(() => void) | null>(null);
   const mergedDSPs = useMemo(
     () =>
       sortDSPsByGeoPopularity(
@@ -343,23 +239,6 @@ export function ProfileCompactSurface({
         viewerCountryCode
       ),
     [artist, socialLinks, viewerCountryCode]
-  );
-  const heroImageUrl = useMemo(() => {
-    return unwrapNextImageUrl(
-      photoDownloadSizes.find(size => size.key === 'large')?.url ??
-        photoDownloadSizes.find(size => size.key === 'original')?.url ??
-        artist.image_url ??
-        null
-    );
-  }, [artist.image_url, photoDownloadSizes]);
-  const shareContext = useMemo(
-    () =>
-      buildProfileShareContext({
-        username: artist.handle,
-        artistName: artist.name,
-        avatarUrl: heroImageUrl,
-      }),
-    [artist.handle, artist.name, heroImageUrl]
   );
   const {
     available: availableContacts,
@@ -369,18 +248,6 @@ export function ProfileCompactSurface({
     contacts,
     artistHandle: artist.handle,
   });
-  const visibleSocialLinks = useMemo(
-    () =>
-      headerSocialLinksOverride
-        ? [...headerSocialLinksOverride]
-        : getHeaderSocialLinks(socialLinks, viewerCountryCode, 2),
-    [headerSocialLinksOverride, socialLinks, viewerCountryCode]
-  );
-  const hasTip = useMemo(
-    () => showPayButton && socialLinks.some(link => link.platform === 'venmo'),
-    [showPayButton, socialLinks]
-  );
-  const hasReleases = releases.length >= 2;
   const isDrawerOverlayActive = renderMode === 'interactive' && drawerOpen;
   const activePrimaryTab = resolveActivePrimaryTab({
     mode: activeMode,
@@ -392,33 +259,78 @@ export function ProfileCompactSurface({
   const isPreviewEmbedded =
     renderMode === 'preview' && presentation === 'embedded';
   const activePrimaryPanel = isHomeMode ? null : activePrimaryTab;
-  const upcomingTourDate = useMemo(
-    () => getUpcomingTourDate(tourDates),
-    [tourDates]
-  );
-  const statusPill = useMemo(
+  const surfaceState = useMemo(
     () =>
-      resolveStatusPill({
+      resolveProfileSurfaceState({
+        artist,
+        socialLinks,
+        photoDownloadSizes,
         latestRelease,
         profileSettings,
-        upcomingTourDate,
+        featuredPlaylistFallback,
+        tourDates,
+        releases,
+        hasPlayableDestinations: mergedDSPs.length > 0,
+        showPayButton,
         isSubscribed,
+        activeSubtitle: getProfileModeDefinition(activePrimaryTab).subtitle,
+        viewerCountryCode,
       }),
-    [isSubscribed, latestRelease, profileSettings, upcomingTourDate]
+    [
+      activePrimaryTab,
+      artist,
+      featuredPlaylistFallback,
+      isSubscribed,
+      latestRelease,
+      mergedDSPs.length,
+      photoDownloadSizes,
+      profileSettings,
+      releases,
+      showPayButton,
+      socialLinks,
+      tourDates,
+      viewerCountryCode,
+    ]
   );
-  const heroSubtitle = useMemo(() => {
-    const tagline =
-      typeof artist.tagline === 'string' ? artist.tagline.trim() : '';
-    if (tagline.length > 0) {
-      return tagline;
-    }
-
-    return getProfileModeDefinition(activePrimaryTab).subtitle;
-  }, [activePrimaryTab, artist.tagline]);
-  const heroRoleLabel = useMemo(() => readHeroRoleLabel(artist), [artist]);
+  const heroImageUrl = surfaceState.heroImageUrl;
+  const visibleSocialLinks = headerSocialLinksOverride
+    ? [...headerSocialLinksOverride]
+    : surfaceState.visibleSocialLinks;
+  const shareContext = useMemo(
+    () =>
+      buildProfileShareContext({
+        username: artist.handle,
+        artistName: artist.name,
+        avatarUrl: heroImageUrl,
+      }),
+    [artist.handle, artist.name, heroImageUrl]
+  );
+  const hasTip = surfaceState.hasTip;
+  const hasReleases = surfaceState.hasReleases;
+  const { heroSubtitle } = surfaceState;
   const IdentityHeading = renderMode === 'preview' ? 'p' : 'h1';
   const topChromeButtonClassName =
-    'h-12! w-12! border-transparent bg-black/44 text-white shadow-[0_20px_44px_rgba(0,0,0,0.34)] backdrop-blur-md hover:bg-black/56';
+    'h-11! w-11! border-transparent bg-black/34 text-white shadow-[0_16px_34px_rgba(0,0,0,0.28)] backdrop-blur-md hover:bg-black/46 active:scale-100';
+  const socialIconClassName =
+    'inline-flex h-11 w-11 items-center justify-center rounded-full text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)] transition-opacity duration-200 hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
+  const heroHeightClassName =
+    !isHomeMode && isPreviewEmbedded ? 'min-h-[316px]' : 'min-h-[408px]';
+  const registerNotificationsReveal = useCallback(
+    (reveal: () => void) => {
+      notificationsRevealRef.current = reveal;
+      onRegisterReveal?.(reveal);
+    },
+    [onRegisterReveal]
+  );
+  const openNotifications = useCallback(() => {
+    const reveal = notificationsRevealRef.current;
+    if (reveal) {
+      reveal();
+    } else {
+      onModeSelect('subscribe');
+    }
+    onRevealNotifications?.();
+  }, [onModeSelect, onRevealNotifications]);
 
   return (
     <div
@@ -433,35 +345,36 @@ export function ProfileCompactSurface({
         data-testid='profile-compact-surface'
         data-presentation={presentation}
       >
-        <div className='pointer-events-none absolute inset-0 bg-[var(--profile-panel-gradient)]' />
+        <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.025),transparent_34%)]' />
 
         <header
           className={cn(
             'relative shrink-0 overflow-hidden',
-            isHomeMode
-              ? isPreviewEmbedded
-                ? 'min-h-[440px]'
-                : 'min-h-[456px]'
-              : isPreviewEmbedded
-                ? 'min-h-[316px]'
-                : 'min-h-[408px]'
+            heroHeightClassName
           )}
         >
           <div className='absolute inset-0'>
-            <ImageWithFallback
-              src={heroImageUrl ?? artist.image_url}
-              alt={artist.name}
-              fill
-              priority
-              sizes='(max-width: 767px) 100vw, 430px'
-              className='object-cover object-center'
-              fallbackVariant='avatar'
-              fallbackClassName='bg-surface-2'
-            />
+            {(heroImageUrl ?? artist.image_url) ? (
+              <ImageWithFallback
+                src={heroImageUrl ?? artist.image_url}
+                alt={artist.name}
+                fill
+                priority
+                sizes='(max-width: 767px) 100vw, 430px'
+                className='object-cover object-center'
+                fallbackVariant='avatar'
+                fallbackClassName='bg-surface-2'
+              />
+            ) : (
+              <div
+                className='h-full w-full bg-[radial-gradient(circle_at_50%_22%,rgba(255,255,255,0.08),transparent_28%),linear-gradient(145deg,#20242c_0%,#11141a_48%,#050608_100%)]'
+                aria-hidden='true'
+              />
+            )}
           </div>
 
           <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(2,3,4,0.18)_0%,rgba(3,4,6,0.22)_20%,rgba(4,5,7,0.42)_52%,rgba(5,6,8,0.94)_100%)]' />
-          <div className='pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,var(--profile-stage-glow-a),transparent_24%),linear-gradient(180deg,transparent_0%,rgba(5,6,8,0.18)_58%,var(--profile-stage-bg)_100%)]' />
+          <div className='pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_24%),linear-gradient(180deg,transparent_0%,rgba(5,6,8,0.18)_58%,var(--profile-stage-bg)_100%)]' />
 
           <div
             className={cn(
@@ -485,20 +398,45 @@ export function ProfileCompactSurface({
                 <ChevronLeft className='h-5 w-5' />
               </CircleIconButton>
 
-              {!hideMoreMenu ? (
-                <CircleIconButton
-                  onClick={onOpenMenu}
-                  size='lg'
-                  variant='pearl'
-                  className={cn(
-                    topChromeButtonClassName,
-                    drawerOpen && 'bg-black/60'
-                  )}
-                  ariaLabel='More options'
-                  aria-haspopup='dialog'
+              {visibleSocialLinks.length > 0 || !hideMoreMenu ? (
+                <div
+                  className='flex items-center gap-1.5'
+                  data-testid='profile-hero-social-row'
                 >
-                  <MoreHorizontal className='h-5 w-5' />
-                </CircleIconButton>
+                  {visibleSocialLinks.map(link =>
+                    link.platform && link.url ? (
+                      <a
+                        key={link.id}
+                        href={link.url}
+                        target='_blank'
+                        rel='noopener noreferrer'
+                        className={socialIconClassName}
+                        aria-label={link.platform}
+                      >
+                        <SocialIcon
+                          platform={link.platform}
+                          className='h-[18px] w-[18px]'
+                        />
+                      </a>
+                    ) : null
+                  )}
+
+                  {!hideMoreMenu ? (
+                    <CircleIconButton
+                      onClick={onOpenMenu}
+                      size='lg'
+                      variant='pearl'
+                      className={cn(
+                        topChromeButtonClassName,
+                        drawerOpen && 'bg-black/50'
+                      )}
+                      ariaLabel='More options'
+                      aria-haspopup='dialog'
+                    >
+                      <MoreHorizontal className='h-5 w-5' />
+                    </CircleIconButton>
+                  ) : null}
+                </div>
               ) : null}
             </div>
 
@@ -528,8 +466,8 @@ export function ProfileCompactSurface({
                     {artist.is_verified ? (
                       <BadgeCheck
                         className='h-5 w-5 shrink-0 drop-shadow-[0_1px_4px_rgba(0,0,0,0.3)]'
-                        fill='#3b82f6'
-                        stroke='white'
+                        fill='white'
+                        stroke='black'
                         strokeWidth={2}
                         aria-label='Verified'
                       />
@@ -539,7 +477,7 @@ export function ProfileCompactSurface({
 
                 <p
                   className={cn(
-                    'max-w-[28ch] font-medium tracking-[-0.012em] text-white/74',
+                    'line-clamp-2 max-w-[30ch] font-medium tracking-[-0.012em] text-white/76',
                     isPreviewEmbedded
                       ? 'text-[15px] leading-5'
                       : 'text-sm leading-6'
@@ -549,103 +487,56 @@ export function ProfileCompactSurface({
                 </p>
               </div>
 
-              <div className='space-y-3.5'>
-                <div
-                  className='flex min-w-0 flex-wrap items-center gap-2.5'
-                  data-testid='profile-hero-status-row'
+              <div className='space-y-3'>
+                {renderMode === 'interactive' ? (
+                  <ProfileInlineNotificationsCTA
+                    artist={artist}
+                    onManageNotifications={onManageNotifications}
+                    onRegisterReveal={registerNotificationsReveal}
+                    portalContainer={notificationsPortalContainer}
+                    variant='hero'
+                    hideTrigger
+                  />
+                ) : null}
+
+                <button
+                  type='button'
+                  onClick={openNotifications}
+                  disabled={renderMode !== 'interactive'}
+                  className='flex min-h-[64px] w-full items-center gap-3 rounded-[20px] border border-white/10 bg-black/22 px-4 text-left text-white shadow-[0_14px_36px_rgba(0,0,0,0.24)] backdrop-blur-2xl transition-[background-color,border-color] duration-200 hover:bg-black/30 disabled:cursor-default disabled:hover:bg-black/22'
+                  data-testid='profile-hero-alerts-row'
                 >
                   <span
-                    className='inline-flex h-11 shrink-0 items-center gap-2 rounded-full border border-[color:var(--profile-status-pill-border)] bg-[color:var(--profile-status-pill-bg)] px-4 text-[13px] font-semibold tracking-[-0.01em] text-[color:var(--profile-accent-primary)] shadow-[0_14px_32px_rgba(0,0,0,0.18)] backdrop-blur-xl'
-                    data-testid='profile-hero-status-pill'
+                    className='flex h-9 w-9 shrink-0 items-center justify-center text-white'
+                    aria-hidden='true'
                   >
-                    <span className='h-2 w-2 rounded-full bg-[color:var(--profile-accent-primary)]' />
-                    <span>{statusPill.label}</span>
+                    <Bell className='h-5 w-5' />
                   </span>
-
-                  {heroRoleLabel ? (
-                    <span
-                      className='inline-flex h-11 shrink-0 items-center rounded-full border border-white/12 bg-black/18 px-4 text-[13px] font-medium tracking-[-0.01em] text-white/64 shadow-[0_14px_28px_rgba(0,0,0,0.22)] backdrop-blur-xl'
-                      data-testid='profile-hero-role-pill'
-                    >
-                      {heroRoleLabel}
+                  <span className='min-w-0 flex-1'>
+                    <span className='block text-[15px] font-semibold leading-5 tracking-[-0.025em]'>
+                      {isSubscribed ? 'Alerts On' : 'Alerts Off'}
                     </span>
-                  ) : null}
-                </div>
-
-                <div
-                  className={cn(
-                    'flex items-end justify-between gap-3.5',
-                    isPreviewEmbedded ? 'pt-1' : ''
-                  )}
-                >
-                  <div
-                    className='shrink-0'
-                    data-testid='profile-hero-notifications-cta'
-                  >
-                    {renderMode === 'interactive' ? (
-                      <ProfileInlineNotificationsCTA
-                        artist={artist}
-                        onManageNotifications={onManageNotifications}
-                        onRegisterReveal={onRegisterReveal}
-                        portalContainer={notificationsPortalContainer}
-                        variant='hero'
-                      />
-                    ) : (
-                      <button
-                        type='button'
-                        className={cn(
-                          profileHeroMorphPillClassName,
-                          'gap-2 whitespace-nowrap px-4.5'
-                        )}
-                        tabIndex={-1}
-                      >
-                        <Bell className='h-4 w-4' />
-                        {isSubscribed ? 'Manage alerts' : 'Turn on alerts'}
-                      </button>
+                    <span className='mt-0.5 block truncate text-[12px] leading-5 text-white/60'>
+                      New music and shows
+                    </span>
+                  </span>
+                  <span
+                    className={cn(
+                      'relative h-8 w-[52px] shrink-0 rounded-full border p-0.5 transition-colors duration-200',
+                      isSubscribed
+                        ? 'border-white/38 bg-white/26'
+                        : 'border-white/20 bg-white/8'
                     )}
-                  </div>
-
-                  {visibleSocialLinks.length > 0 ? (
-                    <div
+                    aria-hidden='true'
+                  >
+                    <span
                       className={cn(
-                        'flex shrink-0 items-center',
-                        isPreviewEmbedded ? 'gap-3.5' : 'gap-4'
+                        'block h-7 w-7 rounded-full bg-white shadow-[0_8px_20px_rgba(0,0,0,0.22)] transition-transform duration-200',
+                        isSubscribed && 'translate-x-5'
                       )}
-                      data-testid='profile-hero-social-row'
-                    >
-                      {visibleSocialLinks.map((link, index) =>
-                        link.platform && link.url ? (
-                          <div
-                            key={link.id}
-                            className={cn(
-                              'flex items-center',
-                              isPreviewEmbedded ? 'gap-3.5' : 'gap-4'
-                            )}
-                          >
-                            <a
-                              href={link.url}
-                              target='_blank'
-                              rel='noopener noreferrer'
-                              className='inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/12 bg-black/24 text-white shadow-[0_18px_40px_rgba(0,0,0,0.24)] backdrop-blur-2xl transition-[background-color,border-color,transform] duration-200 hover:bg-black/34 active:scale-[0.98]'
-                              aria-label={link.platform}
-                            >
-                              <SocialIcon
-                                platform={link.platform}
-                                className='h-[18px] w-[18px]'
-                              />
-                            </a>
-                            {index < visibleSocialLinks.length - 1 ? (
-                              <span
-                                className='h-8 w-px bg-white/18'
-                                aria-hidden='true'
-                              />
-                            ) : null}
-                          </div>
-                        ) : null
-                      )}
-                    </div>
-                  ) : null}
-                </div>
+                    />
+                  </span>
+                </button>
               </div>
             </div>
           </div>
@@ -676,11 +567,8 @@ export function ProfileCompactSurface({
                 hasPlayableDestinations={mergedDSPs.length > 0}
                 renderMode={renderMode}
                 onPlayClick={onPlayClick}
-                onOpenAlerts={() => onModeSelect('subscribe')}
                 viewerLocation={viewerLocation}
                 resolveNearbyTour={resolveNearbyTour}
-                isSubscribed={isSubscribed}
-                previewNotificationsState={previewNotificationsState}
               />
             ) : (
               <ProfilePrimaryTabPanel
@@ -709,7 +597,7 @@ export function ProfileCompactSurface({
           {showBottomNav ? (
             <div className='shrink-0 pt-1'>
               <nav
-                className='mx-[-20px] border-t border-[color:var(--profile-dock-border)] bg-[color:color-mix(in_srgb,var(--profile-dock-bg)_72%,transparent)] px-3 pt-2 backdrop-blur-2xl'
+                className='mx-[-20px] border-t border-white/10 bg-black/54 px-3 pt-2 backdrop-blur-2xl'
                 aria-label='Profile navigation'
                 data-testid='profile-bottom-nav'
               >
@@ -723,7 +611,7 @@ export function ProfileCompactSurface({
                         type='button'
                         onClick={() => onModeSelect(tab.mode)}
                         className={cn(
-                          'relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-2 py-2.5 text-center transition-[background-color,color,transform] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
+                          'relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-2 py-2.5 text-center transition-[background-color,color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
                           isActive
                             ? 'text-white'
                             : 'text-white/40 hover:text-white/62'
@@ -732,7 +620,7 @@ export function ProfileCompactSurface({
                       >
                         {isActive ? (
                           <span
-                            className='absolute left-1/2 top-0 h-1 w-9 -translate-x-1/2 rounded-full bg-[color:var(--profile-tab-active-bg)]'
+                            className='absolute left-1/2 top-0 h-1 w-8 -translate-x-1/2 rounded-full bg-white'
                             aria-hidden='true'
                           />
                         ) : null}

@@ -333,8 +333,8 @@ describe('ProfileCompactTemplate', () => {
     );
 
     const trigger = screen.getByRole('button', { name: /more options/i });
-    expect(trigger.className).toContain('bg-black/44');
-    expect(trigger.className).toContain('h-12!');
+    expect(trigger.className).toContain('bg-black/34');
+    expect(trigger.className).toContain('h-11!');
   });
 
   it('can hide the menu trigger for clean marketing screenshots', async () => {
@@ -473,7 +473,7 @@ describe('ProfileCompactTemplate', () => {
     expect(window.location.search).toBe('?mode=listen');
   });
 
-  it('prioritizes the On Tour status chip over release and alert fallbacks', async () => {
+  it('prioritizes the ticket CTA without rendering tour metadata in the hero', async () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -484,7 +484,7 @@ describe('ProfileCompactTemplate', () => {
           title: "Don't Look Down",
           slug: 'dont-look-down',
           artworkUrl: 'https://example.com/release.jpg',
-          releaseDate: '2099-06-01T00:00:00.000Z',
+          releaseDate: '2026-04-01T00:00:00.000Z',
           releaseType: 'single',
         }}
         tourDates={[
@@ -512,10 +512,18 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    expect(screen.getByText('On Tour')).toBeInTheDocument();
+    expect(screen.getByTestId('profile-hero-alerts-row')).toHaveTextContent(
+      'Alerts Off'
+    );
+    expect(screen.getByTestId('profile-home-rail-tour')).toHaveTextContent(
+      'Tickets'
+    );
+    expect(
+      screen.queryByTestId('profile-hero-status-pill')
+    ).not.toBeInTheDocument();
   });
 
-  it('falls back to the New Release status chip when there is no upcoming tour', async () => {
+  it('falls back to the listen CTA without rendering release metadata in the hero', async () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -526,13 +534,21 @@ describe('ProfileCompactTemplate', () => {
           title: "Don't Look Down",
           slug: 'dont-look-down',
           artworkUrl: 'https://example.com/release.jpg',
-          releaseDate: '2099-06-01T00:00:00.000Z',
+          releaseDate: '2026-04-01T00:00:00.000Z',
           releaseType: 'single',
         }}
       />
     );
 
-    expect(screen.getByText('New Release')).toBeInTheDocument();
+    expect(screen.getByTestId('profile-hero-alerts-row')).toHaveTextContent(
+      'Alerts Off'
+    );
+    expect(screen.getByTestId('profile-home-rail-release')).toHaveTextContent(
+      'Listen Now'
+    );
+    expect(
+      screen.queryByTestId('profile-hero-status-pill')
+    ).not.toBeInTheDocument();
   });
 
   it('falls back to the mode prop when the URL has no mode param', async () => {
@@ -719,7 +735,7 @@ describe('ProfileCompactTemplate', () => {
     expect(screen.getByText('Featured Playlist')).toBeInTheDocument();
   });
 
-  it('renders the optional hero role chip when artist settings provide one', async () => {
+  it('keeps optional hero role metadata out of the mobile hero chrome', async () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -734,9 +750,7 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    expect(screen.getByTestId('profile-hero-role-pill')).toHaveTextContent(
-      'DJ / Producer'
-    );
+    expect(screen.queryByText('DJ / Producer')).not.toBeInTheDocument();
   });
 
   it('keeps the upcoming show CTA ahead of the playlist fallback', async () => {
