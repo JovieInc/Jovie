@@ -176,25 +176,30 @@ describe('deriveNudgeState', () => {
       ).toBe('never_trialed');
     });
 
-    it('handles NaN trialEndsAt during trial plan by returning never_trialed', () => {
+    it('handles NaN trialEndsAt during trial plan by returning trial_honeymoon', () => {
+      // Trial plan with bogus date is a data anomaly — default to honeymoon
+      // (silent banner) rather than offering a "Try Pro free" CTA to a user
+      // who is already on trial.
       expect(
         deriveNudgeState({
           plan: 'trial',
           trialEndsAt: 'not-a-date',
           now: NOW,
         })
-      ).toBe('never_trialed');
+      ).toBe('trial_honeymoon');
     });
 
-    it('handles trial plan with null trialEndsAt by falling through to never_trialed', () => {
-      // Defensive — shouldn't happen, but the function shouldn't crash.
+    it('handles trial plan with null trialEndsAt by defaulting to trial_honeymoon', () => {
+      // Defensive — shouldn't happen because activateTrial always sets
+      // trialEndsAt. Defaulting to honeymoon keeps the slot silent rather
+      // than offering a trial to someone who already has one.
       expect(
         deriveNudgeState({
           plan: 'trial',
           trialEndsAt: null,
           now: NOW,
         })
-      ).toBe('never_trialed');
+      ).toBe('trial_honeymoon');
     });
   });
 });

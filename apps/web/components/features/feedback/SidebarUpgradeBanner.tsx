@@ -10,6 +10,7 @@ import {
   formatVerifiedPriceLabel,
   getPreferredVerifiedPrice,
 } from '@/lib/billing/verified-upgrade';
+import { TRIAL_NOTIFICATION_RECIPIENT_LIMIT } from '@/lib/entitlements/registry';
 import { env } from '@/lib/env-client';
 import { useCheckoutMutation, usePricingOptionsQuery } from '@/lib/queries';
 import { type NudgeState, usePlanGate } from '@/lib/queries/usePlanGate';
@@ -31,8 +32,11 @@ function pluralize(count: number, singular: string, plural: string): string {
   return count === 1 ? singular : plural;
 }
 
-const TRIAL_NOTIFICATION_CAP = 50;
-const TRIAL_NOTIFICATION_WARNING_THRESHOLD = 40;
+const TRIAL_NOTIFICATION_CAP = TRIAL_NOTIFICATION_RECIPIENT_LIMIT;
+// Warn at 80% of cap so the user feels the constraint coming.
+const TRIAL_NOTIFICATION_WARNING_THRESHOLD = Math.floor(
+  TRIAL_NOTIFICATION_CAP * 0.8
+);
 
 function buildVariant(input: {
   state: NudgeState;
@@ -246,7 +250,16 @@ export function SidebarUpgradeBanner() {
     globalThis.location.href = checkout.url;
   }, [checkoutMutation, selectedPrice, variant]);
 
-  if (isPassiveRuntime || isDemoRoute || planGate.isLoading || !variant) {
+  // isError → hide the banner. Otherwise paid Pro/Max users would see
+  // "Try Pro free for 14 days" during a billing API outage because nudgeState
+  // falls through to never_trialed when plan/trialEndsAt are unknown.
+  if (
+    isPassiveRuntime ||
+    isDemoRoute ||
+    planGate.isLoading ||
+    planGate.isError ||
+    !variant
+  ) {
     return null;
   }
 

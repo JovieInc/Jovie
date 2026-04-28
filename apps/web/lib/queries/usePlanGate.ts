@@ -25,9 +25,9 @@ import { useBillingStatusQuery } from './useBillingStatusQuery';
  * The 8 user states the upgrade-nudge system distinguishes between.
  *
  * `pro_paid` and `max_paid` render no nudges (slot hidden).
- * `trial_honeymoon` also renders no nudges (let the user feel ownership during
- * the first 10 days). The other 5 states each render a distinct sidebar slot
- * variant.
+ * `trial_honeymoon` also renders no nudges (let the user feel ownership when
+ * they have more than 3 days left). The other 5 states each render a distinct
+ * sidebar slot variant.
  */
 export type NudgeState =
   | 'never_trialed'
@@ -166,10 +166,16 @@ export function deriveNudgeState(input: NudgeStateInput): NudgeState {
     return 'pro_paid';
   }
 
-  if (plan === 'trial' && trialEndsAt) {
+  if (plan === 'trial') {
+    if (!trialEndsAt) {
+      // Defensive: trial plan with no end date shouldn't happen (activateTrial
+      // always sets it). Default to honeymoon (silent banner) rather than
+      // showing "Try Pro free" to a user who's already on trial.
+      return 'trial_honeymoon';
+    }
     const endTs = new Date(trialEndsAt).getTime();
     if (Number.isNaN(endTs)) {
-      return 'never_trialed';
+      return 'trial_honeymoon';
     }
     const msRemaining = endTs - now;
     if (msRemaining <= 0) {
