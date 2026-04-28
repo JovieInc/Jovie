@@ -173,12 +173,15 @@ const TEXT_TONE: Record<Urgency, string> = {
 
 export function SidebarUpgradeBanner() {
   const pathname = usePathname();
-  const isPassiveRuntime = env.IS_TEST || env.IS_E2E;
+  // Only gate render on NODE_ENV=test (unit tests). IS_E2E mode (dev:local:browse,
+  // playwright runs) needs the banner visible so we can verify it. The pricing
+  // query keeps its own gate to skip the network call under test runtimes.
+  const isPassiveRuntime = env.IS_TEST;
   const isDemoRoute = isDemoRoutePath(pathname);
 
   const planGate = usePlanGate();
   const pricing = usePricingOptionsQuery({
-    enabled: !isPassiveRuntime && !isDemoRoute,
+    enabled: !isPassiveRuntime && !isDemoRoute && !env.IS_E2E,
   });
   const checkoutMutation = useCheckoutMutation();
 
