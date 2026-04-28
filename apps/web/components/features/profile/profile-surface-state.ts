@@ -36,6 +36,8 @@ export type ProfileSurfacePrimaryAction =
       readonly href: null;
     };
 
+type ProfileSurfaceDateInput = Date | string | null | undefined;
+
 export interface ProfileSurfaceState {
   readonly heroImageUrl: string | null;
   readonly heroSubtitle: string;
@@ -74,7 +76,7 @@ function unwrapNextImageUrl(url: string | null | undefined): string | null {
   }
 }
 
-function toDateValue(value: Date | string | null | undefined) {
+function toDateValue(value: ProfileSurfaceDateInput) {
   if (!value) {
     return null;
   }
@@ -132,9 +134,7 @@ function readHeroRoleLabel(artist: Artist) {
   return trimmed.length > 0 ? trimmed : null;
 }
 
-export function formatProfileSurfaceMonth(
-  date: string | Date | null | undefined
-) {
+export function formatProfileSurfaceMonth(date: ProfileSurfaceDateInput) {
   const resolved = toDateValue(date);
   if (!resolved) return 'Soon';
   return new Intl.DateTimeFormat('en-US', {
@@ -142,14 +142,104 @@ export function formatProfileSurfaceMonth(
   }).format(resolved);
 }
 
-export function formatProfileSurfaceDay(
-  date: string | Date | null | undefined
-) {
+export function formatProfileSurfaceDay(date: ProfileSurfaceDateInput) {
   const resolved = toDateValue(date);
   if (!resolved) return '—';
   return new Intl.DateTimeFormat('en-US', {
     day: '2-digit',
   }).format(resolved);
+}
+
+function resolveHeroSubtitle(artist: Artist, activeSubtitle: string) {
+  if (typeof artist.tagline !== 'string') {
+    return activeSubtitle;
+  }
+
+  const trimmed = artist.tagline.trim();
+  return trimmed.length > 0 ? trimmed : activeSubtitle;
+}
+
+function resolvePrimaryAction(params: {
+  readonly nextShow: TourDateViewModel | null;
+  readonly latestVisibleRelease: ProfileSurfaceLatestRelease | null;
+  readonly hasPlayableDestinations: boolean;
+  readonly isSubscribed: boolean;
+}): ProfileSurfacePrimaryAction {
+  const {
+    nextShow,
+    latestVisibleRelease,
+    hasPlayableDestinations,
+    isSubscribed,
+  } = params;
+
+  if (nextShow) {
+    return {
+      kind: 'tour',
+      label: nextShow.ticketUrl ? 'Tickets' : 'Shows',
+      mode: 'tour',
+      href: nextShow.ticketUrl ?? null,
+    };
+  }
+
+  if (latestVisibleRelease || hasPlayableDestinations) {
+    return {
+      kind: 'listen',
+      label: 'Listen',
+      mode: 'listen',
+      href: null,
+    };
+  }
+
+  return {
+    kind: 'subscribe',
+    label: isSubscribed ? 'Manage Alerts' : 'Get Alerts',
+    mode: 'subscribe',
+    href: null,
+  };
+}
+
+function resolveStatusPill(params: {
+  readonly nextShow: TourDateViewModel | null;
+  readonly latestVisibleRelease: ProfileSurfaceLatestRelease | null;
+  readonly isSubscribed: boolean;
+}): ProfileSurfaceState['statusPill'] {
+  const { nextShow, latestVisibleRelease, isSubscribed } = params;
+
+  if (nextShow) {
+    return {
+      kind: 'tour',
+      label: 'On Tour',
+    };
+  }
+
+  if (latestVisibleRelease) {
+    return {
+      kind: 'release',
+      label: 'New Release',
+    };
+  }
+
+  return {
+    kind: 'alerts',
+    label: isSubscribed ? 'Alerts On' : 'Alerts Ready',
+  };
+}
+
+function resolveEmptyState(params: {
+  readonly isSubscribed: boolean;
+  readonly featuredPlaylistFallback?: ConfirmedFeaturedPlaylistFallback | null;
+}): ProfileSurfaceState['emptyState'] {
+  const { isSubscribed, featuredPlaylistFallback } = params;
+
+  return {
+    release: isSubscribed
+      ? 'New music alerts are on.'
+      : 'Follow for the next release.',
+    tour: 'No upcoming shows.',
+    homeProof: featuredPlaylistFallback
+      ? 'Featured playlist ready.'
+      : 'Follow for new music and show updates.',
+  };
 }
 
 export function resolveProfileSurfaceState(params: {
@@ -204,51 +294,23 @@ export function resolveProfileSurfaceState(params: {
   const visibleReleases = releases.filter(release => Boolean(release.slug));
   const hasTip =
     showPayButton && socialLinks.some(link => link.platform === 'venmo');
-  const heroSubtitle =
-    typeof artist.tagline === 'string' && artist.tagline.trim().length > 0
-      ? artist.tagline.trim()
-      : activeSubtitle;
+  const heroSubtitle = resolveHeroSubtitle(artist, activeSubtitle);
   const visibleSocialLinks = getHeaderSocialLinks(
     [...socialLinks],
     viewerCountryCode,
     socialLinkLimit
   );
-
-  const primaryAction: ProfileSurfacePrimaryAction = nextShow
-    ? {
-        kind: 'tour',
-        label: nextShow.ticketUrl ? 'Tickets' : 'Shows',
-        mode: 'tour',
-        href: nextShow.ticketUrl ?? null,
-      }
-    : latestVisibleRelease || hasPlayableDestinations
-      ? {
-          kind: 'listen',
-          label: 'Listen',
-          mode: 'listen',
-          href: null,
-        }
-      : {
-          kind: 'subscribe',
-          label: isSubscribed ? 'Manage Alerts' : 'Get Alerts',
-          mode: 'subscribe',
-          href: null,
-        };
-
-  const statusPill = nextShow
-    ? ({
-        kind: 'tour',
-        label: 'On Tour',
-      } as const)
-    : latestVisibleRelease
-      ? ({
-          kind: 'release',
-          label: 'New Release',
-        } as const)
-      : ({
-          kind: 'alerts',
-          label: isSubscribed ? 'Alerts On' : 'Alerts Ready',
-        } as const);
+  const primaryAction = resolvePrimaryAction({
+    nextShow,
+    latestVisibleRelease,
+    hasPlayableDestinations,
+    isSubscribed,
+  });
+  const statusPill = resolveStatusPill({
+    nextShow,
+    latestVisibleRelease,
+    isSubscribed,
+  });
 
   return {
     heroImageUrl,
@@ -263,14 +325,9 @@ export function resolveProfileSurfaceState(params: {
     visibleSocialLinks,
     hasTip,
     hasReleases: visibleReleases.length > 0,
-    emptyState: {
-      release: isSubscribed
-        ? 'New music alerts are on.'
-        : 'Follow for the next release.',
-      tour: 'No upcoming shows.',
-      homeProof: featuredPlaylistFallback
-        ? 'Featured playlist ready.'
-        : 'Follow for new music and show updates.',
-    },
+    emptyState: resolveEmptyState({
+      isSubscribed,
+      featuredPlaylistFallback,
+    }),
   };
 }

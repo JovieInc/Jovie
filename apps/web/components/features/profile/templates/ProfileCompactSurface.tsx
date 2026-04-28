@@ -313,6 +313,8 @@ export function ProfileCompactSurface({
     'h-11! w-11! border-transparent bg-black/34 text-white shadow-[0_16px_34px_rgba(0,0,0,0.28)] backdrop-blur-md hover:bg-black/46 active:scale-100';
   const socialIconClassName =
     'inline-flex h-11 w-11 items-center justify-center rounded-full text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)] transition-opacity duration-200 hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
+  const heroHeightClassName =
+    !isHomeMode && isPreviewEmbedded ? 'min-h-[316px]' : 'min-h-[408px]';
   const registerNotificationsReveal = useCallback(
     (reveal: () => void) => {
       notificationsRevealRef.current = reveal;
@@ -348,13 +350,7 @@ export function ProfileCompactSurface({
         <header
           className={cn(
             'relative shrink-0 overflow-hidden',
-            isHomeMode
-              ? isPreviewEmbedded
-                ? 'min-h-[408px]'
-                : 'min-h-[408px]'
-              : isPreviewEmbedded
-                ? 'min-h-[316px]'
-                : 'min-h-[408px]'
+            heroHeightClassName
           )}
         >
           <div className='absolute inset-0'>

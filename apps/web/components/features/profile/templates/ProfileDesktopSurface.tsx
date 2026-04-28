@@ -322,6 +322,44 @@ export function ProfileDesktopSurface({
   // otherwise the toggle is meaningless and confuses unsubscribed visitors.
   const artistEmailReady = readArtistEmailReadyFromSettings(artist.settings);
   const showArtistEmailRow = isSubscribed && artistEmailReady;
+  const primaryActionControlClassName =
+    'inline-flex h-11 items-center gap-2 rounded-full bg-white px-4 text-[13px] font-semibold tracking-[-0.01em] text-black transition-colors duration-200 hover:bg-white/88';
+  const PrimaryActionIcon = primaryAction.kind === 'tour' ? CalendarDays : Play;
+  let primaryActionElement: React.ReactNode;
+  if (primaryAction.kind === 'subscribe') {
+    primaryActionElement = (
+      <ProfileInlineNotificationsCTA
+        artist={artist}
+        portalContainer={notificationsPortalContainer}
+        variant='hero'
+        presentation='modal'
+        onManageNotifications={() => onModeSelect('subscribe')}
+      />
+    );
+  } else if (primaryAction.href) {
+    primaryActionElement = (
+      <a href={primaryAction.href} className={primaryActionControlClassName}>
+        <PrimaryActionIcon className='h-4 w-4' />
+        {primaryAction.label}
+      </a>
+    );
+  } else {
+    primaryActionElement = (
+      <button
+        type='button'
+        onClick={() => onModeSelect(primaryAction.mode)}
+        className={primaryActionControlClassName}
+      >
+        <PrimaryActionIcon
+          className={cn(
+            'h-4 w-4',
+            primaryAction.kind === 'listen' && 'fill-current'
+          )}
+        />
+        {primaryAction.label}
+      </button>
+    );
+  }
 
   const homeOverview = (
     <div className='grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.9fr)]'>
@@ -373,34 +411,9 @@ export function ProfileDesktopSurface({
               </div>
 
               <div className='flex flex-wrap items-center gap-2.5'>
-                {primaryAction.kind === 'subscribe' ? (
-                  <ProfileInlineNotificationsCTA
-                    artist={artist}
-                    portalContainer={notificationsPortalContainer}
-                    variant='hero'
-                    presentation='modal'
-                    onManageNotifications={() => onModeSelect('subscribe')}
-                  />
-                ) : primaryAction.href ? (
-                  <a
-                    href={primaryAction.href}
-                    className='inline-flex h-11 items-center gap-2 rounded-full bg-white px-4 text-[13px] font-semibold tracking-[-0.01em] text-black transition-colors duration-200 hover:bg-white/88'
-                  >
-                    <CalendarDays className='h-4 w-4' />
-                    {primaryAction.label}
-                  </a>
-                ) : (
-                  <button
-                    type='button'
-                    onClick={() => onModeSelect(primaryAction.mode)}
-                    className='inline-flex h-11 items-center gap-2 rounded-full bg-white px-4 text-[13px] font-semibold tracking-[-0.01em] text-black transition-colors duration-200 hover:bg-white/88'
-                  >
-                    <Play className='h-4 w-4 fill-current' />
-                    {primaryAction.label}
-                  </button>
-                )}
+                {primaryActionElement}
                 <span className='inline-flex h-9 items-center gap-2 rounded-full border border-white/12 bg-white/8 px-3 text-[12px] font-semibold tracking-[-0.01em] text-white/82'>
-                  <span className='h-1.5 w-1.5 rounded-full bg-white/[0.07]2' />
+                  <span className='h-1.5 w-1.5 rounded-full bg-white/52' />
                   <span>{statusPill.label}</span>
                 </span>
               </div>
