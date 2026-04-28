@@ -889,11 +889,11 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-outcome-card__title {
-  max-width: 9.5ch;
-  font-size: clamp(2rem, 3vw, 3rem);
+  max-width: 12ch;
+  font-size: clamp(1.5rem, 2vw, 1.75rem);
   font-weight: 680;
-  line-height: 1.05;
-  letter-spacing: -0.025em;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
   color: rgb(255 255 255 / 0.96);
   text-wrap: balance;
 }
