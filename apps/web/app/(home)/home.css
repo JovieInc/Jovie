@@ -330,20 +330,15 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-hero-actions .public-action-primary {
-  border: 1px solid rgba(255, 255, 255, 0.88);
-  background: #f5f7ff;
-  color: #050608;
-  box-shadow:
-    0 10px 24px rgba(0, 0, 0, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  border: 0;
+  background: rgb(252, 252, 252);
+  color: rgb(0, 0, 0);
 }
 
 .homepage-hero-actions .public-action-secondary {
-  border: 1px solid rgba(255, 255, 255, 0.13);
-  background: rgba(255, 255, 255, 0.025);
-  color: rgba(255, 255, 255, 0.92);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(18px);
+  border: 0;
+  background: transparent;
+  color: rgb(252, 252, 252);
 }
 
 .homepage-hero-showcase {
@@ -432,14 +427,34 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-hero-mockup__frame {
+  position: relative;
   overflow: hidden;
   border-radius: 10px;
   aspect-ratio: 16 / 9;
   padding: 7px;
-  background: rgba(157, 157, 255, 0.05);
+  background: rgba(157, 157, 255, 0.12);
   box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
     0 30px 80px rgba(0, 0, 0, 0.5);
+}
+
+.homepage-hero-mockup::before {
+  content: "";
+  position: absolute;
+  top: -32px;
+  left: -8px;
+  right: -8px;
+  height: 80px;
+  background: radial-gradient(
+    60% 100% at 50% 100%,
+    rgba(157, 157, 255, 0.22) 0%,
+    rgba(157, 157, 255, 0.08) 40%,
+    rgba(157, 157, 255, 0) 100%
+  );
+  pointer-events: none;
+  filter: blur(14px);
+  z-index: -1;
 }
 
 .homepage-hero-mockup[data-active="true"] .homepage-hero-mockup__frame {
@@ -481,13 +496,18 @@ body:has(.home-viewport)::-webkit-scrollbar {
   height: 44px;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  box-shadow:
-    0 18px 48px rgba(0, 0, 0, 0.34),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(18px);
+  border: 0;
+  border-radius: 100%;
+  background: transparent;
+  color: rgb(252, 252, 252);
+  opacity: 0.7;
+  transition: opacity 180ms ease;
+}
+
+.homepage-hero-showcase:hover .homepage-hero-carousel__arrow,
+.homepage-hero-carousel__side:hover .homepage-hero-carousel__arrow,
+.homepage-hero-carousel__side:focus-visible .homepage-hero-carousel__arrow {
+  opacity: 1;
 }
 
 .homepage-hero-carousel__arrow svg {
