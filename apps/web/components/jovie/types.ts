@@ -261,11 +261,20 @@ export interface StarterSuggestionContext {
  * home.
  */
 export const DEFAULT_SUGGESTIONS: readonly ChatSuggestion[] = [
+  // Catalog-aware first — these exercise the artist-data lookup tools
+  // and show that the chat knows the user's own data, not just generic
+  // music-industry trivia. (Per /autoplan design phase.)
   {
     icon: 'Disc3',
-    label: 'Plan a release',
-    prompt: 'Help me plan my next release.',
+    label: 'Recap last release',
+    prompt: 'How did my last release perform?',
     accent: 'green',
+  },
+  {
+    icon: 'Eye',
+    label: 'Catalog health',
+    prompt: "What's missing or wrong in my catalog metadata?",
+    accent: 'blue',
   },
   {
     icon: 'Camera',
@@ -280,15 +289,9 @@ export const DEFAULT_SUGGESTIONS: readonly ChatSuggestion[] = [
     accent: 'blue',
   },
   {
-    icon: 'Eye',
-    label: 'Build artist profile',
-    prompt: 'Help me polish my artist profile.',
-    accent: 'purple',
-  },
-  {
     icon: 'Link2',
-    label: 'Analyze momentum',
-    prompt: 'Analyze my audience momentum this week.',
+    label: 'Link analytics',
+    prompt: 'Where are my fans clicking this month?',
     accent: 'blue',
   },
 ] as const;

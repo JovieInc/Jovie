@@ -23,6 +23,7 @@ import {
   type ArtistContext,
   artistContextSchema,
   type ChatTelemetry,
+  type JovieChatMessageMetadata,
   type ReleaseContext,
 } from '@/lib/chat/types';
 import { db } from '@/lib/db';
@@ -1928,11 +1929,32 @@ export async function POST(req: Request) {
       },
     });
 
+    // Surface trace_id + retrieved sources to the client via AI SDK
+    // message metadata. The `start` event delivers them up-front so the
+    // UI can render source chips while the answer streams in. The
+    // `finish` event re-emits the same payload. Client reads
+    // `message.metadata.chatTraceId` for /api/chat/feedback POSTs.
+    const metadataPayload: JovieChatMessageMetadata = {
+      chatTraceId: turn.traceMetadata.traceId,
+      retrievedSources: turn.retrieved.map(r => ({
+        title: r.title,
+        sourceUrl: r.sourceUrl ?? null,
+        score: r.score,
+      })),
+      retrievalVersion: turn.traceMetadata.retrievalVersion,
+    };
+
     return turn.streamResult.toUIMessageStreamResponse({
       headers: {
         ...corsHeaders,
         'x-request-id': requestId,
         'x-chat-trace-id': turn.traceMetadata.traceId,
+      },
+      messageMetadata: ({ part }) => {
+        if (part.type === 'start' || part.type === 'finish') {
+          return metadataPayload;
+        }
+        return undefined;
       },
     });
   } catch (error) {

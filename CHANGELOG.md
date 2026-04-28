@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.188] - 2026-04-28
+
+> Chat hardening, PR 3.5 — wires the per-message UI for the chat-rag-eval stack: source chips below the assistant bubble (when canon retrieval populates them), thumbs/reason/correction feedback in the message footer (always available), and catalog-aware empty-state suggestions. Same shell-shared `ChatMessage.tsx` so this lands for both legacy and `SHELL_CHAT_V1` shells with no porting later.
+
+### Added
+
+- **`JovieChatMessageMetadata`** type in `apps/web/lib/chat/types.ts` carrying `chatTraceId` + `retrievedSources` + `retrievalVersion`. The chat route emits this via AI SDK's `messageMetadata` callback on `streamText().toUIMessageStreamResponse()` — fires on `start` and `finish` so the UI can render source chips while tokens stream in.
+- **`MessageSourceChips.tsx`** — pill-style source chips render under the assistant reply bubble between the bubble and tool UI (NOT in the action row). Title only, max 28 chars truncated, no icons (per design phase: no emoji-on-square). Click target opens `source_url` in a new tab when present; non-interactive `<span role='note'>` with tooltip otherwise. Max 3 visible + `+N more` overflow chip. Empty `retrievedSources` = no row at all (no "no sources" placeholder).
+- **`MessageFeedback.tsx`** — progressive-disclosure thumbs UI:
+  - Both thumbs always visible at rest (not hover-reveal)
+  - ↑ = single click + fill + "Saved" (4s fade)
+  - ↓ = fill → reason chips inline (7 reasons) → reason click → optional correction textarea + "Send feedback" button → "Saved" + auto-fade
+  - Inline error preserves selected state so the user can retry with one click
+  - Footer copy: "The Jovie team reviews these. Won't change the answer." — the truth, NOT "Queued for review" (no SLA exists yet, per CEO phase warning)
+  - Full a11y: `aria-pressed` on thumbs, `<fieldset>` legend on reason picker, `aria-live='polite'` on status text, focus management
+- **Catalog-aware default suggestions** — `DEFAULT_SUGGESTIONS` now leads with "Recap last release" (`How did my last release perform?`) and "Catalog health" (`What's missing or wrong in my catalog metadata?`) so the empty-state advertises Jovie's actual moat (chat that knows your data) instead of generic music-industry trivia. "Link analytics" replaces the old "Analyze momentum" prompt with phrasing that targets `lookupLinkAnalytics` directly.
+
+### Changed
+
+- **`ChatMessage.tsx`** rendering on assistant messages: source chips slot between reply bubble and `ToolPartsRenderer` per design-phase consensus. Footer becomes a flex row with feedback affordance left + copy button right. The feedback UI always shows when `metadata.chatTraceId` is present (always, after PR 2 landed) — tool-only answers also get feedback per the design-phase override on `messageHasAssistantText`.
+- **Chat route** passes `messageMetadata` callback to `toUIMessageStreamResponse` emitting the trace_id + retrieved sources payload. The `x-chat-trace-id` response header stays as a fallback debug surface.
+- **Both shells share this chat surface.** `SHELL_CHAT_V1` only swaps the outer frame chrome (rounded corners, sidebar, AudioBar) — the per-message render is the same `ChatMessage.tsx` for both, so this lands in legacy + new shell simultaneously with no porting later.
+
+### Tests
+
+- `tests/unit/chat/MessageFeedback.test.tsx` — 7 tests covering: both thumbs render at rest, ↑ posts up rating, ↓ progressive disclosure to reason chips, ↓ → reason → correction → submit posts the right shape, ↓ → reason → empty correction omits the field, Cancel returns to idle, error path surfaces "Couldn't save — try again" inline.
+- Updated `SuggestedPrompts.test.tsx` and `JovieChat.empty-state.test.tsx` to assert the new catalog-aware default labels.
+
+554 chat tests passing total. Typecheck + lint clean.
+
+### Deferred to a follow-up
+
+- Eval harness (`apps/web/scripts/eval-chat.ts` + DeepSeek-via-NIM judge with deterministic gate + Sonnet promotion fallback). Not blocking the user-facing rollout — eval is a regression yardstick for prompt/retrieval changes, not a launch dependency.
+
 ## [26.4.187] - 2026-04-28
 
 > Chat hardening, part 3 of 3 — `chat_answer_feedback` schema and `/api/chat/feedback` POST handler with append-only supersession. Backend foundation for the per-message thumbs/reason/correction UI; the UI itself + eval harness ship in fast-follows.

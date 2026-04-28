@@ -4,6 +4,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { ImagePlus } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { JovieChatMessageMetadata } from '@/lib/chat/types';
 import { useAppFlag } from '@/lib/flags/client';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
 
@@ -440,6 +441,13 @@ export function JovieChat({
                           skipEntrance={knownMessageIdsRef.current.has(
                             message.id
                           )}
+                          metadata={
+                            message.role === 'assistant' &&
+                            'metadata' in message &&
+                            message.metadata
+                              ? (message.metadata as JovieChatMessageMetadata)
+                              : undefined
+                          }
                         />
                       </div>
                     </div>
