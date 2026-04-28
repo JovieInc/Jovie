@@ -121,6 +121,7 @@ import {
   Table as LibraryTable,
   ViewToggle as LibraryViewToggle,
 } from '@/app/exp/library-v1/page';
+import { CopyToggleIcon } from '@/components/atoms/CopyToggleIcon';
 import { ChatInput } from '@/components/jovie/components/ChatInput';
 import { ChatMarkdown } from '@/components/jovie/components/ChatMarkdown';
 import { ActivityHoverRow } from '@/components/shell/ActivityHoverRow';
@@ -128,6 +129,7 @@ import { AgentPulse } from '@/components/shell/AgentPulse';
 import { ColumnLabel } from '@/components/shell/ColumnLabel';
 import { ContextMenuOverlay } from '@/components/shell/ContextMenuOverlay';
 import { DictationWaveform } from '@/components/shell/DictationWaveform';
+import { DrawerTabStrip } from '@/components/shell/DrawerTabStrip';
 import { DropDateChip } from '@/components/shell/DropDateChip';
 import { DueChip } from '@/components/shell/DueChip';
 import { EntityHoverLink } from '@/components/shell/EntityPopover';
@@ -8406,7 +8408,11 @@ function ReleaseDrawer({
           page floor, not of each other. */}
       <div className='flex-1 min-h-0 px-2 pt-2 pb-2 flex flex-col'>
         <div className='flex-1 min-h-0 rounded-xl bg-(--linear-app-content-surface) shadow-[0_12px_32px_-12px_rgba(0,0,0,0.45),0_2px_6px_rgba(0,0,0,0.22)] flex flex-col overflow-hidden'>
-          <DrawerTabStrip tabs={tabs} active={tab} onChange={setTab} />
+          <DrawerTabStrip
+            tabs={tabs.map(t => ({ value: t, label: TAB_LABEL[t] }))}
+            active={tab}
+            onChange={setTab}
+          />
           <div className='flex-1 min-h-0 overflow-y-auto'>
             {tab === 'overview' && <DrawerOverviewTab release={r} />}
             {tab === 'distribution' && <DrawerDistribution release={r} />}
@@ -8420,50 +8426,6 @@ function ReleaseDrawer({
         </div>
       </div>
     </aside>
-  );
-}
-
-function DrawerTabStrip({
-  tabs,
-  active,
-  onChange,
-}: {
-  tabs: DrawerTab[];
-  active: DrawerTab;
-  onChange: (t: DrawerTab) => void;
-}) {
-  // Pill tabs share the strip equally (flex-1) so the row reads as a
-  // proper segmented control. Active tab carries a brighter surface +
-  // a subtle ring for unmistakable selected state. Drops the bottom
-  // separator — the tab strip's own track is the divider.
-  return (
-    <div className='shrink-0 px-2 pt-2 pb-2'>
-      <div
-        role='tablist'
-        className='flex items-center gap-0.5 p-0.5 rounded-full bg-(--surface-0)/70 border border-(--linear-app-shell-border)/70'
-      >
-        {tabs.map(t => {
-          const on = active === t;
-          return (
-            <button
-              key={t}
-              type='button'
-              role='tab'
-              aria-selected={on}
-              onClick={() => onChange(t)}
-              className={cn(
-                'flex-1 h-7 px-3 rounded-full text-[11.5px] font-medium tracking-[-0.005em] transition-colors duration-150 ease-out',
-                on
-                  ? 'bg-(--surface-2) text-primary-token ring-1 ring-inset ring-white/10 shadow-[0_1px_0_0_rgba(255,255,255,0.05)]'
-                  : 'text-tertiary-token hover:text-primary-token'
-              )}
-            >
-              {TAB_LABEL[t]}
-            </button>
-          );
-        })}
-      </div>
-    </div>
   );
 }
 
@@ -8584,27 +8546,6 @@ function relativeDropMeta(iso: string): {
 // Cross-fade between the rest icon and a confirmation glyph. Uses
 // monochrome white at high opacity for the confirm state — the cyan
 // accent was too attention-seeking for an action you fire constantly.
-function CopyToggleIcon({ copied }: { copied: boolean }) {
-  return (
-    <span className='relative inline-flex h-3 w-3 items-center justify-center'>
-      <Copy
-        className={cn(
-          'absolute inset-0 h-3 w-3 transition-[opacity,transform] duration-200 ease-out',
-          copied ? 'opacity-0 scale-75' : 'opacity-100 scale-100'
-        )}
-        strokeWidth={2.25}
-      />
-      <Check
-        className={cn(
-          'absolute inset-0 h-3 w-3 text-primary-token transition-[opacity,transform] duration-200 ease-out',
-          copied ? 'opacity-100 scale-100' : 'opacity-0 scale-75'
-        )}
-        strokeWidth={2.5}
-      />
-    </span>
-  );
-}
-
 function DrawerSmartLinkRow({ release }: { release: Release }) {
   const [copied, setCopied] = useState(false);
   const url = `jov.ie/${release.artist.toLowerCase().replace(/\s+/g, '-')}/${release.id}`;
