@@ -157,7 +157,7 @@ function HomepageHeroActions() {
         href={APP_ROUTES.ARTIST_PROFILES}
         className='public-action-secondary focus-ring-themed'
       >
-        Explore Profiles
+        Explore Profiles <span aria-hidden='true'>→</span>
       </Link>
     </div>
   );
@@ -178,7 +178,7 @@ export default function HomePage() {
       >
         <div
           data-testid='homepage-hero-shell'
-          className='homepage-hero-shell relative flex h-[100svh] min-h-[760px] flex-col overflow-hidden text-primary-token'
+          className='homepage-hero-shell relative flex min-h-[100svh] flex-col overflow-hidden text-primary-token'
         >
           <div
             aria-hidden='true'
@@ -198,6 +198,9 @@ export default function HomePage() {
 
           <div className='homepage-hero-inner relative z-[3] mx-auto flex w-full max-w-none min-w-0 flex-1 flex-col items-center justify-start'>
             <div className='homepage-hero-copy w-full min-w-0'>
+              <p className='homepage-hero-eyebrow self-center text-center'>
+                {HERO_COPY.eyebrow}
+              </p>
               <h1
                 id='home-hero-heading'
                 className='homepage-hero-headline self-center text-center text-white'
@@ -211,14 +214,14 @@ export default function HomePage() {
             </div>
             <HomepageHeroMockupCarousel />
           </div>
-
-          <HomeTrustSection
-            label='Trusted by artists'
-            presentation='inline-strip'
-            className='homepage-trust-reveal'
-          />
         </div>
       </section>
+      <div className='homepage-trust-section'>
+        <HomeTrustSection
+          label='Trusted by leading independent labels'
+          presentation='inline-strip'
+        />
+      </div>
       <div className='homepage-story-stack'>
         <HomepageOutcomeCards
           headline={ARTIST_PROFILE_COPY.outcomeDuo.homepageHeadline}

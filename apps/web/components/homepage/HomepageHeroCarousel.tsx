@@ -60,6 +60,16 @@ const HERO_MOCKUP_SCREENSHOTS: readonly HeroMockupShot[] = [
     kind: 'desktop',
     priority: false,
   },
+  {
+    id: 'profile-phone',
+    src: '/product-screenshots/profile-phone.png',
+    alt: 'Mobile artist profile with listen, tour, and presave actions',
+    title: 'Artist Profile',
+    width: 780,
+    height: 1688,
+    kind: 'phone',
+    priority: false,
+  },
 ] as const;
 
 const HOVER_ADVANCE_DELAY_MS = 700;
@@ -107,8 +117,8 @@ function getSlideStyle(offset: number): CSSProperties {
       ? distance === 0
         ? 1
         : distance === 1
-          ? 0.3
-          : 0.08
+          ? 1
+          : 0.4
       : 0,
     '--carousel-scale': distance <= 1 ? 1 : 0.96,
     '--carousel-blur':
