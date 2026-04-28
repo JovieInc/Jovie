@@ -36,6 +36,20 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - `apps/web/tests/unit/flags/useStoredAppFlagOverrides.test.tsx` — 6 Vitest cases covering partition correctness, idempotent purge, cross-tab `storage` event sync without auto-write, and no-op on empty orphans.
 
+## [26.4.185] - 2026-04-28
+
+> Refactor: extract `executeChatTurn()` from the 2k-line chat route into `apps/web/lib/chat/run.ts` as a pure pipeline. No behavior change. Sets up an eval harness and a future canon-retrieval layer to share the same code path the production route runs, so regressions are catchable without re-implementing chat from scratch.
+
+### Changed
+
+- **Chat-turn pipeline extracted to `lib/chat/run.ts`.** `executeChatTurn()` owns knowledge-context selection, system-prompt assembly, model-message conversion, model selection (light vs full + `forceLightModel` override), telemetry tagging, and the `streamText()` invocation. Tools are pre-built by the caller and passed in (closure pattern unchanged). `apps/web/app/api/chat/route.ts` shrinks from 2,036 → ~1,800 lines and now delegates the streaming pipeline.
+- **Sentry coupling removed from the pipeline.** `executeChatTurn` accepts a `ChatTelemetry` object with `setTags`/`setExtra`/`captureException` hooks. The route binds these to Sentry; future eval/replay callers can pass a no-op telemetry. No production observability change — the same tags fire from the same call sites.
+- **Shared chat types moved to `lib/chat/types.ts`** (`ArtistContext`, `ReleaseContext`, `artistContextSchema`, `ChatTelemetry`). Avoids cycles between `route.ts` and `run.ts`.
+
+### Added
+
+- `apps/web/tests/unit/chat/run.parity.test.ts` (14 tests). Asserts model selection, system-prompt content, sorted tool names, telemetry tag emission, and `onError` capture routing — locks in parity for any future caller of `executeChatTurn`.
+
 ## [26.4.184] - 2026-04-28
 
 > Frame.io-inspired homepage refresh: the hero now matches Frame.io's exact typography spec (Satoshi 80px / weight 600 / -0.045em) and layout positions, the mockup carousel has a proper window-style top chrome with rounded 18px corners, the header is transparent docked and switches to frosted glass on scroll, and the footer locks to the same edge-to-edge gutter system as the header. New shared `MarketingFinalCTA` foundation for the landing page system.
