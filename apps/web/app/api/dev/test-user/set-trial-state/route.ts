@@ -16,6 +16,7 @@ import { z } from 'zod';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
+import { getRedis } from '@/lib/redis';
 
 const TrialStateSchema = z.enum([
   'never_trialed',
@@ -164,6 +165,14 @@ export async function POST(req: Request) {
       billingUpdatedAt: new Date(),
     })
     .where(eq(users.clerkId, userId));
+
+  // Bust the Redis billing-status cache so the next /api/billing/status
+  // request reflects the mutation. Keep this best-effort — Redis isn't always
+  // configured in dev.
+  const redis = getRedis();
+  if (redis) {
+    await redis.del(`billing:status:v1:${userId}`).catch(() => undefined);
+  }
 
   return NextResponse.json({
     success: true,
