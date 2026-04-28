@@ -160,24 +160,43 @@ for (const packageName of standaloneRuntimePackages) {
 
 /**
  * Turbopack's standalone bundle externalizes some packages with a content
- * hash (e.g. `@sentry/nextjs-223beba69777d308`). Node's runtime require can't
- * resolve those hashed names, so every server response that touches the
- * affected chunk crashes with `Cannot find module '<pkg>-<hash>'`. This
- * appears intermittently after dependency bumps shift the bundle layout.
+ * hash (e.g. `@sentry/nextjs-223beba69777d308`, `require-in-the-middle-<hash>`).
+ * Node's runtime require can't resolve the hash-suffixed name, so every server
+ * response that touches the affected chunk crashes with
+ * `Cannot find module '<pkg>-<hash>'`.
  *
  * Scan the standalone chunks for those references and stub each hashed name
- * with a tiny re-export package, so Node finds it at runtime.
- *
- * Returns the number of stubs created.
+ * with a tiny re-export package, so Node finds it at runtime. We write the
+ * stubs into BOTH `node_modules` lookup locations (the app-level dir and the
+ * `.next/node_modules` dir Turbopack's chunk runtime resolves against) so
+ * neither resolution path misses them.
  */
 function createHashedExternalStubs(rootDir) {
   const chunksDir = path.join(rootDir, '.next', 'server', 'chunks');
   if (!existsSync(chunksDir)) return 0;
 
+  // Candidate node_modules dirs the runtime might search.
+  const candidateDirs = [
+    path.join(rootDir, 'node_modules'),
+    path.join(rootDir, '.next', 'node_modules'),
+    path.join(rootDir, '.next', 'server', 'node_modules'),
+  ];
+
+  // Find a real package directory by searching all candidates. Returns the
+  // first dir whose <name> child exists, or null.
+  const findRealPackageDir = name => {
+    for (const dir of candidateDirs) {
+      const candidate = path.join(dir, ...name.split('/'));
+      if (existsSync(candidate)) return candidate;
+    }
+    return null;
+  };
+
   const referenced = new Set();
-  // Match strings like `"@scope/pkg-<hex>"` or `"pkg-<hex>"` where <hex> is 12+ hex chars
-  // (Turbopack content hashes are 16 hex chars, but we widen the lower bound).
-  const ref = /"((?:@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*-[0-9a-f]{12,40})"/gi;
+  // Accept double-quoted, single-quoted, or backticked strings so we catch
+  // every Turbopack runtime emission style.
+  const ref =
+    /['"`]((?:@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*-[0-9a-f]{12,40})['"`]/gi;
   function walk(dir) {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, entry.name);
@@ -190,7 +209,7 @@ function createHashedExternalStubs(rootDir) {
       let m;
       while ((m = ref.exec(content))) {
         const id = m[1];
-        // Skip ids that happen to look hashed but aren't a node package
+        // Skip ids that aren't a recoverable node package name.
         if (id.startsWith('chunks-') || id.startsWith('static-')) continue;
         referenced.add(id);
       }
@@ -200,46 +219,64 @@ function createHashedExternalStubs(rootDir) {
 
   if (referenced.size === 0) return 0;
 
-  const nodeModulesRoot = path.join(rootDir, 'node_modules');
-  mkdirSync(nodeModulesRoot, { recursive: true });
+  const created = [];
+  const skipped = [];
 
-  let created = 0;
   for (const id of referenced) {
     // Strip the trailing -<hex> to recover the real package name.
     const realName = id.replace(/-[0-9a-f]{12,40}$/i, '');
-    if (!realName || realName === id) continue;
-    // Verify the real package actually exists in standalone node_modules; if not skip.
-    const realPath = path.join(nodeModulesRoot, ...realName.split('/'));
-    if (!existsSync(realPath)) continue;
+    if (!realName || realName === id) {
+      skipped.push(`${id} (no recoverable real name)`);
+      continue;
+    }
 
-    const stubPath = path.join(nodeModulesRoot, ...id.split('/'));
-    if (existsSync(stubPath)) continue;
-    mkdirSync(stubPath, { recursive: true });
+    const realDir = findRealPackageDir(realName);
+    if (!realDir) {
+      skipped.push(
+        `${id} (real pkg ${realName} not found in any node_modules)`
+      );
+      continue;
+    }
 
-    const stubPkgJson = {
-      name: id,
-      version: '0.0.0-stub',
-      main: 'index.js',
-    };
-    writeFileSync(
-      path.join(stubPath, 'package.json'),
-      JSON.stringify(stubPkgJson, null, 2)
-    );
-    writeFileSync(
-      path.join(stubPath, 'index.js'),
-      `module.exports = require(${JSON.stringify(realName)});\n`
-    );
-    created += 1;
+    // Write a stub into every candidate node_modules dir so the runtime
+    // resolves it regardless of which lookup path is used.
+    for (const dir of candidateDirs) {
+      mkdirSync(dir, { recursive: true });
+      const stubPath = path.join(dir, ...id.split('/'));
+      if (existsSync(stubPath)) continue;
+      mkdirSync(stubPath, { recursive: true });
+
+      writeFileSync(
+        path.join(stubPath, 'package.json'),
+        JSON.stringify(
+          { name: id, version: '0.0.0-stub', main: 'index.js' },
+          null,
+          2
+        )
+      );
+      writeFileSync(
+        path.join(stubPath, 'index.js'),
+        `module.exports = require(${JSON.stringify(realName)});\n`
+      );
+    }
+
+    created.push(`${id} → ${realName}`);
   }
-  return created;
+
+  if (created.length > 0) {
+    console.log(
+      `✅ Created ${created.length} hashed-external stub(s) in standalone node_modules:`
+    );
+    for (const entry of created) console.log(`     - ${entry}`);
+  }
+  if (skipped.length > 0) {
+    console.log(`ℹ️  Skipped ${skipped.length} hashed-external candidate(s):`);
+    for (const entry of skipped) console.log(`     - ${entry}`);
+  }
+  return created.length;
 }
 
-const stubsCreated = createHashedExternalStubs(standaloneRoot);
-if (stubsCreated > 0) {
-  console.log(
-    `✅ Created ${stubsCreated} hashed-external stub(s) in standalone node_modules`
-  );
-}
+createHashedExternalStubs(standaloneRoot);
 
 const symlinkCount = countSymlinks(standaloneOutputRoot);
 
