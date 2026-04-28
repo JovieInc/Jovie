@@ -535,18 +535,14 @@ export function HomepageV2FinalCta() {
   return (
     <section
       data-testid='homepage-v2-final-cta'
-      className='homepage-story-final-cta relative isolate min-h-[clamp(30rem,42vw,35rem)] overflow-hidden border-t border-white/8 bg-black'
+      className='homepage-story-final-cta relative isolate overflow-hidden bg-black'
     >
       <div
         aria-hidden='true'
-        className='pointer-events-none absolute inset-0 z-[1]'
-        style={{
-          background:
-            'radial-gradient(55% 46% at 50% 100%, rgba(0,112,243,0.22) 0%, rgba(45,55,132,0.16) 34%, rgba(0,0,0,0) 72%)',
-        }}
+        className='homepage-final-cta-glow pointer-events-none absolute inset-0 z-[1]'
       />
       <svg
-        className='pointer-events-none absolute inset-x-0 bottom-0 z-[2] h-[clamp(18rem,38vw,28rem)] w-full'
+        className='homepage-final-cta-rays pointer-events-none absolute inset-x-0 bottom-0 z-[2] w-full'
         viewBox='0 0 1200 540'
         preserveAspectRatio='xMidYMax slice'
         aria-hidden='true'
@@ -612,7 +608,7 @@ export function HomepageV2FinalCta() {
         />
       </svg>
       <MarketingContainer width='page' className='relative z-10'>
-        <div className='mx-auto max-w-[680px] px-4 pt-[clamp(5.4rem,10vw,7.25rem)] text-center'>
+        <div className='homepage-final-cta-copy mx-auto'>
           <h2
             data-testid='homepage-v2-final-cta-heading'
             className='text-balance text-[clamp(2.1rem,3.9vw,3.25rem)] font-semibold leading-[0.98] tracking-[-0.052em] text-white'
@@ -623,7 +619,7 @@ export function HomepageV2FinalCta() {
           </h2>
           <Link
             href={APP_ROUTES.SIGNUP}
-            className='mt-6 inline-flex h-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.12] px-4 text-[12px] font-medium tracking-[-0.01em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur transition-colors hover:bg-white/[0.16] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
+            className='homepage-final-cta-action inline-flex h-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.12] px-4 text-[12px] font-medium tracking-[-0.01em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur transition-colors hover:bg-white/[0.16] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
             data-testid='homepage-v2-final-cta-primary'
           >
             {HOMEPAGE_V2_COPY.finalCta.primaryCtaLabel}

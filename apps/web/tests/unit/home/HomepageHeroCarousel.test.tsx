@@ -2,12 +2,15 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HomepageHeroMockupCarousel } from '@/components/homepage/HomepageHeroCarousel';
 
+const originalMatchMedia = window.matchMedia;
+
 function expectActiveShot(testId: string) {
   expect(screen.getByTestId(testId)).toHaveAttribute('data-active', 'true');
 }
 
 describe('HomepageHeroMockupCarousel', () => {
   afterEach(() => {
+    window.matchMedia = originalMatchMedia;
     vi.useRealTimers();
   });
 
@@ -71,5 +74,33 @@ describe('HomepageHeroMockupCarousel', () => {
       vi.advanceTimersByTime(2200);
     });
     expectActiveShot('homepage-hero-shot-profile-workspace');
+  });
+
+  it('does not hover-advance when reduced motion is enabled', () => {
+    window.matchMedia = vi.fn().mockImplementation(query => ({
+      matches: query === '(prefers-reduced-motion: reduce)',
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+
+    vi.useFakeTimers();
+    render(<HomepageHeroMockupCarousel />);
+
+    const nextButton = screen.getByRole('button', {
+      name: 'Go to next slide',
+    });
+
+    fireEvent.mouseEnter(nextButton);
+
+    act(() => {
+      vi.advanceTimersByTime(2200);
+    });
+
+    expectActiveShot('homepage-hero-shot-releases-dashboard');
   });
 });

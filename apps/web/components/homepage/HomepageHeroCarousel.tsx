@@ -158,7 +158,7 @@ export function HomepageHeroMockupCarousel() {
   }, [advance, hoverDirection, prefersReducedMotion]);
 
   const handleHoverStart = (direction: CarouselDirection) => {
-    if (suppressHoverUntilLeaveRef.current) {
+    if (prefersReducedMotion || suppressHoverUntilLeaveRef.current) {
       return;
     }
 

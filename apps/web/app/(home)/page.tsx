@@ -196,7 +196,7 @@ export default function HomePage() {
             <div className='homepage-hero-shell__grid' />
           </div>
 
-          <div className='relative z-[3] mx-auto flex w-full max-w-none min-w-0 flex-1 flex-col items-center justify-start px-5 pb-0 pt-[calc(var(--linear-header-height)+5.8rem)] sm:px-8 sm:pt-[calc(var(--linear-header-height)+6.4rem)] lg:px-12 lg:pt-[calc(var(--linear-header-height)+7rem)]'>
+          <div className='homepage-hero-inner relative z-[3] mx-auto flex w-full max-w-none min-w-0 flex-1 flex-col items-center justify-start'>
             <div className='homepage-hero-copy w-full min-w-0'>
               <h1
                 id='home-hero-heading'
@@ -204,7 +204,7 @@ export default function HomePage() {
               >
                 {HERO_COPY.headline}
               </h1>
-              <p className='homepage-hero-subhead mt-6 max-w-[680px] self-center text-center text-[17px] leading-[1.58] tracking-[-0.015em] text-white/68 sm:text-[18px]'>
+              <p className='homepage-hero-subhead self-center text-center text-white/68'>
                 {HERO_COPY.subhead}
               </p>
               <HomepageHeroActions />
