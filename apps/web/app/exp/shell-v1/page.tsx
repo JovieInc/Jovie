@@ -115,6 +115,7 @@ import {
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { ChatInput } from '@/components/jovie/components/ChatInput';
 import { ChatMarkdown } from '@/components/jovie/components/ChatMarkdown';
+import { ActionPill } from '@/components/shell/ActionPill';
 import { ActivityHoverRow } from '@/components/shell/ActivityHoverRow';
 import { AgentPulse } from '@/components/shell/AgentPulse';
 import { ArtworkThumb } from '@/components/shell/ArtworkThumb';
@@ -3729,26 +3730,17 @@ function Header({
   );
 }
 
-// Primary per-view action button. Cyan-300 fill matches the brand accent
-// without the saturated emerald that read as system-y. Drops to nothing
-// for views that don't have a primary action (lyrics, demo, settings).
+// Primary per-view action button. Drops to nothing for views that don't
+// have a primary action (lyrics, demo, settings).
 function PageAction({ view }: { view: CanvasView }) {
   const action = pageActionForView(view);
   if (!action) return null;
-  // White tone by default. Cyan was overpowering — primary actions
-  // shouldn't compete with the brand mark or status badges. White on
-  // dark stays the visual anchor without screaming.
   return (
-    <button
-      type='button'
+    <ActionPill
+      label={action.label}
+      icon={action.icon}
       onClick={action.onClick}
-      className='inline-flex items-center gap-1.5 h-7 px-3.5 rounded-full bg-white text-black text-[12px] font-medium hover:bg-white/90 transition-colors duration-150 ease-out'
-    >
-      {action.icon ? (
-        <action.icon className='h-3.5 w-3.5' strokeWidth={2.5} />
-      ) : null}
-      {action.label}
-    </button>
+    />
   );
 }
 
