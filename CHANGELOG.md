@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.187] - 2026-04-28
+
+> Quiet console fix: avatars and other small images stop triggering Next.js's "placeholder='blur' on image smaller than 40x40" warning on every authenticated page. Plus an expanded Claude Code permission allowlist so QA-typical commands stop prompting.
+
+### Fixed
+
+- **`OptimizedImage` no longer ships a blur placeholder for renders below 40x40.** Next.js Image warns whenever `placeholder='blur'` is set on an image rendered smaller than 40x40 because the blur overhead is wasteful at that size. The component defaulted to `'blur'` and renders avatars as small as `size='sm'` (32x32, used in workspace menu and sidebar profile button), so the warning fired on every authenticated page. New `effectivePlaceholder` memo downgrades to `'empty'` when the rendered dimension is below 40px and the caller didn't ask for empty. `fill` mode keeps the original placeholder since rendered size is unknown at build time. Existing 9 unit tests pass unchanged. (ISSUE-001 from the QA golden-path sweep.)
+
+### Changed
+
+- **`.claude/settings.json` allowlist expanded** from `/sync-permissions` and `/fewer-permission-prompts`. Adds `mcp__linear-server__*` (allow), `pnpm exec grep *` and `~/.claude/skills/gstack/browse/dist/browse *` (bash.allow), and `GIT_EDITOR=* git *` (bash.prompt). Reduces redundant permission prompts during interactive sessions.
+
 ## [26.4.185] - 2026-04-28
 
 > DevToolbar override badge no longer lies about orphans. Override entries in
