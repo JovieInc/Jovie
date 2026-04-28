@@ -44,6 +44,7 @@ export const APP_FLAG_DEFAULTS = {
   ALBUM_ART_GENERATION: true,
   CHAT_JANK_MONITOR: false,
   RELEASE_PLAN_DEMO: false,
+  SHELL_CHAT_V1: false,
 } as const;
 
 export type AppFlagName = keyof typeof APP_FLAG_DEFAULTS;
@@ -69,6 +70,7 @@ export const APP_FLAG_KEYS = {
   ALBUM_ART_GENERATION: 'album_art_generation',
   CHAT_JANK_MONITOR: 'chat_jank_monitor',
   RELEASE_PLAN_DEMO: 'release_plan_demo',
+  SHELL_CHAT_V1: 'shell_chat_v1',
 } as const satisfies Record<AppFlagName, string>;
 
 export const APP_FLAG_OVERRIDE_KEYS = {
@@ -91,6 +93,7 @@ export const APP_FLAG_OVERRIDE_KEYS = {
   ALBUM_ART_GENERATION: 'code:ALBUM_ART_GENERATION',
   CHAT_JANK_MONITOR: 'code:CHAT_JANK_MONITOR',
   RELEASE_PLAN_DEMO: 'code:RELEASE_PLAN_DEMO',
+  SHELL_CHAT_V1: 'code:SHELL_CHAT_V1',
 } as const satisfies Record<AppFlagName, string>;
 
 export const APP_FLAG_TO_STATSIG_GATE = {
@@ -131,4 +134,5 @@ export const APP_FLAG_DESCRIPTIONS = {
   CHAT_JANK_MONITOR:
     'Chat jank instrumentation (message continuity + streaming)',
   RELEASE_PLAN_DEMO: 'Release plan demo page (YC wedge)',
+  SHELL_CHAT_V1: 'New Design',
 } as const satisfies Record<AppFlagName, string>;

@@ -86,44 +86,30 @@ function getHeroMockupSizes(kind: HeroMockupKind): string {
   return '(min-width: 1024px) 44rem, 86vw';
 }
 
-function getWrappedIndex(index: number): number {
-  return (
-    (index + HERO_MOCKUP_SCREENSHOTS.length) % HERO_MOCKUP_SCREENSHOTS.length
-  );
+function getWrappedDesktopIndex(index: number): number {
+  const desktopCount = HERO_MOCKUP_SCREENSHOTS.filter(
+    s => s.kind === 'desktop'
+  ).length;
+  return (index + desktopCount) % desktopCount;
 }
 
-function getOffset(index: number, activeIndex: number): number {
-  let offset = index - activeIndex;
-  const midpoint = Math.floor(HERO_MOCKUP_SCREENSHOTS.length / 2);
-
-  if (offset > midpoint) {
-    offset -= HERO_MOCKUP_SCREENSHOTS.length;
-  }
-
-  if (offset < -midpoint) {
-    offset += HERO_MOCKUP_SCREENSHOTS.length;
-  }
-
-  return offset;
-}
-
-function getSlideStyle(offset: number): CSSProperties {
-  const distance = Math.abs(offset);
-  const isVisible = distance <= 2;
-
+function getDesktopSlideStyle(isActive: boolean): CSSProperties {
   return {
-    '--carousel-offset': offset,
-    '--carousel-opacity': isVisible
-      ? distance === 0
-        ? 1
-        : distance === 1
-          ? 1
-          : 0.4
-      : 0,
-    '--carousel-scale': distance <= 1 ? 1 : 0.96,
-    '--carousel-blur':
-      distance === 0 ? '0px' : distance === 1 ? '0.1px' : '1px',
-    '--carousel-z': HERO_MOCKUP_SCREENSHOTS.length - distance,
+    '--carousel-offset': isActive ? 0 : 0,
+    '--carousel-opacity': isActive ? 1 : 0,
+    '--carousel-scale': 1,
+    '--carousel-blur': '0px',
+    '--carousel-z': isActive ? 5 : 0,
+  } as CSSProperties;
+}
+
+function getPhoneSlideStyle(): CSSProperties {
+  return {
+    '--carousel-offset': 0,
+    '--carousel-opacity': 1,
+    '--carousel-scale': 1,
+    '--carousel-blur': '0px',
+    '--carousel-z': 4,
   } as CSSProperties;
 }
 
@@ -133,10 +119,15 @@ export function HomepageHeroMockupCarousel() {
     useState<CarouselDirection | null>(null);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const suppressHoverUntilLeaveRef = useRef(false);
-  const activeShot = HERO_MOCKUP_SCREENSHOTS[activeIndex];
+  const desktopShots = HERO_MOCKUP_SCREENSHOTS.filter(
+    s => s.kind === 'desktop'
+  );
+  const activeShot = desktopShots[activeIndex] ?? desktopShots[0];
 
   const advance = useCallback((direction: CarouselDirection) => {
-    setActiveIndex(currentIndex => getWrappedIndex(currentIndex + direction));
+    setActiveIndex(currentIndex =>
+      getWrappedDesktopIndex(currentIndex + direction)
+    );
   }, []);
 
   useEffect(() => {
@@ -200,35 +191,58 @@ export function HomepageHeroMockupCarousel() {
           className='homepage-hero-carousel__stage'
           data-active-shot={activeShot.id}
         >
-          {HERO_MOCKUP_SCREENSHOTS.map((shot, index) => {
-            const offset = getOffset(index, activeIndex);
-            const isActive = offset === 0;
-
-            return (
-              <figure
-                aria-hidden={!isActive}
-                className={`homepage-hero-mockup homepage-hero-mockup--${shot.kind}`}
-                data-active={isActive ? 'true' : 'false'}
-                data-testid={`homepage-hero-shot-${shot.id}`}
-                key={shot.id}
-                style={getSlideStyle(offset)}
-              >
-                <div className='homepage-hero-mockup__frame'>
-                  <Image
-                    src={shot.src}
-                    alt={isActive ? shot.alt : ''}
-                    width={shot.width}
-                    height={shot.height}
-                    priority={shot.priority}
-                    quality={85}
-                    sizes={getHeroMockupSizes(shot.kind)}
-                    unoptimized
-                    className='homepage-hero-mockup__image'
-                  />
-                </div>
-              </figure>
-            );
-          })}
+          {HERO_MOCKUP_SCREENSHOTS.filter(s => s.kind === 'desktop').map(
+            shot => {
+              const isActive = shot.id === activeShot.id;
+              return (
+                <figure
+                  aria-hidden={!isActive}
+                  className='homepage-hero-mockup homepage-hero-mockup--desktop'
+                  data-active={isActive ? 'true' : 'false'}
+                  data-testid={`homepage-hero-shot-${shot.id}`}
+                  key={shot.id}
+                  style={getDesktopSlideStyle(isActive)}
+                >
+                  <div className='homepage-hero-mockup__frame'>
+                    <Image
+                      src={shot.src}
+                      alt={isActive ? shot.alt : ''}
+                      width={shot.width}
+                      height={shot.height}
+                      priority={shot.priority}
+                      quality={85}
+                      sizes={getHeroMockupSizes(shot.kind)}
+                      unoptimized
+                      className='homepage-hero-mockup__image'
+                    />
+                  </div>
+                </figure>
+              );
+            }
+          )}
+          {HERO_MOCKUP_SCREENSHOTS.filter(s => s.kind === 'phone').map(shot => (
+            <figure
+              className='homepage-hero-mockup homepage-hero-mockup--phone'
+              data-active='true'
+              data-testid={`homepage-hero-shot-${shot.id}`}
+              key={shot.id}
+              style={getPhoneSlideStyle()}
+            >
+              <div className='homepage-hero-mockup__frame'>
+                <Image
+                  src={shot.src}
+                  alt={shot.alt}
+                  width={shot.width}
+                  height={shot.height}
+                  priority={false}
+                  quality={85}
+                  sizes={getHeroMockupSizes(shot.kind)}
+                  unoptimized
+                  className='homepage-hero-mockup__image'
+                />
+              </div>
+            </figure>
+          ))}
         </div>
         <button
           type='button'

@@ -63,10 +63,8 @@ export function HomeTrustSection({
       >
         <p
           className={cn(
-            isInlineStrip
-              ? 'sr-only'
-              : 'text-center text-[12px] font-medium tracking-[0.02em] text-white/48',
-            !isInlineStrip && labelMarginClass
+            'text-center text-[12px] font-medium tracking-[0.02em] text-white/48',
+            labelMarginClass
           )}
         >
           {label}

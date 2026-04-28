@@ -218,7 +218,7 @@ export default function HomePage() {
       </section>
       <div className='homepage-trust-section'>
         <HomeTrustSection
-          label='Trusted by leading independent labels'
+          label='Trusted by artists on'
           presentation='inline-strip'
         />
       </div>
