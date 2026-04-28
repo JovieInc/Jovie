@@ -396,7 +396,11 @@ describe('DevToolbar', () => {
       });
     });
 
-    it('flips an existing SHELL_CHAT_V1 override back off', () => {
+    it('clears the SHELL_CHAT_V1 override when toggled back to the server default', () => {
+      // Server default for SHELL_CHAT_V1 is false. When the user has an
+      // override of `true` and toggles back, the result (false) matches
+      // the server default, so we remove the override entirely instead of
+      // recording a no-op `false` value. Keeps the override count honest.
       setLocalOverrides({ 'code:SHELL_CHAT_V1': true });
       renderToolbar();
 
@@ -407,9 +411,21 @@ describe('DevToolbar', () => {
 
       expect(
         JSON.parse(localStorage.getItem(FF_OVERRIDES_KEY) ?? '{}')
-      ).toEqual({
-        'code:SHELL_CHAT_V1': false,
-      });
+      ).toEqual({});
+    });
+
+    it('drops the override badge when SHELL_CHAT_V1 is toggled back to default', () => {
+      // Companion to the test above: the user-meaningful override count
+      // returns to zero when an override is cleared, so the collapsed
+      // badge should disappear (no "0 overrides" pill flicker).
+      setLocalOverrides({ 'code:SHELL_CHAT_V1': true });
+      renderToolbar();
+
+      expect(screen.getByText('1 override')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('switch', { name: /New Design/ }));
+
+      expect(screen.queryByText(/override/)).not.toBeInTheDocument();
     });
 
     it('updates the collapsed override badge after toggling', () => {
@@ -532,20 +548,27 @@ describe('DevToolbar', () => {
   // ─── Toggle Flash Feedback ─────────────────────────────────
 
   describe('toggle flash feedback', () => {
-    it('applies flash class when an already-overridden flag is toggled', () => {
-      setLocalOverrides({ 'code:CLAIM_HANDLE': true });
+    it('applies flash class when a non-override flag toggle creates a new override', () => {
+      // Toggling a flag that matches the server default to its non-default
+      // value creates a meaningful override. The new row in the Overrides
+      // section briefly flashes for visual confirmation. (When a flag is
+      // toggled BACK to the server default the row is removed instead —
+      // see auto-clear tests above; the row going away IS the feedback.)
       localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
       renderToolbar();
 
-      // Find the switch in the overrides section (already overridden flag)
+      // CLAIM_HANDLE server default is false. Click the row in the
+      // non-overrides list to toggle it to true (creates an override).
       const flagLabel = screen.getByText('claim handle');
       const row = flagLabel.closest('[class*="rounded-sm"]');
       const flagSwitch = row?.querySelector('[role="switch"]');
       expect(flagSwitch).toBeTruthy();
       fireEvent.click(flagSwitch as Element);
 
-      // The parent row should have the flash background class
-      expect(row?.className).toContain('bg-[var(--color-accent)]/10');
+      // The flag now lives in the Overrides section — find its new row.
+      const newLabel = screen.getByText('claim handle');
+      const newRow = newLabel.closest('[class*="rounded-sm"]');
+      expect(newRow?.className).toContain('bg-[var(--color-accent)]/10');
     });
   });
 
