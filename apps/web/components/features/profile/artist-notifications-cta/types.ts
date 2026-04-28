@@ -28,6 +28,7 @@ export interface ArtistNotificationsCTAProps {
   readonly hideListenFallback?: boolean;
   readonly hideTrigger?: boolean;
   readonly onFlowClosed?: () => void;
+  readonly onSubscriptionActivated?: () => void;
   /**
    * Analytics source identifier for tracking where subscriptions originate.
    * Defaults to 'profile_inline'. Tour drawer passes 'tour_drawer'.

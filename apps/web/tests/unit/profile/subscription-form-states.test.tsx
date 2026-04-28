@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Artist } from '@/types/db';
 
 const mockUseProfileNotifications = vi.fn();
@@ -9,6 +9,8 @@ const mockUseSubscriptionForm = vi.fn();
 const mockUpdateSubscriberNameMutation = vi.fn();
 const mockUpdateSubscriberBirthdayMutation = vi.fn();
 const mockUpdateContentPreferencesMutation = vi.fn();
+
+let ArtistNotificationsCTA: typeof import('@/features/profile/artist-notifications-cta/ArtistNotificationsCTA').ArtistNotificationsCTA;
 
 vi.mock(
   '@/components/organisms/profile-shell/ProfileNotificationsContext',
@@ -62,10 +64,9 @@ vi.mock('@/lib/queries/useNotificationStatusQuery', () => ({
   useUpdateSubscriberNameMutation: () => mockUpdateSubscriberNameMutation(),
 }));
 
-vi.mock('motion/react', async importOriginal => {
-  const actual = await importOriginal<typeof import('motion/react')>();
+vi.mock('motion/react', async () => {
+  await import('react');
   return {
-    ...actual,
     AnimatePresence: ({ children }: { readonly children: React.ReactNode }) => (
       <>{children}</>
     ),
@@ -133,13 +134,16 @@ function buildFormState(overrides: Record<string, unknown> = {}) {
 }
 
 async function renderCTA(props: Record<string, unknown> = {}) {
-  const { ArtistNotificationsCTA } = await import(
-    '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA'
-  );
   return render(<ArtistNotificationsCTA artist={artist} autoOpen {...props} />);
 }
 
 describe('ArtistNotificationsCTA full-screen alert flow states', () => {
+  beforeAll(async () => {
+    ({ ArtistNotificationsCTA } = await import(
+      '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA'
+    ));
+  }, 30_000);
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockUseProfileNotifications.mockReturnValue(buildProfileNotifications());
@@ -180,17 +184,18 @@ describe('ArtistNotificationsCTA full-screen alert flow states', () => {
     expect(screen.queryByText('Stay in the Loop')).not.toBeInTheDocument();
   });
 
-  it('opens directly to manage alerts with toggles off for unsubscribed fans', async () => {
+  it('opens directly to email entry for unsubscribed fans', async () => {
     await renderCTA();
 
-    expect(await screen.findByText('Alerts')).toBeInTheDocument();
-    expect(screen.getByText('Sent from Jovie')).toBeInTheDocument();
-    expect(screen.getByRole('switch', { name: 'New Music' })).not.toBeChecked();
-    expect(screen.getByRole('switch', { name: 'Shows' })).not.toBeChecked();
-    expect(screen.getByRole('switch', { name: 'Merch' })).not.toBeChecked();
+    expect(await screen.findByText('Enter your email')).toBeInTheDocument();
+    expect(screen.getByTestId('mobile-email-input')).toHaveAttribute(
+      'type',
+      'email'
+    );
+    expect(screen.queryByText('Sent from Jovie')).not.toBeInTheDocument();
   });
 
-  it('prompts for email only after an unsubscribed fan toggles an alert', async () => {
+  it('moves from email entry to OTP for unsubscribed fans', async () => {
     const handleSubscribe = vi.fn().mockResolvedValue('pending_confirmation');
     mockUseSubscriptionForm.mockReturnValue(
       buildFormState({
@@ -202,13 +207,7 @@ describe('ArtistNotificationsCTA full-screen alert flow states', () => {
     await renderCTA();
 
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('switch', { name: 'New Music' }));
-
-    expect(await screen.findByText('Enter your email')).toBeInTheDocument();
-    expect(screen.getByTestId('mobile-email-input')).toHaveAttribute(
-      'type',
-      'email'
-    );
+    await screen.findByText('Enter your email');
 
     await user.click(screen.getByRole('button', { name: 'Continue' }));
 
@@ -224,9 +223,6 @@ describe('ArtistNotificationsCTA full-screen alert flow states', () => {
     );
 
     await renderCTA();
-
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole('switch', { name: 'New Music' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Please enter a valid email address'
@@ -248,7 +244,7 @@ describe('ArtistNotificationsCTA full-screen alert flow states', () => {
     await renderCTA();
 
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('switch', { name: 'New Music' }));
+    await screen.findByText('Enter your email');
     await user.click(screen.getByRole('button', { name: 'Continue' }));
     await screen.findByText('Enter the code');
     await user.click(screen.getByRole('button', { name: 'Verify' }));

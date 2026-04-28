@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProfileNotificationsContextValue } from '@/components/organisms/profile-shell/types';
 import type { Artist } from '@/types/db';
 
@@ -10,6 +10,8 @@ const mockUseUserSafe = vi.fn();
 const mockUpdateSubscriberBirthdayMutation = vi.fn();
 const mockUpdateSubscriberNameMutation = vi.fn();
 const mockUpdateContentPreferencesMutation = vi.fn();
+
+let ProfileInlineNotificationsCTA: typeof import('@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA').ProfileInlineNotificationsCTA;
 
 vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
@@ -137,6 +139,12 @@ function buildFormState(overrides: Record<string, unknown> = {}) {
 }
 
 describe('ProfileInlineNotificationsCTA flow', () => {
+  beforeAll(async () => {
+    ({ ProfileInlineNotificationsCTA } = await import(
+      '@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA'
+    ));
+  }, 30_000);
+
   beforeEach(() => {
     vi.clearAllMocks();
     document.body.innerHTML = '';
@@ -158,7 +166,7 @@ describe('ProfileInlineNotificationsCTA flow', () => {
     });
   });
 
-  it('prefills the email step from Clerk once the flow reaches email entry', async () => {
+  it('prefills the email step from Clerk when the flow opens', async () => {
     const handleEmailChange = vi.fn();
     mockUseUserSafe.mockReturnValue({
       user: { primaryEmailAddress: { emailAddress: 'clerk@example.com' } },
@@ -170,19 +178,12 @@ describe('ProfileInlineNotificationsCTA flow', () => {
       })
     );
 
-    const { ProfileInlineNotificationsCTA } = await import(
-      '@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA'
-    );
-
     render(<ProfileInlineNotificationsCTA artist={makeArtist()} />);
 
     fireEvent.click(screen.getByRole('button', { name: /turn on alerts/i }));
-    fireEvent.click(await screen.findByRole('switch', { name: /new music/i }));
 
-    expect(await screen.findByTestId('mobile-email-input')).toBeInTheDocument();
-    await waitFor(() => {
-      expect(handleEmailChange).toHaveBeenCalledWith('clerk@example.com');
-    });
+    expect(screen.getByTestId('mobile-email-input')).toBeInTheDocument();
+    expect(handleEmailChange).toHaveBeenCalledWith('clerk@example.com');
   });
 
   it('moves from email entry into OTP when subscribe returns pending confirmation', async () => {
@@ -193,14 +194,9 @@ describe('ProfileInlineNotificationsCTA flow', () => {
       })
     );
 
-    const { ProfileInlineNotificationsCTA } = await import(
-      '@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA'
-    );
-
     render(<ProfileInlineNotificationsCTA artist={makeArtist()} />);
 
     fireEvent.click(screen.getByRole('button', { name: /turn on alerts/i }));
-    fireEvent.click(await screen.findByRole('switch', { name: /new music/i }));
     fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
 
     await waitFor(() => {
@@ -209,12 +205,8 @@ describe('ProfileInlineNotificationsCTA flow', () => {
     expect(await screen.findByText('Enter the code')).toBeInTheDocument();
   });
 
-  it('does not reset inline auto-open flow back to the initial alerts screen on rerender', async () => {
+  it('does not reset inline auto-open flow back to email on rerender', async () => {
     mockUseSubscriptionForm.mockReturnValue(buildFormState());
-
-    const { ProfileInlineNotificationsCTA } = await import(
-      '@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA'
-    );
 
     const view = render(
       <ProfileInlineNotificationsCTA
@@ -223,8 +215,6 @@ describe('ProfileInlineNotificationsCTA flow', () => {
       />
     );
 
-    expect(await screen.findByText('Alerts')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('switch', { name: /new music/i }));
     expect(await screen.findByTestId('mobile-email-input')).toBeInTheDocument();
 
     mockUseSubscriptionForm.mockReturnValue({
@@ -241,10 +231,10 @@ describe('ProfileInlineNotificationsCTA flow', () => {
     );
 
     expect(await screen.findByTestId('mobile-email-input')).toBeInTheDocument();
-    expect(screen.queryByText('Alerts')).not.toBeInTheDocument();
+    expect(screen.queryByText('Sent from Jovie')).not.toBeInTheDocument();
   });
 
-  it('progresses from OTP through name and birthday into the Alerts screen', async () => {
+  it('progresses from OTP through name and birthday into activated state', async () => {
     const handleSubscribe = vi.fn().mockResolvedValue('pending_confirmation');
     const handleVerifyOtp = vi.fn().mockResolvedValue('subscribed');
 
@@ -256,18 +246,14 @@ describe('ProfileInlineNotificationsCTA flow', () => {
       })
     );
 
-    const { ProfileInlineNotificationsCTA } = await import(
-      '@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA'
-    );
-
     render(<ProfileInlineNotificationsCTA artist={makeArtist()} />);
 
     fireEvent.click(screen.getByRole('button', { name: /turn on alerts/i }));
-    fireEvent.click(await screen.findByRole('switch', { name: /new music/i }));
     fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
     fireEvent.click(await screen.findByRole('button', { name: /^verify$/i }));
 
     expect(await screen.findByTestId('mobile-name-input')).toBeInTheDocument();
+    expect(screen.getByText('Alerts activated')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
     expect(
@@ -281,9 +267,9 @@ describe('ProfileInlineNotificationsCTA flow', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
 
-    expect(await screen.findByText('Alerts')).toBeInTheDocument();
-    expect(screen.getByText('Sent from Jovie')).toBeInTheDocument();
-    expect(screen.getByText('Sent by Test Artist')).toBeInTheDocument();
+    expect(await screen.findByText('Back to Profile')).toBeInTheDocument();
+    expect(screen.queryByText('Sent from Jovie')).not.toBeInTheDocument();
+    expect(screen.queryByText('Sent by Test Artist')).not.toBeInTheDocument();
   });
 
   it('renders nothing while notification hydration is checking', async () => {
@@ -291,10 +277,6 @@ describe('ProfileInlineNotificationsCTA flow', () => {
       buildFormState({
         hydrationStatus: 'checking',
       })
-    );
-
-    const { ProfileInlineNotificationsCTA } = await import(
-      '@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA'
     );
 
     const { container } = render(

@@ -230,6 +230,7 @@ export function ProfileCompactSurface({
 }: Readonly<ProfileCompactSurfaceProps>) {
   const [notificationsPortalContainer, setNotificationsPortalContainer] =
     useState<HTMLDivElement | null>(null);
+  const [showRecentActivationRow, setShowRecentActivationRow] = useState(false);
   const notificationsRevealRef = useRef<(() => void) | null>(null);
   const mergedDSPs = useMemo(
     () =>
@@ -322,6 +323,12 @@ export function ProfileCompactSurface({
     },
     [onRegisterReveal]
   );
+  const handleSubscriptionActivated = useCallback(() => {
+    setShowRecentActivationRow(true);
+  }, []);
+  const returnToProfileAfterNotifications = useCallback(() => {
+    onModeSelect('profile');
+  }, [onModeSelect]);
   const openNotifications = useCallback(() => {
     onModeSelect('subscribe');
     const reveal = notificationsRevealRef.current;
@@ -331,6 +338,7 @@ export function ProfileCompactSurface({
     }
     onRevealNotifications?.();
   }, [onModeSelect, onRevealNotifications]);
+  const showHeroAlertsRow = !isSubscribed || showRecentActivationRow;
 
   return (
     <div
@@ -496,42 +504,46 @@ export function ProfileCompactSurface({
                     portalContainer={notificationsPortalContainer}
                     variant='hero'
                     hideTrigger
+                    onFlowClosed={returnToProfileAfterNotifications}
+                    onSubscriptionActivated={handleSubscriptionActivated}
                   />
                 ) : null}
 
-                <button
-                  type='button'
-                  onClick={openNotifications}
-                  disabled={renderMode !== 'interactive'}
-                  className='flex min-h-[52px] w-full items-center gap-2.5 rounded-[18px] border border-white/10 bg-black/22 px-3.5 text-left text-white shadow-[0_12px_30px_rgba(0,0,0,0.22)] backdrop-blur-2xl transition-[background-color,border-color] duration-200 hover:bg-black/30 disabled:cursor-default disabled:hover:bg-black/22'
-                  data-testid='profile-hero-alerts-row'
-                >
-                  <span
-                    className='flex h-7 w-7 shrink-0 items-center justify-center text-white'
-                    aria-hidden='true'
-                  >
-                    <Bell className='h-4 w-4' />
-                  </span>
-                  <span className='min-w-0 flex-1 truncate text-[14px] font-semibold leading-5 tracking-[-0.025em]'>
-                    {isSubscribed ? 'Alerts On' : 'Alerts Off'}
-                  </span>
-                  <span
-                    className={cn(
-                      'relative h-7 w-11 shrink-0 rounded-full border p-0.5 transition-colors duration-200',
-                      isSubscribed
-                        ? 'border-white/38 bg-white/26'
-                        : 'border-white/20 bg-white/8'
-                    )}
-                    aria-hidden='true'
+                {showHeroAlertsRow ? (
+                  <button
+                    type='button'
+                    onClick={openNotifications}
+                    disabled={renderMode !== 'interactive'}
+                    className='flex min-h-[52px] w-full items-center gap-2.5 rounded-[18px] border border-white/10 bg-black/22 px-3.5 text-left text-white shadow-[0_12px_30px_rgba(0,0,0,0.22)] backdrop-blur-2xl transition-[background-color,border-color] duration-200 hover:bg-black/30 disabled:cursor-default disabled:hover:bg-black/22'
+                    data-testid='profile-hero-alerts-row'
                   >
                     <span
+                      className='flex h-7 w-7 shrink-0 items-center justify-center text-white'
+                      aria-hidden='true'
+                    >
+                      <Bell className='h-4 w-4' />
+                    </span>
+                    <span className='min-w-0 flex-1 truncate text-[14px] font-semibold leading-5 tracking-[-0.025em]'>
+                      {isSubscribed ? 'Alerts On' : 'Alerts Off'}
+                    </span>
+                    <span
                       className={cn(
-                        'block h-6 w-6 rounded-full bg-white shadow-[0_7px_18px_rgba(0,0,0,0.22)] transition-transform duration-200',
-                        isSubscribed && 'translate-x-4'
+                        'relative h-7 w-11 shrink-0 rounded-full border p-0.5 transition-colors duration-200',
+                        isSubscribed
+                          ? 'border-white/38 bg-white/26'
+                          : 'border-white/20 bg-white/8'
                       )}
-                    />
-                  </span>
-                </button>
+                      aria-hidden='true'
+                    >
+                      <span
+                        className={cn(
+                          'block h-6 w-6 rounded-full bg-white shadow-[0_7px_18px_rgba(0,0,0,0.22)] transition-transform duration-200',
+                          isSubscribed && 'translate-x-4'
+                        )}
+                      />
+                    </span>
+                  </button>
+                ) : null}
               </div>
             </div>
           </div>
@@ -585,6 +597,8 @@ export function ProfileCompactSurface({
                 tourDates={tourDates}
                 releases={releases}
                 previewNotificationsState={previewNotificationsState}
+                onFlowClosed={returnToProfileAfterNotifications}
+                onSubscriptionActivated={handleSubscriptionActivated}
               />
             )}
           </div>

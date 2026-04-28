@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Artist } from '@/types/db';
 
 const mockUseProfileNotifications = vi.fn();
@@ -9,6 +9,8 @@ const mockUseSubscriptionForm = vi.fn();
 const mockUpdateSubscriberNameMutation = vi.fn();
 const mockUpdateSubscriberBirthdayMutation = vi.fn();
 const mockUpdateContentPreferencesMutation = vi.fn();
+
+let ArtistNotificationsCTA: typeof import('@/features/profile/artist-notifications-cta/ArtistNotificationsCTA').ArtistNotificationsCTA;
 
 vi.mock(
   '@/components/organisms/profile-shell/ProfileNotificationsContext',
@@ -62,10 +64,9 @@ vi.mock('@/lib/queries/useNotificationStatusQuery', () => ({
   useUpdateSubscriberNameMutation: () => mockUpdateSubscriberNameMutation(),
 }));
 
-vi.mock('motion/react', async importOriginal => {
-  const actual = await importOriginal<typeof import('motion/react')>();
+vi.mock('motion/react', async () => {
+  await import('react');
   return {
-    ...actual,
     AnimatePresence: ({ children }: { readonly children: React.ReactNode }) => (
       <>{children}</>
     ),
@@ -133,13 +134,16 @@ function buildFormState(overrides: Record<string, unknown> = {}) {
 }
 
 async function renderCTA(props: Record<string, unknown> = {}) {
-  const { ArtistNotificationsCTA } = await import(
-    '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA'
-  );
   return render(<ArtistNotificationsCTA artist={artist} autoOpen {...props} />);
 }
 
 describe('ArtistNotificationsCTA SMS manage flow', () => {
+  beforeAll(async () => {
+    ({ ArtistNotificationsCTA } = await import(
+      '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA'
+    ));
+  }, 30_000);
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockUseProfileNotifications.mockReturnValue(buildProfileNotifications());
@@ -161,7 +165,7 @@ describe('ArtistNotificationsCTA SMS manage flow', () => {
   it('removes the retired inline phone composer from the auto-open flow', async () => {
     await renderCTA();
 
-    expect(await screen.findByText('Alerts')).toBeInTheDocument();
+    expect(await screen.findByText('Enter your email')).toBeInTheDocument();
     expect(screen.queryByTestId('country-selector')).not.toBeInTheDocument();
     expect(screen.queryByText('Stay in the Loop')).not.toBeInTheDocument();
   });
