@@ -7,12 +7,11 @@ describe('ProfileHomeRail', () => {
       buildProfileRailCards({
         latestReleaseVisible: true,
         hasUpcomingTourDates: true,
-        hasAlertsCard: true,
         hasPlaylistFallback: true,
         hasListenFallback: true,
         featuredKind: 'tour_next',
       }).map(card => card.kind)
-    ).toEqual(['tour', 'release', 'alerts']);
+    ).toEqual(['tour', 'release', 'playlist']);
   });
 
   it('dedupes the featured card kind and caps the rail at three cards', () => {
@@ -20,11 +19,10 @@ describe('ProfileHomeRail', () => {
       buildProfileRailCards({
         latestReleaseVisible: true,
         hasUpcomingTourDates: true,
-        hasAlertsCard: true,
         hasPlaylistFallback: true,
         hasListenFallback: true,
         featuredKind: 'release_live',
       }).map(card => card.kind)
-    ).toEqual(['release', 'tour', 'alerts']);
+    ).toEqual(['release', 'tour', 'playlist']);
   });
 });

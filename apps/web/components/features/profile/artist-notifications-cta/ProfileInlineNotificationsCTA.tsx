@@ -21,7 +21,7 @@ import {
 } from './ProfileMobileNotificationsFlow';
 import {
   noFontSynthesisStyle,
-  profileHeroMorphPillClassName,
+  profilePrimaryPillClassName,
   subscriptionPrimaryActionClassName,
   subscriptionPrimaryLinkClassName,
 } from './shared';
@@ -111,7 +111,7 @@ function getTriggerClassName(
   variant: ProfileInlineNotificationsCTAProps['variant']
 ) {
   if (variant === 'hero') {
-    return `${profileHeroMorphPillClassName} gap-2 px-5`;
+    return `${profilePrimaryPillClassName} gap-2 px-5`;
   }
 
   if (variant === 'link') {

@@ -1,11 +1,10 @@
 'use client';
 
-import { CheckCircle2, ChevronRight, Play } from 'lucide-react';
+import { Play } from 'lucide-react';
 import Link from 'next/link';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import type {
-  ProfilePreviewNotificationsState,
   ProfileRailCard,
   ProfileRenderMode,
 } from '@/features/profile/contracts';
@@ -35,11 +34,8 @@ interface ProfileHomeRailProps {
   readonly renderMode?: ProfileRenderMode;
   readonly previewActionLabel?: string;
   readonly onPlayClick?: () => void;
-  readonly onOpenAlerts?: () => void;
   readonly viewerLocation?: UserLocation | null;
   readonly resolveNearbyTour?: boolean;
-  readonly isSubscribed?: boolean;
-  readonly previewNotificationsState?: ProfilePreviewNotificationsState;
 }
 
 type FeaturedRailKind =
@@ -165,7 +161,6 @@ function getFeaturedRailCardKind(kind: FeaturedRailKind) {
 export function buildProfileRailCards(params: {
   latestReleaseVisible: boolean;
   hasUpcomingTourDates: boolean;
-  hasAlertsCard: boolean;
   hasPlaylistFallback: boolean;
   hasListenFallback: boolean;
   featuredKind: FeaturedRailKind;
@@ -192,9 +187,6 @@ export function buildProfileRailCards(params: {
   }
   if (params.hasUpcomingTourDates) {
     pushCard('tour');
-  }
-  if (params.hasAlertsCard) {
-    pushCard('alerts');
   }
   if (params.hasPlaylistFallback) {
     pushCard('playlist');
@@ -225,7 +217,7 @@ function RailCardShell({
 }>) {
   const sharedProps = {
     className: cn(
-      'group relative flex min-h-[208px] w-full overflow-hidden rounded-[32px] border border-white/10 bg-[#0d0f12] text-left shadow-[0_32px_72px_rgba(0,0,0,0.38)] transition-transform duration-200 hover:translate-y-[-1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
+      'group relative flex min-h-[286px] w-full overflow-hidden rounded-[30px] border border-white/12 bg-[#0d0f12] text-left shadow-[0_32px_72px_rgba(0,0,0,0.38)] transition-[background-color,border-color] duration-200 hover:border-white/18 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
       className
     ),
     'data-testid': dataTestId,
@@ -290,6 +282,7 @@ function ImageLedRailCard({
   title,
   subtitle,
   actionIcon,
+  actionLabel,
   dataState,
 }: Readonly<{
   dataTestId: string;
@@ -301,6 +294,7 @@ function ImageLedRailCard({
   title: string;
   subtitle: string;
   actionIcon: ReactNode;
+  actionLabel?: string;
   dataState?: string;
 }>) {
   return (
@@ -322,74 +316,24 @@ function ImageLedRailCard({
           fallbackClassName='bg-surface-2'
         />
       </div>
-      <div className='absolute inset-0 bg-[linear-gradient(180deg,rgba(4,5,6,0.08)_0%,rgba(4,5,6,0.18)_35%,rgba(4,5,6,0.82)_100%)]' />
-      <div className='absolute inset-0 bg-[linear-gradient(180deg,rgba(4,5,6,0.02)_0%,rgba(4,5,6,0.18)_28%,rgba(4,5,6,0.84)_100%)]' />
-      <div className='relative flex min-h-[208px] flex-col justify-between p-[18px]'>
+      <div className='absolute inset-0 bg-[linear-gradient(180deg,rgba(4,5,6,0.06)_0%,rgba(4,5,6,0.2)_38%,rgba(4,5,6,0.86)_100%)]' />
+      <div className='relative flex min-h-[286px] flex-col justify-between p-[22px]'>
         <LabelChip>{label}</LabelChip>
-        <div className='space-y-3.5'>
+        <div className='space-y-5'>
           <div className='space-y-1.5'>
-            <p className='max-w-[16ch] text-[18px] font-semibold leading-[1.02] tracking-[-0.05em] text-white'>
+            <p className='max-w-[15ch] text-[29px] font-semibold leading-[1.04] tracking-[-0.055em] text-white'>
               {title}
             </p>
-            <p className='text-[14px] leading-5 text-white/76'>{subtitle}</p>
+            <p className='text-[16px] leading-6 text-white/72'>{subtitle}</p>
           </div>
-          <CircleAction>{actionIcon}</CircleAction>
-        </div>
-      </div>
-    </RailCardShell>
-  );
-}
-
-function AlertsRailCard({
-  isSubscribed,
-  onOpenAlerts,
-  previewNotificationsState,
-}: Readonly<{
-  isSubscribed: boolean;
-  onOpenAlerts?: () => void;
-  previewNotificationsState?: ProfilePreviewNotificationsState;
-}>) {
-  const isAlertsOn =
-    isSubscribed || previewNotificationsState?.kind === 'status';
-  const title = isAlertsOn ? 'Alerts On' : 'Turn On Alerts';
-  const body = isAlertsOn
-    ? 'Manage music, show, and merch alert preferences.'
-    : 'Get new music and tour updates by text or email the moment they land.';
-  const label = isAlertsOn ? 'Alerts On' : 'Turn On Alerts';
-
-  return (
-    <RailCardShell
-      onClick={onOpenAlerts}
-      dataTestId='profile-home-rail-alerts'
-      dataState='alerts'
-      ariaLabel={label}
-      className='bg-[linear-gradient(180deg,rgba(26,28,33,0.96),rgba(12,13,17,0.98))]'
-    >
-      <div className='relative flex min-h-[208px] flex-col justify-between p-[18px]'>
-        <LabelChip>{isAlertsOn ? 'Alerts On' : 'Alerts'}</LabelChip>
-
-        <div className='space-y-3.5'>
-          <div className='space-y-1.5'>
-            <p className='max-w-[14ch] text-[18px] font-semibold leading-[1.04] tracking-[-0.05em] text-white'>
-              {title}
-            </p>
-            <p className='max-w-[22ch] text-[14px] leading-5 text-white/72'>
-              {body}
-            </p>
-          </div>
-
-          <div className='flex items-center justify-between'>
-            <span className='inline-flex items-center gap-2 text-sm font-semibold text-white/78'>
-              {label}
+          {actionLabel ? (
+            <span className='inline-flex h-14 items-center gap-3 rounded-[17px] bg-white px-6 text-[16px] font-semibold tracking-[-0.025em] text-black shadow-[0_18px_40px_rgba(0,0,0,0.32)]'>
+              {actionIcon}
+              {actionLabel}
             </span>
-            <CircleAction>
-              {isAlertsOn ? (
-                <CheckCircle2 className='h-5 w-5' />
-              ) : (
-                <ChevronRight className='h-5 w-5' />
-              )}
-            </CircleAction>
-          </div>
+          ) : (
+            <CircleAction>{actionIcon}</CircleAction>
+          )}
         </div>
       </div>
     </RailCardShell>
@@ -416,38 +360,38 @@ function TourRailCard({
       ariaLabel={`Open ${tourDate.venueName ?? 'tour details'}`}
       className='bg-[linear-gradient(180deg,rgba(26,28,33,0.96),rgba(12,13,17,0.98))]'
     >
-      <div className='relative flex min-h-[208px] flex-col justify-between p-[18px]'>
+      <div className='relative flex min-h-[286px] flex-col justify-between p-[22px]'>
         <LabelChip>
           {stateKind === 'tour_nearby' ? 'On Tour' : 'Upcoming Show'}
         </LabelChip>
 
         <div className='space-y-3.5'>
           <div className='flex items-end justify-between gap-4'>
-            <div className='flex items-end gap-4'>
+            <div className='flex min-w-0 items-end gap-4'>
               <div className='border-r border-white/12 pr-4'>
-                <p className='text-[12px] font-semibold tracking-[0.12em] text-white/46'>
+                <p className='text-[14px] font-medium text-white/54'>
                   {formatMonthLabel(tourDate.startDate)}
                 </p>
-                <p className='mt-1 text-[42px] font-semibold leading-none tracking-[-0.08em] text-white'>
+                <p className='mt-1 text-[46px] font-semibold leading-none tracking-[-0.08em] text-white'>
                   {formatDayLabel(tourDate.startDate)}
                 </p>
               </div>
-              <div className='space-y-1.5 pb-1'>
-                <p className='max-w-[10ch] text-[18px] font-semibold leading-[1.04] tracking-[-0.05em] text-white'>
+              <div className='min-w-0 space-y-1.5 pb-1'>
+                <p className='max-w-[11ch] text-[24px] font-semibold leading-[1.04] tracking-[-0.05em] text-white'>
                   {tourDate.venueName ?? 'Tour Date'}
                 </p>
-                <p className='text-[14px] leading-5 text-white/72'>
+                <p className='text-[15px] leading-5 text-white/72'>
                   {locationLabel}
                 </p>
               </div>
             </div>
 
-            <CircleAction>
-              <ChevronRight className='h-5 w-5' />
-            </CircleAction>
+            <span className='inline-flex h-12 shrink-0 items-center rounded-[15px] bg-white/10 px-5 text-[15px] font-semibold text-white shadow-[0_16px_34px_rgba(0,0,0,0.22)] backdrop-blur-xl'>
+              Tickets
+            </span>
           </div>
 
-          <p className='text-sm font-semibold text-white/54'>
+          <p className='text-[15px] font-medium text-white/54'>
             {stateKind === 'tour_nearby' ? 'Near You' : 'Next Show'}
           </p>
         </div>
@@ -465,11 +409,8 @@ export function ProfileHomeRail({
   hasPlayableDestinations,
   renderMode = 'interactive',
   onPlayClick,
-  onOpenAlerts,
   viewerLocation,
   resolveNearbyTour = true,
-  isSubscribed = false,
-  previewNotificationsState,
 }: Readonly<ProfileHomeRailProps>) {
   const railRef = useRef<HTMLDivElement | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -521,7 +462,6 @@ export function ProfileHomeRail({
       buildProfileRailCards({
         latestReleaseVisible: Boolean(releaseVisibility?.show && latestRelease),
         hasUpcomingTourDates: upcomingTourDates.length > 0,
-        hasAlertsCard: true,
         hasPlaylistFallback: Boolean(featuredPlaylistFallback),
         hasListenFallback: hasPlayableDestinations,
         featuredKind: featuredState.kind,
@@ -579,6 +519,9 @@ export function ProfileHomeRail({
 
   return (
     <div className={cn(isPreviewRail ? 'space-y-3' : 'space-y-4')}>
+      <p className='px-0.5 text-[24px] font-semibold leading-none tracking-[-0.05em] text-white'>
+        Latest
+      </p>
       <div
         ref={railRef}
         className={cn(
@@ -630,6 +573,11 @@ export function ProfileHomeRail({
                     : formatReleaseType(latestRelease.releaseType)
                 }
                 actionIcon={<Play className='h-5 w-5 fill-current' />}
+                actionLabel={
+                  featuredState.kind === 'release_countdown'
+                    ? 'Remind Me'
+                    : 'Listen Now'
+                }
               />
             ) : null}
 
@@ -645,14 +593,6 @@ export function ProfileHomeRail({
               />
             ) : null}
 
-            {card.kind === 'alerts' ? (
-              <AlertsRailCard
-                isSubscribed={isSubscribed}
-                onOpenAlerts={onOpenAlerts}
-                previewNotificationsState={previewNotificationsState}
-              />
-            ) : null}
-
             {card.kind === 'playlist' && featuredPlaylistFallback ? (
               <ImageLedRailCard
                 dataTestId='profile-home-rail-playlist'
@@ -664,6 +604,7 @@ export function ProfileHomeRail({
                 title={featuredPlaylistFallback.title}
                 subtitle='Open Playlist'
                 actionIcon={<Play className='h-5 w-5 fill-current' />}
+                actionLabel='Listen Now'
               />
             ) : null}
 
@@ -679,6 +620,7 @@ export function ProfileHomeRail({
                 title={artist.name}
                 subtitle='Listen Across Your Preferred Platforms'
                 actionIcon={<Play className='h-5 w-5 fill-current' />}
+                actionLabel='Listen Now'
               />
             ) : null}
           </div>

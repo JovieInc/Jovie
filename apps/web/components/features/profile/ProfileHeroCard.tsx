@@ -104,7 +104,7 @@ export function ArtistHero({
   const heroPearlClassName =
     'border border-white/12 bg-white/8 shadow-[0_12px_30px_rgba(0,0,0,0.18)] backdrop-blur-2xl';
   const primaryActionClassName =
-    'inline-flex min-h-12 items-center justify-center rounded-full bg-[var(--profile-pearl-primary-bg)] px-5 py-3 text-mid font-semibold tracking-[-0.015em] text-[var(--profile-pearl-primary-fg)] shadow-[0_18px_40px_rgba(0,0,0,0.3)] transition-[transform,opacity] duration-slow hover:opacity-94 active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
+    'inline-flex min-h-12 items-center justify-center rounded-full bg-[var(--profile-pearl-primary-bg)] px-5 py-3 text-mid font-semibold tracking-[-0.015em] text-[var(--profile-pearl-primary-fg)] shadow-[0_18px_40px_rgba(0,0,0,0.3)] transition-opacity duration-slow hover:opacity-94 active:opacity-[0.9] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
 
   return (
     <section

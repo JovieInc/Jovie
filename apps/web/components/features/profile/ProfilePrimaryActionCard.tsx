@@ -106,7 +106,7 @@ function buildCardStyles(
   return {
     isShowcase,
     shellClassName: cn(
-      'group flex w-full items-center gap-3 rounded-[var(--profile-action-radius)] border border-white/[0.08] bg-white/[0.05] text-left backdrop-blur-2xl transition-[background-color,transform,box-shadow] duration-150 hover:bg-white/[0.08] active:scale-[0.985]',
+      'group flex w-full items-center gap-3 rounded-[var(--profile-action-radius)] border border-white/[0.08] bg-white/[0.05] text-left backdrop-blur-2xl transition-[background-color,box-shadow,opacity] duration-150 hover:bg-white/[0.08] active:opacity-[0.9]',
       isShowcase
         ? 'min-h-[92px] px-4 py-3.5 shadow-[0_22px_58px_rgba(0,0,0,0.34)]'
         : 'min-h-[64px] px-3 py-2.5',

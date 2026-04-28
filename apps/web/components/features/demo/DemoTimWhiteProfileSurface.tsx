@@ -90,6 +90,7 @@ const SHOWCASE_VIEWER_LOCATION = {
 } as const;
 const SHOWCASE_NOW = new Date('2026-04-20T12:00:00.000Z');
 const DEMO_TIM_WHITE_SHOWCASE_MODES = ['cards', 'subscribe'] as const;
+const DEMO_PROFILE_ARCHETYPE_KEYS = ['tim', 'mainstream', 'sparse'] as const;
 const DEMO_TIM_WHITE_SHOWCASE_STATE_IDS = [
   'mock-home',
   'streams-latest',
@@ -130,6 +131,7 @@ const SHOWCASE_PROFILE_SETTINGS = { showOldReleases: true } as const;
 const SHOWCASE_ACTION_CARD_CLASS_NAME = 'w-full';
 
 type DemoTimWhiteShowcaseMode = (typeof DEMO_TIM_WHITE_SHOWCASE_MODES)[number];
+type DemoProfileArchetype = (typeof DEMO_PROFILE_ARCHETYPE_KEYS)[number];
 type ActionCardPreviewConfig = {
   readonly dataTestId: string;
   readonly latestRelease?: ProfilePrimaryActionCardRelease | null;
@@ -200,6 +202,132 @@ function makeDemoRelease(base: DemoReleaseVariant): DemoRelease {
   } as DemoRelease;
 }
 
+function remapDemoSocialLinks(
+  artistId: string,
+  links: readonly (typeof HOMEPAGE_PROFILE_PREVIEW_SOCIAL_LINKS)[number][],
+  prefix: string
+) {
+  return links.map(link => ({
+    ...link,
+    id: `${prefix}-${link.id}`,
+    artist_id: artistId,
+  }));
+}
+
+function getDemoProfileFixture(params: {
+  readonly archetype: DemoProfileArchetype;
+  readonly releaseKey: ReleaseVariant;
+  readonly latestRelease: DemoRelease;
+}) {
+  const { archetype, releaseKey, latestRelease } = params;
+
+  if (archetype === 'mainstream') {
+    const artist = {
+      ...HOMEPAGE_PROFILE_PREVIEW_ARTIST,
+      id: 'demo-mainstream-profile',
+      handle: 'mayavale',
+      spotify_id: 'demo-mainstream-spotify',
+      name: 'Maya Vale',
+      image_url: '/images/hero/tim-profile.avif',
+      tagline: 'Late-night pop built for rooms that know every word.',
+      settings: {
+        heroRoleLabel: 'Singer / Producer',
+      },
+      theme: {
+        profileAccent: {
+          version: 1,
+          primaryHex: '#6ee7b7',
+          sourceUrl: '/images/hero/tim-profile.avif',
+        },
+      },
+      spotify_url: 'https://open.spotify.com/artist/mayavale',
+      apple_music_url: 'https://music.apple.com/us/artist/maya-vale/123',
+      youtube_url: 'https://www.youtube.com/@mayavale',
+      venmo_handle: undefined,
+      genres: ['Alt Pop', 'Electronic', 'Dance'],
+      career_highlights:
+        'Festival main stages, late-night TV, and global radio.',
+    } satisfies StaticArtistPageProps['artist'];
+
+    return {
+      artist,
+      socialLinks: remapDemoSocialLinks(
+        artist.id,
+        HOMEPAGE_PROFILE_PREVIEW_SOCIAL_LINKS.filter(
+          link => link.platform !== 'venmo'
+        ),
+        'mainstream'
+      ),
+      contacts: [...HOMEPAGE_PROFILE_PREVIEW_CONTACTS],
+      latestRelease,
+      releases: [...HOMEPAGE_PROFILE_PREVIEW_DRAWER_RELEASES],
+      tourDates: [...HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES],
+      showPayButton: false,
+      showTourButton: true,
+    };
+  }
+
+  if (archetype === 'sparse') {
+    const artist = {
+      ...HOMEPAGE_PROFILE_PREVIEW_ARTIST,
+      id: 'demo-sparse-profile',
+      handle: 'northwindow',
+      spotify_id: '',
+      name: 'North Window',
+      image_url: undefined,
+      tagline: '',
+      settings: {
+        heroRoleLabel: 'Songwriter',
+      },
+      theme: {
+        profileAccent: {
+          version: 1,
+          primaryHex: '#9ca3af',
+          sourceUrl: '',
+        },
+      },
+      spotify_url: undefined,
+      apple_music_url: undefined,
+      youtube_url: undefined,
+      deezer_id: undefined,
+      tidal_id: undefined,
+      soundcloud_id: undefined,
+      venmo_handle: undefined,
+      location: null,
+      hometown: null,
+      active_since_year: null,
+      genres: ['Singer-Songwriter'],
+      career_highlights: null,
+      target_playlists: null,
+      is_verified: false,
+      is_featured: false,
+    } satisfies StaticArtistPageProps['artist'];
+
+    return {
+      artist,
+      socialLinks: [],
+      contacts: [],
+      latestRelease: null,
+      releases: [],
+      tourDates: [],
+      showPayButton: false,
+      showTourButton: false,
+    };
+  }
+
+  return {
+    artist: HOMEPAGE_PROFILE_PREVIEW_ARTIST,
+    socialLinks: [...HOMEPAGE_PROFILE_PREVIEW_SOCIAL_LINKS],
+    contacts: [...HOMEPAGE_PROFILE_PREVIEW_CONTACTS],
+    latestRelease,
+    releases: [...HOMEPAGE_PROFILE_PREVIEW_DRAWER_RELEASES],
+    tourDates:
+      releaseKey === 'presave' ? [] : [...HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES],
+    showPayButton: true,
+    showTourButton: true,
+  };
+}
+
 function isValidRelease(value: string | null): value is ReleaseVariant {
   return RELEASE_VARIANT_KEYS.includes(value as ReleaseVariant);
 }
@@ -210,6 +338,12 @@ function isDemoTimWhiteShowcaseMode(
   return DEMO_TIM_WHITE_SHOWCASE_MODES.includes(
     value as DemoTimWhiteShowcaseMode
   );
+}
+
+function isDemoProfileArchetype(
+  value: string | null
+): value is DemoProfileArchetype {
+  return DEMO_PROFILE_ARCHETYPE_KEYS.includes(value as DemoProfileArchetype);
 }
 
 function isProfileShowcaseStateId(
@@ -489,6 +623,7 @@ export function DemoTimWhiteProfileSurface() {
   const captureMode = searchParams.get('capture');
   const showcaseParam = searchParams.get('showcase');
   const stateParam = searchParams.get('state');
+  const archetypeParam = searchParams.get('archetype');
 
   const mode: ProfileMode = isProfileMode(modeParam) ? modeParam : 'profile';
   const releaseKey: ReleaseVariant = isValidRelease(releaseParam)
@@ -497,15 +632,19 @@ export function DemoTimWhiteProfileSurface() {
   const showcaseMode = isDemoTimWhiteShowcaseMode(showcaseParam)
     ? showcaseParam
     : null;
+  const archetype = isDemoProfileArchetype(archetypeParam)
+    ? archetypeParam
+    : 'tim';
   const showcaseState = isProfileShowcaseStateId(stateParam)
     ? stateParam
     : null;
   const releaseVariants = useMemo(() => getReleaseVariants(Date.now()), []);
   const latestRelease = makeDemoRelease(releaseVariants[releaseKey]);
-
-  // For presave, omit tour dates so the countdown card renders instead
-  const tourDates =
-    releaseKey === 'presave' ? [] : [...HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES];
+  const fixture = getDemoProfileFixture({
+    archetype,
+    releaseKey,
+    latestRelease,
+  });
   const seededPressPhotos =
     captureMode === 'press-assets' ? [...DEMO_PRESS_PHOTOS] : [];
 
@@ -588,22 +727,22 @@ export function DemoTimWhiteProfileSurface() {
         <StaticArtistPage
           presentation='compact-preview'
           mode={mode}
-          artist={HOMEPAGE_PROFILE_PREVIEW_ARTIST}
+          artist={fixture.artist}
           subtitle='Official artist profile'
-          socialLinks={[...HOMEPAGE_PROFILE_PREVIEW_SOCIAL_LINKS]}
-          contacts={[...HOMEPAGE_PROFILE_PREVIEW_CONTACTS]}
+          socialLinks={fixture.socialLinks}
+          contacts={fixture.contacts}
           pressPhotos={seededPressPhotos}
           allowPhotoDownloads={captureMode === 'press-assets'}
-          tourDates={tourDates}
-          latestRelease={latestRelease}
-          genres={HOMEPAGE_PROFILE_PREVIEW_ARTIST.genres}
+          tourDates={fixture.tourDates}
+          latestRelease={fixture.latestRelease}
+          genres={fixture.artist.genres}
           showBackButton={false}
           showFooter
-          showPayButton
-          showTourButton
+          showPayButton={fixture.showPayButton}
+          showTourButton={fixture.showTourButton}
           showSubscriptionConfirmedBanner={false}
           profileSettings={SHOWCASE_PROFILE_SETTINGS}
-          releases={[...HOMEPAGE_PROFILE_PREVIEW_DRAWER_RELEASES]}
+          releases={fixture.releases}
           hideJovieBranding
           hideMoreMenu
         />

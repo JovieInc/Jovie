@@ -255,6 +255,28 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       publicExportPath: 'tim-white-profile-live-phone.png',
     },
     {
+      id: 'tim-white-profile-live-desktop',
+      title: 'Tim White Profile — Latest Release Desktop',
+      route: '/demo/showcase/tim-white-profile?release=live',
+      waitFor: '[data-testid="profile-desktop-surface"]',
+      publicExportPath: 'tim-white-profile-live-desktop.png',
+    },
+    {
+      id: 'tim-white-profile-mainstream-desktop',
+      title: 'Tim White Profile — Mainstream Desktop',
+      route: '/demo/showcase/tim-white-profile?archetype=mainstream',
+      waitFor: '[data-testid="profile-desktop-surface"]',
+      publicExportPath: 'tim-white-profile-mainstream-desktop.png',
+    },
+    {
+      id: 'tim-white-profile-sparse-mobile',
+      title: 'Tim White Profile — Sparse Mobile',
+      route: '/demo/showcase/tim-white-profile?archetype=sparse',
+      waitFor: '[data-testid="demo-showcase-tim-white-profile"]',
+      viewport: 'mobile',
+      publicExportPath: 'tim-white-profile-sparse-phone.png',
+    },
+    {
       id: 'tim-white-profile-video-mobile',
       title: 'Tim White Profile — Music Video',
       route: '/demo/showcase/tim-white-profile?release=video',

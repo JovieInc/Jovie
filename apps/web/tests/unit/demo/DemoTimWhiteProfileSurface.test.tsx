@@ -81,4 +81,36 @@ describe('DemoTimWhiteProfileSurface', () => {
 
     expect(props?.mode).toBe('profile');
   });
+
+  it('accepts the mainstream design archetype in the demo route only', async () => {
+    const props = await renderSurface('archetype=mainstream');
+
+    expect(props).toMatchObject({
+      artist: expect.objectContaining({
+        name: 'Maya Vale',
+        handle: 'mayavale',
+      }),
+      showPayButton: false,
+      showTourButton: true,
+    });
+  });
+
+  it('accepts the sparse design archetype without release or utility chrome', async () => {
+    const props = await renderSurface('archetype=sparse');
+
+    expect(props).toMatchObject({
+      artist: expect.objectContaining({
+        name: 'North Window',
+        image_url: undefined,
+        is_verified: false,
+      }),
+      socialLinks: [],
+      contacts: [],
+      latestRelease: null,
+      releases: [],
+      tourDates: [],
+      showPayButton: false,
+      showTourButton: false,
+    });
+  });
 });
