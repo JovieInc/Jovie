@@ -406,8 +406,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
     drop-shadow(0 0 72px rgba(64, 126, 214, 0.16));
 }
 
-.homepage-hero-mockup--desktop {
-  width: var(--homepage-carousel-slide-width);
+.homepage-hero-mockup--phone {
+  --homepage-carousel-step: clamp(28rem, 38vw, 36rem);
 }
 
 .homepage-hero-mockup--phone .homepage-hero-mockup__frame {
@@ -419,6 +419,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-hero-mockup__frame {
   position: relative;
   overflow: hidden;
+  height: var(--homepage-carousel-stage-height);
+  width: auto;
   border: 1px solid rgba(189, 189, 244, 0.1);
   border-radius: 10px;
   aspect-ratio: 16 / 9;
