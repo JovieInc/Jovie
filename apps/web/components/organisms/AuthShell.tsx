@@ -17,11 +17,12 @@ import { useAppFlag } from '@/lib/flags/client';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 import { AppShellFrame } from './AppShellFrame';
 import { PersistentAudioBar } from './PersistentAudioBar';
+import { ShellAudioBarBridge } from './ShellAudioBarBridge';
 
-// Module-scope singleton — stable identity prevents AppShellFrame memo from
-// breaking on breadcrumb/header changes. PersistentAudioBar uses hooks
-// internally for its own state updates.
-const AUDIO_PLAYER = <PersistentAudioBar />;
+// Module-scope singletons — stable identity prevents AppShellFrame memo from
+// breaking on breadcrumb/header changes. Both internally use hooks for state.
+const LEGACY_AUDIO_PLAYER = <PersistentAudioBar />;
+const SHELL_CHAT_V1_AUDIO_PLAYER = <ShellAudioBarBridge />;
 
 export interface AuthShellProps {
   readonly section: 'admin' | 'dashboard' | 'settings';
@@ -91,7 +92,9 @@ function AuthShellInner({
       }
       main={children}
       rightPanel={rightPanel}
-      audioPlayer={AUDIO_PLAYER}
+      audioPlayer={
+        shellChatV1Enabled ? SHELL_CHAT_V1_AUDIO_PLAYER : LEGACY_AUDIO_PLAYER
+      }
       mobileBottomNav={mobileBottomNav}
       contentClassName={getContentClassName(showMobileTabs, isTableRoute)}
       isTableRoute={isTableRoute}
