@@ -126,6 +126,7 @@ import { ChatInput } from '@/components/jovie/components/ChatInput';
 import { ChatMarkdown } from '@/components/jovie/components/ChatMarkdown';
 import { ActivityHoverRow } from '@/components/shell/ActivityHoverRow';
 import { AgentPulse } from '@/components/shell/AgentPulse';
+import { ArtworkPlayOverlay } from '@/components/shell/ArtworkPlayOverlay';
 import { ColumnLabel } from '@/components/shell/ColumnLabel';
 import { ContextMenuOverlay } from '@/components/shell/ContextMenuOverlay';
 import { DictationWaveform } from '@/components/shell/DictationWaveform';
@@ -133,6 +134,7 @@ import { DrawerTabStrip } from '@/components/shell/DrawerTabStrip';
 import { DropDateChip } from '@/components/shell/DropDateChip';
 import { DueChip } from '@/components/shell/DueChip';
 import { EntityHoverLink } from '@/components/shell/EntityPopover';
+import { EntityThreadGlyph } from '@/components/shell/EntityThreadGlyph';
 import { IconBtn } from '@/components/shell/IconBtn';
 import { LabelPills } from '@/components/shell/LabelPills';
 import { MetaPill } from '@/components/shell/MetaPill';
@@ -148,6 +150,7 @@ import {
 } from '@/components/shell/ShellDropdown';
 import { ShellLoader } from '@/components/shell/ShellLoader';
 import { Stat } from '@/components/shell/Stat';
+import { StatusBadge } from '@/components/shell/StatusBadge';
 import { ThreadCardIconBtn } from '@/components/shell/ThreadCardIconBtn';
 import { ThreadTurn } from '@/components/shell/ThreadTurn';
 import { Tooltip } from '@/components/shell/Tooltip';
@@ -3597,35 +3600,6 @@ function SidebarNowPlaying({
   );
 }
 
-function ArtworkPlayOverlay({
-  isPlaying,
-  onPlay,
-  visible,
-}: {
-  isPlaying: boolean;
-  onPlay: () => void;
-  visible: boolean;
-}) {
-  return (
-    <button
-      type='button'
-      onClick={onPlay}
-      className={cn(
-        'absolute inset-0 grid place-items-center bg-black/50 text-white transition-opacity duration-150 ease-out hover:opacity-100',
-        visible ? 'opacity-100' : 'opacity-0'
-      )}
-      aria-label={isPlaying ? 'Pause' : 'Play'}
-      tabIndex={visible ? 0 : -1}
-    >
-      {isPlaying ? (
-        <Pause className='h-3.5 w-3.5' />
-      ) : (
-        <Play className='h-3.5 w-3.5' />
-      )}
-    </button>
-  );
-}
-
 // Breadcrumb is section-only — no artist segment. Filtering by artist
 // happens via the search-takeover (typing an artist name adds a pill),
 // not by routing. Returns a single-crumb trail keyed off the current view.
@@ -6748,34 +6722,6 @@ function findRunningThreadFor(
 
 // Tiny pulsing affordance shown on entity rows when a thread is
 // running for that entity. Click → opens the thread in the canvas.
-function EntityThreadGlyph({
-  thread,
-  onOpen,
-}: {
-  thread: Thread;
-  onOpen: () => void;
-}) {
-  return (
-    <Tooltip label='Jovie working — open thread'>
-      <button
-        type='button'
-        onClick={e => {
-          e.stopPropagation();
-          onOpen();
-        }}
-        aria-label='Open running thread'
-        className='shrink-0 inline-flex items-center justify-center h-5 w-5 rounded text-cyan-300/85 hover:text-cyan-200 hover:bg-surface-1/60 transition-colors duration-150 ease-out'
-      >
-        <span className='relative inline-grid place-items-center h-3 w-3'>
-          <span className='absolute inset-0 rounded-full bg-cyan-300/30 anim-calm-halo' />
-          <Sparkles className='relative h-3 w-3' strokeWidth={2.25} />
-        </span>
-        <span className='sr-only'>{thread.title}</span>
-      </button>
-    </Tooltip>
-  );
-}
-
 function mockThreadMarkdown(thread: Thread): string {
   if (thread.status === 'errored') {
     return [
@@ -7723,7 +7669,7 @@ function ReleaseRow({
       <div className='flex items-center gap-3 justify-end'>
         {runningThread && onOpenThread && (
           <EntityThreadGlyph
-            thread={runningThread}
+            threadTitle={runningThread.title}
             onOpen={() => onOpenThread(runningThread.id)}
           />
         )}
@@ -9810,7 +9756,7 @@ function TrackRow({
       <div className='w-10 shrink-0 flex justify-end'>
         {runningThread && onOpenThread && (
           <EntityThreadGlyph
-            thread={runningThread}
+            threadTitle={runningThread.title}
             onOpen={() => onOpenThread(runningThread.id)}
           />
         )}
@@ -9923,27 +9869,7 @@ function StatusChip({ track }: { track: Track }) {
   return <StatusBadge status={track.status} />;
 }
 
-function StatusBadge({ status }: { status: TrackStatus }) {
-  const cfg = STATUS_CHIP[status];
-  return (
-    <span
-      className='inline-flex items-center gap-1.5 h-[18px] pl-1.5 pr-2 rounded border border-(--linear-app-shell-border)/70 bg-(--surface-1)/40 text-tertiary-token text-[10px] font-caption uppercase tracking-[0.06em] whitespace-nowrap'
-      title={cfg.tooltip}
-    >
-      <span
-        aria-hidden='true'
-        className={cn(
-          'h-1.5 w-1.5 rounded-full shrink-0',
-          cfg.dot,
-          cfg.dotBorder && `border ${cfg.dotBorder}`
-        )}
-      />
-      <span className={cfg.text}>{cfg.label}</span>
-    </span>
-  );
-}
-
-const STATUS_CHIP: Record<
+const _STATUS_CHIP: Record<
   TrackStatus,
   {
     label: string;
@@ -10266,7 +10192,7 @@ function TaskListItem({
           <span className='ml-auto inline-flex items-center gap-2 shrink-0'>
             {runningThread && onOpenThread && (
               <EntityThreadGlyph
-                thread={runningThread}
+                threadTitle={runningThread.title}
                 onOpen={() => onOpenThread(runningThread.id)}
               />
             )}
