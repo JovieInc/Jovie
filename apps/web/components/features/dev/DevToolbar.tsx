@@ -71,6 +71,22 @@ const ALL_FLAGS: FlagEntry[] = (
   serverDefault: APP_FLAG_DEFAULTS[name as keyof typeof APP_FLAG_DEFAULTS],
 }));
 
+/**
+ * Lookup table: override-storage-key -> server default. Used to detect
+ * "meaningful" overrides (where the override value diverges from the
+ * server default) so the badge count + override pill don't show stale
+ * no-op overrides that match production state.
+ */
+const OVERRIDE_KEY_TO_SERVER_DEFAULT: Record<string, boolean> =
+  Object.fromEntries(ALL_FLAGS.map(flag => [flag.key, flag.serverDefault]));
+
+function isMeaningfulOverride(key: string, value: boolean): boolean {
+  // Unknown key (legacy entry from a removed flag) — treat as meaningful so
+  // the user can still see and clear it from the UI.
+  if (!(key in OVERRIDE_KEY_TO_SERVER_DEFAULT)) return true;
+  return value !== OVERRIDE_KEY_TO_SERVER_DEFAULT[key];
+}
+
 const BREAKPOINTS = [
   { name: '2xl', min: 1536 },
   { name: 'xl', min: 1280 },
@@ -238,6 +254,23 @@ export function DevToolbar({
   const searchRef = useRef<HTMLInputElement>(null);
   const breakpoint = useBreakpoint();
 
+  // Flash state lives at DevToolbar level (not per-row) so toggling a flag
+  // that re-categorizes between Overrides <-> non-Overrides sections still
+  // shows the visual confirmation on the new row position. Per-row state
+  // would reset on remount and the flash would never play.
+  const [flashedKey, setFlashedKey] = useState<string | null>(null);
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flashFlag = useCallback((key: string) => {
+    setFlashedKey(key);
+    if (flashTimer.current) clearTimeout(flashTimer.current);
+    flashTimer.current = setTimeout(() => setFlashedKey(null), 400);
+  }, []);
+  useEffect(() => {
+    return () => {
+      if (flashTimer.current) clearTimeout(flashTimer.current);
+    };
+  }, []);
+
   // Restore state from localStorage and mark as mounted
   useEffect(() => {
     setMounted(true);
@@ -375,13 +408,51 @@ export function DevToolbar({
     () => overridesCtx.overrides,
     [overridesCtx.overrides]
   );
-  const overrideCount = Object.keys(overrides).length;
+  const overrideCount = useMemo(
+    () =>
+      Object.entries(overrides).filter(([key, value]) =>
+        isMeaningfulOverride(key, value)
+      ).length,
+    [overrides]
+  );
   const shellChatV1OverrideKey = APP_FLAG_OVERRIDE_KEYS.SHELL_CHAT_V1;
-  const shellChatV1Overridden = shellChatV1OverrideKey in overrides;
+  const shellChatV1Overridden =
+    shellChatV1OverrideKey in overrides &&
+    isMeaningfulOverride(
+      shellChatV1OverrideKey,
+      overrides[shellChatV1OverrideKey] as boolean
+    );
+
+  /**
+   * Set an override unless the new value matches the server default — in
+   * which case clear the override so the count stays accurate and stale
+   * no-op overrides don't accumulate. Read current state from the
+   * `overrides` map directly (not from `useAppFlag` closure) so rapid
+   * double-clicks don't race against a pending re-render.
+   */
+  const setOrClearOverride = useCallback(
+    (key: string, value: boolean) => {
+      if (
+        key in OVERRIDE_KEY_TO_SERVER_DEFAULT &&
+        value === OVERRIDE_KEY_TO_SERVER_DEFAULT[key]
+      ) {
+        overridesCtx.removeOverride(key);
+      } else {
+        overridesCtx.setOverride(key, value);
+      }
+      flashFlag(key);
+    },
+    [flashFlag, overridesCtx]
+  );
 
   const toggleShellChatV1 = useCallback(() => {
-    overridesCtx.setOverride(shellChatV1OverrideKey, !shellChatV1Enabled);
-  }, [overridesCtx, shellChatV1Enabled, shellChatV1OverrideKey]);
+    const currentOverride = overrides[shellChatV1OverrideKey];
+    const current =
+      typeof currentOverride === 'boolean'
+        ? currentOverride
+        : APP_FLAG_DEFAULTS.SHELL_CHAT_V1;
+    setOrClearOverride(shellChatV1OverrideKey, !current);
+  }, [overrides, setOrClearOverride, shellChatV1OverrideKey]);
 
   // Unified flag list: filter by search, sort overrides to top
   const filteredFlags = useMemo(() => {
@@ -576,12 +647,11 @@ export function DevToolbar({
                     <FlagRow
                       key={flag.key}
                       label={flag.name.toLowerCase().replaceAll('_', ' ')}
+                      flashing={flashedKey === flag.key}
                       isOverridden
                       checked={overrides[flag.key]}
                       serverDefault={flag.serverDefault}
-                      onCheckedChange={v =>
-                        overridesCtx.setOverride(flag.key, v)
-                      }
+                      onCheckedChange={v => setOrClearOverride(flag.key, v)}
                       onClear={() => overridesCtx.removeOverride(flag.key)}
                       source={flag.source}
                     />
@@ -600,11 +670,10 @@ export function DevToolbar({
                     <FlagRow
                       key={flag.key}
                       label={flag.name.toLowerCase().replaceAll('_', ' ')}
+                      flashing={flashedKey === flag.key}
                       isOverridden={false}
                       checked={checked}
-                      onCheckedChange={v =>
-                        overridesCtx.setOverride(flag.key, v)
-                      }
+                      onCheckedChange={v => setOrClearOverride(flag.key, v)}
                       onClear={() => overridesCtx.removeOverride(flag.key)}
                       source={flag.source}
                     />
@@ -666,41 +735,18 @@ export function DevToolbar({
 
         <button
           type='button'
-          role='switch'
-          aria-checked={shellChatV1Enabled}
-          aria-label={
-            shellChatV1Enabled ? 'Turn New Design Off' : 'Turn New Design On'
-          }
+          aria-pressed={shellChatV1Enabled}
           title='Toggle Shell + Chat design (SHELL_CHAT_V1)'
           onClick={toggleShellChatV1}
-          className={`inline-flex h-7 shrink-0 items-center gap-2 rounded-full border px-2.5 text-[10px] font-semibold transition-colors ${
+          className={`inline-flex shrink-0 items-center gap-1 px-1.5 py-1 rounded text-[10px] transition-colors ${
             shellChatV1Enabled
-              ? 'border-[var(--color-accent)]/35 bg-[var(--color-accent)]/12 text-[var(--color-accent)] hover:bg-[var(--color-accent)]/18'
-              : 'border-[var(--color-border-subtle)] bg-[var(--color-bg-surface-2)] text-[var(--color-text-tertiary)] hover:border-[var(--color-border-default)] hover:text-[var(--color-text-primary)]'
+              ? 'text-[var(--color-accent)] bg-[var(--color-accent)]/10 hover:bg-[var(--color-accent)]/15'
+              : 'text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)]'
           }`}
         >
-          <span className='max-[520px]:sr-only'>New Design</span>
-          <span
-            aria-hidden='true'
-            className={`relative h-3.5 w-6 rounded-full transition-colors ${
-              shellChatV1Enabled
-                ? 'bg-[var(--color-accent)]'
-                : 'bg-[var(--color-bg-surface-3)]'
-            }`}
-          >
-            <span
-              className={`absolute top-0.5 h-2.5 w-2.5 rounded-full bg-white shadow-sm transition-transform ${
-                shellChatV1Enabled ? 'translate-x-3' : 'translate-x-0.5'
-              }`}
-            />
-          </span>
-          <span className='max-sm:hidden text-[9px] opacity-80'>
-            {shellChatV1Enabled ? 'On' : 'Off'}
-          </span>
+          <span>New Design</span>
           {shellChatV1Overridden && (
-            <span className='max-md:hidden rounded-full bg-[var(--color-accent)]/14 px-1 text-[8px] font-medium'>
-              Override
-            </span>
+            <span className='text-[9px] opacity-70'>(override)</span>
           )}
         </button>
 
@@ -1006,6 +1052,7 @@ function FlagRow({
   label,
   isOverridden,
   checked,
+  flashing = false,
   serverDefault,
   onCheckedChange,
   onClear,
@@ -1014,29 +1061,22 @@ function FlagRow({
   label: string;
   isOverridden: boolean;
   checked: boolean;
+  /** Parent-driven flash highlight — survives row re-categorization. */
+  flashing?: boolean;
   serverDefault?: boolean;
   onCheckedChange: (v: boolean) => void;
   onClear: () => void;
   source?: 'statsig' | 'code';
 }>) {
-  const [flash, setFlash] = useState(false);
-  const flashTimer = useRef<ReturnType<typeof setTimeout>>(null);
-  const handleChange = (v: boolean) => {
-    onCheckedChange(v);
-    setFlash(true);
-    if (flashTimer.current) clearTimeout(flashTimer.current);
-    flashTimer.current = setTimeout(() => setFlash(false), 400);
-  };
-
   return (
     <div
       className={`flex items-center gap-2 py-0.5 rounded-sm transition-colors duration-300 ${
-        flash ? 'bg-[var(--color-accent)]/10' : ''
+        flashing ? 'bg-[var(--color-accent)]/10' : ''
       }`}
     >
       <Switch.Root
         checked={checked}
-        onCheckedChange={handleChange}
+        onCheckedChange={onCheckedChange}
         className={`relative w-7 h-4 rounded-full transition-colors outline-none cursor-pointer shrink-0 ${
           checked
             ? 'bg-[var(--color-accent)]'
