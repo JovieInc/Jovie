@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.189] - 2026-04-28
+
+> Landing-page section registry + component-checker. PR 1 of the landing-system consolidation. Adds one source of truth for "what landing-page sections exist" and a full-bleed preview surface (`/exp/component-checker`) so we can audit variants on ultra-wide before merging duplicates.
+
+### Added
+
+- **`apps/web/lib/sections/registry.ts`** — typed registry of landing-page section variants. Eight categories (`header | hero | logo-bar | feature-card | testimonial | faq | footer-cta | footer`) ordered top-of-page → bottom-of-page. Each entry carries `componentPath`, `usedIn`, `status` (`canonical | consolidate | orphaned`), and a `render()` callback so both the component-checker and the upcoming page-builder render variants identically. Per-category variant arrays live in `apps/web/lib/sections/variants/*.tsx` so adding a new variant doesn't touch the registry root.
+- **`/exp/component-checker`** — full-bleed single-section preview, no chrome.
+  - Floating top-left toolbar: category dropdown + variant dropdown + status pill (canonical/consolidate/orphaned) + canonical badge + component path.
+  - URL-driven via `?id=<variant-id>` so deep links survive refresh.
+  - Keyboard nav: `←`/`→` move within the current category; `⌘↑`/`⌘↓` jump category. Skips when an input/textarea is focused.
+  - 16 variants seeded across the 8 categories — every section that ships on a landing page has at least one entry.
+
+### Why
+
+The page-builder (PR 2) and the consolidation pass (PR 3) both need this registry as their data layer. Registry-first means PR 2 lands as a thin composition shell on top of `SECTION_REGISTRY`, and PR 3's deletions are mechanical because every call site is enumerated in `usedIn`.
+
+### Not yet
+
+PR 2 (page-builder with header/footer/CTA chrome toggles) builds on top of this. PR 3 deletes `CTASection` (orphaned), folds `HeroSection` into `MarketingHero`, and refactors `FinalCTASection` to extract `ClaimHandleForm`. PR 4 adds the `MarketingPageShell` "every landing must end with `MarketingFinalCTA` unless in `LEGAL_ROUTES`" invariant.
+
 ## [26.4.184] - 2026-04-28
 
 > Frame.io-inspired homepage refresh: the hero now matches Frame.io's exact typography spec (Satoshi 80px / weight 600 / -0.045em) and layout positions, the mockup carousel has a proper window-style top chrome with rounded 18px corners, the header is transparent docked and switches to frosted glass on scroll, and the footer locks to the same edge-to-edge gutter system as the header. New shared `MarketingFinalCTA` foundation for the landing page system.
