@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from 'react';
@@ -13,6 +14,7 @@ import {
   type AppFlagSnapshot,
 } from './contracts';
 import {
+  APP_FLAG_OVERRIDES_CHANGED_EVENT,
   type AppFlagOverrideRecord,
   clearStoredAppFlagOverrides,
   getAppFlagOverrideValue,
@@ -38,25 +40,40 @@ export function useStoredAppFlagOverrides(): AppFlagOverridesContextValue {
   );
 
   const setOverride = useCallback((key: string, value: boolean) => {
-    setOverrides(prev => {
-      const next = { ...prev, [key]: value };
-      writeStoredAppFlagOverrides(next);
-      return next;
-    });
+    const next = { ...readStoredAppFlagOverrides(), [key]: value };
+    writeStoredAppFlagOverrides(next);
+    setOverrides(next);
   }, []);
 
   const removeOverride = useCallback((key: string) => {
-    setOverrides(prev => {
-      const next = { ...prev };
-      delete next[key];
-      writeStoredAppFlagOverrides(next);
-      return next;
-    });
+    const next = { ...readStoredAppFlagOverrides() };
+    delete next[key];
+    writeStoredAppFlagOverrides(next);
+    setOverrides(next);
   }, []);
 
   const clearOverrides = useCallback(() => {
-    setOverrides({});
     clearStoredAppFlagOverrides();
+    setOverrides({});
+  }, []);
+
+  useEffect(() => {
+    const syncOverrides = () => {
+      setOverrides(readStoredAppFlagOverrides());
+    };
+
+    globalThis.addEventListener(
+      APP_FLAG_OVERRIDES_CHANGED_EVENT,
+      syncOverrides
+    );
+    globalThis.addEventListener('storage', syncOverrides);
+    return () => {
+      globalThis.removeEventListener(
+        APP_FLAG_OVERRIDES_CHANGED_EVENT,
+        syncOverrides
+      );
+      globalThis.removeEventListener('storage', syncOverrides);
+    };
   }, []);
 
   return useMemo(

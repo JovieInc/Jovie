@@ -159,7 +159,7 @@ export default function HomePage() {
       <section className='homepage-hero-stage relative'>
         <div
           data-testid='homepage-hero-shell'
-          className='homepage-hero-shell relative flex min-h-[100svh] flex-col overflow-hidden rounded-b-[44px] text-primary-token sm:rounded-b-[56px] lg:rounded-b-[72px]'
+          className='homepage-hero-shell relative flex min-h-[100svh] flex-col overflow-x-clip rounded-b-[44px] text-primary-token sm:rounded-b-[56px] lg:rounded-b-[72px]'
         >
           <div
             aria-hidden='true'

@@ -7,7 +7,8 @@ import { ImpersonationBannerWrapper } from '@/features/admin/ImpersonationBanner
 import { OperatorBanner } from '@/features/admin/OperatorBanner';
 import { getUserBanStatus } from '@/lib/auth/ban-check';
 import { AppFlagProvider } from '@/lib/flags/client';
-import { getAppFlagsSnapshot } from '@/lib/flags/server';
+import { APP_FLAG_DEFAULTS, type AppFlagSnapshot } from '@/lib/flags/contracts';
+import { getAppFlagsSnapshot, getAppFlagValue } from '@/lib/flags/server';
 import { HydrateClient } from '@/lib/queries';
 import { getDehydratedState } from '@/lib/queries/server';
 import {
@@ -21,6 +22,15 @@ import {
   shouldRedirectToOnboarding,
   shouldUseEssentialShellData,
 } from './shell-route-matches';
+
+async function getEssentialShellFlagsSnapshot(
+  userId: string
+): Promise<AppFlagSnapshot> {
+  return {
+    ...APP_FLAG_DEFAULTS,
+    SHELL_CHAT_V1: await getAppFlagValue('SHELL_CHAT_V1', { userId }),
+  };
+}
 
 /**
  * Async server component that fetches dashboard data,
@@ -50,13 +60,18 @@ export async function DashboardShellContent({
   // because they rely on supplementary fields from the slower fetch.
   const useEssentialShell = shouldUseEssentialShellData(pathname);
   const cookieStorePromise = cookies();
+  const initialFlagsPromise = useEssentialShell
+    ? getEssentialShellFlagsSnapshot(userId)
+    : getAppFlagsSnapshot({ userId });
 
   // Run ban check in parallel with dashboard data fetch
-  const [dashboardData, banStatus, cookieStore] = await Promise.all([
-    useEssentialShell ? getDashboardShellData(userId) : getDashboardData(),
-    getUserBanStatus(userId),
-    cookieStorePromise,
-  ]);
+  const [dashboardData, banStatus, cookieStore, initialFlags] =
+    await Promise.all([
+      useEssentialShell ? getDashboardShellData(userId) : getDashboardData(),
+      getUserBanStatus(userId),
+      cookieStorePromise,
+      initialFlagsPromise,
+    ]);
 
   if (banStatus.isBanned) {
     return <UnavailablePage />;
@@ -92,17 +107,19 @@ export async function DashboardShellContent({
     </div>
   );
 
-  if (useEssentialShell) {
-    return shellContents;
-  }
+  const flaggedShellContents = (
+    <AppFlagProvider initialFlags={initialFlags}>
+      {shellContents}
+    </AppFlagProvider>
+  );
 
-  const initialFlags = await getAppFlagsSnapshot({ userId });
+  if (useEssentialShell) {
+    return flaggedShellContents;
+  }
 
   return (
     <HydrateClient state={getDehydratedState()}>
-      <AppFlagProvider initialFlags={initialFlags}>
-        {shellContents}
-      </AppFlagProvider>
+      {flaggedShellContents}
     </HydrateClient>
   );
 }

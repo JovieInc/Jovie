@@ -74,7 +74,7 @@ vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
   }),
 }));
 
-vi.mock('@/components/organisms/AuthShellWrapper', () => ({
+vi.mock('@/components/organisms/PendingShellContext', () => ({
   usePendingShell: () => ({
     clearPendingShell: (...args: unknown[]) => mockClearPendingShell(...args),
     pendingShellRoute: null,

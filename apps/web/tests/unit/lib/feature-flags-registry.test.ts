@@ -3,7 +3,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-import { APP_FLAG_KEYS, LEGACY_STATSIG_GATE_KEYS } from '@/lib/flags/contracts';
+import {
+  APP_FLAG_KEYS,
+  APP_FLAG_TO_STATSIG_GATE,
+  LEGACY_STATSIG_GATE_KEYS,
+} from '@/lib/flags/contracts';
 
 const SOURCE_DIRECTORIES = ['app', 'components', 'hooks', 'lib'];
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx']);
@@ -80,15 +84,28 @@ describe('feature flag registry integrity', () => {
     expect(unregisteredFlags).toEqual([]);
   });
 
-  it('does not include chat-specific feature flags in the registry', () => {
-    const chatFlagsInKeys = Object.keys(LEGACY_STATSIG_GATE_KEYS).filter(key =>
-      /chat/i.test(key)
+  it('does not include API chat-specific feature flags in the registry', () => {
+    const allowedShellRolloutEntries = new Set([
+      'SHELL_CHAT_V1',
+      LEGACY_STATSIG_GATE_KEYS.SHELL_CHAT_V1,
+    ]);
+    const chatFlagsInKeys = Object.keys(LEGACY_STATSIG_GATE_KEYS).filter(
+      key => /chat/i.test(key) && !allowedShellRolloutEntries.has(key)
     );
     const chatFlagsInValues = Object.values(LEGACY_STATSIG_GATE_KEYS).filter(
-      flag => /chat/i.test(flag)
+      flag => /chat/i.test(flag) && !allowedShellRolloutEntries.has(flag)
     );
 
     expect([...chatFlagsInKeys, ...chatFlagsInValues]).toEqual([]);
+  });
+
+  it('keeps SHELL_CHAT_V1 Statsig-backed', () => {
+    expect(APP_FLAG_KEYS.SHELL_CHAT_V1).toBe(
+      LEGACY_STATSIG_GATE_KEYS.SHELL_CHAT_V1
+    );
+    expect(APP_FLAG_TO_STATSIG_GATE.SHELL_CHAT_V1).toBe(
+      LEGACY_STATSIG_GATE_KEYS.SHELL_CHAT_V1
+    );
   });
 
   it('limits legacy feature-flags imports to static marketing and compatibility files', () => {

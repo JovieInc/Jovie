@@ -14,6 +14,7 @@ export const LEGACY_STATSIG_GATE_KEYS = {
   ENABLE_LIGHT_MODE: 'enable_light_mode',
   SHOW_AUDIENCE_CRM_SECTION: 'show_audience_crm_section',
   SHOW_SEE_IT_IN_ACTION: 'show_see_it_in_action',
+  SHELL_CHAT_V1: 'feature_shell_chat_v1',
 } as const;
 
 export type StatsigGateKey =
@@ -44,6 +45,7 @@ export const APP_FLAG_DEFAULTS = {
   ALBUM_ART_GENERATION: true,
   CHAT_JANK_MONITOR: false,
   RELEASE_PLAN_DEMO: false,
+  SHELL_CHAT_V1: false,
 } as const;
 
 export type AppFlagName = keyof typeof APP_FLAG_DEFAULTS;
@@ -69,6 +71,7 @@ export const APP_FLAG_KEYS = {
   ALBUM_ART_GENERATION: 'album_art_generation',
   CHAT_JANK_MONITOR: 'chat_jank_monitor',
   RELEASE_PLAN_DEMO: 'release_plan_demo',
+  SHELL_CHAT_V1: LEGACY_STATSIG_GATE_KEYS.SHELL_CHAT_V1,
 } as const satisfies Record<AppFlagName, string>;
 
 export const APP_FLAG_OVERRIDE_KEYS = {
@@ -91,6 +94,7 @@ export const APP_FLAG_OVERRIDE_KEYS = {
   ALBUM_ART_GENERATION: 'code:ALBUM_ART_GENERATION',
   CHAT_JANK_MONITOR: 'code:CHAT_JANK_MONITOR',
   RELEASE_PLAN_DEMO: 'code:RELEASE_PLAN_DEMO',
+  SHELL_CHAT_V1: 'code:SHELL_CHAT_V1',
 } as const satisfies Record<AppFlagName, string>;
 
 export const APP_FLAG_TO_STATSIG_GATE = {
@@ -106,6 +110,7 @@ export const APP_FLAG_TO_STATSIG_GATE = {
   STRIPE_CONNECT_ENABLED: LEGACY_STATSIG_GATE_KEYS.STRIPE_CONNECT_ENABLED,
   ENABLE_LIGHT_MODE: LEGACY_STATSIG_GATE_KEYS.ENABLE_LIGHT_MODE,
   SHOW_AUDIENCE_CRM_SECTION: LEGACY_STATSIG_GATE_KEYS.SHOW_AUDIENCE_CRM_SECTION,
+  SHELL_CHAT_V1: LEGACY_STATSIG_GATE_KEYS.SHELL_CHAT_V1,
 } as const satisfies Partial<Record<AppFlagName, StatsigGateKey>>;
 
 export type StatsigBackedAppFlagName = keyof typeof APP_FLAG_TO_STATSIG_GATE;
@@ -131,4 +136,5 @@ export const APP_FLAG_DESCRIPTIONS = {
   CHAT_JANK_MONITOR:
     'Chat jank instrumentation (message continuity + streaming)',
   RELEASE_PLAN_DEMO: 'Release plan demo page (YC wedge)',
+  SHELL_CHAT_V1: 'Shell and chat V1 production design',
 } as const satisfies Record<AppFlagName, string>;
