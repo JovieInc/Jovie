@@ -205,6 +205,20 @@ function SidebarHeaderNav({
   hasMultipleProfiles: boolean;
   isDemoRoute: boolean;
 }>) {
+  const shellChatV1Enabled = useAppFlag('SHELL_CHAT_V1');
+  const newThreadLink = (
+    <Link
+      href={APP_ROUTES.CHAT}
+      aria-label='New thread'
+      className={cn(
+        'flex size-7 shrink-0 items-center justify-center rounded-[10px] bg-transparent text-sidebar-item-icon transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/60 hover:text-sidebar-item-foreground focus-visible:outline-none focus-visible:bg-sidebar-accent/60 focus-visible:text-sidebar-item-foreground',
+        !shellChatV1Enabled && 'ml-auto group-data-[collapsible=icon]:hidden'
+      )}
+    >
+      <SquarePen className='size-3' />
+    </Link>
+  );
+
   return (
     <div className='flex w-full items-center'>
       {(() => {
@@ -285,21 +299,19 @@ function SidebarHeaderNav({
         );
       })()}
 
-      {!isInSettings && isDashboardOrAdmin && (
-        <Tooltip
-          label='New thread'
-          side='bottom'
-          className='ml-auto group-data-[collapsible=icon]:hidden'
-        >
-          <Link
-            href={APP_ROUTES.CHAT}
-            aria-label='New thread'
-            className='flex size-7 shrink-0 items-center justify-center rounded-[10px] bg-transparent text-sidebar-item-icon transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/60 hover:text-sidebar-item-foreground focus-visible:outline-none focus-visible:bg-sidebar-accent/60 focus-visible:text-sidebar-item-foreground'
+      {!isInSettings &&
+        isDashboardOrAdmin &&
+        (shellChatV1Enabled ? (
+          <Tooltip
+            label='New thread'
+            side='bottom'
+            className='ml-auto group-data-[collapsible=icon]:hidden'
           >
-            <SquarePen className='size-3' />
-          </Link>
-        </Tooltip>
-      )}
+            {newThreadLink}
+          </Tooltip>
+        ) : (
+          newThreadLink
+        ))}
     </div>
   );
 }

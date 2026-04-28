@@ -30,6 +30,13 @@ import { useDashboardShortcuts } from '@/hooks/useDashboardShortcuts';
 import { AuthShell } from './AuthShell';
 import { CommandPalette } from './CommandPalette';
 import { KeyboardShortcutsSheet } from './keyboard-shortcuts-sheet';
+import {
+  PendingShellContext,
+  type PendingShellRoute,
+  usePendingShell,
+} from './PendingShellContext';
+
+export { usePendingShell };
 
 // TableMetaContext for audience/creators tables
 type TableMeta = {
@@ -45,34 +52,12 @@ type TableMetaContextValue = {
 
 const TableMetaContext = createContext<TableMetaContextValue | null>(null);
 
-type PendingShellRoute = 'releases' | null;
-
-interface PendingShellContextValue {
-  readonly clearPendingShell: (route?: PendingShellRoute) => void;
-  readonly pendingShellRoute: PendingShellRoute;
-  readonly showPendingShell: (route: Exclude<PendingShellRoute, null>) => void;
-}
-
-const noopPendingShellContext: PendingShellContextValue = {
-  clearPendingShell: () => {},
-  pendingShellRoute: null,
-  showPendingShell: () => {},
-};
-
-const PendingShellContext = createContext<PendingShellContextValue>(
-  noopPendingShellContext
-);
-
 export function useTableMeta(): TableMetaContextValue {
   const ctx = useContext(TableMetaContext);
   if (!ctx) {
     throw new TypeError('useTableMeta must be used within AuthShellWrapper');
   }
   return ctx;
-}
-
-export function usePendingShell() {
-  return useContext(PendingShellContext);
 }
 
 /**

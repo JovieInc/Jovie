@@ -60,6 +60,7 @@ export const APP_FLAG_REGISTRY = {
   ALBUM_ART_GENERATION: buildBooleanFlag('ALBUM_ART_GENERATION'),
   CHAT_JANK_MONITOR: buildBooleanFlag('CHAT_JANK_MONITOR'),
   RELEASE_PLAN_DEMO: buildBooleanFlag('RELEASE_PLAN_DEMO'),
+  SHELL_CHAT_V1: buildBooleanFlag('SHELL_CHAT_V1'),
 } as const satisfies Record<AppFlagName, Flag<boolean, FlagEntities>>;
 
 export const SUBSCRIBE_CTA_VARIANT_FLAG = flag<

@@ -4354,6 +4354,7 @@ function PillComposer({ placeholder }: { placeholder: string }) {
       isLoading={false}
       isSubmitting={false}
       placeholder={placeholder}
+      shellChatV1
     />
   );
 }
@@ -7417,6 +7418,7 @@ function OnboardingCanvas({ onComplete }: { onComplete: () => void }) {
             placeholder={
               stage === 'welcome' ? 'Pick a handle…' : 'Talk to Jovie…'
             }
+            shellChatV1
           />
         </div>
       </footer>
@@ -7624,6 +7626,7 @@ function ChatComposer({ placeholder }: { placeholder: string }) {
       isLoading={false}
       isSubmitting={false}
       placeholder={placeholder}
+      shellChatV1
     />
   );
 }

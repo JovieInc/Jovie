@@ -141,6 +141,7 @@ export function JovieChat({
 
   // ─── Chat jank instrumentation (flag-gated) ─────────────────
   const jankMonitorEnabled = useAppFlag('CHAT_JANK_MONITOR');
+  const shellChatV1Enabled = useAppFlag('SHELL_CHAT_V1');
   const { onSend: notifyJankSend } = useChatJankMonitor({
     conversationId: activeConversationId,
     messages,
@@ -525,6 +526,7 @@ export function JovieChat({
                 {...chatInputProps}
                 placeholder='Ask a follow-up...'
                 variant='compact'
+                shellChatV1={shellChatV1Enabled}
                 quickActions={followUpQuickActions}
                 onQuickActionSelect={handleSuggestedPromptWithJank}
               />
@@ -541,19 +543,36 @@ export function JovieChat({
               className='pointer-events-none absolute inset-0 flex items-center justify-center select-none'
               data-testid='chat-empty-thread-ornament'
             >
-              <svg
-                viewBox='0 0 353.68 347.97'
-                aria-hidden='true'
-                fill='currentColor'
-                style={{
-                  width: 'clamp(180px, 38vw, 360px)',
-                  height: 'clamp(180px, 38vw, 360px)',
-                  color: 'rgba(255,255,255,0.018)',
-                  transform: 'translateY(-12px)',
-                }}
-              >
-                <path d='m176.84,0l3.08.05c8.92,1.73,16.9,6.45,23.05,13.18,7.95,8.7,12.87,20.77,12.87,34.14s-4.92,25.44-12.87,34.14c-6.7,7.34-15.59,12.28-25.49,13.57h-.64s0,.01,0,.01h0c-22.2,0-42.3,8.84-56.83,23.13-14.5,14.27-23.49,33.99-23.49,55.77h0v.02c0,21.78,8.98,41.5,23.49,55.77,14.54,14.3,34.64,23.15,56.83,23.15v-.02h.01c22.2,0,42.3-8.84,56.83-23.13,14.51-14.27,23.49-33.99,23.49-55.77h0c0-17.55-5.81-33.75-15.63-46.82-10.08-13.43-24.42-23.61-41.05-28.62l-2.11-.64c4.36-2.65,8.34-5.96,11.84-9.78,9.57-10.47,15.5-24.89,15.5-40.77s-5.93-30.3-15.5-40.77c-1.44-1.57-2.95-3.06-4.55-4.44l7.67,1.58c40.44,8.35,75.81,30.3,100.91,60.75,24.66,29.91,39.44,68.02,39.44,109.5h0c0,48.05-19.81,91.55-51.83,123.05-31.99,31.46-76.19,50.92-125,50.92v.02h-.01c-48.79,0-93-19.47-125-50.94C19.81,265.54,0,222.04,0,173.99h0c0-48.05,19.81-91.56,51.83-123.05C83.84,19.47,128.04,0,176.84,0Z' />
-              </svg>
+              {shellChatV1Enabled ? (
+                <svg
+                  viewBox='0 0 353.68 347.97'
+                  aria-hidden='true'
+                  fill='currentColor'
+                  style={{
+                    width: 'clamp(180px, 38vw, 360px)',
+                    height: 'clamp(180px, 38vw, 360px)',
+                    color: 'rgba(255,255,255,0.018)',
+                    transform: 'translateY(-12px)',
+                  }}
+                >
+                  <path d='m176.84,0l3.08.05c8.92,1.73,16.9,6.45,23.05,13.18,7.95,8.7,12.87,20.77,12.87,34.14s-4.92,25.44-12.87,34.14c-6.7,7.34-15.59,12.28-25.49,13.57h-.64s0,.01,0,.01h0c-22.2,0-42.3,8.84-56.83,23.13-14.5,14.27-23.49,33.99-23.49,55.77h0v.02c0,21.78,8.98,41.5,23.49,55.77,14.54,14.3,34.64,23.15,56.83,23.15v-.02h.01c22.2,0,42.3-8.84,56.83-23.13,14.51-14.27,23.49-33.99,23.49-55.77h0c0-17.55-5.81-33.75-15.63-46.82-10.08-13.43-24.42-23.61-41.05-28.62l-2.11-.64c4.36-2.65,8.34-5.96,11.84-9.78,9.57-10.47,15.5-24.89,15.5-40.77s-5.93-30.3-15.5-40.77c-1.44-1.57-2.95-3.06-4.55-4.44l7.67,1.58c40.44,8.35,75.81,30.3,100.91,60.75,24.66,29.91,39.44,68.02,39.44,109.5h0c0,48.05-19.81,91.55-51.83,123.05-31.99,31.46-76.19,50.92-125,50.92v.02h-.01c-48.79,0-93-19.47-125-50.94C19.81,265.54,0,222.04,0,173.99h0c0-48.05,19.81-91.56,51.83-123.05C83.84,19.47,128.04,0,176.84,0Z' />
+                </svg>
+              ) : (
+                <span
+                  style={{
+                    fontFamily:
+                      'var(--font-display, "Satoshi", -apple-system, system-ui, sans-serif)',
+                    fontWeight: 600,
+                    fontSize: 'clamp(180px, 38vw, 360px)',
+                    color: 'rgba(255,255,255,0.018)',
+                    letterSpacing: '-0.08em',
+                    lineHeight: 0.8,
+                    transform: 'translateY(-12px)',
+                  }}
+                >
+                  j
+                </span>
+              )}
             </div>
             <div className='relative mx-auto flex min-h-full w-full max-w-[44rem] flex-col items-center justify-center gap-6 py-8'>
               <h1 className='text-balance text-center text-[2rem] font-semibold leading-[1.1] tracking-[-0.035em] text-primary-token sm:text-[2.5rem] md:text-[3rem]'>
@@ -595,7 +614,11 @@ export function JovieChat({
                 </p>
               )}
 
-              <ChatInput {...chatInputProps} placeholder='Ask Jovie...' />
+              <ChatInput
+                {...chatInputProps}
+                placeholder='Ask Jovie...'
+                shellChatV1={shellChatV1Enabled}
+              />
             </div>
           </div>
         </div>

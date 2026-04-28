@@ -1,5 +1,13 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { AppFlagProvider, useAppFlag } from '@/lib/flags/client';
+import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 import { FF_OVERRIDES_KEY } from '@/lib/flags/overrides';
 
 const mockSetTheme = vi.fn();
@@ -19,12 +27,14 @@ vi.mock('@/lib/flags/contracts', () => ({
     HERO_SPOTIFY: 'code:HERO_SPOTIFY',
     BILLING_UPGRADE: 'code:BILLING_UPGRADE',
     THREADS_ENABLED: 'code:THREADS_ENABLED',
+    SHELL_CHAT_V1: 'code:SHELL_CHAT_V1',
   },
   APP_FLAG_DEFAULTS: {
     CLAIM_HANDLE: false,
     HERO_SPOTIFY: false,
     BILLING_UPGRADE: false,
     THREADS_ENABLED: false,
+    SHELL_CHAT_V1: false,
   },
 }));
 
@@ -42,6 +52,22 @@ function renderToolbar(
       sha={props?.sha ?? 'abc1234'}
       version={props?.version ?? '1.0.0'}
     />
+  );
+}
+
+function ShellChatFlagProbe() {
+  const enabled = useAppFlag('SHELL_CHAT_V1');
+  return <div data-testid='shell-chat-v1-probe'>{enabled ? 'new' : 'old'}</div>;
+}
+
+function renderToolbarBesideFlagProvider() {
+  return render(
+    <>
+      <AppFlagProvider initialFlags={APP_FLAG_DEFAULTS}>
+        <ShellChatFlagProbe />
+      </AppFlagProvider>
+      <DevToolbar env='development' sha='abc1234' version='1.0.0' />
+    </>
   );
 }
 
@@ -291,13 +317,13 @@ describe('DevToolbar', () => {
       localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
       renderToolbar();
 
-      // Should show "4 of 4" initially (all 4 code flags)
-      expect(screen.getByText('4 of 4')).toBeInTheDocument();
+      // Should show "5 of 5" initially (all 5 code flags)
+      expect(screen.getByText('5 of 5')).toBeInTheDocument();
 
       const searchInput = screen.getByPlaceholderText('Search flags...');
       fireEvent.change(searchInput, { target: { value: 'claim' } });
 
-      expect(screen.getByText('1 of 4')).toBeInTheDocument();
+      expect(screen.getByText('1 of 5')).toBeInTheDocument();
     });
 
     it('clears search when clear button is clicked', () => {
@@ -307,11 +333,11 @@ describe('DevToolbar', () => {
       const searchInput = screen.getByPlaceholderText('Search flags...');
       fireEvent.change(searchInput, { target: { value: 'claim' } });
 
-      expect(screen.getByText('1 of 4')).toBeInTheDocument();
+      expect(screen.getByText('1 of 5')).toBeInTheDocument();
 
       fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
 
-      expect(screen.getByText('4 of 4')).toBeInTheDocument();
+      expect(screen.getByText('5 of 5')).toBeInTheDocument();
     });
 
     it('does not show clear button when search is empty', () => {
@@ -332,6 +358,7 @@ describe('DevToolbar', () => {
 
       expect(screen.getByText('claim handle')).toBeInTheDocument();
       expect(screen.getByText('threads enabled')).toBeInTheDocument();
+      expect(screen.getByText('shell chat v1')).toBeInTheDocument();
     });
 
     it('shows source label for each non-overridden flag', () => {
@@ -339,7 +366,74 @@ describe('DevToolbar', () => {
       renderToolbar();
 
       const sourceLabels = screen.getAllByText(/^code$/);
-      expect(sourceLabels.length).toBe(4); // all code flags
+      expect(sourceLabels.length).toBe(5); // all code flags
+    });
+  });
+
+  // ─── New Design Toggle ─────────────────────────────────────
+
+  describe('new design toggle', () => {
+    it('renders in the collapsed bottom bar without opening the flag list', () => {
+      renderToolbar();
+
+      const toggle = screen.getByRole('switch', { name: /New Design/ });
+      expect(toggle).toBeInTheDocument();
+      expect(toggle).toHaveAttribute('aria-checked', 'false');
+      expect(
+        screen.getByRole('button', { name: 'Expand dev toolbar' })
+      ).toBeInTheDocument();
+    });
+
+    it('sets the SHELL_CHAT_V1 override on click', () => {
+      renderToolbar();
+
+      fireEvent.click(screen.getByRole('switch', { name: /New Design/ }));
+
+      expect(
+        JSON.parse(localStorage.getItem(FF_OVERRIDES_KEY) ?? '{}')
+      ).toEqual({
+        'code:SHELL_CHAT_V1': true,
+      });
+    });
+
+    it('flips an existing SHELL_CHAT_V1 override back off', () => {
+      setLocalOverrides({ 'code:SHELL_CHAT_V1': true });
+      renderToolbar();
+
+      const toggle = screen.getByRole('switch', { name: /New Design/ });
+      expect(toggle).toHaveAttribute('aria-checked', 'true');
+
+      fireEvent.click(toggle);
+
+      expect(
+        JSON.parse(localStorage.getItem(FF_OVERRIDES_KEY) ?? '{}')
+      ).toEqual({
+        'code:SHELL_CHAT_V1': false,
+      });
+    });
+
+    it('updates the collapsed override badge after toggling', () => {
+      renderToolbar();
+
+      fireEvent.click(screen.getByRole('switch', { name: /New Design/ }));
+
+      expect(screen.getByText('1 override')).toBeInTheDocument();
+    });
+
+    it('syncs the override to shell flag consumers outside the toolbar', async () => {
+      renderToolbarBesideFlagProvider();
+
+      expect(screen.getByTestId('shell-chat-v1-probe')).toHaveTextContent(
+        'old'
+      );
+
+      fireEvent.click(screen.getByRole('switch', { name: /New Design/ }));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('shell-chat-v1-probe')).toHaveTextContent(
+          'new'
+        );
+      });
     });
   });
 
@@ -444,11 +538,13 @@ describe('DevToolbar', () => {
       renderToolbar();
 
       // Find the switch in the overrides section (already overridden flag)
-      const switches = screen.getAllByRole('switch');
-      fireEvent.click(switches[0]);
+      const flagLabel = screen.getByText('claim handle');
+      const row = flagLabel.closest('[class*="rounded-sm"]');
+      const flagSwitch = row?.querySelector('[role="switch"]');
+      expect(flagSwitch).toBeTruthy();
+      fireEvent.click(flagSwitch as Element);
 
       // The parent row should have the flash background class
-      const row = switches[0].closest('[class*="rounded-sm"]');
       expect(row?.className).toContain('bg-[var(--color-accent)]/10');
     });
   });
