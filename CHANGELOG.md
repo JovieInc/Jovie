@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.187] - 2026-04-28
+
+> Chat hardening, part 3 of 3 — `chat_answer_feedback` schema and `/api/chat/feedback` POST handler with append-only supersession. Backend foundation for the per-message thumbs/reason/correction UI; the UI itself + eval harness ship in fast-follows.
+
+### Added
+
+- **`chat_answer_feedback` table** (migration `0041_magenta_guardian`) with two new enums (`chat_feedback_rating`, `chat_feedback_reason`). Keyed primarily by `traceId` (matches stream-time identity from PR 2); `messageId` nullable for the same FK-ordering reason. Append-only with a unique partial index on `(traceId, userId) WHERE superseded_at IS NULL` so each (trace, user) has at most one current rating but the audit history persists.
+- **`POST /api/chat/feedback`** route handler. Auth, payload validation, ownership check (verifies the trace belongs to the calling user — fail soft 404/403), rate limiting via `generalLimiter`, and a transaction that marks any current row superseded then inserts the new row. Schema uses `.strict()` so unknown fields are rejected; reason/correction are only valid on `down` ratings.
+
+### Tests
+
+- `tests/unit/chat/feedback-route.test.ts` (7 tests) — covers 401 unauthed, 400 invalid payload, 400 reason-with-up, 404 missing trace, 403 wrong owner, 201 success with supersession + insert shape, 201 up-rating clears reason/correction.
+
+### Deferred to PR 3.5 (fast-follow)
+
+- Per-message thumbs + reason picker + correction textarea in `apps/web/components/jovie/components/ChatMessage.tsx`
+- Source-chip rendering between reply bubble and tool UI (deferred from PR 2)
+- `SuggestedPrompts.tsx` empty-state update advertising lookup tools
+- Eval harness (`apps/web/scripts/eval-chat.ts` with DeepSeek-via-NIM judge + `chat_rag_feedback_ui_enabled` Statsig gate wiring)
+
+The Statsig flag for the feedback UI is intentionally not yet declared — it'll land alongside the UI in PR 3.5 so flag and UI ship together.
+
 ## [26.4.186] - 2026-04-28
 
 > Chat hardening, part 2 of 3 — canon retrieval (NIM embeddings + Redis-cached cosine search) and four read-only artist-data lookup tools, both gated behind a single Statsig flag (`chat_rag_retrieval_enabled`, default off). Ships dark; ramp via Statsig admins → 5% → 100%.

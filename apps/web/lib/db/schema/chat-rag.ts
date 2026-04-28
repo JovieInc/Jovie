@@ -1,10 +1,13 @@
+import { sql as drizzleSql } from 'drizzle-orm';
 import {
   index,
   integer,
   numeric,
+  pgEnum,
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
@@ -95,3 +98,73 @@ export type NewChatAnswerTrace = typeof chatAnswerTraces.$inferInsert;
 
 export const insertChatAnswerTraceSchema = createInsertSchema(chatAnswerTraces);
 export const selectChatAnswerTraceSchema = createSelectSchema(chatAnswerTraces);
+
+/**
+ * Per-message feedback rating. Append-only — when a user changes their
+ * rating, we mark the prior row `superseded_at` and insert a new row, so
+ * the audit history is preserved.
+ */
+export const chatFeedbackRatingEnum = pgEnum('chat_feedback_rating', [
+  'up',
+  'down',
+]);
+
+export const chatFeedbackReasonEnum = pgEnum('chat_feedback_reason', [
+  'wrong',
+  'outdated',
+  'generic',
+  'hallucinated',
+  'bad_source',
+  'bad_tone',
+  'incomplete',
+]);
+
+/**
+ * Per-assistant-message thumbs/reason/correction feedback.
+ *
+ * Keyed primarily by `traceId` (matches the stream-time identity used by
+ * the chat UI). `messageId` is nullable because the assistant message
+ * doesn't exist at trace-creation time. Append-only with a unique partial
+ * index on `(traceId, userId) WHERE superseded_at IS NULL` so each
+ * (trace, user) has at most one current rating but the history persists.
+ */
+export const chatAnswerFeedback = pgTable(
+  'chat_answer_feedback',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    traceId: uuid('trace_id')
+      .notNull()
+      .references(() => chatAnswerTraces.traceId, { onDelete: 'cascade' }),
+    /** Linked once the message-persistence route runs. Nullable for the same reason as on `chatAnswerTraces`. */
+    messageId: uuid('message_id').references(() => chatMessages.id, {
+      onDelete: 'cascade',
+    }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    rating: chatFeedbackRatingEnum('rating').notNull(),
+    /** Required on `down` ratings; null on `up`. Enforced by the route handler. */
+    reason: chatFeedbackReasonEnum('reason'),
+    /** Optional free-text correction. Trimmed/length-checked by the route. */
+    correction: text('correction'),
+    /** When non-null, this row was superseded by a later feedback from the same user. */
+    supersededAt: timestamp('superseded_at'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  table => ({
+    traceUserCurrentIdx: uniqueIndex(
+      'idx_chat_answer_feedback_trace_user_current'
+    )
+      .on(table.traceId, table.userId)
+      .where(drizzleSql`${table.supersededAt} IS NULL`),
+    traceIdIdx: index('idx_chat_answer_feedback_trace_id').on(table.traceId),
+  })
+);
+
+export type ChatAnswerFeedback = typeof chatAnswerFeedback.$inferSelect;
+export type NewChatAnswerFeedback = typeof chatAnswerFeedback.$inferInsert;
+
+export const insertChatAnswerFeedbackSchema =
+  createInsertSchema(chatAnswerFeedback);
+export const selectChatAnswerFeedbackSchema =
+  createSelectSchema(chatAnswerFeedback);
