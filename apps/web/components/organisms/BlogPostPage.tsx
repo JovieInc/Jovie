@@ -91,14 +91,7 @@ export function BlogPostPage({
             <PublicShareMenu
               context={shareContext}
               title='Share'
-              trigger={
-                <button
-                  type='button'
-                  className='text-sm font-medium text-tertiary-token transition-colors duration-200 hover:text-primary-token'
-                >
-                  Share
-                </button>
-              }
+              triggerVariant='text'
             />
           </div>
 

@@ -11,18 +11,22 @@ export type HudAuthResult =
 export async function authorizeHud(
   kioskToken: string | null
 ): Promise<HudAuthResult> {
-  const entitlements = await getCurrentUserEntitlements();
-  if (entitlements.isAuthenticated && entitlements.isAdmin) {
-    return { ok: true, mode: 'admin' };
-  }
-
   const expectedToken = env.HUD_KIOSK_TOKEN;
-  if (!expectedToken) {
-    return { ok: false, reason: 'not_configured' };
-  }
-
   if (kioskToken && kioskToken === expectedToken) {
     return { ok: true, mode: 'kiosk' };
+  }
+
+  try {
+    const entitlements = await getCurrentUserEntitlements();
+    if (entitlements.isAuthenticated && entitlements.isAdmin) {
+      return { ok: true, mode: 'admin' };
+    }
+  } catch {
+    // Fail closed to the HUD fallback UI when Clerk context is unavailable.
+  }
+
+  if (!expectedToken) {
+    return { ok: false, reason: 'not_configured' };
   }
 
   return { ok: false, reason: 'unauthorized' };

@@ -89,6 +89,8 @@ const CLOSE_TIMEOUT_MS = Number.parseInt(
   process.env.ROUTE_QA_CLOSE_TIMEOUT_MS || '',
   10
 );
+const EXPECT_PRODUCTION_BLOCKED_ROUTES =
+  process.env.ROUTE_QA_EXPECT_PRODUCTION_BLOCKED_ROUTES === '1';
 const VALID_PUBLIC_USERNAMES = ['e2e-test-user', 'browse-test-user'] as const;
 const MISSING_PUBLIC_USERNAME = 'missing-qa-user';
 const ERROR_TEXT_PATTERNS = [
@@ -220,7 +222,47 @@ function routeCaseKey(routeCase: Readonly<RouteCase>) {
   return [routeCase.authPersona, routeCase.path].join('::');
 }
 
+const PRODUCTION_NOT_FOUND_STATIC_ROUTES = new Map<string, string>([
+  [
+    '/dev/smart-links',
+    'Smart-link dev preview intentionally returns not-found in production.',
+  ],
+  [
+    '/sentry-example-page',
+    'Sentry example page is intentionally blocked by proxy.ts in production.',
+  ],
+]);
+
 function buildStaticCase(route: string, source: string): RouteCase {
+  const productionNotFoundNote = EXPECT_PRODUCTION_BLOCKED_ROUTES
+    ? PRODUCTION_NOT_FOUND_STATIC_ROUTES.get(route)
+    : undefined;
+
+  if (productionNotFoundNote) {
+    return {
+      id: routeIdFromPath(route),
+      lane: inferLane(route),
+      path: route,
+      source,
+      authPersona: 'public',
+      expectedState: 'not-found',
+      notes: productionNotFoundNote,
+    };
+  }
+
+  if (route === '/investor-portal' || route === '/investor-portal/respond') {
+    return {
+      id: routeIdFromPath(route),
+      lane: inferLane(route),
+      path: route,
+      source,
+      authPersona: 'public',
+      expectedState: 'not-found',
+      notes:
+        'Investor portal routes are token-gated and intentionally return not-found without an investor token.',
+    };
+  }
+
   return {
     id: routeIdFromPath(route),
     lane: inferLane(route),
@@ -849,7 +891,7 @@ async function runRouteCase(
     const routeRun = settleWithTimeout(
       (async () => {
         const response = await page.goto(targetUrl, {
-          waitUntil: 'domcontentloaded',
+          waitUntil: 'commit',
           timeout: 45_000,
         });
         await waitForStablePage(page);
@@ -891,7 +933,7 @@ async function runRouteCase(
         let status: ResultStatus = 'pass';
         const findings: string[] = [...pageErrors];
 
-        if (!hasMainContent) {
+        if (!hasMainContent && routeCase.expectedState !== 'not-found') {
           status = 'fail';
           findings.push('No visible main content');
         }
@@ -1075,7 +1117,6 @@ async function main() {
   );
 
   let browser: Browser | null = null;
-  let context: BrowserContext | null = null;
   const results: RouteResult[] = [];
   let exitCode = 1;
   let fatalError: unknown = null;
@@ -1084,21 +1125,33 @@ async function main() {
     : 5_000;
   try {
     browser = await chromium.launch({ headless: true });
-    context = await browser.newContext({
-      viewport: { width: 1440, height: 960 },
-      colorScheme: 'dark',
-    });
 
     for (const routeCase of routeCases) {
-      const result = await runRouteCase(context, routeCase);
-      results.push(result);
-      const marker =
-        result.status === 'pass'
-          ? 'PASS'
-          : result.status === 'blocked'
-            ? 'BLOCK'
-            : 'FAIL';
-      console.log(`${marker} ${routeCase.path}`);
+      const routeContext = await browser.newContext({
+        viewport: { width: 1440, height: 960 },
+        colorScheme: 'dark',
+      });
+      try {
+        const result = await runRouteCase(routeContext, routeCase);
+        results.push(result);
+        const marker =
+          result.status === 'pass'
+            ? 'PASS'
+            : result.status === 'blocked'
+              ? 'BLOCK'
+              : 'FAIL';
+        console.log(`${marker} ${routeCase.path}`);
+      } finally {
+        const contextClose = await settleWithTimeout(
+          routeContext.close().catch(() => undefined),
+          closeTimeoutMs
+        );
+        if (contextClose.timedOut) {
+          console.warn(
+            `[route-qa] Timed out after ${closeTimeoutMs}ms while closing the browser context.`
+          );
+        }
+      }
     }
 
     const summary = summarizeResults(results);
@@ -1114,18 +1167,6 @@ async function main() {
     process.exitCode = 1;
     console.error(error);
   } finally {
-    if (context) {
-      const contextClose = await settleWithTimeout(
-        context.close().catch(() => undefined),
-        closeTimeoutMs
-      );
-      if (contextClose.timedOut) {
-        console.warn(
-          `[route-qa] Timed out after ${closeTimeoutMs}ms while closing the browser context.`
-        );
-      }
-    }
-
     if (browser) {
       const browserClose = await settleWithTimeout(
         browser.close().catch(() => undefined),

@@ -45,12 +45,10 @@ import type { Artist, LegacySocialLink } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
 
-const ProfileUnifiedDrawer = dynamic(
-  () =>
-    import('@/features/profile/ProfileUnifiedDrawer').then(mod => ({
-      default: mod.ProfileUnifiedDrawer,
-    })),
-  { ssr: false }
+const ProfileUnifiedDrawer = dynamic(() =>
+  import('@/features/profile/ProfileUnifiedDrawer').then(mod => ({
+    default: mod.ProfileUnifiedDrawer,
+  }))
 );
 
 const ProfileInlineNotificationsCTA = dynamic(
@@ -61,7 +59,6 @@ const ProfileInlineNotificationsCTA = dynamic(
       default: mod.ProfileInlineNotificationsCTA,
     })),
   {
-    ssr: false,
     loading: () => (
       <div
         data-testid='profile-inline-cta-placeholder'

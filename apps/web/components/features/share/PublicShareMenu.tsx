@@ -129,6 +129,7 @@ export function PublicShareActionList({
 interface PublicShareMenuProps {
   readonly context: ShareContext;
   readonly trigger?: ReactNode;
+  readonly triggerVariant?: 'pill' | 'text';
   readonly title?: string;
   readonly align?: 'start' | 'center' | 'end';
 }
@@ -136,6 +137,7 @@ interface PublicShareMenuProps {
 export function PublicShareMenu({
   context,
   trigger,
+  triggerVariant = 'pill',
   title = 'Share',
   align = 'end',
 }: PublicShareMenuProps) {
@@ -204,14 +206,22 @@ export function PublicShareMenu({
     [handleDesktopAction, helperText]
   );
 
-  const defaultTrigger = (
-    <button
-      type='button'
-      className='inline-flex items-center gap-2 rounded-full border border-subtle bg-surface-0 px-3 py-1.5 text-[13px] font-[510] text-secondary-token transition-colors duration-150 hover:text-primary-token'
-    >
-      {title}
-    </button>
-  );
+  const defaultTrigger =
+    triggerVariant === 'text' ? (
+      <button
+        type='button'
+        className='text-sm font-medium text-tertiary-token transition-colors duration-200 hover:text-primary-token'
+      >
+        {title}
+      </button>
+    ) : (
+      <button
+        type='button'
+        className='inline-flex items-center gap-2 rounded-full border border-subtle bg-surface-0 px-3 py-1.5 text-[13px] font-[510] text-secondary-token transition-colors duration-150 hover:text-primary-token'
+      >
+        {title}
+      </button>
+    );
   const resolvedTrigger = trigger ?? defaultTrigger;
 
   const mobileTrigger = useMemo(() => {
