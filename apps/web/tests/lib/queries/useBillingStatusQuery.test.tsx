@@ -60,6 +60,9 @@ describe('useBillingStatusQuery', () => {
         stripeSubscriptionId: 'sub_456',
         stale: false,
         staleReason: null,
+        trialStartedAt: null,
+        trialEndsAt: null,
+        trialNotificationsSent: 0,
       });
     });
 
@@ -87,6 +90,9 @@ describe('useBillingStatusQuery', () => {
         stripeSubscriptionId: null,
         stale: false,
         staleReason: null,
+        trialStartedAt: null,
+        trialEndsAt: null,
+        trialNotificationsSent: 0,
       });
     });
 
@@ -109,6 +115,9 @@ describe('useBillingStatusQuery', () => {
         stripeSubscriptionId: null,
         stale: false,
         staleReason: null,
+        trialStartedAt: null,
+        trialEndsAt: null,
+        trialNotificationsSent: 0,
       });
     });
 

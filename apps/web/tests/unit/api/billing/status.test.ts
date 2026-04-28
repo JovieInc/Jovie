@@ -311,7 +311,15 @@ describe('GET /api/billing/status', () => {
     expect(data).not.toHaveProperty('lastBillingEventAt');
     // Should only contain the expected public fields
     expect(Object.keys(data).sort()).toEqual(
-      ['isPro', 'plan', 'stripeCustomerId', 'stripeSubscriptionId'].sort()
+      [
+        'isPro',
+        'plan',
+        'stripeCustomerId',
+        'stripeSubscriptionId',
+        'trialStartedAt',
+        'trialEndsAt',
+        'trialNotificationsSent',
+      ].sort()
     );
   });
 });
