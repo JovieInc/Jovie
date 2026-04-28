@@ -125,13 +125,18 @@ import { ChatInput } from '@/components/jovie/components/ChatInput';
 import { ChatMarkdown } from '@/components/jovie/components/ChatMarkdown';
 import { ActivityHoverRow } from '@/components/shell/ActivityHoverRow';
 import { AgentPulse } from '@/components/shell/AgentPulse';
+import { ContextMenuOverlay } from '@/components/shell/ContextMenuOverlay';
 import { DictationWaveform } from '@/components/shell/DictationWaveform';
+import { DueChip } from '@/components/shell/DueChip';
 import { EntityHoverLink } from '@/components/shell/EntityPopover';
 import { IconBtn } from '@/components/shell/IconBtn';
+import { LabelPills } from '@/components/shell/LabelPills';
+import { MetaPill } from '@/components/shell/MetaPill';
 import { PickerAction } from '@/components/shell/PickerAction';
 import { PickerLink } from '@/components/shell/PickerLink';
 import { PickerToggle } from '@/components/shell/PickerToggle';
 import { PlayingBars } from '@/components/shell/PlayingBars';
+import { PriorityGlyph } from '@/components/shell/PriorityGlyph';
 import { SettingsRow } from '@/components/shell/SettingsRow';
 import {
   type EntityPopoverData,
@@ -5271,129 +5276,6 @@ type ContextMenuItem =
       tone?: 'default' | 'danger';
     }
   | { kind: 'separator' };
-
-function ContextMenuOverlay({
-  state,
-  onClose,
-}: {
-  state: { x: number; y: number; items: ContextMenuItem[] } | null;
-  onClose: () => void;
-}) {
-  const ref = useRef<HTMLDivElement | null>(null);
-  const [pos, setPos] = useState<{ left: number; top: number }>({
-    left: 0,
-    top: 0,
-  });
-
-  useEffect(() => {
-    if (!state) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
-    }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [state, onClose]);
-
-  // Clamp to viewport — flip up / left if the menu would overflow.
-  useEffect(() => {
-    if (!state || !ref.current) return;
-    const rect = ref.current.getBoundingClientRect();
-    const margin = 8;
-    let left = state.x;
-    let top = state.y;
-    if (left + rect.width + margin > window.innerWidth) {
-      left = Math.max(margin, window.innerWidth - rect.width - margin);
-    }
-    if (top + rect.height + margin > window.innerHeight) {
-      top = Math.max(margin, window.innerHeight - rect.height - margin);
-    }
-    setPos({ left, top });
-  }, [state]);
-
-  if (!state) return null;
-
-  return (
-    <div className='fixed inset-0 z-[60]'>
-      <button
-        type='button'
-        aria-label='Close menu'
-        tabIndex={-1}
-        className='absolute inset-0 cursor-default'
-        onClick={onClose}
-        onContextMenu={e => {
-          e.preventDefault();
-          onClose();
-        }}
-      />
-      <div
-        ref={ref}
-        role='menu'
-        // Chrome unified with ShellDropdown so click + right-click menus
-        // read as one system. rounded-xl, p-1 (4px), same shadow stack.
-        className='absolute min-w-[200px] max-w-[280px] rounded-xl border border-(--linear-app-shell-border) bg-(--linear-app-content-surface)/95 backdrop-blur-xl shadow-[0_12px_40px_rgba(0,0,0,0.32)] p-1'
-        style={{ left: pos.left, top: pos.top }}
-      >
-        {state.items.map(item => {
-          if (item.kind === 'separator') {
-            return (
-              <div
-                key={`sep-${state.items.indexOf(item)}`}
-                className='my-1 border-t border-(--linear-app-shell-border)/60'
-              />
-            );
-          }
-          const Icon = item.icon;
-          const sc = item.shortcut
-            ? typeof item.shortcut === 'string' && !(item.shortcut in SHORTCUTS)
-              ? { keys: item.shortcut }
-              : SHORTCUTS[item.shortcut as keyof typeof SHORTCUTS]
-            : null;
-          return (
-            <button
-              key={item.label}
-              type='button'
-              role='menuitem'
-              disabled={item.disabled}
-              onClick={() => {
-                if (item.disabled) return;
-                item.onSelect();
-                onClose();
-              }}
-              className={cn(
-                'relative group/mi w-full flex items-center gap-2.5 h-7 px-2 rounded-md text-[12.5px] font-caption text-left transition-colors duration-150 ease-out',
-                item.disabled
-                  ? 'opacity-50 cursor-not-allowed text-secondary-token'
-                  : item.tone === 'danger'
-                    ? 'text-rose-300/90 hover:text-rose-200 hover:bg-rose-500/10'
-                    : 'text-secondary-token hover:text-primary-token hover:bg-surface-1'
-              )}
-            >
-              {Icon && (
-                <Icon
-                  className={cn(
-                    'h-3.5 w-3.5 shrink-0',
-                    item.disabled
-                      ? 'text-tertiary-token'
-                      : item.tone === 'danger'
-                        ? 'text-rose-300/70 group-hover/mi:text-rose-200'
-                        : 'text-tertiary-token group-hover/mi:text-primary-token'
-                  )}
-                  strokeWidth={2.25}
-                />
-              )}
-              <span className='flex-1 truncate'>{item.label}</span>
-              {sc && (
-                <kbd className='ml-auto inline-flex items-center h-4 min-w-4 px-1 rounded-[3px] text-[10px] font-caption uppercase tracking-[0.04em] text-tertiary-token bg-surface-0/80 border border-(--linear-app-shell-border)/60 leading-none'>
-                  {sc.keys}
-                </kbd>
-              )}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Entity references — hover any release / track / artist mention to surface
@@ -10712,32 +10594,6 @@ function TaskDetail({
   );
 }
 
-function MetaPill({
-  children,
-  tone = 'neutral',
-}: {
-  children: React.ReactNode;
-  tone?: 'neutral' | 'amber' | 'cyan';
-}) {
-  // Flat at rest, border + subtle bg appears on hover. Tone modifiers
-  // affect text color only at rest; the surface stays clean.
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1.5 h-[24px] px-2 rounded-md text-[11.5px] tracking-[-0.005em] border whitespace-nowrap',
-        'border-transparent bg-transparent transition-[background-color,border-color] duration-150 ease-out cursor-default',
-        tone === 'amber'
-          ? 'text-amber-300/85 hover:border-amber-500/30 hover:bg-amber-500/10'
-          : tone === 'cyan'
-            ? 'text-cyan-300/85 hover:border-cyan-500/30 hover:bg-cyan-500/10'
-            : 'text-secondary-token hover:border-(--linear-app-shell-border) hover:bg-surface-1/40'
-      )}
-    >
-      {children}
-    </span>
-  );
-}
-
 function _DetailRow({
   label,
   children,
@@ -10758,69 +10614,8 @@ function _DetailRow({
 // "Due in 3d" / "Due tomorrow" / "Due today" / "Due 5d ago" — full
 // phrasing instead of a bare "in 3d" so the row reads like English.
 // Soon-due tasks (≤ 2 days) get an amber tone to signal urgency.
-function DueChip({ dueIso, muted }: { dueIso: string; muted?: boolean }) {
-  const ms = new Date(dueIso).getTime() - new Date('2026-04-25').getTime();
-  const days = Math.round(ms / 86400000);
-  let label: string;
-  if (days === 0) label = 'Due today';
-  else if (days === 1) label = 'Due tomorrow';
-  else if (days === -1) label = 'Due yesterday';
-  else if (days > 0)
-    label = `Due in ${days < 7 ? `${days}d` : `${Math.round(days / 7)}w`}`;
-  else
-    label = `Due ${Math.abs(days) < 7 ? `${Math.abs(days)}d` : `${Math.round(Math.abs(days) / 7)}w`} ago`;
-  const soon = !muted && days >= 0 && days <= 2;
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center h-[18px] px-1.5 rounded text-[10px] font-caption uppercase tracking-[0.04em] whitespace-nowrap shrink-0 tabular-nums',
-        muted
-          ? 'text-quaternary-token/70'
-          : soon
-            ? 'text-amber-300/90'
-            : 'text-tertiary-token'
-      )}
-    >
-      {label}
-    </span>
-  );
-}
-
 // Label badges. First label is always visible. ≥ 2 labels collapse the
 // rest into a "+N" chip that swaps to the full set on hover.
-function LabelPills({ labels }: { labels: string[] }) {
-  const first = labels[0];
-  const rest = labels.slice(1);
-  return (
-    <div className='group/labels flex items-center gap-1 min-w-0'>
-      <LabelPill>{first}</LabelPill>
-      {rest.length > 0 && (
-        <>
-          <span
-            className='inline-flex items-center h-[18px] px-1.5 rounded text-[10px] font-caption text-quaternary-token bg-(--surface-1)/60 border border-(--linear-app-shell-border)/50 group-hover/labels:hidden'
-            aria-hidden='true'
-          >
-            +{rest.length}
-          </span>
-          {rest.map(l => (
-            <span key={l} className='hidden group-hover/labels:inline-flex'>
-              <LabelPill>{l}</LabelPill>
-            </span>
-          ))}
-        </>
-      )}
-    </div>
-  );
-}
-
-function LabelPill({ children }: { children: React.ReactNode }) {
-  return (
-    <span className='inline-flex items-center h-[18px] px-1.5 rounded text-[10px] font-caption text-tertiary-token bg-(--surface-1)/40 border border-(--linear-app-shell-border)/50 whitespace-nowrap'>
-      {children}
-    </span>
-  );
-}
-
 function StatusIcon({
   status,
   agentRunning,
@@ -10885,38 +10680,6 @@ function StatusIcon({
         />
       );
   }
-}
-
-function PriorityGlyph({ priority }: { priority: TaskPriority }) {
-  if (priority === 'none')
-    return <span className='inline-block h-2.5 w-3' aria-hidden='true' />;
-  if (priority === 'urgent')
-    return (
-      <span
-        title='Urgent'
-        className='inline-flex items-center justify-center h-3 px-1 rounded text-[8px] font-bold leading-none bg-rose-500/15 text-rose-300'
-      >
-        !
-      </span>
-    );
-  const bars = priority === 'high' ? 3 : priority === 'medium' ? 2 : 1;
-  return (
-    <span
-      className='inline-flex items-end gap-[2px] h-2.5'
-      title={`Priority: ${priority}`}
-    >
-      {[1, 2, 3].map(i => (
-        <span
-          key={i}
-          className={cn(
-            'w-[2px] rounded-sm',
-            i <= bars ? 'bg-secondary-token' : 'bg-quaternary-token/30'
-          )}
-          style={{ height: `${30 + i * 25}%` }}
-        />
-      ))}
-    </span>
-  );
 }
 
 function AssigneeChip({
