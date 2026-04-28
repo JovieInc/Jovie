@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
-import Image from 'next/image';
 import Link from 'next/link';
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
+import { HomepageHeroMockupCarousel } from '@/components/homepage/HomepageHeroCarousel';
 import { HERO_COPY } from '@/components/homepage/intent';
 import { ArtistProfileOutcomeDuo } from '@/components/marketing/artist-profile/ArtistProfileOutcomeDuo';
 import {
@@ -148,117 +148,6 @@ const ORGANIZATION_SCHEMA = buildOrganizationSchema({
   sameAs: ['https://instagram.com/meetjovie'],
 });
 
-type HeroMockupKind = 'desktop' | 'phone' | 'panel';
-
-interface HeroMockupShot {
-  readonly id: string;
-  readonly src: string;
-  readonly alt: string;
-  readonly title: string;
-  readonly width: number;
-  readonly height: number;
-  readonly kind: HeroMockupKind;
-  readonly priority: boolean;
-}
-
-const HERO_MOCKUP_SCREENSHOTS: readonly HeroMockupShot[] = [
-  {
-    id: 'profile-listen-phone',
-    src: '/product-screenshots/tim-white-profile-listen-phone.png',
-    alt: 'Mobile artist profile with streaming and fan actions',
-    title: 'Artist Profile',
-    width: 780,
-    height: 1688,
-    kind: 'phone',
-    priority: false,
-  },
-  {
-    id: 'releases-dashboard',
-    src: '/product-screenshots/releases-dashboard-full.png',
-    alt: 'Desktop release dashboard with tasks, assets, and launch planning',
-    title: 'Release Dashboard',
-    width: 2880,
-    height: 1800,
-    kind: 'desktop',
-    priority: true,
-  },
-  {
-    id: 'release-detail-phone',
-    src: '/product-screenshots/release-sidebar-detail.png',
-    alt: 'Mobile release detail screen for launch planning',
-    title: 'Release Detail',
-    width: 776,
-    height: 1690,
-    kind: 'phone',
-    priority: true,
-  },
-  {
-    id: 'audience-crm',
-    src: '/product-screenshots/audience-crm.png',
-    alt: 'Desktop audience CRM with fan segments and engagement signal',
-    title: 'Audience CRM',
-    width: 2880,
-    height: 1800,
-    kind: 'desktop',
-    priority: false,
-  },
-  {
-    id: 'profile-workspace',
-    src: '/product-screenshots/profile-desktop.png',
-    alt: 'Desktop artist profile management surface',
-    title: 'Profile Workspace',
-    width: 2880,
-    height: 1800,
-    kind: 'desktop',
-    priority: false,
-  },
-  {
-    id: 'release-routing-panel',
-    src: '/product-screenshots/release-sidebar-platforms.png',
-    alt: 'Release platform routing controls for music destinations',
-    title: 'Release Routing',
-    width: 776,
-    height: 582,
-    kind: 'panel',
-    priority: false,
-  },
-  {
-    id: 'tracked-links',
-    src: '/product-screenshots/artist-spec-tracked-links-desktop.png',
-    alt: 'Desktop tracked links analytics for artist marketing',
-    title: 'Tracked Links',
-    width: 1842,
-    height: 952,
-    kind: 'desktop',
-    priority: false,
-  },
-] as const;
-
-const HERO_MOCKUP_CAROUSEL = [
-  ...HERO_MOCKUP_SCREENSHOTS.map(shot => ({
-    ...shot,
-    carouselId: `${shot.id}-primary`,
-    isDuplicate: false,
-  })),
-  ...HERO_MOCKUP_SCREENSHOTS.map(shot => ({
-    ...shot,
-    carouselId: `${shot.id}-duplicate`,
-    isDuplicate: true,
-  })),
-] as const;
-
-function getHeroMockupSizes(kind: HeroMockupKind): string {
-  if (kind === 'phone') {
-    return '(min-width: 1024px) 12rem, 34vw';
-  }
-
-  if (kind === 'panel') {
-    return '(min-width: 1024px) 23rem, 68vw';
-  }
-
-  return '(min-width: 1024px) 42rem, 82vw';
-}
-
 function HomepageHeroActions() {
   return (
     <div className='homepage-hero-actions'>
@@ -275,43 +164,6 @@ function HomepageHeroActions() {
         Explore Profiles
       </Link>
     </div>
-  );
-}
-
-function HomepageHeroMockupCarousel() {
-  return (
-    <section
-      className='homepage-hero-showcase'
-      aria-label='Jovie product screenshots'
-    >
-      <div className='homepage-hero-carousel__viewport'>
-        <div className='homepage-hero-carousel__track'>
-          {HERO_MOCKUP_CAROUSEL.map(shot => {
-            return (
-              <figure
-                aria-hidden={shot.isDuplicate ? true : undefined}
-                className={`homepage-hero-mockup homepage-hero-mockup--${shot.kind}`}
-                key={shot.carouselId}
-              >
-                <div className='homepage-hero-mockup__frame'>
-                  <Image
-                    src={shot.src}
-                    alt={shot.isDuplicate ? '' : shot.alt}
-                    width={shot.width}
-                    height={shot.height}
-                    priority={shot.priority && !shot.isDuplicate}
-                    quality={85}
-                    sizes={getHeroMockupSizes(shot.kind)}
-                    unoptimized
-                    className='homepage-hero-mockup__image'
-                  />
-                </div>
-              </figure>
-            );
-          })}
-        </div>
-      </div>
-    </section>
   );
 }
 

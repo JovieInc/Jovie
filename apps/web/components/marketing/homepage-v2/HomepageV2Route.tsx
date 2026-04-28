@@ -50,7 +50,6 @@ export function HomepageV2BelowHero() {
       ) : null}
       <HomepageV2Pricing />
       <HomepageV2FinalCta />
-      <HomepageV2FooterLinks />
     </>
   );
 }
@@ -538,24 +537,34 @@ export function HomepageV2FinalCta() {
       data-testid='homepage-v2-final-cta'
       className='homepage-story-final-cta relative isolate min-h-[clamp(40rem,60vw,47.5rem)] overflow-hidden border-t border-white/8 bg-black'
     >
+      <Image
+        aria-hidden='true'
+        alt=''
+        className='homepage-final-cta-bg pointer-events-none absolute inset-0 z-0 object-cover'
+        data-testid='homepage-v2-final-cta-background'
+        fill
+        quality={90}
+        sizes='100vw'
+        src='/marketing/footer-cta-bg.png'
+      />
       <div
         aria-hidden='true'
-        className='pointer-events-none absolute inset-0'
+        className='pointer-events-none absolute inset-0 z-[1]'
         style={{
           background:
-            'radial-gradient(80% 60% at 50% 0%, rgba(0,0,0,0) 0%, rgba(0,0,0,0.44) 80%)',
+            'linear-gradient(180deg, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.24) 34%, rgba(0,0,0,0.58) 100%), radial-gradient(80% 60% at 50% 0%, rgba(0,0,0,0) 0%, rgba(0,0,0,0.44) 80%)',
         }}
       />
       <div
         aria-hidden='true'
-        className='pointer-events-none absolute inset-0'
+        className='pointer-events-none absolute inset-0 z-[1]'
         style={{
           background:
             'radial-gradient(58% 58% at 50% 100%, rgba(69,82,178,0.34) 0%, rgba(19,28,82,0.24) 34%, rgba(0,0,0,0) 68%)',
         }}
       />
       <svg
-        className='pointer-events-none absolute inset-x-0 bottom-0 h-[34rem] w-full'
+        className='pointer-events-none absolute inset-x-0 bottom-0 z-[2] h-[34rem] w-full'
         viewBox='0 0 1200 540'
         preserveAspectRatio='xMidYMax slice'
         aria-hidden='true'
@@ -620,7 +629,6 @@ export function HomepageV2FinalCta() {
           opacity='0.3'
         />
       </svg>
-
       <MarketingContainer width='page' className='relative z-10'>
         <div className='mx-auto max-w-[680px] px-4 pt-[clamp(8.5rem,18vw,17.5rem)] text-center'>
           <h2
@@ -633,40 +641,11 @@ export function HomepageV2FinalCta() {
           </h2>
           <Link
             href={APP_ROUTES.SIGNUP}
-            className='mt-7 inline-flex h-10 items-center justify-center rounded-full bg-white px-[22px] text-[13px] font-medium tracking-[-0.01em] text-black transition-colors hover:bg-white/88 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black'
+            className='mt-7 inline-flex h-10 items-center justify-center rounded-full bg-white px-[22px] text-[13px] font-medium tracking-[-0.01em] text-black transition-colors hover:bg-white/[0.88] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black'
             data-testid='homepage-v2-final-cta-primary'
           >
             {HOMEPAGE_V2_COPY.finalCta.primaryCtaLabel}
           </Link>
-        </div>
-      </MarketingContainer>
-    </section>
-  );
-}
-
-export function HomepageV2FooterLinks() {
-  return (
-    <section className='border-t border-white/8 py-10 sm:py-12'>
-      <MarketingContainer width='page'>
-        <div className='grid gap-8 sm:grid-cols-2 lg:grid-cols-4'>
-          {HOMEPAGE_V2_COPY.footerColumns.map(column => (
-            <div key={column.title}>
-              <p className='text-[12px] font-medium tracking-[0.12em] text-tertiary-token'>
-                {column.title}
-              </p>
-              <div className='mt-4 flex flex-col gap-3'>
-                {column.links.map(link => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className='text-[14px] text-secondary-token transition-colors hover:text-primary-token'
-                  >
-                    {link.label}
-                  </Link>
-                ))}
-              </div>
-            </div>
-          ))}
         </div>
       </MarketingContainer>
     </section>
