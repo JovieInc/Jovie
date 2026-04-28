@@ -203,16 +203,6 @@ const HERO_MOCKUP_SCREENSHOTS: readonly HeroMockupShot[] = [
     priority: false,
   },
   {
-    id: 'release-page-phone',
-    src: '/product-screenshots/release-take-me-over-phone.png',
-    alt: 'Mobile release page preview for a single',
-    title: 'Release Page',
-    width: 780,
-    height: 1688,
-    kind: 'phone',
-    priority: false,
-  },
-  {
     id: 'profile-workspace',
     src: '/product-screenshots/profile-desktop.png',
     alt: 'Desktop artist profile management surface',
@@ -312,6 +302,7 @@ function HomepageHeroMockupCarousel() {
                     priority={shot.priority && !shot.isDuplicate}
                     quality={85}
                     sizes={getHeroMockupSizes(shot.kind)}
+                    unoptimized
                     className='homepage-hero-mockup__image'
                   />
                 </div>
