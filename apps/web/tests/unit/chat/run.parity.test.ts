@@ -223,10 +223,15 @@ describe('executeChatTurn — parity assertions', () => {
     expect(tagsArg.chat_model).toBeTypeOf('string');
     expect(tagsArg.chat_force_light).toBe('false');
     expect(tagsArg.chat_has_tools).toBe('true');
-    expect(setExtra).toHaveBeenCalledWith('chat_conversation_id', 'conv-1');
+    expect(tagsArg.chat_rag_retrieval).toBe('false');
+    // Trace + version + conversation_id are all set as extras.
+    const extraKeys = setExtra.mock.calls.map(c => c[0] as string);
+    expect(extraKeys).toContain('chat_trace_id');
+    expect(extraKeys).toContain('chat_retrieval_version');
+    expect(extraKeys).toContain('chat_conversation_id');
   });
 
-  it('skips conversation_id extra when none is provided', async () => {
+  it('skips conversation_id extra when none is provided (but still sets trace_id + version)', async () => {
     const setExtra = vi.fn();
     const telemetry: ChatTelemetry = { setExtra };
 
@@ -238,7 +243,10 @@ describe('executeChatTurn — parity assertions', () => {
       telemetry,
     });
 
-    expect(setExtra).not.toHaveBeenCalled();
+    const extraKeys = setExtra.mock.calls.map(c => c[0] as string);
+    expect(extraKeys).toContain('chat_trace_id');
+    expect(extraKeys).toContain('chat_retrieval_version');
+    expect(extraKeys).not.toContain('chat_conversation_id');
   });
 
   it('routes captureException through telemetry on stream error (no Sentry import in run.ts)', async () => {

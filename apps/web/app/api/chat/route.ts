@@ -10,10 +10,15 @@ import { and, count, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { buildArtistBioDraft } from '@/lib/ai/artist-bio-writer';
+import { buildArtistContextTools } from '@/lib/ai/tools/artist-context';
 import { createImportBioFromUrlTool } from '@/lib/ai/tools/import-bio-from-url';
 import { createProfileEditTool } from '@/lib/ai/tools/profile-edit';
 import { getOptionalAuth } from '@/lib/auth/cached';
-import { executeChatTurn, isClientDisconnect } from '@/lib/chat/run';
+import {
+  executeChatTurn,
+  isClientDisconnect,
+  type TurnFinishInfo,
+} from '@/lib/chat/run';
 import {
   type ArtistContext,
   artistContextSchema,
@@ -23,6 +28,7 @@ import {
 import { db } from '@/lib/db';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
 import { users } from '@/lib/db/schema/auth';
+import { chatAnswerTraces } from '@/lib/db/schema/chat-rag';
 import { discogReleases } from '@/lib/db/schema/content';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -95,6 +101,13 @@ const MAX_MESSAGES_PER_REQUEST = 50;
 const CHAT_KILL_SWITCH_GATES = {
   DISABLED: 'ai_chat_disabled',
   FORCE_LIGHT: 'ai_chat_force_light',
+  /**
+   * Gates the canon-retrieval + artist-data lookup-tool stack added in
+   * the chat-rag-eval initiative. Default false; ramp via Statsig
+   * (admins → 5% → 100%). Falls back to the legacy keyword router when
+   * off, so prod parity is maintained during the rollout.
+   */
+  RAG_RETRIEVAL_ENABLED: 'chat_rag_retrieval_enabled',
 } as const;
 
 /**
@@ -450,6 +463,42 @@ function safeSetSentryContext(callback: () => void): void {
   } catch {
     // Observability must never break the chat request path.
   }
+}
+
+/**
+ * Persists a `chat_answer_traces` row when the streamed turn finishes.
+ *
+ * Trace writes are observability — they never throw to the user (caller
+ * wraps in try/catch). `messageId` and `userMessageId` start NULL because
+ * the assistant message hasn't been persisted yet at `onFinish` time;
+ * the message-persistence route populates them later via `traceId`.
+ */
+async function persistChatAnswerTrace(info: TurnFinishInfo): Promise<void> {
+  const { traceMetadata: m, artistToolsCalled, totalLatencyMs } = info;
+
+  // Resolve user_id (uuid) from clerk id. The `userId` on the trace
+  // metadata is the clerk id; the FK on the table points at users.id.
+  const [userRow] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.clerkId, m.userId))
+    .limit(1);
+  if (!userRow?.id) return;
+
+  await db.insert(chatAnswerTraces).values({
+    traceId: m.traceId,
+    conversationId: m.conversationId,
+    userId: userRow.id,
+    retrievedCanonPaths: m.retrievedCanonPaths as string[],
+    retrievedScores: m.retrievedScores.map(String),
+    artistToolsCalled: artistToolsCalled as string[],
+    retrievalVersion: m.retrievalVersion,
+    gitSha: m.gitSha,
+    modelId: m.modelId,
+    embeddingModel: m.embeddingModel,
+    retrievalLatencyMs: m.retrievalLatencyMs,
+    totalLatencyMs,
+  });
 }
 
 /**
@@ -1709,6 +1758,11 @@ export async function POST(req: Request) {
     CHAT_KILL_SWITCH_GATES.FORCE_LIGHT,
     false
   );
+  const ragRetrievalEnabled = await checkGateForUser(
+    userId,
+    CHAT_KILL_SWITCH_GATES.RAG_RETRIEVAL_ENABLED,
+    false
+  );
   const planLimits = getEntitlements(userPlan);
   const currentUserEntitlements = await getCurrentUserEntitlements().catch(
     () => null
@@ -1811,10 +1865,17 @@ export async function POST(req: Request) {
 
     // Free tools (avatar upload, social links, link removal, feedback) available on ALL plans
     const freeTools = buildFreeChatTools(resolvedProfileId, userId);
+    // Artist-data lookup tools (read-only, closure-captured profileId).
+    // Gated behind the same Statsig flag as canon retrieval — they ship
+    // together since both compose the "chat that knows your catalog" loop.
+    const lookupTools = ragRetrievalEnabled
+      ? buildArtistContextTools(resolvedProfileId)
+      : {};
     // Advanced tools gated behind paid plans
     const tools = planLimits.booleans.aiCanUseTools
       ? {
           ...freeTools,
+          ...lookupTools,
           ...buildChatTools(
             artistContext,
             resolvedProfileId,
@@ -1824,7 +1885,7 @@ export async function POST(req: Request) {
             albumArtEnabled
           ),
         }
-      : freeTools;
+      : { ...freeTools, ...lookupTools };
 
     // Telemetry hooks bind Sentry into `executeChatTurn` without coupling
     // the pure pipeline to Sentry. Eval scripts pass a no-op telemetry.
@@ -1851,12 +1912,27 @@ export async function POST(req: Request) {
       signal: req.signal,
       requestId,
       telemetry,
+      retrieveCanon: ragRetrievalEnabled,
+      onTurnFinish: async info => {
+        try {
+          await persistChatAnswerTrace(info);
+        } catch (err) {
+          // Trace writes are observability — never block, never throw.
+          // run.ts already wraps onTurnFinish in try/catch + Sentry, but
+          // double-guarding here keeps the stream-finish path bulletproof.
+          Sentry.captureException(err, {
+            tags: { feature: 'ai-chat', errorType: 'trace-persist-outer' },
+            extra: { traceId: info.traceMetadata.traceId, requestId },
+          });
+        }
+      },
     });
 
     return turn.streamResult.toUIMessageStreamResponse({
       headers: {
         ...corsHeaders,
         'x-request-id': requestId,
+        'x-chat-trace-id': turn.traceMetadata.traceId,
       },
     });
   } catch (error) {

@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.186] - 2026-04-28
+
+> Chat hardening, part 2 of 3 — canon retrieval (NIM embeddings + Redis-cached cosine search) and four read-only artist-data lookup tools, both gated behind a single Statsig flag (`chat_rag_retrieval_enabled`, default off). Ships dark; ramp via Statsig admins → 5% → 100%.
+
+### Added
+
+- **Canon retrieval pipeline.** 8 hand-curated markdown docs in `apps/web/lib/chat/knowledge/canon/*.md` (converted from existing `topics/`) with frontmatter `{title, claim, tags, source_url?}` validated against a closed-vocabulary tag enum at module load. NIM-only embeddings (`nvidia/nv-embedqa-e5-v5`, 1024-dim) cached in Redis by `sha256(text + model)` so model swaps don't return stale vectors. Redis lock pattern (`SET NX EX 30`) on the embed-and-store path prevents cold-deploy stampede. Cosine top-k=5 + tag boost; min-score 0.7 (admin/E2E-overridable via `?retrieval_threshold=`). NO OpenAI fallback — provider-mismatch breaks cosine math, so retrieval gracefully returns empty on NIM 5xx/429 and Sonnet falls back to its training or invokes a tool.
+- **4 read-only artist-data lookup tools** in `apps/web/lib/ai/tools/artist-context.ts`: `lookupRecentReleases`, `lookupCatalogHealth`, `lookupFanSnapshot`, `lookupLinkAnalytics`. **Tenant isolation**: `profileId` is closure-captured at construction; the Zod input schemas use `.strict()` to reject any model-supplied `profileId`/`userId`/etc. (regression test enforces this). Each tool wrapped in a 3s `executeWithTimeout` budget with structured "timed out" partial response so a slow Drizzle query can't stall the chat stream. Tool-UI registry entries added with present-continuous loading copy ("Checking your recent releases…", etc.) so the fallback "Working on lookup recent releases…" never ships.
+- **Trace persistence.** New `chat_answer_traces` table (migration `0040_sour_korath`) keyed primarily by `traceId` (server-generated UUID returned in stream metadata via `x-chat-trace-id` header). `messageId` is nullable because the assistant message hasn't been persisted yet at `onFinish` time — the message-persistence route populates it later. Stamps `retrievalVersion` (composite hash of system prompt shape + retrieval config + model ids + canon corpus SHAs + tool schemas) and `gitSha` (from `VERCEL_GIT_COMMIT_SHA`) so a hash can be reverse-looked-up to a deploy. Trace writes are wrapped in try/catch with Sentry breadcrumb — they NEVER throw to the user.
+- **Hash-derived versioning** in `apps/web/lib/chat/versions.ts` covering systemPrompt + retrievalConfig + modelId + embeddingModel + canonFileShas + toolSchemas. Tool schema changes bump the version automatically.
+- **Frontmatter Zod validation** that throws at module load on missing required fields or unknown tags. Bad canon shouldn't ship silently.
+
+### Changed
+
+- `executeChatTurn()` now optionally runs canon retrieval (gated by `retrieveCanon` flag) and emits `traceMetadata` plus a stream-finish callback so callers can persist a trace row. Falls back to the legacy keyword router when the Statsig flag is off — production parity preserved during rollout.
+- Chat route registers the 4 lookup tools alongside existing tools when `chat_rag_retrieval_enabled` is on, persists the trace via `persistChatAnswerTrace`, and surfaces `traceId` to the UI via the `x-chat-trace-id` response header.
+
+### Tests
+
+- `tests/unit/chat/canon-loader.test.ts` (6 tests) — frontmatter validation: well-formed docs parse, missing delimiter throws, missing required fields throw, unknown tags throw, unclosed frontmatter throws, optional `source_url` accepted.
+- `tests/unit/chat/artist-context-tools.test.ts` (7 tests) — tenant isolation regression: each lookup tool's input schema rejects `profileId`/`userId`/`creatorProfileId`/etc.; null-profile closure returns `no_profile` error.
+- `tests/unit/chat/run.parity.test.ts` extended (still 14 tests) — confirms new `chat_rag_retrieval` telemetry tag and `chat_trace_id`/`chat_retrieval_version` extras fire on every turn.
+
+### Notes
+
+- Source-chip rendering in `ChatMessage.tsx` and the empty-state prompt update in `SuggestedPrompts.tsx` are deferred to a fast-follow PR. The Statsig flag is off by default so PR 2 ships dark; UI work lands before the rollout reaches 5%.
+- `pnpm chat:retrieve` debug CLI deferred (DX nice-to-have; not blocking).
+
 ## [26.4.185] - 2026-04-28
 
 > Refactor: extract `executeChatTurn()` from the 2k-line chat route into `apps/web/lib/chat/run.ts` as a pure pipeline. No behavior change. Sets up an eval harness and a future canon-retrieval layer to share the same code path the production route runs, so regressions are catchable without re-implementing chat from scratch.

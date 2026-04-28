@@ -116,6 +116,14 @@ export {
   selectChatConversationSchema,
   selectChatMessageSchema,
 } from './chat';
+// Chat RAG (Retrieval traces — feedback table comes in PR 3)
+export {
+  type ChatAnswerTrace,
+  chatAnswerTraces,
+  insertChatAnswerTraceSchema,
+  type NewChatAnswerTrace,
+  selectChatAnswerTraceSchema,
+} from './chat-rag';
 // Content (Providers, Releases, Recordings, Tracks)
 export {
   type Artist,

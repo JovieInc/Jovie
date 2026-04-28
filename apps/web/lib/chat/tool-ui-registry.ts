@@ -139,6 +139,41 @@ export const TOOL_UI_REGISTRY = {
     successTitle: 'Pitches ready',
     errorTitle: "Couldn't write your pitches",
   },
+  // Artist-data lookup tools (read-only). These render as inline status
+  // pills, not artifacts — they feed the answer, not a UI surface.
+  // Loading copy is present-continuous, sentence case, ellipsis.
+  lookupRecentReleases: {
+    label: 'Recent releases',
+    uiHint: 'status',
+    renderer: 'status',
+    loadingTitle: 'Checking your recent releases…',
+    successTitle: 'Recent releases loaded',
+    errorTitle: "Couldn't load your recent releases",
+  },
+  lookupCatalogHealth: {
+    label: 'Catalog health',
+    uiHint: 'status',
+    renderer: 'status',
+    loadingTitle: 'Reviewing catalog health…',
+    successTitle: 'Catalog health reviewed',
+    errorTitle: "Couldn't review your catalog",
+  },
+  lookupFanSnapshot: {
+    label: 'Fan snapshot',
+    uiHint: 'status',
+    renderer: 'status',
+    loadingTitle: 'Reading your fan snapshot…',
+    successTitle: 'Fan snapshot loaded',
+    errorTitle: "Couldn't read your fan snapshot",
+  },
+  lookupLinkAnalytics: {
+    label: 'Link analytics',
+    uiHint: 'status',
+    renderer: 'status',
+    loadingTitle: 'Pulling link analytics…',
+    successTitle: 'Link analytics loaded',
+    errorTitle: "Couldn't pull link analytics",
+  },
 } as const satisfies Record<string, ToolUiConfig>;
 
 function startCaseFromCamelCase(value: string): string {
