@@ -51,7 +51,6 @@ import {
   Disc3,
   ExternalLink,
   Flag,
-  Hash,
   Heart,
   Inbox,
   LayoutDashboard,
@@ -59,8 +58,6 @@ import {
   Link as LinkIcon,
   Loader2,
   LogOut,
-  Mic2,
-  Minimize2,
   MoreHorizontal,
   PanelLeft,
   PanelRight,
@@ -70,13 +67,9 @@ import {
   PinOff,
   Play,
   Plus,
-  Repeat,
   Search,
   Settings,
   Shield,
-  Shuffle,
-  SkipBack,
-  SkipForward,
   Sparkles,
   SquarePen,
   Trash2,
@@ -120,6 +113,7 @@ import { ActivityHoverRow } from '@/components/shell/ActivityHoverRow';
 import { AgentPulse } from '@/components/shell/AgentPulse';
 import { ArtworkThumb } from '@/components/shell/ArtworkThumb';
 import { AssigneeChip } from '@/components/shell/AssigneeChip';
+import { AudioBar } from '@/components/shell/AudioBar';
 import { ColumnLabel } from '@/components/shell/ColumnLabel';
 import { ContextMenuOverlay } from '@/components/shell/ContextMenuOverlay';
 import { CuesPanel } from '@/components/shell/CuesPanel';
@@ -133,12 +127,10 @@ import {
 import { DueChip } from '@/components/shell/DueChip';
 import { EntityHoverLink } from '@/components/shell/EntityPopover';
 import { EntityThreadGlyph } from '@/components/shell/EntityThreadGlyph';
-import { IconBtn } from '@/components/shell/IconBtn';
 import { InlineEditRow } from '@/components/shell/InlineEditRow';
 import { InstallBanner } from '@/components/shell/InstallBanner';
 import { JovieOverlay } from '@/components/shell/JovieOverlay';
 import { LabelPills } from '@/components/shell/LabelPills';
-import { LoopBtn } from '@/components/shell/LoopBtn';
 import { LyricsList } from '@/components/shell/LyricsList';
 import { LyricsView } from '@/components/shell/LyricsView';
 import { MetaPill } from '@/components/shell/MetaPill';
@@ -182,7 +174,6 @@ import { ThreadView as ShellThreadView } from '@/components/shell/ThreadView';
 import { Tooltip } from '@/components/shell/Tooltip';
 import { TypeBadge } from '@/components/shell/TypeBadge';
 import { dropDateMeta } from '@/lib/format-drop-date';
-import { formatTime } from '@/lib/format-time';
 // ---------------------------------------------------------------------------
 // DESIGN RULE — NO AI-SLOP GRADIENTS ON UI CHROME
 // ---------------------------------------------------------------------------
@@ -345,6 +336,9 @@ const TRACK = {
   currentTime: 78,
   duration: 213,
 };
+
+// Demo loop section (percent-of-track) used when loopMode === 'section'.
+const LOOP_SECTION = { from: 31, to: 58 };
 
 type NavItem = {
   icon: typeof LayoutDashboard;
@@ -2633,17 +2627,18 @@ export default function ShellV1Experiment() {
           }}
         >
           <AudioBar
-            variant={variant}
             isPlaying={isPlaying}
             onPlay={() => setIsPlaying(p => !p)}
             onCollapse={() => setBarCollapsed(true)}
-            pct={pct}
+            currentTime={currentTimeSec}
+            duration={TRACK.duration}
             loopMode={loopMode}
             onCycleLoop={() =>
               setLoopMode(m =>
                 m === 'off' ? 'track' : m === 'track' ? 'section' : 'off'
               )
             }
+            loopSection={loopMode === 'section' ? LOOP_SECTION : undefined}
             waveformOn={waveformOn}
             onToggleWaveform={() => setWaveformOn(v => !v)}
             lyricsActive={view === 'lyrics'}
@@ -3912,292 +3907,7 @@ function DashboardHome() {
   );
 }
 
-function AudioBar({
-  variant,
-  isPlaying,
-  onPlay,
-  onCollapse,
-  pct,
-  loopMode,
-  onCycleLoop,
-  waveformOn,
-  onToggleWaveform,
-  lyricsActive,
-  onOpenLyrics,
-  track,
-}: {
-  variant: Variant;
-  isPlaying: boolean;
-  onPlay: () => void;
-  onCollapse: () => void;
-  pct: number;
-  loopMode: 'off' | 'track' | 'section';
-  onCycleLoop: () => void;
-  waveformOn: boolean;
-  onToggleWaveform: () => void;
-  lyricsActive: boolean;
-  onOpenLyrics: () => void;
-  // Track meta — chips (BPM / Key / Version) render on the right side
-  // of the bar so the now-playing card on the left stays clean.
-  track: TrackInfo;
-}) {
-  // All variants share the V1a 64px / two-row Spotify shell.
-  // What differs is the *scrub* — playing with how loud or quiet the
-  // player is, and what kind of artist control it surfaces.
-  const transportButtons = (
-    <div className='flex items-center gap-1.5 justify-self-center'>
-      <IconBtn label='Shuffle' tooltipSide='top' tone='ghost'>
-        <Shuffle className='h-3.5 w-3.5' strokeWidth={2.25} />
-      </IconBtn>
-      <IconBtn label='Previous' tooltipSide='top' tone='ghost'>
-        <SkipBack className='h-4 w-4' strokeWidth={2.5} fill='currentColor' />
-      </IconBtn>
-      <Tooltip
-        label={isPlaying ? 'Pause' : 'Play'}
-        shortcut={SHORTCUTS.playPause}
-        side='top'
-      >
-        <button
-          type='button'
-          onClick={onPlay}
-          className='h-8 w-8 rounded-full grid place-items-center bg-primary text-on-primary transition-transform duration-150 ease-out hover:scale-[1.04] active:scale-95'
-          aria-label={isPlaying ? 'Pause (space)' : 'Play (space)'}
-        >
-          {isPlaying ? (
-            <Pause
-              className='h-3.5 w-3.5'
-              strokeWidth={2.5}
-              fill='currentColor'
-            />
-          ) : (
-            <Play
-              className='h-3.5 w-3.5 translate-x-px'
-              strokeWidth={2.5}
-              fill='currentColor'
-            />
-          )}
-        </button>
-      </Tooltip>
-      <IconBtn label='Next' tooltipSide='top' tone='ghost'>
-        <SkipForward
-          className='h-4 w-4'
-          strokeWidth={2.5}
-          fill='currentColor'
-        />
-      </IconBtn>
-      <LoopBtn mode={loopMode} onClick={onCycleLoop} />
-    </div>
-  );
-
-  const rightCluster = (
-    <div className='flex items-center gap-1.5 justify-self-end'>
-      {waveformOn && (
-        <span className='hidden xl:inline-flex items-center mr-1 text-[10.5px] font-caption text-quaternary-token tracking-[-0.005em]'>
-          {track.bpm} BPM · {track.key} · {track.version}
-        </span>
-      )}
-      {track.hasLyrics && (
-        <IconBtn
-          label='Lyrics'
-          shortcut={SHORTCUTS.toggleLyrics}
-          onClick={onOpenLyrics}
-          active={lyricsActive}
-          tooltipSide='top'
-          tone='ghost'
-        >
-          <Mic2 className='h-3.5 w-3.5' strokeWidth={2.25} />
-        </IconBtn>
-      )}
-      <IconBtn
-        label={waveformOn ? 'Hide waveform' : 'Show waveform'}
-        shortcut={SHORTCUTS.toggleWaveform}
-        onClick={onToggleWaveform}
-        active={waveformOn}
-        tooltipSide='top'
-        tone='ghost'
-      >
-        {waveformOn ? (
-          <AudioLines className='h-3.5 w-3.5' strokeWidth={2.25} />
-        ) : (
-          <AudioWaveform className='h-3.5 w-3.5' strokeWidth={2.25} />
-        )}
-      </IconBtn>
-      <AudioBarOverflowMenu track={track} />
-      <IconBtn
-        label='Minimize player'
-        shortcut={SHORTCUTS.toggleBar}
-        onClick={onCollapse}
-        tooltipSide='top'
-        tone='ghost'
-      >
-        <Minimize2 className='h-3.5 w-3.5' strokeWidth={2.25} />
-      </IconBtn>
-    </div>
-  );
-
-  // V1c (filled) was approved as the canonical waveform. Variant tabs
-  // are kept in the picker for comparison only; everything else uses 'filled'.
-  const kindByVariant: Record<Variant, WaveformKind> = {
-    a: 'hairlines',
-    b: 'stereo',
-    c: 'filled',
-    d: 'peaksRms',
-    e: 'denseBars',
-  };
-  const scrub = (
-    <ScrubGradient
-      pct={pct}
-      loopMode={loopMode}
-      kind={kindByVariant[variant]}
-    />
-  );
-
-  return (
-    <section
-      aria-label='Audio player'
-      className='group/bar shrink-0 hidden lg:grid grid-cols-[1fr_minmax(360px,_720px)_1fr] gap-4 items-center px-8 py-2'
-    >
-      <div />
-      {/* Center column: waveform drawer above, transport below. */}
-      <div className='flex flex-col items-center justify-center min-h-[52px]'>
-        <div
-          aria-hidden={!waveformOn}
-          className='w-full overflow-hidden'
-          style={{
-            maxHeight: waveformOn ? 40 : 0,
-            opacity: waveformOn ? 1 : 0,
-            transform: waveformOn ? 'translateY(0)' : 'translateY(6px)',
-            transition: `max-height ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, opacity ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, transform ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
-          }}
-        >
-          <div className='pt-1.5 pb-1.5'>{scrub}</div>
-        </div>
-        {transportButtons}
-      </div>
-      {/* Right cluster vertically centers across the full bar height,
-          including the waveform drawer when it's open. */}
-      {rightCluster}
-    </section>
-  );
-}
-
-// Audio bar overflow menu — the canonical track-entity action menu. Same
-// entries as the right-click context menu on a track row, plus playback
-// options that only make sense for the actively-playing track (Quality,
-// Playback rate, Add to queue). Ends with the release EntityItem so
-// hovering it reveals the parent release popover.
-function AudioBarOverflowMenu({ track }: { track: TrackInfo }) {
-  const [quality, setQuality] = useState('auto');
-  const [rate, setRate] = useState('1');
-  const onEntityActivate = useEntityActivate();
-  const parentRelease =
-    ENTITY_RELEASES.find(
-      r => r.kind === 'release' && r.label === track.album
-    ) ??
-    ENTITY_RELEASES.find(r => r.kind === 'release') ??
-    null;
-  const noop = (action: string) => () =>
-    console.info(`[shell-v1] ${action} ${track.id}`);
-  return (
-    <ShellDropdown
-      align='end'
-      side='top'
-      sideOffset={8}
-      width={224}
-      onEntityActivate={onEntityActivate}
-      trigger={
-        <button
-          type='button'
-          aria-label='More'
-          className='h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token transition-colors duration-150 ease-out data-[state=open]:text-primary-token'
-        >
-          <MoreHorizontal className='h-3.5 w-3.5' strokeWidth={2.25} />
-        </button>
-      }
-    >
-      <ShellDropdown.Item
-        icon={UserPlus}
-        label='Add to release'
-        onSelect={noop('add-to-release')}
-      />
-      <ShellDropdown.Item
-        icon={Pencil}
-        label='Edit metadata'
-        shortcut='⌘E'
-        onSelect={noop('edit-metadata')}
-      />
-      <ShellDropdown.Separator />
-      <ShellDropdown.Item
-        icon={Hash}
-        label='Copy ISRC'
-        description={track.isrc}
-        onSelect={noop(`copy-isrc ${track.isrc}`)}
-      />
-      <ShellDropdown.Item
-        icon={LinkIcon}
-        label='Copy share link'
-        shortcut='⌘L'
-        onSelect={noop('copy-share-link')}
-      />
-      <ShellDropdown.Item
-        icon={Copy}
-        label='Duplicate'
-        shortcut='⌘D'
-        onSelect={noop('duplicate')}
-      />
-      <ShellDropdown.Separator />
-      <ShellDropdown.Sub>
-        <ShellDropdown.SubTrigger icon={AudioLines} label='Quality' />
-        <ShellDropdown.SubContent>
-          <ShellDropdown.RadioGroup value={quality} onValueChange={setQuality}>
-            <ShellDropdown.RadioItem value='auto' label='Auto' />
-            <ShellDropdown.RadioItem value='lossless' label='Lossless' />
-            <ShellDropdown.RadioItem value='high' label='High' />
-            <ShellDropdown.RadioItem value='normal' label='Normal' />
-          </ShellDropdown.RadioGroup>
-        </ShellDropdown.SubContent>
-      </ShellDropdown.Sub>
-      <ShellDropdown.Sub>
-        <ShellDropdown.SubTrigger icon={Repeat} label='Playback rate' />
-        <ShellDropdown.SubContent>
-          <ShellDropdown.RadioGroup value={rate} onValueChange={setRate}>
-            <ShellDropdown.RadioItem value='0.5' label='0.5×' />
-            <ShellDropdown.RadioItem value='0.75' label='0.75×' />
-            <ShellDropdown.RadioItem value='1' label='1× · Normal' />
-            <ShellDropdown.RadioItem value='1.25' label='1.25×' />
-            <ShellDropdown.RadioItem value='1.5' label='1.5×' />
-            <ShellDropdown.RadioItem value='2' label='2×' />
-          </ShellDropdown.RadioGroup>
-        </ShellDropdown.SubContent>
-      </ShellDropdown.Sub>
-      <ShellDropdown.Item
-        icon={Plus}
-        label='Add to queue'
-        shortcut='Q'
-        onSelect={noop('add-to-queue')}
-      />
-      <ShellDropdown.Separator />
-      {parentRelease ? (
-        <ShellDropdown.EntityItem entity={parentRelease} />
-      ) : (
-        <ShellDropdown.Item
-          icon={LibraryIcon}
-          label='Show in library'
-          disabled
-        />
-      )}
-      <ShellDropdown.Separator />
-      <ShellDropdown.Item
-        icon={Trash2}
-        label='Delete'
-        tone='danger'
-        onSelect={noop('delete')}
-      />
-    </ShellDropdown>
-  );
-}
-
-const TIME_LABEL =
+const _TIME_LABEL =
   'text-[10px] tabular-nums text-quaternary-token w-8 shrink-0';
 
 // All variants share the same gradient SVG shell:
@@ -4210,19 +3920,12 @@ const TIME_LABEL =
 //
 // What changes between variants is the *waveform geometry* itself.
 
-type WaveformKind =
-  | 'hairlines'
-  | 'stereo'
-  | 'filled'
-  | 'peaksRms'
-  | 'denseBars';
-
-const SCRUB_W = 1000;
+const _SCRUB_W = 1000;
 const SCRUB_H = 32; // includes 4px reserved at the top for cue dots
 const WAVE_TOP = 6; // waveform area starts here (cue dots above)
 const WAVE_H = SCRUB_H - WAVE_TOP;
-const WAVE_CY = WAVE_TOP + WAVE_H / 2;
-const WAVE_AMP = WAVE_H / 2 - 1;
+const _WAVE_CY = WAVE_TOP + WAVE_H / 2;
+const _WAVE_AMP = WAVE_H / 2 - 1;
 
 // Deterministic 1D hash so the "audio" looks the same on every render.
 function hash1d(i: number) {
@@ -4251,350 +3954,24 @@ function makeAudio(n: number, seed: number) {
 }
 
 const AUDIO_PEAK = makeAudio(320, 1); // peak amplitude
-const AUDIO_RMS = AUDIO_PEAK.map((v, i) => v * (0.45 + hash1d(i + 99) * 0.25));
-const AUDIO_LEFT = makeAudio(320, 7);
-const AUDIO_RIGHT = makeAudio(320, 13);
+const _AUDIO_RMS = AUDIO_PEAK.map((v, i) => v * (0.45 + hash1d(i + 99) * 0.25));
+const _AUDIO_LEFT = makeAudio(320, 7);
+const _AUDIO_RIGHT = makeAudio(320, 13);
 
-const CUES = [
+const _CUES = [
   { at: 12, label: 'Intro' },
   { at: 31, label: 'Verse' },
   { at: 58, label: 'Drop' },
   { at: 84, label: 'Bridge' },
 ];
-const LOOP_SECTION = { from: 31, to: 58 };
 
 // --- Geometry generators: all are *real audio waveforms* (mirrored about
 // the centerline, dense, dynamic). They differ in render technique.
 
-// Audacity-style mirrored hairlines: dense vertical lines, top + bottom.
-function hairlinesStrands() {
-  const stride = SCRUB_W / AUDIO_PEAK.length;
-  return (
-    <>
-      {AUDIO_PEAK.map((h, i) => {
-        const x = i * stride + stride / 2;
-        const half = h * WAVE_AMP;
-        return (
-          <line
-            // biome-ignore lint/suspicious/noArrayIndexKey: waveform
-            key={i}
-            x1={x}
-            x2={x}
-            y1={WAVE_CY - half}
-            y2={WAVE_CY + half}
-            stroke='url(#scrub-grad)'
-            strokeWidth='0.8'
-            vectorEffect='non-scaling-stroke'
-          />
-        );
-      })}
-    </>
-  );
-}
-
-// Stereo split: top half = left channel, bottom half = right channel.
-function stereoStrands() {
-  const stride = SCRUB_W / AUDIO_LEFT.length;
-  const halfH = WAVE_H / 2 - 0.5;
-  const topMid = WAVE_TOP + halfH / 2 + 0.5;
-  const botMid = WAVE_TOP + halfH + halfH / 2 + 0.5;
-  return (
-    <>
-      {/* L channel — top */}
-      {AUDIO_LEFT.map((h, i) => {
-        const x = i * stride + stride / 2;
-        const amp = h * (halfH / 2);
-        return (
-          <line
-            // biome-ignore lint/suspicious/noArrayIndexKey: waveform
-            key={`l-${i}`}
-            x1={x}
-            x2={x}
-            y1={topMid - amp}
-            y2={topMid + amp}
-            stroke='url(#scrub-grad)'
-            strokeWidth='0.8'
-            vectorEffect='non-scaling-stroke'
-          />
-        );
-      })}
-      {/* R channel — bottom */}
-      {AUDIO_RIGHT.map((h, i) => {
-        const x = i * stride + stride / 2;
-        const amp = h * (halfH / 2);
-        return (
-          <line
-            // biome-ignore lint/suspicious/noArrayIndexKey: waveform
-            key={`r-${i}`}
-            x1={x}
-            x2={x}
-            y1={botMid - amp}
-            y2={botMid + amp}
-            stroke='url(#scrub-grad)'
-            strokeWidth='0.8'
-            vectorEffect='non-scaling-stroke'
-          />
-        );
-      })}
-      {/* Channel divider (very subtle) */}
-      <line
-        x1='0'
-        x2={SCRUB_W}
-        y1={WAVE_TOP + halfH + 0.5}
-        y2={WAVE_TOP + halfH + 0.5}
-        stroke='url(#scrub-grad)'
-        strokeWidth='0.3'
-        opacity='0.25'
-        vectorEffect='non-scaling-stroke'
-      />
-    </>
-  );
-}
-
-// Solid filled mirror waveform (Audacity / Logic look).
-function filledStrands() {
-  const stride = SCRUB_W / AUDIO_PEAK.length;
-  const top: string[] = [];
-  const bot: string[] = [];
-  AUDIO_PEAK.forEach((h, i) => {
-    const x = i * stride;
-    const half = h * WAVE_AMP;
-    top.push(
-      `${i === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${(WAVE_CY - half).toFixed(2)}`
-    );
-    bot.push(`L ${x.toFixed(2)} ${(WAVE_CY + half).toFixed(2)}`);
-  });
-  const filled = `${top.join(' ')} ${bot.reverse().join(' ')} Z`;
-  return <path d={filled} fill='url(#scrub-grad)' />;
-}
-
-// Peaks (outer light shell) + RMS (inner dark). Two layers.
-function peaksRmsStrands() {
-  const stride = SCRUB_W / AUDIO_PEAK.length;
-  return (
-    <>
-      {/* Peak shell — wider, lower opacity */}
-      {AUDIO_PEAK.map((h, i) => {
-        const x = i * stride + stride / 2;
-        const half = h * WAVE_AMP;
-        return (
-          <line
-            // biome-ignore lint/suspicious/noArrayIndexKey: waveform
-            key={`p-${i}`}
-            x1={x}
-            x2={x}
-            y1={WAVE_CY - half}
-            y2={WAVE_CY + half}
-            stroke='url(#scrub-grad)'
-            strokeWidth='1.2'
-            opacity='0.5'
-            vectorEffect='non-scaling-stroke'
-          />
-        );
-      })}
-      {/* RMS core — narrower, sharper */}
-      {AUDIO_RMS.map((h, i) => {
-        const x = i * stride + stride / 2;
-        const half = h * WAVE_AMP;
-        return (
-          <line
-            // biome-ignore lint/suspicious/noArrayIndexKey: waveform
-            key={`r-${i}`}
-            x1={x}
-            x2={x}
-            y1={WAVE_CY - half}
-            y2={WAVE_CY + half}
-            stroke='url(#scrub-grad)'
-            strokeWidth='0.9'
-            vectorEffect='non-scaling-stroke'
-          />
-        );
-      })}
-    </>
-  );
-}
-
 // Dense rounded bars (SoundCloud / podcast look) — fewer, fatter,
 // rounded caps, mirrored.
 const DENSE_BAR_COUNT = 96;
-const DENSE_BARS = makeAudio(DENSE_BAR_COUNT, 21);
-function denseBarsStrands() {
-  const gap = 1.5;
-  const barW = SCRUB_W / DENSE_BAR_COUNT - gap;
-  return (
-    <>
-      {DENSE_BARS.map((h, i) => {
-        const x = i * (barW + gap) + barW / 2;
-        const half = h * WAVE_AMP;
-        return (
-          <line
-            // biome-ignore lint/suspicious/noArrayIndexKey: waveform
-            key={i}
-            x1={x}
-            x2={x}
-            y1={WAVE_CY - half}
-            y2={WAVE_CY + half}
-            stroke='url(#scrub-grad)'
-            strokeWidth='2.6'
-            strokeLinecap='round'
-            vectorEffect='non-scaling-stroke'
-          />
-        );
-      })}
-    </>
-  );
-}
-
-function renderStrands(kind: WaveformKind) {
-  switch (kind) {
-    case 'hairlines':
-      return hairlinesStrands();
-    case 'stereo':
-      return stereoStrands();
-    case 'filled':
-      return filledStrands();
-    case 'peaksRms':
-      return peaksRmsStrands();
-    case 'denseBars':
-      return denseBarsStrands();
-  }
-}
-
-function ScrubGradient({
-  pct,
-  loopMode,
-  kind,
-}: {
-  pct: number;
-  loopMode: 'off' | 'track' | 'section';
-  kind: WaveformKind;
-}) {
-  const playedX = (pct / 100) * SCRUB_W;
-  const loopFromX = (LOOP_SECTION.from / 100) * SCRUB_W;
-  const loopToX = (LOOP_SECTION.to / 100) * SCRUB_W;
-
-  return (
-    <div className='flex w-full items-center gap-2'>
-      <span className={cn(TIME_LABEL, 'text-right')}>
-        {formatTime(TRACK.currentTime)}
-      </span>
-      <div className='relative flex-1 min-w-[60px] h-8'>
-        <svg
-          viewBox={`0 0 ${SCRUB_W} ${SCRUB_H}`}
-          className='w-full h-full overflow-visible'
-          preserveAspectRatio='none'
-          aria-hidden='true'
-        >
-          <defs>
-            <linearGradient id='scrub-grad' x1='0' y1='0' x2='1' y2='0'>
-              <stop offset='0%' stopColor='#a78bfa' />
-              <stop offset='35%' stopColor='#c084fc' />
-              <stop offset='60%' stopColor='#f472b6' />
-              <stop offset='100%' stopColor='#60a5fa' />
-            </linearGradient>
-            <linearGradient id='scrub-edge-fade' x1='0' y1='0' x2='1' y2='0'>
-              <stop offset='0%' stopColor='white' stopOpacity='0' />
-              <stop offset='10%' stopColor='white' stopOpacity='1' />
-              <stop offset='90%' stopColor='white' stopOpacity='1' />
-              <stop offset='100%' stopColor='white' stopOpacity='0' />
-            </linearGradient>
-            <mask id='scrub-edge-mask'>
-              <rect
-                x='0'
-                y='0'
-                width={SCRUB_W}
-                height={SCRUB_H}
-                fill='url(#scrub-edge-fade)'
-              />
-            </mask>
-            <clipPath id='scrub-played'>
-              <rect x='0' y='0' width={playedX} height={SCRUB_H} />
-            </clipPath>
-            <clipPath id='scrub-unplayed'>
-              <rect
-                x={playedX}
-                y='0'
-                width={SCRUB_W - playedX}
-                height={SCRUB_H}
-              />
-            </clipPath>
-          </defs>
-
-          {/* Cue markers — sit in the reserved 6px above the waveform */}
-          {CUES.map(c => (
-            <circle
-              key={c.label}
-              cx={(c.at / 100) * SCRUB_W}
-              cy={2.5}
-              r={1.6}
-              fill='url(#scrub-grad)'
-              opacity='0.55'
-            />
-          ))}
-
-          {/* Loop section band */}
-          {loopMode === 'section' && (
-            <rect
-              x={loopFromX}
-              y={WAVE_TOP}
-              width={loopToX - loopFromX}
-              height={WAVE_H}
-              fill='url(#scrub-grad)'
-              opacity='0.12'
-            />
-          )}
-          {loopMode === 'section' && (
-            <>
-              <line
-                x1={loopFromX}
-                x2={loopFromX}
-                y1={WAVE_TOP}
-                y2={WAVE_TOP + WAVE_H}
-                stroke='url(#scrub-grad)'
-                strokeWidth='1'
-                opacity='0.55'
-                vectorEffect='non-scaling-stroke'
-              />
-              <line
-                x1={loopToX}
-                x2={loopToX}
-                y1={WAVE_TOP}
-                y2={WAVE_TOP + WAVE_H}
-                stroke='url(#scrub-grad)'
-                strokeWidth='1'
-                opacity='0.55'
-                vectorEffect='non-scaling-stroke'
-              />
-            </>
-          )}
-
-          <g mask='url(#scrub-edge-mask)'>
-            {/* Unplayed — ambient */}
-            <g clipPath='url(#scrub-unplayed)' opacity='0.3'>
-              {renderStrands(kind)}
-            </g>
-            {/* Played — saturated but soft */}
-            <g clipPath='url(#scrub-played)' opacity='0.95'>
-              {renderStrands(kind)}
-            </g>
-            {/* Playhead */}
-            <line
-              x1={playedX}
-              x2={playedX}
-              y1={WAVE_TOP - 2}
-              y2={SCRUB_H}
-              stroke='url(#scrub-grad)'
-              strokeWidth='1'
-              opacity='0.9'
-              vectorEffect='non-scaling-stroke'
-            />
-          </g>
-        </svg>
-      </div>
-      <span className={TIME_LABEL}>{formatTime(TRACK.duration)}</span>
-    </div>
-  );
-}
+const _DENSE_BARS = makeAudio(DENSE_BAR_COUNT, 21);
 
 // ---------------------------------------------------------------------------
 // Context menu — right-click on a Tracks / Releases / Tasks row opens this.
