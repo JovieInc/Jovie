@@ -3,7 +3,7 @@
     {
       "allowed": {
         "origins": ["https://jov.ie"],
-        "methods": ["GET", "PUT", "POST", "HEAD"],
+        "methods": ["GET", "PUT", "POST", "DELETE", "HEAD"],
         "headers": [
           "Content-Type",
           "Content-MD5",
