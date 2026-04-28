@@ -38,7 +38,6 @@ import {
   Archive,
   ArrowDown,
   ArrowRight,
-  ArrowUp,
   ArrowUpDown,
   AudioLines,
   AudioWaveform,
@@ -142,6 +141,10 @@ import { InlineEditRow } from '@/components/shell/InlineEditRow';
 import { LabelPills } from '@/components/shell/LabelPills';
 import { LyricsList } from '@/components/shell/LyricsList';
 import { MetaPill } from '@/components/shell/MetaPill';
+import {
+  PerformanceCard,
+  type PerformanceRangeKey,
+} from '@/components/shell/PerformanceCard';
 import { PickerAction } from '@/components/shell/PickerAction';
 import { PickerLink } from '@/components/shell/PickerLink';
 import { PickerToggle } from '@/components/shell/PickerToggle';
@@ -155,6 +158,7 @@ import {
 } from '@/components/shell/ShellDropdown';
 import { ShellLoader } from '@/components/shell/ShellLoader';
 import { SmartLinkRow } from '@/components/shell/SmartLinkRow';
+import type { SparklineTrend } from '@/components/shell/Sparkline';
 import { Stat } from '@/components/shell/Stat';
 import { StatusBadge } from '@/components/shell/StatusBadge';
 import { SuggestionCard } from '@/components/shell/SuggestionCard';
@@ -8262,193 +8266,28 @@ const RANGES: Array<{ key: RangeKey; label: string; days: number }> = [
 ];
 
 function DrawerPerformance({ release }: { release: Release }) {
-  const [range, setRange] = useState<RangeKey>('7d');
-  const days = RANGES.find(r => r.key === range)?.days ?? 7;
-  const points = useMemo(
-    () => generatePerfPoints(release.waveformSeed, release.weeklyStreams, days),
-    [release.waveformSeed, release.weeklyStreams, days]
-  );
-  const total = points.reduce((a, b) => a + b, 0);
-  const trendUp = release.weeklyDelta > 0;
-  const trendFlat = release.weeklyDelta === 0;
-  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
-  const activeIdx = hoverIdx ?? points.length - 1;
-  const activeValue = points[activeIdx];
-  const clicks =
-    hoverIdx !== null ? activeValue : Math.round((total / days) * 7);
-  const valueLabel = hoverIdx !== null ? 'on day' : 'clicks';
-  const dayLabel =
-    hoverIdx !== null
-      ? formatDayOffset(activeIdx - (points.length - 1))
-      : `last ${range}`;
-
+  const pointsByRange = useMemo(() => {
+    const out: Partial<Record<PerformanceRangeKey, readonly number[]>> = {};
+    for (const r of RANGES) {
+      out[r.key] = generatePerfPoints(
+        release.waveformSeed,
+        release.weeklyStreams,
+        r.days
+      );
+    }
+    return out;
+  }, [release.waveformSeed, release.weeklyStreams]);
+  const trend: SparklineTrend =
+    release.weeklyDelta > 0 ? 'up' : release.weeklyDelta < 0 ? 'down' : 'flat';
   return (
-    <div>
-      <div className='flex items-center justify-between mb-2'>
-        <p className='text-[10px] uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
-          Smart link
-        </p>
-        {/* Pill-shaped time-range selector — flush right. */}
-        <div className='flex items-center gap-0.5 p-0.5 rounded-full bg-(--surface-0)/70 border border-(--linear-app-shell-border)/70'>
-          {RANGES.map(r => {
-            const on = r.key === range;
-            return (
-              <button
-                key={r.key}
-                type='button'
-                onClick={() => {
-                  setRange(r.key);
-                  setHoverIdx(null);
-                }}
-                aria-pressed={on}
-                className={cn(
-                  'h-5 px-2 rounded-full text-[10px] font-medium tracking-[-0.005em] transition-colors duration-150 ease-out',
-                  on
-                    ? 'bg-(--surface-2) text-primary-token ring-1 ring-inset ring-white/10'
-                    : 'text-tertiary-token hover:text-primary-token'
-                )}
-              >
-                {r.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className='flex items-baseline gap-2'>
-        <span className='text-[20px] font-semibold text-primary-token tabular-nums'>
-          {clicks.toLocaleString()}
-        </span>
-        <span className='text-[11px] text-tertiary-token'>{valueLabel}</span>
-        <span className='text-[11px] text-quaternary-token tabular-nums'>
-          · {dayLabel}
-        </span>
-        {hoverIdx === null && (
-          <span
-            className={cn(
-              'ml-auto inline-flex items-center gap-0.5 text-[11px] tabular-nums',
-              trendFlat
-                ? 'text-tertiary-token'
-                : trendUp
-                  ? 'text-cyan-200/85'
-                  : 'text-rose-300/85'
-            )}
-          >
-            {trendUp ? (
-              <ArrowUp className='h-3 w-3' strokeWidth={2.25} />
-            ) : trendFlat ? null : (
-              <ArrowDown className='h-3 w-3' strokeWidth={2.25} />
-            )}
-            {Math.abs(release.weeklyDelta)}%
-          </span>
-        )}
-      </div>
-      <Sparkline
-        points={points}
-        trendUp={trendUp}
-        trendFlat={trendFlat}
-        hoverIdx={hoverIdx}
-        onHover={setHoverIdx}
-      />
-    </div>
-  );
-}
-
-function formatDayOffset(offset: number): string {
-  if (offset === 0) return 'today';
-  if (offset === -1) return 'yesterday';
-  return `${Math.abs(offset)}d ago`;
-}
-
-function Sparkline({
-  points,
-  trendUp,
-  trendFlat,
-  hoverIdx,
-  onHover,
-}: {
-  points: number[];
-  trendUp: boolean;
-  trendFlat: boolean;
-  hoverIdx?: number | null;
-  onHover?: (idx: number | null) => void;
-}) {
-  const w = 340;
-  const h = 120;
-  const max = Math.max(...points, 1);
-  const min = Math.min(...points, 0);
-  const range = max - min || 1;
-  const xFor = (i: number) => (i / (points.length - 1)) * w;
-  const yFor = (v: number) => h - ((v - min) / range) * h;
-  const path = points
-    .map(
-      (p, i) =>
-        `${i === 0 ? 'M' : 'L'} ${xFor(i).toFixed(1)} ${yFor(p).toFixed(1)}`
-    )
-    .join(' ');
-  const fillPath = `${path} L ${w} ${h} L 0 ${h} Z`;
-  const stroke = trendFlat
-    ? 'rgba(255,255,255,0.4)'
-    : trendUp
-      ? 'rgba(165,243,252,0.85)'
-      : 'rgba(253,164,175,0.85)';
-  const fill = trendFlat
-    ? 'rgba(255,255,255,0.06)'
-    : trendUp
-      ? 'rgba(103,232,249,0.10)'
-      : 'rgba(253,164,175,0.10)';
-  const svgRef = useRef<SVGSVGElement>(null);
-  function handleMove(e: React.MouseEvent<SVGSVGElement>) {
-    if (!onHover) return;
-    const rect = svgRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const px = ((e.clientX - rect.left) / rect.width) * w;
-    const idx = Math.max(
-      0,
-      Math.min(points.length - 1, Math.round((px / w) * (points.length - 1)))
-    );
-    onHover(idx);
-  }
-  const playheadX = hoverIdx != null ? xFor(hoverIdx) : null;
-  const playheadY = hoverIdx != null ? yFor(points[hoverIdx]) : null;
-  return (
-    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: chart canvas; hover is a mouse-only affordance and exact values are also surfaced in the static summary above
-    <svg
-      ref={svgRef}
-      viewBox={`0 0 ${w} ${h}`}
-      className='mt-3 w-full h-32 block cursor-crosshair'
-      preserveAspectRatio='none'
-      role='img'
-      aria-label='Smart link clicks over time'
-      onMouseMove={handleMove}
-      onMouseLeave={() => onHover?.(null)}
-    >
-      <title>Smart link clicks</title>
-      <path d={fillPath} fill={fill} />
-      <path d={path} fill='none' stroke={stroke} strokeWidth={1.5} />
-      {playheadX != null && playheadY != null && (
-        <>
-          <line
-            x1={playheadX}
-            y1={0}
-            x2={playheadX}
-            y2={h}
-            stroke='rgba(255,255,255,0.30)'
-            strokeWidth={1}
-            vectorEffect='non-scaling-stroke'
-          />
-          <circle
-            cx={playheadX}
-            cy={playheadY}
-            r={3}
-            fill={stroke}
-            stroke='rgba(0,0,0,0.45)'
-            strokeWidth={1}
-            vectorEffect='non-scaling-stroke'
-          />
-        </>
-      )}
-    </svg>
+    <PerformanceCard
+      title='Smart link'
+      metricLabel='clicks'
+      pointsByRange={pointsByRange}
+      trend={trend}
+      delta={release.weeklyDelta}
+      initialRange='7d'
+    />
   );
 }
 
