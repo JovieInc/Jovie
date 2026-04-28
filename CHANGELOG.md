@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.184] - 2026-04-28
+
+> Frame.io-inspired homepage refresh: the hero now matches Frame.io's exact typography spec (Satoshi 80px / weight 600 / -0.045em) and layout positions, the mockup carousel has a proper window-style top chrome with rounded 18px corners, the header is transparent docked and switches to frosted glass on scroll, and the footer locks to the same edge-to-edge gutter system as the header. New shared `MarketingFinalCTA` foundation for the landing page system.
+
+### Changed
+
+- **Homepage hero typography matches Frame.io's `/features/present` spec exactly** (verified by reading their computed styles via DOM inspection). Eyebrow `Meet Jovie` in cyan-blue (rgb(97,153,246)), 12px / weight 400 / 0.06em tracking. Headline `Drop more music, with less work.` in Satoshi 80px / weight 600 / -0.045em. Subhead 18px / weight 400 / line-height 1.45 / color rgba(234,234,255,0.5). CTAs 14px / weight 600 / 40px / 100px radius / solid white primary, transparent secondary.
+- **Header glassmorphism on scroll.** Docked = transparent. Past 8px of scroll = rgba(8,8,10,0.55) bg + backdrop-blur 18px saturate(180%) + hairline bottom border. Driven by `HomeScrollWatcher` toggling `data-scrolled` on `.home-viewport`. 220ms transition.
+- **Mockup carousel restored to Frame's 3-desktop peek pattern.** Center desktop fully visible at 879×494, side peeks clipped at the viewport edges. Window-style top chrome (32px, hairline divider) with 18px rounded corners and a subtle purple glass tint matching Frame.io's GlassWrapper. Soft purple glow above each mockup softens the top transition into the page.
+- **Header / content / footer share the same edge-to-edge gutter system.** New `MarketingFooter` is full-bleed with `clamp(1.25rem, 2.2vw, 2rem)` gutters. Privacy/Terms moved to the right via `justify-between`; copyright stays left.
+- **Header content trimmed.** Header height 84 → 72px, nav 15px/680 → 14px/600, auth links 40 → 36px tall. Login/Start Free Trial gap 1.5rem → 1.75rem so they read as separate elements.
+- **Outcome cards shrunk** ~30% via `flex-basis` reductions. Card titles dropped to clamp(2rem,3vw,3rem) / weight 680 / -0.025em.
+- **Trust band label visible.** "Trusted by artists on" now renders above the logo strip (was sr-only).
+- **Animated electric beam** in the hero: four cyan-blue verticals with an 8s pulse and slight Y drift, mix-blend-mode screen, prefers-reduced-motion respected.
+
+### Added
+
+- `apps/web/components/site/MarketingFinalCTA.tsx` — shared final-CTA section for marketing pages. Sensible defaults (title, "Start Free Trial" → /signup) with per-page overrides for title / body / cta / secondary cta. Foundation for the landing page system.
+- `apps/web/components/homepage/HomeScrollWatcher.tsx` — client component that toggles `data-scrolled` on `.home-viewport` for the glassmorphic header.
+- `SHELL_CHAT_V1` app flag (default off, dev toolbar label "New Design"). Plumbed through contracts + registry; consumer lands separately.
+- Satoshi Variable font loaded globally via `next/font/local` (was downloaded but never registered) so `--font-satoshi` resolves outside the marketing wrapper.
+
 ## [26.4.183] - 2026-04-27
 
 > Follow-up to v26.4.181. Allow `DELETE` in R2 CORS so the browser-side multipart-abort path works when a user cancels a half-finished upload.
