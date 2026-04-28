@@ -6827,6 +6827,19 @@ function DrawerHero({
 // Overview tab — clean stats triad + compact performance + drop date.
 // No carded sections; sub-areas are separated by a hairline only.
 function DrawerOverviewTab({ release }: { release: Release }) {
+  const pointsByRange = useMemo(() => {
+    const out: Partial<Record<PerformanceRangeKey, readonly number[]>> = {};
+    for (const r of RANGES) {
+      out[r.key] = generatePerfPoints(
+        release.waveformSeed,
+        release.weeklyStreams,
+        r.days
+      );
+    }
+    return out;
+  }, [release.waveformSeed, release.weeklyStreams]);
+  const trend: SparklineTrend =
+    release.weeklyDelta > 0 ? 'up' : release.weeklyDelta < 0 ? 'down' : 'flat';
   return (
     <div className='px-3 py-3 space-y-4'>
       <div className='grid grid-cols-3 gap-3'>
@@ -6840,7 +6853,14 @@ function DrawerOverviewTab({ release }: { release: Release }) {
           tabular
         />
       </div>
-      <DrawerPerformance release={release} />
+      <PerformanceCard
+        title='Smart link'
+        metricLabel='clicks'
+        pointsByRange={pointsByRange}
+        trend={trend}
+        delta={release.weeklyDelta}
+        initialRange='7d'
+      />
     </div>
   );
 }
@@ -6869,32 +6889,6 @@ const RANGES: Array<{ key: RangeKey; label: string; days: number }> = [
   { key: '90d', label: '90d', days: 90 },
   { key: 'YTD', label: 'YTD', days: 120 },
 ];
-
-function DrawerPerformance({ release }: { release: Release }) {
-  const pointsByRange = useMemo(() => {
-    const out: Partial<Record<PerformanceRangeKey, readonly number[]>> = {};
-    for (const r of RANGES) {
-      out[r.key] = generatePerfPoints(
-        release.waveformSeed,
-        release.weeklyStreams,
-        r.days
-      );
-    }
-    return out;
-  }, [release.waveformSeed, release.weeklyStreams]);
-  const trend: SparklineTrend =
-    release.weeklyDelta > 0 ? 'up' : release.weeklyDelta < 0 ? 'down' : 'flat';
-  return (
-    <PerformanceCard
-      title='Smart link'
-      metricLabel='clicks'
-      pointsByRange={pointsByRange}
-      trend={trend}
-      delta={release.weeklyDelta}
-      initialRange='7d'
-    />
-  );
-}
 
 function generatePerfPoints(
   seed: number,
