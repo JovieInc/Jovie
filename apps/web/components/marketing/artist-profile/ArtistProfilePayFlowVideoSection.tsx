@@ -18,7 +18,7 @@ interface ArtistProfilePayFlowVideoSectionProps {
   readonly videoUrl: string | undefined;
 }
 
-type VideoState = 'idle' | 'loading' | 'playing' | 'error';
+type VideoState = 'idle' | 'loading' | 'ready' | 'playing' | 'error';
 
 export function ArtistProfilePayFlowVideoSection({
   copy,
@@ -31,26 +31,30 @@ export function ArtistProfilePayFlowVideoSection({
   const [state, setState] = useState<VideoState>(initialState);
 
   const handleLoadedData = useCallback(() => {
-    setState('playing');
-  }, []);
+    setState(reducedMotion ? 'ready' : 'playing');
+  }, [reducedMotion]);
 
   const handleError = useCallback(() => {
     setState('error');
   }, []);
 
-  const handlePlayClick = useCallback(() => {
+  const handlePlayClick = useCallback(async () => {
     const video = videoRef.current;
     if (!video) return;
-    void video.play().catch(() => {
+    try {
+      await video.play();
+      setState('playing');
+    } catch {
       setState('error');
-    });
+    }
   }, []);
 
   if (!videoUrl || state === 'error') {
     return <ArtistProfileMonetizationSection monetization={monetization} />;
   }
 
-  const showPosterOverlay = reducedMotion || state === 'loading';
+  const showPosterOverlay =
+    state === 'loading' || (reducedMotion && state !== 'playing');
 
   return (
     <ArtistProfileSectionShell width='page'>

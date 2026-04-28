@@ -47,7 +47,7 @@ export function DemoReleaseLandingSurface() {
             >
               <div className='rounded-[24px] border border-white/8 bg-white/[0.04] p-4'>
                 <p className='text-center text-[12px] font-semibold text-white/45'>
-                  Creator activation
+                  Creator Activation
                 </p>
                 <div className='mt-4 rounded-[20px] bg-white/[0.05] px-4 py-5 text-center'>
                   <p className='text-[15px] font-semibold text-white'>

@@ -1,7 +1,16 @@
+'use client';
+
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { APP_ROUTES } from '@/constants/routes';
 import { cn } from '@/lib/utils';
+
+const MINIMAL_FOOTER_PATHS = new Set<string>([
+  APP_ROUTES.PRICING,
+  APP_ROUTES.LEGAL_PRIVACY,
+  APP_ROUTES.LEGAL_TERMS,
+]);
 
 interface MarketingFooterProps {
   readonly variant?: 'auto' | 'expanded' | 'minimal';
@@ -58,7 +67,14 @@ export function MarketingFooter({
   variant = 'auto',
   className,
 }: Readonly<MarketingFooterProps>) {
-  const isMinimal = variant === 'minimal';
+  const pathname = usePathname();
+  const resolvedVariant =
+    variant === 'auto'
+      ? pathname && MINIMAL_FOOTER_PATHS.has(pathname)
+        ? 'minimal'
+        : 'expanded'
+      : variant;
+  const isMinimal = resolvedVariant === 'minimal';
 
   return (
     <footer
@@ -75,44 +91,55 @@ export function MarketingFooter({
             : 'pt-[clamp(3.25rem,5vw,4.6rem)] pb-[clamp(5rem,8vw,7rem)]'
         )}
       >
-        <div className='grid gap-12 md:grid-cols-[3.5rem_minmax(0,1fr)] md:gap-14 xl:gap-16'>
-          <div className='min-w-0'>
-            <Link
-              href={APP_ROUTES.HOME}
-              prefetch={false}
-              aria-label='Jovie home'
-              className='-m-1.5 inline-flex rounded-full p-1.5 text-white/[0.9] transition-opacity duration-150 hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
-            >
-              <BrandLogo size={24} tone='white' rounded={false} aria-hidden />
-            </Link>
-          </div>
-
-          <nav
-            className='grid grid-cols-2 gap-x-10 gap-y-8 sm:grid-cols-4 lg:gap-x-14 xl:gap-x-20'
-            aria-label='Footer'
+        {isMinimal ? (
+          <Link
+            href={APP_ROUTES.HOME}
+            prefetch={false}
+            aria-label='Jovie home'
+            className='-m-1.5 inline-flex rounded-full p-1.5 text-white/[0.9] transition-opacity duration-150 hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
           >
-            {FOOTER_COLUMNS.map(column => (
-              <section key={column.title}>
-                <h2 className='mb-4 text-[12px] font-medium leading-[1.35] tracking-[-0.01em] text-white/[0.78]'>
-                  {column.title}
-                </h2>
-                <ul className='flex list-none flex-col gap-2.5 p-0'>
-                  {column.links.map(link => (
-                    <li key={`${link.href}-${link.label}`}>
-                      <Link
-                        href={link.href}
-                        prefetch={false}
-                        className={footerLinkClassName}
-                      >
-                        {link.label}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ))}
-          </nav>
-        </div>
+            <BrandLogo size={24} tone='white' rounded={false} aria-hidden />
+          </Link>
+        ) : (
+          <div className='grid gap-12 md:grid-cols-[3.5rem_minmax(0,1fr)] md:gap-14 xl:gap-16'>
+            <div className='min-w-0'>
+              <Link
+                href={APP_ROUTES.HOME}
+                prefetch={false}
+                aria-label='Jovie home'
+                className='-m-1.5 inline-flex rounded-full p-1.5 text-white/[0.9] transition-opacity duration-150 hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
+              >
+                <BrandLogo size={24} tone='white' rounded={false} aria-hidden />
+              </Link>
+            </div>
+
+            <nav
+              className='grid grid-cols-2 gap-x-10 gap-y-8 sm:grid-cols-4 lg:gap-x-14 xl:gap-x-20'
+              aria-label='Footer'
+            >
+              {FOOTER_COLUMNS.map(column => (
+                <section key={column.title}>
+                  <h2 className='mb-4 text-[12px] font-medium leading-[1.35] tracking-[-0.01em] text-white/[0.78]'>
+                    {column.title}
+                  </h2>
+                  <ul className='flex list-none flex-col gap-2.5 p-0'>
+                    {column.links.map(link => (
+                      <li key={`${link.href}-${link.label}`}>
+                        <Link
+                          href={link.href}
+                          prefetch={false}
+                          className={footerLinkClassName}
+                        >
+                          {link.label}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
+            </nav>
+          </div>
+        )}
 
         <div
           className={cn(

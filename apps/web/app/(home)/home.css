@@ -1224,13 +1224,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
     --homepage-footer-cta-bottom: 13.5rem;
   }
 
-  .homepage-hero-shell__beam {
-    inset: 14% 0 auto;
-    width: min(46vw, 180px);
-    height: 32%;
-    opacity: 0.54;
-  }
-
   .homepage-hero-shell__grid-wrap {
     left: -18%;
     right: -18%;

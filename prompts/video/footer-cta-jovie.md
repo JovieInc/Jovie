@@ -8,7 +8,7 @@ output: apps/web/public/videos/footer-cta-jovie.mp4
 
 # Footer CTA Jovie Video Prompt
 
-Ops canon source: `/Users/timwhite/conductor/workspaces/ops/damascus/01-canon/04-jovie-persona.md`
+Ops canon source: `ops/damascus/01-canon/04-jovie-persona.md`
 
 Jovie canon anchors:
 - Jovie is a photorealistic, LA-based, 27-year-old AI manager and strategist.
@@ -27,7 +27,7 @@ Scene:
 A deep black void with thin electric-blue road lines starting at the bottom edge and converging into the central vanishing point. Keep the upper center mostly empty, clean, dark negative space for website CTA text. No typography, no logos, no watermark.
 
 Character:
-Use the same woman from the reference image as Jovie: young white blonde woman with blue eyes, Swedish/Dutch look, charismatic, confident, warm, approachable, edgy casual punk-inspired style, black leather jacket, dark fitted streetwear, subtle silver jewelry, modern boots, realistic hair, realistic skin texture, realistic fabric. She should feel like a magnetic street musician with fan-connected energy.
+Use the same woman from the reference image as Jovie: young white blonde woman with blue eyes, Swedish/Dutch look, charismatic, confident, warm, approachable, edgy casual punk-inspired style, black leather jacket, dark fitted streetwear, subtle silver jewelry, modern boots, realistic hair, realistic skin texture, realistic fabric. She should feel like a magnetic operator and strategist with fan-connected energy, not like a performer.
 
 Motion:
 Single continuous shot. Locked camera. No cuts. No zooms. No camera shake.
