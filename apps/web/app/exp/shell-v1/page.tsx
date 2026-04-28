@@ -128,6 +128,7 @@ import {
   type EntityPopoverData,
   ShellDropdown,
 } from '@/components/shell/ShellDropdown';
+import { ShellLoader } from '@/components/shell/ShellLoader';
 // ---------------------------------------------------------------------------
 // DESIGN RULE — NO AI-SLOP GRADIENTS ON UI CHROME
 // ---------------------------------------------------------------------------
@@ -2659,34 +2660,6 @@ export default function ShellV1Experiment() {
 // top-left of the page) while the app fades in underneath. The mark in
 // the sidebar takes over visually at the end. Pointer-events disabled
 // throughout so first interactions don't accidentally land on the overlay.
-function ShellLoader({ phase }: { phase: 'bloom' | 'reveal' | 'done' }) {
-  if (phase === 'done') return null;
-  const isReveal = phase === 'reveal';
-  // Calm bloom: logo holds centered, then fades + scales up subtly (no
-  // flight path). Background fades from solid to transparent so the app
-  // reveals underneath without the logo "going somewhere."
-  return (
-    <div
-      aria-hidden='true'
-      className='fixed inset-0 z-[60] pointer-events-none grid place-items-center'
-      style={{
-        background: isReveal ? 'rgba(6,7,10,0)' : 'rgba(6,7,10,1)',
-        transition: `background-color 480ms ${EASE_CINEMATIC}`,
-      }}
-    >
-      <div
-        style={{
-          transform: isReveal ? 'scale(1.08)' : 'scale(1)',
-          opacity: isReveal ? 0 : 1,
-          transition: `transform 520ms ${EASE_CINEMATIC}, opacity 380ms ${EASE_CINEMATIC}`,
-        }}
-      >
-        <JovieMark className='h-12 w-12 text-primary-token' />
-      </div>
-    </div>
-  );
-}
-
 function FloatingSidebarLayer({
   active,
   peekOpen,
