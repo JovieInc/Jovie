@@ -4,23 +4,27 @@ import { SuggestedPrompts } from '@/components/jovie/components/SuggestedPrompts
 import { fastRender } from '@/tests/utils/fast-render';
 
 describe('SuggestedPrompts', () => {
-  it('renders default hero-style pills (mirrors homepage intent)', () => {
+  it('renders default hero-style pills (catalog-aware after chat-rag-eval)', () => {
     const onSelect = vi.fn();
     const { getByText, getByTestId, queryByText } = fastRender(
       <SuggestedPrompts onSelect={onSelect} />
     );
 
     expect(getByTestId('suggested-prompts-rail')).toBeTruthy();
-    expect(getByText('Plan a release')).toBeTruthy();
+    // First two pills exercise the new artist-data lookup tools — design
+    // phase wanted catalog-aware prompts up front.
+    expect(getByText('Recap last release')).toBeTruthy();
+    expect(getByText('Catalog health')).toBeTruthy();
     expect(getByText('Generate album art')).toBeTruthy();
     expect(getByText('Pitch playlists')).toBeTruthy();
-    expect(getByText('Build artist profile')).toBeTruthy();
-    expect(getByText('Analyze momentum')).toBeTruthy();
+    expect(getByText('Link analytics')).toBeTruthy();
 
     // Old task-list entries should be gone — they belong in the profile switcher.
     expect(queryByText('Preview profile')).toBeNull();
     expect(queryByText('Change photo')).toBeNull();
     expect(queryByText('Getting paid')).toBeNull();
+    // Generic "Build artist profile" replaced by catalog-aware prompts.
+    expect(queryByText('Build artist profile')).toBeNull();
   });
 
   it('renders a grid layout when requested', () => {
@@ -60,8 +64,8 @@ describe('SuggestedPrompts', () => {
   it('calls onSelect with the full prompt when clicked', () => {
     const onSelect = vi.fn();
     const { getByText } = fastRender(<SuggestedPrompts onSelect={onSelect} />);
-    getByText('Plan a release').closest('button')?.click();
-    expect(onSelect).toHaveBeenCalledWith('Help me plan my next release.');
+    getByText('Recap last release').closest('button')?.click();
+    expect(onSelect).toHaveBeenCalledWith('How did my last release perform?');
   });
 
   it('renders pitch and feedback actions for returning users with advanced tools', () => {

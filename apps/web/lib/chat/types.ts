@@ -55,3 +55,31 @@ export interface ChatTelemetry {
     context: { tags?: Record<string, string>; extra?: Record<string, unknown> }
   ): void;
 }
+
+/**
+ * One canon doc retrieved for a chat answer. Sent to the client via the
+ * AI SDK's `messageMetadata` callback so source chips can render below
+ * the assistant bubble.
+ */
+export interface RetrievedChatSource {
+  /** Canon doc title (max 60 chars). Renders in the chip. */
+  readonly title: string;
+  /** Optional public URL — when present, the chip is clickable. */
+  readonly sourceUrl: string | null;
+  /** Cosine score (0..1). Surfaced in `title=` tooltip for debugging. */
+  readonly score: number;
+}
+
+/**
+ * Metadata attached to every Jovie chat assistant message. Reaches the
+ * client via AI SDK's `messageMetadata` on `streamText().toUIMessageStreamResponse`.
+ *
+ * The client uses `chatTraceId` for feedback POSTs and renders
+ * `retrievedSources` as source chips below the reply bubble.
+ */
+export interface JovieChatMessageMetadata {
+  readonly chatTraceId: string;
+  readonly retrievedSources: readonly RetrievedChatSource[];
+  /** Composite version stamp; useful for "report bug" affordance. */
+  readonly retrievalVersion: string;
+}

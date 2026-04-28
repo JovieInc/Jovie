@@ -120,8 +120,10 @@ describe('JovieChat empty state', () => {
     expect(queryByText('Jovie Assistant')).toBeNull();
     expect(queryByText('Ask anything or tell Jovie what you need')).toBeNull();
     expect(getByTestId('chat-input')).toBeTruthy();
-    // New hero-style pills sourced from DEFAULT_SUGGESTIONS (mirrors homepage).
-    expect(getByText('Plan a release')).toBeTruthy();
+    // Hero-style pills from DEFAULT_SUGGESTIONS — catalog-aware first
+    // after chat-rag-eval landed the artist-data lookup tools.
+    expect(getByText('Recap last release')).toBeTruthy();
+    expect(getByText('Catalog health')).toBeTruthy();
     expect(getByText('Generate album art')).toBeTruthy();
     expect(getByText('Pitch playlists')).toBeTruthy();
     // Old task-list-style actions should NOT appear — they belong in the profile switcher.

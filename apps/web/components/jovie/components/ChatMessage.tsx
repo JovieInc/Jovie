@@ -7,10 +7,13 @@ import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { useClipboard } from '@/hooks/useClipboard';
+import type { JovieChatMessageMetadata } from '@/lib/chat/types';
 import { cn } from '@/lib/utils';
 import { getRenderableToolEvents, ToolPartsRenderer } from '../tool-ui';
 import type { MessagePart } from '../types';
 import { getMessageText } from '../utils';
+import { MessageFeedback } from './MessageFeedback';
+import { MessageSourceChips } from './MessageSourceChips';
 import { TokenizedText } from './TokenizedText';
 
 const ChatMarkdown = dynamic(
@@ -32,6 +35,12 @@ interface ChatMessageProps {
   readonly profileId?: string;
   /** Skip entrance animation for messages loaded from persistence. */
   readonly skipEntrance?: boolean;
+  /**
+   * Server-emitted metadata: trace_id (for feedback POSTs) + retrieved
+   * canon sources (for source chips). Present on assistant messages
+   * once the stream's `start` event lands.
+   */
+  readonly metadata?: JovieChatMessageMetadata;
 }
 
 export function ChatMessage({
@@ -43,6 +52,7 @@ export function ChatMessage({
   avatarUrl,
   profileId,
   skipEntrance,
+  metadata,
 }: ChatMessageProps) {
   const isUser = role === 'user';
   const { copy, isSuccess } = useClipboard();
@@ -169,6 +179,13 @@ export function ChatMessage({
                   />
                 </div>
               ) : null}
+              {/*
+                Source chips render between the bubble and the tool UI per
+                the /autoplan design phase. Empty sources = no row at all.
+              */}
+              {metadata && metadata.retrievedSources.length > 0 && (
+                <MessageSourceChips sources={metadata.retrievedSources} />
+              )}
             </div>
           )}
 
@@ -179,24 +196,40 @@ export function ChatMessage({
             hasMessageText={Boolean(messageText)}
           />
 
-          {!isStreaming && messageText && (
-            <div className='mt-1.5 flex items-center justify-end pr-0.5'>
-              <SimpleTooltip content={isSuccess ? 'Copied!' : 'Copy response'}>
-                <button
-                  type='button'
-                  onClick={() => copy(messageText)}
-                  className='inline-flex h-7 w-7 items-center justify-center rounded-full border border-transparent bg-transparent text-tertiary-token shadow-none transition-colors duration-150 hover:bg-surface-1 hover:text-secondary-token focus-visible:bg-surface-1 focus-visible:outline-none'
-                  aria-label={
-                    isSuccess ? 'Copied to clipboard' : 'Copy message'
-                  }
+          {!isStreaming && hasAssistantContent && (
+            <div className='mt-1.5 flex items-center justify-between gap-3 pr-0.5'>
+              {/*
+                Feedback affordance — left-aligned. Renders whenever an
+                assistant message has content AND we received a trace_id
+                from the server (i.e., the chat-rag stack is wired). Tool-
+                only answers also get feedback per the /autoplan design
+                consensus on `messageHasAssistantText`.
+              */}
+              <div className='min-h-[28px]'>
+                {metadata?.chatTraceId && (
+                  <MessageFeedback traceId={metadata.chatTraceId} />
+                )}
+              </div>
+              {messageText && (
+                <SimpleTooltip
+                  content={isSuccess ? 'Copied!' : 'Copy response'}
                 >
-                  {isSuccess ? (
-                    <Check className='h-3.5 w-3.5' />
-                  ) : (
-                    <Copy className='h-3.5 w-3.5' />
-                  )}
-                </button>
-              </SimpleTooltip>
+                  <button
+                    type='button'
+                    onClick={() => copy(messageText)}
+                    className='inline-flex h-7 w-7 items-center justify-center rounded-full border border-transparent bg-transparent text-tertiary-token shadow-none transition-colors duration-150 hover:bg-surface-1 hover:text-secondary-token focus-visible:bg-surface-1 focus-visible:outline-none'
+                    aria-label={
+                      isSuccess ? 'Copied to clipboard' : 'Copy message'
+                    }
+                  >
+                    {isSuccess ? (
+                      <Check className='h-3.5 w-3.5' />
+                    ) : (
+                      <Copy className='h-3.5 w-3.5' />
+                    )}
+                  </button>
+                </SimpleTooltip>
+              )}
             </div>
           )}
         </div>
