@@ -102,6 +102,7 @@
   "permissions": {
     "allow": [
       "mcp__linear__*",
+      "mcp__linear-server__*",
       "mcp__claude_ai_Linear__*",
       "Skill(pr)",
       "Skill(pr:*)",
@@ -251,6 +252,8 @@
         "pnpm exec biome *",
         "pnpm exec vitest *",
         "pnpm exec playwright test *",
+        "pnpm exec grep *",
+        "~/.claude/skills/gstack/browse/dist/browse *",
         "npx vitest *",
         "biome *",
         "bash -n *",
@@ -353,6 +356,7 @@
         "gh pr merge *",
         "gh pr update-branch *",
         "gh pr review *",
+        "GIT_EDITOR=* git *",
         "python3 *",
         "docker *",
         "psql *",
