@@ -162,9 +162,12 @@ import type { SparklineTrend } from '@/components/shell/Sparkline';
 import { Stat } from '@/components/shell/Stat';
 import { StatusBadge } from '@/components/shell/StatusBadge';
 import { SuggestionCard } from '@/components/shell/SuggestionCard';
+import { ThreadAudioCard } from '@/components/shell/ThreadAudioCard';
 import { ThreadCardIconBtn } from '@/components/shell/ThreadCardIconBtn';
-import { ThreadComposer } from '@/components/shell/ThreadComposer';
+import { ThreadImageCard } from '@/components/shell/ThreadImageCard';
 import { ThreadTurn } from '@/components/shell/ThreadTurn';
+import { ThreadVideoCard } from '@/components/shell/ThreadVideoCard';
+import { ThreadView as ShellThreadView } from '@/components/shell/ThreadView';
 import { Tooltip } from '@/components/shell/Tooltip';
 import { TypeBadge } from '@/components/shell/TypeBadge';
 // ---------------------------------------------------------------------------
@@ -6702,132 +6705,54 @@ function mockThreadMarkdown(thread: Thread): string {
   ].join('\n');
 }
 
+// 16:10 placeholder used by the "complete" branch of the design demo.
+// Tiny dark-rect SVG keeps visual parity with the inline gradient
+// previously rendered when ThreadImageCard had no previewUrl.
+const THREAD_DEMO_PREVIEW =
+  "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 10'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%23292c33'/><stop offset='1' stop-color='%2310131a'/></linearGradient></defs><rect width='16' height='10' fill='url(%23g)'/></svg>";
+
 function ThreadView({ thread }: { thread: Thread }) {
-  // ChatGPT-pattern: composer stays pinned, messages scroll. The article
-  // is the height-bound parent; the middle div is the scroll boundary;
-  // the floating "scroll to bottom" arrow appears when the user has
-  // scrolled up and disappears when they're already at the bottom.
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [atBottom, setAtBottom] = useState(true);
-  const checkAtBottom = useCallback(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const dist = el.scrollHeight - el.scrollTop - el.clientHeight;
-    setAtBottom(dist < 24);
-  }, []);
-  // Recompute on mount + when the thread or its content height changes
-  // (image / audio / video cards mount async). Otherwise the arrow stays
-  // hidden when the thread loads taller than the viewport.
-  useEffect(() => {
-    checkAtBottom();
-    const el = scrollRef.current;
-    if (!el || typeof ResizeObserver === 'undefined') return;
-    const ro = new ResizeObserver(() => checkAtBottom());
-    ro.observe(el);
-    if (el.firstElementChild) ro.observe(el.firstElementChild);
-    return () => ro.disconnect();
-  }, [checkAtBottom, thread.id]);
-  const scrollToBottom = () => {
-    const el = scrollRef.current;
-    if (!el) return;
-    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-  };
   return (
-    <article className='relative h-full overflow-hidden'>
-      <div
-        ref={scrollRef}
-        onScroll={checkAtBottom}
-        className='absolute inset-0 overflow-y-auto'
-      >
-        {/* Bottom padding leaves room for the floating composer to sit
-            over the canvas without clipping the last message. */}
-        <div className='max-w-3xl mx-auto px-8 pt-6 pb-32'>
-          <header>
-            <h1
-              className='text-[24px] font-semibold leading-tight text-primary-token'
-              style={{ letterSpacing: '-0.018em' }}
-            >
-              {thread.title}
-            </h1>
-            {thread.entityKind && thread.entityId && (
-              <p className='mt-1.5 text-[12.5px] text-tertiary-token'>
-                Linked to {thread.entityKind} ·{' '}
-                <span className='text-secondary-token'>{thread.entityId}</span>
-              </p>
-            )}
-          </header>
-
-          <div className='mt-8 space-y-4 text-[13.5px] leading-relaxed'>
-            <ThreadTurn speaker='jovie'>
-              <ChatMarkdown content={mockThreadMarkdown(thread)} />
-            </ThreadTurn>
-
-            {thread.status === 'complete' && (
-              <>
-                <ThreadImageCard
-                  prompt='Lost in the Light · Spotify Canvas'
-                  status='ready'
-                />
-                <ThreadAudioCard
-                  title='Lost in the Light'
-                  artist='Bahamas'
-                  duration='3:33'
-                />
-                <ThreadVideoCard
-                  title='Lost in the Light · lyric video'
-                  durationSec={34}
-                />
-              </>
-            )}
-
-            {thread.status === 'running' && (
-              <>
-                <ThreadImageCard
-                  prompt='Lost in the Light · Spotify Canvas'
-                  status='generating'
-                />
-                <ThreadTurn speaker='jovie' subtle>
-                  <span className='inline-flex items-center gap-1.5'>
-                    <Loader2
-                      className='h-3 w-3 animate-spin text-quaternary-token'
-                      strokeWidth={2.25}
-                    />
-                    Generating…
-                  </span>
-                </ThreadTurn>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Composer floats over the messages — ChatGPT / Claude pattern. A
-          subtle gradient fades the trailing message into the composer area
-          so the input never reads as a hard band. The composer itself
-          carries no full-width chrome; only the pill is opaque. */}
-      <div
-        aria-hidden='true'
-        className='pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-(--linear-app-content-surface) via-(--linear-app-content-surface)/80 to-transparent'
-      />
-      <div className='absolute inset-x-0 bottom-0'>
-        <div className='relative max-w-3xl mx-auto px-8 pb-4'>
-          <button
-            type='button'
-            onClick={scrollToBottom}
-            aria-label='Scroll to bottom'
-            className={cn(
-              'absolute left-1/2 -translate-x-1/2 -top-10 h-8 w-8 rounded-full grid place-items-center text-secondary-token bg-(--linear-app-content-surface) border border-(--linear-app-shell-border) shadow-[0_2px_8px_rgba(0,0,0,0.18)] hover:text-primary-token hover:bg-surface-1 transition-all duration-200 ease-out z-10',
-              atBottom
-                ? 'opacity-0 translate-y-2 pointer-events-none'
-                : 'opacity-100'
-            )}
-          >
-            <ArrowDown className='h-3.5 w-3.5' strokeWidth={2.25} />
-          </button>
-          <ThreadComposer placeholder='Reply to this thread…' />
-        </div>
-      </div>
-    </article>
+    <ShellThreadView thread={thread}>
+      <ThreadTurn speaker='jovie'>
+        <ChatMarkdown content={mockThreadMarkdown(thread)} />
+      </ThreadTurn>
+      {thread.status === 'complete' && (
+        <>
+          <ThreadImageCard
+            prompt='Lost in the Light · Spotify Canvas'
+            status='ready'
+            previewUrl={THREAD_DEMO_PREVIEW}
+          />
+          <ThreadAudioCard
+            title='Lost in the Light'
+            artist='Bahamas'
+            duration='3:33'
+          />
+          <ThreadVideoCard
+            title='Lost in the Light · lyric video'
+            durationSec={34}
+          />
+        </>
+      )}
+      {thread.status === 'running' && (
+        <>
+          <ThreadImageCard
+            prompt='Lost in the Light · Spotify Canvas'
+            status='generating'
+          />
+          <ThreadTurn speaker='jovie' subtle>
+            <span className='inline-flex items-center gap-1.5'>
+              <Loader2
+                className='h-3 w-3 animate-spin text-quaternary-token'
+                strokeWidth={2.25}
+              />
+              Generating…
+            </span>
+          </ThreadTurn>
+        </>
+      )}
+    </ShellThreadView>
   );
 }
 
@@ -6951,7 +6876,7 @@ function OnboardingCanvas({ onComplete }: { onComplete: () => void }) {
 // Image generation card — clean attachment block. Shimmer + visible
 // prompt while generating; aspect-correct preview + tap-to-lightbox
 // once ready. Toolbar: download / copy / regenerate.
-function ThreadImageCard({
+function _ThreadImageCard({
   prompt,
   status,
 }: {
@@ -7013,7 +6938,7 @@ function ThreadImageCard({
 // Audio card — minimal. Click play takes over the global audio bar at
 // the bottom of the canvas (not parallel state). Inline play/pause
 // stays synced with the global bar via the same isPlaying flag.
-function ThreadAudioCard({
+function _ThreadAudioCard({
   title,
   artist,
   duration,
@@ -7054,7 +6979,7 @@ function ThreadAudioCard({
 // cinematic full-screen (reuses the ScreeningRoom mode by switching
 // canvas view to 'lyrics'; for the design pass we wire that
 // transition next batch).
-function ThreadVideoCard({
+function _ThreadVideoCard({
   title,
   durationSec,
 }: {
