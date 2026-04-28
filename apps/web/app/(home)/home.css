@@ -528,9 +528,9 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-trust-section {
   position: relative;
   z-index: 1;
-  padding-block: clamp(2.75rem, 4vw, 4rem);
-  padding-inline: var(--homepage-page-gutter);
-  background: #050608;
+  padding: clamp(2.75rem, 4vw, 3.875rem) var(--homepage-page-gutter)
+    clamp(7.5rem, 12vw, 11.25rem);
+  background: #000;
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
 
