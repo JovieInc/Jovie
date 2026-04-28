@@ -5,12 +5,8 @@ import { HomepageHeroMockupCarousel } from '@/components/homepage/HomepageHeroCa
 import { HERO_COPY } from '@/components/homepage/intent';
 import { ArtistProfileOutcomeDuo } from '@/components/marketing/artist-profile/ArtistProfileOutcomeDuo';
 import {
-  HomepageV2CaptureReactivate,
   HomepageV2FinalCta,
-  HomepageV2PowerGrid,
   HomepageV2Pricing,
-  HomepageV2Spotlight,
-  HomepageV2SystemOverview,
 } from '@/components/marketing/homepage-v2/HomepageV2Route';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
@@ -182,7 +178,7 @@ export default function HomePage() {
       >
         <div
           data-testid='homepage-hero-shell'
-          className='homepage-hero-shell relative flex min-h-[100svh] flex-col overflow-hidden rounded-b-[44px] text-primary-token sm:rounded-b-[56px] lg:rounded-b-[72px]'
+          className='homepage-hero-shell relative flex h-[100svh] min-h-[760px] flex-col overflow-hidden text-primary-token'
         >
           <div
             aria-hidden='true'
@@ -200,7 +196,7 @@ export default function HomePage() {
             <div className='homepage-hero-shell__grid' />
           </div>
 
-          <div className='relative z-[3] mx-auto flex w-full max-w-[1480px] min-w-0 flex-1 flex-col items-center justify-start px-5 pb-0 pt-[calc(var(--linear-header-height)+4.3rem)] sm:px-8 sm:pt-[calc(var(--linear-header-height)+4.8rem)] lg:px-12 lg:pt-[calc(var(--linear-header-height)+5.25rem)]'>
+          <div className='relative z-[3] mx-auto flex w-full max-w-none min-w-0 flex-1 flex-col items-center justify-start px-5 pb-0 pt-[calc(var(--linear-header-height)+5.8rem)] sm:px-8 sm:pt-[calc(var(--linear-header-height)+6.4rem)] lg:px-12 lg:pt-[calc(var(--linear-header-height)+7rem)]'>
             <div className='homepage-hero-copy w-full min-w-0'>
               <h1
                 id='home-hero-heading'
@@ -228,18 +224,6 @@ export default function HomePage() {
           headline={ARTIST_PROFILE_COPY.outcomeDuo.homepageHeadline}
           duo={ARTIST_PROFILE_COPY.outcomeDuo}
         />
-        {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_SYSTEM_OVERVIEW ? (
-          <HomepageV2SystemOverview />
-        ) : null}
-        {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_SPOTLIGHT ? (
-          <HomepageV2Spotlight />
-        ) : null}
-        {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_CAPTURE_REACTIVATE ? (
-          <HomepageV2CaptureReactivate />
-        ) : null}
-        {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_POWER_GRID ? (
-          <HomepageV2PowerGrid />
-        ) : null}
         {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_PRICING ? <HomepageV2Pricing /> : null}
         {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_FINAL_CTA ? (
           <HomepageV2FinalCta />

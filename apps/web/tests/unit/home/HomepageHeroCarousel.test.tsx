@@ -16,9 +16,7 @@ describe('HomepageHeroMockupCarousel', () => {
 
     expectActiveShot('homepage-hero-shot-releases-dashboard');
 
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Show next product screenshot' })
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Go to next slide' }));
 
     expectActiveShot('homepage-hero-shot-audience-crm');
   });
@@ -28,7 +26,7 @@ describe('HomepageHeroMockupCarousel', () => {
     render(<HomepageHeroMockupCarousel />);
 
     const nextButton = screen.getByRole('button', {
-      name: 'Show next product screenshot',
+      name: 'Go to next slide',
     });
 
     fireEvent.mouseEnter(nextButton);
@@ -46,7 +44,7 @@ describe('HomepageHeroMockupCarousel', () => {
     render(<HomepageHeroMockupCarousel />);
 
     const nextButton = screen.getByRole('button', {
-      name: 'Show next product screenshot',
+      name: 'Go to next slide',
     });
 
     act(() => {

@@ -6,9 +6,7 @@ import { APP_ROUTES } from '@/constants/routes';
 
 const HOME_NAV_LINKS = [
   { href: APP_ROUTES.ARTIST_PROFILES, label: 'Product' },
-  { href: APP_ROUTES.ARTIST_NOTIFICATIONS, label: 'Solutions' },
   { href: APP_ROUTES.PRICING, label: 'Pricing' },
-  { href: APP_ROUTES.BLOG, label: 'Resources' },
 ] as const;
 
 export default function HomeLayout({

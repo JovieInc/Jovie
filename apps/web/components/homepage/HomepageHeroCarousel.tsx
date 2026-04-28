@@ -60,26 +60,6 @@ const HERO_MOCKUP_SCREENSHOTS: readonly HeroMockupShot[] = [
     kind: 'desktop',
     priority: false,
   },
-  {
-    id: 'release-detail-phone',
-    src: '/product-screenshots/release-sidebar-detail.png',
-    alt: 'Mobile release detail screen for launch planning',
-    title: 'Release Detail',
-    width: 776,
-    height: 1690,
-    kind: 'phone',
-    priority: false,
-  },
-  {
-    id: 'release-routing-panel',
-    src: '/product-screenshots/release-sidebar-platforms.png',
-    alt: 'Release platform routing controls for music destinations',
-    title: 'Release Routing',
-    width: 776,
-    height: 582,
-    kind: 'panel',
-    priority: false,
-  },
 ] as const;
 
 const HOVER_ADVANCE_DELAY_MS = 700;
@@ -127,12 +107,12 @@ function getSlideStyle(offset: number): CSSProperties {
       ? distance === 0
         ? 1
         : distance === 1
-          ? 0.38
-          : 0.14
+          ? 0.3
+          : 0.08
       : 0,
-    '--carousel-scale': distance === 0 ? 1 : distance === 1 ? 0.72 : 0.58,
+    '--carousel-scale': distance <= 1 ? 1 : 0.96,
     '--carousel-blur':
-      distance === 0 ? '0px' : distance === 1 ? '0.2px' : '1px',
+      distance === 0 ? '0px' : distance === 1 ? '0.1px' : '1px',
     '--carousel-z': HERO_MOCKUP_SCREENSHOTS.length - distance,
   } as CSSProperties;
 }
@@ -243,22 +223,26 @@ export function HomepageHeroMockupCarousel() {
         <button
           type='button'
           className='homepage-hero-carousel__side homepage-hero-carousel__side--previous focus-ring-themed'
-          aria-label='Show previous product screenshot'
+          aria-label='Go to previous slide'
           onClick={() => handleCarouselClick(-1)}
           onMouseEnter={() => handleHoverStart(-1)}
           onMouseLeave={stopHoverScroll}
         >
-          <ChevronLeft aria-hidden='true' strokeWidth={1.8} />
+          <span className='homepage-hero-carousel__arrow'>
+            <ChevronLeft aria-hidden='true' strokeWidth={1.8} />
+          </span>
         </button>
         <button
           type='button'
           className='homepage-hero-carousel__side homepage-hero-carousel__side--next focus-ring-themed'
-          aria-label='Show next product screenshot'
+          aria-label='Go to next slide'
           onClick={() => handleCarouselClick(1)}
           onMouseEnter={() => handleHoverStart(1)}
           onMouseLeave={stopHoverScroll}
         >
-          <ChevronRight aria-hidden='true' strokeWidth={1.8} />
+          <span className='homepage-hero-carousel__arrow'>
+            <ChevronRight aria-hidden='true' strokeWidth={1.8} />
+          </span>
         </button>
       </div>
     </section>
