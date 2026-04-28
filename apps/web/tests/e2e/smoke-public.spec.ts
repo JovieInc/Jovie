@@ -211,7 +211,7 @@ test.describe('Public Profile', () => {
     ).toBeVisible({ timeout: 20_000 });
   });
 
-  test('profile listen mode renders DSP options', async ({ page }) => {
+  test('profile listen mode renders release options', async ({ page }) => {
     test.setTimeout(90_000);
     await blockAnalytics(page);
 
@@ -235,15 +235,17 @@ test.describe('Public Profile', () => {
     await expect(page.locator('h1').first()).toBeVisible({ timeout: 20_000 });
     await expect(page.locator('h1').first()).toContainText(/dua lipa/i);
 
-    // DSP links must render — this IS listen mode's purpose
-    // 30s timeout handles SSR under parallel test load
+    // Listen mode should expose seeded releases as actionable options. Profiles
+    // without releases fall back to direct DSP links, but the seeded smoke
+    // profile exercises the release-list path.
     await expect(
       page
-        .locator(
-          'a[href*="spotify"], a[href*="apple"], button:has-text("Spotify"), button:has-text("Apple Music")'
-        )
+        .locator(`a[href^="/${TEST_PROFILE}/"]`)
+        .filter({
+          hasText: /future glow|raw energy|neon skyline|midnight drive/i,
+        })
         .first(),
-      'No DSP links in listen mode — Spotify seeding failed or rendering is broken'
+      'No seeded release links in listen mode — release seeding failed or rendering is broken'
     ).toBeVisible({ timeout: 30_000 });
   });
 

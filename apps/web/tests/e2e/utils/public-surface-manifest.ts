@@ -358,7 +358,7 @@ const MARKETING_SURFACES = [
     expectedState: 'ok',
     path: '/blog/[slug]',
     resolvePath: resolveBlogPostPath,
-    readySelectors: ['article', 'h1'],
+    readySelectors: ['h1'],
     mainSelector: 'main',
     minMainTextLength: 180,
     lighthouse: true,

@@ -221,6 +221,19 @@ function routeCaseKey(routeCase: Readonly<RouteCase>) {
 }
 
 function buildStaticCase(route: string, source: string): RouteCase {
+  if (route === '/investor-portal' || route === '/investor-portal/respond') {
+    return {
+      id: routeIdFromPath(route),
+      lane: inferLane(route),
+      path: route,
+      source,
+      authPersona: 'public',
+      expectedState: 'not-found',
+      notes:
+        'Investor portal routes are token-gated and intentionally return not-found without an investor token.',
+    };
+  }
+
   return {
     id: routeIdFromPath(route),
     lane: inferLane(route),
@@ -849,7 +862,7 @@ async function runRouteCase(
     const routeRun = settleWithTimeout(
       (async () => {
         const response = await page.goto(targetUrl, {
-          waitUntil: 'domcontentloaded',
+          waitUntil: 'commit',
           timeout: 45_000,
         });
         await waitForStablePage(page);
@@ -891,7 +904,7 @@ async function runRouteCase(
         let status: ResultStatus = 'pass';
         const findings: string[] = [...pageErrors];
 
-        if (!hasMainContent) {
+        if (!hasMainContent && routeCase.expectedState !== 'not-found') {
           status = 'fail';
           findings.push('No visible main content');
         }
@@ -1075,7 +1088,6 @@ async function main() {
   );
 
   let browser: Browser | null = null;
-  let context: BrowserContext | null = null;
   const results: RouteResult[] = [];
   let exitCode = 1;
   let fatalError: unknown = null;
@@ -1084,21 +1096,33 @@ async function main() {
     : 5_000;
   try {
     browser = await chromium.launch({ headless: true });
-    context = await browser.newContext({
-      viewport: { width: 1440, height: 960 },
-      colorScheme: 'dark',
-    });
 
     for (const routeCase of routeCases) {
-      const result = await runRouteCase(context, routeCase);
-      results.push(result);
-      const marker =
-        result.status === 'pass'
-          ? 'PASS'
-          : result.status === 'blocked'
-            ? 'BLOCK'
-            : 'FAIL';
-      console.log(`${marker} ${routeCase.path}`);
+      const routeContext = await browser.newContext({
+        viewport: { width: 1440, height: 960 },
+        colorScheme: 'dark',
+      });
+      try {
+        const result = await runRouteCase(routeContext, routeCase);
+        results.push(result);
+        const marker =
+          result.status === 'pass'
+            ? 'PASS'
+            : result.status === 'blocked'
+              ? 'BLOCK'
+              : 'FAIL';
+        console.log(`${marker} ${routeCase.path}`);
+      } finally {
+        const contextClose = await settleWithTimeout(
+          routeContext.close().catch(() => undefined),
+          closeTimeoutMs
+        );
+        if (contextClose.timedOut) {
+          console.warn(
+            `[route-qa] Timed out after ${closeTimeoutMs}ms while closing the browser context.`
+          );
+        }
+      }
     }
 
     const summary = summarizeResults(results);
@@ -1114,18 +1138,6 @@ async function main() {
     process.exitCode = 1;
     console.error(error);
   } finally {
-    if (context) {
-      const contextClose = await settleWithTimeout(
-        context.close().catch(() => undefined),
-        closeTimeoutMs
-      );
-      if (contextClose.timedOut) {
-        console.warn(
-          `[route-qa] Timed out after ${closeTimeoutMs}ms while closing the browser context.`
-        );
-      }
-    }
-
     if (browser) {
       const browserClose = await settleWithTimeout(
         browser.close().catch(() => undefined),
