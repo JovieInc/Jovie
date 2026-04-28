@@ -180,12 +180,12 @@ function DesktopSurfaceCard({
   return (
     <section
       className={cn(
-        'rounded-[20px] border border-white/8 bg-white/[0.035] p-5',
+        'rounded-[18px] border border-white/6 bg-white/[0.025] p-5',
         className
       )}
     >
       <div className='mb-4 flex items-center justify-between gap-4'>
-        <h2 className='text-[17px] font-semibold tracking-[-0.025em] text-white'>
+        <h2 className='text-[16px] font-semibold tracking-[-0.02em] text-white'>
           {title}
         </h2>
         {actionLabel && onAction ? (
@@ -294,7 +294,6 @@ export function ProfileDesktopSurface({
   const {
     heroImageUrl,
     heroSubtitle,
-    heroRoleLabel,
     latestVisibleRelease,
     visibleReleases,
     upcomingTourDates,
@@ -327,7 +326,7 @@ export function ProfileDesktopSurface({
   const homeOverview = (
     <div className='grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.9fr)]'>
       <div className='grid min-h-0 gap-3.5'>
-        <section className='relative min-h-[560px] overflow-hidden rounded-[28px] bg-[#0a0c10]'>
+        <section className='relative min-h-[548px] overflow-hidden rounded-[26px] bg-[#0a0c10]'>
           <div className='absolute inset-0'>
             {heroImageUrl ? (
               <ImageWithFallback
@@ -342,13 +341,13 @@ export function ProfileDesktopSurface({
               />
             ) : (
               <div
-                className='h-full w-full bg-[radial-gradient(circle_at_44%_18%,var(--profile-stage-glow-a),transparent_30%),linear-gradient(145deg,#20242c_0%,#11141a_46%,#050608_100%)]'
+                className='h-full w-full bg-[radial-gradient(circle_at_44%_18%,rgba(255,255,255,0.08),transparent_30%),linear-gradient(145deg,#20242c_0%,#11141a_46%,#050608_100%)]'
                 aria-hidden='true'
               />
             )}
           </div>
           <div className='absolute inset-0 bg-[linear-gradient(180deg,rgba(5,6,8,0.14)_0%,rgba(7,8,10,0.38)_42%,rgba(7,8,10,0.98)_100%)]' />
-          <div className='absolute inset-0 bg-[radial-gradient(circle_at_top,var(--profile-stage-glow-a),transparent_22%)]' />
+          <div className='absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_22%)]' />
           <div className='relative z-10 flex h-full flex-col justify-between p-7'>
             <div aria-hidden='true' />
 
@@ -362,8 +361,8 @@ export function ProfileDesktopSurface({
                   {artist.is_verified ? (
                     <BadgeCheck
                       className='h-7 w-7 shrink-0'
-                      fill='#3b82f6'
-                      stroke='white'
+                      fill='white'
+                      stroke='black'
                       strokeWidth={2}
                     />
                   ) : null}
@@ -373,7 +372,7 @@ export function ProfileDesktopSurface({
                 </p>
               </div>
 
-              <div className='flex flex-wrap items-center gap-3'>
+              <div className='flex flex-wrap items-center gap-2.5'>
                 {primaryAction.kind === 'subscribe' ? (
                   <ProfileInlineNotificationsCTA
                     artist={artist}
@@ -385,7 +384,7 @@ export function ProfileDesktopSurface({
                 ) : primaryAction.href ? (
                   <a
                     href={primaryAction.href}
-                    className='inline-flex h-12 items-center gap-2 rounded-full bg-white px-5 text-[14px] font-semibold tracking-[-0.01em] text-black transition-colors duration-200 hover:bg-white/88'
+                    className='inline-flex h-11 items-center gap-2 rounded-full bg-white px-4 text-[13px] font-semibold tracking-[-0.01em] text-black transition-colors duration-200 hover:bg-white/88'
                   >
                     <CalendarDays className='h-4 w-4' />
                     {primaryAction.label}
@@ -394,25 +393,20 @@ export function ProfileDesktopSurface({
                   <button
                     type='button'
                     onClick={() => onModeSelect(primaryAction.mode)}
-                    className='inline-flex h-12 items-center gap-2 rounded-full bg-white px-5 text-[14px] font-semibold tracking-[-0.01em] text-black transition-colors duration-200 hover:bg-white/88'
+                    className='inline-flex h-11 items-center gap-2 rounded-full bg-white px-4 text-[13px] font-semibold tracking-[-0.01em] text-black transition-colors duration-200 hover:bg-white/88'
                   >
                     <Play className='h-4 w-4 fill-current' />
                     {primaryAction.label}
                   </button>
                 )}
-                <span className='inline-flex h-11 items-center gap-2 rounded-full border border-[color:var(--profile-status-pill-border)] bg-[color:var(--profile-status-pill-bg)] px-4 text-[13px] font-semibold tracking-[-0.01em] text-white'>
-                  <span className='h-2 w-2 rounded-full bg-[color:var(--profile-accent-primary)]' />
+                <span className='inline-flex h-9 items-center gap-2 rounded-full border border-white/12 bg-white/8 px-3 text-[12px] font-semibold tracking-[-0.01em] text-white/82'>
+                  <span className='h-1.5 w-1.5 rounded-full bg-white/[0.07]2' />
                   <span>{statusPill.label}</span>
                 </span>
-                {heroRoleLabel ? (
-                  <span className='inline-flex h-11 items-center rounded-full border border-white/10 bg-black/18 px-4 text-[13px] font-medium tracking-[-0.01em] text-white/62 backdrop-blur-xl'>
-                    {heroRoleLabel}
-                  </span>
-                ) : null}
               </div>
 
               {visibleSocialLinks.length > 0 ? (
-                <div className='flex items-center gap-3.5'>
+                <div className='flex items-center gap-3'>
                   {visibleSocialLinks.map(link =>
                     link.platform && link.url ? (
                       <a
@@ -420,12 +414,12 @@ export function ProfileDesktopSurface({
                         href={link.url}
                         target='_blank'
                         rel='noopener noreferrer'
-                        className='inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-black/20 text-white shadow-[0_16px_36px_rgba(0,0,0,0.24)] backdrop-blur-xl transition-colors duration-200 hover:bg-black/34'
+                        className='inline-flex h-10 w-10 items-center justify-center rounded-full text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)] transition-opacity duration-200 hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
                         aria-label={link.platform}
                       >
                         <SocialIcon
                           platform={link.platform}
-                          className='h-[18px] w-[18px]'
+                          className='h-[17px] w-[17px]'
                         />
                       </a>
                     ) : null
@@ -447,13 +441,13 @@ export function ProfileDesktopSurface({
                 upcomingTourDates.slice(0, 5).map(tourDate => (
                   <div
                     key={tourDate.id}
-                    className='grid grid-cols-[58px_minmax(0,1fr)_auto] items-center gap-3 rounded-[18px] bg-white/[0.025] px-4 py-3'
+                    className='grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-3 rounded-[16px] bg-white/[0.025] px-3 py-3'
                   >
-                    <div className='rounded-[14px] border border-[color:var(--profile-status-pill-border)] bg-[color:var(--profile-status-pill-bg)] px-2 py-2 text-center'>
-                      <div className='text-[10px] font-semibold tracking-[0.02em] text-[color:var(--profile-accent-primary)]'>
+                    <div className='rounded-[13px] border border-white/10 bg-white/[0.07] px-2 py-2 text-center'>
+                      <div className='text-[10px] font-semibold tracking-[0.01em] text-white/58'>
                         {formatMonth(tourDate.startDate)}
                       </div>
-                      <div className='mt-1 text-[24px] font-semibold leading-none tracking-[-0.05em] text-white'>
+                      <div className='mt-1 text-[22px] font-semibold leading-none tracking-[-0.05em] text-white'>
                         {formatDay(tourDate.startDate)}
                       </div>
                     </div>
@@ -470,7 +464,7 @@ export function ProfileDesktopSurface({
                     {tourDate.ticketUrl ? (
                       <a
                         href={tourDate.ticketUrl}
-                        className='inline-flex h-10 items-center rounded-full border border-white/12 px-4 text-[13px] font-medium text-white/82 transition-colors duration-200 hover:bg-white/[0.04]'
+                        className='inline-flex h-9 items-center rounded-full border border-white/12 px-3 text-[12px] font-medium text-white/82 transition-colors duration-200 hover:bg-white/[0.04]'
                       >
                         Tickets
                       </a>
@@ -627,17 +621,8 @@ export function ProfileDesktopSurface({
         </DesktopSurfaceCard>
 
         <DesktopSurfaceCard title='Alerts'>
-          <div className='space-y-6'>
-            <div className='space-y-1'>
-              <p className='text-[13px] font-semibold tracking-[-0.01em] text-white/44'>
-                Sent from Jovie
-              </p>
-              <p className='text-[14px] leading-6 text-white/58'>
-                Jovie Alerts are concise, one-time, verified notifications to
-                your email about verified new releases of music and shows.
-              </p>
-            </div>
-            <div className='space-y-4'>
+          <div className='space-y-4'>
+            <div className='space-y-3'>
               {[
                 { key: 'newMusic', label: 'New Music', icon: Music2 },
                 { key: 'tourDates', label: 'Shows', icon: CalendarDays },
@@ -653,8 +638,8 @@ export function ProfileDesktopSurface({
                     className='flex items-center justify-between gap-4'
                   >
                     <div className='flex items-center gap-3'>
-                      <Icon className='size-4.5 text-white/68' />
-                      <span className='text-[15px] font-medium tracking-[-0.015em] text-white/88'>
+                      <Icon className='size-4 text-white/62' />
+                      <span className='text-[14px] font-medium tracking-[-0.015em] text-white/84'>
                         {item.label}
                       </span>
                     </div>
@@ -662,7 +647,7 @@ export function ProfileDesktopSurface({
                       checked={checked}
                       onCheckedChange={() => onModeSelect('subscribe')}
                       aria-label={item.label}
-                      className='data-[state=checked]:bg-[color:var(--profile-accent-primary)] data-[state=unchecked]:bg-white/14'
+                      className='data-[state=checked]:bg-white/36 data-[state=unchecked]:bg-white/14'
                     />
                   </div>
                 );
@@ -683,8 +668,8 @@ export function ProfileDesktopSurface({
                   </div>
                   <div className='flex items-center justify-between gap-4'>
                     <div className='flex items-center gap-3'>
-                      <Mail className='size-4.5 text-white/68' />
-                      <span className='text-[15px] font-medium tracking-[-0.015em] text-white/88'>
+                      <Mail className='size-4 text-white/62' />
+                      <span className='text-[14px] font-medium tracking-[-0.015em] text-white/84'>
                         Subscribe to Other Alerts
                       </span>
                     </div>
@@ -692,7 +677,7 @@ export function ProfileDesktopSurface({
                       checked={isSubscribed}
                       onCheckedChange={() => onModeSelect('subscribe')}
                       aria-label='Subscribe to other alerts'
-                      className='data-[state=checked]:bg-[color:var(--profile-accent-primary)] data-[state=unchecked]:bg-white/14'
+                      className='data-[state=checked]:bg-white/36 data-[state=unchecked]:bg-white/14'
                     />
                   </div>
                 </div>
@@ -769,11 +754,11 @@ export function ProfileDesktopSurface({
                 key={tourDate.id}
                 className='grid grid-cols-[68px_minmax(0,1fr)_auto] items-center gap-4 rounded-[20px] bg-white/[0.025] px-4 py-3'
               >
-                <div className='rounded-[16px] border border-[color:var(--profile-status-pill-border)] bg-[color:var(--profile-status-pill-bg)] px-2 py-3 text-center'>
-                  <div className='text-[10px] font-semibold tracking-[0.02em] text-[color:var(--profile-accent-primary)]'>
+                <div className='rounded-[14px] border border-white/10 bg-white/[0.07] px-2 py-2.5 text-center'>
+                  <div className='text-[10px] font-semibold tracking-[0.01em] text-white/58'>
                     {formatMonth(tourDate.startDate)}
                   </div>
-                  <div className='mt-1 text-[28px] font-semibold leading-none tracking-[-0.05em] text-white'>
+                  <div className='mt-1 text-[26px] font-semibold leading-none tracking-[-0.05em] text-white'>
                     {formatDay(tourDate.startDate)}
                   </div>
                 </div>
@@ -849,7 +834,7 @@ export function ProfileDesktopSurface({
                   <Icon
                     className={cn(
                       'h-4 w-4 shrink-0 transition-colors duration-200',
-                      isActive && 'text-[color:var(--profile-accent-primary)]'
+                      isActive && 'text-white'
                     )}
                   />
                   <span>{tab.label}</span>
@@ -869,7 +854,7 @@ export function ProfileDesktopSurface({
         </div>
 
         <div className='relative flex min-h-0 flex-1 flex-col overflow-hidden'>
-          <div className='pointer-events-none absolute inset-0 bg-[var(--profile-panel-gradient)]' />
+          <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.025),transparent_34%)]' />
           <div className='relative z-10 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain p-5 pt-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
             {nonHomeContent}
           </div>

@@ -310,7 +310,9 @@ export function ProfileCompactSurface({
   const { heroSubtitle } = surfaceState;
   const IdentityHeading = renderMode === 'preview' ? 'p' : 'h1';
   const topChromeButtonClassName =
-    'h-12! w-12! border-transparent bg-black/44 text-white shadow-[0_20px_44px_rgba(0,0,0,0.34)] backdrop-blur-md hover:bg-black/56';
+    'h-11! w-11! border-transparent bg-black/34 text-white shadow-[0_16px_34px_rgba(0,0,0,0.28)] backdrop-blur-md hover:bg-black/46 active:scale-100';
+  const socialIconClassName =
+    'inline-flex h-11 w-11 items-center justify-center rounded-full text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)] transition-opacity duration-200 hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
   const registerNotificationsReveal = useCallback(
     (reveal: () => void) => {
       notificationsRevealRef.current = reveal;
@@ -341,7 +343,7 @@ export function ProfileCompactSurface({
         data-testid='profile-compact-surface'
         data-presentation={presentation}
       >
-        <div className='pointer-events-none absolute inset-0 bg-[var(--profile-panel-gradient)]' />
+        <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.025),transparent_34%)]' />
 
         <header
           className={cn(
@@ -369,14 +371,14 @@ export function ProfileCompactSurface({
               />
             ) : (
               <div
-                className='h-full w-full bg-[radial-gradient(circle_at_50%_22%,var(--profile-stage-glow-a),transparent_28%),linear-gradient(145deg,#20242c_0%,#11141a_48%,#050608_100%)]'
+                className='h-full w-full bg-[radial-gradient(circle_at_50%_22%,rgba(255,255,255,0.08),transparent_28%),linear-gradient(145deg,#20242c_0%,#11141a_48%,#050608_100%)]'
                 aria-hidden='true'
               />
             )}
           </div>
 
           <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(2,3,4,0.18)_0%,rgba(3,4,6,0.22)_20%,rgba(4,5,7,0.42)_52%,rgba(5,6,8,0.94)_100%)]' />
-          <div className='pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,var(--profile-stage-glow-a),transparent_24%),linear-gradient(180deg,transparent_0%,rgba(5,6,8,0.18)_58%,var(--profile-stage-bg)_100%)]' />
+          <div className='pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_24%),linear-gradient(180deg,transparent_0%,rgba(5,6,8,0.18)_58%,var(--profile-stage-bg)_100%)]' />
 
           <div
             className={cn(
@@ -402,7 +404,7 @@ export function ProfileCompactSurface({
 
               {visibleSocialLinks.length > 0 || !hideMoreMenu ? (
                 <div
-                  className='flex items-center gap-2'
+                  className='flex items-center gap-1.5'
                   data-testid='profile-hero-social-row'
                 >
                   {visibleSocialLinks.map(link =>
@@ -412,10 +414,7 @@ export function ProfileCompactSurface({
                         href={link.url}
                         target='_blank'
                         rel='noopener noreferrer'
-                        className={cn(
-                          topChromeButtonClassName,
-                          'inline-flex h-12! w-12! items-center justify-center rounded-full'
-                        )}
+                        className={socialIconClassName}
                         aria-label={link.platform}
                       >
                         <SocialIcon
@@ -433,7 +432,7 @@ export function ProfileCompactSurface({
                       variant='pearl'
                       className={cn(
                         topChromeButtonClassName,
-                        drawerOpen && 'bg-black/60'
+                        drawerOpen && 'bg-black/50'
                       )}
                       ariaLabel='More options'
                       aria-haspopup='dialog'
@@ -471,8 +470,8 @@ export function ProfileCompactSurface({
                     {artist.is_verified ? (
                       <BadgeCheck
                         className='h-5 w-5 shrink-0 drop-shadow-[0_1px_4px_rgba(0,0,0,0.3)]'
-                        fill='#3b82f6'
-                        stroke='white'
+                        fill='white'
+                        stroke='black'
                         strokeWidth={2}
                         aria-label='Verified'
                       />
@@ -508,36 +507,36 @@ export function ProfileCompactSurface({
                   type='button'
                   onClick={openNotifications}
                   disabled={renderMode !== 'interactive'}
-                  className='flex min-h-[72px] w-full items-center gap-3 rounded-[22px] border border-white/10 bg-black/28 px-4 text-left text-white shadow-[0_18px_48px_rgba(0,0,0,0.28)] backdrop-blur-2xl transition-[background-color,border-color] duration-200 hover:bg-black/36 disabled:cursor-default disabled:hover:bg-black/28'
+                  className='flex min-h-[64px] w-full items-center gap-3 rounded-[20px] border border-white/10 bg-black/22 px-4 text-left text-white shadow-[0_14px_36px_rgba(0,0,0,0.24)] backdrop-blur-2xl transition-[background-color,border-color] duration-200 hover:bg-black/30 disabled:cursor-default disabled:hover:bg-black/22'
                   data-testid='profile-hero-alerts-row'
                 >
                   <span
-                    className='flex h-11 w-11 shrink-0 items-center justify-center text-white'
+                    className='flex h-9 w-9 shrink-0 items-center justify-center text-white'
                     aria-hidden='true'
                   >
-                    <Bell className='h-6 w-6' />
+                    <Bell className='h-5 w-5' />
                   </span>
                   <span className='min-w-0 flex-1'>
-                    <span className='block text-[16px] font-semibold leading-5 tracking-[-0.03em]'>
+                    <span className='block text-[15px] font-semibold leading-5 tracking-[-0.025em]'>
                       {isSubscribed ? 'Alerts On' : 'Alerts Off'}
                     </span>
-                    <span className='mt-1 block truncate text-[13px] leading-5 text-white/68'>
-                      Get notified about new music, shows and more.
+                    <span className='mt-0.5 block truncate text-[12px] leading-5 text-white/60'>
+                      New music and shows
                     </span>
                   </span>
                   <span
                     className={cn(
-                      'relative h-9 w-[58px] shrink-0 rounded-full border p-0.5 transition-colors duration-200',
+                      'relative h-8 w-[52px] shrink-0 rounded-full border p-0.5 transition-colors duration-200',
                       isSubscribed
-                        ? 'border-[color:var(--profile-accent-primary)] bg-[color:var(--profile-accent-soft-strong)]'
+                        ? 'border-white/38 bg-white/26'
                         : 'border-white/20 bg-white/8'
                     )}
                     aria-hidden='true'
                   >
                     <span
                       className={cn(
-                        'block h-8 w-8 rounded-full bg-white shadow-[0_8px_20px_rgba(0,0,0,0.25)] transition-transform duration-200',
-                        isSubscribed && 'translate-x-[22px]'
+                        'block h-7 w-7 rounded-full bg-white shadow-[0_8px_20px_rgba(0,0,0,0.22)] transition-transform duration-200',
+                        isSubscribed && 'translate-x-5'
                       )}
                     />
                   </span>
@@ -602,7 +601,7 @@ export function ProfileCompactSurface({
           {showBottomNav ? (
             <div className='shrink-0 pt-1'>
               <nav
-                className='mx-[-20px] border-t border-[color:var(--profile-dock-border)] bg-[color:color-mix(in_srgb,var(--profile-dock-bg)_72%,transparent)] px-3 pt-2 backdrop-blur-2xl'
+                className='mx-[-20px] border-t border-white/10 bg-black/54 px-3 pt-2 backdrop-blur-2xl'
                 aria-label='Profile navigation'
                 data-testid='profile-bottom-nav'
               >
@@ -625,7 +624,7 @@ export function ProfileCompactSurface({
                       >
                         {isActive ? (
                           <span
-                            className='absolute left-1/2 top-0 h-1 w-9 -translate-x-1/2 rounded-full bg-[color:var(--profile-tab-active-bg)]'
+                            className='absolute left-1/2 top-0 h-1 w-8 -translate-x-1/2 rounded-full bg-white'
                             aria-hidden='true'
                           />
                         ) : null}

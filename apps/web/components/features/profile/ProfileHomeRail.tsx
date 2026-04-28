@@ -217,7 +217,7 @@ function RailCardShell({
 }>) {
   const sharedProps = {
     className: cn(
-      'group relative flex min-h-[286px] w-full overflow-hidden rounded-[30px] border border-white/12 bg-[#0d0f12] text-left shadow-[0_32px_72px_rgba(0,0,0,0.38)] transition-[background-color,border-color] duration-200 hover:border-white/18 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
+      'group relative flex min-h-[268px] w-full overflow-hidden rounded-[26px] border border-white/10 bg-[#0d0f12] text-left shadow-[0_24px_56px_rgba(0,0,0,0.32)] transition-[background-color,border-color] duration-200 hover:border-white/16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
       className
     ),
     'data-testid': dataTestId,
@@ -254,7 +254,7 @@ function RailCardShell({
 
 function LabelChip({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <span className='inline-flex h-10 w-fit items-center rounded-full border border-[color:var(--profile-status-pill-border)] bg-[color:var(--profile-status-pill-bg)] px-3.5 text-[12px] font-semibold tracking-[-0.01em] text-[color:var(--profile-accent-primary)] backdrop-blur-xl'>
+    <span className='inline-flex h-8 w-fit items-center rounded-full border border-white/14 bg-white/10 px-3 text-[11px] font-semibold tracking-[-0.01em] text-white/88 backdrop-blur-xl'>
       {children}
     </span>
   );
@@ -266,7 +266,7 @@ function CircleAction({
   children: ReactNode;
 }>) {
   return (
-    <span className='inline-flex h-14 w-14 items-center justify-center rounded-full border border-white/14 bg-black/46 text-white shadow-[0_18px_40px_rgba(0,0,0,0.32)] backdrop-blur-xl'>
+    <span className='inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/12 bg-black/40 text-white shadow-[0_14px_32px_rgba(0,0,0,0.28)] backdrop-blur-xl'>
       {children}
     </span>
   );
@@ -316,18 +316,18 @@ function ImageLedRailCard({
           fallbackClassName='bg-surface-2'
         />
       </div>
-      <div className='absolute inset-0 bg-[linear-gradient(180deg,rgba(4,5,6,0.06)_0%,rgba(4,5,6,0.2)_38%,rgba(4,5,6,0.86)_100%)]' />
-      <div className='relative flex min-h-[286px] flex-col justify-between p-[22px]'>
+      <div className='absolute inset-0 bg-[linear-gradient(180deg,rgba(4,5,6,0.08)_0%,rgba(4,5,6,0.24)_38%,rgba(4,5,6,0.88)_100%)]' />
+      <div className='relative flex min-h-[268px] flex-col justify-between p-5'>
         <LabelChip>{label}</LabelChip>
-        <div className='space-y-5'>
+        <div className='space-y-4'>
           <div className='space-y-1.5'>
-            <p className='max-w-[15ch] text-[29px] font-semibold leading-[1.04] tracking-[-0.055em] text-white'>
+            <p className='max-w-[15ch] text-[26px] font-semibold leading-[1.04] tracking-[-0.05em] text-white'>
               {title}
             </p>
-            <p className='text-[16px] leading-6 text-white/72'>{subtitle}</p>
+            <p className='text-[14px] leading-5 text-white/68'>{subtitle}</p>
           </div>
           {actionLabel ? (
-            <span className='inline-flex h-14 items-center gap-3 rounded-[17px] bg-white px-6 text-[16px] font-semibold tracking-[-0.025em] text-black shadow-[0_18px_40px_rgba(0,0,0,0.32)]'>
+            <span className='inline-flex h-12 items-center gap-2.5 rounded-[15px] bg-white px-5 text-[14px] font-semibold tracking-[-0.02em] text-black shadow-[0_14px_32px_rgba(0,0,0,0.28)]'>
               {actionIcon}
               {actionLabel}
             </span>
@@ -358,9 +358,9 @@ function TourRailCard({
       dataTestId='profile-home-rail-tour'
       dataState={stateKind}
       ariaLabel={`Open ${tourDate.venueName ?? 'tour details'}`}
-      className='bg-[linear-gradient(180deg,rgba(26,28,33,0.96),rgba(12,13,17,0.98))]'
+      className='bg-[linear-gradient(180deg,rgba(22,23,26,0.96),rgba(10,11,13,0.98))]'
     >
-      <div className='relative flex min-h-[286px] flex-col justify-between p-[22px]'>
+      <div className='relative flex min-h-[268px] flex-col justify-between p-5'>
         <LabelChip>
           {stateKind === 'tour_nearby' ? 'On Tour' : 'Upcoming Show'}
         </LabelChip>
@@ -368,30 +368,30 @@ function TourRailCard({
         <div className='space-y-3.5'>
           <div className='flex items-end justify-between gap-4'>
             <div className='flex min-w-0 items-end gap-4'>
-              <div className='border-r border-white/12 pr-4'>
-                <p className='text-[14px] font-medium text-white/54'>
+              <div className='border-r border-white/10 pr-4'>
+                <p className='text-[12px] font-medium text-white/50'>
                   {formatMonthLabel(tourDate.startDate)}
                 </p>
-                <p className='mt-1 text-[46px] font-semibold leading-none tracking-[-0.08em] text-white'>
+                <p className='mt-1 text-[40px] font-semibold leading-none tracking-[-0.075em] text-white'>
                   {formatDayLabel(tourDate.startDate)}
                 </p>
               </div>
               <div className='min-w-0 space-y-1.5 pb-1'>
-                <p className='max-w-[11ch] text-[24px] font-semibold leading-[1.04] tracking-[-0.05em] text-white'>
+                <p className='max-w-[11ch] text-[22px] font-semibold leading-[1.04] tracking-[-0.045em] text-white'>
                   {tourDate.venueName ?? 'Tour Date'}
                 </p>
-                <p className='text-[15px] leading-5 text-white/72'>
+                <p className='text-[14px] leading-5 text-white/66'>
                   {locationLabel}
                 </p>
               </div>
             </div>
 
-            <span className='inline-flex h-12 shrink-0 items-center rounded-[15px] bg-white/10 px-5 text-[15px] font-semibold text-white shadow-[0_16px_34px_rgba(0,0,0,0.22)] backdrop-blur-xl'>
+            <span className='inline-flex h-10 shrink-0 items-center rounded-[13px] bg-white/10 px-4 text-[13px] font-semibold text-white shadow-[0_12px_26px_rgba(0,0,0,0.2)] backdrop-blur-xl'>
               Tickets
             </span>
           </div>
 
-          <p className='text-[15px] font-medium text-white/54'>
+          <p className='text-[13px] font-medium text-white/50'>
             {stateKind === 'tour_nearby' ? 'Near You' : 'Next Show'}
           </p>
         </div>
@@ -519,7 +519,7 @@ export function ProfileHomeRail({
 
   return (
     <div className={cn(isPreviewRail ? 'space-y-3' : 'space-y-4')}>
-      <p className='px-0.5 text-[24px] font-semibold leading-none tracking-[-0.05em] text-white'>
+      <p className='px-0.5 text-[21px] font-semibold leading-none tracking-[-0.04em] text-white'>
         Latest
       </p>
       <div
@@ -644,14 +644,16 @@ export function ProfileHomeRail({
                   block: 'nearest',
                 });
               }}
-              className={cn(
-                'h-2.5 rounded-full transition-all duration-200',
-                index === activeIndex
-                  ? 'w-7 bg-[color:var(--profile-rail-dot-active)]'
-                  : 'w-2.5 bg-[color:var(--profile-rail-dot-inactive)]'
-              )}
+              className='flex h-11 w-11 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
               aria-label={`View rail card ${index + 1}`}
-            />
+            >
+              <span
+                className={cn(
+                  'h-2 rounded-full transition-all duration-200',
+                  index === activeIndex ? 'w-7 bg-white/88' : 'w-2 bg-white/22'
+                )}
+              />
+            </button>
           ))}
         </div>
       ) : null}
