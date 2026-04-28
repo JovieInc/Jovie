@@ -11,20 +11,9 @@ type SentryModule = {
 
 let sentryModulePromise: Promise<SentryModule> | null = null;
 
-// Defeat Turbopack's static analysis of the dynamic import so it does NOT
-// emit `@sentry/nextjs` as a hashed external (`@sentry/nextjs-<hash>`) in
-// the chunked server output. Under `output: 'standalone'`, the runtime
-// can't resolve those hashed names and every request crashes with
-// `Cannot find module '@sentry/nextjs-<hash>'` — see #7881 for context.
-// Node's runtime `require()` still resolves the package from node_modules
-// since the standalone tracer copies it.
-const SENTRY_PACKAGE = ['@sentry', 'nextjs'].join('/');
-
 function loadSentry(): Promise<SentryModule> {
   if (!sentryModulePromise) {
-    sentryModulePromise = (
-      import(SENTRY_PACKAGE) as Promise<typeof import('@sentry/nextjs')>
-    ).then(module => ({
+    sentryModulePromise = import('@sentry/nextjs').then(module => ({
       captureException: module.captureException,
       captureMessage: module.captureMessage,
       captureRequestError: (...args: unknown[]) =>
