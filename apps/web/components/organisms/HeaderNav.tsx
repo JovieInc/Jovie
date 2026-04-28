@@ -94,6 +94,29 @@ export function HeaderNav({
       : 'nav-link-linear'
   );
   const hasNavLinks = !hideNav && !!navLinks?.length;
+  const isHomepagePresentation = presentation === 'homepage-embedded';
+  const navLinksMarkup = hasNavLinks ? (
+    <div
+      className={cn(
+        'max-md:hidden items-center md:flex',
+        isHomepagePresentation
+          ? 'homepage-header-nav-group'
+          : 'gap-1 lg:gap-1.5'
+      )}
+    >
+      {navLinks?.map(link =>
+        link.href.startsWith('/') && !link.href.startsWith('#') ? (
+          <Link key={link.href} href={link.href} className={navLinkClass}>
+            {link.label}
+          </Link>
+        ) : (
+          <a key={link.href} href={link.href} className={navLinkClass}>
+            {link.label}
+          </a>
+        )
+      )}
+    </div>
+  ) : null;
   const containerClass =
     _containerSize === 'homepage'
       ? 'flex h-[var(--linear-header-height)] w-full items-center gap-3 sm:gap-4 md:gap-6'
@@ -154,29 +177,13 @@ export function HeaderNav({
             />
           </div>
 
+          {isHomepagePresentation ? navLinksMarkup : null}
+
           {/* Spacer pushes nav + auth to the right */}
           <div className='flex-1' aria-hidden='true' />
 
           {/* Nav links - desktop only, right-aligned */}
-          {hasNavLinks && (
-            <div className='max-md:hidden items-center gap-1 md:flex lg:gap-1.5'>
-              {navLinks?.map(link =>
-                link.href.startsWith('/') && !link.href.startsWith('#') ? (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className={navLinkClass}
-                  >
-                    {link.label}
-                  </Link>
-                ) : (
-                  <a key={link.href} href={link.href} className={navLinkClass}>
-                    {link.label}
-                  </a>
-                )
-              )}
-            </div>
-          )}
+          {isHomepagePresentation ? null : navLinksMarkup}
 
           {/* Divider between nav and auth - desktop only */}
           {hasNavLinks && presentation !== 'homepage-embedded' ? (
@@ -187,7 +194,12 @@ export function HeaderNav({
           ) : null}
 
           {/* Auth actions - visible on all sizes (Linear shows Log in + Sign up on mobile) */}
-          <div className='flex items-center gap-1'>
+          <div
+            className={cn(
+              'flex items-center gap-1',
+              isHomepagePresentation && 'homepage-header-auth'
+            )}
+          >
             {authMode === 'public-static' ? (
               <PublicAuthActions
                 minimal={minimalAuth}

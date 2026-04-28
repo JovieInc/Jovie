@@ -1,4 +1,5 @@
 import './home.css';
+import Link from 'next/link';
 import { SkipToContent } from '@/components/atoms/SkipToContent';
 import { HomeLegalFooter } from '@/components/homepage/HomeLegalFooter';
 import { MarketingHeader } from '@/components/site/MarketingHeader';
@@ -21,6 +22,11 @@ export default function HomeLayout({
   return (
     <div className='home-viewport dark flex min-h-[100svh] flex-col overflow-x-clip bg-[var(--color-bg-base)] text-primary-token'>
       <SkipToContent />
+      <div className='homepage-announcement-bar'>
+        <Link href={APP_ROUTES.ARTIST_PROFILES}>
+          Meet Jovie Profiles: polished artist pages in minutes. Learn more
+        </Link>
+      </div>
       <MarketingHeader
         logoSize='xs'
         logoVariant='word'

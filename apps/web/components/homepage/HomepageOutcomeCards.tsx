@@ -19,6 +19,13 @@ const HOMEPAGE_OUTCOME_ACCENTS = {
   'share-anywhere': '#f5a623',
 } satisfies Record<HomepageOutcomeId, string>;
 
+const HOMEPAGE_OUTCOME_SIZE_CLASSES = {
+  'drive-streams': 'homepage-outcome-card--drive-streams',
+  'sell-out': 'homepage-outcome-card--sell-out',
+  'get-paid': 'homepage-outcome-card--get-paid',
+  'share-anywhere': 'homepage-outcome-card--share-anywhere',
+} satisfies Record<HomepageOutcomeId, string>;
+
 type OutcomeCardStyle = CSSProperties & {
   readonly '--outcome-accent': string;
 };
@@ -38,17 +45,20 @@ export function HomepageOutcomeCards({
       aria-labelledby='homepage-outcome-cards-heading'
     >
       <div className='homepage-outcome-inner mx-auto w-full'>
-        <div className='homepage-outcome-header mx-auto text-center'>
+        <div className='homepage-outcome-header'>
           <h2
             id='homepage-outcome-cards-heading'
             className='homepage-outcome-heading text-white'
           >
             {headline}
           </h2>
-          <p className='homepage-outcome-body mx-auto'>{outcomes.body}</p>
         </div>
-
-        <div className='homepage-outcome-grid'>
+      </div>
+      <div className='homepage-outcome-rail-bleed'>
+        <div
+          className='homepage-outcome-rail'
+          data-testid='homepage-outcome-rail'
+        >
           {outcomes.cards.map(card => (
             <OutcomeCard key={card.id} card={card} outcomes={outcomes} />
           ))}
@@ -72,14 +82,15 @@ function OutcomeCard({
   return (
     <article
       data-testid='homepage-outcome-card'
-      className='homepage-outcome-card'
+      className={cn(
+        'homepage-outcome-card',
+        HOMEPAGE_OUTCOME_SIZE_CLASSES[card.id]
+      )}
       style={style}
     >
       <div aria-hidden='true' className='homepage-outcome-card__glow' />
       <div className='homepage-outcome-card__copy'>
-        <span className='homepage-outcome-card__accent' aria-hidden='true' />
         <h3 className='homepage-outcome-card__title'>{card.title}</h3>
-        <p className='homepage-outcome-card__description'>{card.description}</p>
       </div>
 
       <div className='homepage-outcome-card__visual' aria-hidden='true'>

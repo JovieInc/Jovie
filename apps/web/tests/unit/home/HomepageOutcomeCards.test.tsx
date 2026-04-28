@@ -27,7 +27,7 @@ describe('HomepageOutcomeCards', () => {
       expect(
         screen.getByRole('heading', { level: 3, name: card.title })
       ).toBeInTheDocument();
-      expect(screen.getByText(card.description)).toBeInTheDocument();
+      expect(screen.queryByText(card.description)).not.toBeInTheDocument();
     }
   });
 
