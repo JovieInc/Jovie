@@ -1,5 +1,5 @@
+import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { cn } from '@/lib/utils';
-import { JovieMark } from './JovieMark';
 
 // Cinematic ease — same curve used across the shell for layout-revealing
 // transitions. Imported here as a literal so this leaf has no cross-file
@@ -57,7 +57,12 @@ export function ShellLoader({
           transition: `transform 520ms ${EASE_CINEMATIC}, opacity 380ms ${EASE_CINEMATIC}`,
         }}
       >
-        <JovieMark className='h-12 w-12 text-primary-token' />
+        <BrandLogo
+          size={48}
+          rounded={false}
+          className='text-primary-token'
+          aria-hidden
+        />
       </div>
     </div>
   );

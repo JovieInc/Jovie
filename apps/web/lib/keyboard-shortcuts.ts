@@ -78,7 +78,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
   {
     id: 'keyboard-shortcuts',
     label: 'View keyboard shortcuts',
-    keys: `${GLYPH_CMD} /`,
+    keys: `${GLYPH_CMD} / · ?`,
     category: 'general',
     icon: Keyboard,
     shortcutKey: 'Meta+/',

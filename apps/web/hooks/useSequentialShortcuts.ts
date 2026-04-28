@@ -56,6 +56,19 @@ export function useSequentialShortcuts({
       if (!event.key) return;
       const key = event.key.toLowerCase();
 
+      // `?` (Shift+/) — Linear's single-key shortcut to open help.
+      // Checked before the modifier branch since `?` is Shift-only.
+      if (
+        key === '?' &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        onOpenShortcutsModal
+      ) {
+        event.preventDefault();
+        onOpenShortcutsModal();
+        return;
+      }
+
       // Handle modifier-based shortcuts first
       if (event.metaKey || event.ctrlKey) {
         // Cmd/Ctrl + / opens shortcuts modal

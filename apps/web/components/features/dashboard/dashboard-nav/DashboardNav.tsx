@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { Flagged } from '@/components/features/dev/Flagged';
-import { usePendingShell } from '@/components/organisms/AuthShellWrapper';
+import { usePendingShell } from '@/components/organisms/PendingShellContext';
 import {
   SidebarGroup,
   SidebarGroupContent,

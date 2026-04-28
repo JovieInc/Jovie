@@ -90,6 +90,8 @@ export interface ChatInputProps {
    * slash picker to scope `useReleasesQuery` to the active creator.
    */
   readonly profileId?: string;
+  /** Enables the Shell + Chat V1 composer geometry behind SHELL_CHAT_V1. */
+  readonly shellChatV1?: boolean;
 }
 
 type SurfaceMode = 'empty' | 'typing' | 'root' | 'entity';
@@ -155,6 +157,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       onAddEntity,
       onPickerOpenChange,
       profileId,
+      shellChatV1 = false,
     },
     ref
   ) {
@@ -357,13 +360,21 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       []
     );
 
-    // Resolve the surface mode from textarea + picker state.
+    // Resolve the surface mode from textarea + picker state. Shell + Chat V1
+    // keeps focus-only empty pills calm; the legacy shell preserves the old
+    // focus-to-typing morph until the rollout flag is enabled.
     const hasText = Boolean(value.trim()) || hasPendingImages;
-    const isExpanded = isFocused || plusMenuOpen || isListening || hasText;
+    const isExpanded = plusMenuOpen || isListening || hasText || isFocused;
     let surfaceMode: SurfaceMode = 'empty';
     if (picker.state.status === 'entity') surfaceMode = 'entity';
     else if (picker.state.status === 'root') surfaceMode = 'root';
-    else if (hasText || isFocused) surfaceMode = 'typing';
+    else if (
+      hasText ||
+      plusMenuOpen ||
+      isListening ||
+      (!shellChatV1 && isFocused)
+    )
+      surfaceMode = 'typing';
 
     const geometry = geometryFor(surfaceMode, isStacked);
     const showInlinePicker = picker.state.status === 'root' && !isStacked;

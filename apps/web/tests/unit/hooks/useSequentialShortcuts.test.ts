@@ -132,6 +132,48 @@ describe('useSequentialShortcuts', () => {
     expect(onOpen).toHaveBeenCalledOnce();
   });
 
+  it('calls onOpenShortcutsModal on ? (Shift+/)', () => {
+    const onOpen = vi.fn();
+    renderHook(() => useSequentialShortcuts({ onOpenShortcutsModal: onOpen }));
+
+    act(() => {
+      dispatchKeyDown({ key: '?' });
+    });
+
+    expect(onOpen).toHaveBeenCalledOnce();
+  });
+
+  it('does not open modal on ? when typing in form elements', () => {
+    const onOpen = vi.fn();
+    renderHook(() => useSequentialShortcuts({ onOpenShortcutsModal: onOpen }));
+
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+
+    act(() => {
+      const event = new KeyboardEvent('keydown', {
+        key: '?',
+        bubbles: true,
+      });
+      Object.defineProperty(event, 'target', { value: input });
+      globalThis.dispatchEvent(event);
+    });
+
+    expect(onOpen).not.toHaveBeenCalled();
+    document.body.removeChild(input);
+  });
+
+  it('does not open modal on Cmd+? (modifier + ?)', () => {
+    const onOpen = vi.fn();
+    renderHook(() => useSequentialShortcuts({ onOpenShortcutsModal: onOpen }));
+
+    act(() => {
+      dispatchKeyDown({ key: '?', metaKey: true });
+    });
+
+    expect(onOpen).not.toHaveBeenCalled();
+  });
+
   it('suppresses shortcuts when typing in form elements', () => {
     renderHook(() => useSequentialShortcuts());
 

@@ -31,6 +31,8 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
     'Legacy settings route redirected to Audience',
   '/app/dashboard/release-plan':
     'Release plan demo page (gated by RELEASE_PLAN_DEMO flag)',
+  '/app/calendar':
+    'Releases + release-moments calendar; reachable by URL until nav placement is finalised',
   '/app/lyrics/[trackId]':
     'Cinematic lyrics surface reached from the AudioBar lyrics button',
 };

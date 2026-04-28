@@ -6,6 +6,8 @@ import {
 
 export const FF_OVERRIDES_KEY = '__ff_overrides';
 export const APP_FLAG_OVERRIDES_COOKIE = 'jovie_app_flag_overrides';
+export const APP_FLAG_OVERRIDES_CHANGED_EVENT =
+  'jovie:app-flag-overrides-changed';
 
 export type AppFlagOverrideRecord = Record<string, boolean>;
 
@@ -44,6 +46,11 @@ function getSecureCookieAttribute(): string {
   return globalThis.location.protocol === 'https:' ? '; Secure' : '';
 }
 
+function notifyStoredAppFlagOverridesChanged(): void {
+  if (globalThis.window === undefined) return;
+  globalThis.dispatchEvent(new Event(APP_FLAG_OVERRIDES_CHANGED_EVENT));
+}
+
 export function writeStoredAppFlagOverrides(
   overrides: AppFlagOverrideRecord
 ): void {
@@ -52,6 +59,7 @@ export function writeStoredAppFlagOverrides(
   const serialized = JSON.stringify(overrides);
   localStorage.setItem(FF_OVERRIDES_KEY, serialized);
   document.cookie = `${APP_FLAG_OVERRIDES_COOKIE}=${encodeURIComponent(serialized)}; path=/; SameSite=Lax${getSecureCookieAttribute()}`;
+  notifyStoredAppFlagOverridesChanged();
 }
 
 export function clearStoredAppFlagOverrides(): void {
@@ -59,6 +67,7 @@ export function clearStoredAppFlagOverrides(): void {
 
   localStorage.removeItem(FF_OVERRIDES_KEY);
   document.cookie = `${APP_FLAG_OVERRIDES_COOKIE}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax${getSecureCookieAttribute()}`;
+  notifyStoredAppFlagOverridesChanged();
 }
 
 export function getAppFlagOverrideValue(

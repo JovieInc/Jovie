@@ -35,11 +35,16 @@ look-and-feel; pieces graduate here once they've settled.
 
 All three accept a `track: NowPlayingTrack` whose fields (`trackTitle`, `artistName`, `artworkUrl`) match `useTrackAudioPlayer().playbackState` directly.
 
+## Drawer
+
+| Component | Purpose |
+|-----------|---------|
+| `DrawerHero` | Header card for the right-rail drawer. Mounts inside `EntitySidebarShell.entityHeader`. Entity-agnostic — pass `title`, `subtitle`, `artwork`, `statusBadge`, `meta`, `trailing` slots. Optional `onPlay` overlay on artwork; optional overflow-menu button. |
+
 ## Brand chrome / loaders
 
 | Component | Purpose |
 |-----------|---------|
-| `JovieMark` | Inline brand SVG, sized via className. Pass `aria-hidden` when adjacent text already names the surface. |
 | `ShellLoader` | Full-screen cold-start bloom + reveal overlay. |
 | `JovieOverlay` | Push-to-talk listening overlay with 32-bar waveform. |
 | `CopyToggleIcon` | Copy ↔ Check icon swap for clipboard buttons. |
@@ -70,5 +75,5 @@ All three accept a `track: NowPlayingTrack` whose fields (`trackTitle`, `artistN
 
 ## Notes
 
-- `JovieMark` shares a path with `BrandLogo` (`components/atoms/BrandLogo.tsx`). Prefer `BrandLogo` for general logo needs (size + tone presets); use `JovieMark` for shell surfaces that need raw SVG with className-driven sizing.
+- For shell brand glyphs, use `BrandLogo` from `@/components/atoms/BrandLogo` (`components/atoms/BrandLogo.tsx`) — size + tone presets, optional `rounded={false}` for borderless glyphs.
 - Foundational primitives (Tooltip, IconBtn, EntityPopover, ShellDropdown, etc.) imported across the shell migration units (A–H). Wave 1 agents extract leaf content components that compose these.

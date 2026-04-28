@@ -184,6 +184,40 @@ describe('useSequentialShortcuts', () => {
     expect(onOpenShortcutsModal).toHaveBeenCalledOnce();
   });
 
+  it('calls onOpenShortcutsModal for ? (Shift+/, Linear convention)', () => {
+    const onOpenShortcutsModal = vi.fn();
+    renderHook(() => useSequentialShortcuts({ onOpenShortcutsModal }));
+
+    act(() => {
+      fireKey('?');
+    });
+
+    expect(onOpenShortcutsModal).toHaveBeenCalledOnce();
+  });
+
+  it('does not open modal on ? when typing in form elements', () => {
+    const onOpenShortcutsModal = vi.fn();
+    renderHook(() => useSequentialShortcuts({ onOpenShortcutsModal }));
+    const input = document.createElement('input');
+
+    act(() => {
+      fireKey('?', input);
+    });
+
+    expect(onOpenShortcutsModal).not.toHaveBeenCalled();
+  });
+
+  it('does not open modal on Cmd+? (modifier + ?)', () => {
+    const onOpenShortcutsModal = vi.fn();
+    renderHook(() => useSequentialShortcuts({ onOpenShortcutsModal }));
+
+    act(() => {
+      fireKey('?', undefined, { metaKey: true });
+    });
+
+    expect(onOpenShortcutsModal).not.toHaveBeenCalled();
+  });
+
   it('cleans up event listener on unmount', () => {
     const { unmount } = renderHook(() => useSequentialShortcuts());
 
