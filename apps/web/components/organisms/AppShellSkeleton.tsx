@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { AppShellFrame } from './AppShellFrame';
+import { AppShellFrame, type AppShellFrameVariant } from './AppShellFrame';
 
 const NAV_ITEMS = [
   { key: 'nav-inbox', width: '60%' },
@@ -19,11 +19,19 @@ const NAV_ITEMS_2 = [
 
 export function AppShellSkeleton({
   main: mainOverride,
+  variant,
 }: {
   readonly main?: ReactNode;
+  /**
+   * Match the AppShellFrame variant the post-skeleton render will use so the
+   * Suspense fallback doesn't flash a different layout while data loads.
+   * Defaults to 'legacy' to match the production default state.
+   */
+  readonly variant?: AppShellFrameVariant;
 } = {}) {
   return (
     <AppShellFrame
+      variant={variant}
       sidebar={
         <div className='max-lg:hidden bg-sidebar lg:flex lg:w-[232px] lg:shrink-0 lg:flex-col'>
           <div className='flex h-9 items-center gap-2 px-2 pt-2'>
