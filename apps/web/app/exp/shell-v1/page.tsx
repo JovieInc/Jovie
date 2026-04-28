@@ -138,6 +138,7 @@ import { InlineEditRow } from '@/components/shell/InlineEditRow';
 import { InstallBanner } from '@/components/shell/InstallBanner';
 import { JovieOverlay } from '@/components/shell/JovieOverlay';
 import { LabelPills } from '@/components/shell/LabelPills';
+import { LoopBtn } from '@/components/shell/LoopBtn';
 import { LyricsList } from '@/components/shell/LyricsList';
 import { LyricsView } from '@/components/shell/LyricsView';
 import { MetaPill } from '@/components/shell/MetaPill';
@@ -4193,45 +4194,6 @@ function AudioBarOverflowMenu({ track }: { track: TrackInfo }) {
         onSelect={noop('delete')}
       />
     </ShellDropdown>
-  );
-}
-
-function LoopBtn({
-  mode,
-  onClick,
-}: {
-  mode: 'off' | 'track' | 'section';
-  onClick: () => void;
-}) {
-  const active = mode !== 'off';
-  return (
-    <button
-      type='button'
-      onClick={onClick}
-      className={cn(
-        'relative h-7 w-7 rounded-md grid place-items-center transition-colors duration-150 ease-out',
-        active
-          ? 'text-primary-token'
-          : 'text-quaternary-token hover:text-primary-token'
-      )}
-      aria-label={`Loop: ${mode}`}
-      title={`Loop: ${mode}`}
-    >
-      <Repeat className='h-3.5 w-3.5' strokeWidth={2.25} />
-      {mode === 'track' && (
-        <span className='absolute -bottom-px right-0 text-[8px] font-bold leading-none text-primary-token'>
-          1
-        </span>
-      )}
-      {mode === 'section' && (
-        <span className='absolute -bottom-px right-0 text-[8px] font-bold leading-none text-primary-token'>
-          ⤴
-        </span>
-      )}
-      {active && (
-        <span className='absolute -top-px left-1/2 -translate-x-1/2 h-1 w-1 rounded-full bg-primary-token' />
-      )}
-    </button>
   );
 }
 
