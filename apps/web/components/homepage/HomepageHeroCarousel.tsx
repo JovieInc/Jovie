@@ -60,6 +60,16 @@ const HERO_MOCKUP_SCREENSHOTS: readonly HeroMockupShot[] = [
     kind: 'desktop',
     priority: false,
   },
+  {
+    id: 'profile-phone',
+    src: '/product-screenshots/profile-phone.png',
+    alt: 'Mobile artist profile with listen, tour, and presave actions',
+    title: 'Artist Profile',
+    width: 780,
+    height: 1688,
+    kind: 'phone',
+    priority: false,
+  },
 ] as const;
 
 const HOVER_ADVANCE_DELAY_MS = 700;
