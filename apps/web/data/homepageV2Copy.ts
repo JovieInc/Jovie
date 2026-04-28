@@ -160,7 +160,7 @@ export const HOMEPAGE_V2_COPY: HomepageV2Copy = {
   finalCta: {
     headline: 'Start With the Next Drop.',
     body: 'Jovie handles the plan, assets, and follow-up from there.',
-    primaryCtaLabel: 'Start Free Trial',
+    primaryCtaLabel: 'Claim my workspace',
     secondaryCtaLabel: 'See Pricing',
   },
   footerColumns: [
