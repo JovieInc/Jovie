@@ -121,12 +121,12 @@ import {
   Table as LibraryTable,
   ViewToggle as LibraryViewToggle,
 } from '@/app/exp/library-v1/page';
-import { CopyToggleIcon } from '@/components/atoms/CopyToggleIcon';
 import { ChatInput } from '@/components/jovie/components/ChatInput';
 import { ChatMarkdown } from '@/components/jovie/components/ChatMarkdown';
 import { ActivityHoverRow } from '@/components/shell/ActivityHoverRow';
 import { AgentPulse } from '@/components/shell/AgentPulse';
 import { ArtworkPlayOverlay } from '@/components/shell/ArtworkPlayOverlay';
+import { AssigneeChip } from '@/components/shell/AssigneeChip';
 import { ColumnLabel } from '@/components/shell/ColumnLabel';
 import { ContextMenuOverlay } from '@/components/shell/ContextMenuOverlay';
 import { DictationWaveform } from '@/components/shell/DictationWaveform';
@@ -136,6 +136,7 @@ import { DueChip } from '@/components/shell/DueChip';
 import { EntityHoverLink } from '@/components/shell/EntityPopover';
 import { EntityThreadGlyph } from '@/components/shell/EntityThreadGlyph';
 import { IconBtn } from '@/components/shell/IconBtn';
+import { InlineEditRow } from '@/components/shell/InlineEditRow';
 import { LabelPills } from '@/components/shell/LabelPills';
 import { MetaPill } from '@/components/shell/MetaPill';
 import { PickerAction } from '@/components/shell/PickerAction';
@@ -150,6 +151,7 @@ import {
   ShellDropdown,
 } from '@/components/shell/ShellDropdown';
 import { ShellLoader } from '@/components/shell/ShellLoader';
+import { SmartLinkRow } from '@/components/shell/SmartLinkRow';
 import { Stat } from '@/components/shell/Stat';
 import { StatusBadge } from '@/components/shell/StatusBadge';
 import { SuggestionCard } from '@/components/shell/SuggestionCard';
@@ -8181,7 +8183,9 @@ function DrawerHero({
       {/* Smart link — copy + open. Pill-shaped to match the input language
           and reinforce the share-this affordance. */}
       <div className='mt-4'>
-        <DrawerSmartLinkRow release={release} />
+        <SmartLinkRow
+          url={`jov.ie/${release.artist.toLowerCase().replace(/\s+/g, '-')}/${release.id}`}
+        />
       </div>
     </section>
   );
@@ -8208,43 +8212,6 @@ function relativeDropMeta(iso: string): {
 // Cross-fade between the rest icon and a confirmation glyph. Uses
 // monochrome white at high opacity for the confirm state — the cyan
 // accent was too attention-seeking for an action you fire constantly.
-function DrawerSmartLinkRow({ release }: { release: Release }) {
-  const [copied, setCopied] = useState(false);
-  const url = `jov.ie/${release.artist.toLowerCase().replace(/\s+/g, '-')}/${release.id}`;
-  return (
-    <div className='flex items-center gap-1.5 h-7 pl-3 pr-1 rounded-full border border-(--linear-app-shell-border) bg-(--surface-0)/60 text-[11.5px] text-tertiary-token transition-colors duration-150 ease-out'>
-      <LinkIcon
-        className='h-3 w-3 text-quaternary-token shrink-0'
-        strokeWidth={2.25}
-      />
-      <span className='flex-1 truncate font-mono tabular-nums'>{url}</span>
-      <Tooltip label={copied ? 'Copied' : 'Copy smart link'}>
-        <button
-          type='button'
-          onClick={() => {
-            setCopied(true);
-            setTimeout(() => setCopied(false), 1200);
-          }}
-          className='inline-flex items-center justify-center h-5 w-5 rounded text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-150 ease-out'
-          aria-label='Copy smart link'
-          aria-live='polite'
-        >
-          <CopyToggleIcon copied={copied} />
-        </button>
-      </Tooltip>
-      <Tooltip label='Open smart link'>
-        <button
-          type='button'
-          className='inline-flex items-center justify-center h-5 w-5 rounded text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-150 ease-out'
-          aria-label='Open smart link'
-        >
-          <ExternalLink className='h-3 w-3' strokeWidth={2.25} />
-        </button>
-      </Tooltip>
-    </div>
-  );
-}
-
 // Overview tab — clean stats triad + compact performance + drop date.
 // No carded sections; sub-areas are separated by a hairline only.
 function DrawerOverviewTab({ release }: { release: Release }) {
@@ -8972,100 +8939,14 @@ function DrawerDetailsTab({ release }: { release: Release }) {
       </p>
       <dl className='flex flex-col -mx-2'>
         {rows.map(row => (
-          <DrawerDetailRow
+          <InlineEditRow
             key={row.label}
             label={row.label}
             value={row.value}
-            readOnly={row.readOnly}
+            onCommit={row.readOnly ? undefined : () => undefined}
           />
         ))}
       </dl>
-    </div>
-  );
-}
-
-function DrawerDetailRow({
-  label,
-  value,
-  readOnly,
-}: {
-  label: string;
-  value: string;
-  readOnly?: boolean;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value);
-  const inputRef = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    if (editing) {
-      inputRef.current?.focus();
-      inputRef.current?.select();
-    }
-  }, [editing]);
-  const enterEdit = () => {
-    if (readOnly) return;
-    setDraft(value);
-    setEditing(true);
-  };
-  const valueClass = cn(
-    'flex-1 min-w-0 text-[12.5px] text-secondary-token truncate',
-    label === 'Key' && 'font-mono tracking-wide',
-    (label === 'BPM' || label === 'Length' || label === 'ID') && 'tabular-nums'
-  );
-  if (editing) {
-    return (
-      <div className='flex items-center gap-3 h-8 px-2 rounded-md bg-surface-1/40'>
-        <dt className='w-[88px] shrink-0 text-[11px] text-quaternary-token'>
-          {label}
-        </dt>
-        <input
-          ref={inputRef}
-          value={draft}
-          onChange={e => setDraft(e.target.value)}
-          onBlur={() => setEditing(false)}
-          onKeyDown={e => {
-            if (e.key === 'Enter' || e.key === 'Escape') {
-              e.preventDefault();
-              setEditing(false);
-            }
-          }}
-          className={cn(valueClass, 'bg-transparent outline-none')}
-        />
-      </div>
-    );
-  }
-  return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: row is a click + double-click affordance into an inline edit input rendered conditionally above
-    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: same — keyboard path is the edit pencil button
-    // biome-ignore lint/a11y/useKeyWithClickEvents: keyboard activation is on the inner pencil button (which is a real <button>)
-    <div
-      className={cn(
-        'group/row flex items-center gap-3 h-8 px-2 rounded-md transition-colors duration-150 ease-out',
-        readOnly
-          ? 'hover:bg-transparent'
-          : 'cursor-pointer hover:bg-surface-1/40'
-      )}
-      onClick={readOnly ? undefined : enterEdit}
-      onDoubleClick={readOnly ? undefined : enterEdit}
-      title={readOnly ? undefined : 'Click to edit'}
-    >
-      <dt className='w-[88px] shrink-0 text-[11px] text-quaternary-token'>
-        {label}
-      </dt>
-      <dd className={valueClass}>{value}</dd>
-      {!readOnly && (
-        <button
-          type='button'
-          onClick={e => {
-            e.stopPropagation();
-            enterEdit();
-          }}
-          aria-label={`Edit ${label}`}
-          className='shrink-0 inline-flex items-center justify-center h-5 w-5 rounded text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 transition-opacity duration-150 ease-out'
-        >
-          <Pencil className='h-3 w-3' strokeWidth={2.25} />
-        </button>
-      )}
     </div>
   );
 }
@@ -9913,7 +9794,10 @@ function TaskListItem({
               />
             )}
             <PriorityGlyph priority={task.priority} />
-            <AssigneeChip assignee={task.assignee} />
+            <AssigneeChip
+              kind={task.assignee === 'jovie' ? 'jovie' : 'human'}
+              name={task.assignee === 'you' ? 'You' : undefined}
+            />
             <TaskRowMoreMenu task={task} />
           </span>
         </div>
@@ -10030,7 +9914,11 @@ function TaskDetail({
           </MetaPill>
         )}
         <MetaPill>
-          <AssigneeChip assignee={task.assignee} expanded />
+          <AssigneeChip
+            kind={task.assignee === 'jovie' ? 'jovie' : 'human'}
+            name={task.assignee === 'you' ? 'You' : undefined}
+            expanded
+          />
         </MetaPill>
         {task.dueIso && (
           <MetaPill
@@ -10162,54 +10050,6 @@ function StatusIcon({
         />
       );
   }
-}
-
-function AssigneeChip({
-  assignee,
-  expanded,
-}: {
-  assignee: TaskAssignee;
-  expanded?: boolean;
-}) {
-  if (assignee === 'jovie') {
-    return (
-      <span
-        className={cn(
-          'inline-flex items-center gap-1.5 shrink-0',
-          expanded
-            ? 'text-[12.5px] text-secondary-token'
-            : 'text-[10.5px] text-tertiary-token'
-        )}
-        title='Assigned to Jovie'
-      >
-        <JovieMark
-          className={cn(expanded ? 'h-3.5 w-3.5' : 'h-3 w-3', 'text-cyan-400')}
-        />
-        {expanded && 'Jovie'}
-      </span>
-    );
-  }
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1.5 shrink-0',
-        expanded
-          ? 'text-[12.5px] text-secondary-token'
-          : 'text-[10.5px] text-tertiary-token'
-      )}
-      title='Assigned to you'
-    >
-      <span
-        className={cn(
-          'rounded-full bg-surface-2 border border-(--linear-app-shell-border) text-[8px] font-caption text-secondary-token grid place-items-center',
-          expanded ? 'h-5 w-5 text-[10px]' : 'h-3.5 w-3.5'
-        )}
-      >
-        TW
-      </span>
-      {expanded && 'Tim White'}
-    </span>
-  );
 }
 
 function statusLabel(s: TaskStatus): string {
