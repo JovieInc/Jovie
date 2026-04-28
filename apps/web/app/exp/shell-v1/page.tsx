@@ -163,6 +163,7 @@ import {
   type NowPlayingTrack,
   SidebarNowPlaying,
 } from '@/components/shell/SidebarNowPlaying';
+import { SidebarSection } from '@/components/shell/SidebarSection';
 import { SidebarThreadsSection } from '@/components/shell/SidebarThreadsSection';
 import { SmartLinkRow } from '@/components/shell/SmartLinkRow';
 import type { SparklineTrend } from '@/components/shell/Sparkline';
@@ -3159,23 +3160,34 @@ function Sidebar({
               </div>
             )}
             {ARTIST_WORKSPACES.map(ws => (
-              <Workspace
+              <SidebarSection
                 key={ws.id}
-                workspace={ws}
+                name={ws.name}
                 open={openWs[ws.id] ?? false}
                 onToggle={() =>
                   setOpenWs(s => ({ ...s, [ws.id]: !(s[ws.id] ?? false) }))
                 }
+                itemCount={ws.items.length}
                 collapsed={collapsed}
                 tight={tight}
-              />
+              >
+                {ws.items.map(item => (
+                  <SidebarNavItem
+                    key={item.label}
+                    item={item}
+                    collapsed={collapsed}
+                    nested={!collapsed}
+                    tight={tight}
+                  />
+                ))}
+              </SidebarSection>
             ))}
           </div>
 
           {/* Admin — separate, no section header */}
           <div>
-            <Workspace
-              workspace={ADMIN_WORKSPACE}
+            <SidebarSection
+              name={ADMIN_WORKSPACE.name}
               open={openWs[ADMIN_WORKSPACE.id] ?? false}
               onToggle={() =>
                 setOpenWs(s => ({
@@ -3183,9 +3195,20 @@ function Sidebar({
                   [ADMIN_WORKSPACE.id]: !(s[ADMIN_WORKSPACE.id] ?? false),
                 }))
               }
+              itemCount={ADMIN_WORKSPACE.items.length}
               collapsed={collapsed}
               tight={tight}
-            />
+            >
+              {ADMIN_WORKSPACE.items.map(item => (
+                <SidebarNavItem
+                  key={item.label}
+                  item={item}
+                  collapsed={collapsed}
+                  nested={!collapsed}
+                  tight={tight}
+                />
+              ))}
+            </SidebarSection>
           </div>
         </nav>
       )}
@@ -3229,88 +3252,6 @@ function Sidebar({
         )}
       </div>
     </aside>
-  );
-}
-
-function Workspace({
-  workspace,
-  open,
-  onToggle,
-  collapsed,
-  tight,
-}: {
-  workspace: Workspace;
-  open: boolean;
-  onToggle: () => void;
-  collapsed: boolean;
-  tight?: boolean;
-}) {
-  // Collapsed sidebar: render just an avatar; click cycles through items
-  // visually (here we just show the avatar with a tone tooltip).
-  if (collapsed) {
-    // No avatar in collapsed mode either — items of an open workspace
-    // simply render as icons inline.
-    if (!open) return null;
-    return (
-      <div className='space-y-px'>
-        {workspace.items.map(item => (
-          <SidebarNavItem key={item.label} item={item} collapsed={true} />
-        ))}
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      <button
-        type='button'
-        onClick={onToggle}
-        className={cn(
-          'relative w-full flex items-center gap-2.5 pl-3 pr-2 rounded-md hover:bg-surface-1/70 transition-colors duration-150 ease-out',
-          tight ? 'h-6' : 'h-7'
-        )}
-        aria-expanded={open}
-      >
-        {/* Chevron sits in the icon column — replaces the avatar */}
-        <ChevronDown
-          aria-hidden='true'
-          className={cn(
-            'h-3.5 w-3.5 shrink-0 text-tertiary-token transition-transform duration-150 ease-out',
-            !open && '-rotate-90'
-          )}
-          strokeWidth={2.25}
-        />
-        <span className='text-[13px] font-caption truncate text-primary-token tracking-[-0.015em]'>
-          {workspace.name}
-        </span>
-      </button>
-      <div
-        className='overflow-hidden'
-        style={{
-          maxHeight: open ? workspace.items.length * (tight ? 26 : 30) + 12 : 0,
-          opacity: open ? 1 : 0,
-          transition: `max-height ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, opacity 200ms ease-out`,
-        }}
-      >
-        {/* Items area — separation is implied by the spacing alone. */}
-        <div className='relative space-y-px pt-1 pb-0.5 [&_a:hover]:bg-surface-1/50'>
-          {workspace.items.map(item => (
-            <SidebarNavItem
-              key={item.label}
-              item={item}
-              collapsed={false}
-              nested
-              tight={tight}
-            />
-          ))}
-          {workspace.items.length === 0 && (
-            <div className='text-[11px] text-tertiary-token italic pl-3 py-1'>
-              No items yet
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
   );
 }
 
