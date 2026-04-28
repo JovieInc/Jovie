@@ -176,6 +176,7 @@ import { ThreadVideoCard } from '@/components/shell/ThreadVideoCard';
 import { ThreadView as ShellThreadView } from '@/components/shell/ThreadView';
 import { Tooltip } from '@/components/shell/Tooltip';
 import { TypeBadge } from '@/components/shell/TypeBadge';
+import { formatTime } from '@/lib/format-time';
 // ---------------------------------------------------------------------------
 // DESIGN RULE — NO AI-SLOP GRADIENTS ON UI CHROME
 // ---------------------------------------------------------------------------
@@ -1546,12 +1547,6 @@ function formatStreams(n: number) {
   if (n < 10_000) return `${(n / 1_000).toFixed(1)}k`;
   if (n < 1_000_000) return `${Math.round(n / 1_000)}k`;
   return `${(n / 1_000_000).toFixed(1)}M`;
-}
-
-function formatTime(s: number) {
-  const m = Math.floor(s / 60);
-  const r = Math.floor(s % 60);
-  return `${m}:${r.toString().padStart(2, '0')}`;
 }
 
 export default function ShellV1Experiment() {
