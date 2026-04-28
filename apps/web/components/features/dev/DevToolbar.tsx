@@ -408,12 +408,14 @@ export function DevToolbar({
     () => overridesCtx.overrides,
     [overridesCtx.overrides]
   );
+  const validOverrides = overridesCtx.validOverrides;
+  const orphanKeys = overridesCtx.orphanKeys;
   const overrideCount = useMemo(
     () =>
-      Object.entries(overrides).filter(([key, value]) =>
+      Object.entries(validOverrides).filter(([key, value]) =>
         isMeaningfulOverride(key, value)
       ).length,
-    [overrides]
+    [validOverrides]
   );
   const shellChatV1OverrideKey = APP_FLAG_OVERRIDE_KEYS.SHELL_CHAT_V1;
   const shellChatV1Overridden =
@@ -658,6 +660,14 @@ export function DevToolbar({
                   ))}
                 </div>
               </div>
+            )}
+
+            {/* Orphan overrides — keys in localStorage that no longer match the contract */}
+            {orphanKeys.length > 0 && !search && (
+              <OrphanOverrides
+                keys={orphanKeys}
+                onPurge={overridesCtx.purgeOrphans}
+              />
             )}
 
             {/* Non-overridden flags */}
@@ -1045,6 +1055,53 @@ function PlanToggleInner({
         ))}
       </div>
     </>
+  );
+}
+
+function OrphanOverrides({
+  keys,
+  onPurge,
+}: Readonly<{ keys: string[]; onPurge: () => void }>) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className='mb-2 mt-1 border-l-2 border-yellow-500/50 pl-3'>
+      <div className='flex items-center justify-between mb-1'>
+        <span
+          className='text-[10px] font-semibold uppercase tracking-wide text-yellow-400'
+          title='Override keys in localStorage that no longer match any flag in APP_FLAG_OVERRIDE_KEYS. Likely from renamed or removed flags.'
+        >
+          Orphans ({keys.length})
+        </span>
+        <div className='flex items-center gap-2'>
+          <button
+            type='button'
+            onClick={() => setExpanded(prev => !prev)}
+            className='text-[10px] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] underline transition-colors'
+          >
+            {expanded ? 'hide' : 'inspect'}
+          </button>
+          <button
+            type='button'
+            onClick={onPurge}
+            className='text-[10px] text-yellow-400 hover:text-yellow-300 underline transition-colors'
+          >
+            purge
+          </button>
+        </div>
+      </div>
+      {expanded && (
+        <div className='flex flex-col gap-0.5 pb-1'>
+          {keys.map(k => (
+            <span
+              key={k}
+              className='truncate text-[10px] text-[var(--color-text-quaternary-token)] font-mono'
+            >
+              {k}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
