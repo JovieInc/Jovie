@@ -352,6 +352,9 @@ describe('ProfileCompactTemplate', () => {
     expect(
       screen.queryByRole('button', { name: /more options/i })
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'More' })
+    ).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
   });
 
@@ -387,6 +390,22 @@ describe('ProfileCompactTemplate', () => {
         'menu'
       );
     });
+  });
+
+  it('keeps the home tab active for about mode deep links', async () => {
+    render(
+      <ProfileCompactTemplate
+        mode='about'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    const bottomNav = screen.getByTestId('profile-bottom-nav');
+    expect(
+      within(bottomNav).getByRole('button', { name: 'Home' })
+    ).toHaveAttribute('aria-current', 'page');
   });
 
   it('uses browser back from the floating back control when history is available', async () => {
@@ -602,6 +621,46 @@ describe('ProfileCompactTemplate', () => {
 
     fireEvent.click(alertsRow);
 
+    await waitFor(() => {
+      expect(screen.getByTestId('mock-primary-tab-panel')).toHaveAttribute(
+        'data-mode',
+        'subscribe'
+      );
+    });
+  });
+
+  it('opens the registered notifications reveal from the compact hero alerts row', async () => {
+    const revealNotifications = vi.fn();
+    mockProfileInlineNotificationsCTA.mockImplementation(
+      (props: {
+        readonly onManageNotifications?: () => void;
+        readonly onRegisterReveal?: (reveal: () => void) => void;
+      }) => {
+        props.onRegisterReveal?.(revealNotifications);
+        return (
+          <button
+            type='button'
+            data-testid='mock-inline-notifications-cta'
+            onClick={() => props.onManageNotifications?.()}
+          >
+            Inline notifications
+          </button>
+        );
+      }
+    );
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('profile-hero-alerts-row'));
+
+    expect(revealNotifications).toHaveBeenCalledTimes(1);
     await waitFor(() => {
       expect(screen.getByTestId('mock-primary-tab-panel')).toHaveAttribute(
         'data-mode',
