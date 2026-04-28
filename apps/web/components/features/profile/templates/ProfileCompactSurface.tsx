@@ -166,11 +166,12 @@ function resolveActivePrimaryTab(params: {
   switch (mode) {
     case 'listen':
     case 'releases':
+      return 'listen';
     case 'tour':
     case 'subscribe':
-    case 'about':
-      return mode === 'releases' ? 'listen' : mode;
+      return mode;
     case 'profile':
+    case 'about':
     case 'pay':
     case 'contact':
     default:
@@ -322,11 +323,11 @@ export function ProfileCompactSurface({
     [onRegisterReveal]
   );
   const openNotifications = useCallback(() => {
+    onModeSelect('subscribe');
     const reveal = notificationsRevealRef.current;
     if (reveal) {
       reveal();
-    } else {
-      onModeSelect('subscribe');
+      return;
     }
     onRevealNotifications?.();
   }, [onModeSelect, onRevealNotifications]);
@@ -595,7 +596,12 @@ export function ProfileCompactSurface({
                 aria-label='Profile navigation'
                 data-testid='profile-bottom-nav'
               >
-                <div className='grid grid-cols-5 items-center gap-1'>
+                <div
+                  className={cn(
+                    'grid items-center gap-1',
+                    hideMoreMenu ? 'grid-cols-4' : 'grid-cols-5'
+                  )}
+                >
                   {PRIMARY_TABS.map(tab => {
                     const Icon = tab.icon;
                     const isActive =
@@ -615,7 +621,7 @@ export function ProfileCompactSurface({
                       >
                         <Icon
                           className={cn(
-                            'h-[19px] w-[19px] shrink-0',
+                            'h-5 w-5 shrink-0',
                             isActive ? 'text-white' : 'text-white/52'
                           )}
                         />
@@ -630,33 +636,35 @@ export function ProfileCompactSurface({
                       </button>
                     );
                   })}
-                  <button
-                    type='button'
-                    onClick={onOpenMenu}
-                    className={cn(
-                      'relative flex min-h-[52px] min-w-0 flex-col items-center justify-center gap-1 rounded-[22px] px-1.5 py-1.5 text-center transition-[background-color,color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
-                      isMenuActive
-                        ? 'text-white'
-                        : 'text-white/40 hover:text-white/62'
-                    )}
-                    aria-haspopup='dialog'
-                    aria-expanded={isMenuActive}
-                  >
-                    <MoreHorizontal
+                  {!hideMoreMenu ? (
+                    <button
+                      type='button'
+                      onClick={onOpenMenu}
                       className={cn(
-                        'h-[19px] w-[19px] shrink-0',
-                        isMenuActive ? 'text-white' : 'text-white/52'
+                        'relative flex min-h-[52px] min-w-0 flex-col items-center justify-center gap-1 rounded-[22px] px-1.5 py-1.5 text-center transition-[background-color,color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
+                        isMenuActive
+                          ? 'text-white'
+                          : 'text-white/40 hover:text-white/62'
                       )}
-                    />
-                    <span
-                      className={cn(
-                        'truncate text-[11px] leading-none tracking-[-0.012em]',
-                        isMenuActive ? 'font-semibold' : 'font-medium'
-                      )}
+                      aria-haspopup='dialog'
+                      aria-expanded={isMenuActive}
                     >
-                      More
-                    </span>
-                  </button>
+                      <MoreHorizontal
+                        className={cn(
+                          'h-5 w-5 shrink-0',
+                          isMenuActive ? 'text-white' : 'text-white/52'
+                        )}
+                      />
+                      <span
+                        className={cn(
+                          'truncate text-[11px] leading-none tracking-[-0.012em]',
+                          isMenuActive ? 'font-semibold' : 'font-medium'
+                        )}
+                      >
+                        More
+                      </span>
+                    </button>
+                  ) : null}
                 </div>
               </nav>
             </div>
