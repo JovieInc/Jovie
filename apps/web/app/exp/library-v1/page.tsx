@@ -611,7 +611,7 @@ export default function LibraryV1Page() {
         filteredAssets.findIndex(a => a.id === selectedId)
       );
       const cols = view === 'grid' ? 4 : 1;
-      let next = idx;
+      let next: number;
       if (e.key === 'ArrowRight')
         next = Math.min(filteredAssets.length - 1, idx + 1);
       else if (e.key === 'ArrowLeft') next = Math.max(0, idx - 1);
