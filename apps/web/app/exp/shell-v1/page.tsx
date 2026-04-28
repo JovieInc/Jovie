@@ -126,6 +126,10 @@ import { CuesPanel } from '@/components/shell/CuesPanel';
 import { DrawerHero as ProductionDrawerHero } from '@/components/shell/DrawerHero';
 import { DrawerTabStrip } from '@/components/shell/DrawerTabStrip';
 import { DropDateChip } from '@/components/shell/DropDateChip';
+import {
+  type DspAvatarItem,
+  DspAvatarStack,
+} from '@/components/shell/DspAvatarStack';
 import { DueChip } from '@/components/shell/DueChip';
 import { EntityHoverLink } from '@/components/shell/EntityPopover';
 import { EntityThreadGlyph } from '@/components/shell/EntityThreadGlyph';
@@ -669,6 +673,36 @@ const DSP_LABEL: Record<DspKey, string> = {
   tidal: 'TIDAL',
 };
 const DSP_ORDER: DspKey[] = ['spotify', 'apple', 'youtube', 'tidal'];
+const DSP_GLYPH: Record<DspKey, string> = {
+  spotify: 'S',
+  apple: 'A',
+  youtube: 'Y',
+  tidal: 'T',
+};
+const DSP_COLOR: Record<DspKey, string> = {
+  spotify: 'bg-emerald-500/90',
+  apple: 'bg-rose-400/90',
+  youtube: 'bg-red-500/90',
+  tidal: 'bg-sky-400/90',
+};
+// Calm DSP status dots — live is the default state and stays neutral.
+// Errors retain a clear rose so they read as needing attention.
+const DSP_STATUS_DOT: Record<DspStatus, string> = {
+  live: 'bg-white/35',
+  pending: 'bg-amber-300/70',
+  error: 'bg-rose-400/85',
+  missing: 'bg-white/12',
+};
+
+function releaseDspItems(release: Release): DspAvatarItem[] {
+  return DSP_ORDER.map(dsp => ({
+    id: dsp,
+    status: release.dsps[dsp],
+    label: DSP_LABEL[dsp],
+    glyph: DSP_GLYPH[dsp],
+    colorClass: DSP_COLOR[dsp],
+  }));
+}
 
 // --- Entity popover demo data ----------------------------------------------
 // Adapter helpers + placeholder teammate/contact records that ShellDropdown
@@ -6778,7 +6812,7 @@ function ReleaseRow({
         >
           {formatStreams(release.weeklyStreams)}
         </span>
-        <DspAvatarStack release={release} />
+        <DspAvatarStack dsps={releaseDspItems(release)} />
         <ReleaseRowMoreMenu release={release} />
       </div>
     </li>
@@ -6852,131 +6886,6 @@ function ReleaseRowMoreMenu({ release }: { release: Release }) {
         <ShellDropdown.Separator />
         <ShellDropdown.Item icon={Archive} label='Archive' tone='danger' />
       </ShellDropdown>
-    </div>
-  );
-}
-
-// DSP presence indicator — one primary glyph + "+N" pill, full list in a
-// hover popover (max-height with internal scroll for overflow). Replaces
-// the row-of-glyphs pattern that competed with the row's other affordances.
-const DSP_GLYPH: Record<DspKey, string> = {
-  spotify: 'S',
-  apple: 'A',
-  youtube: 'Y',
-  tidal: 'T',
-};
-const DSP_COLOR: Record<DspKey, string> = {
-  spotify: 'bg-emerald-500/90',
-  apple: 'bg-rose-400/90',
-  youtube: 'bg-red-500/90',
-  tidal: 'bg-sky-400/90',
-};
-// Calm DSP status dots — live is the default state and stays neutral.
-// Errors retain a clear rose so they read as needing attention.
-const DSP_STATUS_DOT: Record<DspStatus, string> = {
-  live: 'bg-white/35',
-  pending: 'bg-amber-300/70',
-  error: 'bg-rose-400/85',
-  missing: 'bg-white/12',
-};
-function DspAvatarStack({ release }: { release: Release }) {
-  // Sort: live first (in DSP_ORDER), then pending/error, then missing.
-  const ordered = [...DSP_ORDER].sort((a, b) => {
-    const rank = { live: 0, pending: 1, error: 1, missing: 2 } as const;
-    return rank[release.dsps[a]] - rank[release.dsps[b]];
-  });
-  const primary = ordered[0];
-  const primaryStatus = release.dsps[primary];
-  const liveCount = ordered.filter(d => release.dsps[d] === 'live').length;
-  const others = Math.max(0, ordered.length - 1);
-
-  return (
-    <div className='relative inline-flex items-center gap-1.5 group/dsps'>
-      <span
-        className={cn(
-          'relative h-[20px] w-[20px] rounded-full grid place-items-center text-[9px] font-semibold text-white shrink-0',
-          'ring-2 ring-(--linear-bg-page)',
-          primaryStatus === 'missing'
-            ? 'bg-quaternary-token/40 opacity-50'
-            : DSP_COLOR[primary]
-        )}
-      >
-        {DSP_GLYPH[primary]}
-        {primaryStatus === 'pending' && (
-          <span
-            aria-hidden='true'
-            className='absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-amber-400 ring-1 ring-(--linear-bg-page)'
-          />
-        )}
-        {primaryStatus === 'error' && (
-          <span
-            aria-hidden='true'
-            className='absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-rose-500 ring-1 ring-(--linear-bg-page)'
-          />
-        )}
-      </span>
-      {others > 0 && (
-        <span className='inline-flex items-center h-5 px-1.5 rounded text-[10.5px] font-caption tabular-nums text-tertiary-token bg-(--surface-1)/70 border border-(--linear-app-shell-border)'>
-          +{others}
-        </span>
-      )}
-
-      {/* Popover — opens on row/group hover, anchored bottom-right. */}
-      <div
-        role='tooltip'
-        className={cn(
-          'pointer-events-none absolute right-0 top-full mt-1.5 z-40 w-[220px]',
-          'opacity-0 translate-y-1 group-hover/dsps:opacity-100 group-hover/dsps:translate-y-0 group-hover/dsps:pointer-events-auto',
-          'transition-[opacity,transform] duration-150 ease-out delay-[400ms] group-hover/dsps:delay-[400ms]'
-        )}
-      >
-        <div className='rounded-md border border-(--linear-app-shell-border) bg-(--linear-app-content-surface)/95 backdrop-blur-xl shadow-[0_8px_28px_rgba(0,0,0,0.32)] overflow-hidden'>
-          <div className='flex items-center justify-between px-2.5 h-7 border-b border-(--linear-app-shell-border)/60'>
-            <span className='text-[10px] uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
-              Distribution
-            </span>
-            <span className='text-[10.5px] tabular-nums text-tertiary-token'>
-              {liveCount}/{ordered.length} live
-            </span>
-          </div>
-          <div className='max-h-[180px] overflow-y-auto'>
-            {ordered.map(dsp => {
-              const status = release.dsps[dsp];
-              return (
-                <div
-                  key={dsp}
-                  className='flex items-center gap-2 h-7 px-2.5 hover:bg-surface-1/40'
-                >
-                  <span
-                    className={cn(
-                      'h-[14px] w-[14px] rounded-full grid place-items-center text-[8px] font-semibold text-white shrink-0',
-                      status === 'missing'
-                        ? 'bg-quaternary-token/40 opacity-60'
-                        : DSP_COLOR[dsp]
-                    )}
-                  >
-                    {DSP_GLYPH[dsp]}
-                  </span>
-                  <span className='flex-1 text-[12px] text-secondary-token truncate'>
-                    {DSP_LABEL[dsp]}
-                  </span>
-                  <span className='inline-flex items-center gap-1.5'>
-                    <span
-                      className={cn(
-                        'h-1.5 w-1.5 rounded-full',
-                        DSP_STATUS_DOT[status]
-                      )}
-                    />
-                    <span className='text-[10.5px] uppercase tracking-[0.06em] text-quaternary-token'>
-                      {status}
-                    </span>
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
