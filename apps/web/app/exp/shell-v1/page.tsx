@@ -140,6 +140,7 @@ import { LabelPills } from '@/components/shell/LabelPills';
 import { LyricsList } from '@/components/shell/LyricsList';
 import { LyricsView } from '@/components/shell/LyricsView';
 import { MetaPill } from '@/components/shell/MetaPill';
+import { MobilePlayerCard } from '@/components/shell/MobilePlayerCard';
 import {
   PerformanceCard,
   type PerformanceRangeKey,
@@ -168,6 +169,7 @@ import type { SparklineTrend } from '@/components/shell/Sparkline';
 import { Stat } from '@/components/shell/Stat';
 import { StatusBadge } from '@/components/shell/StatusBadge';
 import { SuggestionCard } from '@/components/shell/SuggestionCard';
+import { TabletPlayerCard } from '@/components/shell/TabletPlayerCard';
 import { TaskStatusIcon } from '@/components/shell/TaskStatusIcon';
 import { ThreadAudioCard } from '@/components/shell/ThreadAudioCard';
 import { ThreadImageCard } from '@/components/shell/ThreadImageCard';
@@ -176,6 +178,7 @@ import { ThreadVideoCard } from '@/components/shell/ThreadVideoCard';
 import { ThreadView as ShellThreadView } from '@/components/shell/ThreadView';
 import { Tooltip } from '@/components/shell/Tooltip';
 import { TypeBadge } from '@/components/shell/TypeBadge';
+import { dropDateMeta } from '@/lib/format-drop-date';
 import { formatTime } from '@/lib/format-time';
 // ---------------------------------------------------------------------------
 // DESIGN RULE — NO AI-SLOP GRADIENTS ON UI CHROME
@@ -2668,13 +2671,14 @@ export default function ShellV1Experiment() {
             isPlaying={isPlaying}
             onPlay={() => setIsPlaying(p => !p)}
             pct={pct}
-            track={currentTrack}
+            track={toNowPlayingTrack(currentTrack)}
           />
           <TabletPlayerCard
             isPlaying={isPlaying}
             onPlay={() => setIsPlaying(p => !p)}
-            pct={pct}
-            track={currentTrack}
+            currentTime={currentTimeSec}
+            duration={TRACK.duration}
+            track={toNowPlayingTrack(currentTrack)}
           />
         </div>
 
@@ -4705,188 +4709,6 @@ function ScrubGradient({
         </svg>
       </div>
       <span className={TIME_LABEL}>{formatTime(TRACK.duration)}</span>
-    </div>
-  );
-}
-
-// Mobile playback: a frosted "liquid glass" card pinned to the bottom of
-// the viewport. Phone-only — `md` and up gets the tablet card or full bar.
-function MobilePlayerCard({
-  isPlaying,
-  onPlay,
-  pct,
-  track,
-}: {
-  isPlaying: boolean;
-  onPlay: () => void;
-  pct: number;
-  track: TrackInfo;
-}) {
-  return (
-    <div className='md:hidden fixed inset-x-3 z-40 bottom-3'>
-      <div className='rounded-2xl px-2.5 py-2 flex items-center gap-2.5 backdrop-blur-2xl bg-(--linear-app-content-surface)/70 border border-white/10 shadow-[0_10px_40px_rgba(0,0,0,0.18)] relative overflow-hidden'>
-        {/* Hairline progress at the very top edge */}
-        <span
-          aria-hidden='true'
-          className='absolute top-0 left-0 right-0 h-px bg-tertiary-token/30'
-        />
-        <span
-          aria-hidden='true'
-          className='absolute top-0 left-0 h-px bg-primary-token'
-          style={{ width: `${pct}%` }}
-        />
-
-        {/* Album art */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={track.artwork}
-          alt=''
-          className='h-10 w-10 rounded-lg object-cover shrink-0'
-        />
-
-        {/* Track */}
-        <div className='min-w-0 flex-1'>
-          <div className='truncate text-[13px] font-caption text-primary-token leading-tight'>
-            {track.title}
-          </div>
-          <div className='truncate text-[11px] text-tertiary-token leading-tight mt-0.5'>
-            {track.artist}
-          </div>
-        </div>
-
-        {/* Play */}
-        <button
-          type='button'
-          onClick={onPlay}
-          className='h-9 w-9 rounded-full grid place-items-center bg-primary text-on-primary shrink-0 transition-transform duration-150 ease-out active:scale-95'
-          aria-label={isPlaying ? 'Pause' : 'Play'}
-        >
-          {isPlaying ? (
-            <Pause className='h-4 w-4' strokeWidth={2.5} fill='currentColor' />
-          ) : (
-            <Play
-              className='h-4 w-4 translate-x-px'
-              strokeWidth={2.5}
-              fill='currentColor'
-            />
-          )}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// Tablet playback: same liquid-glass language as mobile, with prev/next
-// flanking the play button and a real scrub bar across the top edge so you
-// can seek without expanding into the full player.
-function TabletPlayerCard({
-  isPlaying,
-  onPlay,
-  pct,
-  track,
-}: {
-  isPlaying: boolean;
-  onPlay: () => void;
-  pct: number;
-  track: TrackInfo;
-}) {
-  return (
-    <div className='hidden md:block lg:hidden fixed inset-x-4 z-40 bottom-4'>
-      <div className='rounded-2xl backdrop-blur-2xl bg-(--linear-app-content-surface)/70 border border-white/10 shadow-[0_10px_40px_rgba(0,0,0,0.18)] relative overflow-hidden'>
-        {/* Hairline progress at the very top edge */}
-        <span
-          aria-hidden='true'
-          className='absolute top-0 left-0 right-0 h-px bg-tertiary-token/30'
-        />
-        <span
-          aria-hidden='true'
-          className='absolute top-0 left-0 h-px bg-primary-token'
-          style={{ width: `${pct}%` }}
-        />
-
-        {/* Single-row: track info | centered transport | scrub */}
-        <div className='grid grid-cols-[minmax(160px,1fr)_auto_minmax(200px,2fr)] items-center gap-4 px-3 py-2.5'>
-          {/* Track info */}
-          <div className='flex items-center gap-3 min-w-0'>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={track.artwork}
-              alt=''
-              className='h-10 w-10 rounded-lg object-cover shrink-0'
-            />
-            <div className='min-w-0'>
-              <div className='truncate text-[13px] font-caption text-primary-token leading-tight'>
-                {track.title}
-              </div>
-              <div className='truncate text-[11px] text-tertiary-token leading-tight mt-0.5'>
-                {track.artist}
-              </div>
-            </div>
-          </div>
-
-          {/* Centered transport */}
-          <div className='flex items-center gap-1.5 justify-self-center'>
-            <button
-              type='button'
-              className='h-8 w-8 rounded grid place-items-center text-quaternary-token hover:text-primary-token transition-colors duration-150 ease-out'
-              aria-label='Previous'
-            >
-              <SkipBack
-                className='h-4 w-4'
-                strokeWidth={2.5}
-                fill='currentColor'
-              />
-            </button>
-            <button
-              type='button'
-              onClick={onPlay}
-              className='h-9 w-9 rounded-full grid place-items-center bg-primary text-on-primary transition-transform duration-150 ease-out active:scale-95'
-              aria-label={isPlaying ? 'Pause' : 'Play'}
-            >
-              {isPlaying ? (
-                <Pause
-                  className='h-4 w-4'
-                  strokeWidth={2.5}
-                  fill='currentColor'
-                />
-              ) : (
-                <Play
-                  className='h-4 w-4 translate-x-px'
-                  strokeWidth={2.5}
-                  fill='currentColor'
-                />
-              )}
-            </button>
-            <button
-              type='button'
-              className='h-8 w-8 rounded grid place-items-center text-quaternary-token hover:text-primary-token transition-colors duration-150 ease-out'
-              aria-label='Next'
-            >
-              <SkipForward
-                className='h-4 w-4'
-                strokeWidth={2.5}
-                fill='currentColor'
-              />
-            </button>
-          </div>
-
-          {/* Inline scrub on the right */}
-          <div className='flex items-center gap-2 min-w-0'>
-            <span className='text-[10px] tabular-nums text-quaternary-token w-8 text-right shrink-0'>
-              {formatTime(TRACK.currentTime)}
-            </span>
-            <div className='relative flex-1 h-[3px] rounded-full bg-tertiary-token/30 overflow-hidden'>
-              <div
-                className='absolute inset-y-0 left-0 bg-primary-token rounded-full'
-                style={{ width: `${pct}%` }}
-              />
-            </div>
-            <span className='text-[10px] tabular-nums text-quaternary-token w-8 shrink-0'>
-              {formatTime(TRACK.duration)}
-            </span>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
@@ -7016,7 +6838,7 @@ function DrawerHero({
   onEntityActivate?: (entity: EntityPopoverData) => void;
 }) {
   const status = statusFromRelease(release);
-  const dropMeta = relativeDropMeta(release.releaseDate);
+  const dropMeta = dropDateMeta(release.releaseDate);
   const smartLinkUrl = `jov.ie/${release.artist.toLowerCase().replace(/\s+/g, '-')}/${release.id}`;
   return (
     <ProductionDrawerHero
@@ -7056,24 +6878,6 @@ function DrawerHero({
       onMenu={onMenu}
     />
   );
-}
-
-function relativeDropMeta(iso: string): {
-  label: string;
-  tone: 'past' | 'soon' | 'future';
-} {
-  const ms = new Date(iso).getTime() - Date.now();
-  const days = Math.round(ms / 86400000);
-  if (days < -1) return { label: `${Math.abs(days)}d ago`, tone: 'past' };
-  if (days === -1) return { label: 'Yesterday', tone: 'past' };
-  if (days === 0) return { label: 'Today', tone: 'soon' };
-  if (days === 1) return { label: 'Tomorrow', tone: 'soon' };
-  if (days <= 7) return { label: `Drops in ${days}d`, tone: 'soon' };
-  if (days <= 30) return { label: `Drops in ${days}d`, tone: 'future' };
-  return {
-    label: `Drops ${new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`,
-    tone: 'future',
-  };
 }
 
 // Cross-fade between the rest icon and a confirmation glyph. Uses
