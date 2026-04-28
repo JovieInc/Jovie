@@ -37,7 +37,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   --homepage-radius: 1rem;
   --homepage-hero-top: calc(
     var(--linear-header-height) +
-    clamp(7rem, 14vh, 9.75rem)
+    clamp(8rem, 15.3vh, 10.5rem)
   );
   --homepage-hero-copy-max: min(
     67.5rem,
