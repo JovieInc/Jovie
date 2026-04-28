@@ -43,15 +43,11 @@ import {
   AudioWaveform,
   BarChart3,
   Calendar,
-  Check,
   CheckCircle2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   ChevronUp,
-  CircleDashed,
-  Circle as CircleIcon,
-  CircleSlash,
   Copy,
   Disc3,
   ExternalLink,
@@ -168,6 +164,7 @@ import type { SparklineTrend } from '@/components/shell/Sparkline';
 import { Stat } from '@/components/shell/Stat';
 import { StatusBadge } from '@/components/shell/StatusBadge';
 import { SuggestionCard } from '@/components/shell/SuggestionCard';
+import { TaskStatusIcon } from '@/components/shell/TaskStatusIcon';
 import { ThreadAudioCard } from '@/components/shell/ThreadAudioCard';
 import { ThreadImageCard } from '@/components/shell/ThreadImageCard';
 import { ThreadTurn } from '@/components/shell/ThreadTurn';
@@ -8375,7 +8372,7 @@ function TaskListItem({
       )}
     >
       <div className='shrink-0 pt-0.5'>
-        <StatusIcon
+        <TaskStatusIcon
           status={task.status}
           agentRunning={
             task.assignee === 'jovie' && task.status === 'in_progress'
@@ -8522,7 +8519,7 @@ function TaskDetail({
       {/* Horizontal metadata strip — one calm line of pills under the title. */}
       <div className='mt-4 flex items-center gap-2 flex-wrap'>
         <MetaPill>
-          <StatusIcon status={task.status} />
+          <TaskStatusIcon status={task.status} />
           <span>{statusLabel(task.status)}</span>
         </MetaPill>
         {task.priority !== 'none' && (
@@ -8580,77 +8577,6 @@ function TaskDetail({
       </div>
     </article>
   );
-}
-
-// "Due in 3d" / "Due tomorrow" / "Due today" / "Due 5d ago" — full
-// phrasing instead of a bare "in 3d" so the row reads like English.
-// Soon-due tasks (≤ 2 days) get an amber tone to signal urgency.
-// Label badges. First label is always visible. ≥ 2 labels collapse the
-// rest into a "+N" chip that swaps to the full set on hover.
-function StatusIcon({
-  status,
-  agentRunning,
-}: {
-  status: TaskStatus;
-  agentRunning?: boolean;
-}) {
-  switch (status) {
-    case 'backlog':
-      return (
-        <CircleDashed
-          className='h-3.5 w-3.5 text-quaternary-token'
-          strokeWidth={2.25}
-        />
-      );
-    case 'todo':
-      return (
-        <CircleIcon
-          className='h-3.5 w-3.5 text-tertiary-token'
-          strokeWidth={2.25}
-        />
-      );
-    case 'in_progress':
-      // Half-filled circle: left half solid cyan, right half dotted
-      // outline. When an agent is actively running the task we add a
-      // subtle pulse so the row reads as "live".
-      return (
-        <svg
-          viewBox='0 0 14 14'
-          className={cn(
-            'h-3.5 w-3.5 text-cyan-400',
-            agentRunning && 'anim-calm-breath'
-          )}
-          aria-label={
-            agentRunning ? 'In progress, agent running' : 'In progress'
-          }
-          role='img'
-        >
-          <title>In progress</title>
-          <path d='M7 1 A6 6 0 0 0 7 13 Z' fill='currentColor' />
-          <path
-            d='M7 1 A6 6 0 0 1 7 13'
-            fill='none'
-            stroke='currentColor'
-            strokeWidth={1.5}
-            strokeDasharray='1.5 1.7'
-            strokeLinecap='round'
-          />
-        </svg>
-      );
-    case 'done':
-      return (
-        <span className='inline-flex items-center justify-center h-3.5 w-3.5 rounded-full bg-emerald-500/85 text-(--linear-bg-page)'>
-          <Check className='h-2.5 w-2.5' strokeWidth={3} />
-        </span>
-      );
-    case 'cancelled':
-      return (
-        <CircleSlash
-          className='h-3.5 w-3.5 text-quaternary-token/70'
-          strokeWidth={2.25}
-        />
-      );
-  }
 }
 
 function statusLabel(s: TaskStatus): string {
