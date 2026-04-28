@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.191] - 2026-04-28
+
+> Pre-landing review fixes for the page-builder + component-checker (#7920, #7919). Four Greptile findings addressed.
+
+### Fixed
+
+- **Suspense boundary around `useSearchParams()`** in both `/exp/page-builder/page.tsx` and `/exp/component-checker/page.tsx`. Without it, Next.js 16 App Router opts the route out of static prerendering and throws at build time.
+- **Page-builder body reset bug**: removing the last section now drops the `?body=` param entirely instead of setting it to `''`. The "no body sections" empty state in the drawer is reachable again.
+- **Page-builder toolbar count**: `Sections (N)` now uses the resolved variant count, not raw URL ids — keeps the label truthful when someone hand-types a stale id into `?body=`.
+- **Page-builder dialog a11y**: drawer now has `aria-modal='true'` and an Escape-key handler.
+
 ## [26.4.190] - 2026-04-28
 
 > Page-builder route + chrome toggles. PR 2 of the landing-system consolidation. Builds on the section registry from PR 1; renders a complete landing page (header + body + CTA + footer) with toolbar toggles for header chrome, footer density, CTA visibility, and a side drawer for body composition.

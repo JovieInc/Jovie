@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import { ComponentCheckerClient } from './ComponentCheckerClient';
 
 export const metadata: Metadata = {
@@ -9,5 +10,13 @@ export const metadata: Metadata = {
 };
 
 export default function ComponentCheckerPage() {
-  return <ComponentCheckerClient />;
+  // useSearchParams() in ComponentCheckerClient requires a Suspense boundary,
+  // otherwise Next.js opts the route out of static prerendering and throws
+  // at build time. Fallback is null because the toolbar + variant render
+  // fully on the client.
+  return (
+    <Suspense fallback={null}>
+      <ComponentCheckerClient />
+    </Suspense>
+  );
 }

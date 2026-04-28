@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import { PageBuilderClient } from './PageBuilderClient';
 
 export const metadata: Metadata = {
@@ -9,5 +10,13 @@ export const metadata: Metadata = {
 };
 
 export default function PageBuilderPage() {
-  return <PageBuilderClient />;
+  // useSearchParams() in PageBuilderClient requires a Suspense boundary,
+  // otherwise Next.js opts the entire route out of static prerendering and
+  // throws at build time. Fallback is null because the toolbar + composed
+  // page render fully on the client immediately.
+  return (
+    <Suspense fallback={null}>
+      <PageBuilderClient />
+    </Suspense>
+  );
 }

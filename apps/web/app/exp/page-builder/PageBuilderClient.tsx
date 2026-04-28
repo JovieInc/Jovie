@@ -2,7 +2,7 @@
 
 import { ChevronDown, ChevronUp, Plus, X } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { MarketingFinalCTA } from '@/components/site/MarketingFinalCTA';
 import { MarketingFooter } from '@/components/site/MarketingFooter';
 import { MarketingHeader } from '@/components/site/MarketingHeader';
@@ -85,7 +85,13 @@ export function PageBuilderClient() {
   );
 
   const setBody = useCallback(
-    (ids: readonly string[]) => setParam({ body: ids.join(',') }),
+    (ids: readonly string[]) =>
+      // Empty body must drop the param entirely. If we set it to '',
+      // `parseBody` falls back to DEFAULT_BODY on next render and the
+      // "no sections" empty state becomes unreachable.
+      ids.length === 0
+        ? setParam({ body: undefined })
+        : setParam({ body: ids.join(',') }),
     [setParam]
   );
 
@@ -131,7 +137,9 @@ export function PageBuilderClient() {
         headerMode={headerMode}
         footerMode={footerMode}
         ctaMode={ctaMode}
-        bodyCount={bodyIds.length}
+        // Use the resolved variant count, not raw URL ids — keeps the label
+        // truthful when someone hand-types a stale or unknown id into ?body=.
+        bodyCount={bodyVariants.length}
         onSetHeader={mode => setParam({ header: mode })}
         onSetFooter={mode => setParam({ footer: mode })}
         onSetCta={mode => setParam({ cta: mode })}
@@ -305,10 +313,23 @@ function SectionDrawer({
   onMove,
   onClose,
 }: SectionDrawerProps) {
+  // Escape closes the drawer — standard dialog behavior.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
   return (
     <div
       className='fixed right-0 top-0 z-[60] flex h-screen w-full max-w-[380px] flex-col border-l border-white/10 bg-black text-white shadow-2xl'
       role='dialog'
+      aria-modal='true'
       aria-label='Body section composer'
     >
       <div className='flex h-[56px] items-center justify-between border-b border-white/10 px-4'>
