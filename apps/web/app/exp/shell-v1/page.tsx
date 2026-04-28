@@ -121,6 +121,7 @@ import {
   Table as LibraryTable,
   ViewToggle as LibraryViewToggle,
 } from '@/app/exp/library-v1/page';
+import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { ChatInput } from '@/components/jovie/components/ChatInput';
 import { ChatMarkdown } from '@/components/jovie/components/ChatMarkdown';
 import { ActivityHoverRow } from '@/components/shell/ActivityHoverRow';
@@ -277,20 +278,6 @@ const PALETTE_PRESETS: Record<string, Palette> = {
 
 // Inline Jovie brand mark — small SVG so the experiment file stays
 // self-contained (the production Logo component imports next/image).
-function JovieMark({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox='0 0 353.68 347.97'
-      className={className}
-      fill='currentColor'
-      aria-hidden='true'
-    >
-      <title>Jovie</title>
-      <path d='m176.84,0l3.08.05c8.92,1.73,16.9,6.45,23.05,13.18,7.95,8.7,12.87,20.77,12.87,34.14s-4.92,25.44-12.87,34.14c-6.7,7.34-15.59,12.28-25.49,13.57h-.64s0,.01,0,.01h0c-22.2,0-42.3,8.84-56.83,23.13-14.5,14.27-23.49,33.99-23.49,55.77h0v.02c0,21.78,8.98,41.5,23.49,55.77,14.54,14.3,34.64,23.15,56.83,23.15v-.02h.01c22.2,0,42.3-8.84,56.83-23.13,14.51-14.27,23.49-33.99,23.49-55.77h0c0-17.55-5.81-33.75-15.63-46.82-10.08-13.43-24.42-23.61-41.05-28.62l-2.11-.64c4.36-2.65,8.34-5.96,11.84-9.78,9.57-10.47,15.5-24.89,15.5-40.77s-5.93-30.3-15.5-40.77c-1.44-1.57-2.95-3.06-4.55-4.44l7.67,1.58c40.44,8.35,75.81,30.3,100.91,60.75,24.66,29.91,39.44,68.02,39.44,109.5h0c0,48.05-19.81,91.55-51.83,123.05-31.99,31.46-76.19,50.92-125,50.92v.02h-.01c-48.79,0-93-19.47-125-50.94C19.81,265.54,0,222.04,0,173.99h0c0-48.05,19.81-91.56,51.83-123.05C83.84,19.47,128.04,0,176.84,0Z' />
-    </svg>
-  );
-}
-
 // Most transitions snap (150ms ease-out). Layout transformations get
 // a cinematic curve — the kind of thing you only get on macOS / Apple
 // surfaces, where the system invests motion budget in revealing structure.
@@ -2940,7 +2927,12 @@ function Sidebar({
           ) : (
             <UserMenu>
               <span className='flex-1 inline-flex items-center gap-2.5 h-7 pl-3 pr-2 rounded-md hover:bg-surface-1/60 transition-colors duration-150 ease-out cursor-pointer min-w-0'>
-                <JovieMark className='h-4 w-4 shrink-0 text-primary-token' />
+                <BrandLogo
+                  size={16}
+                  rounded={false}
+                  className='shrink-0 text-primary-token'
+                  aria-hidden
+                />
                 <span className='text-[13.5px] font-semibold tracking-[-0.02em] text-primary-token flex-1 truncate'>
                   Jovie
                 </span>
@@ -6903,7 +6895,12 @@ function OnboardingCanvas({ onComplete }: { onComplete: () => void }) {
           transition: `opacity 300ms ${EASE_CINEMATIC}, max-height 600ms ${EASE_CINEMATIC}`,
         }}
       >
-        <JovieMark className='h-7 w-7 mx-auto mb-2 text-primary-token opacity-30' />
+        <BrandLogo
+          size={28}
+          rounded={false}
+          className='mx-auto mb-2 text-primary-token opacity-30'
+          aria-hidden
+        />
         <h1
           className='text-[14px] font-medium text-tertiary-token'
           style={{ letterSpacing: '-0.01em' }}
