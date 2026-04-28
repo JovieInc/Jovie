@@ -34,8 +34,12 @@ const mockUseBillingStatusQuery = vi.fn(() => ({
 }));
 
 const mockUsePlanGate = vi.fn(() => ({
-  isPro: true,
+  isLoading: false,
+  isPro: false,
   isTrialing: false,
+  trialDaysRemaining: null,
+  trialNotificationsSent: 0,
+  nudgeState: 'never_trialed' as const,
 }));
 
 vi.mock('@/lib/queries', () => ({
@@ -70,7 +74,9 @@ describe('Sidebar lower shell visual hierarchy', () => {
     expect(card).toBeTruthy();
     expect(card?.className).toContain('bg-sidebar-accent/12');
 
-    expect(screen.getByRole('button', { name: 'Upgrade' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Start trial' })
+    ).toBeInTheDocument();
   });
 
   it('suppresses the upgrade banner on nested demo routes', () => {
@@ -82,6 +88,16 @@ describe('Sidebar lower shell visual hierarchy', () => {
   });
 
   it('keeps install banner visually quieter than nav rows', () => {
+    // Install banner only renders for paid Pro users (isPro && !isTrialing).
+    mockUsePlanGate.mockReturnValueOnce({
+      isLoading: false,
+      isPro: true,
+      isTrialing: false,
+      trialDaysRemaining: null,
+      trialNotificationsSent: 0,
+      nudgeState: 'pro_paid' as const,
+    });
+
     const { container } = render(<SidebarInstallBanner />);
 
     const card = container.querySelector('[class*="rounded-xl"]');

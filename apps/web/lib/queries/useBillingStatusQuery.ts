@@ -12,6 +12,9 @@ export interface BillingStatusData {
   stripeSubscriptionId: string | null;
   stale: boolean;
   staleReason: string | null;
+  trialStartedAt: string | null;
+  trialEndsAt: string | null;
+  trialNotificationsSent: number;
 }
 
 interface BillingStatusResponse {
@@ -19,6 +22,9 @@ interface BillingStatusResponse {
   plan?: string | null;
   stripeCustomerId?: string | null;
   stripeSubscriptionId?: string | null;
+  trialStartedAt?: string | null;
+  trialEndsAt?: string | null;
+  trialNotificationsSent?: number;
   _stale?: boolean;
   _staleReason?: string;
 }
@@ -43,6 +49,9 @@ async function fetchBillingStatus({
     stripeSubscriptionId: payload?.stripeSubscriptionId ?? null,
     stale: Boolean(payload?._stale),
     staleReason: payload?._staleReason ?? null,
+    trialStartedAt: payload?.trialStartedAt ?? null,
+    trialEndsAt: payload?.trialEndsAt ?? null,
+    trialNotificationsSent: payload?.trialNotificationsSent ?? 0,
   };
 }
 

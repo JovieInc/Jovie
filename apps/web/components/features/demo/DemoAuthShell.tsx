@@ -73,6 +73,9 @@ function createDemoQueryClient(
     stripeSubscriptionId: 'demo-subscription',
     stale: false,
     staleReason: null,
+    trialStartedAt: null,
+    trialEndsAt: null,
+    trialNotificationsSent: 0,
   });
   client.setQueryData<ChatUsageData>(queryKeys.chat.usage(), {
     plan: 'max',

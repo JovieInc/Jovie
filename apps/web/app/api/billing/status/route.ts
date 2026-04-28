@@ -3,8 +3,11 @@
  * Returns the current user's billing information
  */
 
+import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { db } from '@/lib/db';
+import { users } from '@/lib/db/schema/auth';
 import { captureError } from '@/lib/error-tracking';
 import { RETRY_AFTER_SERVICE } from '@/lib/http/headers';
 import { getRedis } from '@/lib/redis';
@@ -30,6 +33,52 @@ interface BillingStatusPayload {
   plan: string;
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;
+  trialStartedAt: string | null;
+  trialEndsAt: string | null;
+  trialNotificationsSent: number;
+}
+
+async function readTrialFields(clerkId: string): Promise<{
+  trialStartedAt: string | null;
+  trialEndsAt: string | null;
+  trialNotificationsSent: number;
+}> {
+  try {
+    const row = await db
+      .select({
+        trialStartedAt: users.trialStartedAt,
+        trialEndsAt: users.trialEndsAt,
+        trialNotificationsSent: users.trialNotificationsSent,
+      })
+      .from(users)
+      .where(eq(users.clerkId, clerkId))
+      .limit(1);
+
+    const record = row[0];
+    if (!record) {
+      return {
+        trialStartedAt: null,
+        trialEndsAt: null,
+        trialNotificationsSent: 0,
+      };
+    }
+
+    return {
+      trialStartedAt: record.trialStartedAt?.toISOString() ?? null,
+      trialEndsAt: record.trialEndsAt?.toISOString() ?? null,
+      trialNotificationsSent: record.trialNotificationsSent ?? 0,
+    };
+  } catch (error) {
+    logger.warn('Trial field read failed; defaulting to nulls', {
+      clerkId,
+      error,
+    });
+    return {
+      trialStartedAt: null,
+      trialEndsAt: null,
+      trialNotificationsSent: 0,
+    };
+  }
 }
 
 interface BillingStatusStalePayload extends BillingStatusPayload {
@@ -51,12 +100,18 @@ function buildBillingStatusPayload(params: {
   plan: string | null | undefined;
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;
+  trialStartedAt: string | null;
+  trialEndsAt: string | null;
+  trialNotificationsSent: number;
 }): BillingStatusPayload {
   return {
     isPro: params.isPro,
     plan: params.plan ?? 'free',
     stripeCustomerId: params.stripeCustomerId,
     stripeSubscriptionId: params.stripeSubscriptionId,
+    trialStartedAt: params.trialStartedAt,
+    trialEndsAt: params.trialEndsAt,
+    trialNotificationsSent: params.trialNotificationsSent,
   };
 }
 
@@ -165,6 +220,8 @@ export async function GET() {
       );
     }
 
+    const trialFields = await readTrialFields(userId);
+
     if (!billingResult.data) {
       // User exists in auth but not in database — likely needs onboarding
       const payload = buildBillingStatusPayload({
@@ -172,6 +229,7 @@ export async function GET() {
         plan: 'free',
         stripeCustomerId: null,
         stripeSubscriptionId: null,
+        ...trialFields,
       });
       writeBillingStatusCache(userId, payload);
       return NextResponse.json(payload, { headers: CACHE_HEADERS });
@@ -185,6 +243,7 @@ export async function GET() {
       plan,
       stripeCustomerId,
       stripeSubscriptionId,
+      ...trialFields,
     });
 
     writeBillingStatusCache(userId, payload);

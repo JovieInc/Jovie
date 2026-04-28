@@ -22,6 +22,28 @@ import { ENTITLEMENT_REGISTRY, type PlanId } from '@/lib/entitlements/registry';
 import { useBillingStatusQuery } from './useBillingStatusQuery';
 
 /**
+ * The 8 user states the upgrade-nudge system distinguishes between.
+ *
+ * `pro_paid` and `max_paid` render no nudges (slot hidden).
+ * `trial_honeymoon` also renders no nudges (let the user feel ownership during
+ * the first 10 days). The other 5 states each render a distinct sidebar slot
+ * variant.
+ */
+export type NudgeState =
+  | 'never_trialed'
+  | 'trial_honeymoon'
+  | 'trial_late'
+  | 'trial_last_day'
+  | 'recently_lapsed'
+  | 'stale_lapsed'
+  | 'pro_paid'
+  | 'max_paid';
+
+const TRIAL_LATE_THRESHOLD_DAYS = 3;
+const RECENTLY_LAPSED_WINDOW_DAYS = 30;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
  * Feature entitlements derived from the user's plan.
  * Add new plan-gated features here.
  */
@@ -96,10 +118,86 @@ export interface PlanGateEntitlements {
   aiPitchGenPerRelease: number | null;
   /** Whether the user is on an active trial */
   isTrialing: boolean;
-  /** Days remaining in the trial (null if not trialing) */
+  /** Days remaining in the trial (null if not trialing). Rounded DOWN. */
   trialDaysRemaining: number | null;
-  /** ISO date string when trial ends (null if not trialing) */
+  /** ISO date string when trial ends (null if never trialed) */
   trialEndsAt: string | null;
+  /** ISO date string when trial started (null if never trialed) */
+  trialStartedAt: string | null;
+  /** Number of notification recipients sent during the trial */
+  trialNotificationsSent: number;
+  /** State the upgrade-nudge system uses to pick what (if anything) to render. */
+  nudgeState: NudgeState;
+}
+
+interface NudgeStateInput {
+  plan: string | null;
+  trialEndsAt: string | null;
+  now: number;
+}
+
+/**
+ * Derives the canonical nudge state from the raw plan + trial fields.
+ *
+ * Precedence (top wins):
+ *   1. plan === 'max' or 'growth' → max_paid
+ *   2. plan === 'pro' or 'founding' → pro_paid (Stripe past_due/paused/canceled
+ *      stay pro_paid; dunning UX owns those states separately)
+ *   3. plan === 'trial' AND trialEndsAt > now:
+ *        - 0 calendar days remaining → trial_last_day
+ *        - 1-3 days remaining → trial_late
+ *        - else → trial_honeymoon
+ *   4. plan === 'free' AND trialEndsAt set:
+ *        - within last 30d → recently_lapsed
+ *        - older → stale_lapsed
+ *   5. plan === 'free' AND no trialEndsAt → never_trialed
+ *   6. fallback → never_trialed
+ *
+ * Exported for unit tests.
+ */
+export function deriveNudgeState(input: NudgeStateInput): NudgeState {
+  const { plan, trialEndsAt, now } = input;
+
+  if (plan === 'max' || plan === 'growth') {
+    return 'max_paid';
+  }
+
+  if (plan === 'pro' || plan === 'founding') {
+    return 'pro_paid';
+  }
+
+  if (plan === 'trial' && trialEndsAt) {
+    const endTs = new Date(trialEndsAt).getTime();
+    if (Number.isNaN(endTs)) {
+      return 'never_trialed';
+    }
+    const msRemaining = endTs - now;
+    if (msRemaining <= 0) {
+      return 'recently_lapsed';
+    }
+    const daysRemaining = Math.floor(msRemaining / DAY_MS);
+    if (daysRemaining === 0) {
+      return 'trial_last_day';
+    }
+    if (daysRemaining <= TRIAL_LATE_THRESHOLD_DAYS) {
+      return 'trial_late';
+    }
+    return 'trial_honeymoon';
+  }
+
+  if (plan === 'free' && trialEndsAt) {
+    const endTs = new Date(trialEndsAt).getTime();
+    if (Number.isNaN(endTs)) {
+      return 'never_trialed';
+    }
+    const daysSinceEnd = Math.floor((now - endTs) / DAY_MS);
+    if (daysSinceEnd <= RECENTLY_LAPSED_WINDOW_DAYS) {
+      return 'recently_lapsed';
+    }
+    return 'stale_lapsed';
+  }
+
+  return 'never_trialed';
 }
 
 /**
@@ -131,19 +229,21 @@ export function usePlanGate(): PlanGateEntitlements {
   }
   const ent = ENTITLEMENT_REGISTRY[planKey];
 
-  // Derive trial days remaining from trialEndsAt if available
-  const trialEndsAt =
-    ((data as Record<string, unknown> | undefined)?.trialEndsAt as
-      | string
-      | null) ?? null;
+  const trialEndsAt = data?.trialEndsAt ?? null;
+  const trialStartedAt = data?.trialStartedAt ?? null;
+  const trialNotificationsSent = data?.trialNotificationsSent ?? 0;
+
   let trialDaysRemaining: number | null = null;
   if (isTrialing && trialEndsAt) {
     const msRemaining = new Date(trialEndsAt).getTime() - Date.now();
-    trialDaysRemaining = Math.max(
-      0,
-      Math.floor(msRemaining / (1000 * 60 * 60 * 24))
-    );
+    trialDaysRemaining = Math.max(0, Math.floor(msRemaining / DAY_MS));
   }
+
+  const nudgeState = deriveNudgeState({
+    plan,
+    trialEndsAt,
+    now: Date.now(),
+  });
 
   return {
     isLoading,
@@ -153,6 +253,9 @@ export function usePlanGate(): PlanGateEntitlements {
     isTrialing,
     trialDaysRemaining,
     trialEndsAt,
+    trialStartedAt,
+    trialNotificationsSent,
+    nudgeState,
     ...ent.booleans,
     ...ent.limits,
   };
