@@ -43,7 +43,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
     67.5rem,
     calc(100vw - var(--homepage-page-gutter) - var(--homepage-page-gutter))
   );
-  --homepage-hero-subhead-max: 38rem;
+  --homepage-hero-subhead-max: 44rem;
   --homepage-hero-cta-gap: 0.75rem;
   --homepage-carousel-width: 100vw;
   --homepage-carousel-stage-height: clamp(22rem, 34vw, 31rem);
