@@ -33,20 +33,6 @@ const nextConfig = {
   // Never ship source maps to browsers (Sentry plugin uploads them separately)
   productionBrowserSourceMaps: false,
   output: isVercelPreview ? undefined : 'standalone',
-  // Keep Sentry/OpenTelemetry interception helpers as runtime requires.
-  // Bundling them lets Turbopack rename them as hashed externals
-  // (require-in-the-middle-<hash>), which then can't be resolved at runtime
-  // and breaks every page render under the standalone server (A11y, Lighthouse).
-  // Listing them here forces Next.js to leave them as plain node_module
-  // imports so the standalone output's node_modules copy satisfies the
-  // require at runtime.
-  serverExternalPackages: [
-    'require-in-the-middle',
-    'import-in-the-middle',
-    '@sentry/node',
-    '@sentry/nextjs',
-    '@opentelemetry/instrumentation',
-  ],
   // Monorepo root for standalone output file tracing (prevents lockfile detection warnings)
   outputFileTracingRoot: isVercelPreview
     ? undefined
