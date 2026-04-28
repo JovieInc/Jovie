@@ -611,7 +611,7 @@ export function HomepageV2FinalCta() {
         <div className='homepage-final-cta-copy mx-auto'>
           <h2
             data-testid='homepage-v2-final-cta-heading'
-            className='text-balance text-[clamp(2.1rem,3.9vw,3.25rem)] font-semibold leading-[0.98] tracking-[-0.052em] text-white'
+            className='text-balance text-[clamp(2rem,3.4vw,3rem)] font-[680] leading-[1.05] tracking-[-0.025em] text-white'
           >
             Start using Jovie <span className='block'>today for free.</span>
           </h2>
