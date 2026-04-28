@@ -50,7 +50,7 @@ const FOOTER_COLUMNS: readonly {
 ] as const;
 
 const footerLinkClassName =
-  'inline-flex w-fit rounded-[5px] text-[13px] leading-[1.45] tracking-[-0.012em] text-white/[0.42] transition-colors duration-150 hover:text-white/90 focus-visible:text-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
+  'inline-flex w-fit rounded-[5px] text-[15px] leading-[1.45] tracking-[-0.005em] text-white/[0.72] transition-colors duration-150 hover:text-white focus-visible:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
 const footerLegalLinkClassName =
   'inline-flex w-fit rounded-[5px] text-[12px] leading-5 tracking-[-0.01em] text-white/[0.34] transition-colors duration-150 hover:text-white/70 focus-visible:text-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
 
@@ -63,7 +63,7 @@ export function MarketingFooter({
   return (
     <footer
       className={cn(
-        'relative overflow-hidden border-t border-white/[0.04] bg-[#020303] text-white',
+        'relative overflow-hidden border-t border-white/[0.04] bg-black text-white',
         className
       )}
     >

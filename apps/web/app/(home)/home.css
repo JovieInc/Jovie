@@ -108,11 +108,12 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-header-auth a {
   min-height: 36px;
   font-size: 14px;
+  font-weight: 600;
 }
 
 .homepage-header-auth a:first-child {
   padding-inline: 0;
-  color: rgba(255, 255, 255, 0.92);
+  color: rgb(252, 252, 252);
 }
 
 .homepage-header-auth a:last-child {
@@ -249,7 +250,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   font-size: 14px;
   font-weight: 600;
   letter-spacing: -0.005em;
-  color: rgba(255, 255, 255, 0.92);
+  color: rgb(252, 252, 252);
   transition:
     color 140ms ease,
     opacity 140ms ease;
