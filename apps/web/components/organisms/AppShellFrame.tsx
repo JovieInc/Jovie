@@ -2,6 +2,8 @@ import type { ReactNode } from 'react';
 import { memo } from 'react';
 import { cn } from '@/lib/utils';
 
+export type AppShellFrameVariant = 'legacy' | 'shellChatV1';
+
 interface AppShellFrameProps {
   readonly sidebar: ReactNode;
   readonly header?: ReactNode;
@@ -12,6 +14,7 @@ interface AppShellFrameProps {
   readonly contentClassName?: string;
   readonly containerClassName?: string;
   readonly isTableRoute?: boolean;
+  readonly variant?: AppShellFrameVariant;
 }
 
 /**
@@ -33,14 +36,20 @@ export const AppShellFrame = memo(function AppShellFrame({
   contentClassName,
   containerClassName,
   isTableRoute = false,
+  variant = 'shellChatV1',
 }: Readonly<AppShellFrameProps>) {
+  const isShellChatV1 = variant === 'shellChatV1';
+
   return (
     <div
+      data-shell-design={variant}
       className={cn(
-        'flex h-full w-full overflow-hidden bg-(--linear-bg-page)',
+        'flex h-full w-full overflow-hidden',
+        isShellChatV1 ? 'bg-(--linear-bg-page)' : 'bg-base',
         /* PWA safe area: pad top for notch/Dynamic Island in standalone mode (mobile only) */
         'max-lg:pt-[env(safe-area-inset-top)]',
-        'lg:gap-[var(--linear-app-shell-gap)] lg:p-[var(--linear-app-shell-gap)]',
+        isShellChatV1 &&
+          'lg:gap-[var(--linear-app-shell-gap)] lg:p-[var(--linear-app-shell-gap)]',
         containerClassName
       )}
     >
@@ -48,10 +57,20 @@ export const AppShellFrame = memo(function AppShellFrame({
 
       <main
         id='main-content'
-        className='flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-0 lg:rounded-[var(--linear-app-shell-radius)] lg:border-t lg:border-r lg:border-b lg:border-(--linear-app-shell-border) lg:bg-(--linear-app-content-surface) lg:shadow-[var(--linear-app-shell-shadow)] lg:pt-px'
+        className={cn(
+          'flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-0',
+          isShellChatV1
+            ? 'lg:rounded-[var(--linear-app-shell-radius)] lg:border-t lg:border-r lg:border-b lg:border-(--linear-app-shell-border) lg:bg-(--linear-app-content-surface) lg:shadow-[var(--linear-app-shell-shadow)] lg:pt-px'
+            : 'lg:border-l lg:border-subtle'
+        )}
       >
         {header}
-        <div className='flex flex-1 min-h-0 min-w-0 overflow-hidden lg:gap-[var(--linear-app-shell-gap)]'>
+        <div
+          className={cn(
+            'flex flex-1 min-h-0 min-w-0 overflow-hidden',
+            isShellChatV1 && 'lg:gap-[var(--linear-app-shell-gap)]'
+          )}
+        >
           <div
             className={cn(
               'flex flex-1 min-h-0 min-w-0 flex-col pb-[var(--dev-toolbar-height,0px)]',

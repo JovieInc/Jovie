@@ -178,7 +178,7 @@ export default function HomePage() {
       >
         <div
           data-testid='homepage-hero-shell'
-          className='homepage-hero-shell relative flex min-h-[100svh] flex-col overflow-hidden text-primary-token'
+          className='homepage-hero-shell relative flex min-h-[100svh] flex-col overflow-x-clip text-primary-token'
         >
           <div
             aria-hidden='true'

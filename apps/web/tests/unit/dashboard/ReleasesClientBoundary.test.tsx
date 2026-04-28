@@ -4,7 +4,7 @@ import { ReleasesClientBoundary } from '@/app/app/(shell)/dashboard/releases/Rel
 
 const clearPendingShell = vi.fn();
 
-vi.mock('@/components/organisms/AuthShellWrapper', () => ({
+vi.mock('@/components/organisms/PendingShellContext', () => ({
   usePendingShell: () => ({
     clearPendingShell,
     pendingShellRoute: 'releases',

@@ -31,7 +31,7 @@ import { useTheme } from 'next-themes';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { APP_ROUTES } from '@/constants/routes';
-import { useStoredAppFlagOverrides } from '@/lib/flags/client';
+import { useAppFlag, useStoredAppFlagOverrides } from '@/lib/flags/client';
 import {
   APP_FLAG_DEFAULTS,
   APP_FLAG_OVERRIDE_KEYS,
@@ -232,6 +232,7 @@ export function DevToolbar({
   } | null>(null);
   const { theme, setTheme } = useTheme();
   const overridesCtx = useStoredAppFlagOverrides();
+  const shellChatV1Enabled = useAppFlag('SHELL_CHAT_V1');
   const flagBadgeCtx = useFlagBadges();
   const toolbarRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -375,6 +376,12 @@ export function DevToolbar({
     [overridesCtx.overrides]
   );
   const overrideCount = Object.keys(overrides).length;
+  const shellChatV1OverrideKey = APP_FLAG_OVERRIDE_KEYS.SHELL_CHAT_V1;
+  const shellChatV1Overridden = shellChatV1OverrideKey in overrides;
+
+  const toggleShellChatV1 = useCallback(() => {
+    overridesCtx.setOverride(shellChatV1OverrideKey, !shellChatV1Enabled);
+  }, [overridesCtx, shellChatV1Enabled, shellChatV1OverrideKey]);
 
   // Unified flag list: filter by search, sort overrides to top
   const filteredFlags = useMemo(() => {
@@ -656,6 +663,46 @@ export function DevToolbar({
         <span className='max-md:hidden md:inline px-1.5 py-0.5 rounded text-[10px] text-[var(--color-text-quaternary-token)] bg-[var(--color-bg-surface-2)] shrink-0'>
           {breakpoint}
         </span>
+
+        <button
+          type='button'
+          role='switch'
+          aria-checked={shellChatV1Enabled}
+          aria-label={
+            shellChatV1Enabled ? 'Turn New Design Off' : 'Turn New Design On'
+          }
+          title='Toggle Shell + Chat design (SHELL_CHAT_V1)'
+          onClick={toggleShellChatV1}
+          className={`inline-flex h-7 shrink-0 items-center gap-2 rounded-full border px-2.5 text-[10px] font-semibold transition-colors ${
+            shellChatV1Enabled
+              ? 'border-[var(--color-accent)]/35 bg-[var(--color-accent)]/12 text-[var(--color-accent)] hover:bg-[var(--color-accent)]/18'
+              : 'border-[var(--color-border-subtle)] bg-[var(--color-bg-surface-2)] text-[var(--color-text-tertiary)] hover:border-[var(--color-border-default)] hover:text-[var(--color-text-primary)]'
+          }`}
+        >
+          <span className='max-[520px]:sr-only'>New Design</span>
+          <span
+            aria-hidden='true'
+            className={`relative h-3.5 w-6 rounded-full transition-colors ${
+              shellChatV1Enabled
+                ? 'bg-[var(--color-accent)]'
+                : 'bg-[var(--color-bg-surface-3)]'
+            }`}
+          >
+            <span
+              className={`absolute top-0.5 h-2.5 w-2.5 rounded-full bg-white shadow-sm transition-transform ${
+                shellChatV1Enabled ? 'translate-x-3' : 'translate-x-0.5'
+              }`}
+            />
+          </span>
+          <span className='max-sm:hidden text-[9px] opacity-80'>
+            {shellChatV1Enabled ? 'On' : 'Off'}
+          </span>
+          {shellChatV1Overridden && (
+            <span className='max-md:hidden rounded-full bg-[var(--color-accent)]/14 px-1 text-[8px] font-medium'>
+              Override
+            </span>
+          )}
+        </button>
 
         <div className='flex-1' />
 

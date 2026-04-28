@@ -13,6 +13,7 @@ import { useRightPanel } from '@/contexts/RightPanelContext';
 import { DashboardHeader } from '@/features/dashboard/organisms/DashboardHeader';
 import { DashboardMobileTabs } from '@/features/dashboard/organisms/DashboardMobileTabs';
 import { MobileProfileDrawer } from '@/features/dashboard/organisms/MobileProfileDrawer';
+import { useAppFlag } from '@/lib/flags/client';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 import { AppShellFrame } from './AppShellFrame';
 import { PersistentAudioBar } from './PersistentAudioBar';
@@ -51,6 +52,7 @@ function AuthShellInner({
   const { isMobile } = useSidebar();
   const rightPanel = useRightPanel();
   const previewPanelState = usePreviewPanelState();
+  const shellChatV1Enabled = useAppFlag('SHELL_CHAT_V1');
 
   const sidebarTrigger = isMobile ? null : <SidebarTrigger />;
 
@@ -93,6 +95,7 @@ function AuthShellInner({
       mobileBottomNav={mobileBottomNav}
       contentClassName={getContentClassName(showMobileTabs, isTableRoute)}
       isTableRoute={isTableRoute}
+      variant={shellChatV1Enabled ? 'shellChatV1' : 'legacy'}
     />
   );
 }
