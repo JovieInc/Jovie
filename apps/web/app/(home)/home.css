@@ -468,11 +468,10 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 .homepage-hero-mockup--phone .homepage-hero-mockup__frame {
   aspect-ratio: 9 / 19.5;
-  border-radius: 10px;
+  border-radius: 28px;
   padding: 7px;
 }
 
-.homepage-hero-mockup--phone .homepage-hero-mockup__frame::before,
 .homepage-hero-mockup--phone .homepage-hero-mockup__frame::after {
   display: none;
 }
@@ -480,7 +479,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-hero-mockup__frame {
   position: relative;
   overflow: hidden;
-  border-radius: 10px;
+  border-radius: 18px;
   aspect-ratio: 16 / 9;
   padding: 32px 7px 7px;
   background: rgba(157, 157, 255, 0.12);
@@ -500,33 +499,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   pointer-events: none;
   z-index: 1;
-}
-
-.homepage-hero-mockup__frame::before {
-  content: "";
-  position: absolute;
-  top: 12px;
-  left: 14px;
-  width: 36px;
-  height: 8px;
-  background:
-    radial-gradient(
-      circle at 4px 4px,
-      rgba(255, 95, 86, 0.82) 4px,
-      transparent 4px
-    ),
-    radial-gradient(
-      circle at 18px 4px,
-      rgba(255, 189, 46, 0.78) 4px,
-      transparent 4px
-    ),
-    radial-gradient(
-      circle at 32px 4px,
-      rgba(39, 201, 63, 0.82) 4px,
-      transparent 4px
-    );
-  z-index: 2;
-  pointer-events: none;
 }
 
 .homepage-hero-mockup::before {
