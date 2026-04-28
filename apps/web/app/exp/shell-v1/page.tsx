@@ -3844,6 +3844,7 @@ const SUGGESTIONS: JovieSuggestion[] = [
 
 function DashboardHome() {
   const [index, setIndex] = useState(0);
+  const [composerValue, setComposerValue] = useState('');
   const sorted = useMemo(
     () => [...SUGGESTIONS].sort((a, b) => a.rank - b.rank),
     []
@@ -3887,39 +3888,26 @@ function DashboardHome() {
         </div>
       </div>
 
-      {/* Composer locked to the bottom of the canvas. Pill input with a
-          circular white send button — Variant F adoption is queued (will
-          replace this with the real ChatInput component). */}
+      {/* Composer locked to the bottom of the canvas. Real production
+          ChatInput from apps/web/components/jovie/components/ChatInput.tsx
+          for the morphing pill surface, slash picker, and chip tray.
+          Backend wiring (useJovieChat / streaming / images) stays stubbed
+          for the design pass — those wires land at flip-time. */}
       <div className='shrink-0 mt-4 max-w-[560px] w-full mx-auto'>
-        <PillComposer placeholder='Ask Jovie' />
+        <ChatInput
+          value={composerValue}
+          onChange={setComposerValue}
+          onSubmit={e => {
+            e?.preventDefault();
+            setComposerValue('');
+          }}
+          isLoading={false}
+          isSubmitting={false}
+          placeholder='Ask Jovie'
+          shellChatV1
+        />
       </div>
     </div>
-  );
-}
-
-// Apple-esque suggestion card. No eyebrow, no Jovie attribution, no
-// confidence percentage, no divider — the card IS the message. Title
-// leads, body is short, actions balance to the right edge.
-// Variant F adoption — wraps the shipped ChatInput from
-// apps/web/components/jovie/components/ChatInput.tsx so /exp/shell-v1
-// gets the morphing pill surface, slash picker, chip tray, and motion
-// transitions. Backend wiring (useJovieChat / streaming / images) is
-// kept stubbed for the design pass — those wires land at flip-time.
-function PillComposer({ placeholder }: { placeholder: string }) {
-  const [value, setValue] = useState('');
-  return (
-    <ChatInput
-      value={value}
-      onChange={setValue}
-      onSubmit={e => {
-        e?.preventDefault();
-        setValue('');
-      }}
-      isLoading={false}
-      isSubmitting={false}
-      placeholder={placeholder}
-      shellChatV1
-    />
   );
 }
 
