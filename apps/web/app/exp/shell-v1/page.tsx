@@ -66,7 +66,6 @@ import {
   Loader2,
   LogOut,
   Maximize2,
-  Mic,
   Mic2,
   Minimize2,
   MoreHorizontal,
@@ -129,7 +128,6 @@ import { AssigneeChip } from '@/components/shell/AssigneeChip';
 import { ColumnLabel } from '@/components/shell/ColumnLabel';
 import { ContextMenuOverlay } from '@/components/shell/ContextMenuOverlay';
 import { CuesPanel } from '@/components/shell/CuesPanel';
-import { DictationWaveform } from '@/components/shell/DictationWaveform';
 import { DrawerHero as ProductionDrawerHero } from '@/components/shell/DrawerHero';
 import { DrawerTabStrip } from '@/components/shell/DrawerTabStrip';
 import { DropDateChip } from '@/components/shell/DropDateChip';
@@ -138,6 +136,7 @@ import { EntityHoverLink } from '@/components/shell/EntityPopover';
 import { EntityThreadGlyph } from '@/components/shell/EntityThreadGlyph';
 import { IconBtn } from '@/components/shell/IconBtn';
 import { InlineEditRow } from '@/components/shell/InlineEditRow';
+import { JovieOverlay } from '@/components/shell/JovieOverlay';
 import { LabelPills } from '@/components/shell/LabelPills';
 import { LyricsList } from '@/components/shell/LyricsList';
 import { MetaPill } from '@/components/shell/MetaPill';
@@ -5388,70 +5387,6 @@ function InstallBanner({
   );
 }
 
-function JovieOverlay({ listening }: { listening: boolean }) {
-  // 32-bar live waveform — each bar's height is driven by a layered
-  // sine so the overall envelope reads as natural speech, not a
-  // metronome. The bars use a CSS-only animation per bar with
-  // staggered delays + duration, so we get organic motion at zero
-  // JS cost. The whole strip cross-fades behind a dim backdrop on
-  // entry / exit (cinematic — same vocabulary as ScreeningRoom).
-  return (
-    <>
-      {/* Backdrop dim — fades the entire shell when dictating so
-          the waveform owns the moment. Click to dismiss. */}
-      <div
-        aria-hidden='true'
-        className='fixed inset-0 z-40 bg-black pointer-events-none'
-        style={{
-          opacity: listening ? 0.55 : 0,
-          backdropFilter: listening ? 'blur(2px)' : 'blur(0)',
-          transition: `opacity 350ms ${EASE_CINEMATIC}, backdrop-filter 350ms ${EASE_CINEMATIC}`,
-        }}
-      />
-
-      <div
-        aria-hidden={!listening}
-        className='fixed inset-x-0 bottom-28 z-50 flex justify-center pointer-events-none px-6'
-        style={{
-          opacity: listening ? 1 : 0,
-          transform: listening
-            ? 'translateY(0) scale(1)'
-            : 'translateY(16px) scale(0.96)',
-          transition: `opacity 350ms ${EASE_CINEMATIC}, transform 350ms ${EASE_CINEMATIC}`,
-        }}
-      >
-        <div className='pointer-events-auto rounded-3xl backdrop-blur-2xl bg-(--linear-app-content-surface)/90 border border-(--linear-app-shell-border) shadow-[0_24px_72px_rgba(0,0,0,0.45)] px-6 py-5 flex flex-col items-center gap-4 w-[480px] max-w-full'>
-          <div className='flex items-center gap-3 self-start'>
-            <span className='relative h-8 w-8 rounded-full bg-primary text-on-primary grid place-items-center'>
-              <Mic className='h-3.5 w-3.5' strokeWidth={2.5} />
-              <span
-                aria-hidden='true'
-                className='absolute inset-0 rounded-full ring-2 ring-primary/40 anim-calm-halo'
-              />
-            </span>
-            <div className='flex-1 min-w-0'>
-              <div className='text-[14px] font-semibold text-primary-token leading-tight'>
-                Listening
-              </div>
-              <div className='text-[11.5px] text-tertiary-token leading-tight mt-0.5'>
-                &ldquo;play Take Me Over&rdquo; · &ldquo;find the extended
-                mix&rdquo;
-              </div>
-            </div>
-            <kbd className='text-[10px] text-quaternary-token tabular-nums shrink-0'>
-              hold ⌘J
-            </kbd>
-          </div>
-          <DictationWaveform active={listening} />
-        </div>
-      </div>
-    </>
-  );
-}
-
-// 32-bar live waveform driven by staggered CSS keyframes so the
-// envelope reads as organic speech. Bars only animate when active
-// (paused otherwise) so the component costs nothing at rest.
 // ---------------------------------------------------------------------------
 // PillSearch — Linear/Notion-style filter chip experience.
 // - Type to see suggestions: matching field shortcuts AND matching values
