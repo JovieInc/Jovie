@@ -89,6 +89,8 @@ const CLOSE_TIMEOUT_MS = Number.parseInt(
   process.env.ROUTE_QA_CLOSE_TIMEOUT_MS || '',
   10
 );
+const EXPECT_PRODUCTION_BLOCKED_ROUTES =
+  process.env.ROUTE_QA_EXPECT_PRODUCTION_BLOCKED_ROUTES === '1';
 const VALID_PUBLIC_USERNAMES = ['e2e-test-user', 'browse-test-user'] as const;
 const MISSING_PUBLIC_USERNAME = 'missing-qa-user';
 const ERROR_TEXT_PATTERNS = [
@@ -220,7 +222,34 @@ function routeCaseKey(routeCase: Readonly<RouteCase>) {
   return [routeCase.authPersona, routeCase.path].join('::');
 }
 
+const PRODUCTION_NOT_FOUND_STATIC_ROUTES = new Map<string, string>([
+  [
+    '/dev/smart-links',
+    'Smart-link dev preview intentionally returns not-found in production.',
+  ],
+  [
+    '/sentry-example-page',
+    'Sentry example page is intentionally blocked by proxy.ts in production.',
+  ],
+]);
+
 function buildStaticCase(route: string, source: string): RouteCase {
+  const productionNotFoundNote = EXPECT_PRODUCTION_BLOCKED_ROUTES
+    ? PRODUCTION_NOT_FOUND_STATIC_ROUTES.get(route)
+    : undefined;
+
+  if (productionNotFoundNote) {
+    return {
+      id: routeIdFromPath(route),
+      lane: inferLane(route),
+      path: route,
+      source,
+      authPersona: 'public',
+      expectedState: 'not-found',
+      notes: productionNotFoundNote,
+    };
+  }
+
   if (route === '/investor-portal' || route === '/investor-portal/respond') {
     return {
       id: routeIdFromPath(route),

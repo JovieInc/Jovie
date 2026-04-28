@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { getTestAuthAvailability } from '../../scripts/route-qa';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -18,8 +19,6 @@ describe('route-qa auth probe', () => {
     const warnSpy = vi
       .spyOn(console, 'warn')
       .mockImplementation(() => undefined);
-    const { getTestAuthAvailability } = await import('../../scripts/route-qa');
-
     await expect(getTestAuthAvailability()).resolves.toBeNull();
     expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining('Auth bootstrap probe failed')
