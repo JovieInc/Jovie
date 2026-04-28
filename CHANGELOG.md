@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.190] - 2026-04-28
+
+> Page-builder route + chrome toggles. PR 2 of the landing-system consolidation. Builds on the section registry from PR 1; renders a complete landing page (header + body + CTA + footer) with toolbar toggles for header chrome, footer density, CTA visibility, and a side drawer for body composition.
+
+### Added
+
+- **`/exp/page-builder`** — composes a real landing page from registry sections. Always renders `MarketingHeader` + body + `MarketingFinalCTA` + `MarketingFooter` (the locked-in trio). URL-driven state via `?header=`, `?footer=`, `?cta=`, `?body=` so deep links survive refresh.
+- **Chrome toolbar** (fixed at top of viewport):
+  - **Header**: Solid (`landing` variant) ↔ Transparent (`homepage` variant)
+  - **Footer**: Full ↔ Minimal
+  - **CTA**: On ↔ Off
+  - **Sections (N)** button → opens the side drawer
+- **Section drawer** (slides in from the right):
+  - Top section: current body order with up/down/remove controls per section
+  - Below: every body-eligible variant grouped by category (`hero | logo-bar | feature-card | testimonial | faq`) — click any variant to append it
+  - Headers, footers, and footer-CTAs are excluded from the drawer; they're chrome
+- **Default body composition**: hero → logo-bar → feature-cards → testimonials → FAQ. Mirrors a "complete" landing page so reviewers see the canonical shape on first load.
+
+### Why now
+
+PR 2 closes the loop on what we want every landing page to look like. With the toolbar toggles locked into the spec, "what does this landing page look like with a transparent header and minimal footer?" stops being a thought experiment — you toggle and see it.
+
+### Not yet
+
+PR 3 deletes the duplicates flagged by PR 1's registry (`CTASection` orphaned, `HeroSection` consolidate → `MarketingHero`, `FinalCTASection` refactor to extract `ClaimHandleForm`). PR 4 adds the `MarketingPageShell` "every landing must end with `MarketingFinalCTA` unless in `LEGAL_ROUTES`" invariant so the page-builder's locked-in design contract is enforced at the type level.
+
 ## [26.4.189] - 2026-04-28
 
 > Landing-page section registry + component-checker. PR 1 of the landing-system consolidation. Adds one source of truth for "what landing-page sections exist" and a full-bleed preview surface (`/exp/component-checker`) so we can audit variants on ultra-wide before merging duplicates.
