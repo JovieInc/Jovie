@@ -123,12 +123,25 @@ import {
 } from '@/app/exp/library-v1/page';
 import { ChatInput } from '@/components/jovie/components/ChatInput';
 import { ChatMarkdown } from '@/components/jovie/components/ChatMarkdown';
+import { ActivityHoverRow } from '@/components/shell/ActivityHoverRow';
+import { AgentPulse } from '@/components/shell/AgentPulse';
+import { DictationWaveform } from '@/components/shell/DictationWaveform';
 import { EntityHoverLink } from '@/components/shell/EntityPopover';
+import { IconBtn } from '@/components/shell/IconBtn';
+import { PickerAction } from '@/components/shell/PickerAction';
+import { PickerLink } from '@/components/shell/PickerLink';
+import { PickerToggle } from '@/components/shell/PickerToggle';
+import { PlayingBars } from '@/components/shell/PlayingBars';
+import { SettingsRow } from '@/components/shell/SettingsRow';
 import {
   type EntityPopoverData,
   ShellDropdown,
 } from '@/components/shell/ShellDropdown';
 import { ShellLoader } from '@/components/shell/ShellLoader';
+import { Stat } from '@/components/shell/Stat';
+import { ThreadCardIconBtn } from '@/components/shell/ThreadCardIconBtn';
+import { ThreadTurn } from '@/components/shell/ThreadTurn';
+import { Tooltip } from '@/components/shell/Tooltip';
 // ---------------------------------------------------------------------------
 // DESIGN RULE — NO AI-SLOP GRADIENTS ON UI CHROME
 // ---------------------------------------------------------------------------
@@ -2518,7 +2531,11 @@ export default function ShellV1Experiment() {
                 back to the audio bar when it's collapsed. ChevronUp signals
                 the direction the bar will travel when revealed (up from the
                 bottom edge). */}
-            <Tooltip label='Show audio bar' shortcut='toggleBar' side='top'>
+            <Tooltip
+              label='Show audio bar'
+              shortcut={SHORTCUTS.toggleBar}
+              side='top'
+            >
               <button
                 type='button'
                 onClick={() => setBarCollapsed(false)}
@@ -3973,7 +3990,7 @@ function Header({
     <header className='shrink-0 h-10 px-3 flex items-center gap-2'>
       <Tooltip
         label={sidebarHidden ? 'Dock sidebar' : 'Hide sidebar'}
-        shortcut='toggleSidebar'
+        shortcut={SHORTCUTS.toggleSidebar}
       >
         <button
           type='button'
@@ -4374,7 +4391,7 @@ function AudioBar({
       </IconBtn>
       <Tooltip
         label={isPlaying ? 'Pause' : 'Play'}
-        shortcut='playPause'
+        shortcut={SHORTCUTS.playPause}
         side='top'
       >
         <button
@@ -4419,7 +4436,7 @@ function AudioBar({
       {track.hasLyrics && (
         <IconBtn
           label='Lyrics'
-          shortcut='toggleLyrics'
+          shortcut={SHORTCUTS.toggleLyrics}
           onClick={onOpenLyrics}
           active={lyricsActive}
           tooltipSide='top'
@@ -4430,7 +4447,7 @@ function AudioBar({
       )}
       <IconBtn
         label={waveformOn ? 'Hide waveform' : 'Show waveform'}
-        shortcut='toggleWaveform'
+        shortcut={SHORTCUTS.toggleWaveform}
         onClick={onToggleWaveform}
         active={waveformOn}
         tooltipSide='top'
@@ -4445,7 +4462,7 @@ function AudioBar({
       <AudioBarOverflowMenu track={track} />
       <IconBtn
         label='Minimize player'
-        shortcut='toggleBar'
+        shortcut={SHORTCUTS.toggleBar}
         onClick={onCollapse}
         tooltipSide='top'
         tone='ghost'
@@ -5649,110 +5666,6 @@ function renderWithEntities(
 // CSS-only (no portal). Uses group/tip + delay-300 for a Linear-feeling
 // late reveal, snapping in over 120ms once it commits.
 // ---------------------------------------------------------------------------
-function Tooltip({
-  children,
-  label,
-  shortcut,
-  side = 'bottom',
-  className,
-  block,
-}: {
-  children: React.ReactNode;
-  label: string;
-  shortcut?: keyof typeof SHORTCUTS;
-  side?: 'top' | 'bottom' | 'right' | 'left';
-  className?: string;
-  // Use `block` for full-width triggers (sidebar nav rows). Default is
-  // inline-flex which sizes to children — right for icon buttons.
-  block?: boolean;
-}) {
-  const sc = shortcut ? SHORTCUTS[shortcut] : null;
-  // Per-side: position + enter/exit transform pair (Tailwind JIT needs the
-  // full class string at compile time so we list each variant out).
-  const sideClasses =
-    side === 'bottom'
-      ? 'top-full left-1/2 -translate-x-1/2 mt-1.5 translate-y-0.5 group-hover/tip:translate-y-0 group-focus-within/tip:translate-y-0'
-      : side === 'top'
-        ? 'bottom-full left-1/2 -translate-x-1/2 mb-1.5 -translate-y-0.5 group-hover/tip:translate-y-0 group-focus-within/tip:translate-y-0'
-        : side === 'right'
-          ? 'left-full top-1/2 -translate-y-1/2 ml-1.5 -translate-x-0.5 group-hover/tip:translate-x-0 group-focus-within/tip:translate-x-0'
-          : 'right-full top-1/2 -translate-y-1/2 mr-1.5 translate-x-0.5 group-hover/tip:translate-x-0 group-focus-within/tip:translate-x-0';
-  return (
-    <span
-      className={cn(
-        'relative group/tip isolate',
-        block ? 'flex w-full' : 'inline-flex',
-        className
-      )}
-    >
-      {children}
-      <span
-        role='tooltip'
-        className={cn(
-          'pointer-events-none absolute z-50 whitespace-nowrap',
-          'opacity-0 group-hover/tip:opacity-100 group-focus-within/tip:opacity-100',
-          'transition-[opacity,transform] duration-150 ease-out delay-[400ms] group-hover/tip:delay-[400ms] group-focus-within/tip:delay-[80ms]',
-          sideClasses
-        )}
-      >
-        <span className='inline-flex items-center gap-2 h-6 px-2 rounded-md text-[11px] font-caption text-primary-token bg-(--linear-app-content-surface)/95 border border-(--linear-app-shell-border) backdrop-blur-xl shadow-[0_6px_20px_rgba(0,0,0,0.28)]'>
-          <span className='leading-none'>{label}</span>
-          {sc && (
-            <kbd className='inline-flex items-center h-4 min-w-4 px-1 rounded-[3px] text-[9.5px] font-caption uppercase tracking-[0.04em] text-tertiary-token bg-surface-0/80 border border-(--linear-app-shell-border) leading-none'>
-              {sc.keys}
-            </kbd>
-          )}
-        </span>
-      </span>
-    </span>
-  );
-}
-
-function IconBtn({
-  children,
-  label,
-  onClick,
-  active,
-  shortcut,
-  tooltipSide = 'bottom',
-  tone = 'default',
-}: {
-  children: React.ReactNode;
-  label: string;
-  onClick?: () => void;
-  active?: boolean;
-  shortcut?: keyof typeof SHORTCUTS;
-  tooltipSide?: 'top' | 'bottom' | 'right' | 'left';
-  // 'default' adds a subtle bg on hover/active (sidebar, header, drawer).
-  // 'ghost' drops the bg entirely — icon brightens to white on hover or
-  // when active. Used in the audio bar so the row feels like a dock,
-  // not a stack of cards.
-  tone?: 'default' | 'ghost';
-}) {
-  const isGhost = tone === 'ghost';
-  return (
-    <Tooltip label={label} shortcut={shortcut} side={tooltipSide}>
-      <button
-        type='button'
-        onClick={onClick}
-        className={cn(
-          'h-7 w-7 rounded-md grid place-items-center transition-colors duration-150 ease-out',
-          isGhost
-            ? active
-              ? 'text-primary-token'
-              : 'text-quaternary-token hover:text-primary-token'
-            : active
-              ? 'text-primary-token bg-surface-1/60'
-              : 'text-quaternary-token hover:text-primary-token hover:bg-surface-1/60'
-        )}
-        aria-label={label}
-      >
-        {children}
-      </button>
-    </Tooltip>
-  );
-}
-
 function VariantPicker({
   variant,
   onVariant,
@@ -6051,52 +5964,6 @@ function DropdownGalleryTrigger() {
   );
 }
 
-function PickerLink({ href, label }: { href: string; label: string }) {
-  return (
-    <a
-      href={href}
-      className='flex items-center justify-between h-6 px-1.5 rounded text-[11px] text-secondary-token hover:bg-surface-1 hover:text-primary-token transition-colors duration-150 ease-out'
-    >
-      <span>{label}</span>
-      <ChevronRight
-        className='h-3 w-3 text-quaternary-token'
-        strokeWidth={2.25}
-      />
-    </a>
-  );
-}
-
-function PickerAction({
-  label,
-  onClick,
-  active,
-}: {
-  label: string;
-  onClick: () => void;
-  active?: boolean;
-}) {
-  return (
-    <button
-      type='button'
-      onClick={onClick}
-      className={cn(
-        'w-full flex items-center justify-between h-6 px-1.5 rounded text-[11px] transition-colors duration-150 ease-out',
-        active
-          ? 'bg-surface-1 text-primary-token'
-          : 'text-secondary-token hover:bg-surface-1 hover:text-primary-token'
-      )}
-    >
-      <span>{label}</span>
-      {active && (
-        <span
-          aria-hidden='true'
-          className='h-1.5 w-1.5 rounded-full bg-cyan-300/85'
-        />
-      )}
-    </button>
-  );
-}
-
 function PalettePanel({
   palette,
   onPalette,
@@ -6183,39 +6050,6 @@ function PalettePanel({
         ))}
       </div>
     </div>
-  );
-}
-
-function PickerToggle({
-  on,
-  onClick,
-  onLabel,
-  offLabel,
-  shortcut,
-}: {
-  on: boolean;
-  onClick: () => void;
-  onLabel: string;
-  offLabel: string;
-  shortcut?: string;
-}) {
-  return (
-    <button
-      type='button'
-      onClick={onClick}
-      className='w-full flex items-center gap-2 rounded-md px-2 py-1 text-[11.5px] text-secondary-token hover:bg-surface-1 hover:text-primary-token'
-    >
-      <span
-        className={cn(
-          'h-1.5 w-1.5 rounded-full',
-          on ? 'bg-emerald-400' : 'bg-tertiary-token/60'
-        )}
-      />
-      <span className='flex-1 text-left'>{on ? onLabel : offLabel}</span>
-      {shortcut && (
-        <kbd className='text-[10px] text-quaternary-token'>{shortcut}</kbd>
-      )}
-    </button>
   );
 }
 
@@ -6344,51 +6178,6 @@ function JovieOverlay({ listening }: { listening: boolean }) {
 // 32-bar live waveform driven by staggered CSS keyframes so the
 // envelope reads as organic speech. Bars only animate when active
 // (paused otherwise) so the component costs nothing at rest.
-function DictationWaveform({ active }: { active: boolean }) {
-  const BARS = 32;
-  return (
-    <>
-      <style>{`
-        @keyframes dict-bar {
-          0%, 100% { transform: scaleY(0.18); }
-          25%      { transform: scaleY(0.62); }
-          50%      { transform: scaleY(1); }
-          75%      { transform: scaleY(0.42); }
-        }
-      `}</style>
-      <div
-        className='flex items-center justify-center gap-[3px] h-12 w-full'
-        aria-hidden='true'
-      >
-        {Array.from({ length: BARS }, (_, i) => {
-          // Deterministic per-bar duration / phase. Mid-strip bars
-          // reach taller — gives the strip a soft envelope.
-          const center = (BARS - 1) / 2;
-          const distance = Math.abs(i - center) / center;
-          const baseHeight = 32 + (1 - distance) * 16;
-          const duration = 720 + (i % 7) * 80;
-          const delay = (i * 47) % 600;
-          return (
-            <span
-              key={i}
-              className='block w-[3px] rounded-full bg-cyan-300/85'
-              style={{
-                height: baseHeight,
-                transformOrigin: 'center',
-                animation: active
-                  ? `dict-bar ${duration}ms cubic-bezier(0.4, 0, 0.6, 1) ${delay}ms infinite`
-                  : 'none',
-                opacity: active ? 1 : 0.4,
-                transition: `opacity 350ms ${EASE_CINEMATIC}`,
-              }}
-            />
-          );
-        })}
-      </div>
-    </>
-  );
-}
-
 // ---------------------------------------------------------------------------
 // PillSearch — Linear/Notion-style filter chip experience.
 // - Type to see suggestions: matching field shortcuts AND matching values
@@ -7259,45 +7048,6 @@ function ThreadView({ thread }: { thread: Thread }) {
   );
 }
 
-function ThreadTurn({
-  speaker,
-  subtle,
-  children,
-}: {
-  speaker: 'jovie' | 'me';
-  subtle?: boolean;
-  children: React.ReactNode;
-}) {
-  // iMessage pattern — no labels, no avatars. Speaker reads from
-  // alignment + bubble: Jovie is flat-text full-width on the left,
-  // "you" is a right-aligned bubble. Subtle running indicators (e.g.
-  // Generating…) stay flat regardless of speaker.
-  if (speaker === 'me') {
-    return (
-      <div className='flex justify-end'>
-        <div
-          className={cn(
-            'max-w-[75%] rounded-2xl rounded-br-md px-3.5 py-2 text-[13.5px] leading-relaxed bg-(--surface-1)/80 text-primary-token',
-            subtle && 'text-tertiary-token'
-          )}
-        >
-          {children}
-        </div>
-      </div>
-    );
-  }
-  return (
-    <div
-      className={cn(
-        'text-[13.5px] leading-relaxed',
-        subtle ? 'text-tertiary-token' : 'text-secondary-token'
-      )}
-    >
-      {children}
-    </div>
-  );
-}
-
 // Onboarding lives inside the shell. Initial state: just a centered
 // chat input + a quiet greeting. The user types their handle, hits
 // submit, and the composer cinematically docks to the bottom while
@@ -7564,26 +7314,6 @@ function ThreadVideoCard({
   );
 }
 
-function ThreadCardIconBtn({
-  children,
-  label,
-}: {
-  children: React.ReactNode;
-  label: string;
-}) {
-  return (
-    <Tooltip label={label}>
-      <button
-        type='button'
-        className='h-6 w-6 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-150 ease-out'
-        aria-label={label}
-      >
-        {children}
-      </button>
-    </Tooltip>
-  );
-}
-
 function ChatComposer({ placeholder }: { placeholder: string }) {
   // Same Variant F surface as the dashboard PillComposer. Reused here
   // so the thread reply matches the home composer exactly.
@@ -7631,39 +7361,6 @@ function SettingsView({ section }: { section: SettingsSectionId }) {
         ))}
       </div>
     </article>
-  );
-}
-
-function SettingsRow({
-  label,
-  description,
-  control,
-  tone,
-  divider,
-}: {
-  label: string;
-  description?: string;
-  control: React.ReactNode;
-  tone?: 'default' | 'danger';
-  divider?: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        'flex items-center gap-4 px-4 py-3.5',
-        divider && 'border-t border-(--linear-app-shell-border)/50'
-      )}
-    >
-      <div className='flex-1 min-w-0'>
-        <p className='text-[13px] font-medium text-primary-token'>{label}</p>
-        {description && (
-          <p className='text-[11.5px] text-tertiary-token mt-0.5'>
-            {description}
-          </p>
-        )}
-      </div>
-      <div className='shrink-0'>{control}</div>
-    </div>
   );
 }
 
@@ -8687,70 +8384,6 @@ function RowWaveform({
   );
 }
 
-function PlayingBars() {
-  return (
-    <span
-      role='img'
-      aria-label='Now playing'
-      className='absolute inset-0 grid place-items-center'
-    >
-      {/* Calmer EQ — fewer keyframes, tighter range (40-85% instead of
-          28-96%), slower durations. Reads as a now-playing indicator
-          without strobing in the user's peripheral vision. */}
-      <style>{`
-        @keyframes pb-eq-a {
-          0%, 100% { height: 50%; }
-          50%      { height: 80%; }
-        }
-        @keyframes pb-eq-b {
-          0%, 100% { height: 70%; }
-          50%      { height: 42%; }
-        }
-        @keyframes pb-eq-c {
-          0%, 100% { height: 55%; }
-          50%      { height: 78%; }
-        }
-      `}</style>
-      <span className='flex items-end gap-[2px] h-3'>
-        <span
-          className='w-[2px] rounded-sm bg-primary-token'
-          style={{
-            animation: 'pb-eq-a 1400ms ease-in-out infinite',
-            willChange: 'height',
-          }}
-        />
-        <span
-          className='w-[2px] rounded-sm bg-primary-token'
-          style={{
-            animation: 'pb-eq-b 1100ms ease-in-out infinite',
-            animationDelay: '-220ms',
-            willChange: 'height',
-          }}
-        />
-        <span
-          className='w-[2px] rounded-sm bg-primary-token'
-          style={{
-            animation: 'pb-eq-c 1700ms ease-in-out infinite',
-            animationDelay: '-480ms',
-            willChange: 'height',
-          }}
-        />
-      </span>
-    </span>
-  );
-}
-
-function AgentPulse() {
-  return (
-    <span
-      aria-hidden='true'
-      title='Agent working'
-      className='absolute inset-0 ring-1 ring-inset ring-primary-token/40 rounded anim-calm-breath pointer-events-none'
-      style={{ animationDuration: '1600ms' }}
-    />
-  );
-}
-
 function agentLabel(s: ReleaseAgentState) {
   switch (s) {
     case 'rescanning-dsps':
@@ -9240,35 +8873,6 @@ function DrawerLyricsTab({ release: _release }: { release: Release }) {
           </li>
         ))}
       </ol>
-    </div>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  mono,
-  tabular,
-}: {
-  label: string;
-  value: string;
-  mono?: boolean;
-  tabular?: boolean;
-}) {
-  return (
-    <div className='flex flex-col gap-0.5'>
-      <span className='text-[9.5px] uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
-        {label}
-      </span>
-      <span
-        className={cn(
-          'text-[13px] text-primary-token',
-          mono && 'font-mono tracking-wide',
-          tabular && 'tabular-nums'
-        )}
-      >
-        {value}
-      </span>
     </div>
   );
 }
@@ -9889,52 +9493,6 @@ function DrawerActivityTab({
         />
       </div>
     </div>
-  );
-}
-
-function ActivityHoverRow({
-  icon: Icon,
-  label,
-  meta,
-  onClick,
-  running,
-  iconAccent,
-  danger,
-}: {
-  icon: typeof Activity;
-  label: string;
-  meta: string;
-  onClick?: () => void;
-  running?: boolean;
-  iconAccent?: boolean;
-  danger?: boolean;
-}) {
-  return (
-    <button
-      type='button'
-      onClick={onClick}
-      className={cn(
-        'group/act flex items-center gap-2.5 h-8 px-2 rounded-md text-[12.5px] transition-colors duration-150 ease-out',
-        danger
-          ? 'text-rose-300/85 hover:bg-rose-500/10 hover:text-rose-200'
-          : 'text-secondary-token hover:bg-surface-1/50 hover:text-primary-token'
-      )}
-    >
-      <Icon
-        className={cn(
-          'h-3.5 w-3.5 shrink-0',
-          iconAccent ? 'text-cyan-300/85' : 'text-quaternary-token'
-        )}
-        strokeWidth={2.25}
-      />
-      <span className='flex-1 text-left truncate'>{label}</span>
-      {running && (
-        <span className='h-1.5 w-1.5 rounded-full bg-cyan-300/80 anim-calm-breath' />
-      )}
-      <span className='text-[10.5px] uppercase tracking-[0.06em] text-quaternary-token group-hover/act:text-tertiary-token transition-colors duration-150 ease-out'>
-        {meta}
-      </span>
-    </button>
   );
 }
 
