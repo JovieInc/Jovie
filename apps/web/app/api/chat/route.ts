@@ -1,11 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import { gateway } from '@ai-sdk/gateway';
 import * as Sentry from '@sentry/nextjs';
 import {
-  convertToModelMessages,
   createUIMessageStream,
   createUIMessageStreamResponse,
-  streamText,
   tool,
   type UIMessage,
 } from 'ai';
@@ -16,9 +13,13 @@ import { buildArtistBioDraft } from '@/lib/ai/artist-bio-writer';
 import { createImportBioFromUrlTool } from '@/lib/ai/tools/import-bio-from-url';
 import { createProfileEditTool } from '@/lib/ai/tools/profile-edit';
 import { getOptionalAuth } from '@/lib/auth/cached';
-import { selectKnowledgeContext } from '@/lib/chat/knowledge/router';
-import { buildSystemPrompt } from '@/lib/chat/system-prompt';
-import { CHAT_MODEL, CHAT_MODEL_LIGHT } from '@/lib/constants/ai-models';
+import { executeChatTurn, isClientDisconnect } from '@/lib/chat/run';
+import {
+  type ArtistContext,
+  artistContextSchema,
+  type ChatTelemetry,
+  type ReleaseContext,
+} from '@/lib/chat/types';
 import { db } from '@/lib/db';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
 import { users } from '@/lib/db/schema/auth';
@@ -68,7 +69,6 @@ import {
   getCanvasStatusFromMetadata,
   summarizeCanvasStatus,
 } from '@/lib/services/canvas/service';
-import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { getInsightsSummary } from '@/lib/services/insights/lifecycle';
 import { buildPitchInput, generatePitches } from '@/lib/services/pitch';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
@@ -96,32 +96,6 @@ const CHAT_KILL_SWITCH_GATES = {
   DISABLED: 'ai_chat_disabled',
   FORCE_LIGHT: 'ai_chat_force_light',
 } as const;
-
-/**
- * Zod schema for validating client-provided artist context.
- * Used when profileId is not provided (backward compatibility).
- */
-const artistContextSchema = z.object({
-  displayName: z.string().max(100),
-  username: z.string().max(50),
-  bio: z.string().max(500).nullable(),
-  genres: z.array(z.string().max(50)).max(10),
-  spotifyFollowers: z.number().int().nonnegative().nullable(),
-  spotifyPopularity: z.number().int().min(0).max(100).nullable(),
-  spotifyUrl: z.string().url().nullable().optional(),
-  appleMusicUrl: z.string().url().nullable().optional(),
-  profileViews: z.number().int().nonnegative(),
-  hasSocialLinks: z.boolean(),
-  hasMusicLinks: z.boolean(),
-  tippingStats: z.object({
-    tipClicks: z.number().int().nonnegative(),
-    tipsSubmitted: z.number().int().nonnegative(),
-    totalReceivedCents: z.number().int().nonnegative(),
-    monthReceivedCents: z.number().int().nonnegative(),
-  }),
-});
-
-type ArtistContext = z.infer<typeof artistContextSchema>;
 
 /**
  * Fetches artist context server-side from the database.
@@ -216,19 +190,6 @@ async function fetchArtistContext(
       monthReceivedCents: Number(tipTotals?.monthReceived ?? 0),
     },
   };
-}
-
-/** Lightweight release info for chat context (avoids loading full provider data). */
-interface ReleaseContext {
-  readonly id: string;
-  readonly title: string;
-  readonly releaseType: string;
-  readonly releaseDate: string | null;
-  readonly artworkUrl: string | null;
-  readonly spotifyPopularity: number | null;
-  readonly totalTracks: number;
-  readonly canvasStatus: CanvasStatus;
-  readonly metadata: Record<string, unknown> | null;
 }
 
 /**
@@ -1586,61 +1547,6 @@ async function fetchOptionalReleases(
 }
 
 /**
- * Regex patterns for messages that can be handled by the lightweight model.
- * These are simple, tool-invocation-oriented requests that don't need
- * frontier-model reasoning.
- */
-const SIMPLE_INTENT_PATTERNS = [
-  /^(?:change|update|set|edit|make)\s+(?:my\s+)?(?:display\s*name|name|bio)\s+(?:to|:)/i,
-  /^(?:add|connect|link)\s+(?:my\s+)?(?:instagram|twitter|x|tiktok|youtube|spotify|soundcloud|bandcamp|facebook|link|url|website)/i,
-  /^(?:upload|change|update|set)\s+(?:my\s+)?(?:photo|avatar|picture|profile\s*pic|pfp)/i,
-  /^(?:format|clean\s*up|fix)\s+(?:my\s+)?lyrics/i,
-  /^check\s+(?:my\s+)?canvas/i,
-  /^mark\s+\S+(?:\s+\S+)*\s+as\s+(?:uploaded|done|set)/i,
-] as const;
-
-/**
- * Determines whether a request can be handled by the lightweight (Haiku) model.
- *
- * Returns true for:
- * - Free-tier users (limited tools, simple Q&A)
- * - Short conversations with clearly simple intents (profile edits, link adds)
- */
-function canUseLightModel(
-  messages: UIMessage[],
-  aiCanUseTools: boolean
-): boolean {
-  // Free-plan users don't have advanced tools — always use the light model
-  if (!aiCanUseTools) return true;
-
-  // Only consider light model for short conversations
-  if (messages.length > 6) return false;
-
-  const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
-  if (!lastUserMsg) return false;
-
-  const text = lastUserMsg.parts
-    .filter(
-      (p): p is { type: 'text'; text: string } =>
-        p.type === 'text' && typeof p.text === 'string'
-    )
-    .map(p => p.text)
-    .join('')
-    .trim();
-
-  // Short, clearly tool-oriented requests
-  return text.length < 200 && SIMPLE_INTENT_PATTERNS.some(p => p.test(text));
-}
-
-function isClientDisconnect(
-  error: unknown,
-  signal: AbortSignal | undefined
-): boolean {
-  const code = (error as NodeJS.ErrnoException)?.code;
-  return (code === 'EPIPE' || code === 'ECONNRESET') && !!signal?.aborted;
-}
-
-/**
  * Build a standardized error response for chat streaming failures.
  */
 function buildChatErrorResponse(
@@ -1900,32 +1806,7 @@ export async function POST(req: Request) {
   const resolvedConversationId = toNullableString(conversationId);
   const releases = await fetchOptionalReleases(resolvedProfileId);
 
-  // Select relevant music industry knowledge based on recent user messages.
-  // Uses last 3 turns so follow-up questions retain context from earlier turns.
-  const recentUserText = [...uiMessages]
-    .reverse()
-    .filter(m => m.role === 'user')
-    .slice(0, 3)
-    .flatMap(m =>
-      (m.parts ?? [])
-        .filter(
-          (p): p is { type: 'text'; text: string } =>
-            p.type === 'text' && typeof p.text === 'string'
-        )
-        .map(p => p.text)
-    )
-    .join(' ');
-  const knowledgeContext = selectKnowledgeContext(recentUserText);
-
-  const systemPrompt = buildSystemPrompt(artistContext, releases, {
-    aiCanUseTools: planLimits.booleans.aiCanUseTools,
-    aiDailyMessageLimit: planLimits.limits.aiDailyMessageLimit,
-    insightsEnabled,
-    knowledgeContext: knowledgeContext || undefined,
-  });
-
   try {
-    const modelMessages = await convertToModelMessages(uiMessages);
     const albumArtEnabled = FEATURE_FLAGS.ALBUM_ART_GENERATION;
 
     // Free tools (avatar upload, social links, link removal, feedback) available on ALL plans
@@ -1945,68 +1826,34 @@ export async function POST(req: Request) {
         }
       : freeTools;
 
-    // `forceLightModel` is the runtime lever (Statsig `ai_chat_force_light`)
-    // that degrades the entire chat surface to the light model during a
-    // provider incident, overriding the per-request heuristic. Intermediate
-    // variable keeps the precedence explicit (|| binds tighter than ?:).
-    const shouldUseLightModel =
-      forceLightModel ||
-      canUseLightModel(uiMessages, planLimits.booleans.aiCanUseTools);
-    const selectedModel = shouldUseLightModel ? CHAT_MODEL_LIGHT : CHAT_MODEL;
+    // Telemetry hooks bind Sentry into `executeChatTurn` without coupling
+    // the pure pipeline to Sentry. Eval scripts pass a no-op telemetry.
+    const telemetry: ChatTelemetry = {
+      setTags: tags => safeSetSentryContext(() => Sentry.setTags(tags)),
+      setExtra: (key, value) =>
+        safeSetSentryContext(() => Sentry.setExtra(key, value)),
+      captureException: (error, context) =>
+        Sentry.captureException(error, context),
+    };
 
-    // Tag the request scope with chat-specific dimensions so all Sentry events
-    // for this request (errors, perf, breadcrumbs) are filterable together.
-    // `chat_conversation_id` goes in `extra` (high cardinality per Sentry
-    // guidance); `chat_has_tools` reflects the real plan capability boundary
-    // rather than a count of always-on freeTools.
-    safeSetSentryContext(() => {
-      Sentry.setTags({
-        chat_model: selectedModel,
-        chat_force_light: String(forceLightModel),
-        chat_has_tools: String(planLimits.booleans.aiCanUseTools),
-      });
-    });
-    if (resolvedConversationId) {
-      safeSetSentryContext(() => {
-        Sentry.setExtra(
-          'chat_conversation_id',
-          resolvedConversationId.slice(0, 120)
-        );
-      });
-    }
-
-    const result = streamText({
-      model: gateway(selectedModel),
-      system: systemPrompt,
-      messages: modelMessages,
+    const turn = await executeChatTurn({
+      uiMessages,
+      artistContext,
+      releases,
+      resolvedProfileId,
+      resolvedConversationId,
+      userId,
+      userPlan,
+      planLimits,
+      insightsEnabled,
+      forceLightModel,
       tools,
-      abortSignal: req.signal,
-      experimental_telemetry: {
-        isEnabled: true,
-        // PII: do not capture prompts/outputs in AI SDK spans. Tokens, model,
-        // latency, and tool-call structure are still captured.
-        recordInputs: false,
-        recordOutputs: false,
-        functionId: 'jovie-chat',
-        metadata: { model: selectedModel, plan: userPlan },
-      },
-      onError: ({ error }) => {
-        if (isClientDisconnect(error, req.signal)) return;
-
-        Sentry.captureException(error, {
-          tags: { feature: 'ai-chat', errorType: 'streaming' },
-          extra: {
-            userId,
-            messageCount: uiMessages.length,
-            requestId,
-            profileId: resolvedProfileId,
-            conversationId: resolvedConversationId,
-          },
-        });
-      },
+      signal: req.signal,
+      requestId,
+      telemetry,
     });
 
-    return result.toUIMessageStreamResponse({
+    return turn.streamResult.toUIMessageStreamResponse({
       headers: {
         ...corsHeaders,
         'x-request-id': requestId,
