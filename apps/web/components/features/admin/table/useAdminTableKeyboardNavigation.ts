@@ -19,6 +19,87 @@ interface UseAdminTableKeyboardNavigationResult {
   handleKeyDown: (event: React.KeyboardEvent<HTMLElement>) => void;
 }
 
+interface DispatchContext {
+  event: React.KeyboardEvent<HTMLElement>;
+  itemIds: string[];
+  selectedIndex: number;
+  selectedId: string | null;
+  navigateTo: (event: React.KeyboardEvent<HTMLElement>, index: number) => void;
+  onActivate?: () => void;
+  onToggleSidebar?: () => void;
+  onCloseSidebar?: () => void;
+  isSidebarOpen?: boolean;
+}
+
+function handleNavNext(ctx: DispatchContext): boolean {
+  if (ctx.itemIds.length === 0) return false;
+  const next =
+    ctx.selectedIndex === -1
+      ? 0
+      : Math.min(ctx.selectedIndex + 1, ctx.itemIds.length - 1);
+  ctx.navigateTo(ctx.event, next);
+  return true;
+}
+
+function handleNavPrev(ctx: DispatchContext): boolean {
+  if (ctx.itemIds.length === 0) return false;
+  const prev =
+    ctx.selectedIndex === -1
+      ? ctx.itemIds.length - 1
+      : Math.max(ctx.selectedIndex - 1, 0);
+  ctx.navigateTo(ctx.event, prev);
+  return true;
+}
+
+function handleNavEdge(ctx: DispatchContext, edge: 'first' | 'last'): boolean {
+  if (ctx.itemIds.length === 0) return false;
+  ctx.navigateTo(ctx.event, edge === 'first' ? 0 : ctx.itemIds.length - 1);
+  return true;
+}
+
+function handleActivateAction(ctx: DispatchContext): boolean {
+  if (!ctx.selectedId) return false;
+  ctx.event.preventDefault();
+  if (ctx.onActivate) ctx.onActivate();
+  else ctx.onToggleSidebar?.();
+  return true;
+}
+
+function handleToggleAction(ctx: DispatchContext): boolean {
+  if (!ctx.selectedId || !ctx.onToggleSidebar) return false;
+  ctx.event.preventDefault();
+  ctx.onToggleSidebar();
+  return true;
+}
+
+function handleCloseAction(ctx: DispatchContext): boolean {
+  if (!ctx.isSidebarOpen || !ctx.onCloseSidebar) return false;
+  ctx.event.preventDefault();
+  ctx.onCloseSidebar();
+  return true;
+}
+
+function dispatchTableNavAction(action: string, ctx: DispatchContext): boolean {
+  switch (action) {
+    case 'next':
+      return handleNavNext(ctx);
+    case 'prev':
+      return handleNavPrev(ctx);
+    case 'first':
+      return handleNavEdge(ctx, 'first');
+    case 'last':
+      return handleNavEdge(ctx, 'last');
+    case 'activate':
+      return handleActivateAction(ctx);
+    case 'toggle':
+      return handleToggleAction(ctx);
+    case 'close':
+      return handleCloseAction(ctx);
+    default:
+      return false;
+  }
+}
+
 /**
  * Container-level keyboard navigation for admin tables with sidebar.
  *
@@ -59,59 +140,17 @@ export function useAdminTableKeyboardNavigation<ItemType>(
       const action = resolveTableNavAction(event.key, event.target);
       if (!action) return;
 
-      switch (action) {
-        case 'next': {
-          if (itemIds.length === 0) return;
-          const next =
-            selectedIndex === -1
-              ? 0
-              : Math.min(selectedIndex + 1, itemIds.length - 1);
-          navigateTo(event, next);
-          break;
-        }
-
-        case 'prev': {
-          if (itemIds.length === 0) return;
-          const prev =
-            selectedIndex === -1
-              ? itemIds.length - 1
-              : Math.max(selectedIndex - 1, 0);
-          navigateTo(event, prev);
-          break;
-        }
-
-        case 'first':
-          if (itemIds.length === 0) return;
-          navigateTo(event, 0);
-          break;
-
-        case 'last':
-          if (itemIds.length === 0) return;
-          navigateTo(event, itemIds.length - 1);
-          break;
-
-        case 'activate':
-          if (!selectedId) return;
-          event.preventDefault();
-          if (onActivate) {
-            onActivate();
-          } else {
-            onToggleSidebar?.();
-          }
-          break;
-
-        case 'toggle':
-          if (!selectedId || !onToggleSidebar) return;
-          event.preventDefault();
-          onToggleSidebar();
-          break;
-
-        case 'close':
-          if (!isSidebarOpen || !onCloseSidebar) return;
-          event.preventDefault();
-          onCloseSidebar();
-          break;
-      }
+      dispatchTableNavAction(action, {
+        event,
+        itemIds,
+        selectedIndex,
+        selectedId,
+        navigateTo,
+        onActivate,
+        onToggleSidebar,
+        onCloseSidebar,
+        isSidebarOpen,
+      });
     },
     [
       itemIds,

@@ -22,7 +22,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 const EASE_CINEMATIC = 'cubic-bezier(0.32, 0.72, 0, 1)';
@@ -919,8 +919,3 @@ function planUnlock(goal: string): string {
 function sleep(ms: number) {
   return new Promise<void>(r => setTimeout(r, ms));
 }
-
-// Keep the `useMemo` import live — used by the satellite onboarding pages
-// I'll add later (analytics summary on the right rail, etc.).
-const _keepImports = useMemo;
-void _keepImports;
