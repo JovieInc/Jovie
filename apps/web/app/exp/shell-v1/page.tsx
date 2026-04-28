@@ -206,7 +206,6 @@ import { dropDateMeta } from '@/lib/format-drop-date';
 import { SHORTCUTS } from '@/lib/shortcuts';
 import { cn } from '@/lib/utils';
 
-type Variant = 'a' | 'b' | 'c' | 'd' | 'e';
 type CanvasView =
   | 'demo'
   | 'releases'
@@ -238,42 +237,15 @@ const toNowPlayingTrack = (t: TrackInfo): NowPlayingTrack => ({
   artworkUrl: t.artwork,
 });
 
-// Live-editable palette. The page wrapper writes these as CSS custom
-// properties so the dev picker can mutate them in real time.
-type Palette = {
-  page: string;
-  surface0: string;
-  surface1: string;
-  surface2: string;
-  contentSurface: string;
-  border: string;
-};
-const PALETTE_PRESETS: Record<string, Palette> = {
-  'Cool Black': {
-    page: '#08090b',
-    surface0: '#0c0e11',
-    surface1: '#13161b',
-    surface2: '#191d23',
-    contentSurface: '#0d0f13',
-    border: '#1a1d23',
-  },
-  Carbon: {
-    page: '#06070a',
-    surface0: '#0a0b0e',
-    surface1: '#101216',
-    surface2: '#161a20',
-    contentSurface: '#0a0c0f',
-    border: '#171a20',
-  },
-  Graphite: {
-    // Slightly lighter / more readable while staying cool.
-    page: '#0a0c0f',
-    surface0: '#0e1115',
-    surface1: '#161a20',
-    surface2: '#1d2229',
-    contentSurface: '#0f1216',
-    border: '#1d2128',
-  },
+// Page palette — applied as CSS custom properties on the page wrapper.
+// Locked to Carbon now that the dev picker is gone.
+const CARBON_PALETTE = {
+  page: '#06070a',
+  surface0: '#0a0b0e',
+  surface1: '#101216',
+  surface2: '#161a20',
+  contentSurface: '#0a0c0f',
+  border: '#171a20',
 };
 
 // Inline Jovie brand mark — small SVG so the experiment file stays
@@ -1531,7 +1503,6 @@ function formatStreams(n: number) {
 }
 
 export default function ShellV1Experiment() {
-  const [_variant, _setVariant] = useState<Variant>('a');
   const [sidebarMode, setSidebarMode] = useState<'docked' | 'floating'>(
     'docked'
   );
@@ -1572,7 +1543,7 @@ export default function ShellV1Experiment() {
   const [lyricsLines, setLyricsLines] = useState<LyricLine[]>(MOCK_LYRICS);
   // Push-to-talk Jovie: hold ⌘J anywhere to dictate. Mock for the design pass.
   const [jovieListening, setJovieListening] = useState(false);
-  const [palette, _setPalette] = useState<Palette>(PALETTE_PRESETS.Carbon);
+  const palette = CARBON_PALETTE;
   // Search state lives at the page level so click-artist / click-title in
   // any view can populate it and open the breadcrumb-takeover.
   const [searchOpen, setSearchOpen] = useState(false);
