@@ -76,7 +76,7 @@ export function CookieBannerSection() {
           setCustomize(true);
         },
       };
-      if (typeof globalThis.window !== 'undefined') {
+      if (globalThis.window !== undefined) {
         globalThis.dispatchEvent(new Event('jvconsent:ready'));
       }
     }
