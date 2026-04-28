@@ -64,7 +64,6 @@ import {
   Link as LinkIcon,
   Loader2,
   LogOut,
-  Maximize2,
   Mic2,
   Minimize2,
   MoreHorizontal,
@@ -170,7 +169,6 @@ import { Stat } from '@/components/shell/Stat';
 import { StatusBadge } from '@/components/shell/StatusBadge';
 import { SuggestionCard } from '@/components/shell/SuggestionCard';
 import { ThreadAudioCard } from '@/components/shell/ThreadAudioCard';
-import { ThreadCardIconBtn } from '@/components/shell/ThreadCardIconBtn';
 import { ThreadImageCard } from '@/components/shell/ThreadImageCard';
 import { ThreadTurn } from '@/components/shell/ThreadTurn';
 import { ThreadVideoCard } from '@/components/shell/ThreadVideoCard';
@@ -6268,160 +6266,6 @@ function OnboardingCanvas({ onComplete }: { onComplete: () => void }) {
   );
 }
 
-// Image generation card — clean attachment block. Shimmer + visible
-// prompt while generating; aspect-correct preview + tap-to-lightbox
-// once ready. Toolbar: download / copy / regenerate.
-function _ThreadImageCard({
-  prompt,
-  status,
-}: {
-  prompt: string;
-  status: 'generating' | 'ready';
-}) {
-  return (
-    <div className='rounded-xl border border-(--linear-app-shell-border) bg-(--surface-0)/40 overflow-hidden'>
-      <div className='aspect-[16/10] relative bg-(--surface-2)'>
-        {status === 'generating' ? (
-          <div className='absolute inset-0 grid place-items-center'>
-            <div
-              className='absolute inset-0'
-              style={{
-                background:
-                  'linear-gradient(110deg, transparent 0%, rgba(255,255,255,0.04) 35%, rgba(103,232,249,0.06) 50%, rgba(255,255,255,0.04) 65%, transparent 100%)',
-                backgroundSize: '200% 100%',
-                animation: 'shimmer 2.4s ease-in-out infinite',
-              }}
-            />
-            <p className='relative text-[12px] text-tertiary-token text-center px-6'>
-              Generating &ldquo;{prompt}&rdquo;
-            </p>
-            <style>{`@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }`}</style>
-          </div>
-        ) : (
-          <div
-            className='absolute inset-0'
-            style={{
-              background:
-                'radial-gradient(ellipse at 30% 20%, rgba(103,232,249,0.18) 0%, rgba(255,255,255,0.04) 40%, rgba(0,0,0,0) 70%), linear-gradient(135deg, hsl(220, 35%, 14%), hsl(220, 30%, 6%))',
-            }}
-          />
-        )}
-      </div>
-      <div className='flex items-center gap-2 px-3 h-9 border-t border-(--linear-app-shell-border)/60'>
-        <Sparkles className='h-3 w-3 text-cyan-300/80' strokeWidth={2.25} />
-        <span className='flex-1 text-[11.5px] text-tertiary-token truncate'>
-          {prompt}
-        </span>
-        {status === 'ready' && (
-          <span className='inline-flex items-center gap-0.5'>
-            <ThreadCardIconBtn label='Download'>
-              <ArrowDown className='h-3 w-3' strokeWidth={2.25} />
-            </ThreadCardIconBtn>
-            <ThreadCardIconBtn label='Copy'>
-              <Copy className='h-3 w-3' strokeWidth={2.25} />
-            </ThreadCardIconBtn>
-            <ThreadCardIconBtn label='Regenerate'>
-              <Sparkles className='h-3 w-3' strokeWidth={2.25} />
-            </ThreadCardIconBtn>
-          </span>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// Audio card — minimal. Click play takes over the global audio bar at
-// the bottom of the canvas (not parallel state). Inline play/pause
-// stays synced with the global bar via the same isPlaying flag.
-function _ThreadAudioCard({
-  title,
-  artist,
-  duration,
-}: {
-  title: string;
-  artist: string;
-  duration: string;
-}) {
-  return (
-    <div className='flex items-center gap-3 rounded-xl border border-(--linear-app-shell-border) bg-(--surface-0)/40 px-3 py-2.5'>
-      <div className='shrink-0 h-10 w-10 rounded bg-(--surface-2) grid place-items-center'>
-        <Disc3 className='h-4 w-4 text-tertiary-token' strokeWidth={2.25} />
-      </div>
-      <div className='flex-1 min-w-0'>
-        <p className='text-[12.5px] font-medium text-primary-token truncate'>
-          {title}
-        </p>
-        <p className='text-[11px] text-tertiary-token truncate'>
-          {artist} · {duration}
-        </p>
-      </div>
-      <button
-        type='button'
-        className='h-8 w-8 rounded-full grid place-items-center bg-white text-black hover:bg-white/90 transition-colors duration-150 ease-out'
-        aria-label='Play in global player'
-      >
-        <Play
-          className='h-3 w-3 translate-x-px'
-          strokeWidth={2.5}
-          fill='currentColor'
-        />
-      </button>
-    </div>
-  );
-}
-
-// Video card — inline thumbnail with play overlay. Click expand →
-// cinematic full-screen (reuses the ScreeningRoom mode by switching
-// canvas view to 'lyrics'; for the design pass we wire that
-// transition next batch).
-function _ThreadVideoCard({
-  title,
-  durationSec,
-}: {
-  title: string;
-  durationSec: number;
-}) {
-  return (
-    <div className='rounded-xl border border-(--linear-app-shell-border) bg-(--surface-0)/40 overflow-hidden'>
-      <button
-        type='button'
-        className='group/vid relative w-full aspect-[16/9] block'
-        aria-label='Play video'
-      >
-        <span
-          className='absolute inset-0'
-          style={{
-            background:
-              'radial-gradient(ellipse at 60% 40%, rgba(255,255,255,0.06) 0%, rgba(0,0,0,0) 60%), linear-gradient(135deg, hsl(220, 30%, 12%), hsl(220, 30%, 4%))',
-          }}
-        />
-        <span className='absolute inset-0 grid place-items-center'>
-          <span className='h-12 w-12 rounded-full bg-white/95 text-black grid place-items-center group-hover/vid:scale-105 transition-transform duration-200 ease-out'>
-            <Play
-              className='h-4 w-4 translate-x-px'
-              strokeWidth={2.5}
-              fill='currentColor'
-            />
-          </span>
-        </span>
-        <span className='absolute bottom-2 right-2 inline-flex items-center h-5 px-1.5 rounded text-[10px] font-caption tabular-nums text-primary-token bg-black/60 backdrop-blur'>
-          {Math.floor(durationSec / 60)}:
-          {String(durationSec % 60).padStart(2, '0')}
-        </span>
-      </button>
-      <div className='flex items-center gap-2 px-3 h-9 border-t border-(--linear-app-shell-border)/60'>
-        <Mic2 className='h-3 w-3 text-cyan-300/80' strokeWidth={2.25} />
-        <span className='flex-1 text-[11.5px] text-tertiary-token truncate'>
-          {title}
-        </span>
-        <ThreadCardIconBtn label='Full-screen'>
-          <Maximize2 className='h-3 w-3' strokeWidth={2.25} />
-        </ThreadCardIconBtn>
-      </div>
-    </div>
-  );
-}
-
 // Settings — context-shifts the sidebar (same pattern as Library). The
 // canvas no longer carries its own nav rail; the active section is the
 // only thing on the canvas. All rows for a section group into ONE card
@@ -7140,111 +6984,6 @@ function DspAvatarStack({ release }: { release: Release }) {
   );
 }
 
-// Linear-style stacked chips: dots collapsed by default, expand to labelled
-// pills on row hover. Replaced by DspAvatarStack on the row, kept around
-// for the upcoming Tracks view's status column.
-function _ChipStack({ release }: { release: Release }) {
-  const dspChips = DSP_ORDER.map(dsp => ({
-    key: `dsp-${dsp}`,
-    label: DSP_LABEL[dsp],
-    tone: dspTone(release.dsps[dsp]),
-  }));
-  const tasksChip =
-    release.tasksOpen > 0
-      ? {
-          key: 'tasks',
-          label: `${release.tasksOpen} tasks`,
-          tone: 'amber' as const,
-        }
-      : null;
-  const pitchChip = release.pitchReady
-    ? { key: 'pitch', label: 'Pitch ready', tone: 'green' as const }
-    : null;
-
-  const chips = [
-    ...dspChips,
-    ...(tasksChip ? [tasksChip] : []),
-    ...(pitchChip ? [pitchChip] : []),
-  ];
-
-  return (
-    <div className='flex items-center gap-0.5 group-hover/row:gap-1 transition-[gap] duration-200 ease-out'>
-      {chips.map(chip => (
-        <span
-          key={chip.key}
-          className={cn(
-            'inline-flex items-center h-5 rounded-full transition-[width,padding,background-color] duration-200 ease-out',
-            'overflow-hidden whitespace-nowrap',
-            chipBg(chip.tone),
-            // collapsed = dot. expanded on row hover = pill with label.
-            'w-1.5 px-0 group-hover/row:w-auto group-hover/row:px-1.5'
-          )}
-          title={chip.label}
-        >
-          <span
-            className={cn(
-              'h-1.5 w-1.5 rounded-full shrink-0',
-              chipDot(chip.tone)
-            )}
-          />
-          <span
-            className={cn(
-              'ml-1.5 text-[10.5px] font-caption tabular-nums tracking-[-0.01em]',
-              chipLabel(chip.tone),
-              'opacity-0 group-hover/row:opacity-100 transition-opacity duration-150 ease-out'
-            )}
-          >
-            {chip.label}
-          </span>
-        </span>
-      ))}
-    </div>
-  );
-}
-
-function dspTone(s: DspStatus) {
-  if (s === 'live') return 'green' as const;
-  if (s === 'pending') return 'amber' as const;
-  if (s === 'error') return 'red' as const;
-  return 'neutral' as const;
-}
-function chipBg(tone: 'green' | 'amber' | 'red' | 'neutral') {
-  switch (tone) {
-    case 'green':
-      return 'bg-emerald-500/10 group-hover/row:bg-emerald-500/15';
-    case 'amber':
-      return 'bg-amber-500/10 group-hover/row:bg-amber-500/15';
-    case 'red':
-      return 'bg-rose-500/10 group-hover/row:bg-rose-500/15';
-    default:
-      return 'bg-surface-1';
-  }
-}
-function chipDot(tone: 'green' | 'amber' | 'red' | 'neutral') {
-  switch (tone) {
-    case 'green':
-      return 'bg-emerald-500';
-    case 'amber':
-      return 'bg-amber-500';
-    case 'red':
-      return 'bg-rose-500';
-    default:
-      return 'bg-quaternary-token/70';
-  }
-}
-function chipLabel(tone: 'green' | 'amber' | 'red' | 'neutral') {
-  switch (tone) {
-    case 'green':
-      return 'text-emerald-700 dark:text-emerald-300';
-    case 'amber':
-      return 'text-amber-700 dark:text-amber-300';
-    case 'red':
-      return 'text-rose-700 dark:text-rose-300';
-    default:
-      return 'text-secondary-token';
-  }
-}
-
 function agentLabel(s: ReleaseAgentState) {
   switch (s) {
     case 'rescanning-dsps':
@@ -7589,11 +7328,6 @@ function generatePerfPoints(
   }
   points[points.length - 1] = Math.round(base * (1 + (seed % 5) * 0.05));
   return points;
-}
-
-// Backwards-compat alias — old callers used `generateSparkline`.
-function _generateSparkline(seed: number, target: number): number[] {
-  return generatePerfPoints(seed, target, 14);
 }
 
 // 27 providers Jovie pulls from via music-fetch — covers streaming,
@@ -8385,48 +8119,6 @@ function TrackRow({
   );
 }
 
-function _EnergyBars({ value }: { value: number }) {
-  return (
-    <span
-      className='inline-flex items-end gap-[2px] h-3'
-      title={`Energy ${value}/10`}
-    >
-      {[1, 2, 3, 4, 5].map(i => {
-        const lit = value >= i * 2 - 1;
-        return (
-          <span
-            key={i}
-            className={cn(
-              'w-[3px] rounded-sm',
-              lit ? 'bg-secondary-token' : 'bg-quaternary-token/30'
-            )}
-            style={{ height: `${30 + i * 14}%` }}
-          />
-        );
-      })}
-    </span>
-  );
-}
-
-function _RatingDots({ value }: { value: number }) {
-  return (
-    <span
-      className='inline-flex items-center gap-[3px]'
-      title={`Rating ${value}/5`}
-    >
-      {[1, 2, 3, 4, 5].map(i => (
-        <span
-          key={i}
-          className={cn(
-            'h-1.5 w-1.5 rounded-full',
-            i <= value ? 'bg-amber-400' : 'bg-quaternary-token/30'
-          )}
-        />
-      ))}
-    </span>
-  );
-}
-
 // Replaces the cryptic icon cluster with a single labeled chip. Has-video
 // / has-canvas indicators move into the detail panel where the user has
 // the room (and intent) to read them.
@@ -8887,23 +8579,6 @@ function TaskDetail({
         Updated {relativeDate(task.updatedIso)}
       </div>
     </article>
-  );
-}
-
-function _DetailRow({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <>
-      <dt className='text-[10.5px] uppercase tracking-[0.12em] text-quaternary-token/85 font-medium pt-1'>
-        {label}
-      </dt>
-      <dd className='min-w-0'>{children}</dd>
-    </>
   );
 }
 
