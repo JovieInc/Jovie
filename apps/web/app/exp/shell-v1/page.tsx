@@ -36,7 +36,6 @@
 import {
   Activity,
   Archive,
-  ArrowDown,
   ArrowRight,
   ArrowUpDown,
   AudioLines,
@@ -135,6 +134,7 @@ import { EntityHoverLink } from '@/components/shell/EntityPopover';
 import { EntityThreadGlyph } from '@/components/shell/EntityThreadGlyph';
 import { IconBtn } from '@/components/shell/IconBtn';
 import { InlineEditRow } from '@/components/shell/InlineEditRow';
+import { InstallBanner } from '@/components/shell/InstallBanner';
 import { JovieOverlay } from '@/components/shell/JovieOverlay';
 import { LabelPills } from '@/components/shell/LabelPills';
 import { LyricsList } from '@/components/shell/LyricsList';
@@ -5345,67 +5345,6 @@ function PalettePanel({
             />
           </div>
         ))}
-      </div>
-    </div>
-  );
-}
-
-// Push-to-talk Jovie. Hold ⌘J anywhere to dictate. Mock for design pass —
-// wire to the chat input / command palette intent router in production.
-// Install / upgrade banner — calm strip at the top of the canvas.
-// Dark surface, subtle gradient accent, two affordances (primary
-// install + dismiss). Positioned above the header so it never
-// fights the breadcrumb for attention. Slides in/out with the
-// same cinematic ease as other shell transitions.
-// Compact sidebar card — sits above the now-playing slot. Vertical
-// layout (icon + title, short body, single primary action) so it fits
-// in the 224px sidebar without truncation. Animates max-height +
-// opacity in/out on the same cinematic curve as the now-playing card.
-function InstallBanner({
-  open,
-  onDismiss,
-}: {
-  open: boolean;
-  onDismiss: () => void;
-}) {
-  return (
-    <div
-      aria-hidden={!open}
-      className='shrink-0 overflow-hidden px-2'
-      style={{
-        maxHeight: open ? 140 : 0,
-        opacity: open ? 1 : 0,
-        transition: `max-height ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, opacity ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
-      }}
-    >
-      <div className='relative rounded-xl border border-(--linear-app-shell-border) bg-(--surface-1)/60 backdrop-blur-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_6px_18px_rgba(0,0,0,0.28)] px-3 pt-3 pb-3 mb-2'>
-        <button
-          type='button'
-          onClick={onDismiss}
-          aria-label='Dismiss install prompt'
-          className='absolute top-1.5 right-1.5 h-5 w-5 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-150 ease-out'
-        >
-          <X className='h-3 w-3' strokeWidth={2.25} />
-        </button>
-        <div className='flex items-center gap-1.5 mb-1 pr-5'>
-          <Sparkles
-            className='h-3 w-3 text-cyan-300/85 shrink-0'
-            strokeWidth={2.25}
-          />
-          <span className='text-[12px] font-medium text-primary-token tracking-[-0.005em]'>
-            Get Jovie for desktop
-          </span>
-        </div>
-        <p className='text-[11px] text-tertiary-token leading-snug mb-2.5'>
-          Push-to-talk in any app, native shortcuts.
-        </p>
-        <button
-          type='button'
-          className='w-full inline-flex items-center justify-center gap-1.5 h-7 rounded-full text-[12px] font-medium bg-white text-black hover:brightness-110 active:scale-[0.99] transition-all duration-150 ease-out'
-        >
-          Install
-          <ArrowDown className='h-3 w-3' strokeWidth={2.5} />
-        </button>
       </div>
     </div>
   );
