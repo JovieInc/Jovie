@@ -1,6 +1,6 @@
 {
   "name": "jovie-monorepo",
-  "version": "26.4.183",
+  "version": "26.4.184",
   "private": true,
   "config": {
     "commitizen": {
@@ -100,7 +100,8 @@
     "db:web:studio": "doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run drizzle:studio",
     "knip": "knip",
     "version:check": "node scripts/version-check.mjs",
-    "changelog:send": "doppler run -- node scripts/send-changelog-email.mjs"
+    "changelog:send": "doppler run -- node scripts/send-changelog-email.mjs",
+    "video:footer:generate": "doppler run --project jovie-web --config dev -- tsx scripts/generate-footer-cta-video.ts"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.81.0",

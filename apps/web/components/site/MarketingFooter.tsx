@@ -1,34 +1,171 @@
 'use client';
 
+import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Footer as FooterOrganism } from '@/components/organisms/footer-module';
+import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { APP_ROUTES } from '@/constants/routes';
+import { cn } from '@/lib/utils';
+
+const MINIMAL_FOOTER_PATHS = new Set<string>([
+  APP_ROUTES.PRICING,
+  APP_ROUTES.LEGAL_PRIVACY,
+  APP_ROUTES.LEGAL_TERMS,
+]);
 
 interface MarketingFooterProps {
   readonly variant?: 'auto' | 'expanded' | 'minimal';
+  readonly className?: string;
 }
+
+const FOOTER_COLUMNS: readonly {
+  readonly title: string;
+  readonly links: readonly {
+    readonly href: string;
+    readonly label: string;
+  }[];
+}[] = [
+  {
+    title: 'Product',
+    links: [
+      { href: APP_ROUTES.ARTIST_PROFILES, label: 'Artist Profiles' },
+      { href: APP_ROUTES.SIGNUP, label: 'Release Planning' },
+      { href: APP_ROUTES.PRICING, label: 'Pricing' },
+    ],
+  },
+  {
+    title: 'Features',
+    links: [
+      { href: APP_ROUTES.ARTIST_PROFILES, label: 'Smart Links' },
+      { href: APP_ROUTES.ARTIST_NOTIFICATIONS, label: 'Notifications' },
+      { href: APP_ROUTES.SIGNUP, label: 'Audience Signal' },
+    ],
+  },
+  {
+    title: 'Company',
+    links: [
+      { href: APP_ROUTES.ABOUT, label: 'About' },
+      { href: APP_ROUTES.BLOG, label: 'Blog' },
+      { href: APP_ROUTES.CHANGELOG, label: 'Changelog' },
+    ],
+  },
+  {
+    title: 'Resources',
+    links: [
+      { href: APP_ROUTES.SUPPORT, label: 'Support' },
+      { href: 'https://status.jov.ie', label: 'Status' },
+      { href: APP_ROUTES.DEMO, label: 'Demo' },
+    ],
+  },
+] as const;
+
+const footerLinkClassName =
+  'inline-flex w-fit rounded-[5px] text-[15px] leading-[1.45] tracking-[-0.005em] text-white/[0.72] transition-colors duration-150 hover:text-white focus-visible:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
+const footerLegalLinkClassName =
+  'inline-flex w-fit rounded-[5px] text-[12px] leading-5 tracking-[-0.01em] text-white/[0.34] transition-colors duration-150 hover:text-white/70 focus-visible:text-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
 
 export function MarketingFooter({
   variant = 'auto',
+  className,
 }: Readonly<MarketingFooterProps>) {
   const pathname = usePathname();
-  let resolvedVariant: 'regular' | 'minimal';
-  if (variant === 'auto') {
-    resolvedVariant = pathname === APP_ROUTES.PRICING ? 'regular' : 'minimal';
-  } else {
-    resolvedVariant = variant === 'expanded' ? 'regular' : 'minimal';
-  }
+  const resolvedVariant =
+    variant === 'auto'
+      ? pathname && MINIMAL_FOOTER_PATHS.has(pathname)
+        ? 'minimal'
+        : 'expanded'
+      : variant;
+  const isMinimal = resolvedVariant === 'minimal';
 
   return (
-    <FooterOrganism
-      variant={resolvedVariant}
-      brandingMark='icon'
-      containerSize='homepage'
-      showThemeToggle={false}
-      links={[
-        { href: APP_ROUTES.LEGAL_PRIVACY, label: 'Privacy' },
-        { href: APP_ROUTES.LEGAL_TERMS, label: 'Terms' },
-      ]}
-    />
+    <footer
+      className={cn(
+        'relative overflow-hidden border-t border-white/[0.04] bg-black text-white',
+        className
+      )}
+    >
+      <div
+        className={cn(
+          'marketing-footer-inner relative w-full px-[clamp(1.25rem,2.2vw,2rem)]',
+          isMinimal
+            ? 'py-[clamp(2.6rem,5vw,4rem)]'
+            : 'pt-[clamp(3.25rem,5vw,4.6rem)] pb-[clamp(5rem,8vw,7rem)]'
+        )}
+      >
+        {isMinimal ? (
+          <Link
+            href={APP_ROUTES.HOME}
+            prefetch={false}
+            aria-label='Jovie home'
+            className='-m-1.5 inline-flex rounded-full p-1.5 text-white/[0.9] transition-opacity duration-150 hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
+          >
+            <BrandLogo size={24} tone='white' rounded={false} aria-hidden />
+          </Link>
+        ) : (
+          <div className='grid gap-12 md:grid-cols-[3.5rem_minmax(0,1fr)] md:gap-14 xl:gap-16'>
+            <div className='min-w-0'>
+              <Link
+                href={APP_ROUTES.HOME}
+                prefetch={false}
+                aria-label='Jovie home'
+                className='-m-1.5 inline-flex rounded-full p-1.5 text-white/[0.9] transition-opacity duration-150 hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
+              >
+                <BrandLogo size={24} tone='white' rounded={false} aria-hidden />
+              </Link>
+            </div>
+
+            <nav
+              className='grid grid-cols-2 gap-x-10 gap-y-8 sm:grid-cols-4 lg:gap-x-14 xl:gap-x-20'
+              aria-label='Footer'
+            >
+              {FOOTER_COLUMNS.map(column => (
+                <section key={column.title}>
+                  <h2 className='mb-4 text-[12px] font-medium leading-[1.35] tracking-[-0.01em] text-white/[0.78]'>
+                    {column.title}
+                  </h2>
+                  <ul className='flex list-none flex-col gap-2.5 p-0'>
+                    {column.links.map(link => (
+                      <li key={`${link.href}-${link.label}`}>
+                        <Link
+                          href={link.href}
+                          prefetch={false}
+                          className={footerLinkClassName}
+                        >
+                          {link.label}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
+            </nav>
+          </div>
+        )}
+
+        <div
+          className={cn(
+            'flex flex-wrap items-center justify-between gap-x-7 gap-y-2 text-[12px] leading-5 tracking-[-0.01em] text-white/[0.32]',
+            isMinimal ? 'mt-8' : 'mt-[clamp(3.5rem,6vw,5rem)]'
+          )}
+        >
+          <span>© {new Date().getFullYear()} Jovie Technology Inc.</span>
+          <nav aria-label='Legal' className='flex flex-wrap items-center gap-5'>
+            <Link
+              href={APP_ROUTES.LEGAL_PRIVACY}
+              prefetch={false}
+              className={footerLegalLinkClassName}
+            >
+              Privacy
+            </Link>
+            <Link
+              href={APP_ROUTES.LEGAL_TERMS}
+              prefetch={false}
+              className={footerLegalLinkClassName}
+            >
+              Terms
+            </Link>
+          </nav>
+        </div>
+      </div>
+    </footer>
   );
 }

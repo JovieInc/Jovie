@@ -3,12 +3,13 @@ import { describe, expect, it } from 'vitest';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
 
 describe('AppShellFrame', () => {
-  it('keeps the main content landmark non-focusable while rendering content', () => {
+  it('renders the shellChatV1 design when explicitly opted in', () => {
     render(
       <AppShellFrame
         sidebar={<aside>Sidebar</aside>}
         header={<header>Header</header>}
         main={<div>Main Content</div>}
+        variant='shellChatV1'
       />
     );
 
@@ -29,6 +30,20 @@ describe('AppShellFrame', () => {
     expect(screen.getByText('Sidebar')).toBeInTheDocument();
     expect(screen.getByText('Header')).toBeInTheDocument();
     expect(screen.getByText('Main Content')).toBeInTheDocument();
+  });
+
+  it('defaults to the legacy variant so flag-off callers match production', () => {
+    render(
+      <AppShellFrame
+        sidebar={<aside>Sidebar</aside>}
+        header={<header>Header</header>}
+        main={<div>Main Content</div>}
+      />
+    );
+
+    expect(
+      screen.getByRole('main').closest('[data-shell-design]')
+    ).toHaveAttribute('data-shell-design', 'legacy');
   });
 
   it('can render the legacy flat shell frame for the old design', () => {

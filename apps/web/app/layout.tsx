@@ -15,6 +15,13 @@ const inter = localFont({
   weight: '100 900',
 });
 
+const satoshi = localFont({
+  src: '../public/fonts/Satoshi-Variable.woff2',
+  variable: '--font-satoshi',
+  display: 'swap',
+  weight: '300 900',
+});
+
 export const metadata: Metadata = {
   title: {
     default: APP_NAME,
@@ -180,7 +187,7 @@ export default async function RootLayout({
     );
   }
 
-  const bodyClassName = `${inter.variable} font-sans antialiased bg-base text-primary-token`;
+  const bodyClassName = `${inter.variable} ${satoshi.variable} font-sans antialiased bg-base text-primary-token`;
 
   const content = (
     <>

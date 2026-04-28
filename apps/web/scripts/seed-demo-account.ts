@@ -1138,7 +1138,7 @@ async function seedDemoInbox(profileId: string, contactIds: string[]) {
         fromEmail: 'jessica.nguyen@pitchfork.example.com',
         fromName: 'Jessica Nguyen',
         bodyText:
-          "Hi Calvin,\n\nI'm Jessica Nguyen, a staff writer at Pitchfork. I'm working on a feature about artists who are redefining the boundary between electronic and acoustic music, and your work keeps coming up in my research.\n\nWould you be open to a 30-minute interview? I'd love to talk about your creative process, particularly how you approach production on tracks like \"Blessings featuring Clementine Douglas.\"\n\nWe're looking to publish in the April issue. Happy to work around your schedule.\n\nThanks,\nJessica",
+          "Hi Calvin,\n\nI'm Jessica Nguyen, a staff writer at Pitchfork. I'm working on a feature about artists who are redefining the boundary between electronic and acoustic music, and your work keeps coming up in my research.\n\nWould you be open to a 30-minute interview? I'd love to talk about your creative process, particularly how you revisit catalog moments on releases like \"I'm Not Alone Remixes.\"\n\nWe're looking to publish in the April issue. Happy to work around your schedule.\n\nThanks,\nJessica",
       },
     },
     {

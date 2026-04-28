@@ -7,6 +7,7 @@ import { ARTIST_PROFILE_SECTION_TEST_IDS } from '@/data/artistProfilePageOrder';
 import type { ArtistProfileSocialProofData } from '@/data/socialProof';
 import { HomeTrustSection } from '@/features/home/HomeTrustSection';
 import type { ArtistProfileSectionFlags } from '@/lib/featureFlags';
+import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { ArtistProfileCaptureSection } from './ArtistProfileCaptureSection';
 import { ArtistProfileFaq } from './ArtistProfileFaq';
 import { ArtistProfileFinalCta } from './ArtistProfileFinalCta';
@@ -15,6 +16,7 @@ import { ArtistProfileHeroAdaptiveIntro } from './ArtistProfileHeroAdaptiveIntro
 import { ArtistProfileHowItWorks } from './ArtistProfileHowItWorks';
 import { ArtistProfileMonetizationSection } from './ArtistProfileMonetizationSection';
 import { ArtistProfileOutcomesCarousel } from './ArtistProfileOutcomesCarousel';
+import { ArtistProfilePayFlowVideoSection } from './ArtistProfilePayFlowVideoSection';
 import { ArtistProfileReactivationSection } from './ArtistProfileReactivationSection';
 import { ArtistProfileSocialProof } from './ArtistProfileSocialProof';
 import { ArtistProfileSpecWall } from './ArtistProfileSpecWall';
@@ -25,6 +27,7 @@ interface ArtistProfileLandingPageProps {
   readonly specTiles: readonly ArtistProfileFeatureTile[];
   readonly socialProof: ArtistProfileSocialProofData;
   readonly flags: ArtistProfileSectionFlags;
+  readonly payFlowVideoUrl?: string;
 }
 
 export function ArtistProfileLandingPage({
@@ -33,6 +36,7 @@ export function ArtistProfileLandingPage({
   specTiles,
   socialProof,
   flags,
+  payFlowVideoUrl,
 }: Readonly<ArtistProfileLandingPageProps>) {
   if (!flags.FULL_PAGE) {
     return (
@@ -72,7 +76,15 @@ export function ArtistProfileLandingPage({
         />
       </div>
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.monetization}>
-        <ArtistProfileMonetizationSection monetization={copy.monetization} />
+        {FEATURE_FLAGS.SHOW_ARTIST_PROFILE_PAY_FLOW_VIDEO ? (
+          <ArtistProfilePayFlowVideoSection
+            copy={copy.payFlowVideo}
+            monetization={copy.monetization}
+            videoUrl={payFlowVideoUrl}
+          />
+        ) : (
+          <ArtistProfileMonetizationSection monetization={copy.monetization} />
+        )}
       </div>
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.specWall}>
         <ArtistProfileSpecWall specWall={copy.specWall} tiles={specTiles} />

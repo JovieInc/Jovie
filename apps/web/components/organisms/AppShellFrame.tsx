@@ -36,7 +36,10 @@ export const AppShellFrame = memo(function AppShellFrame({
   contentClassName,
   containerClassName,
   isTableRoute = false,
-  variant = 'shellChatV1',
+  // Default to 'legacy' so callers that don't pass `variant` (AppShellSkeleton,
+  // DemoShell, future surfaces) match the current production state. AuthShell
+  // explicitly passes 'shellChatV1' when the SHELL_CHAT_V1 flag is on.
+  variant = 'legacy',
 }: Readonly<AppShellFrameProps>) {
   const isShellChatV1 = variant === 'shellChatV1';
 

@@ -7,6 +7,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
 import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { getAppFlagValue } from '@/lib/flags/server';
 import ChatLoading from './chat/loading';
 import { DashboardShellContent } from './DashboardShellContent';
 import { ReleaseTableSkeleton } from './dashboard/releases/loading';
@@ -42,15 +43,29 @@ export default async function AppShellLayout({
       redirect(buildAppShellSignInUrl(nextUrlHeader));
     }
 
+    // Resolve the shell variant up front so the Suspense fallback skeleton
+    // matches the post-resolve AppShellFrame layout. Without this, flag-on
+    // users would flash a 'legacy' skeleton then snap to the rounded
+    // 'shellChatV1' frame once DashboardShellContent resolves.
+    const shellChatV1 = await getAppFlagValue('SHELL_CHAT_V1', {
+      userId: auth.userId,
+    });
+    const shellVariant = shellChatV1 ? 'shellChatV1' : 'legacy';
+
     let shellFallback: React.ReactNode;
     if (isChatShellRoute(pathname)) {
-      shellFallback = <AppShellSkeleton main={<ChatLoading />} />;
+      shellFallback = (
+        <AppShellSkeleton main={<ChatLoading />} variant={shellVariant} />
+      );
     } else if (isReleasesShellRoute(pathname)) {
       shellFallback = (
-        <AppShellSkeleton main={<ReleaseTableSkeleton showHeader={false} />} />
+        <AppShellSkeleton
+          main={<ReleaseTableSkeleton showHeader={false} />}
+          variant={shellVariant}
+        />
       );
     } else {
-      shellFallback = <AppShellSkeleton />;
+      shellFallback = <AppShellSkeleton variant={shellVariant} />;
     }
 
     // Ban check moved inside DashboardShellContent (runs in parallel with

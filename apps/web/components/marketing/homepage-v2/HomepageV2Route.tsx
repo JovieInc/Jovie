@@ -50,7 +50,6 @@ export function HomepageV2BelowHero() {
       ) : null}
       <HomepageV2Pricing />
       <HomepageV2FinalCta />
-      <HomepageV2FooterLinks />
     </>
   );
 }
@@ -502,7 +501,7 @@ export function HomepageV2Pricing() {
           align='center'
           headline={HOMEPAGE_V2_COPY.pricing.headline}
           className='max-w-[40rem]'
-          headlineClassName='max-w-[10ch]'
+          headlineClassName='mx-auto max-w-[10ch]'
         />
 
         <div className='homepage-pricing-grid'>
@@ -521,73 +520,108 @@ export function HomepageV2Pricing() {
   );
 }
 
+const HOMEPAGE_FINAL_CTA_ARCS = [
+  { radiusX: 70, radiusY: 245 },
+  { radiusX: 130, radiusY: 235 },
+  { radiusX: 195, radiusY: 225 },
+  { radiusX: 265, radiusY: 215 },
+  { radiusX: 340, radiusY: 205 },
+  { radiusX: 420, radiusY: 198 },
+  { radiusX: 505, radiusY: 192 },
+  { radiusX: 590, radiusY: 188 },
+] as const;
+
 export function HomepageV2FinalCta() {
   return (
     <section
       data-testid='homepage-v2-final-cta'
-      className='homepage-story-section homepage-story-final-cta relative overflow-hidden'
+      className='homepage-story-final-cta relative isolate overflow-hidden bg-black'
     >
       <div
         aria-hidden='true'
-        className='pointer-events-none absolute left-1/2 top-1/2 h-[24rem] w-[38rem] -translate-x-1/2 -translate-y-1/2 blur-3xl'
-        style={{
-          background:
-            'radial-gradient(ellipse at center, oklch(18% 0.04 270 / 0.28), transparent 70%)',
-        }}
+        className='homepage-final-cta-glow pointer-events-none absolute inset-0 z-[1]'
       />
-      <MarketingContainer width='page'>
-        <HomepageStoryHeader
-          align='center'
-          headline={HOMEPAGE_V2_COPY.finalCta.headline}
-          className='relative mx-auto max-w-[40rem]'
-          headlineClassName='text-[clamp(2.8rem,5vw,4.55rem)]'
-          headlineTestId='homepage-v2-final-cta-heading'
+      <svg
+        className='homepage-final-cta-rays pointer-events-none absolute inset-x-0 bottom-0 z-[2] w-full'
+        viewBox='0 0 1200 540'
+        preserveAspectRatio='xMidYMax slice'
+        aria-hidden='true'
+      >
+        <defs>
+          <linearGradient
+            id='homepage-final-cta-ray-primary'
+            x1='0'
+            x2='0'
+            y1='0'
+            y2='1'
+          >
+            <stop offset='0%' stopColor='#0070f3' stopOpacity='0' />
+            <stop offset='55%' stopColor='#0070f3' stopOpacity='0.35' />
+            <stop offset='92%' stopColor='#ffffff' stopOpacity='0.95' />
+            <stop offset='100%' stopColor='#ffffff' stopOpacity='0.6' />
+          </linearGradient>
+          <linearGradient
+            id='homepage-final-cta-ray-secondary'
+            x1='0'
+            x2='0'
+            y1='0'
+            y2='1'
+          >
+            <stop offset='0%' stopColor='#0070f3' stopOpacity='0' />
+            <stop offset='70%' stopColor='#0070f3' stopOpacity='0.55' />
+            <stop offset='100%' stopColor='#dbeaff' stopOpacity='0.85' />
+          </linearGradient>
+        </defs>
+        <ellipse
+          cx='600'
+          cy='600'
+          rx='22'
+          ry='260'
+          stroke='url(#homepage-final-cta-ray-secondary)'
+          strokeWidth='2.2'
+          fill='none'
         />
-        <div className='relative mt-8 flex flex-wrap items-center justify-center gap-3'>
+        {HOMEPAGE_FINAL_CTA_ARCS.map((arc, index) => (
+          <ellipse
+            key={`${arc.radiusX}-${arc.radiusY}`}
+            cx='600'
+            cy='600'
+            rx={arc.radiusX}
+            ry={arc.radiusY}
+            stroke={
+              index % 2 === 0
+                ? 'url(#homepage-final-cta-ray-primary)'
+                : 'url(#homepage-final-cta-ray-secondary)'
+            }
+            strokeWidth={index < 4 ? 1.5 : 1.2}
+            fill='none'
+            opacity={1 - index * 0.05}
+          />
+        ))}
+        <rect
+          x='0'
+          y='538'
+          width='1200'
+          height='2'
+          fill='#0070f3'
+          opacity='0.3'
+        />
+      </svg>
+      <MarketingContainer width='page' className='relative z-10'>
+        <div className='homepage-final-cta-copy mx-auto'>
+          <h2
+            data-testid='homepage-v2-final-cta-heading'
+            className='text-balance text-[clamp(2rem,3.4vw,3rem)] font-[680] leading-[1.05] tracking-[-0.025em] text-white'
+          >
+            Start using Jovie <span className='block'>today for free.</span>
+          </h2>
           <Link
             href={APP_ROUTES.SIGNUP}
-            className='public-action-primary'
+            className='homepage-final-cta-action inline-flex h-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.12] px-4 text-[12px] font-medium tracking-[-0.01em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur transition-colors hover:bg-white/[0.16] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
             data-testid='homepage-v2-final-cta-primary'
           >
             {HOMEPAGE_V2_COPY.finalCta.primaryCtaLabel}
           </Link>
-          <Link
-            href={APP_ROUTES.PRICING}
-            className='homepage-story-link px-3 py-2'
-            data-testid='homepage-v2-final-cta-secondary'
-          >
-            {HOMEPAGE_V2_COPY.finalCta.secondaryCtaLabel}
-            <ArrowRight className='h-3.5 w-3.5' strokeWidth={1.9} />
-          </Link>
-        </div>
-      </MarketingContainer>
-    </section>
-  );
-}
-
-export function HomepageV2FooterLinks() {
-  return (
-    <section className='border-t border-white/8 py-10 sm:py-12'>
-      <MarketingContainer width='page'>
-        <div className='grid gap-8 sm:grid-cols-2 lg:grid-cols-4'>
-          {HOMEPAGE_V2_COPY.footerColumns.map(column => (
-            <div key={column.title}>
-              <p className='text-[12px] font-medium tracking-[0.12em] text-tertiary-token'>
-                {column.title}
-              </p>
-              <div className='mt-4 flex flex-col gap-3'>
-                {column.links.map(link => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className='text-[14px] text-secondary-token transition-colors hover:text-primary-token'
-                  >
-                    {link.label}
-                  </Link>
-                ))}
-              </div>
-            </div>
-          ))}
         </div>
       </MarketingContainer>
     </section>
