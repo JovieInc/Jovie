@@ -25,6 +25,17 @@ const getCachedWrappedLink = cache(async (shortId: string) =>
   getWrappedLink(shortId)
 );
 
+const MISSING_LINK_METADATA = {
+  title: 'Not Found',
+  robots: {
+    index: false,
+    follow: false,
+    nocache: true,
+    nosnippet: true,
+    noarchive: true,
+  },
+} satisfies Metadata;
+
 function MissingLinkState() {
   return (
     <StandaloneProductPage width='sm' centered>
@@ -65,12 +76,12 @@ export async function generateMetadata({
   const { id: shortId } = await params;
 
   if (!shortId || shortId.length > 20) {
-    return { title: 'Not Found' };
+    return MISSING_LINK_METADATA;
   }
 
   const wrappedLink = await getCachedWrappedLink(shortId);
   if (!wrappedLink) {
-    return { title: 'Not Found' };
+    return MISSING_LINK_METADATA;
   }
 
   return {
