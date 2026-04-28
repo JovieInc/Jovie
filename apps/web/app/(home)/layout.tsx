@@ -1,6 +1,7 @@
 import './home.css';
 import { SkipToContent } from '@/components/atoms/SkipToContent';
 import { HomeLegalFooter } from '@/components/homepage/HomeLegalFooter';
+import { HomeScrollWatcher } from '@/components/homepage/HomeScrollWatcher';
 import { MarketingHeader } from '@/components/site/MarketingHeader';
 import { APP_ROUTES } from '@/constants/routes';
 
@@ -21,6 +22,7 @@ export default function HomeLayout({
   return (
     <div className='home-viewport dark flex min-h-[100svh] flex-col overflow-x-clip bg-[var(--color-bg-base)] text-primary-token'>
       <SkipToContent />
+      <HomeScrollWatcher />
       <MarketingHeader
         logoSize='sm'
         logoVariant='word'

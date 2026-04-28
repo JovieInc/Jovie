@@ -46,7 +46,7 @@ export const PILLS: readonly HomepagePill[] = [
 
 export const HERO_COPY = {
   eyebrow: 'Meet Jovie',
-  headline: 'Release more music with less work.',
+  headline: 'Drop more music, with less work.',
   subhead: 'Release music faster and grow your audience effortlessly.',
 } as const;
 
