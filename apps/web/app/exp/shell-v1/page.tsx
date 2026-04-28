@@ -123,6 +123,7 @@ import { ChatInput } from '@/components/jovie/components/ChatInput';
 import { ChatMarkdown } from '@/components/jovie/components/ChatMarkdown';
 import { ActivityHoverRow } from '@/components/shell/ActivityHoverRow';
 import { AgentPulse } from '@/components/shell/AgentPulse';
+import { ArtworkThumb } from '@/components/shell/ArtworkThumb';
 import { AssigneeChip } from '@/components/shell/AssigneeChip';
 import { ColumnLabel } from '@/components/shell/ColumnLabel';
 import { ContextMenuOverlay } from '@/components/shell/ContextMenuOverlay';
@@ -8423,56 +8424,6 @@ function _RatingDots({ value }: { value: number }) {
         />
       ))}
     </span>
-  );
-}
-
-// Artwork with a clean placeholder fallback when the image fails to load.
-// Solid surface + first letter of the title — quiet, never looks broken.
-function ArtworkThumb({
-  src,
-  title,
-  size,
-}: {
-  src: string;
-  title: string;
-  size: number;
-}) {
-  // Preload via the Image() constructor so we can detect failures without
-  // attaching onError to a <img> (sidesteps eslint @next/next/no-img-element
-  // and biome's noninteractive-element rules — we never render an <img>).
-  const [loaded, setLoaded] = useState(false);
-  const [errored, setErrored] = useState(false);
-  useEffect(() => {
-    setLoaded(false);
-    setErrored(false);
-    if (typeof window === 'undefined') return;
-    const img = new window.Image();
-    img.onload = () => setLoaded(true);
-    img.onerror = () => setErrored(true);
-    img.src = src;
-    return () => {
-      img.onload = null;
-      img.onerror = null;
-    };
-  }, [src]);
-
-  return (
-    <div
-      className='relative rounded-sm overflow-hidden shrink-0 bg-surface-1 grid place-items-center'
-      style={{ height: size, width: size }}
-    >
-      {loaded && !errored ? (
-        <span
-          aria-hidden='true'
-          className='absolute inset-0 bg-cover bg-center'
-          style={{ backgroundImage: `url(${src})` }}
-        />
-      ) : (
-        <span className='text-[10px] font-caption text-tertiary-token tracking-tight'>
-          {title.trim().charAt(0).toUpperCase() || '·'}
-        </span>
-      )}
-    </div>
   );
 }
 
