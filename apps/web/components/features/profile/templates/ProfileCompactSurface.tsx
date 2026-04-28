@@ -16,6 +16,7 @@ import Link from 'next/link';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
+import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
 import type {
   ProfileMode,
@@ -226,6 +227,7 @@ export function ProfileCompactSurface({
   },
   dataTestId,
   hideMoreMenu = false,
+  headerSocialLinksOverride,
 }: Readonly<ProfileCompactSurfaceProps>) {
   const [notificationsPortalContainer, setNotificationsPortalContainer] =
     useState<HTMLDivElement | null>(null);
@@ -291,6 +293,9 @@ export function ProfileCompactSurface({
     ]
   );
   const heroImageUrl = surfaceState.heroImageUrl;
+  const visibleSocialLinks = headerSocialLinksOverride
+    ? [...headerSocialLinksOverride]
+    : surfaceState.visibleSocialLinks;
   const shareContext = useMemo(
     () =>
       buildProfileShareContext({
@@ -395,20 +400,48 @@ export function ProfileCompactSurface({
                 <ChevronLeft className='h-5 w-5' />
               </CircleIconButton>
 
-              {!hideMoreMenu ? (
-                <CircleIconButton
-                  onClick={onOpenMenu}
-                  size='lg'
-                  variant='pearl'
-                  className={cn(
-                    topChromeButtonClassName,
-                    drawerOpen && 'bg-black/60'
-                  )}
-                  ariaLabel='More options'
-                  aria-haspopup='dialog'
+              {visibleSocialLinks.length > 0 || !hideMoreMenu ? (
+                <div
+                  className='flex items-center gap-2'
+                  data-testid='profile-hero-social-row'
                 >
-                  <MoreHorizontal className='h-5 w-5' />
-                </CircleIconButton>
+                  {visibleSocialLinks.map(link =>
+                    link.platform && link.url ? (
+                      <a
+                        key={link.id}
+                        href={link.url}
+                        target='_blank'
+                        rel='noopener noreferrer'
+                        className={cn(
+                          topChromeButtonClassName,
+                          'inline-flex h-12! w-12! items-center justify-center rounded-full'
+                        )}
+                        aria-label={link.platform}
+                      >
+                        <SocialIcon
+                          platform={link.platform}
+                          className='h-[18px] w-[18px]'
+                        />
+                      </a>
+                    ) : null
+                  )}
+
+                  {!hideMoreMenu ? (
+                    <CircleIconButton
+                      onClick={onOpenMenu}
+                      size='lg'
+                      variant='pearl'
+                      className={cn(
+                        topChromeButtonClassName,
+                        drawerOpen && 'bg-black/60'
+                      )}
+                      ariaLabel='More options'
+                      aria-haspopup='dialog'
+                    >
+                      <MoreHorizontal className='h-5 w-5' />
+                    </CircleIconButton>
+                  ) : null}
+                </div>
               ) : null}
             </div>
 
