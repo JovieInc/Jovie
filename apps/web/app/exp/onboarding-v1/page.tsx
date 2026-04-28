@@ -129,7 +129,6 @@ export default function OnboardingC() {
   }
 
   // Initial Jovie greeting.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: one-shot init
   useEffect(() => {
     sendJovie([
       "Hey. I'm Jovie — I'll help you set up your home and figure out the best way I can help you this quarter.",
