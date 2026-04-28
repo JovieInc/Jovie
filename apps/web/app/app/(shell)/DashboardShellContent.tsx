@@ -23,6 +23,12 @@ import {
   shouldUseEssentialShellData,
 } from './shell-route-matches';
 
+// Essential-shell routes only need SHELL_CHAT_V1 evaluated server-side for
+// the AuthShell variant decision. All other app flags are intentionally
+// pinned to APP_FLAG_DEFAULTS here — they aren't read by the essential-shell
+// fast path. Client-side AppFlagProvider takes over for non-essential flags
+// once the page hydrates. New flags added to APP_FLAG_DEFAULTS will appear
+// pinned on this path until they're explicitly fetched here.
 async function getEssentialShellFlagsSnapshot(
   userId: string
 ): Promise<AppFlagSnapshot> {
