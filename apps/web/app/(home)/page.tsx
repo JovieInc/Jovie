@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
 import { HomepageHeroMockupCarousel } from '@/components/homepage/HomepageHeroCarousel';
+import { HomepageOutcomeCards } from '@/components/homepage/HomepageOutcomeCards';
 import { HERO_COPY } from '@/components/homepage/intent';
-import { ArtistProfileOutcomeDuo } from '@/components/marketing/artist-profile/ArtistProfileOutcomeDuo';
 import {
   HomepageV2FinalCta,
   HomepageV2Pricing,
@@ -220,9 +220,9 @@ export default function HomePage() {
         </div>
       </section>
       <div className='homepage-story-stack'>
-        <ArtistProfileOutcomeDuo
+        <HomepageOutcomeCards
           headline={ARTIST_PROFILE_COPY.outcomeDuo.homepageHeadline}
-          duo={ARTIST_PROFILE_COPY.outcomeDuo}
+          outcomes={ARTIST_PROFILE_COPY.outcomes}
         />
         {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_PRICING ? <HomepageV2Pricing /> : null}
         {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_FINAL_CTA ? (

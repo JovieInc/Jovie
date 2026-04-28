@@ -558,24 +558,24 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     cards: [
       {
         id: 'drive-streams',
-        title: 'Drive streams',
+        title: 'Drive Streams',
         description:
           'Put the latest release, pre-save, or countdown at the front of the profile.',
       },
       {
         id: 'sell-out',
-        title: 'Sell out',
+        title: 'Sell Out',
         description:
           'Surface the right show moment with saved dates, nearby venues, and ticket intent.',
       },
       {
         id: 'get-paid',
-        title: 'Get paid',
+        title: 'Get Paid',
         description: 'Make direct support feel native to the artist profile.',
       },
       {
         id: 'share-anywhere',
-        title: 'Share anywhere',
+        title: 'Share Anywhere',
         description:
           'Use one clean profile link across bio, QR, posts, stories, and shows.',
       },

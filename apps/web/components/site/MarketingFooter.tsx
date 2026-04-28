@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
-import { SUPPORT_EMAIL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
 import { cn } from '@/lib/utils';
 
@@ -48,14 +47,6 @@ const FOOTER_COLUMNS: readonly {
       { href: APP_ROUTES.DEMO, label: 'Demo' },
     ],
   },
-  {
-    title: 'Connect',
-    links: [
-      { href: `mailto:${SUPPORT_EMAIL}`, label: 'Contact' },
-      { href: 'https://instagram.com/meetjovie', label: 'Instagram' },
-      { href: 'https://x.com/meetjovie', label: 'X' },
-    ],
-  },
 ] as const;
 
 const footerLinkClassName =
@@ -97,7 +88,7 @@ export function MarketingFooter({
           </div>
 
           <nav
-            className='grid grid-cols-2 gap-x-10 gap-y-8 sm:grid-cols-3 lg:grid-cols-5 lg:gap-x-12 xl:gap-x-16'
+            className='grid grid-cols-2 gap-x-10 gap-y-8 sm:grid-cols-4 lg:gap-x-14 xl:gap-x-20'
             aria-label='Footer'
           >
             {FOOTER_COLUMNS.map(column => (

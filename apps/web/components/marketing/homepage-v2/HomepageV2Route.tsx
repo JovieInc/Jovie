@@ -501,7 +501,7 @@ export function HomepageV2Pricing() {
           align='center'
           headline={HOMEPAGE_V2_COPY.pricing.headline}
           className='max-w-[40rem]'
-          headlineClassName='max-w-[10ch]'
+          headlineClassName='mx-auto max-w-[10ch]'
         />
 
         <div className='homepage-pricing-grid'>
@@ -613,9 +613,7 @@ export function HomepageV2FinalCta() {
             data-testid='homepage-v2-final-cta-heading'
             className='text-balance text-[clamp(2.1rem,3.9vw,3.25rem)] font-semibold leading-[0.98] tracking-[-0.052em] text-white'
           >
-            Start using Jovie
-            <br />
-            today for free.
+            Start using Jovie <span className='block'>today for free.</span>
           </h2>
           <Link
             href={APP_ROUTES.SIGNUP}
