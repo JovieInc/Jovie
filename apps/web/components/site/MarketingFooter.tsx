@@ -71,8 +71,8 @@ export function MarketingFooter({ className }: Readonly<MarketingFooterProps>) {
         className
       )}
     >
-      <div className='relative mx-auto w-full max-w-[1180px] px-5 py-[clamp(3rem,6vw,4.8rem)] pb-[clamp(6.75rem,12vw,10.5rem)] sm:px-6 lg:px-0'>
-        <div className='grid gap-[clamp(3rem,6vw,5.2rem)] lg:grid-cols-[minmax(5rem,0.62fr)_minmax(0,3.6fr)]'>
+      <div className='relative mx-auto w-full max-w-[1180px] px-5 py-[clamp(2.8rem,5vw,4.1rem)] pb-[clamp(5.7rem,10vw,8.4rem)] sm:px-6 lg:px-0'>
+        <div className='grid gap-10 md:grid-cols-[4.5rem_minmax(0,1fr)] md:gap-12 xl:gap-16'>
           <div className='min-w-0'>
             <Link
               href={APP_ROUTES.HOME}
@@ -85,7 +85,7 @@ export function MarketingFooter({ className }: Readonly<MarketingFooterProps>) {
           </div>
 
           <nav
-            className='grid grid-cols-2 gap-x-9 gap-y-9 sm:grid-cols-3 lg:grid-cols-5 lg:gap-x-[clamp(2rem,4.2vw,4.4rem)]'
+            className='grid grid-cols-2 gap-x-9 gap-y-9 sm:grid-cols-3 md:grid-cols-5 md:gap-x-8 lg:gap-x-10 xl:gap-x-14'
             aria-label='Footer'
           >
             {FOOTER_COLUMNS.map(column => (
@@ -111,7 +111,7 @@ export function MarketingFooter({ className }: Readonly<MarketingFooterProps>) {
           </nav>
         </div>
 
-        <div className='mt-[clamp(4.7rem,8vw,7rem)] flex flex-wrap items-center gap-x-7 gap-y-2 text-[12px] leading-5 tracking-[-0.01em] text-white/[0.34]'>
+        <div className='mt-[clamp(3.8rem,7vw,6rem)] flex flex-wrap items-center gap-x-7 gap-y-2 text-[12px] leading-5 tracking-[-0.01em] text-white/[0.34]'>
           <span>© {new Date().getFullYear()} Jovie Technology Inc.</span>
           <nav aria-label='Legal' className='flex flex-wrap items-center gap-4'>
             <Link

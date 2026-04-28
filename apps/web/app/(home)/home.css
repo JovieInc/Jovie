@@ -610,14 +610,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-story-final-cta {
-  padding-top: clamp(5rem, 8vw, 7rem);
-  padding-bottom: clamp(5.1rem, 8vw, 7.2rem);
-}
-
-.homepage-final-cta-bg {
-  opacity: 0.82;
-  object-position: center center;
-  filter: saturate(1.04) contrast(1.04);
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 /* Entrance animation for the chat intake island */
@@ -752,10 +746,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   .homepage-split-column,
   .homepage-pricing-card {
     padding: 1.35rem;
-  }
-
-  .homepage-final-cta-bg {
-    object-position: center bottom;
   }
 }
 

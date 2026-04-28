@@ -240,6 +240,13 @@ export interface ArtistProfileLandingCopy {
       ];
     };
   };
+  readonly payFlowVideo: {
+    readonly headline: string;
+    readonly subhead: string;
+    readonly ariaLabel: string;
+    readonly posterAlt: string;
+    readonly playLabel: string;
+  };
   readonly capture: {
     readonly headline: string;
     readonly subhead: string;
@@ -783,6 +790,15 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         },
       ],
     },
+  },
+  payFlowVideo: {
+    headline: 'One scan. A fan for life.',
+    subhead: 'Watch a $10 sidewalk tip turn into a fan you can reach again.',
+    ariaLabel:
+      'Short looping video of a fan scanning an artist QR code, paying $10 with Apple Pay, and the artist receiving a thank-you notification.',
+    posterAlt:
+      'Artist profile open on an iPhone, ready for a fan to send a tip.',
+    playLabel: 'Play pay flow',
   },
   capture: {
     headline: 'Build the list. Keep it working.',

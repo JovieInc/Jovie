@@ -65,6 +65,7 @@ export function ArtistProfileLandingRoute() {
         specTiles={ARTIST_PROFILE_SPEC_TILES}
         socialProof={ARTIST_PROFILE_SOCIAL_PROOF}
         flags={ARTIST_PROFILE_FLAGS}
+        payFlowVideoUrl={process.env.ARTIST_PROFILES_PAY_FLOW_VIDEO_URL}
       />
     </MarketingPageShell>
   );

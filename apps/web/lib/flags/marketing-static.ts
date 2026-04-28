@@ -22,6 +22,7 @@ export const FEATURE_FLAGS = {
   SHOW_HOMEPAGE_V2_PRICING: true,
   SHOW_HOMEPAGE_V2_FINAL_CTA: true,
   SHOW_HOMEPAGE_V2_FOOTER_LINKS: false,
+  SHOW_ARTIST_PROFILE_PAY_FLOW_VIDEO: true,
 } as const;
 
 export type MarketingStaticFlagName = keyof typeof FEATURE_FLAGS;
