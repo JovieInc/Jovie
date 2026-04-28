@@ -2371,7 +2371,7 @@ export default function ShellV1Experiment() {
                     }}
                   />
                 ) : view === 'demo' ? (
-                  <DemoContent />
+                  <DashboardHome />
                 ) : view === 'releases' ? (
                   subview === 'tracks' ? (
                     // View-builder: under the Releases shell, switching to
@@ -3879,10 +3879,6 @@ const SUGGESTIONS: JovieSuggestion[] = [
     rank: 4,
   },
 ];
-
-function DemoContent() {
-  return <DashboardHome />;
-}
 
 function DashboardHome() {
   const [index, setIndex] = useState(0);
