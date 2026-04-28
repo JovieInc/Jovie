@@ -19,6 +19,11 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - **Outcome cards shrunk** ~30% via `flex-basis` reductions. Card titles dropped to clamp(2rem,3vw,3rem) / weight 680 / -0.025em.
 - **Trust band label visible.** "Trusted by artists on" now renders above the logo strip (was sr-only).
 - **Animated electric beam** in the hero: four cyan-blue verticals with an 8s pulse and slight Y drift, mix-blend-mode screen, prefers-reduced-motion respected.
+- **Outcome card titles** drop from 43.2px → 24-28px (clamp(1.5rem, 2vw, 1.75rem)) so the rail stops competing with the H2 above it; H2/H3 step restored.
+- **Final-CTA H2** aligned to the system scale: clamp(2rem, 3.4vw, 3rem) / weight 680 / line-height 1.05 / tracking -0.025em (was 52px / 590 — off-system).
+- **Vestigial mockup top chrome bar removed** after the traffic lights were dropped. Every side now gets equal 7px chrome with the same glass tint.
+- **Final-CTA primary button copy:** "Start Free Trial" → "Claim my workspace" so the same label doesn't repeat in header, hero, pricing, and footer-CTA.
+- **DESIGN.md blesses the homepage hero Satoshi exception** inside System B (Inter-only) so future contributors know the deviation is intentional.
 
 ### Added
 
