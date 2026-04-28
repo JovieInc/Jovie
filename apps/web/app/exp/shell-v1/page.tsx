@@ -125,8 +125,10 @@ import { ChatInput } from '@/components/jovie/components/ChatInput';
 import { ChatMarkdown } from '@/components/jovie/components/ChatMarkdown';
 import { ActivityHoverRow } from '@/components/shell/ActivityHoverRow';
 import { AgentPulse } from '@/components/shell/AgentPulse';
+import { ColumnLabel } from '@/components/shell/ColumnLabel';
 import { ContextMenuOverlay } from '@/components/shell/ContextMenuOverlay';
 import { DictationWaveform } from '@/components/shell/DictationWaveform';
+import { DropDateChip } from '@/components/shell/DropDateChip';
 import { DueChip } from '@/components/shell/DueChip';
 import { EntityHoverLink } from '@/components/shell/EntityPopover';
 import { IconBtn } from '@/components/shell/IconBtn';
@@ -147,6 +149,7 @@ import { Stat } from '@/components/shell/Stat';
 import { ThreadCardIconBtn } from '@/components/shell/ThreadCardIconBtn';
 import { ThreadTurn } from '@/components/shell/ThreadTurn';
 import { Tooltip } from '@/components/shell/Tooltip';
+import { TypeBadge } from '@/components/shell/TypeBadge';
 // ---------------------------------------------------------------------------
 // DESIGN RULE — NO AI-SLOP GRADIENTS ON UI CHROME
 // ---------------------------------------------------------------------------
@@ -5364,7 +5367,7 @@ function ReleaseCard({
             >
               {release.title}
             </span>
-            <TypeBadge type={release.type} />
+            <TypeBadge label={release.type} />
           </span>
           <span className='text-[11.5px] text-tertiary-token truncate mt-0.5'>
             {release.artist} · {release.album}
@@ -7679,7 +7682,7 @@ function ReleaseRow({
           <span className='truncate text-[13px] font-caption leading-tight tracking-[-0.01em] text-primary-token'>
             {release.title}
           </span>
-          <TypeBadge type={release.type} />
+          <TypeBadge label={release.type} />
         </div>
         <div className='truncate text-[11.5px] text-tertiary-token leading-tight mt-0.5'>
           <button
@@ -7806,19 +7809,6 @@ function ReleaseRowMoreMenu({ release }: { release: Release }) {
         <ShellDropdown.Item icon={Archive} label='Archive' tone='danger' />
       </ShellDropdown>
     </div>
-  );
-}
-
-function TypeBadge({ type }: { type: ReleaseType }) {
-  return (
-    <span
-      className={cn(
-        'shrink-0 inline-flex items-center h-[16px] px-1.5 rounded text-[9.5px] font-medium uppercase tracking-[0.06em]',
-        'border border-(--linear-app-shell-border) text-tertiary-token bg-surface-1/40'
-      )}
-    >
-      {type}
-    </span>
   );
 }
 
@@ -8558,12 +8548,8 @@ function DrawerHero({
             </EntityHoverLink>
           </p>
           <div className='mt-2 flex items-center gap-1.5 flex-wrap'>
-            <TypeBadge type={release.type} />
-            <DropDateChip
-              date={release.releaseDate}
-              tone={dropMeta.tone}
-              label={dropMeta.label}
-            />
+            <TypeBadge label={release.type} />
+            <DropDateChip tone={dropMeta.tone} label={dropMeta.label} />
           </div>
         </div>
       </div>
@@ -8593,38 +8579,6 @@ function relativeDropMeta(iso: string): {
     label: `Drops ${new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`,
     tone: 'future',
   };
-}
-
-function DropDateChip({
-  date: _date,
-  tone,
-  label,
-}: {
-  date: string;
-  tone: 'past' | 'soon' | 'future';
-  label: string;
-}) {
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1.5 h-[18px] pl-1.5 pr-2 rounded border text-[10px] font-caption uppercase tracking-[0.06em] whitespace-nowrap',
-        tone === 'soon'
-          ? 'border-cyan-300/40 bg-cyan-500/10 text-cyan-200/90'
-          : tone === 'past'
-            ? 'border-(--linear-app-shell-border)/70 bg-(--surface-1)/40 text-tertiary-token'
-            : 'border-(--linear-app-shell-border)/70 bg-(--surface-1)/40 text-tertiary-token'
-      )}
-    >
-      <Calendar
-        className={cn(
-          'h-2.5 w-2.5 shrink-0',
-          tone === 'soon' ? 'text-cyan-300/80' : 'text-quaternary-token'
-        )}
-        strokeWidth={2.25}
-      />
-      <span>{label}</span>
-    </span>
-  );
 }
 
 // Cross-fade between the rest icon and a confirmation glyph. Uses
@@ -9675,6 +9629,7 @@ function TracksView({
             sortBy={sortBy}
             sortDir={sortDir}
             onSort={toggleSort}
+            defaultField='index'
           />
           <span className='w-7 shrink-0' />
           <ColumnLabel
@@ -9685,6 +9640,7 @@ function TracksView({
             sortBy={sortBy}
             sortDir={sortDir}
             onSort={toggleSort}
+            defaultField='index'
           />
           <ColumnLabel
             field='bpm'
@@ -9694,6 +9650,7 @@ function TracksView({
             sortBy={sortBy}
             sortDir={sortDir}
             onSort={toggleSort}
+            defaultField='index'
           />
           <button
             type='button'
@@ -10139,64 +10096,6 @@ function sortValue(
     case 'rating':
       return t.rating;
   }
-}
-
-function ColumnLabel({
-  field,
-  label,
-  width,
-  flex,
-  align,
-  sortBy,
-  sortDir,
-  onSort,
-}: {
-  field: SortField;
-  label: string;
-  width?: string;
-  flex?: boolean;
-  align: 'left' | 'right';
-  sortBy: SortField;
-  sortDir: 'asc' | 'desc';
-  onSort: (field: SortField) => void;
-}) {
-  // 'index' is the natural default ordering — don't paint it as a user-
-  // chosen sort. Cyan only appears when the user has explicitly picked a
-  // column to sort by.
-  const active = sortBy === field && field !== 'index';
-  return (
-    <button
-      type='button'
-      onClick={() => onSort(field)}
-      className={cn(
-        'group/col h-6 px-1 -mx-1 rounded-md text-[9.5px] uppercase tracking-[0.12em] font-medium transition-colors duration-150 ease-out',
-        flex ? 'flex-1 min-w-0' : (width ?? ''),
-        'shrink-0 inline-flex items-center gap-1',
-        align === 'right' && 'flex-row-reverse',
-        active
-          ? 'text-cyan-300/90'
-          : 'text-quaternary-token/85 hover:text-secondary-token'
-      )}
-    >
-      <span>{label}</span>
-      <span
-        className={cn(
-          'inline-flex items-center transition-opacity duration-150 ease-out',
-          active ? 'opacity-100' : 'opacity-0 group-hover/col:opacity-60'
-        )}
-      >
-        {active ? (
-          sortDir === 'asc' ? (
-            <ArrowUp className='h-2.5 w-2.5' strokeWidth={2.5} />
-          ) : (
-            <ArrowDown className='h-2.5 w-2.5' strokeWidth={2.5} />
-          )
-        ) : (
-          <ArrowUpDown className='h-2.5 w-2.5' strokeWidth={2.25} />
-        )}
-      </span>
-    </button>
-  );
 }
 
 // ---------------------------------------------------------------------------
