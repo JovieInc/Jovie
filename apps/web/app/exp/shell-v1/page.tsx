@@ -130,6 +130,7 @@ import { ArtworkPlayOverlay } from '@/components/shell/ArtworkPlayOverlay';
 import { AssigneeChip } from '@/components/shell/AssigneeChip';
 import { ColumnLabel } from '@/components/shell/ColumnLabel';
 import { ContextMenuOverlay } from '@/components/shell/ContextMenuOverlay';
+import { CuesPanel } from '@/components/shell/CuesPanel';
 import { DictationWaveform } from '@/components/shell/DictationWaveform';
 import { DrawerTabStrip } from '@/components/shell/DrawerTabStrip';
 import { DropDateChip } from '@/components/shell/DropDateChip';
@@ -139,6 +140,7 @@ import { EntityThreadGlyph } from '@/components/shell/EntityThreadGlyph';
 import { IconBtn } from '@/components/shell/IconBtn';
 import { InlineEditRow } from '@/components/shell/InlineEditRow';
 import { LabelPills } from '@/components/shell/LabelPills';
+import { LyricsList } from '@/components/shell/LyricsList';
 import { MetaPill } from '@/components/shell/MetaPill';
 import { PickerAction } from '@/components/shell/PickerAction';
 import { PickerLink } from '@/components/shell/PickerLink';
@@ -8233,51 +8235,21 @@ function DrawerOverviewTab({ release }: { release: Release }) {
 // Lyrics tab — tracks-only. Mock content for the design pass; production
 // pulls from the lyrics service. Shows the lyric text with cue-aligned
 // timestamps; clicking a line will seek (wired the same as Cues).
+const MOCK_DRAWER_LYRICS: readonly { at: number; text: string }[] = [
+  { at: 6, text: 'Walking through the static of a city that forgets' },
+  { at: 14, text: 'Every name it whispered, every promise that it kept' },
+  { at: 26, text: 'I was lost in the light' },
+  { at: 30, text: 'Found a quiet in the noise' },
+  { at: 38, text: 'Something steady in the wreckage of the choice' },
+  { at: 52, text: 'Lost in the light, lost in the light' },
+  { at: 62, text: 'Holding on tight, holding on tight' },
+  { at: 73, text: 'You said the world is what you build it' },
+  { at: 81, text: 'I said the world is what you let go' },
+  { at: 88, text: 'Both of us were right' },
+];
+
 function DrawerLyricsTab({ release: _release }: { release: Release }) {
-  // Mock lyrics — release-agnostic for the design pass.
-  const lines = [
-    { at: 6, text: 'Walking through the static of a city that forgets' },
-    { at: 14, text: 'Every name it whispered, every promise that it kept' },
-    { at: 26, text: 'I was lost in the light' },
-    { at: 30, text: 'Found a quiet in the noise' },
-    { at: 38, text: 'Something steady in the wreckage of the choice' },
-    { at: 52, text: 'Lost in the light, lost in the light' },
-    { at: 62, text: 'Holding on tight, holding on tight' },
-    { at: 73, text: 'You said the world is what you build it' },
-    { at: 81, text: 'I said the world is what you let go' },
-    { at: 88, text: 'Both of us were right' },
-  ];
-  return (
-    <div className='px-4 py-4'>
-      <div className='flex items-center justify-between pb-2'>
-        <p className='text-[10px] uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
-          Lyrics
-        </p>
-        <button
-          type='button'
-          className='text-[10.5px] uppercase tracking-[0.06em] text-quaternary-token hover:text-primary-token transition-colors duration-150 ease-out'
-        >
-          Edit
-        </button>
-      </div>
-      <ol className='flex flex-col -mx-2'>
-        {lines.map(line => (
-          <li key={line.at}>
-            <button
-              type='button'
-              className='group/lyric w-full flex items-start gap-2 px-2 py-1.5 rounded-md text-[12.5px] text-secondary-token hover:bg-surface-1/40 hover:text-primary-token transition-colors duration-150 ease-out text-left'
-            >
-              <span className='shrink-0 w-9 pt-0.5 text-[10.5px] tabular-nums text-quaternary-token group-hover/lyric:text-tertiary-token transition-colors duration-150 ease-out'>
-                {Math.floor(line.at / 60)}:
-                {String(line.at % 60).padStart(2, '0')}
-              </span>
-              <span className='flex-1 leading-snug'>{line.text}</span>
-            </button>
-          </li>
-        ))}
-      </ol>
-    </div>
-  );
+  return <LyricsList lines={MOCK_DRAWER_LYRICS} onEdit={() => undefined} />;
 }
 
 type RangeKey = '24h' | '7d' | '30d' | '90d' | 'YTD';
@@ -8785,62 +8757,12 @@ function DrawerCues({
   release: Release;
   onSeek?: (id: string, sec: number) => void;
 }) {
-  const total = release.durationSec;
   return (
-    <div className='px-4 py-4'>
-      <div className='flex items-center justify-between pb-2'>
-        <p className='text-[10px] uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
-          Cues
-        </p>
-        <span className='text-[10.5px] tabular-nums text-tertiary-token'>
-          {release.cues.length}
-        </span>
-      </div>
-      {/* Mini timeline ribbon — cues plot against duration. */}
-      <div className='relative h-1 rounded-full bg-(--surface-2)'>
-        {release.cues.map(c => {
-          const pct = (c.at / total) * 100;
-          return (
-            <span
-              key={c.at}
-              aria-hidden='true'
-              className='absolute top-1/2 -translate-y-1/2 h-2 w-0.5 rounded-full bg-cyan-300/60'
-              style={{ left: `${pct}%` }}
-            />
-          );
-        })}
-      </div>
-      <ul className='mt-3 flex flex-col -mx-2'>
-        {release.cues.map(c => (
-          <li key={c.at}>
-            <button
-              type='button'
-              onClick={() => onSeek?.(release.id, c.at)}
-              className='group/cue w-full flex items-center gap-2 h-8 px-2 rounded-md text-[12.5px] text-secondary-token hover:bg-surface-1/40 hover:text-primary-token transition-colors duration-150 ease-out'
-            >
-              {/* Hover-play affordance — replaces the timestamp on hover
-                  so the row reads like a track in a playlist. */}
-              <span className='relative w-9 shrink-0'>
-                <span className='absolute inset-0 grid place-items-start tabular-nums text-[10.5px] text-quaternary-token opacity-100 group-hover/cue:opacity-0 transition-opacity duration-150 ease-out'>
-                  {Math.floor(c.at / 60)}:{String(c.at % 60).padStart(2, '0')}
-                </span>
-                <span className='absolute inset-0 grid place-items-center text-primary-token opacity-0 group-hover/cue:opacity-100 transition-opacity duration-150 ease-out'>
-                  <Play
-                    className='h-3 w-3 translate-x-px'
-                    strokeWidth={2.5}
-                    fill='currentColor'
-                  />
-                </span>
-              </span>
-              <span className='flex-1 text-left truncate'>{c.label}</span>
-              <span className='text-[10px] uppercase tracking-[0.06em] text-quaternary-token capitalize'>
-                {c.kind}
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
-    </div>
+    <CuesPanel
+      cues={release.cues}
+      durationSec={release.durationSec}
+      onSeek={onSeek ? sec => onSeek(release.id, sec) : undefined}
+    />
   );
 }
 
