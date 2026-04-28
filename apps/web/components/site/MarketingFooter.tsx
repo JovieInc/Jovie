@@ -69,10 +69,10 @@ export function MarketingFooter({
     >
       <div
         className={cn(
-          'relative mx-auto w-full max-w-[1180px] px-6 sm:px-8 xl:px-0',
+          'marketing-footer-inner relative w-full px-[clamp(1.25rem,2.2vw,2rem)]',
           isMinimal
             ? 'py-[clamp(2.6rem,5vw,4rem)]'
-            : 'pt-[clamp(3.25rem,5vw,4.6rem)] pb-[clamp(7.25rem,12vw,10.5rem)]'
+            : 'pt-[clamp(3.25rem,5vw,4.6rem)] pb-[clamp(5rem,8vw,7rem)]'
         )}
       >
         <div className='grid gap-12 md:grid-cols-[3.5rem_minmax(0,1fr)] md:gap-14 xl:gap-16'>
@@ -116,12 +116,12 @@ export function MarketingFooter({
 
         <div
           className={cn(
-            'flex flex-wrap items-center gap-x-7 gap-y-2 text-[12px] leading-5 tracking-[-0.01em] text-white/[0.32]',
-            isMinimal ? 'mt-8' : 'mt-[clamp(4.7rem,8vw,7.25rem)]'
+            'flex flex-wrap items-center justify-between gap-x-7 gap-y-2 text-[12px] leading-5 tracking-[-0.01em] text-white/[0.32]',
+            isMinimal ? 'mt-8' : 'mt-[clamp(3.5rem,6vw,5rem)]'
           )}
         >
           <span>© {new Date().getFullYear()} Jovie Technology Inc.</span>
-          <nav aria-label='Legal' className='flex flex-wrap items-center gap-4'>
+          <nav aria-label='Legal' className='flex flex-wrap items-center gap-5'>
             <Link
               href={APP_ROUTES.LEGAL_PRIVACY}
               prefetch={false}
