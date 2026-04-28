@@ -20,14 +20,6 @@ const PROFILE_ACCENT_RETRY_POLICY = {
   jitterRatio: 0.2,
 } as const;
 
-interface SharpStatsLike {
-  dominant?: {
-    r?: number;
-    g?: number;
-    b?: number;
-  };
-}
-
 function isRetryableAccentError(error: unknown): boolean {
   const message =
     error instanceof Error
@@ -109,7 +101,7 @@ export async function deriveProfileAccentThemeFromBuffer(params: {
   sourceUrl: string;
 }): Promise<ProfileAccentTheme | null> {
   const sharp = await getSharp();
-  const stats = (await withTimeout(
+  const stats = await withTimeout(
     sharp(params.buffer, { failOnError: false })
       .rotate()
       .withMetadata({ orientation: undefined })
@@ -120,7 +112,7 @@ export async function deriveProfileAccentThemeFromBuffer(params: {
       timeoutMs: PROFILE_ACCENT_DOWNLOAD_TIMEOUT_MS,
       context: 'Profile accent extraction',
     }
-  )) as SharpStatsLike;
+  );
 
   const dominant = stats.dominant;
   const primaryHex =
