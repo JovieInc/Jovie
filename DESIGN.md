@@ -49,6 +49,14 @@ CSS variables: `--font-satoshi`, `--font-dm-sans` (set by `next/font/local`). Sc
 
 **Font:** Inter Variable (self-hosted, weight range 100–900)
 
+**Hero exception (homepage `(home)/*`):** the homepage hero H1 uses **Satoshi
+Variable** at 80px / weight 600 / letter-spacing -0.045em. Satoshi is loaded
+globally in `app/layout.tsx` so the variable resolves outside the marketing
+wrapper. Everything else on the homepage (subhead, CTAs, body, section
+headings) stays Inter. This deviation is approved as of 2026-04-28 — the
+hero needed a wider, heavier display character to match the Frame.io-inspired
+poster composition; Inter at 80px reads narrow and tech-y in this context.
+
 ### Font Weights
 
 | Name | Value | Usage |
