@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
+import { useAppFlag } from '@/lib/flags/client';
 import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
 import { primaryProviderKeys, providerConfig } from './config';
 import { ReleaseTableSkeleton } from './loading';
@@ -12,6 +13,16 @@ const ReleasesExperience = dynamic(
     import('@/features/dashboard/organisms/release-provider-matrix').then(
       mod => mod.ReleasesExperience
     ),
+  {
+    loading: () => <ReleaseTableSkeleton showHeader={false} />,
+  }
+);
+
+const ShellReleasesView = dynamic(
+  () =>
+    import(
+      '@/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView'
+    ).then(mod => mod.ShellReleasesView),
   {
     loading: () => <ReleaseTableSkeleton showHeader={false} />,
   }
@@ -29,6 +40,7 @@ const ReleasesExperience = dynamic(
 export function ReleasesPageClient() {
   const { selectedProfile } = useDashboardData();
   const profileId = selectedProfile?.id ?? '';
+  const shellChatV1Enabled = useAppFlag('SHELL_CHAT_V1');
 
   const { data: releases, isLoading, isError } = useReleasesQuery(profileId);
 
@@ -61,6 +73,10 @@ export function ReleasesPageClient() {
     return (
       <PageErrorState message='Failed to load releases data. Please refresh the page.' />
     );
+  }
+
+  if (shellChatV1Enabled) {
+    return <ShellReleasesView releases={releases ?? []} />;
   }
 
   return (
