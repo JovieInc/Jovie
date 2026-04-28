@@ -43,6 +43,7 @@ import { useAppFlag } from '@/lib/flags/client';
 import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
 import { cn } from '@/lib/utils';
 import { ProfileSwitcher } from './ProfileSwitcher';
+import { SidebarBottomNowPlayingBridge } from './SidebarBottomNowPlayingBridge';
 
 export interface UnifiedSidebarProps {
   readonly section: 'admin' | 'dashboard' | 'settings';
@@ -374,6 +375,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
 
       {isInSettings ? null : (
         <div className='mt-auto shrink-0'>
+          <SidebarBottomNowPlayingBridge />
           {isDemoRoute ? null : <SidebarUpgradeBanner />}
           <SidebarInstallBanner />
 
