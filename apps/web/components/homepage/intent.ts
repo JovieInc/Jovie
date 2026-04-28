@@ -45,9 +45,9 @@ export const PILLS: readonly HomepagePill[] = [
 ] as const;
 
 export const HERO_COPY = {
-  headline: 'Release more music with less work.',
-  subhead:
-    'Plan releases, create assets, pitch playlists, and promote every drop from one AI workspace.',
+  eyebrow: 'Meet Jovie',
+  headline: 'Drop more music, with less work.',
+  subhead: 'Release music faster and grow your audience effortlessly.',
 } as const;
 
 export interface HomepageIntent {

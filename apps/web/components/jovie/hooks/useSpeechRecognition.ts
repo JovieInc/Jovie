@@ -78,6 +78,12 @@ export function useSpeechRecognition({
   lang = 'en-US',
 }: UseSpeechRecognitionOptions): UseSpeechRecognitionReturn {
   const [isListening, setIsListening] = useState(false);
+  // Start as false so SSR and the first client render agree, then flip to
+  // the real value after mount. Otherwise the chat composer renders
+  // <ComposerMicButton> on the client but not the server, which swaps the
+  // hydrated <button> slot at the trailing edge of the input row and
+  // tears the entire send-button subtree (Radix Tooltip + Mic icon).
+  const [isSupported, setIsSupported] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const onTranscriptRef = useRef(onTranscript);
   const browserWindow = globalThis.window ?? undefined;
@@ -85,10 +91,12 @@ export function useSpeechRecognition({
     onTranscriptRef.current = onTranscript;
   }, [onTranscript]);
 
-  const isSupported =
-    browserWindow !== undefined &&
-    ('SpeechRecognition' in browserWindow ||
-      'webkitSpeechRecognition' in browserWindow);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    setIsSupported(
+      'SpeechRecognition' in window || 'webkitSpeechRecognition' in window
+    );
+  }, []);
 
   const getRecognition = useCallback(() => {
     if (recognitionRef.current) return recognitionRef.current;

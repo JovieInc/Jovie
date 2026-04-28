@@ -24,6 +24,7 @@ import {
   SidebarMenuItem,
 } from '@/components/organisms/Sidebar';
 import { UserButton } from '@/components/organisms/user-button';
+import { Tooltip } from '@/components/shell/Tooltip';
 import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { DashboardNav } from '@/features/dashboard/dashboard-nav';
@@ -42,6 +43,7 @@ import { useAppFlag } from '@/lib/flags/client';
 import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
 import { cn } from '@/lib/utils';
 import { ProfileSwitcher } from './ProfileSwitcher';
+import { SidebarBottomNowPlayingBridge } from './SidebarBottomNowPlayingBridge';
 
 export interface UnifiedSidebarProps {
   readonly section: 'admin' | 'dashboard' | 'settings';
@@ -204,6 +206,20 @@ function SidebarHeaderNav({
   hasMultipleProfiles: boolean;
   isDemoRoute: boolean;
 }>) {
+  const shellChatV1Enabled = useAppFlag('SHELL_CHAT_V1');
+  const newThreadLink = (
+    <Link
+      href={APP_ROUTES.CHAT}
+      aria-label='New thread'
+      className={cn(
+        'flex size-7 shrink-0 items-center justify-center rounded-[10px] bg-transparent text-sidebar-item-icon transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/60 hover:text-sidebar-item-foreground focus-visible:outline-none focus-visible:bg-sidebar-accent/60 focus-visible:text-sidebar-item-foreground',
+        !shellChatV1Enabled && 'ml-auto group-data-[collapsible=icon]:hidden'
+      )}
+    >
+      <SquarePen className='size-3' />
+    </Link>
+  );
+
   return (
     <div className='flex w-full items-center'>
       {(() => {
@@ -284,15 +300,19 @@ function SidebarHeaderNav({
         );
       })()}
 
-      {!isInSettings && isDashboardOrAdmin && (
-        <Link
-          href={APP_ROUTES.CHAT}
-          aria-label='New thread'
-          className='ml-auto flex size-7 shrink-0 items-center justify-center rounded-[10px] bg-transparent text-sidebar-item-icon transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/60 hover:text-sidebar-item-foreground focus-visible:outline-none focus-visible:bg-sidebar-accent/60 focus-visible:text-sidebar-item-foreground group-data-[collapsible=icon]:hidden'
-        >
-          <SquarePen className='size-3' />
-        </Link>
-      )}
+      {!isInSettings &&
+        isDashboardOrAdmin &&
+        (shellChatV1Enabled ? (
+          <Tooltip
+            label='New thread'
+            side='bottom'
+            className='ml-auto group-data-[collapsible=icon]:hidden'
+          >
+            {newThreadLink}
+          </Tooltip>
+        ) : (
+          newThreadLink
+        ))}
     </div>
   );
 }
@@ -355,6 +375,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
 
       {isInSettings ? null : (
         <div className='mt-auto shrink-0'>
+          <SidebarBottomNowPlayingBridge />
           {isDemoRoute ? null : <SidebarUpgradeBanner />}
           <SidebarInstallBanner />
 

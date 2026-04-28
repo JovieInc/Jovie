@@ -261,9 +261,8 @@ function ShellDropdownRoot({
     (entity: EntityPopoverData, anchor: HTMLElement) => {
       cancelClose();
       if (
-        active &&
-        active.entity.id === entity.id &&
-        active.entity.kind === entity.kind
+        active?.entity.id === entity.id &&
+        active?.entity.kind === entity.kind
       ) {
         return;
       }

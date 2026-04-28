@@ -31,7 +31,7 @@ import { useTheme } from 'next-themes';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { APP_ROUTES } from '@/constants/routes';
-import { useStoredAppFlagOverrides } from '@/lib/flags/client';
+import { useAppFlag, useStoredAppFlagOverrides } from '@/lib/flags/client';
 import {
   APP_FLAG_DEFAULTS,
   APP_FLAG_OVERRIDE_KEYS,
@@ -70,6 +70,22 @@ const ALL_FLAGS: FlagEntry[] = (
   source: 'code' as const,
   serverDefault: APP_FLAG_DEFAULTS[name as keyof typeof APP_FLAG_DEFAULTS],
 }));
+
+/**
+ * Lookup table: override-storage-key -> server default. Used to detect
+ * "meaningful" overrides (where the override value diverges from the
+ * server default) so the badge count + override pill don't show stale
+ * no-op overrides that match production state.
+ */
+const OVERRIDE_KEY_TO_SERVER_DEFAULT: Record<string, boolean> =
+  Object.fromEntries(ALL_FLAGS.map(flag => [flag.key, flag.serverDefault]));
+
+function isMeaningfulOverride(key: string, value: boolean): boolean {
+  // Unknown key (legacy entry from a removed flag) — treat as meaningful so
+  // the user can still see and clear it from the UI.
+  if (!(key in OVERRIDE_KEY_TO_SERVER_DEFAULT)) return true;
+  return value !== OVERRIDE_KEY_TO_SERVER_DEFAULT[key];
+}
 
 const BREAKPOINTS = [
   { name: '2xl', min: 1536 },
@@ -232,10 +248,28 @@ export function DevToolbar({
   } | null>(null);
   const { theme, setTheme } = useTheme();
   const overridesCtx = useStoredAppFlagOverrides();
+  const shellChatV1Enabled = useAppFlag('SHELL_CHAT_V1');
   const flagBadgeCtx = useFlagBadges();
   const toolbarRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const breakpoint = useBreakpoint();
+
+  // Flash state lives at DevToolbar level (not per-row) so toggling a flag
+  // that re-categorizes between Overrides <-> non-Overrides sections still
+  // shows the visual confirmation on the new row position. Per-row state
+  // would reset on remount and the flash would never play.
+  const [flashedKey, setFlashedKey] = useState<string | null>(null);
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flashFlag = useCallback((key: string) => {
+    setFlashedKey(key);
+    if (flashTimer.current) clearTimeout(flashTimer.current);
+    flashTimer.current = setTimeout(() => setFlashedKey(null), 400);
+  }, []);
+  useEffect(() => {
+    return () => {
+      if (flashTimer.current) clearTimeout(flashTimer.current);
+    };
+  }, []);
 
   // Restore state from localStorage and mark as mounted
   useEffect(() => {
@@ -374,7 +408,51 @@ export function DevToolbar({
     () => overridesCtx.overrides,
     [overridesCtx.overrides]
   );
-  const overrideCount = Object.keys(overrides).length;
+  const overrideCount = useMemo(
+    () =>
+      Object.entries(overrides).filter(([key, value]) =>
+        isMeaningfulOverride(key, value)
+      ).length,
+    [overrides]
+  );
+  const shellChatV1OverrideKey = APP_FLAG_OVERRIDE_KEYS.SHELL_CHAT_V1;
+  const shellChatV1Overridden =
+    shellChatV1OverrideKey in overrides &&
+    isMeaningfulOverride(
+      shellChatV1OverrideKey,
+      overrides[shellChatV1OverrideKey] as boolean
+    );
+
+  /**
+   * Set an override unless the new value matches the server default — in
+   * which case clear the override so the count stays accurate and stale
+   * no-op overrides don't accumulate. Read current state from the
+   * `overrides` map directly (not from `useAppFlag` closure) so rapid
+   * double-clicks don't race against a pending re-render.
+   */
+  const setOrClearOverride = useCallback(
+    (key: string, value: boolean) => {
+      if (
+        key in OVERRIDE_KEY_TO_SERVER_DEFAULT &&
+        value === OVERRIDE_KEY_TO_SERVER_DEFAULT[key]
+      ) {
+        overridesCtx.removeOverride(key);
+      } else {
+        overridesCtx.setOverride(key, value);
+      }
+      flashFlag(key);
+    },
+    [flashFlag, overridesCtx]
+  );
+
+  const toggleShellChatV1 = useCallback(() => {
+    const currentOverride = overrides[shellChatV1OverrideKey];
+    const current =
+      typeof currentOverride === 'boolean'
+        ? currentOverride
+        : APP_FLAG_DEFAULTS.SHELL_CHAT_V1;
+    setOrClearOverride(shellChatV1OverrideKey, !current);
+  }, [overrides, setOrClearOverride, shellChatV1OverrideKey]);
 
   // Unified flag list: filter by search, sort overrides to top
   const filteredFlags = useMemo(() => {
@@ -569,12 +647,11 @@ export function DevToolbar({
                     <FlagRow
                       key={flag.key}
                       label={flag.name.toLowerCase().replaceAll('_', ' ')}
+                      flashing={flashedKey === flag.key}
                       isOverridden
                       checked={overrides[flag.key]}
                       serverDefault={flag.serverDefault}
-                      onCheckedChange={v =>
-                        overridesCtx.setOverride(flag.key, v)
-                      }
+                      onCheckedChange={v => setOrClearOverride(flag.key, v)}
                       onClear={() => overridesCtx.removeOverride(flag.key)}
                       source={flag.source}
                     />
@@ -593,11 +670,10 @@ export function DevToolbar({
                     <FlagRow
                       key={flag.key}
                       label={flag.name.toLowerCase().replaceAll('_', ' ')}
+                      flashing={flashedKey === flag.key}
                       isOverridden={false}
                       checked={checked}
-                      onCheckedChange={v =>
-                        overridesCtx.setOverride(flag.key, v)
-                      }
+                      onCheckedChange={v => setOrClearOverride(flag.key, v)}
                       onClear={() => overridesCtx.removeOverride(flag.key)}
                       source={flag.source}
                     />
@@ -656,6 +732,23 @@ export function DevToolbar({
         <span className='max-md:hidden md:inline px-1.5 py-0.5 rounded text-[10px] text-[var(--color-text-quaternary-token)] bg-[var(--color-bg-surface-2)] shrink-0'>
           {breakpoint}
         </span>
+
+        <button
+          type='button'
+          aria-pressed={shellChatV1Enabled}
+          title='Toggle Shell + Chat design (SHELL_CHAT_V1)'
+          onClick={toggleShellChatV1}
+          className={`inline-flex shrink-0 items-center gap-1 px-1.5 py-1 rounded text-[10px] transition-colors ${
+            shellChatV1Enabled
+              ? 'text-[var(--color-accent)] bg-[var(--color-accent)]/10 hover:bg-[var(--color-accent)]/15'
+              : 'text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)]'
+          }`}
+        >
+          <span>New Design</span>
+          {shellChatV1Overridden && (
+            <span className='text-[9px] opacity-70'>(override)</span>
+          )}
+        </button>
 
         <div className='flex-1' />
 
@@ -959,6 +1052,7 @@ function FlagRow({
   label,
   isOverridden,
   checked,
+  flashing = false,
   serverDefault,
   onCheckedChange,
   onClear,
@@ -967,29 +1061,22 @@ function FlagRow({
   label: string;
   isOverridden: boolean;
   checked: boolean;
+  /** Parent-driven flash highlight — survives row re-categorization. */
+  flashing?: boolean;
   serverDefault?: boolean;
   onCheckedChange: (v: boolean) => void;
   onClear: () => void;
   source?: 'statsig' | 'code';
 }>) {
-  const [flash, setFlash] = useState(false);
-  const flashTimer = useRef<ReturnType<typeof setTimeout>>(null);
-  const handleChange = (v: boolean) => {
-    onCheckedChange(v);
-    setFlash(true);
-    if (flashTimer.current) clearTimeout(flashTimer.current);
-    flashTimer.current = setTimeout(() => setFlash(false), 400);
-  };
-
   return (
     <div
       className={`flex items-center gap-2 py-0.5 rounded-sm transition-colors duration-300 ${
-        flash ? 'bg-[var(--color-accent)]/10' : ''
+        flashing ? 'bg-[var(--color-accent)]/10' : ''
       }`}
     >
       <Switch.Root
         checked={checked}
-        onCheckedChange={handleChange}
+        onCheckedChange={onCheckedChange}
         className={`relative w-7 h-4 rounded-full transition-colors outline-none cursor-pointer shrink-0 ${
           checked
             ? 'bg-[var(--color-accent)]'

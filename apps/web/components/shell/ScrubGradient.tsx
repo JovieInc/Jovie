@@ -69,7 +69,7 @@ function filledStrandsPath(): string {
     );
     bot.push(`L ${x.toFixed(2)} ${(WAVE_CY + half).toFixed(2)}`);
   });
-  return `${top.join(' ')} ${bot.reverse().join(' ')} Z`;
+  return `${top.join(' ')} ${bot.toReversed().join(' ')} Z`;
 }
 
 const FILLED_PATH = filledStrandsPath();

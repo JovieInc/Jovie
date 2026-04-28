@@ -1,18 +1,15 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
-import { HomepageIntent } from '@/components/homepage/HomepageIntent';
+import { HomepageHeroMockupCarousel } from '@/components/homepage/HomepageHeroCarousel';
+import { HomepageOutcomeCards } from '@/components/homepage/HomepageOutcomeCards';
 import { HERO_COPY } from '@/components/homepage/intent';
-import { ArtistProfileOutcomeDuo } from '@/components/marketing/artist-profile/ArtistProfileOutcomeDuo';
 import {
-  HomepageV2CaptureReactivate,
   HomepageV2FinalCta,
-  HomepageV2FooterLinks,
-  HomepageV2PowerGrid,
   HomepageV2Pricing,
-  HomepageV2Spotlight,
-  HomepageV2SystemOverview,
 } from '@/components/marketing/homepage-v2/HomepageV2Route';
 import { APP_NAME, BASE_URL } from '@/constants/app';
+import { APP_ROUTES } from '@/constants/routes';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
 import {
@@ -147,6 +144,25 @@ const ORGANIZATION_SCHEMA = buildOrganizationSchema({
   sameAs: ['https://instagram.com/meetjovie'],
 });
 
+function HomepageHeroActions() {
+  return (
+    <div className='homepage-hero-actions'>
+      <Link
+        href={APP_ROUTES.SIGNUP}
+        className='public-action-primary focus-ring-themed'
+      >
+        Start Free Trial
+      </Link>
+      <Link
+        href={APP_ROUTES.ARTIST_PROFILES}
+        className='public-action-secondary focus-ring-themed'
+      >
+        Explore Profiles <span aria-hidden='true'>→</span>
+      </Link>
+    </div>
+  );
+}
+
 export default function HomePage() {
   return (
     <>
@@ -156,10 +172,13 @@ export default function HomePage() {
       <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
       <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
 
-      <section className='homepage-hero-stage relative'>
+      <section
+        className='homepage-hero-stage relative'
+        aria-labelledby='home-hero-heading'
+      >
         <div
           data-testid='homepage-hero-shell'
-          className='homepage-hero-shell relative flex min-h-[100svh] flex-col overflow-hidden rounded-b-[44px] text-primary-token sm:rounded-b-[56px] lg:rounded-b-[72px]'
+          className='homepage-hero-shell relative flex min-h-[100svh] flex-col overflow-x-clip text-primary-token'
         >
           <div
             aria-hidden='true'
@@ -177,51 +196,40 @@ export default function HomePage() {
             <div className='homepage-hero-shell__grid' />
           </div>
 
-          <div className='relative z-[2] mx-auto flex w-full max-w-[1360px] min-w-0 flex-1 items-center justify-center px-5 pb-10 pt-[calc(var(--linear-header-height)+4rem)] sm:px-8 sm:pb-12 sm:pt-[calc(var(--linear-header-height)+4.75rem)] lg:px-12 lg:pb-14 lg:pt-[calc(var(--linear-header-height)+5.25rem)]'>
-            <div className='w-full min-w-0 max-w-[920px]'>
+          <div className='homepage-hero-inner relative z-[3] mx-auto flex w-full max-w-none min-w-0 flex-1 flex-col items-center justify-start'>
+            <div className='homepage-hero-copy w-full min-w-0'>
+              <p className='homepage-hero-eyebrow self-center text-center'>
+                {HERO_COPY.eyebrow}
+              </p>
               <h1
                 id='home-hero-heading'
                 className='homepage-hero-headline self-center text-center text-white'
               >
                 {HERO_COPY.headline}
               </h1>
-              <p className='homepage-hero-subhead mt-6 max-w-[680px] self-center text-center text-[17px] leading-[1.58] tracking-[-0.015em] text-white/68 sm:text-[18px]'>
+              <p className='homepage-hero-subhead self-center text-center text-white/68'>
                 {HERO_COPY.subhead}
               </p>
-              <HomepageIntent showIntro={false} />
+              <HomepageHeroActions />
             </div>
+            <HomepageHeroMockupCarousel />
           </div>
-
-          <HomeTrustSection
-            label='Trusted by artists'
-            presentation='inline-strip'
-            className='homepage-trust-reveal'
-          />
         </div>
       </section>
-      <div className='homepage-story-stack'>
-        <ArtistProfileOutcomeDuo
-          headline={ARTIST_PROFILE_COPY.outcomeDuo.homepageHeadline}
-          duo={ARTIST_PROFILE_COPY.outcomeDuo}
+      <div className='homepage-trust-section'>
+        <HomeTrustSection
+          label='Trusted by artists on'
+          presentation='inline-strip'
         />
-        {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_SYSTEM_OVERVIEW ? (
-          <HomepageV2SystemOverview />
-        ) : null}
-        {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_SPOTLIGHT ? (
-          <HomepageV2Spotlight />
-        ) : null}
-        {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_CAPTURE_REACTIVATE ? (
-          <HomepageV2CaptureReactivate />
-        ) : null}
-        {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_POWER_GRID ? (
-          <HomepageV2PowerGrid />
-        ) : null}
+      </div>
+      <div className='homepage-story-stack'>
+        <HomepageOutcomeCards
+          headline={ARTIST_PROFILE_COPY.outcomeDuo.homepageHeadline}
+          outcomes={ARTIST_PROFILE_COPY.outcomes}
+        />
         {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_PRICING ? <HomepageV2Pricing /> : null}
         {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_FINAL_CTA ? (
           <HomepageV2FinalCta />
-        ) : null}
-        {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_FOOTER_LINKS ? (
-          <HomepageV2FooterLinks />
         ) : null}
       </div>
     </>
