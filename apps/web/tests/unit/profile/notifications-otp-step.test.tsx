@@ -1,11 +1,14 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProfileNotificationsContextValue } from '@/components/organisms/profile-shell/types';
 import type { Artist } from '@/types/db';
 
 const mockUseSubscriptionForm = vi.fn();
 const mockUseProfileNotifications = vi.fn();
+
+let ArtistNotificationsCTA: typeof import('@/features/profile/artist-notifications-cta/ArtistNotificationsCTA').ArtistNotificationsCTA;
+let TwoStepNotificationsCTA: typeof import('@/features/profile/artist-notifications-cta/TwoStepNotificationsCTA').TwoStepNotificationsCTA;
 
 vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
@@ -129,21 +132,25 @@ function buildFormState() {
 }
 
 describe('public profile notifications OTP step', () => {
+  beforeAll(async () => {
+    ({ ArtistNotificationsCTA } = await import(
+      '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA'
+    ));
+    ({ TwoStepNotificationsCTA } = await import(
+      '@/features/profile/artist-notifications-cta/TwoStepNotificationsCTA'
+    ));
+  }, 30_000);
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockUseProfileNotifications.mockReturnValue(buildProfileNotifications());
     mockUseSubscriptionForm.mockReturnValue(buildFormState());
   });
 
-  it('renders OTP verification UI in ArtistNotificationsCTA after the alerts and email steps', async () => {
-    const { ArtistNotificationsCTA } = await import(
-      '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA'
-    );
-
+  it('renders OTP verification UI in ArtistNotificationsCTA after email entry', async () => {
     render(<ArtistNotificationsCTA artist={artist} autoOpen />);
 
-    fireEvent.click(await screen.findByRole('switch', { name: /new music/i }));
-    fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /^continue$/i }));
 
     await waitFor(() => {
       expect(screen.getByText('Enter the code')).toBeInTheDocument();
@@ -156,15 +163,10 @@ describe('public profile notifications OTP step', () => {
     ).toBeInTheDocument();
   });
 
-  it('renders OTP verification UI in TwoStepNotificationsCTA after the alerts and email steps', async () => {
-    const { TwoStepNotificationsCTA } = await import(
-      '@/features/profile/artist-notifications-cta/TwoStepNotificationsCTA'
-    );
-
+  it('renders OTP verification UI in TwoStepNotificationsCTA after email entry', async () => {
     render(<TwoStepNotificationsCTA artist={artist} startExpanded />);
 
-    fireEvent.click(await screen.findByRole('switch', { name: /new music/i }));
-    fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /^continue$/i }));
 
     await waitFor(() => {
       expect(screen.getByText('Enter the code')).toBeInTheDocument();

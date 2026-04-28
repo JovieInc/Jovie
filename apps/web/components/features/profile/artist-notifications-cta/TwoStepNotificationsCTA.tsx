@@ -8,6 +8,8 @@ interface TwoStepNotificationsCTAProps {
   readonly startExpanded?: boolean;
   readonly presentation?: 'overlay' | 'inline' | 'modal';
   readonly portalContainer?: HTMLElement | null;
+  readonly onFlowClosed?: () => void;
+  readonly onSubscriptionActivated?: () => void;
 }
 
 export function TwoStepNotificationsCTA({
@@ -15,6 +17,8 @@ export function TwoStepNotificationsCTA({
   startExpanded = false,
   presentation,
   portalContainer,
+  onFlowClosed,
+  onSubscriptionActivated,
 }: TwoStepNotificationsCTAProps) {
   return (
     <ProfileInlineNotificationsCTA
@@ -23,6 +27,8 @@ export function TwoStepNotificationsCTA({
       presentation={presentation ?? (startExpanded ? 'inline' : 'overlay')}
       portalContainer={portalContainer}
       autoOpen={startExpanded}
+      onFlowClosed={onFlowClosed}
+      onSubscriptionActivated={onSubscriptionActivated}
     />
   );
 }

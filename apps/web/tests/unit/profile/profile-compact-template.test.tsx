@@ -236,11 +236,14 @@ describe('ProfileCompactTemplate', () => {
       (props: {
         readonly onManageNotifications?: () => void;
         readonly onRegisterReveal?: (reveal: () => void) => void;
+        readonly onSubscriptionActivated?: () => void;
       }) => (
         <button
           type='button'
           data-testid='mock-inline-notifications-cta'
-          onClick={() => props.onManageNotifications?.()}
+          onClick={() =>
+            props.onSubscriptionActivated?.() ?? props.onManageNotifications?.()
+          }
         >
           Inline notifications
         </button>
@@ -669,7 +672,7 @@ describe('ProfileCompactTemplate', () => {
     });
   });
 
-  it('shows the subscribed alerts state in the compact hero alerts row', async () => {
+  it('hides the compact hero alerts row for returning subscribers', async () => {
     mockUseProfileShell.mockImplementation(() => ({
       notificationsContextValue: {
         subscribedChannels: { email: true },
@@ -691,6 +694,40 @@ describe('ProfileCompactTemplate', () => {
         contacts={[]}
       />
     );
+
+    expect(
+      screen.queryByTestId('profile-hero-alerts-row')
+    ).not.toBeInTheDocument();
+  });
+
+  it('keeps the compact hero alerts row on after activation in the current session', async () => {
+    const renderProfile = () => (
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    const view = render(renderProfile());
+
+    fireEvent.click(screen.getByTestId('mock-inline-notifications-cta'));
+
+    mockUseProfileShell.mockImplementation(() => ({
+      notificationsContextValue: {
+        subscribedChannels: { email: true },
+        subscriptionDetails: { email: 'fan@example.com' },
+        setSubscribedChannels: vi.fn(),
+        setSubscriptionDetails: vi.fn(),
+        setState: vi.fn(),
+      },
+      notificationsController: {
+        contentPreferences: null,
+      },
+    }));
+
+    view.rerender(renderProfile());
 
     expect(screen.getByTestId('profile-hero-alerts-row')).toHaveTextContent(
       'Alerts On'

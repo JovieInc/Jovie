@@ -170,23 +170,17 @@ describe('ProfileInlineNotificationsCTA', () => {
     expect(formState.handleChannelChange).toHaveBeenCalledWith('email');
     expect(formState.openSubscription).toHaveBeenCalled();
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByText('Alerts')).toBeInTheDocument();
-    expect(screen.getByText('Sent by Test Artist')).toBeInTheDocument();
-    expect(
-      screen.getByRole('switch', { name: /new music/i })
-    ).not.toBeChecked();
-    expect(
-      screen.queryByRole('button', { name: /save & finish/i })
-    ).not.toBeInTheDocument();
+    expect(screen.getByText('Enter your email')).toBeInTheDocument();
+    expect(screen.getByTestId('mobile-email-input')).toBeInTheDocument();
+    expect(screen.queryByText('Sent by Test Artist')).not.toBeInTheDocument();
   }, 10_000);
 
-  it('prompts for email when an unsubscribed fan toggles an alert', async () => {
+  it('prompts for email immediately for an unsubscribed fan', async () => {
     mockUseSubscriptionForm.mockReturnValue(buildFormState());
 
     render(<ProfileInlineNotificationsCTA artist={makeArtist()} />);
 
     fireEvent.click(screen.getByRole('button', { name: /turn on alerts/i }));
-    fireEvent.click(await screen.findByRole('switch', { name: /new music/i }));
 
     expect(await screen.findByText('Enter your email')).toBeInTheDocument();
   });
@@ -260,7 +254,7 @@ describe('ProfileInlineNotificationsCTA', () => {
       />
     );
 
-    expect(await screen.findByText('Alerts')).toBeInTheDocument();
+    expect(await screen.findByText('Enter your email')).toBeInTheDocument();
 
     mockUseProfileNotifications.mockReturnValue(
       buildProfileNotifications({
@@ -297,7 +291,7 @@ describe('ProfileInlineNotificationsCTA', () => {
       <ProfileInlineNotificationsCTA artist={makeArtist()} autoOpen />
     );
 
-    expect(await screen.findByText('Alerts')).toBeInTheDocument();
+    expect(await screen.findByText('Enter your email')).toBeInTheDocument();
 
     mockUseProfileNotifications.mockReturnValue(
       buildProfileNotifications({

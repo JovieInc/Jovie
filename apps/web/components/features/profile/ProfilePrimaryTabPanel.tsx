@@ -42,6 +42,8 @@ interface ProfilePrimaryTabPanelProps {
   readonly tourDates?: readonly TourDateViewModel[];
   readonly releases?: readonly PublicRelease[];
   readonly previewNotificationsState?: ProfilePreviewNotificationsState;
+  readonly onFlowClosed?: () => void;
+  readonly onSubscriptionActivated?: () => void;
 }
 
 function SectionIntro({
@@ -153,12 +155,16 @@ function SubscribePanel({
   notificationsPortalContainer,
   isSubscribed,
   previewNotificationsState,
+  onFlowClosed,
+  onSubscriptionActivated,
 }: Readonly<{
   renderMode: ProfileRenderMode;
   artist: Artist;
   notificationsPortalContainer?: HTMLElement | null;
   isSubscribed: boolean;
   previewNotificationsState?: ProfilePreviewNotificationsState;
+  onFlowClosed?: () => void;
+  onSubscriptionActivated?: () => void;
 }>) {
   if (renderMode === 'preview') {
     return (
@@ -183,6 +189,8 @@ function SubscribePanel({
       autoOpen
       forceExpanded
       hideTrigger
+      onFlowClosed={onFlowClosed}
+      onSubscriptionActivated={onSubscriptionActivated}
     />
   );
 }
@@ -202,6 +210,8 @@ export function ProfilePrimaryTabPanel({
   tourDates = [],
   releases = [],
   previewNotificationsState,
+  onFlowClosed,
+  onSubscriptionActivated,
 }: Readonly<ProfilePrimaryTabPanelProps>) {
   if (mode === 'listen') {
     const visibleReleases = releases.filter(release => Boolean(release.slug));
@@ -260,6 +270,8 @@ export function ProfilePrimaryTabPanel({
         notificationsPortalContainer={notificationsPortalContainer}
         isSubscribed={isSubscribed}
         previewNotificationsState={previewNotificationsState}
+        onFlowClosed={onFlowClosed}
+        onSubscriptionActivated={onSubscriptionActivated}
       />
     );
   }

@@ -12,6 +12,7 @@ export function ArtistNotificationsCTA({
   forceExpanded = false,
   hideTrigger = false,
   onFlowClosed,
+  onSubscriptionActivated,
   source,
 }: ArtistNotificationsCTAProps) {
   const resolvedPresentation =
@@ -26,6 +27,7 @@ export function ArtistNotificationsCTA({
       autoOpen={autoOpen || forceExpanded}
       hideTrigger={hideTrigger}
       onFlowClosed={onFlowClosed}
+      onSubscriptionActivated={onSubscriptionActivated}
       source={source}
     />
   );

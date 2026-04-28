@@ -513,7 +513,7 @@ export function ProfileMobileNotificationsFlow({
       return (
         <ScreenShell
           title='Enter the code'
-          body='Check your inbox for the 6-digit verification code.'
+          body={`Verify your email to activate alerts from ${artistName}.`}
           footer={
             <div className='space-y-3'>
               {error ? (
@@ -557,8 +557,8 @@ export function ProfileMobileNotificationsFlow({
     if (step === 'name') {
       return (
         <ScreenShell
-          title="What's your first name?"
-          body='So we can personalize your experience.'
+          title='Alerts activated'
+          body='You are subscribed. Add your first name to personalize updates.'
           footer={
             <PrimaryButton onClick={onNameSubmit} disabled={isNameSaving}>
               Continue
@@ -587,8 +587,8 @@ export function ProfileMobileNotificationsFlow({
     if (step === 'birthday') {
       return (
         <ScreenShell
-          title="When's your birthday?"
-          body="Your birthday won't be shown publicly."
+          title='Add your birthday'
+          body="Optional. You're already subscribed, and your birthday won't be shown publicly."
           footer={
             <div className='space-y-3'>
               {birthdayHintShown ? (
@@ -721,9 +721,11 @@ export function ProfileMobileNotificationsFlow({
 
     return (
       <ScreenShell
-        title="You're all set!"
-        body="We'll send alerts for the things you care about."
-        footer={<PrimaryButton onClick={onClose}>Done</PrimaryButton>}
+        title='Alerts activated'
+        body={`New music, shows, and merch alerts from ${artistName} are on.`}
+        footer={
+          <PrimaryButton onClick={onClose}>Back to Profile</PrimaryButton>
+        }
       >
         <div className='flex h-full items-center justify-center'>
           <div
