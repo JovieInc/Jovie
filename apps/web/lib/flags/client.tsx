@@ -10,6 +10,7 @@ import {
 } from 'react';
 import {
   APP_FLAG_DEFAULTS,
+  APP_FLAG_OVERRIDE_KEYS,
   type AppFlagName,
   type AppFlagSnapshot,
 } from './contracts';
@@ -24,9 +25,32 @@ import {
 
 export interface AppFlagOverridesContextValue {
   overrides: AppFlagOverrideRecord;
+  validOverrides: AppFlagOverrideRecord;
+  orphanKeys: string[];
   setOverride: (key: string, value: boolean) => void;
   removeOverride: (key: string) => void;
   clearOverrides: () => void;
+  purgeOrphans: () => void;
+}
+
+const KNOWN_OVERRIDE_KEYS = new Set<string>(
+  Object.values(APP_FLAG_OVERRIDE_KEYS)
+);
+
+function partitionOverrides(record: AppFlagOverrideRecord): {
+  valid: AppFlagOverrideRecord;
+  orphans: string[];
+} {
+  const valid: AppFlagOverrideRecord = {};
+  const orphans: string[] = [];
+  for (const [key, value] of Object.entries(record)) {
+    if (KNOWN_OVERRIDE_KEYS.has(key)) {
+      valid[key] = value;
+    } else {
+      orphans.push(key);
+    }
+  }
+  return { valid, orphans };
 }
 
 const AppFlagsContext = createContext<AppFlagSnapshot | null>(null);
@@ -57,6 +81,14 @@ export function useStoredAppFlagOverrides(): AppFlagOverridesContextValue {
     setOverrides({});
   }, []);
 
+  const purgeOrphans = useCallback(() => {
+    const current = readStoredAppFlagOverrides();
+    const { valid, orphans } = partitionOverrides(current);
+    if (orphans.length === 0) return;
+    writeStoredAppFlagOverrides(valid);
+    setOverrides(valid);
+  }, []);
+
   useEffect(() => {
     const syncOverrides = () => {
       setOverrides(readStoredAppFlagOverrides());
@@ -76,9 +108,30 @@ export function useStoredAppFlagOverrides(): AppFlagOverridesContextValue {
     };
   }, []);
 
+  const { valid: validOverrides, orphans: orphanKeys } = useMemo(
+    () => partitionOverrides(overrides),
+    [overrides]
+  );
+
   return useMemo(
-    () => ({ overrides, setOverride, removeOverride, clearOverrides }),
-    [clearOverrides, overrides, removeOverride, setOverride]
+    () => ({
+      overrides,
+      validOverrides,
+      orphanKeys,
+      setOverride,
+      removeOverride,
+      clearOverrides,
+      purgeOrphans,
+    }),
+    [
+      overrides,
+      validOverrides,
+      orphanKeys,
+      setOverride,
+      removeOverride,
+      clearOverrides,
+      purgeOrphans,
+    ]
   );
 }
 

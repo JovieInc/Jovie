@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.185] - 2026-04-28
+
+> DevToolbar override badge no longer lies about orphans. Override entries in
+> localStorage that no longer match any flag in `APP_FLAG_OVERRIDE_KEYS` are now
+> partitioned out — the badge counts only valid overrides, and a separate
+> "Orphans (N)" section in the open panel exposes them with inspect + manual purge
+> buttons. Manual purge only by design (no auto-prune) to avoid cross-tab races
+> on version skew. Also: Next.js dev indicators disabled to declutter the corner.
+
+### Changed
+
+- `useStoredAppFlagOverrides` now exposes `validOverrides`, `orphanKeys`, and `purgeOrphans()` alongside the existing `overrides` record. `validOverrides` is the partition of the stored record whose keys are present in `APP_FLAG_OVERRIDE_KEYS`; `orphanKeys` is the rest. `purgeOrphans()` rewrites localStorage with only the valid keys.
+- DevToolbar's bottom-bar override count now reads from `validOverrides` so orphans don't inflate it. The open panel renders an "Orphans (N)" section with inspect (expand to see keys) and purge (rewrite localStorage) actions when `orphanKeys.length > 0`.
+- `next.config.js`: `devIndicators` set to `false`. The floating "N" overlay is gone.
+
+### Added
+
+- `apps/web/tests/unit/flags/useStoredAppFlagOverrides.test.tsx` — 6 Vitest cases covering partition correctness, idempotent purge, cross-tab `storage` event sync without auto-write, and no-op on empty orphans.
+
 ## [26.4.184] - 2026-04-28
 
 > Frame.io-inspired homepage refresh: the hero now matches Frame.io's exact typography spec (Satoshi 80px / weight 600 / -0.045em) and layout positions, the mockup carousel has a proper window-style top chrome with rounded 18px corners, the header is transparent docked and switches to frosted glass on scroll, and the footer locks to the same edge-to-edge gutter system as the header. New shared `MarketingFinalCTA` foundation for the landing page system.
