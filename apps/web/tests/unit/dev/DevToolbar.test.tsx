@@ -376,9 +376,9 @@ describe('DevToolbar', () => {
     it('renders in the collapsed bottom bar without opening the flag list', () => {
       renderToolbar();
 
-      const toggle = screen.getByRole('switch', { name: /New Design/ });
+      const toggle = screen.getByRole('button', { name: /New Design/ });
       expect(toggle).toBeInTheDocument();
-      expect(toggle).toHaveAttribute('aria-checked', 'false');
+      expect(toggle).toHaveAttribute('aria-pressed', 'false');
       expect(
         screen.getByRole('button', { name: 'Expand dev toolbar' })
       ).toBeInTheDocument();
@@ -387,7 +387,7 @@ describe('DevToolbar', () => {
     it('sets the SHELL_CHAT_V1 override on click', () => {
       renderToolbar();
 
-      fireEvent.click(screen.getByRole('switch', { name: /New Design/ }));
+      fireEvent.click(screen.getByRole('button', { name: /New Design/ }));
 
       expect(
         JSON.parse(localStorage.getItem(FF_OVERRIDES_KEY) ?? '{}')
@@ -404,8 +404,8 @@ describe('DevToolbar', () => {
       setLocalOverrides({ 'code:SHELL_CHAT_V1': true });
       renderToolbar();
 
-      const toggle = screen.getByRole('switch', { name: /New Design/ });
-      expect(toggle).toHaveAttribute('aria-checked', 'true');
+      const toggle = screen.getByRole('button', { name: /New Design/ });
+      expect(toggle).toHaveAttribute('aria-pressed', 'true');
 
       fireEvent.click(toggle);
 
@@ -423,15 +423,18 @@ describe('DevToolbar', () => {
 
       expect(screen.getByText('1 override')).toBeInTheDocument();
 
-      fireEvent.click(screen.getByRole('switch', { name: /New Design/ }));
+      fireEvent.click(screen.getByRole('button', { name: /New Design/ }));
 
-      expect(screen.queryByText(/override/)).not.toBeInTheDocument();
+      // Pill in the bar disappears AND the inline "(override)" hint inside
+      // the New Design button is gone now that the override matches default.
+      expect(screen.queryByText('1 override')).not.toBeInTheDocument();
+      expect(screen.queryByText('(override)')).not.toBeInTheDocument();
     });
 
     it('updates the collapsed override badge after toggling', () => {
       renderToolbar();
 
-      fireEvent.click(screen.getByRole('switch', { name: /New Design/ }));
+      fireEvent.click(screen.getByRole('button', { name: /New Design/ }));
 
       expect(screen.getByText('1 override')).toBeInTheDocument();
     });
@@ -443,7 +446,7 @@ describe('DevToolbar', () => {
         'old'
       );
 
-      fireEvent.click(screen.getByRole('switch', { name: /New Design/ }));
+      fireEvent.click(screen.getByRole('button', { name: /New Design/ }));
 
       await waitFor(() => {
         expect(screen.getByTestId('shell-chat-v1-probe')).toHaveTextContent(

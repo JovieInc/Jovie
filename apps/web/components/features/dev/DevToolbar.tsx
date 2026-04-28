@@ -735,41 +735,18 @@ export function DevToolbar({
 
         <button
           type='button'
-          role='switch'
-          aria-checked={shellChatV1Enabled}
-          aria-label={
-            shellChatV1Enabled ? 'Turn New Design Off' : 'Turn New Design On'
-          }
+          aria-pressed={shellChatV1Enabled}
           title='Toggle Shell + Chat design (SHELL_CHAT_V1)'
           onClick={toggleShellChatV1}
-          className={`inline-flex h-7 shrink-0 items-center gap-2 rounded-full border px-2.5 text-[10px] font-semibold transition-colors ${
+          className={`inline-flex shrink-0 items-center gap-1 px-1.5 py-1 rounded text-[10px] transition-colors ${
             shellChatV1Enabled
-              ? 'border-[var(--color-accent)]/35 bg-[var(--color-accent)]/12 text-[var(--color-accent)] hover:bg-[var(--color-accent)]/18'
-              : 'border-[var(--color-border-subtle)] bg-[var(--color-bg-surface-2)] text-[var(--color-text-tertiary)] hover:border-[var(--color-border-default)] hover:text-[var(--color-text-primary)]'
+              ? 'text-[var(--color-accent)] bg-[var(--color-accent)]/10 hover:bg-[var(--color-accent)]/15'
+              : 'text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)]'
           }`}
         >
-          <span className='max-[520px]:sr-only'>New Design</span>
-          <span
-            aria-hidden='true'
-            className={`relative h-3.5 w-6 rounded-full transition-colors ${
-              shellChatV1Enabled
-                ? 'bg-[var(--color-accent)]'
-                : 'bg-[var(--color-bg-surface-3)]'
-            }`}
-          >
-            <span
-              className={`absolute top-0.5 h-2.5 w-2.5 rounded-full bg-white shadow-sm transition-transform ${
-                shellChatV1Enabled ? 'translate-x-3' : 'translate-x-0.5'
-              }`}
-            />
-          </span>
-          <span className='max-sm:hidden text-[9px] opacity-80'>
-            {shellChatV1Enabled ? 'On' : 'Off'}
-          </span>
+          <span>New Design</span>
           {shellChatV1Overridden && (
-            <span className='max-md:hidden rounded-full bg-[var(--color-accent)]/14 px-1 text-[8px] font-medium'>
-              Override
-            </span>
+            <span className='text-[9px] opacity-70'>(override)</span>
           )}
         </button>
 
