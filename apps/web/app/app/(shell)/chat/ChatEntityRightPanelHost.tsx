@@ -17,7 +17,7 @@ import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelCo
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { ReleaseViewModel } from '@/lib/discography/types';
-import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
+import { useReleaseEntityQuery } from '@/lib/queries/useReleaseEntityQuery';
 import { cn } from '@/lib/utils';
 import {
   type ChatEntityTarget,
@@ -258,9 +258,10 @@ function ChatReleaseEntityPanelLoader({
   threadTitle?: string | null;
   onClose: () => void;
 }>) {
-  const { data: releases = [], isLoading } = useReleasesQuery(profileId);
-  const release =
-    releases.find(candidate => candidate.id === target.id) ?? null;
+  const { data: release = null, isLoading } = useReleaseEntityQuery(
+    profileId,
+    target.id
+  );
 
   return (
     <ChatReleaseEntityPanel
