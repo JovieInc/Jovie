@@ -3,7 +3,12 @@
  * @critical — Client-first releases page with TanStack Query cache
  */
 import { render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const appFlagState = vi.hoisted(() => ({
+  DESIGN_V1_RELEASES: false,
+  SHELL_CHAT_V1: false,
+}));
 
 // Mock dashboard context
 const mockProfile = {
@@ -13,19 +18,41 @@ const mockProfile = {
   settings: {},
 };
 
-vi.mock('next/dynamic', () => ({
-  default: () =>
-    function DynamicReleasesExperience(props: Record<string, unknown>) {
-      return (
-        <div
-          data-testid='releases-experience'
-          data-count={String((props.releases as unknown[])?.length ?? 0)}
-        >
-          Releases
-        </div>
-      );
+vi.mock('next/dynamic', () => {
+  let dynamicComponentIndex = 0;
+
+  return {
+    default: () => {
+      dynamicComponentIndex += 1;
+
+      if (dynamicComponentIndex === 1) {
+        return function DynamicReleasesExperience(
+          props: Record<string, unknown>
+        ) {
+          return (
+            <div
+              data-testid='releases-experience'
+              data-count={String((props.releases as unknown[])?.length ?? 0)}
+            >
+              Releases
+            </div>
+          );
+        };
+      }
+
+      return function DynamicShellReleasesView(props: Record<string, unknown>) {
+        return (
+          <div
+            data-testid='shell-releases-view'
+            data-count={String((props.releases as unknown[])?.length ?? 0)}
+          >
+            Shell Releases
+          </div>
+        );
+      };
     },
-}));
+  };
+});
 
 vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
   DashboardDataContext: {
@@ -47,6 +74,10 @@ vi.mock('@/lib/queries/useReleasesQuery', () => ({
   useReleasesQuery: () => mockQueryResult,
 }));
 
+vi.mock('@/lib/flags/client', () => ({
+  useAppFlag: (flagName: keyof typeof appFlagState) => appFlagState[flagName],
+}));
+
 vi.mock('@/features/feedback/PageErrorState', () => ({
   PageErrorState: ({ message }: { message: string }) => (
     <div data-testid='page-error'>{message}</div>
@@ -64,9 +95,34 @@ vi.mock('@/app/app/(shell)/dashboard/releases/loading', () => ({
   ),
 }));
 
-import { ReleasesPageClient } from '@/app/app/(shell)/dashboard/releases/ReleasesPageClient';
+import {
+  ReleasesPageClient,
+  resolveReleasesViewMode,
+} from '@/app/app/(shell)/dashboard/releases/ReleasesPageClient';
 
 describe('@critical ReleasesPageClient', () => {
+  beforeEach(() => {
+    appFlagState.DESIGN_V1_RELEASES = false;
+    appFlagState.SHELL_CHAT_V1 = false;
+    mockQueryResult.data = [];
+    mockQueryResult.isLoading = false;
+    mockQueryResult.isError = false;
+  });
+
+  it.each([
+    [false, false, 'legacyProviderMatrix'],
+    [true, false, 'legacyProviderMatrix'],
+    [false, true, 'designV1ShellReleases'],
+    [true, true, 'designV1ShellReleases'],
+  ] as const)('resolves releases view mode for SHELL_CHAT_V1=%s and DESIGN_V1_RELEASES=%s', (shellChatV1Enabled, designV1ReleasesEnabled, expectedMode) => {
+    expect(
+      resolveReleasesViewMode({
+        shellChatV1Enabled,
+        designV1ReleasesEnabled,
+      })
+    ).toBe(expectedMode);
+  });
+
   it('shows skeleton when loading with no cached data', () => {
     mockQueryResult.data = undefined as unknown as unknown[];
     mockQueryResult.isLoading = true;
@@ -76,10 +132,6 @@ describe('@critical ReleasesPageClient', () => {
     expect(screen.getByTestId('release-skeleton')).toHaveTextContent(
       'Loading...'
     );
-
-    // Reset
-    mockQueryResult.data = [];
-    mockQueryResult.isLoading = false;
   });
 
   it('shows PageErrorState when query errors', () => {
@@ -94,10 +146,6 @@ describe('@critical ReleasesPageClient', () => {
     expect(
       screen.getByText('Failed to load releases data. Please refresh the page.')
     ).toBeInTheDocument();
-
-    // Reset
-    mockQueryResult.isError = false;
-    mockQueryResult.data = [];
   });
 
   it('renders ReleasesExperience when data loaded', async () => {
@@ -109,9 +157,6 @@ describe('@critical ReleasesPageClient', () => {
     const exp = await waitFor(() => screen.getByTestId('releases-experience'));
     expect(exp).toHaveTextContent('Releases');
     expect(exp.getAttribute('data-count')).toBe('2');
-
-    // Reset
-    mockQueryResult.data = [];
   });
 
   it('renders ReleasesExperience with empty array when no releases', () => {
@@ -133,5 +178,33 @@ describe('@critical ReleasesPageClient', () => {
       'data-count',
       '0'
     );
+  });
+
+  it('keeps ReleasesExperience when SHELL_CHAT_V1 is on and DESIGN_V1_RELEASES is off', () => {
+    appFlagState.SHELL_CHAT_V1 = true;
+    appFlagState.DESIGN_V1_RELEASES = false;
+    mockQueryResult.data = [{ id: 'r1' }] as unknown[];
+
+    render(<ReleasesPageClient />);
+
+    expect(screen.getByTestId('releases-experience')).toHaveAttribute(
+      'data-count',
+      '1'
+    );
+    expect(screen.queryByTestId('shell-releases-view')).not.toBeInTheDocument();
+  });
+
+  it('renders ShellReleasesView when DESIGN_V1_RELEASES is on and SHELL_CHAT_V1 is off', () => {
+    appFlagState.SHELL_CHAT_V1 = false;
+    appFlagState.DESIGN_V1_RELEASES = true;
+    mockQueryResult.data = [{ id: 'r1' }, { id: 'r2' }] as unknown[];
+
+    render(<ReleasesPageClient />);
+
+    expect(screen.getByTestId('shell-releases-view')).toHaveAttribute(
+      'data-count',
+      '2'
+    );
+    expect(screen.queryByTestId('releases-experience')).not.toBeInTheDocument();
   });
 });

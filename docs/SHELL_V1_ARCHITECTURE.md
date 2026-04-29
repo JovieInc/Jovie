@@ -37,13 +37,28 @@ Defined in `apps/web/lib/flags/contracts.ts` (Statsig gate `feature_shell_chat_v
 When `true`:
 
 - `AppShellSkeleton` switches to the v1 chrome (so the skeleton frame matches what the rendered shell will look like).
-- `DashboardNav`, `ReleasesPageClient`, and `AuthShell` use v1 navigation/audio primitives.
+- `DashboardNav` and `AuthShell` use v1 navigation/audio primitives.
 
 When `false`:
 
 - The shell layout still renders, but consumers fall through to legacy primitives — so the flag is purely a visual rollout control. No traffic ever bypasses `(shell)/layout.tsx`.
 
 Flag plumbing: `apps/web/lib/flags/server.ts:getAppFlagValue` / `getAppFlagsSnapshot` resolve through `APP_FLAG_REGISTRY`, with dev/test overrides honored.
+
+## Releases flag boundary
+
+`SHELL_CHAT_V1` does not own the releases route implementation. It only controls the authenticated shell frame and shared navigation/audio chrome around `/app/dashboard/releases`.
+
+`DESIGN_V1_RELEASES` owns releases-specific Design V1 behavior. `ShellReleasesView` is the gated Design V1 releases view; the legacy `ReleasesExperience`/`ReleaseProviderMatrix` remains the default when `DESIGN_V1_RELEASES` is off.
+
+Mixed-state contract:
+
+| `SHELL_CHAT_V1` | `DESIGN_V1_RELEASES` | Releases behavior |
+|---|---|---|
+| `false` | `false` | Legacy shell frame with `ReleasesExperience` |
+| `true` | `false` | Shell/chat V1 frame with `ReleasesExperience` |
+| `false` | `true` | Legacy shell frame with `ShellReleasesView` |
+| `true` | `true` | Shell/chat V1 frame with `ShellReleasesView` |
 
 ## /exp/shell-v1
 
