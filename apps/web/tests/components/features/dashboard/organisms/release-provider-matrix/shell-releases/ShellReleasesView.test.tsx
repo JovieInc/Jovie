@@ -3,6 +3,10 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ShellReleasesView } from '@/components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView';
 import {
+  HeaderActionsProvider,
+  useHeaderActions,
+} from '@/contexts/HeaderActionsContext';
+import {
   RightPanelProvider,
   useRightPanel,
 } from '@/contexts/RightPanelContext';
@@ -132,6 +136,11 @@ function RightPanelProbe() {
   return <div data-testid='right-panel-probe'>{panel}</div>;
 }
 
+function HeaderActionsProbe() {
+  const { headerActions } = useHeaderActions();
+  return <div data-testid='header-actions-probe'>{headerActions}</div>;
+}
+
 function renderShell(releases: readonly ReleaseViewModel[]) {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -142,15 +151,18 @@ function renderShell(releases: readonly ReleaseViewModel[]) {
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <RightPanelProvider>
-        <ShellReleasesView
-          releases={releases}
-          providerConfig={providerConfig}
-          primaryProviders={primaryProviders}
-          artistName='Bahamas'
-        />
-        <RightPanelProbe />
-      </RightPanelProvider>
+      <HeaderActionsProvider>
+        <RightPanelProvider>
+          <ShellReleasesView
+            releases={releases}
+            providerConfig={providerConfig}
+            primaryProviders={primaryProviders}
+            artistName='Bahamas'
+          />
+          <HeaderActionsProbe />
+          <RightPanelProbe />
+        </RightPanelProvider>
+      </HeaderActionsProvider>
     </QueryClientProvider>
   );
 }

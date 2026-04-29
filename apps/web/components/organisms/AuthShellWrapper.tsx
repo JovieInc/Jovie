@@ -1,6 +1,7 @@
 'use client';
 
 import { TooltipProvider } from '@jovie/ui';
+import { Search } from 'lucide-react';
 import type { ReactNode } from 'react';
 import {
   useCallback,
@@ -31,8 +32,10 @@ import { HeaderChatUsageIndicator } from '@/features/dashboard/atoms/HeaderChatU
 import { HeaderProfileProgress } from '@/features/dashboard/atoms/HeaderProfileProgress';
 import { useAuthRouteConfig } from '@/hooks/useAuthRouteConfig';
 import { useDashboardShortcuts } from '@/hooks/useDashboardShortcuts';
+import { useAppFlag } from '@/lib/flags/client';
 import { AuthShell } from './AuthShell';
 import { CommandPalette } from './CommandPalette';
+import { OPEN_COMMAND_PALETTE_EVENT } from './command-palette-events';
 import { KeyboardShortcutsSheet } from './keyboard-shortcuts-sheet';
 import {
   PendingShellContext,
@@ -58,6 +61,26 @@ function KeyboardShortcutsHandler() {
   return <KeyboardShortcutsSheet />;
 }
 
+function HeaderCommandSearchButton() {
+  const openCommandPalette = useCallback(() => {
+    globalThis.dispatchEvent(new Event(OPEN_COMMAND_PALETTE_EVENT));
+  }, []);
+
+  return (
+    <button
+      type='button'
+      data-app-search-trigger='true'
+      onClick={openCommandPalette}
+      className='inline-flex h-7 items-center gap-1.5 rounded-md border border-(--linear-app-shell-border) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_94%,transparent)] px-2 text-[12px] text-secondary-token transition-[background-color,border-color,color] duration-150 hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+      aria-label='Search Jovie'
+    >
+      <Search className='h-3.5 w-3.5' aria-hidden='true' />
+      <span className='hidden sm:inline'>Search</span>
+      <span className='hidden text-tertiary-token lg:inline'>/</span>
+    </button>
+  );
+}
+
 /**
  * AuthShellWrapperInner - Inner component with access to HeaderActionsContext
  */
@@ -74,6 +97,7 @@ function AuthShellWrapperInner({
 }>) {
   const config = useAuthRouteConfig();
   const headerActionsContext = useOptionalHeaderActions();
+  const designV1Enabled = useAppFlag('DESIGN_V1');
   const [, startTransition] = useTransition();
   const [pendingShellRoute, setPendingShellRoute] =
     useState<PendingShellRoute>(null);
@@ -99,13 +123,14 @@ function AuthShellWrapperInner({
   const defaultHeaderAction = useMemo(
     () => (
       <>
+        {designV1Enabled ? <HeaderCommandSearchButton /> : null}
         {config.showChatUsageIndicator && !config.isDemoRoute ? (
           <HeaderChatUsageIndicator />
         ) : null}
         <HeaderProfileProgress />
       </>
     ),
-    [config.isDemoRoute, config.showChatUsageIndicator]
+    [config.isDemoRoute, config.showChatUsageIndicator, designV1Enabled]
   );
   // Wrap page-injected header elements in ErrorBoundary so a throwing badge/action
   // degrades gracefully (renders nothing + toast) instead of crashing the shell.
