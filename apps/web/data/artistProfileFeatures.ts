@@ -1,3 +1,4 @@
+import { getMarketingExportImage } from '@/lib/screenshots/registry';
 import type { MarketingFeatureTile } from './marketingFeatureTiles';
 
 export type ArtistProfileFeaturePlacement = 'section' | 'card' | 'spec tile';
@@ -125,7 +126,8 @@ export const ARTIST_PROFILE_SPEC_TILES: readonly ArtistProfileFeatureTile[] = [
     layoutClassName:
       'xl:col-start-6 xl:row-start-1 xl:col-span-4 xl:row-span-2',
     visual: 'cropped-screenshot',
-    screenshotSrc: '/product-screenshots/artist-spec-geo-insights-desktop.png',
+    screenshotSrc: getMarketingExportImage('artist-spec-geo-insights-desktop')
+      .publicUrl,
     screenshotAlt: 'Jovie geo insights showing the top cities list.',
     screenshotWidth: 403,
     screenshotHeight: 946,

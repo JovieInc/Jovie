@@ -1,5 +1,6 @@
 import Image from 'next/image';
 import { Container } from '@/components/site/Container';
+import { getMarketingExportImage } from '@/lib/screenshots/registry';
 
 interface FeatureCard {
   readonly heading: string;
@@ -22,7 +23,8 @@ const FEATURES: FeatureCard[] = [
       'Fans notified via email on release day',
       'Pre-save pages that convert to day-one streams',
     ],
-    screenshotSrc: '/product-screenshots/releases-dashboard-full.png',
+    screenshotSrc: getMarketingExportImage('dashboard-releases-desktop')
+      .publicUrl,
     screenshotAlt:
       'Jovie release dashboard showing releases table with smart link details',
     screenshotWidth: 2880,
@@ -38,7 +40,8 @@ const FEATURES: FeatureCard[] = [
       'See which fans came from which release or show',
       'Export contacts anytime — your audience, your data',
     ],
-    screenshotSrc: '/product-screenshots/audience-crm.png',
+    screenshotSrc: getMarketingExportImage('dashboard-audience-desktop')
+      .publicUrl,
     screenshotAlt:
       'Jovie audience CRM showing fan contacts with source tracking',
     screenshotWidth: 2880,

@@ -1,4 +1,3 @@
-import '../(auth)/auth-utilities.css';
 import type { Metadata } from 'next';
 import { ResolvedClientProviders } from '@/components/providers/ResolvedClientProviders';
 import { resolveUserState } from '@/lib/auth/gate';
