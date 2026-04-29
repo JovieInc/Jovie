@@ -5,7 +5,7 @@ import { type FormEvent, useMemo, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { cn } from '@/lib/utils';
 import type { WaitlistAccessOutcome } from '@/lib/waitlist/access-request';
-import { WaitlistOutcomeView } from './WaitlistOutcomeView';
+import { WaitlistSuccessView } from './WaitlistSuccessView';
 
 interface WaitlistIntakeChatProps {
   readonly userEmail: string | null;
@@ -246,7 +246,7 @@ export function WaitlistIntakeChat({
 
   if (outcome) {
     return (
-      <WaitlistOutcomeView outcome={outcome} onRetry={() => setOutcome(null)} />
+      <WaitlistSuccessView outcome={outcome} onRetry={() => setOutcome(null)} />
     );
   }
 

@@ -1,7 +1,25 @@
 'use client';
 
+import { AuthLayout } from '@/features/auth';
+import type { WaitlistAccessOutcome } from '@/lib/waitlist/access-request';
 import { WaitlistOutcomeView } from './WaitlistOutcomeView';
 
-export function WaitlistSuccessView() {
-  return <WaitlistOutcomeView outcome='pending' />;
+interface WaitlistSuccessViewProps {
+  readonly outcome?: WaitlistAccessOutcome | 'pending';
+  readonly onRetry?: () => void;
+}
+
+export function WaitlistSuccessView({
+  outcome = 'pending',
+  onRetry,
+}: Readonly<WaitlistSuccessViewProps>) {
+  return (
+    <AuthLayout
+      formTitle='Request Access'
+      showFormTitle={false}
+      showFooterPrompt={false}
+    >
+      <WaitlistOutcomeView outcome={outcome} onRetry={onRetry} />
+    </AuthLayout>
+  );
 }
