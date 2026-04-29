@@ -129,6 +129,12 @@ async function globalSetup() {
     console.log('ℹ DATABASE_URL not set, skipping test data seeding');
   }
 
+  if (process.env.E2E_SKIP_WARMUP === '1') {
+    console.log('ℹ E2E_SKIP_WARMUP=1, skipping Turbopack route warmup');
+    console.log(`✅ E2E global setup complete in ${Date.now() - startTime}ms`);
+    return;
+  }
+
   // Warm up critical Turbopack routes before tests start
   // This pre-compiles /signin and /app so auth.setup.ts doesn't timeout waiting
   const baseURL = process.env.BASE_URL || 'http://localhost:3100';

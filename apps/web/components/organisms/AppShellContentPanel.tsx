@@ -1,8 +1,9 @@
-import type { ReactNode } from 'react';
+import type { ComponentPropsWithoutRef, ReactNode } from 'react';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { cn } from '@/lib/utils';
 
-export interface AppShellContentPanelProps {
+export interface AppShellContentPanelProps
+  extends Omit<ComponentPropsWithoutRef<'section'>, 'children'> {
   readonly toolbar?: ReactNode;
   readonly children: ReactNode;
   readonly maxWidth?: 'full' | 'wide' | 'reading' | 'form';
@@ -42,6 +43,7 @@ export function AppShellContentPanel({
   surfaceClassName,
   contentClassName,
   'data-testid': testId,
+  ...sectionProps
 }: Readonly<AppShellContentPanelProps>) {
   const panelScrollClassName =
     scroll === 'panel' ? 'min-h-0 overflow-hidden' : 'overflow-visible';
@@ -54,6 +56,7 @@ export function AppShellContentPanel({
         className
       )}
       data-testid={testId}
+      {...sectionProps}
     >
       <div
         className={cn(
