@@ -43,6 +43,10 @@ concurrency:
 jobs:
   knip:
     name: Knip Dead Code Audit
+    if: >-
+      github.event_name == 'schedule' ||
+      github.event.inputs.suite == 'all' ||
+      github.event.inputs.suite == 'unit'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -164,6 +168,22 @@ jobs:
           for _ in $(seq 1 90); do
             if curl -fsS http://127.0.0.1:3100/api/dev/test-auth/session >/dev/null; then
               echo "Nightly QA bypass server is ready."
+              for persona in creator creator-ready; do
+                for attempt in 1 2 3; do
+                  if curl -fsS -X POST http://127.0.0.1:3100/api/dev/test-auth/session \
+                    -H 'content-type: application/json' \
+                    --data "{\"persona\":\"$persona\"}" >/dev/null; then
+                    break
+                  fi
+                  if [ "$attempt" = "3" ]; then
+                    echo "Failed to prepare $persona bypass persona." >&2
+                    cat "$RUNNER_TEMP/nightly-qa-web.log"
+                    exit 1
+                  fi
+                  sleep 5
+                done
+              done
+              echo "Nightly QA bypass personas are ready."
               exit 0
             fi
             sleep 2
@@ -182,9 +202,11 @@ jobs:
           E2E_USE_TEST_AUTH_BYPASS: '1'
           E2E_FAST_ONBOARDING: '1'
           E2E_TEST_AUTH_PERSONA: creator
+          NEXT_PUBLIC_E2E_MODE: '1'
           NEXT_PUBLIC_CLERK_MOCK: '1'
           NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
           NEXT_DISABLE_TOOLBAR: '1'
+          E2E_ALLOW_DEV_CSP: '1'
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
 
       - name: Run nightly route QA breadth pass
@@ -248,9 +270,12 @@ jobs:
           E2E_FAST_ONBOARDING: '1'
           E2E_TEST_AUTH_PERSONA: creator
           E2E_SKIP_SEED: '1'
+          E2E_SKIP_WARMUP: '1'
+          NEXT_PUBLIC_E2E_MODE: '1'
           NEXT_PUBLIC_CLERK_MOCK: '1'
           NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
           NEXT_DISABLE_TOOLBAR: '1'
+          PLAYWRIGHT_WORKERS: '1'
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
 
       - name: Stop route QA bypass server
@@ -319,6 +344,10 @@ jobs:
         continue-on-error: true
         run: |
           cd apps/web
+          if [[ "${CLERK_SECRET_KEY:-}" != sk_test_* ]]; then
+            echo "Skipping Clerk E2E cleanup because CLERK_SECRET_KEY is not a Clerk test secret."
+            exit 0
+          fi
           pnpm tsx scripts/cleanup-e2e-users.ts --force
         env:
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
