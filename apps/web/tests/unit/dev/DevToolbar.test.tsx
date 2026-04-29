@@ -59,7 +59,7 @@ function renderToolbar(
 }
 
 function ShellChatFlagProbe() {
-  const enabled = useAppFlag('DESIGN_V1');
+  const enabled = useAppFlag('SHELL_CHAT_V1');
   return <div data-testid='shell-chat-v1-probe'>{enabled ? 'new' : 'old'}</div>;
 }
 

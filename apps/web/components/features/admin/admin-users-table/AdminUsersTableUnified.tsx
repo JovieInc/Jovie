@@ -22,7 +22,6 @@ import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { HeaderSearchAction } from '@/components/molecules/HeaderSearchAction';
-import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import {
   type ContextMenuItemType,
   convertContextMenuItems,
@@ -37,6 +36,7 @@ import {
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
+import { useTableMeta } from '@/contexts/TableMetaContext';
 import {
   AdminTableHeader,
   AdminTableSubheader,

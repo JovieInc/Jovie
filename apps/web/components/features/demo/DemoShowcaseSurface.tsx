@@ -196,7 +196,7 @@ function DemoDesignStudioShowcase({
   }
 
   return (
-    <div className='min-h-screen bg-[#0b0c0f] p-4 sm:p-6' data-testid={testId}>
+    <div className='min-h-screen bg-surface-1 p-4 sm:p-6' data-testid={testId}>
       {item.preview()}
     </div>
   );

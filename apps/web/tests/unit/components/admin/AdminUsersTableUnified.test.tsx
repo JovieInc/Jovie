@@ -2,8 +2,8 @@ import { TooltipProvider } from '@jovie/ui';
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { TableMetaProvider } from '@/components/organisms/AuthShellWrapper';
 import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
+import { TableMetaProvider } from '@/contexts/TableMetaContext';
 import { AdminUsersTableUnified } from '@/features/admin/admin-users-table/AdminUsersTableUnified';
 
 const mockUseBreakpointDown = vi.fn<

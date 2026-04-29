@@ -405,10 +405,10 @@ function groupItemsByCategory(items: readonly DesignStudioItem[]) {
 
 export function DesignStudioWorkspace({
   mode,
-}: Readonly<{ mode: StudioMode }>) {
+}: Readonly<{ mode: Exclude<StudioMode, 'pages'> }>) {
   return (
     <main
-      className='min-h-screen bg-[#0b0c0f] px-4 pb-12 pt-[80px] text-white sm:px-6 lg:px-8'
+      className='min-h-screen bg-surface-1 px-4 pb-12 pt-[80px] text-white sm:px-6 lg:px-8'
       data-testid={`design-studio-${mode}`}
     >
       {mode === 'sections' ? (

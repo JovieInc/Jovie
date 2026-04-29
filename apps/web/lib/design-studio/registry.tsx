@@ -222,7 +222,7 @@ function LyricsViewPreview() {
     <StudioFrame>
       <div className='h-[420px]'>
         <LyricsView
-          track={{ title: 'Lost in the Light', artist: 'Tim White' }}
+          track={{ title: 'Lost in the Light', artist: 'Sora Vale' }}
           durationSec={214}
           currentTimeSec={82}
           lines={MOCK_LYRICS}
