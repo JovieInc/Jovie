@@ -25,6 +25,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - **Removed Turbo's deprecated `daemon` config** so local Turbo commands no longer emit the Turbo 2.9 deprecation warning.
 
+### Documentation
+
+- **Local development docs now point at `dev:web:fast`** across README, agent guidance, Doppler setup, iOS setup, and screenshot-report instructions.
+
 ## [26.4.194] - 2026-04-29
 
 > Frame.io-inspired design layer for `/artist-profiles` + premium marketing footer rewrite.

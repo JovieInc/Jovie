@@ -71,7 +71,7 @@ CODEX_ARCHIVE_ON_STOP=1 ./scripts/codex-cleanup.sh
 Always run commands from the repo root.
 
 ```bash
-pnpm run dev:web:local
+pnpm run dev:web:fast
 pnpm run test:web
 pnpm run build
 pnpm run typecheck
