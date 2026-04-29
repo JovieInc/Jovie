@@ -33,7 +33,7 @@ describe('getMarketingExportScenarios', () => {
 });
 
 describe('getMarketingExportImage', () => {
-  it('returns a public URL, retina dimensions, and alt text for a desktop scenario', () => {
+  it('returns a public URL, retina dimensions, and alt text for a full-viewport desktop scenario', () => {
     const image = getMarketingExportImage('dashboard-releases-desktop');
     expect(image.publicUrl).toBe(
       '/product-screenshots/releases-dashboard-full.png'
@@ -43,11 +43,42 @@ describe('getMarketingExportImage', () => {
     expect(image.alt).toBe('Releases Dashboard');
   });
 
-  it('uses mobile viewport dimensions for mobile scenarios', () => {
+  it('uses mobile viewport dimensions for full-viewport mobile scenarios', () => {
     const image = getMarketingExportImage('public-profile-mobile');
     expect(image.publicUrl).toBe('/product-screenshots/profile-phone.png');
     expect(image.width).toBe(SCREENSHOT_VIEWPORTS.mobile.width * 2);
     expect(image.height).toBe(SCREENSHOT_VIEWPORTS.mobile.height * 2);
+  });
+
+  it('returns ACTUAL PNG dimensions (not viewport×2) for locator-captured scenarios', () => {
+    // Locator captures crop to a sub-region of the viewport, so their
+    // dimensions are arbitrary. Advertising viewport×2 to next/image distorts
+    // the rendered aspect ratio.
+    const cases: ReadonlyArray<{
+      readonly id: string;
+      readonly width: number;
+      readonly height: number;
+    }> = [
+      { id: 'artist-spec-geo-insights-desktop', width: 720, height: 1690 },
+      { id: 'artist-spec-tracked-links-desktop', width: 1842, height: 952 },
+      { id: 'artist-spec-sync-settings-desktop', width: 1442, height: 1120 },
+      { id: 'release-tasks-desktop', width: 1624, height: 1428 },
+      {
+        id: 'dashboard-release-sidebar-detail-desktop',
+        width: 776,
+        height: 1690,
+      },
+      {
+        id: 'dashboard-release-sidebar-platforms-desktop',
+        width: 776,
+        height: 582,
+      },
+    ];
+    for (const { id, width, height } of cases) {
+      const image = getMarketingExportImage(id);
+      expect(image.width).toBe(width);
+      expect(image.height).toBe(height);
+    }
   });
 
   it('throws on an unknown scenario id', () => {

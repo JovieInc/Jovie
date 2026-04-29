@@ -451,6 +451,45 @@ export function getScreenshotScenario(id: string): ScreenshotScenario | null {
 
 const PUBLIC_EXPORT_URL_PREFIX = '/product-screenshots';
 
+/**
+ * Actual PNG dimensions for every published export. Source of truth: the PNG
+ * IHDR header on disk. Locator-captured scenarios have non-retina dimensions
+ * (smaller than viewport×2) — advertising the wrong size to next/image distorts
+ * aspect ratios and degrades the image optimizer. Regenerate via:
+ *   node -e 'see scripts/print-screenshot-dimensions.ts'
+ */
+const PUBLIC_EXPORT_DIMENSIONS: Record<
+  string,
+  { readonly width: number; readonly height: number }
+> = {
+  'artist-spec-audience-quality-desktop.png': { width: 1682, height: 876 },
+  'artist-spec-creator-menu-mobile.png': { width: 680, height: 528 },
+  'artist-spec-geo-insights-desktop.png': { width: 720, height: 1690 },
+  'artist-spec-opinionated-design-mobile.png': { width: 780, height: 1688 },
+  'artist-spec-press-assets-mobile.png': { width: 700, height: 648 },
+  'artist-spec-sync-settings-desktop.png': { width: 1442, height: 1120 },
+  'artist-spec-tracked-links-desktop.png': { width: 1842, height: 952 },
+  'audience-crm.png': { width: 2880, height: 1800 },
+  'profile-desktop.png': { width: 2880, height: 1800 },
+  'profile-phone.png': { width: 780, height: 1688 },
+  'release-deep-end-phone.png': { width: 780, height: 1688 },
+  'release-landing-desktop.png': { width: 2880, height: 1800 },
+  'release-sidebar-detail.png': { width: 776, height: 1690 },
+  'release-sidebar-platforms.png': { width: 776, height: 582 },
+  'release-take-me-over-phone.png': { width: 780, height: 1688 },
+  'release-tasks-active.png': { width: 1624, height: 1428 },
+  'releases-dashboard-full.png': { width: 2880, height: 1800 },
+  'releases-dashboard-sidebar.png': { width: 2880, height: 1800 },
+  'tim-white-profile-contact-phone.png': { width: 780, height: 1688 },
+  'tim-white-profile-listen-phone.png': { width: 780, height: 1688 },
+  'tim-white-profile-live-phone.png': { width: 780, height: 1688 },
+  'tim-white-profile-pay-phone.png': { width: 780, height: 1688 },
+  'tim-white-profile-presave-phone.png': { width: 780, height: 1688 },
+  'tim-white-profile-subscribe-phone.png': { width: 780, height: 1688 },
+  'tim-white-profile-tour-phone.png': { width: 780, height: 1688 },
+  'tim-white-profile-video-phone.png': { width: 780, height: 1688 },
+};
+
 export interface MarketingExportImage {
   readonly publicUrl: string;
   readonly width: number;
@@ -477,11 +516,15 @@ export function getMarketingExportImage(id: string): MarketingExportImage {
   if (!scenario.publicExportPath) {
     throw new Error(`Screenshot scenario ${id} has no publicExportPath`);
   }
+  const known = PUBLIC_EXPORT_DIMENSIONS[scenario.publicExportPath];
+  // Fallback to viewport×2 retina dimensions for full-viewport captures whose
+  // actual size we haven't catalogued yet (mostly safe because full-viewport
+  // captures are always 1440×900 or 390×844 at deviceScaleFactor 2).
   const viewport = SCREENSHOT_VIEWPORTS[scenario.viewport];
   return {
     publicUrl: `${PUBLIC_EXPORT_URL_PREFIX}/${scenario.publicExportPath}`,
-    width: viewport.width * 2,
-    height: viewport.height * 2,
+    width: known?.width ?? viewport.width * 2,
+    height: known?.height ?? viewport.height * 2,
     alt: scenario.title,
   };
 }
