@@ -96,6 +96,30 @@ function defineScenarios(
   );
 }
 
+const TIM_WHITE_PROFILE_MOBILE_WAIT_FOR =
+  '[data-testid="demo-showcase-tim-white-profile"]';
+
+/**
+ * Build a tim-white-profile mobile scenario seed. The mode/release variants
+ * all share the same waitFor selector + mobile viewport — only the id, title,
+ * URL query, and exported phone screenshot path differ.
+ */
+function timWhiteProfileMobile(input: {
+  readonly id: string;
+  readonly title: string;
+  readonly query: string;
+  readonly publicExportPath: string;
+}): ScreenshotScenarioSeed {
+  return {
+    id: input.id,
+    title: input.title,
+    route: `/demo/showcase/tim-white-profile?${input.query}`,
+    waitFor: TIM_WHITE_PROFILE_MOBILE_WAIT_FOR,
+    viewport: 'mobile',
+    publicExportPath: input.publicExportPath,
+  };
+}
+
 export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
   ...defineScenarios('marketing', ADMIN_AND_INVESTOR, [
     {
@@ -232,54 +256,42 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
     },
   ]),
   ...defineScenarios('marketing', ADMIN_MARKETING_AND_INVESTOR, [
-    {
+    timWhiteProfileMobile({
       id: 'tim-white-profile-listen-mobile',
       title: 'Tim White Profile — Listen',
-      route: '/demo/showcase/tim-white-profile?mode=listen',
-      waitFor: '[data-testid="demo-showcase-tim-white-profile"]',
-      viewport: 'mobile',
+      query: 'mode=listen',
       publicExportPath: 'tim-white-profile-listen-phone.png',
-    },
-    {
+    }),
+    timWhiteProfileMobile({
       id: 'tim-white-profile-tour-mobile',
       title: 'Tim White Profile — Tour',
-      route: '/demo/showcase/tim-white-profile?mode=tour',
-      waitFor: '[data-testid="demo-showcase-tim-white-profile"]',
-      viewport: 'mobile',
+      query: 'mode=tour',
       publicExportPath: 'tim-white-profile-tour-phone.png',
-    },
-    {
+    }),
+    timWhiteProfileMobile({
       id: 'tim-white-profile-pay-mobile',
       title: 'Tim White Profile — Pay',
-      route: '/demo/showcase/tim-white-profile?mode=pay',
-      waitFor: '[data-testid="demo-showcase-tim-white-profile"]',
-      viewport: 'mobile',
+      query: 'mode=pay',
       publicExportPath: 'tim-white-profile-pay-phone.png',
-    },
-    {
+    }),
+    timWhiteProfileMobile({
       id: 'tim-white-profile-live-mobile',
       title: 'Tim White Profile — Latest Release',
-      route: '/demo/showcase/tim-white-profile?release=live',
-      waitFor: '[data-testid="demo-showcase-tim-white-profile"]',
-      viewport: 'mobile',
+      query: 'release=live',
       publicExportPath: 'tim-white-profile-live-phone.png',
-    },
-    {
+    }),
+    timWhiteProfileMobile({
       id: 'tim-white-profile-subscribe-mobile',
       title: 'Tim White Profile — Subscribe',
-      route: '/demo/showcase/tim-white-profile?mode=subscribe',
-      waitFor: '[data-testid="demo-showcase-tim-white-profile"]',
-      viewport: 'mobile',
+      query: 'mode=subscribe',
       publicExportPath: 'tim-white-profile-subscribe-phone.png',
-    },
-    {
+    }),
+    timWhiteProfileMobile({
       id: 'tim-white-profile-contact-mobile',
       title: 'Tim White Profile — Contact',
-      route: '/demo/showcase/tim-white-profile?mode=contact',
-      waitFor: '[data-testid="demo-showcase-tim-white-profile"]',
-      viewport: 'mobile',
+      query: 'mode=contact',
       publicExportPath: 'tim-white-profile-contact-phone.png',
-    },
+    }),
     {
       id: 'release-presave-mobile',
       title: 'Release Presave Mobile',
