@@ -36,6 +36,13 @@ const PUBLIC_PROFILE_LOADER_SOURCE = readFileSync(
   'utf8'
 );
 const PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE = `${PUBLIC_PROFILE_PAGE_SOURCE}\n${PUBLIC_PROFILE_LOADER_SOURCE}`;
+const PUBLIC_PROFILE_TEMPLATE_SOURCE = readFileSync(
+  path.join(
+    WEB_ROOT,
+    'components/features/profile/templates/ProfileCompactTemplate.tsx'
+  ),
+  'utf8'
+);
 
 const mockProfile = {
   id: 'profile-123',
@@ -135,9 +142,11 @@ describe('Public Profile Page Logic', () => {
   });
 
   describe('public claim banner handling', () => {
-    it('reads search params for mode handling', () => {
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-        'const resolvedSearchParams = await searchParams;'
+    it('keeps mode query handling out of the ISR server render', () => {
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain('await searchParams');
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain('readonly searchParams');
+      expect(PUBLIC_PROFILE_TEMPLATE_SOURCE).toContain(
+        'new URLSearchParams(globalThis.location.search).get'
       );
     });
 
