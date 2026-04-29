@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronRight, Play } from 'lucide-react';
+import { Play } from 'lucide-react';
 import { useMemo } from 'react';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { cn } from '@/lib/utils';
@@ -73,13 +73,38 @@ export function ReleasesView({
     return headers;
   }, [releases]);
 
+  const getCollaborators = (release: PublicRelease) =>
+    release.artistNames.filter(name => name.toLowerCase() !== ownerNameLower);
+
+  const getReleaseMeta = (release: PublicRelease): string => {
+    const collaborators = getCollaborators(release);
+    const year = release.releaseDate
+      ? new Date(release.releaseDate).getUTCFullYear().toString()
+      : null;
+
+    return [
+      collaborators.length > 0 ? collaborators.join(', ') : null,
+      formatReleaseType(release.releaseType),
+      year,
+    ]
+      .filter(Boolean)
+      .join(' • ');
+  };
+
+  const getReleaseAriaLabel = (release: PublicRelease): string => {
+    const collaborators = getCollaborators(release);
+    return collaborators.length > 0
+      ? `View ${release.title} by ${collaborators.join(', ')}`
+      : `View ${release.title}`;
+  };
+
   return (
     <div className='flex flex-col' data-testid='profile-mode-drawer-releases'>
       {releases[0]?.slug ? (
         <a
           href={`/${artistHandle}/${releases[0].slug}`}
           className='group flex items-center gap-3 border-y border-white/[0.075] px-4 py-3.5 transition-colors duration-200 hover:bg-white/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
-          aria-label={`View ${releases[0].title}`}
+          aria-label={getReleaseAriaLabel(releases[0])}
         >
           <div className='relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-[8px] bg-white/[0.04] shadow-[0_8px_20px_-10px_rgba(0,0,0,0.55)]'>
             <ImageWithFallback
@@ -97,12 +122,14 @@ export function ReleasesView({
             <p className='mt-1 truncate text-[17px] font-[680] leading-tight tracking-[-0.014em] text-white'>
               {releases[0].title}
             </p>
-            <p className='mt-0.5 truncate text-[13px] text-white/64'>
-              {formatReleaseType(releases[0].releaseType)}
-              {releases[0].releaseDate
-                ? ` · ${new Date(releases[0].releaseDate).getUTCFullYear()}`
-                : ''}
+            <p className='text-2xs mt-0.5 truncate text-[13px] text-white/64'>
+              {getReleaseMeta(releases[0])}
             </p>
+            {releases[0].releaseType === 'music_video' ? (
+              <span className='mt-1.5 inline-flex h-[17px] items-center rounded-full border border-white/8 bg-white/[0.04] px-1.5 text-[9px] font-semibold uppercase tracking-[0.04em] text-white/64'>
+                Video
+              </span>
+            ) : null}
           </div>
           <span className='inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-white px-3 text-[13px] font-[680] tracking-[-0.01em] text-black'>
             <Play className='h-3 w-3 fill-current' />
@@ -112,17 +139,10 @@ export function ReleasesView({
       ) : null}
 
       {releases.length > 1 ? (
-        <div className='flex items-baseline justify-between px-4 pb-2 pt-5'>
+        <div className='px-4 pb-2 pt-5'>
           <h3 className='text-[22px] font-[680] leading-none tracking-[-0.025em] text-white'>
             Top Songs
           </h3>
-          <a
-            href={`/${artistHandle}?mode=releases`}
-            className='inline-flex items-center gap-1 text-[14px] font-medium text-white/64'
-          >
-            See All
-            <ChevronRight className='h-3.5 w-3.5' />
-          </a>
         </div>
       ) : null}
 
@@ -138,20 +158,8 @@ export function ReleasesView({
             ? new Date(release.releaseDate).getUTCFullYear().toString()
             : null;
           const showHeader = yearHeaderSet.has(release.id);
-          const collaborators = release.artistNames.filter(
-            name => name.toLowerCase() !== ownerNameLower
-          );
-          const meta = [
-            collaborators.length > 0 ? collaborators.join(', ') : null,
-            formatReleaseType(release.releaseType),
-            year,
-          ]
-            .filter(Boolean)
-            .join(' • ');
-          const ariaLabel =
-            collaborators.length > 0
-              ? `View ${release.title} by ${collaborators.join(', ')}`
-              : `View ${release.title}`;
+          const meta = getReleaseMeta(release);
+          const ariaLabel = getReleaseAriaLabel(release);
 
           return (
             <div key={release.id}>

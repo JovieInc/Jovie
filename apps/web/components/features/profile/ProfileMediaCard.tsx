@@ -68,6 +68,7 @@ export interface ProfileMediaCardProps {
   readonly datePill?: ProfileMediaCardDatePill | null;
   readonly status?: ProfileMediaCardStatus | null;
   readonly action?: ProfileMediaCardAction | null;
+  readonly secondaryAction?: ProfileMediaCardAction | null;
   readonly priority?: boolean;
   readonly className?: string;
   readonly imageClassName?: string;
@@ -358,6 +359,7 @@ export function ProfileMediaCard({
   datePill,
   status,
   action,
+  secondaryAction,
   priority = false,
   className,
   imageClassName,
@@ -522,9 +524,19 @@ export function ProfileMediaCard({
         </div>
       </div>
 
-      {action ? (
+      {action || secondaryAction ? (
         <div className={cn('bg-black', compact ? 'p-1.5' : 'px-3.5 py-4')}>
-          <CardAction action={action} compact={compact} />
+          <div
+            className={cn(
+              'grid gap-2',
+              action && secondaryAction && !compact && 'grid-cols-2'
+            )}
+          >
+            {action ? <CardAction action={action} compact={compact} /> : null}
+            {secondaryAction ? (
+              <CardAction action={secondaryAction} compact={compact} />
+            ) : null}
+          </div>
         </div>
       ) : null}
     </article>

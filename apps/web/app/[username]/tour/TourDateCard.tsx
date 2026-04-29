@@ -63,13 +63,21 @@ export function TourDateCard({
 
   const canBuyTickets =
     Boolean(tourDate.ticketUrl) && !isCancelled && !isSoldOut;
+  const canAddToCalendar = !isCancelled;
   const actionLabel = isCancelled
     ? 'Cancelled'
     : isSoldOut
-      ? 'Sold out'
+      ? 'Add to calendar'
       : canBuyTickets
         ? 'Get tickets'
         : 'Add to calendar';
+  const calendarAction = canAddToCalendar
+    ? {
+        label: 'Add to calendar',
+        onClick: handleAddToCalendar,
+        icon: 'CalendarPlus' as const,
+      }
+    : null;
 
   return (
     <ProfileMediaCard
@@ -103,8 +111,10 @@ export function TourDateCard({
         onClick: canBuyTickets ? handleTicketClick : handleAddToCalendar,
         icon: canBuyTickets ? 'Ticket' : 'CalendarPlus',
         showChevron: canBuyTickets,
-        disabled: isCancelled || isSoldOut,
+        disabled: isCancelled,
       }}
+      secondaryAction={canBuyTickets ? calendarAction : null}
+      status={isSoldOut ? { label: 'Sold out', tone: 'orange' } : null}
       className={isCancelled ? 'opacity-60' : undefined}
     />
   );
