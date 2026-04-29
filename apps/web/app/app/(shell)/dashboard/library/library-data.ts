@@ -29,7 +29,7 @@ export function buildLibraryReleaseAssets(
       .map(provider => ({
         key: provider.key,
         label: provider.label,
-        url: provider.url.trim(),
+        url: provider.url?.trim() ?? '',
       }))
       .filter(provider => provider.url.length > 0);
 
