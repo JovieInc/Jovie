@@ -100,9 +100,14 @@ describe('LyricsPage', () => {
   });
 
   it('renders the production empty lyrics state for a real track with no lyrics', async () => {
+    // Use distinct values for track.artist vs selectedProfile.displayName so
+    // the assertion proves the rendered artist is sourced from the profile
+    // (not from track.artist). selectedProfile.displayName is 'Bahamas' (see
+    // fixture above); track.artist is set to a sentinel that must NOT leak
+    // through into initialTrack.artist.
     mocks.loadLyricsRouteTrack.mockResolvedValue({
       title: 'Real Track',
-      artist: 'Bahamas',
+      artist: 'WRONG_ARTIST_FROM_TRACK',
       lyrics: null,
     });
 
@@ -114,11 +119,19 @@ describe('LyricsPage', () => {
         initialLines: [],
         initialTrack: {
           title: 'Real Track',
+          // Must come from selectedProfile.displayName, NOT track.artist.
           artist: 'Bahamas',
         },
         trackId: 'track-1',
       },
       undefined
+    );
+
+    // Explicit guard: ensure the track.artist sentinel never leaks through
+    // into initialTrack.artist if a future refactor wires the wrong source.
+    const lastCallArgs = mocks.lyricsPageClient.mock.calls.at(-1);
+    expect(lastCallArgs?.[0]?.initialTrack?.artist).not.toBe(
+      'WRONG_ARTIST_FROM_TRACK'
     );
   });
 });
