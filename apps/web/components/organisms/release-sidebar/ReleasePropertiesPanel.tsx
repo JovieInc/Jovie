@@ -37,7 +37,7 @@ export function ReleasePropertiesPanel({
   return (
     <DrawerSection
       title='Properties'
-      surface='card'
+      surface='plain'
       collapsible={false}
       testId='release-properties-card'
       contentClassName='p-0'

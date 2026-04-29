@@ -36,6 +36,8 @@ export interface PillSearchProps {
   readonly albumOptions: readonly string[];
   /** Called when the user hits Esc on an empty input or focus leaves the surface. */
   readonly onClose: () => void;
+  readonly ariaLabel?: string;
+  readonly placeholder?: string;
 }
 
 type Suggestion =
@@ -144,6 +146,8 @@ export function PillSearch({
   titleOptions,
   albumOptions,
   onClose,
+  ariaLabel = 'Filter tracks',
+  placeholder = 'Type to filter — / for fields',
 }: PillSearchProps) {
   const [text, setText] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -350,16 +354,13 @@ export function PillSearch({
             setDropdownOpen(false);
           }}
           role='combobox'
-          aria-label='Filter tracks'
+          aria-label={ariaLabel}
+          data-app-search-field='true'
           aria-expanded={dropdownVisible}
           aria-controls={listboxId}
           aria-autocomplete='list'
           aria-activedescendant={activeOptionId}
-          placeholder={
-            pills.length === 0
-              ? 'Type to filter — / for fields'
-              : 'and… (/ for fields)'
-          }
+          placeholder={pills.length === 0 ? placeholder : 'and… (/ for fields)'}
           className='flex-1 min-w-[120px] bg-transparent text-[13px] text-primary-token placeholder:text-tertiary-token outline-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cyan-500/30 rounded-sm'
         />
         <button
