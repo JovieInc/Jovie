@@ -135,7 +135,9 @@ export function MarketingFooter({
             >
               {FOOTER_COLUMNS.map(column => (
                 <section key={column.title}>
-                  <h2 className='mf-eyebrow'>{column.title}</h2>
+                  <h2 className='mf-eyebrow mf-eyebrow--caps'>
+                    {column.title}
+                  </h2>
                   <ul className='flex list-none flex-col gap-3 p-0'>
                     {column.links.map(link => (
                       <li key={`${link.href}-${link.label}`}>
