@@ -119,8 +119,9 @@ jobs:
 
             echo "Candidate: $ISSUE_IDENTIFIER -> $BRANCH_NAME"
 
-            EXISTING_PR_COUNT=$(gh pr list --state open --limit 100 --json number,title,body,headRefName --jq \
-              'map(select((.headRefName == env.BRANCH_NAME) or (((.title // "") + "\n" + (.body // "")) | test(env.ISSUE_IDENTIFIER; "i")))) | length')
+            EXISTING_PR_COUNT=$(gh pr list --state open --limit 100 --json number,title,body,headRefName \
+              | jq --arg branch "$BRANCH_NAME" --arg id "$ISSUE_IDENTIFIER" \
+                'map(select((.headRefName == $branch) or (((.title // "") + "\n" + (.body // "")) | test($id; "i")))) | length')
             if [[ "$EXISTING_PR_COUNT" != "0" ]]; then
               echo "Open PR already exists for $ISSUE_IDENTIFIER; skipping"
               continue
@@ -172,8 +173,13 @@ jobs:
             fi
             rm -f "$DISPATCH_BODY"
 
+            # Mutate Linear non-fatally: dispatch already fired, so a rejected
+            # mutation must be logged for observability but must not exit the
+            # loop (the issue is already leased by the orchestrator).
             if [[ -n "$IN_PROGRESS_STATE_ID" ]]; then
-              curl -sS https://api.linear.app/graphql \
+              LEASE_RESPONSE_FILE=$(mktemp)
+              LEASE_HTTP=$(curl -sS -o "$LEASE_RESPONSE_FILE" -w '%{http_code}' \
+                https://api.linear.app/graphql \
                 -H "Authorization: ${LINEAR_API_KEY}" \
                 -H 'Content-Type: application/json' \
                 -d "$(jq -cn \
@@ -182,10 +188,19 @@ jobs:
                   '{
                     query: "mutation LeaseIssue($issueId: String!, $stateId: String!) { issueUpdate(id: $issueId, input: { stateId: $stateId }) { success } }",
                     variables: { issueId: $issueId, stateId: $stateId }
-                  }')" > /dev/null
+                  }')" || echo "000")
+              LEASE_SUCCESS=$(jq -r '.data.issueUpdate.success // false' < "$LEASE_RESPONSE_FILE" 2>/dev/null || echo "false")
+              if [[ "$LEASE_HTTP" != "200" || "$LEASE_SUCCESS" != "true" ]]; then
+                echo "::warning::Linear issueUpdate failed for ${ISSUE_IDENTIFIER} (http=${LEASE_HTTP}, success=${LEASE_SUCCESS}); dispatch already fired"
+                cat "$LEASE_RESPONSE_FILE" || true
+                echo
+              fi
+              rm -f "$LEASE_RESPONSE_FILE"
             fi
 
-            curl -sS https://api.linear.app/graphql \
+            COMMENT_RESPONSE_FILE=$(mktemp)
+            COMMENT_HTTP=$(curl -sS -o "$COMMENT_RESPONSE_FILE" -w '%{http_code}' \
+              https://api.linear.app/graphql \
               -H "Authorization: ${LINEAR_API_KEY}" \
               -H 'Content-Type: application/json' \
               -d "$(jq -cn \
@@ -194,5 +209,12 @@ jobs:
                 '{
                   query: "mutation AddLeaseComment($issueId: String!, $body: String!) { commentCreate(input: { issueId: $issueId, body: $body }) { success } }",
                   variables: { issueId: $issueId, body: $body }
-                }')" > /dev/null
+                }')" || echo "000")
+            COMMENT_SUCCESS=$(jq -r '.data.commentCreate.success // false' < "$COMMENT_RESPONSE_FILE" 2>/dev/null || echo "false")
+            if [[ "$COMMENT_HTTP" != "200" || "$COMMENT_SUCCESS" != "true" ]]; then
+              echo "::warning::Linear commentCreate failed for ${ISSUE_IDENTIFIER} (http=${COMMENT_HTTP}, success=${COMMENT_SUCCESS}); dispatch already fired"
+              cat "$COMMENT_RESPONSE_FILE" || true
+              echo
+            fi
+            rm -f "$COMMENT_RESPONSE_FILE"
           done < /tmp/linear-candidates.jsonl
