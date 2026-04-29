@@ -437,6 +437,56 @@ export async function getReleasesForProfile(
 }
 
 /**
+ * Get one release for a creator profile with the same related data used by the
+ * release matrix, without loading the full catalog.
+ */
+export async function getReleaseForProfileById(
+  creatorProfileId: string,
+  releaseId: string,
+  options?: { includeDrafts?: boolean }
+): Promise<ReleaseWithProviders | null> {
+  const filters = [
+    eq(discogReleases.creatorProfileId, creatorProfileId),
+    eq(discogReleases.id, releaseId),
+    isNull(discogReleases.deletedAt),
+  ];
+  if (!options?.includeDrafts) {
+    filters.push(ne(discogReleases.status, 'draft'));
+  }
+
+  const [release] = await db
+    .select()
+    .from(discogReleases)
+    .where(and(...filters))
+    .limit(1);
+
+  if (!release) {
+    return null;
+  }
+
+  const [trackSummaries, artistNamesByRelease, links] = await Promise.all([
+    getTrackSummariesForReleases([release.id]),
+    getArtistNamesForReleases([release.id]),
+    db
+      .select()
+      .from(providerLinks)
+      .where(
+        and(
+          eq(providerLinks.ownerType, 'release'),
+          eq(providerLinks.releaseId, release.id)
+        )
+      ),
+  ]);
+
+  return {
+    ...release,
+    artistNames: artistNamesByRelease.get(release.id) ?? [],
+    providerLinks: links,
+    trackSummary: trackSummaries.get(release.id),
+  };
+}
+
+/**
  * Get a single release by slug
  */
 export async function getReleaseBySlug(
