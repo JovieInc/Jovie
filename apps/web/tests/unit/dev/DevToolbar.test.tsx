@@ -27,15 +27,18 @@ vi.mock('@/lib/flags/contracts', () => ({
     HERO_SPOTIFY: 'code:HERO_SPOTIFY',
     BILLING_UPGRADE: 'code:BILLING_UPGRADE',
     THREADS_ENABLED: 'code:THREADS_ENABLED',
-    SHELL_CHAT_V1: 'code:SHELL_CHAT_V1',
+    DESIGN_V1: 'code:DESIGN_V1',
+    SHELL_CHAT_V1: 'code:DESIGN_V1',
   },
   APP_FLAG_DEFAULTS: {
     CLAIM_HANDLE: false,
     HERO_SPOTIFY: false,
     BILLING_UPGRADE: false,
     THREADS_ENABLED: false,
+    DESIGN_V1: false,
     SHELL_CHAT_V1: false,
   },
+  DESIGN_V1_ALIAS_FLAGS: ['SHELL_CHAT_V1'],
 }));
 
 import { DevToolbar } from '@/components/features/dev/DevToolbar';
@@ -56,7 +59,7 @@ function renderToolbar(
 }
 
 function ShellChatFlagProbe() {
-  const enabled = useAppFlag('SHELL_CHAT_V1');
+  const enabled = useAppFlag('DESIGN_V1');
   return <div data-testid='shell-chat-v1-probe'>{enabled ? 'new' : 'old'}</div>;
 }
 
@@ -358,7 +361,8 @@ describe('DevToolbar', () => {
 
       expect(screen.getByText('claim handle')).toBeInTheDocument();
       expect(screen.getByText('threads enabled')).toBeInTheDocument();
-      expect(screen.getByText('shell chat v1')).toBeInTheDocument();
+      expect(screen.getByText('design v1')).toBeInTheDocument();
+      expect(screen.queryByText('shell chat v1')).not.toBeInTheDocument();
     });
 
     it('shows source label for each non-overridden flag', () => {
@@ -384,7 +388,7 @@ describe('DevToolbar', () => {
       ).toBeInTheDocument();
     });
 
-    it('sets the SHELL_CHAT_V1 override on click', () => {
+    it('sets the DESIGN_V1 override on click', () => {
       renderToolbar();
 
       fireEvent.click(screen.getByRole('button', { name: /New Design/ }));
@@ -392,16 +396,16 @@ describe('DevToolbar', () => {
       expect(
         JSON.parse(localStorage.getItem(FF_OVERRIDES_KEY) ?? '{}')
       ).toEqual({
-        'code:SHELL_CHAT_V1': true,
+        'code:DESIGN_V1': true,
       });
     });
 
-    it('clears the SHELL_CHAT_V1 override when toggled back to the server default', () => {
-      // Server default for SHELL_CHAT_V1 is false. When the user has an
+    it('clears the DESIGN_V1 override when toggled back to the server default', () => {
+      // Server default for DESIGN_V1 is false. When the user has an
       // override of `true` and toggles back, the result (false) matches
       // the server default, so we remove the override entirely instead of
       // recording a no-op `false` value. Keeps the override count honest.
-      setLocalOverrides({ 'code:SHELL_CHAT_V1': true });
+      setLocalOverrides({ 'code:DESIGN_V1': true });
       renderToolbar();
 
       const toggle = screen.getByRole('button', { name: /New Design/ });
@@ -414,11 +418,11 @@ describe('DevToolbar', () => {
       ).toEqual({});
     });
 
-    it('drops the override badge when SHELL_CHAT_V1 is toggled back to default', () => {
+    it('drops the override badge when DESIGN_V1 is toggled back to default', () => {
       // Companion to the test above: the user-meaningful override count
       // returns to zero when an override is cleared, so the collapsed
       // badge should disappear (no "0 overrides" pill flicker).
-      setLocalOverrides({ 'code:SHELL_CHAT_V1': true });
+      setLocalOverrides({ 'code:DESIGN_V1': true });
       renderToolbar();
 
       expect(screen.getByText('1 override')).toBeInTheDocument();
@@ -437,6 +441,20 @@ describe('DevToolbar', () => {
       fireEvent.click(screen.getByRole('button', { name: /New Design/ }));
 
       expect(screen.getByText('1 override')).toBeInTheDocument();
+    });
+
+    it('keeps the Design Studio shortcut hidden until DESIGN_V1 is on', () => {
+      renderToolbar();
+
+      expect(
+        screen.queryByRole('link', { name: 'Design Studio' })
+      ).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: /New Design/ }));
+
+      expect(
+        screen.getByRole('link', { name: 'Design Studio' })
+      ).toHaveAttribute('href', '/exp/page-builder');
     });
 
     it('syncs the override to shell flag consumers outside the toolbar', async () => {

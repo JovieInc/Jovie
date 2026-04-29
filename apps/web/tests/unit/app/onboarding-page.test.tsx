@@ -557,7 +557,7 @@ describe('onboarding page', () => {
     expect(vi.mocked(reserveOnboardingHandle).mock.calls).toHaveLength(0);
   });
 
-  it('passes designV1=true when DESIGN_V1_ONBOARDING gate is enabled', async () => {
+  it('passes designV1=true when DESIGN_V1 is enabled', async () => {
     const { resolveUserState } = await import('@/lib/auth/gate');
     const { getAppFlagValue } = await import('@/lib/flags/server');
 

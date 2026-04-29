@@ -13,7 +13,7 @@ export const runtime = 'nodejs';
 
 export default async function LibraryPage() {
   const { userId } = await getCachedAuth();
-  const libraryEnabled = await getAppFlagValue('DESIGN_V1_LIBRARY', {
+  const libraryEnabled = await getAppFlagValue('DESIGN_V1', {
     userId,
   });
 

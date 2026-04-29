@@ -318,6 +318,34 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
   ]),
   ...defineScenarios('dashboard', ADMIN_MARKETING_AND_INVESTOR, [
     {
+      id: 'design-studio-music-ai-command-desktop',
+      title: 'Design Studio — Music AI Command Surface',
+      route: '/demo/showcase/music-ai-command',
+      waitFor: '[data-testid="demo-showcase-music-ai-command"]',
+      publicExportPath: 'design-studio-music-ai-command.png',
+    },
+    {
+      id: 'design-studio-shell-lyrics-desktop',
+      title: 'Design Studio — Lyrics View',
+      route: '/demo/showcase/shell-lyrics',
+      waitFor: '[data-testid="demo-showcase-shell-lyrics"]',
+      publicExportPath: 'design-studio-shell-lyrics.png',
+    },
+    {
+      id: 'design-studio-shell-library-desktop',
+      title: 'Design Studio — Library View',
+      route: '/demo/showcase/shell-library',
+      waitFor: '[data-testid="demo-showcase-shell-library"]',
+      publicExportPath: 'design-studio-shell-library.png',
+    },
+    {
+      id: 'design-studio-shell-track-desktop',
+      title: 'Design Studio — Track View',
+      route: '/demo/showcase/shell-track',
+      waitFor: '[data-testid="demo-showcase-shell-track"]',
+      publicExportPath: 'design-studio-shell-track.png',
+    },
+    {
       id: 'dashboard-releases-desktop',
       title: 'Releases Dashboard',
       route: '/demo',

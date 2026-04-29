@@ -159,7 +159,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   const [isGeneratingReleasePlan, setIsGeneratingReleasePlan] = useState(false);
   const router = useRouter();
   const albumArtFlagEnabled = useCodeFlag('ALBUM_ART_GENERATION');
-  const designV1ReleasesEnabled = useAppFlag('DESIGN_V1_RELEASES');
+  const designV1ReleasesEnabled = useAppFlag('DESIGN_V1');
 
   const {
     rows,

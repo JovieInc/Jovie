@@ -107,7 +107,7 @@ function distinctValues(
 }
 
 /**
- * Top-level Linear-style releases view, rendered behind DESIGN_V1_RELEASES.
+ * Top-level Linear-style releases view, rendered behind DESIGN_V1.
  *
  * Replaces the legacy `ReleasesExperience` provider matrix with a shell-row
  * list, PillSearch header, row actions, and the production release drawer.

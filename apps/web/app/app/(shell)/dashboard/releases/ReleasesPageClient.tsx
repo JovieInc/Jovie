@@ -18,7 +18,7 @@ export interface ReleasesFlagState {
 export function resolveReleasesViewMode({
   designV1ReleasesEnabled,
 }: ReleasesFlagState): ReleasesViewMode {
-  // SHELL_CHAT_V1 owns shell chrome; releases view selection belongs to DESIGN_V1_RELEASES.
+  // DESIGN_V1 owns both shell chrome and the releases view selection.
   return designV1ReleasesEnabled
     ? 'designV1ShellReleases'
     : 'legacyProviderMatrix';
@@ -57,8 +57,8 @@ export function ReleasesPageClient() {
   const { selectedProfile } = useDashboardData();
   const profileId = selectedProfile?.id ?? '';
   const releasesViewMode = resolveReleasesViewMode({
-    shellChatV1Enabled: useAppFlag('SHELL_CHAT_V1'),
-    designV1ReleasesEnabled: useAppFlag('DESIGN_V1_RELEASES'),
+    shellChatV1Enabled: useAppFlag('DESIGN_V1'),
+    designV1ReleasesEnabled: useAppFlag('DESIGN_V1'),
   });
 
   const { data: releases, isLoading, isError } = useReleasesQuery(profileId);
