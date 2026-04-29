@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { WaitlistIntakeChat } from '@/components/features/waitlist/WaitlistIntakeChat';
-import { WaitlistOutcomeView } from '@/components/features/waitlist/WaitlistOutcomeView';
+import { WaitlistSuccessView } from '@/components/features/waitlist/WaitlistSuccessView';
 import { APP_ROUTES } from '@/constants/routes';
 import { CanonicalUserState, resolveUserState } from '@/lib/auth/gate';
 
@@ -28,7 +28,7 @@ export default async function WaitlistPage() {
   }
 
   if (authResult.state === CanonicalUserState.WAITLIST_PENDING) {
-    return <WaitlistOutcomeView outcome='pending' />;
+    return <WaitlistSuccessView />;
   }
 
   return <WaitlistIntakeChat userEmail={authResult.context.email} />;
