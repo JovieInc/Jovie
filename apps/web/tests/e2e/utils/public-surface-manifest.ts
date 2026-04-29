@@ -594,7 +594,7 @@ const PROFILE_SURFACES = [
     mainSelector: 'body',
     minMainTextLength: 60,
     allowMissingMain: true,
-    lighthouse: false,
+    lighthouse: true,
     perfGroups: ['public-profile-core'],
     interactions: [
       ...PROFILE_INTERACTIONS,
