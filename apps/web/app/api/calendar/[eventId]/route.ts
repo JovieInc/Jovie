@@ -1,10 +1,14 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { after, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { tourDates } from '@/lib/db/schema/tour';
 import { captureError } from '@/lib/error-tracking';
-import { escapeIcsText, formatIcsTimestamp } from '@/lib/ics/format';
+import {
+  escapeIcsText,
+  formatIcsTimestamp,
+  sanitizeIcsUrl,
+} from '@/lib/ics/format';
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -41,7 +45,12 @@ export async function GET(
       })
       .from(tourDates)
       .innerJoin(creatorProfiles, eq(tourDates.profileId, creatorProfiles.id))
-      .where(eq(tourDates.id, eventId))
+      .where(
+        and(
+          eq(tourDates.id, eventId),
+          eq(tourDates.confirmationStatus, 'confirmed')
+        )
+      )
       .limit(1);
 
     if (!result) {
@@ -75,7 +84,9 @@ export async function GET(
     if (tourDate.ticketUrl) {
       descriptionParts.push(`Tickets: ${tourDate.ticketUrl}`);
     }
-    const description = descriptionParts.join(String.raw`\n`);
+    const description = descriptionParts.join('\n');
+
+    const ticketUrl = sanitizeIcsUrl(tourDate.ticketUrl);
 
     // Build event summary
     const summary = tourDate.title
@@ -100,7 +111,7 @@ export async function GET(
       `SUMMARY:${escapeIcsText(summary)}`,
       `DESCRIPTION:${escapeIcsText(description)}`,
       `LOCATION:${escapeIcsText(location)}`,
-      tourDate.ticketUrl ? `URL:${tourDate.ticketUrl}` : null,
+      ticketUrl ? `URL:${ticketUrl}` : null,
       'STATUS:CONFIRMED',
       'TRANSP:OPAQUE',
       'END:VEVENT',

@@ -93,6 +93,16 @@ describe('insertEvent', () => {
     expect(call.provider).toBe('admin_import');
     expect(call.confirmationStatus).toBe('pending');
   });
+
+  it('throws when the insert returns no row', async () => {
+    mockReturning.mockResolvedValueOnce([]);
+
+    await expect(
+      insertEvent({ ...baseInput, provider: 'bandsintown' })
+    ).rejects.toThrow(
+      'insertEvent failed: no TourDate returned for provider=bandsintown eventType=tour'
+    );
+  });
 });
 
 describe('bulkInsertSyncedEvents', () => {
@@ -159,5 +169,17 @@ describe('bulkInsertSyncedEvents', () => {
     expect(upsertConfig?.set).not.toHaveProperty('confirmationStatus');
     expect(upsertConfig?.set).not.toHaveProperty('reviewedAt');
     expect(upsertConfig?.set).not.toHaveProperty('eventType');
+  });
+
+  it('rejects manual rows without touching the db', async () => {
+    await expect(
+      bulkInsertSyncedEvents([{ ...baseInput, provider: 'manual' }])
+    ).rejects.toThrow(
+      'bulkInsertSyncedEvents only accepts synced/import providers'
+    );
+
+    expect(mockDbInsert).not.toHaveBeenCalled();
+    expect(mockValues).not.toHaveBeenCalled();
+    expect(mockReturning).not.toHaveBeenCalled();
   });
 });

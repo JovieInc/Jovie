@@ -47,6 +47,11 @@ export async function insertEvent(input: InsertEventInput): Promise<TourDate> {
       reviewedAt,
     })
     .returning();
+  if (!row) {
+    throw new Error(
+      `insertEvent failed: no TourDate returned for provider=${input.provider} eventType=${eventType}`
+    );
+  }
   return row;
 }
 
@@ -64,6 +69,11 @@ export async function bulkInsertSyncedEvents(
   rows: ReadonlyArray<InsertEventInput>
 ): Promise<number> {
   if (rows.length === 0) return 0;
+  if (rows.some(row => row.provider === 'manual')) {
+    throw new Error(
+      'bulkInsertSyncedEvents only accepts synced/import providers'
+    );
+  }
   const now = new Date();
   const values = rows.map(input => ({
     ...input,

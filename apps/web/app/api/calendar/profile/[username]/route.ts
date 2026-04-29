@@ -3,7 +3,11 @@ import { after, type NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
-import { escapeIcsText, formatIcsTimestamp } from '@/lib/ics/format';
+import {
+  escapeIcsText,
+  formatIcsTimestamp,
+  sanitizeIcsUrl,
+} from '@/lib/ics/format';
 import { apiLimiter, createRateLimitHeaders } from '@/lib/rate-limit';
 import { getConfirmedTourEventsForProfile } from '@/lib/tour-dates/queries';
 
@@ -116,6 +120,7 @@ export async function GET(
         descriptionParts.push(`Tickets: ${event.ticketUrl}`);
       }
       const description = descriptionParts.join('\n');
+      const ticketUrl = sanitizeIcsUrl(event.ticketUrl);
 
       lines.push(
         'BEGIN:VEVENT',
@@ -126,7 +131,7 @@ export async function GET(
         `SUMMARY:${escapeIcsText(summary)}`,
         `DESCRIPTION:${escapeIcsText(description)}`,
         `LOCATION:${escapeIcsText(location)}`,
-        ...(event.ticketUrl ? [`URL:${event.ticketUrl}`] : []),
+        ...(ticketUrl ? [`URL:${ticketUrl}`] : []),
         'STATUS:CONFIRMED',
         'TRANSP:OPAQUE',
         'END:VEVENT'

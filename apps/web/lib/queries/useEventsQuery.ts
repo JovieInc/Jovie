@@ -45,7 +45,7 @@ export interface EventRecord {
 function formatProvider(provider: TourDateProviderValue): string {
   if (provider === 'bandsintown') return 'Bandsintown';
   if (provider === 'songkick') return 'Songkick';
-  if (provider === 'admin_import') return 'Admin import';
+  if (provider === 'admin_import') return 'Admin Import';
   return 'Manual';
 }
 

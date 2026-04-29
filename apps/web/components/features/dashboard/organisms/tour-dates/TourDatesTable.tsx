@@ -153,7 +153,7 @@ const PROVIDER_CONFIG: Record<
   },
   manual: { label: 'Manual', className: 'text-tertiary-token' },
   admin_import: {
-    label: 'Admin import',
+    label: 'Admin Import',
     className: 'text-amber-600 dark:text-amber-400',
   },
 };

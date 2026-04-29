@@ -16,6 +16,13 @@ export function getEventLocalDateKey(input: {
   timezone: string | null;
   fallbackTimezone?: string | null;
 }): string {
+  if (typeof input.startDate === 'string') {
+    const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(input.startDate);
+    if (dateOnly) {
+      return `${dateOnly[1]}-${dateOnly[2]}-${dateOnly[3]}`;
+    }
+  }
+
   const date =
     input.startDate instanceof Date
       ? input.startDate
@@ -35,16 +42,28 @@ function formatYmdInTimezone(date: Date, timeZone: string): string {
       month: '2-digit',
       day: '2-digit',
     });
-    return formatter.format(date);
+    return formatYmdParts(formatter.formatToParts(date));
   } catch {
-    // Invalid IANA tz — fall back to UTC slice. en-CA gives us YYYY-MM-DD
-    // natively, so a UTC retry stays consistent with the happy path.
+    // Invalid IANA tz — fall back to UTC while keeping the same
+    // year-month-day assembly logic.
     const utc = new Intl.DateTimeFormat('en-CA', {
       timeZone: 'UTC',
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
     });
-    return utc.format(date);
+    return formatYmdParts(utc.formatToParts(date));
   }
+}
+
+function formatYmdParts(parts: Intl.DateTimeFormatPart[]): string {
+  const year = parts.find(part => part.type === 'year')?.value;
+  const month = parts.find(part => part.type === 'month')?.value;
+  const day = parts.find(part => part.type === 'day')?.value;
+
+  if (!year || !month || !day) {
+    throw new TypeError('Could not format event date parts');
+  }
+
+  return `${year}-${month}-${day}`;
 }

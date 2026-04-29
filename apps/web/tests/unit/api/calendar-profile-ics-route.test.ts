@@ -124,5 +124,6 @@ describe('GET /api/calendar/profile/[username]', () => {
     expect(body).toContain(
       'DESCRIPTION:Test Artist live at The Forum\\nDoors: 7:00 PM\\nTickets: https://tickets.example.com/show'
     );
+    expect(body).toContain('URL:https://tickets.example.com/show');
   });
 });

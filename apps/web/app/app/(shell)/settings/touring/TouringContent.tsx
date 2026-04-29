@@ -33,10 +33,9 @@ export function TouringContent() {
 
 function CalendarSubscribeRow({ username }: { readonly username: string }) {
   const [copied, setCopied] = useState(false);
-  const subscribeUrl =
-    typeof window !== 'undefined'
-      ? `${window.location.origin}/api/calendar/profile/${username}`
-      : `/api/calendar/profile/${username}`;
+  const subscribeUrl = globalThis.location?.origin
+    ? `${globalThis.location.origin}/api/calendar/profile/${username}`
+    : `/api/calendar/profile/${username}`;
 
   const handleCopy = async () => {
     try {

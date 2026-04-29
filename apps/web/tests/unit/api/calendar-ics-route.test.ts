@@ -2,7 +2,8 @@ import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GET } from '@/app/api/calendar/[eventId]/route';
 
-const { mockEq, mockCaptureError, mockAfter } = vi.hoisted(() => ({
+const { mockAnd, mockEq, mockCaptureError, mockAfter } = vi.hoisted(() => ({
+  mockAnd: vi.fn(),
   mockEq: vi.fn(),
   mockCaptureError: vi.fn(),
   mockAfter: vi.fn((cb: () => void) => cb()),
@@ -24,6 +25,7 @@ const { db } = vi.hoisted(() => {
 });
 
 vi.mock('drizzle-orm', () => ({
+  and: mockAnd,
   eq: mockEq,
 }));
 

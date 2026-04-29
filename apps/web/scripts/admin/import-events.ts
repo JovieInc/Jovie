@@ -28,7 +28,7 @@
 
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { sql as drizzleSql } from 'drizzle-orm';
+import { and, count, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { tourDates } from '@/lib/db/schema/tour';
 import {
@@ -124,11 +124,15 @@ async function main() {
 
   const inputs: InsertEventInput[] = rows.map((r, idx) => {
     const eventType = r.event_type || 'tour';
+    const externalId = r.external_id?.trim();
     if (!VALID_EVENT_TYPES.has(eventType)) {
       throw new Error(
         `Row ${idx + 2}: invalid event_type "${eventType}". ` +
           `Allowed: ${[...VALID_EVENT_TYPES].join(', ')}.`
       );
+    }
+    if (!externalId) {
+      throw new Error(`Row ${idx + 2}: external_id is required`);
     }
     if (!r.start_date) {
       throw new Error(`Row ${idx + 2}: start_date is required`);
@@ -141,7 +145,7 @@ async function main() {
       profileId,
       provider: 'admin_import',
       eventType: eventType as InsertEventInput['eventType'],
-      externalId: r.external_id || null,
+      externalId,
       title: nullable(r.title),
       startDate,
       startTime: nullable(r.start_time),
@@ -160,11 +164,17 @@ async function main() {
   const inserted = await bulkInsertSyncedEvents(inputs);
   // Sanity ping so the operator sees the conflict-update guard in action
   // if they re-run the script with the same external_ids.
-  const [{ count }] = await db.execute<{ count: number }>(
-    drizzleSql`SELECT COUNT(*)::int as count FROM ${tourDates} WHERE profile_id = ${profileId} AND provider = 'admin_import'`
-  );
+  const [{ count: importedCount }] = await db
+    .select({ count: count() })
+    .from(tourDates)
+    .where(
+      and(
+        eq(tourDates.profileId, profileId),
+        eq(tourDates.provider, 'admin_import')
+      )
+    );
   console.log(
-    `Imported ${inserted} rows. Profile ${profileId} now has ${count} admin_import events. All new rows are pending review on /app/calendar.`
+    `Imported ${inserted} rows. Profile ${profileId} now has ${importedCount} admin_import events. All new rows are pending review on /app/calendar.`
   );
 }
 

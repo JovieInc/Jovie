@@ -60,7 +60,7 @@ function eyebrowFor(entity: EntityRef): string {
     return 'Artist';
   }
   if (meta.kind === 'event') {
-    const type = meta.eventType ? capitalize(meta.eventType) : null;
+    const type = eventTypeLabel(meta.eventType);
     return type ? `Event · ${type}` : 'Event';
   }
   if (meta.releaseTitle) return `Track · ${meta.releaseTitle}`;

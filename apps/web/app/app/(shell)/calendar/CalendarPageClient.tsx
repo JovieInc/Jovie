@@ -3,7 +3,13 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import Image from 'next/image';
-import { useCallback, useMemo, useState, useTransition } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+} from 'react';
 import {
   confirmEvent,
   confirmEvents,
@@ -315,6 +321,26 @@ export function CalendarPageClient() {
       invalidateEvents();
     });
   }, [selectedPendingIds, invalidateEvents]);
+
+  useEffect(() => {
+    const visiblePendingIds = new Set(
+      pendingSelectedEvents.map(event => event.id)
+    );
+    setSelectedPendingIds(previous => {
+      let changed = false;
+      const next = new Set<string>();
+
+      for (const id of previous) {
+        if (visiblePendingIds.has(id)) {
+          next.add(id);
+        } else {
+          changed = true;
+        }
+      }
+
+      return changed ? next : previous;
+    });
+  }, [pendingSelectedEvents, profileId, selectedDay, showRejected]);
 
   // Filter chip predicates applied at the cell-render layer.
   const cellShowsRelease = filter === 'all' || filter === 'releases';
@@ -667,12 +693,14 @@ export function CalendarPageClient() {
   );
 }
 
-function FilterPill(props: {
+type FilterPillProps = Readonly<{
   label: string;
   active: boolean;
   onClick: () => void;
   tone?: 'default' | 'warn';
-}) {
+}>;
+
+function FilterPill(props: FilterPillProps) {
   return (
     <button
       type='button'
@@ -682,8 +710,8 @@ function FilterPill(props: {
         props.active
           ? props.tone === 'warn'
             ? 'bg-amber-400/15 text-amber-300'
-            : 'bg-surface-1/70 text-primary-token'
-          : 'text-tertiary-token hover:text-primary-token hover:bg-surface-1/40'
+            : 'bg-surface-1 text-primary-token'
+          : 'text-tertiary-token hover:text-primary-token hover:bg-surface-1'
       )}
     >
       {props.label}
@@ -784,7 +812,7 @@ function EventRow(props: EventRowProps) {
           <button
             type='button'
             onClick={props.onUndoReject}
-            className='h-7 px-3 rounded-md text-[11px] font-caption bg-surface-1/70 text-tertiary-token hover:text-primary-token transition-colors'
+            className='h-7 px-3 rounded-md text-[11px] font-caption bg-surface-1 text-tertiary-token hover:text-primary-token hover:bg-surface-2 transition-colors'
           >
             Undo reject
           </button>
@@ -794,15 +822,23 @@ function EventRow(props: EventRowProps) {
   );
 }
 
-function ProviderChip({ provider }: { provider: string }) {
+type ProviderChipProps = Readonly<{
+  provider: string;
+}>;
+
+function ProviderChip({ provider }: ProviderChipProps) {
   return (
-    <span className='text-[10px] uppercase tracking-[0.06em] px-1.5 py-0.5 rounded bg-surface-1/60 text-quaternary-token'>
+    <span className='text-[10px] uppercase tracking-[0.06em] px-1.5 py-0.5 rounded bg-surface-1 text-quaternary-token'>
       {provider}
     </span>
   );
 }
 
-function TypeChip({ type }: { type: EventRecord['eventType'] }) {
+type TypeChipProps = Readonly<{
+  type: EventRecord['eventType'];
+}>;
+
+function TypeChip({ type }: TypeChipProps) {
   return (
     <span className='text-[10px] uppercase tracking-[0.06em] px-1.5 py-0.5 rounded bg-violet-400/15 text-violet-300'>
       {EVENT_TYPE_LABEL[type]}

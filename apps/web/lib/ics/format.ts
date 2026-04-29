@@ -21,3 +21,18 @@ export function formatIcsTimestamp(date: Date): string {
     'Z'
   );
 }
+
+export function sanitizeIcsUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (/[\u0000-\u001F\u007F]/.test(url)) return null;
+
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return null;
+    }
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
