@@ -46,6 +46,13 @@ export const APP_FLAG_DEFAULTS = {
   CHAT_JANK_MONITOR: false,
   RELEASE_PLAN_DEMO: false,
   SHELL_CHAT_V1: false,
+  DESIGN_V1_RELEASES: false,
+  DESIGN_V1_TASKS: false,
+  DESIGN_V1_CHAT_ENTITIES: false,
+  DESIGN_V1_LYRICS: false,
+  DESIGN_V1_LIBRARY: false,
+  DESIGN_V1_AUTH: false,
+  DESIGN_V1_ONBOARDING: false,
 } as const;
 
 export type AppFlagName = keyof typeof APP_FLAG_DEFAULTS;
@@ -72,6 +79,13 @@ export const APP_FLAG_KEYS = {
   CHAT_JANK_MONITOR: 'chat_jank_monitor',
   RELEASE_PLAN_DEMO: 'release_plan_demo',
   SHELL_CHAT_V1: LEGACY_STATSIG_GATE_KEYS.SHELL_CHAT_V1,
+  DESIGN_V1_RELEASES: 'design_v1_releases',
+  DESIGN_V1_TASKS: 'design_v1_tasks',
+  DESIGN_V1_CHAT_ENTITIES: 'design_v1_chat_entities',
+  DESIGN_V1_LYRICS: 'design_v1_lyrics',
+  DESIGN_V1_LIBRARY: 'design_v1_library',
+  DESIGN_V1_AUTH: 'design_v1_auth',
+  DESIGN_V1_ONBOARDING: 'design_v1_onboarding',
 } as const satisfies Record<AppFlagName, string>;
 
 export const APP_FLAG_OVERRIDE_KEYS = {
@@ -95,6 +109,13 @@ export const APP_FLAG_OVERRIDE_KEYS = {
   CHAT_JANK_MONITOR: 'code:CHAT_JANK_MONITOR',
   RELEASE_PLAN_DEMO: 'code:RELEASE_PLAN_DEMO',
   SHELL_CHAT_V1: 'code:SHELL_CHAT_V1',
+  DESIGN_V1_RELEASES: 'code:DESIGN_V1_RELEASES',
+  DESIGN_V1_TASKS: 'code:DESIGN_V1_TASKS',
+  DESIGN_V1_CHAT_ENTITIES: 'code:DESIGN_V1_CHAT_ENTITIES',
+  DESIGN_V1_LYRICS: 'code:DESIGN_V1_LYRICS',
+  DESIGN_V1_LIBRARY: 'code:DESIGN_V1_LIBRARY',
+  DESIGN_V1_AUTH: 'code:DESIGN_V1_AUTH',
+  DESIGN_V1_ONBOARDING: 'code:DESIGN_V1_ONBOARDING',
 } as const satisfies Record<AppFlagName, string>;
 
 export const APP_FLAG_TO_STATSIG_GATE = {
@@ -137,4 +158,11 @@ export const APP_FLAG_DESCRIPTIONS = {
     'Chat jank instrumentation (message continuity + streaming)',
   RELEASE_PLAN_DEMO: 'Release plan demo page (YC wedge)',
   SHELL_CHAT_V1: 'Shell and chat V1 production design',
+  DESIGN_V1_RELEASES: 'Design V1 releases and drawer surfaces',
+  DESIGN_V1_TASKS: 'Design V1 tasks workspace',
+  DESIGN_V1_CHAT_ENTITIES: 'Design V1 chat entity panels',
+  DESIGN_V1_LYRICS: 'Design V1 lyrics surfaces',
+  DESIGN_V1_LIBRARY: 'Design V1 read-only library surface',
+  DESIGN_V1_AUTH: 'Design V1 auth shell visuals',
+  DESIGN_V1_ONBOARDING: 'Design V1 onboarding shell visuals',
 } as const satisfies Record<AppFlagName, string>;

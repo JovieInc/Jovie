@@ -61,6 +61,13 @@ export const APP_FLAG_REGISTRY = {
   CHAT_JANK_MONITOR: buildBooleanFlag('CHAT_JANK_MONITOR'),
   RELEASE_PLAN_DEMO: buildBooleanFlag('RELEASE_PLAN_DEMO'),
   SHELL_CHAT_V1: buildBooleanFlag('SHELL_CHAT_V1'),
+  DESIGN_V1_RELEASES: buildBooleanFlag('DESIGN_V1_RELEASES'),
+  DESIGN_V1_TASKS: buildBooleanFlag('DESIGN_V1_TASKS'),
+  DESIGN_V1_CHAT_ENTITIES: buildBooleanFlag('DESIGN_V1_CHAT_ENTITIES'),
+  DESIGN_V1_LYRICS: buildBooleanFlag('DESIGN_V1_LYRICS'),
+  DESIGN_V1_LIBRARY: buildBooleanFlag('DESIGN_V1_LIBRARY'),
+  DESIGN_V1_AUTH: buildBooleanFlag('DESIGN_V1_AUTH'),
+  DESIGN_V1_ONBOARDING: buildBooleanFlag('DESIGN_V1_ONBOARDING'),
 } as const satisfies Record<AppFlagName, Flag<boolean, FlagEntities>>;
 
 export const SUBSCRIBE_CTA_VARIANT_FLAG = flag<

@@ -23,6 +23,7 @@ const SKIP_DIRECTORIES = new Set([
 
 const APP_FLAG_CALL_REGEX =
   /\b(?:useAppFlag|useFeatureFlag|getAppFlagValue)\(\s*['"`]([A-Z0-9_]+)['"`]/g;
+const EXP_ROUTE_IMPORT_REGEX = /from ['"]@\/app\/exp\//;
 
 /** Stable package root resolved from this test file's location. */
 const TEST_FILE_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -152,6 +153,23 @@ describe('feature flag registry integrity', () => {
 
         const source = readFileSync(sourceFile, 'utf8');
         return legacyImportRegex.test(source);
+      })
+      .map(sourceFile => path.relative(WEB_ROOT, sourceFile))
+      .sort();
+
+    expect(violations).toEqual([]);
+  });
+
+  it('keeps experimental route modules out of production source', () => {
+    const sourceFiles = collectSourceFiles(WEB_ROOT);
+    const violations = sourceFiles
+      .filter(
+        sourceFile =>
+          !sourceFile.includes(`${path.sep}app${path.sep}exp${path.sep}`)
+      )
+      .filter(sourceFile => {
+        const source = readFileSync(sourceFile, 'utf8');
+        return EXP_ROUTE_IMPORT_REGEX.test(source);
       })
       .map(sourceFile => path.relative(WEB_ROOT, sourceFile))
       .sort();
