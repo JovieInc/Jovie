@@ -11,7 +11,7 @@ import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useT
 import { AudioBar, type AudioBarTrack } from '@/components/shell/AudioBar';
 import { SidebarBottomNowPlaying } from '@/components/shell/SidebarBottomNowPlaying';
 import { SidebarNowPlaying } from '@/components/shell/SidebarNowPlaying';
-import { APP_ROUTES } from '@/constants/routes';
+import { buildLyricsRoute } from '@/constants/routes';
 import { useAppFlag } from '@/lib/flags/client';
 import { cn } from '@/lib/utils';
 import { formatDuration } from '@/lib/utils/formatDuration';
@@ -23,7 +23,7 @@ interface PersistentAudioBarProps {
 }
 
 function getTrackLyricsPath(trackId: string): string {
-  return `${APP_ROUTES.LYRICS}/${encodeURIComponent(trackId)}`;
+  return buildLyricsRoute(trackId);
 }
 
 export function PersistentAudioBar({
@@ -197,7 +197,7 @@ export function PersistentAudioBar({
     id: activeTrackId,
     title: playbackState.trackTitle ?? '',
     artist: playbackState.artistName ?? '',
-    hasLyrics: designV1LyricsEnabled,
+    hasLyrics: designV1LyricsEnabled && playbackState.hasLyrics,
   };
   const lyricsPath = getTrackLyricsPath(activeTrackId);
   const nowPlayingTrack = {
@@ -236,7 +236,11 @@ export function PersistentAudioBar({
           waveformOn={waveformOn}
           onToggleWaveform={() => setWaveformOn(current => !current)}
           lyricsActive={pathname === lyricsPath}
-          onOpenLyrics={designV1LyricsEnabled ? handleOpenLyrics : undefined}
+          onOpenLyrics={
+            designV1LyricsEnabled && playbackState.hasLyrics
+              ? handleOpenLyrics
+              : undefined
+          }
           track={shellTrack}
         />
       </div>

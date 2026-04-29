@@ -19,8 +19,8 @@ export const APP_ROUTES = {
   DASHBOARD_LINKS: '/app/dashboard/links',
   DASHBOARD_PROFILE: '/app/dashboard/profile',
   DASHBOARD_AUDIENCE: '/app/dashboard/audience',
-  DASHBOARD_RELEASES: '/app/dashboard/releases',
   DASHBOARD_LIBRARY: '/app/dashboard/library',
+  DASHBOARD_RELEASES: '/app/dashboard/releases',
   DASHBOARD_TASKS: '/app/dashboard/tasks',
   DASHBOARD_RELEASE_TASKS: '/app/dashboard/releases/[releaseId]/tasks',
   DASHBOARD_TIPPING: '/app/dashboard/tipping',
@@ -139,6 +139,10 @@ export const APP_ROUTES = {
 } as const;
 
 export type AppRoute = (typeof APP_ROUTES)[keyof typeof APP_ROUTES];
+
+export function buildLyricsRoute(trackId: string): string {
+  return `${APP_ROUTES.LYRICS}/${encodeURIComponent(trackId)}`;
+}
 
 export function isDemoRoutePath(pathname: string | null | undefined): boolean {
   return (

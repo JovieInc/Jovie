@@ -679,6 +679,7 @@ export function ReleaseSidebar({
       releaseTitle: release.title,
       artistName: release.artistNames?.[0],
       artworkUrl: release.artworkUrl,
+      hasLyrics: Boolean(release.lyrics?.trim()),
     }).catch(() => {});
   }, [toggleTrack, release]);
 

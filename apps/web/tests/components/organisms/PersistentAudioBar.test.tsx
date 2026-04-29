@@ -27,6 +27,7 @@ const basePlaybackState = {
   releaseTitle: null as string | null,
   artistName: null as string | null,
   artworkUrl: null as string | null,
+  hasLyrics: false,
 };
 
 type MockPlaybackState = typeof basePlaybackState;
@@ -264,7 +265,7 @@ describe('PersistentAudioBar', () => {
 
   it('links the shell V1 lyrics button to the active track when DESIGN_V1_LYRICS is enabled', async () => {
     const user = userEvent.setup();
-    setPlaying({ artistName: 'DJ Cool' });
+    setPlaying({ artistName: 'DJ Cool', hasLyrics: true });
 
     render(
       <AppFlagProvider
@@ -277,6 +278,20 @@ describe('PersistentAudioBar', () => {
     await user.click(screen.getByRole('button', { name: 'Lyrics' }));
 
     expect(push).toHaveBeenCalledWith('/app/lyrics/track-1');
+  });
+
+  it('keeps the shell V1 lyrics button hidden when the active track has no lyrics', () => {
+    setPlaying({ artistName: 'DJ Cool', hasLyrics: false });
+
+    render(
+      <AppFlagProvider
+        initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1_LYRICS: true }}
+      >
+        <PersistentAudioBar variant='shellChatV1' />
+      </AppFlagProvider>
+    );
+
+    expect(screen.queryByRole('button', { name: 'Lyrics' })).toBeNull();
   });
 
   it('keeps the shell V1 lyrics button hidden when DESIGN_V1_LYRICS is disabled', () => {

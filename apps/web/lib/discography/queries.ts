@@ -1014,6 +1014,7 @@ export interface TrackWithProviders {
   previewUrl: string | null;
   audioUrl: string | null;
   audioFormat: string | null;
+  lyrics: string | null;
   metadata: Record<string, unknown> | null;
   providerLinks: ProviderLink[];
 }
@@ -1111,6 +1112,7 @@ export async function getTracksForReleaseWithProviders(
     previewUrl: track.previewUrl,
     audioUrl: track.audioUrl,
     audioFormat: track.audioFormat,
+    lyrics: track.lyrics,
     metadata: track.metadata ?? null,
     providerLinks: resolveTrackProviderLinks(
       linksByTrack.get(track.id) ?? [],
@@ -1361,6 +1363,7 @@ export interface ReleaseTrackWithProviders {
   previewUrl: string | null;
   audioUrl: string | null;
   audioFormat: string | null;
+  lyrics: string | null;
   metadata: Record<string, unknown> | null;
   providerLinks: ProviderLink[];
 }
@@ -1464,6 +1467,7 @@ export async function getReleaseTracksForReleaseWithProviders(
     previewUrl: rec.previewUrl,
     audioUrl: rec.audioUrl,
     audioFormat: rec.audioFormat,
+    lyrics: rec.lyrics,
     metadata: rec.metadata ?? null,
     providerLinks: resolveTrackProviderLinks(
       linksByReleaseTrack.get(rt.id) ?? [],
