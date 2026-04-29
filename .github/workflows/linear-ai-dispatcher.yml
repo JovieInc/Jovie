@@ -178,7 +178,7 @@ jobs:
             # loop (the issue is already leased by the orchestrator).
             if [[ -n "$IN_PROGRESS_STATE_ID" ]]; then
               LEASE_RESPONSE_FILE=$(mktemp)
-              LEASE_HTTP=$(curl -sS -o "$LEASE_RESPONSE_FILE" -w '%{http_code}' \
+              LEASE_HTTP=$(curl -sS --connect-timeout 10 --max-time 30 -o "$LEASE_RESPONSE_FILE" -w '%{http_code}' \
                 https://api.linear.app/graphql \
                 -H "Authorization: ${LINEAR_API_KEY}" \
                 -H 'Content-Type: application/json' \
@@ -188,7 +188,7 @@ jobs:
                   '{
                     query: "mutation LeaseIssue($issueId: String!, $stateId: String!) { issueUpdate(id: $issueId, input: { stateId: $stateId }) { success } }",
                     variables: { issueId: $issueId, stateId: $stateId }
-                  }')" || echo "000")
+                  }')" 2>/dev/null) || true
               LEASE_SUCCESS=$(jq -r '.data.issueUpdate.success // false' < "$LEASE_RESPONSE_FILE" 2>/dev/null || echo "false")
               if [[ "$LEASE_HTTP" != "200" || "$LEASE_SUCCESS" != "true" ]]; then
                 echo "::warning::Linear issueUpdate failed for ${ISSUE_IDENTIFIER} (http=${LEASE_HTTP}, success=${LEASE_SUCCESS}); dispatch already fired"
@@ -199,7 +199,7 @@ jobs:
             fi
 
             COMMENT_RESPONSE_FILE=$(mktemp)
-            COMMENT_HTTP=$(curl -sS -o "$COMMENT_RESPONSE_FILE" -w '%{http_code}' \
+            COMMENT_HTTP=$(curl -sS --connect-timeout 10 --max-time 30 -o "$COMMENT_RESPONSE_FILE" -w '%{http_code}' \
               https://api.linear.app/graphql \
               -H "Authorization: ${LINEAR_API_KEY}" \
               -H 'Content-Type: application/json' \
@@ -209,7 +209,7 @@ jobs:
                 '{
                   query: "mutation AddLeaseComment($issueId: String!, $body: String!) { commentCreate(input: { issueId: $issueId, body: $body }) { success } }",
                   variables: { issueId: $issueId, body: $body }
-                }')" || echo "000")
+                }')" 2>/dev/null) || true
             COMMENT_SUCCESS=$(jq -r '.data.commentCreate.success // false' < "$COMMENT_RESPONSE_FILE" 2>/dev/null || echo "false")
             if [[ "$COMMENT_HTTP" != "200" || "$COMMENT_SUCCESS" != "true" ]]; then
               echo "::warning::Linear commentCreate failed for ${ISSUE_IDENTIFIER} (http=${COMMENT_HTTP}, success=${COMMENT_SUCCESS}); dispatch already fired"
