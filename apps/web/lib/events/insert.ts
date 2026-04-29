@@ -1,3 +1,4 @@
+import { sql as drizzleSql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   type ConfirmationStatus,
@@ -63,6 +64,7 @@ export async function bulkInsertSyncedEvents(
   rows: ReadonlyArray<InsertEventInput>
 ): Promise<number> {
   if (rows.length === 0) return 0;
+  const now = new Date();
   const values = rows.map(input => ({
     ...input,
     eventType: input.eventType ?? ('tour' as EventType),
@@ -72,8 +74,31 @@ export async function bulkInsertSyncedEvents(
         ? new Date()
         : null,
   }));
-  const inserted = await db.insert(tourDates).values(values).returning({
-    id: tourDates.id,
-  });
+  const inserted = await db
+    .insert(tourDates)
+    .values(values)
+    .onConflictDoUpdate({
+      target: [tourDates.profileId, tourDates.externalId, tourDates.provider],
+      set: {
+        title: drizzleSql`excluded.title`,
+        startDate: drizzleSql`excluded.start_date`,
+        startTime: drizzleSql`excluded.start_time`,
+        timezone: drizzleSql`excluded.timezone`,
+        venueName: drizzleSql`excluded.venue_name`,
+        city: drizzleSql`excluded.city`,
+        region: drizzleSql`excluded.region`,
+        country: drizzleSql`excluded.country`,
+        latitude: drizzleSql`excluded.latitude`,
+        longitude: drizzleSql`excluded.longitude`,
+        ticketUrl: drizzleSql`excluded.ticket_url`,
+        ticketStatus: drizzleSql`excluded.ticket_status`,
+        lastSyncedAt: drizzleSql`excluded.last_synced_at`,
+        rawData: drizzleSql`excluded.raw_data`,
+        updatedAt: now,
+      },
+    })
+    .returning({
+      id: tourDates.id,
+    });
   return inserted.length;
 }

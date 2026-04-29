@@ -115,7 +115,7 @@ export async function GET(
       if (event.ticketUrl) {
         descriptionParts.push(`Tickets: ${event.ticketUrl}`);
       }
-      const description = descriptionParts.join(String.raw`\n`);
+      const description = descriptionParts.join('\n');
 
       lines.push(
         'BEGIN:VEVENT',

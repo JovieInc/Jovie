@@ -1,18 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock the db so we can capture insert args without hitting Postgres.
-const { mockDbInsert, mockValues, mockReturning } = vi.hoisted(() => ({
-  mockDbInsert: vi.fn(),
-  mockValues: vi.fn(),
-  mockReturning: vi.fn(),
-}));
+const { mockDbInsert, mockValues, mockReturning, mockOnConflictDoUpdate } =
+  vi.hoisted(() => ({
+    mockDbInsert: vi.fn(),
+    mockValues: vi.fn(),
+    mockReturning: vi.fn(),
+    mockOnConflictDoUpdate: vi.fn(),
+  }));
 
 vi.mock('@/lib/db', () => ({
   db: { insert: mockDbInsert },
 }));
 
 vi.mock('@/lib/db/schema/tour', () => ({
-  tourDates: { id: 'id' },
+  tourDates: {
+    id: 'id',
+    profileId: 'profile_id',
+    externalId: 'external_id',
+    provider: 'provider',
+  },
 }));
 
 import {
@@ -24,7 +31,11 @@ import {
 beforeEach(() => {
   vi.clearAllMocks();
   mockReturning.mockResolvedValue([{ id: 'td_1' }]);
-  mockValues.mockReturnValue({ returning: mockReturning });
+  mockOnConflictDoUpdate.mockReturnValue({ returning: mockReturning });
+  mockValues.mockReturnValue({
+    returning: mockReturning,
+    onConflictDoUpdate: mockOnConflictDoUpdate,
+  });
   mockDbInsert.mockReturnValue({ values: mockValues });
 });
 
@@ -126,5 +137,27 @@ describe('bulkInsertSyncedEvents', () => {
       { ...baseInput, provider: 'bandsintown' },
     ]);
     expect(result).toBe(3);
+  });
+
+  it('upserts duplicate synced rows without overwriting review state fields', async () => {
+    await bulkInsertSyncedEvents([
+      { ...baseInput, provider: 'admin_import', externalId: 'evt_1' },
+    ]);
+
+    expect(mockOnConflictDoUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        target: ['profile_id', 'external_id', 'provider'],
+      })
+    );
+
+    const upsertConfig = mockOnConflictDoUpdate.mock.calls[0]?.[0];
+    expect(upsertConfig?.set).toEqual(
+      expect.objectContaining({
+        updatedAt: expect.any(Date),
+      })
+    );
+    expect(upsertConfig?.set).not.toHaveProperty('confirmationStatus');
+    expect(upsertConfig?.set).not.toHaveProperty('reviewedAt');
+    expect(upsertConfig?.set).not.toHaveProperty('eventType');
   });
 });
