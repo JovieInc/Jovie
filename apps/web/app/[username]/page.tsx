@@ -2,6 +2,8 @@ import { type Metadata } from 'next';
 import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 
+export const dynamic = 'force-dynamic';
+
 import type { PublicRelease } from '@/components/features/profile/releases/types';
 import { AUDIENCE_ANON_COOKIE, BASE_URL } from '@/constants/app';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
@@ -13,6 +15,7 @@ import {
 } from '@/features/profile/registry';
 import { StaticArtistPage } from '@/features/profile/StaticArtistPage';
 import { JoviePixel } from '@/features/tracking/JoviePixel';
+import { getClientTrackingToken } from '@/lib/analytics/tracking-token';
 import {
   getProfileVisitorState,
   supportsDirectProfileClaim,
@@ -392,6 +395,16 @@ export default async function ArtistPage({
     pendingClaimContext: null,
   });
 
+  // Generate a short-lived HMAC token so the client can authenticate its visit
+  // tracking request to /api/audience/visit (requires TRACKING_TOKEN_SECRET).
+  // Falls back to undefined gracefully if the secret is not configured.
+  let visitTrackingToken: string | undefined;
+  try {
+    visitTrackingToken = getClientTrackingToken(profile.id).token;
+  } catch {
+    // Secret not configured — visit tracking will proceed without token auth
+  }
+
   const latestRelease = fetchedLatestRelease;
 
   const publicContacts: PublicContact[] = toPublicContacts(
@@ -482,7 +495,7 @@ export default async function ArtistPage({
         alertOptInVariant={alertOptInVariant}
         genres={genres}
         tourDates={tourDates}
-        visitTrackingToken={undefined}
+        visitTrackingToken={visitTrackingToken}
         showSubscriptionConfirmedBanner={!isPublicNoAuthSmoke}
         showShopButton={isShopEnabled(profileSettings)}
         profileSettings={{
