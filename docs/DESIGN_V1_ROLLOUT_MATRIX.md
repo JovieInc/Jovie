@@ -25,6 +25,12 @@ resolved through `apps/web/lib/flags/server.ts` / `AppFlagProvider`. Static
 marketing flags are defined in `apps/web/lib/flags/marketing-static.ts` and
 must stay build-time constants so marketing pages remain fully static.
 
+Static marketing flags are not remote rollout controls. The value imported from
+`marketing-static.ts` is bundled into the deployed build, so changing either
+flag requires a new commit and a new deployment. Do not model
+`SHOW_HOME_V1_DESIGN` or `SHOW_PUBLIC_PROFILE_V1_DESIGN` in Statsig, the dev
+toolbar override harness, cookies, request headers, or query parameters.
+
 ## Valid Combinations
 
 | Combination | Expected Behavior | Status |
@@ -71,6 +77,68 @@ document names an explicit dependency.
 7. Ramp runtime flags by cohort only after flag-off parity and flag-on smoke
    are both green for the affected route.
 
+## Static Marketing Preview Procedure
+
+Use this procedure before enabling `SHOW_HOME_V1_DESIGN` or
+`SHOW_PUBLIC_PROFILE_V1_DESIGN` in a release branch.
+
+1. Start from a branch that only changes `apps/web/lib/flags/marketing-static.ts`
+   and any required docs. Do not include marketing redesign work, public profile
+   component changes, or unrelated runtime flag changes in the same PR.
+2. Flip only the static flag being previewed to `true` and open a preview PR.
+   Keep the production default branch value `false` until QA signs off.
+3. Let Vercel build a fresh preview deployment. Because these flags are
+   build-time constants, an already-built deployment cannot be changed by
+   Statsig, Dev Toolbar overrides, browser storage, cookies, or environment
+   edits.
+4. Verify the preview URL for the exact route:
+   homepage for `SHOW_HOME_V1_DESIGN`, and at least one known public profile
+   plus its profile modes for `SHOW_PUBLIC_PROFILE_V1_DESIGN`.
+5. Capture before/after screenshots or a written QA note for the preview PR.
+   The note must identify the flag, preview URL, routes checked, commit SHA, and
+   test evidence.
+6. Confirm the default branch or production deployment still serves the
+   flag-off design until the release commit lands and deploys.
+
+Static marketing preview branches may be short-lived throwaway branches. Do not
+merge a preview-only flag flip unless the intent is to release that build-time
+state.
+
+## Static Marketing Regression Gates
+
+Before either static marketing flag can be enabled in a release PR, attach
+current test evidence for the affected route.
+
+Required for both static flags:
+
+- `./scripts/setup.sh` in the worktree.
+- `git diff --check`.
+- Static route policy coverage:
+  `doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web exec vitest run tests/unit/marketing/static-revalidate-policy.test.ts`.
+- A preview deployment built from the exact release commit.
+
+Required before enabling `SHOW_HOME_V1_DESIGN`:
+
+- Homepage preview smoke on desktop and mobile.
+- Evidence that the homepage route remains fully static and does not add
+  request-time `headers()`, `cookies()`, `no-store` fetches, or dynamic
+  `revalidate`.
+
+Required before enabling `SHOW_PUBLIC_PROFILE_V1_DESIGN`:
+
+- Public profile flag wiring coverage:
+  `doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web exec vitest run tests/unit/profile/static-artist-page.test.tsx`.
+- Public profile V1 visual regression coverage:
+  `doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web exec vitest run tests/unit/profile/profile-compact-template.test.tsx`.
+- Public profile smoke coverage for an anonymous visitor:
+  `doppler run --project jovie-web --config dev -- env E2E_USE_TEST_AUTH_BYPASS=1 pnpm --filter @jovie/web exec playwright test tests/e2e/public-profile-smoke.spec.ts --project=chromium`.
+- Manual preview checks for the canonical profile route and profile modes used
+  by visitors, including at least `profile` and `listen`.
+
+If any public profile regression fails, do not enable the flag. Fix the
+regression under a separate product-code issue, restore green flag-off behavior,
+then repeat this procedure from a fresh preview deployment.
+
 ## Rollback
 
 Runtime app flags:
@@ -82,9 +150,20 @@ Runtime app flags:
 
 Static build-time flags:
 
-1. Revert the constant in `apps/web/lib/flags/marketing-static.ts`.
-2. Redeploy the app. Static routes cannot be rolled back through Statsig.
-3. Confirm cached public/marketing pages serve the prior design after deploy.
+1. Revert the affected constant in
+   `apps/web/lib/flags/marketing-static.ts` to `false`.
+2. Commit the rollback with a conventional commit message and deploy that
+   rollback commit. Static routes cannot be rolled back through Statsig, Dev
+   Toolbar overrides, browser storage, cookies, or environment edits.
+3. Wait for the deployment to finish and receive production traffic. The old
+   build can keep serving the enabled design until the rollback deployment is
+   live.
+4. Confirm cached public/marketing pages serve the prior design after deploy.
+   For public profile rollback, verify at least the canonical profile route and
+   `listen` mode.
+5. Leave the flag-off regression tests in the rollback PR or incident note. If
+   the rollback was caused by public profile behavior, include the failing route,
+   mode, and test that should catch the regression before any future re-enable.
 
 ## Required Verification
 
