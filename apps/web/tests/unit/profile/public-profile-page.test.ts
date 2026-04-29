@@ -140,12 +140,13 @@ describe('Public Profile Page Logic', () => {
     });
   });
 
-  describe('profile accent backfill', () => {
-    it('derives a non-persisted accent fallback during public profile render', () => {
-      expect(PUBLIC_PROFILE_LOADER_SOURCE).toContain(
+  describe('profile accent handling', () => {
+    it('does not derive remote avatar accents during public profile ISR render', () => {
+      expect(PUBLIC_PROFILE_LOADER_SOURCE).toContain('mergeProfileTheme');
+      expect(PUBLIC_PROFILE_LOADER_SOURCE).not.toContain(
         'ensureThemeHasProfileAccent'
       );
-      expect(PUBLIC_PROFILE_LOADER_SOURCE).toContain('accentSourceUrl');
+      expect(PUBLIC_PROFILE_LOADER_SOURCE).not.toContain('accentSourceUrl');
       expect(PUBLIC_PROFILE_LOADER_SOURCE).not.toContain(
         'persistDerivedProfileAccent'
       );
