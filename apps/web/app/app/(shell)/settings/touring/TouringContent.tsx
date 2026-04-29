@@ -73,10 +73,10 @@ function CalendarSubscribeRow({
               <button
                 type='button'
                 onClick={handleCopy}
-                className='inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface-1 px-2.5 py-1 text-2xs text-secondary-token hover:bg-surface-2 transition-colors'
+                className='inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface-1 px-2.5 py-1 text-2xs text-secondary-token hover:bg-surface-2'
               >
                 <Copy className='h-3.5 w-3.5' />
-                {copied ? 'Copied' : 'Copy link'}
+                {copied ? 'Copied' : 'Copy Link'}
               </button>
             ) : undefined
           }

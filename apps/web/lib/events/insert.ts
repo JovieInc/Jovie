@@ -99,6 +99,7 @@ export async function bulkInsertSyncedEvents(
     .onConflictDoUpdate({
       target: [tourDates.profileId, tourDates.externalId, tourDates.provider],
       set: {
+        eventType: drizzleSql`excluded.event_type`,
         title: drizzleSql`excluded.title`,
         startDate: drizzleSql`excluded.start_date`,
         startTime: drizzleSql`excluded.start_time`,

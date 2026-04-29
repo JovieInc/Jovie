@@ -48,6 +48,7 @@ export async function GET(
       .where(
         and(
           eq(tourDates.id, eventId),
+          eq(tourDates.eventType, 'tour'),
           eq(tourDates.confirmationStatus, 'confirmed')
         )
       )

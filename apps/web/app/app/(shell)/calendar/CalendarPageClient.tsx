@@ -11,13 +11,18 @@ import {
   useTransition,
 } from 'react';
 import {
+  bulkEventActionDidFullySucceed,
+  eventActionDidSucceed,
+} from '@/app/app/(shell)/calendar/action-results';
+import {
+  type BulkEventActionResult,
   confirmEvent,
   confirmEvents,
+  type EventActionResult,
   rejectEvent,
   rejectEvents,
   undoRejectEvent,
 } from '@/app/app/(shell)/dashboard/tour-dates/events-actions';
-import { getEventLocalDateKey } from '@/lib/events/date';
 import { normalizeTicketUrl } from '@/lib/events/ticket-url';
 import { queryKeys } from '@/lib/queries';
 import { type EventRecord, useEventsQuery } from '@/lib/queries/useEventsQuery';
@@ -85,8 +90,8 @@ function isSameDay(a: Date, b: Date): boolean {
 
 function localDateKey(d: Date): string {
   // YYYY-MM-DD in local time so day buckets line up with the grid cell
-  // shown to the creator. Releases use this; events use the event-local
-  // tz via getEventLocalDateKey for parity at the day-bucket level.
+  // shown to the creator. Releases and events intentionally share this key
+  // space so Map lookups use the same day buckets as the visible grid.
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
@@ -163,6 +168,21 @@ function formatReviewedAt(iso: string | null): string | null {
   });
 }
 
+function actionFailureMessage(
+  result:
+    | Extract<EventActionResult, { ok: false }>
+    | Extract<BulkEventActionResult, { ok: false }>
+): string {
+  if (result.reason === 'unauthorized') {
+    return 'Your session expired. Sign in again before reviewing events.';
+  }
+  return 'That event could not be updated. Refresh and try again.';
+}
+
+function fallbackActionFailureMessage(): string {
+  return 'Could not update events. Please try again.';
+}
+
 export function CalendarPageClient() {
   const [cursor, setCursor] = useState<Date>(() => startOfMonth(new Date()));
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
@@ -171,7 +191,8 @@ export function CalendarPageClient() {
     ReadonlySet<string>
   >(new Set());
   const [showRejected, setShowRejected] = useState(false);
-  const [, startTransition] = useTransition();
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [isActionPending, startTransition] = useTransition();
 
   const { selectedProfile } = useDashboardData();
   const profileId = selectedProfile?.id ?? '';
@@ -204,17 +225,15 @@ export function CalendarPageClient() {
     const map = new Map<string, EventRecord[]>();
     if (!events) return map;
     for (const e of events) {
-      try {
-        const key = getEventLocalDateKey({
-          startDate: e.eventDate,
-          timezone: e.timezone,
-        });
-        const list = map.get(key);
-        if (list) list.push(e);
-        else map.set(key, [e]);
-      } catch {
+      const date = new Date(e.eventDate);
+      if (Number.isNaN(date.getTime())) {
         // Skip events with unparseable dates rather than crashing the grid.
+        continue;
       }
+      const key = localDateKey(date);
+      const list = map.get(key);
+      if (list) list.push(e);
+      else map.set(key, [e]);
     }
     return map;
   }, [events]);
@@ -264,31 +283,64 @@ export function CalendarPageClient() {
     });
   }, [profileId, queryClient]);
 
-  const handleConfirm = useCallback(
-    (id: string) => {
+  const runEventAction = useCallback(
+    (action: () => Promise<EventActionResult>) => {
+      setActionError(null);
       startTransition(async () => {
-        await confirmEvent(id);
-        invalidateEvents();
+        try {
+          const result = await action();
+          if (!eventActionDidSucceed(result)) {
+            setActionError(actionFailureMessage(result));
+            return;
+          }
+          invalidateEvents();
+        } catch {
+          setActionError(fallbackActionFailureMessage());
+        }
       });
     },
     [invalidateEvents]
+  );
+
+  const handleConfirm = useCallback(
+    (id: string) => runEventAction(() => confirmEvent(id)),
+    [runEventAction]
   );
 
   const handleReject = useCallback(
-    (id: string) => {
-      startTransition(async () => {
-        await rejectEvent(id);
-        invalidateEvents();
-      });
-    },
-    [invalidateEvents]
+    (id: string) => runEventAction(() => rejectEvent(id)),
+    [runEventAction]
   );
 
   const handleUndoReject = useCallback(
-    (id: string) => {
+    (id: string) => runEventAction(() => undoRejectEvent(id)),
+    [runEventAction]
+  );
+
+  const runBulkEventAction = useCallback(
+    (
+      ids: ReadonlyArray<string>,
+      action: (
+        eventIds: ReadonlyArray<string>
+      ) => Promise<BulkEventActionResult>
+    ) => {
+      setActionError(null);
       startTransition(async () => {
-        await undoRejectEvent(id);
-        invalidateEvents();
+        try {
+          const result = await action(ids);
+          if (!result.ok) {
+            setActionError(actionFailureMessage(result));
+            return;
+          }
+          if (!bulkEventActionDidFullySucceed(result)) {
+            setActionError('Some selected events could not be updated.');
+            return;
+          }
+          setSelectedPendingIds(new Set());
+          invalidateEvents();
+        } catch {
+          setActionError(fallbackActionFailureMessage());
+        }
       });
     },
     [invalidateEvents]
@@ -306,22 +358,14 @@ export function CalendarPageClient() {
   const handleBulkConfirm = useCallback(() => {
     const ids = [...selectedPendingIds];
     if (ids.length === 0) return;
-    startTransition(async () => {
-      await confirmEvents(ids);
-      setSelectedPendingIds(new Set());
-      invalidateEvents();
-    });
-  }, [selectedPendingIds, invalidateEvents]);
+    runBulkEventAction(ids, confirmEvents);
+  }, [selectedPendingIds, runBulkEventAction]);
 
   const handleBulkReject = useCallback(() => {
     const ids = [...selectedPendingIds];
     if (ids.length === 0) return;
-    startTransition(async () => {
-      await rejectEvents(ids);
-      setSelectedPendingIds(new Set());
-      invalidateEvents();
-    });
-  }, [selectedPendingIds, invalidateEvents]);
+    runBulkEventAction(ids, rejectEvents);
+  }, [selectedPendingIds, runBulkEventAction]);
 
   useEffect(() => {
     const visiblePendingIds = new Set(
@@ -547,6 +591,10 @@ export function CalendarPageClient() {
             })}
           </h3>
 
+          {actionError && (
+            <p className='mt-2 text-[12px] text-red-300'>{actionError}</p>
+          )}
+
           {/* Releases */}
           {selectedReleases.length > 0 && (
             <div className='mt-3'>
@@ -595,6 +643,7 @@ export function CalendarPageClient() {
                     event={e}
                     variant='confirmed'
                     onReject={() => handleReject(e.id)}
+                    disabled={isActionPending}
                   />
                 ))}
               </ul>
@@ -619,6 +668,7 @@ export function CalendarPageClient() {
                     onToggleSelect={() => togglePendingSelected(e.id)}
                     onConfirm={() => handleConfirm(e.id)}
                     onReject={() => handleReject(e.id)}
+                    disabled={isActionPending}
                   />
                 ))}
               </ul>
@@ -627,6 +677,7 @@ export function CalendarPageClient() {
                   <button
                     type='button'
                     onClick={handleBulkConfirm}
+                    disabled={isActionPending}
                     className='h-7 px-3 rounded-md text-[12px] font-caption bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 transition-colors'
                   >
                     Confirm selected ({selectedPendingIds.size})
@@ -634,6 +685,7 @@ export function CalendarPageClient() {
                   <button
                     type='button'
                     onClick={handleBulkReject}
+                    disabled={isActionPending}
                     className='h-7 px-3 rounded-md text-[12px] font-caption bg-red-500/15 text-red-300 hover:bg-red-500/25 transition-colors'
                   >
                     Reject selected ({selectedPendingIds.size})
@@ -641,6 +693,7 @@ export function CalendarPageClient() {
                   <button
                     type='button'
                     onClick={() => setSelectedPendingIds(new Set())}
+                    disabled={isActionPending}
                     className='h-7 px-2 rounded-md text-[11px] text-tertiary-token hover:text-primary-token transition-colors'
                   >
                     Clear
@@ -670,6 +723,7 @@ export function CalendarPageClient() {
                       event={e}
                       variant='rejected'
                       onUndoReject={() => handleUndoReject(e.id)}
+                      disabled={isActionPending}
                     />
                   ))}
                 </ul>
@@ -729,6 +783,7 @@ interface EventRowProps {
   readonly onConfirm?: () => void;
   readonly onReject?: () => void;
   readonly onUndoReject?: () => void;
+  readonly disabled?: boolean;
 }
 
 function EventRow(props: EventRowProps) {
@@ -742,6 +797,7 @@ function EventRow(props: EventRowProps) {
           type='checkbox'
           checked={!!props.selected}
           onChange={props.onToggleSelect}
+          disabled={props.disabled}
           aria-label={`Select ${event.title}`}
           className='mt-1 h-3.5 w-3.5 accent-amber-400 cursor-pointer'
         />
@@ -789,6 +845,7 @@ function EventRow(props: EventRowProps) {
             <button
               type='button'
               onClick={props.onConfirm}
+              disabled={props.disabled}
               className='h-7 px-3 rounded-md text-[11px] font-caption bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 transition-colors'
             >
               Confirm
@@ -796,6 +853,7 @@ function EventRow(props: EventRowProps) {
             <button
               type='button'
               onClick={props.onReject}
+              disabled={props.disabled}
               className='h-7 px-3 rounded-md text-[11px] font-caption bg-red-500/15 text-red-300 hover:bg-red-500/25 transition-colors'
             >
               Reject
@@ -806,6 +864,7 @@ function EventRow(props: EventRowProps) {
           <button
             type='button'
             onClick={props.onReject}
+            disabled={props.disabled}
             className='h-7 px-2 rounded-md text-[11px] text-tertiary-token hover:text-red-300 hover:bg-red-500/10 transition-colors'
           >
             Reject
@@ -815,6 +874,7 @@ function EventRow(props: EventRowProps) {
           <button
             type='button'
             onClick={props.onUndoReject}
+            disabled={props.disabled}
             className='h-7 px-3 rounded-md text-[11px] font-caption bg-surface-1 text-tertiary-token hover:text-primary-token hover:bg-surface-2 transition-colors'
           >
             Undo reject

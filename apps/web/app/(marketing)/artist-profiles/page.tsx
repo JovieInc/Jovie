@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { ArtistProfileLandingRoute } from '@/app/(marketing)/artist-profile/page';
+import { ArtistProfileLandingRoute } from '@/app/(marketing)/artist-profile/ArtistProfileLandingRoute';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';

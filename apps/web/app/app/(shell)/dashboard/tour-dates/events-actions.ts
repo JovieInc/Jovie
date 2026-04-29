@@ -30,12 +30,17 @@ export type EventActionResult =
 
 export type BulkEventActionResult =
   | { ok: true; updated: number; requested: number }
-  | { ok: false; reason: 'unauthorized' };
+  | { ok: false; reason: 'not_found' | 'unauthorized' };
 
 interface AuthedProfile {
   userId: string;
   profileId: string;
 }
+
+type ModerationStatus = 'confirmed' | 'pending' | 'rejected';
+
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 async function requireAuthedProfile(): Promise<AuthedProfile | null> {
   const { userId } = await getCachedAuth();
@@ -56,6 +61,113 @@ function invalidateEventsCache(authed: AuthedProfile): void {
   revalidateTag(`tour-dates:${authed.userId}:${authed.profileId}`, 'max');
 }
 
+function isValidEventId(id: string): boolean {
+  return UUID_REGEX.test(id);
+}
+
+function allEventIdsAreValid(ids: ReadonlyArray<string>): boolean {
+  return ids.every(isValidEventId);
+}
+
+function affectedRows(result: { rowCount?: number | null }): number {
+  return result.rowCount ?? 0;
+}
+
+async function updateEventModerationStatus({
+  id,
+  authed,
+  status,
+  trackingEvent,
+  requireRejected,
+}: {
+  readonly id: string;
+  readonly authed: AuthedProfile;
+  readonly status: ModerationStatus;
+  readonly trackingEvent: string;
+  readonly requireRejected?: boolean;
+}): Promise<EventActionResult> {
+  if (!isValidEventId(id)) {
+    return { ok: false, reason: 'not_found' };
+  }
+
+  const result = await db
+    .update(tourDates)
+    .set({
+      confirmationStatus: status,
+      reviewedAt: status === 'pending' ? null : new Date(),
+      updatedAt: new Date(),
+    })
+    .where(
+      requireRejected
+        ? and(
+            eq(tourDates.id, id),
+            eq(tourDates.profileId, authed.profileId),
+            eq(tourDates.confirmationStatus, 'rejected')
+          )
+        : and(eq(tourDates.id, id), eq(tourDates.profileId, authed.profileId))
+    );
+
+  if (affectedRows(result) === 0) {
+    return { ok: false, reason: 'not_found' };
+  }
+
+  void trackServerEvent(trackingEvent, {
+    profileId: authed.profileId,
+    eventId: id,
+  });
+
+  invalidateEventsCache(authed);
+  return { ok: true };
+}
+
+async function updateBulkEventModerationStatus({
+  ids,
+  authed,
+  status,
+  trackingEvent,
+}: {
+  readonly ids: ReadonlyArray<string>;
+  readonly authed: AuthedProfile;
+  readonly status: 'confirmed' | 'rejected';
+  readonly trackingEvent: string;
+}): Promise<BulkEventActionResult> {
+  if (!allEventIdsAreValid(ids)) {
+    return { ok: false, reason: 'not_found' };
+  }
+
+  const result = await db
+    .update(tourDates)
+    .set({
+      confirmationStatus: status,
+      reviewedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        inArray(tourDates.id, [...ids]),
+        eq(tourDates.profileId, authed.profileId)
+      )
+    );
+  const updated = affectedRows(result);
+
+  if (updated !== ids.length) {
+    return { ok: false, reason: 'not_found' };
+  }
+
+  void trackServerEvent(trackingEvent, {
+    profileId: authed.profileId,
+    requested: ids.length,
+    updated,
+  });
+
+  invalidateEventsCache(authed);
+  return {
+    ok: true,
+    updated,
+    requested: ids.length,
+  };
+}
+
 export async function confirmEvent(id: string): Promise<EventActionResult> {
   noStore();
   const authed = await requireAuthedProfile();
@@ -63,28 +175,12 @@ export async function confirmEvent(id: string): Promise<EventActionResult> {
     return { ok: false, reason: 'unauthorized' };
   }
 
-  const result = await db
-    .update(tourDates)
-    .set({
-      confirmationStatus: 'confirmed',
-      reviewedAt: new Date(),
-      updatedAt: new Date(),
-    })
-    .where(
-      and(eq(tourDates.id, id), eq(tourDates.profileId, authed.profileId))
-    );
-
-  if (result.rowCount === 0) {
-    return { ok: false, reason: 'not_found' };
-  }
-
-  void trackServerEvent('event_confirmed', {
-    profileId: authed.profileId,
-    eventId: id,
+  return updateEventModerationStatus({
+    id,
+    authed,
+    status: 'confirmed',
+    trackingEvent: 'event_confirmed',
   });
-
-  invalidateEventsCache(authed);
-  return { ok: true };
 }
 
 export async function rejectEvent(id: string): Promise<EventActionResult> {
@@ -94,28 +190,12 @@ export async function rejectEvent(id: string): Promise<EventActionResult> {
     return { ok: false, reason: 'unauthorized' };
   }
 
-  const result = await db
-    .update(tourDates)
-    .set({
-      confirmationStatus: 'rejected',
-      reviewedAt: new Date(),
-      updatedAt: new Date(),
-    })
-    .where(
-      and(eq(tourDates.id, id), eq(tourDates.profileId, authed.profileId))
-    );
-
-  if (result.rowCount === 0) {
-    return { ok: false, reason: 'not_found' };
-  }
-
-  void trackServerEvent('event_rejected', {
-    profileId: authed.profileId,
-    eventId: id,
+  return updateEventModerationStatus({
+    id,
+    authed,
+    status: 'rejected',
+    trackingEvent: 'event_rejected',
   });
-
-  invalidateEventsCache(authed);
-  return { ok: true };
 }
 
 export async function undoRejectEvent(id: string): Promise<EventActionResult> {
@@ -125,32 +205,13 @@ export async function undoRejectEvent(id: string): Promise<EventActionResult> {
     return { ok: false, reason: 'unauthorized' };
   }
 
-  const result = await db
-    .update(tourDates)
-    .set({
-      confirmationStatus: 'pending',
-      reviewedAt: null,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(tourDates.id, id),
-        eq(tourDates.profileId, authed.profileId),
-        eq(tourDates.confirmationStatus, 'rejected')
-      )
-    );
-
-  if (result.rowCount === 0) {
-    return { ok: false, reason: 'not_found' };
-  }
-
-  void trackServerEvent('event_reject_undone', {
-    profileId: authed.profileId,
-    eventId: id,
+  return updateEventModerationStatus({
+    id,
+    authed,
+    status: 'pending',
+    trackingEvent: 'event_reject_undone',
+    requireRejected: true,
   });
-
-  invalidateEventsCache(authed);
-  return { ok: true };
 }
 
 export async function confirmEvents(
@@ -165,32 +226,12 @@ export async function confirmEvents(
     return { ok: false, reason: 'unauthorized' };
   }
 
-  const result = await db
-    .update(tourDates)
-    .set({
-      confirmationStatus: 'confirmed',
-      reviewedAt: new Date(),
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        inArray(tourDates.id, [...ids]),
-        eq(tourDates.profileId, authed.profileId)
-      )
-    );
-
-  void trackServerEvent('events_confirmed_bulk', {
-    profileId: authed.profileId,
-    requested: ids.length,
-    updated: result.rowCount ?? 0,
+  return updateBulkEventModerationStatus({
+    ids,
+    authed,
+    status: 'confirmed',
+    trackingEvent: 'events_confirmed_bulk',
   });
-
-  invalidateEventsCache(authed);
-  return {
-    ok: true,
-    updated: result.rowCount ?? 0,
-    requested: ids.length,
-  };
 }
 
 export async function rejectEvents(
@@ -205,30 +246,10 @@ export async function rejectEvents(
     return { ok: false, reason: 'unauthorized' };
   }
 
-  const result = await db
-    .update(tourDates)
-    .set({
-      confirmationStatus: 'rejected',
-      reviewedAt: new Date(),
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        inArray(tourDates.id, [...ids]),
-        eq(tourDates.profileId, authed.profileId)
-      )
-    );
-
-  void trackServerEvent('events_rejected_bulk', {
-    profileId: authed.profileId,
-    requested: ids.length,
-    updated: result.rowCount ?? 0,
+  return updateBulkEventModerationStatus({
+    ids,
+    authed,
+    status: 'rejected',
+    trackingEvent: 'events_rejected_bulk',
   });
-
-  invalidateEventsCache(authed);
-  return {
-    ok: true,
-    updated: result.rowCount ?? 0,
-    requested: ids.length,
-  };
 }

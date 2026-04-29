@@ -166,9 +166,9 @@ describe('bulkInsertSyncedEvents', () => {
         updatedAt: expect.any(Date),
       })
     );
+    expect(upsertConfig?.set).toHaveProperty('eventType');
     expect(upsertConfig?.set).not.toHaveProperty('confirmationStatus');
     expect(upsertConfig?.set).not.toHaveProperty('reviewedAt');
-    expect(upsertConfig?.set).not.toHaveProperty('eventType');
   });
 
   it('rejects manual rows without touching the db', async () => {

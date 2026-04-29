@@ -53,6 +53,8 @@ vi.mock('@/lib/db/schema/tour', () => ({
     startTime: 'start_time',
     ticketUrl: 'ticket_url',
     title: 'title',
+    eventType: 'event_type',
+    confirmationStatus: 'confirmation_status',
   },
 }));
 
@@ -104,6 +106,22 @@ describe('GET /api/calendar/[eventId]', () => {
     await expect(response.json()).resolves.toEqual({
       error: 'Event not found',
     });
+  });
+
+  it('requires confirmed tour events in the lookup query', async () => {
+    db.select().from().innerJoin().where().limit.mockResolvedValue([]);
+
+    const request = new NextRequest(
+      `https://jov.ie/api/calendar/${VALID_EVENT_ID}`
+    );
+
+    await GET(request, {
+      params: Promise.resolve({ eventId: VALID_EVENT_ID }),
+    });
+
+    expect(mockEq).toHaveBeenCalledWith('id', VALID_EVENT_ID);
+    expect(mockEq).toHaveBeenCalledWith('event_type', 'tour');
+    expect(mockEq).toHaveBeenCalledWith('confirmation_status', 'confirmed');
   });
 
   it('calls captureError with route and eventId context on DB failure', async () => {

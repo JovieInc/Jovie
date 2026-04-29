@@ -55,14 +55,18 @@ export function HomepageOutcomeCards({
         </div>
       </div>
       <div className='homepage-outcome-rail-bleed'>
-        <div
+        <section
           className='homepage-outcome-rail'
           data-testid='homepage-outcome-rail'
+          aria-labelledby='homepage-outcome-cards-heading'
         >
+          <a href='#homepage-outcome-cards-heading' className='sr-only'>
+            Outcome Cards
+          </a>
           {outcomes.cards.map(card => (
             <OutcomeCard key={card.id} card={card} outcomes={outcomes} />
           ))}
-        </div>
+        </section>
       </div>
     </section>
   );

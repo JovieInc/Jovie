@@ -35,7 +35,10 @@ import {
   bulkInsertSyncedEvents,
   type InsertEventInput,
 } from '@/lib/events/insert';
-import { normalizeTicketUrl } from '@/lib/events/ticket-url';
+import {
+  assertValidTicketUrl,
+  normalizeTicketUrl,
+} from '@/lib/events/ticket-url';
 
 interface CliArgs {
   profileId: string;
@@ -113,6 +116,33 @@ const VALID_EVENT_TYPES = new Set([
   'signing',
 ]);
 
+const VALID_TICKET_STATUSES = new Set(['available', 'sold_out', 'cancelled']);
+
+function parseTicketStatus(
+  value: string,
+  rowNumber: number
+): InsertEventInput['ticketStatus'] {
+  const ticketStatus = nullable(value);
+  if (ticketStatus === null) return 'available';
+  if (!VALID_TICKET_STATUSES.has(ticketStatus)) {
+    throw new Error(
+      `Row ${rowNumber}: invalid ticket_status "${ticketStatus}". ` +
+        `Allowed: ${[...VALID_TICKET_STATUSES].join(', ')}.`
+    );
+  }
+  return ticketStatus as InsertEventInput['ticketStatus'];
+}
+
+function parseTicketUrl(value: string, rowNumber: number): string | null {
+  if (!value.trim()) return null;
+  try {
+    assertValidTicketUrl(value);
+  } catch {
+    throw new Error(`Row ${rowNumber}: invalid ticket_url "${value}".`);
+  }
+  return normalizeTicketUrl(value);
+}
+
 async function main() {
   const { profileId, csvPath } = parseArgs(process.argv.slice(2));
   const absolute = resolve(process.cwd(), csvPath);
@@ -124,23 +154,24 @@ async function main() {
   }
 
   const inputs: InsertEventInput[] = rows.map((r, idx) => {
+    const rowNumber = idx + 2;
     const eventType = r.event_type || 'tour';
     const externalId = r.external_id?.trim();
     if (!VALID_EVENT_TYPES.has(eventType)) {
       throw new Error(
-        `Row ${idx + 2}: invalid event_type "${eventType}". ` +
+        `Row ${rowNumber}: invalid event_type "${eventType}". ` +
           `Allowed: ${[...VALID_EVENT_TYPES].join(', ')}.`
       );
     }
     if (!externalId) {
-      throw new Error(`Row ${idx + 2}: external_id is required`);
+      throw new Error(`Row ${rowNumber}: external_id is required`);
     }
     if (!r.start_date) {
-      throw new Error(`Row ${idx + 2}: start_date is required`);
+      throw new Error(`Row ${rowNumber}: start_date is required`);
     }
     const startDate = new Date(r.start_date);
     if (Number.isNaN(startDate.getTime())) {
-      throw new Error(`Row ${idx + 2}: invalid start_date "${r.start_date}"`);
+      throw new Error(`Row ${rowNumber}: invalid start_date "${r.start_date}"`);
     }
     return {
       profileId,
@@ -155,10 +186,8 @@ async function main() {
       city: r.city,
       region: nullable(r.region),
       country: r.country,
-      ticketUrl: normalizeTicketUrl(r.ticket_url),
-      ticketStatus:
-        (nullable(r.ticket_status) as InsertEventInput['ticketStatus']) ??
-        'available',
+      ticketUrl: parseTicketUrl(r.ticket_url, rowNumber),
+      ticketStatus: parseTicketStatus(r.ticket_status, rowNumber),
     };
   });
 
