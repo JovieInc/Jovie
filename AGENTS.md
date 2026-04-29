@@ -78,6 +78,9 @@ When local perf or E2E work needs an authenticated session on loopback/private h
 
 - Enable `E2E_USE_TEST_AUTH_BYPASS=1` for local authenticated test runs.
 - Use `/api/dev/test-auth/session` to mint bypass cookies for programmatic flows and `/api/dev/test-auth/enter?persona=...&redirect=/app` for browser bootstrap flows.
+- Use `persona=creator` for the free, incomplete onboarding baseline.
+- Use `persona=creator-ready` for the Pro-entitled dashboard QA baseline.
+- Use `persona=admin` for the admin-shell baseline; it is not the paid creator baseline.
 - Validate the loopback host you are actually using (`localhost` vs `127.0.0.1`) because host-only cookies do not cross between them.
 - If auth bootstrap fails locally, debug the bypass route/cookie flow first instead of treating it as an expected limitation.
 
