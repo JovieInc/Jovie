@@ -33,34 +33,6 @@
     "publicExportPath": "release-landing-desktop.png"
   },
   {
-    "id": "release-tasks-desktop",
-    "title": "Release Tasks",
-    "group": "marketing",
-    "groupLabel": "Marketing",
-    "route": "/demo/showcase/release-tasks",
-    "viewport": "desktop",
-    "theme": "dark",
-    "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-04-29T04:03:59.551Z",
-    "gitSha": null,
-    "imagePath": "release-tasks-desktop.png",
-    "publicExportPath": "release-tasks-active.png"
-  },
-  {
-    "id": "release-presave-mobile",
-    "title": "Release Presave Mobile",
-    "group": "marketing",
-    "groupLabel": "Marketing",
-    "route": "/demo/showcase/release-presave",
-    "viewport": "mobile",
-    "theme": "dark",
-    "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-04-29T04:04:23.307Z",
-    "gitSha": null,
-    "imagePath": "release-presave-mobile.png",
-    "publicExportPath": "release-deep-end-phone.png"
-  },
-  {
     "id": "release-landing-mobile",
     "title": "Release Landing Mobile",
     "group": "marketing",
@@ -118,20 +90,6 @@
     "gitSha": null,
     "imagePath": "artist-spec-creator-menu-mobile.png",
     "publicExportPath": "artist-spec-creator-menu-mobile.png"
-  },
-  {
-    "id": "artist-spec-sync-settings-desktop",
-    "title": "Artist Spec — Sync Settings",
-    "group": "marketing",
-    "groupLabel": "Marketing",
-    "route": "/demo/showcase/settings?capture=sync",
-    "viewport": "desktop",
-    "theme": "dark",
-    "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-04-29T04:06:32.495Z",
-    "gitSha": null,
-    "imagePath": "artist-spec-sync-settings-desktop.png",
-    "publicExportPath": "artist-spec-sync-settings-desktop.png"
   },
   {
     "id": "artist-spec-press-assets-mobile",
@@ -239,6 +197,48 @@
     "imagePath": "artist-profile-how-it-works-section-desktop.png"
   },
   {
+    "id": "tim-white-profile-presave-mobile",
+    "title": "Tim White Profile — Presave Countdown",
+    "group": "marketing",
+    "groupLabel": "Marketing",
+    "route": "/demo/showcase/tim-white-profile?release=presave",
+    "viewport": "mobile",
+    "theme": "dark",
+    "consumers": ["admin", "investor-ready"],
+    "capturedAt": "2026-04-18T09:53:54.459Z",
+    "gitSha": "6a3abf675f6c0544cf5916805d86a75acff67adc",
+    "imagePath": "tim-white-profile-presave-mobile.png",
+    "publicExportPath": "tim-white-profile-presave-phone.png"
+  },
+  {
+    "id": "tim-white-profile-video-mobile",
+    "title": "Tim White Profile — Music Video",
+    "group": "marketing",
+    "groupLabel": "Marketing",
+    "route": "/demo/showcase/tim-white-profile?release=video",
+    "viewport": "mobile",
+    "theme": "dark",
+    "consumers": ["admin", "investor-ready"],
+    "capturedAt": "2026-04-18T09:54:02.973Z",
+    "gitSha": "6a3abf675f6c0544cf5916805d86a75acff67adc",
+    "imagePath": "tim-white-profile-video-mobile.png",
+    "publicExportPath": "tim-white-profile-video-phone.png"
+  },
+  {
+    "id": "tim-white-profile-listen-mobile",
+    "title": "Tim White Profile — Listen",
+    "group": "marketing",
+    "groupLabel": "Marketing",
+    "route": "/demo/showcase/tim-white-profile?mode=listen",
+    "viewport": "mobile",
+    "theme": "dark",
+    "consumers": ["admin", "investor-ready"],
+    "capturedAt": "2026-04-18T09:54:15.380Z",
+    "gitSha": "6a3abf675f6c0544cf5916805d86a75acff67adc",
+    "imagePath": "tim-white-profile-listen-mobile.png",
+    "publicExportPath": "tim-white-profile-listen-phone.png"
+  },
+  {
     "id": "tim-white-profile-tour-mobile",
     "title": "Tim White Profile — Tour",
     "group": "marketing",
@@ -267,20 +267,6 @@
     "publicExportPath": "tim-white-profile-pay-phone.png"
   },
   {
-    "id": "tim-white-profile-presave-mobile",
-    "title": "Tim White Profile — Presave Countdown",
-    "group": "marketing",
-    "groupLabel": "Marketing",
-    "route": "/demo/showcase/tim-white-profile?release=presave",
-    "viewport": "mobile",
-    "theme": "dark",
-    "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-04-18T09:53:54.459Z",
-    "gitSha": "6a3abf675f6c0544cf5916805d86a75acff67adc",
-    "imagePath": "tim-white-profile-presave-mobile.png",
-    "publicExportPath": "tim-white-profile-presave-phone.png"
-  },
-  {
     "id": "tim-white-profile-live-mobile",
     "title": "Tim White Profile — Latest Release",
     "group": "marketing",
@@ -293,20 +279,6 @@
     "gitSha": "6a3abf675f6c0544cf5916805d86a75acff67adc",
     "imagePath": "tim-white-profile-live-mobile.png",
     "publicExportPath": "tim-white-profile-live-phone.png"
-  },
-  {
-    "id": "tim-white-profile-video-mobile",
-    "title": "Tim White Profile — Music Video",
-    "group": "marketing",
-    "groupLabel": "Marketing",
-    "route": "/demo/showcase/tim-white-profile?release=video",
-    "viewport": "mobile",
-    "theme": "dark",
-    "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-04-18T09:54:02.973Z",
-    "gitSha": "6a3abf675f6c0544cf5916805d86a75acff67adc",
-    "imagePath": "tim-white-profile-video-mobile.png",
-    "publicExportPath": "tim-white-profile-video-phone.png"
   },
   {
     "id": "tim-white-profile-subscribe-mobile",
@@ -337,18 +309,32 @@
     "publicExportPath": "tim-white-profile-contact-phone.png"
   },
   {
-    "id": "tim-white-profile-listen-mobile",
-    "title": "Tim White Profile — Listen",
+    "id": "release-presave-mobile",
+    "title": "Release Presave Mobile",
     "group": "marketing",
     "groupLabel": "Marketing",
-    "route": "/demo/showcase/tim-white-profile?mode=listen",
+    "route": "/demo/showcase/release-presave",
     "viewport": "mobile",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-04-18T09:54:15.380Z",
-    "gitSha": "6a3abf675f6c0544cf5916805d86a75acff67adc",
-    "imagePath": "tim-white-profile-listen-mobile.png",
-    "publicExportPath": "tim-white-profile-listen-phone.png"
+    "capturedAt": "2026-04-29T04:04:23.307Z",
+    "gitSha": null,
+    "imagePath": "release-presave-mobile.png",
+    "publicExportPath": "release-deep-end-phone.png"
+  },
+  {
+    "id": "release-tasks-desktop",
+    "title": "Release Tasks",
+    "group": "marketing",
+    "groupLabel": "Marketing",
+    "route": "/demo/showcase/release-tasks",
+    "viewport": "desktop",
+    "theme": "dark",
+    "consumers": ["admin", "investor-ready"],
+    "capturedAt": "2026-04-29T04:03:59.551Z",
+    "gitSha": null,
+    "imagePath": "release-tasks-desktop.png",
+    "publicExportPath": "release-tasks-active.png"
   },
   {
     "id": "artist-spec-geo-insights-desktop",
@@ -377,6 +363,76 @@
     "gitSha": "6a3abf675f6c0544cf5916805d86a75acff67adc",
     "imagePath": "artist-spec-tracked-links-desktop.png",
     "publicExportPath": "artist-spec-tracked-links-desktop.png"
+  },
+  {
+    "id": "artist-spec-sync-settings-desktop",
+    "title": "Artist Spec — Sync Settings",
+    "group": "marketing",
+    "groupLabel": "Marketing",
+    "route": "/demo/showcase/settings?capture=sync",
+    "viewport": "desktop",
+    "theme": "dark",
+    "consumers": ["admin", "investor-ready"],
+    "capturedAt": "2026-04-29T04:06:32.495Z",
+    "gitSha": null,
+    "imagePath": "artist-spec-sync-settings-desktop.png",
+    "publicExportPath": "artist-spec-sync-settings-desktop.png"
+  },
+  {
+    "id": "design-studio-music-ai-command-desktop",
+    "title": "Design Studio — Music AI Command Surface",
+    "group": "dashboard",
+    "groupLabel": "Dashboard",
+    "route": "/demo/showcase/music-ai-command",
+    "viewport": "desktop",
+    "theme": "dark",
+    "consumers": ["admin", "marketing-export", "investor-ready"],
+    "capturedAt": "2026-04-29T20:06:33.762Z",
+    "gitSha": null,
+    "imagePath": "design-studio-music-ai-command-desktop.png",
+    "publicExportPath": "design-studio-music-ai-command.png"
+  },
+  {
+    "id": "design-studio-shell-lyrics-desktop",
+    "title": "Design Studio — Lyrics View",
+    "group": "dashboard",
+    "groupLabel": "Dashboard",
+    "route": "/demo/showcase/shell-lyrics",
+    "viewport": "desktop",
+    "theme": "dark",
+    "consumers": ["admin", "marketing-export", "investor-ready"],
+    "capturedAt": "2026-04-29T20:06:58.818Z",
+    "gitSha": null,
+    "imagePath": "design-studio-shell-lyrics-desktop.png",
+    "publicExportPath": "design-studio-shell-lyrics.png"
+  },
+  {
+    "id": "design-studio-shell-library-desktop",
+    "title": "Design Studio — Library View",
+    "group": "dashboard",
+    "groupLabel": "Dashboard",
+    "route": "/demo/showcase/shell-library",
+    "viewport": "desktop",
+    "theme": "dark",
+    "consumers": ["admin", "marketing-export", "investor-ready"],
+    "capturedAt": "2026-04-29T20:07:23.255Z",
+    "gitSha": null,
+    "imagePath": "design-studio-shell-library-desktop.png",
+    "publicExportPath": "design-studio-shell-library.png"
+  },
+  {
+    "id": "design-studio-shell-track-desktop",
+    "title": "Design Studio — Track View",
+    "group": "dashboard",
+    "groupLabel": "Dashboard",
+    "route": "/demo/showcase/shell-track",
+    "viewport": "desktop",
+    "theme": "dark",
+    "consumers": ["admin", "marketing-export", "investor-ready"],
+    "capturedAt": "2026-04-29T20:07:47.973Z",
+    "gitSha": null,
+    "imagePath": "design-studio-shell-track-desktop.png",
+    "publicExportPath": "design-studio-shell-track.png"
   },
   {
     "id": "dashboard-releases-desktop",
