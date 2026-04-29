@@ -1,7 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
+import { OPEN_COMMAND_PALETTE_EVENT } from '@/components/organisms/command-palette-events';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   mockClearPendingShell,
@@ -117,6 +118,43 @@ describe('DashboardNav interactions', () => {
 
     expect(mockTogglePreviewPanel).toHaveBeenCalledTimes(1);
     expect(mockRouterPush).not.toHaveBeenCalled();
+  });
+
+  it('opens command search from the Design V1 sidebar search row', async () => {
+    const user = userEvent.setup();
+    const listener = vi.fn();
+    globalThis.addEventListener(OPEN_COMMAND_PALETTE_EVENT, listener);
+
+    renderDashboardNav({
+      renderFn: render,
+      appFlags: { DESIGN_V1: true },
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Search' }));
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    globalThis.removeEventListener(OPEN_COMMAND_PALETTE_EVENT, listener);
+  });
+
+  it('groups artist-owned routes under Artist Workspace in Design V1', () => {
+    renderDashboardNav({
+      renderFn: render,
+      appFlags: { DESIGN_V1: true },
+    });
+
+    expect(
+      screen.getByRole('button', { name: 'Artist Workspace' })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Search' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Profile' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Releases' })).toHaveAttribute(
+      'href',
+      APP_ROUTES.DASHBOARD_RELEASES
+    );
+    expect(screen.getByRole('link', { name: 'Audience' })).toHaveAttribute(
+      'href',
+      APP_ROUTES.DASHBOARD_AUDIENCE
+    );
   });
 
   it('profile button navigates to chat before opening the drawer off chat routes', async () => {
