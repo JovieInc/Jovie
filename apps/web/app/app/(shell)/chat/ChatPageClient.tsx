@@ -191,6 +191,12 @@ export function ChatPageClient({
   const [currentThreadTitle, setCurrentThreadTitle] = useState<string | null>(
     null
   );
+  // Reset the thread title when the conversation changes so the previous
+  // thread's title doesn't leak into a fresh conversation while the new
+  // conversation's metadata is loading.
+  useEffect(() => {
+    setCurrentThreadTitle(null);
+  }, [conversationId]);
   const [_welcomeChatBootstrapState, setWelcomeChatBootstrapState] =
     useState<WelcomeChatBootstrapState>('idle');
   const welcomeChatBootstrapStateRef =

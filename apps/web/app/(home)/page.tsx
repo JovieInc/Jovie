@@ -164,27 +164,29 @@ function HomepageHeroActions() {
   );
 }
 
+function HomePageShell({ children }: { readonly children: React.ReactNode }) {
+  return (
+    <>
+      <AuthRedirectHandler />
+      <script type='application/ld+json'>{WEBSITE_SCHEMA}</script>
+      <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
+      <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
+      {children}
+    </>
+  );
+}
+
 export default function HomePage() {
   if (FEATURE_FLAGS.SHOW_HOME_V1_DESIGN) {
     return (
-      <>
-        <AuthRedirectHandler />
-        <script type='application/ld+json'>{WEBSITE_SCHEMA}</script>
-        <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
-        <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
+      <HomePageShell>
         <HomeV1Design />
-      </>
+      </HomePageShell>
     );
   }
 
   return (
-    <>
-      <AuthRedirectHandler />
-
-      <script type='application/ld+json'>{WEBSITE_SCHEMA}</script>
-      <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
-      <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
-
+    <HomePageShell>
       <section
         className='homepage-hero-stage relative'
         aria-labelledby='home-hero-heading'
@@ -245,6 +247,6 @@ export default function HomePage() {
           <HomepageV2FinalCta />
         ) : null}
       </div>
-    </>
+    </HomePageShell>
   );
 }

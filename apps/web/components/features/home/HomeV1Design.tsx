@@ -92,7 +92,7 @@ export function HomeV1Design() {
               id='home-hero-heading'
               className='max-w-[12ch] text-[56px] font-semibold leading-[0.88] text-white sm:text-[84px] lg:text-[116px] xl:text-[132px]'
             >
-              Release more music with less work.
+              Release More Music With Less Work.
             </h1>
             <p className='mt-6 max-w-[40rem] text-[17px] leading-7 text-white/62 sm:text-[19px]'>
               Plan releases, create assets, pitch playlists, and promote every

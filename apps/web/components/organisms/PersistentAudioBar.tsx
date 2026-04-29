@@ -22,10 +22,6 @@ interface PersistentAudioBarProps {
   readonly variant?: PersistentAudioBarVariant;
 }
 
-function getTrackLyricsPath(trackId: string): string {
-  return buildLyricsRoute(trackId);
-}
-
 export function PersistentAudioBar({
   variant = 'legacy',
 }: Readonly<PersistentAudioBarProps>) {
@@ -68,7 +64,7 @@ export function PersistentAudioBar({
 
   const handleOpenLyrics = useCallback(() => {
     if (!playbackState.activeTrackId) return;
-    router.push(getTrackLyricsPath(playbackState.activeTrackId));
+    router.push(buildLyricsRoute(playbackState.activeTrackId));
   }, [playbackState.activeTrackId, router]);
 
   const activeTrackId = playbackState.activeTrackId;
@@ -199,7 +195,7 @@ export function PersistentAudioBar({
     artist: playbackState.artistName ?? '',
     hasLyrics: designV1LyricsEnabled && playbackState.hasLyrics,
   };
-  const lyricsPath = getTrackLyricsPath(activeTrackId);
+  const lyricsPath = buildLyricsRoute(activeTrackId);
   const nowPlayingTrack = {
     trackTitle: playbackState.trackTitle,
     artistName: playbackState.artistName,

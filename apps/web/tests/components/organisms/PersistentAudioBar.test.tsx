@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { buildLyricsRoute } from '@/constants/routes';
 import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 
@@ -277,7 +278,7 @@ describe('PersistentAudioBar', () => {
 
     await user.click(screen.getByRole('button', { name: 'Lyrics' }));
 
-    expect(push).toHaveBeenCalledWith('/app/lyrics/track-1');
+    expect(push).toHaveBeenCalledWith(buildLyricsRoute('track-1'));
   });
 
   it('keeps the shell V1 lyrics button hidden when the active track has no lyrics', () => {

@@ -25,7 +25,8 @@ export function buildLibraryReleaseAssets(
     releaseType: release.releaseType,
     status: release.status,
     trackCount: release.totalTracks,
-    providerCount: release.providers.filter(provider => provider.url).length,
+    providerCount: release.providers.filter(provider => provider.url?.trim())
+      .length,
     hasLyrics: Boolean(release.lyrics?.trim()),
   }));
 }

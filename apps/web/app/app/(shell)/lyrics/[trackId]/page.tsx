@@ -1,5 +1,8 @@
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
+import { APP_ROUTES } from '@/constants/routes';
+import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { captureError } from '@/lib/error-tracking';
 import { getAppFlagValue } from '@/lib/flags/server';
 import { getDashboardShellData } from '../../dashboard/actions';
 import { LyricsPageClient } from './LyricsPageClient';
@@ -29,6 +32,21 @@ export default async function LyricsPage({ params }: Props) {
   }
 
   const dashboardData = await getDashboardShellData(userId);
+  if (dashboardData.dashboardLoadError) {
+    await captureError(
+      'Dashboard data load failed on lyrics page',
+      dashboardData.dashboardLoadError,
+      { route: `/app/lyrics/${trackId}` }
+    );
+    return (
+      <PageErrorState message='Failed to load lyrics. Please refresh the page.' />
+    );
+  }
+
+  if (dashboardData.needsOnboarding) {
+    redirect(APP_ROUTES.ONBOARDING);
+  }
+
   const selectedProfile = dashboardData.selectedProfile;
   if (!selectedProfile) {
     notFound();

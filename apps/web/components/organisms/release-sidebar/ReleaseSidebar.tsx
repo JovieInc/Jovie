@@ -505,8 +505,8 @@ function ReleaseActivitySection({
             key={`${row.providerKey}-${row.updatedAt}`}
             className='flex items-center gap-2.5 px-3 py-2.5'
           >
-            <span className='flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-1 text-tertiary-token'>
-              <Activity className='h-3 w-3' aria-hidden='true' />
+            <span className='flex size-6 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-1 text-tertiary-token'>
+              <Activity className='size-3' aria-hidden='true' />
             </span>
             <div className='min-w-0 flex-1'>
               <p className='truncate text-[12px] font-caption text-primary-token'>

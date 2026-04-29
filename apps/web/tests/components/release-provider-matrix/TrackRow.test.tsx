@@ -127,6 +127,10 @@ describe('TrackRow', () => {
       id: 'track-1',
       title: 'Open Skies',
       audioUrl: 'https://cdn.example.com/track.mp3',
+      artistName: undefined,
+      artworkUrl: undefined,
+      releaseTitle: undefined,
+      hasLyrics: false,
     });
   });
 

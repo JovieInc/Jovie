@@ -41,7 +41,6 @@ import {
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { cn } from '@/lib/utils';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
-import { capitalizeFirst } from '@/lib/utils/string-utils';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
@@ -657,9 +656,10 @@ export function ProfileCompactTemplate({
     setRequestedMode('profile');
   }, [artist.handle, artist.name]);
 
-  const primaryLinks = socialLinks
-    .filter(link => Boolean(link.url))
-    .slice(0, 4);
+  const primaryLinks = mergedDSPs
+    .filter(dsp => Boolean(dsp.url))
+    .slice(0, 4)
+    .map(dsp => ({ id: dsp.key, url: dsp.url, label: dsp.name }));
   const isV1 = visualVariant === 'v1';
 
   return (
@@ -742,7 +742,7 @@ export function ProfileCompactTemplate({
                         rel='noreferrer'
                         className='rounded-full border border-white/[0.08] px-3 py-1.5 text-[12px] font-medium text-white/62 transition-colors hover:border-white/16 hover:text-white'
                       >
-                        {capitalizeFirst(link.platform) || 'Link'}
+                        {link.label || 'Link'}
                       </a>
                     ))}
                   </div>

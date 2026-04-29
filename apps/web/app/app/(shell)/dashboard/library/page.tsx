@@ -23,7 +23,7 @@ export default async function LibraryPage() {
 
   const dashboardData = await getDashboardShellData(userId);
   if (dashboardData.dashboardLoadError) {
-    void captureError(
+    await captureError(
       'Dashboard data load failed on library page',
       dashboardData.dashboardLoadError,
       { route: APP_ROUTES.DASHBOARD_LIBRARY }

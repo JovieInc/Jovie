@@ -3,20 +3,18 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { APP_ROUTES } from '@/constants/routes';
 import { cn } from '@/lib/utils';
+import { capitalizeFirst } from '@/lib/utils/string-utils';
 import {
   formatLibraryReleaseDate,
   type LibraryReleaseAsset,
 } from './library-data';
 
 function formatReleaseType(type: LibraryReleaseAsset['releaseType']): string {
-  return type
-    .split('_')
-    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
+  return type.split('_').map(capitalizeFirst).join(' ');
 }
 
 function formatReleaseStatus(status: LibraryReleaseAsset['status']): string {
-  return status.charAt(0).toUpperCase() + status.slice(1);
+  return capitalizeFirst(status);
 }
 
 function Artwork({ asset }: { readonly asset: LibraryReleaseAsset }) {
@@ -140,7 +138,8 @@ export function LibrarySurface({
                 </span>
                 <span className='inline-flex items-center gap-1 rounded-md bg-surface-1 px-2 py-1'>
                   <Music2 className='h-3 w-3' strokeWidth={2.25} />
-                  {asset.providerCount} Providers
+                  {asset.providerCount}{' '}
+                  {asset.providerCount === 1 ? 'Provider' : 'Providers'}
                 </span>
                 {asset.hasLyrics ? (
                   <span className='inline-flex items-center gap-1 rounded-md bg-surface-1 px-2 py-1'>

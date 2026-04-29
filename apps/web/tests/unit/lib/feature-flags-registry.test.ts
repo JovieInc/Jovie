@@ -23,7 +23,8 @@ const SKIP_DIRECTORIES = new Set([
 
 const APP_FLAG_CALL_REGEX =
   /\b(?:useAppFlag|useFeatureFlag|getAppFlagValue)\(\s*['"`]([A-Z0-9_]+)['"`]/g;
-const EXP_ROUTE_IMPORT_REGEX = /from ['"]@\/app\/exp\//;
+const EXP_ROUTE_IMPORT_REGEX =
+  /\b(?:import|export)\b[\s\S]*?\bfrom\s*['"]@\/app\/exp(?:\/|['"])|\bimport\s*\(\s*['"]@\/app\/exp(?:\/|['"])/;
 
 /** Stable package root resolved from this test file's location. */
 const TEST_FILE_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -86,9 +87,11 @@ describe('feature flag registry integrity', () => {
   });
 
   it('does not include API chat-specific feature flags in the registry', () => {
-    const allowedShellRolloutEntries = new Set([
+    const allowedShellRolloutEntries = new Set<string>([
       'SHELL_CHAT_V1',
       LEGACY_STATSIG_GATE_KEYS.SHELL_CHAT_V1,
+      'DESIGN_V1_CHAT_ENTITIES',
+      LEGACY_STATSIG_GATE_KEYS.DESIGN_V1_CHAT_ENTITIES,
     ]);
     const chatFlagsInKeys = Object.keys(LEGACY_STATSIG_GATE_KEYS).filter(
       key => /chat/i.test(key) && !allowedShellRolloutEntries.has(key)
