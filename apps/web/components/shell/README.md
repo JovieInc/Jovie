@@ -38,10 +38,11 @@ ledger and delete-later inventory.
 | `SidebarBottomNowPlaying` | Compact now-playing row mounted at the sidebar bottom. Artwork + title/artist + small play button. Hides entirely when nothing's playing. |
 | `ArtworkPlayOverlay` | Small play/pause button overlaid on album art. Shared between the two now-playing cards. |
 
-All three accept a `track: NowPlayingTrack` whose fields (`trackTitle`,
-`artistName`, `artworkUrl`) match `useTrackAudioPlayer().playbackState`
-directly. If another caller needs a differently shaped source, add a small
-adapter at that caller boundary instead of widening the component contract.
+`SidebarNowPlaying` and `SidebarBottomNowPlaying` accept a
+`track: NowPlayingTrack` whose fields (`trackTitle`, `artistName`,
+`artworkUrl`) match `useTrackAudioPlayer().playbackState` directly.
+If another caller needs a differently shaped source, add a small adapter at
+that caller boundary instead of widening the component contract.
 
 ## Drawer
 
