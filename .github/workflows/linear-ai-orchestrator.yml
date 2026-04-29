@@ -107,6 +107,10 @@ jobs:
           BRANCH_NAME="$PAYLOAD_BRANCH_NAME"
           if [[ -z "$BRANCH_NAME" ]]; then
             BRANCH_NAME="codex/${SAFE_ID}-r${GITHUB_RUN_ID}"
+          elif [[ ! "$BRANCH_NAME" =~ ^codex/[a-z0-9._/-]+$ || "$BRANCH_NAME" == *..* ]]; then
+            echo "Invalid branch_name payload: $BRANCH_NAME"
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
 
           PLAN_READY="${PAYLOAD_PLAN_READY,,}"

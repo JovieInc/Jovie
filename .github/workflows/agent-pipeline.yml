@@ -159,7 +159,7 @@ jobs:
         run: |
           echo "Branch: $BRANCH"
 
-          if [[ "$BRANCH" =~ ^(linear/|claude/|codegen-bot/|codex/) || "$BRANCH" =~ ^[^/]+/jov-[0-9]+- ]]; then
+          if [[ "$BRANCH" =~ ^(linear/|claude/|codegen-bot/|codex/) || "$BRANCH" =~ (^|/)jov-[0-9]+ ]]; then
             echo "Agent branch detected"
             echo "is_agent_branch=true" >> "$GITHUB_OUTPUT"
           else
@@ -209,7 +209,7 @@ jobs:
 
           # Sample up to 10 other open agent PRs
           OTHER_PRS=$(gh pr list --state open --json number,headRefName --limit 20 \
-            | jq -r --arg this "$PR_NUMBER" '.[] | select(.number != ($this | tonumber)) | select(.headRefName | test("^(linear/|claude/|codegen-bot/|codex/)") or test("^[^/]+/jov-[0-9]+-"; "i")) | .number' \
+            | jq -r --arg this "$PR_NUMBER" '.[] | select(.number != ($this | tonumber)) | select(.headRefName | test("^(linear/|claude/|codegen-bot/|codex/)") or test("(^|/)jov-[0-9]+"; "i")) | .number' \
             | head -10)
 
           SYSTEMIC_CHECKS=""
@@ -845,7 +845,7 @@ jobs:
           # Find open agent PRs with needs-human label
           STALE_PRS=$(gh pr list --state open --label needs-human --json number,headRefName,updatedAt,title --limit 50 \
             | jq -c --arg cutoff "$(date -u -d '48 hours ago' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v-48H +%Y-%m-%dT%H:%M:%SZ)" \
-            '[.[] | select(.headRefName | test("^(linear/|claude/|codegen-bot/|codex/)") or test("^[^/]+/jov-[0-9]+-"; "i")) | select(.updatedAt < $cutoff)] | .[]')
+            '[.[] | select(.headRefName | test("^(linear/|claude/|codegen-bot/|codex/)") or test("(^|/)jov-[0-9]+"; "i")) | select(.updatedAt < $cutoff)] | .[]')
 
           if [[ -z "$STALE_PRS" ]]; then
             echo "No stale agent PRs found"

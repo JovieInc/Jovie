@@ -119,7 +119,7 @@ jobs:
 
             echo "Candidate: $ISSUE_IDENTIFIER -> $BRANCH_NAME"
 
-            EXISTING_PR_COUNT=$(gh pr list --state open --json number,title,body,headRefName --jq \
+            EXISTING_PR_COUNT=$(gh pr list --state open --limit 100 --json number,title,body,headRefName --jq \
               'map(select((.headRefName == env.BRANCH_NAME) or (((.title // "") + "\n" + (.body // "")) | test(env.ISSUE_IDENTIFIER; "i")))) | length')
             if [[ "$EXISTING_PR_COUNT" != "0" ]]; then
               echo "Open PR already exists for $ISSUE_IDENTIFIER; skipping"
@@ -135,30 +135,6 @@ jobs:
               | map(select(.type == "started" and ((.name // "") | ascii_downcase | test("^in[- ]progress$"))))
               | .[0].id // empty
             ')
-
-            if [[ -n "$IN_PROGRESS_STATE_ID" ]]; then
-              curl -sS https://api.linear.app/graphql \
-                -H "Authorization: ${LINEAR_API_KEY}" \
-                -H 'Content-Type: application/json' \
-                -d "$(jq -cn \
-                  --arg issueId "$ISSUE_ID" \
-                  --arg stateId "$IN_PROGRESS_STATE_ID" \
-                  '{
-                    query: "mutation LeaseIssue($issueId: String!, $stateId: String!) { issueUpdate(id: $issueId, input: { stateId: $stateId }) { success } }",
-                    variables: { issueId: $issueId, stateId: $stateId }
-                  }')" > /dev/null
-            fi
-
-            curl -sS https://api.linear.app/graphql \
-              -H "Authorization: ${LINEAR_API_KEY}" \
-              -H 'Content-Type: application/json' \
-              -d "$(jq -cn \
-                --arg issueId "$ISSUE_ID" \
-                --arg body "Linear AI Dispatcher leased ${ISSUE_IDENTIFIER} for GitHub run ${GITHUB_RUN_ID}. Working branch: ${BRANCH_NAME}. Lease expires when the run fails/stales or the PR opens." \
-                '{
-                  query: "mutation AddLeaseComment($issueId: String!, $body: String!) { commentCreate(input: { issueId: $issueId, body: $body }) { success } }",
-                  variables: { issueId: $issueId, body: $body }
-                }')" > /dev/null
 
             DISPATCH_BODY=$(mktemp)
             jq -cn \
@@ -184,7 +160,39 @@ jobs:
                   }
                 }' > "$DISPATCH_BODY"
 
-            gh api "repos/${{ github.repository }}/dispatches" \
-              --method POST \
-              --input "$DISPATCH_BODY"
+            # Dispatch GitHub workflow first. Only mutate Linear state after a
+            # confirmed dispatch so a dispatch failure does not strand the
+            # issue out of Todo.
+            if ! gh api "repos/${{ github.repository }}/dispatches" \
+                --method POST \
+                --input "$DISPATCH_BODY"; then
+              echo "::warning::GitHub dispatch failed for ${ISSUE_IDENTIFIER}; leaving Linear state untouched"
+              rm -f "$DISPATCH_BODY"
+              continue
+            fi
+            rm -f "$DISPATCH_BODY"
+
+            if [[ -n "$IN_PROGRESS_STATE_ID" ]]; then
+              curl -sS https://api.linear.app/graphql \
+                -H "Authorization: ${LINEAR_API_KEY}" \
+                -H 'Content-Type: application/json' \
+                -d "$(jq -cn \
+                  --arg issueId "$ISSUE_ID" \
+                  --arg stateId "$IN_PROGRESS_STATE_ID" \
+                  '{
+                    query: "mutation LeaseIssue($issueId: String!, $stateId: String!) { issueUpdate(id: $issueId, input: { stateId: $stateId }) { success } }",
+                    variables: { issueId: $issueId, stateId: $stateId }
+                  }')" > /dev/null
+            fi
+
+            curl -sS https://api.linear.app/graphql \
+              -H "Authorization: ${LINEAR_API_KEY}" \
+              -H 'Content-Type: application/json' \
+              -d "$(jq -cn \
+                --arg issueId "$ISSUE_ID" \
+                --arg body "Linear AI Dispatcher leased ${ISSUE_IDENTIFIER} for GitHub run ${GITHUB_RUN_ID}. Working branch: ${BRANCH_NAME}. Lease expires when the run fails/stales or the PR opens." \
+                '{
+                  query: "mutation AddLeaseComment($issueId: String!, $body: String!) { commentCreate(input: { issueId: $issueId, body: $body }) { success } }",
+                  variables: { issueId: $issueId, body: $body }
+                }')" > /dev/null
           done < /tmp/linear-candidates.jsonl
