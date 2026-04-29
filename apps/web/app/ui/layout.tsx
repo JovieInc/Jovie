@@ -22,6 +22,7 @@ const NAV_ITEMS = [
       { href: '/ui/avatars', label: 'Avatar', status: 'done' },
       { href: '/ui/switches', label: 'Switch', status: 'done' },
       { href: '/ui/dialogs', label: 'Dialog', status: 'done' },
+      { href: '/ui/parallax', label: 'Zoom Parallax', status: 'done' },
     ],
   },
 ];
@@ -33,7 +34,7 @@ export default function UILayout({
 }) {
   return (
     <TooltipProvider delayDuration={0}>
-      <div className='flex min-h-screen bg-page text-primary-token'>
+      <div className='flex h-screen bg-page text-primary-token'>
         <aside className='sticky top-0 flex h-screen w-52 shrink-0 flex-col overflow-y-auto border-r border-subtle py-6'>
           <div className='px-4 pb-4'>
             <span className='text-[11px] font-semibold uppercase tracking-wider text-tertiary-token'>
