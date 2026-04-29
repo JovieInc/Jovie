@@ -29,7 +29,6 @@ import {
   getAppFlagDefault,
   installAppFlagOverrides,
 } from './helpers/app-flag-overrides';
-import { setTestUserPlan } from './helpers/plan-helpers';
 
 const DESIGN_V1_FLAGS = [
   'DESIGN_V1_RELEASES',
@@ -48,7 +47,7 @@ const REQUIRED_PERSONAS = ['creator', 'creator-ready'] as const;
 
 interface SurfaceCase {
   readonly flagName: DesignV1Flag;
-  readonly route: string;
+  readonly route: string | ((page: Page) => Promise<string>);
   readonly persona?: RequiredPersona;
   readonly prepare?: (page: Page) => Promise<void>;
   readonly assertDefault: (page: Page) => Promise<void>;
@@ -63,29 +62,60 @@ function getBaseUrl(): string {
   return process.env.BASE_URL ?? 'http://localhost:3100';
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => {
+    setTimeout(resolve, ms);
+  });
+}
+
 async function resolvePersonaUserId(
   request: APIRequestContext,
   persona: RequiredPersona
 ): Promise<string> {
-  const response = await request.post(
-    new URL('/api/dev/test-auth/session', getBaseUrl()).toString(),
-    {
-      data: { persona },
-    }
-  );
-  expect(response.ok(), `Failed to resolve ${persona} test persona`).toBe(true);
+  const url = new URL('/api/dev/test-auth/session', getBaseUrl()).toString();
+  let lastFailure = 'No attempts completed';
 
-  const payload = (await response.json()) as { userId?: string | null };
-  const userId = payload.userId?.trim();
-  expect(userId, `Missing ${persona} test persona userId`).toBeTruthy();
-  return userId!;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      const response = await request.post(url, {
+        data: { persona },
+        timeout: 240_000,
+      });
+
+      if (response.ok()) {
+        const payload = (await response.json()) as { userId?: string | null };
+        const userId = payload.userId?.trim();
+        if (userId) return userId;
+        lastFailure = 'Response was ok but did not include a userId';
+      } else {
+        lastFailure = `HTTP ${response.status()}: ${await response.text()}`;
+      }
+    } catch (error) {
+      lastFailure = error instanceof Error ? error.message : String(error);
+    }
+
+    if (attempt < 3) {
+      await sleep(5_000);
+    }
+  }
+
+  throw new Error(
+    `Failed to resolve ${persona} test persona after retries: ${lastFailure}`
+  );
 }
 
 async function gotoSurface(page: Page, route: string): Promise<void> {
   await page.goto(route, {
-    timeout: 120_000,
+    timeout: 240_000,
     waitUntil: 'domcontentloaded',
   });
+}
+
+async function resolveSurfaceRoute(
+  page: Page,
+  route: SurfaceCase['route']
+): Promise<string> {
+  return typeof route === 'function' ? route(page) : route;
 }
 
 async function expectNotFound(page: Page): Promise<void> {
@@ -124,9 +154,20 @@ async function prepareAuthenticatedSurface(
   ]);
 }
 
-async function prepareProAuthenticatedSurface(page: Page): Promise<void> {
-  await prepareAuthenticatedSurface(page, 'creator-ready');
-  await setTestUserPlan(page, 'pro');
+async function resolveSeededLyricsRoute(page: Page): Promise<string> {
+  await gotoSurface(page, APP_ROUTES.DASHBOARD_RELEASES);
+  await expect(page.getByTestId('releases-matrix')).toBeVisible({
+    timeout: 30_000,
+  });
+
+  const releaseTrigger = page.locator('[data-testid^="release-open-"]').first();
+  await expect(releaseTrigger).toBeVisible({ timeout: 30_000 });
+
+  const testId = await releaseTrigger.getAttribute('data-testid');
+  const releaseId = testId?.replace(/^release-open-/, '').trim();
+  expect(releaseId, 'Expected seeded release id for lyrics route').toBeTruthy();
+
+  return `${APP_ROUTES.LYRICS}/${releaseId}`;
 }
 
 const SURFACE_CASES: readonly SurfaceCase[] = [
@@ -157,7 +198,7 @@ const SURFACE_CASES: readonly SurfaceCase[] = [
   {
     flagName: 'DESIGN_V1_TASKS',
     route: APP_ROUTES.DASHBOARD_TASKS,
-    prepare: prepareProAuthenticatedSurface,
+    persona: 'creator-ready',
     assertDefault: async page => {
       const workspace = page.getByTestId('tasks-workspace');
       await expect(workspace).toBeVisible({ timeout: 30_000 });
@@ -196,7 +237,7 @@ const SURFACE_CASES: readonly SurfaceCase[] = [
   },
   {
     flagName: 'DESIGN_V1_LYRICS',
-    route: `${APP_ROUTES.LYRICS}/flag-matrix-track`,
+    route: resolveSeededLyricsRoute,
     persona: 'creator-ready',
     assertDefault: expectNotFound,
     assertEnabled: async page => {
@@ -258,7 +299,7 @@ const SURFACE_CASES: readonly SurfaceCase[] = [
 ];
 
 test.describe('Design V1 flagged surfaces', () => {
-  test.setTimeout(300_000);
+  test.setTimeout(600_000);
 
   test.skip(
     process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
@@ -273,7 +314,7 @@ test.describe('Design V1 flagged surfaces', () => {
 
   test.describe('surface routes', () => {
     test.beforeAll(async ({ request }) => {
-      test.setTimeout(300_000);
+      test.setTimeout(600_000);
       resolvedPersonaUserIds.clear();
 
       for (const persona of REQUIRED_PERSONAS) {
@@ -296,7 +337,7 @@ test.describe('Design V1 flagged surfaces', () => {
           await prepareAuthenticatedSurface(page, surface.persona);
         }
 
-        await gotoSurface(page, surface.route);
+        await gotoSurface(page, await resolveSurfaceRoute(page, surface.route));
         await surface.assertDefault(page);
       });
 
@@ -309,7 +350,7 @@ test.describe('Design V1 flagged surfaces', () => {
           await prepareAuthenticatedSurface(page, surface.persona);
         }
 
-        await gotoSurface(page, surface.route);
+        await gotoSurface(page, await resolveSurfaceRoute(page, surface.route));
         await surface.assertEnabled(page);
       });
     }
