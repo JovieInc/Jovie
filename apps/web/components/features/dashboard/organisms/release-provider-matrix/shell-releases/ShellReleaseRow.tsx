@@ -3,6 +3,8 @@
 import { ExternalLink, MoreHorizontal } from 'lucide-react';
 import Link from 'next/link';
 import { type KeyboardEvent, memo, useMemo } from 'react';
+import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
+import type { TableActionMenuItem } from '@/components/atoms/table-action-menu/types';
 import { ArtworkThumb } from '@/components/shell/ArtworkThumb';
 import { DropDateChip } from '@/components/shell/DropDateChip';
 import { DspAvatarStack } from '@/components/shell/DspAvatarStack';
@@ -26,12 +28,12 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
   release,
   isSelected,
   onSelect,
-  onOpenMore,
+  actionMenuItems,
 }: {
   readonly release: ReleaseViewModel;
   readonly isSelected: boolean;
   readonly onSelect: () => void;
-  readonly onOpenMore?: (e: React.MouseEvent<HTMLButtonElement>) => void;
+  readonly actionMenuItems?: TableActionMenuItem[];
 }) {
   const dspItems = useMemo(() => releaseToDspItems(release), [release]);
   const dropMeta = useMemo(
@@ -113,22 +115,22 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
         <ExternalLink className='h-3 w-3' strokeWidth={2.25} />
       </Link>
 
-      {onOpenMore ? (
-        <button
-          type='button'
-          onClick={e => {
-            e.stopPropagation();
-            onOpenMore(e);
-          }}
-          aria-label={`Release actions for ${release.title}`}
-          className={cn(
-            'shrink-0 h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-[opacity,color,background-color] duration-150 ease-out',
-            'opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100',
-            isSelected && 'opacity-100'
-          )}
-        >
-          <MoreHorizontal className='h-3 w-3' strokeWidth={2.25} />
-        </button>
+      {actionMenuItems && actionMenuItems.length > 0 ? (
+        <TableActionMenu items={actionMenuItems} trigger='custom' align='end'>
+          <button
+            type='button'
+            onClick={e => e.stopPropagation()}
+            onKeyDown={e => e.stopPropagation()}
+            aria-label={`Release actions for ${release.title}`}
+            className={cn(
+              'shrink-0 h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-[opacity,color,background-color] duration-150 ease-out',
+              'opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100',
+              isSelected && 'opacity-100'
+            )}
+          >
+            <MoreHorizontal className='h-3 w-3' strokeWidth={2.25} />
+          </button>
+        </TableActionMenu>
       ) : null}
     </div>
   );
