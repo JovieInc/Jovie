@@ -19,37 +19,40 @@ const mockProfile = {
 };
 
 vi.mock('next/dynamic', () => {
-  let dynamicComponentIndex = 0;
+  function DynamicReleasesExperience(props: Record<string, unknown>) {
+    return (
+      <div
+        data-testid='releases-experience'
+        data-count={String((props.releases as unknown[])?.length ?? 0)}
+      >
+        Releases
+      </div>
+    );
+  }
+
+  function DynamicShellReleasesView(props: Record<string, unknown>) {
+    return (
+      <div
+        data-testid='shell-releases-view'
+        data-count={String((props.releases as unknown[])?.length ?? 0)}
+      >
+        Shell Releases
+      </div>
+    );
+  }
 
   return {
-    default: () => {
-      dynamicComponentIndex += 1;
-
-      if (dynamicComponentIndex === 1) {
-        return function DynamicReleasesExperience(
-          props: Record<string, unknown>
-        ) {
-          return (
-            <div
-              data-testid='releases-experience'
-              data-count={String((props.releases as unknown[])?.length ?? 0)}
-            >
-              Releases
-            </div>
-          );
-        };
+    default: (importer: () => Promise<unknown>) => {
+      // Key on the importer source so adding a new dynamic() call doesn't
+      // silently shift positional indices and stub the wrong component.
+      const source = importer.toString();
+      if (source.includes('ShellReleasesView')) {
+        return DynamicShellReleasesView;
       }
-
-      return function DynamicShellReleasesView(props: Record<string, unknown>) {
-        return (
-          <div
-            data-testid='shell-releases-view'
-            data-count={String((props.releases as unknown[])?.length ?? 0)}
-          >
-            Shell Releases
-          </div>
-        );
-      };
+      if (source.includes('release-provider-matrix')) {
+        return DynamicReleasesExperience;
+      }
+      throw new Error(`Unmocked next/dynamic import: ${source}`);
     },
   };
 });
@@ -114,10 +117,12 @@ describe('@critical ReleasesPageClient', () => {
     [true, false, 'legacyProviderMatrix'],
     [false, true, 'designV1ShellReleases'],
     [true, true, 'designV1ShellReleases'],
-  ] as const)('resolves releases view mode for SHELL_CHAT_V1=%s and DESIGN_V1_RELEASES=%s', (shellChatV1Enabled, designV1ReleasesEnabled, expectedMode) => {
+  ] as const)('resolves releases view mode for SHELL_CHAT_V1=%s and DESIGN_V1_RELEASES=%s', (_shellChatV1Enabled, designV1ReleasesEnabled, expectedMode) => {
+    // SHELL_CHAT_V1 is intentionally not part of ReleasesFlagState; the
+    // matrix still includes it so we lock in that releases view selection
+    // does not regress to depending on the shell chrome flag.
     expect(
       resolveReleasesViewMode({
-        shellChatV1Enabled,
         designV1ReleasesEnabled,
       })
     ).toBe(expectedMode);
