@@ -713,6 +713,191 @@ describe('DevToolbar', () => {
     });
   });
 
+  // ─── Test Persona Switcher ─────────────────────────────────
+
+  describe('test persona switcher', () => {
+    let fetchSpy: ReturnType<typeof vi.fn>;
+    let reloadSpy: ReturnType<typeof vi.fn>;
+    const originalLocation = window.location;
+
+    function mockSessionResponse(
+      overrides?: Partial<{
+        enabled: boolean;
+        trustedHost: boolean;
+        active: boolean;
+        persona: 'creator' | 'creator-ready' | 'admin' | null;
+        userId: string | null;
+        email: string | null;
+        profilePath: string | null;
+        reason: string | null;
+      }>
+    ) {
+      return {
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            enabled: true,
+            trustedHost: true,
+            active: false,
+            persona: null,
+            userId: null,
+            email: null,
+            profilePath: null,
+            reason: null,
+            ...overrides,
+          }),
+      };
+    }
+
+    beforeEach(() => {
+      fetchSpy = vi.fn().mockResolvedValue(mockSessionResponse());
+      vi.stubGlobal('fetch', fetchSpy);
+      reloadSpy = vi.fn();
+      Object.defineProperty(window, 'location', {
+        value: {
+          ...originalLocation,
+          pathname: '/app/dashboard',
+          reload: reloadSpy,
+        },
+        writable: true,
+        configurable: true,
+      });
+    });
+
+    afterEach(() => {
+      Object.defineProperty(window, 'location', {
+        value: originalLocation,
+        configurable: true,
+        writable: true,
+      });
+      vi.unstubAllGlobals();
+    });
+
+    it('renders a persona button outside production', () => {
+      renderToolbar();
+
+      expect(
+        screen.getByRole('button', { name: 'Test Persona' })
+      ).toBeInTheDocument();
+    });
+
+    it('does not render the persona button in production', () => {
+      renderToolbar({ env: 'production' });
+
+      expect(
+        screen.queryByRole('button', { name: 'Test Persona' })
+      ).not.toBeInTheDocument();
+    });
+
+    it('loads and displays the active persona when opened', async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockSessionResponse({
+          active: true,
+          persona: 'creator-ready',
+          userId: 'user_ready',
+          email: 'browse-ready+clerk_test@jov.ie',
+          profilePath: '/browse-ready-user',
+        })
+      );
+
+      renderToolbar();
+      fireEvent.click(screen.getByRole('button', { name: 'Test Persona' }));
+
+      expect(await screen.findByText('Pro Creator')).toBeInTheDocument();
+      expect(
+        screen.getByText('Active: browse-ready+clerk_test@jov.ie')
+      ).toBeInTheDocument();
+      expect(screen.getByText('/browse-ready-user')).toBeInTheDocument();
+      expect(
+        screen.getByRole('menuitem', { name: /Pro Creator/ })
+      ).toBeDisabled();
+      expect(fetchSpy).toHaveBeenCalledWith('/api/dev/test-auth/session');
+    });
+
+    it('shows disabled explanatory text when test auth is unavailable', async () => {
+      fetchSpy.mockResolvedValueOnce(
+        mockSessionResponse({
+          enabled: false,
+          trustedHost: true,
+          reason: 'E2E_USE_TEST_AUTH_BYPASS is not enabled',
+        })
+      );
+
+      renderToolbar();
+      fireEvent.click(screen.getByRole('button', { name: 'Test Persona' }));
+
+      expect(
+        await screen.findByText('E2E_USE_TEST_AUTH_BYPASS is not enabled')
+      ).toBeInTheDocument();
+      expect(screen.queryByText('Free Creator')).not.toBeInTheDocument();
+    });
+
+    it('switches personas through the dev test-auth session endpoint', async () => {
+      fetchSpy
+        .mockResolvedValueOnce(mockSessionResponse())
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              persona: 'creator-ready',
+              userId: 'user_ready',
+              email: 'browse-ready+clerk_test@jov.ie',
+              profilePath: '/browse-ready-user',
+            }),
+        });
+
+      renderToolbar();
+      fireEvent.click(screen.getByRole('button', { name: 'Test Persona' }));
+      fireEvent.click(
+        await screen.findByRole('menuitem', { name: /Pro Creator/ })
+      );
+
+      await waitFor(() => {
+        expect(fetchSpy).toHaveBeenLastCalledWith(
+          '/api/dev/test-auth/session',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ persona: 'creator-ready' }),
+          }
+        );
+      });
+      expect(reloadSpy).toHaveBeenCalled();
+    });
+
+    it('exits an active test persona through DELETE /session', async () => {
+      fetchSpy
+        .mockResolvedValueOnce(
+          mockSessionResponse({
+            active: true,
+            persona: 'creator',
+            userId: 'user_creator',
+            email: 'browse+clerk_test@jov.ie',
+            profilePath: '/browse-test-user',
+          })
+        )
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ success: true }),
+        });
+
+      renderToolbar();
+      fireEvent.click(screen.getByRole('button', { name: 'Test Persona' }));
+      fireEvent.click(
+        await screen.findByRole('menuitem', { name: 'Exit Persona' })
+      );
+
+      await waitFor(() => {
+        expect(fetchSpy).toHaveBeenLastCalledWith(
+          '/api/dev/test-auth/session',
+          { method: 'DELETE' }
+        );
+      });
+      expect(reloadSpy).toHaveBeenCalled();
+    });
+  });
+
   // ─── Expand/Collapse ───────────────────────────────────────
 
   describe('expand/collapse', () => {

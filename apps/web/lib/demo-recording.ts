@@ -52,7 +52,7 @@ interface RootLayoutChromeState {
 export function getRootLayoutChromeState({
   devEnv,
   isDemoRecording = isDemoRecordingServer(),
-  isE2EClientRuntime = false,
+  isE2EClientRuntime = isEnabled(process.env.NEXT_PUBLIC_E2E_MODE),
 }: RootLayoutChromeStateInput): RootLayoutChromeState {
   const isDevChromeDisabled = isDevChromeDisabledServer();
   const shouldRenderDevChrome = !(

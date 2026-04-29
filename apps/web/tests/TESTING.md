@@ -210,15 +210,17 @@ pnpm run dev:web:browse
 Then authenticate the browse session with one route hit:
 
 ```text
-/api/dev/test-auth/enter?persona=creator&redirect=/app/dashboard/earnings
+/api/dev/test-auth/enter?persona=creator-ready&redirect=/app/dashboard/earnings
 ```
 
 Notes:
-1. `creator` is the default browse persona and is the normal choice for dashboard QA.
-2. `admin` is opt-in:
+1. `creator-ready` is the normal choice for dashboard QA because it has completed onboarding and Pro entitlements.
+2. `creator` is the free, incomplete onboarding baseline:
+   `/api/dev/test-auth/enter?persona=creator&redirect=/app`
+3. `admin` is opt-in:
    `/api/dev/test-auth/enter?persona=admin&redirect=/app/admin`
-3. This flow sets the bypass cookies directly and works without `NEXT_PUBLIC_E2E_MODE=1`.
-4. It auto-provisions the local browse persona if it is missing.
+4. This flow sets the bypass cookies directly and works without `NEXT_PUBLIC_E2E_MODE=1`.
+5. It auto-provisions the local browse persona if it is missing.
 
 ### Fallback Helper For Non-Loopback Hosts
 
