@@ -67,6 +67,7 @@ jobs:
           PAYLOAD_VERIFY_REQUIRED: ${{ github.event.client_payload.verify_required }}
           PAYLOAD_SIMPLIFY_BOUNDED: ${{ github.event.client_payload.simplify_bounded }}
           PAYLOAD_MODEL_TIER: ${{ github.event.client_payload.model_tier }}
+          PAYLOAD_BRANCH_NAME: ${{ github.event.client_payload.branch_name }}
           INPUT_ISSUE_ID: ${{ inputs.issue_id }}
           INPUT_ISSUE_IDENTIFIER: ${{ inputs.issue_identifier }}
           INPUT_ISSUE_TITLE: ${{ inputs.issue_title }}
@@ -103,7 +104,14 @@ jobs:
           if [[ -z "$SAFE_ID" ]]; then
             SAFE_ID="issue-${ISSUE_ID:0:8}"
           fi
-          BRANCH_NAME="codex/${SAFE_ID}"
+          BRANCH_NAME="$PAYLOAD_BRANCH_NAME"
+          if [[ -z "$BRANCH_NAME" ]]; then
+            BRANCH_NAME="codex/${SAFE_ID}-r${GITHUB_RUN_ID}"
+          elif [[ ! "$BRANCH_NAME" =~ ^codex/[a-z0-9._/-]+$ || "$BRANCH_NAME" == *..* ]]; then
+            echo "Invalid branch_name payload: $BRANCH_NAME"
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
 
           PLAN_READY="${PAYLOAD_PLAN_READY,,}"
           if [[ "$PLAN_READY" != "true" ]]; then
@@ -361,7 +369,7 @@ jobs:
             - model_tier: ${{ needs.wait_for_coderabbit_plan.outputs.model_tier }}
 
             Hard requirements:
-            1) Node.js 24.x and pnpm 9.15.4 conventions only.
+            1) Node.js 22.x and pnpm 9.15.4 conventions only.
             2) Run from repo root. Use pnpm/turbo commands only.
             3) Never edit drizzle/migrations files.
             4) Never add // biome-ignore.

@@ -177,6 +177,9 @@ export const ServerEnvSchema = z.object({
 
   // GitHub dispatch (Sentry autofix pipeline)
   GH_DISPATCH_TOKEN: z.string().optional(),
+  // Vercel-injected Git metadata (used to target the dispatch repo)
+  VERCEL_GIT_REPO_OWNER: z.string().optional(),
+  VERCEL_GIT_REPO_SLUG: z.string().optional(),
 
   // Statsig server-side (feature flags)
   STATSIG_SERVER_SECRET: z.string().optional(),
@@ -295,6 +298,8 @@ export const ENV_KEYS = [
   'SENTRY_ORG_SLUG',
   'LINEAR_WEBHOOK_SECRET',
   'GH_DISPATCH_TOKEN',
+  'VERCEL_GIT_REPO_OWNER',
+  'VERCEL_GIT_REPO_SLUG',
   'STATSIG_SERVER_SECRET',
   'AI_GATEWAY_API_KEY',
   'XAI_API_KEY',

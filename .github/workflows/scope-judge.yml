@@ -4,7 +4,7 @@
 # original Linear ticket intent. Prevents agent-generated PRs from drifting
 # beyond the requested scope — the failure mode that tests alone can't catch.
 #
-# TRIGGER: PR opened/synchronized on agent branches (linear/*, claude/*, codegen-bot/*)
+# TRIGGER: PR opened/synchronized on agent branches (linear/*, claude/*, codegen-bot/*, codex/*, */jov-*)
 #
 # HOW IT WORKS:
 # 1. Extracts Linear ticket intent from PR body (populated by linear-ai-orchestrator)
@@ -46,7 +46,8 @@ jobs:
         startsWith(github.event.pull_request.head.ref, 'linear/') ||
         startsWith(github.event.pull_request.head.ref, 'claude/') ||
         startsWith(github.event.pull_request.head.ref, 'codegen-bot/') ||
-        startsWith(github.event.pull_request.head.ref, 'codex/')
+        startsWith(github.event.pull_request.head.ref, 'codex/') ||
+        contains(github.event.pull_request.head.ref, '/jov-')
       )
     steps:
       - name: Generate Jovie Bot token

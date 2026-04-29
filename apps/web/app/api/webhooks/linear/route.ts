@@ -18,7 +18,7 @@
  *
  * Side effects: POSTs to
  * `https://api.github.com/repos/{owner}/{repo}/dispatches` with
- * GH_DISPATCH_TOKEN. Repo defaults to TheBlackFuture/Jovie unless
+ * GH_DISPATCH_TOKEN. Repo defaults to JovieInc/Jovie unless
  * VERCEL_GIT_REPO_OWNER / VERCEL_GIT_REPO_SLUG override.
  */
 
@@ -268,8 +268,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const owner = process.env.VERCEL_GIT_REPO_OWNER ?? 'TheBlackFuture';
-    const repo = process.env.VERCEL_GIT_REPO_SLUG ?? 'Jovie';
+    const owner = env.VERCEL_GIT_REPO_OWNER ?? 'JovieInc';
+    const repo = env.VERCEL_GIT_REPO_SLUG ?? 'Jovie';
     const automationContract = getAutomationContract(payload, isPlanReadyEvent);
 
     const dispatchResponse = await serverFetch(
