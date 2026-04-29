@@ -423,7 +423,10 @@ body:has(.home-viewport)::-webkit-scrollbar {
   width: auto;
   border: 1px solid rgba(189, 189, 244, 0.1);
   border-radius: 10px;
-  aspect-ratio: 16 / 9;
+  /* Per-shot aspect-ratio set inline as --shot-aspect from the image's real
+     width/height. Falls back to 16/10 (the typical 1440x900 desktop capture)
+     when no inline value is supplied. The phone-variant rule overrides this. */
+  aspect-ratio: var(--shot-aspect, 16 / 10);
   padding: 6px;
   background: rgba(157, 157, 255, 0.05);
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);

@@ -204,6 +204,16 @@ export function HomepageHeroMockupCarousel() {
           {HERO_MOCKUP_SCREENSHOTS.map((shot, index) => {
             const offset = getOffset(index, activeIndex);
             const isActive = offset === 0;
+            // Phone shots use a hardcoded 9/19.5 frame aspect (set in CSS).
+            // Desktop/panel shots get the real capture aspect so object-fit:
+            // cover doesn't crop top/bottom (16:9 frame vs 16:10 capture).
+            const shotStyle: CSSProperties =
+              shot.kind === 'phone'
+                ? getSlideStyle(offset)
+                : ({
+                    ...getSlideStyle(offset),
+                    '--shot-aspect': `${shot.width} / ${shot.height}`,
+                  } as CSSProperties);
 
             return (
               <figure
@@ -212,7 +222,7 @@ export function HomepageHeroMockupCarousel() {
                 data-active={isActive ? 'true' : 'false'}
                 data-testid={`homepage-hero-shot-${shot.id}`}
                 key={shot.id}
-                style={getSlideStyle(offset)}
+                style={shotStyle}
               >
                 <div className='homepage-hero-mockup__frame'>
                   <Image
