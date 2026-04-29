@@ -123,7 +123,7 @@ describe('bulkInsertSyncedEvents', () => {
   it('flips every synced row to pending', async () => {
     mockReturning.mockResolvedValueOnce([{ id: 'a' }, { id: 'b' }]);
     await bulkInsertSyncedEvents([
-      { ...baseInput, provider: 'admin_import' },
+      { ...baseInput, provider: 'admin_import', externalId: 'admin-1' },
       { ...baseInput, provider: 'bandsintown', externalId: 'x' },
     ]);
     const rows = mockValues.mock.calls[0]?.[0];
@@ -142,9 +142,9 @@ describe('bulkInsertSyncedEvents', () => {
       { id: 'c' },
     ]);
     const result = await bulkInsertSyncedEvents([
-      { ...baseInput, provider: 'bandsintown' },
-      { ...baseInput, provider: 'bandsintown' },
-      { ...baseInput, provider: 'bandsintown' },
+      { ...baseInput, provider: 'bandsintown', externalId: 'evt-1' },
+      { ...baseInput, provider: 'bandsintown', externalId: 'evt-2' },
+      { ...baseInput, provider: 'bandsintown', externalId: 'evt-3' },
     ]);
     expect(result).toBe(3);
   });
@@ -181,5 +181,15 @@ describe('bulkInsertSyncedEvents', () => {
     expect(mockDbInsert).not.toHaveBeenCalled();
     expect(mockValues).not.toHaveBeenCalled();
     expect(mockReturning).not.toHaveBeenCalled();
+  });
+
+  it('requires externalId for every synced/import row', async () => {
+    await expect(
+      bulkInsertSyncedEvents([{ ...baseInput, provider: 'bandsintown' }])
+    ).rejects.toThrow(
+      'bulkInsertSyncedEvents requires externalId for every synced/import row'
+    );
+
+    expect(mockDbInsert).not.toHaveBeenCalled();
   });
 });

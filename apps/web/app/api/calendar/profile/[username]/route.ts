@@ -96,6 +96,7 @@ export async function GET(
       const startDate = new Date(event.startDate);
       if (Number.isNaN(startDate.getTime())) continue;
       const endDate = new Date(startDate.getTime() + 3 * 60 * 60 * 1000);
+      const venueLabel = event.venueName || event.city || 'TBA';
 
       const location = [
         event.venueName,
@@ -108,19 +109,19 @@ export async function GET(
 
       const summary = event.title
         ? `${artistName}: ${event.title}`
-        : `${artistName} at ${event.venueName}`;
+        : `${artistName} at ${venueLabel}`;
 
       const descriptionParts: string[] = [
-        `${artistName} live at ${event.venueName}`,
+        `${artistName} live at ${venueLabel}`,
       ];
       if (event.startTime) {
         descriptionParts.push(`Doors: ${event.startTime}`);
       }
-      if (event.ticketUrl) {
-        descriptionParts.push(`Tickets: ${event.ticketUrl}`);
+      const ticketUrl = sanitizeIcsUrl(event.ticketUrl);
+      if (ticketUrl) {
+        descriptionParts.push(`Tickets: ${ticketUrl}`);
       }
       const description = descriptionParts.join('\n');
-      const ticketUrl = sanitizeIcsUrl(event.ticketUrl);
 
       lines.push(
         'BEGIN:VEVENT',

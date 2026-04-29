@@ -2,7 +2,6 @@
 
 import { and, eq, inArray } from 'drizzle-orm';
 import { unstable_noStore as noStore, revalidateTag } from 'next/cache';
-import { redirect } from 'next/navigation';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import { tourDates } from '@/lib/db/schema/tour';
@@ -38,17 +37,17 @@ interface AuthedProfile {
   profileId: string;
 }
 
-async function requireAuthedProfile(): Promise<AuthedProfile> {
+async function requireAuthedProfile(): Promise<AuthedProfile | null> {
   const { userId } = await getCachedAuth();
   if (!userId) {
-    throw new Error('Unauthorized');
+    return null;
   }
   const data = await getDashboardData();
   if (data.needsOnboarding && !data.dashboardLoadError) {
-    redirect('/onboarding');
+    return null;
   }
   if (!data.selectedProfile) {
-    redirect('/onboarding');
+    return null;
   }
   return { userId, profileId: data.selectedProfile.id };
 }
@@ -60,6 +59,9 @@ function invalidateEventsCache(authed: AuthedProfile): void {
 export async function confirmEvent(id: string): Promise<EventActionResult> {
   noStore();
   const authed = await requireAuthedProfile();
+  if (!authed) {
+    return { ok: false, reason: 'unauthorized' };
+  }
 
   const result = await db
     .update(tourDates)
@@ -88,6 +90,9 @@ export async function confirmEvent(id: string): Promise<EventActionResult> {
 export async function rejectEvent(id: string): Promise<EventActionResult> {
   noStore();
   const authed = await requireAuthedProfile();
+  if (!authed) {
+    return { ok: false, reason: 'unauthorized' };
+  }
 
   const result = await db
     .update(tourDates)
@@ -116,6 +121,9 @@ export async function rejectEvent(id: string): Promise<EventActionResult> {
 export async function undoRejectEvent(id: string): Promise<EventActionResult> {
   noStore();
   const authed = await requireAuthedProfile();
+  if (!authed) {
+    return { ok: false, reason: 'unauthorized' };
+  }
 
   const result = await db
     .update(tourDates)
@@ -153,6 +161,9 @@ export async function confirmEvents(
     return { ok: true, updated: 0, requested: 0 };
   }
   const authed = await requireAuthedProfile();
+  if (!authed) {
+    return { ok: false, reason: 'unauthorized' };
+  }
 
   const result = await db
     .update(tourDates)
@@ -190,6 +201,9 @@ export async function rejectEvents(
     return { ok: true, updated: 0, requested: 0 };
   }
   const authed = await requireAuthedProfile();
+  if (!authed) {
+    return { ok: false, reason: 'unauthorized' };
+  }
 
   const result = await db
     .update(tourDates)

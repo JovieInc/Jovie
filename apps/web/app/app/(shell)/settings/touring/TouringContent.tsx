@@ -26,12 +26,21 @@ export function TouringContent() {
       description='Connect Bandsintown to display tour dates on your profile.'
     >
       <SettingsTouringSection profileId={artist.id} />
-      <CalendarSubscribeRow username={artist.handle} />
+      <CalendarSubscribeRow
+        username={artist.handle}
+        isPublicProfile={artist.published}
+      />
     </SettingsSection>
   );
 }
 
-function CalendarSubscribeRow({ username }: { readonly username: string }) {
+function CalendarSubscribeRow({
+  username,
+  isPublicProfile,
+}: {
+  readonly username: string;
+  readonly isPublicProfile: boolean;
+}) {
   const [copied, setCopied] = useState(false);
   const subscribeUrl = globalThis.location?.origin
     ? `${globalThis.location.origin}/api/calendar/profile/${username}`
@@ -54,16 +63,22 @@ function CalendarSubscribeRow({ username }: { readonly username: string }) {
         <SettingsActionRow
           icon={<Calendar className='h-4 w-4' aria-hidden />}
           title='Subscribe URL'
-          description='Anyone with this link sees your confirmed tour dates in Google, Apple, or Outlook calendar. Public — share with your team, manager, or industry contacts.'
+          description={
+            isPublicProfile
+              ? 'Anyone with this link sees your confirmed tour dates in Google, Apple, or Outlook calendar. Public — share with your team, manager, or industry contacts.'
+              : 'Publish your profile to enable a public subscribe URL for your confirmed tour dates.'
+          }
           action={
-            <button
-              type='button'
-              onClick={handleCopy}
-              className='inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface-1 px-2.5 py-1 text-2xs text-secondary-token hover:bg-surface-2 transition-colors'
-            >
-              <Copy className='h-3.5 w-3.5' />
-              {copied ? 'Copied' : 'Copy link'}
-            </button>
+            isPublicProfile ? (
+              <button
+                type='button'
+                onClick={handleCopy}
+                className='inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface-1 px-2.5 py-1 text-2xs text-secondary-token hover:bg-surface-2 transition-colors'
+              >
+                <Copy className='h-3.5 w-3.5' />
+                {copied ? 'Copied' : 'Copy link'}
+              </button>
+            ) : undefined
           }
         />
       </div>

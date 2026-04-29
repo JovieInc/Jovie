@@ -35,6 +35,7 @@ import {
   bulkInsertSyncedEvents,
   type InsertEventInput,
 } from '@/lib/events/insert';
+import { normalizeTicketUrl } from '@/lib/events/ticket-url';
 
 interface CliArgs {
   profileId: string;
@@ -154,7 +155,7 @@ async function main() {
       city: r.city,
       region: nullable(r.region),
       country: r.country,
-      ticketUrl: nullable(r.ticket_url),
+      ticketUrl: normalizeTicketUrl(r.ticket_url),
       ticketStatus:
         (nullable(r.ticket_status) as InsertEventInput['ticketStatus']) ??
         'available',

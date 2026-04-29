@@ -19,7 +19,7 @@ import type {
  */
 export interface EventRecord {
   readonly id: string;
-  /** Venue name, e.g. "Brooklyn Steel". Falls back to tour-date title or city. */
+  /** Display title. Prefers custom title, then venue name, then city. */
   readonly title: string;
   /** "city · provider", e.g. "Brooklyn, NY · Bandsintown". */
   readonly subtitle: string;
@@ -75,7 +75,7 @@ export function tourDateToEventRecord(td: TourDateViewModel): EventRecord {
   const subtitle = `${location} · ${providerLabel}`;
   return {
     id: td.id,
-    title: td.venueName || td.title || td.city,
+    title: td.title || td.venueName || td.city,
     subtitle,
     eventDate: td.startDate,
     timezone: td.timezone,
@@ -102,7 +102,7 @@ export function useEventsQuery(profileId: string) {
     queryKey: queryKeys.events.list(profileId),
     // eslint-disable-next-line @jovie/require-abort-signal -- server action, signal not passable
     queryFn: async (): Promise<EventRecord[]> => {
-      const dates = await loadTourDates();
+      const dates = await loadTourDates(profileId);
       return dates.map(tourDateToEventRecord);
     },
     ...STANDARD_NO_REMOUNT_CACHE,

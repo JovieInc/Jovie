@@ -18,6 +18,7 @@ import {
   undoRejectEvent,
 } from '@/app/app/(shell)/dashboard/tour-dates/events-actions';
 import { getEventLocalDateKey } from '@/lib/events/date';
+import { normalizeTicketUrl } from '@/lib/events/ticket-url';
 import { queryKeys } from '@/lib/queries';
 import { type EventRecord, useEventsQuery } from '@/lib/queries/useEventsQuery';
 import { useRecentReleasesQuery } from '@/lib/queries/useRecentReleasesQuery';
@@ -705,6 +706,7 @@ function FilterPill(props: FilterPillProps) {
     <button
       type='button'
       onClick={props.onClick}
+      aria-pressed={props.active}
       className={cn(
         'h-7 px-3 rounded-md text-[11.5px] font-caption transition-colors duration-150 ease-out',
         props.active
@@ -732,6 +734,7 @@ interface EventRowProps {
 function EventRow(props: EventRowProps) {
   const { event } = props;
   const reviewedLabel = formatReviewedAt(event.reviewedAt);
+  const safeTicketUrl = normalizeTicketUrl(event.ticketUrl);
   return (
     <li className='flex items-start gap-3 rounded-lg border border-(--linear-app-shell-border)/60 p-3'>
       {props.variant === 'pending' && props.onToggleSelect && (
@@ -771,9 +774,9 @@ function EventRow(props: EventRowProps) {
         )}
       </div>
       <div className='flex shrink-0 items-center gap-1'>
-        {event.ticketUrl && props.variant !== 'rejected' && (
+        {safeTicketUrl && props.variant !== 'rejected' && (
           <a
-            href={event.ticketUrl}
+            href={safeTicketUrl}
             target='_blank'
             rel='noreferrer'
             className='h-7 px-2 grid place-items-center rounded-md text-[11px] text-tertiary-token hover:text-primary-token hover:bg-surface-1/70 transition-colors'

@@ -126,4 +126,45 @@ describe('GET /api/calendar/profile/[username]', () => {
     );
     expect(body).toContain('URL:https://tickets.example.com/show');
   });
+
+  it('falls back to city when venue is missing and drops invalid ticket URLs', async () => {
+    mockLimit.mockResolvedValue([
+      {
+        id: 'profile-1',
+        displayName: 'Test Artist',
+        username: 'testartist',
+        usernameNormalized: 'testartist',
+        isPublic: true,
+      },
+    ]);
+    mockGetConfirmedTourEventsForProfile.mockResolvedValue([
+      {
+        id: 'event-2',
+        startDate: '2026-06-15T20:00:00Z',
+        venueName: null,
+        city: 'Berlin',
+        region: null,
+        country: 'DE',
+        startTime: null,
+        ticketUrl: 'javascript:alert(1)',
+        title: null,
+      },
+    ]);
+
+    const request = new NextRequest(
+      'https://jov.ie/api/calendar/profile/testartist'
+    );
+
+    const response = await GET(request, {
+      params: Promise.resolve({ username: 'testartist' }),
+    });
+
+    expect(response.status).toBe(200);
+
+    const body = await response.text();
+    expect(body).toContain('SUMMARY:Test Artist at Berlin');
+    expect(body).toContain('DESCRIPTION:Test Artist live at Berlin');
+    expect(body).not.toContain('javascript:alert(1)');
+    expect(body).not.toContain('URL:javascript:alert(1)');
+  });
 });

@@ -74,6 +74,15 @@ export async function bulkInsertSyncedEvents(
       'bulkInsertSyncedEvents only accepts synced/import providers'
     );
   }
+  if (
+    rows.some(
+      row => typeof row.externalId !== 'string' || row.externalId.trim() === ''
+    )
+  ) {
+    throw new Error(
+      'bulkInsertSyncedEvents requires externalId for every synced/import row'
+    );
+  }
   const now = new Date();
   const values = rows.map(input => ({
     ...input,

@@ -59,6 +59,7 @@ export async function GET(
 
     const { tourDate, profile } = result;
     const artistName = profile.displayName || profile.username;
+    const venueLabel = tourDate.venueName || tourDate.city || 'TBA';
 
     // Format date for ICS (YYYYMMDD format)
     const startDate = new Date(tourDate.startDate);
@@ -77,21 +78,20 @@ export async function GET(
       .join(', ');
 
     // Build description
-    const descriptionParts = [`${artistName} live at ${tourDate.venueName}`];
+    const descriptionParts = [`${artistName} live at ${venueLabel}`];
     if (tourDate.startTime) {
       descriptionParts.push(`Doors: ${tourDate.startTime}`);
     }
-    if (tourDate.ticketUrl) {
-      descriptionParts.push(`Tickets: ${tourDate.ticketUrl}`);
+    const ticketUrl = sanitizeIcsUrl(tourDate.ticketUrl);
+    if (ticketUrl) {
+      descriptionParts.push(`Tickets: ${ticketUrl}`);
     }
     const description = descriptionParts.join('\n');
-
-    const ticketUrl = sanitizeIcsUrl(tourDate.ticketUrl);
 
     // Build event summary
     const summary = tourDate.title
       ? `${artistName}: ${tourDate.title}`
-      : `${artistName} at ${tourDate.venueName}`;
+      : `${artistName} at ${venueLabel}`;
 
     // Generate unique ID for the event
     const uid = `${tourDate.id}@jov.ie`;
