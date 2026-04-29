@@ -1,4 +1,7 @@
-import type { ProfilePrimaryTab } from '@/features/profile/contracts';
+import type {
+  ProfilePrimaryTab,
+  ProfileRailCard,
+} from '@/features/profile/contracts';
 import type { PublicRelease } from '@/features/profile/releases/types';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import { getProfileReleaseVisibility } from '@/lib/profile/release-visibility';
@@ -52,6 +55,9 @@ export interface ProfileSurfaceState {
   readonly visibleReleases: readonly PublicRelease[];
   readonly upcomingTourDates: readonly TourDateViewModel[];
   readonly nextShow: TourDateViewModel | null;
+  readonly hasUpcomingEvents: boolean;
+  readonly primaryTabs: readonly ProfilePrimaryTab[];
+  readonly smartCards: readonly ProfileRailCard[];
   readonly visibleSocialLinks: readonly LegacySocialLink[];
   readonly hasTip: boolean;
   readonly hasReleases: boolean;
@@ -126,6 +132,13 @@ function getUpcomingTourDates(
     );
 }
 
+export function hasUpcomingProfileEvents(
+  tourDates: readonly TourDateViewModel[],
+  now = new Date()
+) {
+  return getUpcomingTourDates(tourDates, now).length > 0;
+}
+
 function readHeroRoleLabel(artist: Artist) {
   const label = artist.settings?.heroRoleLabel;
   if (typeof label !== 'string') {
@@ -134,6 +147,45 @@ function readHeroRoleLabel(artist: Artist) {
 
   const trimmed = label.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+export function buildProfilePrimaryTabs(
+  hasUpcomingEvents: boolean
+): ProfilePrimaryTab[] {
+  return [
+    'profile',
+    'listen',
+    ...(hasUpcomingEvents ? (['tour'] as const) : []),
+    'subscribe',
+  ];
+}
+
+export function buildProfileSmartCards(params: {
+  readonly hasUpcomingTourDates: boolean;
+  readonly latestReleaseVisible: boolean;
+  readonly hasPlaylistFallback: boolean;
+  readonly hasListenFallback: boolean;
+}): ProfileRailCard[] {
+  const cards: ProfileRailCard[] = [];
+
+  const pushCard = (kind: ProfileRailCard['kind'] | null) => {
+    if (!kind) {
+      return;
+    }
+
+    if (cards.some(card => card.kind === kind) || cards.length >= 3) {
+      return;
+    }
+
+    cards.push({ id: `profile-smart-card-${kind}`, kind });
+  };
+
+  pushCard(params.hasUpcomingTourDates ? 'tour' : null);
+  pushCard(params.latestReleaseVisible ? 'release' : null);
+  pushCard(params.hasPlaylistFallback ? 'playlist' : null);
+  pushCard(params.hasListenFallback ? 'listen' : null);
+
+  return cards;
 }
 
 export function formatProfileSurfaceMonth(date: ProfileSurfaceDateInput) {
@@ -296,6 +348,7 @@ export function resolveProfileSurfaceState(params: {
     releaseVisibility?.show && latestRelease ? latestRelease : null;
   const upcomingTourDates = getUpcomingTourDates(tourDates, now);
   const nextShow = upcomingTourDates[0] ?? null;
+  const hasUpcomingEvents = upcomingTourDates.length > 0;
   const visibleReleases = releases.filter(release => Boolean(release.slug));
   const hasTip =
     showPayButton && socialLinks.some(link => link.platform === 'venmo');
@@ -327,6 +380,14 @@ export function resolveProfileSurfaceState(params: {
     visibleReleases,
     upcomingTourDates,
     nextShow,
+    hasUpcomingEvents,
+    primaryTabs: buildProfilePrimaryTabs(hasUpcomingEvents),
+    smartCards: buildProfileSmartCards({
+      hasUpcomingTourDates: hasUpcomingEvents,
+      latestReleaseVisible: Boolean(latestVisibleRelease),
+      hasPlaylistFallback: Boolean(featuredPlaylistFallback),
+      hasListenFallback: hasPlayableDestinations,
+    }),
     visibleSocialLinks,
     hasTip,
     hasReleases: visibleReleases.length > 0,

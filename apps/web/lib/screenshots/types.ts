@@ -7,7 +7,12 @@ export type ScreenshotGroup =
   | 'settings'
   | 'public-profile';
 
-export type ScreenshotViewport = 'desktop' | 'mobile';
+export type ScreenshotViewport =
+  | 'desktop'
+  | 'tablet'
+  | 'mobile'
+  | 'mobile-short'
+  | 'mobile-tall';
 
 export type ScreenshotTheme = 'default' | 'dark';
 

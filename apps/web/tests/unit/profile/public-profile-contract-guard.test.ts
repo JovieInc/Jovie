@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -44,7 +44,6 @@ const PROFILE_SHELL = join(
 
 const REPRESENTATIVE_PROFILE_ENTRYPOINTS = [
   join(ROOT, 'app', '[username]', 'page.tsx'),
-  join(ROOT, 'components', 'features', 'profile', 'ProgressiveArtistPage.tsx'),
   join(ROOT, 'components', 'features', 'demo', 'DemoPublicProfileSurface.tsx'),
   join(
     ROOT,
@@ -64,6 +63,78 @@ const REPRESENTATIVE_PROFILE_ENTRYPOINTS = [
   ),
 ] as const;
 
+const PUBLIC_PROFILE_SOURCE_DIRS = [
+  join(ROOT, 'app', '[username]'),
+  join(ROOT, 'components', 'features', 'profile'),
+  join(ROOT, 'tests', 'e2e'),
+] as const;
+
+const DELETED_PUBLIC_PROFILE_FILES = [
+  join(ROOT, 'components', 'features', 'profile', 'ProgressiveArtistPage.tsx'),
+  join(ROOT, 'components', 'features', 'profile', 'SwipeableModeContainer.tsx'),
+  join(
+    ROOT,
+    'components',
+    'features',
+    'profile',
+    'templates',
+    'PublicProfileTemplate.tsx'
+  ),
+  join(
+    ROOT,
+    'components',
+    'features',
+    'profile',
+    'templates',
+    'PublicProfileTemplateV2.tsx'
+  ),
+  join(
+    ROOT,
+    'components',
+    'organisms',
+    'profile-header-v2',
+    'ProfileHeaderV2.tsx'
+  ),
+] as const;
+
+const FORBIDDEN_PUBLIC_PROFILE_PATTERNS = [
+  'SHOW_PUBLIC_PROFILE_V1_DESIGN',
+  'ff_profile_v2',
+  'visualVariant',
+  'AnimatedArtistPage',
+  'ProgressiveArtistPage',
+  'PublicProfileTemplate',
+  'PublicProfileTemplateV2',
+  'SwipeableModeContainer',
+  'ProfileHeaderV2',
+] as const;
+
+function listSourceFiles(root: string): string[] {
+  if (!existsSync(root)) {
+    return [];
+  }
+
+  const entry = statSync(root);
+  if (entry.isFile()) {
+    return [root];
+  }
+
+  return readdirSync(root).flatMap(child => {
+    const childPath = join(root, child);
+    const childEntry = statSync(childPath);
+
+    if (childEntry.isDirectory()) {
+      return listSourceFiles(childPath);
+    }
+
+    if (/\.(?:ts|tsx)$/.test(childPath)) {
+      return [childPath];
+    }
+
+    return [];
+  });
+}
+
 describe('public profile contract guard', () => {
   it('keeps StaticArtistPage pinned to the canonical public profile view-model builder', () => {
     const contents = readFileSync(STATIC_ARTIST_PAGE, 'utf8');
@@ -72,7 +143,7 @@ describe('public profile contract guard', () => {
       /import\s*\{\s*buildProfilePublicViewModel\s*\}\s*from\s*['"]@\/features\/profile\/view-models['"]/
     );
     expect(contents).toMatch(/buildProfilePublicViewModel\s*\(\s*\{/);
-    expect(contents).toContain("presentation = 'full-public'");
+    expect(contents).toMatch(/presentation\s*=\s*["']full-public["']/);
     expect(contents).toContain('<ProfileCompactTemplate');
   });
 
@@ -115,5 +186,22 @@ describe('public profile contract guard', () => {
     expect(readFileSync(PROFILE_SHELL, 'utf8')).toContain(
       '--profile-shell-header-max-width'
     );
+  });
+
+  it('keeps legacy public profile flags and shells deleted', () => {
+    expect(DELETED_PUBLIC_PROFILE_FILES.filter(existsSync)).toEqual([]);
+
+    const offenders = PUBLIC_PROFILE_SOURCE_DIRS.flatMap(listSourceFiles)
+      .map(filePath => {
+        const contents = readFileSync(filePath, 'utf8');
+        const matches = FORBIDDEN_PUBLIC_PROFILE_PATTERNS.filter(pattern =>
+          contents.includes(pattern)
+        );
+
+        return matches.length > 0 ? { filePath, matches } : null;
+      })
+      .filter(Boolean);
+
+    expect(offenders).toEqual([]);
   });
 });

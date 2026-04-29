@@ -87,6 +87,18 @@ describe('resolveProfileSurfaceState', () => {
       kind: 'tour',
       label: 'On Tour',
     });
+    expect(state.hasUpcomingEvents).toBe(true);
+    expect(state.primaryTabs).toEqual([
+      'profile',
+      'listen',
+      'tour',
+      'subscribe',
+    ]);
+    expect(state.smartCards.map(card => card.kind)).toEqual([
+      'tour',
+      'release',
+      'listen',
+    ]);
   });
 
   it('uses listen when music is playable and no show is upcoming', () => {
@@ -115,6 +127,33 @@ describe('resolveProfileSurfaceState', () => {
       kind: 'release',
       label: 'New Release',
     });
+    expect(state.hasUpcomingEvents).toBe(false);
+    expect(state.primaryTabs).toEqual(['profile', 'listen', 'subscribe']);
+    expect(state.smartCards.map(card => card.kind)).toEqual([
+      'release',
+      'listen',
+    ]);
+  });
+
+  it('hides events when tour dates are absent or already past', () => {
+    const state = resolveProfileSurfaceState({
+      artist,
+      socialLinks: [spotifyLink],
+      tourDates: [
+        {
+          ...upcomingShow,
+          id: 'past-show',
+          startDate: '2026-03-01',
+        },
+      ],
+      hasPlayableDestinations: true,
+      activeSubtitle: 'Artist profile',
+      now: new Date('2026-04-01T00:00:00.000Z'),
+    });
+
+    expect(state.hasUpcomingEvents).toBe(false);
+    expect(state.primaryTabs).not.toContain('tour');
+    expect(state.smartCards.map(card => card.kind)).not.toContain('tour');
   });
 
   it('falls back to alerts for sparse profiles and hides unavailable utilities', () => {

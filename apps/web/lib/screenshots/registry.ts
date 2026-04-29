@@ -8,7 +8,10 @@ import type {
 
 export const SCREENSHOT_VIEWPORTS = {
   desktop: { width: 1440, height: 900 },
+  tablet: { width: 768, height: 1024 },
   mobile: { width: 390, height: 844 },
+  'mobile-short': { width: 390, height: 667 },
+  'mobile-tall': { width: 430, height: 932 },
 } as const;
 
 export const GROUP_LABELS: Record<ScreenshotGroup, string> = {
@@ -214,6 +217,7 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       route: '/demo/showcase/tim-white-profile?state=tour-nearby',
       waitFor: '[data-testid="demo-showcase-tim-white-profile-state"]',
       viewport: 'mobile',
+      publicExportPath: 'tim-white-profile-tour-nearby-phone.png',
     },
     {
       id: 'tim-white-profile-presave-mobile',
@@ -244,7 +248,7 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       route: '/demo/showcase/tim-white-profile?archetype=sparse',
       waitFor: '[data-testid="demo-showcase-tim-white-profile"]',
       viewport: 'mobile',
-      publicExportPath: 'tim-white-profile-sparse-phone.png',
+      publicExportPath: 'tim-white-profile-events-absent-phone.png',
     },
     {
       id: 'tim-white-profile-video-mobile',
@@ -260,6 +264,7 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       route: '/demo/showcase/tim-white-profile?state=playlist-fallback',
       waitFor: '[data-testid="demo-showcase-tim-white-profile-state"]',
       viewport: 'mobile',
+      publicExportPath: 'tim-white-profile-playlist-fallback-phone.png',
     },
     {
       id: 'tim-white-profile-listen-fallback-mobile',
@@ -267,6 +272,7 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       route: '/demo/showcase/tim-white-profile?state=listen-fallback',
       waitFor: '[data-testid="demo-showcase-tim-white-profile-state"]',
       viewport: 'mobile',
+      publicExportPath: 'tim-white-profile-listen-fallback-phone.png',
     },
   ]),
   ...defineScenarios('marketing', ADMIN_MARKETING_AND_INVESTOR, [
@@ -456,6 +462,94 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       waitFor: '[data-testid="demo-showcase-public-profile"]',
       viewport: 'mobile',
       publicExportPath: 'profile-phone.png',
+    },
+    {
+      id: 'public-profile-tablet',
+      title: 'Public Profile Tablet',
+      route: '/demo/showcase/public-profile',
+      waitFor: '[data-testid="demo-showcase-public-profile"]',
+      viewport: 'tablet',
+      publicExportPath: 'profile-tablet.png',
+    },
+    {
+      id: 'public-profile-mobile-short',
+      title: 'Public Profile Mobile Short',
+      route: '/demo/showcase/public-profile',
+      waitFor: '[data-testid="demo-showcase-public-profile"]',
+      viewport: 'mobile-short',
+      publicExportPath: 'profile-phone-short.png',
+    },
+    {
+      id: 'public-profile-mobile-tall',
+      title: 'Public Profile Mobile Tall',
+      route: '/demo/showcase/public-profile',
+      waitFor: '[data-testid="demo-showcase-public-profile"]',
+      viewport: 'mobile-tall',
+      publicExportPath: 'profile-phone-tall.png',
+    },
+    {
+      id: 'public-profile-events-absent-desktop',
+      title: 'Public Profile — Events Absent Desktop',
+      route: '/demo/showcase/tim-white-profile?archetype=sparse',
+      waitFor: '[data-testid="profile-desktop-surface"]',
+      publicExportPath: 'tim-white-profile-sparse-desktop.png',
+    },
+    {
+      id: 'public-profile-events-absent-mobile',
+      title: 'Public Profile — Events Absent Mobile',
+      route: '/demo/showcase/tim-white-profile?archetype=sparse',
+      waitFor: '[data-testid="demo-showcase-tim-white-profile"]',
+      viewport: 'mobile',
+      publicExportPath: 'tim-white-profile-sparse-phone.png',
+    },
+    {
+      id: 'public-profile-events-absent-tablet',
+      title: 'Public Profile — Events Absent Tablet',
+      route: '/demo/showcase/tim-white-profile?archetype=sparse',
+      waitFor: '[data-testid="demo-showcase-tim-white-profile"]',
+      viewport: 'tablet',
+      publicExportPath: 'tim-white-profile-sparse-tablet.png',
+    },
+    {
+      id: 'public-profile-alerts-on-preferences-mobile',
+      title: 'Public Profile — Alerts On Preferences',
+      route: '/demo/showcase/tim-white-profile?state=fans-confirmed',
+      waitFor: '[data-testid="demo-showcase-tim-white-profile-state"]',
+      viewport: 'mobile',
+      publicExportPath: 'tim-white-profile-alerts-on-phone.png',
+    },
+    {
+      id: 'public-profile-nearby-tour-mobile',
+      title: 'Public Profile — Nearby Tour',
+      route: '/demo/showcase/tim-white-profile?state=tour-nearby',
+      waitFor: '[data-testid="demo-showcase-tim-white-profile-state"]',
+      viewport: 'mobile',
+      publicExportPath: 'public-profile-nearby-tour-phone.png',
+    },
+    {
+      id: 'public-profile-presave-mobile',
+      title: 'Public Profile — Upcoming Presave',
+      route: '/demo/showcase/tim-white-profile?release=presave',
+      waitFor: '[data-testid="demo-showcase-tim-white-profile"]',
+      viewport: 'mobile',
+      publicExportPath: 'public-profile-presave-phone.png',
+      fixedNow: '2026-04-15T12:00:00.000Z',
+    },
+    {
+      id: 'public-profile-playlist-fallback-mobile',
+      title: 'Public Profile — Playlist Fallback',
+      route: '/demo/showcase/tim-white-profile?state=playlist-fallback',
+      waitFor: '[data-testid="demo-showcase-tim-white-profile-state"]',
+      viewport: 'mobile',
+      publicExportPath: 'public-profile-playlist-fallback-phone.png',
+    },
+    {
+      id: 'public-profile-listen-fallback-mobile',
+      title: 'Public Profile — Listen Fallback',
+      route: '/demo/showcase/tim-white-profile?state=listen-fallback',
+      waitFor: '[data-testid="demo-showcase-tim-white-profile-state"]',
+      viewport: 'mobile',
+      publicExportPath: 'public-profile-listen-fallback-phone.png',
     },
   ]),
 ] as const;

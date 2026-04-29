@@ -15,6 +15,13 @@ const TIM_WHITE_PROFILE_SCREENSHOT_IDS = [
   'tim-white-profile-listen-mobile',
   'tim-white-profile-playlist-fallback-mobile',
   'tim-white-profile-listen-fallback-mobile',
+  'public-profile-tablet',
+  'public-profile-mobile-short',
+  'public-profile-mobile-tall',
+  'public-profile-events-absent-desktop',
+  'public-profile-events-absent-mobile',
+  'public-profile-events-absent-tablet',
+  'public-profile-alerts-on-preferences-mobile',
 ] as const;
 
 describe('screenshot registry', () => {

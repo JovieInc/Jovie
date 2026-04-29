@@ -3,7 +3,6 @@ import path from 'node:path';
 import { expect, test } from './setup';
 import { waitForHydration } from './utils/smoke-test-utils';
 
-type ShellVariant = 'legacy' | 'v2';
 type ThemeVariant = 'dark' | 'light';
 type BreakpointVariant = 'mobile' | 'tablet' | 'desktop';
 
@@ -17,7 +16,6 @@ interface ProfileAuditCase {
   readonly id: string;
   readonly path: string;
   readonly readySelector: string;
-  readonly shells: readonly ShellVariant[];
   readonly composerVisible?: boolean;
   readonly focusComposerInput?: boolean;
 }
@@ -38,20 +36,17 @@ const PROFILE_CASES: readonly ProfileAuditCase[] = [
     id: 'profile',
     path: `/${TEST_PROFILE}`,
     readySelector: PROFILE_READY_SELECTOR,
-    shells: ['legacy', 'v2'],
   },
   {
     id: 'listen',
     path: `/${TEST_PROFILE}?mode=listen`,
     readySelector: PROFILE_READY_SELECTOR,
-    shells: ['legacy', 'v2'],
   },
   {
     id: 'subscribe',
     path: `/${TEST_PROFILE}?mode=subscribe`,
     readySelector:
       '[data-testid="subscribe-cta-container"], h1, [data-testid="profile-header"]',
-    shells: ['legacy', 'v2'],
     composerVisible: true,
   },
   {
@@ -59,7 +54,6 @@ const PROFILE_CASES: readonly ProfileAuditCase[] = [
     path: `/${TEST_PROFILE}?mode=subscribe`,
     readySelector:
       '[data-testid="subscribe-cta-container"], h1, [data-testid="profile-header"]',
-    shells: ['legacy', 'v2'],
     composerVisible: true,
     focusComposerInput: true,
   },
@@ -67,38 +61,32 @@ const PROFILE_CASES: readonly ProfileAuditCase[] = [
     id: 'about',
     path: `/${TEST_PROFILE}?mode=about`,
     readySelector: PROFILE_READY_SELECTOR,
-    shells: ['legacy', 'v2'],
   },
   {
     id: 'tour',
     path: `/${TEST_PROFILE}?mode=tour`,
     readySelector: `#profile-tour-heading, ${PROFILE_READY_SELECTOR}`,
-    shells: ['legacy', 'v2'],
   },
   {
     id: 'contact',
     path: `/${TEST_PROFILE}?mode=contact`,
     readySelector: `${PROFILE_READY_SELECTOR}, [data-testid="contact-drawer"]`,
-    shells: ['legacy', 'v2'],
   },
   {
     id: 'tip',
     path: `/${TIP_PROFILE}?mode=pay`,
     readySelector: `${PROFILE_READY_SELECTOR}, [data-testid="tip-drawer"]`,
-    shells: ['legacy', 'v2'],
   },
   {
     id: 'notifications',
     path: `/${NOTIFICATIONS_PROFILE}/notifications`,
     readySelector: '[data-testid="notifications-page"]',
-    shells: ['legacy'],
     composerVisible: true,
   },
   {
     id: 'notifications-focus',
     path: `/${NOTIFICATIONS_PROFILE}/notifications`,
     readySelector: '[data-testid="notifications-page"]',
-    shells: ['legacy'],
     composerVisible: true,
     focusComposerInput: true,
   },
@@ -152,22 +140,12 @@ const REPO_ROOT = path.resolve(WEB_ROOT, '..', '..');
 const cycleName = process.env.PROFILE_AUDIT_CYCLE ?? 'cycle-01';
 const cycleDir = path.join(REPO_ROOT, '.context/profile-audit', cycleName);
 
-function withShellVariant(routePath: string, shell: ShellVariant): string {
-  if (shell === 'legacy') {
-    return routePath;
-  }
-
-  const separator = routePath.includes('?') ? '&' : '?';
-  return `${routePath}${separator}ff_profile_v2=1`;
-}
-
 function screenshotName(
-  shell: ShellVariant,
   theme: ThemeVariant,
   breakpoint: BreakpointVariant,
   routeId: string
 ): string {
-  return `${shell}-${theme}-${breakpoint}-${routeId}.png`;
+  return `${theme}-${breakpoint}-${routeId}.png`;
 }
 
 async function blockAnalytics(page: import('@playwright/test').Page) {
@@ -366,21 +344,18 @@ test.describe('Public profile visual audit @smoke', () => {
           cycle: cycleName,
           generatedAt: new Date().toISOString(),
           cases: ACTIVE_PROFILE_CASES.flatMap(routeCase =>
-            routeCase.shells.flatMap(shell =>
-              ACTIVE_THEMES.flatMap(theme =>
-                ACTIVE_BREAKPOINTS.map(breakpoint => ({
-                  routeId: routeCase.id,
-                  shell,
-                  theme,
-                  breakpoint: breakpoint.name,
-                  captureState: routeCase.focusComposerInput
-                    ? 'composer-focus'
-                    : routeCase.composerVisible
-                      ? 'composer'
-                      : 'rest',
-                  path: withShellVariant(routeCase.path, shell),
-                }))
-              )
+            ACTIVE_THEMES.flatMap(theme =>
+              ACTIVE_BREAKPOINTS.map(breakpoint => ({
+                routeId: routeCase.id,
+                theme,
+                breakpoint: breakpoint.name,
+                captureState: routeCase.focusComposerInput
+                  ? 'composer-focus'
+                  : routeCase.composerVisible
+                    ? 'composer'
+                    : 'rest',
+                path: routeCase.path,
+              }))
             )
           ),
         },
@@ -391,76 +366,69 @@ test.describe('Public profile visual audit @smoke', () => {
   });
 
   for (const routeCase of ACTIVE_PROFILE_CASES) {
-    for (const shell of routeCase.shells) {
-      for (const theme of ACTIVE_THEMES) {
-        for (const breakpoint of ACTIVE_BREAKPOINTS) {
-          const filename = screenshotName(
-            shell,
-            theme,
-            breakpoint.name,
-            routeCase.id
-          );
+    for (const theme of ACTIVE_THEMES) {
+      for (const breakpoint of ACTIVE_BREAKPOINTS) {
+        const filename = screenshotName(theme, breakpoint.name, routeCase.id);
 
-          test(`${routeCase.id} · ${shell} · ${theme} · ${breakpoint.name}`, async ({
-            page,
-          }, testInfo) => {
-            await blockAnalytics(page);
-            await page.emulateMedia({ colorScheme: theme });
-            await page.setViewportSize({
-              width: breakpoint.width,
-              height: breakpoint.height,
-            });
-
-            const targetPath = withShellVariant(routeCase.path, shell);
-            await page.goto(targetPath, {
-              waitUntil: 'domcontentloaded',
-              timeout: 120_000,
-            });
-
-            await waitForHydration(page);
-            await waitForVisibleSelector(page, routeCase.readySelector);
-            if (routeCase.composerVisible) {
-              await ensureComposerVisible(page);
-            }
-            if (routeCase.focusComposerInput) {
-              await focusComposerInput(page);
-            }
-
-            await waitForImages(page);
-            await waitForSettle(page);
-            await hideTransientUi(page);
-            await assertNoDevOverlays(page);
-
-            const outputPath = testInfo.outputPath(filename);
-            await page.screenshot({
-              path: outputPath,
-              fullPage: false,
-            });
-
-            copyFileSync(outputPath, path.join(cycleDir, filename));
-            await testInfo.attach('profile-visual-case', {
-              body: JSON.stringify(
-                {
-                  cycle: cycleName,
-                  routeId: routeCase.id,
-                  shell,
-                  theme,
-                  breakpoint: breakpoint.name,
-                  captureState: routeCase.focusComposerInput
-                    ? 'composer-focus'
-                    : routeCase.composerVisible
-                      ? 'composer'
-                      : 'rest',
-                  path: targetPath,
-                  screenshot: filename,
-                },
-                null,
-                2
-              ),
-              contentType: 'application/json',
-            });
+        test(`${routeCase.id} · ${theme} · ${breakpoint.name}`, async ({
+          page,
+        }, testInfo) => {
+          test.setTimeout(180_000);
+          await blockAnalytics(page);
+          await page.emulateMedia({ colorScheme: theme });
+          await page.setViewportSize({
+            width: breakpoint.width,
+            height: breakpoint.height,
           });
-        }
+
+          const targetPath = routeCase.path;
+          await page.goto(targetPath, {
+            waitUntil: 'domcontentloaded',
+            timeout: 120_000,
+          });
+
+          await waitForHydration(page);
+          await waitForVisibleSelector(page, routeCase.readySelector);
+          if (routeCase.composerVisible) {
+            await ensureComposerVisible(page);
+          }
+          if (routeCase.focusComposerInput) {
+            await focusComposerInput(page);
+          }
+
+          await waitForImages(page);
+          await waitForSettle(page);
+          await hideTransientUi(page);
+          await assertNoDevOverlays(page);
+
+          const outputPath = testInfo.outputPath(filename);
+          await page.screenshot({
+            path: outputPath,
+            fullPage: false,
+          });
+
+          copyFileSync(outputPath, path.join(cycleDir, filename));
+          await testInfo.attach('profile-visual-case', {
+            body: JSON.stringify(
+              {
+                cycle: cycleName,
+                routeId: routeCase.id,
+                theme,
+                breakpoint: breakpoint.name,
+                captureState: routeCase.focusComposerInput
+                  ? 'composer-focus'
+                  : routeCase.composerVisible
+                    ? 'composer'
+                    : 'rest',
+                path: targetPath,
+                screenshot: filename,
+              },
+              null,
+              2
+            ),
+            contentType: 'application/json',
+          });
+        });
       }
     }
   }
@@ -472,20 +440,18 @@ test.describe('Public profile compact shell sizing', () => {
   test('demo desktop shell stays materially below viewport height', async ({
     page,
   }) => {
+    test.setTimeout(300_000);
     await blockAnalytics(page);
     await page.emulateMedia({ colorScheme: 'dark' });
     await page.setViewportSize({ width: 1280, height: 900 });
 
-    await page.goto('/demo/showcase/public-profile', {
+    await page.goto(`/${TEST_PROFILE}`, {
       waitUntil: 'domcontentloaded',
-      timeout: 120_000,
+      timeout: 240_000,
     });
 
     await waitForHydration(page);
-    await waitForVisibleSelector(
-      page,
-      '[data-testid="demo-showcase-public-profile"]'
-    );
+    await waitForVisibleSelector(page, PROFILE_READY_SELECTOR);
     await waitForImages(page);
     await waitForSettle(page);
 

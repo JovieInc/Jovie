@@ -253,6 +253,30 @@ function AlertsSettingsRow({
   );
 }
 
+function AlertsStatusRow({
+  label,
+  description,
+  checked,
+}: Readonly<{
+  label: string;
+  description: string;
+  checked: boolean;
+}>) {
+  return (
+    <div className='flex min-h-[62px] w-full items-center gap-3 border-t border-white/[0.075] px-4 py-3 first:border-t-0'>
+      <div className='min-w-0 flex-1'>
+        <p className='truncate text-[15px] font-medium tracking-[-0.01em] text-white'>
+          {label}
+        </p>
+        <p className='truncate text-[12px] leading-4 text-white/50'>
+          {description}
+        </p>
+      </div>
+      <SettingsToggle checked={checked} />
+    </div>
+  );
+}
+
 function AlertsSettingsView({
   isSubscribed,
   contentPrefs,
@@ -283,30 +307,54 @@ function AlertsSettingsView({
       </div>
 
       <div className='border-y border-white/[0.075]'>
+        <div className='px-4 py-2 text-[12px] font-semibold tracking-[-0.01em] text-white/46'>
+          Jovie Alerts
+        </div>
+        <AlertsStatusRow
+          label='Release Reminders'
+          description='Smart reminders for music you signed up for.'
+          checked={isSubscribed}
+        />
+        <AlertsStatusRow
+          label='Nearby Events'
+          description='Useful show reminders when dates matter.'
+          checked={isSubscribed}
+        />
+        <AlertsStatusRow
+          label='Account Updates'
+          description='Receipts, confirmation, and opt-out links.'
+          checked={isSubscribed}
+        />
+      </div>
+
+      <div className='mt-4 border-y border-white/[0.075]'>
+        <div className='px-4 py-2 text-[12px] font-semibold tracking-[-0.01em] text-white/46'>
+          Artist Alerts
+        </div>
         <AlertsSettingsRow
           label='New Music'
-          description='Singles, albums, and videos.'
+          description='Direct artist emails about singles, albums, and videos.'
           checked={contentPrefs.newMusic}
           disabled={disabled}
           onClick={() => onTogglePref('newMusic')}
         />
         <AlertsSettingsRow
           label='Events'
-          description='Tour dates and ticket updates.'
+          description='Direct artist emails about tour dates and tickets.'
           checked={contentPrefs.tourDates}
           disabled={disabled}
           onClick={() => onTogglePref('tourDates')}
         />
         <AlertsSettingsRow
           label='Merch'
-          description='Drops, restocks, and low-stock updates.'
+          description='Direct artist emails about drops and restocks.'
           checked={contentPrefs.merch}
           disabled={disabled}
           onClick={() => onTogglePref('merch')}
         />
         <AlertsSettingsRow
           label='General'
-          description='Occasional artist updates.'
+          description='Occasional direct artist updates.'
           checked={contentPrefs.general}
           disabled={disabled}
           onClick={() => onTogglePref('general')}

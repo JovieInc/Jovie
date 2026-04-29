@@ -20,32 +20,6 @@ export const PROFILE_MODE_KEYS = [
 
 export type ProfileMode = (typeof PROFILE_MODE_KEYS)[number];
 
-export const SWIPEABLE_MODES = ['profile', 'tour', 'pay', 'about'] as const;
-
-export type SwipeableProfileMode = (typeof SWIPEABLE_MODES)[number];
-
-export function supportsProfileV2Mode(
-  mode: ProfileMode,
-  hasContacts = false
-): boolean {
-  if (mode === 'contact') {
-    return hasContacts;
-  }
-
-  return true;
-}
-
-export const PROFILE_V2_OVERLAY_MODES = [
-  'listen',
-  'pay',
-  'subscribe',
-  'contact',
-] as const;
-
-export type ProfileV2OverlayMode =
-  | (typeof PROFILE_V2_OVERLAY_MODES)[number]
-  | null;
-
 export type ProfileRenderMode = 'interactive' | 'preview';
 
 export type ProfileSurfacePresentation = 'standalone' | 'embedded' | 'modal';

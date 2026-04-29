@@ -2,27 +2,25 @@ import { describe, expect, it } from 'vitest';
 import { buildProfileRailCards } from '@/features/profile/ProfileHomeRail';
 
 describe('ProfileHomeRail', () => {
-  it('keeps the featured state first, then fills remaining cards in priority order', () => {
+  it('orders smart cards tour first and caps the rail at three cards', () => {
     expect(
       buildProfileRailCards({
         latestReleaseVisible: true,
         hasUpcomingTourDates: true,
         hasPlaylistFallback: true,
         hasListenFallback: true,
-        featuredKind: 'tour_next',
       }).map(card => card.kind)
     ).toEqual(['tour', 'release', 'playlist']);
   });
 
-  it('dedupes the featured card kind and caps the rail at three cards', () => {
+  it('fills remaining cards from qualified release and fallback cards', () => {
     expect(
       buildProfileRailCards({
         latestReleaseVisible: true,
-        hasUpcomingTourDates: true,
+        hasUpcomingTourDates: false,
         hasPlaylistFallback: true,
         hasListenFallback: true,
-        featuredKind: 'release_live',
       }).map(card => card.kind)
-    ).toEqual(['release', 'tour', 'playlist']);
+    ).toEqual(['release', 'playlist', 'listen']);
   });
 });

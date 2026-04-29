@@ -18,7 +18,6 @@ import {
   vi,
 } from 'vitest';
 import type { PublicRelease } from '@/components/features/profile/releases/types';
-import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist } from '@/types/db';
 
@@ -219,15 +218,6 @@ const mockReleases = [
     artistNames: ['Test Artist'],
   },
 ] satisfies readonly PublicRelease[];
-
-function mockDsp(key: string, name: string, url: string) {
-  return {
-    key,
-    name,
-    url,
-    config: {} as never,
-  };
-}
 
 function mockViewport(width: 'mobile' | 'desktop') {
   const previousMatchMedia = window.matchMedia;
@@ -438,11 +428,14 @@ describe('ProfileCompactTemplate', () => {
     );
 
     const bottomNav = screen.getByTestId('profile-bottom-nav');
-    for (const label of ['Home', 'Music', 'Events', 'Alerts', 'More']) {
+    for (const label of ['Home', 'Music', 'Alerts', 'More']) {
       expect(
         within(bottomNav).getByRole('button', { name: label })
       ).toBeInTheDocument();
     }
+    expect(
+      within(bottomNav).queryByRole('button', { name: 'Events' })
+    ).not.toBeInTheDocument();
     expect(
       within(bottomNav).queryByRole('button', { name: 'Profile' })
     ).not.toBeInTheDocument();
@@ -459,6 +452,45 @@ describe('ProfileCompactTemplate', () => {
         'menu'
       );
     });
+  });
+
+  it('shows the Events tab in compact navigation only when events are upcoming', async () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        tourDates={[
+          {
+            id: 'tour-1',
+            profileId: mockArtist.id,
+            title: null,
+            venueName: 'The Echo',
+            city: 'Los Angeles',
+            region: 'CA',
+            country: 'US',
+            startDate: '2099-05-01T00:00:00.000Z',
+            endDate: null,
+            ticketUrl: 'https://tickets.example.com/show',
+            ticketStatus: 'onsale',
+            timezone: 'America/Los_Angeles',
+            latitude: null,
+            longitude: null,
+            source: 'manual',
+            sourceEventId: null,
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+          },
+        ]}
+      />
+    );
+
+    expect(
+      within(screen.getByTestId('profile-bottom-nav')).getByRole('button', {
+        name: 'Events',
+      })
+    ).toBeInTheDocument();
   });
 
   it('keeps the home tab active for about mode deep links', async () => {
@@ -535,7 +567,7 @@ describe('ProfileCompactTemplate', () => {
     pushStateSpy.mockRestore();
   });
 
-  it('renders the alerts tab when ?mode=subscribe is in the URL', async () => {
+  it('opens the full-screen alerts signup when ?mode=subscribe is in the URL and alerts are off', async () => {
     mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
     window.history.replaceState(null, '', '/test-artist?mode=subscribe');
 
@@ -554,16 +586,26 @@ describe('ProfileCompactTemplate', () => {
           modeOverride: 'subscribe',
         })
       );
-      expect(screen.getByTestId('mock-primary-tab-panel')).toHaveAttribute(
-        'data-mode',
-        'subscribe'
+      expect(mockProfileInlineNotificationsCTA).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          autoOpen: true,
+          hideTrigger: true,
+          presentation: 'overlay',
+          source: 'profile_inline',
+        })
       );
+      expect(
+        screen.getByTestId('mock-inline-notifications-cta')
+      ).toBeInTheDocument();
       expect(screen.getByTestId('mock-profile-unified-drawer')).toHaveAttribute(
         'data-open',
         'false'
       );
     });
 
+    expect(
+      screen.queryByTestId('mock-primary-tab-panel')
+    ).not.toBeInTheDocument();
     expect(screen.getByTestId('profile-bottom-nav')).toBeInTheDocument();
   });
 
@@ -594,6 +636,32 @@ describe('ProfileCompactTemplate', () => {
 
     expect(screen.getByTestId('profile-bottom-nav')).toBeInTheDocument();
     expect(window.location.search).toBe('?mode=listen');
+  });
+
+  it('falls back from ?mode=tour when no events are upcoming', async () => {
+    window.history.replaceState(null, '', '/test-artist?mode=tour');
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.queryByTestId('mock-primary-tab-panel')
+      ).not.toBeInTheDocument();
+    });
+
+    expect(window.location.search).toBe('');
+    expect(
+      within(screen.getByTestId('profile-bottom-nav')).queryByRole('button', {
+        name: 'Events',
+      })
+    ).not.toBeInTheDocument();
   });
 
   it('prioritizes the ticket CTA without rendering tour metadata in the hero', async () => {
@@ -646,7 +714,7 @@ describe('ProfileCompactTemplate', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('falls back to the listen CTA without rendering release metadata in the hero', async () => {
+  it('uses the release smart card without rendering release metadata in the hero', async () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -666,15 +734,15 @@ describe('ProfileCompactTemplate', () => {
     expect(screen.getByTestId('profile-hero-alerts-row')).toHaveTextContent(
       'Alerts Off'
     );
-    expect(screen.getByTestId('profile-home-latest-card')).toHaveTextContent(
-      'Listen Now'
+    expect(screen.getByTestId('profile-home-rail-release')).toHaveTextContent(
+      "Don't Look Down"
     );
     expect(
       screen.queryByTestId('profile-hero-status-pill')
     ).not.toBeInTheDocument();
   });
 
-  it('opens the alerts tab from the compact hero alerts row', async () => {
+  it('opens the full-screen alerts signup from the compact hero alerts row', async () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -691,9 +759,59 @@ describe('ProfileCompactTemplate', () => {
     fireEvent.click(alertsRow);
 
     await waitFor(() => {
-      expect(screen.getByTestId('mock-primary-tab-panel')).toHaveAttribute(
-        'data-mode',
-        'subscribe'
+      expect(mockProfileInlineNotificationsCTA).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          autoOpen: true,
+          hideTrigger: true,
+          presentation: 'overlay',
+          source: 'profile_inline',
+        })
+      );
+      expect(
+        screen.getByTestId('mock-inline-notifications-cta')
+      ).toBeInTheDocument();
+    });
+
+    expect(
+      screen.queryByTestId('mock-primary-tab-panel')
+    ).not.toBeInTheDocument();
+  });
+
+  it('keeps artist alert preferences off by default after Jovie alerts are on', async () => {
+    mockUseProfileShell.mockImplementation(() => ({
+      notificationsContextValue: {
+        subscribedChannels: { email: true },
+        subscriptionDetails: { email: 'fan@example.com' },
+        setSubscribedChannels: vi.fn(),
+        setSubscriptionDetails: vi.fn(),
+        setState: vi.fn(),
+      },
+      notificationsController: {
+        contentPreferences: null,
+      },
+    }));
+
+    render(
+      <ProfileCompactTemplate
+        mode='subscribe'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    await waitFor(() => {
+      expect(mockProfilePrimaryTabPanel).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mode: 'subscribe',
+          isSubscribed: true,
+          contentPrefs: {
+            newMusic: false,
+            tourDates: false,
+            merch: false,
+            general: false,
+          },
+        })
       );
     });
   });
@@ -1184,114 +1302,6 @@ describe('ProfileCompactTemplate', () => {
     restoreViewport();
   });
 
-  it('marks the flagged public profile V1 shell on mobile smoke render', async () => {
-    render(
-      <ProfileCompactTemplate
-        mode='profile'
-        artist={mockArtist}
-        socialLinks={[]}
-        contacts={[]}
-        visualVariant='v1'
-      />
-    );
-
-    expect(screen.getByTestId('profile-compact-shell')).toBeInTheDocument();
-    expect(
-      screen
-        .getByTestId('profile-compact-shell')
-        .closest('[data-profile-visual-variant]')
-    ).toHaveAttribute('data-profile-visual-variant', 'v1');
-  });
-
-  it('keeps flagged public profile V1 desktop DSP links in canonical order', async () => {
-    const restoreViewport = mockViewport('desktop');
-    mockCanonicalProfileDSPs.mockReturnValue([
-      mockDsp('spotify', 'Spotify', 'https://open.spotify.com/artist/test'),
-      mockDsp(
-        'apple_music',
-        'Apple Music',
-        'https://music.apple.com/artist/test'
-      ),
-      mockDsp('youtube', 'YouTube', 'https://youtube.com/@test'),
-      mockDsp('deezer', 'Deezer', 'https://www.deezer.com/artist/test'),
-      mockDsp('tidal', 'Tidal', 'https://tidal.com/browse/artist/test'),
-    ]);
-
-    render(
-      <ProfileCompactTemplate
-        mode='profile'
-        artist={{
-          ...mockArtist,
-          tagline: 'Official music, shows, and updates.',
-          image_url: 'https://example.com/artist.jpg',
-        }}
-        socialLinks={[]}
-        contacts={[]}
-        visualVariant='v1'
-      />
-    );
-
-    await screen.findByText('Listen And Follow');
-
-    const dspLinks = screen
-      .getAllByRole('link')
-      .filter(link =>
-        ['Spotify', 'Apple Music', 'YouTube', 'Deezer'].includes(
-          link.textContent?.trim() ?? ''
-        )
-      );
-
-    expect(dspLinks.map(link => link.textContent?.trim())).toEqual([
-      'Spotify',
-      'Apple Music',
-      'YouTube',
-      'Deezer',
-    ]);
-    expect(dspLinks.map(link => link.getAttribute('href'))).toEqual([
-      'https://open.spotify.com/artist/test',
-      'https://music.apple.com/artist/test',
-      'https://youtube.com/@test',
-      'https://www.deezer.com/artist/test',
-    ]);
-    expect(
-      screen.queryByRole('link', { name: 'Tidal' })
-    ).not.toBeInTheDocument();
-
-    restoreViewport();
-  });
-
-  it('keeps the flagged public profile V1 desktop trust surface accessible', async () => {
-    const restoreViewport = mockViewport('desktop');
-    mockCanonicalProfileDSPs.mockReturnValue([
-      mockDsp('spotify', 'Spotify', 'https://open.spotify.com/artist/test'),
-      mockDsp(
-        'apple_music',
-        'Apple Music',
-        'https://music.apple.com/artist/test'
-      ),
-    ]);
-
-    const { container } = render(
-      <ProfileCompactTemplate
-        mode='profile'
-        artist={{
-          ...mockArtist,
-          tagline: 'Official music, shows, and updates.',
-          image_url: 'https://example.com/artist.jpg',
-        }}
-        socialLinks={[]}
-        contacts={[]}
-        visualVariant='v1'
-      />
-    );
-
-    await screen.findByText('Listen And Follow');
-
-    await expectNoA11yViolations(container);
-
-    restoreViewport();
-  });
-
   it('passes pay, contact, tour, subscribe, and release variants into the desktop smoke surface', async () => {
     const restoreViewport = mockViewport('desktop');
 
@@ -1339,7 +1349,6 @@ describe('ProfileCompactTemplate', () => {
         },
       ],
       releases: mockReleases,
-      visualVariant: 'v1' as const,
     };
 
     const view = render(

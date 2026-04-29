@@ -72,22 +72,25 @@ const ProfileInlineNotificationsCTA = dynamic(
 );
 
 const DEFAULT_CONTENT_PREFS: Record<NotificationContentType, boolean> = {
-  newMusic: true,
-  tourDates: true,
-  merch: true,
-  general: true,
+  newMusic: false,
+  tourDates: false,
+  merch: false,
+  general: false,
 };
 
-const PRIMARY_TABS: ReadonlyArray<{
-  mode: ProfilePrimaryTab;
-  label: string;
-  icon: LucideIcon;
-}> = [
-  { mode: 'profile', label: 'Home', icon: UserRound },
-  { mode: 'listen', label: 'Music', icon: Music2 },
-  { mode: 'tour', label: 'Events', icon: CalendarDays },
-  { mode: 'subscribe', label: 'Alerts', icon: Bell },
-];
+const PRIMARY_TAB_PRESENTATION: Record<
+  ProfilePrimaryTab,
+  {
+    label: string;
+    icon: LucideIcon;
+  }
+> = {
+  profile: { label: 'Home', icon: UserRound },
+  listen: { label: 'Music', icon: Music2 },
+  tour: { label: 'Events', icon: CalendarDays },
+  subscribe: { label: 'Alerts', icon: Bell },
+  about: { label: 'Profile', icon: UserRound },
+};
 
 interface ProfileCompactSurfaceProps {
   readonly renderMode?: ProfileRenderMode;
@@ -145,17 +148,21 @@ function resolveActivePrimaryTab(params: {
   readonly mode: ProfileMode;
   readonly drawerOpen: boolean;
   readonly drawerView: DrawerView;
+  readonly availableTabs: readonly ProfilePrimaryTab[];
 }): ProfilePrimaryTab {
+  const normalize = (tab: ProfilePrimaryTab) =>
+    params.availableTabs.includes(tab) ? tab : 'profile';
+
   if (params.drawerOpen) {
     switch (params.drawerView) {
       case 'listen':
       case 'releases':
-        return 'listen';
+        return normalize('listen');
       case 'tour':
-        return 'tour';
+        return normalize('tour');
       case 'subscribe':
       case 'notifications':
-        return 'subscribe';
+        return normalize('subscribe');
       default:
         return 'profile';
     }
@@ -165,10 +172,10 @@ function resolveActivePrimaryTab(params: {
   switch (mode) {
     case 'listen':
     case 'releases':
-      return 'listen';
+      return normalize('listen');
     case 'tour':
     case 'subscribe':
-      return mode;
+      return normalize(mode);
     case 'profile':
     case 'about':
     case 'pay':
@@ -248,17 +255,8 @@ export function ProfileCompactSurface({
     contacts,
     artistHandle: artist.handle,
   });
-  const isDrawerOverlayActive = renderMode === 'interactive' && drawerOpen;
-  const activePrimaryTab = resolveActivePrimaryTab({
-    mode: activeMode,
-    drawerOpen: isDrawerOverlayActive,
-    drawerView,
-  });
-  const isHomeMode = activePrimaryTab === 'profile';
-  const showBottomNav = true;
   const isPreviewEmbedded =
     renderMode === 'preview' && presentation === 'embedded';
-  const activePrimaryPanel = isHomeMode ? null : activePrimaryTab;
   const surfaceState = useMemo(
     () =>
       resolveProfileSurfaceState({
@@ -273,11 +271,11 @@ export function ProfileCompactSurface({
         hasPlayableDestinations: mergedDSPs.length > 0,
         showPayButton,
         isSubscribed,
-        activeSubtitle: getProfileModeDefinition(activePrimaryTab).subtitle,
+        activeSubtitle: getProfileModeDefinition(activeMode).subtitle,
         viewerCountryCode,
       }),
     [
-      activePrimaryTab,
+      activeMode,
       artist,
       featuredPlaylistFallback,
       isSubscribed,
@@ -292,6 +290,21 @@ export function ProfileCompactSurface({
       viewerCountryCode,
     ]
   );
+  const primaryTabs = surfaceState.primaryTabs;
+  const isDrawerOverlayActive = renderMode === 'interactive' && drawerOpen;
+  const activePrimaryTab = resolveActivePrimaryTab({
+    mode: activeMode,
+    drawerOpen: isDrawerOverlayActive,
+    drawerView,
+    availableTabs: primaryTabs,
+  });
+  const isHomeMode = activePrimaryTab === 'profile';
+  const showBottomNav = true;
+  const activePrimaryPanel = isHomeMode ? null : activePrimaryTab;
+  const showSubscribeSignupFlow =
+    renderMode === 'interactive' &&
+    activePrimaryPanel === 'subscribe' &&
+    !isSubscribed;
   const heroImageUrl = surfaceState.heroImageUrl;
   const resolvedHeroImageUrl = useMemo(() => {
     const imageUrl = heroImageUrl ?? artist.image_url ?? null;
@@ -427,7 +440,12 @@ export function ProfileCompactSurface({
               </CircleIconButton>
 
               {!isHomeMode ? (
-                <p className='absolute left-14 right-14 top-[max(env(safe-area-inset-top),14px)] truncate text-center text-[14px] font-semibold tracking-[-0.012em] text-white'>
+                <p
+                  className='absolute left-14 right-14 top-[max(env(safe-area-inset-top),14px)] truncate text-center text-[14px] font-semibold tracking-[-0.012em] text-white'
+                  data-testid={
+                    renderMode === 'preview' ? undefined : 'profile-header'
+                  }
+                >
                   {artist.name}
                 </p>
               ) : null}
@@ -607,6 +625,19 @@ export function ProfileCompactSurface({
                 viewerLocation={viewerLocation}
                 resolveNearbyTour={resolveNearbyTour}
               />
+            ) : showSubscribeSignupFlow ? (
+              <ProfileInlineNotificationsCTA
+                artist={artist}
+                onManageNotifications={onManageNotifications}
+                onRegisterReveal={registerNotificationsReveal}
+                portalContainer={notificationsPortalContainer ?? undefined}
+                presentation='overlay'
+                autoOpen
+                hideTrigger
+                onFlowClosed={returnToProfileAfterNotifications}
+                onSubscriptionActivated={handleSubscriptionActivated}
+                source='profile_inline'
+              />
             ) : (
               <ProfilePrimaryTabPanel
                 mode={activePrimaryPanel ?? 'listen'}
@@ -643,20 +674,23 @@ export function ProfileCompactSurface({
                 data-testid='profile-bottom-nav'
               >
                 <div
-                  className={cn(
-                    'grid items-center gap-1',
-                    hideMoreMenu ? 'grid-cols-4' : 'grid-cols-5'
-                  )}
+                  className='grid items-center gap-1'
+                  style={{
+                    gridTemplateColumns: `repeat(${
+                      primaryTabs.length + (hideMoreMenu ? 0 : 1)
+                    }, minmax(0, 1fr))`,
+                  }}
                 >
-                  {PRIMARY_TABS.map(tab => {
+                  {primaryTabs.map(tabMode => {
+                    const tab = PRIMARY_TAB_PRESENTATION[tabMode];
                     const Icon = tab.icon;
                     const isActive =
-                      !isMenuActive && tab.mode === activePrimaryTab;
+                      !isMenuActive && tabMode === activePrimaryTab;
                     return (
                       <button
-                        key={tab.mode}
+                        key={tabMode}
                         type='button'
-                        onClick={() => onModeSelect(tab.mode)}
+                        onClick={() => onModeSelect(tabMode)}
                         className={cn(
                           'relative flex min-h-[52px] min-w-0 flex-col items-center justify-center gap-1 rounded-[22px] px-1.5 py-1.5 text-center transition-[background-color,color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
                           isActive

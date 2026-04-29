@@ -44,17 +44,19 @@ import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
 import type { PublicRelease } from '../releases/types';
 
-const PRIMARY_TABS: ReadonlyArray<{
-  mode: ProfilePrimaryTab;
-  label: string;
-  icon: typeof House;
-}> = [
-  { mode: 'profile', label: 'Home', icon: House },
-  { mode: 'listen', label: 'Music', icon: Music2 },
-  { mode: 'tour', label: 'Events', icon: CalendarDays },
-  { mode: 'subscribe', label: 'Alerts', icon: Bell },
-  { mode: 'about', label: 'Profile', icon: UserRound },
-];
+const PRIMARY_TAB_PRESENTATION: Record<
+  ProfilePrimaryTab,
+  {
+    label: string;
+    icon: typeof House;
+  }
+> = {
+  profile: { label: 'Home', icon: House },
+  listen: { label: 'Music', icon: Music2 },
+  tour: { label: 'Events', icon: CalendarDays },
+  subscribe: { label: 'Alerts', icon: Bell },
+  about: { label: 'Profile', icon: UserRound },
+};
 
 interface ProfileDesktopSurfaceProps {
   readonly presentation?: ProfileSurfacePresentation;
@@ -148,15 +150,21 @@ function formatReleaseMeta(
   return [normalizedType, year].filter(Boolean).join(' • ');
 }
 
-function getDesktopBaseMode(mode: ProfileMode): ProfilePrimaryTab {
+function getDesktopBaseMode(
+  mode: ProfileMode,
+  availableTabs: readonly ProfilePrimaryTab[]
+): ProfilePrimaryTab {
+  const normalize = (tab: ProfilePrimaryTab) =>
+    availableTabs.includes(tab) ? tab : 'profile';
+
   switch (mode) {
     case 'listen':
     case 'releases':
-      return 'listen';
+      return normalize('listen');
     case 'tour':
-      return 'tour';
+      return normalize('tour');
     case 'subscribe':
-      return 'subscribe';
+      return normalize('subscribe');
     case 'about':
       return 'about';
     default:
@@ -260,7 +268,6 @@ export function ProfileDesktopSurface({
       ),
     [artist, socialLinks, viewerCountryCode]
   );
-  const activePrimaryTab = getDesktopBaseMode(activeMode);
   const surfaceState = useMemo(
     () =>
       resolveProfileSurfaceState({
@@ -304,6 +311,8 @@ export function ProfileDesktopSurface({
     hasReleases,
     emptyState,
   } = surfaceState;
+  const primaryTabs = surfaceState.primaryTabs;
+  const activePrimaryTab = getDesktopBaseMode(activeMode, primaryTabs);
   const shareContext = useMemo(
     () =>
       buildProfileShareContext({
@@ -444,14 +453,14 @@ export function ProfileDesktopSurface({
         </section>
 
         <div className='grid gap-3.5 xl:grid-cols-[minmax(0,1.12fr)_minmax(320px,0.88fr)]'>
-          <DesktopSurfaceCard
-            title='All Shows'
-            actionLabel='View all shows'
-            onAction={() => onModeSelect('tour')}
-          >
-            <div className='space-y-2'>
-              {upcomingTourDates.length > 0 ? (
-                upcomingTourDates.slice(0, 5).map(tourDate => (
+          {surfaceState.hasUpcomingEvents ? (
+            <DesktopSurfaceCard
+              title='All Shows'
+              actionLabel='View all shows'
+              onAction={() => onModeSelect('tour')}
+            >
+              <div className='space-y-2'>
+                {upcomingTourDates.slice(0, 5).map(tourDate => (
                   <div
                     key={tourDate.id}
                     className='grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-3 rounded-[16px] bg-white/[0.025] px-3 py-3'
@@ -483,12 +492,10 @@ export function ProfileDesktopSurface({
                       </a>
                     ) : null}
                   </div>
-                ))
-              ) : (
-                <EmptySurfaceBlock>{emptyState.tour}</EmptySurfaceBlock>
-              )}
-            </div>
-          </DesktopSurfaceCard>
+                ))}
+              </div>
+            </DesktopSurfaceCard>
+          ) : null}
 
           <DesktopSurfaceCard
             title='All Releases'
@@ -636,6 +643,38 @@ export function ProfileDesktopSurface({
         <DesktopSurfaceCard title='Alerts'>
           <div className='space-y-4'>
             <div className='space-y-3'>
+              {[
+                { label: 'Release Reminders', icon: Music2 },
+                { label: 'Nearby Events', icon: CalendarDays },
+                { label: 'Account Updates', icon: Mail },
+              ].map(item => {
+                const Icon = item.icon;
+                return (
+                  <div
+                    key={item.label}
+                    className='flex items-center justify-between gap-4'
+                  >
+                    <div className='flex items-center gap-3'>
+                      <Icon className='size-4 text-white/62' />
+                      <span className='text-[14px] font-medium tracking-[-0.015em] text-white/84'>
+                        {item.label}
+                      </span>
+                    </div>
+                    <Switch
+                      checked={isSubscribed}
+                      disabled
+                      aria-label={item.label}
+                      className='data-[state=checked]:bg-white/36 data-[state=unchecked]:bg-white/14'
+                    />
+                  </div>
+                );
+              })}
+            </div>
+            <div className='h-px bg-white/8' />
+            <div className='space-y-3'>
+              <p className='text-[13px] font-semibold tracking-[-0.01em] text-white/44'>
+                Artist Alerts
+              </p>
               {[
                 { key: 'newMusic', label: 'New Music', icon: Music2 },
                 { key: 'tourDates', label: 'Shows', icon: CalendarDays },
@@ -817,7 +856,7 @@ export function ProfileDesktopSurface({
     );
 
   return (
-    <div className='relative flex h-[min(940px,calc(100dvh-48px))] w-full overflow-hidden rounded-[28px] bg-[rgba(8,10,14,0.76)]'>
+    <div className='relative flex h-[min(860px,calc(100dvh-128px))] w-full overflow-hidden rounded-[28px] bg-[rgba(8,10,14,0.76)]'>
       <div
         ref={setNotificationsPortalContainer}
         className='relative flex min-h-0 w-full flex-col'
@@ -828,14 +867,15 @@ export function ProfileDesktopSurface({
             className='flex min-w-0 items-center gap-1 rounded-full bg-black/24 p-1 backdrop-blur-xl'
             aria-label='Profile navigation'
           >
-            {PRIMARY_TABS.map(tab => {
+            {primaryTabs.map(tabMode => {
+              const tab = PRIMARY_TAB_PRESENTATION[tabMode];
               const Icon = tab.icon;
-              const isActive = activePrimaryTab === tab.mode;
+              const isActive = activePrimaryTab === tabMode;
               return (
                 <button
-                  key={tab.mode}
+                  key={tabMode}
                   type='button'
-                  onClick={() => onModeSelect(tab.mode)}
+                  onClick={() => onModeSelect(tabMode)}
                   className={cn(
                     'inline-flex h-10 min-w-0 items-center gap-2 rounded-full px-3 text-[13px] font-medium tracking-[-0.01em] transition-colors duration-200',
                     isActive

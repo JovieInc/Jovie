@@ -1,6 +1,5 @@
 /**
- * Profile loading skeleton — matches the V2 ProfileViewportShell + ArtistHero + ProfileScrollBody layout.
- * Full-bleed hero gradient at top, then rounded panel placeholders in the scroll body zone.
+ * Profile loading skeleton for the canonical public profile shell.
  */
 export function ProfileSkeleton() {
   const pulse = 'animate-pulse motion-reduce:animate-none';
@@ -21,7 +20,7 @@ export function ProfileSkeleton() {
       {/* Viewport shell */}
       <div className='relative mx-auto flex min-h-[100dvh] w-full max-w-[680px] items-stretch justify-center md:items-center md:px-6 md:py-8'>
         <div className='relative flex w-full flex-col overflow-hidden bg-white/[0.02] md:min-h-0 md:rounded-[var(--profile-shell-card-radius)] md:border md:border-white/[0.06]'>
-          {/* Hero placeholder — matches ArtistHero height */}
+          {/* Hero placeholder */}
           <div
             className={`relative h-[48dvh] max-h-[620px] min-h-[420px] w-full overflow-hidden md:h-[56dvh] md:min-h-[520px] md:rounded-t-[var(--profile-shell-card-radius)] ${pulse}`}
           >

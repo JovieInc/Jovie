@@ -428,11 +428,77 @@ function SectionPreview({ variant }: Readonly<{ variant: SectionVariant }>) {
   );
 }
 
+function PublicProfileBoardPreview() {
+  const states = [
+    ['Mobile', 'Base, short, and tall capture gates'],
+    ['Events', 'Present, nearby, and absent states'],
+    ['Latest', 'Tour, presave, release, and fallback cards'],
+    ['Alerts', 'Signup and preferences states'],
+  ] as const;
+
+  return (
+    <StudioFrame className='p-4'>
+      <div className='grid h-full gap-3 sm:grid-cols-2'>
+        {states.map(([title, body]) => (
+          <div
+            key={title}
+            className='rounded-lg border border-white/10 bg-white/[0.045] p-4'
+          >
+            <div className='mb-4 flex items-center gap-2'>
+              <div className='grid h-8 w-8 place-items-center rounded-md bg-white text-black'>
+                <UserCircle className='h-4 w-4' />
+              </div>
+              <p className='text-[13px] font-semibold text-white'>{title}</p>
+            </div>
+            <p className='text-[12px] leading-5 text-white/58'>{body}</p>
+          </div>
+        ))}
+      </div>
+    </StudioFrame>
+  );
+}
+
 function sectionPrompt(variant: SectionVariant): string {
   return `Use the ${variant.label} landing-page section from ${variant.componentPath}. Place it on a Jovie marketing page where ${variant.description.toLowerCase()} Keep the composition compact and reuse the existing section component instead of rebuilding the layout.`;
 }
 
 const PRODUCT_SHOWCASE_ITEMS: readonly DesignStudioItem[] = [
+  {
+    id: 'public-profile-state-board',
+    label: 'Public Profile State Board',
+    category: 'pages',
+    description:
+      'Canonical public profile screenshot board covering responsive layout, event availability, smart cards, alerts, and sparse data.',
+    preview: PublicProfileBoardPreview,
+    demoRoute: '/demo/showcase/public-profile',
+    componentPaths: [
+      'apps/web/app/[username]/page.tsx',
+      'apps/web/components/features/profile/StaticArtistPage.tsx',
+      'apps/web/components/features/profile/templates/ProfileCompactTemplate.tsx',
+      'apps/web/components/features/profile/templates/ProfileCompactSurface.tsx',
+      'apps/web/components/features/profile/templates/ProfileDesktopSurface.tsx',
+      'apps/web/components/features/profile/profile-surface-state.ts',
+    ],
+    screenshotScenarioIds: [
+      'public-profile-desktop',
+      'public-profile-tablet',
+      'public-profile-mobile',
+      'public-profile-mobile-short',
+      'public-profile-mobile-tall',
+      'public-profile-nearby-tour-mobile',
+      'public-profile-presave-mobile',
+      'tim-white-profile-live-mobile',
+      'public-profile-playlist-fallback-mobile',
+      'public-profile-listen-fallback-mobile',
+      'tim-white-profile-subscribe-mobile',
+      'public-profile-alerts-on-preferences-mobile',
+      'public-profile-events-absent-desktop',
+      'public-profile-events-absent-tablet',
+      'public-profile-events-absent-mobile',
+    ],
+    marketingPrompt:
+      'Use the canonical Jovie public profile state board when reviewing or presenting the production artist profile. Treat these screenshots as the approval set for responsive layout, smart cards, alerts, and empty-data behavior.',
+  },
   {
     id: 'music-ai-command-surface',
     label: 'Music AI Command Surface',
