@@ -1594,20 +1594,31 @@ body:has(.home-viewport)::-webkit-scrollbar {
   border-top: 1px solid var(--frame-hairline);
 }
 
-/* Editorial eyebrow — replaces inline eyebrow strings. Caps, tracked, off-white
-   at tertiary opacity. Sits above section headlines as a category tag.
-   Base class provides typography so callers don't need duplicate Tailwind
-   utilities; .frame-skin layers in the editorial color token. */
+/* Editorial eyebrow — neutral base. Per project design guidance, marketing
+   pages must NOT use all-caps labels or tracked-caps as default styling, so
+   the base class only sets neutral typography (size + line-height). The
+   caps/tracking/weight treatment is opt-in via the `.frame-eyebrow--caps`
+   modifier or by living inside `.frame-skin` (which scopes the cinematic
+   editorial design layer to /artist-profiles). */
 .frame-eyebrow {
   display: inline-block;
-  text-transform: uppercase;
   font-size: 0.6875rem; /* 11px */
-  font-weight: 500;
-  letter-spacing: 0.18em;
   line-height: 1;
 }
 
+/* Opt-in editorial caps treatment. Use this modifier when a surface
+   explicitly wants the tracked-caps eyebrow without inheriting the full
+   .frame-skin design layer. */
+.frame-eyebrow--caps {
+  text-transform: uppercase;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+}
+
+/* Inside the cinematic design layer, eyebrows always render as tracked caps
+   in the off-white tertiary token. */
 .frame-skin .frame-eyebrow {
+  text-transform: uppercase;
   font-size: var(--frame-eyebrow-size);
   font-weight: var(--frame-eyebrow-weight);
   letter-spacing: var(--frame-eyebrow-tracking);
@@ -1674,17 +1685,23 @@ body:has(.home-viewport)::-webkit-scrollbar {
   z-index: 1;
 }
 
+/* Footer column eyebrow — neutral base. Per project design guidance,
+   marketing pages must NOT use all-caps labels as default styling, so the
+   base only sets neutral typography. The tracked-caps treatment is opt-in
+   via the `.mf-eyebrow--caps` modifier (used by footer column headers). */
 .marketing-footer-premium .mf-eyebrow {
   display: block;
-  text-transform: uppercase;
   font-size: 0.6875rem; /* 11px */
-  font-weight: 500;
-  letter-spacing: 0.2em;
   color: var(--mf-text-tertiary);
   line-height: 1;
   margin-bottom: 1.25rem;
 }
 
+.marketing-footer-premium .mf-eyebrow--caps {
+  text-transform: uppercase;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+}
 .marketing-footer-premium .mf-link {
   display: inline-flex;
   width: fit-content;

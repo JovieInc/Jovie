@@ -48,7 +48,6 @@ interface MarketingFooterProps {
 
 const markLinkClassName =
   '-m-1.5 inline-flex rounded-full p-1.5 text-white/[0.92] transition-opacity duration-150 hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
-
 const footerLinkClassName =
   'mf-link inline-flex w-fit rounded-[5px] text-[15px] leading-[1.45] tracking-[-0.005em] text-white/[0.72] transition-colors duration-150 hover:text-white focus-visible:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
 const footerLegalLinkClassName =
@@ -141,7 +140,9 @@ export function MarketingFooter({
             >
               {MARKETING_FOOTER_COLUMNS.map(column => (
                 <section key={column.title}>
-                  <h2 className='mf-eyebrow'>{column.title}</h2>
+                  <h2 className='mf-eyebrow mf-eyebrow--caps'>
+                    {column.title}
+                  </h2>
                   <ul className='flex list-none flex-col gap-3 p-0'>
                     {column.links.map(link => (
                       <li key={`${link.href}-${link.label}`}>
