@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { Flagged } from '@/components/features/dev/Flagged';
-import { OPEN_COMMAND_PALETTE_EVENT } from '@/components/organisms/CommandPalette';
+import { OPEN_COMMAND_PALETTE_EVENT } from '@/components/organisms/command-palette-events';
 import { usePendingShell } from '@/components/organisms/PendingShellContext';
 import {
   SidebarGroup,
@@ -319,7 +319,7 @@ export function DashboardNav(_: DashboardNavProps) {
           onClick={onClick}
           preventNavigation={demoUnavailable}
           renderAsButton={renderAsButton}
-          useShellNavItem={shellChatV1Enabled && renderAsButton}
+          useShellNavItem={shellChatV1Enabled}
           onNavigate={
             isReleasesItem && !isActive
               ? () => showPendingShell('releases')

@@ -20,9 +20,9 @@ import { APP_ROUTES } from '@/constants/routes';
 import type { EntityRef } from '@/lib/commands/entities';
 import { useChatConversationsQuery } from '@/lib/queries';
 import { isFormElement } from '@/lib/utils/keyboard';
+import { OPEN_COMMAND_PALETTE_EVENT } from './command-palette-events';
 
 const RECENT_THREAD_LIMIT = 10;
-export const OPEN_COMMAND_PALETTE_EVENT = 'jovie:open-command-palette';
 
 export function CommandPalette() {
   // Read the context directly so we don't hit the throwing useDashboardData

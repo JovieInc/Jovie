@@ -25,10 +25,11 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/organisms/Sidebar';
-import { SidebarNavItem } from '@/components/shell/SidebarNavItem';
+import { Tooltip } from '@/components/shell/Tooltip';
 import { BASE_URL } from '@/constants/domains';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import type { KeyboardShortcut } from '@/lib/keyboard-shortcuts';
+import { cn } from '@/lib/utils';
 import type { NavItem } from './types';
 
 interface NavMenuItemProps {
@@ -282,25 +283,65 @@ export function NavMenuItem({
     readonly className?: string;
     readonly strokeWidth?: number;
   }>;
-  const shellNavItem =
-    useShellNavItem && renderAsButton && item.badge == null ? (
-      <SidebarNavItem
-        item={{
-          icon: ShellIcon,
-          label: item.name,
-          active: isActive,
-          onActivate: handleButtonClick,
-        }}
-        collapsed={false}
-        tight
+  const shellNavItem = useShellNavItem && item.badge == null;
+  const shellNavClassName = cn(
+    'relative flex h-6 w-full items-center gap-2 rounded-md pl-2.5 pr-2 text-[12.5px] tracking-[-0.005em] transition-colors duration-150 ease-out',
+    isActive
+      ? 'bg-surface-1 text-primary-token'
+      : 'text-secondary-token hover:bg-surface-1/60 hover:text-primary-token',
+    'group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0'
+  );
+  const shellInnerContent = (
+    <>
+      <ShellIcon
+        className={cn(
+          'h-3 w-3 shrink-0',
+          isActive ? 'text-primary-token' : 'text-tertiary-token'
+        )}
+        strokeWidth={2.25}
+        aria-hidden='true'
       />
-    ) : null;
+      <span className='truncate group-data-[collapsible=icon]:hidden'>
+        {item.name}
+      </span>
+    </>
+  );
 
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <SidebarMenuItem>
-          {shellNavItem ?? (
+          {shellNavItem ? (
+            <Tooltip label={item.name} side='right' block>
+              {renderAsButton ? (
+                <button
+                  type='button'
+                  onClick={handleButtonClick}
+                  onPointerDown={handlePressStart}
+                  onMouseEnter={onPrefetch}
+                  onFocus={onPrefetch}
+                  aria-pressed={isActive}
+                  className={shellNavClassName}
+                >
+                  {shellInnerContent}
+                </button>
+              ) : (
+                <Link
+                  href={item.href}
+                  prefetch={prefetch}
+                  onClick={handleLinkClick}
+                  onPointerDown={handlePressStart}
+                  onMouseEnter={onPrefetch}
+                  onFocus={onPrefetch}
+                  aria-current={isActive ? 'page' : undefined}
+                  aria-disabled={preventNavigation || undefined}
+                  className={shellNavClassName}
+                >
+                  {shellInnerContent}
+                </Link>
+              )}
+            </Tooltip>
+          ) : (
             <SidebarMenuButton asChild isActive={isActive} tooltip={tooltip}>
               {renderAsButton ? (
                 <button
