@@ -26,7 +26,14 @@ export function ArtistProfileSectionShell({
     <section
       ref={sectionRef}
       id={id}
-      className={cn('relative py-20 sm:py-24 lg:py-28', className)}
+      className={cn(
+        // Inside .frame-skin, padding + hairline divider come from the
+        // .frame-section utility (declared in home.css). Outside frame-skin
+        // we keep the previous SaaS-rhythm padding so other surfaces are
+        // unaffected by this redesign.
+        'frame-section relative py-20 sm:py-24 lg:py-28',
+        className
+      )}
     >
       <MarketingContainer
         width={width}
