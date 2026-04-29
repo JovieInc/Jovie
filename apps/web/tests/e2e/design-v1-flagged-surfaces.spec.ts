@@ -154,6 +154,29 @@ async function prepareAuthenticatedSurface(
   ]);
 }
 
+async function prepareSeededE2EUser(page: Page): Promise<void> {
+  const userId = process.env.E2E_CLERK_USER_ID?.trim();
+  expect(
+    userId,
+    'E2E_CLERK_USER_ID is required for seeded release-backed lyrics coverage'
+  ).toBeTruthy();
+
+  await page.context().addCookies([
+    {
+      name: TEST_MODE_COOKIE,
+      value: TEST_AUTH_BYPASS_MODE,
+      url: getBaseUrl(),
+      sameSite: 'Lax',
+    },
+    {
+      name: TEST_USER_ID_COOKIE,
+      value: userId!,
+      url: getBaseUrl(),
+      sameSite: 'Lax',
+    },
+  ]);
+}
+
 async function resolveSeededLyricsRoute(page: Page): Promise<string> {
   await gotoSurface(page, APP_ROUTES.DASHBOARD_RELEASES);
   await expect(page.getByTestId('releases-matrix')).toBeVisible({
@@ -210,7 +233,9 @@ const SURFACE_CASES: readonly SurfaceCase[] = [
     assertEnabled: async page => {
       const workspace = page.getByTestId('tasks-workspace');
       await expect(workspace).toBeVisible({ timeout: 30_000 });
-      await expect(workspace).toHaveAttribute('data-design-v1-tasks', 'true');
+      await expect(workspace).toHaveAttribute('data-design-v1-tasks', 'true', {
+        timeout: 30_000,
+      });
     },
   },
   {
@@ -238,7 +263,7 @@ const SURFACE_CASES: readonly SurfaceCase[] = [
   {
     flagName: 'DESIGN_V1_LYRICS',
     route: resolveSeededLyricsRoute,
-    persona: 'creator-ready',
+    prepare: prepareSeededE2EUser,
     assertDefault: expectNotFound,
     assertEnabled: async page => {
       await expect(
