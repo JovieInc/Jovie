@@ -13,6 +13,7 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { isE2EFastOnboardingEnabled } from '@/lib/e2e/runtime';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
+import { getAppFlagValue } from '@/lib/flags/server';
 import {
   buildHandleCandidates,
   reserveOnboardingHandle,
@@ -106,6 +107,9 @@ export default async function OnboardingPage({
   const clerkIdentity = resolveClerkIdentity(user);
   const userEmail = authResult.context.email ?? clerkIdentity.email ?? null;
   const userId = authResult.clerkUserId;
+  const showOnboardingV1Design = await getAppFlagValue('DESIGN_V1_ONBOARDING', {
+    userId,
+  });
   // Run profile prefetch and handle reservation in parallel (they're independent)
   const spotifySuggestedHandle = clerkIdentity.spotifyUsername ?? '';
 
@@ -211,6 +215,7 @@ export default async function OnboardingPage({
         existingAvatarUrl={existingProfile?.avatarUrl ?? null}
         existingBio={existingProfile?.bio ?? null}
         existingGenres={existingProfile?.genres ?? null}
+        designV1={showOnboardingV1Design}
       />
     </>
   );

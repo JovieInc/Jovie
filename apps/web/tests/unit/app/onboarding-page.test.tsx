@@ -106,6 +106,10 @@ vi.mock('@/lib/env-server', () => ({
   },
 }));
 
+vi.mock('@/lib/flags/server', () => ({
+  getAppFlagValue: vi.fn().mockResolvedValue(false),
+}));
+
 vi.mock('@/lib/claim/context', () => ({
   readPendingClaimContext: vi.fn().mockResolvedValue(null),
 }));

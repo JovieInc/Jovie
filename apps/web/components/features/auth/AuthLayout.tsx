@@ -14,6 +14,7 @@ import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { AUTH_FORM_MAX_WIDTH_CLASS } from '@/features/auth/constants';
 import { useMobileKeyboard } from '@/hooks/useMobileKeyboard';
+import { useAppFlag } from '@/lib/flags/client';
 import { cn } from '@/lib/utils';
 import { AuthBrandPanel } from './AuthBrandPanel';
 
@@ -51,6 +52,7 @@ interface AuthLayoutInnerProps {
   readonly showcaseVariant: 'page' | 'image-only';
   readonly isKeyboardVisible: boolean;
   readonly formRef: React.RefObject<HTMLElement | null>;
+  readonly designV1: boolean;
 }
 
 function SplitLayoutContent({
@@ -66,9 +68,15 @@ function SplitLayoutContent({
   showcaseVariant,
   isKeyboardVisible,
   formRef,
+  designV1,
 }: AuthLayoutInnerProps) {
   return (
-    <div className='relative z-10 flex w-full max-w-[1240px] flex-1 items-center justify-center'>
+    <div
+      className={cn(
+        'relative z-10 flex w-full flex-1 items-center justify-center',
+        designV1 ? 'max-w-[1160px]' : 'max-w-[1240px]'
+      )}
+    >
       <div className='grid w-full gap-6 lg:min-h-[calc(100svh-7.5rem)] lg:grid-cols-[minmax(0,500px)_minmax(0,1fr)] lg:items-stretch lg:gap-7 xl:gap-10'>
         <div className='flex min-h-0 flex-col justify-center lg:max-w-[500px] lg:justify-start lg:pt-16 lg:pb-6 xl:pt-20'>
           {showLogo ? (
@@ -130,7 +138,7 @@ function SplitLayoutContent({
         {showLogo ? (
           <div className='auth-desktop-only w-full lg:flex lg:min-h-full lg:justify-self-end'>
             <AuthBrandPanel
-              variant={showcaseVariant}
+              variant={designV1 ? 'v1' : showcaseVariant}
               className='ml-auto h-full w-full max-w-[620px]'
             />
           </div>
@@ -236,6 +244,7 @@ export function AuthLayout({
   showcaseVariant = 'page',
 }: Readonly<AuthLayoutProps>) {
   const { isKeyboardVisible } = useMobileKeyboard();
+  const designV1 = useAppFlag('DESIGN_V1_AUTH');
   const formRef = useRef<HTMLElement>(null);
   const isSplitVariant = layoutVariant === 'split';
 
@@ -265,14 +274,17 @@ export function AuthLayout({
     showcaseVariant,
     isKeyboardVisible,
     formRef,
+    designV1,
   };
 
   return (
     <div
       data-auth-shell
       data-auth-layout-variant={layoutVariant}
+      data-design-v1-auth={designV1 ? 'true' : 'false'}
       className={cn(
-        'fixed inset-0 isolate flex flex-col items-center overflow-y-auto overflow-x-clip overscroll-none max-w-[100dvw] bg-[#08090a] text-white [color-scheme:dark]',
+        'fixed inset-0 isolate flex flex-col items-center overflow-y-auto overflow-x-clip overscroll-none max-w-[100dvw] text-white [color-scheme:dark]',
+        designV1 ? 'bg-[#06070a]' : 'bg-[#08090a]',
         'px-4 sm:px-6',
         isKeyboardVisible
           ? 'pt-8 pb-4'
@@ -288,8 +300,12 @@ export function AuthLayout({
         className='pointer-events-none absolute inset-0 overflow-hidden'
       >
         <div className='auth-shell-grain absolute inset-0 opacity-[0.12]' />
-        <div className='absolute left-[12%] top-[14%] h-[18rem] w-[18rem] rounded-full bg-white/[0.04] blur-[110px]' />
-        <div className='absolute right-[10%] top-[8%] h-[28rem] w-[28rem] rounded-full bg-accent/10 blur-[180px]' />
+        {designV1 ? null : (
+          <>
+            <div className='absolute left-[12%] top-[14%] h-[18rem] w-[18rem] rounded-full bg-white/[0.04] blur-[110px]' />
+            <div className='absolute right-[10%] top-[8%] h-[28rem] w-[28rem] rounded-full bg-accent/10 blur-[180px]' />
+          </>
+        )}
         <div
           className='absolute inset-0'
           style={{
