@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { tourDates } from '@/lib/db/schema/tour';
 import { captureError } from '@/lib/error-tracking';
+import { escapeIcsText, formatIcsTimestamp } from '@/lib/ics/format';
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -52,15 +53,6 @@ export async function GET(
 
     // Format date for ICS (YYYYMMDD format)
     const startDate = new Date(tourDate.startDate);
-    const formatIcsDate = (date: Date) => {
-      return (
-        date
-          .toISOString()
-          .replaceAll('-', '')
-          .replaceAll(':', '')
-          .split('.')[0] + 'Z'
-      );
-    };
 
     // Create end date (assume 3 hours if no end time specified)
     const endDate = new Date(startDate.getTime() + 3 * 60 * 60 * 1000);
@@ -102,9 +94,9 @@ export async function GET(
       'METHOD:PUBLISH',
       'BEGIN:VEVENT',
       `UID:${uid}`,
-      `DTSTAMP:${formatIcsDate(new Date())}`,
-      `DTSTART:${formatIcsDate(startDate)}`,
-      `DTEND:${formatIcsDate(endDate)}`,
+      `DTSTAMP:${formatIcsTimestamp(new Date())}`,
+      `DTSTART:${formatIcsTimestamp(startDate)}`,
+      `DTEND:${formatIcsTimestamp(endDate)}`,
       `SUMMARY:${escapeIcsText(summary)}`,
       `DESCRIPTION:${escapeIcsText(description)}`,
       `LOCATION:${escapeIcsText(location)}`,
@@ -147,17 +139,4 @@ export async function GET(
       { status: 500 }
     );
   }
-}
-
-/**
- * Escape special characters for ICS format per RFC 5545
- */
-function escapeIcsText(text: string): string {
-  if (!text) return '';
-  return text
-    .replaceAll('\\', String.raw`\\`)
-    .replaceAll(';', String.raw`\;`)
-    .replaceAll(',', String.raw`\,`)
-    .replaceAll('\r', '')
-    .replaceAll('\n', String.raw`\n`);
 }

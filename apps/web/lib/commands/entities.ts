@@ -63,7 +63,12 @@ export type EntityRefMeta =
       readonly provider?: string;
       readonly status?: string;
       readonly capacity?: number;
-      readonly eventType?: 'tour' | 'meetup' | 'guest' | 'charity' | 'other';
+      readonly eventType?:
+        | 'tour'
+        | 'livestream'
+        | 'listening_party'
+        | 'ama'
+        | 'signing';
     };
 
 export interface EntityRef {

@@ -521,6 +521,72 @@ describe('tour-dates/actions.ts', () => {
       expect(result.message).toMatch(/not found/i);
       expect(result.synced).toBe(0);
     });
+
+    it('lands synced rows as pending and never touches confirmation/reviewed_at on conflict update', async () => {
+      // The conflict-update guard is the single most important property of
+      // the trust gate: when Bandsintown re-syncs the same external event,
+      // the upsert MUST NOT clobber the creator's confirm/reject decision.
+      setupAuthenticatedUser();
+      mockVerifyBandsintownArtist.mockResolvedValue({ name: 'My Artist' });
+      mockDecryptPII.mockReturnValue(null);
+      mockDbUpdate.mockReturnValue(chainMock(undefined));
+
+      const mockEvent = {
+        externalId: 'bit_1',
+        title: 'Concert',
+        startDate: new Date('2026-07-01'),
+        startTime: '21:00',
+        timezone: 'America/Chicago',
+        venueName: 'Big Hall',
+        city: 'Chicago',
+        region: 'IL',
+        country: 'US',
+        latitude: 41.8,
+        longitude: -87.6,
+        ticketUrl: 'https://tickets.example.com',
+        ticketStatus: 'available' as const,
+        rawData: {},
+      };
+      mockFetchBandsintownEvents.mockResolvedValue([mockEvent]);
+
+      // Fine-grained insert mock so we can capture both the .values() and
+      // .onConflictDoUpdate() arguments.
+      const valuesSpy = vi.fn();
+      const onConflictSpy = vi.fn().mockResolvedValue(undefined);
+      mockDbInsert.mockReturnValue({
+        values: (rows: unknown) => {
+          valuesSpy(rows);
+          return { onConflictDoUpdate: onConflictSpy };
+        },
+      });
+      mockDbSelect.mockReturnValue(chainMock([makeTourDateRow()]));
+
+      const { connectBandsintownArtist } = await import(
+        '@/app/app/(shell)/dashboard/tour-dates/actions'
+      );
+      await connectBandsintownArtist({ artistName: 'My Artist' });
+
+      // 1. Newly inserted rows must declare pending + tour explicitly.
+      const inserted = (
+        valuesSpy.mock.calls[0]?.[0] as Array<Record<string, unknown>>
+      )?.[0];
+      expect(inserted).toMatchObject({
+        provider: 'bandsintown',
+        eventType: 'tour',
+        confirmationStatus: 'pending',
+        reviewedAt: null,
+      });
+
+      // 2. The conflict-update SET block MUST NOT include confirmationStatus
+      //    or reviewedAt — otherwise a re-sync wipes the creator's decision.
+      const conflictArg = onConflictSpy.mock.calls[0]?.[0] as {
+        set: Record<string, unknown>;
+      };
+      expect(conflictArg.set).toBeDefined();
+      expect(Object.keys(conflictArg.set)).not.toContain('confirmationStatus');
+      expect(Object.keys(conflictArg.set)).not.toContain('reviewedAt');
+      expect(Object.keys(conflictArg.set)).not.toContain('eventType');
+    });
   });
 
   // ========================================================================

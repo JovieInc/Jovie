@@ -77,6 +77,11 @@ function mapTourDateToViewModel(tourDate: TourDate): TourDateViewModel {
     profileId: tourDate.profileId,
     externalId: tourDate.externalId,
     provider: tourDate.provider,
+    eventType: tourDate.eventType,
+    confirmationStatus: tourDate.confirmationStatus,
+    reviewedAt: tourDate.reviewedAt
+      ? toISOStringSafe(tourDate.reviewedAt)
+      : null,
     title: tourDate.title,
     startDate: toISOStringSafe(tourDate.startDate),
     startTime: tourDate.startTime,
@@ -113,7 +118,15 @@ function validateTicketUrl(ticketUrl: string | undefined | null): void {
 }
 
 /**
- * Upsert Bandsintown events into the database (batch insert for performance)
+ * Upsert Bandsintown events into the database (batch insert for performance).
+ *
+ * New rows land as `eventType: 'tour'` + `confirmationStatus: 'pending'` —
+ * synced provider data is invisible to fans and suppressed from notifications
+ * until the creator confirms or rejects via the dashboard.
+ *
+ * The conflict-update SET block intentionally OMITS `confirmationStatus` and
+ * `reviewedAt` so a future re-sync from Bandsintown does not wipe out the
+ * creator's confirm/reject decision.
  */
 async function upsertBandsintownEvents(
   profileId: string,
@@ -123,11 +136,13 @@ async function upsertBandsintownEvents(
 
   const now = new Date();
 
-  // Batch all events into a single insert with conflict handling
   const insertValues = events.map(event => ({
     profileId,
     externalId: event.externalId,
     provider: 'bandsintown' as const,
+    eventType: 'tour' as const,
+    confirmationStatus: 'pending' as const,
+    reviewedAt: null,
     title: event.title,
     startDate: event.startDate,
     startTime: event.startTime,
@@ -165,6 +180,8 @@ async function upsertBandsintownEvents(
         lastSyncedAt: drizzleSql`excluded.last_synced_at`,
         rawData: drizzleSql`excluded.raw_data`,
         updatedAt: now,
+        // INTENTIONALLY OMITTED: confirmationStatus, reviewedAt, eventType.
+        // Creator decisions on synced events are sticky across re-syncs.
       },
     });
 
@@ -559,6 +576,10 @@ export async function createTourDate(params: {
     .values({
       profileId: profile.id,
       provider: 'manual',
+      eventType: 'tour',
+      // Manual entries are creator-curated and trusted on creation.
+      confirmationStatus: 'confirmed',
+      reviewedAt: new Date(),
       title: params.title ?? null,
       startDate: parsedStartDate,
       startTime: params.startTime ?? null,
