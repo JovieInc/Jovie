@@ -90,11 +90,17 @@ for (const root of SCAN_ROOTS) {
 
 if (matches.length > 0) {
   console.error('Native browser dialogs are banned (AGENTS.md §4f).');
-  console.error('Use <ConfirmDialog> for confirmations or toast.error/success for notifications.\n');
+  console.error(
+    'Use <ConfirmDialog> for confirmations or toast.error/success for notifications.\n'
+  );
   for (const m of matches) {
-    console.error(`  ${m.file}:${m.line}:${m.column}  ${m.offending}(...)  →  ${m.lineText}`);
+    console.error(
+      `  ${m.file}:${m.line}:${m.column}  ${m.offending}(...)  →  ${m.lineText}`
+    );
   }
-  console.error(`\n${matches.length} match${matches.length === 1 ? '' : 'es'} found.`);
+  console.error(
+    `\n${matches.length} match${matches.length === 1 ? '' : 'es'} found.`
+  );
   process.exit(1);
 }
 
