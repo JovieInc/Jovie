@@ -1,33 +1,39 @@
 'use client';
 
-import { useCallback, useState } from 'react';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
-import { type LyricLine, LyricsView } from '@/components/shell/LyricsView';
-import { MOCK_LYRICS } from '@/data/mock-lyrics';
+import {
+  type LyricLine,
+  LyricsView,
+  type LyricsViewTrack,
+} from '@/components/shell/LyricsView';
 
 /**
  * Client wrapper for the lyrics route.
  *
- * Wires the global audio player into LyricsView. `trackId` is accepted for
- * future per-track lyric storage but currently unused — production has no
- * `getLyricsByTrackId(trackId)` query yet, so the surface ships with
- * placeholder lyrics bound to whatever's playing globally.
+ * Wires the global audio player into LyricsView. Lyrics are read-only here:
+ * if the server cannot resolve DB-backed lyrics, the view intentionally shows
+ * the production empty state instead of demo lyric content.
  */
 export function LyricsPageClient({
-  trackId: _trackId,
+  initialLines,
+  initialTrack,
+  trackId,
 }: {
+  readonly initialLines: readonly LyricLine[];
+  readonly initialTrack: LyricsViewTrack;
   readonly trackId: string;
 }) {
   const { playbackState, seek } = useTrackAudioPlayer();
-  const [lines, setLines] = useState<LyricLine[]>(() => [...MOCK_LYRICS]);
-
-  const handleLinesChange = useCallback((next: LyricLine[]) => {
-    setLines(next);
-  }, []);
 
   const track = {
-    title: playbackState.trackTitle ?? 'No track playing',
-    artist: playbackState.artistName ?? '—',
+    title:
+      playbackState.activeTrackId === trackId && playbackState.trackTitle
+        ? playbackState.trackTitle
+        : initialTrack.title,
+    artist:
+      playbackState.activeTrackId === trackId && playbackState.artistName
+        ? playbackState.artistName
+        : initialTrack.artist,
   };
 
   return (
@@ -35,9 +41,9 @@ export function LyricsPageClient({
       track={track}
       durationSec={playbackState.duration}
       currentTimeSec={playbackState.currentTime}
-      lines={lines}
-      onLinesChange={handleLinesChange}
+      lines={initialLines}
       onSeek={seek}
+      timed={false}
     />
   );
 }

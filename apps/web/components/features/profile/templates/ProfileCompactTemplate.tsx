@@ -39,6 +39,7 @@ import {
   useUpdateContentPreferencesMutation,
 } from '@/lib/queries/useNotificationStatusQuery';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
+import { cn } from '@/lib/utils';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
@@ -93,6 +94,7 @@ interface ProfileCompactTemplateProps {
   readonly releases?: readonly PublicRelease[];
   readonly hideJovieBranding?: boolean;
   readonly hideMoreMenu?: boolean;
+  readonly visualVariant?: 'default' | 'v1';
 }
 
 function resolveDrawerView(
@@ -213,6 +215,7 @@ export function ProfileCompactTemplate({
   releases,
   hideJovieBranding = false,
   hideMoreMenu = false,
+  visualVariant = 'default',
 }: ProfileCompactTemplateProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerView, setDrawerView] = useState<DrawerView>('menu');
@@ -653,11 +656,21 @@ export function ProfileCompactTemplate({
     setRequestedMode('profile');
   }, [artist.handle, artist.name]);
 
+  const primaryLinks = mergedDSPs
+    .filter(dsp => Boolean(dsp.url))
+    .slice(0, 4)
+    .map(dsp => ({ id: dsp.key, url: dsp.url, label: dsp.name }));
+  const isV1 = visualVariant === 'v1';
+
   return (
     <ProfileNotificationsContext.Provider value={notificationsContextValue}>
       <div
-        className='profile-viewport relative h-[100dvh] overflow-hidden bg-[color:var(--profile-stage-bg)] text-primary-token'
+        className={cn(
+          'profile-viewport relative h-[100dvh] overflow-hidden bg-[color:var(--profile-stage-bg)] text-primary-token',
+          isV1 && 'bg-[#06070a]'
+        )}
         style={profileAccentStyle}
+        data-profile-visual-variant={visualVariant}
       >
         <div className='absolute inset-0' aria-hidden='true'>
           <div className='absolute inset-[-10%]'>
@@ -679,14 +692,66 @@ export function ProfileCompactTemplate({
         </div>
 
         <div
-          className={`relative mx-auto flex w-full items-stretch justify-center ${
+          className={cn(
+            'relative mx-auto flex w-full items-stretch justify-center',
             isDesktopLayout
-              ? 'h-full max-w-[1540px] px-4 py-4 md:px-6 md:py-6'
+              ? isV1
+                ? 'h-full max-w-[1580px] gap-6 px-4 py-4 md:px-6 md:py-6'
+                : 'h-full max-w-[1540px] px-4 py-4 md:px-6 md:py-6'
               : 'h-full max-w-[680px] md:items-center md:px-6 md:py-8'
-          }`}
+          )}
         >
+          {isDesktopLayout && isV1 ? (
+            <aside className='hidden w-[360px] shrink-0 flex-col justify-between rounded-[32px] border border-white/[0.07] bg-[#0a0c0f]/78 p-7 shadow-[0_28px_90px_rgba(0,0,0,0.32)] backdrop-blur-xl lg:flex'>
+              <div>
+                <div className='relative h-[320px] overflow-hidden rounded-[26px] bg-white/[0.04]'>
+                  {heroImageUrl ? (
+                    <ImageWithFallback
+                      src={heroImageUrl}
+                      alt={`${artist.name} profile image`}
+                      fill
+                      sizes='360px'
+                      className='object-cover'
+                      fallbackVariant='avatar'
+                      fallbackClassName='bg-surface-1'
+                    />
+                  ) : null}
+                  <div className='absolute inset-0 bg-[linear-gradient(180deg,transparent_34%,rgba(0,0,0,0.58)_100%)]' />
+                  <div className='absolute right-4 bottom-4 left-4'>
+                    <h1 className='text-[42px] font-semibold leading-[0.92] text-white'>
+                      {artist.name}
+                    </h1>
+                  </div>
+                </div>
+                <p className='mt-5 text-[14px] leading-6 text-white/58'>
+                  {artist.tagline || `Music and updates from ${artist.name}.`}
+                </p>
+              </div>
+
+              {primaryLinks.length > 0 ? (
+                <div className='border-t border-white/[0.07] pt-5'>
+                  <p className='text-[12px] font-semibold text-white/44'>
+                    Listen And Follow
+                  </p>
+                  <div className='mt-3 flex flex-wrap gap-2'>
+                    {primaryLinks.map(link => (
+                      <a
+                        key={link.id}
+                        href={link.url}
+                        target='_blank'
+                        rel='noreferrer'
+                        className='rounded-full border border-white/[0.08] px-3 py-1.5 text-[12px] font-medium text-white/62 transition-colors hover:border-white/16 hover:text-white'
+                      >
+                        {link.label || 'Link'}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </aside>
+          ) : null}
           <main className='relative flex h-full w-full items-stretch md:items-center'>
-            {isDesktopLayout ? (
+            {isDesktopLayout && !isV1 ? (
               <h1 className='sr-only' data-testid='profile-header'>
                 {artist.name}
               </h1>

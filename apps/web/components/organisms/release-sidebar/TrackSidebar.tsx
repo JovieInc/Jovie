@@ -49,6 +49,7 @@ export interface TrackSidebarData {
   previewUrl: string | null;
   audioUrl: string | null;
   audioFormat: string | null;
+  lyrics?: string | null;
   previewSource?: PreviewSource;
   previewVerification?: PreviewVerification;
   providerConfidenceSummary?: ProviderConfidenceSummary;
@@ -284,6 +285,7 @@ export function TrackSidebar({
       audioUrl: playableUrl,
       releaseTitle: track.releaseTitle,
       artworkUrl: track.releaseArtworkUrl,
+      hasLyrics: Boolean(track.lyrics?.trim()),
     }).catch(() => {});
   }, [playableUrl, toggleTrack, track]);
 

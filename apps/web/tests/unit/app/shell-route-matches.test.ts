@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   isChatShellRoute,
+  isLibraryShellRoute,
+  isLyricsShellRoute,
   isReleasesShellRoute,
   resolveAppShellRequestPath,
   shouldRedirectToOnboarding,
@@ -78,6 +80,22 @@ describe('isChatShellRoute', () => {
   });
 });
 
+describe('isLyricsShellRoute', () => {
+  it('matches the lyrics route', () => {
+    expect(isLyricsShellRoute(APP_ROUTES.LYRICS)).toBe(true);
+  });
+
+  it('matches lyrics track subroutes', () => {
+    expect(isLyricsShellRoute(`${APP_ROUTES.LYRICS}/track-abc`)).toBe(true);
+  });
+});
+
+describe('isLibraryShellRoute', () => {
+  it('matches the dashboard library route', () => {
+    expect(isLibraryShellRoute(APP_ROUTES.DASHBOARD_LIBRARY)).toBe(true);
+  });
+});
+
 describe('shouldUseEssentialShellData', () => {
   it('returns true for chat routes', () => {
     expect(shouldUseEssentialShellData(APP_ROUTES.CHAT)).toBe(true);
@@ -85,6 +103,13 @@ describe('shouldUseEssentialShellData', () => {
 
   it('returns true for releases routes', () => {
     expect(shouldUseEssentialShellData('/app/dashboard/releases')).toBe(true);
+  });
+
+  it('returns true for lyrics and library routes', () => {
+    expect(shouldUseEssentialShellData(APP_ROUTES.LYRICS)).toBe(true);
+    expect(shouldUseEssentialShellData(APP_ROUTES.DASHBOARD_LIBRARY)).toBe(
+      true
+    );
   });
 
   it('returns true for dashboard root', () => {
@@ -100,6 +125,8 @@ describe('shouldRedirectToOnboarding', () => {
   it('returns true for lightweight shell routes', () => {
     expect(shouldRedirectToOnboarding(APP_ROUTES.CHAT)).toBe(true);
     expect(shouldRedirectToOnboarding('/app/dashboard/releases')).toBe(true);
+    expect(shouldRedirectToOnboarding(APP_ROUTES.LYRICS)).toBe(true);
+    expect(shouldRedirectToOnboarding(APP_ROUTES.DASHBOARD_LIBRARY)).toBe(true);
   });
 
   it('returns false for null', () => {

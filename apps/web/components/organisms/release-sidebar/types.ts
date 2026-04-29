@@ -159,4 +159,6 @@ export interface ReleaseSidebarProps {
   readonly analyticsOverride?: ReleaseSidebarAnalytics | null;
   /** Disable live credits fetching for auth-free mirrors like /demo. */
   readonly showCredits?: boolean;
+  /** Enables the gated Design V1 release drawer treatment. */
+  readonly designV1?: boolean;
 }

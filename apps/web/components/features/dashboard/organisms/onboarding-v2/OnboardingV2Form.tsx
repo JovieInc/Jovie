@@ -245,6 +245,7 @@ interface OnboardingV2FormProps {
   readonly shouldAutoSubmitHandle?: boolean;
   readonly userEmail?: string | null;
   readonly userId: string;
+  readonly designV1?: boolean;
 }
 
 interface StepFrameProps {
@@ -777,6 +778,7 @@ export function OnboardingV2Form({
   shouldAutoSubmitHandle = false,
   userEmail = null,
   userId,
+  designV1 = false,
 }: Readonly<OnboardingV2FormProps>) {
   const router = useRouter();
 
@@ -2243,6 +2245,7 @@ export function OnboardingV2Form({
       }
       sidebarTitle='Jovie Setup'
       stageVariant='flat'
+      visualVariant={designV1 ? 'v1' : 'default'}
       data-testid='onboarding-experience-shell'
     >
       {stepContent}

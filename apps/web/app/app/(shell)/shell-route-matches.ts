@@ -64,6 +64,22 @@ export function isReleasesShellRoute(pathname: string | null): boolean {
   );
 }
 
+export function isLyricsShellRoute(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return (
+    pathname === APP_ROUTES.LYRICS ||
+    pathname.startsWith(`${APP_ROUTES.LYRICS}/`)
+  );
+}
+
+export function isLibraryShellRoute(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return (
+    pathname === APP_ROUTES.DASHBOARD_LIBRARY ||
+    pathname.startsWith(`${APP_ROUTES.DASHBOARD_LIBRARY}/`)
+  );
+}
+
 function isDashboardSubRoute(pathname: string | null): boolean {
   if (!pathname) return false;
   return pathname.startsWith(`${APP_ROUTES.LEGACY_DASHBOARD}/`);
@@ -73,6 +89,8 @@ function isLightweightShellRoute(pathname: string | null): boolean {
   return (
     isChatShellRoute(pathname) ||
     isReleasesShellRoute(pathname) ||
+    isLyricsShellRoute(pathname) ||
+    isLibraryShellRoute(pathname) ||
     isDashboardSubRoute(pathname)
   );
 }
