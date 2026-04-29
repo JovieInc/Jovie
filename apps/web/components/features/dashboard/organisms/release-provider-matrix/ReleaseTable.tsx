@@ -54,6 +54,7 @@ export function ReleaseTable({
   groupByYear = false,
   selectedReleaseId,
   selectedTrackId,
+  designV1 = false,
   refreshingReleaseId,
   flashedReleaseId,
   isSmartLinkLocked,
@@ -106,7 +107,13 @@ export function ReleaseTable({
       const isFlashed = flashedReleaseId === row.id;
 
       let baseClassName: string;
-      if (isSelected) {
+      if (designV1 && isSelected) {
+        baseClassName =
+          'border-transparent bg-(--linear-bg-surface-1)/80 shadow-[inset_3px_0_0_0_var(--linear-accent),inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_24%,transparent)] hover:bg-(--linear-bg-surface-1)/90 focus-within:bg-(--linear-bg-surface-1)';
+      } else if (designV1) {
+        baseClassName =
+          'border-transparent bg-transparent hover:bg-(--linear-bg-surface-1)/55 focus-within:bg-(--linear-bg-surface-1)/65 transition-[background-color,box-shadow,color] duration-150 ease-out [&:hover_span]:text-primary-token [&:hover_p]:text-primary-token';
+      } else if (isSelected) {
         baseClassName =
           'bg-[color-mix(in_oklab,var(--linear-row-selected)_55%,transparent)] shadow-[inset_3px_0_0_0_var(--linear-accent)] hover:bg-[color-mix(in_oklab,var(--linear-row-selected)_65%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-selected)_72%,transparent)] focus-within:shadow-[inset_3px_0_0_0_var(--linear-accent),inset_0_0_0_1px_var(--linear-border-focus)]';
       } else {
@@ -122,7 +129,8 @@ export function ReleaseTable({
         : '';
 
       return [
-        'rounded-none transition-[background-color,box-shadow] duration-150 ease-out',
+        designV1 ? 'rounded-md' : 'rounded-none',
+        'transition-[background-color,box-shadow] duration-150 ease-out',
         baseClassName,
         refreshClassName,
         flashClassName,
@@ -130,7 +138,7 @@ export function ReleaseTable({
         .filter(Boolean)
         .join(' ');
     },
-    [selectedReleaseId, refreshingReleaseId, flashedReleaseId]
+    [designV1, selectedReleaseId, refreshingReleaseId, flashedReleaseId]
   );
 
   // Keyboard navigation callback - open sidebar for focused row
@@ -151,11 +159,11 @@ export function ReleaseTable({
     const releaseColumn = columnHelper.accessor('title', {
       id: 'release',
       header: 'Release',
-      cell: createReleaseCellRenderer(artistName, onEdit),
+      cell: createReleaseCellRenderer(artistName, onEdit, designV1),
       minSize: 200,
       size: 9999, // Large value to make it flex and fill available space
       enableSorting: false,
-      meta: { className: 'pl-4 pr-2.5' },
+      meta: { className: designV1 ? 'pl-3 pr-2' : 'pl-4 pr-2.5' },
     });
 
     const rightMetaColumn = columnHelper.display({
@@ -164,15 +172,20 @@ export function ReleaseTable({
       header: MetaHeaderCell,
       cell: createRightMetaCellRenderer(
         isSmartLinkLocked,
-        getSmartLinkLockReason
+        getSmartLinkLockReason,
+        designV1
       ),
-      size: 260,
+      size: designV1 ? 390 : 260,
       minSize: 100,
-      meta: { className: 'max-sm:hidden pl-2 pr-4 sm:table-cell' },
+      meta: {
+        className: designV1
+          ? 'max-sm:hidden pl-2 pr-3 sm:table-cell'
+          : 'max-sm:hidden pl-2 pr-4 sm:table-cell',
+      },
     });
 
     return [releaseColumn, rightMetaColumn];
-  }, [artistName, onEdit, isSmartLinkLocked, getSmartLinkLockReason]);
+  }, [artistName, onEdit, designV1, isSmartLinkLocked, getSmartLinkLockReason]);
 
   // Transform columnVisibility to TanStack format (always show release)
   const tanstackColumnVisibility = useMemo(() => {
@@ -225,6 +238,7 @@ export function ReleaseTable({
           flashedReleaseId={flashedReleaseId}
           selectedReleaseId={selectedReleaseId}
           selectedTrackId={selectedTrackId}
+          designV1={designV1}
           isSmartLinkLocked={isSmartLinkLocked}
           getSmartLinkLockReason={getSmartLinkLockReason}
           onTrackClick={onTrackClick}
@@ -277,14 +291,22 @@ export function ReleaseTable({
       rowHeight={rowHeight}
       minWidth={minWidth}
       hideHeader
-      className='text-app text-primary-token'
-      containerClassName='h-full px-2.5 pb-2.5 pt-0.5 md:px-3 md:pb-3 md:pt-1'
+      className={
+        designV1
+          ? 'text-[12.5px] text-primary-token'
+          : 'text-app text-primary-token'
+      }
+      containerClassName={
+        designV1
+          ? 'h-full px-2 pb-2 pt-1 md:px-2.5 md:pb-2.5 md:pt-1.5'
+          : 'h-full px-2.5 pb-2.5 pt-0.5 md:px-3 md:pb-3 md:pt-1'
+      }
       columnVisibility={tanstackColumnVisibility}
       onFocusedRowChange={handleFocusedRowChange}
       skeletonRows={14}
       skeletonColumnConfig={[
         { variant: 'release', width: '100%' },
-        { variant: 'meta', width: '204px' },
+        { variant: 'meta', width: designV1 ? '320px' : '204px' },
       ]}
       groupingConfig={groupingConfig}
       emptyState={

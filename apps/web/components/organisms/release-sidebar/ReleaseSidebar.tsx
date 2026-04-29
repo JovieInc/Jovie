@@ -8,7 +8,7 @@
  */
 
 import type { CommonDropdownItem } from '@jovie/ui';
-import { Pause, Play, Plus, RefreshCw } from 'lucide-react';
+import { Activity, Pause, Play, Plus, RefreshCw } from 'lucide-react';
 import {
   type ReactNode,
   useCallback,
@@ -61,6 +61,7 @@ import { dropDateMeta } from '@/lib/format-drop-date';
 import { usePlanGate } from '@/lib/queries';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { cn } from '@/lib/utils';
+import { formatTimeAgo } from '@/lib/utils/date-formatting';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 import { ReleaseDspLinks } from './ReleaseDspLinks';
 import { ReleaseLyricsSection } from './ReleaseLyricsSection';
@@ -460,6 +461,68 @@ function ReleaseArtworkDownloadsSetting({
   );
 }
 
+function ReleaseActivitySection({
+  release,
+  providerConfig,
+}: {
+  readonly release: Release;
+  readonly providerConfig: Record<
+    ProviderKey,
+    { label: string; accent: string }
+  >;
+}) {
+  const activityRows = release.providers
+    .map(provider => {
+      if (!provider.updatedAt) return null;
+      const label = providerConfig[provider.key]?.label || provider.label;
+      return {
+        providerKey: provider.key,
+        label,
+        updatedAt: provider.updatedAt,
+        timestamp: new Date(provider.updatedAt).getTime(),
+      };
+    })
+    .filter((row): row is NonNullable<typeof row> => Boolean(row))
+    .filter(row => Number.isFinite(row.timestamp))
+    .sort((a, b) => b.timestamp - a.timestamp)
+    .slice(0, 3);
+
+  if (activityRows.length === 0) {
+    return null;
+  }
+
+  return (
+    <DrawerSection
+      title='Activity'
+      surface='plain'
+      collapsible={false}
+      testId='release-activity-card'
+      contentClassName='p-0'
+    >
+      <div className='divide-y divide-(--linear-app-frame-seam)'>
+        {activityRows.map(row => (
+          <div
+            key={`${row.providerKey}-${row.updatedAt}`}
+            className='flex items-center gap-2.5 px-3 py-2.5'
+          >
+            <span className='flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-1 text-tertiary-token'>
+              <Activity className='h-3 w-3' aria-hidden='true' />
+            </span>
+            <div className='min-w-0 flex-1'>
+              <p className='truncate text-[12px] font-caption text-primary-token'>
+                {row.label} Link updated
+              </p>
+              <p className='mt-0.5 text-[10.5px] text-tertiary-token'>
+                {formatTimeAgo(row.updatedAt)}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </DrawerSection>
+  );
+}
+
 export function ReleaseSidebar({
   release,
   mode,
@@ -493,6 +556,7 @@ export function ReleaseSidebar({
   analyticsOverride,
   showCredits = true,
   onCanvasStatusUpdate,
+  designV1 = false,
 }: ReleaseSidebarProps) {
   const {
     isAddingLink,
@@ -817,6 +881,12 @@ export function ReleaseSidebar({
               canEditCanvasStatus ? handleCanvasStatusChange : undefined
             }
           />
+          {designV1 ? (
+            <ReleaseActivitySection
+              release={release}
+              providerConfig={providerConfig}
+            />
+          ) : null}
           {isEditable ? (
             <DrawerSection
               title='Artwork'
