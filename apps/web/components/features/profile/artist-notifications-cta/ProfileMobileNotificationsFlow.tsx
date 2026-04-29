@@ -11,7 +11,13 @@ import {
   X,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { type CSSProperties, useEffect, useMemo, useState } from 'react';
+import {
+  type CSSProperties,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { createPortal } from 'react-dom';
 import { OtpInput } from '@/features/auth/atoms/otp-input';
 import { cn } from '@/lib/utils';
@@ -177,10 +183,30 @@ function PrimaryButton({
   onClick: () => void;
   disabled?: boolean;
 }>) {
+  const handledPointerActivationRef = useRef(false);
+
+  const activate = () => {
+    if (disabled) return;
+    onClick();
+  };
+
   return (
     <button
       type='button'
-      onClick={onClick}
+      onPointerDown={event => {
+        if (disabled || (event.pointerType === 'mouse' && event.button !== 0)) {
+          return;
+        }
+        handledPointerActivationRef.current = true;
+        activate();
+      }}
+      onClick={() => {
+        if (handledPointerActivationRef.current) {
+          handledPointerActivationRef.current = false;
+          return;
+        }
+        activate();
+      }}
       disabled={disabled}
       className='inline-flex h-14 w-full items-center justify-center rounded-[18px] bg-white/14 px-5 text-[15px] font-semibold tracking-[-0.02em] text-white transition-colors duration-200 hover:bg-white/18 disabled:cursor-not-allowed disabled:opacity-60'
     >
@@ -248,7 +274,7 @@ function LabeledInput({
         onChange={event => onChange(event.target.value)}
         onKeyDown={onKeyDown}
         disabled={disabled}
-        className='h-14 w-full rounded-[18px] border border-white/10 bg-white/[0.03] px-4 text-[15px] font-medium tracking-[-0.015em] text-white placeholder:text-white/28 focus:border-white/18 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60'
+        className='h-14 w-full touch-manipulation rounded-[18px] border border-white/10 bg-white/[0.03] px-4 text-[16px] font-medium tracking-[-0.015em] text-white placeholder:text-white/28 focus:border-white/18 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60'
       />
     </label>
   );
@@ -288,7 +314,7 @@ function BirthdaySelectors({
           data-testid='mobile-birthday-month'
           value={parts.month}
           onChange={event => updatePart('month', event.target.value)}
-          className='h-14 w-full appearance-none rounded-[18px] border border-white/10 bg-white/[0.03] px-4 text-[15px] font-medium tracking-[-0.015em] text-white focus:border-white/18 focus:outline-none'
+          className='h-14 w-full touch-manipulation appearance-none rounded-[18px] border border-white/10 bg-white/[0.03] px-4 text-[16px] font-medium tracking-[-0.015em] text-white focus:border-white/18 focus:outline-none'
         >
           <option value=''>Month</option>
           {MONTH_OPTIONS.map((month, index) => (
@@ -307,7 +333,7 @@ function BirthdaySelectors({
           data-testid='mobile-birthday-day'
           value={parts.day}
           onChange={event => updatePart('day', event.target.value)}
-          className='h-14 w-full appearance-none rounded-[18px] border border-white/10 bg-white/[0.03] px-4 text-[15px] font-medium tracking-[-0.015em] text-white focus:border-white/18 focus:outline-none'
+          className='h-14 w-full touch-manipulation appearance-none rounded-[18px] border border-white/10 bg-white/[0.03] px-4 text-[16px] font-medium tracking-[-0.015em] text-white focus:border-white/18 focus:outline-none'
         >
           <option value=''>Day</option>
           {Array.from({ length: 31 }, (_, index) => index + 1).map(day => (
@@ -326,7 +352,7 @@ function BirthdaySelectors({
           data-testid='mobile-birthday-year'
           value={parts.year}
           onChange={event => updatePart('year', event.target.value)}
-          className='h-14 w-full appearance-none rounded-[18px] border border-white/10 bg-white/[0.03] px-4 text-[15px] font-medium tracking-[-0.015em] text-white focus:border-white/18 focus:outline-none'
+          className='h-14 w-full touch-manipulation appearance-none rounded-[18px] border border-white/10 bg-white/[0.03] px-4 text-[16px] font-medium tracking-[-0.015em] text-white focus:border-white/18 focus:outline-none'
         >
           <option value=''>Year</option>
           {yearOptions.map(year => (
@@ -547,6 +573,7 @@ export function ProfileMobileNotificationsFlow({
               aria-label='Enter 6-digit verification code'
               disabled={isSubmitting}
               error={Boolean(error)}
+              size='compact'
               showProgressDots={false}
             />
           </div>

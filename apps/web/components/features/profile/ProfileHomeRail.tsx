@@ -23,6 +23,7 @@ import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-p
 import { getProfileReleaseVisibility } from '@/lib/profile/release-visibility';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { cn } from '@/lib/utils';
+import { isDefaultAvatarUrl } from '@/lib/utils/dsp-images';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
 import type { Artist } from '@/types/db';
 
@@ -248,6 +249,32 @@ function CircleAction({
   );
 }
 
+function isDefaultAppIconUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+
+  try {
+    const parsed = new URL(url, 'http://localhost');
+    return parsed.pathname.startsWith('/android-chrome-');
+  } catch {
+    return url.startsWith('/android-chrome-');
+  }
+}
+
+function resolveRailImageUrl(
+  imageUrl: string | null | undefined,
+  fallbackVariant: 'release' | 'avatar'
+) {
+  if (fallbackVariant === 'avatar' && isDefaultAvatarUrl(imageUrl)) {
+    return null;
+  }
+
+  if (fallbackVariant === 'release' && isDefaultAppIconUrl(imageUrl)) {
+    return null;
+  }
+
+  return imageUrl;
+}
+
 function ImageLedRailCard({
   dataTestId,
   ariaLabel,
@@ -260,6 +287,8 @@ function ImageLedRailCard({
   actionIcon,
   actionLabel,
   dataState,
+  fallbackVariant = 'release',
+  priority = false,
 }: Readonly<{
   dataTestId: string;
   ariaLabel: string;
@@ -272,7 +301,11 @@ function ImageLedRailCard({
   actionIcon: ReactNode;
   actionLabel?: string;
   dataState?: string;
+  fallbackVariant?: 'release' | 'avatar';
+  priority?: boolean;
 }>) {
+  const resolvedImageUrl = resolveRailImageUrl(imageUrl, fallbackVariant);
+
   return (
     <RailCardShell
       href={href}
@@ -283,12 +316,13 @@ function ImageLedRailCard({
     >
       <div className='absolute inset-0'>
         <ImageWithFallback
-          src={imageUrl}
+          src={resolvedImageUrl}
           alt={title}
           fill
+          priority={priority}
           sizes='280px'
           className='object-cover object-center'
-          fallbackVariant='release'
+          fallbackVariant={fallbackVariant}
           fallbackClassName='bg-surface-2'
         />
       </div>
@@ -554,6 +588,7 @@ export function ProfileHomeRail({
                     ? 'Remind Me'
                     : 'Listen Now'
                 }
+                priority={index === 0}
               />
             ) : null}
 
@@ -581,6 +616,10 @@ export function ProfileHomeRail({
                 subtitle='Open Playlist'
                 actionIcon={<Play className='h-5 w-5 fill-current' />}
                 actionLabel='Listen Now'
+                fallbackVariant={
+                  featuredPlaylistFallback.imageUrl ? 'release' : 'avatar'
+                }
+                priority={index === 0}
               />
             ) : null}
 
@@ -597,6 +636,8 @@ export function ProfileHomeRail({
                 subtitle='Listen Across Your Preferred Platforms'
                 actionIcon={<Play className='h-5 w-5 fill-current' />}
                 actionLabel='Listen Now'
+                fallbackVariant='avatar'
+                priority={index === 0}
               />
             ) : null}
           </div>

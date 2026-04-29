@@ -5,6 +5,7 @@ import { useCallback, useRef, useState } from 'react';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { SocialLink } from '@/components/molecules/SocialLink';
 import { BASE_URL } from '@/constants/app';
+import { isDefaultAvatarUrl } from '@/lib/utils/dsp-images';
 import type { Artist, LegacySocialLink } from '@/types/db';
 
 type HeroRelease = {
@@ -69,6 +70,10 @@ export function ArtistHero({
   const eyebrow = getReleaseEyebrow(latestRelease);
   const [shareSuccess, setShareSuccess] = useState(false);
   const shareTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fallbackHeroImageUrl = heroImageUrl ?? artist.image_url;
+  const resolvedHeroImageUrl = isDefaultAvatarUrl(fallbackHeroImageUrl)
+    ? null
+    : fallbackHeroImageUrl;
 
   const handleShare = useCallback(async () => {
     const profileUrl = `${BASE_URL}/${artist.handle}`;
@@ -117,7 +122,7 @@ export function ArtistHero({
     >
       <div className='absolute inset-0'>
         <ImageWithFallback
-          src={heroImageUrl ?? artist.image_url}
+          src={resolvedHeroImageUrl}
           alt={artist.name}
           fill
           priority={true}

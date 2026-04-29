@@ -664,12 +664,9 @@ describe('ProfileCompactTemplate', () => {
     fireEvent.click(screen.getByTestId('profile-hero-alerts-row'));
 
     expect(revealNotifications).toHaveBeenCalledTimes(1);
-    await waitFor(() => {
-      expect(screen.getByTestId('mock-primary-tab-panel')).toHaveAttribute(
-        'data-mode',
-        'subscribe'
-      );
-    });
+    expect(
+      screen.queryByTestId('mock-primary-tab-panel')
+    ).not.toBeInTheDocument();
   });
 
   it('hides the compact hero alerts row for returning subscribers', async () => {
