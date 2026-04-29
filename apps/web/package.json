@@ -119,6 +119,7 @@
     "drizzle:up": "drizzle-kit up",
     "tailwind:check": "node scripts/tailwind-guard.mjs",
     "tailwind:guard": "node scripts/tailwind-guard.mjs",
+    "mobile-overflow:guard": "node scripts/mobile-overflow-guard.mjs",
     "generate": "plop",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
