@@ -52,16 +52,21 @@ export function ArtistProfileLandingPage({
   }
 
   return (
-    // frame-skin scopes the cinematic editorial monochrome design layer to
-    // /artist-profiles. Tokens (palette, hairline borders, magazine padding,
-    // film grain, edge glow) live in apps/web/app/(home)/home.css.
-    <div className='frame-skin'>
-      <ArtistProfileHeroAdaptiveIntro
-        hero={copy.hero}
-        adaptive={copy.adaptive}
-        phoneCaption={copy.hero.phoneCaption}
-        phoneSubcaption={copy.hero.phoneSubcaption}
-      />
+    // The cinematic frame-skin design layer is scoped per-section instead of
+    // wrapping the whole page, so each section can iterate independently and
+    // sections that haven't adopted the frame.io treatment render in their
+    // pre-existing style. Today only the hero adaptive intro opts in (it
+    // anchors the page with the editorial top edge-glow + film grain).
+    // Add `frame-skin` to other section wrappers as they migrate.
+    <>
+      <div className='frame-skin'>
+        <ArtistProfileHeroAdaptiveIntro
+          hero={copy.hero}
+          adaptive={copy.adaptive}
+          phoneCaption={copy.hero.phoneCaption}
+          phoneSubcaption={copy.hero.phoneSubcaption}
+        />
+      </div>
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.outcomes}>
         <ArtistProfileOutcomesCarousel outcomes={copy.outcomes} />
       </div>
@@ -111,6 +116,6 @@ export function ArtistProfileLandingPage({
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.finalCta}>
         <ArtistProfileFinalCta finalCta={copy.finalCta} roomy />
       </div>
-    </div>
+    </>
   );
 }
