@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 const ORIGINAL_DEMO_RECORDING = process.env.DEMO_RECORDING;
 const ORIGINAL_PUBLIC_DEMO_RECORDING = process.env.NEXT_PUBLIC_DEMO_RECORDING;
 const ORIGINAL_DISABLE_TOOLBAR = process.env.NEXT_DISABLE_TOOLBAR;
+const ORIGINAL_E2E_MODE = process.env.NEXT_PUBLIC_E2E_MODE;
+const ORIGINAL_TEST_AUTH_BYPASS = process.env.E2E_USE_TEST_AUTH_BYPASS;
 
 async function loadModule() {
   vi.resetModules();
@@ -26,6 +28,18 @@ afterEach(() => {
     delete process.env.NEXT_DISABLE_TOOLBAR;
   } else {
     process.env.NEXT_DISABLE_TOOLBAR = ORIGINAL_DISABLE_TOOLBAR;
+  }
+
+  if (ORIGINAL_E2E_MODE === undefined) {
+    delete process.env.NEXT_PUBLIC_E2E_MODE;
+  } else {
+    process.env.NEXT_PUBLIC_E2E_MODE = ORIGINAL_E2E_MODE;
+  }
+
+  if (ORIGINAL_TEST_AUTH_BYPASS === undefined) {
+    delete process.env.E2E_USE_TEST_AUTH_BYPASS;
+  } else {
+    process.env.E2E_USE_TEST_AUTH_BYPASS = ORIGINAL_TEST_AUTH_BYPASS;
   }
 
   delete document.documentElement.dataset.demoRecording;
@@ -97,6 +111,41 @@ describe('demo recording helpers', () => {
         devEnv: 'development',
         isDemoRecording: false,
         isE2EClientRuntime: false,
+      })
+    ).toEqual({
+      isDemoRecording: false,
+      isDevChromeDisabled: false,
+      shouldRenderCookieBanner: true,
+      shouldRenderDevChrome: true,
+    });
+  });
+
+  it('suppresses dev chrome when NEXT_PUBLIC_E2E_MODE is set', async () => {
+    process.env.NEXT_PUBLIC_E2E_MODE = '1';
+    const { getRootLayoutChromeState } = await loadModule();
+
+    expect(
+      getRootLayoutChromeState({
+        devEnv: 'development',
+        isDemoRecording: false,
+      })
+    ).toEqual({
+      isDemoRecording: false,
+      isDevChromeDisabled: false,
+      shouldRenderCookieBanner: true,
+      shouldRenderDevChrome: false,
+    });
+  });
+
+  it('keeps dev chrome when only the test auth bypass is enabled', async () => {
+    delete process.env.NEXT_PUBLIC_E2E_MODE;
+    process.env.E2E_USE_TEST_AUTH_BYPASS = '1';
+    const { getRootLayoutChromeState } = await loadModule();
+
+    expect(
+      getRootLayoutChromeState({
+        devEnv: 'development',
+        isDemoRecording: false,
       })
     ).toEqual({
       isDemoRecording: false,

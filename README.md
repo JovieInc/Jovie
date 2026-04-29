@@ -141,10 +141,10 @@ JOVIE_ENABLE_LOCAL_SENTRY=1 pnpm run dev:web:fast
 JOVIE_DEV_RESET_NEXT_CACHE=1 pnpm run benchmark:dev
 ```
 
-For authenticated local browser QA, open:
+For authenticated local browser QA, open the dashboard-ready persona:
 
 ```text
-/api/dev/test-auth/enter?persona=creator&redirect=/app/dashboard/earnings
+/api/dev/test-auth/enter?persona=creator-ready&redirect=/app/dashboard/earnings
 ```
 
 3. **Set up Doppler (Recommended)**

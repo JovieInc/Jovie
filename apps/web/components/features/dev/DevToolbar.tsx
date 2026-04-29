@@ -24,6 +24,7 @@ import {
   Sun,
   Trash2,
   UserCheck,
+  UserRound,
   Wrench,
   X,
 } from 'lucide-react';
@@ -123,6 +124,47 @@ const ENV_COLORS: Record<string, string> = {
   production: 'bg-red-500/20 text-red-400 border-red-500/30',
   preview: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
 };
+
+type DevTestAuthPersona = 'creator' | 'creator-ready' | 'admin';
+
+type DevTestAuthSessionStatus = {
+  readonly enabled: boolean;
+  readonly trustedHost: boolean;
+  readonly active: boolean;
+  readonly persona: DevTestAuthPersona | null;
+  readonly userId: string | null;
+  readonly email: string | null;
+  readonly profilePath: string | null;
+  readonly reason: string | null;
+};
+
+type PersonaActionState = DevTestAuthPersona | 'exit' | null;
+
+const PERSONA_OPTIONS: readonly {
+  readonly persona: DevTestAuthPersona;
+  readonly label: string;
+  readonly meta: string;
+  readonly description: string;
+}[] = [
+  {
+    persona: 'creator',
+    label: 'Free Creator',
+    meta: 'Free, Non-Admin',
+    description: 'Incomplete onboarding baseline.',
+  },
+  {
+    persona: 'creator-ready',
+    label: 'Pro Creator',
+    meta: 'Pro, Non-Admin',
+    description: 'Dashboard-ready QA baseline.',
+  },
+  {
+    persona: 'admin',
+    label: 'Admin',
+    meta: 'Admin Shell',
+    description: 'Admin navigation and access baseline.',
+  },
+];
 
 type AsyncActionState = 'idle' | 'loading' | 'done' | 'error';
 
@@ -244,6 +286,13 @@ export function DevToolbar({
   const [clearSessionState, setClearSessionState] = useState<
     'idle' | 'loading' | 'done' | 'error'
   >('idle');
+  const [personaPanelOpen, setPersonaPanelOpen] = useState(false);
+  const [personaSession, setPersonaSession] =
+    useState<DevTestAuthSessionStatus | null>(null);
+  const [personaLoading, setPersonaLoading] = useState(false);
+  const [personaError, setPersonaError] = useState<string | null>(null);
+  const [personaAction, setPersonaAction] = useState<PersonaActionState>(null);
+  const personaStatusAbortRef = useRef<AbortController | null>(null);
   const [swEnabled, setSwEnabled] = useState(false);
   const [promoteState, setPromoteState] = useState<
     'idle' | 'checking' | 'ready' | 'promoting' | 'done' | 'error'
@@ -370,6 +419,57 @@ export function DevToolbar({
     };
   }, [env, hidden]);
 
+  const refreshPersonaSession = useCallback(async () => {
+    if (env === 'production') return;
+
+    personaStatusAbortRef.current?.abort();
+    const controller = new AbortController();
+    personaStatusAbortRef.current = controller;
+    setPersonaLoading(true);
+    setPersonaError(null);
+    try {
+      const res = await fetch('/api/dev/test-auth/session', {
+        signal: controller.signal,
+      });
+      const data = (await res.json()) as DevTestAuthSessionStatus;
+      if (controller.signal.aborted) return;
+      if (!res.ok) {
+        setPersonaError(data.reason ?? 'Persona status unavailable');
+        return;
+      }
+      setPersonaSession(data);
+    } catch (error) {
+      if (
+        controller.signal.aborted ||
+        (error instanceof DOMException && error.name === 'AbortError')
+      ) {
+        return;
+      }
+      setPersonaError('Persona status unavailable');
+    } finally {
+      if (personaStatusAbortRef.current === controller) {
+        personaStatusAbortRef.current = null;
+        if (!controller.signal.aborted) {
+          setPersonaLoading(false);
+        }
+      }
+    }
+  }, [env]);
+
+  useEffect(() => {
+    if (!personaPanelOpen) {
+      personaStatusAbortRef.current?.abort();
+      personaStatusAbortRef.current = null;
+      setPersonaLoading(false);
+      return;
+    }
+    void refreshPersonaSession();
+    return () => {
+      personaStatusAbortRef.current?.abort();
+      personaStatusAbortRef.current = null;
+    };
+  }, [personaPanelOpen, refreshPersonaSession]);
+
   async function handlePromote() {
     setPromoteState('promoting');
     try {
@@ -386,6 +486,58 @@ export function DevToolbar({
     } catch {
       setPromoteState('error');
       setTimeout(() => setPromoteState('ready'), 3000);
+    }
+  }
+
+  async function handleSelectPersona(persona: DevTestAuthPersona) {
+    if (personaAction || personaSession?.persona === persona) return;
+
+    setPersonaAction(persona);
+    setPersonaError(null);
+    try {
+      const res = await fetch('/api/dev/test-auth/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ persona }),
+      });
+      const data = (await res.json().catch(() => null)) as {
+        success?: boolean;
+        error?: string;
+      } | null;
+      if (res.ok && data?.success) {
+        globalThis.location.reload();
+        return;
+      }
+      setPersonaError(data?.error ?? 'Persona switch failed');
+    } catch {
+      setPersonaError('Persona switch failed');
+    } finally {
+      setPersonaAction(null);
+    }
+  }
+
+  async function handleExitPersona() {
+    if (personaAction) return;
+
+    setPersonaAction('exit');
+    setPersonaError(null);
+    try {
+      const res = await fetch('/api/dev/test-auth/session', {
+        method: 'DELETE',
+      });
+      const data = (await res.json().catch(() => null)) as {
+        success?: boolean;
+        error?: string;
+      } | null;
+      if (res.ok && data?.success) {
+        globalThis.location.reload();
+        return;
+      }
+      setPersonaError(data?.error ?? 'Exit persona failed');
+    } catch {
+      setPersonaError('Exit persona failed');
+    } finally {
+      setPersonaAction(null);
     }
   }
 
@@ -858,6 +1010,132 @@ export function DevToolbar({
             <ExternalLink size={11} />
             <span className='max-sm:hidden sm:inline text-[10px]'>Admin</span>
           </Link>
+
+          {env !== 'production' && (
+            <div className='relative'>
+              <button
+                type='button'
+                onClick={() => setPersonaPanelOpen(value => !value)}
+                title='Switch test persona'
+                aria-label='Test Persona'
+                aria-expanded={personaPanelOpen}
+                aria-haspopup='menu'
+                className={`flex items-center gap-1 px-1.5 py-1 rounded text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)] transition-colors ${
+                  personaSession?.active
+                    ? 'text-[var(--color-accent)] bg-[var(--color-accent)]/10'
+                    : ''
+                }`}
+              >
+                <UserRound size={11} />
+                <span className='max-sm:hidden sm:inline text-[10px]'>
+                  Persona
+                </span>
+              </button>
+
+              {personaPanelOpen && (
+                <div
+                  role='menu'
+                  className='absolute bottom-full right-0 mb-2 w-72 overflow-hidden rounded-md border border-[var(--color-border-default)] bg-[var(--color-bg-surface-1)] text-[var(--color-text-primary)] shadow-lg'
+                >
+                  <div className='border-b border-[var(--color-border-subtle)] px-3 py-2'>
+                    <div className='flex items-center justify-between gap-2'>
+                      <span className='text-[11px] font-medium'>
+                        Test Persona
+                      </span>
+                      {personaLoading && (
+                        <Loader2
+                          size={11}
+                          className='animate-spin text-[var(--color-text-quaternary-token)]'
+                        />
+                      )}
+                    </div>
+                    <p className='mt-1 truncate text-[10px] text-[var(--color-text-quaternary-token)]'>
+                      {personaSession?.active
+                        ? `Active: ${personaSession.email ?? personaSession.userId ?? 'test user'}`
+                        : 'No test persona active'}
+                    </p>
+                    {personaSession?.active && personaSession.profilePath && (
+                      <p className='mt-0.5 truncate text-[10px] text-[var(--color-text-quaternary-token)]'>
+                        {personaSession.profilePath}
+                      </p>
+                    )}
+                  </div>
+
+                  {personaSession &&
+                  (!personaSession.enabled || !personaSession.trustedHost) ? (
+                    <div className='px-3 py-3 text-[10px] text-[var(--color-text-tertiary)]'>
+                      {personaSession.reason ??
+                        'Test personas are unavailable on this host.'}
+                    </div>
+                  ) : (
+                    <div className='py-1'>
+                      {PERSONA_OPTIONS.map(option => {
+                        const isActive =
+                          personaSession?.persona === option.persona;
+                        const isSwitching = personaAction === option.persona;
+                        return (
+                          <button
+                            key={option.persona}
+                            type='button'
+                            role='menuitem'
+                            disabled={Boolean(personaAction) || isActive}
+                            onClick={() => handleSelectPersona(option.persona)}
+                            className='flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-[var(--color-bg-surface-2)] disabled:cursor-default disabled:opacity-75'
+                          >
+                            <span className='flex size-4 shrink-0 items-center justify-center text-[var(--color-accent)]'>
+                              {isSwitching ? (
+                                <Loader2 size={12} className='animate-spin' />
+                              ) : isActive ? (
+                                <Check size={12} />
+                              ) : null}
+                            </span>
+                            <span className='min-w-0 flex-1'>
+                              <span className='flex items-center justify-between gap-2'>
+                                <span className='truncate text-[11px] font-medium'>
+                                  {option.label}
+                                </span>
+                                <span className='shrink-0 text-[9px] text-[var(--color-text-quaternary-token)]'>
+                                  {option.meta}
+                                </span>
+                              </span>
+                              <span className='block truncate text-[10px] text-[var(--color-text-tertiary)]'>
+                                {option.description}
+                              </span>
+                            </span>
+                          </button>
+                        );
+                      })}
+
+                      {personaSession?.active && (
+                        <button
+                          type='button'
+                          role='menuitem'
+                          disabled={Boolean(personaAction)}
+                          onClick={handleExitPersona}
+                          className='mt-1 flex w-full items-center gap-2 border-t border-[var(--color-border-subtle)] px-3 py-2 text-left text-[11px] text-[var(--color-text-tertiary)] transition-colors hover:bg-[var(--color-bg-surface-2)] hover:text-[var(--color-text-primary)] disabled:cursor-not-allowed disabled:opacity-50'
+                        >
+                          <span className='flex size-4 shrink-0 items-center justify-center'>
+                            {personaAction === 'exit' ? (
+                              <Loader2 size={12} className='animate-spin' />
+                            ) : (
+                              <X size={12} />
+                            )}
+                          </span>
+                          Exit Persona
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {personaError && (
+                    <div className='border-t border-[var(--color-border-subtle)] px-3 py-2 text-[10px] text-red-400'>
+                      {personaError}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Plan toggle — self-contained, safe outside QueryClientProvider */}
           <PlanToggle />
