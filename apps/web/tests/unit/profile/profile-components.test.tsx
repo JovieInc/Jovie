@@ -331,7 +331,7 @@ describe('LatestReleaseCard', () => {
     );
 
     expect(screen.getByText('Midnight Dreams')).toBeDefined();
-    expect(screen.getByText('Listen')).toBeDefined();
+    expect(screen.getByText('Listen Now')).toBeDefined();
   });
 
   it('displays release type with proper capitalization', async () => {
@@ -433,7 +433,7 @@ describe('LatestReleaseCard', () => {
       />
     );
 
-    const listenLink = screen.getByText('Listen').closest('a');
+    const listenLink = screen.getByText('Listen Now').closest('a');
     expect(listenLink?.getAttribute('href')).toBe(
       '/testartist/midnight-dreams'
     );

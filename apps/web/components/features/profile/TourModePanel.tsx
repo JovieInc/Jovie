@@ -67,7 +67,7 @@ function toDisplayDate(value: string) {
 
 function DateBox({
   date,
-  featured,
+  featured: _featured,
 }: Readonly<{
   readonly date: string;
   readonly featured: boolean;
@@ -75,30 +75,11 @@ function DateBox({
   const displayDate = useMemo(() => toDisplayDate(date), [date]);
 
   return (
-    <div
-      className={cn(
-        'flex h-[68px] w-[54px] shrink-0 flex-col items-center justify-center rounded-[15px] border',
-        featured
-          ? 'border-[color:var(--profile-status-pill-border)] bg-[color:var(--profile-status-pill-bg)]'
-          : 'border-white/8 bg-white/[0.02]'
-      )}
-    >
-      <span
-        className={cn(
-          'text-[9px] font-semibold uppercase tracking-[0.1em]',
-          featured
-            ? 'text-[color:var(--profile-accent-primary)]'
-            : 'text-white/42'
-        )}
-      >
+    <div className='flex w-11 shrink-0 flex-col items-center justify-center'>
+      <span className='text-[10px] font-[680] uppercase tracking-[0.14em] text-white/52'>
         {displayDate.month}
       </span>
-      <span
-        className={cn(
-          'mt-1 text-[16px] font-semibold leading-none tracking-[-0.04em]',
-          featured ? 'text-[color:var(--profile-accent-primary)]' : 'text-white'
-        )}
-      >
+      <span className='mt-1 text-[20px] font-[680] leading-none tracking-[-0.02em] text-white tabular-nums'>
         {displayDate.day}
       </span>
     </div>
@@ -134,17 +115,16 @@ function TourDateRow({
   return (
     <div
       className={cn(
-        'grid grid-cols-[54px_minmax(0,1fr)_auto] items-center gap-2 px-[13px] py-[13px]',
-        featured
-          ? 'rounded-[20px] border border-[color:var(--profile-status-pill-border)] bg-[linear-gradient(180deg,var(--profile-accent-soft-strong),var(--profile-accent-soft))] shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]'
-          : 'border-t border-white/[0.075] first:border-t-0'
+        'grid grid-cols-[44px_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3.5 transition-colors duration-200 hover:bg-white/[0.03]',
+        'border-t border-white/[0.075] first:border-t-0',
+        item.date.ticketStatus === 'cancelled' && 'opacity-50'
       )}
     >
       <DateBox date={item.date.startDate} featured={featured} />
 
       <div className='min-w-0'>
         {featured ? (
-          <div className='mb-1 inline-flex items-center gap-1 text-[9px] font-semibold uppercase tracking-[0.08em] text-[color:var(--profile-accent-primary)]'>
+          <div className='mb-1 inline-flex items-center gap-1 text-[10px] font-[680] uppercase tracking-[0.12em] text-sky-300'>
             <MapPin className='h-[10px] w-[10px]' />
             <span>{nearby ? 'Near You' : 'Upcoming'}</span>
           </div>
@@ -153,7 +133,7 @@ function TourDateRow({
         <p className='truncate text-[15px] font-medium tracking-[-0.03em] text-white'>
           {item.date.venueName}
         </p>
-        <p className='mt-0.5 truncate text-[11.5px] font-medium tracking-[-0.01em] text-white/40'>
+        <p className='mt-0.5 truncate text-[12px] font-medium tracking-[-0.01em] text-white/52'>
           {location}
         </p>
       </div>
@@ -165,7 +145,7 @@ function TourDateRow({
           target='_blank'
           rel='noopener noreferrer'
           className={cn(
-            'inline-flex h-[38px] shrink-0 items-center rounded-full border px-3 text-[13px] font-medium tracking-[-0.02em] transition-[border-color,background-color,opacity] duration-200 hover:opacity-90',
+            'inline-flex h-8 shrink-0 items-center rounded-full border px-3 text-[12px] font-semibold tracking-[-0.01em] transition-[border-color,background-color,opacity] duration-200 hover:opacity-90',
             getTicketStatusClassName(item.date.ticketStatus, canBuyTickets)
           )}
         >
@@ -174,7 +154,7 @@ function TourDateRow({
       ) : (
         <span
           className={cn(
-            'inline-flex h-[38px] shrink-0 items-center rounded-full border px-3 text-[13px] font-medium tracking-[-0.02em]',
+            'inline-flex h-8 shrink-0 items-center rounded-full border px-3 text-[12px] font-semibold tracking-[-0.01em]',
             getTicketStatusClassName(item.date.ticketStatus, canBuyTickets)
           )}
         >
@@ -216,7 +196,7 @@ function TourDatesContent({
 
   return (
     <div
-      className='overflow-hidden rounded-[24px] border border-white/[0.08] bg-white/[0.02]'
+      className='border-y border-white/[0.075]'
       data-testid='tour-drawer-list'
     >
       {allDates.map(item => (

@@ -7,7 +7,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.195] - 2026-04-29
 
-> Faster local web development loop with pinned fast-start commands, route benchmarking, and less repeat setup work.
+> Faster local development, UI parallax polish, and tighter mobile public profiles.
 
 ### Added
 
@@ -16,6 +16,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - [internal] **Fast iteration commands** for changed web tests and incremental web typechecking.
 - **`/ui/parallax` demo route** under the existing UI parity workspace, with a 7-image zoom-parallax collage driven by the shared `ZoomParallax` component in `apps/web/components/ui/zoom-parallax.tsx`.
 - **Unit coverage** for the new component, including the image cap at 7 items and generated fallback alt text for unnamed images.
+- **`ProfileMediaCard` primitive** for image-led release, event, playlist, listen, and merch-style profile cards. Release artwork keeps the editorial grayscale treatment; artist photos stay in color.
+- **iPhone SE 2/3 coverage** in the mobile public profile viewport suite, plus stricter no-scroll assertions for page and compact-shell vertical overflow.
 
 ### Changed
 
@@ -24,6 +26,9 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - [internal] **Homepage fallback imports are lighter** by loading the older home design only when its feature flag is enabled.
 - **`/ui` demo shell now uses a real viewport-height layout** via `h-screen` in `apps/web/app/ui/layout.tsx`, so tall demos scroll within the shell's main pane instead of trapping the page at `scrollY=0`.
 - **Parallax motion implementation now follows the actual scroll container** instead of assuming window scroll. `ZoomParallax` resolves the nearest scrollable ancestor, drives transforms through `requestAnimationFrame`, and respects reduced-motion users.
+- **Mobile public profile Home** is denser and more reference-aligned: color artist hero image, bottom-fade text overlay, Bell alert control, bare social icons, compact Latest + Up Next treatment, and small-height breakpoints that keep content inside standard iPhone viewports.
+- **Mobile Music, Events, and Alerts tabs** now use flatter native-list surfaces with less outer chrome while preserving existing release, tour, and notification data contracts.
+- **Notification viewport QA** now opens the dedicated notifications route, clears local notification status cache, waits for the actual email step, and verifies input focus does not move or zoom the shell.
 
 ### Fixed
 
@@ -32,6 +37,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - [internal] **Fast dev scripts handle edge cases more clearly** with portable port defaults, Node heap defaults, route probe timeouts, and dependency-free port checks.
 - **Nested landmark bug on `/ui/parallax`** by removing an inner `<main>` from the route page. The `/ui` workspace now exposes one top-level main landmark instead of invalid nested mains.
 - **Browser warning from the prior `motion/react` container setup** and the underlying non-animating state in the `/ui` shell. The collage now scales correctly on desktop and mobile within the shell's internal scroller.
+- **Profile media countdown hydration** no longer mismatches server/client seconds on first render.
+- **Public profile mobile overflow** now fails tests when the compact shell requires vertical scroll, including on iPhone SE, Mini, standard, Pro, Plus, and Max viewport families.
 
 ### Documentation
 

@@ -360,7 +360,34 @@ describe('ProfileCompactTemplate', () => {
     ).toHaveAttribute('href', `/${mockArtist.handle}`);
   });
 
-  it('renders the mock-style overflow trigger in the compact profile header', async () => {
+  it('keeps the artist photo in color with profile text over the image', async () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={{
+          ...mockArtist,
+          image_url: 'https://example.com/artist.jpg',
+          location: 'Los Angeles',
+        }}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    const artistPhoto = screen.getByRole('img', { name: mockArtist.name });
+    expect(artistPhoto).toHaveAttribute(
+      'src',
+      'https://example.com/artist.jpg'
+    );
+    expect(artistPhoto.className).not.toContain('grayscale');
+    expect(
+      artistPhoto
+        .closest('header')
+        ?.querySelector('[data-testid="profile-hero-identity-block"]')
+    ).not.toBeNull();
+  });
+
+  it('renders the alerts trigger instead of the overflow trigger in the compact profile header', async () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -370,9 +397,14 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    const trigger = screen.getByRole('button', { name: /more options/i });
-    expect(trigger.className).toContain('bg-black/34');
-    expect(trigger.className).toContain('h-11!');
+    expect(
+      within(screen.getByTestId('profile-top-chrome')).getByRole('button', {
+        name: 'Alerts',
+      })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /more options/i })
+    ).not.toBeInTheDocument();
   });
 
   it('can hide the menu trigger for clean marketing screenshots', async () => {
@@ -532,7 +564,7 @@ describe('ProfileCompactTemplate', () => {
       );
     });
 
-    expect(screen.queryByTestId('profile-bottom-nav')).not.toBeInTheDocument();
+    expect(screen.getByTestId('profile-bottom-nav')).toBeInTheDocument();
   });
 
   it('renders the Music tab when ?mode=listen is in the URL even when releases exist', async () => {
@@ -607,7 +639,7 @@ describe('ProfileCompactTemplate', () => {
       'Alerts Off'
     );
     expect(screen.getByTestId('profile-home-rail-tour')).toHaveTextContent(
-      'Tickets'
+      'Get tickets'
     );
     expect(
       screen.queryByTestId('profile-hero-status-pill')
@@ -634,7 +666,7 @@ describe('ProfileCompactTemplate', () => {
     expect(screen.getByTestId('profile-hero-alerts-row')).toHaveTextContent(
       'Alerts Off'
     );
-    expect(screen.getByTestId('profile-home-rail-release')).toHaveTextContent(
+    expect(screen.getByTestId('profile-home-latest-card')).toHaveTextContent(
       'Listen Now'
     );
     expect(
@@ -732,6 +764,18 @@ describe('ProfileCompactTemplate', () => {
   });
 
   it('keeps the compact hero alerts row on after activation in the current session', async () => {
+    mockProfileInlineNotificationsCTA.mockImplementation(
+      (props: { readonly onSubscriptionActivated?: () => void }) => (
+        <button
+          type='button'
+          data-testid='mock-inline-notifications-cta'
+          onClick={() => props.onSubscriptionActivated?.()}
+        >
+          Inline notifications
+        </button>
+      )
+    );
+
     const renderProfile = () => (
       <ProfileCompactTemplate
         mode='profile'
