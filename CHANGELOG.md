@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.195] - 2026-04-29
+
+> Dashboard destructive actions now use accessible in-app confirmations, and local QA can exercise Pro-gated creator surfaces with the ready persona.
+
+### Changed
+
+- Replaced remaining production `alert()` and `confirm()` browser dialogs in release sidebars, investor links, catalog health, and task deletion flows with `ConfirmDialog` or Sonner toasts.
+- Made the `creator-ready` local auth bypass persona Pro-entitled so dashboard QA and perf checks can reach gated creator surfaces without a manual plan toggle.
+
+### Added
+
+- Added a native-dialog lint guard and design-system docs for choosing confirmations, success/error toasts, and future undo-toast flows.
+- Added test coverage for task deletion confirmation behavior and the ready creator persona's Pro entitlement.
+
 ## [26.4.194] - 2026-04-29
 
 > Frame.io-inspired design layer for `/artist-profiles` + premium marketing footer rewrite.
