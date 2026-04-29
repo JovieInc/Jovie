@@ -38,7 +38,7 @@ export function ArtistProfileSectionHeader({
       {eyebrow ? (
         <p
           className={cn(
-            'frame-eyebrow text-[11px] font-medium uppercase tracking-[0.18em] text-tertiary-token',
+            'frame-eyebrow text-tertiary-token',
             isCentered ? 'mb-6' : 'mb-5',
             eyebrowClassName
           )}

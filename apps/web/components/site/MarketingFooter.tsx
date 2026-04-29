@@ -157,9 +157,9 @@ export function MarketingFooter({
 
         <div
           className={cn(
-            'mf-baseband flex flex-wrap items-center justify-between gap-x-7 gap-y-2',
-            isMinimal ? 'mt-7' : null
+            'mf-baseband flex flex-wrap items-center justify-between gap-x-7 gap-y-2'
           )}
+          style={isMinimal ? { marginTop: '1.75rem' } : undefined}
         >
           <span className='text-[12px] leading-[1.45] tracking-[-0.005em] text-white/[0.36]'>
             © {new Date().getFullYear()} Jovie Technology Inc.

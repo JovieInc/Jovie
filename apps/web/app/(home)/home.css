@@ -1588,15 +1588,23 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 /* Editorial eyebrow — replaces inline eyebrow strings. Caps, tracked, off-white
-   at tertiary opacity. Sits above section headlines as a category tag. */
-.frame-skin .frame-eyebrow {
+   at tertiary opacity. Sits above section headlines as a category tag.
+   Base class provides typography so callers don't need duplicate Tailwind
+   utilities; .frame-skin layers in the editorial color token. */
+.frame-eyebrow {
   display: inline-block;
   text-transform: uppercase;
+  font-size: 0.6875rem; /* 11px */
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  line-height: 1;
+}
+
+.frame-skin .frame-eyebrow {
   font-size: var(--frame-eyebrow-size);
   font-weight: var(--frame-eyebrow-weight);
   letter-spacing: var(--frame-eyebrow-tracking);
   color: var(--frame-text-tertiary);
-  line-height: 1;
 }
 
 /* Editorial caption — used under hero/figure pairings.
