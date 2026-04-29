@@ -2239,15 +2239,35 @@ jobs:
           # The axe audit only tests public routes (SMOKE_ONLY=1) so no real auth is needed.
           mkdir -p tests/.auth
           echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
-          PORT=3100 pnpm --filter=@jovie/web exec next start &
+
+          cleanup() {
+            kill "$SERVER_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          if [ ! -f .next/standalone/apps/web/server.js ]; then
+            echo "Standalone server not found - public axe audit cannot start."
+            exit 1
+          fi
+
+          PORT=3100 node .next/standalone/apps/web/server.js &
           SERVER_PID=$!
-          # Wait for server to accept connections
+
+          SERVER_READY=false
           for i in $(seq 1 30); do
-            if curl -sf http://localhost:3100 > /dev/null 2>&1; then break; fi
+            if curl -sf http://localhost:3100 > /dev/null 2>&1; then
+              SERVER_READY=true
+              break
+            fi
             sleep 1
           done
+
+          if [ "$SERVER_READY" = "false" ]; then
+            echo "Standalone server failed to start within 30s."
+            exit 1
+          fi
+
           pnpm exec playwright test tests/e2e/axe-audit.spec.ts --config=playwright.config.ts --project=chromium --reporter=line
-          kill $SERVER_PID 2>/dev/null || true
         env:
           BASE_URL: http://localhost:3100
           SMOKE_ONLY: '1'

@@ -60,8 +60,11 @@ export function HomepageOutcomeCards({
           data-testid='homepage-outcome-rail'
           aria-labelledby='homepage-outcome-cards-heading'
         >
-          <a href='#homepage-outcome-cards-heading' className='sr-only'>
-            Outcome Cards
+          <a
+            className='sr-only focus:not-sr-only focus-ring-themed'
+            href='#homepage-outcome-card-share-anywhere'
+          >
+            Skip to final outcome card
           </a>
           {outcomes.cards.map(card => (
             <OutcomeCard key={card.id} card={card} outcomes={outcomes} />
@@ -86,6 +89,7 @@ function OutcomeCard({
   return (
     <article
       data-testid='homepage-outcome-card'
+      id={`homepage-outcome-card-${card.id}`}
       className={cn(
         'homepage-outcome-card',
         HOMEPAGE_OUTCOME_SIZE_CLASSES[card.id]
