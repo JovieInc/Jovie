@@ -283,7 +283,7 @@ export function NavMenuItem({
     readonly className?: string;
     readonly strokeWidth?: number;
   }>;
-  const shellNavItem = useShellNavItem && item.badge == null;
+  const shellNavItem = useShellNavItem;
   const shellNavClassName = cn(
     'relative flex h-6 w-full items-center gap-2 rounded-md pl-2.5 pr-2 text-[12.5px] tracking-[-0.005em] transition-colors duration-150 ease-out',
     isActive
@@ -304,6 +304,11 @@ export function NavMenuItem({
       <span className='truncate group-data-[collapsible=icon]:hidden'>
         {item.name}
       </span>
+      {item.badge != null ? (
+        <span className='ml-auto shrink-0 group-data-[collapsible=icon]:hidden'>
+          {item.badge}
+        </span>
+      ) : null}
     </>
   );
 
@@ -372,7 +377,7 @@ export function NavMenuItem({
               )}
             </SidebarMenuButton>
           )}
-          {item.badge != null && (
+          {!shellNavItem && item.badge != null && (
             <SidebarMenuBadge>{item.badge}</SidebarMenuBadge>
           )}
           {actions}
