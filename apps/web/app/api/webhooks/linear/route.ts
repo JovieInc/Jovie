@@ -268,8 +268,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const owner = process.env.VERCEL_GIT_REPO_OWNER ?? 'JovieInc';
-    const repo = process.env.VERCEL_GIT_REPO_SLUG ?? 'Jovie';
+    const owner = env.VERCEL_GIT_REPO_OWNER ?? 'JovieInc';
+    const repo = env.VERCEL_GIT_REPO_SLUG ?? 'Jovie';
     const automationContract = getAutomationContract(payload, isPlanReadyEvent);
 
     const dispatchResponse = await serverFetch(
