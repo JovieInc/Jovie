@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import Image from 'next/image';
 import type { CSSProperties } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { getMarketingExportImage } from '@/lib/screenshots/registry';
 
 type HeroMockupKind = 'desktop' | 'phone' | 'panel';
 type CarouselDirection = -1 | 1;
@@ -22,7 +23,7 @@ interface HeroMockupShot {
 const HERO_MOCKUP_SCREENSHOTS: readonly HeroMockupShot[] = [
   {
     id: 'releases-dashboard',
-    src: '/product-screenshots/releases-dashboard-full.png',
+    src: getMarketingExportImage('dashboard-releases-desktop').publicUrl,
     alt: 'Desktop release dashboard with tasks, assets, and launch planning',
     title: 'Release Dashboard',
     width: 2880,
@@ -32,7 +33,7 @@ const HERO_MOCKUP_SCREENSHOTS: readonly HeroMockupShot[] = [
   },
   {
     id: 'audience-crm',
-    src: '/product-screenshots/audience-crm.png',
+    src: getMarketingExportImage('dashboard-audience-desktop').publicUrl,
     alt: 'Desktop audience CRM with fan segments and engagement signal',
     title: 'Audience CRM',
     width: 2880,
@@ -42,7 +43,7 @@ const HERO_MOCKUP_SCREENSHOTS: readonly HeroMockupShot[] = [
   },
   {
     id: 'profile-workspace',
-    src: '/product-screenshots/profile-desktop.png',
+    src: getMarketingExportImage('public-profile-desktop').publicUrl,
     alt: 'Desktop artist profile management surface',
     title: 'Profile Workspace',
     width: 2880,
@@ -52,7 +53,7 @@ const HERO_MOCKUP_SCREENSHOTS: readonly HeroMockupShot[] = [
   },
   {
     id: 'tracked-links',
-    src: '/product-screenshots/artist-spec-tracked-links-desktop.png',
+    src: getMarketingExportImage('artist-spec-tracked-links-desktop').publicUrl,
     alt: 'Desktop tracked links analytics for artist marketing',
     title: 'Tracked Links',
     width: 1842,
@@ -62,7 +63,7 @@ const HERO_MOCKUP_SCREENSHOTS: readonly HeroMockupShot[] = [
   },
   {
     id: 'profile-phone',
-    src: '/product-screenshots/profile-phone.png',
+    src: getMarketingExportImage('public-profile-mobile').publicUrl,
     alt: 'Mobile artist profile with listen, tour, and presave actions',
     title: 'Artist Profile',
     width: 780,

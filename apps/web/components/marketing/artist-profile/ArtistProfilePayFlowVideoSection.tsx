@@ -5,12 +5,15 @@ import Image from 'next/image';
 import { useCallback, useRef, useState } from 'react';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
+import { getMarketingExportImage } from '@/lib/screenshots/registry';
 import { ArtistProfileMonetizationSection } from './ArtistProfileMonetizationSection';
 import { ArtistProfilePhoneFrame } from './ArtistProfilePhoneFrame';
 import { ArtistProfileSectionHeader } from './ArtistProfileSectionHeader';
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
 
-const POSTER_PATH = '/product-screenshots/tim-white-profile-pay-phone.png';
+const POSTER_PATH = getMarketingExportImage(
+  'tim-white-profile-pay-mobile'
+).publicUrl;
 
 interface ArtistProfilePayFlowVideoSectionProps {
   readonly copy: ArtistProfileLandingCopy['payFlowVideo'];
