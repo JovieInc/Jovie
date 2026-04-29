@@ -44,7 +44,7 @@ vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
   useDashboardData: mockUseDashboardData,
 }));
 
-vi.mock('@/components/organisms/AuthShellWrapper', () => ({
+vi.mock('@/contexts/TableMetaContext', () => ({
   useTableMeta: () => ({
     setTableMeta: mockSetTableMeta,
   }),

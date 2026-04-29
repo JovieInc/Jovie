@@ -34,7 +34,7 @@ export function EntityChip({
   isInputChip = false,
 }: EntityChipProps) {
   const prefix = KIND_PREFIX[data.kind];
-  const designV1ChatEntitiesEnabled = useAppFlag('DESIGN_V1_CHAT_ENTITIES');
+  const designV1ChatEntitiesEnabled = useAppFlag('DESIGN_V1');
   const entityPanel = useOptionalChatEntityPanel();
   const canOpenEntityPanel =
     designV1ChatEntitiesEnabled &&

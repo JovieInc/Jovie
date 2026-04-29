@@ -3,7 +3,7 @@
 import { PanelRight, PanelRightOpen } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
-import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
+import { useTableMeta } from '@/contexts/TableMetaContext';
 import { IngestProfileDropdown } from '@/features/admin/ingest-profile-dropdown';
 
 export interface AdminCreatorsTableHeaderActionsProps {

@@ -35,10 +35,10 @@ describe('DashboardNav interactions', () => {
     expect(screen.queryByRole('link', { name: 'Library' })).toBeNull();
   });
 
-  it('adds Library to navigation when the Library V1 flag is enabled', () => {
+  it('adds Library to navigation when the new design flag is enabled', () => {
     renderDashboardNav({
       renderFn: render,
-      appFlags: { DESIGN_V1_LIBRARY: true },
+      appFlags: { DESIGN_V1: true },
     });
 
     expect(screen.getByRole('link', { name: 'Library' })).toHaveAttribute(
@@ -110,7 +110,7 @@ describe('DashboardNav interactions', () => {
     mockUsePathname.mockReturnValueOnce(APP_ROUTES.CHAT);
     renderDashboardNav({
       renderFn: render,
-      appFlags: { SHELL_CHAT_V1: true },
+      appFlags: { DESIGN_V1: true },
     });
 
     await user.click(screen.getByRole('button', { name: 'Profile' }));

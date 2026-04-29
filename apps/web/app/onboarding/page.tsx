@@ -107,7 +107,7 @@ export default async function OnboardingPage({
   const clerkIdentity = resolveClerkIdentity(user);
   const userEmail = authResult.context.email ?? clerkIdentity.email ?? null;
   const userId = authResult.clerkUserId;
-  const showOnboardingV1Design = await getAppFlagValue('DESIGN_V1_ONBOARDING', {
+  const showOnboardingV1Design = await getAppFlagValue('DESIGN_V1', {
     userId,
   });
   // Run profile prefetch and handle reservation in parallel (they're independent)

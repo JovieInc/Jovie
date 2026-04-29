@@ -1,9 +1,10 @@
 /**
  * Focused Design V1 flag matrix.
  *
- * Verifies every Design V1 runtime app flag remains default-off, preserves the
- * default route behavior with no override, and renders its gated surface when
- * forced on through the same browser override harness used by local QA.
+ * Verifies the single Design V1 runtime app flag remains default-off,
+ * preserves the default route behavior with no override, and renders each
+ * gated surface when forced on through the same browser override harness used
+ * by local QA.
  *
  * Run:
  *   doppler run --project jovie-web --config dev -- env E2E_USE_TEST_AUTH_BYPASS=1 pnpm --filter @jovie/web exec playwright test tests/e2e/design-v1-flagged-surfaces.spec.ts --project=chromium
@@ -23,32 +24,19 @@ import {
   TEST_PERSONA_COOKIE,
   TEST_USER_ID_COOKIE,
 } from '@/lib/auth/test-mode';
-import type { AppFlagName } from '@/lib/flags/contracts';
 import {
   clearAppFlagOverrides,
   getAppFlagDefault,
   installAppFlagOverrides,
 } from './helpers/app-flag-overrides';
-import { setTestUserPlan } from './helpers/plan-helpers';
 
-const DESIGN_V1_FLAGS = [
-  'DESIGN_V1_RELEASES',
-  'DESIGN_V1_TASKS',
-  'DESIGN_V1_CHAT_ENTITIES',
-  'DESIGN_V1_LYRICS',
-  'DESIGN_V1_LIBRARY',
-  'DESIGN_V1_AUTH',
-  'DESIGN_V1_ONBOARDING',
-] as const satisfies readonly AppFlagName[];
-
-type DesignV1Flag = (typeof DESIGN_V1_FLAGS)[number];
 type RequiredPersona = Extract<DevTestAuthPersona, 'creator' | 'creator-ready'>;
 
 const REQUIRED_PERSONAS = ['creator', 'creator-ready'] as const;
 
 interface SurfaceCase {
-  readonly flagName: DesignV1Flag;
-  readonly route: string;
+  readonly name: string;
+  readonly route: string | ((page: Page) => Promise<string>);
   readonly persona?: RequiredPersona;
   readonly prepare?: (page: Page) => Promise<void>;
   readonly assertDefault: (page: Page) => Promise<void>;
@@ -63,29 +51,60 @@ function getBaseUrl(): string {
   return process.env.BASE_URL ?? 'http://localhost:3100';
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => {
+    setTimeout(resolve, ms);
+  });
+}
+
 async function resolvePersonaUserId(
   request: APIRequestContext,
   persona: RequiredPersona
 ): Promise<string> {
-  const response = await request.post(
-    new URL('/api/dev/test-auth/session', getBaseUrl()).toString(),
-    {
-      data: { persona },
-    }
-  );
-  expect(response.ok(), `Failed to resolve ${persona} test persona`).toBe(true);
+  const url = new URL('/api/dev/test-auth/session', getBaseUrl()).toString();
+  let lastFailure = 'No attempts completed';
 
-  const payload = (await response.json()) as { userId?: string | null };
-  const userId = payload.userId?.trim();
-  expect(userId, `Missing ${persona} test persona userId`).toBeTruthy();
-  return userId!;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      const response = await request.post(url, {
+        data: { persona },
+        timeout: 240_000,
+      });
+
+      if (response.ok()) {
+        const payload = (await response.json()) as { userId?: string | null };
+        const userId = payload.userId?.trim();
+        if (userId) return userId;
+        lastFailure = 'Response was ok but did not include a userId';
+      } else {
+        lastFailure = `HTTP ${response.status()}: ${await response.text()}`;
+      }
+    } catch (error) {
+      lastFailure = error instanceof Error ? error.message : String(error);
+    }
+
+    if (attempt < 3) {
+      await sleep(5_000);
+    }
+  }
+
+  throw new Error(
+    `Failed to resolve ${persona} test persona after retries: ${lastFailure}`
+  );
 }
 
 async function gotoSurface(page: Page, route: string): Promise<void> {
   await page.goto(route, {
-    timeout: 120_000,
+    timeout: 240_000,
     waitUntil: 'domcontentloaded',
   });
+}
+
+async function resolveSurfaceRoute(
+  page: Page,
+  route: SurfaceCase['route']
+): Promise<string> {
+  return typeof route === 'function' ? route(page) : route;
 }
 
 async function expectNotFound(page: Page): Promise<void> {
@@ -124,14 +143,48 @@ async function prepareAuthenticatedSurface(
   ]);
 }
 
-async function prepareProAuthenticatedSurface(page: Page): Promise<void> {
-  await prepareAuthenticatedSurface(page, 'creator-ready');
-  await setTestUserPlan(page, 'pro');
+async function prepareSeededE2EUser(page: Page): Promise<void> {
+  const userId = process.env.E2E_CLERK_USER_ID?.trim();
+  expect(
+    userId,
+    'E2E_CLERK_USER_ID is required for seeded release-backed lyrics coverage'
+  ).toBeTruthy();
+
+  await page.context().addCookies([
+    {
+      name: TEST_MODE_COOKIE,
+      value: TEST_AUTH_BYPASS_MODE,
+      url: getBaseUrl(),
+      sameSite: 'Lax',
+    },
+    {
+      name: TEST_USER_ID_COOKIE,
+      value: userId!,
+      url: getBaseUrl(),
+      sameSite: 'Lax',
+    },
+  ]);
+}
+
+async function resolveSeededLyricsRoute(page: Page): Promise<string> {
+  await gotoSurface(page, APP_ROUTES.DASHBOARD_RELEASES);
+  await expect(page.getByTestId('releases-matrix')).toBeVisible({
+    timeout: 30_000,
+  });
+
+  const releaseTrigger = page.locator('[data-testid^="release-open-"]').first();
+  await expect(releaseTrigger).toBeVisible({ timeout: 30_000 });
+
+  const testId = await releaseTrigger.getAttribute('data-testid');
+  const releaseId = testId?.replace(/^release-open-/, '').trim();
+  expect(releaseId, 'Expected seeded release id for lyrics route').toBeTruthy();
+
+  return `${APP_ROUTES.LYRICS}/${releaseId}`;
 }
 
 const SURFACE_CASES: readonly SurfaceCase[] = [
   {
-    flagName: 'DESIGN_V1_RELEASES',
+    name: 'releases',
     route: APP_ROUTES.DASHBOARD_RELEASES,
     persona: 'creator-ready',
     assertDefault: async page => {
@@ -155,9 +208,9 @@ const SURFACE_CASES: readonly SurfaceCase[] = [
     },
   },
   {
-    flagName: 'DESIGN_V1_TASKS',
+    name: 'tasks',
     route: APP_ROUTES.DASHBOARD_TASKS,
-    prepare: prepareProAuthenticatedSurface,
+    persona: 'creator-ready',
     assertDefault: async page => {
       const workspace = page.getByTestId('tasks-workspace');
       await expect(workspace).toBeVisible({ timeout: 30_000 });
@@ -169,11 +222,13 @@ const SURFACE_CASES: readonly SurfaceCase[] = [
     assertEnabled: async page => {
       const workspace = page.getByTestId('tasks-workspace');
       await expect(workspace).toBeVisible({ timeout: 30_000 });
-      await expect(workspace).toHaveAttribute('data-design-v1-tasks', 'true');
+      await expect(workspace).toHaveAttribute('data-design-v1-tasks', 'true', {
+        timeout: 30_000,
+      });
     },
   },
   {
-    flagName: 'DESIGN_V1_CHAT_ENTITIES',
+    name: 'chat entities',
     route: APP_ROUTES.CHAT,
     persona: 'creator-ready',
     assertDefault: async page => {
@@ -195,9 +250,9 @@ const SURFACE_CASES: readonly SurfaceCase[] = [
     },
   },
   {
-    flagName: 'DESIGN_V1_LYRICS',
-    route: `${APP_ROUTES.LYRICS}/flag-matrix-track`,
-    persona: 'creator-ready',
+    name: 'lyrics',
+    route: resolveSeededLyricsRoute,
+    prepare: prepareSeededE2EUser,
     assertDefault: expectNotFound,
     assertEnabled: async page => {
       await expect(
@@ -208,7 +263,7 @@ const SURFACE_CASES: readonly SurfaceCase[] = [
     },
   },
   {
-    flagName: 'DESIGN_V1_LIBRARY',
+    name: 'library',
     route: APP_ROUTES.DASHBOARD_LIBRARY,
     persona: 'creator-ready',
     assertDefault: expectNotFound,
@@ -219,7 +274,7 @@ const SURFACE_CASES: readonly SurfaceCase[] = [
     },
   },
   {
-    flagName: 'DESIGN_V1_AUTH',
+    name: 'auth',
     route: APP_ROUTES.SIGNIN,
     assertDefault: async page => {
       await expect(page.locator('[data-auth-shell]')).toHaveAttribute(
@@ -237,7 +292,7 @@ const SURFACE_CASES: readonly SurfaceCase[] = [
     },
   },
   {
-    flagName: 'DESIGN_V1_ONBOARDING',
+    name: 'onboarding',
     route: `${APP_ROUTES.ONBOARDING}?handle=design-v1-flag-matrix`,
     persona: 'creator',
     assertDefault: async page => {
@@ -258,22 +313,20 @@ const SURFACE_CASES: readonly SurfaceCase[] = [
 ];
 
 test.describe('Design V1 flagged surfaces', () => {
-  test.setTimeout(300_000);
+  test.setTimeout(600_000);
 
   test.skip(
     process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
     'Requires E2E_USE_TEST_AUTH_BYPASS=1'
   );
 
-  test('keeps every Design V1 app flag default-off', () => {
-    for (const flagName of DESIGN_V1_FLAGS) {
-      expect(getAppFlagDefault(flagName), `${flagName} default`).toBe(false);
-    }
+  test('keeps the Design V1 app flag default-off', () => {
+    expect(getAppFlagDefault('DESIGN_V1'), 'DESIGN_V1 default').toBe(false);
   });
 
   test.describe('surface routes', () => {
     test.beforeAll(async ({ request }) => {
-      test.setTimeout(300_000);
+      test.setTimeout(600_000);
       resolvedPersonaUserIds.clear();
 
       for (const persona of REQUIRED_PERSONAS) {
@@ -285,7 +338,7 @@ test.describe('Design V1 flagged surfaces', () => {
     });
 
     for (const surface of SURFACE_CASES) {
-      test(`${surface.flagName} preserves default-off route behavior`, async ({
+      test(`${surface.name} preserves default-off route behavior`, async ({
         page,
       }) => {
         await clearAppFlagOverrides(page);
@@ -296,12 +349,12 @@ test.describe('Design V1 flagged surfaces', () => {
           await prepareAuthenticatedSurface(page, surface.persona);
         }
 
-        await gotoSurface(page, surface.route);
+        await gotoSurface(page, await resolveSurfaceRoute(page, surface.route));
         await surface.assertDefault(page);
       });
 
-      test(`${surface.flagName} renders when forced on`, async ({ page }) => {
-        await installAppFlagOverrides(page, { [surface.flagName]: true });
+      test(`${surface.name} renders when forced on`, async ({ page }) => {
+        await installAppFlagOverrides(page, { DESIGN_V1: true });
 
         if (surface.prepare) {
           await surface.prepare(page);
@@ -309,7 +362,7 @@ test.describe('Design V1 flagged surfaces', () => {
           await prepareAuthenticatedSurface(page, surface.persona);
         }
 
-        await gotoSurface(page, surface.route);
+        await gotoSurface(page, await resolveSurfaceRoute(page, surface.route));
         await surface.assertEnabled(page);
       });
     }

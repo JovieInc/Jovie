@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils';
 import { releaseStatusToShell, releaseToDspItems } from './release-adapters';
 
 /**
- * Linear-style release row for the SHELL_CHAT_V1 path. Replaces the legacy
+ * Linear-style release row for the DESIGN_V1 path. Replaces the legacy
  * provider-matrix cells with: artwork + title + artists + status + drop date
  * + DSP avatar stack + smart link + more menu.
  *

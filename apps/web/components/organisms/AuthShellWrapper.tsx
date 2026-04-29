@@ -3,9 +3,7 @@
 import { TooltipProvider } from '@jovie/ui';
 import type { ReactNode } from 'react';
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -23,6 +21,12 @@ import {
   useKeyboardShortcuts,
 } from '@/contexts/KeyboardShortcutsContext';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
+import {
+  type TableMeta,
+  TableMetaContext,
+  TableMetaProvider,
+  useTableMeta,
+} from '@/contexts/TableMetaContext';
 import { HeaderChatUsageIndicator } from '@/features/dashboard/atoms/HeaderChatUsageIndicator';
 import { HeaderProfileProgress } from '@/features/dashboard/atoms/HeaderProfileProgress';
 import { useAuthRouteConfig } from '@/hooks/useAuthRouteConfig';
@@ -36,52 +40,7 @@ import {
   usePendingShell,
 } from './PendingShellContext';
 
-export { usePendingShell };
-
-// TableMetaContext for audience/creators tables
-type TableMeta = {
-  rowCount: number | null;
-  toggle?: (() => void) | null;
-  rightPanelWidth?: number | null;
-};
-
-type TableMetaContextValue = {
-  tableMeta: TableMeta;
-  setTableMeta: (meta: TableMeta) => void;
-};
-
-const TableMetaContext = createContext<TableMetaContextValue | null>(null);
-
-export function useTableMeta(): TableMetaContextValue {
-  const ctx = useContext(TableMetaContext);
-  if (!ctx) {
-    throw new TypeError('useTableMeta must be used within AuthShellWrapper');
-  }
-  return ctx;
-}
-
-/**
- * TableMetaProvider - Provides TableMetaContext for use in Storybook and tests.
- * Use this when you need to render components that call useTableMeta()
- * without the full AuthShellWrapper (e.g., in Storybook stories).
- */
-export function TableMetaProvider({
-  children,
-}: Readonly<{ children: ReactNode }>) {
-  const [tableMeta, setTableMeta] = useState<TableMeta>({
-    rowCount: null,
-    toggle: null,
-  });
-  const value = useMemo(
-    () => ({ tableMeta, setTableMeta }),
-    [tableMeta, setTableMeta]
-  );
-  return (
-    <TableMetaContext.Provider value={value}>
-      {children}
-    </TableMetaContext.Provider>
-  );
-}
+export { TableMetaProvider, usePendingShell, useTableMeta };
 
 export interface AuthShellWrapperProps {
   readonly persistSidebarCollapsed?: (collapsed: boolean) => Promise<void>;

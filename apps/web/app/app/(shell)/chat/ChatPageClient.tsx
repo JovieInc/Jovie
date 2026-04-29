@@ -225,7 +225,7 @@ export function ChatPageClient({
   const enablePreviewPanel = !env.IS_E2E;
   const fromOnboarding = searchParams.get('from') === 'onboarding';
   const panelParam = searchParams.get('panel');
-  const designV1ChatEntitiesEnabled = useAppFlag('DESIGN_V1_CHAT_ENTITIES');
+  const designV1ChatEntitiesEnabled = useAppFlag('DESIGN_V1');
   // Hydrate only when the panel is open, deep-linked, or onboarding requested it.
   // This keeps closed chat routes cheap while allowing sidebar/mobile profile clicks.
   const shouldHydratePreviewPanel =
