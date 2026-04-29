@@ -1,10 +1,16 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { buildLyricsRoute } from '@/constants/routes';
+import { AppFlagProvider } from '@/lib/flags/client';
+import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 
 const togglerMock = vi.fn();
 const seekMock = vi.fn();
 const stopMock = vi.fn();
 const onErrorMock = vi.fn(() => () => undefined);
+const pushMock = vi.fn();
+let pathname = '/app';
 
 let _state: Record<string, unknown> = {
   activeTrackId: null,
@@ -17,7 +23,13 @@ let _state: Record<string, unknown> = {
   releaseTitle: null,
   artistName: null,
   artworkUrl: null,
+  hasLyrics: false,
 };
+
+vi.mock('next/navigation', () => ({
+  usePathname: () => pathname,
+  useRouter: () => ({ push: pushMock }),
+}));
 
 vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
   useTrackAudioPlayer: () => ({
@@ -40,7 +52,9 @@ beforeEach(() => {
   seekMock.mockReset();
   stopMock.mockReset();
   onErrorMock.mockReset();
+  pushMock.mockReset();
   onErrorMock.mockImplementation(() => () => undefined);
+  pathname = '/app';
   _state = {
     activeTrackId: null,
     isPlaying: false,
@@ -52,6 +66,7 @@ beforeEach(() => {
     releaseTitle: null,
     artistName: null,
     artworkUrl: null,
+    hasLyrics: false,
   };
 });
 
@@ -90,5 +105,50 @@ describe('ShellAudioBarBridge', () => {
     render(<ShellAudioBarBridge />);
     // smoke render — no crash from null artist
     expect(screen.getByLabelText(/Play|Pause/)).toBeInTheDocument();
+  });
+
+  it('links lyrics to the active track when lyrics are flagged on and available', async () => {
+    const user = userEvent.setup();
+    _state = {
+      ..._state,
+      activeTrackId: 'track-1',
+      trackTitle: 'Lost in the Light',
+      artistName: 'Bahamas',
+      currentTime: 12,
+      duration: 213,
+      hasLyrics: true,
+    };
+
+    render(
+      <AppFlagProvider
+        initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1_LYRICS: true }}
+      >
+        <ShellAudioBarBridge />
+      </AppFlagProvider>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Lyrics' }));
+
+    expect(pushMock).toHaveBeenCalledWith(buildLyricsRoute('track-1'));
+  });
+
+  it('keeps lyrics hidden when the active track has no lyrics', () => {
+    _state = {
+      ..._state,
+      activeTrackId: 'track-1',
+      trackTitle: 'Lost in the Light',
+      artistName: 'Bahamas',
+      hasLyrics: false,
+    };
+
+    render(
+      <AppFlagProvider
+        initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1_LYRICS: true }}
+      >
+        <ShellAudioBarBridge />
+      </AppFlagProvider>
+    );
+
+    expect(screen.queryByRole('button', { name: 'Lyrics' })).toBeNull();
   });
 });

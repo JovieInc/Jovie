@@ -89,7 +89,7 @@ function distinctValues(
 }
 
 /**
- * Top-level Linear-style releases view, rendered behind SHELL_CHAT_V1.
+ * Top-level Linear-style releases view, rendered behind DESIGN_V1_RELEASES.
  *
  * Replaces the legacy `ReleasesExperience` provider matrix with a thin
  * shell-row list + PillSearch header. Drawer wiring lands in a follow-up
@@ -130,6 +130,8 @@ export function ShellReleasesView({
     <section
       aria-label='Releases'
       className='flex h-full flex-col focus:outline-none'
+      data-design-v1-releases='true'
+      data-testid='shell-releases-view'
     >
       <header className='shrink-0 px-4 pt-3 pb-2 border-b border-(--linear-app-shell-border)/60'>
         <div className='flex items-center gap-2'>

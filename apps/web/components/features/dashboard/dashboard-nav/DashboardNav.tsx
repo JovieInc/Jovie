@@ -24,6 +24,7 @@ import { useTaskStatsQuery } from '@/lib/queries/useTasksQuery';
 import {
   adminNavigationSections,
   artistSettingsNavigation,
+  libraryNavItem,
   primaryNavigation,
   userSettingsNavigation,
 } from './config';
@@ -88,6 +89,7 @@ export function DashboardNav(_: DashboardNavProps) {
   const queryClient = useQueryClient();
   const threadsEnabled = useAppFlag('THREADS_ENABLED');
   const shellChatV1Enabled = useAppFlag('SHELL_CHAT_V1');
+  const designV1LibraryEnabled = useAppFlag('DESIGN_V1_LIBRARY');
   const {
     isOpen: isPreviewOpen,
     open: openPreviewPanel,
@@ -122,11 +124,19 @@ export function DashboardNav(_: DashboardNavProps) {
   const artistSettingsLabel = artistName || 'Artist';
 
   // Memoize nav sections for dashboard (non-settings) mode
-  const navSections = useMemo(
-    () => [
+  const navSections = useMemo(() => {
+    const primaryItems = designV1LibraryEnabled
+      ? [
+          ...primaryNavigation.slice(0, 2),
+          libraryNavItem,
+          ...primaryNavigation.slice(2),
+        ]
+      : primaryNavigation;
+
+    return [
       {
         key: 'primary',
-        items: primaryNavigation.map(item =>
+        items: primaryItems.map(item =>
           item.id === 'tasks'
             ? {
                 ...item,
@@ -144,9 +154,13 @@ export function DashboardNav(_: DashboardNavProps) {
             : item
         ),
       },
-    ],
-    [canAccessTasksWorkspace, isPlanGateLoading, taskStats]
-  );
+    ];
+  }, [
+    canAccessTasksWorkspace,
+    designV1LibraryEnabled,
+    isPlanGateLoading,
+    taskStats,
+  ]);
 
   // Profile nav item opens the preview drawer instead of navigating to a separate page.
   // If already on a chat route, just opens the drawer; otherwise navigates first.
@@ -180,20 +194,13 @@ export function DashboardNav(_: DashboardNavProps) {
       return;
     }
 
-    // Defer the eager releases prefetch past initial dashboard paint so the
-    // shell can hydrate without competing with a background chunk fetch +
-    // TanStack Query warmup. Matches the hover-prefetch debounce pattern
-    // used by handlePrefetch below. The prefetched marker is written inside
-    // the timer so a cleanup that fires before the timer runs (fast route
-    // change) leaves the ref null and a later visit will retry.
+    // Defer the eager releases data prefetch past initial dashboard paint so
+    // the shell can hydrate before TanStack Query warmup. The prefetched marker
+    // is written inside the timer so a cleanup that fires before the timer runs
+    // leaves the ref null and a later visit will retry.
     const handle = setTimeout(() => {
       releasesPrefetchedProfileIdRef.current = profileId;
       router.prefetch(APP_ROUTES.DASHBOARD_RELEASES);
-      void import(
-        '@/features/dashboard/organisms/release-provider-matrix'
-      ).catch(() => {
-        releasesPrefetchedProfileIdRef.current = null;
-      });
       void import('@/lib/queries/prefetch-dashboard')
         .then(({ prefetchForRoute }) =>
           prefetchForRoute('releases', queryClient, profileId)
@@ -211,11 +218,6 @@ export function DashboardNav(_: DashboardNavProps) {
       if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
       const prefetchDelayMs = itemId === 'releases' ? 0 : 150;
       prefetchTimerRef.current = setTimeout(() => {
-        if (itemId === 'releases') {
-          void import(
-            '@/features/dashboard/organisms/release-provider-matrix'
-          ).catch(() => {});
-        }
         void import('@/lib/queries/prefetch-dashboard')
           .then(({ prefetchForRoute }) =>
             prefetchForRoute(itemId, queryClient, profileId || undefined)
