@@ -53,6 +53,7 @@ export function ReleaseTableWithTracks({
   groupByYear = false,
   selectedReleaseId,
   selectedTrackId,
+  designV1 = false,
   refreshingReleaseId,
   flashedReleaseId,
   isSmartLinkLocked,
@@ -108,7 +109,16 @@ export function ReleaseTableWithTracks({
       const isFlashed = flashedReleaseId === row.id;
 
       let baseClassName: string;
-      if (isSelected) {
+      if (designV1 && isSelected) {
+        baseClassName =
+          'border-transparent bg-(--linear-bg-surface-1)/80 shadow-[inset_3px_0_0_0_var(--linear-accent),inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_24%,transparent)] hover:bg-(--linear-bg-surface-1)/90 focus-within:bg-(--linear-bg-surface-1)';
+      } else if (designV1 && isRowExpanded) {
+        baseClassName =
+          'border-transparent bg-(--linear-bg-surface-1)/58 hover:bg-(--linear-bg-surface-1)/64 focus-within:bg-(--linear-bg-surface-1)/70';
+      } else if (designV1) {
+        baseClassName =
+          'border-transparent bg-transparent hover:bg-(--linear-bg-surface-1)/55 focus-within:bg-(--linear-bg-surface-1)/65 transition-[background-color,box-shadow,color] duration-150 ease-out [&:hover_span]:text-primary-token [&:hover_p]:text-primary-token';
+      } else if (isSelected) {
         baseClassName =
           'bg-[color-mix(in_oklab,var(--linear-row-selected)_55%,transparent)] shadow-[inset_3px_0_0_0_var(--linear-accent)] hover:bg-[color-mix(in_oklab,var(--linear-row-selected)_65%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-selected)_72%,transparent)] focus-within:shadow-[inset_3px_0_0_0_var(--linear-accent),inset_0_0_0_1px_var(--linear-border-focus)]';
       } else if (isRowExpanded) {
@@ -127,7 +137,8 @@ export function ReleaseTableWithTracks({
         : '';
 
       return [
-        'rounded-none transition-[background-color,box-shadow] duration-150 ease-out',
+        designV1 ? 'rounded-md' : 'rounded-none',
+        'transition-[background-color,box-shadow] duration-150 ease-out',
         baseClassName,
         refreshClassName,
         flashClassName,
@@ -135,7 +146,13 @@ export function ReleaseTableWithTracks({
         .filter(Boolean)
         .join(' ');
     },
-    [isExpanded, selectedReleaseId, refreshingReleaseId, flashedReleaseId]
+    [
+      isExpanded,
+      designV1,
+      selectedReleaseId,
+      refreshingReleaseId,
+      flashedReleaseId,
+    ]
   );
 
   const handleFocusedReleaseChange = useCallback(
@@ -163,12 +180,13 @@ export function ReleaseTableWithTracks({
         isExpanded,
         isLoadingTracks,
         toggleExpansion,
-        onEdit
+        onEdit,
+        designV1
       ),
       minSize: 200,
       size: 9999,
       enableSorting: false,
-      meta: { className: 'pl-4 pr-2.5' },
+      meta: { className: designV1 ? 'pl-3 pr-2' : 'pl-4 pr-2.5' },
     });
 
     const rightMetaColumn = columnHelper.display({
@@ -176,11 +194,16 @@ export function ReleaseTableWithTracks({
       header: MetaHeaderCell,
       cell: createRightMetaCellRenderer(
         isSmartLinkLocked,
-        getSmartLinkLockReason
+        getSmartLinkLockReason,
+        designV1
       ),
-      size: 260,
+      size: designV1 ? 390 : 260,
       minSize: 100,
-      meta: { className: 'max-sm:hidden pl-2 pr-4 sm:table-cell' },
+      meta: {
+        className: designV1
+          ? 'max-sm:hidden pl-2 pr-3 sm:table-cell'
+          : 'max-sm:hidden pl-2 pr-4 sm:table-cell',
+      },
     });
 
     return [releaseColumn, rightMetaColumn];
@@ -190,6 +213,7 @@ export function ReleaseTableWithTracks({
     isLoadingTracks,
     toggleExpansion,
     onEdit,
+    designV1,
     isSmartLinkLocked,
     getSmartLinkLockReason,
   ]);
@@ -228,7 +252,7 @@ export function ReleaseTableWithTracks({
       return (
         <div
           data-testid={`release-track-stack-${release.id}`}
-          className='px-4 pb-3 pt-1.5'
+          className={designV1 ? 'px-3 pb-2.5 pt-1' : 'px-4 pb-3 pt-1.5'}
         >
           <div className='rounded-[14px] border border-[color:color-mix(in_oklab,var(--linear-app-frame-seam)_74%,transparent)] bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_70%,var(--linear-bg-surface-0))] p-2.5 shadow-[inset_0_1px_0_color-mix(in_oklab,white_4%,transparent)]'>
             <Suspense fallback={<TrackRowsLoadingRow />}>
@@ -255,6 +279,7 @@ export function ReleaseTableWithTracks({
       tanstackColumnVisibility,
       onTrackClick,
       selectedTrackId,
+      designV1,
     ]
   );
 
@@ -307,13 +332,17 @@ export function ReleaseTableWithTracks({
       minWidth='0'
       hideHeader
       className='text-[12.5px] text-primary-token'
-      containerClassName='h-full px-2.5 pb-2.5 pt-0.5 md:px-3 md:pb-3 md:pt-1'
+      containerClassName={
+        designV1
+          ? 'h-full px-2 pb-2 pt-1 md:px-2.5 md:pb-2.5 md:pt-1.5'
+          : 'h-full px-2.5 pb-2.5 pt-0.5 md:px-3 md:pb-3 md:pt-1'
+      }
       columnVisibility={tanstackColumnVisibility}
       onFocusedRowChange={handleFocusedReleaseChange}
       skeletonRows={14}
       skeletonColumnConfig={[
         { variant: 'release', width: '100%' },
-        { variant: 'meta', width: '204px' },
+        { variant: 'meta', width: designV1 ? '320px' : '204px' },
       ]}
       groupingConfig={groupingConfig}
       expandedRowIds={expandedReleaseIds}

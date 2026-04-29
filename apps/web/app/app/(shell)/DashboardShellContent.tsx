@@ -26,9 +26,30 @@ import {
 async function getEssentialShellFlagsSnapshot(
   userId: string
 ): Promise<AppFlagSnapshot> {
+  const [
+    shellChatV1,
+    designV1Releases,
+    designV1Tasks,
+    designV1ChatEntities,
+    designV1Lyrics,
+    designV1Library,
+  ] = await Promise.all([
+    getAppFlagValue('SHELL_CHAT_V1', { userId }),
+    getAppFlagValue('DESIGN_V1_RELEASES', { userId }),
+    getAppFlagValue('DESIGN_V1_TASKS', { userId }),
+    getAppFlagValue('DESIGN_V1_CHAT_ENTITIES', { userId }),
+    getAppFlagValue('DESIGN_V1_LYRICS', { userId }),
+    getAppFlagValue('DESIGN_V1_LIBRARY', { userId }),
+  ]);
+
   return {
     ...APP_FLAG_DEFAULTS,
-    SHELL_CHAT_V1: await getAppFlagValue('SHELL_CHAT_V1', { userId }),
+    SHELL_CHAT_V1: shellChatV1,
+    DESIGN_V1_RELEASES: designV1Releases,
+    DESIGN_V1_TASKS: designV1Tasks,
+    DESIGN_V1_CHAT_ENTITIES: designV1ChatEntities,
+    DESIGN_V1_LYRICS: designV1Lyrics,
+    DESIGN_V1_LIBRARY: designV1Library,
   };
 }
 

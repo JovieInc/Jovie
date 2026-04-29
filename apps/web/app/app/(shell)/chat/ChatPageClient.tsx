@@ -35,6 +35,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useClipboard } from '@/hooks/useClipboard';
 import { env } from '@/lib/env-client';
+import { useAppFlag } from '@/lib/flags/client';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import {
   ONBOARDING_PREVIEW_SNAPSHOT_KEY,
@@ -187,6 +188,15 @@ export function ChatPageClient({
   const [initialQueryHandled, setInitialQueryHandled] = useState(false);
   const { setHeaderBadge, setHeaderActions } = useSetHeaderActions();
   const [autoRetryCount, setAutoRetryCount] = useState(0);
+  const [currentThreadTitle, setCurrentThreadTitle] = useState<string | null>(
+    null
+  );
+  // Reset the thread title when the conversation changes so the previous
+  // thread's title doesn't leak into a fresh conversation while the new
+  // conversation's metadata is loading.
+  useEffect(() => {
+    setCurrentThreadTitle(null);
+  }, [conversationId]);
   const [_welcomeChatBootstrapState, setWelcomeChatBootstrapState] =
     useState<WelcomeChatBootstrapState>('idle');
   const welcomeChatBootstrapStateRef =
@@ -215,6 +225,7 @@ export function ChatPageClient({
   const enablePreviewPanel = !env.IS_E2E;
   const fromOnboarding = searchParams.get('from') === 'onboarding';
   const panelParam = searchParams.get('panel');
+  const designV1ChatEntitiesEnabled = useAppFlag('DESIGN_V1_CHAT_ENTITIES');
   // Hydrate only when the panel is open, deep-linked, or onboarding requested it.
   // This keeps closed chat routes cheap while allowing sidebar/mobile profile clicks.
   const shouldHydratePreviewPanel =
@@ -387,6 +398,7 @@ export function ChatPageClient({
   // Update the header badge when the conversation title changes
   const handleTitleChange = useCallback(
     (title: string | null) => {
+      setCurrentThreadTitle(title);
       if (title) {
         setHeaderBadge(<ChatTitleBadge title={title} />);
       } else {
@@ -663,6 +675,9 @@ export function ChatPageClient({
     <ChatEntityPanelProvider resetKey={conversationId ?? null}>
       <ChatEntityRightPanelHost
         enablePreviewPanel={shouldHydratePreviewPanel}
+        enableChatEntityPanels={designV1ChatEntitiesEnabled}
+        profileId={activeProfile.id}
+        threadTitle={currentThreadTitle}
       />
       <ErrorBoundary
         fallback={

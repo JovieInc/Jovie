@@ -393,6 +393,27 @@ Implementation note: any PR touching `/api/stripe/`, `/api/billing/`, auth middl
 
 ---
 
+## Trial-aware upgrade nudges — Phase 2
+
+**What:** Phase 1 (commit `8a27e3fec`, v26.4.185) shipped the price-formatting plumbing in `lib/billing/verified-upgrade.ts` and the 8-state nudge machine in `lib/queries/usePlanGate.ts:deriveNudgeState()` (`never_trialed | trial_honeymoon | trial_late | trial_last_day | recently_lapsed | stale_lapsed | pro_paid | max_paid`). Phase 2 should specify what actually fires per state — sidebar banner copy, dashboard placements, win-back emails, and the ramp plan.
+
+**Why:** Without phase 2 documented, the state machine bitrots — new states get added without callers, banner copy drifts from price-format helpers, and the team forgets which lapse window does what. Worse, we ship a half-instrumented surface and can't tell whether the nudge moved the upgrade rate.
+
+**Open questions for Phase 2:**
+- Which states get a sidebar banner vs. an in-line dashboard prompt vs. an email?
+- Win-back email cadence (24h after trial-end? 7d? 30d?) and stop conditions
+- A/B framework — which state(s) are we testing first
+- Funnel metrics — drop-off per state, conversion-by-state, dashboard for ramp tracking
+- 50-fan notification cap (per pricing memory) — does Phase 2 expose a "approaching cap" nudge for free users?
+
+**Context:** Phase 1 is intentionally read-only — it's the data layer. Phase 2 is the surfacing layer. Banner shell already exists at `apps/web/components/.../SidebarUpgradeBanner.tsx` (`buildVariant()`). When Phase 2 is scoped, this entry should be replaced with concrete sub-tickets (one per nudge surface) and the docs at `apps/web/lib/billing/README.md` updated.
+
+**Effort:** TBD — likely M for the banner pass alone, L if win-back emails + admin funnel dashboard are bundled in.
+**Priority:** P2 — Phase 1 is shipped and stable; not blocking, but at risk of stalling.
+**Noticed on:** Post-merge audit of v26.4.185 (2026-04-28).
+
+---
+
 ### Video Release Health Check + Artist Observability
 
 **What:** Three-layer system for broken video detection:

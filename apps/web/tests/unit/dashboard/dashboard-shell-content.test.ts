@@ -17,6 +17,7 @@ import {
   shouldRedirectToOnboarding,
   shouldUseEssentialShellData,
 } from '@/app/app/(shell)/shell-route-matches';
+import { APP_ROUTES } from '@/constants/routes';
 
 describe('@critical DashboardShellContent behavior contracts', () => {
   describe('ban check decision', () => {
@@ -73,6 +74,13 @@ describe('@critical DashboardShellContent behavior contracts', () => {
 
     it('releases routes use essential shell data', () => {
       expect(shouldUseEssentialShellData('/app/dashboard/releases')).toBe(true);
+    });
+
+    it('lyrics and library routes use essential shell data', () => {
+      expect(shouldUseEssentialShellData(APP_ROUTES.LYRICS)).toBe(true);
+      expect(shouldUseEssentialShellData(APP_ROUTES.DASHBOARD_LIBRARY)).toBe(
+        true
+      );
     });
 
     it('dashboard root uses essential shell data', () => {

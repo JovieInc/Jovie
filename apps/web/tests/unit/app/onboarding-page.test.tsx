@@ -106,6 +106,10 @@ vi.mock('@/lib/env-server', () => ({
   },
 }));
 
+vi.mock('@/lib/flags/server', () => ({
+  getAppFlagValue: vi.fn().mockResolvedValue(false),
+}));
+
 vi.mock('@/lib/claim/context', () => ({
   readPendingClaimContext: vi.fn().mockResolvedValue(null),
 }));
@@ -551,5 +555,27 @@ describe('onboarding page', () => {
       })
     );
     expect(vi.mocked(reserveOnboardingHandle).mock.calls).toHaveLength(0);
+  });
+
+  it('passes designV1=true when DESIGN_V1_ONBOARDING gate is enabled', async () => {
+    const { resolveUserState } = await import('@/lib/auth/gate');
+    const { getAppFlagValue } = await import('@/lib/flags/server');
+
+    vi.mocked(resolveUserState).mockResolvedValueOnce({
+      state: 'NEEDS_ONBOARDING',
+      clerkUserId: 'clerk_123',
+      dbUserId: 'db_123',
+      profileId: null,
+      redirectTo: APP_ROUTES.ONBOARDING,
+      context: { isAdmin: false, isPro: false, email: 'artist@example.com' },
+    });
+    vi.mocked(getAppFlagValue).mockResolvedValueOnce(true);
+
+    const page = await OnboardingPage({ searchParams: Promise.resolve({}) });
+    render(page);
+
+    expect(onboardingWrapperPropsSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ designV1: true })
+    );
   });
 });

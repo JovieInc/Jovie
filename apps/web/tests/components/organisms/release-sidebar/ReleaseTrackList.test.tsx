@@ -204,6 +204,7 @@ describe('ReleaseTrackList', () => {
       releaseTitle: 'Midnight Sun',
       artistName: release.artistNames?.[0],
       artworkUrl: release.artworkUrl,
+      hasLyrics: false,
     });
   });
 

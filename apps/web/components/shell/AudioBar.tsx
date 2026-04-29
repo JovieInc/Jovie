@@ -95,15 +95,15 @@ export function AudioBar({
   readonly onShuffle?: () => void;
   readonly onPrevious?: () => void;
   readonly onNext?: () => void;
-  readonly onCollapse: () => void;
+  readonly onCollapse?: () => void;
   readonly currentTime: number;
   readonly duration: number;
   readonly cues?: readonly ScrubCue[];
-  readonly loopMode: LoopMode;
-  readonly onCycleLoop: () => void;
+  readonly loopMode?: LoopMode;
+  readonly onCycleLoop?: () => void;
   readonly loopSection?: ScrubLoopSection;
-  readonly waveformOn: boolean;
-  readonly onToggleWaveform: () => void;
+  readonly waveformOn?: boolean;
+  readonly onToggleWaveform?: () => void;
   readonly lyricsActive?: boolean;
   readonly onOpenLyrics?: () => void;
   readonly track: AudioBarTrack;
@@ -111,22 +111,26 @@ export function AudioBar({
 }) {
   const transportButtons = (
     <div className='flex items-center gap-1.5 justify-self-center'>
-      <IconBtn
-        label='Shuffle'
-        tooltipSide='top'
-        tone='ghost'
-        onClick={onShuffle}
-      >
-        <Shuffle className='h-3.5 w-3.5' strokeWidth={2.25} />
-      </IconBtn>
-      <IconBtn
-        label='Previous'
-        tooltipSide='top'
-        tone='ghost'
-        onClick={onPrevious}
-      >
-        <SkipBack className='h-4 w-4' strokeWidth={2.5} fill='currentColor' />
-      </IconBtn>
+      {onShuffle && (
+        <IconBtn
+          label='Shuffle'
+          tooltipSide='top'
+          tone='ghost'
+          onClick={onShuffle}
+        >
+          <Shuffle className='h-3.5 w-3.5' strokeWidth={2.25} />
+        </IconBtn>
+      )}
+      {onPrevious && (
+        <IconBtn
+          label='Previous'
+          tooltipSide='top'
+          tone='ghost'
+          onClick={onPrevious}
+        >
+          <SkipBack className='h-4 w-4' strokeWidth={2.5} fill='currentColor' />
+        </IconBtn>
+      )}
       <Tooltip
         label={isPlaying ? 'Pause' : 'Play'}
         shortcut={SHORTCUTS.playPause}
@@ -135,7 +139,7 @@ export function AudioBar({
         <button
           type='button'
           onClick={onPlay}
-          className='h-8 w-8 rounded-full grid place-items-center bg-primary text-on-primary transition-transform duration-150 ease-out hover:scale-[1.04] active:scale-95'
+          className='h-8 w-8 rounded-full grid place-items-center bg-primary text-on-primary transition-colors duration-150 ease-out hover:bg-primary/90'
           aria-label={isPlaying ? 'Pause (space)' : 'Play (space)'}
         >
           {isPlaying ? (
@@ -153,14 +157,18 @@ export function AudioBar({
           )}
         </button>
       </Tooltip>
-      <IconBtn label='Next' tooltipSide='top' tone='ghost' onClick={onNext}>
-        <SkipForward
-          className='h-4 w-4'
-          strokeWidth={2.5}
-          fill='currentColor'
-        />
-      </IconBtn>
-      <LoopBtn mode={loopMode} onClick={onCycleLoop} />
+      {onNext && (
+        <IconBtn label='Next' tooltipSide='top' tone='ghost' onClick={onNext}>
+          <SkipForward
+            className='h-4 w-4'
+            strokeWidth={2.5}
+            fill='currentColor'
+          />
+        </IconBtn>
+      )}
+      {loopMode && onCycleLoop && (
+        <LoopBtn mode={loopMode} onClick={onCycleLoop} />
+      )}
     </div>
   );
 
@@ -178,29 +186,33 @@ export function AudioBar({
           <Mic2 className='h-3.5 w-3.5' strokeWidth={2.25} />
         </IconBtn>
       )}
-      <IconBtn
-        label={waveformOn ? 'Hide waveform' : 'Show waveform'}
-        shortcut={SHORTCUTS.toggleWaveform}
-        onClick={onToggleWaveform}
-        active={waveformOn}
-        tooltipSide='top'
-        tone='ghost'
-      >
-        {waveformOn ? (
-          <AudioLines className='h-3.5 w-3.5' strokeWidth={2.25} />
-        ) : (
-          <AudioWaveform className='h-3.5 w-3.5' strokeWidth={2.25} />
-        )}
-      </IconBtn>
-      <IconBtn
-        label='Minimize player'
-        shortcut={SHORTCUTS.toggleBar}
-        onClick={onCollapse}
-        tooltipSide='top'
-        tone='ghost'
-      >
-        <Minimize2 className='h-3.5 w-3.5' strokeWidth={2.25} />
-      </IconBtn>
+      {typeof waveformOn === 'boolean' && onToggleWaveform && (
+        <IconBtn
+          label={waveformOn ? 'Hide waveform' : 'Show waveform'}
+          shortcut={SHORTCUTS.toggleWaveform}
+          onClick={onToggleWaveform}
+          active={waveformOn}
+          tooltipSide='top'
+          tone='ghost'
+        >
+          {waveformOn ? (
+            <AudioLines className='h-3.5 w-3.5' strokeWidth={2.25} />
+          ) : (
+            <AudioWaveform className='h-3.5 w-3.5' strokeWidth={2.25} />
+          )}
+        </IconBtn>
+      )}
+      {onCollapse && (
+        <IconBtn
+          label='Minimize player'
+          shortcut={SHORTCUTS.toggleBar}
+          onClick={onCollapse}
+          tooltipSide='top'
+          tone='ghost'
+        >
+          <Minimize2 className='h-3.5 w-3.5' strokeWidth={2.25} />
+        </IconBtn>
+      )}
     </div>
   );
 

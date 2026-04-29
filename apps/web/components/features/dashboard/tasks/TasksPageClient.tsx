@@ -66,6 +66,7 @@ import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
+import { useAppFlag } from '@/lib/flags/client';
 import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
 import {
   useCreateTaskMutation,
@@ -499,6 +500,7 @@ function TaskDocumentPanel({
   onUpdateAssignee,
   artistName,
   isDesktopLayout,
+  designV1,
 }: Readonly<{
   task: TaskView | null;
   title: string;
@@ -512,6 +514,7 @@ function TaskDocumentPanel({
   onUpdateAssignee: (taskId: string, assigneeKind: TaskAssigneeKind) => void;
   artistName?: string | null;
   isDesktopLayout: boolean;
+  designV1: boolean;
 }>) {
   const descriptionEditorRef = useRef<HTMLTextAreaElement>(null);
   const [descriptionHelperDismissed, setDescriptionHelperDismissed] =
@@ -551,6 +554,22 @@ function TaskDocumentPanel({
   }, [description, descriptionHelper]);
 
   if (!task) {
+    if (designV1) {
+      return (
+        <div className='flex min-h-0 flex-1 items-center justify-center px-8 py-8'>
+          <div className='max-w-sm text-center'>
+            <p className='text-[13px] leading-relaxed text-tertiary-token'>
+              Pick a task from the list to see what it needs.
+            </p>
+            <p className='mt-2 text-[11.5px] text-quaternary-token'>
+              Use the task list to scan the queue, then open the one that needs
+              attention.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className='flex min-h-0 flex-1 items-center justify-center px-6 py-6'>
         <div className='max-w-[34rem] px-6 py-10 text-center'>
@@ -1166,6 +1185,7 @@ function useTaskActions({
 }
 
 export function TasksPageClient() {
+  const designV1TasksEnabled = useAppFlag('DESIGN_V1_TASKS');
   const { selectedProfile } = useDashboardData();
   const { setHeaderActions } = useSetHeaderActions();
   const isXlUp = useBreakpoint('xl');
@@ -1258,7 +1278,8 @@ export function TasksPageClient() {
   );
   const visibleTasks = isXlUp ? tasks : mobileScopedTasks;
   const effectiveSelectedTaskId =
-    selectedTaskId ?? (isXlUp ? (visibleTasks[0]?.id ?? null) : null);
+    selectedTaskId ??
+    (isXlUp && !designV1TasksEnabled ? (visibleTasks[0]?.id ?? null) : null);
   const { data: selectedTaskData } = useTaskQuery(
     effectiveSelectedTaskId,
     profileId
@@ -1438,9 +1459,18 @@ export function TasksPageClient() {
         return;
       }
 
-      setSelectedTaskId(visibleTasks[0]?.id ?? null);
+      setSelectedTaskId(
+        designV1TasksEnabled ? null : (visibleTasks[0]?.id ?? null)
+      );
     }
-  }, [isLoading, isXlUp, selectedTaskId, tasks, visibleTasks]);
+  }, [
+    designV1TasksEnabled,
+    isLoading,
+    isXlUp,
+    selectedTaskId,
+    tasks,
+    visibleTasks,
+  ]);
 
   const selectTaskByIndex = useCallback(
     (index: number) => {
@@ -1747,6 +1777,7 @@ export function TasksPageClient() {
     <PageShell
       className='overflow-hidden'
       data-testid='tasks-workspace'
+      data-design-v1-tasks={designV1TasksEnabled ? 'true' : undefined}
       toolbar={
         isXlUp || headerMode !== 'default' ? (
           <TaskWorkspaceHeaderBar
@@ -1891,6 +1922,7 @@ export function TasksPageClient() {
                   }
                   artistName={artistName}
                   isDesktopLayout={isXlUp}
+                  designV1={designV1TasksEnabled}
                 />
               ) : (
                 <TaskDocumentPanel
@@ -1906,6 +1938,7 @@ export function TasksPageClient() {
                   onUpdateAssignee={NOOP_TASK_ASSIGNEE_UPDATE}
                   artistName={artistName}
                   isDesktopLayout={isXlUp}
+                  designV1={designV1TasksEnabled}
                 />
               )}
             </div>

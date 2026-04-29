@@ -3,6 +3,7 @@ import type { PublicRelease } from '@/features/profile/releases/types';
 import { ProfileCompactTemplate } from '@/features/profile/templates/ProfileCompactTemplate';
 import { buildProfilePublicViewModel } from '@/features/profile/view-models';
 import type { DiscogRelease } from '@/lib/db/schema/content';
+import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
@@ -127,6 +128,9 @@ export function StaticArtistPage({
       releases={releases}
       hideJovieBranding={hideJovieBranding}
       hideMoreMenu={hideMoreMenu}
+      visualVariant={
+        FEATURE_FLAGS.SHOW_PUBLIC_PROFILE_V1_DESIGN ? 'v1' : 'default'
+      }
     />
   );
 }

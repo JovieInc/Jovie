@@ -39,6 +39,7 @@ export function LyricRow({
   onSeek,
   onStamp,
   onChangeText,
+  interactive = true,
 }: {
   readonly line: LyricLine;
   readonly index: number;
@@ -49,8 +50,17 @@ export function LyricRow({
   readonly onSeek: () => void;
   readonly onStamp: () => void;
   readonly onChangeText: (text: string) => void;
+  readonly interactive?: boolean;
 }) {
   if (!editing) {
+    if (!interactive) {
+      return (
+        <li className='text-center text-[20px] leading-[1.35] font-display tracking-[-0.012em] text-secondary-token'>
+          {line.text}
+        </li>
+      );
+    }
+
     // Display mode — the entire row is a seek button. Native <button>
     // gives proper keyboard + Enter/Space + focus ring for free.
     return (

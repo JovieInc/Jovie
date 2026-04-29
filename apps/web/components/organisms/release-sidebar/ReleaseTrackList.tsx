@@ -24,6 +24,7 @@ interface TrackControlSource {
   readonly releaseTitle?: string;
   readonly artistName?: string;
   readonly artworkUrl?: string | null;
+  readonly hasLyrics?: boolean;
 }
 
 function getCanonicalTrackLabel(track: ReleaseSidebarTrack): string {
@@ -197,6 +198,7 @@ function TrackListRow({
       releaseTitle: release.title,
       artistName: release.artistNames?.[0],
       artworkUrl: release.artworkUrl,
+      hasLyrics: Boolean(track.lyrics?.trim()),
     }).catch(() => {
       toast.error('Unable to play this track right now');
     });
@@ -209,6 +211,7 @@ function TrackListRow({
     release.title,
     track.id,
     track.isrc,
+    track.lyrics,
     track.title,
   ]);
 

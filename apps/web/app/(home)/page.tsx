@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
+import { HomeV1Design } from '@/components/features/home/HomeV1Design';
 import { HomepageHeroMockupCarousel } from '@/components/homepage/HomepageHeroCarousel';
 import { HomepageOutcomeCards } from '@/components/homepage/HomepageOutcomeCards';
 import { HERO_COPY } from '@/components/homepage/intent';
@@ -163,15 +164,29 @@ function HomepageHeroActions() {
   );
 }
 
-export default function HomePage() {
+function HomePageShell({ children }: { readonly children: React.ReactNode }) {
   return (
     <>
       <AuthRedirectHandler />
-
       <script type='application/ld+json'>{WEBSITE_SCHEMA}</script>
       <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
       <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
+      {children}
+    </>
+  );
+}
 
+export default function HomePage() {
+  if (FEATURE_FLAGS.SHOW_HOME_V1_DESIGN) {
+    return (
+      <HomePageShell>
+        <HomeV1Design />
+      </HomePageShell>
+    );
+  }
+
+  return (
+    <HomePageShell>
       <section
         className='homepage-hero-stage relative'
         aria-labelledby='home-hero-heading'
@@ -232,6 +247,6 @@ export default function HomePage() {
           <HomepageV2FinalCta />
         ) : null}
       </div>
-    </>
+    </HomePageShell>
   );
 }

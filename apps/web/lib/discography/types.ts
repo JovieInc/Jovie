@@ -205,6 +205,7 @@ export interface TrackViewModel {
   previewUrl: string | null;
   audioUrl: string | null;
   audioFormat: string | null;
+  lyrics?: string | null;
   previewSource?: PreviewSource;
   previewVerification?: PreviewVerification;
   providerConfidenceSummary?: ProviderConfidenceSummary;
