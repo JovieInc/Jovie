@@ -179,3 +179,33 @@ Every Design V1 PR must name the flags it touches and verify:
 
 Docs-only issues may replace test runs with documentation review and `git diff
 --check`, but must still avoid product behavior changes.
+
+## Recurring CI Coverage
+
+PR CI stays focused on fast merge gates plus existing label-gated build, a11y,
+layout, smoke, and Lighthouse jobs. Design V1 flag coverage belongs in recurring
+or manual pre-rollout checks unless the PR changes the flag registry, route
+contract, or a specific flagged surface.
+
+The nightly workflow runs a targeted Chromium canary via:
+
+```bash
+pnpm --filter @jovie/web run test:e2e:design-v1-flags
+```
+
+The canary covers flagged dashboard, auth, and onboarding surfaces in
+`apps/web/tests/e2e/design-v1-flagged-surfaces.spec.ts`. It verifies every
+runtime Design V1 flag remains default-off, then forces each surface on through
+the browser override harness. It is also available manually from **Nightly
+Tests** with suite `design-v1` before a staged rollout.
+
+Interpret failures this way:
+
+- Default-off failures mean a flag default, route fallback, or production
+  baseline changed. Treat this as a rollout blocker.
+- Flag-on failures mean the gated surface, auth bypass, seed data, or route
+  contract regressed. Fix or explicitly defer that surface before widening the
+  cohort.
+- A11y and Lighthouse coverage stays in the existing public/PR lanes unless the
+  changed flagged surface has a known accessibility or performance risk that
+  justifies the extra runtime.
