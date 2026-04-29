@@ -225,7 +225,7 @@ function SidebarHeaderNav({
   hasMultipleProfiles: boolean;
   isDemoRoute: boolean;
 }>) {
-  const shellChatV1Enabled = useAppFlag('SHELL_CHAT_V1');
+  const shellChatV1Enabled = useAppFlag('DESIGN_V1');
   const newThreadLink = (
     <Link
       href={APP_ROUTES.CHAT}
@@ -446,7 +446,7 @@ function ShellSidebarInstallBanner() {
  */
 export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
   const { isAdmin: isUserAdmin, creatorProfiles } = useDashboardData();
-  const shellChatV1Enabled = useAppFlag('SHELL_CHAT_V1');
+  const shellChatV1Enabled = useAppFlag('DESIGN_V1');
   const pathname = usePathname();
   const isDemoRoute = isDemoRoutePath(pathname);
   const isInSettings = section === 'settings';

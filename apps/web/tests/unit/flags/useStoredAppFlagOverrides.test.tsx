@@ -4,7 +4,7 @@ import { useStoredAppFlagOverrides } from '@/lib/flags/client';
 import { APP_FLAG_OVERRIDE_KEYS } from '@/lib/flags/contracts';
 import { FF_OVERRIDES_KEY } from '@/lib/flags/overrides';
 
-const VALID_KEY_A = APP_FLAG_OVERRIDE_KEYS.SHELL_CHAT_V1;
+const VALID_KEY_A = APP_FLAG_OVERRIDE_KEYS.DESIGN_V1;
 const VALID_KEY_B = APP_FLAG_OVERRIDE_KEYS.STRIPE_CONNECT_ENABLED;
 const ORPHAN_KEY = 'code:RENAMED_OR_REMOVED_FLAG';
 

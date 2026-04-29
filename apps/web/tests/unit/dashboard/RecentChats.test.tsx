@@ -178,11 +178,11 @@ const baseDashboardData: DashboardData = {
 };
 
 function renderRecentChats({
-  shellChatV1 = false,
-}: Readonly<{ shellChatV1?: boolean }> = {}) {
+  designV1 = false,
+}: Readonly<{ designV1?: boolean }> = {}) {
   return fastRender(
     <AppFlagProvider
-      initialFlags={{ ...APP_FLAG_DEFAULTS, SHELL_CHAT_V1: shellChatV1 }}
+      initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1: designV1 }}
     >
       <DashboardDataProvider value={baseDashboardData}>
         <SidebarProvider>
@@ -212,8 +212,8 @@ describe('RecentChats', () => {
     expect(getAllByText('Test Chat Two').length).toBeGreaterThanOrEqual(1);
   });
 
-  it('uses shell threads for navigation when Shell Chat V1 is enabled', () => {
-    const { getByRole } = renderRecentChats({ shellChatV1: true });
+  it('uses shell threads for navigation when the new design flag is enabled', () => {
+    const { getByRole } = renderRecentChats({ designV1: true });
 
     fireEvent.click(getByRole('button', { name: /Test Chat Two/ }));
 

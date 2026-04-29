@@ -47,7 +47,7 @@ export default async function AppShellLayout({
     // matches the post-resolve AppShellFrame layout. Without this, flag-on
     // users would flash a 'legacy' skeleton then snap to the rounded
     // 'shellChatV1' frame once DashboardShellContent resolves.
-    const shellChatV1 = await getAppFlagValue('SHELL_CHAT_V1', {
+    const shellChatV1 = await getAppFlagValue('DESIGN_V1', {
       userId: auth.userId,
     });
     const shellVariant = shellChatV1 ? 'shellChatV1' : 'legacy';

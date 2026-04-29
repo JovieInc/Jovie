@@ -28,10 +28,10 @@ describe('DashboardNav', () => {
     expect(queryByRole('link', { name: 'Earnings' })).toBeNull();
   });
 
-  it('renders Library navigation only when the Library V1 flag is enabled', () => {
+  it('renders Library navigation only when the new design flag is enabled', () => {
     const { getByRole } = renderDashboardNav({
       renderFn: fastRender,
-      appFlags: { DESIGN_V1_LIBRARY: true },
+      appFlags: { DESIGN_V1: true },
     });
 
     expect(getByRole('link', { name: 'Library' }).getAttribute('href')).toBe(
@@ -104,7 +104,7 @@ describe('DashboardNav', () => {
 
     const { getByRole } = renderDashboardNav({
       renderFn: fastRender,
-      appFlags: { DESIGN_V1_LIBRARY: true },
+      appFlags: { DESIGN_V1: true },
     });
 
     expect(

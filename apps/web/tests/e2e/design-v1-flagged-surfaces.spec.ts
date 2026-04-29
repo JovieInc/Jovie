@@ -1,9 +1,10 @@
 /**
  * Focused Design V1 flag matrix.
  *
- * Verifies every Design V1 runtime app flag remains default-off, preserves the
- * default route behavior with no override, and renders its gated surface when
- * forced on through the same browser override harness used by local QA.
+ * Verifies the single Design V1 runtime app flag remains default-off,
+ * preserves the default route behavior with no override, and renders each
+ * gated surface when forced on through the same browser override harness used
+ * by local QA.
  *
  * Run:
  *   doppler run --project jovie-web --config dev -- env E2E_USE_TEST_AUTH_BYPASS=1 pnpm --filter @jovie/web exec playwright test tests/e2e/design-v1-flagged-surfaces.spec.ts --project=chromium
@@ -23,30 +24,18 @@ import {
   TEST_PERSONA_COOKIE,
   TEST_USER_ID_COOKIE,
 } from '@/lib/auth/test-mode';
-import type { AppFlagName } from '@/lib/flags/contracts';
 import {
   clearAppFlagOverrides,
   getAppFlagDefault,
   installAppFlagOverrides,
 } from './helpers/app-flag-overrides';
 
-const DESIGN_V1_FLAGS = [
-  'DESIGN_V1_RELEASES',
-  'DESIGN_V1_TASKS',
-  'DESIGN_V1_CHAT_ENTITIES',
-  'DESIGN_V1_LYRICS',
-  'DESIGN_V1_LIBRARY',
-  'DESIGN_V1_AUTH',
-  'DESIGN_V1_ONBOARDING',
-] as const satisfies readonly AppFlagName[];
-
-type DesignV1Flag = (typeof DESIGN_V1_FLAGS)[number];
 type RequiredPersona = Extract<DevTestAuthPersona, 'creator' | 'creator-ready'>;
 
 const REQUIRED_PERSONAS = ['creator', 'creator-ready'] as const;
 
 interface SurfaceCase {
-  readonly flagName: DesignV1Flag;
+  readonly name: string;
   readonly route: string | ((page: Page) => Promise<string>);
   readonly persona?: RequiredPersona;
   readonly prepare?: (page: Page) => Promise<void>;
@@ -195,7 +184,7 @@ async function resolveSeededLyricsRoute(page: Page): Promise<string> {
 
 const SURFACE_CASES: readonly SurfaceCase[] = [
   {
-    flagName: 'DESIGN_V1_RELEASES',
+    name: 'releases',
     route: APP_ROUTES.DASHBOARD_RELEASES,
     persona: 'creator-ready',
     assertDefault: async page => {
@@ -219,7 +208,7 @@ const SURFACE_CASES: readonly SurfaceCase[] = [
     },
   },
   {
-    flagName: 'DESIGN_V1_TASKS',
+    name: 'tasks',
     route: APP_ROUTES.DASHBOARD_TASKS,
     persona: 'creator-ready',
     assertDefault: async page => {
@@ -239,7 +228,7 @@ const SURFACE_CASES: readonly SurfaceCase[] = [
     },
   },
   {
-    flagName: 'DESIGN_V1_CHAT_ENTITIES',
+    name: 'chat entities',
     route: APP_ROUTES.CHAT,
     persona: 'creator-ready',
     assertDefault: async page => {
@@ -261,7 +250,7 @@ const SURFACE_CASES: readonly SurfaceCase[] = [
     },
   },
   {
-    flagName: 'DESIGN_V1_LYRICS',
+    name: 'lyrics',
     route: resolveSeededLyricsRoute,
     prepare: prepareSeededE2EUser,
     assertDefault: expectNotFound,
@@ -274,7 +263,7 @@ const SURFACE_CASES: readonly SurfaceCase[] = [
     },
   },
   {
-    flagName: 'DESIGN_V1_LIBRARY',
+    name: 'library',
     route: APP_ROUTES.DASHBOARD_LIBRARY,
     persona: 'creator-ready',
     assertDefault: expectNotFound,
@@ -285,7 +274,7 @@ const SURFACE_CASES: readonly SurfaceCase[] = [
     },
   },
   {
-    flagName: 'DESIGN_V1_AUTH',
+    name: 'auth',
     route: APP_ROUTES.SIGNIN,
     assertDefault: async page => {
       await expect(page.locator('[data-auth-shell]')).toHaveAttribute(
@@ -303,7 +292,7 @@ const SURFACE_CASES: readonly SurfaceCase[] = [
     },
   },
   {
-    flagName: 'DESIGN_V1_ONBOARDING',
+    name: 'onboarding',
     route: `${APP_ROUTES.ONBOARDING}?handle=design-v1-flag-matrix`,
     persona: 'creator',
     assertDefault: async page => {
@@ -331,10 +320,8 @@ test.describe('Design V1 flagged surfaces', () => {
     'Requires E2E_USE_TEST_AUTH_BYPASS=1'
   );
 
-  test('keeps every Design V1 app flag default-off', () => {
-    for (const flagName of DESIGN_V1_FLAGS) {
-      expect(getAppFlagDefault(flagName), `${flagName} default`).toBe(false);
-    }
+  test('keeps the Design V1 app flag default-off', () => {
+    expect(getAppFlagDefault('DESIGN_V1'), 'DESIGN_V1 default').toBe(false);
   });
 
   test.describe('surface routes', () => {
@@ -351,7 +338,7 @@ test.describe('Design V1 flagged surfaces', () => {
     });
 
     for (const surface of SURFACE_CASES) {
-      test(`${surface.flagName} preserves default-off route behavior`, async ({
+      test(`${surface.name} preserves default-off route behavior`, async ({
         page,
       }) => {
         await clearAppFlagOverrides(page);
@@ -366,8 +353,8 @@ test.describe('Design V1 flagged surfaces', () => {
         await surface.assertDefault(page);
       });
 
-      test(`${surface.flagName} renders when forced on`, async ({ page }) => {
-        await installAppFlagOverrides(page, { [surface.flagName]: true });
+      test(`${surface.name} renders when forced on`, async ({ page }) => {
+        await installAppFlagOverrides(page, { DESIGN_V1: true });
 
         if (surface.prepare) {
           await surface.prepare(page);

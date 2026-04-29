@@ -6,8 +6,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const appFlagState = vi.hoisted(() => ({
-  DESIGN_V1_RELEASES: false,
-  SHELL_CHAT_V1: false,
+  DESIGN_V1: false,
 }));
 
 // Mock dashboard context
@@ -102,22 +101,19 @@ import {
 
 describe('@critical ReleasesPageClient', () => {
   beforeEach(() => {
-    appFlagState.DESIGN_V1_RELEASES = false;
-    appFlagState.SHELL_CHAT_V1 = false;
+    appFlagState.DESIGN_V1 = false;
     mockQueryResult.data = [];
     mockQueryResult.isLoading = false;
     mockQueryResult.isError = false;
   });
 
   it.each([
-    [false, false, 'legacyProviderMatrix'],
-    [true, false, 'legacyProviderMatrix'],
-    [false, true, 'designV1ShellReleases'],
-    [true, true, 'designV1ShellReleases'],
-  ] as const)('resolves releases view mode for SHELL_CHAT_V1=%s and DESIGN_V1_RELEASES=%s', (shellChatV1Enabled, designV1ReleasesEnabled, expectedMode) => {
+    [false, 'legacyProviderMatrix'],
+    [true, 'designV1ShellReleases'],
+  ] as const)('resolves releases view mode for DESIGN_V1=%s', (designV1ReleasesEnabled, expectedMode) => {
     expect(
       resolveReleasesViewMode({
-        shellChatV1Enabled,
+        shellChatV1Enabled: designV1ReleasesEnabled,
         designV1ReleasesEnabled,
       })
     ).toBe(expectedMode);
@@ -180,9 +176,8 @@ describe('@critical ReleasesPageClient', () => {
     );
   });
 
-  it('keeps ReleasesExperience when SHELL_CHAT_V1 is on and DESIGN_V1_RELEASES is off', () => {
-    appFlagState.SHELL_CHAT_V1 = true;
-    appFlagState.DESIGN_V1_RELEASES = false;
+  it('keeps ReleasesExperience when DESIGN_V1 is off', () => {
+    appFlagState.DESIGN_V1 = false;
     mockQueryResult.data = [{ id: 'r1' }] as unknown[];
 
     render(<ReleasesPageClient />);
@@ -194,9 +189,8 @@ describe('@critical ReleasesPageClient', () => {
     expect(screen.queryByTestId('shell-releases-view')).not.toBeInTheDocument();
   });
 
-  it('renders ShellReleasesView when DESIGN_V1_RELEASES is on and SHELL_CHAT_V1 is off', () => {
-    appFlagState.SHELL_CHAT_V1 = false;
-    appFlagState.DESIGN_V1_RELEASES = true;
+  it('renders ShellReleasesView when DESIGN_V1 is on', () => {
+    appFlagState.DESIGN_V1 = true;
     mockQueryResult.data = [{ id: 'r1' }, { id: 'r2' }] as unknown[];
 
     render(<ReleasesPageClient />);

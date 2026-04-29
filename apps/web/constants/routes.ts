@@ -95,6 +95,7 @@ export const APP_ROUTES = {
 
   // System
   UNAVAILABLE: '/unavailable',
+  DESIGN_STUDIO: '/exp/page-builder',
 
   // Marketing
   HOME: '/',

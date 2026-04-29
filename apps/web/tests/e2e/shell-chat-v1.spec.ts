@@ -1,6 +1,6 @@
 /**
  * E2E smoke: the production authenticated shell can render the Shell + Chat V1
- * frame when the dev override forces `SHELL_CHAT_V1`.
+ * frame when the dev override forces `DESIGN_V1`.
  *
  * Run:
  *   doppler run --project jovie-web --config dev -- env E2E_USE_TEST_AUTH_BYPASS=1 pnpm --filter @jovie/web exec playwright test tests/e2e/shell-chat-v1.spec.ts --project=chromium
@@ -52,7 +52,7 @@ test('chat route renders the Shell V1 app frame when forced on', async ({
   test.setTimeout(180_000);
 
   const overrides = JSON.stringify({
-    [APP_FLAG_OVERRIDE_KEYS.SHELL_CHAT_V1]: true,
+    [APP_FLAG_OVERRIDE_KEYS.DESIGN_V1]: true,
   });
 
   await page.addInitScript(
