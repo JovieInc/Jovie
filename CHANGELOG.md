@@ -11,23 +11,25 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Added
 
-- **`pnpm run dev:web:fast`** for daily web work: pinned Doppler scope, local auth bypass defaults, stable `PORT=3100`, local Sentry disabled by default, and automatic prewarming for `/`, `/app`, and `/api/health/build-info`.
-- **`pnpm run benchmark:dev`** to measure local dev server readiness, first-route compile time, and warm-route latency across configurable routes.
-- **Fast iteration commands** for changed web tests and incremental web typechecking.
+- [internal] **`pnpm run dev:web:fast`** for daily web work: pinned Doppler scope, local auth bypass defaults, stable `PORT=3100`, local Sentry disabled by default, and automatic prewarming for `/`, `/app`, and `/api/health/build-info`.
+- [internal] **`pnpm run benchmark:dev`** to measure local dev server readiness, first-route compile time, and warm-route latency across configurable routes.
+- [internal] **Fast iteration commands** for changed web tests and incremental web typechecking.
 
 ### Changed
 
-- **Repeat `./scripts/setup.sh` runs are faster** by skipping unchanged dependency installs, preserving Turbopack cache unless `JOVIE_DEV_RESET_NEXT_CACHE=1`, and making dev Clerk ID sync opt-in or stale-marker based.
-- **Local Sentry initialization is a true no-op by default** in development, while production, preview, and explicit `JOVIE_ENABLE_LOCAL_SENTRY=1` behavior remains available.
-- **Homepage fallback imports are lighter** by loading the older home design only when its feature flag is enabled.
+- [internal] **Repeat `./scripts/setup.sh` runs are faster** by skipping unchanged dependency installs, preserving Turbopack cache unless `JOVIE_DEV_RESET_NEXT_CACHE=1`, and making dev Clerk ID sync opt-in or stale-marker based.
+- [internal] **Local Sentry initialization is a true no-op by default** in development, while production, preview, and explicit `JOVIE_ENABLE_LOCAL_SENTRY=1` behavior remains available.
+- [internal] **Homepage fallback imports are lighter** by loading the older home design only when its feature flag is enabled.
 
 ### Fixed
 
-- **Removed Turbo's deprecated `daemon` config** so local Turbo commands no longer emit the Turbo 2.9 deprecation warning.
+- [internal] **Removed Turbo's deprecated `daemon` config** so local Turbo commands no longer emit the Turbo 2.9 deprecation warning.
+- [internal] **Homepage V2 CTA components now have one source of truth** so pricing and final CTA copy cannot drift between entrypoints.
+- [internal] **Fast dev scripts handle edge cases more clearly** with portable port defaults, Node heap defaults, route probe timeouts, and dependency-free port checks.
 
 ### Documentation
 
-- **Local development docs now point at `dev:web:fast`** across README, agent guidance, Doppler setup, iOS setup, and screenshot-report instructions.
+- [internal] **Local development docs now point at `dev:web:fast`** across README, agent guidance, Doppler setup, iOS setup, and screenshot-report instructions.
 
 ## [26.4.194] - 2026-04-29
 

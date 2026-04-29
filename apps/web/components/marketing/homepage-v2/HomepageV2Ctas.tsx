@@ -5,7 +5,7 @@ import { HOMEPAGE_V2_COPY } from '@/data/homepageV2Copy';
 import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
 import { cn } from '@/lib/utils';
 
-function HomepageStoryHeader({
+export function HomepageStoryHeader({
   headline,
   body,
   align = 'center',
@@ -94,6 +94,12 @@ function PricingCard({
 }
 
 export function HomepageV2Pricing() {
+  const proMonthlyPrice = ENTITLEMENT_REGISTRY.pro.marketing.price?.monthly;
+  const proPriceDisplay =
+    typeof proMonthlyPrice === 'number'
+      ? `$${proMonthlyPrice}/mo`
+      : 'Contact Us';
+
   return (
     <section
       data-testid='homepage-v2-pricing'
@@ -113,7 +119,7 @@ export function HomepageV2Pricing() {
             ctaHref={`${APP_ROUTES.SIGNUP}?plan=pro`}
             ctaLabel='Start 14-Day Free Trial'
             featured
-            price={`$${ENTITLEMENT_REGISTRY.pro.marketing.price?.monthly ?? 0}/mo`}
+            price={proPriceDisplay}
             testId='homepage-v2-pricing-pro'
             title={ENTITLEMENT_REGISTRY.pro.marketing.displayName}
           />
@@ -216,7 +222,7 @@ export function HomepageV2FinalCta() {
             data-testid='homepage-v2-final-cta-heading'
             className='text-balance text-[clamp(2rem,3.4vw,3rem)] font-[680] leading-[1.05] tracking-[-0.025em] text-white'
           >
-            Start using Jovie <span className='block'>today for free.</span>
+            {HOMEPAGE_V2_COPY.finalCta.headline}
           </h2>
           <Link
             href={APP_ROUTES.SIGNUP}

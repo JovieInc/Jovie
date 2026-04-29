@@ -7,8 +7,33 @@ PORT="${PORT:-3100}"
 LOG_FILE="${TMPDIR:-/tmp}/jovie-dev-web-fast-$$.log"
 WARM_ROUTES="${JOVIE_DEV_WARM_ROUTES:-/ /app /api/health/build-info}"
 
-if lsof -ti "tcp:$PORT" >/dev/null 2>&1; then
+set +e
+node - "$PORT" <<'NODE'
+const net = require('node:net');
+const port = Number(process.argv[2]);
+
+if (!Number.isInteger(port) || port < 1 || port > 65535) {
+  process.exit(2);
+}
+
+const server = net.createServer();
+server.once('error', error => {
+  process.exit(error.code === 'EADDRINUSE' ? 42 : 1);
+});
+server.once('listening', () => {
+  server.close(() => process.exit(0));
+});
+server.listen(port);
+NODE
+PORT_STATUS=$?
+set -e
+
+if [ "$PORT_STATUS" -eq 42 ]; then
   echo "Port $PORT is already in use. Stop that server or run: PORT=$((PORT + 1)) pnpm run dev:web:fast" >&2
+  exit 1
+fi
+if [ "$PORT_STATUS" -ne 0 ]; then
+  echo "Unable to verify whether port $PORT is available. Check PORT and try again." >&2
   exit 1
 fi
 

@@ -8,6 +8,7 @@
 #   BENCHMARK_DEV_ROUTES="/ /app /api/health/build-info"
 #   BENCHMARK_DEV_PORT=3100
 #   BENCHMARK_DEV_TIMEOUT=120
+#   BENCHMARK_DEV_ROUTE_TIMEOUT=30
 #   JOVIE_DEV_RESET_NEXT_CACHE=1  # remove .next before each run for cold-start measurement
 
 set -euo pipefail
@@ -66,7 +67,14 @@ trap cleanup EXIT
 request_route() {
   local route="$1"
   local url="$2"
-  curl -sS -o /dev/null -w "${route} %{http_code} %{time_total}" "$url"
+  local route_timeout="${BENCHMARK_DEV_ROUTE_TIMEOUT:-30}"
+  local result
+
+  if result="$(curl -sS --connect-timeout 5 --max-time "$route_timeout" -o /dev/null -w "${route} %{http_code} %{time_total}" "$url")"; then
+    printf '%s' "$result"
+  else
+    printf '%s 000 %s' "$route" "$route_timeout"
+  fi
 }
 
 echo "=== Jovie Local Dev Benchmark ==="
