@@ -25,7 +25,7 @@ interface Props {
 export default async function LyricsPage({ params }: Props) {
   const { trackId } = await params;
   const { userId } = await getCachedAuth();
-  const lyricsEnabled = await getAppFlagValue('DESIGN_V1_LYRICS', { userId });
+  const lyricsEnabled = await getAppFlagValue('DESIGN_V1', { userId });
 
   if (!userId || !lyricsEnabled) {
     notFound();

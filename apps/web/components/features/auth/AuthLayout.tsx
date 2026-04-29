@@ -244,7 +244,7 @@ export function AuthLayout({
   showcaseVariant = 'page',
 }: Readonly<AuthLayoutProps>) {
   const { isKeyboardVisible } = useMobileKeyboard();
-  const designV1 = useAppFlag('DESIGN_V1_AUTH');
+  const designV1 = useAppFlag('DESIGN_V1');
   const formRef = useRef<HTMLElement>(null);
   const isSplitVariant = layoutVariant === 'split';
 

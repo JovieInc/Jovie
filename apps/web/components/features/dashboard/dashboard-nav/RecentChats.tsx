@@ -67,7 +67,7 @@ export function RecentChats() {
   const params = useParams<{ id?: string }>();
   const router = useRouter();
   const notifications = useNotifications();
-  const shellChatV1Enabled = useAppFlag('SHELL_CHAT_V1');
+  const shellChatV1Enabled = useAppFlag('DESIGN_V1');
   const activeConversationId = params.id ?? null;
 
   const { data: conversations, isLoading } = useChatConversationsQuery({

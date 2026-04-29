@@ -52,7 +52,7 @@ afterEach(() => {
 });
 
 describe('SidebarBottomNowPlayingBridge', () => {
-  it('renders nothing when SHELL_CHAT_V1 is off', () => {
+  it('renders nothing when DESIGN_V1 is off', () => {
     _flag = false;
     _state = {
       ..._state,

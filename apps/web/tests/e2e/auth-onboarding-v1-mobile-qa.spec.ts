@@ -126,7 +126,7 @@ test.describe('Auth and onboarding Design V1 mobile QA', () => {
 
     for (const route of [APP_ROUTES.SIGNIN, APP_ROUTES.SIGNUP]) {
       await clearAppFlagOverrides(page);
-      await installAppFlagOverrides(page, { DESIGN_V1_AUTH: true });
+      await installAppFlagOverrides(page, { DESIGN_V1: true });
 
       await page.goto(route, {
         waitUntil: 'domcontentloaded',
@@ -154,7 +154,7 @@ test.describe('Auth and onboarding Design V1 mobile QA', () => {
     const userId = await resolveCreatorUserId(request);
     await page.setViewportSize(MOBILE_VIEWPORT);
     await stubHandleAvailability(page);
-    await installAppFlagOverrides(page, { DESIGN_V1_ONBOARDING: true });
+    await installAppFlagOverrides(page, { DESIGN_V1: true });
     await prepareCreatorSession(page, userId);
 
     await page.goto(`${APP_ROUTES.ONBOARDING}?handle=${ONBOARDING_QA_HANDLE}`, {

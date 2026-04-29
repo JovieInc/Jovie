@@ -141,8 +141,8 @@ export function JovieChat({
 
   // ─── Chat jank instrumentation (flag-gated) ─────────────────
   const jankMonitorEnabled = useAppFlag('CHAT_JANK_MONITOR');
-  const shellChatV1Enabled = useAppFlag('SHELL_CHAT_V1');
-  const designV1ChatEntitiesEnabled = useAppFlag('DESIGN_V1_CHAT_ENTITIES');
+  const shellChatV1Enabled = useAppFlag('DESIGN_V1');
+  const designV1ChatEntitiesEnabled = useAppFlag('DESIGN_V1');
   const { onSend: notifyJankSend } = useChatJankMonitor({
     conversationId: activeConversationId,
     messages,
