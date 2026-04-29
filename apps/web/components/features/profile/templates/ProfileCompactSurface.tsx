@@ -379,9 +379,7 @@ export function ProfileCompactSurface({
         data-presentation={presentation}
       >
         {!isHomeMode && renderMode !== 'preview' ? (
-          <h1 className='sr-only' data-testid='profile-header'>
-            {artist.name}
-          </h1>
+          <h1 className='sr-only'>{artist.name}</h1>
         ) : null}
         <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.025),transparent_34%)]' />
 
