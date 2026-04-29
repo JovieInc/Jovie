@@ -20,6 +20,7 @@ export const APP_ROUTES = {
   DASHBOARD_PROFILE: '/app/dashboard/profile',
   DASHBOARD_AUDIENCE: '/app/dashboard/audience',
   DASHBOARD_RELEASES: '/app/dashboard/releases',
+  DASHBOARD_LIBRARY: '/app/dashboard/library',
   DASHBOARD_TASKS: '/app/dashboard/tasks',
   DASHBOARD_RELEASE_TASKS: '/app/dashboard/releases/[releaseId]/tasks',
   DASHBOARD_TIPPING: '/app/dashboard/tipping',
@@ -37,6 +38,7 @@ export const APP_ROUTES = {
   CHAT: '/app/chat',
   CHAT_PROFILE_PANEL: '/app/chat?panel=profile',
   INSIGHTS: '/app/insights',
+  LYRICS: '/app/lyrics',
   PRESENCE: '/app/presence',
 
   // Settings
