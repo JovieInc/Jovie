@@ -62,11 +62,15 @@ export default async function LyricsPage({ params }: Props) {
     fallbackArtist: artist,
   });
 
+  if (!track) {
+    notFound();
+  }
+
   return (
     <LyricsPageClient
-      initialLines={plainLyricsToLines(track?.lyrics ?? null)}
+      initialLines={plainLyricsToLines(track.lyrics)}
       initialTrack={{
-        title: track?.title ?? 'No lyrics found',
+        title: track.title,
         artist,
       }}
       trackId={trackId}

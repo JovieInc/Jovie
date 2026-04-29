@@ -215,6 +215,8 @@ export const queryKeys = {
         profileId,
         ...(filters ? [filters] : []),
       ] as const,
+    detail: (profileId: string, releaseId: string) =>
+      [...queryKeys.releases.all, 'detail', profileId, releaseId] as const,
     tracks: (releaseId: string) =>
       [...queryKeys.releases.all, 'tracks', releaseId] as const,
     dspStatus: (releaseId: string) =>

@@ -1702,7 +1702,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   font-weight: 500;
   letter-spacing: 0.2em;
 }
-
 .marketing-footer-premium .mf-link {
   display: inline-flex;
   width: fit-content;

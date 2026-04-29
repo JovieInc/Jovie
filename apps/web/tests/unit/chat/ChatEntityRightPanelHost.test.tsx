@@ -10,7 +10,8 @@ import { ChatEntityRightPanelHost } from '@/app/app/(shell)/chat/ChatEntityRight
 const { mockUseRegisterRightPanel } = vi.hoisted(() => ({
   mockUseRegisterRightPanel: vi.fn(),
 }));
-const { mockUseReleasesQuery } = vi.hoisted(() => ({
+const { mockUseReleaseEntityQuery, mockUseReleasesQuery } = vi.hoisted(() => ({
+  mockUseReleaseEntityQuery: vi.fn(),
   mockUseReleasesQuery: vi.fn(),
 }));
 let mockPreviewPanelOpen = false;
@@ -36,6 +37,10 @@ vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
 
 vi.mock('@/hooks/useRegisterRightPanel', () => ({
   useRegisterRightPanel: mockUseRegisterRightPanel,
+}));
+
+vi.mock('@/lib/queries/useReleaseEntityQuery', () => ({
+  useReleaseEntityQuery: mockUseReleaseEntityQuery,
 }));
 
 vi.mock('@/lib/queries/useReleasesQuery', () => ({
@@ -73,7 +78,9 @@ function TargetLabel() {
 
 describe('ChatEntityRightPanelHost', () => {
   beforeEach(() => {
-    mockUseReleasesQuery.mockReturnValue({ data: [], isLoading: false });
+    mockUseReleaseEntityQuery.mockClear();
+    mockUseReleaseEntityQuery.mockReturnValue({ data: null, isLoading: false });
+    mockUseReleasesQuery.mockClear();
   });
 
   it('registers no right panel when preview is closed', () => {
@@ -117,20 +124,18 @@ describe('ChatEntityRightPanelHost', () => {
   it('registers a release entity panel when the design v1 chat entity flag is enabled', () => {
     mockPreviewPanelOpen = false;
     mockUseRegisterRightPanel.mockClear();
-    mockUseReleasesQuery.mockReturnValue({
-      data: [
-        {
-          id: 'release-1',
-          title: 'Lost In The Light',
-          releaseType: 'single',
-          status: 'released',
-          slug: 'lost-in-the-light',
-          smartLinkPath: '/r/lost-in-the-light',
-          profileId: 'profile-1',
-          totalTracks: 1,
-          providers: [],
-        },
-      ],
+    mockUseReleaseEntityQuery.mockReturnValue({
+      data: {
+        id: 'release-1',
+        title: 'Lost In The Light',
+        releaseType: 'single',
+        status: 'released',
+        slug: 'lost-in-the-light',
+        smartLinkPath: '/r/lost-in-the-light',
+        profileId: 'profile-1',
+        totalTracks: 1,
+        providers: [],
+      },
       isLoading: false,
     });
 
@@ -147,6 +152,15 @@ describe('ChatEntityRightPanelHost', () => {
     );
 
     expect(mockUseRegisterRightPanel).toHaveBeenCalled();
-    expect(mockUseRegisterRightPanel.mock.calls.at(-1)?.[0]).not.toBeNull();
+    const registeredPanel = mockUseRegisterRightPanel.mock.calls.at(-1)?.[0];
+    expect(registeredPanel).not.toBeNull();
+
+    render(registeredPanel as React.ReactElement);
+
+    expect(mockUseReleaseEntityQuery).toHaveBeenCalledWith(
+      'profile-1',
+      'release-1'
+    );
+    expect(mockUseReleasesQuery).not.toHaveBeenCalled();
   });
 });
