@@ -1,9 +1,12 @@
 'use client';
 
+import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import { AudioBar } from '@/components/shell/AudioBar';
+import { buildLyricsRoute } from '@/constants/routes';
+import { useAppFlag } from '@/lib/flags/client';
 
 /**
  * ShellAudioBarBridge — flag-on path for the audio player slot.
@@ -21,6 +24,9 @@ import { AudioBar } from '@/components/shell/AudioBar';
  *   scrub gradient from the current playback time and duration.
  */
 export function ShellAudioBarBridge() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const designV1LyricsEnabled = useAppFlag('DESIGN_V1_LYRICS');
   const { playbackState, toggleTrack, stop, onError } = useTrackAudioPlayer();
   const [waveformOn, setWaveformOn] = useState(false);
 
@@ -38,7 +44,14 @@ export function ShellAudioBarBridge() {
     }).catch(() => {});
   }, [playbackState.activeTrackId, playbackState.trackTitle, toggleTrack]);
 
+  const handleOpenLyrics = useCallback(() => {
+    if (!playbackState.activeTrackId) return;
+    router.push(buildLyricsRoute(playbackState.activeTrackId));
+  }, [playbackState.activeTrackId, router]);
+
   if (!playbackState.activeTrackId || !playbackState.trackTitle) return null;
+
+  const lyricsPath = buildLyricsRoute(playbackState.activeTrackId);
 
   return (
     <AudioBar
@@ -49,11 +62,17 @@ export function ShellAudioBarBridge() {
       duration={playbackState.duration}
       waveformOn={waveformOn}
       onToggleWaveform={() => setWaveformOn(current => !current)}
-      lyricsActive={false}
+      lyricsActive={pathname === lyricsPath}
+      onOpenLyrics={
+        designV1LyricsEnabled && playbackState.hasLyrics
+          ? handleOpenLyrics
+          : undefined
+      }
       track={{
         id: playbackState.activeTrackId,
         title: playbackState.trackTitle,
         artist: playbackState.artistName ?? '',
+        hasLyrics: designV1LyricsEnabled && playbackState.hasLyrics,
       }}
     />
   );
