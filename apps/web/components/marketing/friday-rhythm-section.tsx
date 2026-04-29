@@ -70,7 +70,15 @@ function getScrollActiveCount(progress: number, totalFridays: number): number {
 }
 
 function formatSvgNumber(value: number): string {
-  return value.toFixed(2).replace(/\.?0+$/, '');
+  const fixed = value.toFixed(2);
+  const [integerPart, fractionPart] = fixed.split('.');
+  let trimmedFraction = fractionPart ?? '';
+
+  while (trimmedFraction.endsWith('0')) {
+    trimmedFraction = trimmedFraction.slice(0, -1);
+  }
+
+  return trimmedFraction ? `${integerPart}.${trimmedFraction}` : integerPart;
 }
 
 function getHeartbeatBaseline(x: number, progress: number): number {
