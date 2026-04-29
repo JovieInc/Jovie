@@ -1,14 +1,13 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
-import { HomeV1Design } from '@/components/features/home/HomeV1Design';
 import { HomepageHeroMockupCarousel } from '@/components/homepage/HomepageHeroCarousel';
 import { HomepageOutcomeCards } from '@/components/homepage/HomepageOutcomeCards';
 import { HERO_COPY } from '@/components/homepage/intent';
 import {
   HomepageV2FinalCta,
   HomepageV2Pricing,
-} from '@/components/marketing/homepage-v2/HomepageV2Route';
+} from '@/components/marketing/homepage-v2/HomepageV2Ctas';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
@@ -176,8 +175,12 @@ function HomePageShell({ children }: { readonly children: React.ReactNode }) {
   );
 }
 
-export default function HomePage() {
+export default async function HomePage() {
   if (FEATURE_FLAGS.SHOW_HOME_V1_DESIGN) {
+    const { HomeV1Design } = await import(
+      '@/components/features/home/HomeV1Design'
+    );
+
     return (
       <HomePageShell>
         <HomeV1Design />

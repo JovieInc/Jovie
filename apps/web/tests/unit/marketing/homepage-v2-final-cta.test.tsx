@@ -9,7 +9,7 @@ describe('HomepageV2FinalCta', () => {
     expect(screen.getByTestId('homepage-v2-final-cta')).toBeInTheDocument();
     expect(
       screen.getByTestId('homepage-v2-final-cta-heading')
-    ).toHaveTextContent(/Start using Jovie\s*today for free\./);
+    ).toHaveTextContent('Start With the Next Drop.');
     expect(
       screen.getByTestId('homepage-v2-final-cta-primary')
     ).toBeInTheDocument();

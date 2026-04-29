@@ -17,7 +17,7 @@ This system generates screenshot reports showing how all critical pages look acr
 
 ```bash
 # From project root
-pnpm run dev:web:local
+pnpm run dev:web:fast
 ```
 
 ### 2. Generate Screenshot Report
@@ -194,7 +194,7 @@ find screenshot-reports -type d -mtime +7 -exec rm -rf {} +
 ```
 Error: connect ECONNREFUSED ::1:3100
 ```
-**Solution**: Start the dev server first with `pnpm run dev:web:local`
+**Solution**: Start the dev server first with `pnpm run dev:web:fast`
 
 ### Port 8080 already in use
 ```

@@ -16,7 +16,6 @@ import { toast } from 'sonner';
 import {
   connectAppleMusicArtist,
   deleteRelease,
-  revertReleaseArtwork,
 } from '@/app/app/(shell)/dashboard/releases/actions';
 import { instantiateReleaseTasksFromCatalog } from '@/app/app/(shell)/dashboard/releases/catalog-task-actions';
 import { instantiateReleaseTasks } from '@/app/app/(shell)/dashboard/releases/task-actions';
@@ -52,6 +51,10 @@ import {
   ReleaseTableSubheader,
   type ReleaseView,
 } from './ReleaseTableSubheader';
+import {
+  restoreReleaseArtwork,
+  uploadReleaseArtwork,
+} from './release-artwork-actions';
 import type { ReleaseProviderMatrixProps } from './types';
 import { useReleaseProviderMatrix } from './useReleaseProviderMatrix';
 import { filterReleases } from './utils/filterReleases';
@@ -577,38 +580,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
   const closeAddRelease = useCallback(() => setAddReleaseOpen(false), []);
 
-  // Artwork upload handler - calls the artwork upload API endpoint
-  const handleArtworkUpload = useCallback(
-    async (file: File, release: ReleaseViewModel): Promise<string> => {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const response = await fetch(
-        `/api/images/artwork/upload?releaseId=${encodeURIComponent(release.id)}`,
-        { method: 'POST', body: formData }
-      );
-
-      if (!response.ok) {
-        const error = await response
-          .json()
-          .catch(() => ({ message: 'Upload failed' }));
-        throw new Error(error.message ?? 'Failed to upload artwork');
-      }
-
-      const result = await response.json();
-      return result.artworkUrl;
-    },
-    []
-  );
-
-  // Artwork revert handler - reverts to original DSP-ingested artwork
-  const handleArtworkRevert = useCallback(
-    async (releaseId: string): Promise<string> => {
-      const result = await revertReleaseArtwork(releaseId);
-      return result.artworkUrl;
-    },
-    []
-  );
+  const handleArtworkUpload = uploadReleaseArtwork;
+  const handleArtworkRevert = restoreReleaseArtwork;
 
   // Handle release changes from the sidebar (e.g., after artwork upload)
   const handleReleaseChange = useCallback(

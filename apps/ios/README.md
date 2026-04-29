@@ -15,7 +15,7 @@ Native iOS MVP for Jovie. This target is simulator-ready and intentionally stops
 1. Start the web app:
 
    ```bash
-   pnpm run dev:web:local
+   pnpm run dev:web:fast
    ```
 
 2. Generate local iOS config:

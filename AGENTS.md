@@ -66,6 +66,7 @@ ALL commands that need secrets MUST be prefixed with Doppler, and local/dev comm
 - `pnpm run test:web:watch`
 - `pnpm run test:web:e2e`
 - `pnpm run test:web:smoke`
+- `pnpm run dev:web:fast`
 - `pnpm run dev:web:local`
 - `pnpm run dev:web:browse`
 - `pnpm test` alone **will fail** — missing env vars
@@ -184,7 +185,7 @@ pnpm turbo build --filter=@jovie/web
 | `yarn add` | `pnpm add` |
 | `npx turbo ...` | `pnpm turbo ...` |
 | Running turbo from wrong directory | Always run from repo root |
-| `cd apps/web && pnpm dev` | `pnpm run dev:web:local` |
+| `cd apps/web && pnpm dev` | `pnpm run dev:web:fast` |
 | `node script.js` with Node < 22 | Verify `node --version` first |
 
 ---
@@ -193,12 +194,13 @@ pnpm turbo build --filter=@jovie/web
 
 **Always run from repository root.** Never `cd` into packages to run commands.
 
-For local web dev and secret-bound test flows, prefer the root wrappers (`pnpm run dev:web:local`, `pnpm run dev:web:browse`, `pnpm run test:web`) over direct filtered package commands.
+For daily local web dev and secret-bound test flows, prefer the root wrappers (`pnpm run dev:web:fast`, `pnpm run dev:web:local`, `pnpm run dev:web:browse`, `pnpm run test:web`) over direct filtered package commands.
 
 ```bash
 # Development
 pnpm dev                    # Start all dev servers
-pnpm run dev:web:local      # Start local web app with pinned Doppler scope
+pnpm run dev:web:fast       # Start fast local web app with pinned Doppler scope
+pnpm run dev:web:local      # Start local web app without fast prewarm defaults
 
 # Building
 pnpm build                  # Build all packages
