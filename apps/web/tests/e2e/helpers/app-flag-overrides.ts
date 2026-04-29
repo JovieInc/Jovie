@@ -32,13 +32,25 @@ export async function installAppFlagOverrides(
 ): Promise<void> {
   const serialized = serializeAppFlagOverrides(overrides);
 
+  // Seed the cookie before any HTTP request so SSR/middleware sees the
+  // override on the first navigation. addInitScript runs only after the
+  // initial response, so the cookie alone via init script would be
+  // invisible to server-side flag reads on first goto.
+  await page.context().addCookies([
+    {
+      name: APP_FLAG_OVERRIDES_COOKIE,
+      value: encodeURIComponent(serialized),
+      url: process.env.BASE_URL ?? 'http://localhost:3100',
+      sameSite: 'Lax',
+    },
+  ]);
+
+  // Seed localStorage for client-side reads via init script.
   await page.addInitScript(
-    ({ cookieName, key, value }) => {
+    ({ key, value }) => {
       localStorage.setItem(key, value);
-      document.cookie = `${cookieName}=${encodeURIComponent(value)}; path=/; SameSite=Lax`;
     },
     {
-      cookieName: APP_FLAG_OVERRIDES_COOKIE,
       key: FF_OVERRIDES_KEY,
       value: serialized,
     }
