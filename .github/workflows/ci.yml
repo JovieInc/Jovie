@@ -796,6 +796,103 @@ jobs:
           path: apps/web/playwright-report/
           retention-days: 3
 
+  ci-mobile-overflow:
+    name: Mobile Overflow Guard
+    needs: [ci-fast, ci-path-changes, neon-db]
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_e2e == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Run static mobile overflow guard
+        run: pnpm --filter=@jovie/web run mobile-overflow:guard
+
+      - name: Create ephemeral Neon database branch (with retry)
+        id: neon-branch
+        uses: ./.github/actions/neon-create-branch-with-retry
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: mobile-overflow-${{ github.run_id }}-${{ github.run_attempt }}
+          role: neondb_owner
+          api_key: ${{ secrets.NEON_API_KEY }}
+          protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
+
+      - name: Resolve DATABASE_URL (Neon ephemeral)
+        id: resolve-mobile-overflow-neon-db-url
+        uses: ./.github/actions/resolve-neon-database-url
+        with:
+          candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
+          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url }}
+          credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
+          credential_fallback_url: ${{ secrets.DATABASE_URL }}
+
+      - name: Export DATABASE_URL
+        run: echo "DATABASE_URL=${{ steps.resolve-mobile-overflow-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
+
+      - name: Run migrations (ephemeral Neon)
+        run: pnpm --filter=@jovie/web run drizzle:migrate:ci
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          NODE_ENV: test
+          GIT_BRANCH: pr-${{ github.event.pull_request.number }}
+          ALLOW_PROD_MIGRATIONS: 'true'
+
+      - name: Seed mobile overflow fixtures
+        run: pnpm --filter=@jovie/web exec tsx tests/seed-test-data.ts
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          NODE_ENV: test
+
+      - name: Cache Playwright Browsers
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-
+
+      - name: Install Playwright (Chromium)
+        run: pnpm --filter=@jovie/web exec playwright install chromium
+
+      - name: Run mobile overflow Playwright guard
+        run: pnpm --filter=@jovie/web exec playwright test tests/e2e/mobile-overflow.spec.ts --project=chromium --reporter=line
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          NODE_ENV: test
+          CI: true
+          E2E_USE_TEST_AUTH_BYPASS: '1'
+          NEXT_PUBLIC_CLERK_MOCK: '1'
+          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
+          URL_ENCRYPTION_KEY: mobile-overflow-ci-url-encryption-key
+          AI_GATEWAY_API_KEY: mobile-overflow-ci
+
+      - name: Upload Playwright Artifacts on Failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mobile-overflow-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
+          retention-days: 3
+
+      - name: Cleanup ephemeral Neon branch
+        if: always() && steps.neon-branch.outputs.branch_id != ''
+        continue-on-error: true
+        run: |
+          curl -sS -X DELETE \
+            -H "Authorization: Bearer ${{ secrets.NEON_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            "https://console.neon.tech/api/v2/projects/${{ vars.NEON_PROJECT_ID }}/branches/${{ steps.neon-branch.outputs.branch_id }}"
+
   ci-lighthouse-pr:
     name: Lighthouse (public routes PR)
     needs: [ci-build-public, ci-path-changes, neon-db]
