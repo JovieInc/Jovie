@@ -58,6 +58,8 @@ export async function installAppFlagOverrides(
 }
 
 export async function clearAppFlagOverrides(page: Page): Promise<void> {
+  await page.context().clearCookies({ name: APP_FLAG_OVERRIDES_COOKIE });
+
   await page.addInitScript(
     ({ cookieName, key }) => {
       localStorage.removeItem(key);
