@@ -135,9 +135,12 @@ const SURFACE_CASES: readonly SurfaceCase[] = [
     route: APP_ROUTES.DASHBOARD_RELEASES,
     persona: 'creator-ready',
     assertDefault: async page => {
-      await expect(page.getByTestId('releases-matrix')).toBeVisible({
-        timeout: 30_000,
-      });
+      const matrix = page.getByTestId('releases-matrix');
+      await expect(matrix).toBeVisible({ timeout: 30_000 });
+      await expect(matrix).not.toHaveAttribute(
+        'data-design-v1-releases',
+        'true'
+      );
     },
     assertEnabled: async page => {
       const matrix = page.getByTestId('releases-matrix');
@@ -170,9 +173,12 @@ const SURFACE_CASES: readonly SurfaceCase[] = [
     route: APP_ROUTES.CHAT,
     persona: 'creator-ready',
     assertDefault: async page => {
-      await expect(page.getByTestId('chat-content')).toBeVisible({
-        timeout: 30_000,
-      });
+      const chatContent = page.getByTestId('chat-content');
+      await expect(chatContent).toBeVisible({ timeout: 30_000 });
+      await expect(chatContent).not.toHaveAttribute(
+        'data-design-v1-chat-entities',
+        'true'
+      );
     },
     assertEnabled: async page => {
       const chatContent = page.getByTestId('chat-content');
@@ -264,6 +270,7 @@ test.describe('Design V1 flagged surfaces', () => {
   test.describe('surface routes', () => {
     test.beforeAll(async ({ request }) => {
       test.setTimeout(300_000);
+      resolvedPersonaUserIds.clear();
 
       for (const persona of REQUIRED_PERSONAS) {
         resolvedPersonaUserIds.set(
