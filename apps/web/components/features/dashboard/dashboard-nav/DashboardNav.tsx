@@ -1,6 +1,7 @@
 'use client';
 
 import { useQueryClient } from '@tanstack/react-query';
+import { Search } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
@@ -8,6 +9,7 @@ import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { Flagged } from '@/components/features/dev/Flagged';
+import { OPEN_COMMAND_PALETTE_EVENT } from '@/components/organisms/command-palette-events';
 import { usePendingShell } from '@/components/organisms/PendingShellContext';
 import {
   SidebarGroup,
@@ -43,6 +45,14 @@ const RecentChats = dynamic(
     ),
   }
 );
+
+const searchNavItem: NavItem = {
+  name: 'Search',
+  href: APP_ROUTES.CHAT,
+  id: 'search',
+  icon: Search,
+  description: 'Search routes, releases, artists, and threads',
+};
 
 function isItemActive(pathname: string, item: NavItem): boolean {
   const normalizedPathname = (() => {
@@ -125,6 +135,21 @@ export function DashboardNav(_: DashboardNavProps) {
 
   // Memoize nav sections for dashboard (non-settings) mode
   const navSections = useMemo(() => {
+    const decorateItem = (item: NavItem): NavItem =>
+      item.id === 'tasks'
+        ? {
+            ...item,
+            badge: (() => {
+              if (isPlanGateLoading) return undefined;
+              if (canAccessTasksWorkspace) return formatTaskBadge(taskStats);
+              return (
+                <span className='rounded-full border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_76%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_90%,transparent)] px-1.5 py-0.5 text-[9px] font-semibold tracking-[0.02em] text-secondary-token'>
+                  Pro
+                </span>
+              );
+            })(),
+          }
+        : item;
     const primaryItems = designV1LibraryEnabled
       ? [
           ...primaryNavigation.slice(0, 2),
@@ -133,32 +158,46 @@ export function DashboardNav(_: DashboardNavProps) {
         ]
       : primaryNavigation;
 
+    if (shellChatV1Enabled) {
+      const profileItem = primaryNavigation.find(item => item.id === 'profile');
+      const releaseItem = primaryNavigation.find(
+        item => item.id === 'releases'
+      );
+      const audienceItem = primaryNavigation.find(
+        item => item.id === 'audience'
+      );
+      const tasksItem = primaryNavigation.find(item => item.id === 'tasks');
+
+      return [
+        {
+          key: 'user-work',
+          items: [
+            searchNavItem,
+            ...(tasksItem ? [decorateItem(tasksItem)] : []),
+            ...(designV1LibraryEnabled ? [libraryNavItem] : []),
+          ],
+        },
+        {
+          key: 'artist-workspace',
+          label: 'Artist Workspace',
+          items: [profileItem, releaseItem, audienceItem]
+            .filter((item): item is NavItem => Boolean(item))
+            .map(decorateItem),
+        },
+      ];
+    }
+
     return [
       {
         key: 'primary',
-        items: primaryItems.map(item =>
-          item.id === 'tasks'
-            ? {
-                ...item,
-                badge: (() => {
-                  if (isPlanGateLoading) return undefined;
-                  if (canAccessTasksWorkspace)
-                    return formatTaskBadge(taskStats);
-                  return (
-                    <span className='rounded-full border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_76%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_90%,transparent)] px-1.5 py-0.5 text-[9px] font-semibold tracking-[0.02em] text-secondary-token'>
-                      Pro
-                    </span>
-                  );
-                })(),
-              }
-            : item
-        ),
+        items: primaryItems.map(decorateItem),
       },
     ];
   }, [
     canAccessTasksWorkspace,
     designV1LibraryEnabled,
     isPlanGateLoading,
+    shellChatV1Enabled,
     taskStats,
   ]);
 
@@ -245,21 +284,28 @@ export function DashboardNav(_: DashboardNavProps) {
     toast.info(`${item.name} is not available in demo mode`);
   }, []);
 
+  const handleSearchClick = useCallback(() => {
+    globalThis.dispatchEvent(new Event(OPEN_COMMAND_PALETTE_EVENT));
+  }, []);
+
   // Memoize renderNavItem to prevent creating new functions on every render
   const renderNavItem = useCallback(
     (item: NavItem, _index: number) => {
       const isProfileItem = item.id === 'profile';
       const isReleasesItem = item.id === 'releases';
+      const isSearchItem = item.id === 'search';
       const isActive = isProfileItem
         ? isPreviewOpen && pathname.startsWith(APP_ROUTES.CHAT)
         : isItemActive(pathname, item);
       const shortcut = NAV_SHORTCUTS[item.id];
 
       // In demo mode, only Releases has real content — intercept all other nav clicks
-      const demoUnavailable = isDemo && !isReleasesItem;
-      const renderAsButton = isProfileItem && !demoUnavailable;
+      const demoUnavailable = isDemo && !isReleasesItem && !isSearchItem;
+      const renderAsButton =
+        (isProfileItem && !demoUnavailable) || isSearchItem;
       let onClick: (() => void) | undefined;
       if (demoUnavailable) onClick = () => handleDemoNavClick(item);
+      else if (isSearchItem) onClick = handleSearchClick;
       else if (isProfileItem) onClick = handleProfileClick;
 
       return (
@@ -273,7 +319,7 @@ export function DashboardNav(_: DashboardNavProps) {
           onClick={onClick}
           preventNavigation={demoUnavailable}
           renderAsButton={renderAsButton}
-          useShellNavItem={shellChatV1Enabled && renderAsButton}
+          useShellNavItem={shellChatV1Enabled}
           onNavigate={
             isReleasesItem && !isActive
               ? () => showPendingShell('releases')
@@ -294,6 +340,7 @@ export function DashboardNav(_: DashboardNavProps) {
       handleProfileClick,
       handleDemoNavClick,
       handlePrefetch,
+      handleSearchClick,
       clearPendingShell,
       showPendingShell,
       isPreviewOpen,
@@ -330,7 +377,17 @@ export function DashboardNav(_: DashboardNavProps) {
               <div key={section.key} data-nav-section>
                 {/* Section divider for visual separation (except for first section) */}
                 {index > 0 && <div className='my-1.5' />}
-                {renderSection(section.items)}
+                {section.label ? (
+                  <SidebarCollapsibleGroup
+                    label={section.label}
+                    defaultOpen
+                    className='-mx-0.5'
+                  >
+                    {renderSection(section.items)}
+                  </SidebarCollapsibleGroup>
+                ) : (
+                  renderSection(section.items)
+                )}
               </div>
             ))}
           </SidebarGroupContent>

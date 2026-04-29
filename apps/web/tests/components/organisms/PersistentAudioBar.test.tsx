@@ -262,6 +262,9 @@ describe('PersistentAudioBar', () => {
     expect(screen.queryByRole('button', { name: 'Loop: off' })).toBeNull();
     expect(screen.getAllByText('Midnight Drive').length).toBeGreaterThan(0);
     expect(screen.getAllByText('DJ Cool').length).toBeGreaterThan(0);
+    expect(
+      screen.getByRole('button', { name: 'Hide waveform' })
+    ).toBeInTheDocument();
   });
 
   it('links the shell V1 lyrics button to the active track when DESIGN_V1 is enabled', async () => {
@@ -319,5 +322,32 @@ describe('PersistentAudioBar', () => {
       id: 'track-1',
       title: 'Midnight Drive',
     });
+  });
+
+  it('handles shell V1 active-track keyboard shortcuts', () => {
+    setPlaying({ artistName: 'DJ Cool', hasLyrics: true });
+
+    render(
+      <AppFlagProvider initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1: true }}>
+        <PersistentAudioBar variant='shellChatV1' />
+      </AppFlagProvider>
+    );
+
+    fireEvent.keyDown(globalThis, { key: ' ' });
+    expect(toggleTrack).toHaveBeenCalledWith({
+      id: 'track-1',
+      title: 'Midnight Drive',
+    });
+
+    fireEvent.keyDown(globalThis, { key: 'w' });
+    expect(
+      screen.getByRole('button', { name: 'Show waveform' })
+    ).toBeInTheDocument();
+
+    fireEvent.keyDown(globalThis, { key: 'l' });
+    expect(push).toHaveBeenCalledWith(buildLyricsRoute('track-1'));
+
+    fireEvent.keyDown(globalThis, { key: '`' });
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
   });
 });

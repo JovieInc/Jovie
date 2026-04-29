@@ -128,7 +128,7 @@ test.describe('Homepage', () => {
     await finalCta.scrollIntoViewIfNeeded();
     await expect(finalCta).toBeVisible();
     await expect(page.getByTestId('homepage-v2-final-cta-heading')).toHaveText(
-      'Start With the Next Drop.'
+      'Keep Your Music Moving.'
     );
     await expect(
       page.getByTestId('homepage-v2-final-cta-primary')
@@ -176,6 +176,16 @@ test.describe('Homepage', () => {
     await expect(page.getByTestId('homepage-trust')).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
+    const activeHeroShot = page
+      .locator('.homepage-hero-mockup[data-active="true"]')
+      .first();
+    const heroShotBounds = await activeHeroShot.boundingBox();
+    const viewportWidth = page.viewportSize()?.width ?? 0;
+
+    expect(heroShotBounds?.x ?? -1).toBeGreaterThanOrEqual(0);
+    expect(
+      (heroShotBounds?.x ?? 0) + (heroShotBounds?.width ?? 0)
+    ).toBeLessThanOrEqual(viewportWidth);
 
     await page.waitForTimeout(750);
     await page.evaluate(() => {

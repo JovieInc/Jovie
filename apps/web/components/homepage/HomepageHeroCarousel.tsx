@@ -22,10 +22,11 @@ interface HeroMockupShot {
 
 const HERO_MOCKUP_SCREENSHOTS: readonly HeroMockupShot[] = [
   {
-    id: 'releases-dashboard',
-    src: getMarketingExportImage('dashboard-releases-desktop').publicUrl,
-    alt: 'Desktop release dashboard with tasks, assets, and launch planning',
-    title: 'Release Dashboard',
+    id: 'release-calendar-sidebar',
+    src: getMarketingExportImage('dashboard-releases-sidebar-desktop')
+      .publicUrl,
+    alt: 'Desktop release calendar with the release sidebar open and populated catalog rows',
+    title: 'Release Calendar',
     width: 2880,
     height: 1800,
     kind: 'desktop',
@@ -108,22 +109,23 @@ function getOffset(index: number, activeIndex: number): number {
   return offset;
 }
 
+function getSlideBlur(distance: number): string {
+  if (distance === 0) return '0px';
+  if (distance === 1) return '0.8px';
+  return '1.5px';
+}
+
 function getSlideStyle(offset: number): CSSProperties {
   const distance = Math.abs(offset);
-  const isVisible = distance <= 2;
+  const isVisible = distance <= 1;
+  const opacity = isVisible && distance === 0 ? 1 : 0;
+  const blur = getSlideBlur(distance);
 
   return {
     '--carousel-offset': offset,
-    '--carousel-opacity': isVisible
-      ? distance === 0
-        ? 1
-        : distance === 1
-          ? 1
-          : 0.4
-      : 0,
-    '--carousel-scale': distance <= 1 ? 1 : 0.96,
-    '--carousel-blur':
-      distance === 0 ? '0px' : distance === 1 ? '0.1px' : '1px',
+    '--carousel-opacity': opacity,
+    '--carousel-scale': distance === 0 ? 1 : 0.92,
+    '--carousel-blur': blur,
     '--carousel-z': HERO_MOCKUP_SCREENSHOTS.length - distance,
   } as CSSProperties;
 }
