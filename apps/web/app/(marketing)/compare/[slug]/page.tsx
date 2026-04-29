@@ -159,10 +159,7 @@ export default async function ComparePage({ params }: ComparePageProps) {
             {data.bottomLine}
           </p>
           <div className='mt-8'>
-            <Link
-              href={APP_ROUTES.SIGNUP}
-              className='inline-flex items-center rounded-lg bg-accent-token px-6 py-3 text-sm font-medium text-white transition-colors hover:opacity-90'
-            >
+            <Link href={APP_ROUTES.SIGNUP} className='public-action-primary'>
               Try {APP_NAME} Free
             </Link>
           </div>

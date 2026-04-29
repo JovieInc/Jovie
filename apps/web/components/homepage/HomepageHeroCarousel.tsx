@@ -1,9 +1,9 @@
 'use client';
 
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import Image from 'next/image';
 import type { CSSProperties } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { ProductScreenshot } from '@/components/features/home/ProductScreenshot';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
 
 type HeroMockupKind = 'desktop' | 'phone' | 'panel';
@@ -22,7 +22,7 @@ interface HeroMockupShot {
 
 const HERO_MOCKUP_SCREENSHOTS: readonly HeroMockupShot[] = [
   {
-    id: 'releases-dashboard',
+    id: 'app-shell-releases',
     src: getMarketingExportImage('dashboard-releases-desktop').publicUrl,
     alt: 'Desktop release dashboard with tasks, assets, and launch planning',
     title: 'Release Dashboard',
@@ -30,46 +30,6 @@ const HERO_MOCKUP_SCREENSHOTS: readonly HeroMockupShot[] = [
     height: 1800,
     kind: 'desktop',
     priority: true,
-  },
-  {
-    id: 'audience-crm',
-    src: getMarketingExportImage('dashboard-audience-desktop').publicUrl,
-    alt: 'Desktop audience CRM with fan segments and engagement signal',
-    title: 'Audience CRM',
-    width: 2880,
-    height: 1800,
-    kind: 'desktop',
-    priority: false,
-  },
-  {
-    id: 'profile-workspace',
-    src: getMarketingExportImage('public-profile-desktop').publicUrl,
-    alt: 'Desktop artist profile management surface',
-    title: 'Profile Workspace',
-    width: 2880,
-    height: 1800,
-    kind: 'desktop',
-    priority: false,
-  },
-  {
-    id: 'tracked-links',
-    src: getMarketingExportImage('artist-spec-tracked-links-desktop').publicUrl,
-    alt: 'Desktop tracked links analytics for artist marketing',
-    title: 'Tracked Links',
-    width: 1842,
-    height: 952,
-    kind: 'desktop',
-    priority: false,
-  },
-  {
-    id: 'profile-phone',
-    src: getMarketingExportImage('public-profile-mobile').publicUrl,
-    alt: 'Mobile artist profile with listen, tour, and presave actions',
-    title: 'Artist Profile',
-    width: 780,
-    height: 1688,
-    kind: 'phone',
-    priority: false,
   },
 ] as const;
 
@@ -135,8 +95,13 @@ export function HomepageHeroMockupCarousel() {
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const suppressHoverUntilLeaveRef = useRef(false);
   const activeShot = HERO_MOCKUP_SCREENSHOTS[activeIndex];
+  const isCarouselEnabled = HERO_MOCKUP_SCREENSHOTS.length > 1;
 
   const advance = useCallback((direction: CarouselDirection) => {
+    if (HERO_MOCKUP_SCREENSHOTS.length <= 1) {
+      return;
+    }
+
     setActiveIndex(currentIndex => getWrappedIndex(currentIndex + direction));
   }, []);
 
@@ -157,7 +122,7 @@ export function HomepageHeroMockupCarousel() {
   }, []);
 
   useEffect(() => {
-    if (hoverDirection === null || prefersReducedMotion) {
+    if (hoverDirection === null || prefersReducedMotion || !isCarouselEnabled) {
       return;
     }
 
@@ -166,10 +131,14 @@ export function HomepageHeroMockupCarousel() {
     }, HOVER_ADVANCE_DELAY_MS);
 
     return () => window.clearInterval(intervalId);
-  }, [advance, hoverDirection, prefersReducedMotion]);
+  }, [advance, hoverDirection, prefersReducedMotion, isCarouselEnabled]);
 
   const handleHoverStart = (direction: CarouselDirection) => {
-    if (prefersReducedMotion || suppressHoverUntilLeaveRef.current) {
+    if (
+      !isCarouselEnabled ||
+      prefersReducedMotion ||
+      suppressHoverUntilLeaveRef.current
+    ) {
       return;
     }
 
@@ -200,6 +169,7 @@ export function HomepageHeroMockupCarousel() {
         <div
           className='homepage-hero-carousel__stage'
           data-active-shot={activeShot.id}
+          data-carousel-enabled={isCarouselEnabled ? 'true' : 'false'}
         >
           {HERO_MOCKUP_SCREENSHOTS.map((shot, index) => {
             const offset = getOffset(index, activeIndex);
@@ -212,11 +182,11 @@ export function HomepageHeroMockupCarousel() {
                 ? getSlideStyle(offset)
                 : ({
                     ...getSlideStyle(offset),
-                    '--shot-aspect': `${shot.width} / ${shot.height}`,
+                    '--homepage-shot-aspect-ratio': `${shot.width} / ${shot.height}`,
                   } as CSSProperties);
 
             return (
-              <figure
+              <div
                 aria-hidden={!isActive}
                 className={`homepage-hero-mockup homepage-hero-mockup--${shot.kind}`}
                 data-active={isActive ? 'true' : 'false'}
@@ -224,47 +194,52 @@ export function HomepageHeroMockupCarousel() {
                 key={shot.id}
                 style={shotStyle}
               >
-                <div className='homepage-hero-mockup__frame'>
-                  <Image
-                    src={shot.src}
-                    alt={isActive ? shot.alt : ''}
-                    width={shot.width}
-                    height={shot.height}
-                    priority={shot.priority}
-                    quality={85}
-                    sizes={getHeroMockupSizes(shot.kind)}
-                    unoptimized
-                    className='homepage-hero-mockup__image'
-                  />
-                </div>
-              </figure>
+                <ProductScreenshot
+                  src={shot.src}
+                  alt={isActive ? shot.alt : ''}
+                  width={shot.width}
+                  height={shot.height}
+                  title={shot.title}
+                  priority={shot.priority}
+                  quality={85}
+                  sizes={getHeroMockupSizes(shot.kind)}
+                  chrome='minimal'
+                  skipCheck
+                  testId={`homepage-hero-frame-${shot.id}`}
+                  className='homepage-hero-mockup__frame'
+                />
+              </div>
             );
           })}
         </div>
-        <button
-          type='button'
-          className='homepage-hero-carousel__side homepage-hero-carousel__side--previous focus-ring-themed'
-          aria-label='Go to previous slide'
-          onClick={() => handleCarouselClick(-1)}
-          onMouseEnter={() => handleHoverStart(-1)}
-          onMouseLeave={stopHoverScroll}
-        >
-          <span className='homepage-hero-carousel__arrow'>
-            <ChevronLeft aria-hidden='true' strokeWidth={1.8} />
-          </span>
-        </button>
-        <button
-          type='button'
-          className='homepage-hero-carousel__side homepage-hero-carousel__side--next focus-ring-themed'
-          aria-label='Go to next slide'
-          onClick={() => handleCarouselClick(1)}
-          onMouseEnter={() => handleHoverStart(1)}
-          onMouseLeave={stopHoverScroll}
-        >
-          <span className='homepage-hero-carousel__arrow'>
-            <ChevronRight aria-hidden='true' strokeWidth={1.8} />
-          </span>
-        </button>
+        {isCarouselEnabled ? (
+          <>
+            <button
+              type='button'
+              className='homepage-hero-carousel__side homepage-hero-carousel__side--previous focus-ring-themed'
+              aria-label='Go to previous slide'
+              onClick={() => handleCarouselClick(-1)}
+              onMouseEnter={() => handleHoverStart(-1)}
+              onMouseLeave={stopHoverScroll}
+            >
+              <span className='homepage-hero-carousel__arrow'>
+                <ChevronLeft aria-hidden='true' strokeWidth={1.8} />
+              </span>
+            </button>
+            <button
+              type='button'
+              className='homepage-hero-carousel__side homepage-hero-carousel__side--next focus-ring-themed'
+              aria-label='Go to next slide'
+              onClick={() => handleCarouselClick(1)}
+              onMouseEnter={() => handleHoverStart(1)}
+              onMouseLeave={stopHoverScroll}
+            >
+              <span className='homepage-hero-carousel__arrow'>
+                <ChevronRight aria-hidden='true' strokeWidth={1.8} />
+              </span>
+            </button>
+          </>
+        ) : null}
       </div>
     </section>
   );

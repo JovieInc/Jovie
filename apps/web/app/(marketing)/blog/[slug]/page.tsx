@@ -11,11 +11,6 @@ import {
   buildArticleSchema,
   buildBreadcrumbSchema,
 } from '@/lib/constants/schemas';
-import type { ProfileData } from '@/lib/services/profile';
-import {
-  getProfileByUsername,
-  getProfilesByUsernames,
-} from '@/lib/services/profile';
 
 /** Normalize a relative URL to absolute, or return undefined if empty. */
 function toAbsoluteUrl(url: string | null | undefined): string | undefined {
@@ -79,42 +74,11 @@ export default async function BlogPostRoute({
   try {
     const post = await getBlogPost(slug);
 
-    // Resolve author profile
-    let profile: ProfileData | null = null;
-    if (post.authorUsername) {
-      try {
-        profile = await getProfileByUsername(post.authorUsername);
-      } catch {
-        profile = null;
-      }
-    }
-    const author = resolveAuthor(post, profile);
+    const author = resolveAuthor(post);
 
-    // Get related posts with author data
     const relatedPosts = await getRelatedPosts(slug, post.category);
-    const relatedUsernames = [
-      ...new Set(
-        relatedPosts
-          .map(p => p.authorUsername)
-          .filter((u): u is string => u != null)
-      ),
-    ];
-    let relatedProfileMap: Map<string, ProfileData> = new Map();
-    try {
-      relatedProfileMap = await getProfilesByUsernames(relatedUsernames);
-    } catch {
-      // Fallback to frontmatter-only
-    }
     const relatedAuthors = new Map(
-      relatedPosts.map(p => [
-        p.slug,
-        resolveAuthor(
-          p,
-          p.authorUsername
-            ? relatedProfileMap.get(p.authorUsername.toLowerCase())
-            : null
-        ),
-      ])
+      relatedPosts.map(p => [p.slug, resolveAuthor(p)])
     );
 
     // Build schemas

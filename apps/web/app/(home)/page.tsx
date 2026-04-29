@@ -1,14 +1,19 @@
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import Link from 'next/link';
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
-import { HomeV1Design } from '@/components/features/home/HomeV1Design';
 import { HomepageHeroMockupCarousel } from '@/components/homepage/HomepageHeroCarousel';
 import { HomepageOutcomeCards } from '@/components/homepage/HomepageOutcomeCards';
 import { HERO_COPY } from '@/components/homepage/intent';
+import { FaqSection } from '@/components/marketing';
 import {
+  HomepageV2CaptureReactivate,
   HomepageV2FinalCta,
+  HomepageV2PowerGrid,
   HomepageV2Pricing,
-} from '@/components/marketing/homepage-v2/HomepageV2Route';
+  HomepageV2Spotlight,
+  HomepageV2SystemOverview,
+} from '@/components/marketing/homepage-v2/HomepageSections';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
@@ -145,6 +150,29 @@ const ORGANIZATION_SCHEMA = buildOrganizationSchema({
   sameAs: ['https://instagram.com/meetjovie'],
 });
 
+const HOMEPAGE_FAQ_ITEMS = [
+  {
+    question: 'Do I Need To Replace My Current Link In Bio?',
+    answer:
+      'No. Jovie can run as your primary artist profile or sit beside your current link while you test release pages, fan capture, and notifications.',
+  },
+  {
+    question: 'What Happens When I Announce A New Release?',
+    answer:
+      'You can publish a release page, collect fans before launch, route listeners to the right platform, and keep the same profile updated after the drop.',
+  },
+  {
+    question: 'Can Fans Choose How They Hear From Me?',
+    answer:
+      'Yes. Fans can opt in through the profile, then you can reach them again for future songs, shows, drops, and updates without rebuilding the list.',
+  },
+  {
+    question: 'Is Jovie Built For Solo Artists And Teams?',
+    answer:
+      'Yes. The workspace is designed for artists, managers, and small teams that need one place to manage releases, profiles, links, and audience signal.',
+  },
+] as const;
+
 function HomepageHeroActions() {
   return (
     <div className='homepage-hero-actions'>
@@ -164,29 +192,50 @@ function HomepageHeroActions() {
   );
 }
 
-function HomePageShell({ children }: { readonly children: React.ReactNode }) {
+function HomepageFaq() {
   return (
-    <>
-      <AuthRedirectHandler />
-      <script type='application/ld+json'>{WEBSITE_SCHEMA}</script>
-      <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
-      <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
-      {children}
-    </>
+    <div className='homepage-faq-section' data-testid='homepage-faq'>
+      <FaqSection
+        items={HOMEPAGE_FAQ_ITEMS}
+        heading='Frequently Asked Questions'
+        className='homepage-faq-panel'
+        headingClassName='homepage-faq-heading'
+      />
+    </div>
+  );
+}
+
+function HomepageSignalMotion() {
+  return (
+    <section
+      className='homepage-signal-motion-section'
+      aria-label='Jovie workflow'
+      data-testid='homepage-signal-motion'
+    >
+      <div className='homepage-signal-motion-inner'>
+        <Image
+          src='/images/homepage/go-live-motion.png'
+          alt='Go live in 60 seconds with Jovie: catch the signal, turn it into action, and compound the motion.'
+          width={1739}
+          height={904}
+          sizes='(min-width: 1280px) 1180px, calc(100vw - 3rem)'
+          className='homepage-signal-motion-image'
+          priority={false}
+        />
+      </div>
+    </section>
   );
 }
 
 export default function HomePage() {
-  if (FEATURE_FLAGS.SHOW_HOME_V1_DESIGN) {
-    return (
-      <HomePageShell>
-        <HomeV1Design />
-      </HomePageShell>
-    );
-  }
-
   return (
-    <HomePageShell>
+    <>
+      <AuthRedirectHandler />
+
+      <script type='application/ld+json'>{WEBSITE_SCHEMA}</script>
+      <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
+      <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
+
       <section
         className='homepage-hero-stage relative'
         aria-labelledby='home-hero-heading'
@@ -237,16 +286,22 @@ export default function HomePage() {
           presentation='inline-strip'
         />
       </div>
+      <HomepageSignalMotion />
       <div className='homepage-story-stack'>
+        <HomepageV2SystemOverview />
+        <HomepageV2Spotlight />
+        <HomepageV2CaptureReactivate />
+        <HomepageV2PowerGrid />
         <HomepageOutcomeCards
           headline={ARTIST_PROFILE_COPY.outcomeDuo.homepageHeadline}
           outcomes={ARTIST_PROFILE_COPY.outcomes}
         />
+        <HomepageFaq />
         {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_PRICING ? <HomepageV2Pricing /> : null}
         {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_FINAL_CTA ? (
           <HomepageV2FinalCta />
         ) : null}
       </div>
-    </HomePageShell>
+    </>
   );
 }

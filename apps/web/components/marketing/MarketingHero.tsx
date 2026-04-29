@@ -13,7 +13,7 @@ export interface MarketingHeroProps {
  * - `left`: single column, text left-aligned, constrained to page width
  * - `split`: two-column grid on md+, text left / media right
  *
- * Both variants include generous vertical padding matching Linear hero spacing.
+ * All variants include the shared public marketing hero spacing.
  */
 export function MarketingHero({
   variant,

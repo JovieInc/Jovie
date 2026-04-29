@@ -130,7 +130,7 @@ describe('feature flag registry integrity', () => {
         'components',
         'marketing',
         'homepage-v2',
-        'HomepageV2Route.tsx'
+        'HomepageSections.tsx'
       ),
       path.join(
         'components',

@@ -1,24 +1,20 @@
 /**
- * Linear Design Tokens
+ * Public Shell Design Tokens
  *
- * Extracted from Linear.app marketing pages.
- * Colors primarily use OKLCH; exact Linear parity values may use LCH or hex where needed.
+ * Colors primarily use OKLCH; exact compatibility values may use LCH or hex where needed.
  * Light + dark mode support via :root / :root.dark.
  *
  * Usage:
  * - Import this file in design-system.css
- * - Use var(--linear-*) in marketing components
- * - Run `pnpm linear:extract` to regenerate from Linear.app
- *
- * @see https://linear.app
+ * - Use var(--linear-*) compatibility tokens in marketing components
+ * - Rename compatibility tokens only in a broad, dedicated token migration
  */
 
 :root {
   /* ============================================
-     LINEAR COLOR PRIMITIVES (OKLCH)
-     Extracted from Linear.app, converted to OKLCH
+     PUBLIC COLOR PRIMITIVES (OKLCH)
      ============================================ */
-  /* Lightness scale (Linear's gray ramp — dark mode reference) */
+  /* Lightness scale for the neutral gray ramp — dark mode reference */
   --linear-l-0: 5%;
   /* rgb(8,9,10) → near black */
   --linear-l-1: 7%;
@@ -35,10 +31,10 @@
   /* rgb(138,143,152) → secondary text */
   --linear-l-7: 97%;
   /* rgb(247,248,248) → primary text */
-  /* Base chroma for Linear's neutral grays */
+  /* Base chroma for neutral grays */
   --linear-chroma: 0.008;
   --linear-hue: 282;
-  /* Linear March 2026 refresh hue (shifted from 260→282) */
+  /* Refreshed neutral hue (shifted from 260→282) */
   /* ============================================
      TEXT COLORS — LIGHT MODE
      ============================================ */
@@ -49,7 +45,7 @@
   --linear-text-inverse: oklch(97% 0.005 282);
   /* ============================================
      BACKGROUNDS — LIGHT MODE
-     Clean, warm off-whites inspired by Linear's light UI
+     Clean, warm off-whites for the light UI
      ============================================ */
   --linear-bg-page: oklch(98.5% 0.002 282);
   --linear-bg-header: oklch(98.5% 0.002 282 / 0.85);
@@ -133,9 +129,9 @@
   /* ============================================
      TYPOGRAPHY (mode-independent)
      ============================================ */
-  /* Font weights - Linear CSS vars (extracted 2026-03-16) */
+  /* Font weights */
   --linear-font-weight-normal: 400;
-  /* Linear: --font-weight-normal = 400 */
+  /* Normal compatibility value */
   --linear-font-weight-medium: 510;
   --linear-font-weight-semibold: 590;
   --linear-font-weight-bold: 680;
@@ -150,7 +146,7 @@
   --linear-leading-snug: 1.08;
   --linear-leading-normal: 1.6;
   --linear-leading-relaxed: 1.33;
-  /* Font features - Linear's OpenType features */
+  /* Font features */
   --linear-font-features: "cv01", "ss03";
   --linear-font-optical-sizing: 28;
   /* ============================================
@@ -348,11 +344,11 @@
      ============================================ */
   --linear-h1-size-sm: 38px;
   --linear-h1-size-md: 56px;
-  /* --linear-h1-size-lg removed: Linear caps H1 at 64px (--linear-h1-size), never 76px */
+  /* --linear-h1-size-lg removed: public H1 caps at 64px, never 76px */
   --linear-h2-size-sm: 24px;
   --linear-h2-size-md: 36px;
   --linear-h2-size-xl: 48px;
-  /* --linear-h2-size-lg removed: Linear caps H2 at 48px (--linear-h2-size), never 56px */
+  /* --linear-h2-size-lg removed: public H2 caps at 48px, never 56px */
   --linear-body-lg-size-sm: 16px;
   --linear-body-lg-size-lg: 17px;
 }
@@ -364,16 +360,16 @@
    ============================================ */
 
 :root.dark {
-  /* Text — extracted directly from linear.app computed styles (2026-03-10):
+  /* Text compatibility values:
      --color-text-primary: #f7f8f8  (rgb 247,248,248)
-     --color-text-secondary: #d0d6e0 (much brighter than previous)
+     --color-text-secondary: #d0d6e0
      --color-text-tertiary: #8a8f98  (rgb 138,143,152) */
   --linear-text-primary: #f7f8f8;
   --linear-text-secondary: #d0d6e0;
   --linear-text-tertiary: #8a8f98;
   --linear-text-quaternary: #62666d;
   --linear-text-inverse: oklch(5% 0.005 282);
-  /* Backgrounds — extracted from linear.app computed styles (2026-03-10):
+  /* Background compatibility values:
      --color-bg-primary: #08090a  body bg
      --color-bg-secondary: #1c1c1f  cards/panels
      --color-bg-tertiary: #232326  elevated surfaces */
@@ -398,7 +394,7 @@
   --linear-border-default: rgba(255, 255, 255, 0.11);
   --linear-border-strong: rgba(255, 255, 255, 0.18);
   --linear-border-focus: oklch(60% 0.12 282);
-  /* Buttons — white primary on dark bg, matching Linear.app */
+  /* Buttons — white primary on dark bg */
   --linear-btn-primary-bg: #ffffff;
   --linear-btn-primary-fg: #08090a;
   --linear-btn-primary-hover: #e8e9ec;
@@ -461,7 +457,7 @@
 
 /* ============================================
    SEMANTIC ALIASES
-   Map Linear tokens to semantic names for easier use
+   Map compatibility tokens to semantic names for easier use
    ============================================ */
 
 :root {

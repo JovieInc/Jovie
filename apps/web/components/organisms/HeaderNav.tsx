@@ -1,4 +1,3 @@
-import { getLinearPillClassName } from '@jovie/ui';
 import Link from 'next/link';
 import type { LogoVariant } from '@/components/atoms/Logo';
 import { LogoLink } from '@/components/atoms/LogoLink';
@@ -7,11 +6,6 @@ import { MobileNav } from '@/components/molecules/MobileNav';
 import { MarketingSignInLink } from '@/components/organisms/MarketingSignInLink';
 import { APP_ROUTES } from '@/constants/routes';
 import { cn } from '@/lib/utils';
-
-// Linear header structure: full-width header with centered ~1000px content
-// Linear uses ~224px margins on 1440px viewport = ~984px content width
-// maxWidth 1032px - 48px (24px padding each side) = 984px content
-// See globals.css for .nav-link-linear styles
 
 export interface HeaderNavProps {
   readonly sticky?: boolean;
@@ -26,7 +20,7 @@ export interface HeaderNavProps {
   readonly minimalAuth?: boolean;
   readonly minimalAuthVariant?: 'link' | 'pill';
   readonly includePublicLoginInMobileNav?: boolean;
-  readonly presentation?: 'default' | 'homepage-embedded';
+  readonly presentation?: 'default' | 'public-compact' | 'homepage-embedded';
 }
 
 type PublicAuthActionsProps = Readonly<{
@@ -43,7 +37,7 @@ function PublicAuthActions({
       return (
         <Link
           href={APP_ROUTES.SIGNIN}
-          className='focus-ring-themed hidden h-[36px] items-center justify-center rounded-full border border-white/88 bg-white px-4 text-[13px] font-medium tracking-[-0.012em] text-black shadow-[0_8px_20px_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.72)] transition-colors duration-150 hover:bg-white/95 sm:inline-flex sm:h-[40px] sm:px-5 sm:text-[14px] sm:shadow-[0_10px_24px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.72)]'
+          className='focus-ring-themed inline-flex h-[36px] items-center justify-center rounded-full border border-white/88 bg-white px-3.5 text-[13px] font-medium tracking-[-0.012em] text-black shadow-[0_8px_20px_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.72)] transition-colors duration-150 hover:bg-white/95 sm:h-[40px] sm:px-5 sm:text-[14px] sm:shadow-[0_10px_24px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.72)]'
         >
           Sign in
         </Link>
@@ -56,15 +50,13 @@ function PublicAuthActions({
     <div className='flex items-center gap-1'>
       <Link
         href={APP_ROUTES.SIGNIN}
-        className='btn-linear-login focus-ring-themed shrink-0 whitespace-nowrap'
+        className='public-login-link focus-ring-themed shrink-0 whitespace-nowrap'
       >
         Log in
       </Link>
       <Link
         href={APP_ROUTES.SIGNUP}
-        className={getLinearPillClassName({
-          className: 'focus-ring-themed shrink-0 whitespace-nowrap',
-        })}
+        className='public-signup-link focus-ring-themed shrink-0 whitespace-nowrap'
       >
         Start Free Trial
       </Link>
@@ -89,19 +81,15 @@ export function HeaderNav({
 }: HeaderNavProps = {}) {
   const navLinkClass = cn(
     'focus-ring-themed',
-    presentation === 'homepage-embedded'
-      ? 'homepage-header-nav-link'
-      : 'nav-link-linear'
+    presentation === 'default' ? 'public-nav-link' : 'public-header-nav-link'
   );
   const hasNavLinks = !hideNav && !!navLinks?.length;
-  const isHomepagePresentation = presentation === 'homepage-embedded';
+  const isCompactPresentation = presentation !== 'default';
   const navLinksMarkup = hasNavLinks ? (
     <div
       className={cn(
         'max-md:hidden items-center md:flex',
-        isHomepagePresentation
-          ? 'homepage-header-nav-group'
-          : 'gap-1 lg:gap-1.5'
+        isCompactPresentation ? 'public-header-nav-group' : 'gap-1 lg:gap-1.5'
       )}
     >
       {navLinks?.map(link =>
@@ -118,7 +106,7 @@ export function HeaderNav({
     </div>
   ) : null;
   const containerClass =
-    _containerSize === 'homepage'
+    isCompactPresentation || _containerSize === 'homepage'
       ? 'flex h-[var(--linear-header-height)] w-full items-center gap-3 sm:gap-4 md:gap-6'
       : 'flex h-[var(--linear-header-height)] w-full items-center gap-6';
   return (
@@ -157,18 +145,17 @@ export function HeaderNav({
         ...style,
       }}
     >
-      {/* Linear-style full-width content container */}
       <nav
         className={cn(
           'mx-auto w-full px-5 sm:px-6',
-          _containerSize === 'homepage'
+          isCompactPresentation || _containerSize === 'homepage'
             ? 'max-w-[var(--linear-content-max)] lg:px-0'
             : 'max-w-[calc(var(--linear-content-max)+3rem)]'
         )}
         aria-label='Primary navigation'
       >
         <div className={containerClass}>
-          {/* Logo section - left aligned with Linear padding */}
+          {/* Logo section - left aligned with compact padding */}
           <div className='flex items-center'>
             <LogoLink
               logoSize={logoSize}
@@ -177,13 +164,13 @@ export function HeaderNav({
             />
           </div>
 
-          {isHomepagePresentation ? navLinksMarkup : null}
+          {isCompactPresentation ? navLinksMarkup : null}
 
           {/* Spacer pushes nav + auth to the right */}
           <div className='flex-1' aria-hidden='true' />
 
           {/* Nav links - desktop only, right-aligned */}
-          {isHomepagePresentation ? null : navLinksMarkup}
+          {isCompactPresentation ? null : navLinksMarkup}
 
           {/* Divider between nav and auth - desktop only */}
           {hasNavLinks && presentation !== 'homepage-embedded' ? (
@@ -193,11 +180,12 @@ export function HeaderNav({
             />
           ) : null}
 
-          {/* Auth actions - visible on all sizes (Linear shows Log in + Sign up on mobile) */}
+          {/* Auth actions - visible on all sizes */}
           <div
             className={cn(
               'flex items-center gap-1',
-              isHomepagePresentation && 'homepage-header-auth'
+              isCompactPresentation && 'public-header-auth',
+              minimalAuth && 'public-header-auth--minimal'
             )}
           >
             {authMode === 'public-static' ? (

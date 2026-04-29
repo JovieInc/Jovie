@@ -95,6 +95,7 @@ interface ProfileCompactTemplateProps {
   readonly releases?: readonly PublicRelease[];
   readonly hideJovieBranding?: boolean;
   readonly hideMoreMenu?: boolean;
+  readonly disableHistorySync?: boolean;
   readonly visualVariant?: 'default' | 'v1';
 }
 
@@ -216,6 +217,7 @@ export function ProfileCompactTemplate({
   releases,
   hideJovieBranding = false,
   hideMoreMenu = false,
+  disableHistorySync = false,
   visualVariant = 'default',
 }: ProfileCompactTemplateProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -518,6 +520,10 @@ export function ProfileCompactTemplate({
   }, [syncRequestedModeFromLocation]);
 
   useEffect(() => {
+    if (disableHistorySync) {
+      return;
+    }
+
     if (!initialLocationModeAlignedRef.current) {
       return;
     }
@@ -551,7 +557,14 @@ export function ProfileCompactTemplate({
     }
 
     globalThis.history.pushState(globalThis.history.state, '', href);
-  }, [drawerOpen, drawerView, requestedMode, artist.handle, searchSuffix]);
+  }, [
+    drawerOpen,
+    drawerView,
+    requestedMode,
+    artist.handle,
+    searchSuffix,
+    disableHistorySync,
+  ]);
 
   const profileHref = useMemo(
     () => getProfileModeHref(artist.handle, 'profile', searchSuffix),

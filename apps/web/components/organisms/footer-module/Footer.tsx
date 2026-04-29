@@ -223,7 +223,7 @@ export function Footer({
     );
   }
 
-  // Minimal/Marketing footer with Linear styling
+  // Minimal marketing footer with shared public styling
   return (
     <footer
       className={className}

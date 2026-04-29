@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { MarketingContainer, MarketingHero } from '@/components/marketing';
 import { APP_ROUTES } from '@/constants/routes';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 
@@ -12,68 +13,64 @@ export const metadata: Metadata = {
 
 export default function AiPage() {
   return (
-    <main className='bg-base px-6 py-16 text-primary-token sm:px-8 lg:px-12'>
-      <div className='mx-auto flex max-w-5xl flex-col gap-10'>
-        <section className='max-w-3xl space-y-5'>
-          <p className='text-sm font-medium tracking-tight text-muted-token'>
-            Public Brief
-          </p>
-          <h1 className='text-4xl font-semibold tracking-tight sm:text-5xl'>
-            The AI operating system behind every Jovie profile
-          </h1>
-          <p className='max-w-2xl text-lg leading-8 text-secondary-token'>
-            Jovie turns a creator profile into an always-on decision loop:
-            identify the fan, read context, choose the next best action, and
-            learn from the result. This public page covers the operating model
-            without exposing the private investor portal.
-          </p>
-          <div className='flex flex-wrap gap-3'>
-            <Link className='btn-linear-primary' href={APP_ROUTES.PRICING}>
-              See Pricing
-            </Link>
-            <Link className='btn-linear-secondary' href={APP_ROUTES.SUPPORT}>
-              Contact The Team
-            </Link>
-          </div>
-        </section>
+    <>
+      <MarketingHero variant='left'>
+        <p className='marketing-kicker'>Public Brief</p>
+        <h1 className='marketing-h1-linear mt-6 max-w-[18ch] text-primary-token'>
+          The AI operating system behind every Jovie profile
+        </h1>
+        <p className='marketing-lead-linear mt-6 max-w-[44rem] text-secondary-token'>
+          Jovie turns a creator profile into an always-on decision loop:
+          identify the fan, read context, choose the next best action, and learn
+          from the result.
+        </p>
+        <div className='mt-7 flex flex-wrap gap-3'>
+          <Link className='public-action-primary' href={APP_ROUTES.PRICING}>
+            See Pricing
+          </Link>
+          <Link className='public-action-secondary' href={APP_ROUTES.SUPPORT}>
+            Contact The Team
+          </Link>
+        </div>
+      </MarketingHero>
 
+      <MarketingContainer width='page' className='pb-20 sm:pb-28'>
         <section className='grid gap-4 md:grid-cols-2 xl:grid-cols-4'>
-          <article className='rounded-3xl border border-subtle bg-panel px-5 py-6'>
-            <h2 className='text-lg font-semibold'>1. Identify</h2>
-            <p className='mt-3 text-sm leading-7 text-secondary-token'>
-              Recognize known fans, captured contacts, and anonymous visitors
-              with enough signal to personalize the page in real time.
-            </p>
-          </article>
-          <article className='rounded-3xl border border-subtle bg-panel px-5 py-6'>
-            <h2 className='text-lg font-semibold'>2. Decide</h2>
-            <p className='mt-3 text-sm leading-7 text-secondary-token'>
-              Route each visit toward the highest-value next action, whether
-              that is listening, subscribing, tipping, merch, or tickets.
-            </p>
-          </article>
-          <article className='rounded-3xl border border-subtle bg-panel px-5 py-6'>
-            <h2 className='text-lg font-semibold'>3. Measure</h2>
-            <p className='mt-3 text-sm leading-7 text-secondary-token'>
-              Capture impressions, clicks, and downstream value events so
-              creators can see what turns traffic into real relationships.
-            </p>
-          </article>
-          <article className='rounded-3xl border border-subtle bg-panel px-5 py-6'>
-            <h2 className='text-lg font-semibold'>4. Learn</h2>
-            <p className='mt-3 text-sm leading-7 text-secondary-token'>
-              Use those outcomes to improve routing, segmentation, and follow-up
-              automation across future visits.
-            </p>
-          </article>
+          {[
+            {
+              title: '1. Identify',
+              body: 'Recognize known fans, captured contacts, and anonymous visitors with enough signal to personalize the page in real time.',
+            },
+            {
+              title: '2. Decide',
+              body: 'Route each visit toward the highest-value next action, whether that is listening, subscribing, tipping, merch, or tickets.',
+            },
+            {
+              title: '3. Measure',
+              body: 'Capture impressions, clicks, and downstream value events so creators can see what turns traffic into real relationships.',
+            },
+            {
+              title: '4. Learn',
+              body: 'Use those outcomes to improve routing, segmentation, and follow-up automation across future visits.',
+            },
+          ].map(item => (
+            <article key={item.title} className='homepage-surface-card p-5'>
+              <h2 className='text-[1rem] font-semibold tracking-[-0.02em] text-primary-token'>
+                {item.title}
+              </h2>
+              <p className='mt-3 text-sm leading-7 text-secondary-token'>
+                {item.body}
+              </p>
+            </article>
+          ))}
         </section>
 
-        <section className='grid gap-8 rounded-[2rem] border border-subtle bg-panel px-6 py-8 lg:grid-cols-[1.2fr_0.8fr]'>
-          <div className='space-y-4'>
-            <h2 className='text-2xl font-semibold tracking-tight'>
+        <section className='homepage-surface-card mt-6 grid gap-8 p-6 lg:grid-cols-[1.2fr_0.8fr]'>
+          <div>
+            <h2 className='text-2xl font-semibold tracking-tight text-primary-token'>
               What ships in the launch version
             </h2>
-            <ul className='space-y-3 text-sm leading-7 text-secondary-token'>
+            <ul className='mt-4 space-y-3 text-sm leading-7 text-secondary-token'>
               <li>
                 Adaptive primary CTAs for anonymous versus identified fans.
               </li>
@@ -86,24 +83,24 @@ export default function AiPage() {
               </li>
             </ul>
           </div>
-          <div className='space-y-4'>
-            <h2 className='text-2xl font-semibold tracking-tight'>
+          <div>
+            <h2 className='text-2xl font-semibold tracking-tight text-primary-token'>
               Read the public context
             </h2>
-            <p className='text-sm leading-7 text-secondary-token'>
+            <p className='mt-4 text-sm leading-7 text-secondary-token'>
               The deeper memo and fundraising material stay private. The public
               surfaces below explain the problem, the product shape, and the
               creator-facing offer.
             </p>
-            <div className='flex flex-wrap gap-3'>
+            <div className='mt-5 flex flex-wrap gap-3'>
               <Link
-                className='btn-linear-secondary'
+                className='public-action-secondary'
                 href={APP_ROUTES.INVESTORS}
               >
                 Investor Overview
               </Link>
               <Link
-                className='btn-linear-secondary'
+                className='public-action-secondary'
                 href={APP_ROUTES.BLOG_THE_MYSPACE_PROBLEM}
               >
                 Read The Memo
@@ -111,7 +108,7 @@ export default function AiPage() {
             </div>
           </div>
         </section>
-      </div>
-    </main>
+      </MarketingContainer>
+    </>
   );
 }

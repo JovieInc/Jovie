@@ -1,17 +1,15 @@
 /**
- * Jovie Design System - Linear-inspired OKLCH Theme Generation
+ * Jovie Design System - OKLCH Theme Generation
  *
- * Core Principles (from Linear's redesign):
+ * Core Principles:
  * 1. OKLCH color space for perceptual uniformity
  * 2. Only 3 theme inputs generate ALL colors
  * 3. Light/dark modes use identical generation logic
  * 4. Contrast is a continuous variable (0-100)
- *
- * @see https://linear.app/now/how-we-redesigned-the-linear-ui
  */
 
-/* Import Linear-specific tokens for marketing pages */
-@import "./linear-tokens.css";
+/* Import public shell tokens for marketing and app surfaces */
+@import "./public-shell-tokens.css";
 
 /* ============================================
    THEME INPUTS - The only 3 variables needed
@@ -41,11 +39,11 @@
 
   /* Core Theme Inputs */
   --theme-base-hue: 282;
-  /* Neutral foundation hue — Linear March 2026 refresh (shifted from 272→282) */
+  /* Neutral foundation hue — refreshed neutral family (shifted from 272→282) */
   --theme-base-chroma: 0.015;
   /* Very low chroma for neutrals */
   --theme-accent-hue: 282;
-  /* Brand accent hue — aligned with base hue per Linear refresh */
+  /* Brand accent hue — aligned with the refreshed base hue */
   --theme-accent-chroma: 0.18;
   /* Vibrant accent saturation */
   --theme-contrast: 65;
@@ -66,7 +64,7 @@
    SURFACE SYSTEM - Layered elevation
    ============================================
 
-   Linear uses 5 surface levels for depth:
+   The public shell uses 5 surface levels for depth:
    - base: App background
    - surface-0: Elevated (sidebars)
    - surface-1: Cards/panels
@@ -75,7 +73,7 @@
 */
 
 :root {
-  /* Light mode surfaces — matching Linear's exact structural hues
+  /* Light mode surfaces — structural hues
      --bg-base: Sidebar & page background
      --bg-surface-1: Main app content area
      --bg-surface-2: Cards and panels
@@ -108,10 +106,10 @@
   /* Same as surface-3 */
   --color-bg-primary: lch(98.94% 0.5 282);
   --color-bg-secondary: lch(95.94% 0.5 282);
-  /* Linear March 2026 exact — was lch(93.797% 1.529 282), too dark/saturated */
+  /* Calibrated neutral — previous value was too dark/saturated */
   --color-bg-button: #e3e5e8;
   --color-bg-tooltip: #101012;
-  /* Linear dark background for light mode tooltips */
+  /* Dark background for light mode tooltips */
 
   /* Text hierarchy - contrast-aware */
   --color-text-primary-token: lch(9.894% 0 282);
@@ -132,7 +130,7 @@
   --color-border-default: oklch(0% 0 0 / 8%);
   --color-border-strong: oklch(0% 0 0 / 15%);
   --color-border-focus: #7170ff;
-  /* Linear accent for focus */
+  /* Accent for focus */
 
   /* Accent palette rotation */
   --color-accent-gray: #7f7f85;
@@ -185,7 +183,7 @@
   /* Table cell hover */
   --color-cell-hover: #f0f0f0;
 
-  /* Shadows — Linear's exact values (same hierarchy, lighter in light mode) */
+  /* Shadows — same hierarchy, lighter in light mode */
   --shadow-color: 240 10% 3.9%;
   --shadow-sm: 0px 4px 4px -1px #0000000a, 0px 1px 1px 0px #00000014;
   --shadow-md: 0 3px 8px #0000001a, 0 2px 5px #0000001a, 0 1px 1px #0000001a;
@@ -194,7 +192,7 @@
     0 1px 1px #0000000f;
   --shadow-xl: 0 5px 50px #00000033, 0 4px 30px #00000033, 0 3px 10px #0000001a;
 
-  /* Linear card shadow — ring border + soft depth (the signature look) */
+  /* Card shadow — ring border + soft depth */
   --shadow-card:
     oklch(80% 0 283) 0px 0px 0px 1px,
     oklch(0% 0 0 / 2.2%) 0px 3px 6px -2px,
@@ -290,23 +288,23 @@
   );
   --color-skeleton-shimmer: oklch(100% 0 0);
 
-  /* Focus ring — Linear: #7170ff (extracted 2026-03-16) */
+  /* Focus ring compatibility value */
   --color-focus-ring: var(--color-accent);
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
 
-  /* Font size scale — extracted from Linear CSS vars (2026-02-17)
+  /* Font size scale compatibility values
      --font-size-micro: 11px, --font-size-mini: 12px, --font-size-small: 13px,
      --font-size-regular: 15px, --font-size-large: 18px */
 }
 
 /* Dark mode - same generation logic, inverted lightness */
 :root.dark {
-  /* Dark mode surfaces — matched to Linear's exact Hex values */
+  /* Dark mode surfaces */
   --color-bg-base: #08090a;
   /* sidebar/page bg */
   --color-bg-surface-0: #0f1011;
-  /* primary app surface — matches --linear-bg-surface-0 */
+  /* primary app surface — matches the base framed surface */
   --color-bg-surface-1: var(--linear-bg-surface-1);
   /* Shared card surface inside the dark app shell */
   --color-bg-surface-2: #23252a;
@@ -333,26 +331,25 @@
   /* Matches surface-3 in dark mode */
 
   /* Text hierarchy - inverted for dark mode
-     Extracted from Linear.app live (2026-02-15):
        Primary:   lch(100% 0 272)       → oklch ~100% — pure white headings
        Secondary: lch(90.65% 1.35 272) → oklch ~91% — body text, labels (bright!)
        Tertiary:  lch(62.6% 1.35 272)   → oklch ~63% — descriptions, meta
        Quaternary: lch(38.29% 1.35 272) → oklch ~38% — placeholders, disabled
-     Key insight: Linear's secondary is MUCH brighter than typical (90% not 65%) */
-  /* Text hierarchy — extracted from Linear CSS vars (2026-02-17)
+     Key insight: secondary is much brighter than typical (90% not 65%) */
+  /* Text hierarchy compatibility values
      --color-text-primary:    lch(100% 0 272)       = pure white
      --color-text-secondary:  lch(90.65% 1.35 272)  = #E3E4E6
      --color-text-tertiary:   lch(62.6% 1.35 272)   = #969799
      --color-text-quaternary: lch(38.29% 1.35 272)   = #5A5B5D
      --content-color:         #6b6f76               = content/meta text */
   --color-text-primary-token: lch(100% 0 282);
-  /* Pure white — Linear exact (hue 282 per March 2026 refresh) */
+  /* Pure white */
   --color-text-secondary-token: lch(90.65% 1.35 282);
-  /* #E3E4E6 — Linear exact */
+  /* #E3E4E6 */
   --color-text-tertiary-token: lch(68% 1.35 282);
-  /* #969799 — Linear exact */
+  /* #969799 */
   --color-text-quaternary-token: #62666d;
-  /* Linear: --color-text-quaternary = #62666d (extracted 2026-03-16) */
+  /* Quaternary text compatibility value */
   /* JOV-1780: disabled text lifted from oklch(28%) to oklch(45%) so
      disabled form controls remain legible against page bg `#08090a`. */
   --color-text-disabled-token: oklch(45% 0.006 282);
@@ -363,7 +360,7 @@
   --color-logo-muted: rgba(255, 255, 255, 0.55);
   --color-logo-muted-hover: rgba(255, 255, 255, 0.75);
 
-  /* Border system - extracted from Linear marketing (2026-02-16)
+  /* Border system compatibility values
      Subtle:  rgba(255,255,255,0.05) — card borders, dividers
      Default: rgba(255,255,255,0.08) — frame borders, input borders
      Strong:  rgba(255,255,255,0.10) — panel outlines */
@@ -374,7 +371,7 @@
   --color-border-default: rgba(255, 255, 255, 0.11);
   --color-border-strong: rgba(255, 255, 255, 0.18);
   --color-border-focus: #7170ff;
-  /* Linear accent for focus */
+  /* Accent for focus */
 
   /* Accent palette rotation */
   --color-accent-gray: #8d8d93;
@@ -400,7 +397,7 @@
   --color-accent-active: #8a37f4;
   --color-accent-subtle: var(--color-accent-purple-subtle);
 
-  /* Primary button - inverted for dark mode (Linear: rgb(230,230,230)) */
+  /* Primary button - inverted for dark mode */
   --color-btn-primary-bg: #e6e6e6;
   --color-btn-primary-fg: #08090a;
   --color-btn-primary-hover: #f0f0f0;
@@ -414,12 +411,12 @@
     24% var(--theme-base-chroma) var(--theme-base-hue)
   );
 
-  /* Interactive states - white-based (Linear uses semi-transparent overlays)
+  /* Interactive states - white-based semi-transparent overlays
      Extracted: hover rows = rgba(255,255,255,0.02-0.03), buttons = 0.05, active = 0.05 */
   --color-interactive-hover: rgba(255, 255, 255, 0.05);
   --color-interactive-active: rgba(255, 255, 255, 0.05);
 
-  /* Badge/tag styles — extracted from Linear marketing demo (2026-02-16)
+  /* Badge/tag compatibility values
      bg: rgba(255,255,255,0.05), border: 1px solid rgba(255,255,255,0.05)
      radius: 2px, font: 10px/510 */
   --color-badge-bg: rgba(255, 255, 255, 0.05);
@@ -429,7 +426,7 @@
   /* Table cell hover — same as surface-2 rgb(22,23,24) */
   --color-cell-hover: #161718;
 
-  /* Shadows — extracted from Linear CSS vars (2026-02-17)
+  /* Shadow compatibility values
      --shadow-tiny: 0px 4px 4px -1px #0000000f, 0px 1px 1px 0px #0000001e
      --shadow-low:  0 3px 8px #0000002f, 0 2px 5px #0000002f, 0 1px 1px #0000002f
      --shadow-medium: 0 4px 40px #00000026, 0 3px 20px #00000036, 0 2px 6px #0000001f, 0 1px 1px #0000001a
@@ -858,7 +855,7 @@
    TYPOGRAPHY SYSTEM
    ============================================ */
 :root {
-  /* Font stack — matches Linear.app exactly (extracted 2026-02-15) */
+  /* Font stack */
   --font-sans:
     "Inter Variable", "Inter", "SF Pro Display", -apple-system,
     BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell,
@@ -867,33 +864,32 @@
     "SF Mono", "Fira Code", "Fira Mono", Menlo, Monaco, Consolas,
     "Liberation Mono", "Courier New", monospace;
 
-  /* Linear font features (extracted 2026-03-16: --font-settings: "cv01","ss03") */
+  /* Font feature compatibility values */
   --font-features: "cv01", "ss03";
   --font-optical-sizing: 28;
 
-  /* Font weights — Linear uses Inter Variable axis with non-standard stops
-     Extracted from Linear CSS vars (2026-02-17):
+  /* Font weights — Inter Variable axis with non-standard stops:
        --font-weight-normal: 450  (book weight — their default!)
        --font-weight-medium: 510
        --font-weight-semibold: 600
        --font-weight-bold: 700 */
   --font-weight-normal: 400;
-  /* Linear: --font-weight-normal = 400 (extracted 2026-03-16) */
+  /* Normal compatibility value */
   --font-weight-book: 450;
-  /* Linear's "book" weight — their default UI weight (confirmed from live extraction) */
+  /* Book weight */
   /* Alias for normal */
   --font-weight-medium: 510;
-  /* Linear: --font-weight-medium = 510 */
+  /* Medium compatibility value */
   --font-weight-nav: 510;
-  /* Linear sidebar nav = --font-weight-medium */
+  /* Sidebar nav = medium */
   --font-weight-semibold: 590;
-  /* Linear: --font-weight-semibold = 590 (extracted 2026-03-16) */
+  /* Semibold compatibility value */
   --font-weight-bold: 680;
-  /* Linear: --font-weight-bold = 680 (extracted 2026-03-16) */
+  /* Bold compatibility value */
   --font-weight-heavy: 680;
 
   /* Type scale - based on 16px base
-     KEY: Linear uses 13px (0.8125rem) as the primary app UI size */
+     KEY: 13px (0.8125rem) is the primary app UI size */
   --text-3xs: 0.625rem;
   /* 10px — micro labels, legal */
   --text-2xs: 0.6875rem;
@@ -901,7 +897,7 @@
   --text-xs: 0.75rem;
   /* 12px */
   --text-app: 0.8125rem;
-  /* 13px — LINEAR'S DEFAULT APP UI SIZE (sidebar, issues, tabs) */
+  /* 13px — default app UI size for sidebar, lists, and tabs */
   --text-sm: 0.875rem;
   /* 14px */
   --text-mid: 0.9375rem;
@@ -995,7 +991,7 @@
   --radius-3xl: 22px;
   /* Large modals — extracted: 22px on hero sections */
   --radius-pill: 48px;
-  /* Pill buttons (observed in Linear) */
+  /* Pill buttons */
   --radius-full: 9999px;
   /* Circles, tags */
 }
@@ -1004,19 +1000,19 @@
    ANIMATION SYSTEM
    ============================================ */
 :root {
-  /* Durations — extracted from Linear CSS vars (2026-02-17)
+  /* Duration compatibility values
      --speed-quickTransition: .1s
      --speed-regularTransition: .25s
      --speed-slowTransition: .35s */
   --duration-instant: 50ms;
   --duration-fast: 100ms;
-  /* Linear: quickTransition */
+  /* Quick transition */
   --duration-normal: 160ms;
   /* Sidebar/nav transition: 0.16s cubic-bezier */
   --duration-slow: 250ms;
-  /* Linear: regularTransition */
+  /* Regular transition */
   --duration-slower: 350ms;
-  /* Linear: slowTransition */
+  /* Slow transition */
   --duration-slowest: 350ms;
 
   /* Two-tier intent vocabulary (DESIGN.md → Motion):
@@ -1029,7 +1025,7 @@
   --duration-subtle: 150ms;
   --duration-cinematic: 320ms;
 
-  /* Easings - Linear uses cubic-bezier for smooth feel */
+  /* Easings */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -1039,7 +1035,7 @@
   --ease-subtle: var(--ease-interactive);
   --ease-cinematic: cubic-bezier(0.32, 0.72, 0, 1);
 
-  /* Pre-composed transition patterns (extracted from Linear)
+  /* Pre-composed transition patterns
      Use duration custom properties so prefers-reduced-motion overrides work */
   --transition-colors:
     border var(--duration-normal), background-color var(--duration-normal),
@@ -1078,20 +1074,15 @@
   /* Sidebar tokens - RGB format for Tailwind opacity modifiers */
   /* Maps to --color-bg-base: #f5f5f5 = rgb(245,245,245) */
   --sidebar-background: 247 248 248;
-  /* Linear: --linear-app-sidebar-background-rgb */
   --sidebar-foreground: 12 12 12;
   --sidebar-primary: 12 12 12;
   --sidebar-primary-foreground: 255 255 255;
   --sidebar-accent: 242 243 245;
-  /* Linear: --linear-app-sidebar-accent-rgb */
   --sidebar-accent-active: 236 238 241;
-  /* Linear: --linear-app-sidebar-accent-active-rgb */
   --sidebar-accent-foreground: 18 18 20;
   --sidebar-border: 0 0 0 / 0.06;
-  /* Linear: --linear-app-sidebar-border-rgb */
   --sidebar-ring: 124 58 237;
   --sidebar-muted: 112 116 124;
-  /* Linear: --linear-app-sidebar-muted-rgb */
   --sidebar-muted-foreground: 112 116 124;
   --sidebar-surface: 247 248 248;
   /* Matches sidebar background */
@@ -1100,32 +1091,23 @@
   --sidebar-input-background: 255 255 255;
   --sidebar-input-border: 0 0 0 / 0.06;
   --sidebar-item-foreground: 88 90 96;
-  /* Linear: --linear-app-sidebar-item-foreground-rgb */
   --sidebar-item-icon: 122 125 132;
-  /* Linear: --linear-app-sidebar-item-icon-rgb */
   --sidebar-accent-active: 236 238 241;
-  /* Linear: --linear-app-sidebar-accent-active-rgb */
 }
 
 :root.dark {
   /* Sidebar tokens - RGB format for Tailwind opacity modifiers */
   /* Keep the sidebar on the darker shell canvas so the framed main pane reads above it. */
   --sidebar-background: var(--linear-app-sidebar-background-rgb);
-  /* Linear: --linear-app-sidebar-background-rgb */
   --sidebar-foreground: 227 228 229;
-  /* Linear: --linear-app-sidebar-foreground-rgb */
   --sidebar-primary: 227 228 229;
   --sidebar-primary-foreground: 12 12 12;
   --sidebar-accent: 255 255 255 / 0.03;
-  /* Linear: --linear-app-sidebar-accent-rgb */
   --sidebar-accent-active: 255 255 255 / 0.05;
-  /* Linear: --linear-app-sidebar-accent-active-rgb */
   --sidebar-accent-foreground: 227 228 229;
   --sidebar-border: 255 255 255 / 0.06;
-  /* Linear: --linear-app-sidebar-border-rgb */
   --sidebar-ring: 109 119 230 / 0.55;
   --sidebar-muted: 138 143 152;
-  /* Linear: --linear-app-sidebar-muted-rgb */
   --sidebar-muted-foreground: 138 143 152;
   --sidebar-surface: var(--linear-app-sidebar-background-rgb);
   /* Matches sidebar background */
@@ -1134,11 +1116,8 @@
   --sidebar-input-background: 255 255 255 / 0.06;
   --sidebar-input-border: 255 255 255 / 0.06;
   --sidebar-item-foreground: 214 218 226;
-  /* Linear: --linear-app-sidebar-item-foreground-rgb */
   --sidebar-item-icon: 116 120 128;
-  /* Linear: --linear-app-sidebar-item-icon-rgb */
   --sidebar-accent-active: 255 255 255 / 0.06;
-  /* Linear: --linear-app-sidebar-accent-active-rgb */
 }
 
 /* ============================================
@@ -1154,7 +1133,7 @@
 }
 
 :root.dark {
-  /* Menu tokens aligned to Linear surface hierarchy (2026-02-16)
+  /* Menu tokens aligned to the public-shell surface hierarchy (2026-02-16)
      Menu bg = surface-0 (rgb 16,17,18) — elevated menus use darker base */
   --menu-background: 16 17 18;
   --menu-foreground: 244 244 245;
@@ -1168,7 +1147,7 @@
    LIQUID GLASS SYSTEM
    ============================================
 
-   Linear-inspired frosted glass effect with:
+   Frosted glass effect with:
    - Gaussian blur for depth
    - Subtle gradients for structure
    - Specular highlights
@@ -1231,65 +1210,60 @@
 }
 
 /* ============================================
-   MARKETING MODE - Linear Theme Bridge
+   MARKETING MODE - Public Theme Bridge
    ============================================
 
-   Activate Linear styling on marketing pages by adding
-   [data-theme="linear"] to a parent element or using
-   the .linear-marketing class.
-
-   This maps Linear tokens to the existing design system
-   variables for seamless integration.
+   Activate public marketing styling by adding the .marketing-system class.
+   This maps public marketing tokens to the existing design system variables.
 */
 
-[data-theme="linear"],
-.linear-marketing {
+.marketing-system {
   /* Marketing typography: Satoshi (display/buttons) + DM Sans (body) */
   font-family: var(--font-body);
   --marketing-font-display: var(--font-display);
   --marketing-font-body: var(--font-body);
 
-  /* Map Linear text colors to design system */
+  /* Map public-shell text colors to design system */
   --color-text-primary-token: var(--linear-text-primary);
   --color-text-secondary-token: var(--linear-text-secondary);
   --color-text-tertiary-token: var(--linear-text-tertiary);
 
-  /* Map Linear backgrounds to design system */
+  /* Map public-shell backgrounds to design system */
   --color-bg-base: var(--linear-bg-page);
   --color-bg-surface-0: var(--linear-bg-surface-0);
   --color-bg-surface-1: var(--linear-bg-surface-1);
   --color-bg-surface-2: var(--linear-bg-surface-2);
 
-  /* Map Linear borders to design system */
+  /* Map public-shell borders to design system */
   --color-border-subtle: var(--linear-border-subtle);
   --color-border-default: var(--linear-border-default);
   --color-border-strong: var(--linear-border-strong);
 
-  /* Map Linear buttons to design system */
+  /* Map public-shell buttons to design system */
   --color-btn-primary-bg: var(--linear-btn-primary-bg);
   --color-btn-primary-fg: var(--linear-btn-primary-fg);
   --color-btn-secondary-bg: var(--linear-btn-secondary-bg);
   --color-btn-secondary-fg: var(--linear-btn-secondary-fg);
 
-  /* Map Linear interactive states */
+  /* Map public-shell interactive states */
   --color-interactive-hover: var(--linear-bg-hover);
 
-  /* Map Linear page bg and focus ring */
+  /* Map public-shell page bg and focus ring */
   --color-bg-page: var(--linear-bg-page);
   --color-border-focus: var(--linear-border-focus);
 }
 
 /* Marketing typography: headings and buttons use Satoshi (display font) */
-.linear-marketing h1,
-.linear-marketing h2,
-.linear-marketing h3,
-.linear-marketing h4 {
+.marketing-system h1,
+.marketing-system h2,
+.marketing-system h3,
+.marketing-system h4 {
   font-family: var(--marketing-font-display);
 }
 
-.linear-marketing button,
-.linear-marketing [role="button"],
-.linear-marketing a[class*="btn"] {
+.marketing-system button,
+.marketing-system [role="button"],
+.marketing-system a[class*="btn"] {
   font-family: var(--marketing-font-display);
   letter-spacing: -0.01em;
 }

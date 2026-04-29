@@ -359,6 +359,30 @@ const nextConfig = {
       permanent: false,
     }));
 
+    const retiredMarketingRedirects = [
+      { source: '/new', destination: '/', permanent: true },
+      {
+        source: '/exp/home-v1',
+        destination: '/exp/design-studio?tab=landing',
+        permanent: true,
+      },
+      {
+        source: '/exp/page-builder',
+        destination: '/exp/design-studio?tab=landing',
+        permanent: true,
+      },
+      {
+        source: '/exp/marketing-sections',
+        destination: '/exp/design-studio',
+        permanent: true,
+      },
+      {
+        source: '/artist-profile',
+        destination: '/artist-profiles',
+        permanent: true,
+      },
+    ];
+
     return [
       // Legal page redirects
       {
@@ -398,6 +422,7 @@ const nextConfig = {
         destination: '/artist-notifications',
         permanent: true,
       },
+      ...retiredMarketingRedirects,
       // VIP username redirects
       ...vipUsernameRedirects,
     ];

@@ -6,7 +6,7 @@
  *
  * Read by:
  *   - `/exp/component-checker` — full-bleed single-section preview
- *   - `/exp/page-builder` — composes sections into a full landing page
+ *   - `/exp/design-studio` — composes sections into a full landing page
  *
  * Rules:
  *   - Every section that ships on a landing page MUST have an entry here.

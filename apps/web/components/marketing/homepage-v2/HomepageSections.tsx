@@ -1,13 +1,10 @@
 import { ArrowRight } from 'lucide-react';
-import Image from 'next/image';
 import Link from 'next/link';
 import type { CSSProperties } from 'react';
 import { DemoPublicProfileSurface } from '@/components/features/demo/DemoPublicProfileSurface';
-import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
-import { MarketingContainer, MarketingPageShell } from '@/components/marketing';
+import { MarketingContainer } from '@/components/marketing';
 import { ArtistProfileModeSwitcher } from '@/components/marketing/artist-profile';
 import { ArtistProfilePhoneFrame } from '@/components/marketing/artist-profile/ArtistProfilePhoneFrame';
-import { ArtistProfileSectionHeader } from '@/components/marketing/artist-profile/ArtistProfileSectionHeader';
 import { ArtistProfileSpecWall } from '@/components/marketing/artist-profile/ArtistProfileSpecWall';
 import { MarketingScreenshot } from '@/components/marketing/MarketingScreenshot';
 import {
@@ -15,6 +12,7 @@ import {
   ArtistProfileCaptureVisual,
   ArtistProfileReactivationVisual,
 } from '@/components/marketing/MarketingStoryPrimitives';
+import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { APP_ROUTES } from '@/constants/routes';
 import { ARTIST_NOTIFICATIONS_COPY } from '@/data/artistNotificationsCopy';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
@@ -22,37 +20,8 @@ import {
   HOMEPAGE_V2_COPY,
   HOMEPAGE_V2_POWER_TILES,
 } from '@/data/homepageV2Copy';
-import { ARTIST_PROFILE_SOCIAL_PROOF } from '@/data/socialProof';
 import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
-import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 import { cn } from '@/lib/utils';
-
-export function HomepageV2Route() {
-  return (
-    <MarketingPageShell>
-      <HomepageV2Hero />
-      <HomepageV2BelowHero />
-    </MarketingPageShell>
-  );
-}
-
-export function HomepageV2BelowHero() {
-  return (
-    <>
-      <HomeTrustSection />
-      <div aria-hidden='true' className='section-gradient-divider' />
-      <HomepageV2SystemOverview />
-      <HomepageV2Spotlight />
-      <HomepageV2CaptureReactivate />
-      <HomepageV2PowerGrid />
-      {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_SOCIAL_PROOF ? (
-        <HomepageV2SocialProof />
-      ) : null}
-      <HomepageV2Pricing />
-      <HomepageV2FinalCta />
-    </>
-  );
-}
 
 function HomepageStoryHeader({
   headline,
@@ -101,7 +70,7 @@ function HomepageStoryHeader({
   );
 }
 
-function HomepageV2Hero() {
+export function HomepageV2Hero() {
   const floatingCards = ARTIST_NOTIFICATIONS_COPY.hero.floatingCards.slice(
     0,
     3
@@ -431,56 +400,6 @@ export function HomepageV2PowerGrid() {
   );
 }
 
-function HomepageV2SocialProof() {
-  return (
-    <section
-      data-testid='homepage-v2-social-proof'
-      className='section-spacing-linear-sm'
-    >
-      <MarketingContainer width='page'>
-        <ArtistProfileSectionHeader
-          align='center'
-          headline={HOMEPAGE_V2_COPY.socialProof.headline}
-          body={HOMEPAGE_V2_COPY.socialProof.body}
-          className='max-w-[40rem]'
-          bodyClassName='mx-auto max-w-[28rem]'
-        />
-
-        <div className='mt-8 grid gap-4 lg:grid-cols-3'>
-          {ARTIST_PROFILE_SOCIAL_PROOF.profileCards.map(card => (
-            <article
-              key={card.id}
-              className='overflow-hidden rounded-[1.25rem] bg-white/[0.03]'
-            >
-              <div className='relative aspect-[4/3]'>
-                <Image
-                  src={card.src}
-                  alt={`${card.name} profile image`}
-                  fill
-                  sizes='(max-width: 1024px) 100vw, 360px'
-                  className='object-cover'
-                />
-                <div className='absolute inset-0 bg-[linear-gradient(180deg,rgba(8,9,12,0.05),rgba(8,9,12,0.8)_100%)]' />
-                <div className='absolute inset-x-0 bottom-0 z-10 p-5'>
-                  <p className='font-mono text-[12px] tracking-[-0.02em] text-white/68'>
-                    jov.ie/{card.handle}
-                  </p>
-                  <p className='mt-2 text-[20px] font-medium tracking-[-0.02em] text-white'>
-                    {card.name}
-                  </p>
-                  <p className='mt-2 text-[13px] leading-[1.6] text-white/72'>
-                    {card.supportingLine}
-                  </p>
-                </div>
-              </div>
-            </article>
-          ))}
-        </div>
-      </MarketingContainer>
-    </section>
-  );
-}
-
 export function HomepageV2Pricing() {
   return (
     <section
@@ -511,112 +430,8 @@ export function HomepageV2Pricing() {
   );
 }
 
-const HOMEPAGE_FINAL_CTA_ARCS = [
-  { radiusX: 70, radiusY: 245 },
-  { radiusX: 130, radiusY: 235 },
-  { radiusX: 195, radiusY: 225 },
-  { radiusX: 265, radiusY: 215 },
-  { radiusX: 340, radiusY: 205 },
-  { radiusX: 420, radiusY: 198 },
-  { radiusX: 505, radiusY: 192 },
-  { radiusX: 590, radiusY: 188 },
-] as const;
-
 export function HomepageV2FinalCta() {
-  return (
-    <section
-      data-testid='homepage-v2-final-cta'
-      className='homepage-story-final-cta relative isolate overflow-hidden bg-black'
-    >
-      <div
-        aria-hidden='true'
-        className='homepage-final-cta-glow pointer-events-none absolute inset-0 z-[1]'
-      />
-      <svg
-        className='homepage-final-cta-rays pointer-events-none absolute inset-x-0 bottom-0 z-[2] w-full'
-        viewBox='0 0 1200 540'
-        preserveAspectRatio='xMidYMax slice'
-        aria-hidden='true'
-      >
-        <defs>
-          <linearGradient
-            id='homepage-final-cta-ray-primary'
-            x1='0'
-            x2='0'
-            y1='0'
-            y2='1'
-          >
-            <stop offset='0%' stopColor='#0070f3' stopOpacity='0' />
-            <stop offset='55%' stopColor='#0070f3' stopOpacity='0.35' />
-            <stop offset='92%' stopColor='#ffffff' stopOpacity='0.95' />
-            <stop offset='100%' stopColor='#ffffff' stopOpacity='0.6' />
-          </linearGradient>
-          <linearGradient
-            id='homepage-final-cta-ray-secondary'
-            x1='0'
-            x2='0'
-            y1='0'
-            y2='1'
-          >
-            <stop offset='0%' stopColor='#0070f3' stopOpacity='0' />
-            <stop offset='70%' stopColor='#0070f3' stopOpacity='0.55' />
-            <stop offset='100%' stopColor='#dbeaff' stopOpacity='0.85' />
-          </linearGradient>
-        </defs>
-        <ellipse
-          cx='600'
-          cy='600'
-          rx='22'
-          ry='260'
-          stroke='url(#homepage-final-cta-ray-secondary)'
-          strokeWidth='2.2'
-          fill='none'
-        />
-        {HOMEPAGE_FINAL_CTA_ARCS.map((arc, index) => (
-          <ellipse
-            key={`${arc.radiusX}-${arc.radiusY}`}
-            cx='600'
-            cy='600'
-            rx={arc.radiusX}
-            ry={arc.radiusY}
-            stroke={
-              index % 2 === 0
-                ? 'url(#homepage-final-cta-ray-primary)'
-                : 'url(#homepage-final-cta-ray-secondary)'
-            }
-            strokeWidth={index < 4 ? 1.5 : 1.2}
-            fill='none'
-            opacity={1 - index * 0.05}
-          />
-        ))}
-        <rect
-          x='0'
-          y='538'
-          width='1200'
-          height='2'
-          fill='#0070f3'
-          opacity='0.3'
-        />
-      </svg>
-      <MarketingContainer width='page' className='relative z-10'>
-        <div className='homepage-final-cta-copy mx-auto'>
-          <h2
-            data-testid='homepage-v2-final-cta-heading'
-            className='text-balance text-[clamp(2rem,3.4vw,3rem)] font-[680] leading-[1.05] tracking-[-0.025em] text-white'
-          >
-            Start using Jovie <span className='block'>today for free.</span>
-          </h2>
-          <Link
-            href={APP_ROUTES.SIGNUP}
-            className='homepage-final-cta-action inline-flex h-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.12] px-4 text-[12px] font-medium tracking-[-0.01em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur transition-colors hover:bg-white/[0.16] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
-            data-testid='homepage-v2-final-cta-primary'
-          >
-            {HOMEPAGE_V2_COPY.finalCta.primaryCtaLabel}
-          </Link>
-        </div>
-      </MarketingContainer>
-    </section>
-  );
+  return <MarketingFooterCta />;
 }
 
 function PricingCard({

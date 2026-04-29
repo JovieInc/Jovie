@@ -487,39 +487,6 @@ export default function PricingPage() {
           </div>
         </MarketingContainer>
       </section>
-
-      <section
-        className='border-t py-20 md:py-28'
-        style={{ borderColor: 'var(--linear-border-subtle)' }}
-      >
-        <MarketingContainer width='page'>
-          <div className='text-center'>
-            <h2 className='text-[clamp(2.1rem,4vw,3.5rem)] font-semibold tracking-[-0.05em] text-primary-token'>
-              Start Free.
-            </h2>
-            <p className='mx-auto mt-4 max-w-[30rem] text-[15px] leading-[1.7] text-secondary-token'>
-              Build the profile first. Turn on notifications, deeper analytics,
-              and reactivation when you want them.
-            </p>
-            <div className='mt-8 flex flex-wrap items-center justify-center gap-3'>
-              <Link
-                href={`${APP_ROUTES.SIGNUP}?plan=free`}
-                prefetch={false}
-                className='public-action-primary'
-              >
-                Start Free
-              </Link>
-              <Link
-                href={APP_ROUTES.ARTIST_PROFILES}
-                prefetch={false}
-                className='public-action-secondary'
-              >
-                Explore Artist Profiles
-              </Link>
-            </div>
-          </div>
-        </MarketingContainer>
-      </section>
     </MarketingPageShell>
   );
 }

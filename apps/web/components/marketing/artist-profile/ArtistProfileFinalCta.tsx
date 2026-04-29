@@ -39,7 +39,7 @@ export function ArtistProfileFinalCta({
       <Link
         href={ctaHref}
         data-testid='final-cta-action'
-        className='mt-6 inline-flex h-11 items-center justify-center rounded-full bg-white px-5 text-[14px] font-medium text-black transition-colors hover:bg-white/90'
+        className='public-action-primary mt-6'
       >
         {finalCta.ctaLabel}
       </Link>

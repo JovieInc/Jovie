@@ -5,7 +5,7 @@ import { MarketingHeader } from '@/components/site/MarketingHeader';
 
 export default function NotFound() {
   return (
-    <div className='dark linear-marketing min-h-screen bg-base text-primary-token'>
+    <div className='dark marketing-system min-h-screen bg-base text-primary-token'>
       <MarketingHeader logoSize='xs' />
 
       <main

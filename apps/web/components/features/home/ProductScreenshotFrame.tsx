@@ -98,6 +98,7 @@ export function ProductScreenshotFrame({
   return (
     <figure
       aria-label={isAvailable === true ? undefined : alt}
+      data-screenshot-chrome={chrome}
       data-testid={testId}
       className={[
         'relative overflow-hidden rounded-[0.95rem] border border-subtle bg-surface-0 shadow-card-elevated md:rounded-[1rem]',

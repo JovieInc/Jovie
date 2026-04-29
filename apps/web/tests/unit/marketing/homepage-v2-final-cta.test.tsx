@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { HomepageV2FinalCta } from '@/components/marketing/homepage-v2/HomepageV2Route';
+import { HomepageV2FinalCta } from '@/components/marketing/homepage-v2/HomepageSections';
 
 describe('HomepageV2FinalCta', () => {
   it('renders the static CTA contract without a media background', () => {

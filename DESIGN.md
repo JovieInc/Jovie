@@ -1,9 +1,9 @@
 # Jovie Design System
 
-> **Baseline:** Linear.app March 2026 UI refresh, evolved with Jovie's own identity.
+> **Baseline:** Compact workbench refresh, evolved with Jovie's own identity.
 > **Aesthetic:** Apple meets Rekordbox. Dark-first, restrained, product-as-hero. The restraint is the brand.
 > **Target audience:** World-class touring DJs who take themselves seriously.
-> **Color space:** OKLCH (with LCH for values extracted directly from Linear's CSS).
+> **Color space:** OKLCH (with LCH for compatibility values where needed).
 
 ---
 
@@ -43,7 +43,7 @@ Marketing pages use a two-font system loaded via `next/font/local` in the market
 
 Font files: `apps/web/public/fonts/Satoshi-Variable.woff2` (~42KB), `apps/web/public/fonts/DMSans-Variable.woff2` (~48KB).
 
-CSS variables: `--font-satoshi`, `--font-dm-sans` (set by `next/font/local`). Scoped to `.linear-marketing` wrapper via `--marketing-font-display` and `--marketing-font-body`.
+CSS variables: `--font-satoshi`, `--font-dm-sans` (set by `next/font/local`). Scoped to the `.marketing-system` wrapper via `--marketing-font-display` and `--marketing-font-body`.
 
 ### System B — App (Inter)
 
@@ -54,15 +54,15 @@ Variable** at 80px / weight 600 / letter-spacing -0.045em. Satoshi is loaded
 globally in `app/layout.tsx` so the variable resolves outside the marketing
 wrapper. Everything else on the homepage (subhead, CTAs, body, section
 headings) stays Inter. This deviation is approved as of 2026-04-28 — the
-hero needed a wider, heavier display character to match the Frame.io-inspired
-poster composition; Inter at 80px reads narrow and tech-y in this context.
+hero needed a wider, heavier display character to match the approved poster
+composition; Inter at 80px reads narrow and tech-y in this context.
 
 ### Font Weights
 
 | Name | Value | Usage |
 |------|-------|-------|
 | normal | 400 | Body text, nav links, secondary content |
-| book | 450 | Linear's default UI weight — app body, labels, descriptions |
+| book | 450 | Default UI weight — app body, labels, descriptions |
 | medium | 510 | Headlines, nav items, workspace name, captions |
 | semibold | 590 | Section headings, emphasis |
 | bold | 680 | Strong emphasis, rare |
@@ -86,7 +86,7 @@ poster composition; Inter at 80px reads narrow and tech-y in this context.
 | Level | Size | Weight | Usage |
 |-------|------|--------|-------|
 | 2xs | 11px | 450 | Counts, badges, small indicators |
-| App default | 13px | 450 | Linear's primary app text size |
+| App default | 13px | 450 | Primary app text size |
 | Nav item | 12px | 500 | Sidebar navigation |
 | Workspace name | 13px | 500 | Sidebar workspace label |
 | Heading | 13px | 510 | List/view headings |
@@ -164,7 +164,7 @@ The example above says one thing three times. Jovie should say it once.
 ### Product UI Taste
 
 - Jovie app surfaces should feel calm, dense, and expensive, not loud or overcomposed
-- Linear is the baseline: small text, tight vertical rhythm, restrained emphasis, and very selective use of borders
+- Compact workbench UI is the baseline: small text, tight vertical rhythm, restrained emphasis, and very selective use of borders
 - Hierarchy should come primarily from layout and typography, not from uppercase text or extra boxes
 - If a section still reads clearly after removing its border or eyebrow label, that simpler version is usually the right one
 - Hover feedback should stay visual, not positional. Prefer color, border, or shadow changes. Do not make the interface jump on hover unless the motion communicates direct manipulation.
@@ -356,7 +356,7 @@ Pure neutral HSL — no hue tint. Used across both systems.
 | Prose | 624px | Long-form text |
 | Pricing grid | 1024px | Pricing layout (intentional narrow) |
 
-**Rule:** All marketing sections use `max-w-[1200px]` (or `var(--linear-content-max)`). Full-bleed sections explicitly break out. No more mixed widths.
+**Rule:** All marketing sections use `max-w-[1200px]` (or the shared public-shell content max token). Full-bleed sections explicitly break out. No more mixed widths.
 
 ---
 
@@ -398,7 +398,7 @@ Pure neutral HSL — no hue tint. Used across both systems.
 | md | `0 3px 8px #0000001a, 0 2px 5px #0000001a, 0 1px 1px #0000001a` | Cards |
 | lg | `0 4px 40px #00000014, 0 3px 20px #0000001a, 0 2px 6px #00000014, 0 1px 1px #0000000f` | Elevated |
 | xl | `0 5px 50px #00000033, 0 4px 30px #00000033, 0 3px 10px #0000001a` | Modals |
-| card | Ring border + soft depth (Linear signature) | Cards |
+| card | Ring border + soft depth | Cards |
 | button | Layered shadow — `0px 8px 2px` through `0px 0px 1px` | Buttons |
 
 ### Dark Mode
@@ -495,7 +495,7 @@ Height: sm=32px, md=40px. Radius: pill (9999px) for app, 6px for marketing. Padd
 
 | Token | Light | Dark |
 |-------|-------|------|
-| Background | `var(--linear-app-content-surface)` (flat — no `color-mix()`) | same token |
+| Background | Shared app content surface token (flat — no `color-mix()`) | same token |
 | Border | `frame-seam token` (thin left-border divider) | same token |
 | Radius | 10px | 10px |
 | Layout | Right panel lives inside `<main>` content card — sidebar and panel share one unified card | same |
@@ -629,7 +629,7 @@ All full-screen takeover screens (offline, global error, root error, public erro
 | File | Responsibility |
 |------|----------------|
 | `apps/web/styles/design-system.css` | Canonical app/product token source |
-| `apps/web/styles/linear-tokens.css` | Marketing-specific Linear-extracted tokens |
+| `apps/web/styles/public-shell-tokens.css` | Marketing-specific public-shell tokens |
 | `apps/web/styles/theme.css` | Feature accents & animations only |
 | `apps/web/app/globals.css` | Tailwind registration + shared utilities |
 | `apps/web/tailwind.config.js` | Tailwind v4 token mapping |
@@ -638,7 +638,7 @@ All full-screen takeover screens (offline, global error, root error, public erro
 | `apps/web/components/site/MarketingFooter.tsx` | Marketing footer |
 | `apps/web/components/features/auth/AuthLayout.tsx` | Product-funnel shell |
 | `apps/web/components/homepage/*` | Homepage chat-intake implementation (System B) |
-| `apps/web/components/features/home/*` | Legacy marketing-home components (still used by `(marketing)/new/*`) |
+| `apps/web/components/features/home/*` | Legacy marketing-home components retained only when still imported by the canonical homepage or public sections |
 | `apps/web/app/(home)/layout.tsx` | Homepage shell — `MarketingHeader` (minimal) + `MarketingFooter` |
 
 ---
@@ -647,21 +647,21 @@ All full-screen takeover screens (offline, global error, root error, public erro
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
-| 2026-03-23 | Lock Linear March 2026 refresh as baseline | Start from proven design, evolve into Jovie identity later |
-| 2026-03-23 | Stay on OKLCH color space | Linear uses LCH for rendering but OKLCH-like generation; OKLCH is more modern and positions us for theme generation |
-| 2026-03-23 | Theme base hue: 282 | Match Linear's March 2026 refresh (shifted from 272) |
-| 2026-03-23 | Font weight book: 450 | Linear's default UI weight (was incorrectly set to 400) |
-| 2026-03-23 | Two accent colors: #7170ff (app) + #5E6AD2 (marketing CTA) | Linear uses different accent colors for app vs marketing surfaces |
-| 2026-03-23 | Marketing always dark | Linear's marketing pages are dark-only; System A follows this |
-| 2026-03-25 | Remove `color-mix()` from content surfaces | Flat `var(--linear-app-content-surface)` renders more cleanly and avoids compositing artifacts |
-| 2026-03-25 | Right panel inside `<main>` content card | Matches Linear's unified card layout — sidebar and panel share one card with a thin left-border divider |
-| 2026-03-25 | Sidebar: no border, radius, shadow, or backdrop-blur | Flat sidebar sits flush against page background — matches Linear's design (v26.4.72) |
+| 2026-03-23 | Lock compact workbench refresh as baseline | Start from proven design structure, evolve into Jovie identity later |
+| 2026-03-23 | Stay on OKLCH color space | OKLCH is modern and positions us for theme generation |
+| 2026-03-23 | Theme base hue: 282 | Match the refreshed neutral family (shifted from 272) |
+| 2026-03-23 | Font weight book: 450 | Default UI weight (was incorrectly set to 400) |
+| 2026-03-23 | Two accent colors: #7170ff (app) + #5E6AD2 (marketing CTA) | App and marketing surfaces need separate accent roles |
+| 2026-03-23 | Marketing always dark | System A uses dark-only public marketing surfaces |
+| 2026-03-25 | Remove `color-mix()` from content surfaces | Flat app content surfaces render more cleanly and avoid compositing artifacts |
+| 2026-03-25 | Right panel inside `<main>` content card | Sidebar and panel share one card with a thin left-border divider |
+| 2026-03-25 | Sidebar: no border, radius, shadow, or backdrop-blur | Flat sidebar sits flush against page background |
 | 2026-03-25 | BrandLogo: `next/image` with dark/light variants | Reverted from inline SVG — `next/image` handles theme-aware loading with proper optimization |
 | 2026-04-11 | Marketing typography: Satoshi (display) + DM Sans (body) | Inter is too generic for a music/DJ product. Satoshi 800 provides hierarchy without being flashy. DM Sans is clean body text. |
 | 2026-04-11 | No brand color (Apple approach) | White-on-black CTAs. Accent colors are supporting cast for feature differentiation only. Restraint is the brand. |
-| 2026-04-22 | Homepage migrated from System A to System B | Chat-intake is product, not marketing. Satoshi-editorial typography on a utility entrypoint was a category error. Lovable, v0, Bolt, and ChatGPT all use one system across homepage and product. System A scope shrinks to editorial surfaces (blog, pricing, changelog, support, legal). Full System A retirement deferred 3 months pending shipping data. |
-| 2026-04-22 | Homepage hero typography: Inter 40→48→56px, weight 680 (Linear bold / `font-bold` token) | Replaces Satoshi 800 marketing display. Product-powerful without tipping into marketing-shout. Letter-spacing -2.5% at display sizes. `--font-weight-bold` resolves to 680 (verified at runtime); the plan's initial "try 590 first, 680 if too muted" landed on 680. |
-| 2026-04-28 | Homepage hero H1 exception in System B: Satoshi 80px / 600 / -0.045em | Supersedes the 2026-04-22 Inter-only hero decision for `(home)` H1 only. Subhead, CTAs, body, and section headings on the homepage stay Inter. Driven by Frame.io-inspired hero composition where Inter at 80px reads narrow; Satoshi at 600/-0.045em matches Frame.io's FrameGothic computed style spec (verified by getComputedStyle). |
+| 2026-04-22 | Homepage migrated from System A to System B | Chat-intake is product, not marketing. Satoshi-editorial typography on a utility entrypoint was a category error. Product-led AI builder surfaces work best when homepage and product share one system. System A scope shrinks to editorial surfaces (blog, pricing, changelog, support, legal). Full System A retirement deferred 3 months pending shipping data. |
+| 2026-04-22 | Homepage hero typography: Inter 40→48→56px, weight 680 (`font-bold` token) | Replaces Satoshi 800 marketing display. Product-powerful without tipping into marketing-shout. Letter-spacing -2.5% at display sizes. `--font-weight-bold` resolves to 680 (verified at runtime); the plan's initial "try 590 first, 680 if too muted" landed on 680. |
+| 2026-04-28 | Homepage hero H1 exception in System B: Satoshi 80px / 600 / -0.045em | Supersedes the 2026-04-22 Inter-only hero decision for `(home)` H1 only. Subhead, CTAs, body, and section headings on the homepage stay Inter. Driven by the approved poster composition where Inter at 80px reads narrow; Satoshi at 600/-0.045em matches the computed style target. |
 | 2026-04-11 | Canonical 1200px width for all marketing | Fixed inconsistent widths (header 1200px, hero 1120px). Everything boxed at 1200px now. |
 | 2026-04-11 | Ban emoji-on-colored-square icons | Replaced with accent color on card title text. Icon-on-square reads as AI slop and cheapens the brand. |
 | 2026-04-11 | Ban gold colors | Gold signals prestige-seeking. Not appropriate for Jovie's DJ audience. |

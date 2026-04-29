@@ -4,68 +4,55 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { APP_ROUTES } from '@/constants/routes';
+import {
+  MARKETING_FOOTER_COLUMNS,
+  MARKETING_LEGAL_LINKS,
+  type MarketingFooterLink,
+} from '@/data/marketingNavigation';
 import { cn } from '@/lib/utils';
+import { MarketingFooterCta } from './MarketingFooterCta';
 
 const MINIMAL_FOOTER_PATHS = new Set<string>([
-  APP_ROUTES.PRICING,
   APP_ROUTES.LEGAL_PRIVACY,
   APP_ROUTES.LEGAL_TERMS,
+]);
+const PAGE_OWNS_FINAL_CTA_PATHS = new Set<string>([
+  APP_ROUTES.HOME,
+  APP_ROUTES.ARTIST_PROFILES,
+  '/artist-profile',
+  APP_ROUTES.ARTIST_NOTIFICATIONS,
+  APP_ROUTES.LAUNCH,
 ]);
 
 interface MarketingFooterProps {
   readonly variant?: 'auto' | 'expanded' | 'minimal';
   readonly className?: string;
+  readonly showCta?: boolean;
 }
-
-const FOOTER_COLUMNS: readonly {
-  readonly title: string;
-  readonly links: readonly {
-    readonly href: string;
-    readonly label: string;
-  }[];
-}[] = [
-  {
-    title: 'Product',
-    links: [
-      { href: APP_ROUTES.ARTIST_PROFILES, label: 'Artist Profiles' },
-      { href: APP_ROUTES.SIGNUP, label: 'Release Planning' },
-      { href: APP_ROUTES.PRICING, label: 'Pricing' },
-    ],
-  },
-  {
-    title: 'Features',
-    links: [
-      { href: APP_ROUTES.ARTIST_PROFILES, label: 'Smart Links' },
-      { href: APP_ROUTES.ARTIST_NOTIFICATIONS, label: 'Notifications' },
-      { href: APP_ROUTES.SIGNUP, label: 'Audience Signal' },
-    ],
-  },
-  {
-    title: 'Company',
-    links: [
-      { href: APP_ROUTES.ABOUT, label: 'About' },
-      { href: APP_ROUTES.BLOG, label: 'Blog' },
-      { href: APP_ROUTES.CHANGELOG, label: 'Changelog' },
-    ],
-  },
-  {
-    title: 'Resources',
-    links: [
-      { href: APP_ROUTES.SUPPORT, label: 'Support' },
-      { href: 'https://status.jov.ie', label: 'Status' },
-      { href: APP_ROUTES.DEMO, label: 'Demo' },
-    ],
-  },
-] as const;
 
 const footerLinkClassName =
   'inline-flex w-fit rounded-[5px] text-[15px] leading-[1.45] tracking-[-0.005em] text-white/[0.72] transition-colors duration-150 hover:text-white focus-visible:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
 const footerLegalLinkClassName =
   'inline-flex w-fit rounded-[5px] text-[12px] leading-5 tracking-[-0.01em] text-white/[0.34] transition-colors duration-150 hover:text-white/70 focus-visible:text-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
 
+function FooterLink({ link }: Readonly<{ link: MarketingFooterLink }>) {
+  return (
+    <Link
+      href={link.href}
+      prefetch={link.external ? undefined : false}
+      className={footerLinkClassName}
+      target={link.external ? '_blank' : undefined}
+      rel={link.external ? 'noreferrer' : undefined}
+    >
+      {link.label}
+    </Link>
+  );
+}
+
 export function MarketingFooter({
   variant = 'auto',
   className,
+  showCta = true,
 }: Readonly<MarketingFooterProps>) {
   const pathname = usePathname();
   const resolvedVariant =
@@ -75,6 +62,9 @@ export function MarketingFooter({
         : 'expanded'
       : variant;
   const isMinimal = resolvedVariant === 'minimal';
+  const pageOwnsFinalCta =
+    typeof pathname === 'string' && PAGE_OWNS_FINAL_CTA_PATHS.has(pathname);
+  const shouldShowCta = showCta && !isMinimal && !pageOwnsFinalCta;
 
   return (
     <footer
@@ -88,9 +78,17 @@ export function MarketingFooter({
           'marketing-footer-inner relative w-full px-[clamp(1.25rem,2.2vw,2rem)]',
           isMinimal
             ? 'py-[clamp(2.6rem,5vw,4rem)]'
-            : 'pt-[clamp(3.25rem,5vw,4.6rem)] pb-[clamp(5rem,8vw,7rem)]'
+            : shouldShowCta
+              ? 'pt-0 pb-[clamp(5rem,8vw,7rem)]'
+              : 'pt-[clamp(3.25rem,5vw,4.6rem)] pb-[clamp(5rem,8vw,7rem)]'
         )}
       >
+        {shouldShowCta ? (
+          <div className='-mx-[clamp(1.25rem,2.2vw,2rem)]'>
+            <MarketingFooterCta />
+          </div>
+        ) : null}
+
         {isMinimal ? (
           <Link
             href={APP_ROUTES.HOME}
@@ -101,7 +99,12 @@ export function MarketingFooter({
             <BrandLogo size={24} tone='white' rounded={false} aria-hidden />
           </Link>
         ) : (
-          <div className='grid gap-12 md:grid-cols-[3.5rem_minmax(0,1fr)] md:gap-14 xl:gap-16'>
+          <div
+            className={cn(
+              'grid gap-12 md:grid-cols-[3.5rem_minmax(0,1fr)] md:gap-14 xl:gap-16',
+              shouldShowCta && 'mt-[clamp(3.25rem,5vw,4.6rem)]'
+            )}
+          >
             <div className='min-w-0'>
               <Link
                 href={APP_ROUTES.HOME}
@@ -114,10 +117,10 @@ export function MarketingFooter({
             </div>
 
             <nav
-              className='grid grid-cols-2 gap-x-10 gap-y-8 sm:grid-cols-4 lg:gap-x-14 xl:gap-x-20'
+              className='grid grid-cols-2 gap-x-10 gap-y-8 sm:grid-cols-3 lg:grid-cols-5 lg:gap-x-12 xl:gap-x-16'
               aria-label='Footer'
             >
-              {FOOTER_COLUMNS.map(column => (
+              {MARKETING_FOOTER_COLUMNS.map(column => (
                 <section key={column.title}>
                   <h2 className='mb-4 text-[12px] font-medium leading-[1.35] tracking-[-0.01em] text-white/[0.78]'>
                     {column.title}
@@ -125,13 +128,7 @@ export function MarketingFooter({
                   <ul className='flex list-none flex-col gap-2.5 p-0'>
                     {column.links.map(link => (
                       <li key={`${link.href}-${link.label}`}>
-                        <Link
-                          href={link.href}
-                          prefetch={false}
-                          className={footerLinkClassName}
-                        >
-                          {link.label}
-                        </Link>
+                        <FooterLink link={link} />
                       </li>
                     ))}
                   </ul>
@@ -149,20 +146,16 @@ export function MarketingFooter({
         >
           <span>© {new Date().getFullYear()} Jovie Technology Inc.</span>
           <nav aria-label='Legal' className='flex flex-wrap items-center gap-5'>
-            <Link
-              href={APP_ROUTES.LEGAL_PRIVACY}
-              prefetch={false}
-              className={footerLegalLinkClassName}
-            >
-              Privacy
-            </Link>
-            <Link
-              href={APP_ROUTES.LEGAL_TERMS}
-              prefetch={false}
-              className={footerLegalLinkClassName}
-            >
-              Terms
-            </Link>
+            {MARKETING_LEGAL_LINKS.map(link => (
+              <Link
+                key={link.href}
+                href={link.href}
+                prefetch={false}
+                className={footerLegalLinkClassName}
+              >
+                {link.label}
+              </Link>
+            ))}
           </nav>
         </div>
       </div>

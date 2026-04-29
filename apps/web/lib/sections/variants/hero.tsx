@@ -70,7 +70,7 @@ export const HERO_VARIANTS: readonly SectionVariant[] = [
     description:
       'Single-column, text centered. Standard landing-page hero shape.',
     componentPath: 'components/marketing/MarketingHero.tsx',
-    usedIn: ['/changelog', '/blog', '/support', '/new'],
+    usedIn: ['/changelog', '/blog', '/support', '/'],
     status: 'canonical',
     canonical: true,
     render: () => (

@@ -22,6 +22,9 @@ const FORBIDDEN_REQUEST_TIME_PATTERNS: readonly RegExp[] = [
   /\bheaders\s*\(/,
   /\bcookies\s*\(/,
   /cache\s*:\s*['"]no-store['"]/,
+  /from\s+['"]@\/lib\/services\/profile['"]/,
+  /from\s+['"]@\/lib\/db['"]/,
+  /from\s+['"]@clerk\/nextjs\/server['"]/,
 ];
 
 function listRouteFiles(directory: string): string[] {

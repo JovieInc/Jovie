@@ -14,7 +14,7 @@ export interface MarketingContainerProps {
 
 /**
  * Centered container with responsive horizontal padding.
- * Uses the Linear-derived max-width tokens for consistent page widths.
+ * Uses shared public marketing max-width tokens for consistent page widths.
  */
 export function MarketingContainer({
   width,

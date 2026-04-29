@@ -7,8 +7,6 @@ import {
   buildBreadcrumbSchema,
   buildPersonSchema,
 } from '@/lib/constants/schemas';
-import type { ProfileData } from '@/lib/services/profile';
-import { getProfileByUsername } from '@/lib/services/profile';
 
 /** Normalize a relative URL to absolute, or return undefined if empty. */
 function toAbsoluteUrl(url: string | null | undefined): string | undefined {
@@ -42,18 +40,12 @@ export async function generateMetadata({ params }: AuthorPageProps) {
     p => p.authorUsername?.toLowerCase() === username.toLowerCase()
   );
 
-  if (authorPosts.length === 0) {
+  const firstPost = authorPosts[0];
+  if (!firstPost) {
     return { title: 'Author' };
   }
 
-  let profile: ProfileData | null = null;
-  try {
-    profile = await getProfileByUsername(username);
-  } catch {
-    profile = null;
-  }
-
-  const authorName = profile?.displayName ?? authorPosts[0].author;
+  const authorName = firstPost.author;
 
   return {
     title: `${authorName} — Blog`,
@@ -79,18 +71,12 @@ export default async function AuthorPage({
     p => p.authorUsername?.toLowerCase() === username.toLowerCase()
   );
 
-  if (authorPosts.length === 0) {
+  const firstPost = authorPosts[0];
+  if (!firstPost) {
     notFound();
   }
 
-  let profile: ProfileData | null = null;
-  try {
-    profile = await getProfileByUsername(username);
-  } catch {
-    profile = null;
-  }
-
-  const author = resolveAuthor(authorPosts[0], profile);
+  const author = resolveAuthor(firstPost);
 
   // Normalize profile URL to absolute
   const absoluteProfileUrl = toAbsoluteUrl(author.profileUrl);

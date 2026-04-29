@@ -3,6 +3,6 @@ import { APP_ROUTES } from '@/constants/routes';
 
 export const revalidate = false;
 
-export default function ArtistProfilePage() {
-  permanentRedirect(APP_ROUTES.ARTIST_PROFILES);
+export default function MarketingSectionsPage() {
+  permanentRedirect(APP_ROUTES.EXP_DESIGN_STUDIO);
 }

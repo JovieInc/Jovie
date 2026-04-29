@@ -2,8 +2,6 @@ import { MarketingContainer, MarketingHero } from '@/components/marketing';
 import { BASE_URL } from '@/constants/app';
 import { getBlogPosts } from '@/lib/blog/getBlogPosts';
 import { resolveAuthor } from '@/lib/blog/resolveAuthor';
-import type { ProfileData } from '@/lib/services/profile';
-import { getProfilesByUsernames } from '@/lib/services/profile';
 import { BlogCard } from './components/BlogCard';
 
 // Fully static - blog posts are read from filesystem at build time
@@ -20,18 +18,6 @@ export const metadata = {
 
 export default async function BlogIndexPage() {
   const posts = await getBlogPosts();
-  const usernames = [
-    ...new Set(
-      posts.map(p => p.authorUsername).filter((u): u is string => u != null)
-    ),
-  ];
-  let profileMap: Map<string, ProfileData> = new Map();
-  try {
-    profileMap = await getProfilesByUsernames(usernames);
-  } catch {
-    // Fallback to frontmatter-only author data if profile fetch fails
-  }
-
   const [featured, ...remaining] = posts;
 
   if (!featured) {
@@ -50,12 +36,7 @@ export default async function BlogIndexPage() {
     );
   }
 
-  const featuredAuthor = resolveAuthor(
-    featured,
-    featured.authorUsername
-      ? profileMap.get(featured.authorUsername.toLowerCase())
-      : null
-  );
+  const featuredAuthor = resolveAuthor(featured);
 
   return (
     <div className='min-h-screen'>
@@ -99,12 +80,7 @@ export default async function BlogIndexPage() {
         {remaining.length > 0 && (
           <div className='grid grid-cols-1 md:grid-cols-2 gap-8'>
             {remaining.map(post => {
-              const author = resolveAuthor(
-                post,
-                post.authorUsername
-                  ? profileMap.get(post.authorUsername.toLowerCase())
-                  : null
-              );
+              const author = resolveAuthor(post);
               return <BlogCard key={post.slug} post={post} author={author} />;
             })}
           </div>

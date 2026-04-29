@@ -8,7 +8,7 @@ export default function PlaylistsLayout({
 }>) {
   return (
     <PublicPageShell
-      className='dark linear-marketing overflow-x-clip bg-black text-primary-token'
+      className='dark marketing-system overflow-x-clip bg-black text-primary-token'
       logoSize='xs'
     >
       {children}

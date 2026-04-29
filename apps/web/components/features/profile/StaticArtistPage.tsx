@@ -43,6 +43,8 @@ export interface StaticArtistPageProps {
   readonly releases?: readonly PublicRelease[];
   readonly hideJovieBranding?: boolean;
   readonly hideMoreMenu?: boolean;
+  readonly disableVisitTracking?: boolean;
+  readonly disableHistorySync?: boolean;
 }
 
 export function StaticArtistPage({
@@ -73,6 +75,8 @@ export function StaticArtistPage({
   releases,
   hideJovieBranding = false,
   hideMoreMenu = false,
+  disableVisitTracking = false,
+  disableHistorySync = false,
 }: StaticArtistPageProps) {
   const viewModel = buildProfilePublicViewModel({
     mode,
@@ -118,7 +122,9 @@ export function StaticArtistPage({
       allowPhotoDownloads={viewModel.allowPhotoDownloads}
       photoDownloadSizes={viewModel.photoDownloadSizes}
       tourDates={viewModel.tourDates}
-      visitTrackingToken={viewModel.visitTrackingToken}
+      visitTrackingToken={
+        disableVisitTracking ? undefined : viewModel.visitTrackingToken
+      }
       showSubscriptionConfirmedBanner={
         viewModel.showSubscriptionConfirmedBanner
       }
@@ -128,6 +134,7 @@ export function StaticArtistPage({
       releases={releases}
       hideJovieBranding={hideJovieBranding}
       hideMoreMenu={hideMoreMenu}
+      disableHistorySync={disableHistorySync}
       visualVariant={
         FEATURE_FLAGS.SHOW_PUBLIC_PROFILE_V1_DESIGN ? 'v1' : 'default'
       }

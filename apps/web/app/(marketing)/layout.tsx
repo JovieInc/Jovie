@@ -1,4 +1,5 @@
-import '../(home)/home.css';
+import '../public-marketing.css';
+import './marketing-utilities.css';
 import { PublicPageShell } from '@/components/site/PublicPageShell';
 import { MarketingEnhancements } from '@/features/home/MarketingEnhancements';
 
@@ -11,7 +12,7 @@ export default async function MarketingLayout({
 }>) {
   return (
     <PublicPageShell
-      className='dark linear-marketing overflow-x-clip bg-black text-primary-token'
+      className='dark marketing-system overflow-x-clip bg-black text-primary-token'
       logoSize='xs'
     >
       {children}

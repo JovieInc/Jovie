@@ -95,6 +95,10 @@ export const APP_ROUTES = {
 
   // System
   UNAVAILABLE: '/unavailable',
+  EXP_DESIGN_STUDIO: '/exp/design-studio',
+  EXP_HOME_V1: '/exp/home-v1',
+  EXP_MARKETING_SECTIONS: '/exp/marketing-sections',
+  EXP_PAGE_BUILDER: '/exp/page-builder',
 
   // Marketing
   HOME: '/',

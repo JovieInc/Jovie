@@ -5,8 +5,6 @@ import { getCategoryBySlug } from '@/lib/blog/categories';
 import { getBlogPosts, slugifyCategory } from '@/lib/blog/getBlogPosts';
 import { resolveAuthor } from '@/lib/blog/resolveAuthor';
 import { buildBreadcrumbSchema } from '@/lib/constants/schemas';
-import type { ProfileData } from '@/lib/services/profile';
-import { getProfilesByUsernames } from '@/lib/services/profile';
 import { BlogCard } from '../../components/BlogCard';
 
 interface CategoryPageProps {
@@ -75,21 +73,6 @@ export default async function CategoryPage({
     p => p.category && slugifyCategory(p.category) === slug
   );
 
-  // Resolve author profiles
-  const usernames = [
-    ...new Set(
-      categoryPosts
-        .map(p => p.authorUsername)
-        .filter((u): u is string => u != null)
-    ),
-  ];
-  let profileMap: Map<string, ProfileData> = new Map();
-  try {
-    profileMap = await getProfilesByUsernames(usernames);
-  } catch {
-    // Fallback
-  }
-
   const breadcrumbSchema = buildBreadcrumbSchema([
     { name: APP_NAME, url: BASE_URL },
     { name: 'Blog', url: `${BASE_URL}/blog` },
@@ -122,12 +105,7 @@ export default async function CategoryPage({
           ) : (
             <div className='grid grid-cols-1 md:grid-cols-2 gap-8'>
               {categoryPosts.map(post => {
-                const author = resolveAuthor(
-                  post,
-                  post.authorUsername
-                    ? profileMap.get(post.authorUsername.toLowerCase())
-                    : null
-                );
+                const author = resolveAuthor(post);
                 return <BlogCard key={post.slug} post={post} author={author} />;
               })}
             </div>

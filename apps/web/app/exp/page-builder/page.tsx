@@ -1,22 +1,8 @@
-import type { Metadata } from 'next';
-import { Suspense } from 'react';
-import { PageBuilderClient } from './PageBuilderClient';
+import { permanentRedirect } from 'next/navigation';
+import { APP_ROUTES } from '@/constants/routes';
 
-export const metadata: Metadata = {
-  title: 'Page builder — Jovie',
-  description:
-    'Compose a landing page from registry sections with chrome toggles for header, footer, and final CTA. Becomes the canonical reference for every landing page.',
-  robots: { index: false, follow: false },
-};
+export const revalidate = false;
 
 export default function PageBuilderPage() {
-  // useSearchParams() in PageBuilderClient requires a Suspense boundary,
-  // otherwise Next.js opts the entire route out of static prerendering and
-  // throws at build time. Fallback is null because the toolbar + composed
-  // page render fully on the client immediately.
-  return (
-    <Suspense fallback={null}>
-      <PageBuilderClient />
-    </Suspense>
-  );
+  permanentRedirect(`${APP_ROUTES.EXP_DESIGN_STUDIO}?tab=landing`);
 }

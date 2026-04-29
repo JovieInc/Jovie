@@ -116,20 +116,15 @@ export default async function AlternativesPage({
       {/* CTA */}
       <MarketingContainer width='prose' className='pb-16'>
         <section>
-          <div className='rounded-xl border border-border-primary bg-surface-secondary p-8 text-center'>
-            <h2 className='text-xl font-semibold text-primary-token'>
-              Ready to try {APP_NAME}?
-            </h2>
-            <p className='mt-2 text-sm text-secondary-token'>
-              Create your free profile in under a minute.
-            </p>
-            <Link
-              href={APP_ROUTES.SIGNUP}
-              className='mt-6 inline-flex items-center rounded-lg bg-accent-token px-6 py-3 text-sm font-medium text-white transition-colors hover:opacity-90'
-            >
-              Get started free
-            </Link>
-          </div>
+          <h2 className='text-2xl font-semibold text-primary-token'>
+            Ready to try {APP_NAME}?
+          </h2>
+          <p className='mt-4 text-base leading-relaxed text-secondary-token'>
+            Create your free profile in under a minute.
+          </p>
+          <Link href={APP_ROUTES.SIGNUP} className='public-action-primary mt-6'>
+            Get Started Free
+          </Link>
         </section>
       </MarketingContainer>
 

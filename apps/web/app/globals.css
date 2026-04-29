@@ -37,14 +37,14 @@ body {
 /* Marketing pages use document scrolling rather than app-shell scroll panes.
    Only override html — setting overflow-y:auto on body promotes overflow-x:clip
    to overflow-x:hidden, which creates a scroll container that breaks sticky. */
-html:has(.linear-marketing),
+html:has(.marketing-system),
 html:has(.home-viewport) {
   height: auto;
   min-height: 100%;
   overflow-y: auto;
   overscroll-behavior: auto;
 }
-body:has(.linear-marketing),
+body:has(.marketing-system),
 body:has(.home-viewport) {
   height: auto;
   min-height: 100%;
@@ -415,14 +415,14 @@ body {
     --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
     --safe-area-inset-left: env(safe-area-inset-left, 0px);
   }
-  /* Linear Typography Features - apply font features globally */
+  /* Public shell typography features - apply font features globally */
   body {
     font-feature-settings:
       "cv01",
       "ss03",
       "rlig" 1,
       "calt" 1;
-    /* letter-spacing: removed — Linear applies tracking per-element, not globally.
+    /* letter-spacing: removed — public shell applies tracking per-element, not globally.
        Nav items, buttons, and labels should have normal tracking.
        Body text classes (.text-linear, .marketing-lead-linear) apply their own. */
     text-rendering: optimizelegibility;
@@ -430,13 +430,13 @@ body {
 }
 
 @theme {
-  /* Custom font sizes — Linear's type scale registered as Tailwind utilities
-     text-3xs = 10px, text-2xs = 11px, text-app = 13px (Linear's default UI size), text-mid = 15px */
+  /* Custom font sizes registered as Tailwind utilities:
+     text-3xs = 10px, text-2xs = 11px, text-app = 13px, text-mid = 15px */
   --text-3xs: 0.625rem;
   --text-2xs: 0.6875rem;
   --text-app: 0.8125rem;
   --text-mid: 0.9375rem;
-  /* Font stack: var(--font-inter) for Next.js localFont, then Linear's exact fallbacks */
+  /* Font stack: var(--font-inter) for Next.js localFont, then system fallbacks */
   --font-sans:
     var(--font-inter), "Inter Variable", "SF Pro Display", -apple-system, "system-ui", "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
   /* Marketing display + body fonts (scoped via CSS variables set by next/font/local in marketing layout) */
@@ -490,7 +490,7 @@ body {
   --color-default: var(--color-border-default);
   --color-strong: var(--color-border-strong);
   --color-focus: var(--color-border-focus);
-  /* Transition durations — Linear timing tokens for duration-* utilities in @apply */
+  /* Transition durations for duration-* utilities in @apply */
   --transition-duration-instant: var(--duration-instant);
   --transition-duration-fast: var(--duration-fast);
   --transition-duration-normal: var(--duration-normal);
@@ -550,7 +550,7 @@ body {
 @layer components {
   .dashboard-heading {
     font-weight: var(--font-weight-bold);
-    /* 590 — Linear bold */
+    /* 590 — dense UI bold */
     letter-spacing: -0.025em;
     font-feature-settings:
       "cv01",
@@ -562,7 +562,7 @@ body {
     font-size: var(--text-2xs);
     /* 11px */
     font-weight: var(--font-weight-semibold);
-    /* 538 — Linear semibold */
+    /* 538 — dense UI semibold */
     text-transform: uppercase;
     letter-spacing: 0.08em;
   }
@@ -719,9 +719,9 @@ body {
     line-height: var(--linear-leading-normal);
   }
   .marketing-h1-linear {
-    /* Discrete breakpoints matching Linear.app (verified 2026-03-23):
+    /* Discrete public-shell breakpoints:
        375px: 38px/1.1  |  768px: 56px/1.08  |  1280px+: 64px/1.06
-       Linear caps at 64px — never goes to 76px at any viewport width */
+       caps at 64px — never goes to 76px at any viewport width */
     font-size: var(--linear-h1-size-sm);
     font-weight: 510;
     letter-spacing: -0.022em;
@@ -742,7 +742,7 @@ body {
     }
   }
   .marketing-h2-linear {
-    /* Linear.app verified 2026-03-23:
+    /* Public-shell heading scale:
        Desktop max: 48px/510/-2.2%/1.0 — caps here, never goes to 56px
        375px: 24px/1.33  |  768px: 36px/1.125  |  1280px+: 48px/1.0 */
     font-size: var(--linear-h2-size-sm);
@@ -785,7 +785,7 @@ body {
     }
   }
   .marketing-lead-linear {
-    /* Exact Linear.app: 15px, 400wt, -0.165px tracking, 24px line-height */
+    /* Compact lead text: 15px, 400wt, -0.165px tracking, 24px line-height */
     font-size: 18px;
     font-weight: 400;
     font-feature-settings: var(--linear-font-features);
@@ -850,15 +850,20 @@ body {
     align-items: center;
     justify-content: center;
     min-height: var(--linear-button-height-sm);
-    border-radius: var(--linear-radius-sm);
+    border: 1px solid var(--linear-btn-primary-border);
+    border-radius: var(--radius-pill);
     background: var(--linear-btn-primary-bg);
     color: var(--linear-btn-primary-fg);
     padding: 0 20px;
     font-size: var(--linear-body-sm-size);
     font-weight: var(--linear-font-weight-medium);
+    box-shadow:
+      var(--shadow-button-inset),
+      0 1px 1px rgba(0, 0, 0, 0.14);
     transition:
-      opacity 150ms var(--ease-interactive),
-      transform 150ms var(--ease-interactive);
+      background-color 150ms var(--ease-interactive),
+      border-color 150ms var(--ease-interactive),
+      opacity 150ms var(--ease-interactive);
   }
   .public-action-primary:hover {
     opacity: 0.92;
@@ -868,15 +873,20 @@ body {
     align-items: center;
     justify-content: center;
     min-height: var(--linear-button-height-sm);
-    border-radius: var(--linear-radius-sm);
+    border: 1px solid var(--linear-border-subtle);
+    border-radius: var(--radius-pill);
     background: var(--linear-bg-button);
     color: var(--linear-text-primary);
     padding: 0 20px;
     font-size: var(--linear-body-sm-size);
     font-weight: var(--linear-font-weight-medium);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.04),
+      0 1px 1px rgba(0, 0, 0, 0.08);
     transition:
-      opacity 150ms var(--ease-interactive),
-      transform 150ms var(--ease-interactive);
+      background-color 150ms var(--ease-interactive),
+      border-color 150ms var(--ease-interactive),
+      opacity 150ms var(--ease-interactive);
   }
   .public-action-secondary:hover {
     opacity: 0.92;
@@ -940,7 +950,7 @@ body {
   }
 
   /* Hero stagger entrance — children fade up in sequence */
-  /* Numbered section label — Linear's "1.0 Intake →" pattern */
+  /* Numbered section label pattern */
   .section-number-label {
     font-size: var(--linear-label-size, 12px);
     font-weight: var(--linear-font-weight-medium, 510);
@@ -960,7 +970,7 @@ body {
     color: var(--linear-text-primary);
   }
 
-  /* Accordion expand/collapse — Linear sub-item pattern */
+  /* Accordion expand/collapse sub-item pattern */
   .accordion-content {
     display: grid;
     grid-template-rows: 0fr;
@@ -1007,7 +1017,7 @@ body {
     transform: rotate(45deg);
   }
 
-  /* FIG card label — Linear's "FIG 0.1" pattern */
+  /* Figure card label pattern */
   .fig-label {
     font-size: 11px;
     font-weight: var(--linear-font-weight-medium, 510);
@@ -1130,11 +1140,11 @@ body {
    Now in lib/tailwind/utilities-plugin.js */
 
 /* ============================================
-   LINEAR-STYLE COMPONENTS
+   PUBLIC SHELL COMPONENTS
    ============================================ */
 
 @layer components {
-  /* Linear Nav Link & Login Button - identical ghost-style link using Linear tokens */
+  /* Public shell nav link and login button */
   .nav-link-linear,
   .btn-linear-login {
     position: relative;
@@ -1198,7 +1208,7 @@ body {
     }
   }
 
-  /* Linear Nav Signup Button - filled inverted style matching Linear header */
+  /* Public shell nav signup button - filled inverted style */
   .btn-linear-signup {
     position: relative;
     display: inline-flex;
@@ -1232,7 +1242,7 @@ body {
       border-color: var(--linear-btn-primary-hover);
     }
   }
-  /* Linear Button - Primary CTA styling using tokens */
+  /* Primary CTA button styling using shared tokens */
   .btn-linear-primary {
     display: inline-flex;
     align-items: center;
@@ -1258,7 +1268,7 @@ body {
       background-color: var(--color-btn-primary-hover);
     }
   }
-  /* Linear Spacing System — symmetric section padding from tokens */
+  /* Public shell spacing system — symmetric section padding from tokens */
   .section-spacing-linear {
     padding-top: var(--linear-section-pt-sm);
     padding-bottom: var(--linear-section-pt-sm);
@@ -2314,7 +2324,7 @@ body {
   /* Logo muted tokens for label logos bar */
   --color-logo-muted: var(--color-logo-muted);
   --color-logo-muted-hover: var(--color-logo-muted-hover);
-  /* Badge tokens — extracted from Linear marketing demo */
+  /* Badge tokens for marketing surfaces */
   --color-badge-bg: var(--color-badge-bg);
   --color-badge-border: var(--color-badge-border);
   --color-badge-text: var(--color-badge-text);

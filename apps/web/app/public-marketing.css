@@ -1,11 +1,8 @@
 /*
- * Homepage chat intake styles.
+ * Shared public marketing styles.
  *
- * The prior ~1430 lines of marketing typography (.marketing-h1-linear,
- * .linear-marketing-*, etc) became dead after the (home) layout dropped
- * the `linear-marketing` class and the `HomePageNarrative` surface.
- * If any of that is ever needed again, pull it back in from git history
- * (parent of commit fc2f6723d).
+ * This stylesheet owns the public homepage surface plus shared marketing
+ * chrome/section classes used by the canonical page and Design Studio.
  */
 
 /* Hide the scrollbar on the actual scroll container. `.home-viewport` is
@@ -37,7 +34,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   --homepage-radius: 1rem;
   --homepage-hero-top: calc(
     var(--linear-header-height) +
-    clamp(8rem, 15.3vh, 10.5rem)
+    clamp(5.5rem, 10vh, 7.25rem)
   );
   --homepage-hero-copy-max: min(
     67.5rem,
@@ -46,9 +43,9 @@ body:has(.home-viewport)::-webkit-scrollbar {
   --homepage-hero-subhead-max: 44rem;
   --homepage-hero-cta-gap: 0.75rem;
   --homepage-carousel-width: 100vw;
-  --homepage-carousel-stage-height: clamp(22rem, 34vw, 31rem);
-  --homepage-carousel-slide-width: clamp(40rem, 61vw, 55rem);
-  --homepage-carousel-step: clamp(45rem, 68vw, 62rem);
+  --homepage-carousel-stage-height: clamp(22rem, 32vw, 32rem);
+  --homepage-carousel-slide-width: clamp(40rem, 62vw, 50rem);
+  --homepage-carousel-step: clamp(42rem, 66vw, 56rem);
   --homepage-carousel-control-inset: clamp(1.5rem, 4vw, 3.75rem);
   --homepage-section-space: clamp(5rem, 8.5vw, 7.5rem);
   --homepage-section-max: min(
@@ -67,26 +64,58 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 .home-viewport [data-testid="header-nav"] {
   top: 0 !important;
+  isolation: isolate;
   min-height: var(--linear-header-height);
   border-bottom: 1px solid transparent !important;
   background: transparent !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
+  box-shadow: none;
   transition:
-    background-color 220ms ease,
+    background 220ms ease,
     backdrop-filter 220ms ease,
     -webkit-backdrop-filter 220ms ease,
-    border-color 220ms ease !important;
+    border-color 220ms ease,
+    box-shadow 220ms ease !important;
+}
+
+.home-viewport [data-testid="header-nav"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(16, 18, 24, 0.74), rgba(7, 8, 12, 0.5)),
+    radial-gradient(
+      70% 125% at 50% 0%,
+      rgba(255, 255, 255, 0.14),
+      transparent 62%
+    );
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.05) inset,
+    0 18px 44px rgba(0, 0, 0, 0.32);
+  opacity: 0;
+  backdrop-filter: blur(26px) saturate(190%);
+  -webkit-backdrop-filter: blur(26px) saturate(190%);
+  transition: opacity 220ms ease;
 }
 
 .home-viewport[data-scrolled="true"] [data-testid="header-nav"] {
-  background: rgba(8, 8, 10, 0.55) !important;
-  backdrop-filter: blur(18px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(18px) saturate(180%) !important;
-  border-bottom-color: rgba(255, 255, 255, 0.06) !important;
+  backdrop-filter: blur(22px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(190%) !important;
+  border-bottom-color: transparent !important;
+  box-shadow: 0 24px 62px rgba(0, 0, 0, 0.22);
+}
+
+.home-viewport[data-scrolled="true"] [data-testid="header-nav"]::before {
+  opacity: 1;
 }
 
 .home-viewport [data-testid="header-nav"] nav {
+  position: relative;
+  z-index: 1;
   max-width: none !important;
   margin-inline: 0 !important;
   padding-inline: var(--homepage-page-gutter) !important;
@@ -96,28 +125,65 @@ body:has(.home-viewport)::-webkit-scrollbar {
   height: var(--linear-header-height);
 }
 
-.homepage-header-nav-group {
-  gap: clamp(1.7rem, 2.4vw, 2.35rem);
-  margin-left: clamp(2.75rem, 3.7vw, 3.25rem);
+.home-viewport [data-testid="header-nav"] nav > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
 }
 
-.homepage-header-auth {
-  gap: 1.75rem;
+.home-viewport [data-testid="header-nav"] nav > div > div:first-child {
+  justify-self: start;
 }
 
-.homepage-header-auth a {
+.home-viewport [data-testid="header-nav"] nav > div > div[aria-hidden="true"] {
+  display: none;
+}
+
+.public-header-nav-group {
+  justify-self: center;
+  gap: 0.15rem;
+  margin-left: 0;
+  padding: 0.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.045);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 10px 34px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.home-viewport[data-scrolled="true"] .public-header-nav-group {
+  border-color: rgba(255, 255, 255, 0.13);
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.11),
+    0 14px 38px rgba(0, 0, 0, 0.24);
+}
+
+.public-header-auth {
+  justify-self: end;
+  gap: 1rem;
+}
+
+.public-header-auth a {
   min-height: 36px;
   font-size: 14px;
   font-weight: 600;
 }
 
-.homepage-header-auth a:first-child {
+.public-header-auth:not(.public-header-auth--minimal) a:first-child {
   padding-inline: 0;
   color: rgb(252, 252, 252);
 }
 
-.homepage-header-auth a:last-child {
-  padding-inline: 24px;
+.public-header-auth:not(.public-header-auth--minimal) a:last-child {
+  padding-inline: 22px;
   border-color: rgba(255, 255, 255, 0.9);
   background: #f4f6ff;
   color: #050506;
@@ -128,7 +194,14 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-hero-shell {
-  background: #000;
+  background:
+    radial-gradient(
+      52% 42% at 50% 9%,
+      rgba(45, 83, 142, 0.18) 0%,
+      rgba(45, 83, 142, 0.06) 42%,
+      transparent 72%
+    ),
+    linear-gradient(180deg, #020303 0%, #000 56%, #000 100%);
   contain: layout paint;
   box-shadow: none;
 }
@@ -141,9 +214,23 @@ body:has(.home-viewport)::-webkit-scrollbar {
   backface-visibility: hidden;
 }
 
-.homepage-hero-shell__base,
-.homepage-hero-shell__halo {
+.homepage-hero-shell__base {
   display: none;
+}
+
+.homepage-hero-shell__halo {
+  display: block;
+  background:
+    radial-gradient(
+      34rem 18rem at 50% 19%,
+      rgba(255, 255, 255, 0.045) 0%,
+      rgba(255, 255, 255, 0) 72%
+    ),
+    radial-gradient(
+      62rem 26rem at 50% 76%,
+      rgba(97, 153, 246, 0.08) 0%,
+      rgba(97, 153, 246, 0) 72%
+    );
 }
 
 .homepage-hero-shell__beam {
@@ -155,18 +242,12 @@ body:has(.home-viewport)::-webkit-scrollbar {
   background: linear-gradient(
     90deg,
     transparent 0%,
-    transparent 18%,
-    rgba(97, 153, 246, 0.42) 19%,
-    rgba(97, 153, 246, 0) 19.4%,
-    transparent 36%,
-    rgba(157, 200, 255, 0.32) 37%,
-    rgba(157, 200, 255, 0) 37.3%,
-    transparent 62%,
-    rgba(97, 153, 246, 0.34) 63%,
-    rgba(97, 153, 246, 0) 63.3%,
-    transparent 81%,
-    rgba(157, 200, 255, 0.38) 82%,
-    rgba(157, 200, 255, 0) 82.3%,
+    transparent 27%,
+    rgba(97, 153, 246, 0.16) 28%,
+    rgba(97, 153, 246, 0) 28.35%,
+    transparent 70%,
+    rgba(157, 200, 255, 0.13) 71%,
+    rgba(157, 200, 255, 0) 71.35%,
     transparent 100%
   );
   mask-image: linear-gradient(
@@ -178,7 +259,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
     transparent 100%
   );
   filter: blur(0.5px);
-  opacity: 0.55;
+  opacity: 0.28;
   mix-blend-mode: screen;
   animation: heroBeamPulse 8s ease-in-out infinite;
 }
@@ -239,26 +320,28 @@ body:has(.home-viewport)::-webkit-scrollbar {
   padding: var(--homepage-hero-top) var(--homepage-page-gutter) 0;
 }
 
-.homepage-header-nav-link {
+.public-header-nav-link {
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 32px;
-  padding: 0;
+  min-height: 34px;
+  padding: 0 14px;
   border-radius: 999px;
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: -0.005em;
-  color: rgb(252, 252, 252);
+  font-size: 13px;
+  font-weight: 530;
+  letter-spacing: 0;
+  color: rgba(252, 252, 252, 0.72);
   transition:
+    background-color 140ms ease,
     color 140ms ease,
     opacity 140ms ease;
 }
 
-.homepage-header-nav-link:hover,
-.homepage-header-nav-link:focus-visible {
-  color: rgba(255, 255, 255, 0.94);
+.public-header-nav-link:hover,
+.public-header-nav-link:focus-visible {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.96);
 }
 
 .homepage-hero-eyebrow {
@@ -314,7 +397,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-hero-actions .public-action-primary,
-.homepage-hero-actions .public-action-secondary {
+.homepage-hero-actions .public-action-secondary,
+.homepage-final-cta-action.public-action-primary {
   min-height: 40px;
   border-radius: 100px;
   padding-inline: 24px;
@@ -323,10 +407,26 @@ body:has(.home-viewport)::-webkit-scrollbar {
   letter-spacing: 0.01em;
 }
 
-.homepage-hero-actions .public-action-primary {
+.homepage-hero-actions .public-action-primary,
+.homepage-final-cta-action.public-action-primary {
   border: 0;
-  background: rgb(252, 252, 252);
+  background: linear-gradient(180deg, rgb(255, 255, 255), #f4f6ff);
   color: rgb(0, 0, 0);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.86),
+    0 12px 30px rgba(0, 0, 0, 0.24);
+  transition:
+    background-color 150ms ease,
+    box-shadow 150ms ease,
+    opacity 150ms ease;
+}
+
+.homepage-hero-actions .public-action-primary:hover,
+.homepage-final-cta-action.public-action-primary:hover {
+  opacity: 0.96;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 14px 34px rgba(0, 0, 0, 0.28);
 }
 
 .homepage-hero-actions .public-action-secondary {
@@ -338,7 +438,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-hero-showcase {
   position: relative;
   width: var(--homepage-carousel-width);
-  margin-top: clamp(3.5rem, 5vw, 4.5rem);
+  margin-top: clamp(1.75rem, 3vw, 2.5rem);
   margin-left: calc(50% - 50vw);
   overflow: hidden;
   padding-block: 0 1rem;
@@ -348,16 +448,16 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-hero-showcase::before {
   content: "";
   position: absolute;
-  inset: 2% 13% 0;
+  inset: 0 15% 4%;
   pointer-events: none;
   border-radius: 999px;
   background: radial-gradient(
     58% 62% at 50% 48%,
-    rgba(77, 137, 218, 0.2) 0%,
-    rgba(28, 70, 122, 0.1) 42%,
+    rgba(77, 137, 218, 0.14) 0%,
+    rgba(28, 70, 122, 0.08) 42%,
     transparent 74%
   );
-  filter: blur(30px);
+  filter: blur(28px);
 }
 
 .homepage-hero-carousel__viewport {
@@ -411,23 +511,26 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-hero-mockup--phone .homepage-hero-mockup__frame {
+  width: clamp(11rem, 18vw, 15rem);
   aspect-ratio: 9 / 19.5;
-  border-radius: 28px;
-  padding: 6px;
+  --product-screenshot-chrome-radius: 28px;
+  --product-screenshot-chrome-padding: 6px;
+}
+
+.homepage-hero-mockup--panel .homepage-hero-mockup__frame {
+  width: clamp(20rem, 34vw, 28rem);
 }
 
 .homepage-hero-mockup__frame {
   position: relative;
   overflow: hidden;
-  height: var(--homepage-carousel-stage-height);
-  width: auto;
+  width: var(--homepage-carousel-slide-width);
+  height: auto;
+  --product-screenshot-chrome-radius: 14px;
+  --product-screenshot-chrome-padding: 6px;
   border: 1px solid rgba(189, 189, 244, 0.1);
-  border-radius: 10px;
-  /* Per-shot aspect-ratio set inline as --shot-aspect from the image's real
-     width/height. Falls back to 16/10 (the typical 1440x900 desktop capture)
-     when no inline value is supplied. The phone-variant rule overrides this. */
-  aspect-ratio: var(--shot-aspect, 16 / 10);
-  padding: 6px;
+  border-radius: var(--product-screenshot-chrome-radius);
+  aspect-ratio: var(--homepage-shot-aspect-ratio, 16 / 10);
   background: rgba(157, 157, 255, 0.05);
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
 }
@@ -452,13 +555,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 .homepage-hero-mockup[data-active="true"] .homepage-hero-mockup__frame {
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
-}
-
-.homepage-hero-mockup__image {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
 }
 
 .homepage-hero-carousel__side {
@@ -534,7 +630,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   position: relative;
   z-index: 1;
   padding: clamp(2.75rem, 4vw, 3.875rem) var(--homepage-page-gutter)
-    clamp(7.5rem, 12vw, 11.25rem);
+    clamp(3.75rem, 6vw, 5.5rem);
   background: #000;
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
@@ -559,6 +655,25 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-trust-section img {
   max-height: 14px;
   opacity: 0.55;
+}
+
+.homepage-signal-motion-section {
+  position: relative;
+  z-index: 1;
+  padding: clamp(5rem, 8.5vw, 8rem) var(--homepage-page-gutter)
+    clamp(5.5rem, 9vw, 8.5rem);
+  background: #000;
+}
+
+.homepage-signal-motion-inner {
+  max-width: min(1180px, calc(100vw - var(--homepage-page-gutter) * 2));
+  margin-inline: auto;
+}
+
+.homepage-signal-motion-image {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
 .homepage-story-stack {
@@ -1178,6 +1293,54 @@ body:has(.home-viewport)::-webkit-scrollbar {
     linear-gradient(180deg, rgba(10, 12, 18, 0.96) 0%, rgba(5, 6, 8, 0.98) 100%);
 }
 
+.homepage-faq-section {
+  padding: clamp(5rem, 8vw, 7.25rem) var(--homepage-page-gutter);
+  background:
+    radial-gradient(
+      58% 34% at 50% 0%,
+      rgba(45, 83, 142, 0.1) 0%,
+      rgba(5, 6, 8, 0) 72%
+    ),
+    #020303;
+}
+
+.homepage-faq-panel {
+  max-width: 760px;
+  margin-inline: auto;
+}
+
+.homepage-faq-heading {
+  max-width: 12ch;
+  font-size: clamp(2rem, 3.4vw, 3rem);
+  font-weight: 680;
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+  color: rgb(255 255 255 / 0.98);
+}
+
+.homepage-faq-panel > div {
+  margin-top: clamp(2rem, 3vw, 2.75rem);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.homepage-faq-panel > div > div {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.homepage-faq-panel button {
+  color: rgb(255 255 255 / 0.94);
+}
+
+.homepage-faq-panel button:hover,
+.homepage-faq-panel button:focus-visible {
+  opacity: 1;
+}
+
+.homepage-faq-panel p {
+  color: rgb(255 255 255 / 0.58);
+}
+
 .homepage-story-final-cta {
   min-height: clamp(31rem, 44vw, 39rem);
   border-top: 1px solid rgba(255, 255, 255, 0.055);
@@ -1215,16 +1378,20 @@ body:has(.home-viewport)::-webkit-scrollbar {
     --linear-header-height: 72px;
     --homepage-page-gutter: 1.5rem;
     --homepage-header-gutter: 1.5rem;
-    --homepage-hero-top: calc(var(--linear-header-height) + 8.15rem);
+    --homepage-hero-top: calc(var(--linear-header-height) + 5.75rem);
     --homepage-hero-copy-max: calc(100vw - 3rem);
     --homepage-hero-subhead-max: 22rem;
-    --homepage-carousel-stage-height: clamp(14rem, 58vw, 18rem);
-    --homepage-carousel-slide-width: min(82vw, 28rem);
+    --homepage-carousel-stage-height: clamp(14.5rem, 58vw, 19rem);
+    --homepage-carousel-slide-width: min(88vw, 30rem);
     --homepage-carousel-step: min(88vw, 28rem);
     --homepage-carousel-control-inset: 1.5rem;
     --homepage-section-space: 4rem;
     --homepage-footer-cta-top: 4.4rem;
     --homepage-footer-cta-bottom: 13.5rem;
+  }
+
+  .home-viewport [data-testid="header-nav"] nav > div {
+    display: flex;
   }
 
   .homepage-hero-shell__grid-wrap {
@@ -1236,24 +1403,24 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
   .homepage-hero-shell__grid {
     background-size: 48px 48px;
-    opacity: 0.28;
+    opacity: 0;
   }
 
-  .homepage-header-nav-link {
+  .public-header-nav-link {
     min-height: 32px;
     font-size: 13px;
   }
 
-  .homepage-header-auth {
+  .public-header-auth {
     gap: 0;
   }
 
-  .homepage-header-auth a:first-child {
+  .public-header-auth a:first-child {
     min-height: 36px;
     font-size: 14px;
   }
 
-  .homepage-header-auth a:last-child {
+  .public-header-auth:not(.public-header-auth--minimal) a:last-child {
     display: none;
   }
 
@@ -1277,15 +1444,9 @@ body:has(.home-viewport)::-webkit-scrollbar {
   }
 
   .homepage-hero-showcase {
-    margin-top: 3.35rem;
+    margin-top: 2.8rem;
     padding-bottom: 0.9rem;
-    mask-image: linear-gradient(
-      to right,
-      transparent 0%,
-      black 5%,
-      black 95%,
-      transparent 100%
-    );
+    mask-image: none;
   }
 
   .homepage-hero-carousel__viewport {

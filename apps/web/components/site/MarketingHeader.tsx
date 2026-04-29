@@ -1,9 +1,8 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
 import type { LogoVariant } from '@/components/atoms/Logo';
 import { HeaderNav } from '@/components/organisms/HeaderNav';
-import { APP_ROUTES } from '@/constants/routes';
+import { MARKETING_NAV_LINKS } from '@/data/marketingNavigation';
 
 export type MarketingHeaderVariant =
   | 'landing'
@@ -14,16 +13,6 @@ export interface MarketingHeaderNavLink {
   readonly href: string;
   readonly label: string;
 }
-
-const DEFAULT_STAGED_HOMEPAGE_NAV_LINKS: readonly MarketingHeaderNavLink[] = [
-  { href: APP_ROUTES.ARTIST_PROFILES, label: 'Artist Profiles' },
-  { href: APP_ROUTES.PRICING, label: 'Pricing' },
-  { href: APP_ROUTES.SUPPORT, label: 'Support' },
-] as const;
-const STAGED_NAV_PATHS = new Set<string>([
-  APP_ROUTES.LANDING_NEW,
-  APP_ROUTES.PRICING,
-]);
 
 export interface MarketingHeaderProps
   extends Readonly<{
@@ -42,10 +31,8 @@ export function MarketingHeader({
   navLinks,
   variant = 'landing',
 }: MarketingHeaderProps) {
-  const pathname = usePathname();
-  const showStagedNav = pathname !== null && STAGED_NAV_PATHS.has(pathname);
-  const resolvedNavLinks =
-    navLinks ?? (showStagedNav ? DEFAULT_STAGED_HOMEPAGE_NAV_LINKS : undefined);
+  const resolvedNavLinks = navLinks ?? MARKETING_NAV_LINKS;
+  const isHomepageVariant = variant === 'homepage';
 
   return (
     <HeaderNav
@@ -53,11 +40,11 @@ export function MarketingHeader({
       logoVariant={logoVariant}
       authMode='public-static'
       hideNav={variant === 'minimal'}
-      minimalAuth={variant === 'minimal' || variant === 'homepage'}
-      minimalAuthVariant={variant === 'homepage' ? 'pill' : 'link'}
-      includePublicLoginInMobileNav={variant !== 'homepage'}
+      minimalAuth={variant === 'minimal' || isHomepageVariant}
+      minimalAuthVariant={isHomepageVariant ? 'pill' : 'link'}
+      includePublicLoginInMobileNav={!isHomepageVariant}
       containerSize='homepage'
-      presentation={variant === 'homepage' ? 'homepage-embedded' : 'default'}
+      presentation={isHomepageVariant ? 'homepage-embedded' : 'public-compact'}
       navLinks={resolvedNavLinks}
     />
   );
