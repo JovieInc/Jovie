@@ -292,6 +292,7 @@ export function DevToolbar({
   const [personaLoading, setPersonaLoading] = useState(false);
   const [personaError, setPersonaError] = useState<string | null>(null);
   const [personaAction, setPersonaAction] = useState<PersonaActionState>(null);
+  const personaStatusAbortRef = useRef<AbortController | null>(null);
   const [swEnabled, setSwEnabled] = useState(false);
   const [promoteState, setPromoteState] = useState<
     'idle' | 'checking' | 'ready' | 'promoting' | 'done' | 'error'
@@ -421,26 +422,52 @@ export function DevToolbar({
   const refreshPersonaSession = useCallback(async () => {
     if (env === 'production') return;
 
+    personaStatusAbortRef.current?.abort();
+    const controller = new AbortController();
+    personaStatusAbortRef.current = controller;
     setPersonaLoading(true);
     setPersonaError(null);
     try {
-      const res = await fetch('/api/dev/test-auth/session');
+      const res = await fetch('/api/dev/test-auth/session', {
+        signal: controller.signal,
+      });
       const data = (await res.json()) as DevTestAuthSessionStatus;
+      if (controller.signal.aborted) return;
       if (!res.ok) {
         setPersonaError(data.reason ?? 'Persona status unavailable');
         return;
       }
       setPersonaSession(data);
-    } catch {
+    } catch (error) {
+      if (
+        controller.signal.aborted ||
+        (error instanceof DOMException && error.name === 'AbortError')
+      ) {
+        return;
+      }
       setPersonaError('Persona status unavailable');
     } finally {
-      setPersonaLoading(false);
+      if (personaStatusAbortRef.current === controller) {
+        personaStatusAbortRef.current = null;
+        if (!controller.signal.aborted) {
+          setPersonaLoading(false);
+        }
+      }
     }
   }, [env]);
 
   useEffect(() => {
-    if (!personaPanelOpen) return;
+    if (!personaPanelOpen) {
+      personaStatusAbortRef.current?.abort();
+      personaStatusAbortRef.current = null;
+      setPersonaLoading(false);
+      return;
+    }
     void refreshPersonaSession();
+    return () => {
+      personaStatusAbortRef.current?.abort();
+      personaStatusAbortRef.current = null;
+    };
   }, [personaPanelOpen, refreshPersonaSession]);
 
   async function handlePromote() {

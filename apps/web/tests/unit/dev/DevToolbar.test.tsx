@@ -811,7 +811,12 @@ describe('DevToolbar', () => {
       expect(
         screen.getByRole('menuitem', { name: /Pro Creator/ })
       ).toBeDisabled();
-      expect(fetchSpy).toHaveBeenCalledWith('/api/dev/test-auth/session');
+      expect(fetchSpy).toHaveBeenCalledWith(
+        '/api/dev/test-auth/session',
+        expect.objectContaining({
+          signal: expect.any(AbortSignal),
+        })
+      );
     });
 
     it('shows disabled explanatory text when test auth is unavailable', async () => {
