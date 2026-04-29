@@ -1309,6 +1309,12 @@ body:has(.home-viewport)::-webkit-scrollbar {
     width: var(--homepage-carousel-slide-width);
   }
 
+  .homepage-hero-mockup--desktop .homepage-hero-mockup__frame,
+  .homepage-hero-mockup--panel .homepage-hero-mockup__frame {
+    width: var(--homepage-carousel-slide-width);
+    height: auto;
+  }
+
   .homepage-hero-carousel__side {
     bottom: 1rem;
     width: 24vw;

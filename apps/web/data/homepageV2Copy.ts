@@ -158,7 +158,7 @@ export const HOMEPAGE_V2_COPY: HomepageV2Copy = {
     href: APP_ROUTES.PRICING,
   },
   finalCta: {
-    headline: 'Start With the Next Drop.',
+    headline: 'Keep Your Music Moving.',
     body: 'Jovie handles the plan, assets, and follow-up from there.',
     primaryCtaLabel: 'Claim My Workspace',
     secondaryCtaLabel: 'See Pricing',
