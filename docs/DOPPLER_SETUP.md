@@ -71,7 +71,7 @@ Doppler is the canonical internal local workflow. The root wrapper commands alre
 **Development server:**
 
 ```bash
-pnpm run dev:web:local
+pnpm run dev:web:fast
 ```
 
 **Type checking:**
@@ -233,7 +233,7 @@ doppler configure get
 doppler setup --project jovie-web --config dev
 
 # Or use the repo wrapper command
-pnpm run dev:web:local
+pnpm run dev:web:fast
 ```
 
 ### Vercel Sync Not Working

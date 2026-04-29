@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "NODE_OPTIONS=--max-old-space-size=8192 doppler run -- next dev",
+    "dev:fast": "node scripts/dev-fast.mjs",
     "dev:local": "next dev",
     "dev:local:browse": "E2E_USE_TEST_AUTH_BYPASS=1 NEXT_PUBLIC_CLERK_MOCK=1 NEXT_PUBLIC_CLERK_PROXY_DISABLED=1 next dev",
     "dev:local:playwright": "next dev --webpack",
@@ -51,6 +52,7 @@
     "test:flaky": "tsx scripts/flaky-test-detector.ts",
     "test:e2e": "playwright test",
     "test:e2e:fast": "node scripts/run-playwright-fast.mjs",
+    "test:e2e:design-v1-flags": "E2E_USE_TEST_AUTH_BYPASS=1 playwright test tests/e2e/design-v1-flagged-surfaces.spec.ts --project=chromium --reporter=line",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:synthetic": "playwright test --config=playwright.synthetic.config.ts",
     "test:e2e:golden-path": "playwright test tests/e2e/golden-path.spec.ts",
@@ -119,6 +121,7 @@
     "drizzle:up": "drizzle-kit up",
     "tailwind:check": "node scripts/tailwind-guard.mjs",
     "tailwind:guard": "node scripts/tailwind-guard.mjs",
+    "mobile-overflow:guard": "node scripts/mobile-overflow-guard.mjs",
     "generate": "plop",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",

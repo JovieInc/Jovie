@@ -3,7 +3,10 @@ import { buildDemoProfile } from '@/features/demo/mock-dashboard-data';
 import { HOME_PAGE_ARTIST } from '@/features/home/home-page-content';
 import { HOMEPAGE_PROFILE_PREVIEW_ARTIST } from '@/features/home/homepage-profile-preview-fixture';
 import { MOCK_ARTIST } from '@/features/home/phone-mode-content';
-import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
+import {
+  FOUNDER_DEMO_PERSONA,
+  INTERNAL_DJ_DEMO_PERSONA,
+} from '@/lib/demo-personas';
 import { TIM_WHITE_SPOTIFY_ID } from '@/lib/spotify/blacklist';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
@@ -58,6 +61,22 @@ describe('Tim White canonical mock identity', () => {
     );
     expect(demoProfile.spotifyUrl).toBe(
       INTERNAL_DJ_DEMO_PERSONA.profile.spotifyUrl
+    );
+  });
+
+  it('keeps founder public profile fixtures aligned with the canonical Tim White profile', () => {
+    expect(FOUNDER_DEMO_PERSONA.profile.displayName).toBe(
+      TIM_WHITE_PROFILE.name
+    );
+    expect(FOUNDER_DEMO_PERSONA.profile.handle).toBe(TIM_WHITE_PROFILE.handle);
+    expect(FOUNDER_DEMO_PERSONA.profile.avatarSrc).toBe(
+      TIM_WHITE_PROFILE.avatarSrc
+    );
+    expect(FOUNDER_DEMO_PERSONA.profile.spotifyArtistId).toBe(
+      TIM_WHITE_PROFILE.spotifyArtistId
+    );
+    expect(FOUNDER_DEMO_PERSONA.profile.spotifyUrl).toBe(
+      TIM_WHITE_PROFILE.spotifyUrl
     );
   });
 });

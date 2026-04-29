@@ -7,8 +7,6 @@
     "version.json"
   ],
   "ui": "tui",
-  // Daemon disabled due to broken gRPC in current environment
-  "daemon": false,
   "remoteCache": {
     "enabled": true
   },
