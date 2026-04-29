@@ -9,7 +9,7 @@
 --
 -- Provider-aware backfill: existing rows get confirmation_status='confirmed'
 -- only if provider='manual' (creator-curated). Synced rows (bandsintown,
--- songkick, admin_import) backfill to 'pending' so the trust gate engages
+-- songkick) backfill to 'pending' so the trust gate engages
 -- immediately on already-imported third-party data — auto-confirming them
 -- would defeat the entire feature.
 --
@@ -51,12 +51,12 @@ UPDATE "tour_dates"
 SET "confirmation_status" = 'confirmed', "reviewed_at" = now()
 WHERE "provider" = 'manual' AND "confirmation_status" IS NULL;--> statement-breakpoint
 
---    Synced entries (bandsintown / songkick / admin_import) land in the trust
+--    Synced entries (bandsintown / songkick) land in the trust
 --    queue. They are invisible to fans + suppressed from notifications until
 --    the creator confirms them.
 UPDATE "tour_dates"
 SET "confirmation_status" = 'pending'
-WHERE "provider" IN ('bandsintown', 'songkick', 'admin_import')
+WHERE "provider" IN ('bandsintown', 'songkick')
   AND "confirmation_status" IS NULL;--> statement-breakpoint
 
 -- 6. Online-safe NOT NULL enforcement on confirmation_status.
