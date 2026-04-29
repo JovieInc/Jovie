@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.198] - 2026-04-29
+
+> Main CI and Linear automation are restored to a green, predictable path.
+
+### Fixed
+
+- **Public axe CI** now boots the downloaded standalone Next.js server artifact directly, waits for readiness, and cleans up the server process after the audit.
+- **Linear AI Dispatcher** now treats missing Linear credentials as disabled automation with a green scheduled run instead of making `main` red.
+- **Homepage outcome cards** now expose the horizontal rail as a keyboard-focusable labelled region so the public axe audit passes.
+
 ## [26.4.197] - 2026-04-29
 
 > Homepage hero, Friday rhythm, and footer CTA visual polish.
