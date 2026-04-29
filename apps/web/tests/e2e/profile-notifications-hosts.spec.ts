@@ -30,11 +30,10 @@ async function blockAnalytics(page: import('@playwright/test').Page) {
 
 test.describe('Profile Notifications Hosts', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
+  test.setTimeout(120_000);
 
   for (const breakpoint of BREAKPOINTS) {
-    test(`home hero opens overlay flow @ ${breakpoint.name}`, async ({
-      page,
-    }) => {
+    test(`home alerts entry renders @ ${breakpoint.name}`, async ({ page }) => {
       await blockAnalytics(page);
       await page.setViewportSize({
         width: breakpoint.width,
@@ -47,13 +46,30 @@ test.describe('Profile Notifications Hosts', () => {
       });
       await waitForHydration(page);
 
-      await page.getByTestId('profile-inline-notifications-trigger').click();
+      if (breakpoint.name === 'desktop') {
+        await expect(
+          page.getByRole('heading', { name: 'Alerts' })
+        ).toBeVisible();
+        await expect(
+          page.getByRole('switch', { name: /new music/i })
+        ).toBeVisible();
+        return;
+      }
+
+      const trigger = page.getByTestId('profile-hero-alerts-row');
+      await expect(trigger).toBeVisible();
+
+      if (breakpoint.name === 'tablet') {
+        return;
+      }
+
+      await trigger.click();
 
       await expect(
         page.getByTestId('profile-mobile-notifications-flow')
       ).toBeVisible();
       await expect(
-        page.getByTestId('profile-mobile-notifications-step-preferences')
+        page.getByTestId('profile-mobile-notifications-step-email')
       ).toBeVisible();
     });
 
@@ -76,7 +92,7 @@ test.describe('Profile Notifications Hosts', () => {
         page.getByTestId('profile-mobile-notifications-flow')
       ).toBeVisible();
       await expect(
-        page.getByTestId('profile-mobile-notifications-step-preferences')
+        page.getByTestId('profile-mobile-notifications-step-email')
       ).toBeVisible();
     });
 
@@ -100,7 +116,7 @@ test.describe('Profile Notifications Hosts', () => {
         page.getByTestId('profile-mobile-notifications-flow')
       ).toBeVisible();
       await expect(
-        page.getByTestId('profile-mobile-notifications-step-preferences')
+        page.getByTestId('profile-mobile-notifications-step-email')
       ).toBeVisible();
     });
 

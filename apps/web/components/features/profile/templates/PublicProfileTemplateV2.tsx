@@ -24,6 +24,7 @@ import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import { getHeaderSocialLinks } from '@/lib/utils/context-aware-links';
+import { isDefaultAvatarUrl } from '@/lib/utils/dsp-images';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
 
@@ -137,12 +138,13 @@ export function PublicProfileTemplateV2({
   }, []);
 
   const heroImageUrl = useMemo(() => {
-    return unwrapNextImageUrl(
+    const imageUrl = unwrapNextImageUrl(
       photoDownloadSizes.find(size => size.key === 'large')?.url ??
         photoDownloadSizes.find(size => size.key === 'original')?.url ??
         artist.image_url ??
         null
     );
+    return isDefaultAvatarUrl(imageUrl) ? null : imageUrl;
   }, [artist.image_url, photoDownloadSizes]);
 
   const { notificationsContextValue } = useProfileShell({

@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.192] - 2026-04-29
+
+> Mobile public profile alert signup hardening and iPhone viewport gates.
+
+### Added
+
+- **Blocking mobile profile viewport suite** covering iPhone 13 through 17 viewport families across Home, Music, Events, Alerts, About, Contact, Pay, Releases, and Notifications screens.
+- **Alert signup focus stability checks** that fail when mobile input focus changes the layout viewport, scrolls the shell, introduces horizontal overflow, or risks iOS input zoom.
+- **Public Lighthouse CI coverage** for the new profile mobile viewport/performance budget gate.
+
+### Changed
+
+- **Alerts signup flow** now treats OTP verification as the subscription activation moment, then collects name and birthday as follow-up enrichment.
+- **Mobile profile artwork fallbacks** avoid rendering default app/avatar assets as hero and rail imagery.
+
 ## [26.4.191] - 2026-04-28
 
 > Pre-landing review fixes for the page-builder + component-checker (#7920, #7919). Four Greptile findings addressed.

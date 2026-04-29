@@ -1,4 +1,5 @@
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
+import { isDefaultAvatarUrl } from '@/lib/utils/dsp-images';
 
 interface ProfileViewportShellProps {
   readonly ambientImageUrl?: string | null;
@@ -13,13 +14,17 @@ export function ProfileViewportShell({
   header,
   children,
 }: ProfileViewportShellProps) {
+  const resolvedAmbientImageUrl = isDefaultAvatarUrl(ambientImageUrl)
+    ? null
+    : ambientImageUrl;
+
   return (
     <div className='relative min-h-[100dvh] overflow-hidden bg-[color:var(--profile-stage-bg)] text-primary-token'>
       <div className='absolute inset-0' aria-hidden='true'>
         <div className='absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_26%),radial-gradient(circle_at_20%_16%,rgba(255,255,255,0.05),transparent_28%),linear-gradient(180deg,rgba(6,8,13,0.34)_0%,rgba(7,8,10,0.82)_42%,rgba(8,9,10,0.98)_100%)]' />
         <div className='absolute inset-[-10%]'>
           <ImageWithFallback
-            src={ambientImageUrl}
+            src={resolvedAmbientImageUrl}
             alt={`${artistName} background`}
             fill
             sizes='(max-width: 767px) 100vw, 680px'
