@@ -109,16 +109,23 @@ function getOffset(index: number, activeIndex: number): number {
   return offset;
 }
 
+function getSlideBlur(distance: number): string {
+  if (distance === 0) return '0px';
+  if (distance === 1) return '0.8px';
+  return '1.5px';
+}
+
 function getSlideStyle(offset: number): CSSProperties {
   const distance = Math.abs(offset);
   const isVisible = distance <= 1;
+  const opacity = isVisible && distance === 0 ? 1 : 0;
+  const blur = getSlideBlur(distance);
 
   return {
     '--carousel-offset': offset,
-    '--carousel-opacity': isVisible ? (distance === 0 ? 1 : 0) : 0,
+    '--carousel-opacity': opacity,
     '--carousel-scale': distance === 0 ? 1 : 0.92,
-    '--carousel-blur':
-      distance === 0 ? '0px' : distance === 1 ? '0.8px' : '1.5px',
+    '--carousel-blur': blur,
     '--carousel-z': HERO_MOCKUP_SCREENSHOTS.length - distance,
   } as CSSProperties;
 }

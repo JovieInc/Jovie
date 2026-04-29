@@ -84,6 +84,41 @@ function getContributionText(count: number, label?: string): string {
   return `${count} active Fridays`;
 }
 
+function getActiveCellStyle(day: CalendarCell): CSSProperties | undefined {
+  if (day.count === 0 || !day.accentColor) {
+    return undefined;
+  }
+
+  const boxShadow = day.accentMuted
+    ? '0 0 10px rgba(255,255,255,0.055)'
+    : '0 0 16px rgba(255,255,255,0.09)';
+  const filter = day.accentMuted
+    ? 'saturate(0.72) brightness(0.9)'
+    : 'saturate(0.86) brightness(0.96)';
+
+  return {
+    backgroundColor: day.accentColor,
+    boxShadow,
+    filter,
+  };
+}
+
+function getCellOpacity({
+  inYear,
+  isActive,
+  isFriday,
+  isMuted,
+}: Readonly<{
+  inYear: boolean;
+  isActive: boolean;
+  isFriday: boolean;
+  isMuted?: boolean;
+}>): number {
+  if (!inYear) return 0.08;
+  if (isActive) return isMuted ? 0.9 : 1;
+  return isFriday ? 0.18 : 0.12;
+}
+
 function getGraphYear(data: readonly ContributionData[]): number {
   const firstDate = data[0]?.date;
   const parsedYear = firstDate ? Number.parseInt(firstDate.slice(0, 4), 10) : 0;
@@ -212,18 +247,13 @@ export function ContributionGraph({
             const isFriday = day.dayIndex === 5;
             const isActive = day.count > 0;
             const isWeekend = !isWorkday(day.dayIndex);
-            const activeCellStyle: CSSProperties | undefined =
-              isActive && day.accentColor
-                ? {
-                    backgroundColor: day.accentColor,
-                    boxShadow: day.accentMuted
-                      ? '0 0 10px rgba(255,255,255,0.055)'
-                      : '0 0 16px rgba(255,255,255,0.09)',
-                    filter: day.accentMuted
-                      ? 'saturate(0.72) brightness(0.9)'
-                      : 'saturate(0.86) brightness(0.96)',
-                  }
-                : undefined;
+            const activeCellStyle = getActiveCellStyle(day);
+            const opacity = getCellOpacity({
+              inYear: day.inYear,
+              isActive,
+              isFriday,
+              isMuted: day.accentMuted,
+            });
 
             return (
               <div
@@ -244,15 +274,7 @@ export function ContributionGraph({
               >
                 <motion.div
                   animate={{
-                    opacity: day.inYear
-                      ? isActive
-                        ? day.accentMuted
-                          ? 0.9
-                          : 1
-                        : isFriday
-                          ? 0.18
-                          : 0.12
-                      : 0.08,
+                    opacity,
                     scale: isActive ? 1.02 : 0.86,
                   }}
                   transition={

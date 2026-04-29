@@ -79,24 +79,48 @@ function getHeartbeatBaseline(x: number, progress: number): number {
   return 14 - progress * 1.4 - progress * 6.8 * normalizedX ** 2.25;
 }
 
+function getHeartbeatSpikeCount(
+  progress: number,
+  totalFridays: number
+): number {
+  let spikeCount = 3;
+
+  if (progress >= 0.86) {
+    spikeCount = 52;
+  } else if (progress >= 0.68) {
+    spikeCount = 26;
+  } else if (progress >= 0.46) {
+    spikeCount = 13;
+  } else if (progress >= 0.24) {
+    spikeCount = 7;
+  }
+
+  return Math.min(totalFridays, spikeCount);
+}
+
+function getDesktopActiveFridayCount({
+  prefersReducedMotion,
+  progress,
+  totalFridays,
+}: Readonly<{
+  prefersReducedMotion: boolean | null;
+  progress: number;
+  totalFridays: number;
+}>): number {
+  if (!prefersReducedMotion) {
+    return getScrollActiveCount(progress, totalFridays);
+  }
+
+  return progress >= 0.5 ? totalFridays : INITIAL_ACTIVE_FRIDAYS;
+}
+
 function buildHeartbeatPath(
   data: ReturnType<typeof generateFridayRhythmData>,
   totalFridays: number
 ): string {
   const activeCount = data.filter(day => day.count > 0).length;
   const progress = totalFridays > 0 ? activeCount / totalFridays : 0;
-  const spikeCount = Math.min(
-    totalFridays,
-    progress >= 0.86
-      ? 52
-      : progress >= 0.68
-        ? 26
-        : progress >= 0.46
-          ? 13
-          : progress >= 0.24
-            ? 7
-            : 3
-  );
+  const spikeCount = getHeartbeatSpikeCount(progress, totalFridays);
 
   if (spikeCount === 0) {
     return `M 2 ${formatSvgNumber(getHeartbeatBaseline(2, 0))} L 98 ${formatSvgNumber(
@@ -152,15 +176,15 @@ export function FridayRhythmSection() {
       frame = 0;
 
       const rect = section.getBoundingClientRect();
-      const viewportHeight = window.innerHeight || 1;
+      const viewportHeight = globalThis.innerHeight || 1;
       const stickyTravel = Math.max(rect.height - viewportHeight, 1);
       const rawProgress = -rect.top / stickyTravel;
       const progress = Math.min(Math.max(rawProgress, 0), 1);
-      const nextCount = prefersReducedMotion
-        ? progress >= 0.5
-          ? totalFridays
-          : INITIAL_ACTIVE_FRIDAYS
-        : getScrollActiveCount(progress, totalFridays);
+      const nextCount = getDesktopActiveFridayCount({
+        prefersReducedMotion,
+        progress,
+        totalFridays,
+      });
 
       setDesktopActiveFridays(current =>
         current === nextCount ? current : nextCount
@@ -169,19 +193,19 @@ export function FridayRhythmSection() {
 
     const scheduleProgressUpdate = () => {
       if (frame) return;
-      frame = window.requestAnimationFrame(updateProgress);
+      frame = globalThis.requestAnimationFrame(updateProgress);
     };
 
     updateProgress();
-    window.addEventListener('scroll', scheduleProgressUpdate, {
+    globalThis.addEventListener('scroll', scheduleProgressUpdate, {
       passive: true,
     });
-    window.addEventListener('resize', scheduleProgressUpdate);
+    globalThis.addEventListener('resize', scheduleProgressUpdate);
 
     return () => {
-      if (frame) window.cancelAnimationFrame(frame);
-      window.removeEventListener('scroll', scheduleProgressUpdate);
-      window.removeEventListener('resize', scheduleProgressUpdate);
+      if (frame) globalThis.cancelAnimationFrame(frame);
+      globalThis.removeEventListener('scroll', scheduleProgressUpdate);
+      globalThis.removeEventListener('resize', scheduleProgressUpdate);
     };
   }, [prefersReducedMotion, totalFridays]);
 
