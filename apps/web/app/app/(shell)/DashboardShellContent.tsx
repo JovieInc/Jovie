@@ -37,6 +37,8 @@ async function getEssentialShellFlagsSnapshot(
     DESIGN_V1_CHAT_ENTITIES: designV1,
     DESIGN_V1_LYRICS: designV1,
     DESIGN_V1_LIBRARY: designV1,
+    DESIGN_V1_AUTH: designV1,
+    DESIGN_V1_ONBOARDING: designV1,
   };
 }
 

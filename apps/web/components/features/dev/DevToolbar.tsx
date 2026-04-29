@@ -456,11 +456,9 @@ export function DevToolbar({
   const toggleDesignV1 = useCallback(() => {
     const currentOverride = overrides[designV1OverrideKey];
     const current =
-      typeof currentOverride === 'boolean'
-        ? currentOverride
-        : APP_FLAG_DEFAULTS.DESIGN_V1;
+      typeof currentOverride === 'boolean' ? currentOverride : designV1Enabled;
     setOrClearOverride(designV1OverrideKey, !current);
-  }, [designV1OverrideKey, overrides, setOrClearOverride]);
+  }, [designV1Enabled, designV1OverrideKey, overrides, setOrClearOverride]);
 
   // Unified flag list: filter by search, sort overrides to top
   const filteredFlags = useMemo(() => {
@@ -839,7 +837,7 @@ export function DevToolbar({
 
           {designV1Enabled && (
             <Link
-              href='/exp/page-builder'
+              href={APP_ROUTES.DESIGN_STUDIO}
               title='Open Design Studio'
               className='flex items-center gap-1 px-1.5 py-1 rounded text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)] transition-colors'
               aria-label='Design Studio'

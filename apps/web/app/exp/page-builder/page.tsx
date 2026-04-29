@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
+import { getOptionalAuth } from '@/lib/auth/cached';
 import { getAppFlagValue } from '@/lib/flags/server';
 import { PageBuilderClient } from './PageBuilderClient';
 
@@ -11,7 +12,8 @@ export const metadata: Metadata = {
 };
 
 export default async function PageBuilderPage() {
-  const designV1Enabled = await getAppFlagValue('DESIGN_V1');
+  const { userId } = await getOptionalAuth();
+  const designV1Enabled = await getAppFlagValue('DESIGN_V1', { userId });
 
   // useSearchParams() in PageBuilderClient requires a Suspense boundary,
   // otherwise Next.js opts the entire route out of static prerendering and
