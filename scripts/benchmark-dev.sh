@@ -1,102 +1,176 @@
 #!/usr/bin/env bash
-# Benchmark dev server cold start time.
-# Usage: ./scripts/benchmark-dev.sh [runs]
-# Default: 3 runs, averages the results.
+# Measure the local Next.js dev loop: server ready, first route compile, and warm route response.
+# Usage:
+#   pnpm run benchmark:dev
+#   ./scripts/benchmark-dev.sh [runs] [route ...]
+#
+# Environment:
+#   BENCHMARK_DEV_ROUTES="/ /app /api/health/build-info"
+#   BENCHMARK_DEV_PORT=3100
+#   BENCHMARK_DEV_TIMEOUT=120
+#   BENCHMARK_DEV_ROUTE_TIMEOUT=30
+#   JOVIE_DEV_RESET_NEXT_CACHE=1  # remove .next before each run for cold-start measurement
 
 set -euo pipefail
 
-RUNS=${1:-3}
+RUNS="${1:-1}"
+if [[ "$RUNS" =~ ^[0-9]+$ ]]; then
+  shift || true
+else
+  RUNS=1
+fi
+
+REPO_ROOT="$(pwd)"
 WEB_DIR="apps/web"
 NEXT_DIR="$WEB_DIR/.next"
-TMPFILE="/tmp/benchmark-dev-results.$$"
-REPO_ROOT="$(pwd)"
-TIMEOUT=120
+BASE_PORT="${BENCHMARK_DEV_PORT:-3100}"
+TIMEOUT="${BENCHMARK_DEV_TIMEOUT:-120}"
+OUTPUT_DIR="${TMPDIR:-/tmp}"
+RESULTS_FILE="$OUTPUT_DIR/jovie-dev-benchmark-results.$$"
+LOG_FILE="$OUTPUT_DIR/jovie-dev-benchmark-output.$$"
 
-# Ensure we're in the repo root
 if [ ! -f "turbo.json" ]; then
   echo "Error: Run from repo root (where turbo.json lives)"
   exit 1
 fi
 
-rm -f "$TMPFILE"
+if [ "$#" -gt 0 ]; then
+  ROUTES=("$@")
+elif [ -n "${BENCHMARK_DEV_ROUTES:-}" ]; then
+  # shellcheck disable=SC2206
+  ROUTES=(${BENCHMARK_DEV_ROUTES})
+else
+  ROUTES=("/" "/app" "/api/health/build-info")
+fi
 
-echo "=== Dev Server Cold Start Benchmark ==="
+now_ms() {
+  node -e 'process.stdout.write(String(Date.now()))'
+}
+
+find_free_port() {
+  local port="$1"
+  while lsof -ti "tcp:$port" >/dev/null 2>&1; do
+    port=$((port + 1))
+  done
+  echo "$port"
+}
+
+cleanup() {
+  if [ -n "${DEV_PID:-}" ]; then
+    kill "$DEV_PID" >/dev/null 2>&1 || true
+    wait "$DEV_PID" >/dev/null 2>&1 || true
+  fi
+  rm -f "$LOG_FILE"
+}
+trap cleanup EXIT
+
+request_route() {
+  local route="$1"
+  local url="$2"
+  local route_timeout="${BENCHMARK_DEV_ROUTE_TIMEOUT:-30}"
+  local result
+
+  if result="$(curl -sS --connect-timeout 5 --max-time "$route_timeout" -o /dev/null -w "${route} %{http_code} %{time_total}" "$url")"; then
+    printf '%s' "$result"
+  else
+    printf '%s 000 %s' "$route" "$route_timeout"
+  fi
+}
+
+echo "=== Jovie Local Dev Benchmark ==="
 echo "Runs: $RUNS"
+echo "Routes: ${ROUTES[*]}"
+echo "Base port: $BASE_PORT"
 echo ""
 
-for i in $(seq 1 "$RUNS"); do
-  echo "--- Run $i/$RUNS ---"
+rm -f "$RESULTS_FILE"
 
-  # Kill any existing dev server (scoped to this repo to avoid killing unrelated processes)
+for run in $(seq 1 "$RUNS"); do
+  echo "--- Run $run/$RUNS ---"
+
   pkill -f "$REPO_ROOT.*next dev" 2>/dev/null || true
   sleep 1
 
-  # Clear .next cache for true cold start
-  rm -rf "$NEXT_DIR"
-  echo "  Cleared .next cache"
+  if [ "${JOVIE_DEV_RESET_NEXT_CACHE:-0}" = "1" ]; then
+    rm -rf "$NEXT_DIR"
+    echo "  Reset .next for cold measurement"
+  else
+    echo "  Keeping existing .next cache"
+  fi
 
-  # Start dev server in background and time until "Ready" message.
-  # Using process substitution so the while loop runs in the main shell
-  # (not a subshell), allowing TMPFILE writes and proper flow control.
-  START_S=$(date +%s)
+  PORT="$(find_free_port "$BASE_PORT")"
+  if [ "$PORT" != "$BASE_PORT" ]; then
+    echo "  Port $BASE_PORT is busy; using measured port $PORT"
+  fi
 
-  pnpm --filter web exec next dev --turbopack > "/tmp/benchmark-dev-output.$$" 2>&1 &
+  rm -f "$LOG_FILE"
+  START_MS="$(now_ms)"
+  pnpm --filter @jovie/web exec next dev -p "$PORT" >"$LOG_FILE" 2>&1 &
   DEV_PID=$!
 
   READY=false
-  DEADLINE=$((START_S + TIMEOUT))
+  DEADLINE=$(( $(date +%s) + TIMEOUT ))
   while [ "$(date +%s)" -lt "$DEADLINE" ]; do
-    if [ -f "/tmp/benchmark-dev-output.$$" ]; then
-      while IFS= read -r line; do
-        echo "  $line"
-        if echo "$line" | grep -qiE "(Ready in|✓ Ready)"; then
-          END_S=$(date +%s)
-          ELAPSED=$((END_S - START_S))
-          echo ""
-          echo "  >>> COLD START: ${ELAPSED}s"
-          echo "$ELAPSED" >> "$TMPFILE"
-          READY=true
-          break 2
-        fi
-      done < "/tmp/benchmark-dev-output.$$"
+    if ! kill -0 "$DEV_PID" >/dev/null 2>&1; then
+      echo "  Dev server exited before ready"
+      sed 's/^/  /' "$LOG_FILE" || true
+      exit 1
     fi
-    sleep 0.5
+
+    if grep -qiE "(Ready in|Local:)" "$LOG_FILE" 2>/dev/null; then
+      READY=true
+      break
+    fi
+
+    sleep 0.25
   done
 
-  if [ "$READY" = false ]; then
-    echo "  >>> TIMED OUT after ${TIMEOUT}s"
+  if [ "$READY" != "true" ]; then
+    echo "  Timed out waiting for dev server after ${TIMEOUT}s"
+    sed 's/^/  /' "$LOG_FILE" || true
+    exit 1
   fi
 
-  # Kill the dev server
-  kill "$DEV_PID" 2>/dev/null || true
-  wait "$DEV_PID" 2>/dev/null || true
-  pkill -f "$REPO_ROOT.*next dev" 2>/dev/null || true
-  rm -f "/tmp/benchmark-dev-output.$$"
+  READY_MS=$(( $(now_ms) - START_MS ))
+  echo "  Ready: ${READY_MS}ms"
 
-  sleep 2
+  BASE_URL="http://localhost:$PORT"
+  for route in "${ROUTES[@]}"; do
+    FIRST_LINE="$(request_route "$route" "$BASE_URL$route")"
+    WARM_LINE="$(request_route "$route" "$BASE_URL$route")"
+    FIRST_STATUS="$(printf '%s' "$FIRST_LINE" | awk '{print $2}')"
+    FIRST_SECONDS="$(printf '%s' "$FIRST_LINE" | awk '{print $3}')"
+    WARM_STATUS="$(printf '%s' "$WARM_LINE" | awk '{print $2}')"
+    WARM_SECONDS="$(printf '%s' "$WARM_LINE" | awk '{print $3}')"
+
+    printf '  %-28s first=%ss status=%s warm=%ss status=%s\n' \
+      "$route" "$FIRST_SECONDS" "$FIRST_STATUS" "$WARM_SECONDS" "$WARM_STATUS"
+    printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+      "$run" "$route" "$READY_MS" "$FIRST_SECONDS" "$FIRST_STATUS" "$WARM_SECONDS" >>"$RESULTS_FILE"
+  done
+
+  kill "$DEV_PID" >/dev/null 2>&1 || true
+  wait "$DEV_PID" >/dev/null 2>&1 || true
+  DEV_PID=""
+  rm -f "$LOG_FILE"
+  echo ""
 done
 
-# Read results and compute average
-if [ -f "$TMPFILE" ]; then
-  echo ""
+if [ -f "$RESULTS_FILE" ]; then
   echo "=== Results ==="
-  TOTAL=0
-  COUNT=0
-  while IFS= read -r secs; do
-    COUNT=$((COUNT + 1))
-    echo "  Run $COUNT: ${secs}s"
-    TOTAL=$((TOTAL + secs))
-  done < "$TMPFILE"
-
-  if [ "$COUNT" -gt 0 ]; then
-    AVG=$((TOTAL / COUNT))
-    echo ""
-    echo "  Average: ${AVG}s"
-  fi
-
-  rm -f "$TMPFILE"
-else
-  echo ""
-  echo "No results captured. The dev server may not have started correctly."
-  echo "Try running manually: pnpm --filter web exec next dev --turbopack"
+  awk -F '\t' '
+    {
+      route=$2
+      count[route] += 1
+      ready[route] += $3
+      first[route] += $4
+      warm[route] += $6
+    }
+    END {
+      for (route in count) {
+        printf "  %-28s ready_avg=%.0fms first_avg=%.3fs warm_avg=%.3fs\n", route, ready[route]/count[route], first[route]/count[route], warm[route]/count[route]
+      }
+    }
+  ' "$RESULTS_FILE"
+  rm -f "$RESULTS_FILE"
 fi

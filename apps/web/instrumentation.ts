@@ -155,7 +155,9 @@ export async function register() {
     // the server SDK adds no signal there while increasing startup fragility.
     const isDev = process.env.NODE_ENV === 'development';
     const isCi = process.env.CI === 'true';
-    const shouldSkipServerInstrumentation = isDev || isCi;
+    const shouldSkipLocalSentry =
+      isDev && process.env.JOVIE_ENABLE_LOCAL_SENTRY !== '1';
+    const shouldSkipServerInstrumentation = shouldSkipLocalSentry || isCi;
 
     if (!shouldSkipServerInstrumentation) {
       const Sentry = await loadSentry();
@@ -249,7 +251,10 @@ export async function register() {
 
   if (process.env.NEXT_RUNTIME === 'edge') {
     const isCi = process.env.CI === 'true';
-    if (process.env.NODE_ENV !== 'development' && !isCi) {
+    const shouldSkipLocalSentry =
+      process.env.NODE_ENV === 'development' &&
+      process.env.JOVIE_ENABLE_LOCAL_SENTRY !== '1';
+    if (!shouldSkipLocalSentry && !isCi) {
       await import('./sentry.edge.config');
     }
   }
@@ -258,8 +263,10 @@ export async function register() {
 export async function onRequestError(...args: unknown[]) {
   const isDev = process.env.NODE_ENV === 'development';
   const isCi = process.env.CI === 'true';
+  const shouldSkipLocalSentry =
+    isDev && process.env.JOVIE_ENABLE_LOCAL_SENTRY !== '1';
 
-  if (isDev || isCi) {
+  if (shouldSkipLocalSentry || isCi) {
     return;
   }
 
