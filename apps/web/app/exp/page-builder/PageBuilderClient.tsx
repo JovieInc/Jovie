@@ -1,11 +1,34 @@
 'use client';
 
-import { ChevronDown, ChevronUp, Plus, X } from 'lucide-react';
+import {
+  Camera,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  ExternalLink,
+  Layers,
+  LayoutTemplate,
+  Music2,
+  Plus,
+  X,
+} from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { MarketingFinalCTA } from '@/components/site/MarketingFinalCTA';
 import { MarketingFooter } from '@/components/site/MarketingFooter';
 import { MarketingHeader } from '@/components/site/MarketingHeader';
+import {
+  DESIGN_STUDIO_CATEGORY_LABELS,
+  DESIGN_STUDIO_ITEMS,
+  DESIGN_STUDIO_SCREENSHOT_SCENARIOS,
+  type DesignStudioCategory,
+  type DesignStudioItem,
+  getDesignStudioPublicScreenshotUrl,
+  getDesignStudioScreenshotUrl,
+} from '@/lib/design-studio/registry';
+import { SCREENSHOT_SCENARIOS } from '@/lib/screenshots/registry';
+import type { ScreenshotScenario } from '@/lib/screenshots/types';
 import {
   getSectionById,
   getSectionsByCategory,
@@ -19,6 +42,7 @@ import { cn } from '@/lib/utils';
 type HeaderMode = 'solid' | 'transparent';
 type FooterMode = 'full' | 'minimal';
 type CtaMode = 'on' | 'off';
+type StudioMode = 'pages' | 'sections' | 'product' | 'screenshots';
 
 /**
  * Default body composition. Mirrors a "complete" landing page so reviewers
@@ -57,11 +81,22 @@ function parseFooter(param: string | null): FooterMode {
 function parseCta(param: string | null): CtaMode {
   return param === 'off' ? 'off' : 'on';
 }
+function parseMode(param: string | null): StudioMode {
+  if (param === 'sections' || param === 'product' || param === 'screenshots') {
+    return param;
+  }
+  return 'pages';
+}
 
-export function PageBuilderClient() {
+export function PageBuilderClient({
+  designV1Enabled,
+}: Readonly<{
+  designV1Enabled: boolean;
+}>) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  const mode = designV1Enabled ? parseMode(searchParams.get('mode')) : 'pages';
   const headerMode = parseHeader(searchParams.get('header'));
   const footerMode = parseFooter(searchParams.get('footer'));
   const ctaMode = parseCta(searchParams.get('cta'));
@@ -72,7 +107,9 @@ export function PageBuilderClient() {
 
   const setParam = useCallback(
     (
-      updates: Partial<Record<'header' | 'footer' | 'cta' | 'body', string>>
+      updates: Partial<
+        Record<'mode' | 'header' | 'footer' | 'cta' | 'body', string>
+      >
     ) => {
       const params = new URLSearchParams(searchParams.toString());
       for (const [k, v] of Object.entries(updates)) {
@@ -140,37 +177,44 @@ export function PageBuilderClient() {
         // Use the resolved variant count, not raw URL ids — keeps the label
         // truthful when someone hand-types a stale or unknown id into ?body=.
         bodyCount={bodyVariants.length}
+        designV1Enabled={designV1Enabled}
+        mode={mode}
+        onSetMode={nextMode => setParam({ mode: nextMode })}
         onSetHeader={mode => setParam({ header: mode })}
         onSetFooter={mode => setParam({ footer: mode })}
         onSetCta={mode => setParam({ cta: mode })}
         onOpenDrawer={() => setDrawerOpen(true)}
       />
 
-      {/*
-        The composed landing page. Padding-top = toolbar height so the
-        header always renders below the toolbar without overlap.
-      */}
-      <div className='pt-[64px]'>
-        <MarketingHeader
-          variant={headerMode === 'transparent' ? 'homepage' : 'landing'}
-        />
+      {mode === 'pages' ? (
+        /*
+          The composed landing page. Padding-top = toolbar height so the
+          header always renders below the toolbar without overlap.
+        */
+        <div className='pt-[64px]'>
+          <MarketingHeader
+            variant={headerMode === 'transparent' ? 'homepage' : 'landing'}
+          />
 
-        <main>
-          {bodyVariants.map(({ variant, idx }) => (
-            <div key={`${variant.id}-${idx}`} data-body-section={variant.id}>
-              {variant.render()}
-            </div>
-          ))}
-        </main>
+          <main>
+            {bodyVariants.map(({ variant, idx }) => (
+              <div key={`${variant.id}-${idx}`} data-body-section={variant.id}>
+                {variant.render()}
+              </div>
+            ))}
+          </main>
 
-        {ctaMode === 'on' && <MarketingFinalCTA />}
+          {ctaMode === 'on' && <MarketingFinalCTA />}
 
-        <MarketingFooter
-          variant={footerMode === 'minimal' ? 'minimal' : 'expanded'}
-        />
-      </div>
+          <MarketingFooter
+            variant={footerMode === 'minimal' ? 'minimal' : 'expanded'}
+          />
+        </div>
+      ) : (
+        <DesignStudioWorkspace mode={mode} />
+      )}
 
-      {drawerOpen && (
+      {drawerOpen && mode === 'pages' && (
         <SectionDrawer
           bodyIds={bodyIds}
           onAdd={addSection}
@@ -188,6 +232,9 @@ interface ToolbarProps {
   readonly footerMode: FooterMode;
   readonly ctaMode: CtaMode;
   readonly bodyCount: number;
+  readonly designV1Enabled: boolean;
+  readonly mode: StudioMode;
+  readonly onSetMode: (mode: StudioMode) => void;
   readonly onSetHeader: (mode: HeaderMode) => void;
   readonly onSetFooter: (mode: FooterMode) => void;
   readonly onSetCta: (mode: CtaMode) => void;
@@ -199,6 +246,9 @@ function Toolbar({
   footerMode,
   ctaMode,
   bodyCount,
+  designV1Enabled,
+  mode,
+  onSetMode,
   onSetHeader,
   onSetFooter,
   onSetCta,
@@ -206,8 +256,14 @@ function Toolbar({
 }: ToolbarProps) {
   return (
     <div className='fixed left-0 right-0 top-0 z-50 flex h-[56px] items-center gap-4 border-b border-white/10 bg-black/85 px-4 text-white shadow-lg backdrop-blur-md'>
-      <span className='text-2xs font-semibold uppercase tracking-wider text-white/70'>
-        Page builder
+      <span
+        className={
+          designV1Enabled
+            ? 'text-xs font-semibold text-white/80'
+            : 'text-2xs font-semibold uppercase tracking-wider text-white/70'
+        }
+      >
+        {designV1Enabled ? 'Design Studio' : 'Page Builder'}
       </span>
 
       <div
@@ -215,44 +271,82 @@ function Toolbar({
         aria-hidden='true'
       />
 
-      <Toggle
-        label='Header'
-        value={headerMode}
-        options={[
-          { value: 'solid', label: 'Solid' },
-          { value: 'transparent', label: 'Transparent' },
-        ]}
-        onChange={onSetHeader}
-      />
+      {designV1Enabled && (
+        <div className='inline-flex rounded-md border border-white/10 bg-black/60 p-0.5'>
+          {[
+            { value: 'pages', label: 'Pages', icon: LayoutTemplate },
+            { value: 'sections', label: 'Sections', icon: Layers },
+            { value: 'product', label: 'Product Components', icon: Music2 },
+            { value: 'screenshots', label: 'Screenshots', icon: Camera },
+          ].map(option => {
+            const Icon = option.icon;
+            return (
+              <button
+                key={option.value}
+                type='button'
+                aria-pressed={mode === option.value}
+                onClick={() => onSetMode(option.value as StudioMode)}
+                className={cn(
+                  'inline-flex h-7 items-center gap-1.5 rounded px-2.5 text-2xs font-semibold transition-colors',
+                  mode === option.value
+                    ? 'bg-white text-black'
+                    : 'text-white/70 hover:text-white'
+                )}
+              >
+                <Icon className='h-3 w-3' />
+                <span className='hidden lg:inline'>{option.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
-      <Toggle
-        label='Footer'
-        value={footerMode}
-        options={[
-          { value: 'full', label: 'Full' },
-          { value: 'minimal', label: 'Minimal' },
-        ]}
-        onChange={onSetFooter}
-      />
+      {mode === 'pages' ? (
+        <>
+          <Toggle
+            label='Header'
+            value={headerMode}
+            options={[
+              { value: 'solid', label: 'Solid' },
+              { value: 'transparent', label: 'Transparent' },
+            ]}
+            onChange={onSetHeader}
+          />
 
-      <Toggle
-        label='CTA'
-        value={ctaMode}
-        options={[
-          { value: 'on', label: 'On' },
-          { value: 'off', label: 'Off' },
-        ]}
-        onChange={onSetCta}
-      />
+          <Toggle
+            label='Footer'
+            value={footerMode}
+            options={[
+              { value: 'full', label: 'Full' },
+              { value: 'minimal', label: 'Minimal' },
+            ]}
+            onChange={onSetFooter}
+          />
 
-      <button
-        type='button'
-        onClick={onOpenDrawer}
-        className='ml-auto inline-flex h-8 items-center gap-2 rounded-md border border-white/15 bg-white/5 px-3 text-xs font-semibold text-white transition-colors hover:bg-white/10'
-      >
-        <Plus className='h-3.5 w-3.5' />
-        Sections ({bodyCount})
-      </button>
+          <Toggle
+            label='CTA'
+            value={ctaMode}
+            options={[
+              { value: 'on', label: 'On' },
+              { value: 'off', label: 'Off' },
+            ]}
+            onChange={onSetCta}
+          />
+
+          <button
+            type='button'
+            onClick={onOpenDrawer}
+            className='ml-auto inline-flex h-8 items-center gap-2 rounded-md border border-white/15 bg-white/5 px-3 text-xs font-semibold text-white transition-colors hover:bg-white/10'
+          >
+            <Plus className='h-3.5 w-3.5' />
+            Sections ({bodyCount})
+          </button>
+        </>
+      ) : (
+        <div className='ml-auto text-xs text-white/45'>
+          Internal marketing tooling for previews, captures, and prompts
+        </div>
+      )}
     </div>
   );
 }
@@ -295,6 +389,286 @@ function Toggle<T extends string>({
         ))}
       </div>
     </div>
+  );
+}
+
+function groupItemsByCategory(items: readonly DesignStudioItem[]) {
+  return items.reduce(
+    (groups, item) => {
+      const existing = groups[item.category] ?? [];
+      groups[item.category] = [...existing, item];
+      return groups;
+    },
+    {} as Partial<Record<DesignStudioCategory, readonly DesignStudioItem[]>>
+  );
+}
+
+export function DesignStudioWorkspace({
+  mode,
+}: Readonly<{ mode: Exclude<StudioMode, 'pages'> }>) {
+  return (
+    <main
+      className='min-h-screen bg-surface-1 px-4 pb-12 pt-[80px] text-white sm:px-6 lg:px-8'
+      data-testid={`design-studio-${mode}`}
+    >
+      {mode === 'sections' ? (
+        <SectionStudio />
+      ) : mode === 'product' ? (
+        <ProductComponentStudio />
+      ) : (
+        <ScreenshotStudio />
+      )}
+    </main>
+  );
+}
+
+function StudioIntro({
+  title,
+  description,
+}: Readonly<{ title: string; description: string }>) {
+  return (
+    <div className='mb-6 flex flex-col gap-2'>
+      <h1 className='text-2xl font-semibold tracking-[-0.02em]'>{title}</h1>
+      <p className='max-w-3xl text-sm leading-6 text-white/55'>{description}</p>
+    </div>
+  );
+}
+
+function ProductComponentStudio() {
+  const grouped = groupItemsByCategory(
+    DESIGN_STUDIO_ITEMS.filter(item => item.category !== 'sections')
+  );
+  const categoryOrder: readonly DesignStudioCategory[] = [
+    'music-ai',
+    'shell-views',
+    'components',
+  ];
+
+  return (
+    <div>
+      <StudioIntro
+        title='Product Components'
+        description='Curated product surfaces for internal marketing: live previews, capture routes, downloadable screenshots, and prompts for placing each component on a page.'
+      />
+      <div className='space-y-8'>
+        {categoryOrder.map(category => {
+          const items = grouped[category] ?? [];
+          if (items.length === 0) return null;
+          return (
+            <section key={category} className='space-y-3'>
+              <h2 className='text-sm font-semibold text-white/75'>
+                {DESIGN_STUDIO_CATEGORY_LABELS[category]}
+              </h2>
+              <div className='grid gap-4 xl:grid-cols-2'>
+                {items.map(item => (
+                  <DesignStudioItemCard key={item.id} item={item} />
+                ))}
+              </div>
+            </section>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function SectionStudio() {
+  const sectionItems = DESIGN_STUDIO_ITEMS.filter(
+    item => item.category === 'sections'
+  );
+  return (
+    <div>
+      <StudioIntro
+        title='Sections'
+        description='Landing-page sections from the shared registry. Use this view to inspect the canonical component, open it in the section checker, and copy placement prompts.'
+      />
+      <div className='grid gap-4 xl:grid-cols-2'>
+        {sectionItems.map(item => (
+          <DesignStudioItemCard key={item.id} item={item} compact />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ScreenshotStudio() {
+  const publicScenarios = SCREENSHOT_SCENARIOS.filter(
+    scenario =>
+      scenario.consumers.includes('marketing-export') ||
+      DESIGN_STUDIO_SCREENSHOT_SCENARIOS.some(item => item.id === scenario.id)
+  );
+  return (
+    <div>
+      <StudioIntro
+        title='Screenshots'
+        description='Capture-ready screenshots from the existing product screenshot registry. Download existing public exports or open the route before regenerating the catalog.'
+      />
+      <div className='grid gap-3 md:grid-cols-2 xl:grid-cols-3'>
+        {publicScenarios.map(scenario => (
+          <ScreenshotScenarioCard key={scenario.id} scenario={scenario} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DesignStudioItemCard({
+  item,
+  compact = false,
+}: Readonly<{ item: DesignStudioItem; compact?: boolean }>) {
+  return (
+    <article
+      className='overflow-hidden rounded-lg border border-white/10 bg-white/[0.035]'
+      data-testid={`design-studio-item-${item.id}`}
+    >
+      <div className={compact ? 'max-h-[280px] overflow-hidden' : ''}>
+        {item.preview()}
+      </div>
+      <div className='space-y-3 border-t border-white/10 p-4'>
+        <div>
+          <div className='flex items-start justify-between gap-3'>
+            <div className='min-w-0'>
+              <h2 className='text-sm font-semibold'>{item.label}</h2>
+              <p className='mt-1 text-xs leading-5 text-white/50'>
+                {item.description}
+              </p>
+            </div>
+            <span className='shrink-0 rounded-md bg-white/[0.06] px-2 py-1 text-[11px] text-white/55'>
+              {DESIGN_STUDIO_CATEGORY_LABELS[item.category]}
+            </span>
+          </div>
+        </div>
+
+        <div className='flex flex-wrap gap-2'>
+          <StudioLinkButton href={item.demoRoute} label='Open Preview' />
+          {item.screenshotScenarioIds.map(id => (
+            <StudioLinkButton
+              key={id}
+              href={getDesignStudioScreenshotUrl(id)}
+              label='Screenshot'
+              download={`${id}.png`}
+            />
+          ))}
+          {item.screenshotScenarioIds.map(id => {
+            const publicUrl = getDesignStudioPublicScreenshotUrl(id);
+            if (!publicUrl) return null;
+            return (
+              <StudioLinkButton
+                key={`${id}-public`}
+                href={publicUrl}
+                label='Public Export'
+                download
+              />
+            );
+          })}
+          <CopyButton value={item.marketingPrompt} label='Copy Prompt' />
+          <CopyButton value={item.demoRoute} label='Copy Route' />
+        </div>
+
+        <div className='flex flex-wrap gap-1.5'>
+          {item.componentPaths.slice(0, 4).map(path => (
+            <code
+              key={path}
+              className='rounded bg-black/35 px-2 py-1 text-[10px] text-white/45'
+            >
+              {path}
+            </code>
+          ))}
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function ScreenshotScenarioCard({
+  scenario,
+}: Readonly<{ scenario: ScreenshotScenario }>) {
+  const catalogUrl = getDesignStudioScreenshotUrl(scenario.id);
+  const publicUrl = getDesignStudioPublicScreenshotUrl(scenario.id);
+  return (
+    <article className='rounded-lg border border-white/10 bg-white/[0.035] p-3'>
+      <div className='flex items-start justify-between gap-3'>
+        <div className='min-w-0'>
+          <h2 className='truncate text-sm font-semibold'>{scenario.title}</h2>
+          <p className='mt-1 truncate text-xs text-white/45'>
+            {scenario.route}
+          </p>
+        </div>
+        <span className='rounded-md bg-white/[0.06] px-2 py-1 text-[11px] text-white/55'>
+          {scenario.viewport}
+        </span>
+      </div>
+      <div className='mt-3 flex flex-wrap gap-2'>
+        <StudioLinkButton href={scenario.route} label='Open Route' />
+        <StudioLinkButton
+          href={catalogUrl}
+          label='Download'
+          download={`${scenario.id}.png`}
+        />
+        {publicUrl ? (
+          <StudioLinkButton href={publicUrl} label='Public Export' download />
+        ) : null}
+        <CopyButton value={scenario.route} label='Copy Route' />
+      </div>
+    </article>
+  );
+}
+
+function StudioLinkButton({
+  href,
+  label,
+  download,
+}: Readonly<{
+  href: string;
+  label: string;
+  download?: boolean | string;
+}>) {
+  return (
+    <a
+      href={href}
+      download={download}
+      target={download ? undefined : '_blank'}
+      rel={download ? undefined : 'noreferrer'}
+      className='inline-flex h-8 items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.04] px-2.5 text-xs font-medium text-white/70 transition-colors hover:bg-white/[0.08] hover:text-white'
+    >
+      <ExternalLink className='h-3.5 w-3.5' />
+      {label}
+    </a>
+  );
+}
+
+function CopyButton({
+  value,
+  label,
+}: Readonly<{ value: string; label: string }>) {
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>(
+    'idle'
+  );
+  return (
+    <button
+      type='button'
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(value);
+          setCopyState('copied');
+        } catch {
+          setCopyState('failed');
+        }
+        window.setTimeout(() => setCopyState('idle'), 1200);
+      }}
+      className='inline-flex h-8 items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.04] px-2.5 text-xs font-medium text-white/70 transition-colors hover:bg-white/[0.08] hover:text-white'
+    >
+      {copyState === 'copied' ? (
+        <Check className='h-3.5 w-3.5' />
+      ) : (
+        <Copy className='h-3.5 w-3.5' />
+      )}
+      {copyState === 'copied'
+        ? 'Copied'
+        : copyState === 'failed'
+          ? 'Copy Failed'
+          : label}
+    </button>
   );
 }
 

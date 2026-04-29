@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import {
   APP_FLAG_KEYS,
   APP_FLAG_TO_STATSIG_GATE,
+  DESIGN_V1_ALIAS_FLAGS,
   LEGACY_STATSIG_GATE_KEYS,
 } from '@/lib/flags/contracts';
 
@@ -88,6 +89,8 @@ describe('feature flag registry integrity', () => {
 
   it('does not include API chat-specific feature flags in the registry', () => {
     const allowedShellRolloutEntries = new Set<string>([
+      'DESIGN_V1',
+      LEGACY_STATSIG_GATE_KEYS.DESIGN_V1,
       'SHELL_CHAT_V1',
       LEGACY_STATSIG_GATE_KEYS.SHELL_CHAT_V1,
       'DESIGN_V1_CHAT_ENTITIES',
@@ -103,13 +106,18 @@ describe('feature flag registry integrity', () => {
     expect([...chatFlagsInKeys, ...chatFlagsInValues]).toEqual([]);
   });
 
-  it('keeps SHELL_CHAT_V1 Statsig-backed', () => {
-    expect(APP_FLAG_KEYS.SHELL_CHAT_V1).toBe(
-      LEGACY_STATSIG_GATE_KEYS.SHELL_CHAT_V1
+  it('keeps new design surfaces backed by DESIGN_V1', () => {
+    expect(APP_FLAG_KEYS.DESIGN_V1).toBe(LEGACY_STATSIG_GATE_KEYS.DESIGN_V1);
+    expect(APP_FLAG_TO_STATSIG_GATE.DESIGN_V1).toBe(
+      LEGACY_STATSIG_GATE_KEYS.DESIGN_V1
     );
-    expect(APP_FLAG_TO_STATSIG_GATE.SHELL_CHAT_V1).toBe(
-      LEGACY_STATSIG_GATE_KEYS.SHELL_CHAT_V1
-    );
+
+    for (const aliasFlag of DESIGN_V1_ALIAS_FLAGS) {
+      expect(APP_FLAG_KEYS[aliasFlag]).toBe(LEGACY_STATSIG_GATE_KEYS.DESIGN_V1);
+      expect(APP_FLAG_TO_STATSIG_GATE[aliasFlag]).toBe(
+        LEGACY_STATSIG_GATE_KEYS.DESIGN_V1
+      );
+    }
   });
 
   it('limits legacy feature-flags imports to static marketing and compatibility files', () => {

@@ -8,7 +8,7 @@ import { useAppFlag } from '@/lib/flags/client';
 /**
  * SidebarBottomNowPlayingBridge — flag-gated mount of the shell
  * `SidebarBottomNowPlaying` atom inside `UnifiedSidebar`. Renders only when
- * `SHELL_CHAT_V1` is on AND there's an active track.
+ * DESIGN_V1 is on AND there's an active track.
  *
  * Adapter: production `useTrackAudioPlayer().playbackState` →
  * `NowPlayingTrack` (trackTitle / artistName / artworkUrl). Tap-to-play
@@ -16,7 +16,7 @@ import { useAppFlag } from '@/lib/flags/client';
  * sidebar mini-player and the persistent bar stay in sync.
  */
 export function SidebarBottomNowPlayingBridge() {
-  const shellChatV1Enabled = useAppFlag('SHELL_CHAT_V1');
+  const shellChatV1Enabled = useAppFlag('DESIGN_V1');
   const { playbackState, toggleTrack } = useTrackAudioPlayer();
 
   const handlePlay = useCallback(() => {

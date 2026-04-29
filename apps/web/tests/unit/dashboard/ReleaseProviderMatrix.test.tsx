@@ -58,7 +58,7 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/app/dashboard/releases',
 }));
 
-vi.mock('@/components/organisms/AuthShellWrapper', () => ({
+vi.mock('@/contexts/TableMetaContext', () => ({
   useTableMeta: () => ({
     tableMeta: { rowCount: null, toggle: null, rightPanelWidth: null },
     setTableMeta: vi.fn(),

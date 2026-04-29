@@ -1,6 +1,14 @@
 'use client';
 
-import { lazy, Suspense, useCallback, useMemo, useState } from 'react';
+import { Search } from 'lucide-react';
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { DrawerLoadingSkeleton } from '@/components/molecules/drawer';
 import type { ReleaseSidebarProps } from '@/components/organisms/release-sidebar';
 import { convertContextMenuItems } from '@/components/organisms/table';
@@ -9,6 +17,7 @@ import type {
   FilterField,
   FilterPill,
 } from '@/components/shell/pill-search.types';
+import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { buildReleaseActions } from '@/features/dashboard/organisms/releases/release-actions';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
@@ -107,7 +116,7 @@ function distinctValues(
 }
 
 /**
- * Top-level Linear-style releases view, rendered behind DESIGN_V1_RELEASES.
+ * Top-level Linear-style releases view, rendered behind DESIGN_V1.
  *
  * Replaces the legacy `ReleasesExperience` provider matrix with a shell-row
  * list, PillSearch header, row actions, and the production release drawer.
@@ -128,7 +137,8 @@ export function ShellReleasesView({
   readonly artistName?: string | null;
   readonly allowArtworkDownloads?: boolean;
 }) {
-  const [searchOpen, setSearchOpen] = useState(true);
+  const { setHeaderActions } = useSetHeaderActions();
+  const [searchOpen, setSearchOpen] = useState(false);
   const [pills, setPills] = useState<FilterPill[]>([]);
   const releaseRows = useMemo(() => [...releases], [releases]);
   const {
@@ -277,24 +287,10 @@ export function ShellReleasesView({
     setPills([]);
   }, []);
 
-  return (
-    <section
-      aria-label='Releases'
-      className='flex h-full flex-col focus:outline-none'
-      data-design-v1-releases='true'
-      data-testid='shell-releases-view'
-    >
-      <header className='shrink-0 px-4 pt-3 pb-2 border-b border-(--linear-app-shell-border)/60'>
-        <div className='flex items-center gap-2'>
-          <h1 className='text-[14px] font-caption tracking-[-0.01em] text-primary-token'>
-            Releases
-          </h1>
-          <span className='text-[11px] tabular-nums text-quaternary-token'>
-            {visibleReleases.length}
-            {releaseCountSuffix}
-          </span>
-        </div>
-        <div className='mt-2'>
+  const headerSearch = useMemo(() => {
+    if (searchOpen) {
+      return (
+        <div className='w-[min(560px,calc(100vw-2rem))] rounded-lg border border-(--linear-app-shell-border) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] px-2 py-1 shadow-[0_10px_32px_rgba(0,0,0,0.16)] sm:w-[440px] lg:w-[520px]'>
           <PillSearch
             active={searchOpen}
             pills={pills}
@@ -302,14 +298,55 @@ export function ShellReleasesView({
             artistOptions={artistOptions}
             titleOptions={titleOptions}
             albumOptions={albumOptions}
+            ariaLabel='Filter releases'
+            placeholder='Filter releases — / for fields'
             onClose={() => {
               setSearchOpen(false);
               setPills([]);
             }}
           />
         </div>
-      </header>
+      );
+    }
 
+    return (
+      <button
+        type='button'
+        data-app-search-trigger='true'
+        onClick={() => setSearchOpen(true)}
+        className='inline-flex h-7 items-center gap-1.5 rounded-md border border-(--linear-app-shell-border) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_94%,transparent)] px-2 text-[12px] text-secondary-token transition-[background-color,border-color,color] duration-150 hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+        aria-label='Search releases'
+      >
+        <Search className='h-3.5 w-3.5' aria-hidden='true' />
+        <span className='hidden sm:inline'>Search Releases</span>
+        <span className='tabular-nums text-tertiary-token'>
+          {visibleReleases.length}
+          {releaseCountSuffix}
+        </span>
+      </button>
+    );
+  }, [
+    albumOptions,
+    artistOptions,
+    pills,
+    releaseCountSuffix,
+    searchOpen,
+    titleOptions,
+    visibleReleases.length,
+  ]);
+
+  useEffect(() => {
+    setHeaderActions(headerSearch);
+    return () => setHeaderActions(null);
+  }, [headerSearch, setHeaderActions]);
+
+  return (
+    <section
+      aria-label='Releases'
+      className='flex h-full flex-col focus:outline-none'
+      data-design-v1-releases='true'
+      data-testid='shell-releases-view'
+    >
       <div className='flex-1 min-h-0 overflow-y-auto'>
         {visibleReleases.length === 0 ? (
           <div className='py-12 grid place-items-center text-center'>

@@ -15,6 +15,7 @@ import { buildLyricsRoute } from '@/constants/routes';
 import { useAppFlag } from '@/lib/flags/client';
 import { cn } from '@/lib/utils';
 import { formatDuration } from '@/lib/utils/formatDuration';
+import { isFormElement } from '@/lib/utils/keyboard';
 
 export type PersistentAudioBarVariant = 'legacy' | 'shellChatV1';
 
@@ -27,12 +28,12 @@ export function PersistentAudioBar({
 }: Readonly<PersistentAudioBarProps>) {
   const router = useRouter();
   const pathname = usePathname();
-  const designV1LyricsEnabled = useAppFlag('DESIGN_V1_LYRICS');
+  const designV1LyricsEnabled = useAppFlag('DESIGN_V1');
   const { playbackState, toggleTrack, seek, stop, onError } =
     useTrackAudioPlayer();
   const [imgError, setImgError] = useState(false);
   const [barCollapsed, setBarCollapsed] = useState(false);
-  const [waveformOn, setWaveformOn] = useState(false);
+  const [waveformOn, setWaveformOn] = useState(true);
 
   useEffect(() => {
     return onError(() => {
@@ -68,6 +69,68 @@ export function PersistentAudioBar({
   }, [playbackState.activeTrackId, router]);
 
   const activeTrackId = playbackState.activeTrackId;
+
+  useEffect(() => {
+    if (variant !== 'shellChatV1' || !activeTrackId) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.defaultPrevented || isFormElement(event.target)) return;
+
+      const hasModifier = event.metaKey || event.ctrlKey || event.altKey;
+      const plainKey = !hasModifier && !event.shiftKey;
+      const key = event.key.toLowerCase();
+
+      if (event.key === ' ' && plainKey) {
+        event.preventDefault();
+        handleToggle();
+        return;
+      }
+
+      if (key === 'w' && plainKey) {
+        event.preventDefault();
+        setWaveformOn(value => !value);
+        return;
+      }
+
+      if (
+        key === 'l' &&
+        plainKey &&
+        designV1LyricsEnabled &&
+        playbackState.hasLyrics
+      ) {
+        event.preventDefault();
+        handleOpenLyrics();
+        return;
+      }
+
+      if (event.key === '`' && plainKey) {
+        event.preventDefault();
+        setBarCollapsed(value => !value);
+        return;
+      }
+
+      if (
+        event.key === '\\' &&
+        (event.metaKey || event.ctrlKey) &&
+        !event.altKey &&
+        !event.shiftKey
+      ) {
+        event.preventDefault();
+        setBarCollapsed(value => !value);
+      }
+    }
+
+    globalThis.addEventListener('keydown', handleKeyDown);
+    return () => globalThis.removeEventListener('keydown', handleKeyDown);
+  }, [
+    activeTrackId,
+    designV1LyricsEnabled,
+    handleOpenLyrics,
+    handleToggle,
+    playbackState.hasLyrics,
+    variant,
+  ]);
+
   if (!activeTrackId) return null;
 
   const isLoading = playbackState.playbackStatus === 'loading';

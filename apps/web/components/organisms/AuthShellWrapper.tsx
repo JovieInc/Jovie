@@ -1,11 +1,10 @@
 'use client';
 
 import { TooltipProvider } from '@jovie/ui';
+import { Search } from 'lucide-react';
 import type { ReactNode } from 'react';
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -23,12 +22,20 @@ import {
   useKeyboardShortcuts,
 } from '@/contexts/KeyboardShortcutsContext';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
+import {
+  type TableMeta,
+  TableMetaContext,
+  TableMetaProvider,
+  useTableMeta,
+} from '@/contexts/TableMetaContext';
 import { HeaderChatUsageIndicator } from '@/features/dashboard/atoms/HeaderChatUsageIndicator';
 import { HeaderProfileProgress } from '@/features/dashboard/atoms/HeaderProfileProgress';
 import { useAuthRouteConfig } from '@/hooks/useAuthRouteConfig';
 import { useDashboardShortcuts } from '@/hooks/useDashboardShortcuts';
+import { useAppFlag } from '@/lib/flags/client';
 import { AuthShell } from './AuthShell';
 import { CommandPalette } from './CommandPalette';
+import { OPEN_COMMAND_PALETTE_EVENT } from './command-palette-events';
 import { KeyboardShortcutsSheet } from './keyboard-shortcuts-sheet';
 import {
   PendingShellContext,
@@ -36,52 +43,7 @@ import {
   usePendingShell,
 } from './PendingShellContext';
 
-export { usePendingShell };
-
-// TableMetaContext for audience/creators tables
-type TableMeta = {
-  rowCount: number | null;
-  toggle?: (() => void) | null;
-  rightPanelWidth?: number | null;
-};
-
-type TableMetaContextValue = {
-  tableMeta: TableMeta;
-  setTableMeta: (meta: TableMeta) => void;
-};
-
-const TableMetaContext = createContext<TableMetaContextValue | null>(null);
-
-export function useTableMeta(): TableMetaContextValue {
-  const ctx = useContext(TableMetaContext);
-  if (!ctx) {
-    throw new TypeError('useTableMeta must be used within AuthShellWrapper');
-  }
-  return ctx;
-}
-
-/**
- * TableMetaProvider - Provides TableMetaContext for use in Storybook and tests.
- * Use this when you need to render components that call useTableMeta()
- * without the full AuthShellWrapper (e.g., in Storybook stories).
- */
-export function TableMetaProvider({
-  children,
-}: Readonly<{ children: ReactNode }>) {
-  const [tableMeta, setTableMeta] = useState<TableMeta>({
-    rowCount: null,
-    toggle: null,
-  });
-  const value = useMemo(
-    () => ({ tableMeta, setTableMeta }),
-    [tableMeta, setTableMeta]
-  );
-  return (
-    <TableMetaContext.Provider value={value}>
-      {children}
-    </TableMetaContext.Provider>
-  );
-}
+export { TableMetaProvider, usePendingShell, useTableMeta };
 
 export interface AuthShellWrapperProps {
   readonly persistSidebarCollapsed?: (collapsed: boolean) => Promise<void>;
@@ -97,6 +59,26 @@ function KeyboardShortcutsHandler() {
   const { open } = useKeyboardShortcuts();
   useDashboardShortcuts({ onOpenShortcutsModal: open });
   return <KeyboardShortcutsSheet />;
+}
+
+function HeaderCommandSearchButton() {
+  const openCommandPalette = useCallback(() => {
+    globalThis.dispatchEvent(new Event(OPEN_COMMAND_PALETTE_EVENT));
+  }, []);
+
+  return (
+    <button
+      type='button'
+      data-app-search-trigger='true'
+      onClick={openCommandPalette}
+      className='inline-flex h-7 items-center gap-1.5 rounded-md border border-(--linear-app-shell-border) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_94%,transparent)] px-2 text-[12px] text-secondary-token transition-[background-color,border-color,color] duration-150 hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+      aria-label='Search Jovie'
+    >
+      <Search className='h-3.5 w-3.5' aria-hidden='true' />
+      <span className='hidden sm:inline'>Search</span>
+      <span className='hidden text-tertiary-token lg:inline'>/</span>
+    </button>
+  );
 }
 
 /**
@@ -115,6 +97,7 @@ function AuthShellWrapperInner({
 }>) {
   const config = useAuthRouteConfig();
   const headerActionsContext = useOptionalHeaderActions();
+  const designV1Enabled = useAppFlag('DESIGN_V1');
   const [, startTransition] = useTransition();
   const [pendingShellRoute, setPendingShellRoute] =
     useState<PendingShellRoute>(null);
@@ -140,13 +123,14 @@ function AuthShellWrapperInner({
   const defaultHeaderAction = useMemo(
     () => (
       <>
+        {designV1Enabled ? <HeaderCommandSearchButton /> : null}
         {config.showChatUsageIndicator && !config.isDemoRoute ? (
           <HeaderChatUsageIndicator />
         ) : null}
         <HeaderProfileProgress />
       </>
     ),
-    [config.isDemoRoute, config.showChatUsageIndicator]
+    [config.isDemoRoute, config.showChatUsageIndicator, designV1Enabled]
   );
   // Wrap page-injected header elements in ErrorBoundary so a throwing badge/action
   // degrades gracefully (renders nothing + toast) instead of crashing the shell.

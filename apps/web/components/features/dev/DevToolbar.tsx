@@ -17,6 +17,7 @@ import {
   Loader2,
   Monitor,
   Moon,
+  PanelsTopLeft,
   RefreshCw,
   Route,
   Search,
@@ -35,6 +36,7 @@ import { useAppFlag, useStoredAppFlagOverrides } from '@/lib/flags/client';
 import {
   APP_FLAG_DEFAULTS,
   APP_FLAG_OVERRIDE_KEYS,
+  DESIGN_V1_ALIAS_FLAGS,
 } from '@/lib/flags/contracts';
 import { queryKeys } from '@/lib/queries/keys';
 import { useBillingStatusQuery } from '@/lib/queries/useBillingStatusQuery';
@@ -64,12 +66,16 @@ type FlagEntry = {
 
 const ALL_FLAGS: FlagEntry[] = (
   Object.entries(APP_FLAG_OVERRIDE_KEYS) as [string, string][]
-).map(([name, key]) => ({
-  name,
-  key,
-  source: 'code' as const,
-  serverDefault: APP_FLAG_DEFAULTS[name as keyof typeof APP_FLAG_DEFAULTS],
-}));
+)
+  .filter(
+    ([name]) => !(DESIGN_V1_ALIAS_FLAGS as readonly string[]).includes(name)
+  )
+  .map(([name, key]) => ({
+    name,
+    key,
+    source: 'code' as const,
+    serverDefault: APP_FLAG_DEFAULTS[name as keyof typeof APP_FLAG_DEFAULTS],
+  }));
 
 /**
  * Lookup table: override-storage-key -> server default. Used to detect
@@ -248,7 +254,7 @@ export function DevToolbar({
   } | null>(null);
   const { theme, setTheme } = useTheme();
   const overridesCtx = useStoredAppFlagOverrides();
-  const shellChatV1Enabled = useAppFlag('SHELL_CHAT_V1');
+  const designV1Enabled = useAppFlag('DESIGN_V1');
   const flagBadgeCtx = useFlagBadges();
   const toolbarRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -417,12 +423,12 @@ export function DevToolbar({
       ).length,
     [validOverrides]
   );
-  const shellChatV1OverrideKey = APP_FLAG_OVERRIDE_KEYS.SHELL_CHAT_V1;
-  const shellChatV1Overridden =
-    shellChatV1OverrideKey in overrides &&
+  const designV1OverrideKey = APP_FLAG_OVERRIDE_KEYS.DESIGN_V1;
+  const designV1Overridden =
+    designV1OverrideKey in overrides &&
     isMeaningfulOverride(
-      shellChatV1OverrideKey,
-      overrides[shellChatV1OverrideKey] as boolean
+      designV1OverrideKey,
+      overrides[designV1OverrideKey] as boolean
     );
 
   /**
@@ -447,14 +453,12 @@ export function DevToolbar({
     [flashFlag, overridesCtx]
   );
 
-  const toggleShellChatV1 = useCallback(() => {
-    const currentOverride = overrides[shellChatV1OverrideKey];
+  const toggleDesignV1 = useCallback(() => {
+    const currentOverride = overrides[designV1OverrideKey];
     const current =
-      typeof currentOverride === 'boolean'
-        ? currentOverride
-        : APP_FLAG_DEFAULTS.SHELL_CHAT_V1;
-    setOrClearOverride(shellChatV1OverrideKey, !current);
-  }, [overrides, setOrClearOverride, shellChatV1OverrideKey]);
+      typeof currentOverride === 'boolean' ? currentOverride : designV1Enabled;
+    setOrClearOverride(designV1OverrideKey, !current);
+  }, [designV1Enabled, designV1OverrideKey, overrides, setOrClearOverride]);
 
   // Unified flag list: filter by search, sort overrides to top
   const filteredFlags = useMemo(() => {
@@ -745,17 +749,17 @@ export function DevToolbar({
 
         <button
           type='button'
-          aria-pressed={shellChatV1Enabled}
-          title='Toggle Shell + Chat design (SHELL_CHAT_V1)'
-          onClick={toggleShellChatV1}
+          aria-pressed={designV1Enabled}
+          title='Toggle New Design (DESIGN_V1)'
+          onClick={toggleDesignV1}
           className={`inline-flex shrink-0 items-center gap-1 px-1.5 py-1 rounded text-[10px] transition-colors ${
-            shellChatV1Enabled
+            designV1Enabled
               ? 'text-[var(--color-accent)] bg-[var(--color-accent)]/10 hover:bg-[var(--color-accent)]/15'
               : 'text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)]'
           }`}
         >
           <span>New Design</span>
-          {shellChatV1Overridden && (
+          {designV1Overridden && (
             <span className='text-[9px] opacity-70'>(override)</span>
           )}
         </button>
@@ -830,6 +834,20 @@ export function DevToolbar({
             <CopyFieldIcon copied={copiedField === 'route'} icon={Route} />
             <span className='max-sm:hidden sm:inline text-[10px]'>Route</span>
           </button>
+
+          {designV1Enabled && (
+            <Link
+              href={APP_ROUTES.DESIGN_STUDIO}
+              title='Open Design Studio'
+              className='flex items-center gap-1 px-1.5 py-1 rounded text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)] transition-colors'
+              aria-label='Design Studio'
+            >
+              <PanelsTopLeft size={11} />
+              <span className='max-sm:hidden sm:inline text-[10px]'>
+                Design Studio
+              </span>
+            </Link>
+          )}
 
           <Link
             href={APP_ROUTES.ADMIN}

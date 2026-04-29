@@ -421,7 +421,7 @@ function getLatestTableProps() {
 }
 
 function enableDesignV1Tasks() {
-  mockUseAppFlag.mockImplementation(flagName => flagName === 'DESIGN_V1_TASKS');
+  mockUseAppFlag.mockImplementation(flagName => flagName === 'DESIGN_V1');
 }
 
 describe('TasksPageClient', () => {
@@ -478,7 +478,7 @@ describe('TasksPageClient', () => {
     expect(tableProps?.data?.map(task => task.id)).toEqual(['task-jovie']);
   });
 
-  it('keeps DESIGN_V1_TASKS desktop unselected until the user opens a task', () => {
+  it('keeps DESIGN_V1 desktop unselected until the user opens a task', () => {
     enableDesignV1Tasks();
 
     renderPage();
@@ -496,7 +496,7 @@ describe('TasksPageClient', () => {
     expect(screen.getByLabelText('Task title')).toHaveValue(mockTaskTwo.title);
   });
 
-  it('resets the DESIGN_V1_TASKS detail selection when subview filters exclude the selected task', () => {
+  it('resets the DESIGN_V1 detail selection when subview filters exclude the selected task', () => {
     enableDesignV1Tasks();
     mockTasksData = [mockTaskTwo, mockJovieTask];
 
@@ -518,7 +518,7 @@ describe('TasksPageClient', () => {
     ]);
   });
 
-  it('keeps all assignee subviews wired under DESIGN_V1_TASKS', () => {
+  it('keeps all assignee subviews wired under DESIGN_V1', () => {
     enableDesignV1Tasks();
     mockTasksData = [mockTask, mockTaskTwo, mockJovieTask];
 
@@ -939,7 +939,7 @@ describe('TasksPageClient', () => {
     expect(screen.getByLabelText('Task title')).toHaveValue(mockTaskTwo.title);
   });
 
-  it('lets keyboard navigation intentionally open the first DESIGN_V1_TASKS task from empty detail', () => {
+  it('lets keyboard navigation intentionally open the first DESIGN_V1 task from empty detail', () => {
     enableDesignV1Tasks();
 
     renderPage();
@@ -1005,7 +1005,7 @@ describe('TasksPageClient', () => {
     expect(screen.getByText(mockTask.title)).toBeInTheDocument();
   });
 
-  it('keeps mobile assignee subviews and detail layout disjoint under DESIGN_V1_TASKS', () => {
+  it('keeps mobile assignee subviews and detail layout disjoint under DESIGN_V1', () => {
     enableDesignV1Tasks();
     mockIsXlUp = false;
     mockTasksData = [mockTask, mockTaskTwo, mockJovieTask];

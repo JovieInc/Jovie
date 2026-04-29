@@ -31,7 +31,7 @@ export function DashboardMobileTabs({
 }: DashboardMobileTabsProps): React.JSX.Element {
   const { isAdmin } = useDashboardData();
   const { signOut } = useAuthSafe();
-  const designV1LibraryEnabled = useAppFlag('DESIGN_V1_LIBRARY');
+  const designV1LibraryEnabled = useAppFlag('DESIGN_V1');
   const expandedItems = useMemo(
     () =>
       (designV1LibraryEnabled

@@ -26,12 +26,12 @@ import {
   DrawerLoadingSkeleton,
   DrawerSurfaceCard,
 } from '@/components/molecules/drawer';
-import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { DialogLoadingSkeleton } from '@/components/organisms/DialogLoadingSkeleton';
 import { PageShell } from '@/components/organisms/PageShell';
 import type { TrackSidebarData } from '@/components/organisms/release-sidebar';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
+import { useTableMeta } from '@/contexts/TableMetaContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { openChatWithPrompt } from '@/lib/chat/open-chat-with-prompt';
 import type { ReleaseViewModel } from '@/lib/discography/types';
@@ -159,7 +159,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   const [isGeneratingReleasePlan, setIsGeneratingReleasePlan] = useState(false);
   const router = useRouter();
   const albumArtFlagEnabled = useCodeFlag('ALBUM_ART_GENERATION');
-  const designV1ReleasesEnabled = useAppFlag('DESIGN_V1_RELEASES');
+  const designV1ReleasesEnabled = useAppFlag('DESIGN_V1');
 
   const {
     rows,
