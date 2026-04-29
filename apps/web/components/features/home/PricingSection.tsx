@@ -57,9 +57,9 @@ export function PricingSection() {
               </h2>
             </div>
             <p className='homepage-section-copy marketing-lead-linear text-secondary-token'>
-              Start free with smart links and your artist profile. Upgrade when
-              you want release notifications, deeper audience intelligence, and
-              stronger fan ownership.
+              Request access for smart links and your artist profile. Upgrade
+              when you want release notifications, deeper audience intelligence,
+              and stronger fan ownership.
             </p>
           </div>
 

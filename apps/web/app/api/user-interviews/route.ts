@@ -3,11 +3,11 @@
  *
  * Persists a Mom Test interview transcript captured after onboarding.
  * Idempotent on `(userId, source)` via a unique index — duplicate submits
- * return `{ deduped: true }`. Summarization runs asynchronously via the
+ * update the latest transcript. Summarization runs asynchronously via the
  * /api/cron/summarize-interviews cron handler.
  */
 
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getOptionalAuth } from '@/lib/auth/cached';
@@ -38,6 +38,9 @@ const requestSchema = z.object({
       plan: z.string().max(64).optional().nullable(),
       locale: z.string().max(32).optional().nullable(),
       userAgent: z.string().max(512).optional().nullable(),
+      waitlistEntryId: z.string().uuid().optional().nullable(),
+      accessOutcome: z.string().max(64).optional().nullable(),
+      submittedFrom: z.string().max(64).optional().nullable(),
     })
     .default({}),
 });
@@ -79,13 +82,29 @@ export async function POST(request: Request) {
         metadata,
         status: 'pending',
       })
-      .onConflictDoNothing({
+      .onConflictDoUpdate({
         target: [userInterviews.userId, userInterviews.source],
+        set: {
+          transcript: transcript as InterviewTranscriptEntry[],
+          metadata,
+          status: 'pending',
+          updatedAt: new Date(),
+        },
       })
       .returning({ id: userInterviews.id });
 
     if (inserted.length === 0) {
-      return NextResponse.json({ ok: true, deduped: true });
+      const [existing] = await db
+        .select({ id: userInterviews.id })
+        .from(userInterviews)
+        .where(
+          and(
+            eq(userInterviews.userId, user.id),
+            eq(userInterviews.source, source)
+          )
+        )
+        .limit(1);
+      return NextResponse.json({ ok: true, id: existing?.id, updated: true });
     }
 
     return NextResponse.json({ ok: true, id: inserted[0].id });

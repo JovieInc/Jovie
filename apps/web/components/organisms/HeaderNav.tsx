@@ -66,7 +66,7 @@ function PublicAuthActions({
           className: 'focus-ring-themed shrink-0 whitespace-nowrap',
         })}
       >
-        Start Free Trial
+        Request Access
       </Link>
     </div>
   );

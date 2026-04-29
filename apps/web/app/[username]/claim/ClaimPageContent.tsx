@@ -58,7 +58,7 @@ export function ClaimPageContent({
           </Link>
 
           <p className='mt-4 text-xs text-tertiary-token'>
-            Free forever. No credit card required.
+            Private launch access. No credit card required.
           </p>
         </div>
       </div>

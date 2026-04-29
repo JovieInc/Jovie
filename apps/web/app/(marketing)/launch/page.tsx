@@ -218,7 +218,7 @@ export default function LaunchPage() {
           </p>
 
           <p className='mt-6 text-sm text-tertiary-token'>
-            Free forever. No credit card.
+            Private launch access. No credit card.
           </p>
 
           <div className='mt-4 w-full max-w-[520px]'>
