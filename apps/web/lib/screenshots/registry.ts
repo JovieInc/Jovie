@@ -99,26 +99,40 @@ function defineScenarios(
 const TIM_WHITE_PROFILE_MOBILE_WAIT_FOR =
   '[data-testid="demo-showcase-tim-white-profile"]';
 
+interface TimWhiteProfileMobileVariant {
+  readonly slug: string;
+  readonly title: string;
+  readonly queryKey: 'mode' | 'release';
+}
+
 /**
  * Build a tim-white-profile mobile scenario seed. The mode/release variants
- * all share the same waitFor selector + mobile viewport — only the id, title,
- * URL query, and exported phone screenshot path differ.
+ * all share the same waitFor selector + mobile viewport — only the slug
+ * (driving id, title, URL query, and exported phone screenshot path) differs.
  */
-function timWhiteProfileMobile(input: {
-  readonly id: string;
-  readonly title: string;
-  readonly query: string;
-  readonly publicExportPath: string;
-}): ScreenshotScenarioSeed {
+function timWhiteProfileMobile(
+  variant: TimWhiteProfileMobileVariant
+): ScreenshotScenarioSeed {
+  const { slug, title, queryKey } = variant;
   return {
-    id: input.id,
-    title: input.title,
-    route: `/demo/showcase/tim-white-profile?${input.query}`,
+    id: `tim-white-profile-${slug}-mobile`,
+    title: `Tim White Profile — ${title}`,
+    route: `/demo/showcase/tim-white-profile?${queryKey}=${slug}`,
     waitFor: TIM_WHITE_PROFILE_MOBILE_WAIT_FOR,
     viewport: 'mobile',
-    publicExportPath: input.publicExportPath,
+    publicExportPath: `tim-white-profile-${slug}-phone.png`,
   };
 }
+
+const TIM_WHITE_PROFILE_MOBILE_VARIANTS: readonly TimWhiteProfileMobileVariant[] =
+  [
+    { slug: 'listen', title: 'Listen', queryKey: 'mode' },
+    { slug: 'tour', title: 'Tour', queryKey: 'mode' },
+    { slug: 'pay', title: 'Pay', queryKey: 'mode' },
+    { slug: 'live', title: 'Latest Release', queryKey: 'release' },
+    { slug: 'subscribe', title: 'Subscribe', queryKey: 'mode' },
+    { slug: 'contact', title: 'Contact', queryKey: 'mode' },
+  ];
 
 export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
   ...defineScenarios('marketing', ADMIN_AND_INVESTOR, [
@@ -256,42 +270,7 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
     },
   ]),
   ...defineScenarios('marketing', ADMIN_MARKETING_AND_INVESTOR, [
-    timWhiteProfileMobile({
-      id: 'tim-white-profile-listen-mobile',
-      title: 'Tim White Profile — Listen',
-      query: 'mode=listen',
-      publicExportPath: 'tim-white-profile-listen-phone.png',
-    }),
-    timWhiteProfileMobile({
-      id: 'tim-white-profile-tour-mobile',
-      title: 'Tim White Profile — Tour',
-      query: 'mode=tour',
-      publicExportPath: 'tim-white-profile-tour-phone.png',
-    }),
-    timWhiteProfileMobile({
-      id: 'tim-white-profile-pay-mobile',
-      title: 'Tim White Profile — Pay',
-      query: 'mode=pay',
-      publicExportPath: 'tim-white-profile-pay-phone.png',
-    }),
-    timWhiteProfileMobile({
-      id: 'tim-white-profile-live-mobile',
-      title: 'Tim White Profile — Latest Release',
-      query: 'release=live',
-      publicExportPath: 'tim-white-profile-live-phone.png',
-    }),
-    timWhiteProfileMobile({
-      id: 'tim-white-profile-subscribe-mobile',
-      title: 'Tim White Profile — Subscribe',
-      query: 'mode=subscribe',
-      publicExportPath: 'tim-white-profile-subscribe-phone.png',
-    }),
-    timWhiteProfileMobile({
-      id: 'tim-white-profile-contact-mobile',
-      title: 'Tim White Profile — Contact',
-      query: 'mode=contact',
-      publicExportPath: 'tim-white-profile-contact-phone.png',
-    }),
+    ...TIM_WHITE_PROFILE_MOBILE_VARIANTS.map(timWhiteProfileMobile),
     {
       id: 'release-presave-mobile',
       title: 'Release Presave Mobile',
