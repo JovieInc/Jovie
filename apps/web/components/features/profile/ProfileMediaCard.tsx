@@ -426,7 +426,7 @@ export function ProfileMediaCard({
         <div
           className={cn(
             'absolute inset-0 z-10 flex flex-col',
-            landscape ? 'justify-end' : 'justify-end',
+            'justify-end',
             CONTENT_CLASS_NAMES[ratio]
           )}
         >
