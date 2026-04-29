@@ -72,17 +72,6 @@ export async function POST(request: Request) {
       );
     }
 
-    if (result.outcome === 'no_profile') {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            'No profile found for this waitlist entry. The user must submit the waitlist form first.',
-        },
-        { status: 422, headers: NO_STORE_HEADERS }
-      );
-    }
-
     if (result.outcome === 'no_user') {
       return NextResponse.json(
         {
@@ -100,7 +89,7 @@ export async function POST(request: Request) {
     const { message, target } = buildWaitlistInviteEmail({
       email: result.email,
       fullName: result.fullName,
-      dedupKey: `waitlist_welcome:${result.profileId}`,
+      dedupKey: `waitlist_welcome:${result.profileId ?? result.entryId}`,
     });
 
     // Fire-and-forget: don't block the response on email delivery
@@ -109,7 +98,8 @@ export async function POST(request: Request) {
         'Failed to send waitlist welcome email',
         error instanceof Error ? error : new Error(String(error)),
         {
-          profileId: result.profileId,
+          profileId: result.profileId ?? 'pending-onboarding',
+          waitlistEntryId: result.entryId,
           email: result.email,
         }
       );
@@ -120,8 +110,8 @@ export async function POST(request: Request) {
         success: true,
         status: 'claimed',
         profileId: result.profileId,
-        message:
-          'Profile linked to user and activated. User can sign in immediately.',
+        waitlistEntryId: result.entryId,
+        message: 'Access approved. User can continue onboarding immediately.',
       },
       { status: 200, headers: NO_STORE_HEADERS }
     );

@@ -54,11 +54,11 @@ export function HeroLinear({ fullScreen = false }: Readonly<HeroLinearProps>) {
                 href={APP_ROUTES.SIGNUP}
                 className='public-action-primary focus-ring-themed'
               >
-                Get Started Free
+                Request Access
               </Link>
             </div>
             <p className='mt-3 text-[11px] tracking-[0.01em] text-quaternary-token'>
-              Free forever. No credit card required.
+              Private launch access. No credit card required.
             </p>
           </div>
         </div>

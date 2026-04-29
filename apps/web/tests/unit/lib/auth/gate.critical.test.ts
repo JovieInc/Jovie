@@ -117,6 +117,7 @@ vi.mock('@/lib/waitlist/settings', () => ({
 vi.mock('drizzle-orm', () => ({
   eq: vi.fn((_col, val) => ({ eq: val })),
   and: vi.fn((...args: unknown[]) => ({ and: args })),
+  sql: vi.fn((strings, ...values) => ({ sql: strings, values })),
 }));
 
 vi.mock('@sentry/nextjs', () => ({
@@ -363,12 +364,12 @@ describe('@critical gate.ts', () => {
       expect(result.redirectTo).toBe('/onboarding?fresh_signup=true');
     });
 
-    it('creates DB user when createDbUserIfMissing is true (default) and no DB user exists', async () => {
+    it('routes missing DB users to waitlist intake when no access request exists', async () => {
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
       mockCachedCurrentUser.mockResolvedValue(mockClerkUser());
 
       // First call: resolveUserState main query (no user found)
-      // Second call: createUserWithRetry inner select (no existing user)
+      // Second call: waitlist query (no entry found)
       let selectCallCount = 0;
       mockDbSelect.mockImplementation(() => {
         selectCallCount++;
@@ -376,32 +377,34 @@ describe('@critical gate.ts', () => {
           // Main query in resolveUserState - no user
           return createJoinSelectChain([]);
         }
-        // createUserWithRetry inner select - no existing user
-        return createJoinSelectChain([]);
-      });
-
-      // Insert succeeds
-      mockDbInsert.mockReturnValue(createInsertChain([{ id: 'new-user-id' }]));
-
-      mockResolveProfileState.mockReturnValue({
-        state: CanonicalUserState.NEEDS_ONBOARDING,
-        profileId: null,
-        redirectTo: '/onboarding?fresh_signup=true',
+        return createSimpleSelectChain([]);
       });
 
       const result = await resolveUserState();
 
-      expect(result.state).toBe(CanonicalUserState.NEEDS_ONBOARDING);
-      expect(result.dbUserId).toBe('new-user-id');
-      expect(mockDbInsert).toHaveBeenCalled();
+      expect(result.state).toBe(CanonicalUserState.NEEDS_WAITLIST_SUBMISSION);
+      expect(result.dbUserId).toBeNull();
+      expect(result.redirectTo).toBe('/waitlist');
+      expect(mockDbInsert).not.toHaveBeenCalled();
     });
 
     it('returns USER_CREATION_FAILED when user creation fails after retries', async () => {
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
       mockCachedCurrentUser.mockResolvedValue(mockClerkUser());
 
-      // No DB user found
-      mockDbSelect.mockReturnValue(createJoinSelectChain([]));
+      let selectCallCount = 0;
+      mockDbSelect.mockImplementation(() => {
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          return createJoinSelectChain([]);
+        }
+        if (selectCallCount === 2) {
+          return createSimpleSelectChain([
+            { id: 'waitlist-entry-123', status: 'claimed' },
+          ]);
+        }
+        return createJoinSelectChain([]);
+      });
 
       // Insert always fails with a permanent error
       mockDbInsert.mockImplementation(() => {
@@ -430,7 +433,17 @@ describe('@critical gate.ts', () => {
         if (selectCallCount === 1) {
           return createJoinSelectChain([]);
         }
-        return createJoinSelectChain([]);
+        if (selectCallCount === 2) {
+          return createSimpleSelectChain([
+            { id: 'waitlist-entry-123', status: 'claimed' },
+          ]);
+        }
+        if (selectCallCount === 3) {
+          return createJoinSelectChain([]);
+        }
+        return createSimpleSelectChain([
+          { userStatus: 'waitlist_approved', deletedAt: null },
+        ]);
       });
 
       const wrappedUniqueError = new Error(
@@ -516,7 +529,16 @@ describe('@critical gate.ts', () => {
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
       mockCachedCurrentUser.mockResolvedValue(mockClerkUser('new@example.com'));
 
-      const dbResult = mockDbUserResult({ email: 'old@example.com' });
+      const dbResult = mockDbUserResult({
+        email: 'old@example.com',
+        profileId: 'profile-123',
+        profileUsername: 'testuser',
+        profileUsernameNormalized: 'testuser',
+        profileDisplayName: 'Test User',
+        profileIsPublic: true,
+        profileOnboardingCompletedAt: new Date(),
+        profileIsClaimed: true,
+      });
       mockDbSelect.mockReturnValue(createJoinSelectChain([dbResult]));
 
       mockSyncEmailFromClerk.mockRejectedValue(new Error('sync failed'));
@@ -600,8 +622,13 @@ describe('@critical gate.ts', () => {
             { id: 'waitlist-entry-123', status: 'claimed' },
           ]);
         }
-        // createUserWithRetry inner select
-        return createJoinSelectChain([]);
+        if (selectCallCount === 3) {
+          // createUserWithRetry inner select
+          return createJoinSelectChain([]);
+        }
+        return createSimpleSelectChain([
+          { userStatus: 'waitlist_approved', deletedAt: null },
+        ]);
       });
 
       mockDbInsert.mockReturnValue(createInsertChain([{ id: 'new-user-id' }]));
@@ -633,7 +660,7 @@ describe('@critical gate.ts', () => {
       expect(mockCaptureError).toHaveBeenCalled();
     });
 
-    it('passes profile data to resolveProfileState correctly', async () => {
+    it('uses joined profile data when resolving canonical state', async () => {
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
       mockCachedCurrentUser.mockResolvedValue(mockClerkUser());
 
@@ -654,19 +681,13 @@ describe('@critical gate.ts', () => {
         redirectTo: null,
       });
 
-      await resolveUserState();
+      const result = await resolveUserState();
 
-      expect(mockResolveProfileState).toHaveBeenCalledWith(
-        expect.objectContaining({
-          id: 'profile-456',
-          username: 'myuser',
-          displayName: 'My User',
-          isPublic: true,
-        })
-      );
+      expect(result.state).toBe(CanonicalUserState.ACTIVE);
+      expect(result.profileId).toBe('profile-456');
     });
 
-    it('calls resolveProfileState with null when new user has no profile', async () => {
+    it('returns onboarding state when an approved new user has no profile', async () => {
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
       mockCachedCurrentUser.mockResolvedValue(mockClerkUser());
 
@@ -677,7 +698,17 @@ describe('@critical gate.ts', () => {
         if (selectCallCount === 1) {
           return createJoinSelectChain([]); // main: no user
         }
-        return createJoinSelectChain([]); // retry inner: no user
+        if (selectCallCount === 2) {
+          return createSimpleSelectChain([
+            { id: 'waitlist-entry-123', status: 'claimed' },
+          ]);
+        }
+        if (selectCallCount === 3) {
+          return createJoinSelectChain([]); // retry inner: no user
+        }
+        return createSimpleSelectChain([
+          { userStatus: 'waitlist_approved', deletedAt: null },
+        ]);
       });
 
       mockDbInsert.mockReturnValue(createInsertChain([{ id: 'new-user-id' }]));
@@ -688,9 +719,10 @@ describe('@critical gate.ts', () => {
         redirectTo: '/onboarding?fresh_signup=true',
       });
 
-      await resolveUserState();
+      const result = await resolveUserState();
 
-      expect(mockResolveProfileState).toHaveBeenCalledWith(null);
+      expect(result.state).toBe(CanonicalUserState.NEEDS_ONBOARDING);
+      expect(result.profileId).toBeNull();
     });
   });
 
