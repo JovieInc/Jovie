@@ -1,8 +1,8 @@
 'use client';
 
-import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 import { NumberedSection } from '@/components/marketing';
+import { MarketingPhoneImage } from '@/components/marketing/MarketingPhoneImage';
 import { PhoneFrame } from './PhoneFrame';
 
 const SUB_ITEMS = [
@@ -80,9 +80,9 @@ export function PhoneProfileDemo() {
           }}
         >
           <PhoneFrame className='lg:h-[634px] lg:w-[302px] xl:h-[664px] xl:w-[316px]'>
-            <Image
-              src='/product-screenshots/tim-white-profile-listen-phone.png'
-              alt='Artist profile page showing streaming links, tips, and tour dates'
+            <MarketingPhoneImage
+              scenarioId='tim-white-profile-listen-mobile'
+              altOverride='Artist profile page showing streaming links, tips, and tour dates'
               width={780}
               height={1688}
               sizes='(min-width: 1280px) 316px, (min-width: 1024px) 302px, 282px'

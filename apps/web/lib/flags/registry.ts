@@ -41,18 +41,12 @@ function buildBooleanFlag(flagName: AppFlagName): Flag<boolean, FlagEntities> {
 }
 
 export const APP_FLAG_REGISTRY = {
-  PROFILE_V2: buildBooleanFlag('PROFILE_V2'),
-  CLAIM_HANDLE: buildBooleanFlag('CLAIM_HANDLE'),
-  HERO_SPOTIFY_CLAIM_FLOW: buildBooleanFlag('HERO_SPOTIFY_CLAIM_FLOW'),
   BILLING_UPGRADE_DIRECT: buildBooleanFlag('BILLING_UPGRADE_DIRECT'),
-  SUBSCRIBE_TWO_STEP: buildBooleanFlag('SUBSCRIBE_TWO_STEP'),
-  LATEST_RELEASE_CARD: buildBooleanFlag('LATEST_RELEASE_CARD'),
   SMARTLINK_PRE_SAVE: buildBooleanFlag('SMARTLINK_PRE_SAVE'),
   IOS_APPLE_MUSIC_PRIORITY: buildBooleanFlag('IOS_APPLE_MUSIC_PRIORITY'),
   SPOTIFY_OAUTH: buildBooleanFlag('SPOTIFY_OAUTH'),
   STRIPE_CONNECT_ENABLED: buildBooleanFlag('STRIPE_CONNECT_ENABLED'),
   ENABLE_LIGHT_MODE: buildBooleanFlag('ENABLE_LIGHT_MODE'),
-  SHOW_AUDIENCE_CRM_SECTION: buildBooleanFlag('SHOW_AUDIENCE_CRM_SECTION'),
   THREADS_ENABLED: buildBooleanFlag('THREADS_ENABLED'),
   PWA_INSTALL_BANNER: buildBooleanFlag('PWA_INSTALL_BANNER'),
   SHOW_RELEASE_TOOLBAR_EXTRAS: buildBooleanFlag('SHOW_RELEASE_TOOLBAR_EXTRAS'),
@@ -61,6 +55,13 @@ export const APP_FLAG_REGISTRY = {
   CHAT_JANK_MONITOR: buildBooleanFlag('CHAT_JANK_MONITOR'),
   RELEASE_PLAN_DEMO: buildBooleanFlag('RELEASE_PLAN_DEMO'),
   SHELL_CHAT_V1: buildBooleanFlag('SHELL_CHAT_V1'),
+  DESIGN_V1_RELEASES: buildBooleanFlag('DESIGN_V1_RELEASES'),
+  DESIGN_V1_TASKS: buildBooleanFlag('DESIGN_V1_TASKS'),
+  DESIGN_V1_CHAT_ENTITIES: buildBooleanFlag('DESIGN_V1_CHAT_ENTITIES'),
+  DESIGN_V1_LYRICS: buildBooleanFlag('DESIGN_V1_LYRICS'),
+  DESIGN_V1_LIBRARY: buildBooleanFlag('DESIGN_V1_LIBRARY'),
+  DESIGN_V1_AUTH: buildBooleanFlag('DESIGN_V1_AUTH'),
+  DESIGN_V1_ONBOARDING: buildBooleanFlag('DESIGN_V1_ONBOARDING'),
 } as const satisfies Record<AppFlagName, Flag<boolean, FlagEntities>>;
 
 export const SUBSCRIBE_CTA_VARIANT_FLAG = flag<

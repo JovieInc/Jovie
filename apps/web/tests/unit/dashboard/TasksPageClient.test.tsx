@@ -2,6 +2,12 @@ import { TooltipProvider } from '@jovie/ui';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { TaskView } from '@/lib/tasks/types';
+
+const { mockRegisterRightPanel, mockUseAppFlag } = vi.hoisted(() => ({
+  mockRegisterRightPanel: vi.fn(),
+  mockUseAppFlag: vi.fn(),
+}));
 
 vi.mock('@jovie/ui', async () => {
   const actual = await vi.importActual<typeof import('@jovie/ui')>('@jovie/ui');
@@ -207,7 +213,11 @@ vi.mock('@/contexts/HeaderActionsContext', () => ({
 }));
 
 vi.mock('@/hooks/useRegisterRightPanel', () => ({
-  useRegisterRightPanel: vi.fn(),
+  useRegisterRightPanel: mockRegisterRightPanel,
+}));
+
+vi.mock('@/lib/flags/client', () => ({
+  useAppFlag: mockUseAppFlag,
 }));
 
 vi.mock('@/hooks/useBreakpoint', () => ({
@@ -395,6 +405,25 @@ function renderPage() {
   );
 }
 
+function getLatestTableProps() {
+  return mockUnifiedTable.mock.calls.at(-1)?.[0] as
+    | {
+        readonly data?: ReadonlyArray<TaskView>;
+        readonly onRowClick?: (task: TaskView) => void;
+        readonly getContextMenuItems?: (task: TaskView) => ReadonlyArray<{
+          readonly id?: string;
+          readonly label?: string;
+          readonly destructive?: boolean;
+          readonly onClick?: () => void;
+        }>;
+      }
+    | undefined;
+}
+
+function enableDesignV1Tasks() {
+  mockUseAppFlag.mockImplementation(flagName => flagName === 'DESIGN_V1_TASKS');
+}
+
 describe('TasksPageClient', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -402,6 +431,8 @@ describe('TasksPageClient', () => {
     mockDeleteTask.mockReset();
     mockUpdateTask.mockReset();
     mockSetHeaderActions.mockReset();
+    mockRegisterRightPanel.mockReset();
+    mockUseAppFlag.mockReturnValue(false);
     mockUnifiedTable.mockReset();
     mockIsXlUp = true;
     mockIs2xlUp = true;
@@ -445,6 +476,77 @@ describe('TasksPageClient', () => {
       screen.getByRole('tab', { name: 'Assigned To Jovie 1' })
     ).toHaveAttribute('aria-selected', 'true');
     expect(tableProps?.data?.map(task => task.id)).toEqual(['task-jovie']);
+  });
+
+  it('keeps DESIGN_V1_TASKS desktop unselected until the user opens a task', () => {
+    enableDesignV1Tasks();
+
+    renderPage();
+
+    expect(screen.getByTestId('task-document-pane')).toBeInTheDocument();
+    expect(
+      screen.getByText('Pick a task from the list to see what it needs.')
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText('Task title')).not.toBeInTheDocument();
+
+    act(() => {
+      getLatestTableProps()?.onRowClick?.(mockTaskTwo);
+    });
+
+    expect(screen.getByLabelText('Task title')).toHaveValue(mockTaskTwo.title);
+  });
+
+  it('resets the DESIGN_V1_TASKS detail selection when subview filters exclude the selected task', () => {
+    enableDesignV1Tasks();
+    mockTasksData = [mockTaskTwo, mockJovieTask];
+
+    renderPage();
+
+    act(() => {
+      getLatestTableProps()?.onRowClick?.(mockTaskTwo);
+    });
+    expect(screen.getByLabelText('Task title')).toHaveValue(mockTaskTwo.title);
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Assigned To Jovie 1' }));
+
+    expect(screen.queryByLabelText('Task title')).not.toBeInTheDocument();
+    expect(
+      screen.getByText('Pick a task from the list to see what it needs.')
+    ).toBeInTheDocument();
+    expect(getLatestTableProps()?.data?.map(task => task.id)).toEqual([
+      'task-jovie',
+    ]);
+  });
+
+  it('keeps all assignee subviews wired under DESIGN_V1_TASKS', () => {
+    enableDesignV1Tasks();
+    mockTasksData = [mockTask, mockTaskTwo, mockJovieTask];
+
+    renderPage();
+
+    expect(getLatestTableProps()?.data?.map(task => task.id)).toEqual([
+      'task-2',
+      'task-jovie',
+      'task-1',
+    ]);
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Assigned To Me 2' }));
+    expect(getLatestTableProps()?.data?.map(task => task.id)).toEqual([
+      'task-2',
+      'task-1',
+    ]);
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Assigned To Jovie 1' }));
+    expect(getLatestTableProps()?.data?.map(task => task.id)).toEqual([
+      'task-jovie',
+    ]);
+
+    fireEvent.click(screen.getByRole('tab', { name: 'All 3' }));
+    expect(getLatestTableProps()?.data?.map(task => task.id)).toEqual([
+      'task-2',
+      'task-jovie',
+      'task-1',
+    ]);
   });
 
   it('renders the task title editor as a textarea for wrapping document headings', () => {
@@ -504,6 +606,18 @@ describe('TasksPageClient', () => {
 
     expect(screen.getByTestId('task-document-pane')).toHaveClass('hidden');
     expect(screen.getByTestId('tasks-table')).toBeInTheDocument();
+  });
+
+  it('registers the release side panel from the selected task document', () => {
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: 'QA Release' }));
+
+    expect(mockRegisterRightPanel).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        type: expect.any(Function),
+      })
+    );
   });
 
   it('autosaves document edits and removes the manual save button', () => {
@@ -825,6 +939,28 @@ describe('TasksPageClient', () => {
     expect(screen.getByLabelText('Task title')).toHaveValue(mockTaskTwo.title);
   });
 
+  it('lets keyboard navigation intentionally open the first DESIGN_V1_TASKS task from empty detail', () => {
+    enableDesignV1Tasks();
+
+    renderPage();
+
+    expect(screen.queryByLabelText('Task title')).not.toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: 'j' });
+
+    expect(screen.getByLabelText('Task title')).toHaveValue(mockTaskTwo.title);
+  });
+
+  it('keeps task keyboard navigation out of text editors', () => {
+    renderPage();
+
+    expect(screen.getByLabelText('Task title')).toHaveValue(mockTaskTwo.title);
+
+    fireEvent.keyDown(screen.getByLabelText('Task title'), { key: 'j' });
+
+    expect(screen.getByLabelText('Task title')).toHaveValue(mockTaskTwo.title);
+  });
+
   it('does not auto-select a task on narrower layouts', () => {
     mockIsXlUp = false;
 
@@ -847,5 +983,51 @@ describe('TasksPageClient', () => {
     fireEvent.click(screen.getAllByTestId('mobile-task-row')[0]!);
 
     expect(screen.getByLabelText('Task title')).toBeInTheDocument();
+  });
+
+  it('filters mobile task scopes without opening a detail pane', () => {
+    mockIsXlUp = false;
+    mockTasksData = [mockTask, mockTaskTwo, mockJovieTask];
+
+    renderPage();
+
+    expect(screen.getAllByTestId('mobile-task-row')).toHaveLength(3);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open 2' }));
+    expect(screen.getAllByTestId('mobile-task-row')).toHaveLength(2);
+    expect(screen.getByText(mockTaskTwo.title)).toBeInTheDocument();
+    expect(screen.getByText(mockJovieTask.title)).toBeInTheDocument();
+    expect(screen.queryByText(mockTask.title)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Task title')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Closed 1' }));
+    expect(screen.getAllByTestId('mobile-task-row')).toHaveLength(1);
+    expect(screen.getByText(mockTask.title)).toBeInTheDocument();
+  });
+
+  it('keeps mobile assignee subviews and detail layout disjoint under DESIGN_V1_TASKS', () => {
+    enableDesignV1Tasks();
+    mockIsXlUp = false;
+    mockTasksData = [mockTask, mockTaskTwo, mockJovieTask];
+
+    renderPage();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Assigned To Jovie 1' }));
+
+    expect(screen.getAllByTestId('mobile-task-row')).toHaveLength(1);
+    expect(screen.getByText(mockJovieTask.title)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('mobile-task-row'));
+
+    expect(screen.getByLabelText('Task title')).toHaveValue(
+      mockJovieTask.title
+    );
+    expect(screen.getByTestId('task-list-pane')).toHaveClass('hidden');
+    expect(screen.getByTestId('task-document-pane')).toHaveClass('flex');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back to task list' }));
+
+    expect(screen.queryByLabelText('Task title')).not.toBeInTheDocument();
+    expect(screen.getByTestId('mobile-task-list')).toBeInTheDocument();
   });
 });

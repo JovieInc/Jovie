@@ -4,12 +4,12 @@ import Link from 'next/link';
 import type { CSSProperties } from 'react';
 import { DemoPublicProfileSurface } from '@/components/features/demo/DemoPublicProfileSurface';
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
-import { ProductScreenshot } from '@/components/features/home/ProductScreenshot';
 import { MarketingContainer, MarketingPageShell } from '@/components/marketing';
 import { ArtistProfileModeSwitcher } from '@/components/marketing/artist-profile';
 import { ArtistProfilePhoneFrame } from '@/components/marketing/artist-profile/ArtistProfilePhoneFrame';
 import { ArtistProfileSectionHeader } from '@/components/marketing/artist-profile/ArtistProfileSectionHeader';
 import { ArtistProfileSpecWall } from '@/components/marketing/artist-profile/ArtistProfileSpecWall';
+import { MarketingScreenshot } from '@/components/marketing/MarketingScreenshot';
 import {
   ArtistNotificationFloatingCardView,
   ArtistProfileCaptureVisual,
@@ -208,14 +208,11 @@ function HomepageV2Hero() {
                 } as CSSProperties
               }
             >
-              <ProductScreenshot
-                src='/product-screenshots/releases-dashboard-sidebar.png'
-                alt='Release page workspace with launch routing and destination controls'
-                width={2880}
-                height={1800}
+              <MarketingScreenshot
+                scenarioId='dashboard-releases-sidebar-desktop'
+                altOverride='Release page workspace with launch routing and destination controls'
                 title='Release surfaces'
                 chrome='minimal'
-                skipCheck
                 className='rounded-[1.15rem]'
               />
             </div>
@@ -229,14 +226,11 @@ function HomepageV2Hero() {
                 } as CSSProperties
               }
             >
-              <ProductScreenshot
-                src='/product-screenshots/artist-spec-geo-insights-desktop.png'
-                alt='Audience insights showing top cities and engagement signals'
-                width={970}
-                height={518}
+              <MarketingScreenshot
+                scenarioId='artist-spec-geo-insights-desktop'
+                altOverride='Audience insights showing top cities and engagement signals'
                 title='Audience insight'
                 chrome='minimal'
-                skipCheck
                 className='rounded-[1rem]'
               />
             </div>
@@ -250,14 +244,11 @@ function HomepageV2Hero() {
                 } as CSSProperties
               }
             >
-              <ProductScreenshot
-                src='/product-screenshots/artist-spec-tracked-links-desktop.png'
-                alt='Tracked link share menu with campaign routing controls'
-                width={920}
-                height={442}
+              <MarketingScreenshot
+                scenarioId='artist-spec-tracked-links-desktop'
+                altOverride='Tracked link share menu with campaign routing controls'
                 title='Share and route'
                 chrome='minimal'
-                skipCheck
                 className='rounded-[1rem]'
               />
             </div>

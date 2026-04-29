@@ -5,6 +5,70 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.194] - 2026-04-29
+
+> Frame.io-inspired design layer for `/artist-profiles` + premium marketing footer rewrite.
+
+### Added
+
+- **`.frame-skin` design layer** in `apps/web/app/(home)/home.css` — page-scoped cinematic editorial monochrome. Deep `#0a0a0b` base, subtle SVG film grain at 4%, hairline `rgba(255,255,255,0.06)` dividers between sections, 320px ambient edge-glow at the page seam, magazine-scale section padding via `--frame-section-y: clamp(5rem, 8vw, 9rem)`. Inside `.frame-skin`, `--primary-token` / `--secondary-token` / `--tertiary-token` / `--linear-border-*` map to frame.io values so child components inherit without per-component changes.
+- **`.frame-eyebrow` + `.frame-caption`** helpers for editorial pairings (11px / 0.18em tracking, 13px / 1.55 leading). Promoted to base classes so callers outside `.frame-skin` get the same typography.
+- **`eyebrow` prop** on `ArtistProfileSectionHeader` for category tags above the headline.
+
+### Changed
+
+- **`/artist-profiles` end-to-end** now wears the frame.io skin: tightened type ramp on `ArtistProfileSectionHeader` (clamp 2.6→4.5rem, weight 640, leading 0.96, body max-w 36rem); `ArtistProfileSectionShell` tags each section with `frame-section` so in-skin padding and divider rules apply automatically.
+- **`MarketingFooter` rewrite** as `.marketing-footer-premium` — `#06070a` base, hairline top border + 220px ambient edge-glow, wordmark column with tagline, 4 nav columns with 11px tracked-caps eyebrow headers, 14px caption-weight links, hairline-separated bottom band with copyright + Privacy/Terms in 12px tertiary. Active across every marketing route. Minimal variant collapses to mark + bottom band only.
+
+### Fixed
+
+- **Hairline section dividers actually render now** — the original `.frame-skin .frame-section + .frame-section` selector never matched because each section in `ArtistProfileLandingPage` is wrapped in a `<div data-testid="...">`. Switched to `.frame-skin > div + div` which targets the wrapper divs that ARE direct siblings. (Sentry P-LOW)
+- **Minimal-footer baseband margin** — `mt-7` Tailwind class (specificity 0,1,0) was overridden by `.mf-baseband { margin-top: clamp(...) }` (specificity 0,2,0). Switched to inline style so the minimal footer lands at 28px instead of 48–72px. (Greptile P1)
+- **Eyebrow class duplication** in `ArtistProfileSectionHeader` — removed redundant `text-[11px] font-medium uppercase tracking-[0.18em]` Tailwind classes since `.frame-eyebrow` already covers them. (Greptile P2)
+
+## [26.4.193] - 2026-04-29
+
+> Marketing screenshot pipeline + CSS cascade fix. Hamburger no longer leaks onto desktop, profile-desktop capture renders the real desktop UI, every product-screenshot literal in marketing code now flows through `apps/web/lib/screenshots/registry.ts`.
+
+### Fixed
+
+- **Hamburger menu showing on desktop** — `marketing-utilities.css`, `auth-utilities.css`, and `app-utilities.css` were re-importing `tailwindcss/utilities.css` after globals.css, emitting a duplicate `.flex { display: flex }` rule that won source-order tiebreak over `.md\:hidden { display: none }`. Removed all three CSS files and their imports from `(marketing)`, `(auth)`, `app`, `onboarding`, and `waitlist` layouts. Tailwind v4 still auto-scans the project, so no classes are lost. Second CSS bundle on `/new` dropped from 371KB to 29KB.
+- **`profile-desktop.png` rendered as a phone-shaped fallback on a wide black canvas** — the capture's `waitFor` selector fired before React's `useEffect` flipped `isDesktopLayout=true`. Switched to `[data-testid="profile-desktop-surface"]` so the capture waits for post-hydration desktop layout. Same fix applied to `tim-white-profile-live-desktop` and `tim-white-profile-mainstream-desktop`.
+- **Locator-captured screenshots advertised wrong dimensions to next/image** — `release-tasks-active.png` is 1624×1428, not 2880×1800. New `PUBLIC_EXPORT_DIMENSIONS` map in `apps/web/lib/screenshots/registry.ts` returns the actual PNG dimensions from each IHDR header.
+
+### Changed
+
+- New `getMarketingExportScenarios()` and `getMarketingExportImage(id)` helpers in `apps/web/lib/screenshots/registry.ts` (client-safe — no `node:fs` imports).
+- New `<MarketingScreenshot scenarioId>` and `<MarketingPhoneImage scenarioId>` wrappers under `apps/web/components/marketing/`. Default `quality={85}` and a sensible responsive `sizes` attribute.
+- 31 hardcoded `/product-screenshots/...` literals across 14 active files (data files + 9 home components + 2 artist-profile sections + `HomepageV2Route`) now flow through the registry.
+- 9 scenarios re-tagged `marketing-export` (`tim-white-profile-*` mobile variants, release-presave-mobile, release-tasks-desktop, `artist-spec-*` desktops).
+- Recaptured at retina: `marketing-home-desktop`, `public-profile-desktop`, `release-landing-{desktop,mobile}`, `release-tasks-active`, several `artist-spec-*` and `artist-profile-*-section-desktop`.
+- Cleaned up 2 orphan PNGs (`artist-spec-geo-insights-panel.png`, `artist-spec-rich-analytics-panel.png`) that had no registry entry.
+
+### Removed
+
+- 3 unused orphan files in `apps/web/app/(marketing)/new/_components/` (`NewLandingHero`, `NewLandingSections`, `NewLandingFinalCta` — 473 lines of dead code, never imported).
+
+### Documentation
+
+- `docs/CANONICAL_SURFACES.md` gains a "How to add a marketing screenshot" section.
+- `CLAUDE.md` gets a one-line pointer.
+
+## [26.4.192] - 2026-04-29
+
+> Mobile public profile alert signup hardening and iPhone viewport gates.
+
+### Added
+
+- **Blocking mobile profile viewport suite** covering iPhone 13 through 17 viewport families across Home, Music, Events, Alerts, About, Contact, Pay, Releases, and Notifications screens.
+- **Alert signup focus stability checks** that fail when mobile input focus changes the layout viewport, scrolls the shell, introduces horizontal overflow, or risks iOS input zoom.
+- **Public Lighthouse CI coverage** for the new profile mobile viewport/performance budget gate.
+
+### Changed
+
+- **Alerts signup flow** now treats OTP verification as the subscription activation moment, then collects name and birthday as follow-up enrichment.
+- **Mobile profile artwork fallbacks** avoid rendering default app/avatar assets as hero and rail imagery.
+
 ## [26.4.191] - 2026-04-28
 
 > Pre-landing review fixes for the page-builder + component-checker (#7920, #7919). Four Greptile findings addressed.

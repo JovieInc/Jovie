@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 import type { LogoVariant } from '@/components/atoms/Logo';
 import { HeaderNav } from '@/components/organisms/HeaderNav';
 import { APP_ROUTES } from '@/constants/routes';
+import { MARKETING_NAV_LINKS } from '@/data/marketingNavigation';
 
 export type MarketingHeaderVariant =
   | 'landing'
@@ -45,7 +46,8 @@ export function MarketingHeader({
   const pathname = usePathname();
   const showStagedNav = pathname !== null && STAGED_NAV_PATHS.has(pathname);
   const resolvedNavLinks =
-    navLinks ?? (showStagedNav ? DEFAULT_STAGED_HOMEPAGE_NAV_LINKS : undefined);
+    navLinks ??
+    (showStagedNav ? DEFAULT_STAGED_HOMEPAGE_NAV_LINKS : MARKETING_NAV_LINKS);
 
   return (
     <HeaderNav

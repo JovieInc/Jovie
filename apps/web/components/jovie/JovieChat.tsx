@@ -142,6 +142,7 @@ export function JovieChat({
   // ─── Chat jank instrumentation (flag-gated) ─────────────────
   const jankMonitorEnabled = useAppFlag('CHAT_JANK_MONITOR');
   const shellChatV1Enabled = useAppFlag('SHELL_CHAT_V1');
+  const designV1ChatEntitiesEnabled = useAppFlag('DESIGN_V1_CHAT_ENTITIES');
   const { onSend: notifyJankSend } = useChatJankMonitor({
     conversationId: activeConversationId,
     messages,
@@ -354,6 +355,9 @@ export function JovieChat({
       ref={dropZoneRef}
       className='relative flex h-full flex-col bg-(--linear-app-content-surface)'
       data-testid='chat-content'
+      data-design-v1-chat-entities={
+        designV1ChatEntitiesEnabled ? 'true' : undefined
+      }
     >
       {/* Registers entity providers (release, artist) for the slash menu */}
       {profileId ? <ChatProvidersRegistrar profileId={profileId} /> : null}

@@ -40,6 +40,7 @@ import { buildProfileShareContext } from '@/lib/share/context';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { cn } from '@/lib/utils';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
+import { isDefaultAvatarUrl } from '@/lib/utils/dsp-images';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
@@ -229,6 +230,7 @@ export function ProfileCompactSurface({
     useState<HTMLDivElement | null>(null);
   const [showRecentActivationRow, setShowRecentActivationRow] = useState(false);
   const notificationsRevealRef = useRef<(() => void) | null>(null);
+  const pendingNotificationsOpenRef = useRef(false);
   const mergedDSPs = useMemo(
     () =>
       sortDSPsByGeoPopularity(
@@ -290,6 +292,10 @@ export function ProfileCompactSurface({
     ]
   );
   const heroImageUrl = surfaceState.heroImageUrl;
+  const resolvedHeroImageUrl = useMemo(() => {
+    const imageUrl = heroImageUrl ?? artist.image_url ?? null;
+    return isDefaultAvatarUrl(imageUrl) ? null : imageUrl;
+  }, [artist.image_url, heroImageUrl]);
   const visibleSocialLinks = headerSocialLinksOverride
     ? [...headerSocialLinksOverride]
     : surfaceState.visibleSocialLinks;
@@ -298,9 +304,9 @@ export function ProfileCompactSurface({
       buildProfileShareContext({
         username: artist.handle,
         artistName: artist.name,
-        avatarUrl: heroImageUrl,
+        avatarUrl: resolvedHeroImageUrl,
       }),
-    [artist.handle, artist.name, heroImageUrl]
+    [artist.handle, artist.name, resolvedHeroImageUrl]
   );
   const hasTip = surfaceState.hasTip;
   const hasReleases = surfaceState.hasReleases;
@@ -317,6 +323,11 @@ export function ProfileCompactSurface({
     (reveal: () => void) => {
       notificationsRevealRef.current = reveal;
       onRegisterReveal?.(reveal);
+
+      if (pendingNotificationsOpenRef.current) {
+        pendingNotificationsOpenRef.current = false;
+        reveal();
+      }
     },
     [onRegisterReveal]
   );
@@ -327,12 +338,13 @@ export function ProfileCompactSurface({
     onModeSelect('profile');
   }, [onModeSelect]);
   const openNotifications = useCallback(() => {
-    onModeSelect('subscribe');
     const reveal = notificationsRevealRef.current;
     if (reveal) {
       reveal();
       return;
     }
+    pendingNotificationsOpenRef.current = true;
+    onModeSelect('subscribe');
     onRevealNotifications?.();
   }, [onModeSelect, onRevealNotifications]);
   const showHeroAlertsRow = !isSubscribed || showRecentActivationRow;
@@ -359,9 +371,9 @@ export function ProfileCompactSurface({
           )}
         >
           <div className='absolute inset-0'>
-            {(heroImageUrl ?? artist.image_url) ? (
+            {resolvedHeroImageUrl ? (
               <ImageWithFallback
-                src={heroImageUrl ?? artist.image_url}
+                src={resolvedHeroImageUrl}
                 alt={artist.name}
                 fill
                 priority
@@ -498,7 +510,7 @@ export function ProfileCompactSurface({
                     artist={artist}
                     onManageNotifications={onManageNotifications}
                     onRegisterReveal={registerNotificationsReveal}
-                    portalContainer={notificationsPortalContainer}
+                    portalContainer={notificationsPortalContainer ?? undefined}
                     variant='hero'
                     hideTrigger
                     onFlowClosed={returnToProfileAfterNotifications}
@@ -579,7 +591,9 @@ export function ProfileCompactSurface({
                 mode={activePrimaryPanel ?? 'listen'}
                 renderMode={renderMode}
                 artist={artist}
-                notificationsPortalContainer={notificationsPortalContainer}
+                notificationsPortalContainer={
+                  notificationsPortalContainer ?? undefined
+                }
                 dsps={mergedDSPs}
                 enableDynamicEngagement={enableDynamicEngagement}
                 subscribeTwoStep={subscribeTwoStep}

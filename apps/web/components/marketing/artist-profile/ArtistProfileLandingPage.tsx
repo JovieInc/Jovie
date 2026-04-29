@@ -52,7 +52,10 @@ export function ArtistProfileLandingPage({
   }
 
   return (
-    <>
+    // frame-skin scopes the cinematic editorial monochrome design layer to
+    // /artist-profiles. Tokens (palette, hairline borders, magazine padding,
+    // film grain, edge glow) live in apps/web/app/(home)/home.css.
+    <div className='frame-skin'>
       <ArtistProfileHeroAdaptiveIntro
         hero={copy.hero}
         adaptive={copy.adaptive}
@@ -108,6 +111,6 @@ export function ArtistProfileLandingPage({
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.finalCta}>
         <ArtistProfileFinalCta finalCta={copy.finalCta} roomy />
       </div>
-    </>
+    </div>
   );
 }

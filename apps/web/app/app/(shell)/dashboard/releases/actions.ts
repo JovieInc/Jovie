@@ -27,6 +27,7 @@ import { validateProviderUrl } from '@/lib/discography/provider-domains';
 import {
   getProviderLink,
   getReleaseById,
+  getReleaseForProfileById,
   getReleasesForProfile as getReleasesFromDb,
   getReleaseTracksForReleaseWithProviders,
   getTracksForRelease,
@@ -312,6 +313,21 @@ async function fetchReleaseMatrixCore(
   );
 }
 
+async function fetchReleaseEntityCore(
+  profileId: string,
+  profileHandle: string,
+  releaseId: string
+): Promise<ReleaseViewModel | null> {
+  const providerLabels = buildProviderLabels();
+  const release = await getReleaseForProfileById(profileId, releaseId, {
+    includeDrafts: true,
+  });
+
+  return release
+    ? mapReleaseToViewModel(release, providerLabels, profileId, profileHandle)
+    : null;
+}
+
 export interface ReleaseProfileContext {
   readonly userId: string;
   readonly profileId: string;
@@ -353,6 +369,30 @@ async function resolveReleaseMatrix(
  * Uses React's cache() for request-level deduplication.
  */
 export const loadReleaseMatrix = cache(resolveReleaseMatrix);
+
+async function resolveReleaseEntity(params: {
+  readonly profileId: string;
+  readonly releaseId: string;
+}): Promise<ReleaseViewModel | null> {
+  const { userId } = await getCachedAuth();
+
+  if (!userId) {
+    redirect(`${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.RELEASES}`);
+  }
+
+  const profile = await requireProfile(params.profileId);
+
+  return unstable_cache(
+    () => fetchReleaseEntityCore(profile.id, profile.handle, params.releaseId),
+    ['release-entity', userId, profile.id, params.releaseId],
+    {
+      revalidate: CACHE_TTL.MEDIUM,
+      tags: [`releases:${userId}:${profile.id}`],
+    }
+  )();
+}
+
+export const loadReleaseEntity = cache(resolveReleaseEntity);
 
 export async function loadReleaseMatrixForProfile(
   profile: ReleaseProfileContext

@@ -1,4 +1,3 @@
-import './app-utilities.css';
 import { ResolvedClientProviders } from '@/components/providers/ResolvedClientProviders';
 
 export default async function AppLayout({

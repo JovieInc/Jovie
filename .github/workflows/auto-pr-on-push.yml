@@ -80,9 +80,10 @@ jobs:
           echo "Changed files:"
           echo "$CHANGED"
 
-          # Filter out audit-only files: audits/, docs/, and standalone markdown
+          # Filter out audit-only files: audits/, docs/, and standalone markdown.
+          # Workflow changes are executable automation code and should open PRs.
           # A push is "audit-only" if every changed file matches these patterns
-          CODE_CHANGES=$(echo "$CHANGED" | grep -vE '^(audits/|docs/|\.github/workflows/|[^/]+\.md$)' || true)
+          CODE_CHANGES=$(echo "$CHANGED" | grep -vE '^(audits/|docs/|[^/]+\.md$)' || true)
 
           if [[ -z "$CODE_CHANGES" ]]; then
             echo "All changes are audit/docs only. Skipping PR creation."

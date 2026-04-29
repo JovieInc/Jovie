@@ -6,6 +6,7 @@ import {
   adminSettingsNavItem,
   adminSettingsNavigation,
   artistSettingsNavigation,
+  libraryNavItem,
   paymentsNavItem,
   primaryNavigation,
   settingsNavItem,
@@ -90,6 +91,7 @@ function isRedirectStub(source: string): boolean {
 function getNavRoutePaths(): Set<string> {
   const navItems = [
     ...primaryNavigation,
+    libraryNavItem,
     settingsNavItem,
     ...userSettingsNavigation,
     paymentsNavItem,

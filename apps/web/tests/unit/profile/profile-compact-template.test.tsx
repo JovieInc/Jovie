@@ -18,6 +18,7 @@ import {
   vi,
 } from 'vitest';
 import type { PublicRelease } from '@/components/features/profile/releases/types';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist } from '@/types/db';
 
@@ -47,6 +48,10 @@ vi.mock('next/dynamic', () => ({
 
     if (source.includes('ProfileInlineNotificationsCTA')) {
       return (props: unknown) => mockProfileInlineNotificationsCTA(props);
+    }
+
+    if (source.includes('ProfileDesktopSurface')) {
+      return (props: unknown) => mockProfileDesktopSurface(props);
     }
 
     return () => null;
@@ -214,6 +219,35 @@ const mockReleases = [
     artistNames: ['Test Artist'],
   },
 ] satisfies readonly PublicRelease[];
+
+function mockDsp(key: string, name: string, url: string) {
+  return {
+    key,
+    name,
+    url,
+    config: {} as never,
+  };
+}
+
+function mockViewport(width: 'mobile' | 'desktop') {
+  const previousMatchMedia = window.matchMedia;
+  window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+    matches:
+      width === 'desktop' &&
+      (query === '(min-width: 768px)' || query === '(min-width: 1180px)'),
+    media: query,
+    onchange: null,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })) as typeof window.matchMedia;
+
+  return () => {
+    window.matchMedia = previousMatchMedia;
+  };
+}
 
 let ProfileCompactTemplate: typeof import('@/features/profile/templates/ProfileCompactTemplate').ProfileCompactTemplate;
 
@@ -664,12 +698,9 @@ describe('ProfileCompactTemplate', () => {
     fireEvent.click(screen.getByTestId('profile-hero-alerts-row'));
 
     expect(revealNotifications).toHaveBeenCalledTimes(1);
-    await waitFor(() => {
-      expect(screen.getByTestId('mock-primary-tab-panel')).toHaveAttribute(
-        'data-mode',
-        'subscribe'
-      );
-    });
+    expect(
+      screen.queryByTestId('mock-primary-tab-panel')
+    ).not.toBeInTheDocument();
   });
 
   it('hides the compact hero alerts row for returning subscribers', async () => {
@@ -1091,17 +1122,7 @@ describe('ProfileCompactTemplate', () => {
   });
 
   it('renders the drawer at desktop widths', async () => {
-    const previousMatchMedia = window.matchMedia;
-    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
-      matches: query === '(min-width: 768px)',
-      media: query,
-      onchange: null,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    })) as typeof window.matchMedia;
+    const restoreViewport = mockViewport('desktop');
 
     render(
       <ProfileCompactTemplate
@@ -1113,11 +1134,216 @@ describe('ProfileCompactTemplate', () => {
     );
 
     await waitFor(() => {
-      expect(
-        screen.getByTestId('mock-profile-unified-drawer')
-      ).toBeInTheDocument();
+      expect(mockProfileDesktopSurface).toHaveBeenCalled();
     });
 
-    window.matchMedia = previousMatchMedia;
+    restoreViewport();
+  });
+
+  it('marks the flagged public profile V1 shell on mobile smoke render', async () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        visualVariant='v1'
+      />
+    );
+
+    expect(screen.getByTestId('profile-compact-shell')).toBeInTheDocument();
+    expect(
+      screen
+        .getByTestId('profile-compact-shell')
+        .closest('[data-profile-visual-variant]')
+    ).toHaveAttribute('data-profile-visual-variant', 'v1');
+  });
+
+  it('keeps flagged public profile V1 desktop DSP links in canonical order', async () => {
+    const restoreViewport = mockViewport('desktop');
+    mockCanonicalProfileDSPs.mockReturnValue([
+      mockDsp('spotify', 'Spotify', 'https://open.spotify.com/artist/test'),
+      mockDsp(
+        'apple_music',
+        'Apple Music',
+        'https://music.apple.com/artist/test'
+      ),
+      mockDsp('youtube', 'YouTube', 'https://youtube.com/@test'),
+      mockDsp('deezer', 'Deezer', 'https://www.deezer.com/artist/test'),
+      mockDsp('tidal', 'Tidal', 'https://tidal.com/browse/artist/test'),
+    ]);
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={{
+          ...mockArtist,
+          tagline: 'Official music, shows, and updates.',
+          image_url: 'https://example.com/artist.jpg',
+        }}
+        socialLinks={[]}
+        contacts={[]}
+        visualVariant='v1'
+      />
+    );
+
+    await screen.findByText('Listen And Follow');
+
+    const dspLinks = screen
+      .getAllByRole('link')
+      .filter(link =>
+        ['Spotify', 'Apple Music', 'YouTube', 'Deezer'].includes(
+          link.textContent?.trim() ?? ''
+        )
+      );
+
+    expect(dspLinks.map(link => link.textContent?.trim())).toEqual([
+      'Spotify',
+      'Apple Music',
+      'YouTube',
+      'Deezer',
+    ]);
+    expect(dspLinks.map(link => link.getAttribute('href'))).toEqual([
+      'https://open.spotify.com/artist/test',
+      'https://music.apple.com/artist/test',
+      'https://youtube.com/@test',
+      'https://www.deezer.com/artist/test',
+    ]);
+    expect(
+      screen.queryByRole('link', { name: 'Tidal' })
+    ).not.toBeInTheDocument();
+
+    restoreViewport();
+  });
+
+  it('keeps the flagged public profile V1 desktop trust surface accessible', async () => {
+    const restoreViewport = mockViewport('desktop');
+    mockCanonicalProfileDSPs.mockReturnValue([
+      mockDsp('spotify', 'Spotify', 'https://open.spotify.com/artist/test'),
+      mockDsp(
+        'apple_music',
+        'Apple Music',
+        'https://music.apple.com/artist/test'
+      ),
+    ]);
+
+    const { container } = render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={{
+          ...mockArtist,
+          tagline: 'Official music, shows, and updates.',
+          image_url: 'https://example.com/artist.jpg',
+        }}
+        socialLinks={[]}
+        contacts={[]}
+        visualVariant='v1'
+      />
+    );
+
+    await screen.findByText('Listen And Follow');
+
+    await expectNoA11yViolations(container);
+
+    restoreViewport();
+  });
+
+  it('passes pay, contact, tour, subscribe, and release variants into the desktop smoke surface', async () => {
+    const restoreViewport = mockViewport('desktop');
+
+    const variantProps = {
+      artist: mockArtist,
+      socialLinks: [
+        {
+          id: 'venmo-1',
+          artist_id: mockArtist.id,
+          platform: 'venmo' as const,
+          url: 'https://venmo.com/testartist',
+          clicks: 0,
+          created_at: '2024-01-01T00:00:00.000Z',
+        },
+      ],
+      contacts: mockContacts,
+      showPayButton: true,
+      latestRelease: {
+        title: "Don't Look Down",
+        slug: 'dont-look-down',
+        artworkUrl: 'https://example.com/release.jpg',
+        releaseDate: '2026-04-01T00:00:00.000Z',
+        releaseType: 'single' as const,
+      },
+      tourDates: [
+        {
+          id: 'tour-1',
+          profileId: mockArtist.id,
+          title: null,
+          venueName: 'The Echo',
+          city: 'Los Angeles',
+          region: 'CA',
+          country: 'US',
+          startDate: '2099-05-01T00:00:00.000Z',
+          endDate: null,
+          ticketUrl: 'https://tickets.example.com/show',
+          ticketStatus: 'onsale' as const,
+          timezone: 'America/Los_Angeles',
+          latitude: null,
+          longitude: null,
+          source: 'manual' as const,
+          sourceEventId: null,
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+      releases: mockReleases,
+      visualVariant: 'v1' as const,
+    };
+
+    const view = render(
+      <ProfileCompactTemplate mode='pay' {...variantProps} />
+    );
+
+    await waitFor(() => {
+      expect(mockProfileDesktopSurface).toHaveBeenCalledWith(
+        expect.objectContaining({
+          activeMode: 'pay',
+          contacts: mockContacts,
+          latestRelease: expect.objectContaining({
+            title: "Don't Look Down",
+            slug: 'dont-look-down',
+          }),
+          showPayButton: true,
+          tourDates: expect.arrayContaining([
+            expect.objectContaining({
+              venueName: 'The Echo',
+              ticketUrl: 'https://tickets.example.com/show',
+            }),
+          ]),
+          releases: mockReleases,
+        })
+      );
+    });
+
+    view.rerender(
+      <ProfileCompactTemplate mode='subscribe' {...variantProps} />
+    );
+
+    await waitFor(() => {
+      expect(mockProfileDesktopSurface).toHaveBeenCalledWith(
+        expect.objectContaining({
+          activeMode: 'subscribe',
+          contacts: mockContacts,
+          latestRelease: expect.objectContaining({
+            title: "Don't Look Down",
+          }),
+          tourDates: expect.arrayContaining([
+            expect.objectContaining({
+              venueName: 'The Echo',
+            }),
+          ]),
+        })
+      );
+    });
+
+    restoreViewport();
   });
 });

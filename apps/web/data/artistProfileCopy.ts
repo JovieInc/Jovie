@@ -1,3 +1,5 @@
+import { getMarketingExportImage } from '@/lib/screenshots/registry';
+
 export interface ArtistProfileMode {
   readonly id: 'listen' | 'pay' | 'tour' | 'contact';
   readonly label: string;
@@ -381,8 +383,9 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     ],
     restingScreenshotAlt:
       "Jovie artist profile showing Tim White's live profile view.",
-    restingScreenshotSrc:
-      '/product-screenshots/tim-white-profile-live-phone.png',
+    restingScreenshotSrc: getMarketingExportImage(
+      'tim-white-profile-live-mobile'
+    ).publicUrl,
     modes: [
       {
         id: 'listen',
@@ -415,8 +418,9 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
             },
           ],
         },
-        screenshotSrc:
-          '/product-screenshots/tim-white-profile-listen-phone.png',
+        screenshotSrc: getMarketingExportImage(
+          'tim-white-profile-listen-mobile'
+        ).publicUrl,
         screenshotAlt: 'Jovie artist profile showing a listen-first view.',
         screenshotWidth: 660,
         screenshotHeight: 1368,
@@ -464,7 +468,8 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
             },
           ],
         },
-        screenshotSrc: '/product-screenshots/tim-white-profile-tour-phone.png',
+        screenshotSrc: getMarketingExportImage('tim-white-profile-tour-mobile')
+          .publicUrl,
         screenshotAlt:
           'Jovie artist profile showing nearby shows and ticket paths.',
         screenshotWidth: 660,
@@ -501,7 +506,8 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
             },
           ],
         },
-        screenshotSrc: '/product-screenshots/tim-white-profile-pay-phone.png',
+        screenshotSrc: getMarketingExportImage('tim-white-profile-pay-mobile')
+          .publicUrl,
         screenshotAlt: 'Jovie artist profile showing direct support options.',
         screenshotWidth: 660,
         screenshotHeight: 1368,
@@ -543,8 +549,9 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
             },
           ],
         },
-        screenshotSrc:
-          '/product-screenshots/tim-white-profile-contact-phone.png',
+        screenshotSrc: getMarketingExportImage(
+          'tim-white-profile-contact-mobile'
+        ).publicUrl,
         screenshotAlt:
           'Jovie artist profile showing contact access for booking and press.',
         screenshotWidth: 660,
@@ -583,12 +590,14 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     syntheticProofs: {
       visualProofs: {
         driveStreams: {
-          liveScreenshotSrc:
-            '/product-screenshots/tim-white-profile-live-phone.png',
+          liveScreenshotSrc: getMarketingExportImage(
+            'tim-white-profile-live-mobile'
+          ).publicUrl,
           liveScreenshotAlt:
             'Jovie artist profile showing Tim White with the latest release live.',
-          presaveScreenshotSrc:
-            '/product-screenshots/release-deep-end-phone.png',
+          presaveScreenshotSrc: getMarketingExportImage(
+            'release-presave-mobile'
+          ).publicUrl,
           presaveScreenshotAlt:
             'Jovie release page showing The Deep End countdown card.',
           title: 'The Deep End',
@@ -597,8 +606,9 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
           presaveLabel: 'Countdown live',
         },
         sellOut: {
-          screenshotSrc:
-            '/product-screenshots/tim-white-profile-tour-phone.png',
+          screenshotSrc: getMarketingExportImage(
+            'tim-white-profile-tour-mobile'
+          ).publicUrl,
           screenshotAlt:
             'Jovie profile showing an open tour drawer with upcoming ticket dates.',
           nearbyCardLabel: 'Nearby date',
@@ -628,7 +638,8 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
           ],
         },
         getPaid: {
-          screenshotSrc: '/product-screenshots/tim-white-profile-pay-phone.png',
+          screenshotSrc: getMarketingExportImage('tim-white-profile-pay-mobile')
+            .publicUrl,
           screenshotAlt:
             'Jovie profile showing an open support drawer with payment amounts.',
           drawerTitle: 'Pay',

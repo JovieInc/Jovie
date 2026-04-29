@@ -11,8 +11,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-04-18T09:47:48.803Z",
-    "gitSha": "6a3abf675f6c0544cf5916805d86a75acff67adc",
+    "capturedAt": "2026-04-29T04:03:29.467Z",
+    "gitSha": null,
     "imagePath": "marketing-home-desktop.png"
   },
   {
@@ -27,7 +27,7 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-04-16T01:56:15.836Z",
+    "capturedAt": "2026-04-29T04:03:35.887Z",
     "gitSha": null,
     "imagePath": "release-landing-desktop.png",
     "publicExportPath": "release-landing-desktop.png"
@@ -41,8 +41,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-04-18T09:48:17.836Z",
-    "gitSha": "6a3abf675f6c0544cf5916805d86a75acff67adc",
+    "capturedAt": "2026-04-29T04:03:59.551Z",
+    "gitSha": null,
     "imagePath": "release-tasks-desktop.png",
     "publicExportPath": "release-tasks-active.png"
   },
@@ -55,8 +55,8 @@
     "viewport": "mobile",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-04-18T09:48:41.267Z",
-    "gitSha": "6a3abf675f6c0544cf5916805d86a75acff67adc",
+    "capturedAt": "2026-04-29T04:04:23.307Z",
+    "gitSha": null,
     "imagePath": "release-presave-mobile.png",
     "publicExportPath": "release-deep-end-phone.png"
   },
@@ -72,7 +72,7 @@
     "viewport": "mobile",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-04-16T00:20:21.111Z",
+    "capturedAt": "2026-04-29T04:04:27.266Z",
     "gitSha": null,
     "imagePath": "release-landing-mobile.png",
     "publicExportPath": "release-take-me-over-phone.png"
@@ -86,8 +86,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-04-18T09:49:08.595Z",
-    "gitSha": "6a3abf675f6c0544cf5916805d86a75acff67adc",
+    "capturedAt": "2026-04-29T04:04:54.795Z",
+    "gitSha": null,
     "imagePath": "artist-spec-audience-quality-desktop.png",
     "publicExportPath": "artist-spec-audience-quality-desktop.png"
   },
@@ -100,8 +100,8 @@
     "viewport": "mobile",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-04-18T09:49:12.863Z",
-    "gitSha": "6a3abf675f6c0544cf5916805d86a75acff67adc",
+    "capturedAt": "2026-04-29T04:05:28.845Z",
+    "gitSha": null,
     "imagePath": "artist-spec-opinionated-design-mobile.png",
     "publicExportPath": "artist-spec-opinionated-design-mobile.png"
   },
@@ -114,24 +114,10 @@
     "viewport": "mobile",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-04-18T09:49:36.216Z",
-    "gitSha": "6a3abf675f6c0544cf5916805d86a75acff67adc",
+    "capturedAt": "2026-04-29T04:05:54.801Z",
+    "gitSha": null,
     "imagePath": "artist-spec-creator-menu-mobile.png",
     "publicExportPath": "artist-spec-creator-menu-mobile.png"
-  },
-  {
-    "id": "artist-spec-geo-insights-desktop",
-    "title": "Artist Spec — Geo Insights",
-    "group": "marketing",
-    "groupLabel": "Marketing",
-    "route": "/demo/audience?capture=geo",
-    "viewport": "desktop",
-    "theme": "dark",
-    "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-04-18T09:49:59.835Z",
-    "gitSha": "6a3abf675f6c0544cf5916805d86a75acff67adc",
-    "imagePath": "artist-spec-geo-insights-desktop.png",
-    "publicExportPath": "artist-spec-geo-insights-desktop.png"
   },
   {
     "id": "artist-spec-sync-settings-desktop",
@@ -142,8 +128,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-04-18T09:50:23.271Z",
-    "gitSha": "6a3abf675f6c0544cf5916805d86a75acff67adc",
+    "capturedAt": "2026-04-29T04:06:32.495Z",
+    "gitSha": null,
     "imagePath": "artist-spec-sync-settings-desktop.png",
     "publicExportPath": "artist-spec-sync-settings-desktop.png"
   },
@@ -156,24 +142,10 @@
     "viewport": "mobile",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-04-18T09:50:26.942Z",
-    "gitSha": "6a3abf675f6c0544cf5916805d86a75acff67adc",
+    "capturedAt": "2026-04-29T04:06:48.807Z",
+    "gitSha": null,
     "imagePath": "artist-spec-press-assets-mobile.png",
     "publicExportPath": "artist-spec-press-assets-mobile.png"
-  },
-  {
-    "id": "artist-spec-tracked-links-desktop",
-    "title": "Artist Spec — UTM Builder",
-    "group": "marketing",
-    "groupLabel": "Marketing",
-    "route": "/demo/showcase/release-tracked-links",
-    "viewport": "desktop",
-    "theme": "dark",
-    "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-04-18T09:50:50.419Z",
-    "gitSha": "6a3abf675f6c0544cf5916805d86a75acff67adc",
-    "imagePath": "artist-spec-tracked-links-desktop.png",
-    "publicExportPath": "artist-spec-tracked-links-desktop.png"
   },
   {
     "id": "artist-profile-adaptive-section-desktop",
@@ -184,9 +156,22 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-04-19T06:06:14.061Z",
-    "gitSha": "2834f1217127d1c720a0f645eac1613b2080472f",
+    "capturedAt": "2026-04-29T04:07:24.612Z",
+    "gitSha": null,
     "imagePath": "artist-profile-adaptive-section-desktop.png"
+  },
+  {
+    "id": "artist-profile-built-for-artists-section-desktop",
+    "title": "Artist Profile Built for Artists Section",
+    "group": "marketing",
+    "groupLabel": "Marketing",
+    "route": "/artist-profiles",
+    "viewport": "desktop",
+    "theme": "dark",
+    "consumers": ["admin", "investor-ready"],
+    "capturedAt": "2026-04-29T04:07:49.898Z",
+    "gitSha": null,
+    "imagePath": "artist-profile-built-for-artists-section-desktop.png"
   },
   {
     "id": "artist-profile-capture-section-desktop",
@@ -226,19 +211,6 @@
     "capturedAt": "2026-04-18T09:52:27.926Z",
     "gitSha": "6a3abf675f6c0544cf5916805d86a75acff67adc",
     "imagePath": "artist-profile-monetization-section-desktop.png"
-  },
-  {
-    "id": "artist-profile-built-for-artists-section-desktop",
-    "title": "Artist Profile Built for Artists Section",
-    "group": "marketing",
-    "groupLabel": "Marketing",
-    "route": "/artist-profiles",
-    "viewport": "desktop",
-    "theme": "dark",
-    "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-04-18T09:52:52.896Z",
-    "gitSha": "6a3abf675f6c0544cf5916805d86a75acff67adc",
-    "imagePath": "artist-profile-built-for-artists-section-desktop.png"
   },
   {
     "id": "artist-profile-power-features-section-desktop",
@@ -377,6 +349,34 @@
     "gitSha": "6a3abf675f6c0544cf5916805d86a75acff67adc",
     "imagePath": "tim-white-profile-listen-mobile.png",
     "publicExportPath": "tim-white-profile-listen-phone.png"
+  },
+  {
+    "id": "artist-spec-geo-insights-desktop",
+    "title": "Artist Spec — Geo Insights",
+    "group": "marketing",
+    "groupLabel": "Marketing",
+    "route": "/demo/audience?capture=geo",
+    "viewport": "desktop",
+    "theme": "dark",
+    "consumers": ["admin", "investor-ready"],
+    "capturedAt": "2026-04-18T09:49:59.835Z",
+    "gitSha": "6a3abf675f6c0544cf5916805d86a75acff67adc",
+    "imagePath": "artist-spec-geo-insights-desktop.png",
+    "publicExportPath": "artist-spec-geo-insights-desktop.png"
+  },
+  {
+    "id": "artist-spec-tracked-links-desktop",
+    "title": "Artist Spec — UTM Builder",
+    "group": "marketing",
+    "groupLabel": "Marketing",
+    "route": "/demo/showcase/release-tracked-links",
+    "viewport": "desktop",
+    "theme": "dark",
+    "consumers": ["admin", "investor-ready"],
+    "capturedAt": "2026-04-18T09:50:50.419Z",
+    "gitSha": "6a3abf675f6c0544cf5916805d86a75acff67adc",
+    "imagePath": "artist-spec-tracked-links-desktop.png",
+    "publicExportPath": "artist-spec-tracked-links-desktop.png"
   },
   {
     "id": "dashboard-releases-desktop",
@@ -578,8 +578,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-04-18T09:58:35.932Z",
-    "gitSha": "6a3abf675f6c0544cf5916805d86a75acff67adc",
+    "capturedAt": "2026-04-29T04:02:20.681Z",
+    "gitSha": null,
     "imagePath": "public-profile-desktop.png",
     "publicExportPath": "profile-desktop.png"
   },

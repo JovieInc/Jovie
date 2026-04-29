@@ -8,6 +8,22 @@ import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
 import { primaryProviderKeys, providerConfig } from './config';
 import { ReleaseTableSkeleton } from './loading';
 
+export type ReleasesViewMode = 'designV1ShellReleases' | 'legacyProviderMatrix';
+
+export interface ReleasesFlagState {
+  readonly shellChatV1Enabled: boolean;
+  readonly designV1ReleasesEnabled: boolean;
+}
+
+export function resolveReleasesViewMode({
+  designV1ReleasesEnabled,
+}: ReleasesFlagState): ReleasesViewMode {
+  // SHELL_CHAT_V1 owns shell chrome; releases view selection belongs to DESIGN_V1_RELEASES.
+  return designV1ReleasesEnabled
+    ? 'designV1ShellReleases'
+    : 'legacyProviderMatrix';
+}
+
 const ReleasesExperience = dynamic(
   () =>
     import('@/features/dashboard/organisms/release-provider-matrix').then(
@@ -40,7 +56,10 @@ const ShellReleasesView = dynamic(
 export function ReleasesPageClient() {
   const { selectedProfile } = useDashboardData();
   const profileId = selectedProfile?.id ?? '';
-  const shellChatV1Enabled = useAppFlag('SHELL_CHAT_V1');
+  const releasesViewMode = resolveReleasesViewMode({
+    shellChatV1Enabled: useAppFlag('SHELL_CHAT_V1'),
+    designV1ReleasesEnabled: useAppFlag('DESIGN_V1_RELEASES'),
+  });
 
   const { data: releases, isLoading, isError } = useReleasesQuery(profileId);
 
@@ -75,7 +94,7 @@ export function ReleasesPageClient() {
     );
   }
 
-  if (shellChatV1Enabled) {
+  if (releasesViewMode === 'designV1ShellReleases') {
     return <ShellReleasesView releases={releases ?? []} />;
   }
 

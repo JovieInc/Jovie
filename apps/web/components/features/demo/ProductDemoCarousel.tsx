@@ -3,30 +3,33 @@
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { getMarketingExportImage } from '@/lib/screenshots/registry';
 import { BrowserFrame } from './BrowserFrame';
 
 const SLIDES = [
   {
     id: 'profile',
-    src: '/product-screenshots/profile-desktop.png',
+    src: getMarketingExportImage('public-profile-desktop').publicUrl,
     caption: 'Your artist page, instantly',
     alt: 'Artist profile page with listen, tip, and tour CTAs',
   },
   {
     id: 'releases',
-    src: '/product-screenshots/releases-dashboard-sidebar.png',
+    src: getMarketingExportImage('dashboard-releases-sidebar-desktop')
+      .publicUrl,
     caption: 'Every release, every platform',
     alt: 'Release dashboard showing smart link sidebar',
   },
   {
     id: 'audience',
-    src: '/product-screenshots/audience-crm.png',
+    src: getMarketingExportImage('dashboard-audience-desktop').publicUrl,
     caption: 'Own your audience',
     alt: 'Fan CRM with tracked interactions and contact details',
   },
   {
     id: 'platforms',
-    src: '/product-screenshots/release-sidebar-platforms.png',
+    src: getMarketingExportImage('dashboard-release-sidebar-platforms-desktop')
+      .publicUrl,
     caption: 'Smart links across every DSP',
     alt: 'Platform links auto-generated for Spotify, Apple Music, and more',
   },

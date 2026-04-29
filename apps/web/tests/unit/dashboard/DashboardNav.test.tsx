@@ -24,7 +24,19 @@ describe('DashboardNav', () => {
     expect(getByRole('link', { name: 'Releases' })).toBeDefined();
     expect(getByRole('link', { name: 'Tasks' })).toBeDefined();
     expect(getByRole('link', { name: 'Audience' })).toBeDefined();
+    expect(queryByRole('link', { name: 'Library' })).toBeNull();
     expect(queryByRole('link', { name: 'Earnings' })).toBeNull();
+  });
+
+  it('renders Library navigation only when the Library V1 flag is enabled', () => {
+    const { getByRole } = renderDashboardNav({
+      renderFn: fastRender,
+      appFlags: { DESIGN_V1_LIBRARY: true },
+    });
+
+    expect(getByRole('link', { name: 'Library' }).getAttribute('href')).toBe(
+      APP_ROUTES.DASHBOARD_LIBRARY
+    );
   });
 
   it('applies active state to current page', () => {
@@ -85,6 +97,19 @@ describe('DashboardNav', () => {
 
     const audienceLink = getByRole('link', { name: 'Audience' });
     expect(audienceLink.getAttribute('aria-current')).toBe('page');
+  });
+
+  it('applies active state to Library when the flagged route is current', () => {
+    mockUsePathname.mockReturnValueOnce(APP_ROUTES.DASHBOARD_LIBRARY);
+
+    const { getByRole } = renderDashboardNav({
+      renderFn: fastRender,
+      appFlags: { DESIGN_V1_LIBRARY: true },
+    });
+
+    expect(
+      getByRole('link', { name: 'Library' }).getAttribute('aria-current')
+    ).toBe('page');
   });
 
   it('renders settings groups with the selected artist name', () => {

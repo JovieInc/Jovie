@@ -1,4 +1,3 @@
-import './auth-utilities.css';
 import * as Sentry from '@sentry/nextjs';
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';

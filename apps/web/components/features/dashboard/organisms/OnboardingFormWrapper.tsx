@@ -86,6 +86,7 @@ interface OnboardingFormWrapperProps {
   readonly existingAvatarUrl?: string | null;
   readonly existingBio?: string | null;
   readonly existingGenres?: string[] | null;
+  readonly designV1?: boolean;
 }
 
 export function OnboardingFormWrapper({
@@ -101,6 +102,7 @@ export function OnboardingFormWrapper({
   existingAvatarUrl = null,
   existingBio = null,
   existingGenres = null,
+  designV1 = false,
 }: OnboardingFormWrapperProps) {
   // Keep the form disabled until React has attached submit handlers. Otherwise
   // a fast click on a server-seeded handle can trigger a native GET submit.
@@ -137,6 +139,7 @@ export function OnboardingFormWrapper({
           existingAvatarUrl={existingAvatarUrl}
           existingBio={existingBio}
           existingGenres={existingGenres}
+          designV1={designV1}
         />
       ) : (
         <OnboardingHandleOnlyForm
@@ -148,6 +151,7 @@ export function OnboardingFormWrapper({
           userEmail={userEmail}
           userId={userId}
           shouldAutoSubmitHandle={shouldAutoSubmitHandle}
+          designV1={designV1}
         />
       )}
     </div>

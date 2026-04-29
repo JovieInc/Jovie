@@ -4,68 +4,74 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { APP_ROUTES } from '@/constants/routes';
+import {
+  MARKETING_FOOTER_COLUMNS,
+  MARKETING_LEGAL_LINKS,
+  type MarketingFooterLink,
+} from '@/data/marketingNavigation';
 import { cn } from '@/lib/utils';
+import { MarketingFooterCta } from './MarketingFooterCta';
+
+/**
+ * Marketing footer — frame.io-inspired premium density.
+ *
+ * Visual contract:
+ * - #06070a base, hairline rgba(255,255,255,0.07) top border, subtle 220px
+ *   ambient edge-glow at the seam.
+ * - 4-column nav with caps eyebrow headers (11px / 0.2em tracking / muted),
+ *   14px caption-weight links.
+ * - Hairline-separated bottom band with copyright + legal — a sub-band, not
+ *   a separate footer row.
+ * - Wordmark column carries a small tagline below the mark for editorial
+ *   weight.
+ * - Minimal variant collapses to mark + bottom band only (used on
+ *   /pricing, /legal/*).
+ */
 
 const MINIMAL_FOOTER_PATHS = new Set<string>([
   APP_ROUTES.PRICING,
   APP_ROUTES.LEGAL_PRIVACY,
   APP_ROUTES.LEGAL_TERMS,
 ]);
+const PAGE_OWNS_FINAL_CTA_PATHS = new Set<string>([
+  APP_ROUTES.HOME,
+  APP_ROUTES.ARTIST_PROFILES,
+  APP_ROUTES.ARTIST_NOTIFICATIONS,
+  APP_ROUTES.LAUNCH,
+]);
 
 interface MarketingFooterProps {
   readonly variant?: 'auto' | 'expanded' | 'minimal';
   readonly className?: string;
+  readonly showCta?: boolean;
 }
 
-const FOOTER_COLUMNS: readonly {
-  readonly title: string;
-  readonly links: readonly {
-    readonly href: string;
-    readonly label: string;
-  }[];
-}[] = [
-  {
-    title: 'Product',
-    links: [
-      { href: APP_ROUTES.ARTIST_PROFILES, label: 'Artist Profiles' },
-      { href: APP_ROUTES.SIGNUP, label: 'Release Planning' },
-      { href: APP_ROUTES.PRICING, label: 'Pricing' },
-    ],
-  },
-  {
-    title: 'Features',
-    links: [
-      { href: APP_ROUTES.ARTIST_PROFILES, label: 'Smart Links' },
-      { href: APP_ROUTES.ARTIST_NOTIFICATIONS, label: 'Notifications' },
-      { href: APP_ROUTES.SIGNUP, label: 'Audience Signal' },
-    ],
-  },
-  {
-    title: 'Company',
-    links: [
-      { href: APP_ROUTES.ABOUT, label: 'About' },
-      { href: APP_ROUTES.BLOG, label: 'Blog' },
-      { href: APP_ROUTES.CHANGELOG, label: 'Changelog' },
-    ],
-  },
-  {
-    title: 'Resources',
-    links: [
-      { href: APP_ROUTES.SUPPORT, label: 'Support' },
-      { href: 'https://status.jov.ie', label: 'Status' },
-      { href: APP_ROUTES.DEMO, label: 'Demo' },
-    ],
-  },
-] as const;
+const markLinkClassName =
+  '-m-1.5 inline-flex rounded-full p-1.5 text-white/[0.92] transition-opacity duration-150 hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
 
 const footerLinkClassName =
-  'inline-flex w-fit rounded-[5px] text-[15px] leading-[1.45] tracking-[-0.005em] text-white/[0.72] transition-colors duration-150 hover:text-white focus-visible:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
+  'mf-link inline-flex w-fit rounded-[5px] text-[15px] leading-[1.45] tracking-[-0.005em] text-white/[0.72] transition-colors duration-150 hover:text-white focus-visible:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
 const footerLegalLinkClassName =
-  'inline-flex w-fit rounded-[5px] text-[12px] leading-5 tracking-[-0.01em] text-white/[0.34] transition-colors duration-150 hover:text-white/70 focus-visible:text-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
+  'mf-legal-link inline-flex w-fit rounded-[5px] text-[12px] leading-5 tracking-[-0.01em] text-white/[0.34] transition-colors duration-150 hover:text-white/70 focus-visible:text-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
+
+function FooterLink({ link }: Readonly<{ link: MarketingFooterLink }>) {
+  return (
+    <Link
+      href={link.href}
+      prefetch={link.external ? undefined : false}
+      className={footerLinkClassName}
+      target={link.external ? '_blank' : undefined}
+      rel={link.external ? 'noreferrer' : undefined}
+    >
+      {link.label}
+    </Link>
+  );
+}
 
 export function MarketingFooter({
   variant = 'auto',
   className,
+  showCta = true,
 }: Readonly<MarketingFooterProps>) {
   const pathname = usePathname();
   const resolvedVariant =
@@ -75,63 +81,71 @@ export function MarketingFooter({
         : 'expanded'
       : variant;
   const isMinimal = resolvedVariant === 'minimal';
+  const pageOwnsFinalCta =
+    typeof pathname === 'string' && PAGE_OWNS_FINAL_CTA_PATHS.has(pathname);
+  const shouldShowCta = showCta && !isMinimal && !pageOwnsFinalCta;
 
   return (
     <footer
-      className={cn(
-        'relative overflow-hidden border-t border-white/[0.04] bg-black text-white',
-        className
-      )}
+      className={cn('marketing-footer-premium', className)}
+      data-testid='marketing-footer'
     >
       <div
         className={cn(
-          'marketing-footer-inner relative w-full px-[clamp(1.25rem,2.2vw,2rem)]',
+          'mx-auto w-full max-w-[var(--linear-content-max)] px-[clamp(1.25rem,2.2vw,2rem)]',
           isMinimal
-            ? 'py-[clamp(2.6rem,5vw,4rem)]'
-            : 'pt-[clamp(3.25rem,5vw,4.6rem)] pb-[clamp(5rem,8vw,7rem)]'
+            ? 'pt-[clamp(2.5rem,4.5vw,3.5rem)] pb-[clamp(2rem,3.5vw,2.75rem)]'
+            : shouldShowCta
+              ? 'pt-0 pb-[clamp(2rem,3.5vw,2.75rem)]'
+              : 'pt-[clamp(3.5rem,5.5vw,5rem)] pb-[clamp(2rem,3.5vw,2.75rem)]'
         )}
       >
+        {shouldShowCta ? (
+          <div className='-mx-[clamp(1.25rem,2.2vw,2rem)]'>
+            <MarketingFooterCta />
+          </div>
+        ) : null}
+
         {isMinimal ? (
           <Link
             href={APP_ROUTES.HOME}
             prefetch={false}
             aria-label='Jovie home'
-            className='-m-1.5 inline-flex rounded-full p-1.5 text-white/[0.9] transition-opacity duration-150 hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
+            className={markLinkClassName}
           >
-            <BrandLogo size={24} tone='white' rounded={false} aria-hidden />
+            <BrandLogo size={22} tone='white' rounded={false} aria-hidden />
           </Link>
         ) : (
-          <div className='grid gap-12 md:grid-cols-[3.5rem_minmax(0,1fr)] md:gap-14 xl:gap-16'>
+          <div className='grid gap-12 md:grid-cols-[minmax(0,1fr)_minmax(0,2.6fr)] md:gap-x-16 md:gap-y-14 lg:gap-x-24'>
             <div className='min-w-0'>
               <Link
                 href={APP_ROUTES.HOME}
                 prefetch={false}
                 aria-label='Jovie home'
-                className='-m-1.5 inline-flex rounded-full p-1.5 text-white/[0.9] transition-opacity duration-150 hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
+                className={markLinkClassName}
               >
-                <BrandLogo size={24} tone='white' rounded={false} aria-hidden />
+                <BrandLogo size={22} tone='white' rounded={false} aria-hidden />
               </Link>
+              <p className='mf-mark-tagline'>
+                Tools for artists to release music, capture fans, and earn
+                without the platform tax.
+              </p>
             </div>
 
             <nav
-              className='grid grid-cols-2 gap-x-10 gap-y-8 sm:grid-cols-4 lg:gap-x-14 xl:gap-x-20'
+              className={cn(
+                'grid grid-cols-2 gap-x-8 gap-y-10 sm:grid-cols-3 lg:grid-cols-5 lg:gap-x-12 xl:gap-x-16',
+                shouldShowCta && 'mt-[clamp(3.25rem,5vw,4.6rem)]'
+              )}
               aria-label='Footer'
             >
-              {FOOTER_COLUMNS.map(column => (
+              {MARKETING_FOOTER_COLUMNS.map(column => (
                 <section key={column.title}>
-                  <h2 className='mb-4 text-[12px] font-medium leading-[1.35] tracking-[-0.01em] text-white/[0.78]'>
-                    {column.title}
-                  </h2>
-                  <ul className='flex list-none flex-col gap-2.5 p-0'>
+                  <h2 className='mf-eyebrow'>{column.title}</h2>
+                  <ul className='flex list-none flex-col gap-3 p-0'>
                     {column.links.map(link => (
                       <li key={`${link.href}-${link.label}`}>
-                        <Link
-                          href={link.href}
-                          prefetch={false}
-                          className={footerLinkClassName}
-                        >
-                          {link.label}
-                        </Link>
+                        <FooterLink link={link} />
                       </li>
                     ))}
                   </ul>
@@ -143,26 +157,24 @@ export function MarketingFooter({
 
         <div
           className={cn(
-            'flex flex-wrap items-center justify-between gap-x-7 gap-y-2 text-[12px] leading-5 tracking-[-0.01em] text-white/[0.32]',
-            isMinimal ? 'mt-8' : 'mt-[clamp(3.5rem,6vw,5rem)]'
+            'mf-baseband flex flex-wrap items-center justify-between gap-x-7 gap-y-2'
           )}
+          style={isMinimal ? { marginTop: '1.75rem' } : undefined}
         >
-          <span>© {new Date().getFullYear()} Jovie Technology Inc.</span>
-          <nav aria-label='Legal' className='flex flex-wrap items-center gap-5'>
-            <Link
-              href={APP_ROUTES.LEGAL_PRIVACY}
-              prefetch={false}
-              className={footerLegalLinkClassName}
-            >
-              Privacy
-            </Link>
-            <Link
-              href={APP_ROUTES.LEGAL_TERMS}
-              prefetch={false}
-              className={footerLegalLinkClassName}
-            >
-              Terms
-            </Link>
+          <span className='text-[12px] leading-[1.45] tracking-[-0.005em] text-white/[0.36]'>
+            © {new Date().getFullYear()} Jovie Technology Inc.
+          </span>
+          <nav aria-label='Legal' className='flex flex-wrap items-center gap-6'>
+            {MARKETING_LEGAL_LINKS.map(link => (
+              <Link
+                key={link.href}
+                href={link.href}
+                prefetch={false}
+                className={footerLegalLinkClassName}
+              >
+                {link.label}
+              </Link>
+            ))}
           </nav>
         </div>
       </div>

@@ -13,6 +13,7 @@ import type { ReactNode } from 'react';
 import { forwardRef, useCallback, useEffect, useRef, useState } from 'react';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
+import { getMarketingExportImage } from '@/lib/screenshots/registry';
 import { cn } from '@/lib/utils';
 import {
   clampOutcomeIndex,
@@ -395,7 +396,7 @@ function IrlPaymentsVisual({}: Readonly<{
         className='object-cover object-bottom'
         fill
         sizes='(max-width: 640px) 18rem, 19rem'
-        src='/product-screenshots/tim-white-profile-pay-phone.png'
+        src={getMarketingExportImage('tim-white-profile-pay-mobile').publicUrl}
       />
       <div
         aria-hidden='true'

@@ -38,6 +38,7 @@ import { openChatWithPrompt } from '@/lib/chat/open-chat-with-prompt';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { captureError } from '@/lib/error-tracking';
 import { useCodeFlag } from '@/lib/feature-flags/client';
+import { useAppFlag } from '@/lib/flags/client';
 import { QueryErrorBoundary, usePlanGate } from '@/lib/queries';
 import type { ReleaseContext } from '@/lib/release-tasks/applicability';
 import { cn } from '@/lib/utils';
@@ -155,6 +156,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   const [isGeneratingReleasePlan, setIsGeneratingReleasePlan] = useState(false);
   const router = useRouter();
   const albumArtFlagEnabled = useCodeFlag('ALBUM_ART_GENERATION');
+  const designV1ReleasesEnabled = useAppFlag('DESIGN_V1_RELEASES');
 
   const {
     rows,
@@ -834,6 +836,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           analyticsOverride={selectedSidebarData?.analytics ?? null}
           tracksOverride={selectedSidebarData?.tracks}
           showCredits={experienceMode === 'live'}
+          designV1={designV1ReleasesEnabled}
           onCanvasStatusUpdate={
             experienceAdapter?.onCanvasStatusUpdate ?? handleCanvasStatusUpdate
           }
@@ -874,6 +877,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     canEditSmartLinks,
     handleCanvasStatusUpdate,
     releaseSidebarHandlers,
+    designV1ReleasesEnabled,
   ]);
 
   useRegisterRightPanel(sidebarPanel);
@@ -883,6 +887,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       <div
         className='flex h-full min-h-0 min-w-0 flex-col'
         data-testid='releases-matrix'
+        data-design-v1-releases={designV1ReleasesEnabled ? 'true' : undefined}
       >
         <h1 className='sr-only'>Releases</h1>
 
@@ -983,11 +988,12 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                 canGenerateAlbumArt={showGenerateAlbumArtAction}
                 onGenerateAlbumArt={handleGenerateAlbumArt}
                 columnVisibility={columnVisibility}
-                rowHeight={rowHeight}
+                rowHeight={designV1ReleasesEnabled ? 46 : rowHeight}
                 showTracks={showTracks}
                 groupByYear={groupByYear}
                 selectedReleaseId={editingRelease?.id}
                 selectedTrackId={editingTrack?.id}
+                designV1={designV1ReleasesEnabled}
                 refreshingReleaseId={refreshingReleaseId}
                 flashedReleaseId={flashedReleaseId}
                 isSmartLinkLocked={isSmartLinkLocked}

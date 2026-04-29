@@ -26,7 +26,7 @@ export type { LyricLine, LyricsViewTrack } from './LyricsView.types';
  * @example
  * ```tsx
  * const { playbackState, seek } = useTrackAudioPlayer();
- * const [lines, setLines] = useState<LyricLine[]>(MOCK_LYRICS);
+ * const [lines, setLines] = useState<LyricLine[]>(initialLines);
  * <LyricsView
  *   track={{ artist: 'Bahamas', title: 'Lost in the Light' }}
  *   durationSec={playbackState.duration}
@@ -48,6 +48,7 @@ export function LyricsView({
   onTranscribe,
   onPaste,
   editing = false,
+  timed = true,
   className,
 }: {
   readonly track: LyricsViewTrack;
@@ -60,6 +61,7 @@ export function LyricsView({
   readonly onTranscribe?: () => void;
   readonly onPaste?: () => void;
   readonly editing?: boolean;
+  readonly timed?: boolean;
   readonly className?: string;
 }) {
   const [focusedIndex, setFocusedIndex] = useState(0);
@@ -69,12 +71,14 @@ export function LyricsView({
     // (LyricsView allows mid-list reordering via stampLine), so we cannot
     // rely on ascending order to early-exit. Linear scan is O(n) but n is
     // typically <40 lyric lines per track.
+    if (!timed) return -1;
+
     let idx = -1;
     for (let i = 0; i < lines.length; i++) {
       if (lines[i].startSec <= currentTimeSec) idx = i;
     }
     return idx;
-  }, [lines, currentTimeSec]);
+  }, [lines, currentTimeSec, timed]);
 
   useEffect(() => {
     if (activeIndex >= 0) setFocusedIndex(activeIndex);
@@ -180,6 +184,7 @@ export function LyricsView({
                 isActive={isActive}
                 isFocused={isFocused}
                 editing={editing && Boolean(onLinesChange)}
+                interactive={timed}
                 onFocus={() => setFocusedIndex(i)}
                 onSeek={() => onSeek(line.startSec)}
                 onStamp={() => stampLine(i)}
@@ -189,13 +194,15 @@ export function LyricsView({
           })}
         </ul>
       </div>
-      <LyricsTimeline
-        durationSec={durationSec}
-        currentTimeSec={currentTimeSec}
-        lines={lines}
-        activeIndex={activeIndex}
-        onSeek={onSeek}
-      />
+      {timed && (
+        <LyricsTimeline
+          durationSec={durationSec}
+          currentTimeSec={currentTimeSec}
+          lines={lines}
+          activeIndex={activeIndex}
+          onSeek={onSeek}
+        />
+      )}
     </section>
   );
 }

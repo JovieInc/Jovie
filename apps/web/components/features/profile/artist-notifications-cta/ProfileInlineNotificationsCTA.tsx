@@ -182,6 +182,7 @@ export function ProfileInlineNotificationsCTA({
   const subscribedEmailRef = useRef('');
   const hasAutoOpenedRef = useRef(false);
   const activatedInCurrentFlowRef = useRef(false);
+  const otpVerificationInFlightRef = useRef(false);
 
   const isInline = presentation === 'inline';
   const artistEmailReady = readArtistEmailReadyFromSettings(artist.settings);
@@ -375,7 +376,12 @@ export function ProfileInlineNotificationsCTA({
   ]);
 
   const handleOtpSubmit = useCallback(async () => {
-    const result = await handleVerifyOtp();
+    if (otpVerificationInFlightRef.current) return;
+    otpVerificationInFlightRef.current = true;
+
+    const result = await handleVerifyOtp().finally(() => {
+      otpVerificationInFlightRef.current = false;
+    });
     if (result !== 'subscribed') return;
 
     subscribedEmailRef.current =
@@ -393,7 +399,12 @@ export function ProfileInlineNotificationsCTA({
     async (value: string) => {
       handleOtpChange(value);
       if (value.length !== 6) return;
-      const result = await handleVerifyOtp(value);
+      if (otpVerificationInFlightRef.current) return;
+      otpVerificationInFlightRef.current = true;
+
+      const result = await handleVerifyOtp(value).finally(() => {
+        otpVerificationInFlightRef.current = false;
+      });
       if (result !== 'subscribed') return;
 
       subscribedEmailRef.current =
@@ -412,28 +423,25 @@ export function ProfileInlineNotificationsCTA({
     ]
   );
 
-  const handleNameSubmit = useCallback(async () => {
+  const handleNameSubmit = useCallback(() => {
     const trimmed = nameInput.trim();
+    setStep('birthday');
+
     if (!trimmed || !activeEmail) {
-      setStep('birthday');
       return;
     }
 
-    try {
-      await nameMutation.mutateAsync({
+    void nameMutation
+      .mutateAsync({
         artistId: artist.id,
         email: activeEmail,
         name: trimmed,
-      });
-    } catch {
-      // Best-effort, do not block the flow on profile enrichment.
-    }
-
-    setStep('birthday');
+      })
+      .catch(() => {});
   }, [activeEmail, artist.id, nameInput, nameMutation]);
 
   const handleBirthdaySubmit = useCallback(
-    async (overrideDigits?: string) => {
+    (overrideDigits?: string) => {
       const digits = (overrideDigits ?? birthdayInput).replaceAll(/[^\d]/g, '');
 
       if (digits.length < 8) {
@@ -454,15 +462,17 @@ export function ProfileInlineNotificationsCTA({
       }
 
       if (activeEmail) {
-        try {
-          await birthdayMutation.mutateAsync({
+        setCanEditPreferences(true);
+        setStep('done');
+
+        void birthdayMutation
+          .mutateAsync({
             artistId: artist.id,
             email: activeEmail,
             birthday: birthdayDigitsToStorage(digits),
-          });
-        } catch {
-          // Best-effort, do not block the flow on profile enrichment.
-        }
+          })
+          .catch(() => {});
+        return;
       }
 
       setCanEditPreferences(true);

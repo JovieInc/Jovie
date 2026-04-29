@@ -1,5 +1,5 @@
 import { NumberedSection } from '@/components/marketing';
-import { ProductScreenshot } from './ProductScreenshot';
+import { MarketingScreenshot } from '@/components/marketing/MarketingScreenshot';
 
 const SUB_ITEMS = [
   {
@@ -34,9 +34,9 @@ export function AudienceCRMSection() {
       className='relative overflow-hidden bg-page'
     >
       <div className='relative'>
-        <ProductScreenshot
-          src='/product-screenshots/audience-crm.png'
-          alt='Audience CRM showing fan table with source tracking and segments'
+        <MarketingScreenshot
+          scenarioId='dashboard-audience-desktop'
+          altOverride='Audience CRM showing fan table with source tracking and segments'
           width={2880}
           height={1800}
           title='Audience'

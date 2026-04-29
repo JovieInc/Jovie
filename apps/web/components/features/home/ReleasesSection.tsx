@@ -3,7 +3,7 @@
 import { BellRing, CheckCheck, Mail } from 'lucide-react';
 import Image from 'next/image';
 import { NumberedSection } from '@/components/marketing';
-import { ProductScreenshot } from './ProductScreenshot';
+import { MarketingScreenshot } from '@/components/marketing/MarketingScreenshot';
 import { RELEASES } from './releases-data';
 
 const SUB_ITEMS = [
@@ -75,14 +75,13 @@ export function ReleasesSection() {
         <div className='mt-3.5 grid gap-3.5 lg:grid-cols-[minmax(0,1.08fr)_15.5rem] lg:items-start xl:grid-cols-[minmax(0,1.06fr)_16.25rem]'>
           <div className='space-y-3'>
             <div className='max-w-[42rem]'>
-              <ProductScreenshot
-                src='/product-screenshots/releases-dashboard-full.png'
-                alt='Jovie releases dashboard showing catalog with smart links'
+              <MarketingScreenshot
+                scenarioId='dashboard-releases-desktop'
+                altOverride='Jovie releases dashboard showing catalog with smart links'
                 width={2880}
                 height={1800}
                 title='Jovie - Release Flow'
                 priority
-                skipCheck
               />
             </div>
 
