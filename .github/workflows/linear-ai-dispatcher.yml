@@ -64,8 +64,8 @@ jobs:
           set -euo pipefail
 
           if [[ -z "$LINEAR_API_KEY" ]]; then
-            echo "Missing LINEAR_API_KEY; cannot dispatch Linear issues"
-            exit 1
+            echo "::notice::LINEAR_API_KEY is not configured; Linear dispatch automation is disabled."
+            exit 0
           fi
 
           OPEN_AGENT_PRS=$(gh api "repos/${{ github.repository }}/pulls?state=open&per_page=100" \
