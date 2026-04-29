@@ -17,7 +17,14 @@ const PRIVILEGED_TEST_ACCOUNT_EMAIL_REGEX =
 
 type SeededUserValues = Pick<
   typeof users.$inferInsert,
-  'clerkId' | 'email' | 'name' | 'userStatus' | 'isAdmin'
+  | 'clerkId'
+  | 'email'
+  | 'name'
+  | 'userStatus'
+  | 'isAdmin'
+  | 'plan'
+  | 'isPro'
+  | 'billingUpdatedAt'
 >;
 
 type SeededCreatorProfileValues = Pick<

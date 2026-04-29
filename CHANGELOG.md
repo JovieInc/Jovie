@@ -7,23 +7,32 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.195] - 2026-04-29
 
-> Faster local web development loop with pinned fast-start commands, route benchmarking, and less repeat setup work.
+> Faster local development, UI parallax polish, and tighter mobile public profiles.
 
 ### Added
 
 - [internal] **`pnpm run dev:web:fast`** for daily web work: pinned Doppler scope, local auth bypass defaults, stable `PORT=3100`, local Sentry disabled by default, and automatic prewarming for `/`, `/app`, and `/api/health/build-info`.
 - [internal] **`pnpm run benchmark:dev`** to measure local dev server readiness, first-route compile time, and warm-route latency across configurable routes.
 - [internal] **Fast iteration commands** for changed web tests and incremental web typechecking.
+- Added a native-dialog lint guard and design-system docs for choosing confirmations, success/error toasts, and future undo-toast flows.
+- Added test coverage for task deletion confirmation behavior and the ready creator persona's Pro entitlement.
 - **`/ui/parallax` demo route** under the existing UI parity workspace, with a 7-image zoom-parallax collage driven by the shared `ZoomParallax` component in `apps/web/components/ui/zoom-parallax.tsx`.
 - **Unit coverage** for the new component, including the image cap at 7 items and generated fallback alt text for unnamed images.
+- **`ProfileMediaCard` primitive** for image-led release, event, playlist, listen, and merch-style profile cards. Release artwork keeps the editorial grayscale treatment; artist photos stay in color.
+- **iPhone SE 2/3 coverage** in the mobile public profile viewport suite, plus stricter no-scroll assertions for page and compact-shell vertical overflow.
 
 ### Changed
 
 - [internal] **Repeat `./scripts/setup.sh` runs are faster** by skipping unchanged dependency installs, preserving Turbopack cache unless `JOVIE_DEV_RESET_NEXT_CACHE=1`, and making dev Clerk ID sync opt-in or stale-marker based.
 - [internal] **Local Sentry initialization is a true no-op by default** in development, while production, preview, and explicit `JOVIE_ENABLE_LOCAL_SENTRY=1` behavior remains available.
 - [internal] **Homepage fallback imports are lighter** by loading the older home design only when its feature flag is enabled.
+- Replaced remaining production `alert()` and `confirm()` browser dialogs in release sidebars, investor links, catalog health, and task deletion flows with `ConfirmDialog` or Sonner toasts.
+- Made the `creator-ready` local auth bypass persona Pro-entitled so dashboard QA and perf checks can reach gated creator surfaces without a manual plan toggle.
 - **`/ui` demo shell now uses a real viewport-height layout** via `h-screen` in `apps/web/app/ui/layout.tsx`, so tall demos scroll within the shell's main pane instead of trapping the page at `scrollY=0`.
 - **Parallax motion implementation now follows the actual scroll container** instead of assuming window scroll. `ZoomParallax` resolves the nearest scrollable ancestor, drives transforms through `requestAnimationFrame`, and respects reduced-motion users.
+- **Mobile public profile Home** is denser and more reference-aligned: color artist hero image, bottom-fade text overlay, Bell alert control, bare social icons, compact Latest + Up Next treatment, and small-height breakpoints that keep content inside standard iPhone viewports.
+- **Mobile Music, Events, and Alerts tabs** now use flatter native-list surfaces with less outer chrome while preserving existing release, tour, and notification data contracts.
+- **Notification viewport QA** now opens the dedicated notifications route, clears local notification status cache, waits for the actual email step, and verifies input focus does not move or zoom the shell.
 
 ### Fixed
 
@@ -32,6 +41,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - [internal] **Fast dev scripts handle edge cases more clearly** with portable port defaults, Node heap defaults, route probe timeouts, and dependency-free port checks.
 - **Nested landmark bug on `/ui/parallax`** by removing an inner `<main>` from the route page. The `/ui` workspace now exposes one top-level main landmark instead of invalid nested mains.
 - **Browser warning from the prior `motion/react` container setup** and the underlying non-animating state in the `/ui` shell. The collage now scales correctly on desktop and mobile within the shell's internal scroller.
+- **Profile media countdown hydration** no longer mismatches server/client seconds on first render.
+- **Public profile mobile overflow** now fails tests when the compact shell requires vertical scroll, including on iPhone SE, Mini, standard, Pro, Plus, and Max viewport families.
 
 ### Documentation
 

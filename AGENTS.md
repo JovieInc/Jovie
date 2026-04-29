@@ -79,6 +79,9 @@ When local perf or E2E work needs an authenticated session on loopback/private h
 
 - Enable `E2E_USE_TEST_AUTH_BYPASS=1` for local authenticated test runs.
 - Use `/api/dev/test-auth/session` to mint bypass cookies for programmatic flows and `/api/dev/test-auth/enter?persona=...&redirect=/app` for browser bootstrap flows.
+- Use `persona=creator` for the free, incomplete onboarding baseline.
+- Use `persona=creator-ready` for the Pro-entitled dashboard QA baseline.
+- Use `persona=admin` for the admin-shell baseline; it is not the paid creator baseline.
 - Validate the loopback host you are actually using (`localhost` vs `127.0.0.1`) because host-only cookies do not cross between them.
 - If auth bootstrap fails locally, debug the bypass route/cookie flow first instead of treating it as an expected limitation.
 
@@ -381,6 +384,18 @@ This is 4b (subtraction principle) applied specifically to container boundaries.
 - Do **NOT** use `translate`, `scale`, lift-on-hover, or floating-card motion on buttons, cards, screenshots, auth surfaces, or marketing panels as a default polish move
 - Prefer background-color, border-color, text-color, opacity, or shadow changes for hover feedback
 - If motion is necessary because the UI is directly manipulating something spatial, it must be intentional and clearly tied to that interaction
+
+### 4f. No Native Browser Dialogs
+
+- **NEVER** use `alert(...)`, `confirm(...)`, or `prompt(...)` — bare or via `globalThis` / `window` / `self` — anywhere in production app code
+- Native dialogs are blocking, unstyled, and break design-system + a11y guarantees
+- The Biome rule `noRestrictedGlobals` (level: error) catches bare calls; `pnpm --filter web lint:no-native-dialogs` catches `globalThis.X` / `window.X` forms — both run in CI
+- Use the canonical replacements:
+  - **Confirmations (irreversible actions)** → `<ConfirmDialog>` from `@/components/molecules/ConfirmDialog`
+  - **Notifications / async errors** → `toast.error()` / `toast.success()` from `sonner`
+  - **Reversible actions** → optimistic update + undo-toast (pattern not yet codified — file a Linear ticket if you need this)
+- See `DESIGN.md` → "Confirmations & Destructive Actions" for the full decision rule and copy guidance
+- Storybook stories (`*.stories.tsx`) and CLI scripts (`apps/web/scripts/**`) are exempted via the Biome override; they may use `alert()` for handler-fired signals
 
 ### 5. Conventional Commits Required
 

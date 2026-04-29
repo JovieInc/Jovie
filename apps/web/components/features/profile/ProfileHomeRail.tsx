@@ -1,13 +1,11 @@
 'use client';
 
-import { Play } from 'lucide-react';
-import Link from 'next/link';
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
+import { useMemo } from 'react';
 import type {
   ProfileRailCard,
   ProfileRenderMode,
 } from '@/features/profile/contracts';
+import { ProfileMediaCard } from '@/features/profile/ProfileMediaCard';
 import {
   type ProfilePrimaryActionCardRelease,
   resolveProfilePrimaryActionCardState,
@@ -72,52 +70,6 @@ function getUpcomingTourDates(
     );
 }
 
-function formatMonthLabel(value: string | null | undefined) {
-  const date = toDateValue(value);
-  if (!date) {
-    return 'Soon';
-  }
-
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-  }).format(date);
-}
-
-function formatDayLabel(value: string | null | undefined) {
-  const date = toDateValue(value);
-  if (!date) {
-    return '—';
-  }
-
-  return new Intl.DateTimeFormat('en-US', {
-    day: 'numeric',
-  }).format(date);
-}
-
-function formatDateLabel(value: string | Date | null | undefined) {
-  const date = toDateValue(value);
-  if (!date) {
-    return 'Soon';
-  }
-
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-  }).format(date);
-}
-
-function formatTourLocation(tourDate: TourDateViewModel) {
-  return [tourDate.city, tourDate.region].filter(Boolean).join(', ');
-}
-
-function formatReleaseType(value: string | null | undefined) {
-  if (!value) {
-    return 'Release';
-  }
-
-  return capitalizeFirst(value.replaceAll('_', ' '));
-}
-
 function getFeaturedRailCardKind(kind: FeaturedRailKind) {
   switch (kind) {
     case 'release_countdown':
@@ -175,92 +127,48 @@ export function buildProfileRailCards(params: {
   return cards;
 }
 
-function RailCardShell({
-  href,
-  onClick,
-  className,
-  dataTestId,
-  dataState,
-  ariaLabel,
-  children,
-}: Readonly<{
-  href?: string | null;
-  onClick?: () => void;
-  className?: string;
-  dataTestId: string;
-  dataState?: string;
-  ariaLabel: string;
-  children: ReactNode;
-}>) {
-  const sharedProps = {
-    className: cn(
-      'group relative flex min-h-[268px] w-full overflow-hidden rounded-[26px] border border-white/10 bg-[#0d0f12] text-left shadow-[0_24px_56px_rgba(0,0,0,0.32)] transition-[background-color,border-color] duration-200 hover:border-white/16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
-      className
-    ),
-    'data-testid': dataTestId,
-    'data-state': dataState,
-    'aria-label': ariaLabel,
-  };
+function formatMonthLabel(value: string | null | undefined) {
+  const date = toDateValue(value);
+  if (!date) return 'Soon';
 
-  if (href?.startsWith('/')) {
-    return (
-      <Link href={href} prefetch={false} {...sharedProps}>
-        {children}
-      </Link>
-    );
-  }
-
-  if (href) {
-    return (
-      <a href={href} target='_blank' rel='noopener noreferrer' {...sharedProps}>
-        {children}
-      </a>
-    );
-  }
-
-  if (onClick) {
-    return (
-      <button type='button' onClick={onClick} {...sharedProps}>
-        {children}
-      </button>
-    );
-  }
-
-  return <div {...sharedProps}>{children}</div>;
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    timeZone: 'UTC',
+  }).format(date);
 }
 
-function LabelChip({ children }: Readonly<{ children: ReactNode }>) {
-  return (
-    <span className='inline-flex h-8 w-fit items-center rounded-full border border-white/14 bg-white/10 px-3 text-[11px] font-semibold tracking-[-0.01em] text-white/88 backdrop-blur-xl'>
-      {children}
-    </span>
-  );
+function formatDayLabel(value: string | null | undefined) {
+  const date = toDateValue(value);
+  if (!date) return '--';
+
+  return new Intl.DateTimeFormat('en-US', {
+    day: '2-digit',
+    timeZone: 'UTC',
+  }).format(date);
 }
 
-function CircleAction({
-  children,
-}: Readonly<{
-  children: ReactNode;
-}>) {
-  return (
-    <span className='inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/12 bg-black/40 text-white shadow-[0_14px_32px_rgba(0,0,0,0.28)] backdrop-blur-xl'>
-      {children}
-    </span>
-  );
+function formatWeekdayTimeLabel(tourDate: TourDateViewModel) {
+  const date = toDateValue(tourDate.startDate);
+  const weekday = date
+    ? new Intl.DateTimeFormat('en-US', {
+        weekday: 'short',
+        timeZone: 'UTC',
+      }).format(date)
+    : null;
+
+  return [weekday, tourDate.startTime].filter(Boolean).join(' · ');
 }
 
-function isDefaultAppIconUrl(url: string | null | undefined): boolean {
-  if (!url) return false;
-
-  try {
-    const parsed = new URL(url, 'http://localhost');
-    return parsed.pathname.startsWith('/android-chrome-');
-  } catch {
-    return url.startsWith('/android-chrome-');
-  }
+function formatTourLocation(tourDate: TourDateViewModel) {
+  return [tourDate.city, tourDate.region].filter(Boolean).join(', ');
 }
 
-function resolveRailImageUrl(
+function formatReleaseType(value: string | null | undefined) {
+  if (!value) return 'Release';
+  return capitalizeFirst(value.replaceAll('_', ' '));
+}
+
+function resolveImageUrl(
   imageUrl: string | null | undefined,
   fallbackVariant: 'release' | 'avatar'
 ) {
@@ -268,145 +176,172 @@ function resolveRailImageUrl(
     return null;
   }
 
-  if (fallbackVariant === 'release' && isDefaultAppIconUrl(imageUrl)) {
-    return null;
-  }
-
-  return imageUrl;
+  return imageUrl ?? null;
 }
 
-function ImageLedRailCard({
-  dataTestId,
-  ariaLabel,
-  imageUrl,
-  href,
-  onClick,
-  label,
-  title,
-  subtitle,
-  actionIcon,
-  actionLabel,
-  dataState,
-  fallbackVariant = 'release',
-  priority = false,
+function getReleaseCardMeta(release: ProfilePrimaryActionCardRelease) {
+  const type = formatReleaseType(release.releaseType);
+  return release.releaseType === 'ep' ? 'EP' : type;
+}
+
+function LatestReleaseFeature({
+  artist,
+  latestRelease,
+  isCountdown,
+  onPlayClick,
+  renderMode,
 }: Readonly<{
-  dataTestId: string;
-  ariaLabel: string;
-  imageUrl?: string | null;
-  href?: string | null;
-  onClick?: () => void;
-  label: string;
-  title: string;
-  subtitle: string;
-  actionIcon: ReactNode;
-  actionLabel?: string;
-  dataState?: string;
-  fallbackVariant?: 'release' | 'avatar';
-  priority?: boolean;
+  artist: Artist;
+  latestRelease: ProfilePrimaryActionCardRelease;
+  isCountdown: boolean;
+  onPlayClick?: () => void;
+  renderMode: ProfileRenderMode;
 }>) {
-  const resolvedImageUrl = resolveRailImageUrl(imageUrl, fallbackVariant);
+  const releaseDate = toDateValue(latestRelease.releaseDate);
+  const liveAction =
+    renderMode === 'interactive' && onPlayClick
+      ? { label: 'Listen Now', onClick: onPlayClick, icon: 'Play' as const }
+      : {
+          label: 'Listen Now',
+          href: `/${artist.handle}/${latestRelease.slug}`,
+          icon: 'Play' as const,
+        };
 
   return (
-    <RailCardShell
-      href={href}
-      onClick={onClick}
-      dataTestId={dataTestId}
-      dataState={dataState}
-      ariaLabel={ariaLabel}
-    >
-      <div className='absolute inset-0'>
-        <ImageWithFallback
-          src={resolvedImageUrl}
-          alt={title}
-          fill
-          priority={priority}
-          sizes='280px'
-          className='object-cover object-center'
-          fallbackVariant={fallbackVariant}
-          fallbackClassName='bg-surface-2'
-        />
-      </div>
-      <div className='absolute inset-0 bg-[linear-gradient(180deg,rgba(4,5,6,0.08)_0%,rgba(4,5,6,0.24)_38%,rgba(4,5,6,0.88)_100%)]' />
-      <div className='relative flex min-h-[268px] flex-col justify-between p-5'>
-        <LabelChip>{label}</LabelChip>
-        <div className='space-y-4'>
-          <div className='space-y-1.5'>
-            <p className='max-w-[15ch] text-[26px] font-semibold leading-[1.04] tracking-[-0.05em] text-white'>
-              {title}
-            </p>
-            <p className='text-[14px] leading-5 text-white/68'>{subtitle}</p>
-          </div>
-          {actionLabel ? (
-            <span className='inline-flex h-12 items-center gap-2.5 rounded-[15px] bg-white px-5 text-[14px] font-semibold tracking-[-0.02em] text-black shadow-[0_14px_32px_rgba(0,0,0,0.28)]'>
-              {actionIcon}
-              {actionLabel}
-            </span>
-          ) : (
-            <CircleAction>{actionIcon}</CircleAction>
-          )}
-        </div>
-      </div>
-    </RailCardShell>
+    <ProfileMediaCard
+      eyebrow={isCountdown ? 'New Single' : 'New Release'}
+      title={latestRelease.title}
+      subtitle={getReleaseCardMeta(latestRelease)}
+      imageUrl={resolveImageUrl(latestRelease.artworkUrl, 'release')}
+      imageAlt={`${latestRelease.title} artwork`}
+      fallbackVariant='release'
+      accent='purple'
+      ratio='landscape'
+      countdown={
+        isCountdown && releaseDate
+          ? { targetDate: releaseDate, label: 'Drops in' }
+          : null
+      }
+      status={isCountdown ? null : { label: 'Out Now', tone: 'green' }}
+      action={
+        isCountdown
+          ? {
+              label: 'Notify me',
+              href: `/${artist.handle}/${latestRelease.slug}`,
+              icon: 'Bell',
+            }
+          : liveAction
+      }
+      priority
+      dataTestId='profile-home-latest-card'
+      className='rounded-[18px] [&>div:first-child]:aspect-[3/1] [@media(max-height:880px)]:[&>div:last-child]:px-2.5 [@media(max-height:880px)]:[&>div:last-child]:py-2'
+    />
   );
 }
 
-function TourRailCard({
-  artistHandle,
-  stateKind,
+function TourUpNextCard({
+  artist,
   tourDate,
+  isNearYou,
 }: Readonly<{
-  artistHandle: string;
-  stateKind: 'tour_nearby' | 'tour_next';
+  artist: Artist;
   tourDate: TourDateViewModel;
+  isNearYou: boolean;
 }>) {
-  const href = tourDate.ticketUrl ?? `/${artistHandle}?mode=tour`;
-  const locationLabel = formatTourLocation(tourDate) || 'Upcoming show';
+  const canBuyTickets =
+    Boolean(tourDate.ticketUrl) &&
+    tourDate.ticketStatus !== 'cancelled' &&
+    tourDate.ticketStatus !== 'sold_out';
 
   return (
-    <RailCardShell
-      href={href}
+    <ProfileMediaCard
+      eyebrow={isNearYou ? 'Near You' : 'Next Show'}
+      title={tourDate.title ?? `${artist.name} Live`}
+      subtitle={tourDate.venueName}
+      locationLabel={formatTourLocation(tourDate)}
+      imageUrl={resolveImageUrl(artist.image_url, 'avatar')}
+      imageAlt={`${artist.name} show`}
+      fallbackVariant='avatar'
+      accent={isNearYou ? 'blue' : 'orange'}
+      ratio='compact'
+      datePill={{
+        month: formatMonthLabel(tourDate.startDate),
+        day: formatDayLabel(tourDate.startDate),
+        meta: formatWeekdayTimeLabel(tourDate),
+      }}
+      action={{
+        label:
+          tourDate.ticketStatus === 'sold_out'
+            ? 'Sold out'
+            : tourDate.ticketStatus === 'cancelled'
+              ? 'Cancelled'
+              : canBuyTickets
+                ? 'Get tickets'
+                : 'Details',
+        href: canBuyTickets ? tourDate.ticketUrl : `/${artist.handle}/tour`,
+        icon: 'Ticket',
+        showChevron: canBuyTickets,
+        disabled: tourDate.ticketStatus === 'cancelled',
+      }}
       dataTestId='profile-home-rail-tour'
-      dataState={stateKind}
-      ariaLabel={`Open ${tourDate.venueName ?? 'tour details'}`}
-      className='bg-[linear-gradient(180deg,rgba(22,23,26,0.96),rgba(10,11,13,0.98))]'
-    >
-      <div className='relative flex min-h-[268px] flex-col justify-between p-5'>
-        <LabelChip>
-          {stateKind === 'tour_nearby' ? 'On Tour' : 'Upcoming Show'}
-        </LabelChip>
+      className='[@media(max-height:880px)]:[&>div:first-child]:aspect-[1.35/1] [@media(max-height:880px)]:[&>div:last-child]:p-1'
+    />
+  );
+}
 
-        <div className='space-y-3.5'>
-          <div className='flex items-end justify-between gap-4'>
-            <div className='flex min-w-0 items-end gap-4'>
-              <div className='border-r border-white/10 pr-4'>
-                <p className='text-[12px] font-medium text-white/50'>
-                  {formatMonthLabel(tourDate.startDate)}
-                </p>
-                <p className='mt-1 text-[40px] font-semibold leading-none tracking-[-0.075em] text-white'>
-                  {formatDayLabel(tourDate.startDate)}
-                </p>
-              </div>
-              <div className='min-w-0 space-y-1.5 pb-1'>
-                <p className='max-w-[11ch] text-[22px] font-semibold leading-[1.04] tracking-[-0.045em] text-white'>
-                  {tourDate.venueName ?? 'Tour Date'}
-                </p>
-                <p className='text-[14px] leading-5 text-white/66'>
-                  {locationLabel}
-                </p>
-              </div>
-            </div>
+function PlaylistUpNextCard({
+  playlist,
+}: Readonly<{ playlist: ConfirmedFeaturedPlaylistFallback }>) {
+  return (
+    <ProfileMediaCard
+      eyebrow='Featured Playlist'
+      title={playlist.title}
+      subtitle='Open playlist'
+      imageUrl={playlist.imageUrl}
+      imageAlt={playlist.title}
+      fallbackVariant='release'
+      accent='green'
+      ratio='compact'
+      action={{
+        label: 'Listen',
+        ariaLabel: `Open ${playlist.title}`,
+        href: playlist.url,
+        icon: 'Play',
+        showChevron: true,
+      }}
+      dataTestId='profile-home-rail-playlist'
+      className='[@media(max-height:880px)]:[&>div:first-child]:aspect-[1.35/1] [@media(max-height:880px)]:[&>div:last-child]:p-1'
+    />
+  );
+}
 
-            <span className='inline-flex h-10 shrink-0 items-center rounded-[13px] bg-white/10 px-4 text-[13px] font-semibold text-white shadow-[0_12px_26px_rgba(0,0,0,0.2)] backdrop-blur-xl'>
-              Tickets
-            </span>
-          </div>
-
-          <p className='text-[13px] font-medium text-white/50'>
-            {stateKind === 'tour_nearby' ? 'Near You' : 'Next Show'}
-          </p>
-        </div>
-      </div>
-    </RailCardShell>
+function ListenUpNextCard({
+  artist,
+  onPlayClick,
+}: Readonly<{
+  artist: Artist;
+  onPlayClick?: () => void;
+}>) {
+  return (
+    <ProfileMediaCard
+      eyebrow='Music'
+      title={artist.name}
+      subtitle='Choose a platform'
+      imageUrl={resolveImageUrl(artist.image_url, 'avatar')}
+      imageAlt={artist.name}
+      fallbackVariant='avatar'
+      accent='purple'
+      ratio='compact'
+      action={{
+        label: 'Listen',
+        ariaLabel: `Listen to ${artist.name}`,
+        href: onPlayClick ? null : `/${artist.handle}?mode=listen`,
+        onClick: onPlayClick,
+        icon: 'Play',
+      }}
+      dataTestId='profile-home-rail-listen'
+      className='[@media(max-height:880px)]:[&>div:first-child]:aspect-[1.35/1] [@media(max-height:880px)]:[&>div:last-child]:p-1'
+    />
   );
 }
 
@@ -422,13 +357,10 @@ export function ProfileHomeRail({
   viewerLocation,
   resolveNearbyTour = true,
 }: Readonly<ProfileHomeRailProps>) {
-  const railRef = useRef<HTMLDivElement | null>(null);
-  const [activeIndex, setActiveIndex] = useState(0);
   const upcomingTourDates = useMemo(
     () => getUpcomingTourDates(tourDates),
     [tourDates]
   );
-  const isPreviewRail = renderMode === 'preview';
   const releaseVisibility = useMemo(
     () => getProfileReleaseVisibility(latestRelease, profileSettings),
     [latestRelease, profileSettings]
@@ -486,192 +418,120 @@ export function ProfileHomeRail({
     ]
   );
 
-  useEffect(() => {
-    const container = railRef.current;
-    if (!container) {
-      return;
-    }
-
-    const updateActiveCard = () => {
-      const cardElements = Array.from(
-        container.querySelectorAll<HTMLElement>('[data-rail-card-index]')
-      );
-      if (cardElements.length === 0) {
-        return;
-      }
-
-      const containerLeft = container.getBoundingClientRect().left;
-      const nextIndex = cardElements.reduce(
-        (best, element, index) => {
-          const distance = Math.abs(
-            element.getBoundingClientRect().left - containerLeft
-          );
-          return distance < best.distance ? { index, distance } : best;
-        },
-        { index: 0, distance: Number.POSITIVE_INFINITY }
-      ).index;
-
-      setActiveIndex(nextIndex);
-    };
-
-    updateActiveCard();
-    container.addEventListener('scroll', updateActiveCard, { passive: true });
-    globalThis.addEventListener('resize', updateActiveCard);
-    return () => {
-      container.removeEventListener('scroll', updateActiveCard);
-      globalThis.removeEventListener('resize', updateActiveCard);
-    };
-  }, [cards.length]);
-
   if (cards.length === 0) {
     return null;
   }
 
+  const showLatest = Boolean(releaseVisibility?.show && latestRelease);
+  const upNextCards = cards.filter(
+    card => !(showLatest && card.kind === 'release')
+  );
+  const visibleTourDate = nearbyTourDate ?? nextTourDate;
+
   return (
-    <div className={cn(isPreviewRail ? 'space-y-3' : 'space-y-4')}>
-      <p className='px-0.5 text-[21px] font-semibold leading-none tracking-[-0.04em] text-white'>
-        Latest
-      </p>
-      <div
-        ref={railRef}
-        className={cn(
-          '-mx-1 flex snap-x snap-mandatory overflow-x-auto px-1 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
-          isPreviewRail ? 'gap-3.5' : 'gap-4'
-        )}
-        data-testid='profile-home-rail'
-      >
-        {cards.map((card, index) => (
-          <div
-            key={card.id}
-            className={cn(
-              'snap-start',
-              isPreviewRail
-                ? 'min-w-[calc(100%-92px)] sm:min-w-[calc(100%-112px)]'
-                : 'min-w-[calc(100%-72px)] sm:min-w-[calc(100%-92px)]'
-            )}
-            data-rail-card-index={index}
-          >
-            {card.kind === 'release' && latestRelease ? (
-              <ImageLedRailCard
-                dataTestId='profile-home-rail-release'
-                ariaLabel={`Open ${latestRelease.title}`}
-                imageUrl={latestRelease.artworkUrl ?? artist.image_url}
-                href={
-                  featuredState.kind === 'release_live' && onPlayClick
-                    ? null
-                    : `/${artist.handle}/${latestRelease.slug}`
-                }
-                onClick={
-                  featuredState.kind === 'release_live'
-                    ? onPlayClick
-                    : undefined
-                }
-                label={
-                  featuredState.kind === 'release_countdown'
-                    ? 'Coming Soon'
-                    : 'Latest Release'
-                }
-                dataState={
-                  featuredState.kind === 'release_countdown'
-                    ? 'release_countdown'
-                    : 'release_live'
-                }
-                title={latestRelease.title}
-                subtitle={
-                  featuredState.kind === 'release_countdown'
-                    ? `Drops ${formatDateLabel(latestRelease.releaseDate)}`
-                    : formatReleaseType(latestRelease.releaseType)
-                }
-                actionIcon={<Play className='h-5 w-5 fill-current' />}
-                actionLabel={
-                  featuredState.kind === 'release_countdown'
-                    ? 'Remind Me'
-                    : 'Listen Now'
-                }
-                priority={index === 0}
-              />
-            ) : null}
-
-            {card.kind === 'tour' && (nearbyTourDate ?? nextTourDate) ? (
-              <TourRailCard
-                artistHandle={artist.handle}
-                stateKind={
-                  nearbyTourDate && resolveNearbyTour
-                    ? 'tour_nearby'
-                    : 'tour_next'
-                }
-                tourDate={(nearbyTourDate ?? nextTourDate)!}
-              />
-            ) : null}
-
-            {card.kind === 'playlist' && featuredPlaylistFallback ? (
-              <ImageLedRailCard
-                dataTestId='profile-home-rail-playlist'
-                ariaLabel={`Open ${featuredPlaylistFallback.title}`}
-                imageUrl={featuredPlaylistFallback.imageUrl ?? artist.image_url}
-                href={featuredPlaylistFallback.url}
-                label='Featured Playlist'
-                dataState='playlist_fallback'
-                title={featuredPlaylistFallback.title}
-                subtitle='Open Playlist'
-                actionIcon={<Play className='h-5 w-5 fill-current' />}
-                actionLabel='Listen Now'
-                fallbackVariant={
-                  featuredPlaylistFallback.imageUrl ? 'release' : 'avatar'
-                }
-                priority={index === 0}
-              />
-            ) : null}
-
-            {card.kind === 'listen' ? (
-              <ImageLedRailCard
-                dataTestId='profile-home-rail-listen'
-                ariaLabel={`Listen to ${artist.name}`}
-                imageUrl={artist.image_url}
-                href={onPlayClick ? null : `/${artist.handle}?mode=listen`}
-                onClick={onPlayClick}
-                label='Music'
-                dataState='listen_fallback'
-                title={artist.name}
-                subtitle='Listen Across Your Preferred Platforms'
-                actionIcon={<Play className='h-5 w-5 fill-current' />}
-                actionLabel='Listen Now'
-                fallbackVariant='avatar'
-                priority={index === 0}
-              />
-            ) : null}
-          </div>
-        ))}
-      </div>
-
-      {cards.length > 1 ? (
-        <div className='flex items-center justify-center gap-2'>
-          {cards.map((card, index) => (
-            <button
-              key={`${card.id}-dot`}
-              type='button'
-              onClick={() => {
-                const container = railRef.current;
-                const target = container?.querySelector<HTMLElement>(
-                  `[data-rail-card-index="${index}"]`
-                );
-                target?.scrollIntoView({
-                  behavior: 'smooth',
-                  inline: 'start',
-                  block: 'nearest',
-                });
-              }}
-              className='flex h-11 w-11 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
-              aria-label={`View rail card ${index + 1}`}
-            >
+    <div
+      className='space-y-2 [@media(max-height:820px)]:space-y-1.5'
+      data-testid='profile-home-rail'
+    >
+      {showLatest && latestRelease ? (
+        <>
+          <p className='text-[11px] font-[680] uppercase tracking-[0.16em] text-white/72 [@media(max-height:760px)]:text-[9px]'>
+            Latest
+          </p>
+          <LatestReleaseFeature
+            artist={artist}
+            latestRelease={latestRelease}
+            isCountdown={featuredState.kind === 'release_countdown'}
+            onPlayClick={onPlayClick}
+            renderMode={renderMode}
+          />
+          <div className='flex items-center justify-center gap-1.5 pt-0.5 [@media(max-height:820px)]:hidden'>
+            {[0, 1, 2, 3, 4].map(index => (
               <span
+                key={`latest-dot-${index}`}
                 className={cn(
-                  'h-2 rounded-full transition-all duration-200',
-                  index === activeIndex ? 'w-7 bg-white/88' : 'w-2 bg-white/22'
+                  'h-1.5 rounded-full',
+                  index === 0 ? 'w-4 bg-white/82' : 'w-1.5 bg-white/16'
                 )}
               />
-            </button>
-          ))}
+            ))}
+          </div>
+        </>
+      ) : null}
+
+      {upNextCards.length > 0 ? (
+        <div className='space-y-2 pt-0.5 [@media(max-height:820px)]:space-y-1'>
+          <p className='text-[18px] font-[680] leading-none tracking-[-0.018em] text-white [@media(max-height:820px)]:text-[15px]'>
+            Up Next
+          </p>
+          <div className='-mx-4 flex snap-x snap-mandatory gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [@media(max-height:820px)]:gap-1.5 [&::-webkit-scrollbar]:hidden'>
+            {upNextCards.map(card => (
+              <div
+                key={card.id}
+                className='w-[108px] shrink-0 snap-start [@media(max-height:820px)]:w-[92px] [@media(max-height:760px)]:w-[88px]'
+                data-rail-card-index={card.id}
+              >
+                {card.kind === 'release' && latestRelease ? (
+                  <ProfileMediaCard
+                    eyebrow={
+                      featuredState.kind === 'release_countdown'
+                        ? 'New Single'
+                        : 'New Release'
+                    }
+                    title={latestRelease.title}
+                    subtitle={getReleaseCardMeta(latestRelease)}
+                    imageUrl={resolveImageUrl(
+                      latestRelease.artworkUrl,
+                      'release'
+                    )}
+                    imageAlt={`${latestRelease.title} artwork`}
+                    fallbackVariant='release'
+                    accent='purple'
+                    ratio='compact'
+                    countdown={
+                      featuredState.kind === 'release_countdown' &&
+                      latestRelease.releaseDate
+                        ? {
+                            targetDate: latestRelease.releaseDate,
+                            label: 'Drops in',
+                          }
+                        : null
+                    }
+                    action={{
+                      label:
+                        featuredState.kind === 'release_countdown'
+                          ? 'Notify me'
+                          : 'Listen',
+                      ariaLabel: `Open ${latestRelease.title}`,
+                      href: `/${artist.handle}/${latestRelease.slug}`,
+                      icon:
+                        featuredState.kind === 'release_countdown'
+                          ? 'Bell'
+                          : 'Play',
+                    }}
+                    dataTestId='profile-home-rail-release'
+                    className='[@media(max-height:880px)]:[&>div:first-child]:aspect-[1.35/1] [@media(max-height:880px)]:[&>div:last-child]:p-1'
+                  />
+                ) : null}
+
+                {card.kind === 'tour' && visibleTourDate ? (
+                  <TourUpNextCard
+                    artist={artist}
+                    tourDate={visibleTourDate}
+                    isNearYou={Boolean(nearbyTourDate && resolveNearbyTour)}
+                  />
+                ) : null}
+
+                {card.kind === 'playlist' && featuredPlaylistFallback ? (
+                  <PlaylistUpNextCard playlist={featuredPlaylistFallback} />
+                ) : null}
+
+                {card.kind === 'listen' ? (
+                  <ListenUpNextCard artist={artist} onPlayClick={onPlayClick} />
+                ) : null}
+              </div>
+            ))}
+          </div>
         </div>
       ) : null}
     </div>

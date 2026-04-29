@@ -97,10 +97,13 @@
       "style": {
         "useConst": "error",
         "noRestrictedGlobals": {
-          "level": "warn",
+          "level": "error",
           "options": {
             "deniedGlobals": {
-              "global": "Use 'globalThis' instead of 'global' for cross-environment compatibility"
+              "global": "Use 'globalThis' instead of 'global' for cross-environment compatibility",
+              "alert": "Use sonner's toast.error() or toast.success() — native alert() is blocking and unstyled. See AGENTS.md §4f.",
+              "confirm": "Use <ConfirmDialog> from @/components/molecules/ConfirmDialog — native confirm() is blocking and unstyled. See AGENTS.md §4f.",
+              "prompt": "Use <Dialog> with a controlled input — native prompt() is blocking and unstyled. See AGENTS.md §4f."
             }
           }
         }
@@ -114,6 +117,7 @@
         "**/*.test.tsx",
         "**/*.spec.ts",
         "**/*.spec.tsx",
+        "**/*.stories.tsx",
         "**/tests/**",
         "**/.storybook/**",
         "**/scripts/**",

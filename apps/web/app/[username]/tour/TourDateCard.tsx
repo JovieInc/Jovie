@@ -1,9 +1,8 @@
 'use client';
 
-import { Icon } from '@/components/atoms/Icon';
+import { ProfileMediaCard } from '@/features/profile/ProfileMediaCard';
 import { useTourDateTicketClick } from '@/hooks/useTourDateTicketClick';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
-import { cn } from '@/lib/utils';
 import { formatLocationString } from '@/lib/utils/string-utils';
 
 // Pre-configured formatters for date display
@@ -59,113 +58,64 @@ export function TourDateCard({
   );
 
   const handleAddToCalendar = () => {
-    // Generate ICS file URL - use direct navigation for reliable download
-    const icsUrl = `/api/calendar/${tourDate.id}`;
-    globalThis.location.href = icsUrl;
+    globalThis.location.href = `/api/calendar/${tourDate.id}`;
   };
 
+  const canBuyTickets =
+    Boolean(tourDate.ticketUrl) && !isCancelled && !isSoldOut;
+  const canAddToCalendar = !isCancelled;
+  const actionLabel = isCancelled
+    ? 'Cancelled'
+    : isSoldOut
+      ? 'Add to calendar'
+      : canBuyTickets
+        ? 'Get tickets'
+        : 'Add to calendar';
+  const calendarAction = canAddToCalendar
+    ? {
+        label: 'Add to calendar',
+        onClick: handleAddToCalendar,
+        icon: 'CalendarPlus' as const,
+      }
+    : null;
+
   return (
-    <div
-      className={cn(
-        'rounded-lg border border-subtle bg-surface-1 p-4 transition-colors duration-normal hover:bg-interactive-hover',
-        isCancelled && 'opacity-60'
-      )}
-    >
-      <div className='flex items-start gap-4'>
-        {/* Date block */}
-        <div className='flex w-16 shrink-0 flex-col items-center rounded-md bg-surface-2 py-2'>
-          <span className='text-2xs font-[var(--font-weight-medium)] uppercase text-tertiary-token'>
-            {monthFormatter.format(date)}
-          </span>
-          <span className='text-2xl font-[var(--font-weight-medium)] text-primary-token'>
-            {dayFormatter.format(date)}
-          </span>
-          <span className='text-xs text-tertiary-token'>
-            {weekdayFormatter.format(date)}
-          </span>
-        </div>
-
-        {/* Event details */}
-        <div className='min-w-0 flex-1'>
-          <div className='flex items-start justify-between gap-2'>
-            <div className='min-w-0'>
-              {tourDate.title && (
-                <p className='text-sm font-[var(--font-weight-medium)] text-accent'>
-                  {tourDate.title}
-                </p>
-              )}
-              <h3 className='truncate font-[var(--font-weight-medium)] text-primary-token'>
-                {tourDate.venueName}
-              </h3>
-              <p className='truncate text-sm text-secondary-token'>
-                {location}
-              </p>
-              {tourDate.startTime && (
-                <p className='mt-1 text-sm text-tertiary-token'>
-                  Doors: {tourDate.startTime}
-                  {timezoneAbbr && (
-                    <span className='ml-1 text-xs'>{timezoneAbbr}</span>
-                  )}
-                </p>
-              )}
-            </div>
-
-            {/* Status badges */}
-            <div className='flex shrink-0 flex-col items-end gap-1'>
-              {isNearYou && (
-                <span className='inline-flex items-center gap-1 rounded-full border border-subtle bg-surface-2 px-2 py-0.5 text-2xs font-[var(--font-weight-medium)] text-secondary-token'>
-                  <Icon name='MapPin' className='h-3 w-3' />
-                  {distanceKm === null || distanceKm === undefined
-                    ? 'Near You'
-                    : `${Math.round(distanceKm)} km away`}
-                </span>
-              )}
-              {isSoldOut && (
-                <span className='rounded-full border border-subtle bg-surface-2 px-2 py-0.5 text-2xs font-[var(--font-weight-medium)] text-tertiary-token'>
-                  Sold Out
-                </span>
-              )}
-              {isCancelled && (
-                <span className='rounded-full border border-subtle bg-surface-2 px-2 py-0.5 text-2xs font-[var(--font-weight-medium)] text-tertiary-token'>
-                  Cancelled
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div className='mt-3 flex flex-wrap items-center gap-2'>
-            {tourDate.ticketUrl && !isCancelled && !isSoldOut && (
-              <a
-                href={tourDate.ticketUrl}
-                onClick={handleTicketClick}
-                target='_blank'
-                rel='noopener noreferrer'
-                className='inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-sm font-[var(--font-weight-medium)] text-white transition-colors duration-normal hover:bg-accent/90'
-              >
-                <Icon name='Ticket' className='h-4 w-4' />
-                Get Tickets
-              </a>
-            )}
-            {tourDate.ticketUrl && !isCancelled && isSoldOut && (
-              <span className='inline-flex items-center gap-1.5 rounded-md bg-surface-2 px-3 py-1.5 text-sm font-[var(--font-weight-medium)] text-tertiary-token'>
-                <Icon name='Ticket' className='h-4 w-4' />
-                Sold Out
-              </span>
-            )}
-            {!isCancelled && (
-              <button
-                type='button'
-                onClick={handleAddToCalendar}
-                className='inline-flex items-center gap-1.5 rounded-md bg-surface-2 px-3 py-1.5 text-sm font-[var(--font-weight-medium)] text-secondary-token transition-colors duration-normal hover:bg-surface-3'
-              >
-                <Icon name='CalendarPlus' className='h-4 w-4' />
-                Add to Calendar
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
+    <ProfileMediaCard
+      eyebrow={
+        isNearYou
+          ? distanceKm === null || distanceKm === undefined
+            ? 'Near You'
+            : `${Math.round(distanceKm)} km away`
+          : 'Next Show'
+      }
+      title={tourDate.title ?? 'Live'}
+      subtitle={tourDate.venueName}
+      locationLabel={location}
+      secondaryLocationLabel={
+        tourDate.startTime
+          ? `Doors: ${tourDate.startTime}${timezoneAbbr ? ` ${timezoneAbbr}` : ''}`
+          : null
+      }
+      imageAlt={tourDate.venueName}
+      fallbackVariant='generic'
+      accent={isNearYou ? 'blue' : 'orange'}
+      ratio='portrait'
+      datePill={{
+        month: monthFormatter.format(date),
+        day: dayFormatter.format(date),
+        meta: `${weekdayFormatter.format(date)}${tourDate.startTime ? ` · ${tourDate.startTime}` : ''}`,
+      }}
+      action={{
+        label: actionLabel,
+        href: canBuyTickets ? tourDate.ticketUrl : null,
+        onClick: canBuyTickets ? handleTicketClick : handleAddToCalendar,
+        icon: canBuyTickets ? 'Ticket' : 'CalendarPlus',
+        showChevron: canBuyTickets,
+        disabled: isCancelled,
+      }}
+      secondaryAction={canBuyTickets ? calendarAction : null}
+      status={isSoldOut ? { label: 'Sold out', tone: 'orange' } : null}
+      className={isCancelled ? 'opacity-60' : undefined}
+    />
   );
 }

@@ -64,8 +64,8 @@ const PROFILE_MOBILE_SCREENS = [
     path: `/${TEST_PROFILES.DUALIPA}?mode=subscribe`,
     rootSelector: '[data-testid="profile-compact-surface"]',
     readySelectors: [
-      '[data-testid="profile-mobile-notifications-step-email"]',
-      '[data-testid="profile-mobile-notifications-flow"]',
+      '[data-testid="profile-alerts-settings"]',
+      '[data-testid="profile-primary-tab-subscribe"]',
     ],
   },
   {
@@ -108,10 +108,7 @@ const PROFILE_MOBILE_SCREENS = [
     id: 'notifications',
     path: '/testartist/notifications',
     rootSelector: '[data-testid="notifications-page"]',
-    readySelectors: [
-      '[data-testid="notifications-page"]',
-      '[data-testid="profile-mobile-notifications-step-email"]',
-    ],
+    readySelectors: ['[data-testid="profile-mobile-notifications-step-email"]'],
   },
 ] as const satisfies readonly MobileProfileScreen[];
 
@@ -121,6 +118,7 @@ type ViewportSnapshot = {
   readonly scrollX: number;
   readonly scrollY: number;
   readonly horizontalOverflow: number;
+  readonly verticalOverflow: number;
   readonly activeFontSize: number | null;
   readonly activeTagName: string | null;
   readonly visualViewport: {
@@ -136,6 +134,8 @@ type ViewportSnapshot = {
     readonly bottom: number;
     readonly width: number;
     readonly height: number;
+    readonly scrollHeight: number;
+    readonly clientHeight: number;
   };
 };
 
@@ -187,6 +187,21 @@ async function installProfileMocks(page: Page) {
 }
 
 async function installNotificationFlowMocks(page: Page) {
+  await page.addInitScript(() => {
+    window.localStorage.removeItem('jovie:notification-contacts');
+    window.localStorage.removeItem('jovie:notification-status-cache');
+  });
+  await page.route('**/api/notifications/status', route =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        channels: { email: false, sms: false },
+        details: { email: null, phone: null },
+      }),
+    })
+  );
   await page.route('**/api/notifications/subscribe', route =>
     route.fulfill({
       status: 200,
@@ -294,6 +309,11 @@ async function waitForAnyVisible(
 }
 
 async function settleLayout(page: Page) {
+  await page.evaluate(async () => {
+    if ('fonts' in document) {
+      await document.fonts.ready;
+    }
+  });
   await page.evaluate(
     () =>
       new Promise<void>(resolve => {
@@ -322,7 +342,10 @@ async function collectViewportSnapshot(
       : null;
     const documentWidth = document.documentElement.scrollWidth;
     const bodyWidth = document.body.scrollWidth;
+    const documentHeight = document.documentElement.scrollHeight;
+    const bodyHeight = document.body.scrollHeight;
     const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
 
     return {
       innerWidth: window.innerWidth,
@@ -330,6 +353,7 @@ async function collectViewportSnapshot(
       scrollX: window.scrollX,
       scrollY: window.scrollY,
       horizontalOverflow: Math.max(documentWidth, bodyWidth) - viewportWidth,
+      verticalOverflow: Math.max(documentHeight, bodyHeight) - viewportHeight,
       activeFontSize: activeStyle
         ? Number.parseFloat(activeStyle.fontSize)
         : null,
@@ -349,6 +373,8 @@ async function collectViewportSnapshot(
         bottom: rootRect.bottom,
         width: rootRect.width,
         height: rootRect.height,
+        scrollHeight: root.scrollHeight,
+        clientHeight: root.clientHeight,
       },
     };
   }, rootSelector);
@@ -382,6 +408,21 @@ function expectMobileShellStable(
     snapshot.root.bottom,
     `${label} root should fill viewport`
   ).toBeGreaterThanOrEqual(snapshot.innerHeight - 2);
+  expect(
+    snapshot.root.bottom,
+    `${label} root should not grow below viewport`
+  ).toBeLessThanOrEqual(snapshot.innerHeight + 2);
+  expect(snapshot.scrollY, `${label} page should not vertically scroll`).toBe(
+    0
+  );
+  expect(
+    snapshot.verticalOverflow,
+    `${label} should not introduce vertical page overflow`
+  ).toBeLessThanOrEqual(2);
+  expect(
+    snapshot.root.scrollHeight - snapshot.root.clientHeight,
+    `${label} compact shell should not need its own vertical scroll`
+  ).toBeLessThanOrEqual(2);
 }
 
 function expectNoFocusShift(
@@ -498,6 +539,7 @@ test.describe('Public Profile Mobile Viewport Stability @smoke @critical', () =>
 
           await waitForHydration(screenPage);
           await waitForAnyVisible(screenPage, screen.readySelectors);
+          await settleLayout(screenPage);
 
           const snapshot = await collectViewportSnapshot(
             screenPage,
@@ -540,8 +582,10 @@ test.describe('Public Profile Mobile Viewport Stability @smoke @critical', () =>
 
         const response = await smokeNavigate(
           flowPage,
-          `/${TEST_PROFILES.DUALIPA}?mode=subscribe`,
-          { timeout: 120_000 }
+          '/testartist/notifications',
+          {
+            timeout: 120_000,
+          }
         );
         expect(response?.status() ?? 0).toBeLessThan(500);
         await waitForHydration(flowPage);
@@ -549,7 +593,7 @@ test.describe('Public Profile Mobile Viewport Stability @smoke @critical', () =>
           '[data-testid="profile-mobile-notifications-step-email"]',
         ]);
 
-        const rootSelector = '[data-testid="profile-compact-surface"]';
+        const rootSelector = '[data-testid="notifications-page"]';
         const emailInput = flowPage.getByTestId('mobile-email-input');
         await focusAndAssertNoShift(
           flowPage,

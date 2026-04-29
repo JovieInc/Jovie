@@ -9,6 +9,14 @@ export interface MobileProfileViewport {
 
 export const MOBILE_PROFILE_VIEWPORTS = [
   {
+    id: 'iphone-se-2-3',
+    label: 'iPhone SE 2/3',
+    width: 375,
+    height: 667,
+    deviceScaleFactor: 2,
+    devices: ['iPhone SE 2', 'iPhone SE 3'],
+  },
+  {
     id: 'iphone-13-mini',
     label: 'iPhone 13 Mini',
     width: 375,
