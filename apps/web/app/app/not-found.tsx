@@ -4,7 +4,10 @@
  */
 export default function AppNotFound() {
   return (
-    <div className='flex flex-1 items-center justify-center p-6'>
+    <div
+      className='flex flex-1 items-center justify-center p-6'
+      data-testid='not-found'
+    >
       <div className='flex flex-col items-center text-center'>
         {/* Illustration — broken vinyl / missing track, Jovie-themed */}
         <div className='mb-5 flex h-[72px] w-[72px] items-center justify-center rounded-2xl bg-surface-2'>

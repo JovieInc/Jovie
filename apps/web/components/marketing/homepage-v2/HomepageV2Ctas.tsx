@@ -220,7 +220,7 @@ export function HomepageV2FinalCta() {
         <div className='homepage-final-cta-copy mx-auto'>
           <h2
             data-testid='homepage-v2-final-cta-heading'
-            className='text-balance text-[clamp(2rem,3.4vw,3rem)] font-[680] leading-[1.05] tracking-[-0.025em] text-white'
+            className='text-balance text-[clamp(2.15rem,3.7vw,3.65rem)] font-semibold leading-[1.03] tracking-[-0.035em] text-white'
           >
             {HOMEPAGE_V2_COPY.finalCta.headline}
           </h2>

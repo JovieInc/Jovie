@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.197] - 2026-04-29
+
+> Homepage hero, Friday rhythm, and footer CTA visual polish.
+
+### Changed
+
+- **Homepage hero** now leads with the sidebar-open release calendar screenshot as a single crisp product frame, with neighboring carousel shots hidden to avoid cropped side imagery.
+- **Friday rhythm section** now uses a full-section, subtle heartbeat background, tighter notification cards, darker graph treatment, and calmer release-category accent glow.
+- **Go Live and final CTA typography** now use tighter spacing and smaller, cleaner responsive sizing to better match the homepage design system.
+
+### Fixed
+
+- **Homepage header logo contrast** is locked to white on the dark homepage surface in both light and dark system modes.
+- **Mobile and desktop homepage layouts** were rechecked for horizontal overflow at 1440, 1024, 430, 375, and 320px.
+
+## [26.4.196] - 2026-04-29
+
+> Homepage story polish, Friday rhythm model, and mobile hero crop repair.
+
+### Added
+
+- **Go Live In 60 Seconds homepage section** above the Friday rhythm story, with three native dark-mode workflow columns for signal, action, and compounding motion.
+- **Friday Rhythm homepage section** with deterministic 2026 Friday modeling, mobile before/after controls, decorative heartbeat motion, release-category accents, and unit coverage for Friday generation.
+
+### Changed
+
+- **Footer CTA headline** now reads “Keep Your Music Moving.”
+- **Friday rhythm graph** now fills every active Friday with muted release-category accents for new singles, merch drops, remixes, videos, and tour recaps.
+
+### Fixed
+
+- **Mobile homepage hero screenshots no longer crop horizontally** by sizing the mobile desktop mockup frame from available width instead of fixed stage height.
+
 ## [26.4.195] - 2026-04-29
 
 > Faster local development, UI parallax polish, and tighter mobile public profiles.

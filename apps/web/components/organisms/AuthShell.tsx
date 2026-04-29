@@ -46,7 +46,7 @@ function AuthShellInner({
   const { isMobile } = useSidebar();
   const rightPanel = useRightPanel();
   const previewPanelState = usePreviewPanelState();
-  const shellChatV1Enabled = useAppFlag('SHELL_CHAT_V1');
+  const shellChatV1Enabled = useAppFlag('DESIGN_V1');
 
   const sidebarTrigger = isMobile ? null : <SidebarTrigger />;
 

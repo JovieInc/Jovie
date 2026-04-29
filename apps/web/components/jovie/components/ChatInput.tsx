@@ -90,7 +90,7 @@ export interface ChatInputProps {
    * slash picker to scope `useReleasesQuery` to the active creator.
    */
   readonly profileId?: string;
-  /** Enables the Shell + Chat V1 composer geometry behind SHELL_CHAT_V1. */
+  /** Enables the Shell + Chat V1 composer geometry behind DESIGN_V1. */
   readonly shellChatV1?: boolean;
 }
 

@@ -1180,7 +1180,7 @@ function useTaskActions({
 }
 
 export function TasksPageClient() {
-  const designV1TasksEnabled = useAppFlag('DESIGN_V1_TASKS');
+  const designV1TasksEnabled = useAppFlag('DESIGN_V1');
   const { selectedProfile } = useDashboardData();
   const { setHeaderActions } = useSetHeaderActions();
   const isXlUp = useBreakpoint('xl');

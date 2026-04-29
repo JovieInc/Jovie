@@ -264,14 +264,12 @@ describe('PersistentAudioBar', () => {
     expect(screen.getAllByText('DJ Cool').length).toBeGreaterThan(0);
   });
 
-  it('links the shell V1 lyrics button to the active track when DESIGN_V1_LYRICS is enabled', async () => {
+  it('links the shell V1 lyrics button to the active track when DESIGN_V1 is enabled', async () => {
     const user = userEvent.setup();
     setPlaying({ artistName: 'DJ Cool', hasLyrics: true });
 
     render(
-      <AppFlagProvider
-        initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1_LYRICS: true }}
-      >
+      <AppFlagProvider initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1: true }}>
         <PersistentAudioBar variant='shellChatV1' />
       </AppFlagProvider>
     );
@@ -285,9 +283,7 @@ describe('PersistentAudioBar', () => {
     setPlaying({ artistName: 'DJ Cool', hasLyrics: false });
 
     render(
-      <AppFlagProvider
-        initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1_LYRICS: true }}
-      >
+      <AppFlagProvider initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1: true }}>
         <PersistentAudioBar variant='shellChatV1' />
       </AppFlagProvider>
     );
@@ -295,12 +291,12 @@ describe('PersistentAudioBar', () => {
     expect(screen.queryByRole('button', { name: 'Lyrics' })).toBeNull();
   });
 
-  it('keeps the shell V1 lyrics button hidden when DESIGN_V1_LYRICS is disabled', () => {
+  it('keeps the shell V1 lyrics button hidden when DESIGN_V1 is disabled', () => {
     setPlaying({ artistName: 'DJ Cool' });
 
     render(
       <AppFlagProvider
-        initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1_LYRICS: false }}
+        initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1: false }}
       >
         <PersistentAudioBar variant='shellChatV1' />
       </AppFlagProvider>

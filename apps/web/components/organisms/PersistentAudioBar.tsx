@@ -27,7 +27,7 @@ export function PersistentAudioBar({
 }: Readonly<PersistentAudioBarProps>) {
   const router = useRouter();
   const pathname = usePathname();
-  const designV1LyricsEnabled = useAppFlag('DESIGN_V1_LYRICS');
+  const designV1LyricsEnabled = useAppFlag('DESIGN_V1');
   const { playbackState, toggleTrack, seek, stop, onError } =
     useTrackAudioPlayer();
   const [imgError, setImgError] = useState(false);

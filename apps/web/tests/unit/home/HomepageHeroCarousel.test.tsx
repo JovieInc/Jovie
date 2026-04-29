@@ -9,19 +9,23 @@ function expectActiveShot(testId: string) {
 }
 
 describe('HomepageHeroMockupCarousel', () => {
+  const firstShotId = 'homepage-hero-shot-release-calendar-sidebar';
+  const secondShotId = 'homepage-hero-shot-audience-crm';
+  const thirdShotId = 'homepage-hero-shot-profile-workspace';
+
   afterEach(() => {
     window.matchMedia = originalMatchMedia;
     vi.useRealTimers();
   });
 
-  it('shows the desktop release dashboard by default and advances on click', () => {
+  it('shows the desktop release calendar by default and advances on click', () => {
     render(<HomepageHeroMockupCarousel />);
 
-    expectActiveShot('homepage-hero-shot-releases-dashboard');
+    expectActiveShot(firstShotId);
 
     fireEvent.click(screen.getByRole('button', { name: 'Go to next slide' }));
 
-    expectActiveShot('homepage-hero-shot-audience-crm');
+    expectActiveShot(secondShotId);
   });
 
   it('does not keep advancing after a click while the pointer remains over the side', () => {
@@ -34,12 +38,12 @@ describe('HomepageHeroMockupCarousel', () => {
 
     fireEvent.mouseEnter(nextButton);
     fireEvent.click(nextButton);
-    expectActiveShot('homepage-hero-shot-audience-crm');
+    expectActiveShot(secondShotId);
 
     act(() => {
       vi.advanceTimersByTime(1600);
     });
-    expectActiveShot('homepage-hero-shot-audience-crm');
+    expectActiveShot(secondShotId);
   });
 
   it('advances only while a side hover is active', () => {
@@ -53,27 +57,27 @@ describe('HomepageHeroMockupCarousel', () => {
     act(() => {
       vi.advanceTimersByTime(2200);
     });
-    expectActiveShot('homepage-hero-shot-releases-dashboard');
+    expectActiveShot(firstShotId);
 
     fireEvent.mouseEnter(nextButton);
-    expectActiveShot('homepage-hero-shot-releases-dashboard');
+    expectActiveShot(firstShotId);
 
     act(() => {
       vi.advanceTimersByTime(700);
     });
-    expectActiveShot('homepage-hero-shot-audience-crm');
+    expectActiveShot(secondShotId);
 
     act(() => {
       vi.advanceTimersByTime(700);
     });
-    expectActiveShot('homepage-hero-shot-profile-workspace');
+    expectActiveShot(thirdShotId);
 
     fireEvent.mouseLeave(nextButton);
 
     act(() => {
       vi.advanceTimersByTime(2200);
     });
-    expectActiveShot('homepage-hero-shot-profile-workspace');
+    expectActiveShot(thirdShotId);
   });
 
   it('does not hover-advance when reduced motion is enabled', () => {
@@ -101,6 +105,6 @@ describe('HomepageHeroMockupCarousel', () => {
       vi.advanceTimersByTime(2200);
     });
 
-    expectActiveShot('homepage-hero-shot-releases-dashboard');
+    expectActiveShot(firstShotId);
   });
 });

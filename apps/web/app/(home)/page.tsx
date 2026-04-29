@@ -4,6 +4,8 @@ import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
 import { HomepageHeroMockupCarousel } from '@/components/homepage/HomepageHeroCarousel';
 import { HomepageOutcomeCards } from '@/components/homepage/HomepageOutcomeCards';
 import { HERO_COPY } from '@/components/homepage/intent';
+import { FridayRhythmSection } from '@/components/marketing/friday-rhythm-section';
+import { GoLiveInSixtySection } from '@/components/marketing/go-live-in-sixty-section';
 import {
   HomepageV2FinalCta,
   HomepageV2Pricing,
@@ -241,6 +243,8 @@ export default async function HomePage() {
         />
       </div>
       <div className='homepage-story-stack'>
+        <GoLiveInSixtySection />
+        <FridayRhythmSection />
         <HomepageOutcomeCards
           headline={ARTIST_PROFILE_COPY.outcomeDuo.homepageHeadline}
           outcomes={ARTIST_PROFILE_COPY.outcomes}

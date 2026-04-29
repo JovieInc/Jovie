@@ -67,7 +67,7 @@ export function RecentChats() {
   const params = useParams<{ id?: string }>();
   const router = useRouter();
   const notifications = useNotifications();
-  const shellChatV1Enabled = useAppFlag('SHELL_CHAT_V1');
+  const designV1Enabled = useAppFlag('DESIGN_V1');
   const activeConversationId = params.id ?? null;
 
   const { data: conversations, isLoading } = useChatConversationsQuery({
@@ -166,7 +166,7 @@ export function RecentChats() {
     return null;
   }
 
-  if (shellChatV1Enabled) {
+  if (designV1Enabled) {
     const shellThreads: SidebarThread[] = conversations.map(convo => ({
       id: convo.id,
       title: convo.title || 'Untitled Thread',

@@ -88,8 +88,8 @@ export function DashboardNav(_: DashboardNavProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const threadsEnabled = useAppFlag('THREADS_ENABLED');
-  const shellChatV1Enabled = useAppFlag('SHELL_CHAT_V1');
-  const designV1LibraryEnabled = useAppFlag('DESIGN_V1_LIBRARY');
+  const shellChatV1Enabled = useAppFlag('DESIGN_V1');
+  const designV1LibraryEnabled = useAppFlag('DESIGN_V1');
   const {
     isOpen: isPreviewOpen,
     open: openPreviewPanel,

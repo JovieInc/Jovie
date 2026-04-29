@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { TableMetaProvider } from '@/components/organisms/AuthShellWrapper';
+import { TableMetaProvider } from '@/contexts/TableMetaContext';
 import type { AudienceMember } from '@/types';
 import { DashboardAudienceTable } from './dashboard-audience-table';
 
