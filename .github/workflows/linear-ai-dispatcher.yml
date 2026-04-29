@@ -1,0 +1,190 @@
+# Linear AI Dispatcher
+#
+# Scheduled retry loop for explicitly labeled Linear issues. The dispatcher is
+# label-scoped so the orchestrator can open more work only when capacity allows.
+
+name: Linear AI Dispatcher
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+    inputs:
+      project_name:
+        description: 'Linear project name to poll'
+        required: false
+        default: 'Design V1 Rollout / Flag Hardening'
+      ready_label:
+        description: 'Only dispatch Todo issues with this label'
+        required: false
+        default: 'automated'
+      max_dispatch:
+        description: 'Maximum issues to dispatch this run'
+        required: false
+        default: '2'
+      dry_run:
+        description: 'Log candidates without leasing or dispatching'
+        required: false
+        default: 'false'
+
+permissions: {}
+
+concurrency:
+  group: linear-ai-dispatcher
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    name: Dispatch Ready Linear Issues
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: read
+      actions: write
+    env:
+      PROJECT_NAME: ${{ inputs.project_name || 'Design V1 Rollout / Flag Hardening' }}
+      READY_LABEL: ${{ inputs.ready_label || 'automated' }}
+      MAX_DISPATCH: ${{ inputs.max_dispatch || '2' }}
+      DRY_RUN: ${{ inputs.dry_run || 'false' }}
+      MAX_OPEN_AGENT_PRS: '10'
+    steps:
+      - name: Generate Jovie Bot token
+        id: app-token
+        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859 # v3.0.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+
+      - name: Find capacity and dispatch candidates
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$LINEAR_API_KEY" ]]; then
+            echo "Missing LINEAR_API_KEY; cannot dispatch Linear issues"
+            exit 1
+          fi
+
+          OPEN_AGENT_PRS=$(gh api "repos/${{ github.repository }}/pulls?state=open&per_page=100" \
+            | jq '[.[] | select(.head.ref | test("^(codex|codegen-bot|linear|claude)/") or test("^[^/]+/jov-[0-9]+-"; "i"))] | length')
+
+          CAPACITY=$((MAX_OPEN_AGENT_PRS - OPEN_AGENT_PRS))
+          if [[ "$CAPACITY" -le 0 ]]; then
+            echo "No dispatch capacity: $OPEN_AGENT_PRS / $MAX_OPEN_AGENT_PRS agent PRs are open"
+            exit 0
+          fi
+
+          if [[ "$MAX_DISPATCH" -gt "$CAPACITY" ]]; then
+            MAX_DISPATCH="$CAPACITY"
+          fi
+
+          echo "Dispatch capacity: $MAX_DISPATCH issue(s)"
+
+          RESPONSE=$(curl -sS https://api.linear.app/graphql \
+            -H "Authorization: ${LINEAR_API_KEY}" \
+            -H 'Content-Type: application/json' \
+            -d "$(jq -cn \
+              --arg projectName "$PROJECT_NAME" \
+              --arg labelName "$READY_LABEL" \
+              '{
+                query: "query ReadyIssues($projectName: String!, $labelName: String!) { issues(first: 25, filter: { project: { name: { eq: $projectName } }, state: { type: { eq: \"unstarted\" } }, labels: { name: { eq: $labelName } } }) { nodes { id identifier title description url updatedAt team { key states { nodes { id name type } } } } } }",
+                variables: { projectName: $projectName, labelName: $labelName }
+              }')"
+          )
+
+          if [[ "$(echo "$RESPONSE" | jq -r '.errors != null')" == "true" ]]; then
+            echo "$RESPONSE" | jq -r '.errors'
+            exit 1
+          fi
+
+          echo "$RESPONSE" | jq -c '.data.issues.nodes[]' | head -n "$MAX_DISPATCH" > /tmp/linear-candidates.jsonl
+
+          if [[ ! -s /tmp/linear-candidates.jsonl ]]; then
+            echo "No Todo issues found for project '$PROJECT_NAME' with label '$READY_LABEL'"
+            exit 0
+          fi
+
+          while IFS= read -r issue; do
+            ISSUE_ID=$(echo "$issue" | jq -r '.id')
+            ISSUE_IDENTIFIER=$(echo "$issue" | jq -r '.identifier')
+            ISSUE_TITLE=$(echo "$issue" | jq -r '.title')
+            ISSUE_DESCRIPTION=$(echo "$issue" | jq -r '.description // ""')
+            ISSUE_URL=$(echo "$issue" | jq -r '.url')
+            SAFE_ID=$(echo "$ISSUE_IDENTIFIER" | tr '[:upper:]' '[:lower:]')
+            SAFE_TITLE=$(echo "$ISSUE_TITLE" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9-' '-' | sed 's/^-//;s/-$//' | cut -c1-48)
+            BRANCH_NAME="codex/${SAFE_ID}-${SAFE_TITLE}-r${GITHUB_RUN_ID}"
+
+            echo "Candidate: $ISSUE_IDENTIFIER -> $BRANCH_NAME"
+
+            EXISTING_PR_COUNT=$(gh pr list --state open --json number,title,body,headRefName --jq \
+              'map(select((.headRefName == env.BRANCH_NAME) or (((.title // "") + "\n" + (.body // "")) | test(env.ISSUE_IDENTIFIER; "i")))) | length')
+            if [[ "$EXISTING_PR_COUNT" != "0" ]]; then
+              echo "Open PR already exists for $ISSUE_IDENTIFIER; skipping"
+              continue
+            fi
+
+            if [[ "${DRY_RUN,,}" == "true" ]]; then
+              continue
+            fi
+
+            IN_PROGRESS_STATE_ID=$(echo "$issue" | jq -r '
+              .team.states.nodes
+              | map(select(.type == "started" and ((.name // "") | ascii_downcase | test("^in[- ]progress$"))))
+              | .[0].id // empty
+            ')
+
+            if [[ -n "$IN_PROGRESS_STATE_ID" ]]; then
+              curl -sS https://api.linear.app/graphql \
+                -H "Authorization: ${LINEAR_API_KEY}" \
+                -H 'Content-Type: application/json' \
+                -d "$(jq -cn \
+                  --arg issueId "$ISSUE_ID" \
+                  --arg stateId "$IN_PROGRESS_STATE_ID" \
+                  '{
+                    query: "mutation LeaseIssue($issueId: String!, $stateId: String!) { issueUpdate(id: $issueId, input: { stateId: $stateId }) { success } }",
+                    variables: { issueId: $issueId, stateId: $stateId }
+                  }')" > /dev/null
+            fi
+
+            curl -sS https://api.linear.app/graphql \
+              -H "Authorization: ${LINEAR_API_KEY}" \
+              -H 'Content-Type: application/json' \
+              -d "$(jq -cn \
+                --arg issueId "$ISSUE_ID" \
+                --arg body "Linear AI Dispatcher leased ${ISSUE_IDENTIFIER} for GitHub run ${GITHUB_RUN_ID}. Working branch: ${BRANCH_NAME}. Lease expires when the run fails/stales or the PR opens." \
+                '{
+                  query: "mutation AddLeaseComment($issueId: String!, $body: String!) { commentCreate(input: { issueId: $issueId, body: $body }) { success } }",
+                  variables: { issueId: $issueId, body: $body }
+                }')" > /dev/null
+
+            DISPATCH_BODY=$(mktemp)
+            jq -cn \
+                --arg issueId "$ISSUE_ID" \
+                --arg issueIdentifier "$ISSUE_IDENTIFIER" \
+                --arg issueTitle "$ISSUE_TITLE" \
+                --arg issueDescription "$ISSUE_DESCRIPTION" \
+                --arg issueUrl "$ISSUE_URL" \
+                --arg branchName "$BRANCH_NAME" \
+                '{
+                  event_type: "linear_plan_ready",
+                  client_payload: {
+                    issue_id: $issueId,
+                    issue_identifier: $issueIdentifier,
+                    issue_title: $issueTitle,
+                    issue_description: $issueDescription,
+                    issue_url: $issueUrl,
+                    branch_name: $branchName,
+                    plan_ready: true,
+                    verify_required: true,
+                    simplify_bounded: true,
+                    model_tier: "premium"
+                  }
+                }' > "$DISPATCH_BODY"
+
+            gh api "repos/${{ github.repository }}/dispatches" \
+              --method POST \
+              --input "$DISPATCH_BODY"
+          done < /tmp/linear-candidates.jsonl

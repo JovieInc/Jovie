@@ -1,0 +1,55 @@
+# Agent PR Verify + Ready
+#
+# Draft agent PRs do not run the main CI/scope automation. This workflow gives
+# same-repo agent branches a small unprivileged verification gate and marks the
+# PR ready only after that gate passes.
+
+name: Agent PR Verify Ready
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: agent-pr-verify-ready-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  verify-ready:
+    name: Verify Draft Agent PR
+    if: >-
+      github.event.pull_request.draft &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      (
+        startsWith(github.event.pull_request.head.ref, 'linear/') ||
+        startsWith(github.event.pull_request.head.ref, 'claude/') ||
+        startsWith(github.event.pull_request.head.ref, 'codegen-bot/') ||
+        startsWith(github.event.pull_request.head.ref, 'codex/') ||
+        contains(github.event.pull_request.head.ref, '/jov-')
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Run affected automation verify
+        run: bash scripts/automation-verify.sh affected
+
+      - name: Mark PR ready
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: gh pr ready "$PR_NUMBER"
