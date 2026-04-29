@@ -95,7 +95,15 @@ export function ReleasesPageClient() {
   }
 
   if (releasesViewMode === 'designV1ShellReleases') {
-    return <ShellReleasesView releases={releases ?? []} />;
+    return (
+      <ShellReleasesView
+        releases={releases ?? []}
+        providerConfig={providerConfig}
+        primaryProviders={primaryProviderKeys}
+        artistName={spotifyArtistName}
+        allowArtworkDownloads={allowArtworkDownloads}
+      />
+    );
   }
 
   return (
