@@ -11,6 +11,7 @@ import {
   IdCard,
   Image as ImageIcon,
   LayoutDashboard,
+  Library as LibraryIcon,
   Lock,
   MailCheck,
   Music,
@@ -77,6 +78,14 @@ export const primaryNavigation: NavItem[] = [
     description: 'Understand your audience demographics',
   },
 ];
+
+export const libraryNavItem: NavItem = {
+  name: 'Library',
+  href: APP_ROUTES.DASHBOARD_LIBRARY,
+  id: 'library',
+  icon: LibraryIcon,
+  description: 'Browse read-only release assets and provider links',
+};
 
 export const settingsNavItem: NavItem = {
   name: 'Settings',
