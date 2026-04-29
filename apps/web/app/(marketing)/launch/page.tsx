@@ -1873,7 +1873,7 @@ export default function LaunchPage() {
               href={APP_ROUTES.SIGNUP}
               className='public-action-primary focus-ring'
             >
-              Get started free
+              Request Access
             </Link>
             <a
               href='mailto:hello@jov.ie'

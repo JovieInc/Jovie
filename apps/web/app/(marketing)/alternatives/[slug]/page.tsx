@@ -127,7 +127,7 @@ export default async function AlternativesPage({
               href={APP_ROUTES.SIGNUP}
               className='mt-6 inline-flex items-center rounded-lg bg-accent-token px-6 py-3 text-sm font-medium text-white transition-colors hover:opacity-90'
             >
-              Get started free
+              Request Access
             </Link>
           </div>
         </section>

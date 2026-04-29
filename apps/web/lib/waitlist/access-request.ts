@@ -239,19 +239,18 @@ export async function submitWaitlistAccessRequest(
           .set(entryValues)
           .where(eq(waitlistEntries.id, existing.id));
 
-        const outcome = await decideAccess({
+        await upsertUserStatus({
           tx,
-          entryId: existing.id,
           clerkUserId: input.clerkUserId,
+          entryId: existing.id,
           emailRaw,
+          nextStatus: 'waitlist_pending',
         });
 
         return {
           entryId: existing.id,
-          status:
-            outcome === 'accepted' ? ('claimed' as const) : existing.status,
-          outcome:
-            outcome === 'waitlisted_gate_on' ? 'already_waitlisted' : outcome,
+          status: existing.status,
+          outcome: 'already_waitlisted' as const,
         };
       }
 
