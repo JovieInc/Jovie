@@ -46,9 +46,9 @@ body:has(.home-viewport)::-webkit-scrollbar {
   --homepage-hero-subhead-max: 44rem;
   --homepage-hero-cta-gap: 0.75rem;
   --homepage-carousel-width: 100vw;
-  --homepage-carousel-stage-height: clamp(22rem, 34vw, 31rem);
+  --homepage-carousel-stage-height: clamp(22rem, 31vw, 30rem);
   --homepage-carousel-slide-width: clamp(40rem, 61vw, 55rem);
-  --homepage-carousel-step: clamp(45rem, 68vw, 62rem);
+  --homepage-carousel-step: clamp(54rem, 74vw, 76rem);
   --homepage-carousel-control-inset: clamp(1.5rem, 4vw, 3.75rem);
   --homepage-section-space: clamp(5rem, 8.5vw, 7.5rem);
   --homepage-section-max: min(
@@ -61,15 +61,17 @@ body:has(.home-viewport)::-webkit-scrollbar {
     rgba(12, 16, 24, 0.98) 0%,
     rgba(4, 5, 7, 0.98) 100%
   );
-  --homepage-footer-cta-top: clamp(4.7rem, 8vw, 7rem);
-  --homepage-footer-cta-bottom: clamp(12.5rem, 19vw, 17.5rem);
+  --homepage-footer-cta-top: clamp(4rem, 6.5vw, 5.6rem);
+  --homepage-footer-cta-bottom: clamp(9.5rem, 14vw, 13rem);
 }
 
 .home-viewport [data-testid="header-nav"] {
+  --linear-text-primary: rgb(252, 252, 252);
   top: 0 !important;
   min-height: var(--linear-header-height);
   border-bottom: 1px solid transparent !important;
   background: transparent !important;
+  color: rgb(252, 252, 252);
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
   transition:
@@ -338,7 +340,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-hero-showcase {
   position: relative;
   width: var(--homepage-carousel-width);
-  margin-top: clamp(3.5rem, 5vw, 4.5rem);
+  margin-top: clamp(3.1rem, 4.4vw, 4.1rem);
   margin-left: calc(50% - 50vw);
   overflow: hidden;
   padding-block: 0 1rem;
@@ -348,13 +350,13 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-hero-showcase::before {
   content: "";
   position: absolute;
-  inset: 2% 13% 0;
+  inset: 0 16% 0;
   pointer-events: none;
   border-radius: 999px;
   background: radial-gradient(
     58% 62% at 50% 48%,
-    rgba(77, 137, 218, 0.2) 0%,
-    rgba(28, 70, 122, 0.1) 42%,
+    rgba(77, 137, 218, 0.18) 0%,
+    rgba(28, 70, 122, 0.09) 42%,
     transparent 74%
   );
   filter: blur(30px);
@@ -386,7 +388,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   pointer-events: none;
   opacity: var(--carousel-opacity);
   filter: saturate(1) brightness(1) blur(var(--carousel-blur))
-    drop-shadow(0 32px 90px rgba(0, 0, 0, 0.42));
+    drop-shadow(0 30px 88px rgba(0, 0, 0, 0.48));
   transform: translate3d(
       calc(-50% + var(--carousel-offset) * var(--homepage-carousel-step)),
       -50%,
@@ -401,9 +403,9 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-hero-mockup[data-active="true"] {
-  filter: saturate(1.04) brightness(1.14) contrast(1.04)
+  filter: saturate(1.03) brightness(1.08) contrast(1.03)
     blur(var(--carousel-blur)) drop-shadow(0 34px 96px rgba(0, 0, 0, 0.5))
-    drop-shadow(0 0 72px rgba(64, 126, 214, 0.16));
+    drop-shadow(0 0 72px rgba(64, 126, 214, 0.13));
 }
 
 .homepage-hero-mockup--phone {
@@ -421,14 +423,14 @@ body:has(.home-viewport)::-webkit-scrollbar {
   overflow: hidden;
   height: var(--homepage-carousel-stage-height);
   width: auto;
-  border: 1px solid rgba(189, 189, 244, 0.1);
-  border-radius: 10px;
+  border: 1px solid rgba(189, 189, 244, 0.09);
+  border-radius: 12px;
   /* Per-shot aspect-ratio set inline as --shot-aspect from the image's real
      width/height. Falls back to 16/10 (the typical 1440x900 desktop capture)
      when no inline value is supplied. The phone-variant rule overrides this. */
   aspect-ratio: var(--shot-aspect, 16 / 10);
-  padding: 6px;
-  background: rgba(157, 157, 255, 0.05);
+  padding: 4px;
+  background: rgba(157, 157, 255, 0.04);
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
 }
 
@@ -458,7 +460,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  background: #06070a;
 }
 
 .homepage-hero-carousel__side {
@@ -534,7 +537,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   position: relative;
   z-index: 1;
   padding: clamp(2.75rem, 4vw, 3.875rem) var(--homepage-page-gutter)
-    clamp(7.5rem, 12vw, 11.25rem);
+    clamp(5.5rem, 8vw, 8.5rem);
   background: #000;
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
@@ -1179,7 +1182,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-story-final-cta {
-  min-height: clamp(31rem, 44vw, 39rem);
+  min-height: clamp(25rem, 36vw, 32rem);
   border-top: 1px solid rgba(255, 255, 255, 0.055);
   padding-top: 0;
   padding-bottom: 0;
@@ -1195,8 +1198,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-final-cta-rays {
-  height: clamp(16rem, 34vw, 25rem);
-  opacity: 0.46;
+  height: clamp(14rem, 28vw, 21rem);
+  opacity: 0.38;
 }
 
 .homepage-final-cta-copy {
@@ -1223,8 +1226,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
     --homepage-carousel-step: min(88vw, 28rem);
     --homepage-carousel-control-inset: 1.5rem;
     --homepage-section-space: 4rem;
-    --homepage-footer-cta-top: 4.4rem;
-    --homepage-footer-cta-bottom: 13.5rem;
+    --homepage-footer-cta-top: 4rem;
+    --homepage-footer-cta-bottom: 11rem;
   }
 
   .homepage-hero-shell__grid-wrap {
@@ -1334,8 +1337,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
   }
 
   .homepage-story-heading {
-    font-size: clamp(2.2rem, 10vw, 3.35rem);
-    letter-spacing: -0.064em;
+    font-size: clamp(2.1rem, 9vw, 3rem);
+    letter-spacing: -0.048em;
   }
 
   .homepage-story-body {
@@ -1374,9 +1377,9 @@ body:has(.home-viewport)::-webkit-scrollbar {
   }
 
   .homepage-outcome-heading {
-    max-width: 10.5ch;
-    font-size: clamp(3rem, 15vw, 4.35rem);
-    line-height: 0.94;
+    max-width: 12ch;
+    font-size: clamp(2.35rem, 10vw, 3.25rem);
+    line-height: 1;
   }
 
   .homepage-outcome-rail-bleed {
@@ -1397,7 +1400,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
   }
 
   .homepage-outcome-card__title {
-    font-size: clamp(2.7rem, 12vw, 3.55rem);
+    font-size: clamp(1.8rem, 8vw, 2.35rem);
+    line-height: 1.08;
   }
 
   .homepage-outcome-card__visual {

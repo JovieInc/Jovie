@@ -1,5 +1,6 @@
 'use client';
 
+import { Bell, Shirt, Sparkles, Video } from 'lucide-react';
 import {
   motion,
   useReducedMotion as useMotionReducedMotion,
@@ -28,27 +29,31 @@ type RhythmMode = 'before' | 'after';
 const RHYTHM_ACTION_CARDS = [
   {
     accent: '#7c5cff',
+    Icon: Shirt,
     label: 'Merch Drop',
-    text: "Nothing scheduled for next Friday? Should we drop some new merch? Here's 3 designs I think you'll love. Reply thumbs up to schedule.",
-    className: 'bottom-[7%] left-[5vw] w-[19rem]',
+    text: 'Friday is open. Three merch designs are ready to schedule.',
+    className: 'bottom-[14%] left-[7vw] w-[15.5rem]',
   },
   {
     accent: '#2fcf7f',
+    Icon: Bell,
     label: 'New Single',
-    text: 'New ISRC code detected on Spotify. Notifying 4,379 fans right now.',
-    className: 'right-[7vw] top-[30%] w-[18rem]',
+    text: 'New ISRC detected. Notifying 4,379 fans right now.',
+    className: 'right-[9vw] top-[27%] w-[15rem]',
   },
   {
     accent: '#2f80d8',
+    Icon: Video,
     label: 'Video Hold',
-    text: 'Your 9:00 AM slot is open. I drafted the teaser, caption, and smart-link update.',
-    className: 'right-[13vw] bottom-[7%] w-[17rem]',
+    text: 'The 9:00 AM slot is open. Teaser and caption are drafted.',
+    className: 'right-[15vw] bottom-[14%] w-[15.25rem]',
   },
   {
     accent: '#c04494',
+    Icon: Sparkles,
     label: 'Tour Recap',
-    text: 'Top listeners from the last drop are ready for a private preview before Friday.',
-    className: 'bottom-[3%] left-[22vw] w-[17rem]',
+    text: 'Top listeners are ready for a private preview before Friday.',
+    className: 'bottom-[5%] left-[25vw] w-[15rem]',
   },
 ] as const;
 
@@ -252,11 +257,11 @@ function FridayRhythmContent({
   return (
     <div className='mx-auto w-full max-w-[var(--homepage-section-max)] px-[var(--homepage-page-gutter)] py-20 sm:py-24 md:py-0'>
       <div className='max-w-[45rem] text-left'>
-        <h2 className='text-[clamp(2.55rem,5.8vw,5rem)] font-semibold leading-[0.92] text-white'>
+        <h2 className='text-[clamp(2.5rem,5.3vw,4.75rem)] font-semibold leading-[0.95] tracking-[-0.04em] text-white'>
           <span className='block'>Make Every Friday</span>
           <span className='block'>Count.</span>
         </h2>
-        <p className='mt-5 max-w-[34rem] text-[15px] leading-[1.65] text-white/58 sm:text-[17px]'>
+        <p className='mt-5 max-w-[34rem] text-[15px] leading-[1.65] tracking-[-0.005em] text-white/56 sm:text-[16px]'>
           Jovie turns open Fridays into a planned release rhythm people come
           back to.
         </p>
@@ -282,7 +287,7 @@ function FridayRhythmContent({
           opacity: 1,
           y: 0,
         }}
-        className='mx-auto mt-12 max-w-[61rem] md:mt-16'
+        className='mx-auto mt-12 max-w-[60rem] md:mt-16'
         initial={false}
         transition={{
           duration: reducedMotion ? 0 : 0.4,
@@ -290,11 +295,6 @@ function FridayRhythmContent({
         }}
       >
         <div className='relative'>
-          <RhythmHeartbeatLine
-            data={data}
-            reducedMotion={reducedMotion}
-            totalFridays={totalFridays}
-          />
           <ContributionGraph
             ariaLabel={graphSummary}
             className='relative z-10'
@@ -362,15 +362,25 @@ function RhythmAtmosphere({
   totalFridays: number;
 }>) {
   const progress = totalFridays > 0 ? activeFridays / totalFridays : 0;
+  const heartbeatData = useMemo(
+    () => generateFridayRhythmData(FRIDAY_RHYTHM_YEAR, activeFridays),
+    [activeFridays]
+  );
 
   return (
     <div
       aria-hidden='true'
       className='pointer-events-none absolute inset-0 z-0 overflow-hidden'
     >
-      <div className='absolute inset-y-0 left-1/2 w-[150vw] -translate-x-1/2 bg-[radial-gradient(circle_at_50%_42%,rgba(94,106,210,0.13),transparent_32%),linear-gradient(90deg,transparent,rgba(94,106,210,0.11)_18%,rgba(94,106,210,0.045)_50%,rgba(94,106,210,0.11)_82%,transparent)] opacity-80 blur-3xl' />
-      <div className='absolute left-1/2 top-[52%] h-px w-[160vw] -translate-x-1/2 bg-gradient-to-r from-transparent via-[var(--linear-accent,#5e6ad2)]/28 to-transparent opacity-75 blur-[0.5px]' />
-      <div className='absolute inset-0 bg-[radial-gradient(circle_at_15%_58%,rgba(139,92,246,0.08),transparent_16%),radial-gradient(circle_at_86%_32%,rgba(20,184,166,0.07),transparent_18%),linear-gradient(180deg,transparent,rgba(0,0,0,0.45)_76%)]' />
+      <div className='absolute inset-y-0 left-1/2 w-[165vw] -translate-x-1/2 bg-[radial-gradient(circle_at_50%_42%,rgba(94,106,210,0.09),transparent_32%),linear-gradient(90deg,transparent,rgba(94,106,210,0.075)_20%,rgba(94,106,210,0.028)_50%,rgba(94,106,210,0.075)_80%,transparent)] opacity-80 blur-3xl' />
+      <RhythmHeartbeatLine
+        data={heartbeatData}
+        reducedMotion={reducedMotion}
+        totalFridays={totalFridays}
+        variant='section'
+      />
+      <div className='absolute left-1/2 top-[52%] h-px w-[168vw] -translate-x-1/2 bg-gradient-to-r from-transparent via-[var(--linear-accent,#5e6ad2)]/18 to-transparent opacity-70 blur-[0.5px]' />
+      <div className='absolute inset-0 bg-[radial-gradient(circle_at_15%_58%,rgba(139,92,246,0.045),transparent_16%),radial-gradient(circle_at_86%_32%,rgba(20,184,166,0.04),transparent_18%),linear-gradient(180deg,transparent,rgba(0,0,0,0.48)_76%)]' />
       {Array.from({ length: 34 }, (_, index) => {
         const x = (index * 29) % 100;
         const y = 18 + ((index * 17) % 64);
@@ -390,16 +400,16 @@ function RhythmAtmosphere({
       })}
       <div className='hidden md:block'>
         {RHYTHM_ACTION_CARDS.map((card, index) => {
+          const Icon = card.Icon;
           const threshold = index * 0.15;
           const cardProgress = Math.min(
             Math.max((progress - threshold) / 0.46, 0),
             1
           );
-          const baseOpacity = index < 2 ? 0.24 : 0.1;
-          const opacity =
-            baseOpacity + cardProgress * (index < 2 ? 0.52 : 0.58);
-          const translateY = 56 - cardProgress * 56;
-          const scale = 0.86 + cardProgress * 0.14;
+          const baseOpacity = index < 2 ? 0.2 : 0.08;
+          const opacity = baseOpacity + cardProgress * (index < 2 ? 0.46 : 0.5);
+          const translateY = 36 - cardProgress * 36;
+          const scale = 0.94 + cardProgress * 0.06;
 
           return (
             <motion.div
@@ -410,7 +420,7 @@ function RhythmAtmosphere({
                 y: reducedMotion ? 0 : translateY,
               }}
               className={cn(
-                'absolute rounded-lg border border-white/[0.09] bg-black/34 p-4 text-left shadow-[0_24px_80px_rgba(0,0,0,0.46)] backdrop-blur-xl',
+                'absolute rounded-md border border-white/[0.08] bg-[#06070a]/46 p-3 text-left shadow-[0_18px_64px_rgba(0,0,0,0.44)] backdrop-blur-xl',
                 card.className
               )}
               initial={false}
@@ -424,16 +434,17 @@ function RhythmAtmosphere({
                 ease: 'easeOut',
               }}
             >
-              <div className='mb-3 h-px w-16 bg-[var(--rhythm-card-accent)] opacity-70 shadow-[0_0_22px_var(--rhythm-card-accent)]' />
-              <p className='text-[11px] font-medium leading-none text-white/46'>
-                {card.label}
-              </p>
-              <p className='mt-2 text-[13px] leading-5 text-white/80'>
-                {card.text}
-              </p>
-              <div className='mt-4 space-y-2'>
-                <span className='block h-1.5 w-full rounded-full bg-white/[0.07]' />
-                <span className='block h-1.5 w-3/4 rounded-full bg-white/[0.045]' />
+              <div className='flex items-start gap-2.5'>
+                <span className='mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-[7px] border border-white/[0.08] bg-white/[0.045] text-[var(--rhythm-card-accent)] shadow-[0_0_24px_rgba(94,106,210,0.16)]'>
+                  <Icon aria-hidden='true' className='h-3.5 w-3.5' />
+                </span>
+                <p className='min-w-0 text-[12px] leading-[1.45] tracking-[-0.005em] text-white/78'>
+                  {card.text}
+                </p>
+              </div>
+              <div className='mt-3 space-y-1.5 pl-[2.375rem]'>
+                <span className='block h-1 w-full rounded-full bg-white/[0.07]' />
+                <span className='block h-1 w-2/3 rounded-full bg-white/[0.045]' />
               </div>
             </motion.div>
           );
@@ -447,10 +458,12 @@ function RhythmHeartbeatLine({
   data,
   reducedMotion,
   totalFridays,
+  variant = 'graph',
 }: Readonly<{
   data: ReturnType<typeof generateFridayRhythmData>;
   reducedMotion: boolean;
   totalFridays: number;
+  variant?: 'graph' | 'section';
 }>) {
   const heartbeatPath = useMemo(
     () => buildHeartbeatPath(data, totalFridays),
@@ -460,7 +473,12 @@ function RhythmHeartbeatLine({
   return (
     <svg
       aria-hidden='true'
-      className='pointer-events-none absolute inset-x-8 top-8 z-0 h-[calc(100%-3.25rem)] w-[calc(100%-4rem)] overflow-visible text-[var(--linear-accent,#5e6ad2)]'
+      className={cn(
+        'pointer-events-none absolute z-0 overflow-visible text-[var(--linear-accent,#5e6ad2)]',
+        variant === 'section'
+          ? 'left-1/2 top-[38%] h-[22rem] w-[190vw] -translate-x-1/2 opacity-45 [mask-image:linear-gradient(90deg,transparent,black_16%,black_84%,transparent)]'
+          : 'inset-x-8 top-8 h-[calc(100%-3.25rem)] w-[calc(100%-4rem)]'
+      )}
       focusable='false'
       preserveAspectRatio='none'
       viewBox={`0 0 ${HEARTBEAT_WIDTH} ${HEARTBEAT_HEIGHT}`}
@@ -473,8 +491,8 @@ function RhythmHeartbeatLine({
         stroke='currentColor'
         strokeLinecap='round'
         strokeLinejoin='round'
-        strokeOpacity='0.025'
-        strokeWidth='2'
+        strokeOpacity={variant === 'section' ? '0.018' : '0.025'}
+        strokeWidth={variant === 'section' ? '2.6' : '2'}
         transition={{
           duration: reducedMotion ? 0 : 0.45,
           ease: 'easeOut',
@@ -488,8 +506,8 @@ function RhythmHeartbeatLine({
         stroke='currentColor'
         strokeLinecap='round'
         strokeLinejoin='round'
-        strokeOpacity='0.07'
-        strokeWidth='0.46'
+        strokeOpacity={variant === 'section' ? '0.052' : '0.07'}
+        strokeWidth={variant === 'section' ? '0.62' : '0.46'}
         transition={{
           duration: reducedMotion ? 0 : 0.45,
           ease: 'easeOut',

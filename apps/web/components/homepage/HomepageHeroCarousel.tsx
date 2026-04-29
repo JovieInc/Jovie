@@ -22,10 +22,11 @@ interface HeroMockupShot {
 
 const HERO_MOCKUP_SCREENSHOTS: readonly HeroMockupShot[] = [
   {
-    id: 'releases-dashboard',
-    src: getMarketingExportImage('dashboard-releases-desktop').publicUrl,
-    alt: 'Desktop release dashboard with tasks, assets, and launch planning',
-    title: 'Release Dashboard',
+    id: 'release-calendar-sidebar',
+    src: getMarketingExportImage('dashboard-releases-sidebar-desktop')
+      .publicUrl,
+    alt: 'Desktop release calendar with the release sidebar open and populated catalog rows',
+    title: 'Release Calendar',
     width: 2880,
     height: 1800,
     kind: 'desktop',
@@ -110,20 +111,14 @@ function getOffset(index: number, activeIndex: number): number {
 
 function getSlideStyle(offset: number): CSSProperties {
   const distance = Math.abs(offset);
-  const isVisible = distance <= 2;
+  const isVisible = distance <= 1;
 
   return {
     '--carousel-offset': offset,
-    '--carousel-opacity': isVisible
-      ? distance === 0
-        ? 1
-        : distance === 1
-          ? 1
-          : 0.4
-      : 0,
-    '--carousel-scale': distance <= 1 ? 1 : 0.96,
+    '--carousel-opacity': isVisible ? (distance === 0 ? 1 : 0) : 0,
+    '--carousel-scale': distance === 0 ? 1 : 0.92,
     '--carousel-blur':
-      distance === 0 ? '0px' : distance === 1 ? '0.1px' : '1px',
+      distance === 0 ? '0px' : distance === 1 ? '0.8px' : '1.5px',
     '--carousel-z': HERO_MOCKUP_SCREENSHOTS.length - distance,
   } as CSSProperties;
 }

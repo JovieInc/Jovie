@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.197] - 2026-04-29
+
+> Homepage hero, Friday rhythm, and footer CTA visual polish.
+
+### Changed
+
+- **Homepage hero** now leads with the sidebar-open release calendar screenshot as a single crisp product frame, with neighboring carousel shots hidden to avoid cropped side imagery.
+- **Friday rhythm section** now uses a full-section, subtle heartbeat background, tighter notification cards, darker graph treatment, and calmer release-category accent glow.
+- **Go Live and final CTA typography** now use tighter spacing and smaller, cleaner responsive sizing to better match the homepage design system.
+
+### Fixed
+
+- **Homepage header logo contrast** is locked to white on the dark homepage surface in both light and dark system modes.
+- **Mobile and desktop homepage layouts** were rechecked for horizontal overflow at 1440, 1024, 430, 375, and 320px.
+
 ## [26.4.196] - 2026-04-29
 
 > Homepage story polish, Friday rhythm model, and mobile hero crop repair.

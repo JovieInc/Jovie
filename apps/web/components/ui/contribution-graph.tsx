@@ -217,9 +217,11 @@ export function ContributionGraph({
                 ? {
                     backgroundColor: day.accentColor,
                     boxShadow: day.accentMuted
-                      ? '0 0 10px rgba(255,255,255,0.08)'
-                      : '0 0 18px rgba(255,255,255,0.12)',
-                    filter: day.accentMuted ? 'saturate(0.86)' : undefined,
+                      ? '0 0 10px rgba(255,255,255,0.055)'
+                      : '0 0 16px rgba(255,255,255,0.09)',
+                    filter: day.accentMuted
+                      ? 'saturate(0.72) brightness(0.9)'
+                      : 'saturate(0.86) brightness(0.96)',
                   }
                 : undefined;
 
