@@ -45,8 +45,11 @@ jobs:
       - name: Setup Node.js and pnpm
         uses: ./.github/actions/setup-node-pnpm
 
-      - name: Run affected automation verify
-        run: bash scripts/automation-verify.sh affected
+      - name: Run affected typecheck
+        run: pnpm turbo typecheck --affected
+
+      - name: Run affected lint
+        run: pnpm turbo lint --affected
 
       - name: Mark PR ready
         env:
