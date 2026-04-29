@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import { AudioBar } from '@/components/shell/AudioBar';
@@ -15,22 +15,14 @@ import { AudioBar } from '@/components/shell/AudioBar';
  *
  * Notes on feature parity:
  * - Production has no per-track cue data yet, so `cues` is left undefined.
- * - Loop modes (`track`/`section`) aren't wired to the audio element here;
- *   the AudioBar renders the toggle but cycling is a no-op until the
- *   `useTrackAudioPlayer` hook gains loop semantics.
- * - Waveform toggle is local visual state — production doesn't render
- *   per-track waveform strands yet (the shell AudioBar handles its own
- *   scrub gradient).
- * - Lyrics toggle becomes a no-op until the lyrics-route deeplink is wired.
+ * - Loop modes (`track`/`section`) are omitted until `useTrackAudioPlayer`
+ *   gains loop semantics.
+ * - Waveform toggle is local visual state. The shell AudioBar renders the
+ *   scrub gradient from the current playback time and duration.
  */
 export function ShellAudioBarBridge() {
-  const {
-    playbackState,
-    toggleTrack,
-    seek: _seek,
-    stop,
-    onError,
-  } = useTrackAudioPlayer();
+  const { playbackState, toggleTrack, stop, onError } = useTrackAudioPlayer();
+  const [waveformOn, setWaveformOn] = useState(false);
 
   useEffect(() => {
     return onError(() => {
@@ -55,14 +47,8 @@ export function ShellAudioBarBridge() {
       onCollapse={stop}
       currentTime={playbackState.currentTime}
       duration={playbackState.duration}
-      loopMode='off'
-      onCycleLoop={() => {
-        /* loop semantics not yet wired in useTrackAudioPlayer */
-      }}
-      waveformOn={false}
-      onToggleWaveform={() => {
-        /* waveform-toggle persistence not yet wired */
-      }}
+      waveformOn={waveformOn}
+      onToggleWaveform={() => setWaveformOn(current => !current)}
       lyricsActive={false}
       track={{
         id: playbackState.activeTrackId,

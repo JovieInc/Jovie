@@ -2,11 +2,15 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { AppFlagProvider } from '@/lib/flags/client';
+import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 
 const toggleTrack = vi.fn().mockResolvedValue(undefined);
 const stop = vi.fn();
 const seek = vi.fn();
 const onError = vi.fn().mockReturnValue(() => {});
+const push = vi.fn();
+let pathname = '/app';
 
 const basePlaybackState = {
   activeTrackId: null as string | null,
@@ -36,6 +40,11 @@ vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
     stop,
     onError,
   }),
+}));
+
+vi.mock('next/navigation', () => ({
+  usePathname: () => pathname,
+  useRouter: () => ({ push }),
 }));
 
 vi.mock('@/components/atoms/TruncatedText', () => ({
@@ -95,6 +104,8 @@ describe('PersistentAudioBar', () => {
     stop.mockClear();
     seek.mockClear();
     onError.mockClear().mockReturnValue(() => {});
+    push.mockClear();
+    pathname = '/app';
     mockPlaybackState = { ...basePlaybackState };
   });
 
@@ -246,11 +257,40 @@ describe('PersistentAudioBar', () => {
     expect(
       screen.getByRole('button', { name: 'Minimize player' })
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'Loop: off' })
-    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Loop: off' })).toBeNull();
     expect(screen.getAllByText('Midnight Drive').length).toBeGreaterThan(0);
     expect(screen.getAllByText('DJ Cool').length).toBeGreaterThan(0);
+  });
+
+  it('links the shell V1 lyrics button to the active track when DESIGN_V1_LYRICS is enabled', async () => {
+    const user = userEvent.setup();
+    setPlaying({ artistName: 'DJ Cool' });
+
+    render(
+      <AppFlagProvider
+        initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1_LYRICS: true }}
+      >
+        <PersistentAudioBar variant='shellChatV1' />
+      </AppFlagProvider>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Lyrics' }));
+
+    expect(push).toHaveBeenCalledWith('/app/lyrics/track-1');
+  });
+
+  it('keeps the shell V1 lyrics button hidden when DESIGN_V1_LYRICS is disabled', () => {
+    setPlaying({ artistName: 'DJ Cool' });
+
+    render(
+      <AppFlagProvider
+        initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1_LYRICS: false }}
+      >
+        <PersistentAudioBar variant='shellChatV1' />
+      </AppFlagProvider>
+    );
+
+    expect(screen.queryByRole('button', { name: 'Lyrics' })).toBeNull();
   });
 
   it('shows the compact shell V1 now-playing row after minimizing', async () => {

@@ -2,15 +2,17 @@
 
 import { Pause, Play, X } from 'lucide-react';
 import Image from 'next/image';
+import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { SeekBar } from '@/components/atoms/SeekBar';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import { AudioBar, type AudioBarTrack } from '@/components/shell/AudioBar';
-import type { LoopMode } from '@/components/shell/LoopBtn';
 import { SidebarBottomNowPlaying } from '@/components/shell/SidebarBottomNowPlaying';
 import { SidebarNowPlaying } from '@/components/shell/SidebarNowPlaying';
+import { APP_ROUTES } from '@/constants/routes';
+import { useAppFlag } from '@/lib/flags/client';
 import { cn } from '@/lib/utils';
 import { formatDuration } from '@/lib/utils/formatDuration';
 
@@ -20,17 +22,21 @@ interface PersistentAudioBarProps {
   readonly variant?: PersistentAudioBarVariant;
 }
 
-const LOOP_SECTION = { from: 25, to: 55 };
+function getTrackLyricsPath(trackId: string): string {
+  return `${APP_ROUTES.LYRICS}/${encodeURIComponent(trackId)}`;
+}
 
 export function PersistentAudioBar({
   variant = 'legacy',
 }: Readonly<PersistentAudioBarProps>) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const designV1LyricsEnabled = useAppFlag('DESIGN_V1_LYRICS');
   const { playbackState, toggleTrack, seek, stop, onError } =
     useTrackAudioPlayer();
   const [imgError, setImgError] = useState(false);
   const [barCollapsed, setBarCollapsed] = useState(false);
   const [waveformOn, setWaveformOn] = useState(false);
-  const [loopMode, setLoopMode] = useState<LoopMode>('off');
 
   useEffect(() => {
     return onError(() => {
@@ -60,11 +66,10 @@ export function PersistentAudioBar({
     toggleTrack,
   ]);
 
-  const handleCycleLoop = useCallback(() => {
-    setLoopMode(current =>
-      current === 'off' ? 'track' : current === 'track' ? 'section' : 'off'
-    );
-  }, []);
+  const handleOpenLyrics = useCallback(() => {
+    if (!playbackState.activeTrackId) return;
+    router.push(getTrackLyricsPath(playbackState.activeTrackId));
+  }, [playbackState.activeTrackId, router]);
 
   const activeTrackId = playbackState.activeTrackId;
   if (!activeTrackId) return null;
@@ -192,7 +197,9 @@ export function PersistentAudioBar({
     id: activeTrackId,
     title: playbackState.trackTitle ?? '',
     artist: playbackState.artistName ?? '',
+    hasLyrics: designV1LyricsEnabled,
   };
+  const lyricsPath = getTrackLyricsPath(activeTrackId);
   const nowPlayingTrack = {
     trackTitle: playbackState.trackTitle,
     artistName: playbackState.artistName,
@@ -226,11 +233,10 @@ export function PersistentAudioBar({
           onCollapse={() => setBarCollapsed(true)}
           currentTime={playbackState.currentTime}
           duration={playbackState.duration}
-          loopMode={loopMode}
-          onCycleLoop={handleCycleLoop}
-          loopSection={loopMode === 'section' ? LOOP_SECTION : undefined}
           waveformOn={waveformOn}
           onToggleWaveform={() => setWaveformOn(current => !current)}
+          lyricsActive={pathname === lyricsPath}
+          onOpenLyrics={designV1LyricsEnabled ? handleOpenLyrics : undefined}
           track={shellTrack}
         />
       </div>
