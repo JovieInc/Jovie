@@ -120,6 +120,13 @@ describe('dev-test-auth.server', () => {
         username: 'browse-test-user',
       })
     );
+    expect(mockEnsureUserRecord).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.not.objectContaining({
+        plan: expect.anything(),
+        isPro: expect.anything(),
+      })
+    );
     expect(mockEnsureCreatorProfileRecord).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
@@ -166,6 +173,14 @@ describe('dev-test-auth.server', () => {
       expect.objectContaining({
         email: 'browse-ready+clerk_test@jov.ie',
         username: 'browse-ready-user',
+      })
+    );
+    expect(mockEnsureUserRecord).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        plan: 'pro',
+        isPro: true,
+        billingUpdatedAt: expect.any(Date),
       })
     );
     expect(mockEnsureCreatorProfileRecord).toHaveBeenCalledWith(

@@ -11,6 +11,8 @@ import {
   XCircle,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
+import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { MismatchCard } from './MismatchCard';
 import type { CatalogMismatch, CatalogScan } from './types';
 
@@ -106,6 +108,7 @@ export function CatalogHealthSection({
     CatalogMismatch[] | null
   >(null);
   const [confirmedNotMineCount, setConfirmedNotMineCount] = useState(0);
+  const [bulkDismissOpen, setBulkDismissOpen] = useState(false);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasLoadedRef = useRef(false);
 
@@ -254,7 +257,7 @@ export function CatalogHealthSection({
     []
   );
 
-  const handleBulkDismiss = useCallback(async () => {
+  const handleBulkDismiss = useCallback(async (): Promise<number> => {
     const ids = unresolvedNotInCatalog.map(m => m.id);
     const results = await Promise.allSettled(
       ids.map(id =>
@@ -275,6 +278,10 @@ export function CatalogHealthSection({
         prev ? prev.filter(m => !succeededIds.includes(m.id)) : prev
       );
     }
+    if (succeededIds.length === 0 && ids.length > 0) {
+      throw new Error('Bulk dismiss failed');
+    }
+    return succeededIds.length;
   }, [unresolvedNotInCatalog]);
 
   // No Spotify = hidden entirely
@@ -410,15 +417,7 @@ export function CatalogHealthSection({
                     variant='outline'
                     size='sm'
                     className='h-7 text-xs'
-                    onClick={() => {
-                      if (
-                        confirm(
-                          `Dismiss all ${unresolvedNotInCatalog.length} items?`
-                        )
-                      ) {
-                        handleBulkDismiss();
-                      }
-                    }}
+                    onClick={() => setBulkDismissOpen(true)}
                   >
                     Dismiss all
                   </Button>
@@ -473,6 +472,25 @@ export function CatalogHealthSection({
             )}
         </div>
       )}
+
+      <ConfirmDialog
+        open={bulkDismissOpen}
+        onOpenChange={setBulkDismissOpen}
+        title={`Dismiss ${unresolvedNotInCatalog.length} mismatches?`}
+        description={`They'll be hidden from this view until your next scan finds them again.`}
+        confirmLabel='Dismiss all'
+        variant='destructive'
+        onConfirm={async () => {
+          try {
+            const dismissedCount = await handleBulkDismiss();
+            toast.success(
+              `${dismissedCount} mismatch${dismissedCount === 1 ? '' : 'es'} dismissed`
+            );
+          } catch {
+            toast.error("Couldn't dismiss mismatches");
+          }
+        }}
+      />
     </div>
   );
 }

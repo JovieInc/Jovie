@@ -263,6 +263,7 @@ vi.mock('@/lib/queries/useTaskMutations', () => ({
   }),
   useDeleteTaskMutation: () => ({
     mutate: mockDeleteTask,
+    mutateAsync: mockDeleteTask,
     isPending: false,
   }),
   useUpdateTaskMutation: () => ({
@@ -866,8 +867,7 @@ describe('TasksPageClient', () => {
     });
   });
 
-  it('confirms before deleting a task from the context menu', () => {
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+  it('opens a confirmation dialog before deleting a task from the context menu', () => {
     renderPage();
 
     const tableProps = mockUnifiedTable.mock.calls.at(-1)?.[0] as
@@ -883,23 +883,23 @@ describe('TasksPageClient', () => {
       ?.getContextMenuItems?.(mockTaskTwo)
       ?.find(item => item.id === 'delete-task');
 
-    deleteItem?.onClick?.();
+    act(() => {
+      deleteItem?.onClick?.();
+    });
 
-    expect(confirmSpy).toHaveBeenCalledWith(
-      `Delete "${mockTaskTwo.title}"? This can't be undone.`
-    );
-    expect(mockDeleteTask).toHaveBeenCalledWith(
-      mockTaskTwo.id,
-      expect.objectContaining({
-        onError: expect.any(Function),
-      })
-    );
+    const dialog = screen.getByRole('alertdialog');
+    expect(dialog).toHaveTextContent('Delete task?');
+    expect(dialog).toHaveTextContent(mockTaskTwo.title);
 
-    confirmSpy.mockRestore();
+    const deleteButton = screen.getByRole('button', { name: /^Delete$/ });
+    act(() => {
+      fireEvent.click(deleteButton);
+    });
+
+    expect(mockDeleteTask).toHaveBeenCalledWith(mockTaskTwo.id);
   });
 
-  it('does not delete a task when the context menu confirmation is cancelled', () => {
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+  it('does not delete a task when the confirmation dialog is cancelled', () => {
     renderPage();
 
     const tableProps = mockUnifiedTable.mock.calls.at(-1)?.[0] as
@@ -915,11 +915,16 @@ describe('TasksPageClient', () => {
       ?.getContextMenuItems?.(mockTaskTwo)
       ?.find(item => item.id === 'delete-task');
 
-    deleteItem?.onClick?.();
+    act(() => {
+      deleteItem?.onClick?.();
+    });
+
+    const cancelButton = screen.getByRole('button', { name: /^Cancel$/ });
+    act(() => {
+      fireEvent.click(cancelButton);
+    });
 
     expect(mockDeleteTask).not.toHaveBeenCalled();
-
-    confirmSpy.mockRestore();
   });
 
   it('supports j and k keyboard navigation across visible tasks', () => {
