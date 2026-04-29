@@ -110,7 +110,7 @@ Jovie uses a modern, secure stack designed for scalability, type safety, and exc
    ./scripts/setup.sh
    ```
 
-   This verifies the required Node/pnpm/ripgrep tooling, installs dependencies, and checks Doppler access.
+   This verifies the required Node/pnpm/ripgrep tooling, installs dependencies when package manifests changed, and checks Doppler access.
    On supported macOS and Debian/Ubuntu systems it will attempt to install `ripgrep` automatically. If auto-install is unavailable, use:
 
    ```bash
@@ -124,9 +124,21 @@ From the repo root, use the root wrappers for the canonical internal workflow:
 
 ```bash
 pnpm run db:web:migrate
-pnpm run dev:web:local
+pnpm run dev:web:fast
+pnpm run benchmark:dev
 pnpm run test:web
 pnpm run dev:web:browse
+```
+
+`pnpm run dev:web:fast` is the daily coding loop. It pins Doppler to `jovie-web/dev`, enables the local test-auth bypass, disables local Sentry initialization unless `JOVIE_ENABLE_LOCAL_SENTRY=1`, uses `PORT=3100` by default, and prewarms `/`, `/app`, and `/api/health/build-info` after the server is ready.
+
+Useful local speed toggles:
+
+```bash
+JOVIE_DEV_RESET_NEXT_CACHE=1 ./scripts/setup.sh
+JOVIE_DEV_SYNC_CLERK_IDS=1 ./scripts/setup.sh
+JOVIE_ENABLE_LOCAL_SENTRY=1 pnpm run dev:web:fast
+JOVIE_DEV_RESET_NEXT_CACHE=1 pnpm run benchmark:dev
 ```
 
 For authenticated local browser QA, open:
@@ -168,10 +180,10 @@ For authenticated local browser QA, open:
 6. **Start the development server**
 
    ```bash
-   pnpm run dev:web:local
+   pnpm run dev:web:fast
    ```
 
-   Open [http://localhost:3000](http://localhost:3000) in your browser.
+   Open [http://localhost:3100](http://localhost:3100) in your browser.
 
 ## Development
 
@@ -214,6 +226,9 @@ pnpm run db:web:studio
 # Web app test suite with pinned Doppler scope
 pnpm run test:web
 
+# Changed web tests for quick local iteration
+pnpm run test:web:changed
+
 # Web smoke suite
 pnpm run test:web:smoke
 
@@ -227,6 +242,9 @@ pnpm test:fast
 ### Code Quality
 
 ```bash
+# Fast web typecheck for local iteration
+pnpm run typecheck:web:fast
+
 # Type checking
 pnpm typecheck
 
@@ -240,6 +258,9 @@ pnpm format:check
 
 # Tailwind CSS check
 pnpm tailwind:check
+
+# Dev server ready, first-route compile, and warm-route timing
+pnpm run benchmark:dev
 ```
 
 ### Turborepo
