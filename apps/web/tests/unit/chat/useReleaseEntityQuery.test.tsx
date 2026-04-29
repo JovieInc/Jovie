@@ -83,4 +83,25 @@ describe('useReleaseEntityQuery', () => {
       releaseId: 'release-1',
     });
   });
+
+  it('forwards the matrix dataUpdatedAt to seeded detail data so it is not stale at t=0', () => {
+    const cachedRelease = makeRelease();
+    const matrixKey = queryKeys.releases.matrix('profile-1');
+    queryClient.setQueryData(matrixKey, [cachedRelease]);
+
+    const matrixState =
+      queryClient.getQueryState<ReleaseViewModel[]>(matrixKey);
+    expect(matrixState?.dataUpdatedAt).toBeGreaterThan(0);
+
+    const { result } = renderHook(
+      () => useReleaseEntityQuery('profile-1', 'release-1'),
+      { wrapper: TestWrapper }
+    );
+
+    // The detail entry's dataUpdatedAt must equal the matrix's dataUpdatedAt
+    // so STANDARD_NO_REMOUNT_CACHE's staleTime applies; otherwise TanStack
+    // treats seeded data as stale from t=0.
+    expect(result.current.dataUpdatedAt).toBe(matrixState?.dataUpdatedAt);
+    expect(result.current.isStale).toBe(false);
+  });
 });
