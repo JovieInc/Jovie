@@ -50,11 +50,19 @@ describe('library data', () => {
         title: 'Test Release',
         artist: 'Test Artist',
         artworkUrl: 'https://example.com/art.jpg',
+        smartLinkPath: '/artist/test-release',
         releaseDate: null,
         releaseType: 'single',
         status: 'released',
         trackCount: 1,
         providerCount: 1,
+        providers: [
+          {
+            key: 'spotify',
+            label: 'Spotify',
+            url: 'https://open.spotify.com/album/test',
+          },
+        ],
         hasLyrics: true,
       },
     ]);

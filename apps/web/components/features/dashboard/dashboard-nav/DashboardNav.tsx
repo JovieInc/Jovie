@@ -24,6 +24,7 @@ import { useTaskStatsQuery } from '@/lib/queries/useTasksQuery';
 import {
   adminNavigationSections,
   artistSettingsNavigation,
+  libraryNavItem,
   primaryNavigation,
   userSettingsNavigation,
 } from './config';
@@ -88,6 +89,7 @@ export function DashboardNav(_: DashboardNavProps) {
   const queryClient = useQueryClient();
   const threadsEnabled = useAppFlag('THREADS_ENABLED');
   const shellChatV1Enabled = useAppFlag('SHELL_CHAT_V1');
+  const designV1LibraryEnabled = useAppFlag('DESIGN_V1_LIBRARY');
   const {
     isOpen: isPreviewOpen,
     open: openPreviewPanel,
@@ -122,11 +124,19 @@ export function DashboardNav(_: DashboardNavProps) {
   const artistSettingsLabel = artistName || 'Artist';
 
   // Memoize nav sections for dashboard (non-settings) mode
-  const navSections = useMemo(
-    () => [
+  const navSections = useMemo(() => {
+    const primaryItems = designV1LibraryEnabled
+      ? [
+          ...primaryNavigation.slice(0, 2),
+          libraryNavItem,
+          ...primaryNavigation.slice(2),
+        ]
+      : primaryNavigation;
+
+    return [
       {
         key: 'primary',
-        items: primaryNavigation.map(item =>
+        items: primaryItems.map(item =>
           item.id === 'tasks'
             ? {
                 ...item,
@@ -144,9 +154,13 @@ export function DashboardNav(_: DashboardNavProps) {
             : item
         ),
       },
-    ],
-    [canAccessTasksWorkspace, isPlanGateLoading, taskStats]
-  );
+    ];
+  }, [
+    canAccessTasksWorkspace,
+    designV1LibraryEnabled,
+    isPlanGateLoading,
+    taskStats,
+  ]);
 
   // Profile nav item opens the preview drawer instead of navigating to a separate page.
   // If already on a chat route, just opens the drawer; otherwise navigates first.

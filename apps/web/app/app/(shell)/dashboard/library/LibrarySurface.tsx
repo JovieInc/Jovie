@@ -1,4 +1,4 @@
-import { Disc3, FileText, ImageIcon, Music2 } from 'lucide-react';
+import { Disc3, ExternalLink, FileText, ImageIcon, Music2 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { APP_ROUTES } from '@/constants/routes';
@@ -8,6 +8,15 @@ import {
   formatLibraryReleaseDate,
   type LibraryReleaseAsset,
 } from './library-data';
+
+const LIBRARY_LOADING_PLACEHOLDERS = [
+  'library-loading-release-1',
+  'library-loading-release-2',
+  'library-loading-release-3',
+  'library-loading-release-4',
+  'library-loading-release-5',
+  'library-loading-release-6',
+] as const;
 
 function formatReleaseType(type: LibraryReleaseAsset['releaseType']): string {
   return type.split('_').map(capitalizeFirst).join(' ');
@@ -35,6 +44,54 @@ function Artwork({ asset }: { readonly asset: LibraryReleaseAsset }) {
     <div className='grid h-20 w-20 place-items-center rounded-md border border-subtle bg-surface-1 text-tertiary-token sm:h-24 sm:w-24'>
       <ImageIcon className='h-5 w-5' strokeWidth={2.25} />
     </div>
+  );
+}
+
+export function LibraryLoadingState() {
+  return (
+    <main
+      aria-busy='true'
+      aria-label='Loading Library'
+      className='h-full overflow-y-auto px-5 py-5 sm:px-6 lg:px-8'
+    >
+      <div className='mx-auto max-w-6xl space-y-5'>
+        <div className='flex items-end justify-between gap-4'>
+          <div className='space-y-2'>
+            <div className='h-6 w-24 rounded-md bg-surface-1' />
+            <div className='h-4 w-64 max-w-[72vw] rounded-md bg-surface-1' />
+          </div>
+          <div className='hidden h-4 w-20 rounded-md bg-surface-1 sm:block' />
+        </div>
+
+        <div className='grid gap-3 sm:grid-cols-2 xl:grid-cols-3'>
+          {LIBRARY_LOADING_PLACEHOLDERS.map(placeholderId => (
+            <div
+              key={placeholderId}
+              className='min-w-0 rounded-lg border border-subtle bg-surface-0 p-3'
+            >
+              <div className='flex gap-3'>
+                <div className='h-20 w-20 shrink-0 rounded-md bg-surface-1 sm:h-24 sm:w-24' />
+                <div className='min-w-0 flex-1 space-y-3'>
+                  <div className='space-y-2'>
+                    <div className='h-4 w-3/4 rounded-md bg-surface-1' />
+                    <div className='h-3 w-1/2 rounded-md bg-surface-1' />
+                  </div>
+                  <div className='grid grid-cols-2 gap-3'>
+                    <div className='h-8 rounded-md bg-surface-1' />
+                    <div className='h-8 rounded-md bg-surface-1' />
+                  </div>
+                </div>
+              </div>
+              <div className='mt-3 flex gap-1.5'>
+                <div className='h-6 w-16 rounded-md bg-surface-1' />
+                <div className='h-6 w-20 rounded-md bg-surface-1' />
+                <div className='h-6 w-14 rounded-md bg-surface-1' />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </main>
   );
 }
 
@@ -145,6 +202,33 @@ export function LibrarySurface({
                   <span className='inline-flex items-center gap-1 rounded-md bg-surface-1 px-2 py-1'>
                     <FileText className='h-3 w-3' strokeWidth={2.25} />
                     Lyrics
+                  </span>
+                ) : null}
+              </div>
+
+              <div className='mt-3 flex flex-wrap items-center gap-1.5'>
+                <Link
+                  href={asset.smartLinkPath}
+                  className='inline-flex h-7 items-center gap-1 rounded-md border border-subtle bg-surface-0 px-2 text-xs font-medium text-primary-token transition-[background-color,border-color] hover:border-default hover:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token'
+                >
+                  Open Release
+                  <ExternalLink className='h-3 w-3' strokeWidth={2.25} />
+                </Link>
+                {asset.providers.slice(0, 3).map(provider => (
+                  <a
+                    key={`${asset.id}-${provider.key}`}
+                    href={provider.url}
+                    target='_blank'
+                    rel='noopener noreferrer'
+                    className='inline-flex h-7 items-center gap-1 rounded-md border border-subtle bg-surface-0 px-2 text-xs font-medium text-secondary-token transition-[background-color,border-color,color] hover:border-default hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token'
+                  >
+                    {provider.label}
+                    <ExternalLink className='h-3 w-3' strokeWidth={2.25} />
+                  </a>
+                ))}
+                {asset.providerCount > 3 ? (
+                  <span className='inline-flex h-7 items-center rounded-md bg-surface-1 px-2 text-xs text-tertiary-token'>
+                    {asset.providerCount - 3} More
                   </span>
                 ) : null}
               </div>
