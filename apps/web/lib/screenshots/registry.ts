@@ -468,7 +468,7 @@ const PUBLIC_EXPORT_URL_PREFIX = '/product-screenshots';
  * IHDR header on disk. Locator-captured scenarios have non-retina dimensions
  * (smaller than viewport×2) — advertising the wrong size to next/image distorts
  * aspect ratios and degrades the image optimizer. Regenerate via:
- *   node -e 'see scripts/print-screenshot-dimensions.ts'
+ *   pnpm tsx scripts/print-screenshot-dimensions.ts
  */
 const PUBLIC_EXPORT_DIMENSIONS: Record<
   string,
@@ -529,6 +529,14 @@ export function getMarketingExportImage(id: string): MarketingExportImage {
     throw new Error(`Screenshot scenario ${id} has no publicExportPath`);
   }
   const known = PUBLIC_EXPORT_DIMENSIONS[scenario.publicExportPath];
+  // Locator captures crop to a sub-region of the viewport — their dimensions
+  // are arbitrary, not viewport×2. Fail loudly instead of silently advertising
+  // distorted dimensions to next/image.
+  if (scenario.captureTarget === 'locator' && !known) {
+    throw new Error(
+      `Missing PUBLIC_EXPORT_DIMENSIONS entry for locator capture: ${scenario.publicExportPath}`
+    );
+  }
   // Fallback to viewport×2 retina dimensions for full-viewport captures whose
   // actual size we haven't catalogued yet (mostly safe because full-viewport
   // captures are always 1440×900 or 390×844 at deviceScaleFactor 2).
