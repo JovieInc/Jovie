@@ -32,6 +32,19 @@ describe('DashboardNav interactions', () => {
       'href',
       APP_ROUTES.DASHBOARD_AUDIENCE
     );
+    expect(screen.queryByRole('link', { name: 'Library' })).toBeNull();
+  });
+
+  it('adds Library to navigation when the Library V1 flag is enabled', () => {
+    renderDashboardNav({
+      renderFn: render,
+      appFlags: { DESIGN_V1_LIBRARY: true },
+    });
+
+    expect(screen.getByRole('link', { name: 'Library' })).toHaveAttribute(
+      'href',
+      APP_ROUTES.DASHBOARD_LIBRARY
+    );
   });
 
   it('shows grouped admin navigation with growth links for admin users', () => {

@@ -143,11 +143,15 @@ const SURFACE_CASES: readonly SurfaceCase[] = [
       );
     },
     assertEnabled: async page => {
-      const matrix = page.getByTestId('releases-matrix');
-      await expect(matrix).toBeVisible({ timeout: 30_000 });
-      await expect(matrix).toHaveAttribute('data-design-v1-releases', 'true', {
-        timeout: 30_000,
-      });
+      const shellReleasesView = page.getByTestId('shell-releases-view');
+      await expect(shellReleasesView).toBeVisible({ timeout: 30_000 });
+      await expect(shellReleasesView).toHaveAttribute(
+        'data-design-v1-releases',
+        'true',
+        {
+          timeout: 30_000,
+        }
+      );
     },
   },
   {

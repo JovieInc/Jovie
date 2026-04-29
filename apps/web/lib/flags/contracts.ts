@@ -136,7 +136,7 @@ export const APP_FLAG_DESCRIPTIONS = {
     'Chat jank instrumentation (message continuity + streaming)',
   RELEASE_PLAN_DEMO: 'Release plan demo page (YC wedge)',
   SHELL_CHAT_V1: 'Shell and chat V1 production design',
-  DESIGN_V1_RELEASES: 'Design V1 releases and drawer surfaces',
+  DESIGN_V1_RELEASES: 'Design V1 releases view and drawer surfaces',
   DESIGN_V1_TASKS: 'Design V1 tasks workspace',
   DESIGN_V1_CHAT_ENTITIES: 'Design V1 chat entity panels',
   DESIGN_V1_LYRICS: 'Design V1 lyrics surfaces',

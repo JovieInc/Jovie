@@ -20,12 +20,20 @@ This document is the canonical reference for Statsig-backed gates used by the we
 | `stripe-connect-enabled` | `LEGACY_STATSIG_GATE_KEYS.STRIPE_CONNECT_ENABLED` | `false` | Stripe Connect payouts (settings + payment routes) | Active |
 | `enable_light_mode` | `LEGACY_STATSIG_GATE_KEYS.ENABLE_LIGHT_MODE` | `false` | Light mode theme toggle (footer) | Active |
 | `feature_shell_chat_v1` | `LEGACY_STATSIG_GATE_KEYS.SHELL_CHAT_V1` | `false` | Shell + chat V1 production design rollout | Active |
+| `design_v1_releases` | `LEGACY_STATSIG_GATE_KEYS.DESIGN_V1_RELEASES` | `false` | Releases-specific Design V1 view rollout (`ShellReleasesView`) | Active |
+| `design_v1_tasks` | `LEGACY_STATSIG_GATE_KEYS.DESIGN_V1_TASKS` | `false` | Tasks Design V1 rollout | Active |
+| `design_v1_chat_entities` | `LEGACY_STATSIG_GATE_KEYS.DESIGN_V1_CHAT_ENTITIES` | `false` | Chat entity panel Design V1 rollout | Active |
+| `design_v1_lyrics` | `LEGACY_STATSIG_GATE_KEYS.DESIGN_V1_LYRICS` | `false` | Lyrics Design V1 rollout | Active |
+| `design_v1_library` | `LEGACY_STATSIG_GATE_KEYS.DESIGN_V1_LIBRARY` | `false` | Read-only library Design V1 rollout | Active |
+| `design_v1_auth` | `LEGACY_STATSIG_GATE_KEYS.DESIGN_V1_AUTH` | `false` | Auth visual Design V1 rollout | Active |
+| `design_v1_onboarding` | `LEGACY_STATSIG_GATE_KEYS.DESIGN_V1_ONBOARDING` | `false` | Onboarding visual Design V1 rollout | Active |
 
 ## Operational Notes
 
 - Gates are evaluated server-side with Statsig and then passed to client components via bootstrap payloads.
 - If `NEXT_PUBLIC_STATSIG_CLIENT_KEY` or `STATSIG_SERVER_SECRET_KEY` is not configured, the app degrades gracefully to safe defaults.
 - Security-sensitive authorization must still rely on server-side entitlement checks; gates are rollout controls, not permission boundaries.
+- The Design V1 rollout contract, valid flag combinations, and rollback paths live in `docs/DESIGN_V1_ROLLOUT_MATRIX.md`.
 
 ## Maintenance Checklist
 
