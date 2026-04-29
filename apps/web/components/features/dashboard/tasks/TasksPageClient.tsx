@@ -1558,14 +1558,21 @@ export function TasksPageClient() {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.defaultPrevented) return;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
-      if (!selectedTask) return;
 
       const action = resolveTableNavAction(event.key, event.target);
       if (action === 'next') {
         event.preventDefault();
+        if (!selectedTask) {
+          selectTaskByIndex(0);
+          return;
+        }
         selectNextTask();
       } else if (action === 'prev') {
         event.preventDefault();
+        if (!selectedTask) {
+          selectTaskByIndex(visibleTasks.length - 1);
+          return;
+        }
         selectPreviousTask();
       }
     }
@@ -1574,7 +1581,13 @@ export function TasksPageClient() {
     return () => {
       globalThis.removeEventListener('keydown', handleKeyDown);
     };
-  }, [selectNextTask, selectPreviousTask, selectedTask]);
+  }, [
+    selectNextTask,
+    selectPreviousTask,
+    selectTaskByIndex,
+    selectedTask,
+    visibleTasks.length,
+  ]);
 
   const sidebarPanel = selectedRelease ? (
     <ReleaseSidebar
