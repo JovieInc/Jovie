@@ -473,59 +473,57 @@ async function focusAndAssertNoShift(
 }
 
 test.describe('Public Profile Mobile Viewport Stability @smoke @critical', () => {
-  test.setTimeout(180_000);
+  test.setTimeout(120_000);
 
   for (const viewport of MOBILE_PROFILE_VIEWPORTS) {
-    test(`${viewport.label} public screens fill the mobile viewport`, async ({
-      context,
-    }, testInfo) => {
-      for (const screen of PROFILE_MOBILE_SCREENS) {
-        await test.step(screen.id, async () => {
-          const screenPage = await context.newPage();
+    for (const screen of PROFILE_MOBILE_SCREENS) {
+      test(`${viewport.label} ${screen.id} fills the mobile viewport`, async ({
+        context,
+      }, testInfo) => {
+        const screenPage = await context.newPage();
 
-          try {
-            await screenPage.setViewportSize({
-              width: viewport.width,
-              height: viewport.height,
-            });
-            await installProfileMocks(screenPage);
-            await installNotificationFlowMocks(screenPage);
-            await warmProfileRouteForBudget(screenPage, screen.path);
+        try {
+          await screenPage.setViewportSize({
+            width: viewport.width,
+            height: viewport.height,
+          });
+          await installProfileMocks(screenPage);
+          await installNotificationFlowMocks(screenPage);
+          await warmProfileRouteForBudget(screenPage, screen.path);
 
-            const response = await smokeNavigate(screenPage, screen.path, {
-              timeout: 120_000,
-            });
-            expect(response?.status() ?? 0).toBeLessThan(500);
+          const response = await smokeNavigate(screenPage, screen.path, {
+            timeout: 120_000,
+          });
+          expect(response?.status() ?? 0).toBeLessThan(500);
 
-            await waitForHydration(screenPage);
-            await waitForAnyVisible(screenPage, screen.readySelectors);
+          await waitForHydration(screenPage);
+          await waitForAnyVisible(screenPage, screen.readySelectors);
 
-            const snapshot = await collectViewportSnapshot(
-              screenPage,
-              screen.rootSelector
-            );
-            expectMobileShellStable(
-              snapshot,
-              viewport,
-              `${viewport.label} ${screen.id}`
-            );
-            await expectNavigationBudget(
-              screenPage,
-              getNavigationBudget(screen.id),
-              `${viewport.label} ${screen.id}`
-            );
-            await maybeCaptureScreenshot(
-              screenPage,
-              viewport,
-              screen.id,
-              testInfo
-            );
-          } finally {
-            await screenPage.close();
-          }
-        });
-      }
-    });
+          const snapshot = await collectViewportSnapshot(
+            screenPage,
+            screen.rootSelector
+          );
+          expectMobileShellStable(
+            snapshot,
+            viewport,
+            `${viewport.label} ${screen.id}`
+          );
+          await expectNavigationBudget(
+            screenPage,
+            getNavigationBudget(screen.id),
+            `${viewport.label} ${screen.id}`
+          );
+          await maybeCaptureScreenshot(
+            screenPage,
+            viewport,
+            screen.id,
+            testInfo
+          );
+        } finally {
+          await screenPage.close();
+        }
+      });
+    }
 
     test(`${viewport.label} alerts walkthrough focus never shifts the shell`, async ({
       context,
