@@ -11,14 +11,14 @@ import { ReleaseTableSkeleton } from './loading';
 export type ReleasesViewMode = 'designV1ShellReleases' | 'legacyProviderMatrix';
 
 export interface ReleasesFlagState {
-  readonly shellChatV1Enabled: boolean;
   readonly designV1ReleasesEnabled: boolean;
 }
 
 export function resolveReleasesViewMode({
   designV1ReleasesEnabled,
 }: ReleasesFlagState): ReleasesViewMode {
-  // SHELL_CHAT_V1 owns shell chrome; releases view selection belongs to DESIGN_V1_RELEASES.
+  // SHELL_CHAT_V1 owns shell chrome (consumed elsewhere); releases view
+  // selection belongs solely to DESIGN_V1_RELEASES.
   return designV1ReleasesEnabled
     ? 'designV1ShellReleases'
     : 'legacyProviderMatrix';
@@ -57,7 +57,6 @@ export function ReleasesPageClient() {
   const { selectedProfile } = useDashboardData();
   const profileId = selectedProfile?.id ?? '';
   const releasesViewMode = resolveReleasesViewMode({
-    shellChatV1Enabled: useAppFlag('SHELL_CHAT_V1'),
     designV1ReleasesEnabled: useAppFlag('DESIGN_V1_RELEASES'),
   });
 
