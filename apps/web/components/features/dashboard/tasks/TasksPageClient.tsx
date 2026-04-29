@@ -47,6 +47,7 @@ import {
   HIDDEN_DIV_STYLES,
   useTextareaAutosize,
 } from '@/components/jovie/hooks/useTextareaAutosize';
+import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import {
   TOOLBAR_MENU_CONTENT_CLASS,
   TOOLBAR_MENU_SEPARATOR_CLASS,
@@ -1009,13 +1010,13 @@ function MobileTaskListItem({
 
 function useTaskActions({
   artistName,
-  deleteTask,
+  onRequestDelete,
   openReleaseSidebar,
   openTaskDocument,
   updateTask,
 }: {
   artistName: string | null | undefined;
-  deleteTask: (taskId: string, opts: { onError: () => void }) => void;
+  onRequestDelete: (task: TaskView) => void;
   openReleaseSidebar: (task: TaskView) => void;
   openTaskDocument: (task: TaskView) => void;
   updateTask: (
@@ -1041,15 +1042,9 @@ function useTaskActions({
 
   const handleDeleteTask = useCallback(
     (task: TaskView) => {
-      const shouldDelete = globalThis.confirm(
-        `Delete "${task.title}"? This can't be undone.`
-      );
-      if (!shouldDelete) return;
-      deleteTask(task.id, {
-        onError: () => toast.error("Couldn't delete task"),
-      });
+      onRequestDelete(task);
     },
-    [deleteTask]
+    [onRequestDelete]
   );
 
   const getTaskContextMenuItems = useCallback(
@@ -1185,6 +1180,9 @@ export function TasksPageClient() {
   >('all');
   const [mobileScope, setMobileScope] = useState<MobileTaskScope>('all');
   const [draftTitle, setDraftTitle] = useState('');
+  const [taskPendingDelete, setTaskPendingDelete] = useState<TaskView | null>(
+    null
+  );
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [selectedReleaseId, setSelectedReleaseId] = useState<string | null>(
     null
@@ -1197,7 +1195,7 @@ export function TasksPageClient() {
   const createTaskMutation = useCreateTaskMutation();
   const deleteTaskMutation = useDeleteTaskMutation();
   const updateTaskMutation = useUpdateTaskMutation();
-  const { mutate: deleteTask } = deleteTaskMutation;
+  const { mutateAsync: deleteTaskAsync } = deleteTaskMutation;
   const { mutate: updateTask, isPending: isUpdatingTask } = updateTaskMutation;
   const { data: releases = [] } = useReleasesQuery(profileId ?? '');
 
@@ -1398,7 +1396,7 @@ export function TasksPageClient() {
 
   const { getTaskContextMenuItems, updateTaskField } = useTaskActions({
     artistName,
-    deleteTask,
+    onRequestDelete: setTaskPendingDelete,
     openReleaseSidebar,
     openTaskDocument,
     updateTask,
@@ -1744,174 +1742,200 @@ export function TasksPageClient() {
   }
 
   return (
-    <PageShell
-      className='overflow-hidden'
-      data-testid='tasks-workspace'
-      toolbar={
-        isXlUp || headerMode !== 'default' ? (
-          <TaskWorkspaceHeaderBar
-            mode={headerMode}
-            search={search}
-            draftTitle={draftTitle}
-            taskCount={visibleTasks.length}
-            subviews={taskSubviewOptions}
-            activeSubview={activeTaskSubview}
-            onSubviewChange={setTaskSubview}
-            onSearchChange={value => {
-              setSearch(value);
-              if (headerMode === 'default') {
-                setHeaderMode('search');
-              }
-            }}
-            onDraftTitleChange={setDraftTitle}
-            onEnterSearch={() => setHeaderMode('search')}
-            onExitSearch={() => setHeaderMode('default')}
-            onCancelCreate={() => {
-              setDraftTitle('');
-              setHeaderMode('default');
-            }}
-            onSubmitCreate={handleCreateTask}
-            createPending={createTaskMutation.isPending}
-            filterCategories={taskFilterCategories}
-            onClearFilters={clearFilters}
-            showTaskNavigation={isXlUp && Boolean(selectedTask)}
-            canSelectPrevious={canSelectPrevious}
-            canSelectNext={canSelectNext}
-            onSelectPrevious={selectPreviousTask}
-            onSelectNext={selectNextTask}
-          />
-        ) : undefined
-      }
-    >
-      <section
-        className={cn(
-          'flex min-h-0 flex-1 flex-col gap-2 overflow-hidden pb-2'
-        )}
-        data-testid='tasks-content-panel'
+    <>
+      <PageShell
+        className='overflow-hidden'
+        data-testid='tasks-workspace'
+        toolbar={
+          isXlUp || headerMode !== 'default' ? (
+            <TaskWorkspaceHeaderBar
+              mode={headerMode}
+              search={search}
+              draftTitle={draftTitle}
+              taskCount={visibleTasks.length}
+              subviews={taskSubviewOptions}
+              activeSubview={activeTaskSubview}
+              onSubviewChange={setTaskSubview}
+              onSearchChange={value => {
+                setSearch(value);
+                if (headerMode === 'default') {
+                  setHeaderMode('search');
+                }
+              }}
+              onDraftTitleChange={setDraftTitle}
+              onEnterSearch={() => setHeaderMode('search')}
+              onExitSearch={() => setHeaderMode('default')}
+              onCancelCreate={() => {
+                setDraftTitle('');
+                setHeaderMode('default');
+              }}
+              onSubmitCreate={handleCreateTask}
+              createPending={createTaskMutation.isPending}
+              filterCategories={taskFilterCategories}
+              onClearFilters={clearFilters}
+              showTaskNavigation={isXlUp && Boolean(selectedTask)}
+              canSelectPrevious={canSelectPrevious}
+              canSelectNext={canSelectNext}
+              onSelectPrevious={selectPreviousTask}
+              onSelectNext={selectNextTask}
+            />
+          ) : undefined
+        }
       >
-        {isError ? (
-          <div className='flex min-h-[240px] flex-1 flex-col items-center justify-center gap-3 px-6 text-center'>
-            <div className='space-y-1'>
-              <h2 className='text-mid font-semibold text-primary-token'>
-                Couldn&apos;t Load Tasks
-              </h2>
-              <p className='text-app text-secondary-token'>
-                Try reloading the task list.
-              </p>
+        <section
+          className={cn(
+            'flex min-h-0 flex-1 flex-col gap-2 overflow-hidden pb-2'
+          )}
+          data-testid='tasks-content-panel'
+        >
+          {isError ? (
+            <div className='flex min-h-[240px] flex-1 flex-col items-center justify-center gap-3 px-6 text-center'>
+              <div className='space-y-1'>
+                <h2 className='text-mid font-semibold text-primary-token'>
+                  Couldn&apos;t Load Tasks
+                </h2>
+                <p className='text-app text-secondary-token'>
+                  Try reloading the task list.
+                </p>
+              </div>
+              <Button
+                type='button'
+                variant='secondary'
+                size='sm'
+                onClick={() => refetch()}
+              >
+                Retry
+              </Button>
             </div>
-            <Button
-              type='button'
-              variant='secondary'
-              size='sm'
-              onClick={() => refetch()}
-            >
-              Retry
-            </Button>
-          </div>
-        ) : (
-          <div className='flex min-h-0 flex-1 overflow-hidden'>
-            <div
-              data-testid='task-list-pane'
-              className={cn(
-                'min-h-0 min-w-0',
-                TASK_WORKSPACE_PANE_CLASSNAME,
-                selectedTask && showTaskDocumentPane
-                  ? 'xl:flex-none xl:basis-[32rem] xl:min-w-[28rem] xl:max-w-[36rem] xl:border-r xl:border-[color-mix(in_oklab,var(--linear-app-shell-border)_74%,transparent)]'
-                  : 'flex-1',
-                showTaskListPane ? 'block' : 'hidden',
-                !selectedTask && 'xl:max-w-none'
-              )}
-            >
-              {desktopTaskPane ?? (
-                <div
-                  className='flex h-full min-h-0 flex-col overflow-hidden'
-                  data-testid='mobile-task-list'
-                >
-                  <div className='flex items-center justify-between px-4 pb-1 pt-3'>
-                    <div>
-                      <p className='text-xs text-secondary-token'>
-                        {mobileScopeCounts.all} total tasks
-                      </p>
+          ) : (
+            <div className='flex min-h-0 flex-1 overflow-hidden'>
+              <div
+                data-testid='task-list-pane'
+                className={cn(
+                  'min-h-0 min-w-0',
+                  TASK_WORKSPACE_PANE_CLASSNAME,
+                  selectedTask && showTaskDocumentPane
+                    ? 'xl:flex-none xl:basis-[32rem] xl:min-w-[28rem] xl:max-w-[36rem] xl:border-r xl:border-[color-mix(in_oklab,var(--linear-app-shell-border)_74%,transparent)]'
+                    : 'flex-1',
+                  showTaskListPane ? 'block' : 'hidden',
+                  !selectedTask && 'xl:max-w-none'
+                )}
+              >
+                {desktopTaskPane ?? (
+                  <div
+                    className='flex h-full min-h-0 flex-col overflow-hidden'
+                    data-testid='mobile-task-list'
+                  >
+                    <div className='flex items-center justify-between px-4 pb-1 pt-3'>
+                      <div>
+                        <p className='text-xs text-secondary-token'>
+                          {mobileScopeCounts.all} total tasks
+                        </p>
+                      </div>
+                      <button
+                        type='button'
+                        onClick={() =>
+                          setHeaderMode(current =>
+                            current === 'search' ? 'default' : 'search'
+                          )
+                        }
+                        aria-label='Search tasks'
+                        className='inline-flex h-10 w-10 items-center justify-center rounded-full bg-surface-1 text-secondary-token transition-[background-color,color] duration-150 hover:bg-surface-0 hover:text-primary-token'
+                      >
+                        <Search className='h-4 w-4' />
+                      </button>
                     </div>
-                    <button
-                      type='button'
-                      onClick={() =>
-                        setHeaderMode(current =>
-                          current === 'search' ? 'default' : 'search'
-                        )
-                      }
-                      aria-label='Search tasks'
-                      className='inline-flex h-10 w-10 items-center justify-center rounded-full bg-surface-1 text-secondary-token transition-[background-color,color] duration-150 hover:bg-surface-0 hover:text-primary-token'
-                    >
-                      <Search className='h-4 w-4' />
-                    </button>
+                    <TaskSubviewTabs
+                      subviews={taskSubviewOptions}
+                      activeSubview={activeTaskSubview}
+                      onSubviewChange={setTaskSubview}
+                      className='px-3 pb-1 pt-2'
+                    />
+                    <MobileTaskScopeTabs
+                      scope={mobileScope}
+                      counts={mobileScopeCounts}
+                      onChange={setMobileScope}
+                    />
+                    <div className='min-h-0 flex-1 overflow-y-auto overscroll-contain pb-6'>
+                      {mobileTaskContent}
+                    </div>
                   </div>
-                  <TaskSubviewTabs
-                    subviews={taskSubviewOptions}
-                    activeSubview={activeTaskSubview}
-                    onSubviewChange={setTaskSubview}
-                    className='px-3 pb-1 pt-2'
+                )}
+              </div>
+              <div
+                className={cn(
+                  'min-h-0 min-w-0 flex-1 overflow-hidden',
+                  TASK_WORKSPACE_PANE_CLASSNAME,
+                  showTaskDocumentPane ? 'flex' : 'hidden'
+                )}
+                data-testid='task-document-pane'
+              >
+                {selectedTask ? (
+                  <TaskDocumentPanel
+                    task={selectedTask}
+                    title={editorTitle}
+                    description={editorDescription}
+                    onTitleChange={setEditorTitle}
+                    onDescriptionChange={setEditorDescription}
+                    onClose={() => setSelectedTaskId(null)}
+                    onOpenRelease={openReleaseSidebar}
+                    onUpdateStatus={(taskId, status) =>
+                      updateTaskField(taskId, { status })
+                    }
+                    onUpdatePriority={(taskId, priority) =>
+                      updateTaskField(taskId, { priority })
+                    }
+                    onUpdateAssignee={(taskId, assigneeKind) =>
+                      updateTaskField(taskId, { assigneeKind })
+                    }
+                    artistName={artistName}
+                    isDesktopLayout={isXlUp}
                   />
-                  <MobileTaskScopeTabs
-                    scope={mobileScope}
-                    counts={mobileScopeCounts}
-                    onChange={setMobileScope}
+                ) : (
+                  <TaskDocumentPanel
+                    task={null}
+                    title=''
+                    description=''
+                    onTitleChange={NOOP}
+                    onDescriptionChange={NOOP}
+                    onClose={NOOP}
+                    onOpenRelease={NOOP_TASK_OPEN}
+                    onUpdateStatus={NOOP_TASK_STATUS_UPDATE}
+                    onUpdatePriority={NOOP_TASK_PRIORITY_UPDATE}
+                    onUpdateAssignee={NOOP_TASK_ASSIGNEE_UPDATE}
+                    artistName={artistName}
+                    isDesktopLayout={isXlUp}
                   />
-                  <div className='min-h-0 flex-1 overflow-y-auto overscroll-contain pb-6'>
-                    {mobileTaskContent}
-                  </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
-            <div
-              className={cn(
-                'min-h-0 min-w-0 flex-1 overflow-hidden',
-                TASK_WORKSPACE_PANE_CLASSNAME,
-                showTaskDocumentPane ? 'flex' : 'hidden'
-              )}
-              data-testid='task-document-pane'
-            >
-              {selectedTask ? (
-                <TaskDocumentPanel
-                  task={selectedTask}
-                  title={editorTitle}
-                  description={editorDescription}
-                  onTitleChange={setEditorTitle}
-                  onDescriptionChange={setEditorDescription}
-                  onClose={() => setSelectedTaskId(null)}
-                  onOpenRelease={openReleaseSidebar}
-                  onUpdateStatus={(taskId, status) =>
-                    updateTaskField(taskId, { status })
-                  }
-                  onUpdatePriority={(taskId, priority) =>
-                    updateTaskField(taskId, { priority })
-                  }
-                  onUpdateAssignee={(taskId, assigneeKind) =>
-                    updateTaskField(taskId, { assigneeKind })
-                  }
-                  artistName={artistName}
-                  isDesktopLayout={isXlUp}
-                />
-              ) : (
-                <TaskDocumentPanel
-                  task={null}
-                  title=''
-                  description=''
-                  onTitleChange={NOOP}
-                  onDescriptionChange={NOOP}
-                  onClose={NOOP}
-                  onOpenRelease={NOOP_TASK_OPEN}
-                  onUpdateStatus={NOOP_TASK_STATUS_UPDATE}
-                  onUpdatePriority={NOOP_TASK_PRIORITY_UPDATE}
-                  onUpdateAssignee={NOOP_TASK_ASSIGNEE_UPDATE}
-                  artistName={artistName}
-                  isDesktopLayout={isXlUp}
-                />
-              )}
-            </div>
-          </div>
-        )}
-      </section>
-    </PageShell>
+          )}
+        </section>
+      </PageShell>
+
+      <ConfirmDialog
+        open={taskPendingDelete !== null}
+        onOpenChange={open => {
+          if (!open) setTaskPendingDelete(null);
+        }}
+        title='Delete task?'
+        description={
+          taskPendingDelete
+            ? `"${taskPendingDelete.title}" can't be recovered.`
+            : ''
+        }
+        confirmLabel='Delete'
+        variant='destructive'
+        onConfirm={async () => {
+          if (!taskPendingDelete) return;
+          try {
+            await deleteTaskAsync(taskPendingDelete.id);
+            toast.success('Task deleted');
+          } catch {
+            toast.error("Couldn't delete task");
+          }
+        }}
+      />
+    </>
   );
 }

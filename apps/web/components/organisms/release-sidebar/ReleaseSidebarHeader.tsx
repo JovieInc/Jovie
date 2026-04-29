@@ -9,6 +9,7 @@
 
 import { Check, Hash, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 
 import type { Release } from './types';
@@ -58,7 +59,7 @@ export function useReleaseHeaderParts({
   const handleCopyReleaseId = useCallback(async () => {
     const releaseId = release?.id ?? '';
     if (!releaseId) {
-      alert('No release ID available to copy.');
+      toast.error('No release ID available to copy.');
       return;
     }
     try {
@@ -67,7 +68,7 @@ export function useReleaseHeaderParts({
       if (idCopyTimeoutRef.current) clearTimeout(idCopyTimeoutRef.current);
       idCopyTimeoutRef.current = setTimeout(() => setIsIdCopied(false), 2000);
     } catch {
-      alert(
+      toast.error(
         'Failed to copy the release ID. Your browser may not allow clipboard access.'
       );
     }

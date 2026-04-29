@@ -528,6 +528,35 @@ Height: sm=32px, md=40px. Radius: pill (9999px) for app, 6px for marketing. Padd
 | Hover | `oklch(96.2% 0.003 260)` | `rgba(255,255,255,0.022)` |
 | Selected | `oklch(94.8% 0.006 260)` | `rgba(255,255,255,0.048)` |
 
+### Confirmations & Destructive Actions
+
+| Action shape | Replacement | When |
+|---|---|---|
+| Irreversible single-item delete (account, investor link, payment method) | `<ConfirmDialog>` modal, `variant='destructive'` | Default for hard delete and any action with no recovery path |
+| Bulk destructive action ≥ 10 items | `<ConfirmDialog>` modal with count-prefixed title | Below the count threshold, prefer one-click + undo-toast |
+| Async error / failure feedback | `toast.error("...")` from `sonner` | Non-blocking; auto-dismisses |
+| Async success feedback | `toast.success("...")` from `sonner` | Show on every successful confirm — silence reads as "did it work?" |
+| Reversible single-item action (soft-delete, hide/show, status change) | Optimistic update + undo-toast | Pattern not yet codified — for now use `<ConfirmDialog>` and file a follow-up |
+| Native `alert()` / `confirm()` / `prompt()` | **NEVER** | Banned by `biome.json` `noRestrictedGlobals` and CI grep gate |
+
+**Copy rules (earn every word):**
+- **Title (Title Case):** name the action and its target. "Delete investor link?" not "Are you sure?"
+- **Description (Sentence case):** name the *external* consequence, not the internal record state. "Anyone with this URL will see a 404." not "This will be permanently removed."
+- **Confirm button (Title Case):** action verb. "Delete", "Dismiss all", "Cancel subscription" — never "OK" or "Yes"
+- **Cancel button:** keep the default "Cancel"
+- **Success toast:** terse confirmation, name the action and (where useful) the count. "Investor link deleted", "42 mismatches dismissed"
+
+**Component placement:**
+- Render exactly one `<ConfirmDialog>` per surface — at the manager / page-level component, not inside row components. Multiple per-row dialogs cause focus-trap conflicts and a multi-dialog race.
+- Drive open-state with a `pendingX: T | null` pattern — single source of truth for "which item is pending."
+- For mutations: prefer `mutateAsync` + `await` so the dialog's "Please wait..." state matches the actual network duration.
+- Wrap `onConfirm` in try/catch to route success/failure to toasts; the dialog's own `try/finally` already handles state cleanup on throw.
+
+**Mobile (375px iPhone SE):**
+- Title and description must not clip; long object names should wrap, not overflow
+- Destructive button height ≥ 44pt
+- Modal padding may not introduce horizontal scroll
+
 ---
 
 ## Full-Screen Status Screens

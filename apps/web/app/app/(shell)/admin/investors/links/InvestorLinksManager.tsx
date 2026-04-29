@@ -15,7 +15,9 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { Icon } from '@/components/atoms/Icon';
+import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import {
@@ -355,11 +357,11 @@ function StatusBadge({ isActive }: { readonly isActive: boolean }) {
 function LinkActions({
   link,
   onToggleActive,
-  onDelete,
+  onRequestDelete,
 }: {
   readonly link: InvestorLinkWithCounts;
   readonly onToggleActive: (id: string, isActive: boolean) => void;
-  readonly onDelete: (id: string) => void;
+  readonly onRequestDelete: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -439,14 +441,7 @@ function LinkActions({
               className='flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-app text-destructive transition-colors hover:bg-destructive/8'
               onClick={() => {
                 setMenuOpen(false);
-                // Deactivates the link (soft-delete) — confirm first
-                if (
-                  globalThis.confirm(
-                    `Delete "${link.label}"? The link will be permanently removed.`
-                  )
-                ) {
-                  onDelete(link.id);
-                }
+                onRequestDelete();
               }}
             >
               <Trash2 className='h-3.5 w-3.5' />
@@ -468,6 +463,8 @@ export function InvestorLinksManager() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [pendingDeleteLink, setPendingDeleteLink] =
+    useState<InvestorLinkWithCounts | null>(null);
 
   const fetchLinks = useCallback(async () => {
     try {
@@ -506,7 +503,6 @@ export function InvestorLinksManager() {
 
   const handleDelete = async (id: string) => {
     const original = links.find(l => l.id === id);
-    // Optimistic soft-delete (matches server behavior: sets isActive=false)
     setLinks(prev =>
       prev.map(l => (l.id === id ? { ...l, isActive: false } : l))
     );
@@ -515,8 +511,7 @@ export function InvestorLinksManager() {
         method: 'DELETE',
       });
       if (!res.ok) throw new Error('Failed to delete link');
-    } catch {
-      // Revert on failure — restore original isActive state
+    } catch (err) {
       if (original) {
         setLinks(prev =>
           prev.map(l =>
@@ -524,6 +519,7 @@ export function InvestorLinksManager() {
           )
         );
       }
+      throw err;
     }
   };
 
@@ -662,7 +658,7 @@ export function InvestorLinksManager() {
                         <LinkActions
                           link={link}
                           onToggleActive={handleToggleActive}
-                          onDelete={handleDelete}
+                          onRequestDelete={() => setPendingDeleteLink(link)}
                         />
                       </div>
                     </td>
@@ -678,6 +674,30 @@ export function InvestorLinksManager() {
         open={createDialogOpen}
         onClose={() => setCreateDialogOpen(false)}
         onCreated={handleCreated}
+      />
+
+      <ConfirmDialog
+        open={pendingDeleteLink !== null}
+        onOpenChange={open => {
+          if (!open) setPendingDeleteLink(null);
+        }}
+        title='Delete investor link?'
+        description={
+          pendingDeleteLink
+            ? `"${pendingDeleteLink.label}" will stop working. Anyone with this URL will see a 404.`
+            : ''
+        }
+        confirmLabel='Delete'
+        variant='destructive'
+        onConfirm={async () => {
+          if (!pendingDeleteLink) return;
+          try {
+            await handleDelete(pendingDeleteLink.id);
+            toast.success('Investor link deleted');
+          } catch {
+            toast.error("Couldn't delete investor link");
+          }
+        }}
       />
     </>
   );

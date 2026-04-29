@@ -380,6 +380,18 @@ This is 4b (subtraction principle) applied specifically to container boundaries.
 - Prefer background-color, border-color, text-color, opacity, or shadow changes for hover feedback
 - If motion is necessary because the UI is directly manipulating something spatial, it must be intentional and clearly tied to that interaction
 
+### 4f. No Native Browser Dialogs
+
+- **NEVER** use `alert(...)`, `confirm(...)`, or `prompt(...)` — bare or via `globalThis` / `window` / `self` — anywhere in production app code
+- Native dialogs are blocking, unstyled, and break design-system + a11y guarantees
+- The Biome rule `noRestrictedGlobals` (level: error) catches bare calls; `pnpm --filter web lint:no-native-dialogs` catches `globalThis.X` / `window.X` forms — both run in CI
+- Use the canonical replacements:
+  - **Confirmations (irreversible actions)** → `<ConfirmDialog>` from `@/components/molecules/ConfirmDialog`
+  - **Notifications / async errors** → `toast.error()` / `toast.success()` from `sonner`
+  - **Reversible actions** → optimistic update + undo-toast (pattern not yet codified — file a Linear ticket if you need this)
+- See `DESIGN.md` → "Confirmations & Destructive Actions" for the full decision rule and copy guidance
+- Storybook stories (`*.stories.tsx`) and CLI scripts (`apps/web/scripts/**`) are exempted via the Biome override; they may use `alert()` for handler-fired signals
+
 ### 5. Conventional Commits Required
 
 ```bash
