@@ -172,6 +172,29 @@ describe('DashboardNav', () => {
     expect(getByText('7')).toBeDefined();
   });
 
+  it('keeps task badges inline with Design V1 shell nav rows', () => {
+    mockUseTaskStatsQuery.mockReturnValueOnce({
+      data: {
+        backlog: 1,
+        todo: 2,
+        inProgress: 4,
+        done: 0,
+        cancelled: 0,
+        activeTodoCount: 7,
+      },
+    });
+
+    const { getByRole, getByText } = renderDashboardNav({
+      renderFn: fastRender,
+      appFlags: { DESIGN_V1: true },
+    });
+
+    const tasksLink = getByRole('link', { name: 'Tasks 7' });
+    expect(tasksLink.className).toContain('h-6');
+    expect(tasksLink.className).toContain('text-[12.5px]');
+    expect(getByText('7')).toBeDefined();
+  });
+
   it('renders the Pro badge when tasks are locked', () => {
     mockUsePlanGate.mockReturnValueOnce({
       canAccessTasksWorkspace: false,

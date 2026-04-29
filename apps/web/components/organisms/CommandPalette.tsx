@@ -20,6 +20,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import type { EntityRef } from '@/lib/commands/entities';
 import { useChatConversationsQuery } from '@/lib/queries';
 import { isFormElement } from '@/lib/utils/keyboard';
+import { OPEN_COMMAND_PALETTE_EVENT } from './command-palette-events';
 
 const RECENT_THREAD_LIMIT = 10;
 
@@ -56,8 +57,21 @@ function CommandPaletteInner({ profileId }: CommandPaletteInnerProps) {
       event.preventDefault();
       setOpen(prev => !prev);
     }
+    function onOpenCommandPalette() {
+      setOpen(true);
+    }
     globalThis.addEventListener('keydown', onKeyDown);
-    return () => globalThis.removeEventListener('keydown', onKeyDown);
+    globalThis.addEventListener(
+      OPEN_COMMAND_PALETTE_EVENT,
+      onOpenCommandPalette
+    );
+    return () => {
+      globalThis.removeEventListener('keydown', onKeyDown);
+      globalThis.removeEventListener(
+        OPEN_COMMAND_PALETTE_EVENT,
+        onOpenCommandPalette
+      );
+    };
   }, []);
 
   const { data: conversations } = useChatConversationsQuery({
