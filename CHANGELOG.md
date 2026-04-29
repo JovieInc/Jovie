@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.196] - 2026-04-29
+
+> Homepage story polish, Friday rhythm model, and mobile hero crop repair.
+
+### Added
+
+- **Go Live In 60 Seconds homepage section** above the Friday rhythm story, with three native dark-mode workflow columns for signal, action, and compounding motion.
+- **Friday Rhythm homepage section** with deterministic 2026 Friday modeling, mobile before/after controls, decorative heartbeat motion, release-category accents, and unit coverage for Friday generation.
+
+### Changed
+
+- **Footer CTA headline** now reads “Keep Your Music Moving.”
+- **Friday rhythm graph** now fills every active Friday with muted release-category accents for new singles, merch drops, remixes, videos, and tour recaps.
+
+### Fixed
+
+- **Mobile homepage hero screenshots no longer crop horizontally** by sizing the mobile desktop mockup frame from available width instead of fixed stage height.
+
 ## [26.4.195] - 2026-04-29
 
 > Faster local development, UI parallax polish, and tighter mobile public profiles.
