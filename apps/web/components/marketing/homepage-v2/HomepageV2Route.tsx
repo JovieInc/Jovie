@@ -229,8 +229,6 @@ function HomepageV2Hero() {
               <MarketingScreenshot
                 scenarioId='artist-spec-geo-insights-desktop'
                 altOverride='Audience insights showing top cities and engagement signals'
-                width={970}
-                height={518}
                 title='Audience insight'
                 chrome='minimal'
                 className='rounded-[1rem]'
@@ -249,8 +247,6 @@ function HomepageV2Hero() {
               <MarketingScreenshot
                 scenarioId='artist-spec-tracked-links-desktop'
                 altOverride='Tracked link share menu with campaign routing controls'
-                width={920}
-                height={442}
                 title='Share and route'
                 chrome='minimal'
                 className='rounded-[1rem]'
