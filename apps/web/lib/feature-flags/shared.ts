@@ -2,10 +2,7 @@
  * Deprecated compatibility surface for static marketing flags and legacy
  * Statsig key references. Runtime app flags now live under `@/lib/flags/*`.
  */
-import {
-  APP_FLAG_DEFAULTS,
-  type StatsigFeatureFlagsBootstrap,
-} from '@/lib/flags/contracts';
+import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 import { FEATURE_FLAGS as MARKETING_STATIC_FLAGS } from '@/lib/flags/marketing-static';
 
 export type { StatsigFeatureFlagsBootstrap } from '@/lib/flags/contracts';
@@ -27,6 +24,3 @@ export const FEATURE_FLAGS = {
 } as const;
 
 export type CodeFlagName = keyof typeof FEATURE_FLAGS;
-
-/** @deprecated Compatibility alias. */
-export interface FeatureFlagsBootstrap extends StatsigFeatureFlagsBootstrap {}

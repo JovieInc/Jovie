@@ -1,3 +1,35 @@
+/**
+ * AI Chat Route — POST /api/chat
+ *
+ * Entry point for the in-app artist chat. The request flow is:
+ *
+ *   1. Auth (Clerk via getOptionalAuth) + Sentry tagging (feature, plan_tier)
+ *   2. Billing fetch (so 503/429 responses are still tagged by tier)
+ *   3. Kill switches via Statsig — `ai_chat_disabled` (503) and
+ *      `ai_chat_force_light` (route to cheaper model). Gate keys are const so
+ *      a typo fails at compile time rather than silently defaulting to false.
+ *   4. Plan-aware rate limiting (checkAiChatRateLimitForPlan) + 429 with
+ *      Retry-After when over quota
+ *   5. Body parse + UIMessage validation (length, role, parts shape)
+ *   6. Deterministic intent routing (tryRouteViaIntent) — short-circuits the
+ *      LLM for simple CRUD intents and emits a UIMessage SSE stream directly
+ *   7. Resolve artist context (server-side fetch by profileId, with optional
+ *      client-provided fallback for backwards compatibility)
+ *   8. Build tools for the active plan (buildFreeChatTools always; paid plans
+ *      add buildChatTools — bio/canvas/album-art/pitch/etc.)
+ *   9. executeChatTurn(): the pure pipeline that runs the LLM with tools,
+ *      streams UIMessage parts, and persists telemetry. Telemetry hooks bind
+ *      Sentry from this layer so executeChatTurn stays provider-neutral
+ *      (eval scripts pass a no-op).
+ *
+ * Auth: Clerk; unauthenticated requests get 401. CORS via
+ * createAuthenticatedCorsHeaders so the chat client can be embedded on
+ * trusted origins.
+ *
+ * Cancellation: req.signal forwarded to executeChatTurn; client disconnects
+ * surface as 499 (and bypass Sentry capture).
+ */
+
 import { randomUUID } from 'node:crypto';
 import * as Sentry from '@sentry/nextjs';
 import {
