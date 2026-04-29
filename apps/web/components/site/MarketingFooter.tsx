@@ -6,6 +6,22 @@ import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { APP_ROUTES } from '@/constants/routes';
 import { cn } from '@/lib/utils';
 
+/**
+ * Marketing footer — frame.io-inspired premium density.
+ *
+ * Visual contract:
+ * - #06070a base, hairline rgba(255,255,255,0.07) top border, subtle 220px
+ *   ambient edge-glow at the seam.
+ * - 4-column nav with caps eyebrow headers (11px / 0.2em tracking / muted),
+ *   14px caption-weight links.
+ * - Hairline-separated bottom band with copyright + legal — a sub-band, not
+ *   a separate footer row.
+ * - Wordmark column carries a small tagline below the mark for editorial
+ *   weight.
+ * - Minimal variant collapses to mark + bottom band only (used on
+ *   /pricing, /legal/*).
+ */
+
 const MINIMAL_FOOTER_PATHS = new Set<string>([
   APP_ROUTES.PRICING,
   APP_ROUTES.LEGAL_PRIVACY,
@@ -58,10 +74,8 @@ const FOOTER_COLUMNS: readonly {
   },
 ] as const;
 
-const footerLinkClassName =
-  'inline-flex w-fit rounded-[5px] text-[15px] leading-[1.45] tracking-[-0.005em] text-white/[0.72] transition-colors duration-150 hover:text-white focus-visible:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
-const footerLegalLinkClassName =
-  'inline-flex w-fit rounded-[5px] text-[12px] leading-5 tracking-[-0.01em] text-white/[0.34] transition-colors duration-150 hover:text-white/70 focus-visible:text-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
+const markLinkClassName =
+  '-m-1.5 inline-flex rounded-full p-1.5 text-white/[0.92] transition-opacity duration-150 hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
 
 export function MarketingFooter({
   variant = 'auto',
@@ -78,17 +92,15 @@ export function MarketingFooter({
 
   return (
     <footer
-      className={cn(
-        'relative overflow-hidden border-t border-white/[0.04] bg-black text-white',
-        className
-      )}
+      className={cn('marketing-footer-premium', className)}
+      data-testid='marketing-footer'
     >
       <div
         className={cn(
-          'marketing-footer-inner relative w-full px-[clamp(1.25rem,2.2vw,2rem)]',
+          'mx-auto w-full max-w-[var(--linear-content-max)] px-[clamp(1.25rem,2.2vw,2rem)]',
           isMinimal
-            ? 'py-[clamp(2.6rem,5vw,4rem)]'
-            : 'pt-[clamp(3.25rem,5vw,4.6rem)] pb-[clamp(5rem,8vw,7rem)]'
+            ? 'pt-[clamp(2.5rem,4.5vw,3.5rem)] pb-[clamp(2rem,3.5vw,2.75rem)]'
+            : 'pt-[clamp(3.5rem,5.5vw,5rem)] pb-[clamp(2rem,3.5vw,2.75rem)]'
         )}
       >
         {isMinimal ? (
@@ -96,39 +108,41 @@ export function MarketingFooter({
             href={APP_ROUTES.HOME}
             prefetch={false}
             aria-label='Jovie home'
-            className='-m-1.5 inline-flex rounded-full p-1.5 text-white/[0.9] transition-opacity duration-150 hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
+            className={markLinkClassName}
           >
-            <BrandLogo size={24} tone='white' rounded={false} aria-hidden />
+            <BrandLogo size={22} tone='white' rounded={false} aria-hidden />
           </Link>
         ) : (
-          <div className='grid gap-12 md:grid-cols-[3.5rem_minmax(0,1fr)] md:gap-14 xl:gap-16'>
+          <div className='grid gap-12 md:grid-cols-[minmax(0,1fr)_minmax(0,2.6fr)] md:gap-x-16 md:gap-y-14 lg:gap-x-24'>
             <div className='min-w-0'>
               <Link
                 href={APP_ROUTES.HOME}
                 prefetch={false}
                 aria-label='Jovie home'
-                className='-m-1.5 inline-flex rounded-full p-1.5 text-white/[0.9] transition-opacity duration-150 hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
+                className={markLinkClassName}
               >
-                <BrandLogo size={24} tone='white' rounded={false} aria-hidden />
+                <BrandLogo size={22} tone='white' rounded={false} aria-hidden />
               </Link>
+              <p className='mf-mark-tagline'>
+                Tools for artists to release music, capture fans, and earn
+                without the platform tax.
+              </p>
             </div>
 
             <nav
-              className='grid grid-cols-2 gap-x-10 gap-y-8 sm:grid-cols-4 lg:gap-x-14 xl:gap-x-20'
+              className='grid grid-cols-2 gap-x-8 gap-y-10 sm:grid-cols-4 lg:gap-x-12'
               aria-label='Footer'
             >
               {FOOTER_COLUMNS.map(column => (
                 <section key={column.title}>
-                  <h2 className='mb-4 text-[12px] font-medium leading-[1.35] tracking-[-0.01em] text-white/[0.78]'>
-                    {column.title}
-                  </h2>
-                  <ul className='flex list-none flex-col gap-2.5 p-0'>
+                  <h2 className='mf-eyebrow'>{column.title}</h2>
+                  <ul className='flex list-none flex-col gap-3 p-0'>
                     {column.links.map(link => (
                       <li key={`${link.href}-${link.label}`}>
                         <Link
                           href={link.href}
                           prefetch={false}
-                          className={footerLinkClassName}
+                          className='mf-link'
                         >
                           {link.label}
                         </Link>
@@ -143,23 +157,25 @@ export function MarketingFooter({
 
         <div
           className={cn(
-            'flex flex-wrap items-center justify-between gap-x-7 gap-y-2 text-[12px] leading-5 tracking-[-0.01em] text-white/[0.32]',
-            isMinimal ? 'mt-8' : 'mt-[clamp(3.5rem,6vw,5rem)]'
+            'mf-baseband flex flex-wrap items-center justify-between gap-x-7 gap-y-2'
           )}
+          style={isMinimal ? { marginTop: '1.75rem' } : undefined}
         >
-          <span>© {new Date().getFullYear()} Jovie Technology Inc.</span>
-          <nav aria-label='Legal' className='flex flex-wrap items-center gap-5'>
+          <span className='text-[12px] leading-[1.45] tracking-[-0.005em] text-white/[0.36]'>
+            © {new Date().getFullYear()} Jovie Technology Inc.
+          </span>
+          <nav aria-label='Legal' className='flex flex-wrap items-center gap-6'>
             <Link
               href={APP_ROUTES.LEGAL_PRIVACY}
               prefetch={false}
-              className={footerLegalLinkClassName}
+              className='mf-legal-link'
             >
               Privacy
             </Link>
             <Link
               href={APP_ROUTES.LEGAL_TERMS}
               prefetch={false}
-              className={footerLegalLinkClassName}
+              className='mf-legal-link'
             >
               Terms
             </Link>
