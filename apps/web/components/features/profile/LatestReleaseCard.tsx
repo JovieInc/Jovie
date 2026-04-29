@@ -1,14 +1,12 @@
 'use client';
 
-import Link from 'next/link';
 import { useState } from 'react';
-import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
+import { ProfileMediaCard } from '@/features/profile/ProfileMediaCard';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import type { AvailableDSP } from '@/lib/dsp';
 import type { Artist } from '@/types/db';
 import { ListenDrawer } from './ListenDrawer';
 
-/** Minimal release shape needed by this client component (avoids server-only schema import). */
 type ReleaseCardData = {
   title: string;
   slug: string;
@@ -20,17 +18,11 @@ type ReleaseCardData = {
 type LatestReleaseCardProps = {
   readonly release: ReleaseCardData;
   readonly artistHandle: string;
-  /** Full artist object – required for the mobile listen drawer */
   readonly artist?: Artist;
-  /** Merged DSPs – when provided on mobile the Listen button opens a drawer */
   readonly dsps?: AvailableDSP[];
   readonly enableDynamicEngagement?: boolean;
 };
 
-/**
- * Compact card displaying the latest release with album art and listen CTA.
- * Designed for reuse with tour dates and merch items (same layout pattern).
- */
 export function LatestReleaseCard({
   release,
   artistHandle,
@@ -41,75 +33,65 @@ export function LatestReleaseCard({
   const isMobile = useBreakpointDown('md');
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const releaseYear = release.releaseDate
-    ? new Date(release.releaseDate).getUTCFullYear()
+  const releaseDate = release.releaseDate
+    ? new Date(release.releaseDate)
     : null;
-
+  const releaseYear =
+    releaseDate && !Number.isNaN(releaseDate.getTime())
+      ? releaseDate.getUTCFullYear()
+      : null;
+  const isFutureRelease =
+    releaseDate !== null &&
+    !Number.isNaN(releaseDate.getTime()) &&
+    releaseDate.getTime() > Date.now();
   const releaseTypeLabel =
     release.releaseType === 'ep'
       ? 'EP'
       : release.releaseType.charAt(0).toUpperCase() +
         release.releaseType.slice(1);
-
   const showDrawer = isMobile && artist && dsps && dsps.length > 0;
 
-  const listenButtonClass =
-    'shrink-0 rounded-full bg-btn-primary px-3.5 py-1.5 text-sm font-medium text-btn-primary-foreground transition-opacity duration-normal ease-out hover:opacity-90 active:opacity-[0.85] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2';
-
   return (
-    <div className='flex items-center gap-3 rounded-2xl border border-subtle bg-surface-1 p-3 shadow-sm'>
-      {/* Album Art */}
-      <div className='relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-surface-2'>
-        <ImageWithFallback
-          src={release.artworkUrl}
-          alt={`${release.title} artwork`}
-          fill
-          sizes='56px'
-          className='object-cover'
-          fallbackVariant='release'
-        />
-      </div>
-
-      {/* Release Info */}
-      <div className='min-w-0 flex-1'>
-        <p className='truncate text-sm font-medium text-primary-token'>
-          {release.title}
-        </p>
-        <p className='text-xs text-secondary-token'>
-          {releaseTypeLabel}
-          {releaseYear && ` · ${releaseYear}`}
-        </p>
-      </div>
-
-      {/* Listen Button — opens drawer on mobile, navigates on desktop */}
+    <>
+      <ProfileMediaCard
+        eyebrow={isFutureRelease ? 'New Single' : 'New Release'}
+        title={release.title}
+        subtitle={`${releaseTypeLabel}${releaseYear ? ` · ${releaseYear}` : ''}`}
+        imageUrl={release.artworkUrl}
+        imageAlt={`${release.title} artwork`}
+        fallbackVariant='release'
+        accent='purple'
+        ratio='landscape'
+        countdown={
+          isFutureRelease && releaseDate
+            ? { targetDate: releaseDate, label: 'Drops in' }
+            : null
+        }
+        status={isFutureRelease ? null : { label: 'Out Now', tone: 'green' }}
+        action={
+          showDrawer
+            ? {
+                label: isFutureRelease ? 'Notify me' : 'Listen Now',
+                onClick: () => setDrawerOpen(true),
+                icon: isFutureRelease ? 'Bell' : 'Play',
+              }
+            : {
+                label: isFutureRelease ? 'Notify me' : 'Listen Now',
+                href: `/${artistHandle}/${release.slug}`,
+                icon: isFutureRelease ? 'Bell' : 'Play',
+              }
+        }
+        dataTestId='latest-release-card'
+      />
       {showDrawer ? (
-        <>
-          <button
-            type='button'
-            onClick={() => setDrawerOpen(true)}
-            aria-label={`Listen to ${release.title}`}
-            className={listenButtonClass}
-          >
-            Listen
-          </button>
-          <ListenDrawer
-            open={drawerOpen}
-            onOpenChange={setDrawerOpen}
-            artist={artist}
-            dsps={dsps}
-            enableDynamicEngagement={enableDynamicEngagement}
-          />
-        </>
-      ) : (
-        <Link
-          href={`/${artistHandle}/${release.slug}`}
-          prefetch={false}
-          aria-label={`Listen to ${release.title}`}
-          className={listenButtonClass}
-        >
-          Listen
-        </Link>
-      )}
-    </div>
+        <ListenDrawer
+          open={drawerOpen}
+          onOpenChange={setDrawerOpen}
+          artist={artist}
+          dsps={dsps}
+          enableDynamicEngagement={enableDynamicEngagement}
+        />
+      ) : null}
+    </>
   );
 }

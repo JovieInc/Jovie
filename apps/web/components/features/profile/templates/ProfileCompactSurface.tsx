@@ -6,6 +6,7 @@ import {
   CalendarDays,
   ChevronLeft,
   type LucideIcon,
+  MapPin,
   MoreHorizontal,
   Music2,
   UserRound,
@@ -254,7 +255,7 @@ export function ProfileCompactSurface({
     drawerView,
   });
   const isHomeMode = activePrimaryTab === 'profile';
-  const showBottomNav = activePrimaryTab !== 'subscribe';
+  const showBottomNav = true;
   const isPreviewEmbedded =
     renderMode === 'preview' && presentation === 'embedded';
   const activePrimaryPanel = isHomeMode ? null : activePrimaryTab;
@@ -314,11 +315,13 @@ export function ProfileCompactSurface({
   const IdentityHeading = renderMode === 'preview' ? 'p' : 'h1';
   const isMenuActive = drawerOpen && drawerView === 'menu';
   const topChromeButtonClassName =
-    'h-11! w-11! border-transparent bg-black/34 text-white shadow-[0_16px_34px_rgba(0,0,0,0.28)] backdrop-blur-md hover:bg-black/46 active:scale-100';
+    'h-9! w-9! border-white/14 bg-black/24 text-white shadow-[0_10px_24px_rgba(0,0,0,0.22)] backdrop-blur-md hover:bg-black/36 active:scale-100';
   const socialIconClassName =
-    'inline-flex h-11 w-11 items-center justify-center rounded-full text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)] transition-opacity duration-200 hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
-  const heroHeightClassName =
-    !isHomeMode && isPreviewEmbedded ? 'min-h-[316px]' : 'min-h-[408px]';
+    'inline-flex h-8 w-8 items-center justify-center rounded-full text-white/82 transition-colors duration-200 hover:bg-white/8 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
+  const heroHeightClassName = isHomeMode
+    ? 'h-[34svh] min-h-[232px] max-h-[250px] [@media(min-height:761px)_and_(max-height:880px)]:max-h-[190px] [@media(min-height:761px)_and_(max-height:880px)]:min-h-[190px] [@media(max-height:760px)]:h-[156px] [@media(max-height:760px)]:min-h-[156px]'
+    : 'h-14 border-b border-white/[0.075]';
+  const locationLabel = artist.location?.trim() || artist.hometown?.trim();
   const registerNotificationsReveal = useCallback(
     (reveal: () => void) => {
       notificationsRevealRef.current = reveal;
@@ -370,39 +373,47 @@ export function ProfileCompactSurface({
             heroHeightClassName
           )}
         >
-          <div className='absolute inset-0'>
-            {resolvedHeroImageUrl ? (
-              <ImageWithFallback
-                src={resolvedHeroImageUrl}
-                alt={artist.name}
-                fill
-                priority
-                sizes='(max-width: 767px) 100vw, 430px'
-                className='object-cover object-center'
-                fallbackVariant='avatar'
-                fallbackClassName='bg-surface-2'
-              />
-            ) : (
-              <div
-                className='h-full w-full bg-[radial-gradient(circle_at_50%_22%,rgba(255,255,255,0.08),transparent_28%),linear-gradient(145deg,#20242c_0%,#11141a_48%,#050608_100%)]'
-                aria-hidden='true'
-              />
-            )}
-          </div>
+          {isHomeMode ? (
+            <>
+              <div className='absolute inset-0'>
+                {resolvedHeroImageUrl ? (
+                  <ImageWithFallback
+                    src={resolvedHeroImageUrl}
+                    alt={artist.name}
+                    fill
+                    priority
+                    sizes='(max-width: 767px) 100vw, 430px'
+                    className='object-cover object-center'
+                    fallbackVariant='avatar'
+                    fallbackClassName='bg-surface-2'
+                  />
+                ) : (
+                  <div
+                    className='h-full w-full bg-[radial-gradient(circle_at_50%_22%,rgba(255,255,255,0.08),transparent_28%),linear-gradient(145deg,#20242c_0%,#11141a_48%,#050608_100%)]'
+                    aria-hidden='true'
+                  />
+                )}
+              </div>
 
-          <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(2,3,4,0.18)_0%,rgba(3,4,6,0.22)_20%,rgba(4,5,7,0.42)_52%,rgba(5,6,8,0.94)_100%)]' />
-          <div className='pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_24%),linear-gradient(180deg,transparent_0%,rgba(5,6,8,0.18)_58%,var(--profile-stage-bg)_100%)]' />
+              <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(2,3,4,0.08)_0%,rgba(2,3,4,0.12)_26%,rgba(3,4,6,0.34)_58%,rgba(5,6,8,0.9)_84%,var(--profile-stage-bg)_100%)]' />
+              <div className='pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-[linear-gradient(180deg,transparent,var(--profile-stage-bg)_92%)]' />
+            </>
+          ) : (
+            <div className='absolute inset-0 bg-black/94 backdrop-blur-2xl' />
+          )}
 
           <div
             className={cn(
-              'relative z-10 flex h-full flex-col justify-between px-5 pb-6',
+              'relative z-10 flex h-full items-start justify-between px-4',
               isPreviewEmbedded
                 ? 'pt-[74px]'
-                : 'pt-[max(env(safe-area-inset-top),20px)]'
+                : isHomeMode
+                  ? 'pt-[max(env(safe-area-inset-top),16px)]'
+                  : 'pt-[max(env(safe-area-inset-top),10px)]'
             )}
           >
             <div
-              className='flex items-center justify-between'
+              className='flex w-full items-start justify-between'
               data-testid='profile-top-chrome'
             >
               <CircleIconButton
@@ -412,56 +423,31 @@ export function ProfileCompactSurface({
                 className={topChromeButtonClassName}
                 ariaLabel='Back'
               >
-                <ChevronLeft className='h-5 w-5' />
+                <ChevronLeft className='h-[18px] w-[18px]' />
               </CircleIconButton>
 
-              {visibleSocialLinks.length > 0 || !hideMoreMenu ? (
-                <div
-                  className='flex items-center gap-1.5'
-                  data-testid='profile-hero-social-row'
-                >
-                  {visibleSocialLinks.map(link =>
-                    link.platform && link.url ? (
-                      <a
-                        key={link.id}
-                        href={link.url}
-                        target='_blank'
-                        rel='noopener noreferrer'
-                        className={socialIconClassName}
-                        aria-label={link.platform}
-                      >
-                        <SocialIcon
-                          platform={link.platform}
-                          className='h-[18px] w-[18px]'
-                        />
-                      </a>
-                    ) : null
-                  )}
-
-                  {!hideMoreMenu ? (
-                    <CircleIconButton
-                      onClick={onOpenMenu}
-                      size='lg'
-                      variant='pearl'
-                      className={cn(
-                        topChromeButtonClassName,
-                        drawerOpen && 'bg-black/50'
-                      )}
-                      ariaLabel='More options'
-                      aria-haspopup='dialog'
-                    >
-                      <MoreHorizontal className='h-5 w-5' />
-                    </CircleIconButton>
-                  ) : null}
-                </div>
+              {!isHomeMode ? (
+                <p className='absolute left-14 right-14 top-[max(env(safe-area-inset-top),14px)] truncate text-center text-[14px] font-semibold tracking-[-0.012em] text-white'>
+                  {artist.name}
+                </p>
               ) : null}
-            </div>
 
-            <div
-              className={cn(isPreviewEmbedded ? 'space-y-3.5' : 'space-y-4')}
-            >
+              <CircleIconButton
+                onClick={openNotifications}
+                size='lg'
+                variant='pearl'
+                className={topChromeButtonClassName}
+                ariaLabel='Alerts'
+              >
+                <Bell className='h-4 w-4' />
+              </CircleIconButton>
+            </div>
+          </div>
+
+          {isHomeMode ? (
+            <div className='absolute inset-x-0 bottom-0 z-10 px-4 pb-4 [@media(max-height:820px)]:pb-3'>
               <div
-                className={cn(isPreviewEmbedded ? 'space-y-1.5' : 'space-y-2')}
+                className='min-w-0 space-y-1'
                 data-testid='profile-hero-identity-block'
               >
                 <IdentityHeading
@@ -474,15 +460,12 @@ export function ProfileCompactSurface({
                     data-testid='profile-identity-link'
                     href={profileHref}
                     aria-label={`Go to ${artist.name}'s profile`}
-                    className={cn(
-                      'inline-flex min-w-0 items-center gap-1.5 rounded-md font-semibold leading-[1.02] tracking-[-0.035em] text-white [text-shadow:0_1px_12px_rgba(0,0,0,0.4)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
-                      isPreviewEmbedded ? 'text-[38px]' : 'text-[34px]'
-                    )}
+                    className='inline-flex max-w-full min-w-0 items-center gap-1.5 rounded-md text-[36px] font-semibold leading-[0.98] tracking-[-0.026em] text-white drop-shadow-[0_2px_14px_rgba(0,0,0,0.42)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent [@media(max-height:820px)]:text-[32px] [@media(max-height:760px)]:text-[31px]'
                   >
                     <span className='truncate'>{artist.name}</span>
                     {artist.is_verified ? (
                       <BadgeCheck
-                        className='h-5 w-5 shrink-0 drop-shadow-[0_1px_4px_rgba(0,0,0,0.3)]'
+                        className='h-5 w-5 shrink-0 [@media(max-height:820px)]:h-4 [@media(max-height:820px)]:w-4'
                         fill='white'
                         stroke='black'
                         strokeWidth={2}
@@ -492,73 +475,111 @@ export function ProfileCompactSurface({
                   </Link>
                 </IdentityHeading>
 
-                <p
-                  className={cn(
-                    'line-clamp-2 max-w-[30ch] font-medium tracking-[-0.012em] text-white/76',
-                    isPreviewEmbedded
-                      ? 'text-[15px] leading-5'
-                      : 'text-sm leading-6'
-                  )}
-                >
+                <p className='line-clamp-1 text-[13px] font-medium leading-5 tracking-[-0.012em] text-white/76 [@media(max-height:820px)]:text-[12px]'>
                   {heroSubtitle}
                 </p>
-              </div>
 
-              <div className='space-y-3'>
-                {renderMode === 'interactive' ? (
-                  <ProfileInlineNotificationsCTA
-                    artist={artist}
-                    onManageNotifications={onManageNotifications}
-                    onRegisterReveal={registerNotificationsReveal}
-                    portalContainer={notificationsPortalContainer ?? undefined}
-                    variant='hero'
-                    hideTrigger
-                    onFlowClosed={returnToProfileAfterNotifications}
-                    onSubscriptionActivated={handleSubscriptionActivated}
-                  />
-                ) : null}
+                <div className='flex min-w-0 items-center justify-between gap-3 pt-1 [@media(max-height:820px)]:pt-0'>
+                  {locationLabel ? (
+                    <p className='inline-flex min-w-0 items-center gap-1.5 text-[13px] font-medium text-white/78 [@media(max-height:820px)]:text-[12px]'>
+                      <MapPin className='h-3.5 w-3.5 shrink-0' />
+                      <span className='truncate'>{locationLabel}</span>
+                    </p>
+                  ) : (
+                    <span />
+                  )}
 
-                {showHeroAlertsRow ? (
-                  <button
-                    type='button'
-                    onClick={openNotifications}
-                    disabled={renderMode !== 'interactive'}
-                    className='flex min-h-[52px] w-full items-center gap-2.5 rounded-[18px] border border-white/10 bg-black/22 px-3.5 text-left text-white shadow-[0_12px_30px_rgba(0,0,0,0.22)] backdrop-blur-2xl transition-[background-color,border-color] duration-200 hover:bg-black/30 disabled:cursor-default disabled:hover:bg-black/22'
-                    data-testid='profile-hero-alerts-row'
-                  >
-                    <span
-                      className='flex h-7 w-7 shrink-0 items-center justify-center text-white'
-                      aria-hidden='true'
+                  {visibleSocialLinks.length > 0 ? (
+                    <div
+                      className='flex shrink-0 items-center gap-2'
+                      data-testid='profile-hero-social-row'
                     >
-                      <Bell className='h-4 w-4' />
-                    </span>
-                    <span className='min-w-0 flex-1 truncate text-[14px] font-semibold leading-5 tracking-[-0.025em]'>
-                      {isSubscribed ? 'Alerts On' : 'Alerts Off'}
-                    </span>
-                    <span
-                      className={cn(
-                        'relative h-7 w-11 shrink-0 rounded-full border p-0.5 transition-colors duration-200',
-                        isSubscribed
-                          ? 'border-white/38 bg-white/26'
-                          : 'border-white/20 bg-white/8'
+                      {visibleSocialLinks.map(link =>
+                        link.platform && link.url ? (
+                          <a
+                            key={link.id}
+                            href={link.url}
+                            target='_blank'
+                            rel='noopener noreferrer'
+                            className={socialIconClassName}
+                            aria-label={link.platform}
+                          >
+                            <SocialIcon
+                              platform={link.platform}
+                              className='h-[18px] w-[18px]'
+                            />
+                          </a>
+                        ) : null
                       )}
-                      aria-hidden='true'
-                    >
-                      <span
-                        className={cn(
-                          'block h-6 w-6 rounded-full bg-white shadow-[0_7px_18px_rgba(0,0,0,0.22)] transition-transform duration-200',
-                          isSubscribed && 'translate-x-4'
-                        )}
-                      />
-                    </span>
-                  </button>
-                ) : null}
+                    </div>
+                  ) : null}
+                </div>
               </div>
             </div>
-          </div>
+          ) : null}
         </header>
 
-        <div className='relative z-10 flex min-h-0 flex-1 flex-col px-5 pt-4'>
+        <div className='relative z-10 flex min-h-0 flex-1 flex-col px-4 pt-2'>
+          {isHomeMode ? (
+            <div className='shrink-0 space-y-2 pb-2'>
+              {renderMode === 'interactive' ? (
+                <ProfileInlineNotificationsCTA
+                  artist={artist}
+                  onManageNotifications={onManageNotifications}
+                  onRegisterReveal={registerNotificationsReveal}
+                  portalContainer={notificationsPortalContainer ?? undefined}
+                  variant='hero'
+                  hideTrigger
+                  onFlowClosed={returnToProfileAfterNotifications}
+                  onSubscriptionActivated={handleSubscriptionActivated}
+                />
+              ) : null}
+
+              {showHeroAlertsRow ? (
+                <button
+                  type='button'
+                  onClick={openNotifications}
+                  disabled={renderMode !== 'interactive'}
+                  className='flex min-h-11 w-full items-center gap-3 rounded-[14px] border border-white/10 bg-white/[0.035] px-3 text-left text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_14px_28px_-18px_rgba(0,0,0,0.55)] backdrop-blur-2xl transition-[background-color,border-color] duration-200 hover:bg-white/[0.055] disabled:cursor-default disabled:hover:bg-white/[0.035] [@media(max-height:820px)]:hidden'
+                  data-testid='profile-hero-alerts-row'
+                >
+                  <span
+                    className='flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-white/8 bg-white/[0.045] text-white'
+                    aria-hidden='true'
+                  >
+                    <Bell className='h-4 w-4' />
+                  </span>
+                  <span className='min-w-0 flex-1'>
+                    <span className='block truncate text-[13px] font-semibold leading-5 tracking-[-0.01em]'>
+                      {isSubscribed ? 'Alerts On' : 'Alerts Off'}
+                    </span>
+                    <span className='block truncate text-[11.5px] leading-4 text-white/52'>
+                      New music, events and merch.
+                    </span>
+                  </span>
+                  <span
+                    className={cn(
+                      'relative h-[26px] w-[42px] shrink-0 rounded-full border p-0.5 transition-colors duration-200',
+                      isSubscribed
+                        ? 'border-white/42 bg-white'
+                        : 'border-white/16 bg-white/10'
+                    )}
+                    aria-hidden='true'
+                  >
+                    <span
+                      className={cn(
+                        'block h-[22px] w-[22px] rounded-full shadow-[0_4px_10px_rgba(0,0,0,0.22)] transition-transform duration-200',
+                        isSubscribed
+                          ? 'translate-x-4 bg-black'
+                          : 'translate-x-0 bg-white'
+                      )}
+                    />
+                  </span>
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+
           {showSubscriptionConfirmedBanner ? (
             <div className='shrink-0 pb-3'>
               <SubscriptionConfirmedBanner />
@@ -615,9 +636,9 @@ export function ProfileCompactSurface({
           </div>
 
           {showBottomNav ? (
-            <div className='shrink-0 pb-[max(env(safe-area-inset-bottom),12px)] pt-1'>
+            <div className='-mx-4 shrink-0 border-t border-white/[0.075] bg-black/72 px-1 pb-[max(env(safe-area-inset-bottom),10px)] pt-1 backdrop-blur-2xl'>
               <nav
-                className='rounded-[30px] border border-white/10 bg-black/58 px-2 py-2 shadow-[0_20px_54px_rgba(0,0,0,0.38)] backdrop-blur-2xl'
+                className='px-0 py-1'
                 aria-label='Profile navigation'
                 data-testid='profile-bottom-nav'
               >

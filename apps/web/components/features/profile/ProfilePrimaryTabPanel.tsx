@@ -1,8 +1,7 @@
 'use client';
 
-import { Bell, CheckCircle2 } from 'lucide-react';
+import { Bell, CheckCircle2, ChevronRight, Mail } from 'lucide-react';
 import { AboutSection } from '@/features/profile/AboutSection';
-import { ArtistNotificationsCTA } from '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA';
 import type {
   ProfilePreviewNotificationsState,
   ProfilePrimaryTab,
@@ -22,6 +21,7 @@ import type { PressPhoto } from '@/types/press-photos';
 const PANEL_CLASS_NAME =
   'rounded-[34px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.025))] p-5 shadow-[0_28px_72px_rgba(0,0,0,0.26)] backdrop-blur-2xl';
 const OTP_SLOT_KEYS = ['a', 'b', 'c', 'd', 'e', 'f'] as const;
+const NATIVE_PANEL_CLASS_NAME = '-mx-4 space-y-0 pb-2';
 
 interface ProfilePrimaryTabPanelProps {
   readonly mode: Exclude<ProfilePrimaryTab, 'profile'>;
@@ -150,21 +150,21 @@ function PreviewAlertsPanel({
 }
 
 function SubscribePanel({
-  renderMode,
-  artist,
-  notificationsPortalContainer,
   isSubscribed,
+  contentPrefs,
+  onTogglePref,
+  onUnsubscribe,
+  isUnsubscribing,
+  renderMode,
   previewNotificationsState,
-  onFlowClosed,
-  onSubscriptionActivated,
 }: Readonly<{
-  renderMode: ProfileRenderMode;
-  artist: Artist;
-  notificationsPortalContainer?: HTMLElement | null;
   isSubscribed: boolean;
+  contentPrefs: Record<NotificationContentType, boolean>;
+  onTogglePref: (key: NotificationContentType) => void;
+  onUnsubscribe: () => void;
+  isUnsubscribing: boolean;
+  renderMode: ProfileRenderMode;
   previewNotificationsState?: ProfilePreviewNotificationsState;
-  onFlowClosed?: () => void;
-  onSubscriptionActivated?: () => void;
 }>) {
   if (renderMode === 'preview') {
     return (
@@ -182,16 +182,167 @@ function SubscribePanel({
   }
 
   return (
-    <ArtistNotificationsCTA
-      artist={artist}
-      presentation='overlay'
-      portalContainer={notificationsPortalContainer}
-      autoOpen
-      forceExpanded
-      hideTrigger
-      onFlowClosed={onFlowClosed}
-      onSubscriptionActivated={onSubscriptionActivated}
+    <AlertsSettingsView
+      isSubscribed={isSubscribed}
+      contentPrefs={contentPrefs}
+      onTogglePref={onTogglePref}
+      onUnsubscribe={onUnsubscribe}
+      isUnsubscribing={isUnsubscribing}
     />
+  );
+}
+
+function SettingsToggle({
+  checked,
+  disabled,
+}: Readonly<{
+  checked: boolean;
+  disabled?: boolean;
+}>) {
+  return (
+    <span
+      className={cn(
+        'relative h-[26px] w-[42px] shrink-0 rounded-full border p-0.5 transition-colors duration-200',
+        checked
+          ? 'border-white/40 bg-white'
+          : 'border-white/14 bg-white/[0.08]',
+        disabled && 'opacity-45'
+      )}
+      aria-hidden='true'
+    >
+      <span
+        className={cn(
+          'block h-[22px] w-[22px] rounded-full shadow-[0_4px_10px_rgba(0,0,0,0.22)] transition-transform duration-200',
+          checked ? 'translate-x-4 bg-black' : 'translate-x-0 bg-white'
+        )}
+      />
+    </span>
+  );
+}
+
+function AlertsSettingsRow({
+  label,
+  description,
+  checked,
+  disabled,
+  onClick,
+}: Readonly<{
+  label: string;
+  description: string;
+  checked: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}>) {
+  return (
+    <button
+      type='button'
+      onClick={onClick}
+      disabled={disabled}
+      className='flex min-h-[62px] w-full items-center gap-3 border-t border-white/[0.075] px-4 py-3 text-left transition-colors duration-200 first:border-t-0 hover:bg-white/[0.03] disabled:cursor-default disabled:hover:bg-transparent'
+    >
+      <div className='min-w-0 flex-1'>
+        <p className='truncate text-[15px] font-medium tracking-[-0.01em] text-white'>
+          {label}
+        </p>
+        <p className='truncate text-[12px] leading-4 text-white/50'>
+          {description}
+        </p>
+      </div>
+      <SettingsToggle checked={checked} disabled={disabled} />
+    </button>
+  );
+}
+
+function AlertsSettingsView({
+  isSubscribed,
+  contentPrefs,
+  onTogglePref,
+  onUnsubscribe,
+  isUnsubscribing,
+}: Readonly<{
+  isSubscribed: boolean;
+  contentPrefs: Record<NotificationContentType, boolean>;
+  onTogglePref: (key: NotificationContentType) => void;
+  onUnsubscribe: () => void;
+  isUnsubscribing: boolean;
+}>) {
+  const disabled = !isSubscribed;
+
+  return (
+    <div
+      className={NATIVE_PANEL_CLASS_NAME}
+      data-testid='profile-alerts-settings'
+    >
+      <div className='flex items-baseline justify-between px-4 pb-2 pt-3'>
+        <h2 className='text-[22px] font-[680] leading-none tracking-[-0.025em] text-white'>
+          Alerts
+        </h2>
+        <span className='text-[13px] font-medium text-white/52'>
+          {isSubscribed ? 'On' : 'Off'}
+        </span>
+      </div>
+
+      <div className='border-y border-white/[0.075]'>
+        <AlertsSettingsRow
+          label='New Music'
+          description='Singles, albums, and videos.'
+          checked={contentPrefs.newMusic}
+          disabled={disabled}
+          onClick={() => onTogglePref('newMusic')}
+        />
+        <AlertsSettingsRow
+          label='Events'
+          description='Tour dates and ticket updates.'
+          checked={contentPrefs.tourDates}
+          disabled={disabled}
+          onClick={() => onTogglePref('tourDates')}
+        />
+        <AlertsSettingsRow
+          label='Merch'
+          description='Drops, restocks, and low-stock updates.'
+          checked={contentPrefs.merch}
+          disabled={disabled}
+          onClick={() => onTogglePref('merch')}
+        />
+        <AlertsSettingsRow
+          label='General'
+          description='Occasional artist updates.'
+          checked={contentPrefs.general}
+          disabled={disabled}
+          onClick={() => onTogglePref('general')}
+        />
+      </div>
+
+      <div className='flex items-center gap-3 border-b border-white/[0.075] px-4 py-3.5'>
+        <span className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-white/72'>
+          <Mail className='h-4 w-4' />
+        </span>
+        <div className='min-w-0 flex-1'>
+          <p className='truncate text-[15px] font-medium tracking-[-0.01em] text-white'>
+            Delivery
+          </p>
+          <p className='truncate text-[12px] leading-4 text-white/50'>
+            Email and SMS settings are managed securely.
+          </p>
+        </div>
+        <ChevronRight className='h-4 w-4 text-white/32' />
+      </div>
+
+      {isSubscribed ? (
+        <button
+          type='button'
+          onClick={onUnsubscribe}
+          disabled={isUnsubscribing}
+          className='mt-5 w-full px-4 py-3 text-center text-[14px] font-semibold text-white/72 transition-colors duration-200 hover:text-white disabled:cursor-not-allowed disabled:text-white/36'
+        >
+          {isUnsubscribing ? 'Turning Off...' : 'Turn Off Alerts'}
+        </button>
+      ) : (
+        <p className='px-4 pt-4 text-[12px] leading-5 text-white/42'>
+          Alert preferences appear here after alerts are enabled.
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -199,19 +350,19 @@ export function ProfilePrimaryTabPanel({
   mode,
   renderMode = 'interactive',
   artist,
-  notificationsPortalContainer,
   dsps,
   enableDynamicEngagement = false,
-  subscribeTwoStep = false,
   isSubscribed,
+  contentPrefs,
+  onTogglePref,
+  onUnsubscribe,
+  isUnsubscribing,
   genres,
   pressPhotos = [],
   allowPhotoDownloads = false,
   tourDates = [],
   releases = [],
   previewNotificationsState,
-  onFlowClosed,
-  onSubscriptionActivated,
 }: Readonly<ProfilePrimaryTabPanelProps>) {
   if (mode === 'listen') {
     const visibleReleases = releases.filter(release => Boolean(release.slug));
@@ -219,10 +370,14 @@ export function ProfilePrimaryTabPanel({
     if (visibleReleases.length > 0) {
       return (
         <div
-          className={PANEL_CLASS_NAME}
+          className={NATIVE_PANEL_CLASS_NAME}
           data-testid='profile-primary-tab-releases'
         >
-          <SectionIntro title='Releases' />
+          <div className='px-4 pb-2 pt-3'>
+            <h2 className='text-[22px] font-[680] leading-none tracking-[-0.025em] text-white'>
+              Music
+            </h2>
+          </div>
           <ReleasesView
             releases={visibleReleases}
             artistHandle={artist.handle}
@@ -234,10 +389,14 @@ export function ProfilePrimaryTabPanel({
 
     return (
       <div
-        className={PANEL_CLASS_NAME}
+        className={NATIVE_PANEL_CLASS_NAME}
         data-testid='profile-primary-tab-listen'
       >
-        <SectionIntro title='Music' />
+        <div className='px-4 pb-2 pt-3'>
+          <h2 className='text-[22px] font-[680] leading-none tracking-[-0.025em] text-white'>
+            Music
+          </h2>
+        </div>
         <StaticListenInterface
           artist={artist}
           handle={artist.handle}
@@ -255,8 +414,15 @@ export function ProfilePrimaryTabPanel({
 
   if (mode === 'tour') {
     return (
-      <div className={PANEL_CLASS_NAME} data-testid='profile-primary-tab-tour'>
-        <SectionIntro title='Events' />
+      <div
+        className={NATIVE_PANEL_CLASS_NAME}
+        data-testid='profile-primary-tab-tour'
+      >
+        <div className='px-4 pb-2 pt-3'>
+          <h2 className='text-[22px] font-[680] leading-none tracking-[-0.025em] text-white'>
+            Events
+          </h2>
+        </div>
         <TourDrawerContent artist={artist} tourDates={[...tourDates]} />
       </div>
     );
@@ -266,12 +432,12 @@ export function ProfilePrimaryTabPanel({
     return (
       <SubscribePanel
         renderMode={renderMode}
-        artist={artist}
-        notificationsPortalContainer={notificationsPortalContainer}
         isSubscribed={isSubscribed}
+        contentPrefs={contentPrefs}
+        onTogglePref={onTogglePref}
+        onUnsubscribe={onUnsubscribe}
+        isUnsubscribing={isUnsubscribing}
         previewNotificationsState={previewNotificationsState}
-        onFlowClosed={onFlowClosed}
-        onSubscriptionActivated={onSubscriptionActivated}
       />
     );
   }
