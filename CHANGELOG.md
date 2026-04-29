@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.195] - 2026-04-29
+
+> Added a `Zoom Parallax` UI demo and fixed the `/ui` shell so tall interactive demos actually scroll and animate inside the preview workspace.
+
+### Added
+
+- **`/ui/parallax` demo route** under the existing UI parity workspace, with a 7-image zoom-parallax collage driven by the shared `ZoomParallax` component in `apps/web/components/ui/zoom-parallax.tsx`.
+- **Unit coverage** for the new component, including the image cap at 7 items and generated fallback alt text for unnamed images.
+
+### Changed
+
+- **`/ui` demo shell now uses a real viewport-height layout** via `h-screen` in `apps/web/app/ui/layout.tsx`, so tall demos scroll within the shell's main pane instead of trapping the page at `scrollY=0`.
+- **Parallax motion implementation now follows the actual scroll container** instead of assuming window scroll. `ZoomParallax` resolves the nearest scrollable ancestor, drives transforms through `requestAnimationFrame`, and respects reduced-motion users.
+
+### Fixed
+
+- **Nested landmark bug on `/ui/parallax`** by removing an inner `<main>` from the route page. The `/ui` workspace now exposes one top-level main landmark instead of invalid nested mains.
+- **Browser warning from the prior `motion/react` container setup** and the underlying non-animating state in the `/ui` shell. The collage now scales correctly on desktop and mobile within the shell's internal scroller.
+
 ## [26.4.194] - 2026-04-29
 
 > Frame.io-inspired design layer for `/artist-profiles` + premium marketing footer rewrite.
