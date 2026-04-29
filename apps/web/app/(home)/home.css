@@ -1583,7 +1583,14 @@ body:has(.home-viewport)::-webkit-scrollbar {
   padding-bottom: var(--frame-section-y);
 }
 
-.frame-skin .frame-section + .frame-section {
+/* Hairline divider between adjacent sections.
+   ArtistProfileLandingPage wraps each section in a <div data-testid="...">,
+   so .frame-section elements are NOT direct siblings of each other —
+   the wrapper divs are. Apply the border on the wrapper instead. The hero
+   (ArtistProfileHeroAdaptiveIntro) renders a bare <section>, so the first
+   wrapped section (which has a preceding <section> sibling, not a div)
+   is correctly excluded by the `> div + div` adjacency. */
+.frame-skin > div + div {
   border-top: 1px solid var(--frame-hairline);
 }
 
