@@ -140,7 +140,9 @@ const SURFACE_CASES: readonly SurfaceCase[] = [
       });
     },
     assertEnabled: async page => {
-      await expect(page.getByTestId('releases-matrix')).toBeVisible({
+      const matrix = page.getByTestId('releases-matrix');
+      await expect(matrix).toBeVisible({ timeout: 30_000 });
+      await expect(matrix).toHaveAttribute('data-design-v1-releases', 'true', {
         timeout: 30_000,
       });
     },
@@ -173,9 +175,13 @@ const SURFACE_CASES: readonly SurfaceCase[] = [
       });
     },
     assertEnabled: async page => {
-      await expect(page.getByTestId('chat-content')).toBeVisible({
-        timeout: 30_000,
-      });
+      const chatContent = page.getByTestId('chat-content');
+      await expect(chatContent).toBeVisible({ timeout: 30_000 });
+      await expect(chatContent).toHaveAttribute(
+        'data-design-v1-chat-entities',
+        'true',
+        { timeout: 30_000 }
+      );
     },
   },
   {

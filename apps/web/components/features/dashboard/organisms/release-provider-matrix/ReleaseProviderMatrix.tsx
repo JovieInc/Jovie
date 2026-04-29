@@ -887,6 +887,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       <div
         className='flex h-full min-h-0 min-w-0 flex-col'
         data-testid='releases-matrix'
+        data-design-v1-releases={designV1ReleasesEnabled ? 'true' : undefined}
       >
         <h1 className='sr-only'>Releases</h1>
 
