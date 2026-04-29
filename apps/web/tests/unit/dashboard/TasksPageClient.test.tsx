@@ -419,6 +419,10 @@ function getLatestTableProps() {
     | undefined;
 }
 
+function enableDesignV1Tasks() {
+  mockUseAppFlag.mockImplementation(flagName => flagName === 'DESIGN_V1_TASKS');
+}
+
 describe('TasksPageClient', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -474,9 +478,7 @@ describe('TasksPageClient', () => {
   });
 
   it('keeps DESIGN_V1_TASKS desktop unselected until the user opens a task', () => {
-    mockUseAppFlag.mockImplementation(
-      flagName => flagName === 'DESIGN_V1_TASKS'
-    );
+    enableDesignV1Tasks();
 
     renderPage();
 
@@ -494,9 +496,7 @@ describe('TasksPageClient', () => {
   });
 
   it('resets the DESIGN_V1_TASKS detail selection when subview filters exclude the selected task', () => {
-    mockUseAppFlag.mockImplementation(
-      flagName => flagName === 'DESIGN_V1_TASKS'
-    );
+    enableDesignV1Tasks();
     mockTasksData = [mockTaskTwo, mockJovieTask];
 
     renderPage();
@@ -518,9 +518,7 @@ describe('TasksPageClient', () => {
   });
 
   it('keeps all assignee subviews wired under DESIGN_V1_TASKS', () => {
-    mockUseAppFlag.mockImplementation(
-      flagName => flagName === 'DESIGN_V1_TASKS'
-    );
+    enableDesignV1Tasks();
     mockTasksData = [mockTask, mockTaskTwo, mockJovieTask];
 
     renderPage();
@@ -937,9 +935,7 @@ describe('TasksPageClient', () => {
   });
 
   it('lets keyboard navigation intentionally open the first DESIGN_V1_TASKS task from empty detail', () => {
-    mockUseAppFlag.mockImplementation(
-      flagName => flagName === 'DESIGN_V1_TASKS'
-    );
+    enableDesignV1Tasks();
 
     renderPage();
 
@@ -1005,9 +1001,7 @@ describe('TasksPageClient', () => {
   });
 
   it('keeps mobile assignee subviews and detail layout disjoint under DESIGN_V1_TASKS', () => {
-    mockUseAppFlag.mockImplementation(
-      flagName => flagName === 'DESIGN_V1_TASKS'
-    );
+    enableDesignV1Tasks();
     mockIsXlUp = false;
     mockTasksData = [mockTask, mockTaskTwo, mockJovieTask];
 
