@@ -84,4 +84,64 @@ describe('resolveClerkIdentity', () => {
     expect(identity.spotifyUsername).toBe(null);
     expect(identity.displayNameSource).toBe(null);
   });
+
+  it('handles empty string email without crashing', () => {
+    const identity = resolveClerkIdentity({
+      primaryEmailAddress: { emailAddress: '' },
+    });
+
+    expect(identity.email).toBe(null);
+    expect(identity.displayName).toBe(null);
+    expect(identity.displayNameSource).toBe(null);
+  });
+
+  it('handles email without @ symbol gracefully', () => {
+    const identity = resolveClerkIdentity({
+      primaryEmailAddress: { emailAddress: 'notanemail' },
+    });
+
+    expect(identity.email).toBe('notanemail');
+    expect(identity.displayName).toBe(null);
+    expect(identity.displayNameSource).toBe(null);
+  });
+
+  it('handles email with empty local part (@example.com)', () => {
+    const identity = resolveClerkIdentity({
+      primaryEmailAddress: { emailAddress: '@example.com' },
+    });
+
+    expect(identity.email).toBe('@example.com');
+    expect(identity.displayName).toBe(null);
+    expect(identity.displayNameSource).toBe(null);
+  });
+
+  it('handles email with trailing @ by using local part', () => {
+    const identity = resolveClerkIdentity({
+      primaryEmailAddress: { emailAddress: 'local@' },
+    });
+
+    expect(identity.email).toBe('local@');
+    expect(identity.displayName).toBe('local');
+    expect(identity.displayNameSource).toBe('email_local_part');
+  });
+
+  it('handles email with multiple @ signs by using first local part', () => {
+    const identity = resolveClerkIdentity({
+      primaryEmailAddress: { emailAddress: 'a@b@c.com' },
+    });
+
+    expect(identity.email).toBe('a@b@c.com');
+    expect(identity.displayName).toBe('a');
+    expect(identity.displayNameSource).toBe('email_local_part');
+  });
+
+  it('falls back through candidates when email local part is empty', () => {
+    const identity = resolveClerkIdentity({
+      primaryEmailAddress: { emailAddress: '@example.com' },
+      username: 'user123',
+    });
+
+    expect(identity.displayName).toBe('user123');
+    expect(identity.displayNameSource).toBe('clerk_username');
+  });
 });
