@@ -2891,6 +2891,8 @@ jobs:
         env:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
+          # Unset deprecated TURBO_REMOTE_ONLY to prevent conflict with TURBO_CACHE
+          TURBO_REMOTE_ONLY: ''
       - name: Deploy (PR preview, fast deployment for UI-only changes)
         id: pr_deploy
         run: |
@@ -3462,6 +3464,8 @@ jobs:
         env:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
+          # Unset deprecated TURBO_REMOTE_ONLY to prevent conflict with TURBO_CACHE
+          TURBO_REMOTE_ONLY: ''
       - name: Deploy (staging preview, prebuilt)
         id: deploy
         run: |
