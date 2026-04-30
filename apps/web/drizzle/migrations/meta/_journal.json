@@ -281,6 +281,13 @@
       "when": 1777072300651,
       "tag": "0039_keen_toro",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1777434177115,
+      "tag": "0040_calendar_events_trust_gate",
+      "breakpoints": true
     }
   ]
 }

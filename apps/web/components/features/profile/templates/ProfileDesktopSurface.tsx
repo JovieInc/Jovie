@@ -393,6 +393,7 @@ export function ProfileDesktopSurface({
               <div className='space-y-2.5'>
                 <Link
                   href={profileHref}
+                  data-testid='profile-header'
                   className='inline-flex max-w-[820px] items-start gap-2 rounded-md text-[clamp(3rem,6vw,5.75rem)] font-semibold leading-[0.92] tracking-[-0.06em] text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
                 >
                   <span className='line-clamp-2'>{artist.name}</span>

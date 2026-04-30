@@ -1,9 +1,14 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { after, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { tourDates } from '@/lib/db/schema/tour';
 import { captureError } from '@/lib/error-tracking';
+import {
+  escapeIcsText,
+  formatIcsTimestamp,
+  sanitizeIcsUrl,
+} from '@/lib/ics/format';
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -40,7 +45,13 @@ export async function GET(
       })
       .from(tourDates)
       .innerJoin(creatorProfiles, eq(tourDates.profileId, creatorProfiles.id))
-      .where(eq(tourDates.id, eventId))
+      .where(
+        and(
+          eq(tourDates.id, eventId),
+          eq(tourDates.eventType, 'tour'),
+          eq(tourDates.confirmationStatus, 'confirmed')
+        )
+      )
       .limit(1);
 
     if (!result) {
@@ -49,18 +60,10 @@ export async function GET(
 
     const { tourDate, profile } = result;
     const artistName = profile.displayName || profile.username;
+    const venueLabel = tourDate.venueName || tourDate.city || 'TBA';
 
     // Format date for ICS (YYYYMMDD format)
     const startDate = new Date(tourDate.startDate);
-    const formatIcsDate = (date: Date) => {
-      return (
-        date
-          .toISOString()
-          .replaceAll('-', '')
-          .replaceAll(':', '')
-          .split('.')[0] + 'Z'
-      );
-    };
 
     // Create end date (assume 3 hours if no end time specified)
     const endDate = new Date(startDate.getTime() + 3 * 60 * 60 * 1000);
@@ -76,19 +79,20 @@ export async function GET(
       .join(', ');
 
     // Build description
-    const descriptionParts = [`${artistName} live at ${tourDate.venueName}`];
+    const descriptionParts = [`${artistName} live at ${venueLabel}`];
     if (tourDate.startTime) {
       descriptionParts.push(`Doors: ${tourDate.startTime}`);
     }
-    if (tourDate.ticketUrl) {
-      descriptionParts.push(`Tickets: ${tourDate.ticketUrl}`);
+    const ticketUrl = sanitizeIcsUrl(tourDate.ticketUrl);
+    if (ticketUrl) {
+      descriptionParts.push(`Tickets: ${ticketUrl}`);
     }
-    const description = descriptionParts.join(String.raw`\n`);
+    const description = descriptionParts.join('\n');
 
     // Build event summary
     const summary = tourDate.title
       ? `${artistName}: ${tourDate.title}`
-      : `${artistName} at ${tourDate.venueName}`;
+      : `${artistName} at ${venueLabel}`;
 
     // Generate unique ID for the event
     const uid = `${tourDate.id}@jov.ie`;
@@ -102,13 +106,13 @@ export async function GET(
       'METHOD:PUBLISH',
       'BEGIN:VEVENT',
       `UID:${uid}`,
-      `DTSTAMP:${formatIcsDate(new Date())}`,
-      `DTSTART:${formatIcsDate(startDate)}`,
-      `DTEND:${formatIcsDate(endDate)}`,
+      `DTSTAMP:${formatIcsTimestamp(new Date())}`,
+      `DTSTART:${formatIcsTimestamp(startDate)}`,
+      `DTEND:${formatIcsTimestamp(endDate)}`,
       `SUMMARY:${escapeIcsText(summary)}`,
       `DESCRIPTION:${escapeIcsText(description)}`,
       `LOCATION:${escapeIcsText(location)}`,
-      tourDate.ticketUrl ? `URL:${tourDate.ticketUrl}` : null,
+      ticketUrl ? `URL:${ticketUrl}` : null,
       'STATUS:CONFIRMED',
       'TRANSP:OPAQUE',
       'END:VEVENT',
@@ -147,17 +151,4 @@ export async function GET(
       { status: 500 }
     );
   }
-}
-
-/**
- * Escape special characters for ICS format per RFC 5545
- */
-function escapeIcsText(text: string): string {
-  if (!text) return '';
-  return text
-    .replaceAll('\\', String.raw`\\`)
-    .replaceAll(';', String.raw`\;`)
-    .replaceAll(',', String.raw`\,`)
-    .replaceAll('\r', '')
-    .replaceAll('\n', String.raw`\n`);
 }

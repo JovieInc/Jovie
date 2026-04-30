@@ -7,9 +7,6 @@
     "version.json"
   ],
   "ui": "tui",
-  "remoteCache": {
-    "enabled": true
-  },
   "globalPassThroughEnv": [
     "SENTRY_AUTH_TOKEN",
     "DOPPLER_PROJECT",

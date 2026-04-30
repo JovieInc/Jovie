@@ -56,9 +56,9 @@ export function HomepageOutcomeCards({
       </div>
       <div className='homepage-outcome-rail-bleed'>
         <section
-          aria-labelledby='homepage-outcome-cards-heading'
           className='homepage-outcome-rail'
           data-testid='homepage-outcome-rail'
+          aria-labelledby='homepage-outcome-cards-heading'
         >
           <a
             className='sr-only focus:not-sr-only focus-ring-themed'

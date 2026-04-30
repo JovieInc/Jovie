@@ -20,6 +20,7 @@
 
 import type { ReactNode } from 'react';
 import type { EntityKind } from '@/lib/chat/tokens';
+import type { EventTypeValue } from '@/lib/tour-dates/types';
 
 /**
  * Per-kind rich metadata used by the entity preview pane in the chat
@@ -63,7 +64,7 @@ export type EntityRefMeta =
       readonly provider?: string;
       readonly status?: string;
       readonly capacity?: number;
-      readonly eventType?: 'tour' | 'meetup' | 'guest' | 'charity' | 'other';
+      readonly eventType?: EventTypeValue;
     };
 
 export interface EntityRef {

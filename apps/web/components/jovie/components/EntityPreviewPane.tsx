@@ -60,7 +60,7 @@ function eyebrowFor(entity: EntityRef): string {
     return 'Artist';
   }
   if (meta.kind === 'event') {
-    const type = meta.eventType ? capitalize(meta.eventType) : null;
+    const type = eventTypeLabel(meta.eventType);
     return type ? `Event · ${type}` : 'Event';
   }
   if (meta.releaseTitle) return `Track · ${meta.releaseTitle}`;
@@ -166,9 +166,11 @@ function buildTrackStats(
 }
 
 function eventTypeLabel(
-  type?: 'tour' | 'meetup' | 'guest' | 'charity' | 'other'
+  type?: 'tour' | 'livestream' | 'listening_party' | 'ama' | 'signing'
 ): string | null {
   if (!type) return null;
+  if (type === 'listening_party') return 'Listening party';
+  if (type === 'ama') return 'AMA';
   return capitalize(type);
 }
 

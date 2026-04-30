@@ -21,11 +21,16 @@ import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { type TourDate, tourDates } from '@/lib/db/schema/tour';
 import { captureError } from '@/lib/error-tracking';
+import {
+  assertValidTicketUrl,
+  normalizeTicketUrl,
+} from '@/lib/events/ticket-url';
 import { checkBandsintownSyncRateLimit } from '@/lib/rate-limit/limiters';
 import { trackServerEvent } from '@/lib/server-analytics';
 import { getUpcomingTourDatesForProfile } from '@/lib/tour-dates/queries';
 import type { TicketStatus, TourDateViewModel } from '@/lib/tour-dates/types';
-import { toISOStringOrNull, toISOStringSafe } from '@/lib/utils/date';
+import { mapTourDateToViewModel } from '@/lib/tour-dates/view-model';
+import { toISOStringOrNull } from '@/lib/utils/date';
 import { decryptPII, encryptPII } from '@/lib/utils/pii-encryption';
 import { getDashboardData } from '../actions';
 
@@ -71,49 +76,16 @@ async function requireProfile(): Promise<{
   };
 }
 
-function mapTourDateToViewModel(tourDate: TourDate): TourDateViewModel {
-  return {
-    id: tourDate.id,
-    profileId: tourDate.profileId,
-    externalId: tourDate.externalId,
-    provider: tourDate.provider,
-    title: tourDate.title,
-    startDate: toISOStringSafe(tourDate.startDate),
-    startTime: tourDate.startTime,
-    timezone: tourDate.timezone,
-    venueName: tourDate.venueName,
-    city: tourDate.city,
-    region: tourDate.region,
-    country: tourDate.country,
-    latitude: tourDate.latitude,
-    longitude: tourDate.longitude,
-    ticketUrl: tourDate.ticketUrl,
-    ticketStatus: tourDate.ticketStatus,
-    lastSyncedAt: tourDate.lastSyncedAt
-      ? toISOStringSafe(tourDate.lastSyncedAt)
-      : null,
-    createdAt: toISOStringSafe(tourDate.createdAt),
-    updatedAt: toISOStringSafe(tourDate.updatedAt),
-  };
-}
-
 /**
- * Validate ticket URL (must be http or https)
- */
-function validateTicketUrl(ticketUrl: string | undefined | null): void {
-  if (!ticketUrl) return;
-  try {
-    const url = new URL(ticketUrl);
-    if (!['http:', 'https:'].includes(url.protocol)) {
-      throw new TypeError('Invalid ticket URL: must use http or https');
-    }
-  } catch {
-    throw new TypeError('Invalid ticket URL');
-  }
-}
-
-/**
- * Upsert Bandsintown events into the database (batch insert for performance)
+ * Upsert Bandsintown events into the database (batch insert for performance).
+ *
+ * New rows land as `eventType: 'tour'` + `confirmationStatus: 'pending'` —
+ * synced provider data is invisible to fans and suppressed from notifications
+ * until the creator confirms or rejects via the dashboard.
+ *
+ * The conflict-update SET block intentionally OMITS `confirmationStatus` and
+ * `reviewedAt` so a future re-sync from Bandsintown does not wipe out the
+ * creator's confirm/reject decision.
  */
 async function upsertBandsintownEvents(
   profileId: string,
@@ -123,11 +95,13 @@ async function upsertBandsintownEvents(
 
   const now = new Date();
 
-  // Batch all events into a single insert with conflict handling
   const insertValues = events.map(event => ({
     profileId,
     externalId: event.externalId,
     provider: 'bandsintown' as const,
+    eventType: 'tour' as const,
+    confirmationStatus: 'pending' as const,
+    reviewedAt: null,
     title: event.title,
     startDate: event.startDate,
     startTime: event.startTime,
@@ -165,6 +139,8 @@ async function upsertBandsintownEvents(
         lastSyncedAt: drizzleSql`excluded.last_synced_at`,
         rawData: drizzleSql`excluded.raw_data`,
         updatedAt: now,
+        // INTENTIONALLY OMITTED: confirmationStatus, reviewedAt, eventType.
+        // Creator decisions on synced events are sticky across re-syncs.
       },
     });
 
@@ -194,7 +170,9 @@ async function fetchTourDatesCore(
  * Core tour dates loading logic (cacheable).
  * Cache is invalidated on mutations (create, update, delete, sync).
  */
-async function resolveTourDates(): Promise<TourDateViewModel[]> {
+async function resolveTourDates(
+  requestedProfileId?: string
+): Promise<TourDateViewModel[]> {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
@@ -204,14 +182,18 @@ async function resolveTourDates(): Promise<TourDateViewModel[]> {
   }
 
   const profile = await requireProfile();
+  const resolvedProfileId = requestedProfileId ?? profile.id;
+  if (resolvedProfileId !== profile.id) {
+    return [];
+  }
 
   // Cache with 30s TTL and tags for invalidation
   return unstable_cache(
-    () => fetchTourDatesCore(profile.id),
-    ['tour-dates', userId, profile.id],
+    () => fetchTourDatesCore(resolvedProfileId),
+    ['tour-dates', userId, resolvedProfileId],
     {
       revalidate: 30,
-      tags: [`tour-dates:${userId}:${profile.id}`],
+      tags: [`tour-dates:${userId}:${resolvedProfileId}`],
     }
   )();
 }
@@ -552,13 +534,18 @@ export async function createTourDate(params: {
   }
 
   // Validate ticketUrl if provided
-  validateTicketUrl(params.ticketUrl);
+  assertValidTicketUrl(params.ticketUrl);
+  const ticketUrl = normalizeTicketUrl(params.ticketUrl);
 
   const [created] = await db
     .insert(tourDates)
     .values({
       profileId: profile.id,
       provider: 'manual',
+      eventType: 'tour',
+      // Manual entries are creator-curated and trusted on creation.
+      confirmationStatus: 'confirmed',
+      reviewedAt: new Date(),
       title: params.title ?? null,
       startDate: parsedStartDate,
       startTime: params.startTime ?? null,
@@ -567,7 +554,7 @@ export async function createTourDate(params: {
       city: params.city,
       region: params.region ?? null,
       country: params.country,
-      ticketUrl: params.ticketUrl ?? null,
+      ticketUrl,
       ticketStatus: params.ticketStatus ?? 'available',
     })
     .returning();
@@ -643,8 +630,8 @@ export async function updateTourDate(params: {
   if (params.region !== undefined) updateData.region = params.region;
   if (params.country !== undefined) updateData.country = params.country;
   if (params.ticketUrl !== undefined) {
-    validateTicketUrl(params.ticketUrl);
-    updateData.ticketUrl = params.ticketUrl;
+    assertValidTicketUrl(params.ticketUrl);
+    updateData.ticketUrl = normalizeTicketUrl(params.ticketUrl);
   }
   if (params.ticketStatus !== undefined)
     updateData.ticketStatus = params.ticketStatus;
@@ -652,8 +639,14 @@ export async function updateTourDate(params: {
   const [updated] = await db
     .update(tourDates)
     .set(updateData)
-    .where(eq(tourDates.id, params.id))
+    .where(
+      and(eq(tourDates.id, params.id), eq(tourDates.profileId, profile.id))
+    )
     .returning();
+
+  if (!updated) {
+    throw new TypeError('Tour date not found');
+  }
 
   // Invalidate cache tag so next server fetch returns fresh data
   revalidateTag(`tour-dates:${userId}:${profile.id}`, 'max');
