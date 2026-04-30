@@ -1,7 +1,7 @@
 {
   "framework": "nextjs",
   "installCommand": "corepack enable && corepack pnpm install",
-  "buildCommand": "corepack pnpm turbo build --filter=@jovie/web",
+  "buildCommand": "env -u TURBO_REMOTE_ONLY corepack pnpm turbo build --filter=@jovie/web",
   "ignoreCommand": "bash -c 'R=$VERCEL_GIT_COMMIT_REF;[[ $R == main || $R == production || $R =~ ^(codex|claude|codegen-bot|linear)/ ]] && exit 0;npx turbo-ignore @jovie/web'",
   "github": {
     "autoAlias": false
