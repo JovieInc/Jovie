@@ -27,7 +27,13 @@ If multiple arguments are present, apply all of them. Example: `JOV-1234 --plan-
 
 Run from the Jovie repo root.
 
-Before executing task work, verify:
+Before any repo command, run the canonical workspace setup:
+
+```bash
+./scripts/setup.sh
+```
+
+Then verify:
 
 ```bash
 node --version
@@ -196,7 +202,9 @@ Run design review through `/autoplan` when UI scope is present. UI scope include
 - Search for sibling bugs when fixing a bug.
 - Respect migration immutability and all hard guardrails in `AGENTS.md`.
 - Keep the branch/PR metadata discoverable by Linear automation by preserving `jov-XXXX`.
-- If a new branch is needed, prefer `itstimwhite/jov-XXXX-<short-slug>`.
+- If a new branch is needed, prefer the Linear issue's `gitBranchName`.
+- If Linear does not provide a branch name, use the repo's agent convention: `tim/jov-XXXX-<short-slug>`.
+- If the host workspace enforces a different branch owner prefix, keep `jov-XXXX` in the branch name and include `<!-- linear-issue-id:JOV-XXXX -->` in the PR body so Linear automation can still resolve the issue.
 
 ## Validation
 
