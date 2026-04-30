@@ -53,22 +53,12 @@ const ProfileUnifiedDrawer = dynamic(() =>
   }))
 );
 
-const ProfileInlineNotificationsCTA = dynamic(
-  () =>
-    import(
-      '@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA'
-    ).then(mod => ({
-      default: mod.ProfileInlineNotificationsCTA,
-    })),
-  {
-    loading: () => (
-      <div
-        data-testid='profile-inline-cta-placeholder'
-        className='min-h-[116px]'
-        aria-hidden='true'
-      />
-    ),
-  }
+const ProfileInlineNotificationsCTA = dynamic(() =>
+  import(
+    '@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA'
+  ).then(mod => ({
+    default: mod.ProfileInlineNotificationsCTA,
+  }))
 );
 
 const DEFAULT_CONTENT_PREFS: Record<NotificationContentType, boolean> = {
