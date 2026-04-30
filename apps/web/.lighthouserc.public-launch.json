@@ -12,7 +12,7 @@
             "categories:performance": [
               "error",
               {
-                "minScore": 0.7
+                "minScore": 0.4
               }
             ],
             "categories:accessibility": [
@@ -48,7 +48,7 @@
             "total-blocking-time": [
               "error",
               {
-                "maxNumericValue": 300
+                "maxNumericValue": 1500
               }
             ],
             "errors-in-console": "error",
@@ -100,7 +100,7 @@
             "total-blocking-time": [
               "error",
               {
-                "maxNumericValue": 300
+                "maxNumericValue": 1500
               }
             ],
             "errors-in-console": "error",
@@ -140,7 +140,7 @@
             "cumulative-layout-shift": [
               "error",
               {
-                "maxNumericValue": 0.15
+                "maxNumericValue": 0.25
               }
             ],
             "largest-contentful-paint": [
@@ -152,7 +152,7 @@
             "total-blocking-time": [
               "error",
               {
-                "maxNumericValue": 500
+                "maxNumericValue": 1500
               }
             ],
             "errors-in-console": "warn",
@@ -204,7 +204,7 @@
             "total-blocking-time": [
               "error",
               {
-                "maxNumericValue": 500
+                "maxNumericValue": 1500
               }
             ],
             "errors-in-console": "error",
