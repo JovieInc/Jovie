@@ -269,15 +269,18 @@ pnpm run benchmark:dev
 # Search Turborepo docs from terminal (2.8+)
 turbo docs "task configuration"
 
-# Run only affected packages (CI optimization)
-pnpm turbo build --affected
-pnpm turbo test --affected
+# Run only affected packages with local-read/remote-read Turbo cache policy
+pnpm run build -- --affected
+pnpm run test -- --affected
+
+# Verify local remote-cache reads
+pnpm run turbo:verify-cache
 
 # Preview task execution plan without running
-pnpm turbo build --dry
+pnpm run build -- --dry
 
 # Reduce memory pressure for tests (OOM fix)
-pnpm turbo test --concurrency=1
+pnpm run test -- --concurrency=1
 ```
 
 ### Parallel Development with Worktrees
@@ -289,8 +292,8 @@ Git worktrees enable parallel agent work with shared Turbo cache (2.8+):
 git worktree add ../Jovie-agent-1 -b agent/task-name
 cd ../Jovie-agent-1 && ./scripts/setup.sh
 
-# Work normally -- turbo cache is shared automatically
-pnpm turbo build
+# Work normally with the local remote-cache read policy
+pnpm run build
 
 # Clean up
 git worktree remove ../Jovie-agent-1

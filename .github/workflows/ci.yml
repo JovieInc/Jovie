@@ -35,6 +35,7 @@ concurrency:
 env:
   TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
   TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
+  TURBO_CACHE: local:rw,remote:rw
   # Larger runner for CPU-heavy jobs (typecheck, build, tests).
   # Set to a GitHub-hosted larger runner label (e.g. "ubuntu-4core") for burst throughput,
   # or leave as "ubuntu-latest" for default 2-core runners.
@@ -2890,6 +2891,8 @@ jobs:
         env:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
+          # Unset deprecated TURBO_REMOTE_ONLY to prevent conflict with TURBO_CACHE
+          TURBO_REMOTE_ONLY: ''
       - name: Deploy (PR preview, fast deployment for UI-only changes)
         id: pr_deploy
         run: |
@@ -3461,6 +3464,8 @@ jobs:
         env:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
+          # Unset deprecated TURBO_REMOTE_ONLY to prevent conflict with TURBO_CACHE
+          TURBO_REMOTE_ONLY: ''
       - name: Deploy (staging preview, prebuilt)
         id: deploy
         run: |
