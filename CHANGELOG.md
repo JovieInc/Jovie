@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.199] - 2026-04-30
+
+> Turbo remote cache policy is now explicit for local development and CI.
+
+### Added
+
+- [internal] **Local Turbo wrapper** for root build, lint, typecheck, and test scripts that reads `TURBO_TOKEN` and `TURBO_TEAM` from the environment or Doppler while keeping app secrets out of Turbo task hashes.
+- [internal] **Remote cache verifier** via `pnpm run turbo:verify-cache` to prove local read access against a small cached task.
+- [internal] **TypeScript native-preview benchmark notes** in `.context`, showing TS6 baseline timing and the current TS7 blocker on inherited `baseUrl`.
+
+### Changed
+
+- [internal] **Local Turbo tasks** now default to `local:rw,remote:r`, while CI uses `local:rw,remote:rw` so CI remains the trusted remote-cache writer.
+- [internal] **Automation verify and lint-staged typecheck** now run through the local Turbo wrapper for consistent cache behavior.
+
 ## [26.4.198] - 2026-04-29
 
 > Main CI and Linear automation are restored to a green, predictable path.
