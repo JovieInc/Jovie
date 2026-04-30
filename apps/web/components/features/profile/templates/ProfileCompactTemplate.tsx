@@ -722,7 +722,7 @@ export function ProfileCompactTemplate({
                   <div className='absolute right-4 bottom-4 left-4'>
                     <h1
                       className='text-[42px] font-semibold leading-[0.92] text-white'
-                      data-testid='profile-header'
+                      data-testid='profile-compact-header'
                     >
                       {artist.name}
                     </h1>
