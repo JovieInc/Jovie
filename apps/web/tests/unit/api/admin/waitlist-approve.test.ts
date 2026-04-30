@@ -68,6 +68,7 @@ describe('Admin Waitlist Approve API', () => {
     mockWithSystemIngestionSession
       .mockResolvedValueOnce({
         outcome: 'approved',
+        entryId,
         profileId: 'profile_123',
         email: 'user@example.com',
         fullName: 'Test User',
@@ -121,6 +122,7 @@ describe('Admin Waitlist Approve API', () => {
 
     mockWithSystemIngestionSession.mockResolvedValueOnce({
       outcome: 'approved',
+      entryId,
       profileId,
       email,
       fullName,
@@ -160,11 +162,15 @@ describe('Admin Waitlist Approve API', () => {
     expect(mockSendNotification).toHaveBeenCalledWith(mockMessage, mockTarget);
   });
 
-  it('returns 422 when no profile is found for the entry', async () => {
+  it('approves access when no profile exists yet', async () => {
     const entryId = '44444444-4444-4444-8444-444444444444';
 
     mockWithSystemIngestionSession.mockResolvedValueOnce({
-      outcome: 'no_profile',
+      outcome: 'approved',
+      entryId,
+      profileId: null,
+      email: 'newuser@example.com',
+      fullName: 'New User',
     });
 
     mockGetCurrentUserEntitlements.mockResolvedValue({
@@ -186,11 +192,15 @@ describe('Admin Waitlist Approve API', () => {
     );
     const data = await response.json();
 
-    expect(response.status).toBe(422);
-    expect(data.success).toBe(false);
-    expect(data.error).toMatch(/profile/i);
-    expect(mockBuildWaitlistInviteEmail).not.toHaveBeenCalled();
-    expect(mockSendNotification).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    expect(data.success).toBe(true);
+    expect(data.profileId).toBe(null);
+    expect(data.waitlistEntryId).toBe(entryId);
+    expect(mockBuildWaitlistInviteEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dedupKey: `waitlist_welcome:${entryId}`,
+      })
+    );
   });
 
   it('returns 422 when user has not signed in yet', async () => {

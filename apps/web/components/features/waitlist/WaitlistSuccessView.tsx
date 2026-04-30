@@ -1,24 +1,25 @@
 'use client';
 
-import { APP_ROUTES } from '@/constants/routes';
 import { AuthLayout } from '@/features/auth';
-import { AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
-import { cn } from '@/lib/utils';
+import type { WaitlistAccessOutcome } from '@/lib/waitlist/access-request';
+import { WaitlistOutcomeView } from './WaitlistOutcomeView';
 
-export function WaitlistSuccessView() {
+interface WaitlistSuccessViewProps {
+  readonly outcome?: WaitlistAccessOutcome | 'pending';
+  readonly onRetry?: () => void;
+}
+
+export function WaitlistSuccessView({
+  outcome = 'pending',
+  onRetry,
+}: Readonly<WaitlistSuccessViewProps>) {
   return (
     <AuthLayout
-      formTitle="You're on the waitlist!"
-      showLogo={false}
+      formTitle='Request Access'
+      showFormTitle={false}
       showFooterPrompt={false}
-      showLogoutButton
-      logoutRedirectUrl={APP_ROUTES.SIGNIN}
     >
-      <div className={cn('w-full px-6 py-7 text-center', AUTH_SURFACE.card)}>
-        <p className={cn(FORM_LAYOUT.hint, 'mt-0')}>
-          Early access is rolling out in stages.
-        </p>
-      </div>
+      <WaitlistOutcomeView outcome={outcome} onRetry={onRetry} />
     </AuthLayout>
   );
 }

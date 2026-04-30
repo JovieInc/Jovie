@@ -53,22 +53,12 @@ const ProfileUnifiedDrawer = dynamic(() =>
   }))
 );
 
-const ProfileInlineNotificationsCTA = dynamic(
-  () =>
-    import(
-      '@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA'
-    ).then(mod => ({
-      default: mod.ProfileInlineNotificationsCTA,
-    })),
-  {
-    loading: () => (
-      <div
-        data-testid='profile-inline-cta-placeholder'
-        className='min-h-[116px]'
-        aria-hidden='true'
-      />
-    ),
-  }
+const ProfileInlineNotificationsCTA = dynamic(() =>
+  import(
+    '@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA'
+  ).then(mod => ({
+    default: mod.ProfileInlineNotificationsCTA,
+  }))
 );
 
 const DEFAULT_CONTENT_PREFS: Record<NotificationContentType, boolean> = {
@@ -365,6 +355,9 @@ export function ProfileCompactSurface({
         data-testid='profile-compact-surface'
         data-presentation={presentation}
       >
+        {!isHomeMode && renderMode !== 'preview' ? (
+          <h1 className='sr-only'>{artist.name}</h1>
+        ) : null}
         <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.025),transparent_34%)]' />
 
         <header
@@ -427,7 +420,12 @@ export function ProfileCompactSurface({
               </CircleIconButton>
 
               {!isHomeMode ? (
-                <p className='absolute left-14 right-14 top-[max(env(safe-area-inset-top),14px)] truncate text-center text-[14px] font-semibold tracking-[-0.012em] text-white'>
+                <p
+                  className='absolute left-14 right-14 top-[max(env(safe-area-inset-top),14px)] truncate text-center text-[14px] font-semibold tracking-[-0.012em] text-white'
+                  data-testid={
+                    renderMode === 'preview' ? undefined : 'profile-header'
+                  }
+                >
                   {artist.name}
                 </p>
               ) : null}

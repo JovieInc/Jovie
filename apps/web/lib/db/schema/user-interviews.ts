@@ -42,6 +42,9 @@ export interface InterviewMetadata {
   plan?: string | null;
   locale?: string | null;
   userAgent?: string | null;
+  waitlistEntryId?: string | null;
+  accessOutcome?: string | null;
+  submittedFrom?: 'onboarding_chat' | string | null;
   summary_structured?: InterviewSummaryStructured | null;
   summary_error?: string | null;
 }

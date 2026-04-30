@@ -17,7 +17,7 @@ export const revalidate = false;
 export const metadata: Metadata = {
   title: 'Pricing',
   description:
-    'Start free with artist profiles, smart links, and audience capture. Upgrade for notifications, deeper analytics, and fan reactivation.',
+    'Request access to Jovie launch plans for artist profiles, smart links, and audience capture.',
   keywords: [
     'Jovie pricing',
     'artist profile pricing',
@@ -28,7 +28,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: `Pricing - ${APP_NAME}`,
     description:
-      'Start free with artist profiles, smart links, and audience capture. Upgrade for notifications, deeper analytics, and fan reactivation.',
+      'Request access to Jovie launch plans for artist profiles, smart links, and audience capture.',
     url: `${BASE_URL}/pricing`,
     type: 'website',
   },
@@ -36,7 +36,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: `Pricing - ${APP_NAME}`,
     description:
-      'Start free with artist profiles, smart links, and audience capture. Upgrade for notifications, deeper analytics, and fan reactivation.',
+      'Request access to Jovie launch plans for artist profiles, smart links, and audience capture.',
   },
   robots: {
     index: true,
@@ -56,7 +56,7 @@ const PRICING_SCHEMA = {
   '@type': 'WebPage',
   name: `Pricing - ${APP_NAME}`,
   description:
-    'Start free with artist profiles, smart links, and audience capture. Upgrade for notifications, deeper analytics, and fan reactivation.',
+    'Request access to Jovie launch plans for artist profiles, smart links, and audience capture.',
   url: `${BASE_URL}/pricing`,
   mainEntity: {
     '@type': 'ItemList',
@@ -117,7 +117,7 @@ function getPlanCta(planId: VisiblePlanId) {
   if (planId === 'free') {
     return {
       href: `${APP_ROUTES.SIGNUP}?plan=free`,
-      label: 'Start Free',
+      label: 'Request Access',
       variant: 'secondary' as const,
     };
   }
@@ -125,7 +125,7 @@ function getPlanCta(planId: VisiblePlanId) {
   if (planId === 'pro') {
     return {
       href: `${APP_ROUTES.SIGNUP}?plan=pro`,
-      label: 'Start Pro Trial',
+      label: 'Request Access',
       variant: 'primary' as const,
     };
   }
@@ -251,19 +251,18 @@ export default function PricingPage() {
                 Pricing
               </h1>
               <p className='marketing-lead-linear mt-5 max-w-[28rem] text-secondary-token'>
-                Start free with artist profiles, smart links, and audience
-                capture. Upgrade for notifications, deeper analytics, and fan
-                reactivation.
+                Request access to the private launch workspace for artist
+                profiles, smart links, and audience capture.
               </p>
               <p className='mt-6 text-[13px] font-medium tracking-[-0.01em] text-tertiary-token'>
-                14-day Pro trial. No credit card required.
+                Access opens from the launch waitlist. No credit card required.
               </p>
               <div className='mt-7 flex flex-wrap items-center gap-3'>
                 <Link
                   href={`${APP_ROUTES.SIGNUP}?plan=free`}
                   className='public-action-primary'
                 >
-                  Start Free
+                  Request Access
                 </Link>
                 <Link
                   href={APP_ROUTES.ARTIST_PROFILES}
@@ -495,7 +494,7 @@ export default function PricingPage() {
         <MarketingContainer width='page'>
           <div className='text-center'>
             <h2 className='text-[clamp(2.1rem,4vw,3.5rem)] font-semibold tracking-[-0.05em] text-primary-token'>
-              Start Free.
+              Request Access.
             </h2>
             <p className='mx-auto mt-4 max-w-[30rem] text-[15px] leading-[1.7] text-secondary-token'>
               Build the profile first. Turn on notifications, deeper analytics,
@@ -507,7 +506,7 @@ export default function PricingPage() {
                 prefetch={false}
                 className='public-action-primary'
               >
-                Start Free
+                Request Access
               </Link>
               <Link
                 href={APP_ROUTES.ARTIST_PROFILES}

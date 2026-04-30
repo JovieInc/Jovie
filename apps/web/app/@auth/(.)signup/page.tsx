@@ -57,7 +57,7 @@ function SignupModalBody() {
   }, [searchParams]);
 
   const signInUrl = buildAuthRouteUrl(APP_ROUTES.SIGNIN, searchParams);
-  const redirectUrl = searchParams.get('redirect_url') ?? APP_ROUTES.ONBOARDING;
+  const redirectUrl = searchParams.get('redirect_url') ?? APP_ROUTES.WAITLIST;
 
   const statusRow = promptHint ? (
     <p aria-live='polite' className='truncate' title={promptHint}>

@@ -62,7 +62,7 @@ export function HomeV1Design() {
                 href={APP_ROUTES.SIGNUP}
                 className='inline-flex h-9 items-center gap-1.5 rounded-full bg-white px-4 text-[13px] font-semibold text-black transition-colors hover:bg-white/90'
               >
-                Get Started
+                Request Access
                 <ArrowRight className='h-3.5 w-3.5' strokeWidth={2.4} />
               </Link>
             </div>
@@ -92,33 +92,33 @@ export function HomeV1Design() {
               id='home-hero-heading'
               className='max-w-[12ch] text-[56px] font-semibold leading-[0.88] text-white sm:text-[84px] lg:text-[116px] xl:text-[132px]'
             >
-              Release More Music With Less Work.
+              Release Work, Finally Organized.
             </h1>
             <p className='mt-6 max-w-[40rem] text-[17px] leading-7 text-white/62 sm:text-[19px]'>
-              Plan releases, create assets, pitch playlists, and promote every
-              drop from one AI workspace.
+              Request access to the private launch. Tell Jovie what you are
+              working on, and we will save the context before opening the app.
             </p>
 
             <div className='mt-10 w-full max-w-[760px] rounded-[28px] border border-white/[0.08] bg-[#0b0d11]/88 p-3 text-left shadow-[0_34px_120px_rgba(0,0,0,0.48)] backdrop-blur-2xl'>
               <div className='flex items-start gap-3 rounded-[22px] bg-white/[0.035] px-4 py-4 ring-1 ring-white/[0.04] sm:px-5'>
                 <Sparkles className='mt-1 h-4 w-4 shrink-0 text-cyan-200/70' />
                 <p className='text-[15px] leading-6 text-white/78'>
-                  Tell Jovie what you are releasing next. It turns the plan,
-                  assets, profile updates, and fan touchpoints into a working
-                  queue.
+                  Tell Jovie what you are releasing next. Your request becomes
+                  the context we use to shape setup, profile work, and the
+                  launch queue.
                 </p>
               </div>
 
               <div className='mt-3 flex flex-col gap-3 rounded-[24px] border border-white/[0.07] bg-black/30 p-3 sm:flex-row sm:items-center'>
                 <div className='flex min-h-12 flex-1 items-center gap-3 rounded-full bg-white/[0.04] px-4 text-[14px] text-white/42'>
                   <Mic className='h-4 w-4 shrink-0' />
-                  Ask Jovie to build your release plan
+                  Tell Jovie what you are releasing next
                 </div>
                 <Link
                   href={APP_ROUTES.SIGNUP}
                   className='inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-white px-5 text-[14px] font-semibold text-black transition-colors hover:bg-white/90'
                 >
-                  Start
+                  Request Access
                   <ArrowRight className='h-4 w-4' strokeWidth={2.4} />
                 </Link>
               </div>

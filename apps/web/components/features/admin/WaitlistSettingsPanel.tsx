@@ -103,7 +103,7 @@ export function WaitlistSettingsPanel() {
           <SettingsToggleRow
             icon={<ShieldCheck className='h-4 w-4' aria-hidden />}
             title='Manual approval gate'
-            description='When disabled, new submissions bypass manual approval.'
+            description='When enabled, every new access request is saved to the waitlist.'
             checked={settings.gateEnabled}
             onCheckedChange={checked =>
               setSettings(current =>
@@ -119,7 +119,7 @@ export function WaitlistSettingsPanel() {
           <SettingsToggleRow
             icon={<UserPlus className='h-4 w-4' aria-hidden />}
             title='Auto-accept'
-            description='Automatically approve a limited number of new submissions each day before manual review takes over.'
+            description='When the manual gate is disabled, approve the first daily slots before waitlisting the rest.'
             checked={settings.autoAcceptEnabled}
             onCheckedChange={checked =>
               setSettings(current =>

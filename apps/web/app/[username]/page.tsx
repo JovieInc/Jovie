@@ -1,20 +1,16 @@
 import { type Metadata } from 'next';
+import { unstable_cache } from 'next/cache';
 import { notFound } from 'next/navigation';
-
-export const dynamic = 'force-dynamic';
 
 import type { PublicRelease } from '@/components/features/profile/releases/types';
 import { BASE_URL } from '@/constants/app';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
 import { DesktopQrOverlayClient } from '@/features/profile/DesktopQrOverlayClient';
 import { ProfileViewTracker } from '@/features/profile/ProfileViewTracker';
-import {
-  getProfileMode,
-  getProfileModeDefinition,
-} from '@/features/profile/registry';
+import { getProfileModeDefinition } from '@/features/profile/registry';
 import { StaticArtistPage } from '@/features/profile/StaticArtistPage';
 import { JoviePixel } from '@/features/tracking/JoviePixel';
-import { getClientTrackingToken } from '@/lib/analytics/tracking-token';
+import { createProfileTag } from '@/lib/cache/tags';
 import {
   getProfileVisitorState,
   supportsDirectProfileClaim,
@@ -52,6 +48,7 @@ import { getProfileAndLinks } from './_lib/public-profile-loader';
 
 /** Max MusicEvent schemas to emit (Google shows ~5 in rich results). */
 const MAX_EVENT_SCHEMAS = 5;
+const PUBLIC_PROFILE_DETAIL_CACHE_TTL_SECONDS = 3600;
 
 /**
  * Map ticketStatus enum to schema.org Event properties.
@@ -268,16 +265,25 @@ interface Props {
   readonly params: Promise<{
     readonly username: string;
   }>;
-  readonly searchParams?: Promise<{
-    readonly mode?: string | string[];
-  }>;
 }
 
-async function getPublicTourDates(
-  profileId: string
-): Promise<TourDateViewModel[]> {
+async function getPublicTourDates(params: {
+  profileId: string;
+  usernameNormalized: string;
+}): Promise<TourDateViewModel[]> {
+  const { profileId, usernameNormalized } = params;
+
   try {
-    return await getUpcomingTourDatesForProfile(profileId);
+    const cachedGetTourDates = unstable_cache(
+      async () => getUpcomingTourDatesForProfile(profileId),
+      [`public-profile-tour-dates-${profileId}`],
+      {
+        tags: [createProfileTag(usernameNormalized)],
+        revalidate: PUBLIC_PROFILE_DETAIL_CACHE_TTL_SECONDS,
+      }
+    );
+
+    return await cachedGetTourDates();
   } catch (error) {
     logger.error(
       'Error fetching public profile tour dates',
@@ -292,11 +298,23 @@ async function getPublicTourDates(
   }
 }
 
-async function getPublicReleases(
-  profileId: string
-): Promise<Awaited<ReturnType<typeof getReleasesForProfileLite>>> {
+async function getPublicReleases(params: {
+  profileId: string;
+  usernameNormalized: string;
+}): Promise<Awaited<ReturnType<typeof getReleasesForProfileLite>>> {
+  const { profileId, usernameNormalized } = params;
+
   try {
-    return await getReleasesForProfileLite(profileId);
+    const cachedGetReleases = unstable_cache(
+      async () => getReleasesForProfileLite(profileId),
+      [`public-profile-releases-${profileId}`],
+      {
+        tags: [createProfileTag(usernameNormalized)],
+        revalidate: PUBLIC_PROFILE_DETAIL_CACHE_TTL_SECONDS,
+      }
+    );
+
+    return await cachedGetReleases();
   } catch (error) {
     try {
       await captureError('Error fetching public profile releases', error, {
@@ -311,17 +329,9 @@ async function getPublicReleases(
   }
 }
 
-export default async function ArtistPage({
-  params,
-  searchParams,
-}: Readonly<Props>) {
+export default async function ArtistPage({ params }: Readonly<Props>) {
   const { username } = await params;
-  const resolvedSearchParams = await searchParams;
-  const requestedMode = getProfileMode(
-    Array.isArray(resolvedSearchParams?.mode)
-      ? resolvedSearchParams?.mode[0]
-      : resolvedSearchParams?.mode
-  );
+  const initialMode = 'profile';
 
   // Early reject obviously invalid usernames before hitting the database
   if (
@@ -368,10 +378,19 @@ export default async function ArtistPage({
     notFound();
   }
 
+  const usernameNormalized =
+    profile.username_normalized || username.toLowerCase();
+
   // Kick off independent DB queries immediately so they overlap with the
   // synchronous artist conversion, visitor-state, and tracking-token work below.
-  const tourDatesPromise = getPublicTourDates(profile.id);
-  const releasesPromise = getPublicReleases(profile.id);
+  const tourDatesPromise = getPublicTourDates({
+    profileId: profile.id,
+    usernameNormalized,
+  });
+  const releasesPromise = getPublicReleases({
+    profileId: profile.id,
+    usernameNormalized,
+  });
 
   // Convert our profile data to the Artist type expected by components
   const artist = convertCreatorProfileToArtist(profile);
@@ -390,16 +409,6 @@ export default async function ArtistPage({
     pendingClaimContext: null,
   });
 
-  // Generate a short-lived HMAC token so the client can authenticate its visit
-  // tracking request to /api/audience/visit (requires TRACKING_TOKEN_SECRET).
-  // Falls back to undefined gracefully if the secret is not configured.
-  let visitTrackingToken: string | undefined;
-  try {
-    visitTrackingToken = getClientTrackingToken(profile.id).token;
-  } catch {
-    // Secret not configured — visit tracking will proceed without token auth
-  }
-
   const latestRelease = fetchedLatestRelease;
 
   const publicContacts: PublicContact[] = toPublicContacts(
@@ -407,8 +416,8 @@ export default async function ArtistPage({
     artist.name
   );
   const showPayButton = links.some(link => link.platform === 'venmo');
-  const showBackButton = requestedMode !== 'profile';
-  const subtitle = getProfileModeDefinition(requestedMode).subtitle;
+  const showBackButton = false;
+  const subtitle = getProfileModeDefinition(initialMode).subtitle;
 
   // Read profile photo download settings
   const profileSettings =
@@ -471,7 +480,7 @@ export default async function ArtistPage({
       {/* Server-side pixel tracking */}
       {isPublicNoAuthSmoke ? null : <JoviePixel profileId={profile.id} />}
       <StaticArtistPage
-        mode={requestedMode}
+        mode={initialMode}
         artist={artist}
         socialLinks={links}
         viewerCountryCode={viewerCountryCode}
@@ -488,7 +497,7 @@ export default async function ArtistPage({
         subscribeTwoStep
         genres={genres}
         tourDates={tourDates}
-        visitTrackingToken={visitTrackingToken}
+        visitTrackingToken={undefined}
         showSubscriptionConfirmedBanner={!isPublicNoAuthSmoke}
         showShopButton={isShopEnabled(profileSettings)}
         profileSettings={{

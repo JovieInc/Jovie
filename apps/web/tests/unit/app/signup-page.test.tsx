@@ -94,13 +94,13 @@ describe('signup page', () => {
     });
 
     expect(screen.getByTestId('clerk-sign-up')).toBeInTheDocument();
-    expect(routerPrefetchMock).toHaveBeenCalledWith(APP_ROUTES.SIGNIN);
+    expect(routerPrefetchMock).toHaveBeenCalledWith(APP_ROUTES.WAITLIST);
     expect(clerkSignUpMock).toHaveBeenCalledWith(
       expect.objectContaining({
         routing: 'hash',
         oauthFlow: 'redirect',
         signInUrl: APP_ROUTES.SIGNIN,
-        fallbackRedirectUrl: APP_ROUTES.ONBOARDING,
+        fallbackRedirectUrl: APP_ROUTES.WAITLIST,
       })
     );
     expect(

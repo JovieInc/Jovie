@@ -37,7 +37,7 @@ describe('HeaderNav flyout interactions', () => {
       '/signin'
     );
     expect(
-      screen.getByRole('link', { name: 'Start Free Trial' })
+      screen.getByRole('link', { name: 'Request Access' })
     ).toHaveAttribute('href', '/signup');
   });
 });

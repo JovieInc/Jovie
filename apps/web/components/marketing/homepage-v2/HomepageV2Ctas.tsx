@@ -115,9 +115,9 @@ export function HomepageV2Pricing() {
 
         <div className='homepage-pricing-grid'>
           <PricingCard
-            body='One plan. 14-day free trial. Then the workspace keeps running.'
+            body='One launch workspace. Request access now; setup opens as slots become available.'
             ctaHref={`${APP_ROUTES.SIGNUP}?plan=pro`}
-            ctaLabel='Start 14-Day Free Trial'
+            ctaLabel='Request Access'
             featured
             price={proPriceDisplay}
             testId='homepage-v2-pricing-pro'

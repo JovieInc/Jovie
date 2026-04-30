@@ -18,7 +18,7 @@ export function PricingPreview() {
             Simple, transparent pricing
           </h2>
           <p className='mt-4 text-lg text-neutral-500 dark:text-neutral-400'>
-            Start free. Scale as you grow.
+            Request access. Scale as you grow.
           </p>
         </div>
 

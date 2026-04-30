@@ -190,15 +190,23 @@ function SignUpPageContent() {
 
   return (
     <>
-      <AuthRoutePrefetch href={APP_ROUTES.SIGNIN} />
+      <AuthRoutePrefetch href={APP_ROUTES.WAITLIST} />
       <SignUpClaimDataPersistence />
       <SignUpOauthErrorBanner />
+      <div className='mb-4 text-center lg:text-left'>
+        <h1 className='text-[22px] font-semibold leading-7 text-white'>
+          Request Access
+        </h1>
+        <p className='mt-2 text-[13px] leading-5 text-white/58'>
+          Create an account to start your private launch request.
+        </p>
+      </div>
       <div ref={containerRef}>
         <SignUp
           routing='hash'
           oauthFlow='redirect'
           signInUrl={signInUrl}
-          fallbackRedirectUrl={APP_ROUTES.ONBOARDING}
+          fallbackRedirectUrl={APP_ROUTES.WAITLIST}
         />
       </div>
       <p className='mt-4 text-center text-2xs leading-relaxed text-white/80 lg:text-left'>
@@ -228,7 +236,7 @@ function SignUpPageContent() {
 export default function SignUpPage() {
   return (
     <AuthLayout
-      formTitle='Create your account'
+      formTitle='Request Access'
       showFormTitle={false}
       showFooterPrompt={false}
       layoutVariant='split'

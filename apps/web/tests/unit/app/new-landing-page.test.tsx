@@ -9,7 +9,7 @@ vi.mock('@/components/marketing/homepage-v2/HomepageV2Route', () => ({
     <main data-testid='homepage-v2-route'>
       <h1>Make every release feel bigger.</h1>
       <Link data-testid='homepage-v2-hero-primary-cta' href='/signup'>
-        Start free trial
+        Request Access
       </Link>
       <Link href='/artist-profiles'>Explore artist profiles</Link>
       <h2>One system for the whole release cycle.</h2>

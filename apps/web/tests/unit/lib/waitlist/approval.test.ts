@@ -51,8 +51,8 @@ describe('approveWaitlistEntryInTx', () => {
           status: 'new',
         },
       ],
-      [{ id: 'target-profile' }],
       [{ id: 'user-1', clerkId: 'clerk_123' }],
+      [{ id: 'target-profile' }],
       [{ id: 'old-profile' }],
     ]);
 
@@ -60,6 +60,7 @@ describe('approveWaitlistEntryInTx', () => {
 
     expect(result).toEqual({
       outcome: 'approved',
+      entryId: 'entry-1',
       profileId: 'target-profile',
       email: 'creator@example.com',
       fullName: 'Creator',
@@ -83,7 +84,7 @@ describe('approveWaitlistEntryInTx', () => {
       expect.objectContaining({
         userId: 'user-1',
         isClaimed: true,
-        isPublic: true,
+        isPublic: false,
       })
     );
     expect(updateSet).toHaveBeenNthCalledWith(
@@ -93,11 +94,12 @@ describe('approveWaitlistEntryInTx', () => {
       })
     );
 
-    // User status stays active — onboarding is gated by isProfileComplete() not userStatus
+    // Approval grants access but still requires onboarding completion.
     expect(updateSet).toHaveBeenNthCalledWith(
       4,
       expect.objectContaining({
-        userStatus: 'active',
+        userStatus: 'waitlist_approved',
+        activeProfileId: 'target-profile',
       })
     );
   });
@@ -112,8 +114,8 @@ describe('approveWaitlistEntryInTx', () => {
           status: 'new',
         },
       ],
-      [{ id: 'target-profile' }],
       [{ id: 'user-1', clerkId: 'clerk_123' }],
+      [{ id: 'target-profile' }],
       [],
     ]);
 
@@ -134,11 +136,45 @@ describe('approveWaitlistEntryInTx', () => {
         onboardingCompletedAt: expect.anything(),
       })
     );
-    // User status stays active
+    // User gets access without being marked active.
     expect(updateSet).toHaveBeenNthCalledWith(
       3,
       expect.objectContaining({
-        userStatus: 'active',
+        userStatus: 'waitlist_approved',
+      })
+    );
+  });
+
+  it('approves entries that do not have a precreated profile', async () => {
+    const { tx, updateSet } = createTxMock([
+      [
+        {
+          id: 'entry-1',
+          email: 'creator@example.com',
+          fullName: 'Creator',
+          status: 'new',
+        },
+      ],
+      [{ id: 'user-1', clerkId: 'clerk_123' }],
+      [],
+    ]);
+
+    const result = await approveWaitlistEntryInTx(tx, 'entry-1');
+
+    expect(result).toEqual({
+      outcome: 'approved',
+      entryId: 'entry-1',
+      profileId: null,
+      email: 'creator@example.com',
+      fullName: 'Creator',
+      clerkId: 'clerk_123',
+    });
+    expect(updateSet).toHaveBeenCalledTimes(2);
+    expect(updateSet).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        userStatus: 'waitlist_approved',
+        activeProfileId: null,
       })
     );
   });

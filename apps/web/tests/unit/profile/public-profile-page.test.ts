@@ -36,6 +36,13 @@ const PUBLIC_PROFILE_LOADER_SOURCE = readFileSync(
   'utf8'
 );
 const PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE = `${PUBLIC_PROFILE_PAGE_SOURCE}\n${PUBLIC_PROFILE_LOADER_SOURCE}`;
+const PUBLIC_PROFILE_TEMPLATE_SOURCE = readFileSync(
+  path.join(
+    WEB_ROOT,
+    'components/features/profile/templates/ProfileCompactTemplate.tsx'
+  ),
+  'utf8'
+);
 
 const mockProfile = {
   id: 'profile-123',
@@ -113,7 +120,13 @@ describe('Public Profile Page Logic', () => {
         'Error fetching public profile tour dates'
       );
       expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-        'getPublicTourDates(profile.id)'
+        'const tourDatesPromise = getPublicTourDates({'
+      );
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        'public-profile-tour-dates-${profileId}'
+      );
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        'createProfileTag(usernameNormalized)'
       );
     });
 
@@ -129,9 +142,11 @@ describe('Public Profile Page Logic', () => {
   });
 
   describe('public claim banner handling', () => {
-    it('reads search params for mode handling', () => {
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-        'const resolvedSearchParams = await searchParams;'
+    it('keeps mode query handling out of the ISR server render', () => {
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain('await searchParams');
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain('readonly searchParams');
+      expect(PUBLIC_PROFILE_TEMPLATE_SOURCE).toContain(
+        'new URLSearchParams(globalThis.location.search).get'
       );
     });
 
@@ -140,12 +155,13 @@ describe('Public Profile Page Logic', () => {
     });
   });
 
-  describe('profile accent backfill', () => {
-    it('derives a non-persisted accent fallback during public profile render', () => {
-      expect(PUBLIC_PROFILE_LOADER_SOURCE).toContain(
+  describe('profile accent handling', () => {
+    it('does not derive remote avatar accents during public profile ISR render', () => {
+      expect(PUBLIC_PROFILE_LOADER_SOURCE).toContain('mergeProfileTheme');
+      expect(PUBLIC_PROFILE_LOADER_SOURCE).not.toContain(
         'ensureThemeHasProfileAccent'
       );
-      expect(PUBLIC_PROFILE_LOADER_SOURCE).toContain('accentSourceUrl');
+      expect(PUBLIC_PROFILE_LOADER_SOURCE).not.toContain('accentSourceUrl');
       expect(PUBLIC_PROFILE_LOADER_SOURCE).not.toContain(
         'persistDerivedProfileAccent'
       );

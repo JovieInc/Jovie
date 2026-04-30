@@ -153,7 +153,7 @@ function HomepageHeroActions() {
         href={APP_ROUTES.SIGNUP}
         className='public-action-primary focus-ring-themed'
       >
-        Start Free Trial
+        Request Access
       </Link>
       <Link
         href={APP_ROUTES.ARTIST_PROFILES}

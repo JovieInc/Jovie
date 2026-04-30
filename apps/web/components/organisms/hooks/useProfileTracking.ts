@@ -81,16 +81,42 @@ export function useProfileVisitTracking(
     if (typeof window === 'undefined') return;
     if (!artistId) return;
     if (process.env.NEXT_PUBLIC_CI === 'true') return;
+    let cancelled = false;
+    const profileId = artistId;
 
     const utmParams = extractUtmParams();
     const referrer = document.referrer || undefined;
 
-    trackVisitRef.current.mutate({
-      profileId: artistId,
-      referrer,
-      ...(utmParams && { utmParams }),
-      ...(trackingToken && { trackingToken }),
-    });
+    async function recordVisit() {
+      let resolvedToken = trackingToken;
+      if (!resolvedToken) {
+        try {
+          const response = await fetch(
+            `/api/audience/visit-token?profileId=${encodeURIComponent(profileId)}`,
+            { cache: 'no-store' }
+          );
+          const payload = (await response.json().catch(() => null)) as {
+            token?: string | null;
+          } | null;
+          resolvedToken = payload?.token ?? undefined;
+        } catch {
+          resolvedToken = undefined;
+        }
+      }
+
+      if (cancelled) return;
+      trackVisitRef.current.mutate({
+        profileId: artistId,
+        referrer,
+        ...(utmParams && { utmParams }),
+        ...(resolvedToken && { trackingToken: resolvedToken }),
+      });
+    }
+
+    void recordVisit();
+    return () => {
+      cancelled = true;
+    };
   }, [artistId, trackingToken]);
 }
 
