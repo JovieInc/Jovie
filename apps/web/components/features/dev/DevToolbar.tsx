@@ -463,7 +463,7 @@ export function DevToolbar({
       setPersonaLoading(false);
       return;
     }
-    void refreshPersonaSession();
+    refreshPersonaSession();
     return () => {
       personaStatusAbortRef.current?.abort();
       personaStatusAbortRef.current = null;

@@ -296,6 +296,11 @@ function getDspAvatarItems(
   return [...linkedItems, ...missingItems];
 }
 
+function formatTrackCount(totalTracks: number): string | null {
+  if (totalTracks <= 0) return null;
+  return `${totalTracks} ${totalTracks === 1 ? 'Track' : 'Tracks'}`;
+}
+
 function ReleaseEntityHeader({
   release,
   artistName,
@@ -326,10 +331,7 @@ function ReleaseEntityHeader({
     ? dropDateMeta(release.releaseDate)
     : null;
   const dspItems = getDspAvatarItems(release, providerConfig);
-  const trackLabel =
-    release.totalTracks > 0
-      ? `${release.totalTracks} ${release.totalTracks === 1 ? 'Track' : 'Tracks'}`
-      : null;
+  const trackLabel = formatTrackCount(release.totalTracks);
 
   return (
     <DrawerSurfaceCard

@@ -207,7 +207,7 @@ export function RecentChats() {
               type='button'
               role='menuitem'
               onClick={() => {
-                void copySessionId(shellActionMenu.thread.id);
+                copySessionId(shellActionMenu.thread.id);
                 setShellActionMenu(null);
               }}
               className='flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-2xs hover:bg-sidebar-accent focus-visible:bg-sidebar-accent focus-visible:outline-none'
@@ -312,7 +312,7 @@ export function RecentChats() {
                     <DropdownMenuContent side='bottom' align='end'>
                       <DropdownMenuItem
                         onClick={() => {
-                          void copySessionId(convo.id);
+                          copySessionId(convo.id);
                         }}
                       >
                         <Copy className='size-3.5' aria-hidden='true' />
