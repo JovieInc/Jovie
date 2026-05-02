@@ -59,19 +59,19 @@ function buildArtworkImageValue(
 function buildFlatCredits(
   credits: SmartLinkCreditGroup[] | null | undefined
 ): Record<string, unknown> {
+  if (!credits) return {};
+
   const creditProps: Record<string, unknown[]> = {};
-  if (credits) {
-    for (const group of credits) {
-      const schemaProp = CREDIT_ROLE_SCHEMA_MAP[group.role];
-      if (!schemaProp) continue;
-      if (!creditProps[schemaProp]) creditProps[schemaProp] = [];
-      for (const entry of group.entries) {
-        creditProps[schemaProp].push({
-          '@type': 'Person',
-          name: entry.name,
-          ...(entry.handle && { url: `${BASE_URL}/${entry.handle}` }),
-        });
-      }
+  for (const group of credits) {
+    const schemaProp = CREDIT_ROLE_SCHEMA_MAP[group.role];
+    if (!schemaProp) continue;
+    if (!creditProps[schemaProp]) creditProps[schemaProp] = [];
+    for (const entry of group.entries) {
+      creditProps[schemaProp].push({
+        '@type': 'Person',
+        name: entry.name,
+        ...(entry.handle && { url: `${BASE_URL}/${entry.handle}` }),
+      });
     }
   }
 

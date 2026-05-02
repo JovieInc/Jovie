@@ -431,7 +431,7 @@ export function ProfileInlineNotificationsCTA({
       return;
     }
 
-    void nameMutation
+    nameMutation
       .mutateAsync({
         artistId: artist.id,
         email: activeEmail,
@@ -465,7 +465,7 @@ export function ProfileInlineNotificationsCTA({
         setCanEditPreferences(true);
         setStep('done');
 
-        void birthdayMutation
+        birthdayMutation
           .mutateAsync({
             artistId: artist.id,
             email: activeEmail,
