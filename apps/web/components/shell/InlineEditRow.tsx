@@ -142,9 +142,8 @@ export function InlineEditRow({
   }
 
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: row click opens an inline edit input above; keyboard activation is on the inner pencil button (a real <button>)
-    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: same — handlers route to a real button for keyboard users
-    // biome-ignore lint/a11y/useKeyWithClickEvents: inner pencil button is the keyboard-accessible affordance
+    // biome-ignore lint/a11y/noStaticElementInteractions: role is conditionally 'button' — static analysis can't resolve the ternary
+    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: same — handlers route to enterEdit only when non-readOnly
     <div
       className={cn(
         'group/row flex items-center gap-3 h-8 px-2 rounded-md transition-colors duration-150 ease-out',
@@ -155,6 +154,18 @@ export function InlineEditRow({
       )}
       onClick={readOnly ? undefined : enterEdit}
       onDoubleClick={readOnly ? undefined : enterEdit}
+      onKeyDown={
+        readOnly
+          ? undefined
+          : e => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                enterEdit();
+              }
+            }
+      }
+      role={readOnly ? undefined : 'button'}
+      tabIndex={readOnly ? undefined : 0}
       title={readOnly ? undefined : 'Click to edit'}
     >
       <dt className='w-[88px] shrink-0 text-[11px] text-quaternary-token'>
