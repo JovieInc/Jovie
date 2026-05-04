@@ -179,7 +179,7 @@ async function readBodyWithCap(response: Response): Promise<string | null> {
   const reader = response.body?.getReader();
   if (!reader) {
     const text = await response.text();
-    return text.length > MAX_BYTES ? null : text;
+    return new TextEncoder().encode(text).byteLength > MAX_BYTES ? null : text;
   }
 
   const result = await readStreamChunks(reader);
