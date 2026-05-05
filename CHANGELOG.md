@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.200] - 2026-05-05
+
+> [internal] Internal agent docs were reorganized for reliability — no user-facing changes.
+
+### Changed
+
+- [internal] **Agent docs restructured** to module-style. `CLAUDE.md` shrunk from 168 lines to ~130 as a controller that lists hard invariants and points to scoped rule files. `AGENTS.md` is now a symlink to `CLAUDE.md` so Codex/Cursor read the same source.
+- [internal] **`CODEX.md`** updated to reference the new scoped rules.
+
+### Added
+
+- [internal] **`.claude/rules/`** with 11 topic-scoped guides: environment, auth, db, ui, security, release, testing, infra, code-style, linear, gstack. Detail moved here from the previous 1,880-line `AGENTS.md`. Anthropic guidance: agent docs under ~200 lines are followed more reliably.
+
 ## [26.4.199] - 2026-04-30
 
 > Turbo remote cache policy is now explicit for local development and CI.
