@@ -427,6 +427,14 @@ export function ProfileHomeRail({
     card => !(showLatest && card.kind === 'release')
   );
   const visibleTourDate = nearbyTourDate ?? nextTourDate;
+  const isCountdown = featuredState.kind === 'release_countdown';
+  const releaseEyebrow = isCountdown ? 'New Single' : 'New Release';
+  const releaseCountdown =
+    isCountdown && latestRelease?.releaseDate
+      ? { targetDate: latestRelease.releaseDate, label: 'Drops in' as const }
+      : null;
+  const releaseActionLabel = isCountdown ? 'Notify me' : 'Listen';
+  const releaseActionIcon = isCountdown ? 'Bell' : 'Play';
 
   return (
     <div
@@ -441,7 +449,7 @@ export function ProfileHomeRail({
           <LatestReleaseFeature
             artist={artist}
             latestRelease={latestRelease}
-            isCountdown={featuredState.kind === 'release_countdown'}
+            isCountdown={isCountdown}
             onPlayClick={onPlayClick}
             renderMode={renderMode}
           />
@@ -473,11 +481,7 @@ export function ProfileHomeRail({
               >
                 {card.kind === 'release' && latestRelease ? (
                   <ProfileMediaCard
-                    eyebrow={
-                      featuredState.kind === 'release_countdown'
-                        ? 'New Single'
-                        : 'New Release'
-                    }
+                    eyebrow={releaseEyebrow}
                     title={latestRelease.title}
                     subtitle={getReleaseCardMeta(latestRelease)}
                     imageUrl={resolveImageUrl(
@@ -488,26 +492,12 @@ export function ProfileHomeRail({
                     fallbackVariant='release'
                     accent='purple'
                     ratio='compact'
-                    countdown={
-                      featuredState.kind === 'release_countdown' &&
-                      latestRelease.releaseDate
-                        ? {
-                            targetDate: latestRelease.releaseDate,
-                            label: 'Drops in',
-                          }
-                        : null
-                    }
+                    countdown={releaseCountdown}
                     action={{
-                      label:
-                        featuredState.kind === 'release_countdown'
-                          ? 'Notify me'
-                          : 'Listen',
+                      label: releaseActionLabel,
                       ariaLabel: `Open ${latestRelease.title}`,
                       href: `/${artist.handle}/${latestRelease.slug}`,
-                      icon:
-                        featuredState.kind === 'release_countdown'
-                          ? 'Bell'
-                          : 'Play',
+                      icon: releaseActionIcon,
                     }}
                     dataTestId='profile-home-rail-release'
                     className='[@media(max-height:880px)]:[&>div:first-child]:aspect-[1.35/1] [@media(max-height:880px)]:[&>div:last-child]:p-1'
