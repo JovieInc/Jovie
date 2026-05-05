@@ -223,6 +223,27 @@ describe('sendPendingNotifications', () => {
     );
   });
 
+  it('short-circuits and skips batch fetches when no pending notifications are due', async () => {
+    // Reset the default `mockReturnValueOnce` chain set up in beforeEach, then wire
+    // a single empty-results chain for fetchPendingNotifications. The fix in the
+    // route swaps `drizzleSql\`x = ANY(${ids})\`` for `inArray(x, ids)` in the
+    // batch-fetch helpers, but the empty short-circuit must continue to skip
+    // those queries entirely so node-postgres never sees an empty UUID array.
+    mockDbSelect.mockReset();
+    mockDbSelect.mockReturnValueOnce(createPendingNotificationsChain([]));
+
+    const { sendPendingNotifications } = await import(
+      '@/app/api/cron/send-release-notifications/route'
+    );
+
+    const result = await sendPendingNotifications();
+
+    expect(result).toEqual({ sent: 0, failed: 0, skipped: 0, processed: 0 });
+    expect(mockGetBatchCreatorEntitlements).not.toHaveBeenCalled();
+    // Only the pending-lookup select should have run; no batch fetches issued.
+    expect(mockDbSelect).toHaveBeenCalledTimes(1);
+  });
+
   it('skips notifications for creators without send entitlement', async () => {
     // Override the rejected entitlements to return a result with canSendNotifications: false.
     // Shape must match getBatchCreatorEntitlements return: { plan, entitlements: { booleans: {...} } }
