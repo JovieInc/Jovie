@@ -40,6 +40,10 @@ overrides:
   '@vercel/microfrontends': 2.3.2
   follow-redirects: 1.16.0
   '@clerk/ui>@floating-ui/react': 0.27.19
+  '@clerk/react>@clerk/shared': 4.8.5
+  '@clerk/localizations>@clerk/shared': 4.8.5
+  '@clerk/testing>@clerk/backend': 3.4.1
+  '@clerk/testing>@clerk/shared': 4.8.5
   tar: 7.5.13
   '@tootallnate/once': 3.0.1
   smol-toml: 1.6.1
@@ -438,8 +442,8 @@ importers:
         specifier: ^6.7.7
         version: 6.7.7(@solana/web3.js@1.98.4(bufferutil@4.1.0)(typescript@6.0.3)(utf-8-validate@6.0.6))(@types/react@19.2.14)(bs58@6.0.0)(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(immer@11.1.4)(react-dom@19.2.4(react@19.2.4))(react-native@0.83.1(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.4)(utf-8-validate@6.0.6))(react@19.2.4)(typescript@6.0.3)(use-sync-external-store@1.6.0(react@19.2.4))(utf-8-validate@6.0.6)(zod@4.3.6)
       '@clerk/testing':
-        specifier: ^2.0.21
-        version: 2.0.21(@playwright/test@1.58.2)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+        specifier: ^2.0.24
+        version: 2.0.24(@playwright/test@1.58.2)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@lhci/cli':
         specifier: ^0.15.1
         version: 0.15.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
@@ -1079,8 +1083,8 @@ packages:
       react-dom:
         optional: true
 
-  '@clerk/testing@2.0.21':
-    resolution: {integrity: sha512-LlpWQyk0cH/jpNgwuUgXYQi9FrsfzzM+VupBi1HRl7rT2Faf5vzSsoOfiHoUJjxdCgO0NIL5K1fjENrVGPUOsA==}
+  '@clerk/testing@2.0.24':
+    resolution: {integrity: sha512-M0oafQaCenpkt9JiLzheE4nfv5Waota0bYV99HF6EpDcib1Y+Idn+C35A6bLjxMwVAbPK6JtelXWsci5ViG+mg==}
     engines: {node: '>=20.9.0'}
     peerDependencies:
       '@playwright/test': ^1
@@ -12989,7 +12993,7 @@ snapshots:
       react: 19.2.4
       react-dom: 19.2.4(react@19.2.4)
 
-  '@clerk/testing@2.0.21(@playwright/test@1.58.2)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
+  '@clerk/testing@2.0.24(@playwright/test@1.58.2)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
     dependencies:
       '@clerk/backend': 3.4.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@clerk/shared': 4.8.5(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
