@@ -77,23 +77,23 @@ function SplitLayoutContent({
         designV1 ? 'max-w-[1160px]' : 'max-w-[1240px]'
       )}
     >
-      <div className='grid w-full gap-6 lg:min-h-[calc(100svh-7.5rem)] lg:grid-cols-[minmax(0,500px)_minmax(0,1fr)] lg:items-stretch lg:gap-7 xl:gap-10'>
-        <div className='flex min-h-0 flex-col justify-center lg:max-w-[500px] lg:justify-start lg:pt-16 lg:pb-6 xl:pt-20'>
+      <div className='grid w-full gap-4 lg:min-h-[calc(100svh-7.5rem)] lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)] lg:items-stretch lg:gap-6 xl:gap-8'>
+        <div className='flex min-h-0 flex-col justify-center lg:max-w-[420px] lg:justify-start lg:pt-10 lg:pb-4 xl:pt-12'>
           {showLogo ? (
             <div
               className={cn(
-                'mb-5 flex justify-center transition-opacity duration-200 ease-out lg:mb-6 lg:justify-start',
+                'mb-6 flex justify-center transition-opacity duration-200 ease-out lg:mb-8 lg:justify-start',
                 isKeyboardVisible && 'pointer-events-none opacity-0'
               )}
               aria-hidden={isKeyboardVisible}
             >
               <Link
                 href='/'
-                className='inline-flex items-center justify-center text-white/92 transition-colors duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20'
+                className='inline-flex items-center justify-center text-white/40 transition-colors duration-200 hover:text-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20'
                 aria-label='Go to homepage'
                 tabIndex={isKeyboardVisible ? -1 : undefined}
               >
-                <BrandLogo size={20} tone='white' aria-hidden />
+                <BrandLogo size={16} tone='auto' aria-hidden />
               </Link>
             </div>
           ) : null}
@@ -102,7 +102,7 @@ function SplitLayoutContent({
             <h1
               className={cn(
                 formTitleClassName,
-                'mb-8 text-center transition-all duration-200 ease-out lg:text-left',
+                'mb-6 text-center transition-all duration-200 ease-out lg:text-left',
                 isKeyboardVisible && 'mb-0 h-0 overflow-hidden opacity-0'
               )}
               aria-hidden={isKeyboardVisible}
@@ -117,13 +117,13 @@ function SplitLayoutContent({
             tabIndex={-1}
             className='w-full scroll-mt-4'
           >
-            <div className='mx-auto w-full max-w-[500px] lg:mx-0'>
+            <div className='mx-auto w-full max-w-[420px] lg:mx-0'>
               {children}
             </div>
           </main>
 
           {showFooterPrompt && !isKeyboardVisible ? (
-            <p className='mt-6 text-center text-app font-normal text-white/58 animate-in fade-in-0 duration-200 lg:text-left'>
+            <p className='mt-5 text-center text-app font-normal text-white/58 animate-in fade-in-0 duration-200 lg:text-left'>
               {footerPrompt}{' '}
               <Link
                 href={footerLinkHref}
@@ -137,10 +137,7 @@ function SplitLayoutContent({
 
         {showLogo ? (
           <div className='auth-desktop-only w-full lg:flex lg:min-h-full lg:justify-self-end'>
-            <AuthBrandPanel
-              variant={designV1 ? 'v1' : showcaseVariant}
-              className='ml-auto h-full w-full max-w-[620px]'
-            />
+            <AuthBrandPanel className='ml-auto h-full w-full max-w-[620px]' />
           </div>
         ) : null}
       </div>
