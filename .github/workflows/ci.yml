@@ -2886,6 +2886,14 @@ jobs:
           secrets: ${{ toJSON(secrets) }}
       - name: Pull env (preview)
         run: ./node_modules/.bin/vercel pull --yes --environment=preview --token ${{ secrets.VERCEL_TOKEN }}
+      - name: Strip deprecated Turbo env overrides (preview)
+        run: |
+          for env_file in .vercel/.env.preview.local .vercel/.env.local; do
+            if [ -f "$env_file" ]; then
+              grep -v '^TURBO_REMOTE_ONLY=' "$env_file" > "${env_file}.tmp" || true
+              mv "${env_file}.tmp" "$env_file"
+            fi
+          done
       - name: Build (PR preview)
         run: ./node_modules/.bin/vercel build --token ${{ secrets.VERCEL_TOKEN }}
         env:
@@ -3459,6 +3467,14 @@ jobs:
           secrets: ${{ toJSON(secrets) }}
       - name: Pull env (production)
         run: ./node_modules/.bin/vercel pull --yes --environment=production --token ${{ secrets.VERCEL_TOKEN }}
+      - name: Strip deprecated Turbo env overrides (production)
+        run: |
+          for env_file in .vercel/.env.production.local .vercel/.env.local; do
+            if [ -f "$env_file" ]; then
+              grep -v '^TURBO_REMOTE_ONLY=' "$env_file" > "${env_file}.tmp" || true
+              mv "${env_file}.tmp" "$env_file"
+            fi
+          done
       - name: Build (preview target for staging verification)
         run: ./node_modules/.bin/vercel build --token ${{ secrets.VERCEL_TOKEN }}
         env:
