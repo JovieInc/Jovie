@@ -110,89 +110,74 @@ export type RuleEvaluation = {
   reasons: string[];
 };
 
+function matchResult(matched: boolean, reason: string): RuleEvaluation {
+  return { matched, reasons: matched ? [reason] : [] };
+}
+
 export function compileRule(
   predicate: ApplicabilityPredicate
 ): (ctx: ReleaseContext) => RuleEvaluation {
   return (ctx: ReleaseContext) => evaluate(predicate, ctx);
 }
 
-function evaluate(
+function evaluateLeaf(
+  predicate: ApplicabilityPredicate,
+  ctx: ReleaseContext
+): RuleEvaluation | null {
+  switch (predicate.type) {
+    case 'always':
+      return { matched: true, reasons: ['always'] };
+    case 'genre': {
+      const inList = predicate.values.includes(ctx.genre);
+      const matched = predicate.op === 'in' ? inList : !inList;
+      return matchResult(
+        matched,
+        `genre ${predicate.op} ${predicate.values.join(',')}`
+      );
+    }
+    case 'distribution': {
+      const eq = ctx.distribution === predicate.value;
+      const matched = predicate.op === 'eq' ? eq : !eq;
+      return matchResult(
+        matched,
+        `distribution ${predicate.op} ${predicate.value}`
+      );
+    }
+    case 'territory':
+      return matchResult(
+        predicate.values.some(t => ctx.territory.includes(t)),
+        `territory includes ${predicate.values.join(',')}`
+      );
+    case 'hasPublisher':
+      return matchResult(
+        ctx.hasPublisher === predicate.value,
+        `hasPublisher=${predicate.value}`
+      );
+    case 'releaseFormat':
+      return matchResult(
+        predicate.values.includes(ctx.releaseFormat),
+        `releaseFormat in ${predicate.values.join(',')}`
+      );
+    case 'primaryGoal':
+      return matchResult(
+        predicate.values.includes(ctx.primaryGoal),
+        `primaryGoal in ${predicate.values.join(',')}`
+      );
+    default:
+      return null;
+  }
+}
+
+function evaluateComposite(
   predicate: ApplicabilityPredicate,
   ctx: ReleaseContext
 ): RuleEvaluation {
   switch (predicate.type) {
-    case 'always':
-      return { matched: true, reasons: ['always'] };
-
-    case 'genre': {
-      const inList = predicate.values.includes(ctx.genre);
-      const matched = predicate.op === 'in' ? inList : !inList;
-      return {
-        matched,
-        reasons: matched
-          ? [`genre ${predicate.op} ${predicate.values.join(',')}`]
-          : [],
-      };
-    }
-
-    case 'distribution': {
-      const eq = ctx.distribution === predicate.value;
-      const matched = predicate.op === 'eq' ? eq : !eq;
-      return {
-        matched,
-        reasons: matched
-          ? [`distribution ${predicate.op} ${predicate.value}`]
-          : [],
-      };
-    }
-
-    case 'territory': {
-      const matched = predicate.values.some(t => ctx.territory.includes(t));
-      return {
-        matched,
-        reasons: matched
-          ? [`territory includes ${predicate.values.join(',')}`]
-          : [],
-      };
-    }
-
-    case 'hasPublisher': {
-      const matched = ctx.hasPublisher === predicate.value;
-      return {
-        matched,
-        reasons: matched ? [`hasPublisher=${predicate.value}`] : [],
-      };
-    }
-
-    case 'releaseFormat': {
-      const matched = predicate.values.includes(ctx.releaseFormat);
-      return {
-        matched,
-        reasons: matched
-          ? [`releaseFormat in ${predicate.values.join(',')}`]
-          : [],
-      };
-    }
-
-    case 'primaryGoal': {
-      const matched = predicate.values.includes(ctx.primaryGoal);
-      return {
-        matched,
-        reasons: matched
-          ? [`primaryGoal in ${predicate.values.join(',')}`]
-          : [],
-      };
-    }
-
     case 'and': {
       const evals = predicate.rules.map(r => evaluate(r, ctx));
       const matched = evals.every(e => e.matched);
-      return {
-        matched,
-        reasons: matched ? evals.flatMap(e => e.reasons) : [],
-      };
+      return { matched, reasons: matched ? evals.flatMap(e => e.reasons) : [] };
     }
-
     case 'or': {
       const evals = predicate.rules.map(r => evaluate(r, ctx));
       const matched = evals.some(e => e.matched);
@@ -203,15 +188,20 @@ function evaluate(
           : [],
       };
     }
-
     case 'not': {
       const inner = evaluate(predicate.rule, ctx);
-      return {
-        matched: !inner.matched,
-        reasons: inner.matched ? [] : ['not'],
-      };
+      return { matched: !inner.matched, reasons: inner.matched ? [] : ['not'] };
     }
+    default:
+      return { matched: false, reasons: [] };
   }
+}
+
+function evaluate(
+  predicate: ApplicabilityPredicate,
+  ctx: ReleaseContext
+): RuleEvaluation {
+  return evaluateLeaf(predicate, ctx) ?? evaluateComposite(predicate, ctx);
 }
 
 export function parseApplicabilityRule(raw: unknown): ApplicabilityPredicate {
