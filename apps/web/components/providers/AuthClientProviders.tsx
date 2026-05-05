@@ -16,6 +16,7 @@ import {
   isPublicAuthHost,
   shouldBypassClerk,
 } from './clerkAvailability';
+import { authClerkLocalization } from './clerkLocalization';
 import { QueryProvider } from './QueryProvider';
 
 interface AuthClientProvidersProps {
@@ -70,6 +71,7 @@ export function AuthClientProviders({
       publishableKey={publishableKey}
       proxyUrl={getClerkProxyUrl(globalThis.location)}
       appearance={authClerkAppearance}
+      localization={authClerkLocalization}
       ui={ui}
       signInUrl={APP_ROUTES.SIGNIN}
       signUpUrl={APP_ROUTES.SIGNUP}

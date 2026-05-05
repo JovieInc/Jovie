@@ -171,6 +171,11 @@
   text-wrap: pretty;
 }
 
+/* Collapse the empty subtitle from our terse localization. */
+:is(.cl-signIn-root, .cl-signUp-root) .cl-headerSubtitle:empty {
+  display: none;
+}
+
 :is(.cl-signIn-root, .cl-signUp-root) .cl-formHeaderTitle {
   color: var(--clerk-color-foreground);
   font-size: 1.35rem;
