@@ -392,11 +392,132 @@ async function noteUnrecognizedFromPhone(phone: string): Promise<void> {
   });
 }
 
+async function handleStopCommand(
+  message: InboundSmsMessage,
+  command: { kind: 'stop'; rawToken: string },
+  providerEventId: string
+): Promise<WebhookHandleResult> {
+  const phoneNorm = normalizePhoneE164(message.fromPhone);
+  if (phoneNorm) {
+    await suppressPhoneForStop(phoneNorm, {
+      source: 'twilio_inbound_stop',
+      providerEventId,
+      rawCommand: command.rawToken,
+    });
+  }
+  return {
+    status: 200,
+    kind: 'stop_applied',
+    outboundReply: phoneNorm
+      ? { to: phoneNorm, body: STOP_REPLY_TEXT }
+      : undefined,
+  };
+}
+
+function handleHelpCommand(message: InboundSmsMessage): WebhookHandleResult {
+  return {
+    status: 200,
+    kind: 'help_replied',
+    outboundReply: {
+      to: normalizePhoneE164(message.fromPhone) ?? message.fromPhone,
+      body: HELP_REPLY_TEXT,
+    },
+  };
+}
+
+async function handleStartCommand(
+  message: InboundSmsMessage,
+  providerEventId: string
+): Promise<WebhookHandleResult> {
+  const phoneNorm = normalizePhoneE164(message.fromPhone);
+  if (!phoneNorm) {
+    return { status: 200, kind: 'reactivate_unknown' };
+  }
+  const result = await reactivatePhoneAfterVerifiedOptIn(phoneNorm, {
+    source: 'twilio_inbound_start',
+    consentTextHash: getSmsConsentTextHash(),
+    consentVersion: SMS_CONSENT_VERSION,
+    providerEventId,
+  });
+  return {
+    status: 200,
+    kind: result.contactId ? 'reactivated' : 'reactivate_unknown',
+  };
+}
+
+async function handleJoinCommand(
+  message: InboundSmsMessage,
+  command: { kind: 'join'; code: string },
+  providerEventId: string,
+  nativeSmsEnabled: boolean
+): Promise<WebhookHandleResult> {
+  if (!nativeSmsEnabled) {
+    return { status: 200, kind: 'join_disabled' };
+  }
+  const phoneNorm = normalizePhoneE164(message.fromPhone);
+  if (!phoneNorm) {
+    return { status: 400, kind: 'malformed' };
+  }
+
+  const confirmResult = await confirmSubscriptionFromIntent({
+    code: command.code,
+    fromPhone: phoneNorm,
+    providerName: message.provider,
+    providerEventId,
+    source: SMS_NATIVE_INTENT_SOURCE,
+    sourceUrl: null,
+  });
+
+  if (confirmResult.kind === 'join_confirmed') {
+    logger.info('SMS subscription confirmed', {
+      phone: logSafePhone(phoneNorm),
+      code: logSafeCode(command.code),
+      intentId: confirmResult.intentId,
+      creatorProfileId: confirmResult.creatorProfileId,
+    });
+    return { status: 200, kind: 'join_confirmed' };
+  }
+
+  if (confirmResult.kind === 'error') {
+    return { status: 500, kind: 'error' };
+  }
+
+  // Cross-phone replay polite reject (codex ENG-N6) — give the fan a
+  // hint instead of silence, but never modify any subscription.
+  return {
+    status: 200,
+    kind: confirmResult.kind,
+    outboundReply: {
+      to: phoneNorm,
+      body: CODE_NOT_FOUND_REPLY_TEXT,
+    },
+  };
+}
+
+async function handleUnknownCommand(
+  message: InboundSmsMessage
+): Promise<WebhookHandleResult> {
+  // Log to provide a polling-side recovery hint and reply
+  // with the help template so the fan isn't stranded.
+  await noteUnrecognizedFromPhone(message.fromPhone);
+  return {
+    status: 200,
+    kind: 'unknown_command',
+    outboundReply: {
+      to: normalizePhoneE164(message.fromPhone) ?? message.fromPhone,
+      body: HELP_REPLY_TEXT,
+    },
+  };
+}
+
 /**
  * Top-level dispatch from the route layer. Caller passes the verified
  * inbound + dedupe result; this function applies the command, with the
  * critical TCPA invariant: STOP/HELP/STOPALL etc. process regardless of
  * any feature flags (decision row #40 / F15).
+ *
+ * Each command branch is extracted into a dedicated handler so this stays
+ * a thin router (Sonar S3776).
  */
 export async function handleVerifiedInbound(input: {
   verified: VerifiedInbound;
@@ -407,107 +528,23 @@ export async function handleVerifiedInbound(input: {
   const command = parseInboundCommand(message.body);
 
   try {
-    if (command.kind === 'stop') {
-      const phoneNorm = normalizePhoneE164(message.fromPhone);
-      if (phoneNorm) {
-        await suppressPhoneForStop(phoneNorm, {
-          source: 'twilio_inbound_stop',
+    switch (command.kind) {
+      case 'stop':
+        return await handleStopCommand(message, command, providerEventId);
+      case 'help':
+        return handleHelpCommand(message);
+      case 'start':
+        return await handleStartCommand(message, providerEventId);
+      case 'join':
+        return await handleJoinCommand(
+          message,
+          command,
           providerEventId,
-          rawCommand: command.rawToken,
-        });
-      }
-      return {
-        status: 200,
-        kind: 'stop_applied',
-        outboundReply: phoneNorm
-          ? { to: phoneNorm, body: STOP_REPLY_TEXT }
-          : undefined,
-      };
+          input.nativeSmsEnabled
+        );
+      default:
+        return await handleUnknownCommand(message);
     }
-
-    if (command.kind === 'help') {
-      return {
-        status: 200,
-        kind: 'help_replied',
-        outboundReply: {
-          to: normalizePhoneE164(message.fromPhone) ?? message.fromPhone,
-          body: HELP_REPLY_TEXT,
-        },
-      };
-    }
-
-    if (command.kind === 'start') {
-      const phoneNorm = normalizePhoneE164(message.fromPhone);
-      if (!phoneNorm) {
-        return { status: 200, kind: 'reactivate_unknown' };
-      }
-      const result = await reactivatePhoneAfterVerifiedOptIn(phoneNorm, {
-        source: 'twilio_inbound_start',
-        consentTextHash: getSmsConsentTextHash(),
-        consentVersion: SMS_CONSENT_VERSION,
-        providerEventId,
-      });
-      return {
-        status: 200,
-        kind: result.contactId ? 'reactivated' : 'reactivate_unknown',
-      };
-    }
-
-    if (command.kind === 'join') {
-      if (!input.nativeSmsEnabled) {
-        return { status: 200, kind: 'join_disabled' };
-      }
-      const phoneNorm = normalizePhoneE164(message.fromPhone);
-      if (!phoneNorm) {
-        return { status: 400, kind: 'malformed' };
-      }
-
-      const confirmResult = await confirmSubscriptionFromIntent({
-        code: command.code,
-        fromPhone: phoneNorm,
-        providerName: message.provider,
-        providerEventId,
-        source: SMS_NATIVE_INTENT_SOURCE,
-        sourceUrl: null,
-      });
-
-      if (confirmResult.kind === 'join_confirmed') {
-        logger.info('SMS subscription confirmed', {
-          phone: logSafePhone(phoneNorm),
-          code: logSafeCode(command.code),
-          intentId: confirmResult.intentId,
-          creatorProfileId: confirmResult.creatorProfileId,
-        });
-        return { status: 200, kind: 'join_confirmed' };
-      }
-
-      if (confirmResult.kind === 'error') {
-        return { status: 500, kind: 'error' };
-      }
-
-      // Cross-phone replay polite reject (codex ENG-N6) — give the fan a
-      // hint instead of silence, but never modify any subscription.
-      return {
-        status: 200,
-        kind: confirmResult.kind,
-        outboundReply: {
-          to: phoneNorm,
-          body: CODE_NOT_FOUND_REPLY_TEXT,
-        },
-      };
-    }
-
-    // Unknown text. Log to provide a polling-side recovery hint and reply
-    // with the help template so the fan isn't stranded.
-    await noteUnrecognizedFromPhone(message.fromPhone);
-    return {
-      status: 200,
-      kind: 'unknown_command',
-      outboundReply: {
-        to: normalizePhoneE164(message.fromPhone) ?? message.fromPhone,
-        body: HELP_REPLY_TEXT,
-      },
-    };
   } catch (error) {
     captureCriticalError('SMS webhook handler error', error, {
       providerEventId,
