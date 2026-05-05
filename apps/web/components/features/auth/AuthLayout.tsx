@@ -241,13 +241,11 @@ export function AuthLayout({
       data-auth-layout-variant={layoutVariant}
       data-design-v1-auth={designV1 ? 'true' : 'false'}
       className={cn(
-        'fixed inset-0 isolate flex flex-col items-center overflow-y-auto overflow-x-clip overscroll-none max-w-[100dvw] text-white [color-scheme:dark]',
+        'fixed inset-0 isolate flex flex-col items-center overflow-hidden overscroll-none max-w-[100dvw] text-white [color-scheme:dark]',
         designV1 ? 'bg-[#06070a]' : 'bg-[#08090a]',
         'px-4 sm:px-6',
-        isKeyboardVisible
-          ? 'pt-8 pb-4'
-          : 'pt-10 pb-10 sm:pt-14 sm:pb-12 lg:pt-16',
-        'pb-[max(1.5rem,env(safe-area-inset-bottom))]',
+        isKeyboardVisible ? 'pt-6 pb-2' : 'pt-8 pb-6 sm:pt-10 sm:pb-8 lg:pt-12',
+        'pb-[max(1rem,env(safe-area-inset-bottom))]',
         'pl-[max(1rem,env(safe-area-inset-left))]',
         'pr-[max(1rem,env(safe-area-inset-right))]',
         'transition-[padding] duration-200 ease-out'
