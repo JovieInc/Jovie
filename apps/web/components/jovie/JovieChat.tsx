@@ -29,6 +29,20 @@ import type { JovieChatProps, MessagePart } from './types';
 const THINKING_PLACEHOLDER_ID = 'thinking-placeholder';
 const VIRTUALIZATION_THRESHOLD = 12;
 
+function findLastAssistantIndex(
+  messages: readonly { id: string; role: string }[]
+): number {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (
+      messages[i].role === 'assistant' &&
+      messages[i].id !== THINKING_PLACEHOLDER_ID
+    ) {
+      return i;
+    }
+  }
+  return -1;
+}
+
 export function JovieChat({
   profileId,
   artistContext, // NOSONAR - intentional backward compatibility for deprecated prop
@@ -293,17 +307,7 @@ export function JovieChat({
     virtualizer,
   ]);
 
-  // Find the last real assistant message index for streaming cursor
-  let lastAssistantIndex = -1;
-  for (let i = displayMessages.length - 1; i >= 0; i--) {
-    if (
-      displayMessages[i].role === 'assistant' &&
-      displayMessages[i].id !== THINKING_PLACEHOLDER_ID
-    ) {
-      lastAssistantIndex = i;
-      break;
-    }
-  }
+  const lastAssistantIndex = findLastAssistantIndex(displayMessages);
 
   const isStreaming = status === 'streaming';
 

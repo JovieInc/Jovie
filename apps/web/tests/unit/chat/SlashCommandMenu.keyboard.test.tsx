@@ -16,6 +16,10 @@ import type { SkillCommand } from '@/lib/commands/registry';
  * ChatInput) so each assertion is local to the listener contract.
  */
 
+const { mockUseEventsQuery } = vi.hoisted(() => ({
+  mockUseEventsQuery: vi.fn(),
+}));
+
 vi.mock('@/lib/queries/useReleasesQuery', () => ({
   useReleasesQuery: () => ({ data: [], isLoading: false }),
 }));
@@ -26,6 +30,10 @@ vi.mock('@/lib/queries/useArtistSearchQuery', () => ({
     state: 'idle' as const,
     search: vi.fn(),
   }),
+}));
+
+vi.mock('@/lib/queries/useEventsQuery', () => ({
+  useEventsQuery: mockUseEventsQuery,
 }));
 
 function withProviders(ui: ReactNode) {
@@ -81,6 +89,9 @@ function renderMenu(state: PickerState, handlers: Handlers) {
     )
   );
 }
+
+// Default mock: no events. Individual /event-mode tests override below.
+mockUseEventsQuery.mockReturnValue({ data: [], isLoading: false });
 
 describe('SlashCommandMenu keyboard + IME + ARIA', () => {
   it('renders a listbox with role=option rows for each skill', () => {
@@ -218,6 +229,48 @@ describe('SlashCommandMenu keyboard + IME + ARIA', () => {
     // The first option's id should match what was reported.
     const options = screen.getAllByRole('option');
     expect(options[0]).toHaveAttribute('id', 'test-list-id-row-0');
+  });
+
+  it('renders an "Event" header (not "Track") in /event entity mode', () => {
+    mockUseEventsQuery.mockReturnValue({ data: [], isLoading: false });
+    const handlers = makeHandlers();
+    const state: PickerState = {
+      status: 'entity',
+      kind: 'event',
+      query: '',
+      startIdx: 0,
+      selectedIndex: 0,
+    };
+    renderMenu(state, handlers);
+    expect(screen.getByText(/^Event$/)).toBeInTheDocument();
+  });
+
+  it('renders backed event rows from useEventsQuery', () => {
+    mockUseEventsQuery.mockReturnValue({
+      data: [
+        {
+          id: 'evt_brooklyn',
+          title: 'Brooklyn Steel',
+          subtitle: 'Brooklyn, NY · Bandsintown',
+          eventDate: '2026-06-12T23:30:00.000Z',
+          eventType: 'tour' as const,
+          venue: 'Brooklyn Steel',
+          city: 'Brooklyn, NY',
+          provider: 'Bandsintown',
+        },
+      ],
+      isLoading: false,
+    });
+    const handlers = makeHandlers();
+    const state: PickerState = {
+      status: 'entity',
+      kind: 'event',
+      query: 'Brooklyn',
+      startIdx: 0,
+      selectedIndex: 0,
+    };
+    renderMenu(state, handlers);
+    expect(screen.getByText('Brooklyn Steel')).toBeInTheDocument();
   });
 
   it('exposes EntityRef typed result on entity commit', () => {

@@ -124,21 +124,9 @@ function extractTitle(html: string): string | undefined {
   return sanitized || undefined;
 }
 
-async function readBodyWithCap(response: Response): Promise<string | null> {
-  const contentLength = response.headers.get('content-length');
-  if (contentLength) {
-    const length = Number(contentLength);
-    if (Number.isFinite(length) && length > MAX_BYTES) {
-      return null;
-    }
-  }
-
-  const reader = response.body?.getReader();
-  if (!reader) {
-    const text = await response.text();
-    return text.length > MAX_BYTES ? null : text;
-  }
-
+async function readStreamChunks(
+  reader: ReadableStreamDefaultReader<Uint8Array>
+): Promise<{ chunks: Uint8Array[]; total: number } | null> {
   const chunks: Uint8Array[] = [];
   let total = 0;
   while (true) {
@@ -156,15 +144,20 @@ async function readBodyWithCap(response: Response): Promise<string | null> {
     }
     chunks.push(value);
   }
+  return { chunks, total };
+}
 
+function mergeAndDecode(
+  chunks: Uint8Array[],
+  total: number,
+  contentType: string
+): string {
   const merged = new Uint8Array(total);
   let offset = 0;
   for (const chunk of chunks) {
     merged.set(chunk, offset);
     offset += chunk.byteLength;
   }
-  // Decode using charset from Content-Type when present, default UTF-8.
-  const contentType = response.headers.get('content-type') ?? '';
   const charsetMatch = /charset=([^;]+)/i.exec(contentType);
   const charset = charsetMatch?.[1]?.trim().toLowerCase() ?? 'utf-8';
   try {
@@ -172,6 +165,31 @@ async function readBodyWithCap(response: Response): Promise<string | null> {
   } catch {
     return new TextDecoder('utf-8', { fatal: false }).decode(merged);
   }
+}
+
+async function readBodyWithCap(response: Response): Promise<string | null> {
+  const contentLength = response.headers.get('content-length');
+  if (contentLength) {
+    const length = Number(contentLength);
+    if (Number.isFinite(length) && length > MAX_BYTES) {
+      return null;
+    }
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) {
+    const text = await response.text();
+    return new TextEncoder().encode(text).byteLength > MAX_BYTES ? null : text;
+  }
+
+  const result = await readStreamChunks(reader);
+  if (!result) return null;
+
+  return mergeAndDecode(
+    result.chunks,
+    result.total,
+    response.headers.get('content-type') ?? ''
+  );
 }
 
 function classifyContentType(response: Response): SafeFetchError | null {

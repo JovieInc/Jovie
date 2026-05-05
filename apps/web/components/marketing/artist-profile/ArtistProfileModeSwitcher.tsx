@@ -1,6 +1,6 @@
 'use client';
 
-import { SegmentControl, type SegmentControlOption } from '@jovie/ui';
+import { SegmentControl, type SegmentControlOption, Tabs } from '@jovie/ui';
 import { AnimatePresence, motion } from 'motion/react';
 import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -14,6 +14,7 @@ interface ArtistProfileModeSwitcherProps {
   readonly phoneCaption: string;
   readonly phoneSubcaption: string;
   readonly showIntroHeading?: boolean;
+  readonly showForgeUiMarketingUpdates?: boolean;
 }
 
 export function ArtistProfileModeSwitcher({
@@ -21,6 +22,7 @@ export function ArtistProfileModeSwitcher({
   phoneCaption,
   phoneSubcaption,
   showIntroHeading = true,
+  showForgeUiMarketingUpdates = false,
 }: Readonly<ArtistProfileModeSwitcherProps>) {
   const rootRef = useRef<HTMLDivElement>(null);
   const sequenceTimersRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
@@ -32,12 +34,12 @@ export function ArtistProfileModeSwitcher({
   const [tabsVisible, setTabsVisible] = useState(reducedMotion);
   const activeMode =
     activeIndex === null ? null : (adaptive.modes[activeIndex] ?? null);
+  const selectedModeId = activeMode?.id ?? '__resting__';
   const modeOptions: readonly SegmentControlOption<string>[] =
     adaptive.modes.map(mode => ({
       value: mode.id,
       label: mode.label,
     }));
-  const selectedModeId = activeMode?.id ?? '__resting__';
 
   const clearSequenceTimers = useCallback(() => {
     for (const timer of sequenceTimersRef.current) {
@@ -142,12 +144,12 @@ export function ArtistProfileModeSwitcher({
           }}
         >
           <div className='min-h-[4.5rem] sm:min-h-[5.1rem]'>
-            <h2 className='mx-auto max-w-[11ch] text-[clamp(2.7rem,5.25vw,4.6rem)] font-[650] leading-[0.94] tracking-[-0.072em] text-primary-token'>
+            <h2 className='mx-auto max-w-[11ch] text-[2.7rem] font-[650] leading-[0.94] tracking-normal text-primary-token sm:text-[3.8rem] lg:text-[4.6rem]'>
               {phoneCaption}
             </h2>
           </div>
           <div className='min-h-[2.3rem]'>
-            <p className='mt-1.5 text-[clamp(0.9rem,1.2vw,1rem)] font-medium leading-[1.28] tracking-[-0.03em] text-secondary-token'>
+            <p className='mt-1.5 text-[0.9rem] font-medium leading-[1.28] tracking-normal text-secondary-token sm:text-[1rem]'>
               {phoneSubcaption}
             </p>
           </div>
@@ -206,29 +208,50 @@ export function ArtistProfileModeSwitcher({
           className='pointer-events-none absolute inset-x-10 top-1/2 h-8 -translate-y-1/2 rounded-full bg-white/[0.08] blur-2xl'
         />
         <div className='w-full pb-1'>
-          <SegmentControl
-            value={selectedModeId}
-            onValueChange={nextModeId => {
-              manualSelectionRef.current = true;
-              clearSequenceTimers();
-              setTabsVisible(true);
+          {showForgeUiMarketingUpdates ? (
+            <AnimatedProfileModeTabs
+              modes={adaptive.modes}
+              reducedMotion={reducedMotion}
+              value={selectedModeId}
+              onValueChange={nextModeId => {
+                manualSelectionRef.current = true;
+                clearSequenceTimers();
+                setTabsVisible(true);
 
-              const nextIndex = adaptive.modes.findIndex(
-                mode => mode.id === nextModeId
-              );
+                const nextIndex = adaptive.modes.findIndex(
+                  mode => mode.id === nextModeId
+                );
 
-              if (nextIndex >= 0) {
-                setActiveIndex(nextIndex);
-              }
-            }}
-            options={modeOptions}
-            variant='linear-pill'
-            layout='fill'
-            size='sm'
-            aria-label='Profile modes'
-            className='mx-auto w-full supports-[backdrop-filter]:backdrop-blur-xl'
-            triggerClassName='min-h-11 min-w-0 px-2.5 data-[state=active]:!text-white sm:px-3.5'
-          />
+                if (nextIndex >= 0) {
+                  setActiveIndex(nextIndex);
+                }
+              }}
+            />
+          ) : (
+            <SegmentControl
+              value={selectedModeId}
+              onValueChange={nextModeId => {
+                manualSelectionRef.current = true;
+                clearSequenceTimers();
+                setTabsVisible(true);
+
+                const nextIndex = adaptive.modes.findIndex(
+                  mode => mode.id === nextModeId
+                );
+
+                if (nextIndex >= 0) {
+                  setActiveIndex(nextIndex);
+                }
+              }}
+              options={modeOptions}
+              variant='linear-pill'
+              layout='fill'
+              size='sm'
+              aria-label='Profile modes'
+              className='mx-auto w-full supports-[backdrop-filter]:backdrop-blur-xl'
+              triggerClassName='min-h-11 min-w-0 px-2.5 data-[state=active]:!text-white sm:px-3.5'
+            />
+          )}
         </div>
       </div>
 
@@ -237,7 +260,7 @@ export function ArtistProfileModeSwitcher({
           {activeMode ? (
             <motion.p
               key={activeMode.id}
-              className='absolute inset-x-0 text-balance text-[14px] font-medium leading-[1.34] tracking-[-0.03em] text-white/86 sm:text-[15px]'
+              className='absolute inset-x-0 text-balance text-[14px] font-medium leading-[1.34] tracking-normal text-white/86 sm:text-[15px]'
               initial={false}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -299,5 +322,100 @@ export function ArtistProfileModeSwitcher({
         }
       `}</style>
     </div>
+  );
+}
+
+function AnimatedProfileModeTabs({
+  modes,
+  onValueChange,
+  reducedMotion,
+  value,
+}: Readonly<{
+  modes: ArtistProfileLandingCopy['adaptive']['modes'];
+  onValueChange: (value: string) => void;
+  reducedMotion: boolean;
+  value: string;
+}>) {
+  const selectModeFromKey = (currentModeId: string, key: string) => {
+    const currentIndex = modes.findIndex(mode => mode.id === currentModeId);
+    if (currentIndex < 0) {
+      return false;
+    }
+
+    if (key === 'Home') {
+      onValueChange(modes[0]?.id ?? currentModeId);
+      return true;
+    }
+
+    if (key === 'End') {
+      onValueChange(modes.at(-1)?.id ?? currentModeId);
+      return true;
+    }
+
+    if (key !== 'ArrowRight' && key !== 'ArrowLeft') {
+      return false;
+    }
+
+    const direction = key === 'ArrowRight' ? 1 : -1;
+    const nextIndex = (currentIndex + direction + modes.length) % modes.length;
+    onValueChange(modes[nextIndex]?.id ?? currentModeId);
+    return true;
+  };
+
+  return (
+    <Tabs.Root
+      value={value}
+      onValueChange={onValueChange}
+      className='mx-auto w-full'
+    >
+      <Tabs.List
+        aria-label='Profile modes'
+        className='relative grid w-full grid-cols-4 rounded-full border border-white/[0.09] bg-white/[0.045] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_18px_44px_rgba(0,0,0,0.24)] supports-[backdrop-filter]:backdrop-blur-xl'
+      >
+        {modes.map(mode => {
+          const isActive = mode.id === value;
+
+          return (
+            <Tabs.Trigger
+              key={mode.id}
+              value={mode.id}
+              onClick={() => {
+                onValueChange(mode.id);
+              }}
+              onKeyDown={event => {
+                if (selectModeFromKey(mode.id, event.key)) {
+                  event.preventDefault();
+                }
+              }}
+              className='relative z-10 flex min-h-11 min-w-0 items-center justify-center rounded-full px-1.5 text-center text-[10px] font-semibold tracking-normal text-white/50 transition-colors duration-150 hover:text-white/78 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 data-[state=active]:text-black sm:px-3.5 sm:text-[12px]'
+            >
+              {isActive ? (
+                <motion.span
+                  aria-hidden='true'
+                  className='absolute inset-0 z-[-1] rounded-full border border-white/30 bg-white shadow-[0_8px_22px_rgba(0,0,0,0.24)]'
+                  layoutId='artist-profile-mode-active-tab'
+                  transition={{
+                    duration: reducedMotion ? 0 : undefined,
+                    type: 'spring',
+                    stiffness: 500,
+                    damping: 36,
+                  }}
+                />
+              ) : null}
+              <span className='whitespace-nowrap'>{mode.label}</span>
+            </Tabs.Trigger>
+          );
+        })}
+      </Tabs.List>
+      {modes.map(mode => (
+        <Tabs.Content
+          key={`${mode.id}-panel`}
+          value={mode.id}
+          forceMount
+          className='hidden'
+          aria-hidden='true'
+        />
+      ))}
+    </Tabs.Root>
   );
 }

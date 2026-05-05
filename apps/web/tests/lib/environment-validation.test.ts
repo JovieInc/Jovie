@@ -127,7 +127,6 @@ describe('Environment Validation', () => {
         }
       }
     });
-
     it('does not warn about XAI_API_KEY in development', () => {
       const originalVercelEnv = process.env.VERCEL_ENV;
       const originalXaiKey = process.env.XAI_API_KEY;

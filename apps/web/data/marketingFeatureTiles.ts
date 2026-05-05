@@ -43,8 +43,14 @@ export interface MarketingMockPopoverFeatureTile
   readonly popoverItems: readonly string[];
 }
 
+export interface MarketingAudienceQualityFeatureTile
+  extends MarketingFeatureTileBase {
+  readonly visual: 'audience-quality-filter';
+}
+
 export type MarketingFeatureTile =
   | MarketingButtonChipFeatureTile
   | MarketingIconBadgeFeatureTile
   | MarketingMockPopoverFeatureTile
+  | MarketingAudienceQualityFeatureTile
   | MarketingScreenshotFeatureTile;
