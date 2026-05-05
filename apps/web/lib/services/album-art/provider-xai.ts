@@ -7,6 +7,23 @@ import type { AlbumArtStylePreset } from './types';
 
 const DEFAULT_MODEL = 'grok-imagine-image';
 
+/**
+ * Thrown when XAI_API_KEY is not configured. This is an *expected operational
+ * state* (provider key not provisioned in an env), not an application error.
+ * Callers should treat it as `feature_disabled` and skip Sentry capture.
+ */
+export class XaiApiKeyMissingError extends Error {
+  readonly code = 'XAI_API_KEY_MISSING' as const;
+  constructor(message = 'XAI_API_KEY is not configured') {
+    super(message);
+    this.name = 'XaiApiKeyMissingError';
+  }
+}
+
+export function isXaiConfigured(): boolean {
+  return Boolean(env.XAI_API_KEY?.trim());
+}
+
 function getAlbumArtModelId(): string {
   return env.ALBUM_ART_IMAGE_MODEL ?? DEFAULT_MODEL;
 }
@@ -51,6 +68,9 @@ export async function generateAlbumArtBackgrounds(params: {
   readonly model: string;
   readonly images: readonly Buffer[];
 }> {
+  if (!isXaiConfigured()) {
+    throw new XaiApiKeyMissingError();
+  }
   const model = getAlbumArtModelId();
   const result = await generateImage({
     model: xai.image(model),
