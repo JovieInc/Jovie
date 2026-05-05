@@ -38,7 +38,7 @@ Multiple agents run in parallel (Conductor workspaces, autopilot, ad-hoc session
 
 ### The contract
 
-1. **On start — mark the Linear issue `In Progress`.** Do this BEFORE reading code or editing files. If the issue is unassigned, assign it to yourself (or the human owner) at the same time. This is the only manual transition.
+1. **On start — mark the Linear issue `In Progress`.** Do this BEFORE reading code or editing files. If the issue is unassigned, assign it to yourself (or the human owner) at the same time. This is the required initial manual transition (the only one for orchestrator-dispatched work; ad-hoc work also needs a manual `In Review` transition on PR open — see step 2).
 
 2. **On PR open —** behavior depends on how the work was started:
    - **Orchestrator-dispatched work** (branches created by `linear-ai-orchestrator.yml`): no action required. The `sync_linear_in_review` job auto-transitions the issue to `In Review` when the PR opens.

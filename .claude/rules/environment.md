@@ -270,7 +270,7 @@ Important: the commit itself often **succeeds** before husky errors on cleanup. 
 Mitigations (in priority order):
 
 1. **Serialize commits across worktrees** in the orchestrator. Don't fire `git commit` in 5 worktrees at once; queue them.
-2. Before commit, drop stale lint-staged stashes left by prior failed runs: `while git stash list | grep -q "lint-staged automatic backup"; do git stash drop "stash@{0}"; done`. Run this right before the commit, not preemptively.
+2. Before commit, drop only the stale lint-staged backup stashes left by prior failed runs: `git stash list | grep "lint-staged automatic backup" | cut -d: -f1 | xargs -r -n1 git stash drop`. This targets the matching refs by name, so it won't clobber an unrelated stash you have on top. Run it right before the commit, not preemptively.
 3. If you're running long-lived parallel worktree agents (like `/swarm`), dispatch each agent in its own backgrounded turn so their commit windows rarely overlap.
 
 **Never** use `--no-verify` to route around this. The hook failure message is cosmetic, but the fix is coordination, not skipping validation.

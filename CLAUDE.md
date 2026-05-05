@@ -54,7 +54,7 @@ These rules will block your changes if violated.
 
 1. Read the relevant files before editing.
 2. State the plan for multi-file or risky changes (use plan mode for 3+ steps, schema, or refactors).
-3. Mark the Linear issue `In Progress` BEFORE editing files (see [`.claude/rules/linear.md`](.claude/rules/linear.md)). In Review and Done are automated.
+3. Mark the Linear issue `In Progress` BEFORE editing files (see [`.claude/rules/linear.md`](.claude/rules/linear.md)). `Done` is automated on merge; `In Review` is automated for orchestrator-dispatched PRs but must be set manually for ad-hoc PRs.
 4. Edit only files needed for the task.
 5. Open a draft PR on the first push so CI runs early.
 6. Run the narrowest verification (typecheck, lint, focused tests) before claiming done.
@@ -63,7 +63,7 @@ These rules will block your changes if violated.
 ## Linear (Gating, Ownership)
 
 - Skip any issue labeled `human-review-required` or whose description contains "This issue requires human review".
-- Mark issues `In Progress` before editing — `In Review` (PR open) and `Done` (merge) are automated. Do not transition them manually.
+- Mark issues `In Progress` before editing. `Done` is automated on merge. `In Review` is automated for orchestrator-dispatched PRs; set it manually only for ad-hoc PRs.
 - File a Linear issue for any deferred follow-up; don't rely on `// TODO` or PR-body bullets.
 
 Full contract: [`.claude/rules/linear.md`](.claude/rules/linear.md).
@@ -117,7 +117,7 @@ When the user's request matches an available skill, ALWAYS invoke it using the S
 
 ## Quick Pointers
 
-- `AGENTS.md` is a symlink to this file — keep them identical.
+- `AGENTS.md` is a symlink to this file — do not replace it with a standalone file.
 - `DESIGN.md` is the visual source of truth (read before any UI decision).
 - `CODEX.md` is the Codex bootstrap wrapper.
 - `apps/web/tests/TESTING.md` is the deep test reference.
