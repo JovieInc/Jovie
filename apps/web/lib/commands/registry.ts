@@ -15,6 +15,32 @@ import { APP_ROUTES } from '@/constants/routes';
 import type { EntityKind } from '@/lib/chat/tokens';
 import type { ToolSchemaKey } from '@/lib/chat/tool-schemas';
 
+/**
+ * Backend chat tools that are deliberately NOT exposed as user-visible
+ * commands. Each entry must include a non-empty reason. The parity test
+ * (`registry.parity.test.ts`) asserts that every tool present in
+ * `apps/web/lib/chat/tool-ui-registry.ts` is either in `COMMANDS` (visible)
+ * or here (intentionally hidden) — no orphans.
+ */
+export const HIDDEN_TOOLS: Readonly<Record<string, string>> = {
+  proposeProfileEdit:
+    'Triggered conversationally; surfacing as a slash command would duplicate proposeAvatarUpload + proposeSocialLink.',
+  showTopInsights: 'Surfaced as a home-screen card, not a slash command.',
+  checkCanvasStatus:
+    'Diagnostic; results surface inside writeWorldClassBio / createPromoStrategy.',
+  suggestRelatedArtists:
+    'Always part of createPromoStrategy; never a standalone user action.',
+  writeWorldClassBio:
+    'Pro-only; chat surfaces it conversationally rather than via slash.',
+  generateCanvasPlan: 'Pro-only; surfaced via the release detail surface.',
+  createPromoStrategy: 'Pro-only; surfaced via the release detail surface.',
+  markCanvasUploaded:
+    'CRUD-style follow-up; surfaced inside the checkCanvasStatus card.',
+  formatLyrics: 'Pro-only; surfaced via the lyrics surface, not slash.',
+  createRelease: 'Surfaced in the releases dashboard; chat tool is a fallback.',
+  generateReleasePitch: 'Pro-only; surfaced via the release detail surface.',
+} as const;
+
 export type CommandSurface = 'chat-slash' | 'cmdk';
 
 export interface EntitySlot {
