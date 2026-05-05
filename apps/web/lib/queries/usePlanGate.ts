@@ -155,54 +155,37 @@ interface NudgeStateInput {
  *
  * Exported for unit tests.
  */
+function deriveTrialNudgeState(
+  trialEndsAt: string | null,
+  now: number
+): NudgeState {
+  if (!trialEndsAt) return 'trial_honeymoon';
+  const endTs = new Date(trialEndsAt).getTime();
+  if (Number.isNaN(endTs)) return 'trial_honeymoon';
+  const msRemaining = endTs - now;
+  if (msRemaining <= 0) return 'recently_lapsed';
+  const daysRemaining = Math.floor(msRemaining / DAY_MS);
+  if (daysRemaining === 0) return 'trial_last_day';
+  if (daysRemaining <= TRIAL_LATE_THRESHOLD_DAYS) return 'trial_late';
+  return 'trial_honeymoon';
+}
+
+function deriveLapsedNudgeState(trialEndsAt: string, now: number): NudgeState {
+  const endTs = new Date(trialEndsAt).getTime();
+  if (Number.isNaN(endTs)) return 'never_trialed';
+  const daysSinceEnd = Math.floor((now - endTs) / DAY_MS);
+  if (daysSinceEnd <= RECENTLY_LAPSED_WINDOW_DAYS) return 'recently_lapsed';
+  return 'stale_lapsed';
+}
+
 export function deriveNudgeState(input: NudgeStateInput): NudgeState {
   const { plan, trialEndsAt, now } = input;
-
-  if (plan === 'max' || plan === 'growth') {
-    return 'max_paid';
-  }
-
-  if (plan === 'pro' || plan === 'founding') {
-    return 'pro_paid';
-  }
-
-  if (plan === 'trial') {
-    if (!trialEndsAt) {
-      // Defensive: trial plan with no end date shouldn't happen (activateTrial
-      // always sets it). Default to honeymoon (silent banner) rather than
-      // showing "Try Pro free" to a user who's already on trial.
-      return 'trial_honeymoon';
-    }
-    const endTs = new Date(trialEndsAt).getTime();
-    if (Number.isNaN(endTs)) {
-      return 'trial_honeymoon';
-    }
-    const msRemaining = endTs - now;
-    if (msRemaining <= 0) {
-      return 'recently_lapsed';
-    }
-    const daysRemaining = Math.floor(msRemaining / DAY_MS);
-    if (daysRemaining === 0) {
-      return 'trial_last_day';
-    }
-    if (daysRemaining <= TRIAL_LATE_THRESHOLD_DAYS) {
-      return 'trial_late';
-    }
-    return 'trial_honeymoon';
-  }
-
+  if (plan === 'max' || plan === 'growth') return 'max_paid';
+  if (plan === 'pro' || plan === 'founding') return 'pro_paid';
+  if (plan === 'trial') return deriveTrialNudgeState(trialEndsAt, now);
   if (plan === 'free' && trialEndsAt) {
-    const endTs = new Date(trialEndsAt).getTime();
-    if (Number.isNaN(endTs)) {
-      return 'never_trialed';
-    }
-    const daysSinceEnd = Math.floor((now - endTs) / DAY_MS);
-    if (daysSinceEnd <= RECENTLY_LAPSED_WINDOW_DAYS) {
-      return 'recently_lapsed';
-    }
-    return 'stale_lapsed';
+    return deriveLapsedNudgeState(trialEndsAt, now);
   }
-
   return 'never_trialed';
 }
 
