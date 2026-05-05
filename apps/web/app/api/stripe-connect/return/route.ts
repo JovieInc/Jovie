@@ -14,7 +14,7 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { publicEnv } from '@/lib/env-public';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
-import { stripe } from '@/lib/stripe/client';
+import { getStripeConnectReadiness } from '@/lib/stripe/connect-readiness';
 
 export const runtime = 'nodejs';
 
@@ -50,25 +50,16 @@ export async function GET() {
       });
     }
 
-    // Check the account status on Stripe
-    const account = await stripe.accounts.retrieve(profile.stripeAccountId);
-
-    const onboardingComplete = account.details_submitted === true;
-    const payoutsEnabled = account.payouts_enabled === true;
-
-    // Update the DB with the latest status
-    await db
-      .update(creatorProfiles)
-      .set({
-        stripeOnboardingComplete: onboardingComplete,
-        stripePayoutsEnabled: payoutsEnabled,
-        updatedAt: new Date(),
-      })
-      .where(eq(creatorProfiles.id, profile.id));
+    // The user just finished Stripe's onboarding flow — force a fresh fetch
+    // and write through to the cache. The helper handles update-by-id and
+    // captures a warning on Stripe failure.
+    const readiness = await getStripeConnectReadiness(profile.stripeAccountId, {
+      forceRefresh: true,
+    });
 
     let status: string;
-    if (payoutsEnabled) status = 'success';
-    else if (onboardingComplete) status = 'pending';
+    if (readiness?.payoutsEnabled) status = 'success';
+    else if (readiness?.onboardingComplete) status = 'pending';
     else status = 'incomplete';
 
     return NextResponse.redirect(`${settingsUrl}?stripe_connect=${status}`, {
