@@ -25,8 +25,13 @@ function buildExpectedSignature(
   fullUrl: string,
   formParams: URLSearchParams
 ): string {
+  // Twilio's signature spec requires keys sorted by byte order (ASCII /
+  // UTF-16 code units), NOT by locale. `localeCompare` can disagree with
+  // byte order under non-default locales (e.g. some Linux runners); a
+  // deterministic byte-order comparator is required (Sentry MEDIUM).
+  // The explicit comparator also satisfies Sonar S2871.
   const sortedKeys = Array.from(new Set(Array.from(formParams.keys()))).sort(
-    (a, b) => a.localeCompare(b)
+    (a, b) => (a < b ? -1 : a > b ? 1 : 0)
   );
   let signed = fullUrl;
   for (const key of sortedKeys) {

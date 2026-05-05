@@ -296,7 +296,7 @@ export function NativeSmsSubscribeButton({
           </span>
           {intent.smsTo && (
             <a
-              href={`sms:${intent.smsTo}?&body=${encodeURIComponent(`JOIN ${intent.code}`)}`}
+              href={`sms:${intent.smsTo}?body=${encodeURIComponent(`JOIN ${intent.code}`)}`}
               className='text-sm text-[var(--accent)] underline-offset-2 hover:underline'
             >
               Text {intent.smsTo}

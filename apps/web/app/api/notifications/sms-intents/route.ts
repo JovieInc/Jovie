@@ -61,11 +61,12 @@ function buildSmsHref(
   code: string
 ): string | null {
   if (!fromNumber) return null;
-  // sms: URI per RFC 5724. Body encoded for cross-platform compatibility.
-  // The frontend may rebuild this with `&body` for iOS or `?body` for some
-  // Android variants per codex F18 / decision row #43.
+  // sms: URI per RFC 5724 — `?body=` (no leading `&`). Strict Android SMS
+  // clients (AOSP Messaging, Samsung Messages) drop the body when the
+  // query string starts with an empty parameter (`?&body=`); iOS is
+  // tolerant either way (Greptile P1).
   const body = encodeURIComponent(`JOIN ${code}`);
-  return `sms:${fromNumber}?&body=${body}`;
+  return `sms:${fromNumber}?body=${body}`;
 }
 
 function isFlagEnabled(value: string | undefined): boolean {
