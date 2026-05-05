@@ -187,6 +187,15 @@ export type ConsumeIntentResult =
   | { status: 'already_consumed' };
 
 /**
+ * Drizzle exposes the transaction executor with the same query surface as the
+ * top-level client; widening to that union lets `consumeIntentByCode` run
+ * inside a `db.transaction(...)` callback without forking the implementation.
+ */
+type SmsIntentsExecutor =
+  | typeof db
+  | Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/**
  * Atomic intent consume. Implements codex ENG-N2 + audit row #35.
  *
  * Single UPDATE with WHERE-clause-on-status + expiry check. If rowcount=1
@@ -196,15 +205,22 @@ export type ConsumeIntentResult =
  * If rowcount=0, we look up the intent to discriminate between `not_found`,
  * `expired`, and `already_consumed` so the webhook can pick the right
  * fan-facing reply.
+ *
+ * Pass `executor` (the `tx` argument from `db.transaction`) to make the
+ * status flip part of the surrounding transaction. Without this, a failure
+ * in the contact/subscription upsert leaves the intent permanently
+ * `confirmed` while no subscription exists, silently losing the fan on
+ * Twilio's retry (Greptile P1).
  */
 export async function consumeIntentByCode(
   code: string,
-  bind: { phone: string; provider: string; providerMessageId: string }
+  bind: { phone: string; provider: string; providerMessageId: string },
+  executor: SmsIntentsExecutor = db
 ): Promise<ConsumeIntentResult> {
   const codeHash = hashIntentCode(code);
   const now = new Date();
 
-  const updated = await db
+  const updated = await executor
     .update(smsSubscribeIntents)
     .set({
       status: 'confirmed',
@@ -228,7 +244,7 @@ export async function consumeIntentByCode(
   }
 
   // Rowcount=0 → diagnose the cause.
-  const existing = await db
+  const existing = await executor
     .select()
     .from(smsSubscribeIntents)
     .where(eq(smsSubscribeIntents.codeHash, codeHash))

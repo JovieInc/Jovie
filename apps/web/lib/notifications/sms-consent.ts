@@ -1,18 +1,20 @@
 import 'server-only';
 import { createHash } from 'node:crypto';
+import { SMS_CONSENT_TEXT, SMS_CONSENT_VERSION } from './sms-consent-shared';
 
 /**
  * Versioned SMS consent disclosure shown before any native handoff.
  *
- * Bump the version (and update SMS_CONSENT_TEXT) any time the language
- * changes. The version + hash are persisted on `notification_contacts`
- * (global first-write-wins) and on `notification_subscriptions` (per-artist)
- * to preserve TCPA audit trail across multi-artist races.
+ * Bump the version (and update `SMS_CONSENT_TEXT` in `sms-consent-shared.ts`)
+ * any time the language changes. The version + hash are persisted on
+ * `notification_contacts` (global first-write-wins) and on
+ * `notification_subscriptions` (per-artist) to preserve TCPA audit trail
+ * across multi-artist races.
+ *
+ * Re-export the plain constants here so existing server callers don't have
+ * to switch import paths.
  */
-export const SMS_CONSENT_VERSION = 'v1';
-
-export const SMS_CONSENT_TEXT =
-  'By texting Jovie, you agree to receive release alerts from this artist. Msg & data rates may apply. Reply STOP to opt out.';
+export { SMS_CONSENT_TEXT, SMS_CONSENT_VERSION } from './sms-consent-shared';
 
 const CONSENT_TEXT_HASH = createHash('sha256')
   .update(SMS_CONSENT_TEXT, 'utf8')

@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { notificationSubscriptions } from '@/lib/db/schema/analytics';
 import {
   notificationContacts,
+  type SmsSubscribeIntent,
   smsSubscribeIntents,
 } from '@/lib/db/schema/notifications';
 import { webhookEvents } from '@/lib/db/schema/suppression';
@@ -248,23 +249,6 @@ async function confirmSubscriptionFromIntent(input: {
   | { kind: 'join_expired' | 'join_already_consumed' | 'join_not_found' }
   | { kind: 'error'; reason: string }
 > {
-  const consume = await consumeIntentByCode(input.code, {
-    phone: input.fromPhone,
-    provider: input.providerName,
-    providerMessageId: input.providerEventId,
-  });
-
-  if (consume.status === 'expired') {
-    return { kind: 'join_expired' };
-  }
-  if (consume.status === 'already_consumed') {
-    return { kind: 'join_already_consumed' };
-  }
-  if (consume.status === 'not_found') {
-    return { kind: 'join_not_found' };
-  }
-
-  const intent = consume.intent;
   const phoneNorm = normalizePhoneE164(input.fromPhone);
   if (!phoneNorm) {
     return { kind: 'error', reason: 'phone_normalize_failed' };
@@ -273,7 +257,33 @@ async function confirmSubscriptionFromIntent(input: {
   const consentSnapshot = getCurrentConsentSnapshot();
   const now = new Date();
 
-  await db.transaction(async tx => {
+  // Both the intent flip and the contact/subscription upserts run inside
+  // the same transaction so a failure in any step rolls back the intent
+  // status. Without this, a transient DB error between the intent flip and
+  // the subscription write would leave the intent permanently `confirmed`
+  // with no subscription row; Twilio's retry would then see
+  // `already_consumed` and the fan would be silently lost (Greptile P1).
+  type ConsumeOutcome =
+    | { kind: 'confirmed'; intent: SmsSubscribeIntent }
+    | { kind: 'expired' }
+    | { kind: 'already_consumed' }
+    | { kind: 'not_found' };
+
+  const consumeStatus = await db.transaction<ConsumeOutcome>(async tx => {
+    const consume = await consumeIntentByCode(
+      input.code,
+      {
+        phone: phoneNorm,
+        provider: input.providerName,
+        providerMessageId: input.providerEventId,
+      },
+      tx
+    );
+
+    if (consume.status !== 'confirmed') {
+      return { kind: consume.status };
+    }
+
     // Global contact: insert with first-write-wins consent fields. On
     // conflict (existing phone), bump phoneVerifiedAt + clear smsStatus
     // back to 'active' so a fresh verified opt-in re-enables a previously
@@ -311,10 +321,10 @@ async function confirmSubscriptionFromIntent(input: {
     await tx
       .insert(notificationSubscriptions)
       .values({
-        creatorProfileId: intent.creatorProfileId,
+        creatorProfileId: consume.intent.creatorProfileId,
         channel: 'sms',
         phone: phoneNorm,
-        countryCode: intent.countryCode ?? null,
+        countryCode: consume.intent.countryCode ?? null,
         source: SMS_NATIVE_INTENT_SOURCE,
         confirmedAt: now,
         smsConsentAt: now,
@@ -347,12 +357,24 @@ async function confirmSubscriptionFromIntent(input: {
     // is the existing pattern. If we don't have a fingerprint at this
     // point (webhook context, no browser session), skip the audience write
     // and let next profile visit fold the engagement signal in.
+
+    return { kind: 'confirmed', intent: consume.intent };
   });
+
+  if (consumeStatus.kind === 'expired') {
+    return { kind: 'join_expired' };
+  }
+  if (consumeStatus.kind === 'already_consumed') {
+    return { kind: 'join_already_consumed' };
+  }
+  if (consumeStatus.kind === 'not_found') {
+    return { kind: 'join_not_found' };
+  }
 
   return {
     kind: 'join_confirmed',
-    intentId: intent.id,
-    creatorProfileId: intent.creatorProfileId,
+    intentId: consumeStatus.intent.id,
+    creatorProfileId: consumeStatus.intent.creatorProfileId,
   };
 }
 

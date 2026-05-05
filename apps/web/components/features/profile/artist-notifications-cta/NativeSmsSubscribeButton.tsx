@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useProfileNotifications } from '@/components/organisms/profile-shell/ProfileNotificationsContext';
 import { track } from '@/lib/analytics';
-import { SMS_CONSENT_TEXT } from '@/lib/notifications/sms-consent';
+import { SMS_CONSENT_TEXT } from '@/lib/notifications/sms-consent-shared';
 import {
   useCreateSmsIntentMutation,
   useSmsIntentStatusQuery,

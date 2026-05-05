@@ -135,12 +135,15 @@ export async function suppressPhoneForStop(
       })
       .returning({ id: notificationContacts.id });
 
+    // STOP only cascades SMS-channel subscriptions; an email-channel row that
+    // happens to carry the same phone number must keep emailing (Greptile P1).
     await tx
       .update(notificationSubscriptions)
       .set({ unsubscribedAt: now })
       .where(
         and(
           eq(notificationSubscriptions.phone, normalized),
+          eq(notificationSubscriptions.channel, 'sms'),
           drizzleSql`${notificationSubscriptions.unsubscribedAt} IS NULL`
         )
       );
