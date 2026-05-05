@@ -3,9 +3,10 @@ import { AUDIENCE_IDENTIFIED_COOKIE } from '@/constants/app';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {
   computeIntentFingerprint,
-  getIntentForPolling,
+  getIntentById,
   hashIpAddress,
   hashUserAgent,
+  verifyIntentFingerprint,
 } from '@/lib/notifications/sms-intents';
 import { createRateLimiter, getClientIP } from '@/lib/rate-limit';
 import { maskPhoneForDisplay } from '@/lib/utils/pii';
@@ -45,16 +46,11 @@ export async function GET(request: NextRequest, context: RouteContext) {
     );
   }
 
-  const visitorId =
-    request.cookies.get(AUDIENCE_IDENTIFIED_COOKIE)?.value ?? null;
-  const expectedFingerprint = computeIntentFingerprint({
-    visitorId,
-    ipHash: hashIpAddress(ip),
-    userAgentHash: hashUserAgent(request.headers.get('user-agent') ?? null),
-    artistId: '', // populated below if intent found
-  });
-
-  const intent = await getIntentForPolling(id, expectedFingerprint);
+  // Load the intent by id without any fingerprint check so we can read
+  // creatorProfileId. Fingerprint enforcement is then artist-scoped — see
+  // codex F12 / decision row #53. Phone PII is only revealed when the
+  // request fingerprint matches the stored one.
+  const intent = await getIntentById(id);
   if (!intent) {
     return NextResponse.json(
       {
@@ -66,20 +62,20 @@ export async function GET(request: NextRequest, context: RouteContext) {
     );
   }
 
-  // Re-derive fingerprint with the intent's actual artistId and re-check.
-  const exactFingerprint = computeIntentFingerprint({
+  const visitorId =
+    request.cookies.get(AUDIENCE_IDENTIFIED_COOKIE)?.value ?? null;
+  const expectedFingerprint = computeIntentFingerprint({
     visitorId,
     ipHash: hashIpAddress(ip),
     userAgentHash: hashUserAgent(request.headers.get('user-agent') ?? null),
     artistId: intent.creatorProfileId,
   });
 
-  const fingerprintMatches =
-    !!intent.fingerprintHash && intent.fingerprintHash === exactFingerprint;
+  const fingerprintMatches = verifyIntentFingerprint(
+    expectedFingerprint,
+    intent.fingerprintHash
+  );
 
-  // Always return generic status info. PII (masked phone) only when the
-  // requesting browser session matches the originating intent fingerprint
-  // (codex F12 / decision row #53).
   const now = Date.now();
   const expired = intent.expiresAt.getTime() <= now;
   const baseStatus =

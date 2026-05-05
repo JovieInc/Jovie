@@ -116,16 +116,30 @@ export const twilioAdapter: SmsProviderAdapter = {
 };
 
 /**
- * Convenience: parse a date in any of: ISO-8601, RFC-3339, UNIX seconds.
- * Returns null if the string is missing or unparsable.
+ * Convenience: parse a date in any of:
+ *   - ISO-8601 / RFC-3339 string
+ *   - 10-digit UNIX seconds epoch
+ *   - 13-digit UNIX milliseconds epoch (e.g. `Date.now()` output)
+ *
+ * Returns null when the input is missing or unparsable. We discriminate
+ * seconds vs milliseconds by string length to prevent a 13-digit JS
+ * timestamp from being silently treated as seconds (which would push the
+ * expiry to the year ~56000).
  */
 export function parseSecondaryExpiresAt(raw: string | undefined): Date | null {
   if (!raw) return null;
   const trimmed = raw.trim();
   if (!trimmed) return null;
   if (/^\d+$/.test(trimmed)) {
-    const epoch = Number.parseInt(trimmed, 10);
-    return Number.isFinite(epoch) ? new Date(epoch * 1000) : null;
+    if (trimmed.length === 10) {
+      const seconds = Number.parseInt(trimmed, 10);
+      return Number.isFinite(seconds) ? new Date(seconds * 1000) : null;
+    }
+    if (trimmed.length === 13) {
+      const ms = Number.parseInt(trimmed, 10);
+      return Number.isFinite(ms) ? new Date(ms) : null;
+    }
+    return null;
   }
   const parsed = new Date(trimmed);
   return Number.isFinite(parsed.getTime()) ? parsed : null;

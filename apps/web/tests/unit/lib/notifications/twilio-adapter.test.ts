@@ -171,10 +171,22 @@ describe('parseSecondaryExpiresAt', () => {
     );
   });
 
-  it('parses UNIX seconds as a number string', () => {
+  it('parses 10-digit UNIX seconds', () => {
     const result = parseSecondaryExpiresAt('1900000000');
     expect(result).toBeInstanceOf(Date);
     expect(result?.getTime()).toBe(1900000000 * 1000);
+  });
+
+  it('parses 13-digit UNIX milliseconds (Date.now() output)', () => {
+    const ms = 1715000000000;
+    const result = parseSecondaryExpiresAt(String(ms));
+    expect(result).toBeInstanceOf(Date);
+    expect(result?.getTime()).toBe(ms);
+  });
+
+  it('rejects ambiguous 11/12-digit numeric strings', () => {
+    expect(parseSecondaryExpiresAt('19000000001')).toBeNull();
+    expect(parseSecondaryExpiresAt('190000000012')).toBeNull();
   });
 
   it('returns null for invalid input', () => {

@@ -3,13 +3,17 @@ import 'server-only';
 /**
  * Mask a phone number for safe logging.
  *
- * Returns a string that preserves country code prefix and the last 4 digits
- * with the middle redacted. Returns "" for missing input. Never throws.
+ * Returns a string that preserves only the leading "+" marker (when
+ * present) and the last 4 digits, with everything else redacted. We
+ * deliberately do NOT preserve country-code digits because mixing them
+ * with the last 4 narrows the search space too much (e.g. for a US
+ * number, the area code of the carrier sender is usually known).
  *
  * Examples:
- *   logSafePhone('+15555550100') -> '+1*******0100'
- *   logSafePhone('+447700900123') -> '+44*******0123'
- *   logSafePhone(null) -> ''
+ *   logSafePhone('+15555550100')  -> '+********0100'
+ *   logSafePhone('+447700900123') -> '+*********0123'
+ *   logSafePhone('5555550100')    -> '*****0100'
+ *   logSafePhone(null)            -> ''
  *
  * Use at every logging callsite that touches phone numbers. Raw phone in
  * database columns and webhook payloads is fine for audit; raw phone in
@@ -19,15 +23,14 @@ export function logSafePhone(phone: string | null | undefined): string {
   if (!phone) return '';
   const trimmed = phone.trim();
   if (trimmed.length === 0) return '';
-  if (trimmed.length <= 5) return '***';
+  const digits = trimmed.replace(/\D/g, '');
+  if (digits.length <= 4) return '***';
 
-  // Preserve a leading "+" plus 1-3 country-code digits, keep last 4, mask middle.
-  const startsWithPlus = trimmed.startsWith('+');
-  const prefix = startsWithPlus
-    ? trimmed.slice(0, Math.min(3, trimmed.length - 4))
-    : trimmed.slice(0, 1);
-  const last4 = trimmed.slice(-4);
-  const maskedLen = Math.max(0, trimmed.length - prefix.length - last4.length);
+  const prefix = trimmed.startsWith('+') ? '+' : '';
+  const last4 = digits.slice(-4);
+  // Mask all digits except the trailing 4. At least one mask char is
+  // always emitted so very short inputs don't collapse to "+0100".
+  const maskedLen = Math.max(1, digits.length - last4.length);
   return `${prefix}${'*'.repeat(maskedLen)}${last4}`;
 }
 

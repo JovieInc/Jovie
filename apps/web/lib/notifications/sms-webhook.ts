@@ -149,13 +149,21 @@ export async function verifyInboundSmsWebhook(input: {
 
 interface DedupeResult {
   isFirstSeen: boolean;
+  /**
+   * Whether the existing row for this (provider, eventId) was already
+   * fully processed. Only meaningful when `isFirstSeen=false`. The route
+   * layer must keep retries flowing when `processed=false` so a prior
+   * crash doesn't permanently swallow the event (codex F4 + F6).
+   */
+  alreadyProcessed: boolean;
   webhookEventId: string;
 }
 
 /**
  * Insert the webhookEvents row OUTSIDE the main transaction. On unique
- * conflict, return `isFirstSeen=false` so the caller can short-circuit
- * with HTTP 200 (the original delivery already processed). See codex F4.
+ * conflict, return the existing row's `processed` flag so the caller can
+ * decide whether to short-circuit (already processed) or replay (a prior
+ * attempt failed before marking processed). See codex F4 + F6.
  */
 export async function recordWebhookEvent(input: {
   provider: string;
@@ -177,12 +185,21 @@ export async function recordWebhookEvent(input: {
     .returning({ id: webhookEvents.id });
 
   if (inserted.length === 1) {
-    return { isFirstSeen: true, webhookEventId: inserted[0].id };
+    return {
+      isFirstSeen: true,
+      alreadyProcessed: false,
+      webhookEventId: inserted[0].id,
+    };
   }
 
-  // Conflict — find the existing row id for downstream processed=true update.
+  // Conflict — find the existing row's id and processed flag so the route
+  // can route processed-already events to a fast 200, but force retries
+  // on rows that were inserted but never marked processed.
   const existing = await db
-    .select({ id: webhookEvents.id })
+    .select({
+      id: webhookEvents.id,
+      processed: webhookEvents.processed,
+    })
     .from(webhookEvents)
     .where(
       and(
@@ -194,6 +211,7 @@ export async function recordWebhookEvent(input: {
 
   return {
     isFirstSeen: false,
+    alreadyProcessed: existing[0]?.processed ?? false,
     webhookEventId: existing[0]?.id ?? '',
   };
 }
@@ -275,6 +293,10 @@ async function confirmSubscriptionFromIntent(input: {
       })
       .onConflictDoUpdate({
         target: notificationContacts.phoneHash,
+        // Required: the unique index on phone_hash is partial
+        // (WHERE phone_hash IS NOT NULL); PostgreSQL needs the predicate
+        // to match the partial index for ON CONFLICT inference.
+        targetWhere: drizzleSql`${notificationContacts.phoneHash} IS NOT NULL`,
         set: {
           phoneVerifiedAt: now,
           smsStatus: 'active',

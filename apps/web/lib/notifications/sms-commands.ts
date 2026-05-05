@@ -29,9 +29,23 @@ const HELP_TOKENS = new Set(['HELP', 'INFO']);
  * Allowed alphabet for intent codes: A-Z and 2-9, excluding I O 0 1 to
  * avoid iOS autocorrect / visual ambiguity. Codes are 6-8 chars; the
  * generator emits 8, but the parser accepts 6-8 for forward-compat.
+ *
+ * Two acceptance paths to keep ordinary words like "UPDATE" from being
+ * confused with codes (CodeRabbit major):
+ *  1. An explicit "JOIN <code>" prefix.
+ *  2. A bare token that contains at least one digit from 2-9 (since codes
+ *     emitted by `generateIntentCode` always include random digits with
+ *     overwhelming probability — the chance an 8-char code is all letters
+ *     is (24/32)^8 ≈ 10%, while every English word is letters-only).
  */
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-const CODE_PATTERN = new RegExp(`\\b([${CODE_ALPHABET}]{6,8})\\b`);
+const JOIN_CODE_PATTERN = new RegExp(
+  String.raw`\bJOIN[\s:_-]+([` + CODE_ALPHABET + String.raw`]{6,8})\b`
+);
+const BARE_CODE_PATTERN = new RegExp(
+  String.raw`\b([` + CODE_ALPHABET + String.raw`]{6,8})\b`
+);
+const HAS_DIGIT_PATTERN = /[2-9]/;
 
 const TOKEN_PATTERN = /[A-Z0-9]+/g;
 
@@ -72,11 +86,20 @@ export function parseInboundCommand(
     }
   }
 
-  // JOIN is implicit: the keyword "JOIN" is optional; a bare code anywhere
-  // in the body counts. Strip "JOIN" tokens first to expose the code.
-  const codeMatch = upper.match(CODE_PATTERN);
-  if (codeMatch?.[1]) {
-    return { kind: 'join', code: codeMatch[1] };
+  // Acceptance path 1: explicit "JOIN <code>" prefix wins over any bare
+  // code so the carrier can disambiguate.
+  const joinMatch = upper.match(JOIN_CODE_PATTERN);
+  if (joinMatch?.[1]) {
+    return { kind: 'join', code: joinMatch[1] };
+  }
+
+  // Acceptance path 2: a bare token from the code alphabet with at least
+  // one digit. The digit requirement rejects ordinary letters-only words
+  // like "UPDATE" or "PLEASE" while still accepting the codes the
+  // generator emits (it guarantees ≥1 digit).
+  const bareMatch = upper.match(BARE_CODE_PATTERN);
+  if (bareMatch?.[1] && HAS_DIGIT_PATTERN.test(bareMatch[1])) {
+    return { kind: 'join', code: bareMatch[1] };
   }
 
   return { kind: 'unknown' };

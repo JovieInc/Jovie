@@ -65,8 +65,15 @@ export async function POST(request: NextRequest) {
 
   const { message, providerEventId } = verification;
 
-  // Persist the raw delivery first so duplicate events short-circuit.
-  let dedupe: { isFirstSeen: boolean; webhookEventId: string };
+  // Persist the raw delivery first so duplicate events short-circuit
+  // ONLY when they were already fully processed. If a prior attempt
+  // crashed before processed=true was set, we must let the retry flow
+  // through so the event isn't permanently dropped (codex F4 + F6).
+  let dedupe: {
+    isFirstSeen: boolean;
+    alreadyProcessed: boolean;
+    webhookEventId: string;
+  };
   try {
     const formObj = Object.fromEntries(new URLSearchParams(rawBody));
     dedupe = await recordWebhookEvent({
@@ -84,12 +91,19 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!dedupe.isFirstSeen) {
-    logger.info('SMS webhook duplicate event ignored', { providerEventId });
+  if (!dedupe.isFirstSeen && dedupe.alreadyProcessed) {
+    logger.info('SMS webhook duplicate event ignored (already processed)', {
+      providerEventId,
+    });
     return NextResponse.json(
       { ok: true, idempotent: true },
       { status: 200, headers: NO_STORE_HEADERS }
     );
+  }
+  if (!dedupe.isFirstSeen) {
+    logger.warn('SMS webhook retry of unprocessed event — replaying', {
+      providerEventId,
+    });
   }
 
   const nativeSmsEnabled =

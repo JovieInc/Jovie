@@ -14,12 +14,16 @@ describe('logSafePhone', () => {
     expect(logSafePhone('   ')).toBe('');
   });
 
-  it('preserves +1 country prefix and last 4 digits', () => {
-    expect(logSafePhone('+15555550100')).toBe('+15*****0100');
+  it('preserves only "+" marker and last 4 digits for E.164', () => {
+    expect(logSafePhone('+15555550100')).toBe('+*******0100');
   });
 
-  it('preserves +44 country prefix and last 4 digits', () => {
-    expect(logSafePhone('+447700900123')).toBe('+44******0123');
+  it('masks all country-code digits for international E.164', () => {
+    expect(logSafePhone('+447700900123')).toBe('+********0123');
+  });
+
+  it('drops the "+" when input has no plus sign', () => {
+    expect(logSafePhone('5555550100')).toBe('******0100');
   });
 
   it('does not crash on very short inputs', () => {

@@ -22,6 +22,11 @@ export const INTENT_TTL_MS = 10 * 60 * 1000;
  * Generate a single intent code. Uses crypto.randomBytes for unbiased
  * draws across a 32-symbol alphabet by rejecting bytes ≥ 224 (largest
  * multiple of 32 ≤ 255 is 224).
+ *
+ * Guarantees at least one digit (2-9) in the output so the inbound
+ * parser's "must contain a digit" rule never rejects a real code. If a
+ * draw comes back letters-only (~10% of the time on the first pass), we
+ * pick another random byte and replace one position with a digit.
  */
 export function generateIntentCode(): string {
   const out: string[] = [];
@@ -32,6 +37,12 @@ export function generateIntentCode(): string {
       out.push(INTENT_CODE_ALPHABET[byte % INTENT_CODE_ALPHABET.length]);
       if (out.length >= INTENT_CODE_LENGTH) break;
     }
+  }
+  if (!/[2-9]/.test(out.join(''))) {
+    const digits = '23456789';
+    const pickByte = randomBytes(2);
+    const pos = pickByte[0] % INTENT_CODE_LENGTH;
+    out[pos] = digits[pickByte[1] % digits.length];
   }
   return out.join('');
 }
@@ -236,34 +247,37 @@ export async function consumeIntentByCode(
 }
 
 /**
- * Fetch an intent by ID for status polling. Returns null if not found or
- * if the fingerprint check fails (privacy: a stranger's tab cannot learn
- * a masked phone from a known intent ID).
+ * Fetch an intent row by ID without any fingerprint enforcement. Returns
+ * null when the row does not exist. Callers MUST treat the returned row
+ * as untrusted-with-respect-to-PII and only expose the masked phone after
+ * an artist-scoped fingerprint match (see `verifyIntentFingerprint`).
  */
-export async function getIntentForPolling(
-  intentId: string,
-  expectedFingerprintHash: string
+export async function getIntentById(
+  intentId: string
 ): Promise<SmsSubscribeIntent | null> {
   const rows = await db
     .select()
     .from(smsSubscribeIntents)
     .where(eq(smsSubscribeIntents.id, intentId))
     .limit(1);
-  const row = rows[0];
-  if (!row) return null;
-  if (!row.fingerprintHash) {
-    // Legacy / unbound intents — only return generic status, not phone PII.
-    return row;
-  }
+  return rows[0] ?? null;
+}
+
+/**
+ * Timing-safe comparison between an expected and stored fingerprint hash.
+ * Returns false when either side is missing/malformed.
+ */
+export function verifyIntentFingerprint(
+  expectedFingerprintHash: string,
+  storedFingerprintHash: string | null | undefined
+): boolean {
+  if (!storedFingerprintHash) return false;
   const expectedBuf = Buffer.from(expectedFingerprintHash, 'hex');
-  const storedBuf = Buffer.from(row.fingerprintHash, 'hex');
-  if (
-    expectedBuf.length !== storedBuf.length ||
-    !timingSafeEqual(expectedBuf, storedBuf)
-  ) {
-    return null;
+  const storedBuf = Buffer.from(storedFingerprintHash, 'hex');
+  if (expectedBuf.length === 0 || expectedBuf.length !== storedBuf.length) {
+    return false;
   }
-  return row;
+  return timingSafeEqual(expectedBuf, storedBuf);
 }
 
 /**

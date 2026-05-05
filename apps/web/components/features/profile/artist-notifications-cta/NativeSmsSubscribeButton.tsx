@@ -20,7 +20,7 @@ type Phase =
   | 'expired'
   | 'error';
 
-const POLL_DEADLINE_MS = 90_000;
+const POLL_FALLBACK_DEADLINE_MS = 90_000;
 const REVEAL_CODE_AFTER_MS = 30_000;
 const SMS_HANDOFF_DETECT_MS = 1500;
 
@@ -119,12 +119,18 @@ export function NativeSmsSubscribeButton({
       return;
     }
     if (!intent) return;
-    const startedAt = intent.createdAt;
+    // Trust the server's expires_at when present; fall back to a fixed
+    // window only if the timestamp is missing/invalid (CodeRabbit major).
+    const expiresAtMs = (() => {
+      const parsed = new Date(intent.expiresAt).getTime();
+      if (Number.isFinite(parsed)) return parsed;
+      return intent.createdAt + POLL_FALLBACK_DEADLINE_MS;
+    })();
     const t = window.setTimeout(
       () => {
         setPhase(current => (current === 'confirmed' ? current : 'expired'));
       },
-      Math.max(0, POLL_DEADLINE_MS - (Date.now() - startedAt))
+      Math.max(0, expiresAtMs - Date.now())
     );
     return () => window.clearTimeout(t);
   }, [phase, intent]);
@@ -216,12 +222,6 @@ export function NativeSmsSubscribeButton({
     }
   }, [phase, artistId, source, createIntent]);
 
-  const handleRetry = useCallback(() => {
-    setIntent(null);
-    setPhase('idle');
-    setErrorMessage(null);
-  }, []);
-
   const buttonLabel = (() => {
     switch (phase) {
       case 'pending':
@@ -250,9 +250,7 @@ export function NativeSmsSubscribeButton({
     <div className={cn('flex flex-col items-stretch gap-2', className)}>
       <button
         type='button'
-        onClick={
-          phase === 'expired' || phase === 'error' ? handleRetry : handleClick
-        }
+        onClick={handleClick}
         disabled={phase === 'pending'}
         className={cn(
           'inline-flex h-11 items-center justify-center gap-2 rounded-full px-4',
@@ -298,10 +296,10 @@ export function NativeSmsSubscribeButton({
           </span>
           {intent.smsTo && (
             <a
-              href={`tel:${intent.smsTo}`}
+              href={`sms:${intent.smsTo}?&body=${encodeURIComponent(`JOIN ${intent.code}`)}`}
               className='text-sm text-[var(--accent)] underline-offset-2 hover:underline'
             >
-              Send to {intent.smsTo}
+              Text {intent.smsTo}
             </a>
           )}
         </div>

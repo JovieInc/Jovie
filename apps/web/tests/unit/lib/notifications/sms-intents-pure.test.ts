@@ -48,6 +48,15 @@ describe('generateIntentCode', () => {
     // 200 random draws from ~1.1e12 keyspace → no collisions.
     expect(seen.size).toBe(200);
   });
+
+  it('always includes at least one digit (parser guarantee)', async () => {
+    const { generateIntentCode } = await import(
+      '@/lib/notifications/sms-intents'
+    );
+    for (let i = 0; i < 500; i++) {
+      expect(generateIntentCode()).toMatch(/[2-9]/);
+    }
+  });
 });
 
 describe('hashIntentCode', () => {

@@ -88,6 +88,23 @@ describe('parseInboundCommand', () => {
       const result = parseInboundCommand('foo J7K4Q2HZ bar XYZK456P');
       expect(result.kind).toBe('join');
     });
+
+    it('accepts JOIN-prefixed letters-only token (explicit prefix path)', () => {
+      const result = parseInboundCommand('JOIN ABCDEFGH');
+      expect(result).toEqual({ kind: 'join', code: 'ABCDEFGH' });
+    });
+
+    it('rejects letters-only token without JOIN prefix (no digits)', () => {
+      // Real-world ordinary words must not be parsed as codes.
+      expect(parseInboundCommand('UPDATE').kind).toBe('unknown');
+      expect(parseInboundCommand('PLEASE').kind).toBe('unknown');
+      expect(parseInboundCommand('GREATEST').kind).toBe('unknown');
+    });
+
+    it('accepts a bare token only when it contains a 2-9 digit', () => {
+      expect(parseInboundCommand('ABC234').kind).toBe('join');
+      expect(parseInboundCommand('A2B3C4D5').kind).toBe('join');
+    });
   });
 
   describe('unknown', () => {
@@ -99,6 +116,9 @@ describe('parseInboundCommand', () => {
       'How do I sign up?',
       // Code shorter than 6 chars — never matches.
       'J7K4',
+      // Letters-only tokens are now rejected as bare codes.
+      'UPDATE',
+      'PLEASE',
     ])('parses %s as unknown', input => {
       const result = parseInboundCommand(input);
       expect(result.kind).toBe('unknown');

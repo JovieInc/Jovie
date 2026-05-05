@@ -1,6 +1,6 @@
 import 'server-only';
 import { createHash } from 'node:crypto';
-import { and, sql as drizzleSql, eq, isNotNull } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { notificationSubscriptions } from '@/lib/db/schema/analytics';
 import { notificationContacts } from '@/lib/db/schema/notifications';
@@ -124,6 +124,10 @@ export async function suppressPhoneForStop(
       })
       .onConflictDoUpdate({
         target: notificationContacts.phoneHash,
+        // Required: the unique index on phone_hash is partial
+        // (WHERE phone_hash IS NOT NULL); PostgreSQL needs the predicate
+        // to match the partial index for ON CONFLICT inference.
+        targetWhere: drizzleSql`${notificationContacts.phoneHash} IS NOT NULL`,
         set: {
           smsStatus: 'stopped',
           updatedAt: now,
@@ -185,12 +189,7 @@ export async function reactivatePhoneAfterVerifiedOptIn(
       phoneVerifiedAt: now,
       updatedAt: now,
     })
-    .where(
-      and(
-        eq(notificationContacts.phoneHash, phoneHash),
-        isNotNull(notificationContacts.phoneHash)
-      )
-    )
+    .where(eq(notificationContacts.phoneHash, phoneHash))
     .returning({ id: notificationContacts.id });
 
   if (updated.length === 0) {
