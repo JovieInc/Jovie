@@ -2895,12 +2895,10 @@ jobs:
             fi
           done
       - name: Build (PR preview)
-        run: ./node_modules/.bin/vercel build --token ${{ secrets.VERCEL_TOKEN }}
+        run: env -u TURBO_REMOTE_ONLY ./node_modules/.bin/vercel build --token ${{ secrets.VERCEL_TOKEN }}
         env:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
-          # Unset deprecated TURBO_REMOTE_ONLY to prevent conflict with TURBO_CACHE
-          TURBO_REMOTE_ONLY: ''
       - name: Deploy (PR preview, fast deployment for UI-only changes)
         id: pr_deploy
         run: |
@@ -3476,12 +3474,10 @@ jobs:
             fi
           done
       - name: Build (preview target for staging verification)
-        run: ./node_modules/.bin/vercel build --token ${{ secrets.VERCEL_TOKEN }}
+        run: env -u TURBO_REMOTE_ONLY ./node_modules/.bin/vercel build --token ${{ secrets.VERCEL_TOKEN }}
         env:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
-          # Unset deprecated TURBO_REMOTE_ONLY to prevent conflict with TURBO_CACHE
-          TURBO_REMOTE_ONLY: ''
       - name: Deploy (staging preview, prebuilt)
         id: deploy
         run: |
