@@ -1,11 +1,10 @@
 'use client';
 
 import { AnimatePresence, motion } from 'motion/react';
-import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { SHELL_H2_CLASS } from '@/components/marketing/artist-profile/ArtistProfileSectionHeader';
+import { ProductScreenshotFrame } from '@/components/marketing/ProductScreenshotFrame';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
-import { getMarketingExportImage } from '@/lib/screenshots/registry';
 import { cn } from '@/lib/utils';
 
 interface AuthBrandPanelProps {
@@ -16,19 +15,14 @@ interface AuthBrandPanelProps {
 
 const SLIDE_MS = 5500;
 
+/**
+ * All slides share a 16:10 aspect ratio so the floating device frame
+ * doesn't shift size when the carousel advances.
+ */
 const SLIDES = [
-  {
-    id: 'dashboard-releases-sidebar-desktop',
-    image: getMarketingExportImage('dashboard-releases-sidebar-desktop'),
-  },
-  {
-    id: 'dashboard-audience-desktop',
-    image: getMarketingExportImage('dashboard-audience-desktop'),
-  },
-  {
-    id: 'artist-spec-tracked-links-desktop',
-    image: getMarketingExportImage('artist-spec-tracked-links-desktop'),
-  },
+  'dashboard-releases-sidebar-desktop',
+  'dashboard-audience-desktop',
+  'public-profile-desktop',
 ] as const;
 
 export function AuthBrandPanel({ className }: Readonly<AuthBrandPanelProps>) {
@@ -64,68 +58,48 @@ function AuthBrandCarousel() {
 
   return (
     <div className='absolute inset-0 flex flex-col'>
-      {/* Spacer — pushes the floating screenshot down toward visual center. */}
+      {/* Spacer above the floating screenshot. */}
       <div className='min-h-0 flex-1' />
 
-      {/* Image area — fixed aspect ratio so the screenshot doesn't get
-          dwarfed. Browser-chrome top bar + a light gray surround give
-          structural separation from the white card behind. */}
+      {/* Floating product screenshot — same device frame as the homepage hero. */}
       <div className='relative mx-8 sm:mx-10'>
-        <div className='overflow-hidden rounded-[14px] bg-[#f4f4f6] shadow-[0_24px_60px_rgba(0,0,0,0.14)] ring-1 ring-black/[0.08]'>
-          {/* Browser chrome */}
-          <div className='flex h-7 items-center gap-1.5 border-b border-black/[0.06] bg-[#ebecee] px-3'>
-            <span className='size-2 rounded-full bg-black/15' />
-            <span className='size-2 rounded-full bg-black/15' />
-            <span className='size-2 rounded-full bg-black/15' />
-          </div>
-          {/* Screenshot stage */}
-          <div className='relative aspect-[16/10]'>
-            <AnimatePresence mode='sync'>
-              <motion.div
-                key={slide.id}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{
-                  duration: reducedMotion ? 0 : 0.32,
-                  ease: 'easeOut',
-                }}
-                className='absolute inset-0'
-              >
-                <Image
-                  src={slide.image.publicUrl}
-                  alt={slide.image.alt}
-                  width={slide.image.width}
-                  height={slide.image.height}
-                  priority
-                  unoptimized
-                  className='absolute inset-0 h-full w-full object-cover object-top'
-                />
-              </motion.div>
-            </AnimatePresence>
-          </div>
-        </div>
+        <AnimatePresence mode='sync'>
+          <motion.div
+            key={slide}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{
+              duration: reducedMotion ? 0 : 0.32,
+              ease: 'easeOut',
+            }}
+          >
+            <ProductScreenshotFrame
+              scenarioId={slide}
+              sizes='(min-width: 1280px) 540px, (min-width: 1024px) 44vw, 88vw'
+              priority={index === 0}
+            />
+          </motion.div>
+        </AnimatePresence>
       </div>
 
-      {/* Spacer — keeps the headline anchored at the bottom while the
-          screenshot floats toward the center. */}
+      {/* Spacer pushes the headline + bars to the bottom of the card. */}
       <div className='min-h-0 flex-1' />
 
-      {/* Headline — bottom-left of the card, sits above the bars. */}
       <div className='relative z-10 px-8 pb-5 sm:px-10 sm:pb-6'>
         <h2 className={cn(SHELL_H2_CLASS, 'text-balance text-black')}>
           Built for Artists.
         </h2>
       </div>
 
-      {/* Segmented progress bars — one per slide, side-by-side at the bottom. */}
+      {/* Segmented progress bars — one per slide, side-by-side. */}
       <div
         aria-hidden='true'
         className='relative z-10 flex gap-1.5 px-8 pb-7 sm:px-10 sm:pb-8'
       >
         {SLIDES.map((s, i) => (
           <ProgressSegment
-            key={s.id}
+            key={s}
             state={i < index ? 'past' : i === index ? 'active' : 'future'}
             reducedMotion={reducedMotion}
           />

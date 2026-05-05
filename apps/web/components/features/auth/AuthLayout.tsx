@@ -79,25 +79,6 @@ function SplitLayoutContent({
     >
       <div className='grid w-full gap-4 lg:min-h-[calc(100svh-7.5rem)] lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)] lg:items-stretch lg:gap-6 xl:gap-8'>
         <div className='flex min-h-0 flex-col justify-center lg:max-w-[420px] lg:justify-start lg:pt-10 lg:pb-4 xl:pt-12'>
-          {showLogo ? (
-            <div
-              className={cn(
-                'mb-6 flex justify-center transition-opacity duration-200 ease-out lg:mb-8 lg:justify-start',
-                isKeyboardVisible && 'pointer-events-none opacity-0'
-              )}
-              aria-hidden={isKeyboardVisible}
-            >
-              <Link
-                href='/'
-                className='inline-flex items-center justify-center text-white/40 transition-colors duration-200 hover:text-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20'
-                aria-label='Go to homepage'
-                tabIndex={isKeyboardVisible ? -1 : undefined}
-              >
-                <BrandLogo size={16} tone='auto' aria-hidden />
-              </Link>
-            </div>
-          ) : null}
-
           {showFormTitle && formTitle ? (
             <h1
               className={cn(
@@ -165,26 +146,6 @@ function StackLayoutContent({
           `relative z-10 flex w-full ${AUTH_FORM_MAX_WIDTH_CLASS} flex-col items-center overflow-visible`
         )}
       >
-        <div
-          className={cn(
-            'mb-6 flex h-6 w-6 items-center justify-center sm:mb-8',
-            'transition-opacity duration-200 ease-out',
-            (isKeyboardVisible || !showLogo) && 'pointer-events-none opacity-0'
-          )}
-          aria-hidden={isKeyboardVisible || !showLogo}
-        >
-          <Link
-            href='/'
-            className={`block ${LINK_FOCUS_CLASSES}`}
-            aria-label='Go to homepage'
-            tabIndex={isKeyboardVisible || !showLogo ? -1 : undefined}
-          >
-            <span className='inline-flex'>
-              <BrandLogo size={24} tone='auto' />
-            </span>
-          </Link>
-        </div>
-
         {showFormTitle && formTitle ? (
           <h1
             className={cn(
@@ -319,6 +280,25 @@ export function AuthLayout({
         >
           Skip to form
         </Link>
+      ) : null}
+
+      {showLogo ? (
+        <div
+          className={cn(
+            'absolute top-5 left-5 z-50 transition-opacity duration-200 ease-out sm:top-6 sm:left-6',
+            isKeyboardVisible && 'pointer-events-none opacity-0'
+          )}
+          aria-hidden={isKeyboardVisible}
+        >
+          <Link
+            href='/'
+            className='inline-flex items-center justify-center text-white/45 transition-colors duration-200 hover:text-white/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20'
+            aria-label='Go to homepage'
+            tabIndex={isKeyboardVisible ? -1 : undefined}
+          >
+            <BrandLogo size={18} tone='auto' aria-hidden />
+          </Link>
+        </div>
       ) : null}
 
       {showLogoutButton ? (
