@@ -10,9 +10,16 @@ import { ChatEntityRightPanelHost } from '@/app/app/(shell)/chat/ChatEntityRight
 const { mockUseRegisterRightPanel } = vi.hoisted(() => ({
   mockUseRegisterRightPanel: vi.fn(),
 }));
-const { mockUseReleaseEntityQuery, mockUseReleasesQuery } = vi.hoisted(() => ({
+const {
+  mockUseReleaseEntityQuery,
+  mockUseReleasesQuery,
+  mockUseContactsQuery,
+  mockUseEventsQuery,
+} = vi.hoisted(() => ({
   mockUseReleaseEntityQuery: vi.fn(),
   mockUseReleasesQuery: vi.fn(),
+  mockUseContactsQuery: vi.fn(),
+  mockUseEventsQuery: vi.fn(),
 }));
 let mockPreviewPanelOpen = false;
 
@@ -47,6 +54,14 @@ vi.mock('@/lib/queries/useReleasesQuery', () => ({
   useReleasesQuery: mockUseReleasesQuery,
 }));
 
+vi.mock('@/lib/queries/useContactsQuery', () => ({
+  useContactsQuery: mockUseContactsQuery,
+}));
+
+vi.mock('@/lib/queries/useEventsQuery', () => ({
+  useEventsQuery: mockUseEventsQuery,
+}));
+
 vi.mock('@/components/providers/ErrorBoundary', () => ({
   ErrorBoundary: ({ children }: { readonly children: React.ReactNode }) =>
     children,
@@ -76,11 +91,41 @@ function TargetLabel() {
   return <div>{target?.kind ?? 'none'}</div>;
 }
 
+function OpenContactTarget() {
+  const { open } = useChatEntityPanel();
+  useEffect(() => {
+    open({
+      kind: 'contact',
+      id: 'contact-1',
+      source: 'tool',
+      focusKey: 'contact-1',
+    });
+  }, [open]);
+  return null;
+}
+
+function OpenTourDateTarget() {
+  const { open } = useChatEntityPanel();
+  useEffect(() => {
+    open({
+      kind: 'tour-date',
+      id: 'evt_brooklyn',
+      source: 'tool',
+      focusKey: 'evt_brooklyn',
+    });
+  }, [open]);
+  return null;
+}
+
 describe('ChatEntityRightPanelHost', () => {
   beforeEach(() => {
     mockUseReleaseEntityQuery.mockClear();
     mockUseReleaseEntityQuery.mockReturnValue({ data: null, isLoading: false });
     mockUseReleasesQuery.mockClear();
+    mockUseContactsQuery.mockClear();
+    mockUseContactsQuery.mockReturnValue({ data: [], isLoading: false });
+    mockUseEventsQuery.mockClear();
+    mockUseEventsQuery.mockReturnValue({ data: [], isLoading: false });
   });
 
   it('registers no right panel when preview is closed', () => {
@@ -162,5 +207,99 @@ describe('ChatEntityRightPanelHost', () => {
       'release-1'
     );
     expect(mockUseReleasesQuery).not.toHaveBeenCalled();
+  });
+
+  it('registers a contact entity panel backed by useContactsQuery', () => {
+    mockPreviewPanelOpen = false;
+    mockUseRegisterRightPanel.mockClear();
+    mockUseContactsQuery.mockReturnValue({
+      data: [
+        {
+          id: 'contact-1',
+          creatorProfileId: 'profile-1',
+          role: 'manager',
+          personName: 'Pat Manager',
+          territories: ['NA'],
+          email: 'pat@example.com',
+          isActive: true,
+          sortOrder: 0,
+        },
+      ],
+      isLoading: false,
+    });
+
+    render(
+      <ChatEntityPanelProvider>
+        <OpenContactTarget />
+        <ChatEntityRightPanelHost
+          enablePreviewPanel={false}
+          enableChatEntityPanels
+          profileId='profile-1'
+        />
+      </ChatEntityPanelProvider>
+    );
+
+    const registeredPanel = mockUseRegisterRightPanel.mock.calls.at(-1)?.[0];
+    expect(registeredPanel).not.toBeNull();
+    render(registeredPanel as React.ReactElement);
+    expect(mockUseContactsQuery).toHaveBeenCalledWith('profile-1');
+    expect(screen.getByTestId('chat-contact-entity-panel')).toBeInTheDocument();
+    expect(screen.getByText('Pat Manager')).toBeInTheDocument();
+  });
+
+  it('registers a tour-date entity panel backed by useEventsQuery', () => {
+    mockPreviewPanelOpen = false;
+    mockUseRegisterRightPanel.mockClear();
+    mockUseEventsQuery.mockReturnValue({
+      data: [
+        {
+          id: 'evt_brooklyn',
+          title: 'Brooklyn Steel',
+          subtitle: 'Brooklyn, NY · Bandsintown',
+          eventDate: '2026-06-12T23:30:00.000Z',
+          eventType: 'tour',
+          venue: 'Brooklyn Steel',
+          city: 'Brooklyn, NY',
+          provider: 'Bandsintown',
+        },
+      ],
+      isLoading: false,
+    });
+
+    render(
+      <ChatEntityPanelProvider>
+        <OpenTourDateTarget />
+        <ChatEntityRightPanelHost
+          enablePreviewPanel={false}
+          enableChatEntityPanels
+          profileId='profile-1'
+        />
+      </ChatEntityPanelProvider>
+    );
+
+    const registeredPanel = mockUseRegisterRightPanel.mock.calls.at(-1)?.[0];
+    expect(registeredPanel).not.toBeNull();
+    render(registeredPanel as React.ReactElement);
+    expect(mockUseEventsQuery).toHaveBeenCalledWith('profile-1');
+    expect(
+      screen.getByTestId('chat-tour-date-entity-panel')
+    ).toBeInTheDocument();
+    expect(screen.getByText('Brooklyn Steel')).toBeInTheDocument();
+  });
+
+  it('keeps the right rail empty when flag is off (no panel for contact target)', () => {
+    mockPreviewPanelOpen = false;
+    mockUseRegisterRightPanel.mockClear();
+    render(
+      <ChatEntityPanelProvider>
+        <OpenContactTarget />
+        <ChatEntityRightPanelHost
+          enablePreviewPanel={false}
+          enableChatEntityPanels={false}
+          profileId='profile-1'
+        />
+      </ChatEntityPanelProvider>
+    );
+    expect(mockUseRegisterRightPanel).toHaveBeenLastCalledWith(null);
   });
 });
