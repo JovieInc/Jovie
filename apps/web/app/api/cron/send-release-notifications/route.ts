@@ -1,4 +1,4 @@
-import { and, sql as drizzleSql, eq, lt, lte } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, inArray, lt, lte } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
@@ -312,7 +312,7 @@ async function batchFetchReleases(releaseIds: string[]) {
       sourceType: discogReleases.sourceType,
     })
     .from(discogReleases)
-    .where(drizzleSql`${discogReleases.id} = ANY(${releaseIds})`);
+    .where(inArray(discogReleases.id, releaseIds));
 
   return new Map(releases.map(r => [r.id, r]));
 }
@@ -334,7 +334,7 @@ async function batchFetchCreatorProfiles(creatorProfileIds: string[]) {
     })
     .from(creatorProfiles)
     .leftJoin(users, eq(users.id, creatorProfiles.userId))
-    .where(drizzleSql`${creatorProfiles.id} = ANY(${creatorProfileIds})`);
+    .where(inArray(creatorProfiles.id, creatorProfileIds));
 
   return new Map(creators.map(c => [c.id, c]));
 }
@@ -353,7 +353,7 @@ async function batchFetchSubscribers(subscriptionIds: string[]) {
     .from(notificationSubscriptions)
     .where(
       and(
-        drizzleSql`${notificationSubscriptions.id} = ANY(${subscriptionIds})`,
+        inArray(notificationSubscriptions.id, subscriptionIds),
         drizzleSql`${notificationSubscriptions.unsubscribedAt} IS NULL`,
         drizzleSql`${notificationSubscriptions.confirmedAt} IS NOT NULL`,
         drizzleSql`(${notificationSubscriptions.preferences}->>'releaseDay')::boolean = true`
@@ -376,7 +376,7 @@ async function batchFetchStreamingLinks(releaseIds: string[]) {
     .where(
       and(
         eq(providerLinks.ownerType, 'release'),
-        drizzleSql`${providerLinks.releaseId} = ANY(${releaseIds})`
+        inArray(providerLinks.releaseId, releaseIds)
       )
     );
 

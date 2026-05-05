@@ -81,6 +81,8 @@ import {
 import {
   buildAlbumArtBackgroundPrompt,
   generateAlbumArtBackgrounds,
+  isXaiConfigured,
+  XaiApiKeyMissingError,
 } from '@/lib/services/album-art/provider-xai';
 import { renderAlbumArtCandidate } from '@/lib/services/album-art/render';
 import {
@@ -825,6 +827,14 @@ function createGenerateAlbumArtTool(params: {
         };
       }
 
+      if (!isXaiConfigured()) {
+        return {
+          success: false as const,
+          retryable: false,
+          error: 'Album art generation is temporarily unavailable.',
+        };
+      }
+
       const releases = await fetchReleasesForChat(params.profileId);
       const target = resolveAlbumArtReleaseTarget(releases, {
         releaseId,
@@ -965,6 +975,15 @@ function createGenerateAlbumArtTool(params: {
           })),
         };
       } catch (error) {
+        if (error instanceof XaiApiKeyMissingError) {
+          // Provider key may go missing between the early check and the call
+          // (e.g. env reload). Treat as feature_disabled, do not capture.
+          return {
+            success: false as const,
+            retryable: false,
+            error: 'Album art generation is temporarily unavailable.',
+          };
+        }
         Sentry.captureException(error, {
           tags: { feature: 'album-art-generation' },
           extra: { profileId: params.profileId, releaseId, releaseTitle },

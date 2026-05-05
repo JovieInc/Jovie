@@ -2886,13 +2886,19 @@ jobs:
           secrets: ${{ toJSON(secrets) }}
       - name: Pull env (preview)
         run: ./node_modules/.bin/vercel pull --yes --environment=preview --token ${{ secrets.VERCEL_TOKEN }}
+      - name: Strip deprecated Turbo env overrides (preview)
+        run: |
+          for env_file in .vercel/.env.preview.local .vercel/.env.local; do
+            if [ -f "$env_file" ]; then
+              grep -v '^TURBO_REMOTE_ONLY=' "$env_file" > "${env_file}.tmp" || true
+              mv "${env_file}.tmp" "$env_file"
+            fi
+          done
       - name: Build (PR preview)
-        run: ./node_modules/.bin/vercel build --token ${{ secrets.VERCEL_TOKEN }}
+        run: env -u TURBO_REMOTE_ONLY ./node_modules/.bin/vercel build --token ${{ secrets.VERCEL_TOKEN }}
         env:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
-          # Unset deprecated TURBO_REMOTE_ONLY to prevent conflict with TURBO_CACHE
-          TURBO_REMOTE_ONLY: ''
       - name: Deploy (PR preview, fast deployment for UI-only changes)
         id: pr_deploy
         run: |
@@ -3459,13 +3465,19 @@ jobs:
           secrets: ${{ toJSON(secrets) }}
       - name: Pull env (production)
         run: ./node_modules/.bin/vercel pull --yes --environment=production --token ${{ secrets.VERCEL_TOKEN }}
+      - name: Strip deprecated Turbo env overrides (production)
+        run: |
+          for env_file in .vercel/.env.production.local .vercel/.env.local; do
+            if [ -f "$env_file" ]; then
+              grep -v '^TURBO_REMOTE_ONLY=' "$env_file" > "${env_file}.tmp" || true
+              mv "${env_file}.tmp" "$env_file"
+            fi
+          done
       - name: Build (preview target for staging verification)
-        run: ./node_modules/.bin/vercel build --token ${{ secrets.VERCEL_TOKEN }}
+        run: env -u TURBO_REMOTE_ONLY ./node_modules/.bin/vercel build --token ${{ secrets.VERCEL_TOKEN }}
         env:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
-          # Unset deprecated TURBO_REMOTE_ONLY to prevent conflict with TURBO_CACHE
-          TURBO_REMOTE_ONLY: ''
       - name: Deploy (staging preview, prebuilt)
         id: deploy
         run: |

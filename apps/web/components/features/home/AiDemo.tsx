@@ -87,6 +87,28 @@ function randomDelay() {
   );
 }
 
+function resolveToggleLabel(
+  prefersReducedMotion: boolean,
+  isPaused: boolean
+): string {
+  if (prefersReducedMotion) return 'Show next demo';
+  if (isPaused) return 'Resume demo';
+  return 'Pause demo';
+}
+
+function AiDemoCursor({ isPremium }: Readonly<{ isPremium: boolean }>) {
+  return (
+    <span
+      className='ai-demo-cursor ml-0.5 inline-block h-[15px] w-[7px] align-text-bottom'
+      style={{
+        backgroundColor: isPremium ? 'rgb(196 181 253)' : 'rgb(167 139 250)',
+        animation: 'cursorBlink 1s step-end infinite',
+      }}
+      aria-hidden='true'
+    />
+  );
+}
+
 interface AiDemoProps {
   readonly className?: string;
   readonly variant?: 'default' | 'premium';
@@ -195,9 +217,7 @@ export function AiDemo({
     if (nextDemo) setVisibleCount(nextDemo.segments.length);
   }, [demoIndex]);
 
-  let toggleLabel = 'Pause demo';
-  if (prefersReducedMotion) toggleLabel = 'Show next demo';
-  else if (isPaused) toggleLabel = 'Resume demo';
+  const toggleLabel = resolveToggleLabel(prefersReducedMotion, isPaused);
 
   return (
     <figure
@@ -358,16 +378,7 @@ export function AiDemo({
           })}
 
           {hasStarted && !prefersReducedMotion ? (
-            <span
-              className='ai-demo-cursor ml-0.5 inline-block h-[15px] w-[7px] align-text-bottom'
-              style={{
-                backgroundColor: isPremium
-                  ? 'rgb(196 181 253)'
-                  : 'rgb(167 139 250)',
-                animation: 'cursorBlink 1s step-end infinite',
-              }}
-              aria-hidden='true'
-            />
+            <AiDemoCursor isPremium={isPremium} />
           ) : null}
         </output>
       </div>

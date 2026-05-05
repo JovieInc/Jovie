@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
 import { HomepageHeroMockupCarousel } from '@/components/homepage/HomepageHeroCarousel';
 import { HomepageOutcomeCards } from '@/components/homepage/HomepageOutcomeCards';
+import { HomepageReleaseVelocityReveal } from '@/components/homepage/HomepageReleaseVelocityReveal';
 import { HERO_COPY } from '@/components/homepage/intent';
 import { FridayRhythmSection } from '@/components/marketing/friday-rhythm-section';
 import { GoLiveInSixtySection } from '@/components/marketing/go-live-in-sixty-section';
@@ -243,6 +244,9 @@ export default async function HomePage() {
         />
       </div>
       <div className='homepage-story-stack'>
+        {FEATURE_FLAGS.SHOW_FORGEUI_MARKETING_UPDATES ? (
+          <HomepageReleaseVelocityReveal />
+        ) : null}
         <GoLiveInSixtySection />
         <FridayRhythmSection />
         <HomepageOutcomeCards

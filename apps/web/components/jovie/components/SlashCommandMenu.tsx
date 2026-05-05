@@ -30,6 +30,7 @@ import type { EntityKind } from '@/lib/chat/tokens';
 import type { EntityRef } from '@/lib/commands/entities';
 import { commandsForSurface, type SkillCommand } from '@/lib/commands/registry';
 import { useArtistSearchQuery } from '@/lib/queries/useArtistSearchQuery';
+import { useEventsQuery } from '@/lib/queries/useEventsQuery';
 import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
 import {
   artistResultToEntityRef,
@@ -37,6 +38,7 @@ import {
   releaseRowMatches,
   releaseRowToEntityRef,
 } from './entity-mappers';
+import { eventRowMatches, eventToEntityRef } from './event-provider';
 import type { PickerItem } from './picker-rows';
 import { type PickerState } from './useChatPicker';
 
@@ -99,6 +101,7 @@ function fuzzyMatch(haystack: string, needle: string): boolean {
 function entityKindLabel(kind: EntityKind): string {
   if (kind === 'release') return 'Release';
   if (kind === 'artist') return 'Artist';
+  if (kind === 'event') return 'Event';
   return 'Track';
 }
 
@@ -130,6 +133,9 @@ export function useSlashItems(
   const { data: releaseData, isLoading: releaseLoading } =
     useReleasesQuery(profileId);
 
+  const { data: eventData, isLoading: eventLoading } =
+    useEventsQuery(profileId);
+
   const artistSearch = useArtistSearchQuery({ limit: 8, minQueryLength: 1 });
   const artistSearchSearch = artistSearch.search;
   const artistQueryNeeded = isRoot || (isEntity && state.kind === 'artist');
@@ -149,13 +155,32 @@ export function useSlashItems(
       .slice(0, isEntity ? 8 : 4)
       .map(r => releaseRowToEntityRef(r as ReleaseLikeRow));
 
+    const filteredEvents: EntityRef[] = (eventData ?? [])
+      .filter(e => eventRowMatches(e, lowerQuery))
+      .slice(0, isEntity ? 8 : 4)
+      .map(eventToEntityRef);
+
     const artistEntities: EntityRef[] = artistSearch.results
       .slice(0, isEntity ? 8 : 4)
       .map(artistResultToEntityRef);
 
     if (state.status === 'entity') {
-      const items: EntityRef[] =
-        state.kind === 'release' ? filteredReleases : artistEntities;
+      let items: EntityRef[];
+      let loading: boolean;
+      if (state.kind === 'release') {
+        items = filteredReleases;
+        loading = releaseLoading;
+      } else if (state.kind === 'event') {
+        items = filteredEvents;
+        loading = eventLoading;
+      } else if (state.kind === 'artist') {
+        items = artistEntities;
+        loading = artistSearch.state === 'loading';
+      } else {
+        // 'track' has no provider yet — return a real empty state.
+        items = [];
+        loading = false;
+      }
       const slashItems: SlashMenuItem[] = items.map(e => ({
         kind: 'entity',
         entity: e,
@@ -167,14 +192,7 @@ export function useSlashItems(
           items: slashItems,
         },
       ];
-      return {
-        items: slashItems,
-        sections,
-        isLoading:
-          state.kind === 'release'
-            ? releaseLoading
-            : artistSearch.state === 'loading',
-      };
+      return { items: slashItems, sections, isLoading: loading };
     }
 
     // root: skills + entity suggestions per kind
@@ -208,11 +226,20 @@ export function useSlashItems(
       sections.push({ id: 'artist', label: 'Artists', items: groupItems });
       items.push(...groupItems);
     }
+    if (filteredEvents.length > 0) {
+      const groupItems: SlashMenuItem[] = filteredEvents.map(e => ({
+        kind: 'entity',
+        entity: e,
+      }));
+      sections.push({ id: 'event', label: 'Events', items: groupItems });
+      items.push(...groupItems);
+    }
 
     return {
       items,
       sections,
-      isLoading: releaseLoading || artistSearch.state === 'loading',
+      isLoading:
+        releaseLoading || eventLoading || artistSearch.state === 'loading',
     };
   }, [
     state,
@@ -220,6 +247,8 @@ export function useSlashItems(
     isEntity,
     releaseData,
     releaseLoading,
+    eventData,
+    eventLoading,
     artistSearch.results,
     artistSearch.state,
   ]);
