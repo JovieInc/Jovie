@@ -25,7 +25,9 @@ function buildExpectedSignature(
   fullUrl: string,
   formParams: URLSearchParams
 ): string {
-  const sortedKeys = Array.from(new Set(Array.from(formParams.keys()))).sort();
+  const sortedKeys = Array.from(new Set(Array.from(formParams.keys()))).sort(
+    (a, b) => a.localeCompare(b)
+  );
   let signed = fullUrl;
   for (const key of sortedKeys) {
     const values = formParams.getAll(key);
