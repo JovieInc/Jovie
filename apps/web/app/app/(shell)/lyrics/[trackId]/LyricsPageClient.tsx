@@ -17,30 +17,39 @@ import {
 export function LyricsPageClient({
   initialLines,
   initialTrack,
+  initialDurationSec,
   trackId,
 }: {
   readonly initialLines: readonly LyricLine[];
   readonly initialTrack: LyricsViewTrack;
+  readonly initialDurationSec: number;
   readonly trackId: string;
 }) {
   const { playbackState, seek } = useTrackAudioPlayer();
+  const isActive = playbackState.activeTrackId === trackId;
 
   const track = {
     title:
-      playbackState.activeTrackId === trackId && playbackState.trackTitle
+      isActive && playbackState.trackTitle
         ? playbackState.trackTitle
         : initialTrack.title,
     artist:
-      playbackState.activeTrackId === trackId && playbackState.artistName
+      isActive && playbackState.artistName
         ? playbackState.artistName
         : initialTrack.artist,
   };
 
+  // Prefer the live audio element's duration when this track is the active
+  // playback target; otherwise fall back to the persisted track length so
+  // the surface still shows duration on cold loads.
+  const durationSec = isActive ? playbackState.duration : initialDurationSec;
+  const currentTimeSec = isActive ? playbackState.currentTime : 0;
+
   return (
     <LyricsView
       track={track}
-      durationSec={playbackState.duration}
-      currentTimeSec={playbackState.currentTime}
+      durationSec={durationSec}
+      currentTimeSec={currentTimeSec}
       lines={initialLines}
       onSeek={seek}
       timed={false}
