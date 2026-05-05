@@ -1,6 +1,6 @@
 # Codex Setup Guide for Jovie
 
-This repo uses the shared Jovie setup and archive scripts for Codex. Keep Codex-specific files as thin wrappers so they cannot drift from `AGENTS.md`, `conductor.json`, or the scripts humans run locally.
+This repo uses the shared Jovie setup and archive scripts for Codex. Keep Codex-specific files as thin wrappers so they cannot drift from `CLAUDE.md` (and its `AGENTS.md` symlink), the scoped rules under `.claude/rules/`, `conductor.json`, or the scripts humans run locally.
 
 ## Automatic Local Setup
 
@@ -83,3 +83,7 @@ Commands that need secrets must use the repo wrappers or an explicit Doppler pre
 ```bash
 doppler run --project jovie-web --config dev -- <command>
 ```
+
+## Scoped Rules
+
+Codex agents follow the same rules as Claude. The canonical entry point is `CLAUDE.md`/`AGENTS.md`, which points to topic-scoped files under `.claude/rules/` (environment, auth, db, ui, security, release, testing, infra, code-style, linear, gstack). Read the relevant rule before editing the topic it covers.
