@@ -257,7 +257,7 @@
     "vite": "8.0.9",
     "@vitejs/plugin-react": "^5.2.0",
     "@vitest/browser": "4.1.4",
-    "@vitest/browser-playwright": "4.1.4",
+    "@vitest/browser-playwright": "4.1.5",
     "@vitest/coverage-v8": "4.1.4",
     "autoprefixer": "^10.4.27",
     "axe-core": "^4.11.1",
