@@ -256,7 +256,7 @@ export async function scheduleReleaseNotifications(): Promise<{
       })
       .from(creatorProfiles)
       .leftJoin(users, eq(users.id, creatorProfiles.userId))
-      .where(drizzleSql`${creatorProfiles.id} = ANY(${creatorProfileIds})`),
+      .where(inArray(creatorProfiles.id, creatorProfileIds)),
     db
       .select({
         releaseId: providerLinks.releaseId,
@@ -265,7 +265,7 @@ export async function scheduleReleaseNotifications(): Promise<{
       .where(
         and(
           eq(providerLinks.ownerType, 'release'),
-          drizzleSql`${providerLinks.releaseId} = ANY(${releaseIds})`
+          inArray(providerLinks.releaseId, releaseIds)
         )
       ),
   ]);
@@ -278,7 +278,7 @@ export async function scheduleReleaseNotifications(): Promise<{
     .from(notificationSubscriptions)
     .where(
       and(
-        drizzleSql`${notificationSubscriptions.creatorProfileId} = ANY(${creatorProfileIds})`,
+        inArray(notificationSubscriptions.creatorProfileId, creatorProfileIds),
         drizzleSql`${notificationSubscriptions.unsubscribedAt} IS NULL`,
         drizzleSql`${notificationSubscriptions.confirmedAt} IS NOT NULL`,
         drizzleSql`(${notificationSubscriptions.preferences}->>'releaseDay')::boolean = true`

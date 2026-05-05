@@ -68,6 +68,65 @@ describe('Environment Validation', () => {
       }
     });
 
+    it('flags missing XAI_API_KEY as warning (not critical) in production', () => {
+      const originalVercelEnv = process.env.VERCEL_ENV;
+      const originalXaiKey = process.env.XAI_API_KEY;
+      process.env.VERCEL_ENV = 'production';
+      delete process.env.XAI_API_KEY;
+
+      try {
+        const result = validateEnvironment('runtime');
+
+        expect(
+          result.warnings.some(message =>
+            message.includes('XAI_API_KEY is missing')
+          )
+        ).toBe(true);
+        // Critical list must NOT include the xAI warning — app must still boot
+        expect(
+          result.critical.some(message => message.includes('XAI_API_KEY'))
+        ).toBe(false);
+      } finally {
+        if (originalVercelEnv) {
+          process.env.VERCEL_ENV = originalVercelEnv;
+        } else {
+          delete process.env.VERCEL_ENV;
+        }
+        if (originalXaiKey) {
+          process.env.XAI_API_KEY = originalXaiKey;
+        } else {
+          delete process.env.XAI_API_KEY;
+        }
+      }
+    });
+
+    it('does not warn about XAI_API_KEY in development', () => {
+      const originalVercelEnv = process.env.VERCEL_ENV;
+      const originalXaiKey = process.env.XAI_API_KEY;
+      process.env.VERCEL_ENV = 'development';
+      delete process.env.XAI_API_KEY;
+
+      try {
+        const result = validateEnvironment('runtime');
+        expect(
+          result.warnings.some(message =>
+            message.includes('XAI_API_KEY is missing')
+          )
+        ).toBe(false);
+      } finally {
+        if (originalVercelEnv) {
+          process.env.VERCEL_ENV = originalVercelEnv;
+        } else {
+          delete process.env.VERCEL_ENV;
+        }
+        if (originalXaiKey) {
+          process.env.XAI_API_KEY = originalXaiKey;
+        } else {
+          delete process.env.XAI_API_KEY;
+        }
+      }
+    });
+
     it('passes AI gateway validation when AI_GATEWAY_API_KEY is set in preview', () => {
       const originalVercelEnv = process.env.VERCEL_ENV;
       const originalGatewayKey = process.env.AI_GATEWAY_API_KEY;
