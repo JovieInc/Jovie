@@ -201,6 +201,27 @@ const checkAiGatewayApiKey: ValidationRule = ({ server, vercelEnv }) => {
 };
 
 /**
+ * Validation rule: Warn when XAI_API_KEY is missing in production/preview.
+ *
+ * xAI powers album-art generation, which gracefully degrades when the key is
+ * absent. Warning (not critical) so the app still boots, but loud enough at
+ * startup that an operator notices the missing capability.
+ */
+const checkXaiApiKey: ValidationRule = ({ server, vercelEnv }) => {
+  if (
+    (vercelEnv === 'production' || vercelEnv === 'preview') &&
+    !server.XAI_API_KEY
+  ) {
+    return {
+      type: 'warning',
+      message:
+        'XAI_API_KEY is missing — album art generation will be disabled until configured',
+    };
+  }
+  return null;
+};
+
+/**
  * Runtime validation rules (checked in runtime context)
  */
 export const RUNTIME_VALIDATION_RULES: ValidationRule[] = [
@@ -212,4 +233,5 @@ export const RUNTIME_VALIDATION_RULES: ValidationRule[] = [
   checkStripePairConsistency,
   checkUrlEncryptionKey,
   checkAiGatewayApiKey,
+  checkXaiApiKey,
 ];
