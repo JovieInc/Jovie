@@ -217,7 +217,7 @@ function AudienceQualityFilterVisual() {
                 <span className='block text-[10px] font-semibold leading-tight text-white/76 sm:text-[11px]'>
                   {label}
                 </span>
-                <span className='block text-[10px] leading-tight text-white/36'>
+                <span className='block text-[10px] leading-tight text-white/64'>
                   {detail}
                 </span>
               </span>
