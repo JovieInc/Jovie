@@ -1,16 +1,9 @@
 import type { Metadata } from 'next';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
 import { HomepageHeroMockupCarousel } from '@/components/homepage/HomepageHeroCarousel';
-import { HomepageOutcomeCards } from '@/components/homepage/HomepageOutcomeCards';
-import { HomepageReleaseVelocityReveal } from '@/components/homepage/HomepageReleaseVelocityReveal';
 import { HERO_COPY } from '@/components/homepage/intent';
-import { FridayRhythmSection } from '@/components/marketing/friday-rhythm-section';
-import { GoLiveInSixtySection } from '@/components/marketing/go-live-in-sixty-section';
-import {
-  HomepageV2FinalCta,
-  HomepageV2Pricing,
-} from '@/components/marketing/homepage-v2/HomepageV2Ctas';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
@@ -22,6 +15,53 @@ import {
 } from '@/lib/constants/schemas';
 import { publicEnv } from '@/lib/env-public';
 import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
+
+// Below-the-fold sections are dynamic-loaded so their `motion/react`
+// hydration cost doesn't compete with above-the-fold work. SSR stays on
+// (SEO + initial HTML preserved) — only the client JS chunk is deferred.
+// JOV-1835: cuts homepage TBT from ~1365ms toward the 300ms budget.
+const HomepageReleaseVelocityReveal = dynamic(
+  () =>
+    import('@/components/homepage/HomepageReleaseVelocityReveal').then(m => ({
+      default: m.HomepageReleaseVelocityReveal,
+    })),
+  { ssr: true }
+);
+const HomepageOutcomeCards = dynamic(
+  () =>
+    import('@/components/homepage/HomepageOutcomeCards').then(m => ({
+      default: m.HomepageOutcomeCards,
+    })),
+  { ssr: true }
+);
+const FridayRhythmSection = dynamic(
+  () =>
+    import('@/components/marketing/friday-rhythm-section').then(m => ({
+      default: m.FridayRhythmSection,
+    })),
+  { ssr: true }
+);
+const GoLiveInSixtySection = dynamic(
+  () =>
+    import('@/components/marketing/go-live-in-sixty-section').then(m => ({
+      default: m.GoLiveInSixtySection,
+    })),
+  { ssr: true }
+);
+const HomepageV2Pricing = dynamic(
+  () =>
+    import('@/components/marketing/homepage-v2/HomepageV2Ctas').then(m => ({
+      default: m.HomepageV2Pricing,
+    })),
+  { ssr: true }
+);
+const HomepageV2FinalCta = dynamic(
+  () =>
+    import('@/components/marketing/homepage-v2/HomepageV2Ctas').then(m => ({
+      default: m.HomepageV2FinalCta,
+    })),
+  { ssr: true }
+);
 
 export const revalidate = false;
 
