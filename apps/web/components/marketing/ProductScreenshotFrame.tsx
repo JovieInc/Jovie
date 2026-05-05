@@ -10,6 +10,13 @@ interface ProductScreenshotFrameProps {
   readonly className?: string;
   readonly altOverride?: string;
   readonly device?: 'desktop' | 'phone';
+  /**
+   * Fill the parent container instead of sizing to the image's intrinsic
+   * aspect ratio. The parent must enforce dimensions (typically via
+   * `aspect-[16/10]` or fixed height). Used when the frame lives inside
+   * an absolutely-positioned crossfade slot.
+   */
+  readonly fill?: boolean;
   readonly 'aria-hidden'?: boolean;
 }
 
@@ -33,6 +40,7 @@ export function ProductScreenshotFrame({
   className,
   altOverride,
   device = 'desktop',
+  fill,
   'aria-hidden': ariaHidden,
 }: ProductScreenshotFrameProps) {
   const image = getMarketingExportImage(scenarioId);
@@ -44,10 +52,15 @@ export function ProductScreenshotFrame({
       className={cn(
         'relative overflow-hidden border border-[rgba(189,189,244,0.09)] bg-[rgba(157,157,255,0.04)] shadow-[0_30px_80px_rgba(0,0,0,0.5)]',
         isPhone ? 'rounded-[28px] p-1.5' : 'rounded-[12px] p-1',
+        fill && 'h-full w-full',
         className
       )}
       style={
-        { aspectRatio: `${image.width} / ${image.height}` } as CSSProperties
+        fill
+          ? undefined
+          : ({
+              aspectRatio: `${image.width} / ${image.height}`,
+            } as CSSProperties)
       }
     >
       <Image

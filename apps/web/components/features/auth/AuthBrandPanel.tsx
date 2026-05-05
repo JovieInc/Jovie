@@ -2,7 +2,6 @@
 
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useState } from 'react';
-import { SHELL_H2_CLASS } from '@/components/marketing/artist-profile/ArtistProfileSectionHeader';
 import { ProductScreenshotFrame } from '@/components/marketing/ProductScreenshotFrame';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { cn } from '@/lib/utils';
@@ -61,23 +60,26 @@ function AuthBrandCarousel() {
       {/* Spacer above the floating screenshot. */}
       <div className='min-h-0 flex-1' />
 
-      {/* Floating product screenshot — same device frame as the homepage hero. */}
-      <div className='relative mx-8 sm:mx-10'>
-        <AnimatePresence mode='sync'>
+      {/* Stage with reserved 16:10 space — slides crossfade absolutely so
+          they overlap (no layout glitch on slide change). */}
+      <div className='relative mx-8 aspect-[16/10] sm:mx-10'>
+        <AnimatePresence initial={false} mode='sync'>
           <motion.div
             key={slide}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{
-              duration: reducedMotion ? 0 : 0.32,
-              ease: 'easeOut',
+              duration: reducedMotion ? 0 : 0.5,
+              ease: [0.22, 1, 0.36, 1],
             }}
+            className='absolute inset-0'
           >
             <ProductScreenshotFrame
               scenarioId={slide}
               sizes='(min-width: 1280px) 540px, (min-width: 1024px) 44vw, 88vw'
               priority={index === 0}
+              fill
             />
           </motion.div>
         </AnimatePresence>
@@ -86,13 +88,13 @@ function AuthBrandCarousel() {
       {/* Spacer pushes the headline + bars to the bottom of the card. */}
       <div className='min-h-0 flex-1' />
 
-      <div className='relative z-10 px-8 pb-5 sm:px-10 sm:pb-6'>
-        <h2 className={cn(SHELL_H2_CLASS, 'text-balance text-black')}>
+      <div className='relative z-10 px-8 pb-4 sm:px-10'>
+        <h2 className='text-balance text-[clamp(1.5rem,2.6vw,2rem)] font-[680] leading-[1.05] tracking-[-0.025em] text-black'>
           Built for Artists.
         </h2>
       </div>
 
-      {/* Segmented progress bars — one per slide, side-by-side. */}
+      {/* Segmented progress bars — thicker, side-by-side. */}
       <div
         aria-hidden='true'
         className='relative z-10 flex gap-1.5 px-8 pb-7 sm:px-10 sm:pb-8'
@@ -116,7 +118,7 @@ interface ProgressSegmentProps {
 
 function ProgressSegment({ state, reducedMotion }: ProgressSegmentProps) {
   return (
-    <div className='relative h-[3px] flex-1 overflow-hidden rounded-full bg-black/10'>
+    <div className='relative h-[5px] flex-1 overflow-hidden rounded-full bg-black/10'>
       {state === 'past' ? <div className='h-full w-full bg-black' /> : null}
       {state === 'active' ? (
         reducedMotion ? (
