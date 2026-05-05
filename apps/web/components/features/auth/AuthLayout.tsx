@@ -73,7 +73,7 @@ function SplitLayoutContent({
   return (
     <div className='relative z-10 flex w-full flex-1 items-stretch'>
       <div className='grid w-full gap-2 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)] lg:items-stretch'>
-        <div className='flex min-h-0 flex-col justify-center px-4 sm:px-8 lg:max-w-[460px] lg:justify-start lg:px-12 lg:pt-12 lg:pb-6 xl:pt-16'>
+        <div className='flex min-h-0 flex-col justify-center px-4 sm:px-8 lg:max-w-[460px] lg:justify-start lg:px-12 lg:pt-8 lg:pb-3 xl:pt-10'>
           {showFormTitle && formTitle ? (
             <h1
               className={cn(
@@ -99,7 +99,7 @@ function SplitLayoutContent({
           </main>
 
           {showFooterPrompt && !isKeyboardVisible ? (
-            <p className='mt-5 text-center text-app font-normal text-white/58 animate-in fade-in-0 duration-200 lg:text-left'>
+            <p className='mt-3 text-center text-app font-normal text-white/58 animate-in fade-in-0 duration-200 lg:text-left'>
               {footerPrompt}{' '}
               <Link
                 href={footerLinkHref}

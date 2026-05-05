@@ -146,7 +146,7 @@
 }
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-header {
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
 }
 
 /* Auth-tier title — tighter than marketing SHELL_H2_CLASS. Auth = tool, not billboard. */
@@ -193,9 +193,9 @@
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-socialButtons {
   display: grid;
-  gap: 0.5rem;
+  gap: 0.375rem;
   grid-template-columns: minmax(0, 1fr);
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.5rem;
 }
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-socialButtonsBlockButton {
@@ -248,7 +248,7 @@
 }
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-dividerRow {
-  margin: 0.75rem 0 0.625rem;
+  margin: 0.5rem 0;
 }
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-dividerLine {
@@ -336,7 +336,7 @@
 /* Auth-tier primary — tighter than marketing ShellCtaButton (h-12 / 15px). */
 :is(.cl-signIn-root, .cl-signUp-root) .cl-formButtonPrimary {
   min-height: 2.5rem;
-  margin-top: 0.375rem;
+  margin-top: 0.25rem;
   border: 0;
   border-radius: var(--clerk-radius-pill);
   background: #ffffff;
