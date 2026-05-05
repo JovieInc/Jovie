@@ -2,37 +2,34 @@ import XCTest
 
 final class JovieUITests: XCTestCase {
   func testSignedOutLaunchShowsAuthScreen() {
-    let app = XCUIApplication()
-    app.launchArguments.append("-ui-testing-signed-out")
-    app.launch()
-
-    XCTAssertTrue(app.staticTexts["Sign In"].waitForExistence(timeout: 2))
+    _ = launchMockApp(launchArgument: "-ui-testing-signed-out", expectedElementDescription: "\"Sign In\"") {
+      $0.staticTexts["Sign In"]
+    }
   }
 
   func testReadyLaunchShowsDashboard() {
-    let app = XCUIApplication()
-    app.launchArguments.append("-ui-testing-ready")
-    app.launch()
+    let app = launchMockApp(launchArgument: "-ui-testing-ready", expectedElementDescription: "\"Copy URL\"") {
+      $0.buttons["Copy URL"]
+    }
 
-    XCTAssertTrue(app.buttons["Copy URL"].waitForExistence(timeout: 2))
     XCTAssertTrue(app.staticTexts["DJ Shadow"].exists)
   }
 
   func testNeedsOnboardingLaunchShowsContinueOnWeb() {
-    let app = XCUIApplication()
-    app.launchArguments.append("-ui-testing-needs-onboarding")
-    app.launch()
-
-    XCTAssertTrue(app.buttons["Continue On Web"].waitForExistence(timeout: 2))
+    _ = launchMockApp(
+      launchArgument: "-ui-testing-needs-onboarding",
+      expectedElementDescription: "\"Continue On Web\""
+    ) {
+      $0.buttons["Continue On Web"]
+    }
   }
 
   func testCopyURLButtonShowsCopiedState() throws {
-    let app = XCUIApplication()
-    app.launchArguments.append("-ui-testing-ready")
-    app.launch()
+    let app = launchMockApp(launchArgument: "-ui-testing-ready", expectedElementDescription: "\"Copy URL\"") {
+      $0.buttons["Copy URL"]
+    }
 
     let copyButton = app.buttons["Copy URL"]
-    XCTAssertTrue(copyButton.waitForExistence(timeout: 2))
     copyButton.tap()
 
     XCTAssertTrue(app.buttons["Copied"].waitForExistence(timeout: 2))
@@ -109,5 +106,34 @@ final class JovieUITests: XCTestCase {
     }
 
     return value
+  }
+
+  private func launchMockApp(
+    launchArgument: String,
+    expectedElementDescription: String,
+    timeout: TimeInterval = 5,
+    file: StaticString = #filePath,
+    line: UInt = #line,
+    element: (XCUIApplication) -> XCUIElement
+  ) -> XCUIApplication {
+    let app = XCUIApplication()
+    app.launchArguments.append(launchArgument)
+
+    for attempt in 1...2 {
+      app.launch()
+      if element(app).waitForExistence(timeout: timeout) {
+        return app
+      }
+
+      guard attempt == 1 else { break }
+      app.terminate()
+    }
+
+    XCTFail(
+      "App did not reach expected element \(expectedElementDescription).\n\(app.debugDescription)",
+      file: file,
+      line: line
+    )
+    return app
   }
 }

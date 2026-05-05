@@ -95,22 +95,31 @@ test.describe('Homepage', () => {
   test('staged story sections ship live with aligned homepage copy', async ({
     page,
   }) => {
-    await expect(page.getByTestId('homepage-v2-system-overview')).toBeVisible();
-    await expect(
-      page.getByRole('heading', { name: 'What Jovie Handles for You.' })
-    ).toBeVisible();
-    await expect(page.getByTestId('homepage-v2-spotlight')).toBeVisible();
-    await expect(
-      page.getByRole('heading', { name: 'One Link. Always In Sync.' })
-    ).toBeVisible();
-    await expect(
-      page.getByTestId('homepage-v2-capture-reactivate')
-    ).toBeVisible();
+    const releaseVelocity = page.getByTestId(
+      'homepage-release-velocity-reveal'
+    );
+
+    await expect(releaseVelocity).toBeVisible();
     await expect(
       page.getByRole('heading', {
-        name: 'Build the List Once. Keep It Working.',
+        name: 'Jovie helps artists release music faster so they learn what works and iterate before they burn out.',
       })
     ).toBeVisible();
+    await expect(
+      page.getByTestId('homepage-release-velocity-lead')
+    ).toHaveClass(/text-white/);
+    await expect(
+      page.getByTestId('homepage-release-velocity-support')
+    ).toHaveClass(/text-white\/36/);
+    await expect(page.getByTestId('go-live-sixty-section')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Go Live. In 60 Seconds.' })
+    ).toBeVisible();
+    await expect(page.getByTestId('friday-rhythm-section')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Make Every Friday Count.' })
+    ).toBeVisible();
+    await expect(page.getByTestId('homepage-outcome-cards')).toBeVisible();
     await expect(page.getByTestId('homepage-v2-pricing')).toBeVisible();
     await expect(
       page.getByRole('heading', { name: 'Simple Pricing.' })

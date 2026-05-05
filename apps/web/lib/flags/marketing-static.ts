@@ -4,6 +4,11 @@
  * These flags must remain build-time constants so homepage and marketing routes
  * stay fully static.
  */
+const IS_VERCEL_PRODUCTION = process.env.VERCEL_ENV === 'production';
+const SHOW_FORGEUI_MARKETING_UPDATES =
+  process.env.NEXT_PUBLIC_SHOW_FORGEUI_MARKETING_UPDATES === 'true' ||
+  !IS_VERCEL_PRODUCTION;
+
 export const FEATURE_FLAGS = {
   SHOW_EXAMPLE_PROFILES_CAROUSEL: false,
   SHOW_SEE_IT_IN_ACTION: false,
@@ -23,6 +28,7 @@ export const FEATURE_FLAGS = {
   SHOW_HOMEPAGE_V2_FINAL_CTA: true,
   SHOW_HOMEPAGE_V2_FOOTER_LINKS: false,
   SHOW_ARTIST_PROFILE_PAY_FLOW_VIDEO: true,
+  SHOW_FORGEUI_MARKETING_UPDATES,
   SHOW_HOME_V1_DESIGN: false,
   SHOW_PUBLIC_PROFILE_V1_DESIGN: false,
 } as const;

@@ -616,7 +616,7 @@ export async function generateMetadata({
   const ogImage = isMystery
     ? null
     : resolveOgImage(content.artworkSizes, content.artworkUrl);
-  const artworkAlt = `${content.title} ${content.type === 'release' ? 'album' : 'track'} artwork`;
+  const artworkAlt = `${content.title} ${contentType} artwork`;
   const ogTitle = isMystery
     ? `New music from ${artistName}`
     : `${content.title} by ${artistName}`;

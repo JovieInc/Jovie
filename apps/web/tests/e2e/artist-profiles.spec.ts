@@ -315,7 +315,7 @@ test.describe('Artist Profiles Landing', () => {
     await expectNoHorizontalOverflow(page);
   });
 
-  test('spec wall renders the final seven cards without legacy philosophy copy', async ({
+  test('spec wall renders the final eight cards without legacy philosophy copy', async ({
     page,
   }) => {
     const specWallSection = page.getByTestId(
@@ -323,6 +323,16 @@ test.describe('Artist Profiles Landing', () => {
     );
     await specWallSection.scrollIntoViewIfNeeded();
 
+    await expect(
+      specWallSection.getByRole('heading', {
+        name: 'Audience Quality Filtering',
+      })
+    ).toBeVisible();
+    await expect(
+      specWallSection.getByText(
+        'Jovie identifies bots, your own team, and test traffic so your fan metrics measure actual fans.'
+      )
+    ).toBeVisible();
     await expect(
       specWallSection.getByRole('heading', {
         name: 'Rich Analytics',
@@ -362,9 +372,6 @@ test.describe('Artist Profiles Landing', () => {
       )
     ).toBeVisible();
     await expect(specWallSection.getByText('Power features')).toHaveCount(0);
-    await expect(
-      specWallSection.getByText('Audience quality filtering')
-    ).toHaveCount(0);
     await expect(specWallSection.getByText('Opinionated design')).toHaveCount(
       0
     );
