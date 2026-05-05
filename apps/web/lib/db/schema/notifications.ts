@@ -1,5 +1,6 @@
 import { sql as drizzleSql } from 'drizzle-orm';
 import {
+  check,
   index,
   jsonb,
   pgTable,
@@ -50,6 +51,10 @@ export const notificationContacts = pgTable(
       .where(drizzleSql`${table.emailHash} IS NOT NULL`),
     smsStatusIdx: index('notification_contacts_sms_status_idx').on(
       table.smsStatus
+    ),
+    smsStatusValid: check(
+      'notification_contacts_sms_status_valid',
+      drizzleSql`${table.smsStatus} IN ('active', 'stopped', 'blocked')`
     ),
   })
 );
@@ -112,6 +117,10 @@ export const smsSubscribeIntents = pgTable(
     visitorIdIdx: index('sms_subscribe_intents_visitor_id_idx')
       .on(table.visitorId)
       .where(drizzleSql`${table.visitorId} IS NOT NULL`),
+    statusValid: check(
+      'sms_subscribe_intents_status_valid',
+      drizzleSql`${table.status} IN ('created', 'sms_received', 'confirmed', 'expired', 'consumed', 'blocked')`
+    ),
   })
 );
 
