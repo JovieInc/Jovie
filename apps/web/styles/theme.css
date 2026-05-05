@@ -152,22 +152,23 @@
 /* Auth-tier title — tighter than marketing SHELL_H2_CLASS. Auth = tool, not billboard. */
 :is(.cl-signIn-root, .cl-signUp-root) .cl-headerTitle {
   color: var(--clerk-color-foreground);
-  font-size: clamp(1.625rem, 3.2vw, 2.25rem);
+  font-size: clamp(1.5rem, 2.6vw, 2rem);
   font-weight: 680;
-  line-height: 1.05;
+  line-height: 1.1;
   letter-spacing: -0.025em;
-  text-align: left;
+  text-align: center;
   text-wrap: balance;
 }
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-headerSubtitle {
   margin-top: 0.625rem;
   max-width: 22rem;
+  margin-inline: auto;
   color: var(--clerk-color-muted-foreground);
   font-size: 0.9375rem;
   line-height: 1.45;
   letter-spacing: -0.011em;
-  text-align: left;
+  text-align: center;
   text-wrap: pretty;
 }
 
@@ -200,7 +201,9 @@
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-socialButtonsBlockButton {
   width: 100%;
+  height: 2.5rem;
   min-height: 2.5rem;
+  max-height: 2.5rem;
   justify-content: center;
   gap: 0.5rem;
   padding-inline: 1rem;
@@ -275,7 +278,9 @@
 :is(.cl-signIn-root, .cl-signUp-root) .cl-phoneInputBox,
 :is(.cl-signIn-root, .cl-signUp-root) .cl-selectButton,
 :is(.cl-signIn-root, .cl-signUp-root) .cl-selectSearchInput {
+  height: 2.5rem;
   min-height: 2.5rem;
+  max-height: 2.5rem;
   font-size: 0.875rem;
   border: 1px solid var(--clerk-color-border);
   border-radius: var(--clerk-radius-pill);
@@ -335,7 +340,9 @@
 
 /* Auth-tier primary — tighter than marketing ShellCtaButton (h-12 / 15px). */
 :is(.cl-signIn-root, .cl-signUp-root) .cl-formButtonPrimary {
+  height: 2.5rem;
   min-height: 2.5rem;
+  max-height: 2.5rem;
   margin-top: 0.25rem;
   border: 0;
   border-radius: var(--clerk-radius-pill);
