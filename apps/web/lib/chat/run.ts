@@ -203,7 +203,7 @@ export async function executeChatTurn(
     );
   }
 
-  const toolNames = Object.keys(tools).sort();
+  const toolNames = Object.keys(tools).sort((a, b) => a.localeCompare(b));
 
   const streamResult = streamText({
     model: gateway(selectedModel),

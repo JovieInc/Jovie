@@ -1285,7 +1285,7 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    await screen.findByText('Listen And Follow');
+    expect(await screen.findByText('Listen And Follow')).toBeInTheDocument();
 
     await expectNoA11yViolations(container);
 
