@@ -443,19 +443,14 @@ export async function completeOnboarding({
       );
     }
 
-    // Step 8: Sync operations (parallel, fire-and-forget)
+    // Steps 8-9: Sync, trial activation, and completion cookie (fire-and-forget)
     if (shouldFinalizeOnboarding) {
       runBackgroundSyncOperations(userId, completion.username);
-    }
 
-    // Step 9: Activate 14-day Pro trial (fire-and-forget)
-    if (shouldFinalizeOnboarding) {
       void import('./activate-trial').then(({ activateTrial }) =>
         activateTrial(userId)
       );
-    }
 
-    if (shouldFinalizeOnboarding) {
       // ENG-002: Set completion cookie to prevent redirect loop race condition
       const cookieStore = await cookies();
       cookieStore.set('jovie_onboarding_complete', '1', {
