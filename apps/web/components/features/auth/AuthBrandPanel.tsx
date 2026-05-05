@@ -29,8 +29,13 @@ export function AuthBrandPanel({ className }: Readonly<AuthBrandPanelProps>) {
     <div
       data-testid='auth-brand-panel'
       className={cn(
-        'auth-showcase-panel relative flex h-full min-h-[34rem] flex-col overflow-hidden rounded-[28px] bg-white text-black shadow-[0_24px_60px_rgba(0,0,0,0.35)]',
-        'lg:min-h-[calc(100svh-7.5rem)]',
+        // App-shell content surface elevation (matches `--linear-bg-surface-0`
+        // = `--linear-app-content-surface` in Linear dark mode). 12px radius
+        // matches the app shell frame so this reads as an extension of the
+        // shell. Hex-pinned because auth is dark regardless of root theme.
+        'auth-showcase-panel relative flex h-full min-h-[34rem] flex-col overflow-hidden rounded-[12px] bg-[#0f1011] text-white',
+        'border border-white/[0.05]',
+        'lg:min-h-[calc(100svh-1rem)]',
         className
       )}
     >
@@ -89,7 +94,7 @@ function AuthBrandCarousel() {
       <div className='min-h-0 flex-1' />
 
       <div className='relative z-10 px-8 pb-4 sm:px-10'>
-        <h2 className='text-balance text-[clamp(1.5rem,2.6vw,2rem)] font-[680] leading-[1.05] tracking-[-0.025em] text-black'>
+        <h2 className='text-balance text-[clamp(1.5rem,2.6vw,2rem)] font-[680] leading-[1.05] tracking-[-0.025em] text-white'>
           Built for Artists.
         </h2>
       </div>
@@ -118,17 +123,17 @@ interface ProgressSegmentProps {
 
 function ProgressSegment({ state, reducedMotion }: ProgressSegmentProps) {
   return (
-    <div className='relative h-[5px] flex-1 overflow-hidden rounded-full bg-black/10'>
-      {state === 'past' ? <div className='h-full w-full bg-black' /> : null}
+    <div className='relative h-[5px] flex-1 overflow-hidden rounded-full bg-white/12'>
+      {state === 'past' ? <div className='h-full w-full bg-white' /> : null}
       {state === 'active' ? (
         reducedMotion ? (
-          <div className='h-full w-1/2 bg-black' />
+          <div className='h-full w-1/2 bg-white' />
         ) : (
           <motion.div
             initial={{ width: '0%' }}
             animate={{ width: '100%' }}
             transition={{ duration: SLIDE_MS / 1000, ease: 'linear' }}
-            className='h-full bg-black'
+            className='h-full bg-white'
           />
         )
       ) : null}

@@ -71,14 +71,9 @@ function SplitLayoutContent({
   designV1,
 }: AuthLayoutInnerProps) {
   return (
-    <div
-      className={cn(
-        'relative z-10 flex w-full flex-1 items-center justify-center',
-        designV1 ? 'max-w-[1160px]' : 'max-w-[1240px]'
-      )}
-    >
-      <div className='grid w-full gap-4 lg:min-h-[calc(100svh-7.5rem)] lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)] lg:items-stretch lg:gap-6 xl:gap-8'>
-        <div className='flex min-h-0 flex-col justify-center lg:max-w-[420px] lg:justify-start lg:pt-10 lg:pb-4 xl:pt-12'>
+    <div className='relative z-10 flex w-full flex-1 items-stretch'>
+      <div className='grid w-full gap-2 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)] lg:items-stretch'>
+        <div className='flex min-h-0 flex-col justify-center px-4 sm:px-8 lg:max-w-[460px] lg:justify-start lg:px-12 lg:pt-12 lg:pb-6 xl:pt-16'>
           {showFormTitle && formTitle ? (
             <h1
               className={cn(
@@ -117,8 +112,8 @@ function SplitLayoutContent({
         </div>
 
         {showLogo ? (
-          <div className='auth-desktop-only w-full lg:flex lg:min-h-full lg:justify-self-end'>
-            <AuthBrandPanel className='ml-auto h-full w-full max-w-[620px]' />
+          <div className='auth-desktop-only h-full w-full lg:flex lg:min-h-full'>
+            <AuthBrandPanel className='h-full w-full' />
           </div>
         ) : null}
       </div>
@@ -241,13 +236,19 @@ export function AuthLayout({
       data-auth-layout-variant={layoutVariant}
       data-design-v1-auth={designV1 ? 'true' : 'false'}
       className={cn(
+        // App-shell base — sidebar/page background tone (matches Linear
+        // dark `--linear-bg-page`). The bento card sits inside as the
+        // elevated content surface with an 8px gap (matches the app
+        // shell's frame-shell-gap), so this surface reads as an
+        // extension of the shell, not a separate page. Hex-pinned
+        // because auth is dark regardless of root theme preference.
         'fixed inset-0 isolate flex flex-col items-center overflow-hidden overscroll-none max-w-[100dvw] text-white [color-scheme:dark]',
-        designV1 ? 'bg-[#06070a]' : 'bg-[#08090a]',
-        'px-4 sm:px-6',
-        isKeyboardVisible ? 'pt-6 pb-2' : 'pt-8 pb-6 sm:pt-10 sm:pb-8 lg:pt-12',
-        'pb-[max(1rem,env(safe-area-inset-bottom))]',
-        'pl-[max(1rem,env(safe-area-inset-left))]',
-        'pr-[max(1rem,env(safe-area-inset-right))]',
+        'bg-[#08090a]',
+        'p-2 sm:p-2',
+        isKeyboardVisible && 'pt-1 pb-1',
+        'pb-[max(0.5rem,env(safe-area-inset-bottom))]',
+        'pl-[max(0.5rem,env(safe-area-inset-left))]',
+        'pr-[max(0.5rem,env(safe-area-inset-right))]',
         'transition-[padding] duration-200 ease-out'
       )}
     >
@@ -283,7 +284,7 @@ export function AuthLayout({
       {showLogo ? (
         <div
           className={cn(
-            'absolute top-5 left-5 z-50 transition-opacity duration-200 ease-out sm:top-6 sm:left-6',
+            'absolute top-5 left-5 z-50 transition-opacity duration-200 ease-out sm:top-6 sm:left-7 lg:top-7 lg:left-14',
             isKeyboardVisible && 'pointer-events-none opacity-0'
           )}
           aria-hidden={isKeyboardVisible}

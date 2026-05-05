@@ -9,7 +9,7 @@
 export const authClerkLocalization = {
   signIn: {
     start: {
-      title: 'Sign in.',
+      title: 'Welcome back.',
       subtitle: '',
       actionText: 'No account?',
       actionLink: 'Sign up',
