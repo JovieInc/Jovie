@@ -51,6 +51,17 @@ function nodeMatchesPriorityType(node: JsonLdNode): boolean {
   return typeof type === 'string' && BIO_PRIORITY_TYPES.has(type);
 }
 
+function findDescriptionInCandidates(candidates: JsonLdNode[]): string | null {
+  for (const candidate of candidates) {
+    if (!nodeMatchesPriorityType(candidate)) continue;
+    if (typeof candidate.description === 'string') {
+      const trimmed = candidate.description.trim();
+      if (trimmed) return trimmed;
+    }
+  }
+  return null;
+}
+
 function extractJsonLdDescription(html: string): string | null {
   const blockPattern =
     /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
@@ -64,15 +75,8 @@ function extractJsonLdDescription(html: string): string | null {
     } catch {
       continue;
     }
-
-    const candidates = flattenJsonLdCandidates(parsed);
-    for (const candidate of candidates) {
-      if (!nodeMatchesPriorityType(candidate)) continue;
-      if (typeof candidate.description === 'string') {
-        const trimmed = candidate.description.trim();
-        if (trimmed) return trimmed;
-      }
-    }
+    const result = findDescriptionInCandidates(flattenJsonLdCandidates(parsed));
+    if (result) return result;
   }
   return null;
 }
