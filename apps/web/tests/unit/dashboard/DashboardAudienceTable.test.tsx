@@ -334,11 +334,10 @@ describe('DashboardAudienceTable', () => {
 
     await waitFor(() => {
       expect(capturedColumnVisibility).toEqual({
-        location: false,
-        source: false,
-        value: false,
+        signal: false,
         engagement: false,
-        lastSeen: false,
+        state: false,
+        last: false,
       });
       expect(capturedMinWidth).toBe('480px');
     });
@@ -357,8 +356,8 @@ describe('DashboardAudienceTable', () => {
 
     await waitFor(() => {
       expect(capturedColumnVisibility).toEqual({
-        location: false,
-        value: false,
+        signal: false,
+        engagement: false,
       });
       expect(capturedMinWidth).toBe('640px');
     });
@@ -397,11 +396,10 @@ describe('DashboardAudienceTable', () => {
 
     await waitFor(() => {
       expect(capturedColumnVisibility).toEqual({
-        location: false,
-        source: false,
-        value: false,
+        signal: false,
         engagement: false,
-        lastSeen: false,
+        state: false,
+        last: false,
       });
       expect(capturedMinWidth).toBe('480px');
     });
