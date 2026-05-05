@@ -219,6 +219,15 @@ export const ServerEnvSchema = z.object({
   E2E_CLERK_USER_USERNAME: z.string().optional(),
   DEMO_RECORDING: z.string().optional(),
   DEMO_CLERK_USER_ID: z.string().optional(),
+
+  // SMS subscribe handoff (Twilio + intent codes; JOV-1834)
+  SMS_INTENT_SECRET: z.string().optional(),
+  TWILIO_ACCOUNT_SID: z.string().optional(),
+  TWILIO_AUTH_TOKEN: z.string().optional(),
+  TWILIO_AUTH_TOKEN_SECONDARY: z.string().optional(),
+  TWILIO_AUTH_TOKEN_SECONDARY_EXPIRES_AT: z.string().optional(),
+  TWILIO_MESSAGING_SERVICE_SID: z.string().optional(),
+  TWILIO_FROM_NUMBER: z.string().optional(),
 });
 
 /**
@@ -323,4 +332,11 @@ export const ENV_KEYS = [
   'E2E_CLERK_USER_USERNAME',
   'DEMO_RECORDING',
   'DEMO_CLERK_USER_ID',
+  'SMS_INTENT_SECRET',
+  'TWILIO_ACCOUNT_SID',
+  'TWILIO_AUTH_TOKEN',
+  'TWILIO_AUTH_TOKEN_SECONDARY',
+  'TWILIO_AUTH_TOKEN_SECONDARY_EXPIRES_AT',
+  'TWILIO_MESSAGING_SERVICE_SID',
+  'TWILIO_FROM_NUMBER',
 ] as const satisfies readonly (keyof z.infer<typeof ServerEnvSchema>)[];
