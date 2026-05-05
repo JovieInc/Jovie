@@ -1,3 +1,4 @@
+import { SHELL_H2_CLASS } from '@/components/marketing/artist-profile/ArtistProfileSectionHeader';
 import { cn } from '@/lib/utils';
 
 interface AuthBrandPanelProps {
@@ -95,7 +96,7 @@ export function AuthBrandPanel({
     >
       {showCopy ? (
         <div className='auth-showcase-copy'>
-          <h2 className='text-[clamp(2.2rem,3vw,3rem)] leading-[0.95] font-[600] tracking-[-0.06em] whitespace-nowrap text-white'>
+          <h2 className={cn(SHELL_H2_CLASS, 'whitespace-nowrap text-white')}>
             Built for Artists.
           </h2>
         </div>
