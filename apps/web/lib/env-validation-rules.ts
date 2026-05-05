@@ -210,7 +210,7 @@ const checkAiGatewayApiKey: ValidationRule = ({ server, vercelEnv }) => {
 const checkXaiApiKey: ValidationRule = ({ server, vercelEnv }) => {
   if (
     (vercelEnv === 'production' || vercelEnv === 'preview') &&
-    !server.XAI_API_KEY
+    !server.XAI_API_KEY?.trim()
   ) {
     return {
       type: 'warning',

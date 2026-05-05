@@ -17,8 +17,11 @@ import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelCo
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { ReleaseViewModel } from '@/lib/discography/types';
+import { useContactsQuery } from '@/lib/queries/useContactsQuery';
+import { type EventRecord, useEventsQuery } from '@/lib/queries/useEventsQuery';
 import { useReleaseEntityQuery } from '@/lib/queries/useReleaseEntityQuery';
 import { cn } from '@/lib/utils';
+import type { DashboardContact } from '@/types/contacts';
 import {
   type ChatEntityTarget,
   useChatEntityPanel,
@@ -274,6 +277,178 @@ function ChatReleaseEntityPanelLoader({
   );
 }
 
+function ChatSimpleEntityPanel({
+  eyebrow,
+  title,
+  loading,
+  emptyMessage,
+  onClose,
+  children,
+  testId,
+}: Readonly<{
+  eyebrow: string;
+  title: string;
+  loading: boolean;
+  emptyMessage: string;
+  onClose: () => void;
+  children: ReactNode;
+  testId: string;
+}>) {
+  const hasContent = !loading && children !== null;
+  return (
+    <aside
+      className='flex h-full min-h-0 w-full flex-col overflow-hidden bg-(--linear-app-content-surface)'
+      data-testid={testId}
+    >
+      <div className='flex shrink-0 items-center justify-between border-b border-[color-mix(in_oklab,var(--linear-app-shell-border)_64%,transparent)] px-4 py-3'>
+        <div className='min-w-0'>
+          <p className='text-[11px] text-tertiary-token'>{eyebrow}</p>
+          <h2 className='truncate text-[13px] font-semibold text-primary-token'>
+            {title}
+          </h2>
+        </div>
+        <Button
+          type='button'
+          variant='ghost'
+          size='icon'
+          aria-label='Close entity panel'
+          onClick={onClose}
+          className='h-8 w-8 shrink-0'
+        >
+          <X className='h-4 w-4' />
+        </Button>
+      </div>
+      {loading ? (
+        <div className='flex flex-1 items-center justify-center px-6 text-center text-[13px] text-tertiary-token'>
+          Loading…
+        </div>
+      ) : hasContent ? (
+        <div className='min-h-0 flex-1 overflow-y-auto px-4 py-4'>
+          {children}
+        </div>
+      ) : (
+        <div className='flex flex-1 items-center justify-center px-6 text-center text-[13px] text-tertiary-token'>
+          {emptyMessage}
+        </div>
+      )}
+    </aside>
+  );
+}
+
+function ChatContactEntityPanelLoader({
+  target,
+  profileId,
+  onClose,
+}: Readonly<{
+  target: ChatEntityTarget;
+  profileId: string;
+  onClose: () => void;
+}>) {
+  const { data, isLoading } = useContactsQuery(profileId);
+  const contact: DashboardContact | null =
+    (data ?? []).find(c => c.id === target.id) ?? null;
+  const title =
+    contact?.personName?.trim() ||
+    contact?.companyName?.trim() ||
+    target.label ||
+    'Contact';
+  return (
+    <ChatSimpleEntityPanel
+      eyebrow='Contact'
+      title={title}
+      loading={isLoading}
+      emptyMessage='This contact is not available in the current profile.'
+      onClose={onClose}
+      testId='chat-contact-entity-panel'
+    >
+      {contact ? (
+        <div className='space-y-2 text-[12px] text-secondary-token'>
+          {contact.role ? (
+            <span className='inline-flex items-center rounded-md bg-surface-1 px-1.5 py-1 text-[11px]'>
+              {contact.role}
+            </span>
+          ) : null}
+          {contact.email ? (
+            <a
+              href={`mailto:${contact.email}`}
+              className='flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-surface-1 hover:text-primary-token'
+            >
+              <LinkIcon className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
+              <span className='truncate'>{contact.email}</span>
+            </a>
+          ) : null}
+          {contact.phone ? (
+            <a
+              href={`tel:${contact.phone}`}
+              className='flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-surface-1 hover:text-primary-token'
+            >
+              <LinkIcon className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
+              <span className='truncate'>{contact.phone}</span>
+            </a>
+          ) : null}
+          {contact.territories.length > 0 ? (
+            <p className='text-[12px] text-secondary-token'>
+              {contact.territories.join(', ')}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+    </ChatSimpleEntityPanel>
+  );
+}
+
+function ChatTourDateEntityPanelLoader({
+  target,
+  profileId,
+  onClose,
+}: Readonly<{
+  target: ChatEntityTarget;
+  profileId: string;
+  onClose: () => void;
+}>) {
+  const { data, isLoading } = useEventsQuery(profileId);
+  const event: EventRecord | null =
+    (data ?? []).find(e => e.id === target.id) ?? null;
+  const eventDate = formatReleaseDate(event?.eventDate);
+  const title = event?.title ?? target.label ?? 'Tour date';
+  return (
+    <ChatSimpleEntityPanel
+      eyebrow='Tour date'
+      title={title}
+      loading={isLoading}
+      emptyMessage='This tour date is not available in the current profile.'
+      onClose={onClose}
+      testId='chat-tour-date-entity-panel'
+    >
+      {event ? (
+        <div className='space-y-3'>
+          <div className='flex flex-wrap items-center gap-1.5 text-[11px] text-secondary-token'>
+            {eventDate ? (
+              <span className='inline-flex items-center gap-1 rounded-md bg-surface-1 px-1.5 py-1'>
+                <Calendar className='h-3 w-3 text-tertiary-token' />
+                {eventDate}
+              </span>
+            ) : null}
+            {event.status ? (
+              <span className='rounded-md bg-surface-1 px-1.5 py-1'>
+                {event.status}
+              </span>
+            ) : null}
+            {event.provider ? (
+              <span className='rounded-md bg-surface-1 px-1.5 py-1'>
+                {event.provider}
+              </span>
+            ) : null}
+          </div>
+          {event.subtitle ? (
+            <p className='text-[12px] text-secondary-token'>{event.subtitle}</p>
+          ) : null}
+        </div>
+      ) : null}
+    </ChatSimpleEntityPanel>
+  );
+}
+
 export function ChatEntityRightPanelHost({
   enablePreviewPanel,
   enableChatEntityPanels = false,
@@ -284,18 +459,40 @@ export function ChatEntityRightPanelHost({
   const { target, close } = useChatEntityPanel();
 
   const panel = useMemo(() => {
-    if (enableChatEntityPanels && target?.kind === 'release') {
-      return profileId ? (
-        <ChatReleaseEntityPanelLoader
-          target={target}
-          profileId={profileId}
-          threadTitle={threadTitle}
-          onClose={close}
-        />
-      ) : null;
+    if (enableChatEntityPanels && profileId && target) {
+      if (target.kind === 'release') {
+        return (
+          <ChatReleaseEntityPanelLoader
+            target={target}
+            profileId={profileId}
+            threadTitle={threadTitle}
+            onClose={close}
+          />
+        );
+      }
+      if (target.kind === 'contact') {
+        return (
+          <ChatContactEntityPanelLoader
+            target={target}
+            profileId={profileId}
+            onClose={close}
+          />
+        );
+      }
+      if (target.kind === 'tour-date') {
+        return (
+          <ChatTourDateEntityPanelLoader
+            target={target}
+            profileId={profileId}
+            onClose={close}
+          />
+        );
+      }
     }
 
     if (target) {
+      // Flag off, no profileId, or unsupported kind: keep the rail empty
+      // (don't fall through to the profile preview while a target is active).
       return null;
     }
 

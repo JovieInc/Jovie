@@ -100,6 +100,33 @@ describe('Environment Validation', () => {
       }
     });
 
+    it('flags whitespace-only XAI_API_KEY as warning in preview', () => {
+      const originalVercelEnv = process.env.VERCEL_ENV;
+      const originalXaiKey = process.env.XAI_API_KEY;
+      process.env.VERCEL_ENV = 'preview';
+      process.env.XAI_API_KEY = '   ';
+
+      try {
+        const result = validateEnvironment('runtime');
+
+        expect(
+          result.warnings.some(message =>
+            message.includes('XAI_API_KEY is missing')
+          )
+        ).toBe(true);
+      } finally {
+        if (originalVercelEnv) {
+          process.env.VERCEL_ENV = originalVercelEnv;
+        } else {
+          delete process.env.VERCEL_ENV;
+        }
+        if (originalXaiKey) {
+          process.env.XAI_API_KEY = originalXaiKey;
+        } else {
+          delete process.env.XAI_API_KEY;
+        }
+      }
+    });
     it('does not warn about XAI_API_KEY in development', () => {
       const originalVercelEnv = process.env.VERCEL_ENV;
       const originalXaiKey = process.env.XAI_API_KEY;
