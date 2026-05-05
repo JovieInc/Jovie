@@ -86,6 +86,13 @@ export interface FingerprintInputs {
  * Tolerates missing fields (e.g. cookies disabled): the fingerprint is
  * present-or-absent per-session, never stale across sessions.
  */
+// ASCII Unit Separator delimiter prevents component collisions in
+// `computeIntentFingerprint` — without it, visitorId="abc" + ipHash=""
+// joins to "abc" (same as visitorId="" + ipHash="abc"), so two unrelated
+// sessions could compute the same fingerprint and one could read the
+// other's masked phone via the status endpoint (Greptile P1 + security).
+const FINGERPRINT_FIELD_DELIMITER = '\x1f';
+
 export function computeIntentFingerprint(inputs: FingerprintInputs): string {
   const parts = [
     inputs.visitorId ?? '',
@@ -94,7 +101,7 @@ export function computeIntentFingerprint(inputs: FingerprintInputs): string {
     inputs.artistId,
   ];
   return createHash('sha256')
-    .update(parts.join(''), 'utf8')
+    .update(parts.join(FINGERPRINT_FIELD_DELIMITER), 'utf8')
     .update(getIntentSecret(), 'utf8')
     .digest('hex');
 }
