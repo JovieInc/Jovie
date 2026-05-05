@@ -445,6 +445,11 @@ export const notificationSubscriptions = pgTable(
     emailOtpAttempts: integer('email_otp_attempts').notNull().default(0),
     artistEmailOptInAt: timestamp('artist_email_opt_in_at'),
     artistEmailOptOutAt: timestamp('artist_email_opt_out_at'),
+    // Per-artist SMS consent ledger (set at confirmation time; never overwritten
+    // afterward to preserve TCPA audit trail across multi-artist races).
+    smsConsentAt: timestamp('sms_consent_at'),
+    smsConsentTextHash: text('sms_consent_text_hash'),
+    smsConsentVersion: text('sms_consent_version'),
     unsubscribedAt: timestamp('unsubscribed_at'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },

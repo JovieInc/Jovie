@@ -281,6 +281,13 @@
       "when": 1777072300651,
       "tag": "0039_keen_toro",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1778003709772,
+      "tag": "0040_lush_grey_gargoyle",
+      "breakpoints": true
     }
   ]
 }
