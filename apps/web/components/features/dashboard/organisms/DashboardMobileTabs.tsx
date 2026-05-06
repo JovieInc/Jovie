@@ -31,14 +31,14 @@ export function DashboardMobileTabs({
 }: DashboardMobileTabsProps): React.JSX.Element {
   const { isAdmin } = useDashboardData();
   const { signOut } = useAuthSafe();
-  const designV1LibraryEnabled = useAppFlag('DESIGN_V1');
+  const shellChatLibraryEnabled = useAppFlag('SHELL_CHAT_V1');
   const expandedItems = useMemo(
     () =>
-      (designV1LibraryEnabled
+      (shellChatLibraryEnabled
         ? [libraryNavItem, ...mobileExpandedNavigation]
         : mobileExpandedNavigation
       ).map(toMenuItem),
-    [designV1LibraryEnabled]
+    [shellChatLibraryEnabled]
   );
 
   const handleSignOut = useCallback(async () => {

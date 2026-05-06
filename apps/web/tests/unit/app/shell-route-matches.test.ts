@@ -91,7 +91,12 @@ describe('isLyricsShellRoute', () => {
 });
 
 describe('isLibraryShellRoute', () => {
-  it('matches the dashboard library route', () => {
+  it('matches the production library route', () => {
+    expect(isLibraryShellRoute(APP_ROUTES.LIBRARY)).toBe(true);
+  });
+
+  it('matches the legacy dashboard library redirect route', () => {
+    expect(isLibraryShellRoute(APP_ROUTES.LEGACY_DASHBOARD_LIBRARY)).toBe(true);
     expect(isLibraryShellRoute(APP_ROUTES.DASHBOARD_LIBRARY)).toBe(true);
   });
 });
@@ -107,9 +112,7 @@ describe('shouldUseEssentialShellData', () => {
 
   it('returns true for lyrics and library routes', () => {
     expect(shouldUseEssentialShellData(APP_ROUTES.LYRICS)).toBe(true);
-    expect(shouldUseEssentialShellData(APP_ROUTES.DASHBOARD_LIBRARY)).toBe(
-      true
-    );
+    expect(shouldUseEssentialShellData(APP_ROUTES.LIBRARY)).toBe(true);
   });
 
   it('returns true for dashboard root', () => {
@@ -126,7 +129,7 @@ describe('shouldRedirectToOnboarding', () => {
     expect(shouldRedirectToOnboarding(APP_ROUTES.CHAT)).toBe(true);
     expect(shouldRedirectToOnboarding('/app/dashboard/releases')).toBe(true);
     expect(shouldRedirectToOnboarding(APP_ROUTES.LYRICS)).toBe(true);
-    expect(shouldRedirectToOnboarding(APP_ROUTES.DASHBOARD_LIBRARY)).toBe(true);
+    expect(shouldRedirectToOnboarding(APP_ROUTES.LIBRARY)).toBe(true);
   });
 
   it('returns false for null', () => {

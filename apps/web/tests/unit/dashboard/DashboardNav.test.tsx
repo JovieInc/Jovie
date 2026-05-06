@@ -31,11 +31,11 @@ describe('DashboardNav', () => {
   it('renders Library navigation only when the new design flag is enabled', () => {
     const { getByRole } = renderDashboardNav({
       renderFn: fastRender,
-      appFlags: { DESIGN_V1: true },
+      appFlags: { SHELL_CHAT_V1: true },
     });
 
     expect(getByRole('link', { name: 'Library' }).getAttribute('href')).toBe(
-      APP_ROUTES.DASHBOARD_LIBRARY
+      APP_ROUTES.LIBRARY
     );
   });
 
@@ -104,7 +104,7 @@ describe('DashboardNav', () => {
 
     const { getByRole } = renderDashboardNav({
       renderFn: fastRender,
-      appFlags: { DESIGN_V1: true },
+      appFlags: { SHELL_CHAT_V1: true },
     });
 
     expect(

@@ -75,8 +75,12 @@ export function isLyricsShellRoute(pathname: string | null): boolean {
 export function isLibraryShellRoute(pathname: string | null): boolean {
   if (!pathname) return false;
   return (
+    pathname === APP_ROUTES.LIBRARY ||
+    pathname.startsWith(`${APP_ROUTES.LIBRARY}/`) ||
     pathname === APP_ROUTES.DASHBOARD_LIBRARY ||
-    pathname.startsWith(`${APP_ROUTES.DASHBOARD_LIBRARY}/`)
+    pathname.startsWith(`${APP_ROUTES.DASHBOARD_LIBRARY}/`) ||
+    pathname === APP_ROUTES.LEGACY_DASHBOARD_LIBRARY ||
+    pathname.startsWith(`${APP_ROUTES.LEGACY_DASHBOARD_LIBRARY}/`)
   );
 }
 

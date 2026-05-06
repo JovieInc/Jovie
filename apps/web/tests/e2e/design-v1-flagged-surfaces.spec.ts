@@ -264,11 +264,11 @@ const SURFACE_CASES: readonly SurfaceCase[] = [
   },
   {
     name: 'library',
-    route: APP_ROUTES.DASHBOARD_LIBRARY,
+    route: APP_ROUTES.LIBRARY,
     persona: 'creator-ready',
     assertDefault: expectNotFound,
     assertEnabled: async page => {
-      await expect(page.getByRole('heading', { name: 'Library' })).toBeVisible({
+      await expect(page.getByTestId('library-surface')).toBeVisible({
         timeout: 30_000,
       });
     },

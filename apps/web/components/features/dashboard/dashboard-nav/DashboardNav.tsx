@@ -99,7 +99,7 @@ export function DashboardNav(_: DashboardNavProps) {
   const queryClient = useQueryClient();
   const threadsEnabled = useAppFlag('THREADS_ENABLED');
   const shellChatV1Enabled = useAppFlag('DESIGN_V1');
-  const designV1LibraryEnabled = useAppFlag('DESIGN_V1');
+  const shellChatLibraryEnabled = useAppFlag('SHELL_CHAT_V1');
   const {
     isOpen: isPreviewOpen,
     open: openPreviewPanel,
@@ -150,7 +150,7 @@ export function DashboardNav(_: DashboardNavProps) {
             })(),
           }
         : item;
-    const primaryItems = designV1LibraryEnabled
+    const primaryItems = shellChatLibraryEnabled
       ? [
           ...primaryNavigation.slice(0, 2),
           libraryNavItem,
@@ -174,7 +174,7 @@ export function DashboardNav(_: DashboardNavProps) {
           items: [
             searchNavItem,
             ...(tasksItem ? [decorateItem(tasksItem)] : []),
-            ...(designV1LibraryEnabled ? [libraryNavItem] : []),
+            ...(shellChatLibraryEnabled ? [libraryNavItem] : []),
           ],
         },
         {
@@ -195,9 +195,9 @@ export function DashboardNav(_: DashboardNavProps) {
     ];
   }, [
     canAccessTasksWorkspace,
-    designV1LibraryEnabled,
     isPlanGateLoading,
     shellChatV1Enabled,
+    shellChatLibraryEnabled,
     taskStats,
   ]);
 
