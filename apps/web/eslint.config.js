@@ -12,6 +12,7 @@ const noManualDbPoolingRule = require('./eslint-rules/no-manual-db-pooling');
 const noHardcodedRoutesRule = require('./eslint-rules/no-hardcoded-routes');
 const requireQueryCacheConfigRule = require('./eslint-rules/require-query-cache-config');
 const requireAbortSignalRule = require('./eslint-rules/require-abort-signal');
+const noRawMotionValuesRule = require('./eslint-rules/no-raw-motion-values');
 
 const [nextBase, nextTypescript, nextIgnores] = nextConfig;
 
@@ -32,6 +33,7 @@ const baseConfig = {
         'no-hardcoded-routes': noHardcodedRoutesRule,
         'require-query-cache-config': requireQueryCacheConfigRule,
         'require-abort-signal': requireAbortSignalRule,
+        'no-raw-motion-values': noRawMotionValuesRule,
       },
     },
   },
@@ -174,6 +176,7 @@ const baseConfig = {
     '@jovie/no-hardcoded-routes': 'error',
     '@jovie/require-query-cache-config': 'error',
     '@jovie/require-abort-signal': 'error',
+    '@jovie/no-raw-motion-values': 'warn',
   },
 };
 

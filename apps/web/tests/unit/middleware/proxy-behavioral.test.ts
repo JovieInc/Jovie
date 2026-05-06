@@ -702,6 +702,99 @@ describe('proxy.ts middleware', () => {
       }
     });
 
+    it('handles upstream 3xx redirects via NextResponse.redirect (avoids middleware crash on streamed redirect bodies)', async () => {
+      // Reproduces the staging Google OAuth bug: FAPI returns 301 for
+      // /v1/oauth_callback, and the proxy must turn that into a clean
+      // middleware-compliant redirect instead of streaming the upstream
+      // Response (which crashes Vercel Edge with an opaque 500).
+      const stagingFapiHost = 'clerk.staging.jov.ie';
+      const previousPublishableKey =
+        process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+
+      try {
+        process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = `pk_live_${Buffer.from('production-fapi.clerk.example$').toString('base64')}`;
+        mocks.resolveClerkKeys.mockReturnValue({
+          publishableKey: `pk_live_${Buffer.from(`${stagingFapiHost}$`).toString('base64')}`,
+          secretKey: 'sk_live_staging_example',
+          status: 'ok',
+        });
+
+        const upstreamLocation = `https://${stagingFapiHost}/v1/oauth_callback?err_code=authorization_invalid`;
+        const upstreamCookie =
+          '__cf_bm=abc123; path=/; domain=.clerk.staging.jov.ie; HttpOnly; Secure; SameSite=None';
+        mocks.fetch.mockResolvedValueOnce(
+          new Response(null, {
+            status: 301,
+            headers: {
+              location: upstreamLocation,
+              'set-cookie': upstreamCookie,
+              'content-encoding': 'gzip',
+            },
+          })
+        );
+
+        const req = createUnauthenticatedRequest({
+          hostname: 'staging.jov.ie',
+          pathname: '/__clerk/v1/oauth_callback',
+          searchParams: { state: 'test', code: 'test' },
+        });
+        const res = await callMiddleware(req);
+
+        expect(res.status).toBe(301);
+        expect(res.headers.get('location')).toBe(
+          `https://staging.jov.ie/__clerk/v1/oauth_callback?err_code=authorization_invalid`
+        );
+        // Set-Cookie from upstream is forwarded so __cf_bm survives the proxy hop.
+        const setCookies =
+          res.headers.getSetCookie?.() ??
+          res.headers.get('set-cookie')?.split(/,(?=[^;]+=)/) ??
+          [];
+        expect(setCookies.join('\n')).toContain('__cf_bm=abc123');
+      } finally {
+        if (previousPublishableKey === undefined) {
+          delete process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+        } else {
+          process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY =
+            previousPublishableKey;
+        }
+      }
+    });
+
+    it('passes through upstream non-redirect 3xx-adjacent responses (e.g. 304) without rewriting Location', async () => {
+      // Sanity: 200 path still streams (covered above by /v1/client). This
+      // covers the edge where upstream 3xx has no Location header — the proxy
+      // should fall through to the streaming path.
+      const stagingFapiHost = 'clerk.staging.jov.ie';
+      const previousPublishableKey =
+        process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+
+      try {
+        process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = `pk_live_${Buffer.from('production-fapi.clerk.example$').toString('base64')}`;
+        mocks.resolveClerkKeys.mockReturnValue({
+          publishableKey: `pk_live_${Buffer.from(`${stagingFapiHost}$`).toString('base64')}`,
+          secretKey: 'sk_live_staging_example',
+          status: 'ok',
+        });
+
+        mocks.fetch.mockResolvedValueOnce(new Response(null, { status: 304 }));
+
+        const req = createUnauthenticatedRequest({
+          hostname: 'staging.jov.ie',
+          pathname: '/__clerk/v1/environment',
+        });
+        const res = await callMiddleware(req);
+
+        expect(res.status).toBe(304);
+      } finally {
+        if (previousPublishableKey === undefined) {
+          delete process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+        } else {
+          process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY =
+            previousPublishableKey;
+        }
+      }
+    });
+
     it('returns 503 for staging Clerk proxy traffic when staging keys are missing', async () => {
       const previousPublishableKey =
         process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;

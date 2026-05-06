@@ -15,6 +15,7 @@ import {
   type ReleaseNotificationEligibilityReason,
 } from '@/lib/notifications/release-eligibility';
 import { sendNotification } from '@/lib/notifications/service';
+import { buildReleaseDaySmsBody } from '@/lib/notifications/templates/release-day-sms';
 import { toISOStringSafe } from '@/lib/utils/date';
 import { logger } from '@/lib/utils/logger';
 import type { SenderContext } from '@/types/notifications';
@@ -442,6 +443,45 @@ async function sendEmailNotification(
   return success ? 'sent' : 'failed';
 }
 
+async function sendSmsNotification(
+  ctx: ProcessingContext,
+  subscriber: { phone: string },
+  smsInputs: {
+    artistName: string;
+    releaseTitle: string;
+    username: string;
+    slug: string;
+  },
+  senderContext: SenderContext
+): Promise<ProcessResult> {
+  const body = buildReleaseDaySmsBody(smsInputs);
+
+  const result = await sendNotification(
+    {
+      id: ctx.notification.id,
+      // SMS has no separate subject; reuse text so the dispatch contract holds.
+      subject: body,
+      text: body,
+      channels: ['sms'],
+      category: 'marketing',
+      senderContext,
+    },
+    { phone: subscriber.phone }
+  );
+
+  const success = result.delivered.length > 0;
+  const error = success ? null : (result.errors[0]?.error ?? 'Unknown error');
+
+  await updateNotificationStatus(
+    ctx.notification.id,
+    ctx.now,
+    success ? 'sent' : 'failed',
+    error
+  );
+
+  return success ? 'sent' : 'failed';
+}
+
 async function processNotificationWithBatchedData(ctx: {
   notification: PendingNotification;
   now: Date;
@@ -596,13 +636,27 @@ async function processNotificationWithBatchedData(ctx: {
     }
 
     if (subscriber.channel === 'sms' && subscriber.phone) {
-      await updateNotificationStatus(
-        notification.id,
-        now,
-        'failed',
-        'SMS channel not yet implemented'
+      const result = await sendSmsNotification(
+        { now, notification },
+        { phone: subscriber.phone },
+        {
+          artistName,
+          releaseTitle: release.title,
+          username: creator.usernameNormalized,
+          slug: release.slug,
+        },
+        senderContext
       );
-      return 'failed';
+
+      if (result === 'sent' && trialState.isTrialing && creator.ownerUserId) {
+        await persistTrialNotificationCount(
+          notification.id,
+          creator.ownerUserId,
+          trialState
+        );
+      }
+
+      return result;
     }
 
     await updateNotificationStatus(
