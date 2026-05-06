@@ -906,6 +906,17 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup-node-pnpm
 
+      - name: Cache Playwright Browsers
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-
+
+      - name: Install Playwright (Chromium)
+        run: pnpm --filter=@jovie/web exec playwright install chromium
+
       - name: Create ephemeral Neon database branch (with retry)
         id: neon-branch
         uses: ./.github/actions/neon-create-branch-with-retry
