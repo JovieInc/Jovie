@@ -210,6 +210,18 @@ export const creatorProfiles = pgTable(
     stripePayoutsEnabled: boolean('stripe_payouts_enabled')
       .default(false)
       .notNull(),
+    // Cached Stripe Connect readiness (JOV-1767). Webhooks keep these fresh;
+    // the in-app reader falls back to Stripe + writes through if the cache is
+    // older than the TTL or empty.
+    stripeChargesEnabled: boolean('stripe_charges_enabled')
+      .default(false)
+      .notNull(),
+    stripeDetailsSubmitted: boolean('stripe_details_submitted')
+      .default(false)
+      .notNull(),
+    stripePayoutEmail: text('stripe_payout_email'),
+    stripeConnectLastSyncedAt: timestamp('stripe_connect_last_synced_at'),
+    stripeConnectLastEventAt: timestamp('stripe_connect_last_event_at'),
     nextTaskNumber: integer('next_task_number').default(1).notNull(),
     smsAccessRequestedAt: timestamp('sms_access_requested_at'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -241,6 +253,11 @@ export const creatorProfiles = pgTable(
       table.outreachStatus,
       table.createdAt
     ),
+    // Webhook lookup by Stripe Connect account id (JOV-1767). Partial: only
+    // creators that have linked a Connect account.
+    stripeAccountIdIndex: index('idx_creator_profiles_stripe_account_id')
+      .on(table.stripeAccountId)
+      .where(drizzleSql`stripe_account_id IS NOT NULL`),
   })
 );
 

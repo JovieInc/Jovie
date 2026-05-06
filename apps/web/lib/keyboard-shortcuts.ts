@@ -10,7 +10,6 @@ import {
   MessageCircle,
   Music,
   PanelLeft,
-  Search,
   Settings,
   Sun,
   UserCircle,
@@ -66,14 +65,6 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     category: 'general',
     icon: Command,
     shortcutKey: 'Meta+k',
-  },
-  {
-    id: 'search',
-    label: 'Open search',
-    keys: '/',
-    category: 'general',
-    icon: Search,
-    shortcutKey: '/',
   },
   {
     id: 'keyboard-shortcuts',
@@ -197,10 +188,10 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
   {
     id: 'toggle-theme',
     label: 'Toggle theme',
-    keys: 'T',
+    keys: `${GLYPH_OPT} T`,
     category: 'actions',
     icon: Sun,
-    shortcutKey: 't',
+    shortcutKey: 'Alt+t',
   },
   {
     id: 'sign-out',

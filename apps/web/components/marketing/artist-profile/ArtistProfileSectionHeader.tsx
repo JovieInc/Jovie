@@ -3,11 +3,6 @@ import { cn } from '@/lib/utils';
 interface ArtistProfileSectionHeaderProps {
   readonly headline: string;
   readonly body?: string;
-  /**
-   * Optional editorial eyebrow rendered above the headline. Inside the
-   * .frame-skin design layer this picks up the .frame-eyebrow style
-   * (caps, 11px, 0.18em tracking, off-white at 42% opacity).
-   */
   readonly eyebrow?: string;
   readonly align?: 'center' | 'left';
   readonly className?: string;
@@ -15,6 +10,15 @@ interface ArtistProfileSectionHeaderProps {
   readonly bodyClassName?: string;
   readonly eyebrowClassName?: string;
 }
+
+export const SHELL_H2_CLASS =
+  'text-[clamp(2.25rem,4.8vw,3.5rem)] font-[680] leading-[1.02] tracking-[-0.04em] text-primary-token text-balance';
+
+export const SHELL_EYEBROW_CLASS =
+  'text-[12px] font-medium uppercase tracking-[0.06em] text-secondary-token';
+
+export const SHELL_LEAD_CLASS =
+  'text-[clamp(1.0625rem,1.4vw,1.25rem)] leading-[1.45] text-secondary-token';
 
 export function ArtistProfileSectionHeader({
   headline,
@@ -36,29 +40,17 @@ export function ArtistProfileSectionHeader({
       )}
     >
       {eyebrow ? (
-        <p
-          className={cn(
-            'frame-eyebrow text-tertiary-token',
-            isCentered ? 'mb-6' : 'mb-5',
-            eyebrowClassName
-          )}
-        >
+        <p className={cn(SHELL_EYEBROW_CLASS, 'mb-5', eyebrowClassName)}>
           {eyebrow}
         </p>
       ) : null}
-      <h2
-        className={cn(
-          'text-[clamp(2.6rem,5.1vw,4.5rem)] font-[640] leading-[0.96] tracking-[-0.07em] text-primary-token',
-          headlineClassName
-        )}
-      >
-        {headline}
-      </h2>
+      <h2 className={cn(SHELL_H2_CLASS, headlineClassName)}>{headline}</h2>
       {body ? (
         <p
           className={cn(
-            'mt-6 text-[clamp(1rem,1.55vw,1.18rem)] leading-[1.62] tracking-[-0.018em] text-secondary-token',
-            isCentered ? 'mx-auto max-w-[36rem]' : null,
+            SHELL_LEAD_CLASS,
+            'mt-5 sm:mt-6',
+            isCentered ? 'mx-auto max-w-[38rem]' : 'max-w-[42rem]',
             bodyClassName
           )}
         >
