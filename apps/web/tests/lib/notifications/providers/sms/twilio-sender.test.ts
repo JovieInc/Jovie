@@ -20,7 +20,10 @@ vi.mock('@/lib/http/server-fetch', async () => {
 });
 
 import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
-import { sendTwilioSms } from '@/lib/notifications/providers/sms/twilio-sender';
+import {
+  redactPhoneNumbers,
+  sendTwilioSms,
+} from '@/lib/notifications/providers/sms/twilio-sender';
 
 const mockedFetch = vi.mocked(serverFetch);
 
@@ -93,6 +96,39 @@ describe('sendTwilioSms', () => {
     }
   });
 
+  it('does NOT retry on 5xx (Twilio Messages is non-idempotent)', async () => {
+    mockedFetch.mockResolvedValueOnce(jsonResponse({}, 500));
+
+    await sendTwilioSms({ to: '+15551112222', body: 'hi' });
+
+    // The single POST call must not be retried — duplicate sends would
+    // result in duplicate billed messages.
+    expect(mockedFetch).toHaveBeenCalledTimes(1);
+    const [, init] = mockedFetch.mock.calls[0];
+    expect(init?.retry).toBeUndefined();
+  });
+
+  it('redacts phone numbers from Twilio error messages before returning', async () => {
+    mockedFetch.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          code: 21211,
+          message:
+            "The 'To' phone number: +15551234567, is not currently reachable",
+        },
+        400
+      )
+    );
+
+    const result = await sendTwilioSms({ to: '+15551112222', body: 'hi' });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).not.toContain('+15551234567');
+      expect(result.error).toContain('[REDACTED_PHONE]');
+    }
+  });
+
   it('reports timeouts as retryable failures', async () => {
     mockedFetch.mockRejectedValueOnce(
       new ServerFetchTimeoutError(
@@ -121,6 +157,30 @@ describe('sendTwilioSms', () => {
       expect(result.error).toContain('missing message sid');
       expect(result.retryable).toBe(false);
     }
+  });
+});
+
+describe('redactPhoneNumbers', () => {
+  it('redacts E.164 numbers in any position', () => {
+    expect(redactPhoneNumbers('Send to +15551234567 failed')).toBe(
+      'Send to [REDACTED_PHONE] failed'
+    );
+  });
+
+  it('redacts numbers without + prefix when long enough', () => {
+    expect(redactPhoneNumbers('to 15551234567')).toContain('[REDACTED_PHONE]');
+  });
+
+  it('redacts formatted numbers with separators', () => {
+    expect(
+      redactPhoneNumbers('number (555) 123-4567 is unreachable')
+    ).toContain('[REDACTED_PHONE]');
+  });
+
+  it('leaves messages without phone numbers unchanged', () => {
+    expect(redactPhoneNumbers('queued for delivery')).toBe(
+      'queued for delivery'
+    );
   });
 });
 
