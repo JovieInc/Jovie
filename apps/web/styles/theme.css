@@ -367,7 +367,12 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :is(.cl-signIn-root, .cl-signUp-root) .cl-formButtonPrimary {
+  :is(.cl-signIn-root, .cl-signUp-root) .cl-formButtonPrimary,
+  :is(.cl-signIn-root, .cl-signUp-root) .cl-socialButtonsBlockButton,
+  :is(.cl-signIn-root, .cl-signUp-root) .cl-formFieldInput,
+  :is(.cl-signIn-root, .cl-signUp-root) .cl-phoneInputBox,
+  :is(.cl-signIn-root, .cl-signUp-root) .cl-selectButton,
+  :is(.cl-signIn-root, .cl-signUp-root) .cl-selectSearchInput {
     transition: none;
   }
   :is(.cl-signIn-root, .cl-signUp-root) .cl-formButtonPrimary:active {
@@ -523,7 +528,7 @@
 
 @media (max-width: 1023px) {
   :is(.cl-signIn-root, .cl-signUp-root) .cl-headerTitle {
-    font-size: clamp(2.45rem, 10.8vw, 3.7rem);
+    font-size: clamp(1.5rem, 6vw, 2rem);
     text-align: center;
   }
 

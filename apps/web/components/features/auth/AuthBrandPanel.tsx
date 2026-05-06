@@ -8,8 +8,6 @@ import { cn } from '@/lib/utils';
 
 interface AuthBrandPanelProps {
   readonly className?: string;
-  /** Kept for back-compat with existing call sites; only 'page' is rendered. */
-  readonly variant?: 'page' | 'image-only' | 'v1';
 }
 
 const SLIDE_MS = 5500;
@@ -61,7 +59,11 @@ function AuthBrandCarousel() {
   const slide = SLIDES[index];
 
   return (
-    <div className='absolute inset-0 flex flex-col'>
+    <section
+      aria-label='Product preview'
+      aria-roledescription='carousel'
+      className='absolute inset-0 flex flex-col'
+    >
       {/* Spacer above the floating screenshot. */}
       <div className='min-h-0 flex-1' />
 
@@ -112,7 +114,7 @@ function AuthBrandCarousel() {
           />
         ))}
       </div>
-    </div>
+    </section>
   );
 }
 

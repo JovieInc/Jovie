@@ -9,7 +9,7 @@ import {
 } from '@jovie/ui';
 import { MoreHorizontal } from 'lucide-react';
 import Link from 'next/link';
-import { type ReactNode, useEffect, useRef } from 'react';
+import { type ReactNode, useRef } from 'react';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { AUTH_FORM_MAX_WIDTH_CLASS } from '@/features/auth/constants';
@@ -199,18 +199,9 @@ export function AuthLayout({
   const formRef = useRef<HTMLElement>(null);
   const isSplitVariant = layoutVariant === 'split';
 
-  useEffect(() => {
-    if (isKeyboardVisible && formRef.current) {
-      const timer = setTimeout(() => {
-        formRef.current?.scrollIntoView({
-          behavior: 'smooth',
-          block: 'center',
-        });
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-    return undefined;
-  }, [isKeyboardVisible]);
+  // No scrollIntoView keyboard pull-up: the shell is overflow-hidden
+  // (no scrollable ancestor), and the layout is sized to fit at every
+  // standard breakpoint without scroll.
 
   const innerProps: AuthLayoutInnerProps = {
     children,
