@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.205] - 2026-05-06
+
+> Release-day SMS alerts now actually send. Phase 1 captured verified SMS subscribers; this release wires Twilio into the notification dispatch path so those fans receive the text when an artist's release ships.
+
+### Added
+
+- [notifications] **SMS as a first-class delivery channel** in `sendNotification()`. Verified subscribers with `channel='sms'` now receive a release-day text built from a compact GSM-7 body (artist + title + URL, capped near two segments with title-trim that always preserves the URL).
+- [notifications] **Outbound Twilio sender** at `apps/web/lib/notifications/providers/sms/twilio-sender.ts`. Uses the bounded `serverFetch` wrapper for timeout protection. Returns a discriminated result; never throws on Twilio-side failures so the dispatch path can persist a delivery-log entry without try/catch noise.
+- [notifications] **Global STOP enforcement on every SMS dispatch** via `isPhoneSmsSuppressed`. A fan who texted STOP is filtered out at send time even if a stale subscriber row slipped past the cron's upstream filter.
+- [notifications] **Provider error 21610 maps to suppression.** When Twilio reports a recipient as unsubscribed, the contact is flipped to `stopped` immediately so subsequent releases skip cleanly — protects against missed STOP webhooks and out-of-band carrier opt-outs.
+- [tests] **22 new unit tests** covering the SMS body builder, Twilio sender (success / 4xx with code / 5xx-retryable / timeout / no-retry-on-POST / phone-redaction / missing config), and the SMS dispatch flow (deliver / no-phone / suppressed / provider-error / 21610 → suppression / channel-disabled).
+
+### Changed
+
+- [notifications] **No retry on outbound SMS POST.** Twilio's Messages API is not idempotent; a 5xx or timeout retry was double-billing duplicate sends. The release-notification cron picks the row up on its next tick if the first attempt looked transient.
+- [notifications] **Phone numbers stripped from logged Twilio errors.** Twilio frequently echoes the recipient phone in error strings; that value is now redacted before it crosses into Sentry, application logs, or `notification_delivery_log`.
+- [internal] **Unified `NotificationDeliveryChannel`** to include `sms` alongside `email`, `push`, and `in_app`. Resolves the structural split that forced JOV-1834 to bypass the dispatch service.
+
 ## [26.4.203] - 2026-05-05
 
 > Native SMS subscribe handoff Phase 1 lands behind a feature flag. Fans tap "Get Release Alerts," text a JOIN code from their phone, and the inbound webhook confirms verified consent without a Jovie form in the middle.
