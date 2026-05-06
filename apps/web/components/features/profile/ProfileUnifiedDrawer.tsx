@@ -76,12 +76,61 @@ interface ProfileUnifiedDrawerProps {
   readonly pressPhotos?: readonly PressPhoto[];
   readonly allowPhotoDownloads?: boolean;
   readonly tourDates?: TourDateViewModel[];
+  readonly hasTourDates: boolean;
   readonly hasReleases: boolean;
   readonly releases?: readonly PublicRelease[];
   readonly presentation?: ProfileSurfacePresentation;
 }
 
 const PAY_AMOUNTS = [5, 10, 20];
+
+function resolveRegistryKey(
+  view: DrawerView
+): keyof typeof PROFILE_VIEW_REGISTRY {
+  return view === 'releases' || view === 'tour' ? 'menu' : view;
+}
+
+function resolveViewMeta({
+  view,
+  canOpenReleasesDrawer,
+  canOpenTourDrawer,
+  registryKey,
+}: {
+  readonly view: DrawerView;
+  readonly canOpenReleasesDrawer: boolean;
+  readonly canOpenTourDrawer: boolean;
+  readonly registryKey: keyof typeof PROFILE_VIEW_REGISTRY;
+}) {
+  if (view === 'releases' && canOpenReleasesDrawer) {
+    return { title: 'Releases', subtitle: undefined };
+  }
+
+  if (view === 'tour' && canOpenTourDrawer) {
+    return { title: 'All Shows', subtitle: undefined };
+  }
+
+  return PROFILE_VIEW_REGISTRY[registryKey];
+}
+
+function resolveRenderedView({
+  view,
+  canOpenReleasesDrawer,
+  canOpenTourDrawer,
+}: {
+  readonly view: DrawerView;
+  readonly canOpenReleasesDrawer: boolean;
+  readonly canOpenTourDrawer: boolean;
+}): DrawerView {
+  if (view === 'releases' && !canOpenReleasesDrawer) {
+    return 'menu';
+  }
+
+  if (view === 'tour' && !canOpenTourDrawer) {
+    return 'menu';
+  }
+
+  return view;
+}
 
 function ContactList({
   artistHandle,
@@ -176,6 +225,7 @@ export function ProfileUnifiedDrawer({
   pressPhotos = [],
   allowPhotoDownloads = false,
   tourDates = [],
+  hasTourDates,
   hasReleases,
   releases = [],
   presentation = 'standalone',
@@ -185,14 +235,20 @@ export function ProfileUnifiedDrawer({
     [releases]
   );
   const canOpenReleasesDrawer = hasReleases && visibleReleases.length > 0;
+  const canOpenTourDrawer = hasTourDates && tourDates.length > 0;
 
-  const registryKey = view === 'releases' ? 'menu' : view;
-  const meta =
-    view === 'releases' && canOpenReleasesDrawer
-      ? { title: 'Releases', subtitle: undefined }
-      : PROFILE_VIEW_REGISTRY[registryKey];
-  const renderedView =
-    view === 'releases' && !canOpenReleasesDrawer ? 'menu' : view;
+  const registryKey = resolveRegistryKey(view);
+  const meta = resolveViewMeta({
+    view,
+    canOpenReleasesDrawer,
+    canOpenTourDrawer,
+    registryKey,
+  });
+  const renderedView = resolveRenderedView({
+    view,
+    canOpenReleasesDrawer,
+    canOpenTourDrawer,
+  });
 
   const handleOpenChange = useCallback(
     (next: boolean) => {
@@ -232,16 +288,35 @@ export function ProfileUnifiedDrawer({
           releases_count: visibleReleases.length,
         });
         break;
+      case 'tour':
+        if (canOpenTourDrawer) {
+          track('tour_drawer_open', {
+            handle: artist.handle,
+            tour_dates_count: tourDates.length,
+          });
+        }
+        break;
       default:
         break;
     }
-  }, [open, view, artist.handle, contacts.length, visibleReleases.length]);
+  }, [
+    open,
+    view,
+    artist.handle,
+    canOpenTourDrawer,
+    contacts.length,
+    tourDates.length,
+    visibleReleases.length,
+  ]);
 
   useEffect(() => {
     if (view === 'releases' && !canOpenReleasesDrawer) {
       onViewChange('menu');
     }
-  }, [canOpenReleasesDrawer, onViewChange, view]);
+    if (view === 'tour' && !canOpenTourDrawer) {
+      onViewChange('menu');
+    }
+  }, [canOpenReleasesDrawer, canOpenTourDrawer, onViewChange, view]);
 
   const venmoLink =
     socialLinks.find(link => link.platform === 'venmo')?.url ?? null;
@@ -270,7 +345,7 @@ export function ProfileUnifiedDrawer({
     };
   }, [hasValidVenmoLink, venmoLink, venmoUsername]);
 
-  const isSubView = view !== 'menu';
+  const isSubView = renderedView !== 'menu';
 
   return (
     <ProfileDrawerShell
@@ -294,6 +369,7 @@ export function ProfileUnifiedDrawer({
             <MenuView
               onNavigate={next => navigateTo(next as DrawerView)}
               hasReleases={canOpenReleasesDrawer}
+              hasTourDates={canOpenTourDrawer}
               hasTip={hasTip}
               hasContacts={hasContacts}
             />

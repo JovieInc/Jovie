@@ -12,6 +12,7 @@ import { StaticListenInterface } from '@/features/profile/StaticListenInterface'
 import { TourDrawerContent } from '@/features/profile/TourModePanel';
 import { ReleasesView } from '@/features/profile/views/ReleasesView';
 import type { AvailableDSP } from '@/lib/dsp';
+import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { cn } from '@/lib/utils';
 import type { Artist } from '@/types/db';
@@ -31,6 +32,7 @@ interface ProfilePrimaryTabPanelProps {
   readonly dsps: AvailableDSP[];
   readonly enableDynamicEngagement?: boolean;
   readonly subscribeTwoStep?: boolean;
+  readonly alertOptInVariant?: ProfileAlertOptInVariant;
   readonly isSubscribed: boolean;
   readonly contentPrefs: Record<NotificationContentType, boolean>;
   readonly onTogglePref: (key: NotificationContentType) => void;
