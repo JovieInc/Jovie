@@ -6,6 +6,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { AuthModalShell } from '@/components/auth/AuthModalShell';
 import { AuthFormSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { APP_ROUTES } from '@/constants/routes';
+import { AuthGoogleOneTap } from '@/features/auth';
 import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
 import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 
@@ -31,6 +32,7 @@ function SigninModalBody() {
 
   return (
     <AuthModalShell ariaLabel='Sign in to Jovie'>
+      <AuthGoogleOneTap searchParams={searchParams} />
       {isMounted ? (
         <SignIn
           routing='hash'

@@ -571,6 +571,11 @@ body:has(.home-viewport)::-webkit-scrollbar {
       opacity 120ms ease,
       filter 120ms ease;
   }
+
+  .homepage-hero-showcase::before,
+  .homepage-hero-showcase::after {
+    transition: none;
+  }
 }
 
 .homepage-trust-section {

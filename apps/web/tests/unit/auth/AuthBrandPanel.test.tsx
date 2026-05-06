@@ -81,4 +81,22 @@ describe('AuthBrandPanel', () => {
       )
     ).toBeInTheDocument();
   });
+
+  it('updates per-slide ambient CSS variables when the slide rotates', async () => {
+    render(<AuthBrandPanel />);
+
+    const panel = screen.getByRole('region', { name: /product preview/i });
+    const initialAmbient = panel.style.getPropertyValue(
+      '--auth-ambient-primary'
+    );
+    expect(initialAmbient).not.toBe('');
+
+    await act(async () => {
+      vi.advanceTimersByTime(5500);
+    });
+
+    const nextAmbient = panel.style.getPropertyValue('--auth-ambient-primary');
+    expect(nextAmbient).not.toBe('');
+    expect(nextAmbient).not.toBe(initialAmbient);
+  });
 });

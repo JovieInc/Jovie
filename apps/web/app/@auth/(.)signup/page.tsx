@@ -10,6 +10,7 @@ import {
 } from '@/components/homepage/intent-store';
 import { AuthFormSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { APP_ROUTES } from '@/constants/routes';
+import { AuthGoogleOneTap } from '@/features/auth';
 import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
 import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 
@@ -78,6 +79,7 @@ function SignupModalBody() {
       statusRow={statusRow}
       backButtonLabel={promptHint ? 'Back to chat' : 'Go back'}
     >
+      <AuthGoogleOneTap searchParams={searchParams} />
       {isMounted ? (
         <SignUp
           routing='hash'
