@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.4.206] - 2026-05-06
+## [26.4.208] - 2026-05-06
 
 > Auth pages and the homepage hero now share a stable ambient-light treatment, and guarded Clerk One Tap remains isolated behind explicit switches.
 
@@ -22,6 +22,13 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - **Content Security Policy** updated to support the One Tap prompt.
 - [internal] **Clerk agent setup and proxy guidance** stays aligned with Jovie's auth architecture without exposing implementation details in public release copy.
 - [internal] **Standalone preview dependency coverage** now includes the transitive cookie module needed by the sanitized HTML path.
+## [26.4.207] - 2026-05-06
+
+> The auth-unavailable fallback now reads the right verb. Visiting `/signup` no longer says "Sign in is temporarily unavailable" — it says "Sign up is temporarily unavailable." A small thing, but the prior copy made every signup-CTA click on the homepage feel like the wrong page when Clerk briefly fell back.
+
+### Fixed
+
+- [auth] Auth-unavailable fallback page now reads the auth flow from the URL: `/signup` shows "Sign up is temporarily unavailable", `/signin` keeps "Sign in is temporarily unavailable". Previously the headline was hardcoded to "Sign in" on both routes, so every homepage signup CTA looked broken whenever Clerk was unreachable.
 
 ## [26.4.205] - 2026-05-06
 

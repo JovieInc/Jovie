@@ -14,6 +14,14 @@ vi.mock('@clerk/nextjs', () => ({
     clerkSignInMock(props);
     return <div data-testid='clerk-sign-in' />;
   },
+  // AuthGoogleOneTap (mounted by SigninModalPage) imports `GoogleOneTap`
+  // from this module. None of the disable flags
+  // (NEXT_PUBLIC_GOOGLE_ONE_TAP_DISABLED / NEXT_PUBLIC_CLERK_MOCK /
+  // NEXT_PUBLIC_E2E_MODE) are set in the unit-test env, so the component
+  // would call React.createElement(undefined, …) and crash before
+  // clerkSignInMock fires. Stub it out so the suite exercises the modal
+  // shell only.
+  GoogleOneTap: () => <div data-testid='clerk-google-one-tap' />,
 }));
 
 vi.mock('next/navigation', () => ({

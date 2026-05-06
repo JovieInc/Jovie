@@ -17,6 +17,27 @@ interface HomeTrustSectionProps {
   readonly label?: string;
 }
 
+function getInnerBoxClass(
+  isInlineStrip: boolean,
+  variant: 'default' | 'compact'
+): string {
+  if (isInlineStrip) return 'px-0';
+  return cn(
+    'rounded-[28px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(10,11,15,0.96)_0%,rgba(7,8,11,1)_100%)] shadow-[0_26px_72px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.04)]',
+    variant === 'compact'
+      ? 'px-5 py-5 sm:px-6 sm:py-6'
+      : 'px-6 py-7 sm:px-8 sm:py-9'
+  );
+}
+
+function getLabelMarginClass(
+  isInlineStrip: boolean,
+  variant: 'default' | 'compact'
+): string {
+  if (variant === 'compact' && !isInlineStrip) return 'mb-4';
+  return 'mb-5 sm:mb-6';
+}
+
 export function HomeTrustSection({
   variant = 'default',
   className,
@@ -25,23 +46,8 @@ export function HomeTrustSection({
 }: Readonly<HomeTrustSectionProps>) {
   const isInlineStrip = presentation === 'inline-strip';
   const logoTone = isInlineStrip ? 'text-white/68' : 'text-white/92';
-  const innerBoxClass = isInlineStrip
-    ? 'px-0'
-    : cn(
-        'rounded-[28px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(10,11,15,0.96)_0%,rgba(7,8,11,1)_100%)] shadow-[0_26px_72px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.04)]',
-        variant === 'compact'
-          ? 'px-5 py-5 sm:px-6 sm:py-6'
-          : 'px-6 py-7 sm:px-8 sm:py-9'
-      );
-
-  let labelMarginClass: string;
-  if (isInlineStrip) {
-    labelMarginClass = 'mb-5 sm:mb-6';
-  } else if (variant === 'compact') {
-    labelMarginClass = 'mb-4';
-  } else {
-    labelMarginClass = 'mb-5 sm:mb-6';
-  }
+  const innerBoxClass = getInnerBoxClass(isInlineStrip, variant);
+  const labelMarginClass = getLabelMarginClass(isInlineStrip, variant);
 
   return (
     <section
