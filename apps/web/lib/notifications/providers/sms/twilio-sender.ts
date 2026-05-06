@@ -4,11 +4,20 @@ import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
 
 const TWILIO_API_BASE = 'https://api.twilio.com/2010-04-01';
 const TWILIO_TIMEOUT_MS = 8000;
-const TWILIO_RETRY = {
-  maxRetries: 2,
-  baseDelayMs: 250,
-  maxDelayMs: 2000,
-};
+// Intentionally NO retry on POST. Twilio's Messages API is NOT idempotent —
+// retrying after a 5xx or timeout can produce duplicate sends (and duplicate
+// billing). On a transient failure we bail; the release-notification cron
+// will pick the row up on the next tick if it stays `pending`.
+
+/**
+ * Strip E.164 phone numbers from a string before logging/persisting.
+ * Twilio's error messages frequently echo the recipient phone (e.g.
+ * "The 'To' number +15551234567 is unreachable"); we never want that
+ * leaking into Sentry, application logs, or `notification_delivery_log`.
+ */
+export function redactPhoneNumbers(input: string): string {
+  return input.replace(/\+?\d[\d\s\-().]{6,}\d/g, '[REDACTED_PHONE]');
+}
 
 export interface SendSmsParams {
   /** E.164-formatted destination phone. */
@@ -117,7 +126,7 @@ export async function sendTwilioSms(
       body: form.toString(),
       timeoutMs: TWILIO_TIMEOUT_MS,
       context: 'twilio.messages.create',
-      retry: TWILIO_RETRY,
+      // No retry: Twilio Messages is not idempotent.
     });
   } catch (error) {
     if (error instanceof ServerFetchTimeoutError) {
@@ -127,9 +136,11 @@ export async function sendTwilioSms(
         retryable: true,
       };
     }
+    const rawMessage =
+      error instanceof Error ? error.message : 'Twilio fetch failed';
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Twilio fetch failed',
+      error: redactPhoneNumbers(rawMessage),
       retryable: true,
     };
   }
@@ -144,11 +155,14 @@ export async function sendTwilioSms(
 
   if (!response.ok) {
     const errorBody = parsed as TwilioErrorBody;
+    const rawError =
+      errorBody.message ?? `Twilio request failed with HTTP ${response.status}`;
     return {
       success: false,
-      error:
-        errorBody.message ??
-        `Twilio request failed with HTTP ${response.status}`,
+      // Twilio error messages frequently include the recipient phone in
+      // plaintext; redact before the value crosses the trust boundary into
+      // logs / delivery_log.
+      error: redactPhoneNumbers(rawError),
       errorCode: errorBody.code != null ? String(errorBody.code) : undefined,
       httpStatus: response.status,
       retryable: response.status >= 500,

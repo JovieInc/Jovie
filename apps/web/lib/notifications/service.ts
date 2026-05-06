@@ -11,7 +11,10 @@ import {
 import { checkQuota, incrementQuota } from '@/lib/notifications/quota';
 import { checkReputation, recordSend } from '@/lib/notifications/reputation';
 import { formatSystemSender } from '@/lib/notifications/sender-policy';
-import { isPhoneSmsSuppressed } from '@/lib/notifications/sms-suppression';
+import {
+  isPhoneSmsSuppressed,
+  suppressPhoneForStop,
+} from '@/lib/notifications/sms-suppression';
 import {
   isEmailSuppressed,
   logDelivery,
@@ -349,6 +352,25 @@ async function handleSmsChannel(
     httpStatus: result.httpStatus,
     notificationId: message.id,
   });
+
+  // Twilio error 21610 = "Attempt to send to unsubscribed recipient." If a
+  // STOP webhook was missed (or the carrier opt-out happened out-of-band),
+  // honor it now so we never bill another segment to this number.
+  if (result.errorCode === '21610') {
+    try {
+      await suppressPhoneForStop(to, {
+        source: 'twilio_21610',
+        providerEventId: message.id,
+      });
+    } catch (suppressError) {
+      logger.warn('[notifications] Failed to record suppression after 21610', {
+        notificationId: message.id,
+        error:
+          suppressError instanceof Error ? suppressError.message : 'unknown',
+      });
+    }
+  }
+
   return buildErrorResult('sms', result.error);
 }
 

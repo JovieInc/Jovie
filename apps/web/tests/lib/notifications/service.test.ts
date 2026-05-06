@@ -44,6 +44,7 @@ vi.mock('@/lib/notifications/suppression', () => ({
 
 vi.mock('@/lib/notifications/sms-suppression', () => ({
   isPhoneSmsSuppressed: vi.fn(),
+  suppressPhoneForStop: vi.fn(),
 }));
 
 vi.mock('@/lib/notifications/providers/sms/twilio-sender', () => ({
@@ -73,7 +74,10 @@ import {
   sendNotification,
   setEmailProvider,
 } from '@/lib/notifications/service';
-import { isPhoneSmsSuppressed } from '@/lib/notifications/sms-suppression';
+import {
+  isPhoneSmsSuppressed,
+  suppressPhoneForStop,
+} from '@/lib/notifications/sms-suppression';
 import {
   isEmailSuppressed,
   logDelivery,
@@ -123,6 +127,10 @@ describe('Notification Service', () => {
     vi.mocked(isPhoneSmsSuppressed).mockResolvedValue({
       suppressed: false,
       reason: null,
+    });
+
+    vi.mocked(suppressPhoneForStop).mockResolvedValue({
+      contactId: 'contact-123',
     });
 
     // Default SMS provider: success
@@ -473,6 +481,55 @@ describe('Notification Service', () => {
           errorMessage: 'Recipient unsubscribed',
         })
       );
+    });
+
+    it('records suppression when Twilio returns 21610 (recipient unsubscribed)', async () => {
+      vi.mocked(sendTwilioSms).mockResolvedValue({
+        success: false,
+        error: 'Attempt to send to unsubscribed recipient',
+        errorCode: '21610',
+        httpStatus: 400,
+        retryable: false,
+      });
+
+      const result = await sendNotification(smsMessage, smsTarget);
+
+      expect(result.errors).toHaveLength(1);
+      expect(suppressPhoneForStop).toHaveBeenCalledWith('+15551112222', {
+        source: 'twilio_21610',
+        providerEventId: 'sms-1',
+      });
+    });
+
+    it('does NOT call suppressPhoneForStop for non-21610 failures', async () => {
+      vi.mocked(sendTwilioSms).mockResolvedValue({
+        success: false,
+        error: 'queue full',
+        errorCode: '30007',
+        httpStatus: 500,
+        retryable: true,
+      });
+
+      await sendNotification(smsMessage, smsTarget);
+
+      expect(suppressPhoneForStop).not.toHaveBeenCalled();
+    });
+
+    it('does NOT throw if suppression bookkeeping fails', async () => {
+      vi.mocked(sendTwilioSms).mockResolvedValue({
+        success: false,
+        error: 'unsubscribed',
+        errorCode: '21610',
+        httpStatus: 400,
+        retryable: false,
+      });
+      vi.mocked(suppressPhoneForStop).mockRejectedValue(new Error('db down'));
+
+      // The send already happened (and failed); suppression is best-effort.
+      // A DB hiccup here must not corrupt the result chain.
+      await expect(
+        sendNotification(smsMessage, smsTarget)
+      ).resolves.toBeDefined();
     });
 
     it('honors the channels=disabled preference for SMS', async () => {
