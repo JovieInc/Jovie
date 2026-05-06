@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.201] - 2026-05-06
+
+> Clerk auth pages now have a guarded Google One Tap experiment, while agent setup guidance stays aligned with Jovie's custom Clerk architecture.
+
+### Added
+
+- **Google One Tap on auth pages** behind `NEXT_PUBLIC_GOOGLE_ONE_TAP_DISABLED`, E2E mode, and Clerk mock-mode guards. Safe `redirect_url` values are preserved, while unsafe external redirects fall back to the app or onboarding routes.
+- **Agent-only Clerk setup helper** for optional `clerk skill install -y --pm pnpm` setup without making human bootstrap depend on the Clerk CLI.
+
+### Changed
+
+- **Clerk agent guidance** now explicitly forbids generic quickstart setup, generated middleware, env rewrites, and mutating Clerk CLI commands that would break Jovie's `/__clerk` proxy architecture.
+- **Content Security Policy** now allows Google Identity Services through `script-src`, `connect-src`, and `frame-src` for the One Tap prompt.
+
 ## [26.4.200] - 2026-05-05
 
 > [internal] Internal agent docs were reorganized for reliability — no user-facing changes.
