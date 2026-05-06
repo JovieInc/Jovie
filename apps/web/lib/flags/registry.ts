@@ -6,9 +6,14 @@ import {
   APP_FLAG_KEYS,
   APP_FLAG_TO_STATSIG_GATE,
   type AppFlagName,
+  type ProfileAlertOptInVariant,
   type SubscribeCTAVariant,
 } from './contracts';
-import { getStatsigGateValue, getSubscribeCTAVariantValue } from './statsig';
+import {
+  getProfileAlertOptInVariantValue,
+  getStatsigGateValue,
+  getSubscribeCTAVariantValue,
+} from './statsig';
 
 type FlagEntities = {
   userId: string | null;
@@ -75,6 +80,19 @@ export const SUBSCRIBE_CTA_VARIANT_FLAG = flag<
   options: ['two_step', 'inline'],
   async decide({ entities }) {
     return getSubscribeCTAVariantValue(entities?.userId ?? null);
+  },
+});
+
+export const PROFILE_ALERT_OPTIN_VARIANT_FLAG = flag<
+  ProfileAlertOptInVariant,
+  FlagEntities
+>({
+  key: 'profile_alert_optin_cta_variant',
+  defaultValue: 'button',
+  description: 'Public profile alert opt-in CTA variant',
+  options: ['button', 'toggle'],
+  async decide({ entities }) {
+    return getProfileAlertOptInVariantValue(entities?.userId ?? null);
   },
 });
 

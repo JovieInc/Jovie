@@ -1,3 +1,4 @@
+import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import type { Artist } from '@/types/db';
 
 export type NotificationSource = 'profile_inline' | 'tour_drawer';
@@ -29,6 +30,7 @@ export interface ArtistNotificationsCTAProps {
   readonly hideTrigger?: boolean;
   readonly onFlowClosed?: () => void;
   readonly onSubscriptionActivated?: () => void;
+  readonly experimentVariant?: ProfileAlertOptInVariant;
   /**
    * Analytics source identifier for tracking where subscriptions originate.
    * Defaults to 'profile_inline'. Tour drawer passes 'tour_drawer'.

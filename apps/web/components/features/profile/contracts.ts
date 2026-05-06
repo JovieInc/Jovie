@@ -1,4 +1,5 @@
 import type { DiscogRelease } from '@/lib/db/schema/content';
+import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
@@ -161,6 +162,7 @@ export interface ProfilePublicViewModel {
   readonly allowPhotoDownloads: boolean;
   readonly pressPhotos: PressPhoto[];
   readonly subscribeTwoStep: boolean;
+  readonly alertOptInVariant: ProfileAlertOptInVariant;
   readonly genres?: string[] | null;
   readonly tourDates: TourDateViewModel[];
   readonly visitTrackingToken?: string;

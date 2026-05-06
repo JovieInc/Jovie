@@ -148,7 +148,9 @@ describe('ProfileDesktopSurface', () => {
     expect(screen.getByTestId('profile-desktop-surface')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Home' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Music' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Events' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Events' })
+    ).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Alerts' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Profile' })).toBeInTheDocument();
     expect(screen.getByText('Tim White')).toBeInTheDocument();

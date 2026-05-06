@@ -1,5 +1,6 @@
 'use client';
 
+import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import type { Artist } from '@/types/db';
 import { ProfileInlineNotificationsCTA } from './ProfileInlineNotificationsCTA';
 
@@ -10,6 +11,7 @@ interface TwoStepNotificationsCTAProps {
   readonly portalContainer?: HTMLElement | null;
   readonly onFlowClosed?: () => void;
   readonly onSubscriptionActivated?: () => void;
+  readonly experimentVariant?: ProfileAlertOptInVariant;
 }
 
 export function TwoStepNotificationsCTA({
@@ -19,6 +21,7 @@ export function TwoStepNotificationsCTA({
   portalContainer,
   onFlowClosed,
   onSubscriptionActivated,
+  experimentVariant,
 }: TwoStepNotificationsCTAProps) {
   return (
     <ProfileInlineNotificationsCTA
@@ -29,6 +32,7 @@ export function TwoStepNotificationsCTA({
       autoOpen={startExpanded}
       onFlowClosed={onFlowClosed}
       onSubscriptionActivated={onSubscriptionActivated}
+      experimentVariant={experimentVariant}
     />
   );
 }
