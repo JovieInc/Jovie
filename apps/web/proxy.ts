@@ -1144,20 +1144,42 @@ export default async function middleware(
         redirect: 'manual',
       });
 
+      // Streaming a raw 3xx Response with a non-null body through Next.js
+      // middleware on Vercel Edge crashes the runtime *before* this try/catch
+      // can intercept (surfaces as opaque "500 Internal Server Error"). Use
+      // NextResponse.redirect for redirects — the only middleware-supported
+      // redirect primitive — and forward Set-Cookie headers explicitly.
+      const isRedirect = proxyRes.status >= 300 && proxyRes.status < 400;
+      const upstreamLocation = proxyRes.headers.get('location');
+
+      if (isRedirect && upstreamLocation) {
+        const fapiOrigin = `https://${fapiHost}`;
+        const rewrittenLocation = upstreamLocation.startsWith(fapiOrigin)
+          ? upstreamLocation.replace(
+              fapiOrigin,
+              `${req.nextUrl.origin}/__clerk`
+            )
+          : upstreamLocation;
+
+        const redirectStatus = proxyRes.status as 301 | 302 | 303 | 307 | 308;
+        const redirect = NextResponse.redirect(
+          rewrittenLocation,
+          redirectStatus
+        );
+
+        const setCookies =
+          proxyRes.headers.getSetCookie?.() ??
+          proxyRes.headers.get('set-cookie')?.split(/,(?=[^;]+=)/) ??
+          [];
+        for (const cookie of setCookies) {
+          if (cookie) redirect.headers.append('set-cookie', cookie);
+        }
+
+        return redirect;
+      }
+
       const resHeaders = new Headers(proxyRes.headers);
       resHeaders.delete('content-encoding');
-
-      // Rewrite redirect Location headers to route back through /__clerk
-      const location = resHeaders.get('location');
-      if (location) {
-        const fapiOrigin = `https://${fapiHost}`;
-        if (location.startsWith(fapiOrigin)) {
-          resHeaders.set(
-            'location',
-            location.replace(fapiOrigin, `${req.nextUrl.origin}/__clerk`)
-          );
-        }
-      }
 
       return new NextResponse(proxyRes.body, {
         status: proxyRes.status,
