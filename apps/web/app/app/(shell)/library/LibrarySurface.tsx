@@ -1,4 +1,11 @@
-import { Disc3, ExternalLink, FileText, ImageIcon, Music2 } from 'lucide-react';
+import {
+  Disc3,
+  ExternalLink,
+  FileAudio2,
+  FileText,
+  ImageIcon,
+  Music2,
+} from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { APP_ROUTES } from '@/constants/routes';
@@ -57,8 +64,8 @@ export function LibraryLoadingState() {
       <div className='mx-auto max-w-6xl space-y-5'>
         <div className='flex items-end justify-between gap-4'>
           <div className='space-y-2'>
-            <div className='h-6 w-24 rounded-md bg-surface-1' />
-            <div className='h-4 w-64 max-w-[72vw] rounded-md bg-surface-1' />
+            <div className='h-4 w-56 max-w-[72vw] rounded-md bg-surface-1' />
+            <div className='h-4 w-32 rounded-md bg-surface-1' />
           </div>
           <div className='hidden h-4 w-20 rounded-md bg-surface-1 sm:block' />
         </div>
@@ -102,12 +109,18 @@ export function LibrarySurface({
 }) {
   if (assets.length === 0) {
     return (
-      <main className='flex h-full min-h-[420px] items-center justify-center px-6'>
+      <main
+        aria-label='Library'
+        className='flex h-full min-h-[420px] items-center justify-center px-6'
+        data-testid='library-surface'
+      >
         <div className='max-w-sm text-center'>
           <div className='mx-auto mb-4 grid h-10 w-10 place-items-center rounded-md border border-subtle bg-surface-1 text-tertiary-token'>
             <Music2 className='h-4 w-4' strokeWidth={2.25} />
           </div>
-          <h1 className='text-lg font-semibold text-primary-token'>Library</h1>
+          <h2 className='text-base font-semibold text-primary-token'>
+            No Release Assets
+          </h2>
           <p className='mt-2 text-sm leading-6 text-secondary-token'>
             Releases and artwork will appear here after your catalog is
             connected.
@@ -124,17 +137,16 @@ export function LibrarySurface({
   }
 
   return (
-    <main className='h-full overflow-y-auto px-5 py-5 sm:px-6 lg:px-8'>
+    <main
+      aria-label='Library'
+      className='h-full overflow-y-auto px-5 py-5 sm:px-6 lg:px-8'
+      data-testid='library-surface'
+    >
       <div className='mx-auto max-w-6xl space-y-5'>
         <div className='flex items-end justify-between gap-4'>
-          <div>
-            <h1 className='text-xl font-semibold tracking-[-0.01em] text-primary-token'>
-              Library
-            </h1>
-            <p className='mt-1 text-sm text-secondary-token'>
-              Read-only release assets from your connected catalog.
-            </p>
-          </div>
+          <p className='max-w-2xl text-sm text-secondary-token'>
+            Read-only release assets from your connected catalog.
+          </p>
           <div className='hidden text-sm tabular-nums text-tertiary-token sm:block'>
             {assets.length} {assets.length === 1 ? 'Release' : 'Releases'}
           </div>
@@ -198,6 +210,18 @@ export function LibrarySurface({
                   {asset.providerCount}{' '}
                   {asset.providerCount === 1 ? 'Provider' : 'Providers'}
                 </span>
+                {asset.hasArtwork ? (
+                  <span className='inline-flex items-center gap-1 rounded-md bg-surface-1 px-2 py-1'>
+                    <ImageIcon className='h-3 w-3' strokeWidth={2.25} />
+                    Artwork
+                  </span>
+                ) : null}
+                {asset.previewUrl ? (
+                  <span className='inline-flex items-center gap-1 rounded-md bg-surface-1 px-2 py-1'>
+                    <FileAudio2 className='h-3 w-3' strokeWidth={2.25} />
+                    Preview
+                  </span>
+                ) : null}
                 {asset.hasLyrics ? (
                   <span className='inline-flex items-center gap-1 rounded-md bg-surface-1 px-2 py-1'>
                     <FileText className='h-3 w-3' strokeWidth={2.25} />
@@ -214,6 +238,17 @@ export function LibrarySurface({
                   Open Release
                   <ExternalLink className='h-3 w-3' strokeWidth={2.25} />
                 </Link>
+                {asset.previewUrl ? (
+                  <a
+                    href={asset.previewUrl}
+                    target='_blank'
+                    rel='noopener noreferrer'
+                    className='inline-flex h-7 items-center gap-1 rounded-md border border-subtle bg-surface-0 px-2 text-xs font-medium text-secondary-token transition-[background-color,border-color,color] hover:border-default hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token'
+                  >
+                    Open Preview
+                    <ExternalLink className='h-3 w-3' strokeWidth={2.25} />
+                  </a>
+                ) : null}
                 {asset.providers.slice(0, 3).map(provider => (
                   <a
                     key={`${asset.id}-${provider.key}`}
