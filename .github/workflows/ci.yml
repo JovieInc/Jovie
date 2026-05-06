@@ -2086,7 +2086,7 @@ jobs:
           VITEST_CI_FLAGS="--pool=forks --maxWorkers=2"
           # Mitigate low-frequency flakes by retrying failed tests once in CI
           RETRY_FLAG="--retry=1"
-          # Use shard-specific output file so Codecov Test Analytics receives all 4 shards
+          # Use shard-specific output file so Codecov Test Analytics receives all 6 shards
           # (a shared filename causes only the last upload to be recorded)
           # Note: vitest runs from apps/web/, so path is relative to that directory
           SHARD_SLUG="${{ matrix.shard }}"
