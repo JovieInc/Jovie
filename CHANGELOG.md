@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.209] - 2026-05-06
+
+> Public alert-conversion landing page: each artist now has a fast `/<handle>/alerts` URL that turns paid traffic into verified SMS or email subscribers. Single CTA, channel toggle, TCPA-grade consent copy, source-link attribution carried through every click.
+
+### Added
+
+- [alerts] **New public route** at `/<handle>/alerts` — fully static (CDN-cached HTML), profile-scoped, with `generateMetadata` for OG tags and a canonical URL.
+- [alerts] **`<AlertGrowthLanding>` client component** that reads `?s=<code>` from the live URL via `useSearchParams` (so the parent page can stay static) and threads it into the subscribe-mutation `source` field as `alerts-landing:<code>`.
+- [alerts] **TCPA-grade consent copy** rendered inline on the SMS path using the canonical `SMS_CONSENT_TEXT` + `SMS_CONSENT_VERSION` constants. The form labels them with `data-consent-version` so a future evidence query can match the version a fan saw at signup.
+- [tests] **15 unit tests** covering channel toggling, US E.164 normalization, source-link sanitization, query-string read, error/pending/success states, and the aria-pressed toggle pattern.
+
+### Changed
+
+- [alerts] **Strict US-only phone normalization at the form boundary.** A `+44 7700 …` paste now rejects with an inline error instead of being mangled into a malformed `+1447700…` number that hits Twilio. NANP rules enforced (area code starts 2-9).
+- [alerts] **Source-link query strings are sanitized** to `[a-zA-Z0-9_-]{1,32}` before threading into the subscribe payload. A hostile `?s=<200KB>` paste cannot now blow up downstream parsers or analytics funnels.
+- [alerts] **No double-submit after success/pending-confirmation.** The submit handler bails on every non-`idle` / non-`error` state so a tap-spamming user can't trigger a second mutation.
+
+
 ## [26.4.207] - 2026-05-06
 
 > The auth-unavailable fallback now reads the right verb. Visiting `/signup` no longer says "Sign in is temporarily unavailable" — it says "Sign up is temporarily unavailable." A small thing, but the prior copy made every signup-CTA click on the homepage feel like the wrong page when Clerk briefly fell back.
