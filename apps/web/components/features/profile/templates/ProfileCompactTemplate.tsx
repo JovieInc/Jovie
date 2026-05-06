@@ -27,6 +27,7 @@ import {
 } from '@/features/profile/registry';
 import type { PublicRelease } from '@/features/profile/releases/types';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
+import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import {
@@ -84,6 +85,7 @@ interface ProfileCompactTemplateProps {
   readonly featuredPlaylistFallback?: ConfirmedFeaturedPlaylistFallback | null;
   readonly enableDynamicEngagement?: boolean;
   readonly subscribeTwoStep?: boolean;
+  readonly alertOptInVariant?: ProfileAlertOptInVariant;
   readonly genres?: string[] | null;
   readonly pressPhotos?: PressPhoto[];
   readonly allowPhotoDownloads?: boolean;
@@ -205,6 +207,7 @@ export function ProfileCompactTemplate({
   featuredPlaylistFallback,
   enableDynamicEngagement = false,
   subscribeTwoStep = false,
+  alertOptInVariant = 'button',
   genres,
   pressPhotos = [],
   allowPhotoDownloads = false,
@@ -769,6 +772,7 @@ export function ProfileCompactTemplate({
                   showPayButton={showPayButton}
                   latestRelease={latestRelease}
                   profileSettings={profileSettings}
+                  alertOptInVariant={alertOptInVariant}
                   genres={genres}
                   pressPhotos={pressPhotos}
                   allowPhotoDownloads={allowPhotoDownloads}
@@ -816,6 +820,7 @@ export function ProfileCompactTemplate({
                   featuredPlaylistFallback={featuredPlaylistFallback}
                   enableDynamicEngagement={enableDynamicEngagement}
                   subscribeTwoStep={subscribeTwoStep}
+                  alertOptInVariant={alertOptInVariant}
                   genres={genres}
                   pressPhotos={pressPhotos}
                   allowPhotoDownloads={allowPhotoDownloads}

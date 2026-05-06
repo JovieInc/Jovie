@@ -35,6 +35,7 @@ import type { PublicRelease } from '@/features/profile/releases/types';
 import { SubscriptionConfirmedBanner } from '@/features/profile/SubscriptionConfirmedBanner';
 import type { UserLocation } from '@/hooks/useUserLocation';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
+import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import { buildProfileShareContext } from '@/lib/share/context';
@@ -103,6 +104,7 @@ interface ProfileCompactSurfaceProps {
   readonly featuredPlaylistFallback?: ConfirmedFeaturedPlaylistFallback | null;
   readonly enableDynamicEngagement?: boolean;
   readonly subscribeTwoStep?: boolean;
+  readonly alertOptInVariant?: ProfileAlertOptInVariant;
   readonly genres?: string[] | null;
   readonly pressPhotos?: PressPhoto[];
   readonly allowPhotoDownloads?: boolean;
@@ -190,6 +192,7 @@ export function ProfileCompactSurface({
   featuredPlaylistFallback,
   enableDynamicEngagement = false,
   subscribeTwoStep = false,
+  alertOptInVariant = 'button',
   genres,
   pressPhotos = [],
   allowPhotoDownloads = false,
@@ -254,11 +257,13 @@ export function ProfileCompactSurface({
     drawerOpen: isDrawerOverlayActive,
     drawerView,
   });
-  const isHomeMode = activePrimaryTab === 'profile';
+  const hasTourDates = tourDates.length > 0;
+  const activeVisiblePrimaryTab =
+    activePrimaryTab === 'tour' && !hasTourDates ? 'profile' : activePrimaryTab;
+  const isHomeMode = activeVisiblePrimaryTab === 'profile';
   const showBottomNav = true;
   const isPreviewEmbedded =
     renderMode === 'preview' && presentation === 'embedded';
-  const activePrimaryPanel = isHomeMode ? null : activePrimaryTab;
   const surfaceState = useMemo(
     () =>
       resolveProfileSurfaceState({
@@ -273,11 +278,12 @@ export function ProfileCompactSurface({
         hasPlayableDestinations: mergedDSPs.length > 0,
         showPayButton,
         isSubscribed,
-        activeSubtitle: getProfileModeDefinition(activePrimaryTab).subtitle,
+        activeSubtitle: getProfileModeDefinition(activeVisiblePrimaryTab)
+          .subtitle,
         viewerCountryCode,
       }),
     [
-      activePrimaryTab,
+      activeVisiblePrimaryTab,
       artist,
       featuredPlaylistFallback,
       isSubscribed,
@@ -311,13 +317,20 @@ export function ProfileCompactSurface({
   );
   const hasTip = surfaceState.hasTip;
   const hasReleases = surfaceState.hasReleases;
+  const visiblePrimaryTabs = useMemo(
+    () => PRIMARY_TABS.filter(tab => tab.mode !== 'tour' || hasTourDates),
+    [hasTourDates]
+  );
+  const visiblePrimaryTabCount =
+    visiblePrimaryTabs.length + (hideMoreMenu ? 0 : 1);
   const { heroSubtitle } = surfaceState;
   const IdentityHeading = renderMode === 'preview' ? 'p' : 'h1';
-  const isMenuActive = drawerOpen && drawerView === 'menu';
+  const isMenuActive =
+    drawerOpen && drawerView === 'menu' && activeVisiblePrimaryTab !== 'tour';
   const topChromeButtonClassName =
     'h-9! w-9! border-white/14 bg-black/24 text-white shadow-[0_10px_24px_rgba(0,0,0,0.22)] backdrop-blur-md hover:bg-black/36 active:scale-100';
   const socialIconClassName =
-    'inline-flex h-8 w-8 items-center justify-center rounded-full text-white/82 transition-colors duration-200 hover:bg-white/8 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
+    'inline-flex h-8 w-8 items-center justify-center text-white/68 transition-colors duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
   const heroHeightClassName = isHomeMode
     ? 'h-[34svh] min-h-[232px] max-h-[250px] [@media(min-height:761px)_and_(max-height:880px)]:max-h-[190px] [@media(min-height:761px)_and_(max-height:880px)]:min-h-[190px] [@media(max-height:760px)]:h-[156px] [@media(max-height:760px)]:min-h-[156px]'
     : 'h-14 border-b border-white/[0.075]';
@@ -524,7 +537,11 @@ export function ProfileCompactSurface({
                 </div>
               </div>
             </div>
-          ) : null}
+          ) : renderMode === 'preview' ? null : (
+            <h1 className='sr-only' data-testid='profile-header'>
+              {artist.name}
+            </h1>
+          )}
         </header>
 
         <div className='relative z-10 flex min-h-0 flex-1 flex-col px-4 pt-2'>
@@ -538,6 +555,7 @@ export function ProfileCompactSurface({
                   portalContainer={notificationsPortalContainer ?? undefined}
                   variant='hero'
                   hideTrigger
+                  experimentVariant={alertOptInVariant}
                   onFlowClosed={returnToProfileAfterNotifications}
                   onSubscriptionActivated={handleSubscriptionActivated}
                 />
@@ -567,21 +585,28 @@ export function ProfileCompactSurface({
                   </span>
                   <span
                     className={cn(
-                      'relative h-[26px] w-[42px] shrink-0 rounded-full border p-0.5 transition-colors duration-200',
-                      isSubscribed
-                        ? 'border-white/42 bg-white'
-                        : 'border-white/16 bg-white/10'
+                      alertOptInVariant === 'toggle'
+                        ? 'relative h-[26px] w-[42px] shrink-0 rounded-full border p-0.5 transition-colors duration-200'
+                        : 'inline-flex h-8 shrink-0 items-center rounded-full bg-white px-3 text-[12px] font-semibold text-black transition-colors duration-200',
+                      alertOptInVariant === 'toggle' &&
+                        (isSubscribed
+                          ? 'border-white/42 bg-white'
+                          : 'border-white/16 bg-white/10')
                     )}
                     aria-hidden='true'
                   >
-                    <span
-                      className={cn(
-                        'block h-[22px] w-[22px] rounded-full shadow-[0_4px_10px_rgba(0,0,0,0.22)] transition-transform duration-200',
-                        isSubscribed
-                          ? 'translate-x-4 bg-black'
-                          : 'translate-x-0 bg-white'
-                      )}
-                    />
+                    {alertOptInVariant === 'toggle' ? (
+                      <span
+                        className={cn(
+                          'block h-[22px] w-[22px] rounded-full shadow-[0_4px_10px_rgba(0,0,0,0.22)] transition-transform duration-200',
+                          isSubscribed
+                            ? 'translate-x-4 bg-black'
+                            : 'translate-x-0 bg-white'
+                        )}
+                      />
+                    ) : (
+                      <span>{isSubscribed ? 'Manage' : 'Turn On'}</span>
+                    )}
                   </span>
                 </button>
               ) : null}
@@ -617,7 +642,7 @@ export function ProfileCompactSurface({
               />
             ) : (
               <ProfilePrimaryTabPanel
-                mode={activePrimaryPanel ?? 'listen'}
+                mode={activeVisiblePrimaryTab}
                 renderMode={renderMode}
                 artist={artist}
                 notificationsPortalContainer={
@@ -626,6 +651,7 @@ export function ProfileCompactSurface({
                 dsps={mergedDSPs}
                 enableDynamicEngagement={enableDynamicEngagement}
                 subscribeTwoStep={subscribeTwoStep}
+                alertOptInVariant={alertOptInVariant}
                 isSubscribed={isSubscribed}
                 contentPrefs={contentPrefs}
                 onTogglePref={onTogglePref}
@@ -651,15 +677,15 @@ export function ProfileCompactSurface({
                 data-testid='profile-bottom-nav'
               >
                 <div
-                  className={cn(
-                    'grid items-center gap-1',
-                    hideMoreMenu ? 'grid-cols-4' : 'grid-cols-5'
-                  )}
+                  className={cn('grid items-center gap-1')}
+                  style={{
+                    gridTemplateColumns: `repeat(${visiblePrimaryTabCount}, minmax(0, 1fr))`,
+                  }}
                 >
-                  {PRIMARY_TABS.map(tab => {
+                  {visiblePrimaryTabs.map(tab => {
                     const Icon = tab.icon;
                     const isActive =
-                      !isMenuActive && tab.mode === activePrimaryTab;
+                      !isMenuActive && tab.mode === activeVisiblePrimaryTab;
                     return (
                       <button
                         key={tab.mode}
@@ -748,6 +774,7 @@ export function ProfileCompactSurface({
           subscribeTwoStep={subscribeTwoStep}
           hasTip={hasTip}
           hasContacts={hasContacts}
+          hasTourDates={hasTourDates}
           hasReleases={hasReleases}
           genres={genres}
           pressPhotos={pressPhotos}

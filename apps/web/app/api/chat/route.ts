@@ -831,8 +831,7 @@ function createGenerateAlbumArtTool(params: {
         return {
           success: false as const,
           retryable: false,
-          error:
-            'Album art generation is temporarily unavailable. Our team has been notified.',
+          error: 'Album art generation is temporarily unavailable.',
         };
       }
 
@@ -982,8 +981,7 @@ function createGenerateAlbumArtTool(params: {
           return {
             success: false as const,
             retryable: false,
-            error:
-              'Album art generation is temporarily unavailable. Our team has been notified.',
+            error: 'Album art generation is temporarily unavailable.',
           };
         }
         Sentry.captureException(error, {

@@ -1,12 +1,41 @@
 'use client';
 
 import { Play } from 'lucide-react';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { cn } from '@/lib/utils';
 import type { PublicRelease } from '../releases/types';
 
 const YEAR_HEADER_THRESHOLD = 15;
+const AUDIO_RELEASE_TYPES = new Set([
+  'single',
+  'album',
+  'compilation',
+  'live',
+  'mixtape',
+]);
+const RELEASE_FILTERS = [
+  { key: 'all', label: 'All' },
+  { key: 'songs', label: 'Music' },
+  { key: 'eps', label: 'EPs' },
+  { key: 'videos', label: 'Videos' },
+] as const;
+
+type ReleaseFilter = (typeof RELEASE_FILTERS)[number]['key'];
+
+function getMoreReleasesHeading(activeFilter: ReleaseFilter): string {
+  switch (activeFilter) {
+    case 'songs':
+      return 'More Music';
+    case 'eps':
+      return 'More EPs';
+    case 'videos':
+      return 'More Videos';
+    case 'all':
+    default:
+      return 'More Releases';
+  }
+}
 
 function formatReleaseType(type: string): string {
   switch (type) {
@@ -40,11 +69,52 @@ export function ReleasesView({
   artistHandle,
   artistName,
 }: ReleasesViewProps) {
+  const [activeFilter, setActiveFilter] = useState<ReleaseFilter>('all');
   const ownerNameLower = artistName.toLowerCase();
+  const availableFilters = useMemo(() => {
+    const types = new Set(releases.map(release => release.releaseType));
+    return RELEASE_FILTERS.filter(filter => {
+      switch (filter.key) {
+        case 'songs':
+          return [...AUDIO_RELEASE_TYPES].some(type => types.has(type));
+        case 'eps':
+          return types.has('ep');
+        case 'videos':
+          return types.has('music_video');
+        case 'all':
+        default:
+          return true;
+      }
+    });
+  }, [releases]);
+
+  useEffect(() => {
+    if (!availableFilters.some(filter => filter.key === activeFilter)) {
+      setActiveFilter('all');
+    }
+  }, [activeFilter, availableFilters]);
+
+  const visibleReleases = useMemo(
+    () =>
+      releases.filter(release => {
+        switch (activeFilter) {
+          case 'songs':
+            return AUDIO_RELEASE_TYPES.has(release.releaseType);
+          case 'eps':
+            return release.releaseType === 'ep';
+          case 'videos':
+            return release.releaseType === 'music_video';
+          case 'all':
+          default:
+            return true;
+        }
+      }),
+    [activeFilter, releases]
+  );
 
   const yearHeaderSet = useMemo(() => {
     const years = new Set(
-      releases
+      visibleReleases
         .map(r =>
           r.releaseDate
             ? new Date(r.releaseDate).getUTCFullYear().toString()
@@ -53,14 +123,14 @@ export function ReleasesView({
         .filter(Boolean)
     );
 
-    if (releases.length < YEAR_HEADER_THRESHOLD || years.size < 2) {
+    if (visibleReleases.length < YEAR_HEADER_THRESHOLD || years.size < 2) {
       return new Set<string>();
     }
 
     const headers = new Set<string>();
     let previousYear: string | null = null;
 
-    for (const release of releases) {
+    for (const release of visibleReleases) {
       const year = release.releaseDate
         ? new Date(release.releaseDate).getUTCFullYear().toString()
         : null;
@@ -71,7 +141,7 @@ export function ReleasesView({
     }
 
     return headers;
-  }, [releases]);
+  }, [visibleReleases]);
 
   const getCollaborators = (release: PublicRelease) =>
     release.artistNames.filter(name => name.toLowerCase() !== ownerNameLower);
@@ -97,19 +167,44 @@ export function ReleasesView({
       ? `View ${release.title} by ${collaborators.join(', ')}`
       : `View ${release.title}`;
   };
+  const moreReleasesHeading = getMoreReleasesHeading(activeFilter);
 
   return (
     <div className='flex flex-col' data-testid='profile-mode-drawer-releases'>
-      {releases[0]?.slug ? (
+      {availableFilters.length > 2 ? (
+        <div className='flex gap-2 overflow-x-auto px-4 pb-3 pt-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
+          {availableFilters.map(filter => {
+            const isActive = activeFilter === filter.key;
+            return (
+              <button
+                key={filter.key}
+                type='button'
+                onClick={() => setActiveFilter(filter.key)}
+                aria-pressed={isActive}
+                className={cn(
+                  'inline-flex h-8 shrink-0 items-center rounded-full border px-3 text-[12px] font-semibold transition-colors duration-200',
+                  isActive
+                    ? 'border-white bg-white text-black'
+                    : 'border-white/10 bg-white/[0.035] text-white/58 hover:text-white'
+                )}
+              >
+                {filter.label}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
+      {visibleReleases[0]?.slug ? (
         <a
-          href={`/${artistHandle}/${releases[0].slug}`}
+          href={`/${artistHandle}/${visibleReleases[0].slug}`}
           className='group flex items-center gap-3 border-y border-white/[0.075] px-4 py-3.5 transition-colors duration-200 hover:bg-white/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
-          aria-label={getReleaseAriaLabel(releases[0])}
+          aria-label={getReleaseAriaLabel(visibleReleases[0])}
         >
           <div className='relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-[8px] bg-white/[0.04] shadow-[0_8px_20px_-10px_rgba(0,0,0,0.55)]'>
             <ImageWithFallback
-              src={releases[0].artworkUrl}
-              alt={releases[0].title}
+              src={visibleReleases[0].artworkUrl}
+              alt={visibleReleases[0].title}
               fill
               sizes='72px'
               className='object-cover grayscale contrast-[1.04]'
@@ -120,12 +215,12 @@ export function ReleasesView({
               Latest Release
             </p>
             <p className='mt-1 truncate text-[17px] font-[680] leading-tight tracking-[-0.014em] text-white'>
-              {releases[0].title}
+              {visibleReleases[0].title}
             </p>
             <p className='text-2xs mt-0.5 truncate text-[13px] text-white/64'>
-              {getReleaseMeta(releases[0])}
+              {getReleaseMeta(visibleReleases[0])}
             </p>
-            {releases[0].releaseType === 'music_video' ? (
+            {visibleReleases[0].releaseType === 'music_video' ? (
               <span className='mt-1.5 inline-flex h-[17px] items-center rounded-full border border-white/8 bg-white/[0.04] px-1.5 text-[9px] font-semibold uppercase tracking-[0.04em] text-white/64'>
                 Video
               </span>
@@ -138,18 +233,20 @@ export function ReleasesView({
         </a>
       ) : null}
 
-      {releases.length > 1 ? (
+      {visibleReleases.length > 1 ? (
         <div className='px-4 pb-2 pt-5'>
           <h3 className='text-[22px] font-[680] leading-none tracking-[-0.025em] text-white'>
-            Top Songs
+            {moreReleasesHeading}
           </h3>
         </div>
       ) : null}
 
       <div
-        className={cn(releases.length > 1 && 'border-y border-white/[0.075]')}
+        className={cn(
+          visibleReleases.length > 1 && 'border-y border-white/[0.075]'
+        )}
       >
-        {releases.slice(1).map((release, index) => {
+        {visibleReleases.slice(1).map((release, index) => {
           if (!release.slug) {
             return null;
           }

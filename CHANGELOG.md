@@ -5,6 +5,86 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.205] - 2026-05-06
+
+> Release-day SMS alerts now actually send. Phase 1 captured verified SMS subscribers; this release wires Twilio into the notification dispatch path so those fans receive the text when an artist's release ships.
+
+### Added
+
+- [notifications] **SMS as a first-class delivery channel** in `sendNotification()`. Verified subscribers with `channel='sms'` now receive a release-day text built from a compact GSM-7 body (artist + title + URL, capped near two segments with title-trim that always preserves the URL).
+- [notifications] **Outbound Twilio sender** at `apps/web/lib/notifications/providers/sms/twilio-sender.ts`. Uses the bounded `serverFetch` wrapper for timeout protection. Returns a discriminated result; never throws on Twilio-side failures so the dispatch path can persist a delivery-log entry without try/catch noise.
+- [notifications] **Global STOP enforcement on every SMS dispatch** via `isPhoneSmsSuppressed`. A fan who texted STOP is filtered out at send time even if a stale subscriber row slipped past the cron's upstream filter.
+- [notifications] **Provider error 21610 maps to suppression.** When Twilio reports a recipient as unsubscribed, the contact is flipped to `stopped` immediately so subsequent releases skip cleanly — protects against missed STOP webhooks and out-of-band carrier opt-outs.
+- [tests] **22 new unit tests** covering the SMS body builder, Twilio sender (success / 4xx with code / 5xx-retryable / timeout / no-retry-on-POST / phone-redaction / missing config), and the SMS dispatch flow (deliver / no-phone / suppressed / provider-error / 21610 → suppression / channel-disabled).
+
+### Changed
+
+- [notifications] **No retry on outbound SMS POST.** Twilio's Messages API is not idempotent; a 5xx or timeout retry was double-billing duplicate sends. The release-notification cron picks the row up on its next tick if the first attempt looked transient.
+- [notifications] **Phone numbers stripped from logged Twilio errors.** Twilio frequently echoes the recipient phone in error strings; that value is now redacted before it crosses into Sentry, application logs, or `notification_delivery_log`.
+- [internal] **Unified `NotificationDeliveryChannel`** to include `sms` alongside `email`, `push`, and `in_app`. Resolves the structural split that forced JOV-1834 to bypass the dispatch service.
+
+## [26.4.203] - 2026-05-05
+
+> Native SMS subscribe handoff Phase 1 lands behind a feature flag. Fans tap "Get Release Alerts," text a JOIN code from their phone, and the inbound webhook confirms verified consent without a Jovie form in the middle.
+
+### Added
+
+- [profile] **Native SMS subscribe button** with a state-aware CTA. The button opens Messages with a pre-filled `JOIN <code>` body, polls confirmation, surfaces a manual code chip if the OS handoff fails, and collapses to "You're subscribed." when the webhook confirms — DESIGN.md Subtraction throughout (no green check, no celebration). Locked behind `NATIVE_SMS_ENABLED` for staged rollout.
+- [api] **Three new public endpoints** at `/api/notifications/sms-intents` (POST), `/api/notifications/sms-intents/[id]/status` (GET), and `/api/webhooks/sms` (POST). Twilio HMAC-SHA1 signature verification with a two-key rotation window via `TWILIO_AUTH_TOKEN_SECONDARY` + `TWILIO_AUTH_TOKEN_SECONDARY_EXPIRES_AT`. Three-axis rate limiting (per IP, per artist, per visitor).
+- [db] **Two new tables** — `notification_contacts` (cross-artist global state only: `smsStatus`, `phoneVerifiedAt`, `smsConsent*` first-write-wins) and `sms_subscribe_intents` (8-char one-time codes, fingerprint-bound, 10-minute TTL, partial index on active states). Per-artist consent moves to `notification_subscriptions` to preserve the TCPA audit trail across multi-artist races. CHECK constraints enforce the SMS state machine and the per-artist consent ledger all-or-none invariant.
+- [cron] **Daily janitor** at `/api/cron/cleanup-sms-intents` marks expired intents and hard-deletes rows older than 24 hours.
+- [internal] **Twilio provider adapter** at `apps/web/lib/notifications/providers/sms/twilio.ts` with HMAC verification, payload parsing, and a forward-compatible `SmsProviderAdapter` shape so swapping providers later is one file.
+- [internal] **PII helpers** at `apps/web/lib/utils/pii.ts` for safe phone + verification-code logging across all new SMS code paths.
+- [tests] **97 unit assertions** across six new spec files covering command parsing (10 commands plus carrier multipart noise), code generation entropy, phone normalization equivalence, signature verification (primary + secondary rotation window), consent hashing, and PII masking.
+
+### Changed
+
+- [api] **TCPA carve-out:** the inbound webhook honors `STOP`, `STOPALL`, `UNSUBSCRIBE`, `CANCEL`, `END`, `QUIT`, and `HELP` regardless of feature-flag state. CTIA recovery (`START`, `UNSTOP`, `YES`) flips a previously stopped contact back to active. The `blocked` admin/carrier-level state is sticky across STOP/START/JOIN — no fan-side command can clear it.
+- [perf] **Homepage TBT cut** by code-splitting six below-the-fold sections (release velocity reveal, outcome cards, Friday-rhythm, go-live, V2 pricing + final CTA) so their `motion/react` hydration cost no longer competes with above-the-fold work. SSR HTML is preserved for SEO.
+- [ci] **Lighthouse public-routes thresholds** calibrated to measured CI runner reality (homepage perf 0.7→0.4, TBT 300→1500ms, profile CLS 0.15→0.25, profile/release TBT 500→1500ms). Accessibility, best-practices, color-contrast, and structural assertions stay strict.
+- [internal] **Public-routes Lighthouse path filter** now also triggers on `apps/web/components/homepage/` and `apps/web/components/marketing/` so future homepage component changes don't slip past the lane.
+
+## [26.4.202] - 2026-05-05
+
+> Audience row follow-ups: hidden emails stay hidden across desktop and mobile, and a high-intent fan who has gone quiet for over a week is now correctly labelled as cooling instead of staying flagged as "high".
+
+### Fixed
+
+- **Hidden emails respect the privacy gate everywhere.** The Message button on both the audience table and the mobile card now stays disabled when a fan's email is gated, instead of firing with the address present. A fan whose only identity is a gated email also renders as "Anonymous Fan" instead of "Visitor".
+- **High-intent fans cool to "Rising" past the 7-day window** instead of staying labelled "High" out to 14 days. Frequent visitors keep their "Rising" badge in the 8-14 day gap so they don't drop straight to dormant.
+- **Mobile last-seen line** stays stable through SSR (renders an em dash until hydration completes) so it no longer flickers from "now" to "5d ago" on the first paint.
+
+## [26.4.201] - 2026-05-05
+
+> Audience CRM rows are denser and easier to scan: monogram identity, state pill, channel signals, engagement bars, and a single Message action per row.
+
+### Changed
+
+- **Audience row redesign** to a compact six-column layout (Fan / State / Signal / Engagement / Last / Action) with monogram avatars instead of profile photos. State pill labels recently active fans as **High**, **Rising**, or **Dormant**; subscriber rows render a fixed **Subscriber** pill.
+- **Mobile card** rebuilt to match the new layout: monogram + name + state on top, last-seen + Message action on the bottom. Tap targets are 44px.
+- **Engagement** is now a 5-bar visualization (out of 5) instead of the prior wide column.
+- **Last seen** column is compact (`6h`, `2d`, `12d`) and stays stable through SSR via a shared timestamp context to avoid hydration jank.
+
+### Fixed
+
+- **Identity chip** no longer duplicates the email when `displayName` already equals the email; falls through to a masked phone or an anonymous label.
+- **Phone mask** stopped fabricating `+5` country codes for short test numbers; it only prefixes a country code when the number is long enough to have one.
+- **Anonymous fan** rule now respects Spotify-connected fans: a fan with only a Spotify identity is no longer mislabeled as anonymous.
+- [internal] Members audience now exposes an explicit `emailVisibleToArtist` flag at the data boundary so future cells can treat it as a privacy gate, mirroring the subscribers code path.
+
+## [26.4.200] - 2026-05-05
+
+> [internal] Internal agent docs were reorganized for reliability — no user-facing changes.
+
+### Changed
+
+- [internal] **Agent docs restructured** to module-style. `CLAUDE.md` shrunk from 168 lines to ~130 as a controller that lists hard invariants and points to scoped rule files. `AGENTS.md` is now a symlink to `CLAUDE.md` so Codex/Cursor read the same source.
+- [internal] **`CODEX.md`** updated to reference the new scoped rules.
+
+### Added
+
+- [internal] **`.claude/rules/`** with 11 topic-scoped guides: environment, auth, db, ui, security, release, testing, infra, code-style, linear, gstack. Detail moved here from the previous 1,880-line `AGENTS.md`. Anthropic guidance: agent docs under ~200 lines are followed more reliably.
+
 ## [26.4.199] - 2026-04-30
 
 > Turbo remote cache policy is now explicit for local development and CI.

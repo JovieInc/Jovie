@@ -177,12 +177,16 @@ function TourDatesContent({
   if (allDates.length === 0) {
     return (
       <div className='space-y-4'>
-        <p className='text-[16px] font-medium tracking-[-0.03em] text-white'>
-          No upcoming events.
-        </p>
+        <div className='space-y-1.5'>
+          <p className='text-[16px] font-medium tracking-[-0.03em] text-white'>
+            No upcoming events.
+          </p>
+          <p className='max-w-[30ch] text-[13px] leading-5 text-white/52'>
+            Turn on alerts to hear when new shows are announced.
+          </p>
+        </div>
         <ArtistNotificationsCTA
           artist={artist}
-          forceExpanded
           hideListenFallback
           source='tour_drawer'
           presentation='overlay'

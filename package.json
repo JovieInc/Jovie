@@ -1,6 +1,6 @@
 {
   "name": "jovie-monorepo",
-  "version": "26.4.197",
+  "version": "26.4.205",
   "private": true,
   "config": {
     "commitizen": {
@@ -50,6 +50,7 @@
       "follow-redirects": "1.16.0",
       "@clerk/ui>@floating-ui/react": "0.27.19",
       "@clerk/react>@clerk/shared": "4.8.5",
+      "@clerk/ui>@clerk/shared": "4.8.5",
       "@clerk/localizations>@clerk/shared": "4.8.5",
       "@clerk/testing>@clerk/backend": "3.4.1",
       "@clerk/testing>@clerk/shared": "4.8.5",

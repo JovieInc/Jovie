@@ -1,5 +1,5 @@
 {
-  "id": "0cca6c26-bea3-4238-9d21-e2eca62f4420",
+  "id": "6f4a9685-02a7-4d64-a5cb-059d89cc9472",
   "prevId": "e8c9581f-ca70-4284-827d-6a2c498205fa",
   "version": "7",
   "dialect": "postgresql",
@@ -4910,6 +4910,38 @@
           "notNull": true,
           "default": false
         },
+        "stripe_charges_enabled": {
+          "name": "stripe_charges_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "stripe_details_submitted": {
+          "name": "stripe_details_submitted",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "stripe_payout_email": {
+          "name": "stripe_payout_email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stripe_connect_last_synced_at": {
+          "name": "stripe_connect_last_synced_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stripe_connect_last_event_at": {
+          "name": "stripe_connect_last_event_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
         "next_task_number": {
           "name": "next_task_number",
           "type": "integer",
@@ -5027,6 +5059,22 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_creator_profiles_stripe_account_id": {
+          "name": "idx_creator_profiles_stripe_account_id",
+          "columns": [
+            {
+              "expression": "stripe_account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "stripe_account_id IS NOT NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -16757,27 +16805,6 @@
           "notNull": true,
           "default": "'manual'"
         },
-        "event_type": {
-          "name": "event_type",
-          "type": "event_type",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'tour'"
-        },
-        "confirmation_status": {
-          "name": "confirmation_status",
-          "type": "confirmation_status",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "reviewed_at": {
-          "name": "reviewed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
         "title": {
           "name": "title",
           "type": "text",
@@ -16933,27 +16960,6 @@
             }
           ],
           "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_tour_dates_confirmation_status": {
-          "name": "idx_tour_dates_confirmation_status",
-          "columns": [
-            {
-              "expression": "profile_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "confirmation_status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -18931,7 +18937,7 @@
     "public.tour_date_provider": {
       "name": "tour_date_provider",
       "schema": "public",
-      "values": ["bandsintown", "songkick", "manual", "admin_import"]
+      "values": ["bandsintown", "songkick", "manual"]
     },
     "public.user_status_lifecycle": {
       "name": "user_status_lifecycle",

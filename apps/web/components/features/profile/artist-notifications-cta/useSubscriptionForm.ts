@@ -8,6 +8,7 @@ import {
 } from '@/features/profile/notifications';
 import { track } from '@/lib/analytics';
 import { captureError } from '@/lib/error-tracking';
+import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import {
   getNotificationSubscribeSuccessMessage,
@@ -29,6 +30,7 @@ import { buildPhoneE164, getMaxNationalDigits } from './utils';
 interface UseSubscriptionFormOptions {
   artist: Artist;
   source?: NotificationSource;
+  experimentVariant?: ProfileAlertOptInVariant;
 }
 
 export type SubscriptionErrorOrigin =
@@ -94,6 +96,7 @@ const resolveInlineErrorMessage = (
 export function useSubscriptionForm({
   artist,
   source: sourceProp,
+  experimentVariant,
 }: UseSubscriptionFormOptions): UseSubscriptionFormReturn {
   const source = sourceProp ?? 'profile_inline';
   const {
@@ -280,6 +283,7 @@ export function useSubscriptionForm({
         channel,
         source,
         handle: artist.handle,
+        alert_opt_in_variant: experimentVariant,
         pending_confirmation: response.pendingConfirmation ?? false,
       });
 
@@ -323,6 +327,7 @@ export function useSubscriptionForm({
         channel,
         source,
         handle: artist.handle,
+        alert_opt_in_variant: experimentVariant,
       });
       return 'error';
     } finally {
@@ -336,6 +341,7 @@ export function useSubscriptionForm({
     country.code,
     country.dialCode,
     emailInput,
+    experimentVariant,
     isSubmitting,
     phoneInput,
     source,
@@ -427,6 +433,7 @@ export function useSubscriptionForm({
     track('otp_resend_attempt', {
       source,
       handle: artist.handle,
+      alert_opt_in_variant: experimentVariant,
     });
 
     const result = await handleConfirmSubscription();
@@ -435,6 +442,7 @@ export function useSubscriptionForm({
       track('otp_resend_success', {
         source,
         handle: artist.handle,
+        alert_opt_in_variant: experimentVariant,
       });
 
       setOtpCode('');
@@ -448,6 +456,7 @@ export function useSubscriptionForm({
   }, [
     artist.handle,
     clearError,
+    experimentVariant,
     handleConfirmSubscription,
     isResending,
     resendCooldownEnd,
@@ -470,6 +479,7 @@ export function useSubscriptionForm({
       channel,
       source,
       handle: artist.handle,
+      alert_opt_in_variant: experimentVariant,
     });
 
     if (!validateCurrent('submit')) {
@@ -478,6 +488,7 @@ export function useSubscriptionForm({
         channel,
         source,
         handle: artist.handle,
+        alert_opt_in_variant: experimentVariant,
       });
       return 'error' as const;
     }
@@ -486,12 +497,14 @@ export function useSubscriptionForm({
       channel,
       source,
       handle: artist.handle,
+      alert_opt_in_variant: experimentVariant,
     });
 
     return await handleConfirmSubscription();
   }, [
     artist.handle,
     channel,
+    experimentVariant,
     handleConfirmSubscription,
     isSubmitting,
     source,

@@ -24,9 +24,11 @@
   --public-shell-text: var(--color-text-primary-token);
   --public-shell-border: var(--color-border-default);
   --public-shell-content-max: var(--linear-content-max);
+  /* TODO(DS_FOUNDATION_V1 Wave 1): migrate consumers to --ds-public-content-max (1298px) and remove these legacy variants */
   --public-content-max-landing: 1280px;
   --public-content-max-page: 1200px;
-  --public-content-max-prose: 680px;
+  /* TODO(DS_FOUNDATION_V1 Wave 4): consider deprecating once consumers migrate to --ds-prose-max */
+  --public-content-max-prose: var(--ds-prose-max);
   --app-shell-content-max-wide: 84rem;
   --app-shell-content-max-reading: 56rem;
   --app-shell-content-max-form: 50rem;
@@ -38,6 +40,15 @@
   --profile-drawer-radius-mobile: 24px;
   --profile-drawer-radius-desktop: 20px;
   --profile-action-radius: 14px;
+
+  /* DS_FOUNDATION_V1: canonical semantic aliases (do not redefine downstream) */
+  --ds-public-content-max: 1298px; /* canonical public/marketing width */
+  --ds-prose-max: 680px; /* prose exception */
+
+  --ds-motion-subtle-duration: 150ms;
+  --ds-motion-subtle-easing: cubic-bezier(0.4, 0, 0.2, 1);
+  --ds-motion-cinematic-duration: 420ms;
+  --ds-motion-cinematic-easing: cubic-bezier(0.22, 1, 0.36, 1);
 
   /* Core Theme Inputs */
   --theme-base-hue: 282;
@@ -1026,8 +1037,8 @@
                   open/close, chat composer surface morph. 320ms feels
                   intentional and gives the eye time to track the move.
      Always prefer these over hardcoded numbers; they pick up reduced-motion. */
-  --duration-subtle: 150ms;
-  --duration-cinematic: 320ms;
+  --duration-subtle: var(--ds-motion-subtle-duration);
+  --duration-cinematic: var(--ds-motion-cinematic-duration);
 
   /* Easings - Linear uses cubic-bezier for smooth feel */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -1036,8 +1047,8 @@
   --ease-interactive: cubic-bezier(0.25, 0.46, 0.45, 0.94);
   --ease-linear: var(--ease-interactive);
   /* Legacy alias */
-  --ease-subtle: var(--ease-interactive);
-  --ease-cinematic: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-subtle: var(--ds-motion-subtle-easing);
+  --ease-cinematic: var(--ds-motion-cinematic-easing);
 
   /* Pre-composed transition patterns (extracted from Linear)
      Use duration custom properties so prefers-reduced-motion overrides work */
@@ -1060,6 +1071,8 @@
 /* Reduced motion — zero out all duration tokens so transition patterns inherit 0ms */
 @media (prefers-reduced-motion: reduce) {
   :root {
+    --ds-motion-subtle-duration: 0ms;
+    --ds-motion-cinematic-duration: 0ms;
     --duration-instant: 0ms;
     --duration-fast: 0ms;
     --duration-normal: 0ms;

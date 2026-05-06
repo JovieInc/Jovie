@@ -1,6 +1,6 @@
 'use client';
 
-import { Disc3, Mail, Share2, Wallet } from 'lucide-react';
+import { Disc3, Mail, Share2, Ticket, Wallet } from 'lucide-react';
 import { PROFILE_DRAWER_MENU_ITEM_CLASS } from '../profile-drawer-classes';
 import type { ProfileViewKey } from './registry';
 
@@ -9,6 +9,7 @@ const ICON_CLASS = 'size-4 text-white/40';
 export interface MenuViewProps {
   readonly onNavigate: (view: ProfileViewKey) => void;
   readonly hasReleases: boolean;
+  readonly hasTourDates: boolean;
   readonly hasTip: boolean;
   readonly hasContacts: boolean;
 }
@@ -27,6 +28,7 @@ export interface MenuViewProps {
 export function MenuView({
   onNavigate,
   hasReleases,
+  hasTourDates,
   hasTip,
   hasContacts,
 }: MenuViewProps) {
@@ -51,6 +53,18 @@ export function MenuView({
         >
           <Disc3 className={ICON_CLASS} />
           Releases
+        </button>
+      ) : null}
+
+      {hasTourDates ? (
+        <button
+          type='button'
+          role='menuitem'
+          className={PROFILE_DRAWER_MENU_ITEM_CLASS}
+          onClick={() => onNavigate('tour')}
+        >
+          <Ticket className={ICON_CLASS} />
+          Events
         </button>
       ) : null}
 

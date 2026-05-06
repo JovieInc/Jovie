@@ -1,8 +1,9 @@
 // Fan-facing notification channels stored in the DB today
 export type NotificationChannel = 'sms' | 'email';
 
-// App-wide delivery channels (allows future push/in-app support)
-export type NotificationDeliveryChannel = 'email' | 'push' | 'in_app';
+// App-wide delivery channels. `email` and `sms` overlap with NotificationChannel
+// (the DB-facing fan enum); `push`/`in_app` are creator-facing only.
+export type NotificationDeliveryChannel = 'email' | 'sms' | 'push' | 'in_app';
 
 export type NotificationCategory = 'transactional' | 'product' | 'marketing';
 
@@ -16,6 +17,7 @@ export interface NotificationPreferences {
 
 export interface NotificationTarget {
   email?: string | null;
+  phone?: string | null;
   name?: string | null;
   userId?: string;
   clerkUserId?: string;

@@ -8,6 +8,7 @@ import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { cn } from '@/lib/utils';
 import { ArtistProfilePhoneFrame } from './ArtistProfilePhoneFrame';
+import { SHELL_H2_CLASS } from './ArtistProfileSectionHeader';
 
 interface ArtistProfileModeSwitcherProps {
   readonly adaptive: ArtistProfileLandingCopy['adaptive'];
@@ -143,13 +144,13 @@ export function ArtistProfileModeSwitcher({
             ease: [0.22, 1, 0.36, 1],
           }}
         >
-          <div className='min-h-[4.5rem] sm:min-h-[5.1rem]'>
-            <h2 className='mx-auto max-w-[11ch] text-[2.7rem] font-[650] leading-[0.94] tracking-normal text-primary-token sm:text-[3.8rem] lg:text-[4.6rem]'>
+          <div className='min-h-[3.25rem] sm:min-h-[3.75rem]'>
+            <h2 className={cn(SHELL_H2_CLASS, 'mx-auto max-w-[11ch]')}>
               {phoneCaption}
             </h2>
           </div>
-          <div className='min-h-[2.3rem]'>
-            <p className='mt-1.5 text-[0.9rem] font-medium leading-[1.28] tracking-normal text-secondary-token sm:text-[1rem]'>
+          <div className='min-h-[1.75rem]'>
+            <p className='mt-2 text-[14px] font-medium leading-[1.4] tracking-[-0.011em] text-secondary-token sm:text-[15px]'>
               {phoneSubcaption}
             </p>
           </div>

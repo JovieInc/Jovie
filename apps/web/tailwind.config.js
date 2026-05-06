@@ -84,6 +84,9 @@ module.exports = {
         'linear-content': 'var(--linear-content-max)',
         'linear-hero': 'var(--linear-hero-section-max)',
         'linear-pricing': 'var(--linear-pricing-grid-max)',
+        // DS_FOUNDATION_V1 canonical max widths
+        'public-content': 'var(--ds-public-content-max)',
+        'prose-canonical': 'var(--ds-prose-max)',
       },
 
       // Tier 1: Design token colors - auto-generates text-*, bg-*, border-* utilities
@@ -211,11 +214,17 @@ module.exports = {
         slow: 'var(--duration-slow)', // 200ms
         slower: 'var(--duration-slower)', // 250ms
         slowest: 'var(--duration-slowest)', // 300ms
+        // DS_FOUNDATION_V1 canonical motion taxonomy
+        subtle: 'var(--ds-motion-subtle-duration)', // 150ms
+        cinematic: 'var(--ds-motion-cinematic-duration)', // 420ms
       },
 
       // Transition timing functions
       transitionTimingFunction: {
         interactive: 'var(--ease-interactive)',
+        // DS_FOUNDATION_V1 canonical motion taxonomy
+        subtle: 'var(--ds-motion-subtle-easing)',
+        cinematic: 'var(--ds-motion-cinematic-easing)',
       },
 
       // Ring colors (for focus rings)
