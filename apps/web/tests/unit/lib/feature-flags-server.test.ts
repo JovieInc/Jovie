@@ -97,6 +97,9 @@ describe('Statsig server initialization', () => {
       SUBSCRIBE_CTA_VARIANT_FLAG: {
         run: vi.fn().mockResolvedValue('two_step'),
       },
+      PROFILE_ALERT_OPTIN_VARIANT_FLAG: {
+        run: vi.fn().mockResolvedValue('button'),
+      },
     }));
 
     const { getAppFlagValue } = await import('@/lib/flags/server');

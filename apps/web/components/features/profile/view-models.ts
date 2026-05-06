@@ -1,4 +1,5 @@
 import type { DiscogRelease } from '@/lib/db/schema/content';
+import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
@@ -27,6 +28,7 @@ interface BuildProfilePublicViewModelInput {
   readonly allowPhotoDownloads?: boolean;
   readonly pressPhotos?: PressPhoto[];
   readonly subscribeTwoStep?: boolean;
+  readonly alertOptInVariant?: ProfileAlertOptInVariant;
   readonly genres?: string[] | null;
   readonly tourDates?: TourDateViewModel[];
   readonly visitTrackingToken?: string;
@@ -59,6 +61,7 @@ export function buildProfilePublicViewModel({
   allowPhotoDownloads = false,
   pressPhotos = [],
   subscribeTwoStep = false,
+  alertOptInVariant = 'button',
   genres,
   tourDates = [],
   visitTrackingToken,
@@ -95,6 +98,7 @@ export function buildProfilePublicViewModel({
     allowPhotoDownloads,
     pressPhotos,
     subscribeTwoStep,
+    alertOptInVariant,
     genres,
     tourDates,
     visitTrackingToken,

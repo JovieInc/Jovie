@@ -14,14 +14,14 @@
  * Hook-order: every `useEffect` here is unconditional and runs once.
  */
 
-import { useClerk } from '@clerk/nextjs';
 import { useEffect } from 'react';
 import { useThemeToggle } from '@/components/site/theme-toggle/useThemeToggle';
+import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { isFormElement } from '@/lib/utils/keyboard';
 
 export function useGlobalShortcutActions() {
   const { cycleTheme } = useThemeToggle();
-  const { signOut } = useClerk();
+  const { signOut } = useAuthSafe();
 
   // Alt+T → cycle theme (skip when typing in inputs).
   useEffect(() => {

@@ -26,7 +26,7 @@ export interface DrawerCardActionBarProps {
 }
 
 export const DRAWER_CARD_ACTION_BUTTON_CLASSNAME = cn(
-  'inline-flex h-7 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-subtle bg-surface-1 px-2.5 text-[11.5px] font-caption text-secondary-token transition-[background-color,border-color,color] duration-150 hover:border-default hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:border-focus focus-visible:bg-surface-0 focus-visible:ring-2 focus-visible:ring-focus/16 active:border-default active:bg-surface-1 [&_svg]:h-3.5 [&_svg]:w-3.5'
+  'inline-flex h-7 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-subtle bg-surface-1 px-2.5 text-[11.5px] font-caption text-secondary-token transition-[background-color,border-color,color] duration-subtle hover:border-default hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:border-focus focus-visible:bg-surface-0 focus-visible:ring-2 focus-visible:ring-focus/16 active:border-default active:bg-surface-1 [&_svg]:h-3.5 [&_svg]:w-3.5'
 );
 
 function toMenuItems(
@@ -47,16 +47,13 @@ function toMenuItems(
     }));
 }
 
-export function DrawerCardActionBar({
-  primaryActions,
-  overflowActions = [],
-  menuItems,
-  className,
-  onClose,
-  overflowTriggerPlacement = 'inline',
-  overflowTriggerIcon,
-}: DrawerCardActionBarProps) {
-  const displayActions = primaryActions.slice(0, 3);
+function resolveMenuState(
+  overflowActions: readonly DrawerHeaderAction[],
+  menuItems: readonly CommonDropdownItem[] | undefined,
+  onClose: (() => void) | undefined,
+  overflowTriggerPlacement: 'inline' | 'card-top-right',
+  overflowTriggerIcon: 'horizontal' | 'vertical' | undefined
+) {
   const baseMenuItems = toMenuItems(overflowActions);
   const resolvedBaseMenuItems =
     menuItems && menuItems.length > 0
@@ -72,6 +69,69 @@ export function DrawerCardActionBar({
     (overflowTriggerPlacement === 'card-top-right' ? 'vertical' : 'horizontal');
   const TriggerIcon =
     resolvedTriggerIcon === 'vertical' ? MoreVertical : MoreHorizontal;
+
+  return { resolvedMenuItems, hasFloatingCloseButton, TriggerIcon };
+}
+
+function ActionButton({ action }: { readonly action: DrawerHeaderAction }) {
+  const Icon =
+    action.isActive && action.activeIcon ? action.activeIcon : action.icon;
+
+  if (action.href) {
+    return (
+      <Button
+        type='button'
+        variant='ghost'
+        size='sm'
+        asChild
+        className={DRAWER_CARD_ACTION_BUTTON_CLASSNAME}
+      >
+        <Link href={action.href}>
+          <Icon className='h-3.5 w-3.5' aria-hidden='true' />
+          <span>{action.label}</span>
+        </Link>
+      </Button>
+    );
+  }
+
+  return (
+    <Button
+      type='button'
+      variant='ghost'
+      size='sm'
+      onClick={action.onClick}
+      disabled={action.disabled}
+      className={cn(
+        DRAWER_CARD_ACTION_BUTTON_CLASSNAME,
+        action.isActive
+          ? 'text-primary-token'
+          : 'text-secondary-token hover:text-primary-token'
+      )}
+    >
+      <Icon className='h-3.5 w-3.5' aria-hidden='true' />
+      <span>{action.label}</span>
+    </Button>
+  );
+}
+
+export function DrawerCardActionBar({
+  primaryActions,
+  overflowActions = [],
+  menuItems,
+  className,
+  onClose,
+  overflowTriggerPlacement = 'inline',
+  overflowTriggerIcon,
+}: DrawerCardActionBarProps) {
+  const displayActions = primaryActions.slice(0, 3);
+  const { resolvedMenuItems, hasFloatingCloseButton, TriggerIcon } =
+    resolveMenuState(
+      overflowActions,
+      menuItems,
+      onClose,
+      overflowTriggerPlacement,
+      overflowTriggerIcon
+    );
 
   if (
     displayActions.length === 0 &&
@@ -134,50 +194,9 @@ export function DrawerCardActionBar({
       floatingCloseButton ? (
         <div className='absolute right-3 top-3 z-10'>{floatingCloseButton}</div>
       ) : null}
-      {displayActions.map(action => {
-        const Icon =
-          action.isActive && action.activeIcon
-            ? action.activeIcon
-            : action.icon;
-
-        if (action.href) {
-          return (
-            <Button
-              key={action.id}
-              type='button'
-              variant='ghost'
-              size='sm'
-              asChild
-              className={DRAWER_CARD_ACTION_BUTTON_CLASSNAME}
-            >
-              <Link href={action.href}>
-                <Icon className='h-3.5 w-3.5' aria-hidden='true' />
-                <span>{action.label}</span>
-              </Link>
-            </Button>
-          );
-        }
-
-        return (
-          <Button
-            key={action.id}
-            type='button'
-            variant='ghost'
-            size='sm'
-            onClick={action.onClick}
-            disabled={action.disabled}
-            className={cn(
-              DRAWER_CARD_ACTION_BUTTON_CLASSNAME,
-              action.isActive
-                ? 'text-primary-token'
-                : 'text-secondary-token hover:text-primary-token'
-            )}
-          >
-            <Icon className='h-3.5 w-3.5' aria-hidden='true' />
-            <span>{action.label}</span>
-          </Button>
-        );
-      })}
+      {displayActions.map(action => (
+        <ActionButton key={action.id} action={action} />
+      ))}
 
       {overflowTriggerPlacement === 'inline' && overflowTrigger ? (
         <div className='ml-auto'>{overflowTrigger}</div>

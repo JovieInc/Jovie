@@ -32,6 +32,7 @@ import { ProfileUnifiedDrawer } from '@/features/profile/ProfileUnifiedDrawer';
 import { resolveProfileSurfaceState } from '@/features/profile/profile-surface-state';
 import { ReleasesView } from '@/features/profile/views/ReleasesView';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
+import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import { readArtistEmailReadyFromSettings } from '@/lib/notifications/artist-email';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import { buildProfileShareContext } from '@/lib/share/context';
@@ -73,6 +74,7 @@ interface ProfileDesktopSurfaceProps {
   readonly profileSettings?: {
     readonly showOldReleases?: boolean;
   } | null;
+  readonly alertOptInVariant?: ProfileAlertOptInVariant;
   readonly genres?: string[] | null;
   readonly pressPhotos?: PressPhoto[];
   readonly allowPhotoDownloads?: boolean;
@@ -222,6 +224,7 @@ export function ProfileDesktopSurface({
   showPayButton = true,
   latestRelease,
   profileSettings,
+  alertOptInVariant = 'button',
   genres,
   pressPhotos = [],
   allowPhotoDownloads = false,
@@ -260,7 +263,16 @@ export function ProfileDesktopSurface({
       ),
     [artist, socialLinks, viewerCountryCode]
   );
-  const activePrimaryTab = getDesktopBaseMode(activeMode);
+  const baseActivePrimaryTab = getDesktopBaseMode(activeMode);
+  const hasTourDates = tourDates.length > 0;
+  const activePrimaryTab =
+    baseActivePrimaryTab === 'tour' && !hasTourDates
+      ? 'profile'
+      : baseActivePrimaryTab;
+  const visiblePrimaryTabs = useMemo(
+    () => PRIMARY_TABS.filter(tab => tab.mode !== 'tour' || hasTourDates),
+    [hasTourDates]
+  );
   const surfaceState = useMemo(
     () =>
       resolveProfileSurfaceState({
@@ -333,6 +345,7 @@ export function ProfileDesktopSurface({
         portalContainer={notificationsPortalContainer}
         variant='hero'
         presentation='modal'
+        experimentVariant={alertOptInVariant}
         onManageNotifications={() => onModeSelect('subscribe')}
       />
     );
@@ -427,7 +440,7 @@ export function ProfileDesktopSurface({
                         href={link.url}
                         target='_blank'
                         rel='noopener noreferrer'
-                        className='inline-flex h-10 w-10 items-center justify-center rounded-full text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)] transition-opacity duration-200 hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+                        className='inline-flex h-10 w-10 items-center justify-center text-white/78 drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)] transition-colors duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
                         aria-label={link.platform}
                       >
                         <SocialIcon
@@ -546,95 +559,36 @@ export function ProfileDesktopSurface({
       </div>
 
       <div className='grid min-h-0 gap-3.5'>
-        <DesktopSurfaceCard title='Latest Release'>
-          {latestVisibleRelease ? (
-            <div className='flex gap-4'>
-              <div className='relative h-[128px] w-[128px] overflow-hidden rounded-[20px]'>
-                <ImageWithFallback
-                  src={latestVisibleRelease.artworkUrl}
-                  alt={latestVisibleRelease.title}
-                  fill
-                  sizes='128px'
-                  className='object-cover'
-                />
-              </div>
-              <div className='min-w-0 flex-1 space-y-4'>
-                <div className='space-y-1.5'>
-                  <p className='truncate text-[18px] font-semibold tracking-[-0.03em] text-white'>
-                    {latestVisibleRelease.title}
-                  </p>
-                  <p className='text-[14px] text-white/48'>
-                    {formatReleaseMeta(
-                      latestVisibleRelease.releaseType,
-                      latestVisibleRelease.releaseDate
-                    )}
-                  </p>
-                </div>
-                <div className='flex flex-wrap items-center gap-2.5'>
-                  <button
-                    type='button'
-                    onClick={onPlayClick}
-                    className='inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/12 bg-black/32 text-white transition-colors duration-200 hover:bg-black/48'
-                    aria-label='Play'
-                  >
-                    <Play className='ml-0.5 h-4 w-4 fill-current' />
-                  </button>
-                  {latestVisibleRelease.slug ? (
-                    <a
-                      href={`/${artist.handle}/${latestVisibleRelease.slug}`}
-                      className='inline-flex h-11 items-center rounded-full border border-white/12 px-4 text-[14px] font-medium text-white/84 transition-colors duration-200 hover:bg-white/[0.04]'
-                    >
-                      View Release
-                    </a>
-                  ) : null}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <EmptySurfaceBlock>{emptyState.release}</EmptySurfaceBlock>
-          )}
-        </DesktopSurfaceCard>
-
-        <DesktopSurfaceCard title='More Music'>
-          {visibleReleases.length > 0 ? (
-            <div className='grid grid-cols-3 gap-3'>
-              {visibleReleases.slice(0, 3).map(release => (
-                <a
-                  key={release.id}
-                  href={
-                    release.slug
-                      ? `/${artist.handle}/${release.slug}`
-                      : undefined
-                  }
-                >
-                  <div className='relative aspect-[0.95] overflow-hidden rounded-[22px] border border-white/8'>
-                    <ImageWithFallback
-                      src={release.artworkUrl}
-                      alt={release.title}
-                      fill
-                      sizes='180px'
-                      className='object-cover'
-                    />
-                  </div>
-                  <p className='mt-3 truncate text-[16px] font-medium tracking-[-0.025em] text-white'>
-                    {release.title}
-                  </p>
-                  <p className='mt-1 truncate text-[13px] text-white/44'>
-                    {formatReleaseMeta(
-                      release.releaseType,
-                      release.releaseDate
-                    )}
-                  </p>
-                </a>
-              ))}
-            </div>
-          ) : (
-            <EmptySurfaceBlock>{emptyState.homeProof}</EmptySurfaceBlock>
-          )}
-        </DesktopSurfaceCard>
-
         <DesktopSurfaceCard title='Alerts'>
           <div className='space-y-4'>
+            {!isSubscribed ? (
+              <button
+                type='button'
+                onClick={() => onModeSelect('subscribe')}
+                className='flex min-h-[58px] w-full items-center justify-between gap-4 rounded-[18px] border border-white/8 bg-white/[0.035] px-4 text-left transition-colors duration-200 hover:bg-white/[0.055]'
+              >
+                <span className='min-w-0'>
+                  <span className='block truncate text-[15px] font-semibold tracking-[-0.015em] text-white'>
+                    Release Alerts
+                  </span>
+                  <span className='block truncate text-[12px] leading-5 text-white/48'>
+                    New music, shows, and merch.
+                  </span>
+                </span>
+                {alertOptInVariant === 'toggle' ? (
+                  <span
+                    className='relative h-[26px] w-[42px] shrink-0 rounded-full border border-white/16 bg-white/10 p-0.5'
+                    aria-hidden='true'
+                  >
+                    <span className='block h-[22px] w-[22px] rounded-full bg-white shadow-[0_4px_10px_rgba(0,0,0,0.22)]' />
+                  </span>
+                ) : (
+                  <span className='inline-flex h-8 shrink-0 items-center rounded-full bg-white px-3 text-[12px] font-semibold text-black'>
+                    Turn On
+                  </span>
+                )}
+              </button>
+            ) : null}
             <div className='space-y-3'>
               {[
                 { key: 'newMusic', label: 'New Music', icon: Music2 },
@@ -828,7 +782,7 @@ export function ProfileDesktopSurface({
             className='flex min-w-0 items-center gap-1 rounded-full bg-black/24 p-1 backdrop-blur-xl'
             aria-label='Profile navigation'
           >
-            {PRIMARY_TABS.map(tab => {
+            {visiblePrimaryTabs.map(tab => {
               const Icon = tab.icon;
               const isActive = activePrimaryTab === tab.mode;
               return (
@@ -837,10 +791,10 @@ export function ProfileDesktopSurface({
                   type='button'
                   onClick={() => onModeSelect(tab.mode)}
                   className={cn(
-                    'inline-flex h-10 min-w-0 items-center gap-2 rounded-full px-3 text-[13px] font-medium tracking-[-0.01em] transition-colors duration-200',
+                    'inline-flex h-10 min-w-0 items-center gap-2 rounded-full px-3 text-[13px] font-medium tracking-[-0.01em] transition-colors duration-200 active:bg-white/[0.08]',
                     isActive
-                      ? 'bg-white/[0.1] text-white'
-                      : 'text-white/50 hover:bg-white/[0.05] hover:text-white/78'
+                      ? 'text-white'
+                      : 'text-white/50 hover:text-white/78'
                   )}
                   aria-current={isActive ? 'page' : undefined}
                 >
@@ -880,6 +834,7 @@ export function ProfileDesktopSurface({
             portalContainer={notificationsPortalContainer}
             autoOpen
             hideTrigger
+            experimentVariant={alertOptInVariant}
             onFlowClosed={onAlertsModalClose}
           />
         ) : null}
@@ -902,6 +857,7 @@ export function ProfileDesktopSurface({
           shareContext={shareContext}
           hasTip={hasTip}
           hasContacts={hasContacts}
+          hasTourDates={hasTourDates}
           genres={genres}
           pressPhotos={pressPhotos}
           allowPhotoDownloads={allowPhotoDownloads}
