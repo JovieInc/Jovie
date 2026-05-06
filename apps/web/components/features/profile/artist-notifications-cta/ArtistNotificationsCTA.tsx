@@ -13,6 +13,7 @@ export function ArtistNotificationsCTA({
   hideTrigger = false,
   onFlowClosed,
   onSubscriptionActivated,
+  experimentVariant,
   source,
 }: ArtistNotificationsCTAProps) {
   const resolvedPresentation =
@@ -28,6 +29,7 @@ export function ArtistNotificationsCTA({
       hideTrigger={hideTrigger}
       onFlowClosed={onFlowClosed}
       onSubscriptionActivated={onSubscriptionActivated}
+      experimentVariant={experimentVariant}
       source={source}
     />
   );
