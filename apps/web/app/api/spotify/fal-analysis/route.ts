@@ -168,47 +168,55 @@ type FalNameResult =
       warnings: string[];
     };
 
-function extractArtistNamesFromHtml(html: string): string[] {
+function extractFromJsonLd(html: string): string[] {
   const names: string[] = [];
-
-  // Try extracting from JSON-LD or embedded data
-  const artistNamePattern =
-    /"name"\s*:\s*"([^"]+)"\s*,\s*"@type"\s*:\s*"MusicGroup"/g;
-  let match = artistNamePattern.exec(html);
+  const pattern = /"name"\s*:\s*"([^"]+)"\s*,\s*"@type"\s*:\s*"MusicGroup"/g;
+  let match = pattern.exec(html);
   while (match) {
     names.push(match[1]);
-    match = artistNamePattern.exec(html);
+    match = pattern.exec(html);
   }
-
-  // Fallback: extract from embedded script data
-  if (names.length === 0) {
-    const dataPattern = /"artists":\s*\[([^\]]*)\]/g;
-    let dataMatch = dataPattern.exec(html);
-    while (dataMatch) {
-      const nameMatches = dataMatch[1].matchAll(/"name"\s*:\s*"([^"]+)"/g);
-      for (const nm of nameMatches) {
-        if (nm[1] && !names.includes(nm[1])) {
-          names.push(nm[1]);
-        }
-      }
-      dataMatch = dataPattern.exec(html);
-    }
-  }
-
-  // Final fallback: extract from test ID patterns
-  if (names.length === 0) {
-    const simplePattern = /data-testid="artist-link"[^>]*>([^<]+)</g;
-    let simpleMatch = simplePattern.exec(html);
-    while (simpleMatch) {
-      const name = simpleMatch[1].trim();
-      if (name && !names.includes(name)) {
-        names.push(name);
-      }
-      simpleMatch = simplePattern.exec(html);
-    }
-  }
-
   return names;
+}
+
+function extractFromArtistArray(html: string): string[] {
+  const names: string[] = [];
+  const dataPattern = /"artists":\s*\[([^\]]*)\]/g;
+  let dataMatch = dataPattern.exec(html);
+  while (dataMatch) {
+    const nameMatches = dataMatch[1].matchAll(/"name"\s*:\s*"([^"]+)"/g);
+    for (const nm of nameMatches) {
+      if (nm[1] && !names.includes(nm[1])) {
+        names.push(nm[1]);
+      }
+    }
+    dataMatch = dataPattern.exec(html);
+  }
+  return names;
+}
+
+function extractFromTestIds(html: string): string[] {
+  const names: string[] = [];
+  const pattern = /data-testid="artist-link"[^>]*>([^<]+)</g;
+  let match = pattern.exec(html);
+  while (match) {
+    const name = match[1].trim();
+    if (name && !names.includes(name)) {
+      names.push(name);
+    }
+    match = pattern.exec(html);
+  }
+  return names;
+}
+
+function extractArtistNamesFromHtml(html: string): string[] {
+  const jsonLdNames = extractFromJsonLd(html);
+  if (jsonLdNames.length > 0) return jsonLdNames;
+
+  const arrayNames = extractFromArtistArray(html);
+  if (arrayNames.length > 0) return arrayNames;
+
+  return extractFromTestIds(html);
 }
 
 async function scrapeFansAlsoLike(artistId: string): Promise<FalNameResult> {
