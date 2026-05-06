@@ -24,9 +24,11 @@
   --public-shell-text: var(--color-text-primary-token);
   --public-shell-border: var(--color-border-default);
   --public-shell-content-max: var(--linear-content-max);
+  /* TODO(DS_FOUNDATION_V1 Wave 1): migrate consumers to --ds-public-content-max (1298px) and remove these legacy variants */
   --public-content-max-landing: 1280px;
   --public-content-max-page: 1200px;
-  --public-content-max-prose: 680px;
+  /* TODO(DS_FOUNDATION_V1 Wave 4): consider deprecating once consumers migrate to --ds-prose-max */
+  --public-content-max-prose: var(--ds-prose-max);
   --app-shell-content-max-wide: 84rem;
   --app-shell-content-max-reading: 56rem;
   --app-shell-content-max-form: 50rem;
@@ -1069,6 +1071,8 @@
 /* Reduced motion — zero out all duration tokens so transition patterns inherit 0ms */
 @media (prefers-reduced-motion: reduce) {
   :root {
+    --ds-motion-subtle-duration: 0ms;
+    --ds-motion-cinematic-duration: 0ms;
     --duration-instant: 0ms;
     --duration-fast: 0ms;
     --duration-normal: 0ms;
