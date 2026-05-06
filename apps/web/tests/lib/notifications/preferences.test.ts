@@ -54,7 +54,7 @@ import type { NotificationPreferences } from '@/types/notifications';
 describe('Notification Preferences', () => {
   describe('mergePreferences', () => {
     const basePreferences: NotificationPreferences = {
-      channels: { email: true, push: false, in_app: true },
+      channels: { email: true, sms: true, push: false, in_app: true },
       marketingEmails: true,
       dismissedNotificationIds: ['old-notification'],
       email: 'base@example.com',
@@ -74,13 +74,14 @@ describe('Notification Preferences', () => {
 
     it('should merge channel overrides', () => {
       const overrides: Partial<NotificationPreferences> = {
-        channels: { email: true, push: true, in_app: true },
+        channels: { email: true, sms: true, push: true, in_app: true },
       };
 
       const result = mergePreferences(basePreferences, overrides);
 
       expect(result.channels).toEqual({
         email: true,
+        sms: true,
         push: true, // overridden from false to true
         in_app: true,
       });
@@ -163,7 +164,7 @@ describe('Notification Preferences', () => {
 
     it('should handle base with undefined optional fields', () => {
       const minimalBase: NotificationPreferences = {
-        channels: { email: true, push: false, in_app: false },
+        channels: { email: true, sms: true, push: false, in_app: false },
         marketingEmails: true,
         dismissedNotificationIds: [],
       };
@@ -196,7 +197,7 @@ describe('Notification Preferences', () => {
   describe('Default channel values', () => {
     it('should have email enabled by default', () => {
       const defaults: NotificationPreferences = {
-        channels: { email: true, push: false, in_app: true },
+        channels: { email: true, sms: true, push: false, in_app: true },
         marketingEmails: true,
         dismissedNotificationIds: [],
       };
@@ -206,7 +207,7 @@ describe('Notification Preferences', () => {
 
     it('should have push disabled by default', () => {
       const defaults: NotificationPreferences = {
-        channels: { email: true, push: false, in_app: true },
+        channels: { email: true, sms: true, push: false, in_app: true },
         marketingEmails: true,
         dismissedNotificationIds: [],
       };
@@ -216,7 +217,7 @@ describe('Notification Preferences', () => {
 
     it('should have in_app enabled by default', () => {
       const defaults: NotificationPreferences = {
-        channels: { email: true, push: false, in_app: true },
+        channels: { email: true, sms: true, push: false, in_app: true },
         marketingEmails: true,
         dismissedNotificationIds: [],
       };
