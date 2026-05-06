@@ -49,7 +49,7 @@ const MARKETING_GLASS_FLYOUTS: readonly HeaderFlyoutMenu[] = [
           'Collect demand from releases, shows, links, and QR scans.',
       },
       {
-        href: APP_ROUTES.HOME,
+        href: APP_ROUTES.LAUNCH,
         label: 'Release System',
         description: 'Plan, launch, and keep each release moving.',
       },
@@ -93,7 +93,6 @@ const MARKETING_GLASS_MOBILE_LINKS: readonly MarketingHeaderNavLink[] = [
     menu.links.map(link => ({ href: link.href, label: link.label }))
   ),
   ...MARKETING_GLASS_DESKTOP_LINKS,
-  { href: APP_ROUTES.SUPPORT, label: 'Contact' },
 ] as const;
 
 export interface MarketingHeaderProps
@@ -121,6 +120,16 @@ export function MarketingHeader({
   const isMinimal = variant === 'minimal';
   const presentation = isMinimal ? 'default' : 'marketing-glass';
   const useCustomNav = !isMinimal && navLinks !== undefined;
+  const hasSimpleNav = isMinimal || useCustomNav;
+  const resolvedFlyoutMenus = hasSimpleNav
+    ? undefined
+    : MARKETING_GLASS_FLYOUTS;
+  const resolvedMobileNavLinks = hasSimpleNav
+    ? resolvedNavLinks
+    : MARKETING_GLASS_MOBILE_LINKS;
+  const resolvedDesktopNavLinks = hasSimpleNav
+    ? resolvedNavLinks
+    : MARKETING_GLASS_DESKTOP_LINKS;
 
   return (
     <HeaderNav
@@ -133,21 +142,9 @@ export function MarketingHeader({
       includePublicLoginInMobileNav
       containerSize='homepage'
       presentation={presentation}
-      flyoutMenus={
-        isMinimal || useCustomNav ? undefined : MARKETING_GLASS_FLYOUTS
-      }
-      mobileNavLinks={
-        isMinimal
-          ? resolvedNavLinks
-          : useCustomNav
-            ? resolvedNavLinks
-            : MARKETING_GLASS_MOBILE_LINKS
-      }
-      navLinks={
-        isMinimal || useCustomNav
-          ? resolvedNavLinks
-          : MARKETING_GLASS_DESKTOP_LINKS
-      }
+      flyoutMenus={resolvedFlyoutMenus}
+      mobileNavLinks={resolvedMobileNavLinks}
+      navLinks={resolvedDesktopNavLinks}
     />
   );
 }

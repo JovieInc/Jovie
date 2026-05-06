@@ -60,7 +60,7 @@ function PublicAuthActions({
       return (
         <Link
           href={APP_ROUTES.SIGNIN}
-          className='focus-ring-themed hidden h-[36px] items-center justify-center rounded-full border border-white/88 bg-white px-4 text-[13px] font-medium tracking-[-0.012em] text-black shadow-[0_8px_20px_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.72)] transition-colors duration-150 hover:bg-white/95 sm:inline-flex sm:h-[40px] sm:px-5 sm:text-[14px] sm:shadow-[0_10px_24px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.72)]'
+          className='focus-ring-themed hidden h-[36px] items-center justify-center rounded-full border border-white/88 bg-white px-4 text-[13px] font-medium tracking-[-0.012em] text-black shadow-[0_8px_20px_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.72)] transition-colors duration-subtle hover:bg-white/95 sm:inline-flex sm:h-[40px] sm:px-5 sm:text-[14px] sm:shadow-[0_10px_24px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.72)]'
         >
           Sign in
         </Link>
@@ -182,6 +182,42 @@ function MarketingGlassFlyout({
   );
 }
 
+function getNavLinkVariantClass({
+  isHomepagePresentation,
+  isMarketingGlass,
+}: Readonly<{
+  isHomepagePresentation: boolean;
+  isMarketingGlass: boolean;
+}>) {
+  if (isMarketingGlass) {
+    return 'marketing-glass-header__nav-link';
+  }
+
+  if (isHomepagePresentation) {
+    return 'homepage-header-nav-link';
+  }
+
+  return 'nav-link-linear';
+}
+
+function getNavGroupVariantClass({
+  isHomepagePresentation,
+  isMarketingGlass,
+}: Readonly<{
+  isHomepagePresentation: boolean;
+  isMarketingGlass: boolean;
+}>) {
+  if (isMarketingGlass) {
+    return 'marketing-glass-header__nav';
+  }
+
+  if (isHomepagePresentation) {
+    return 'homepage-header-nav-group';
+  }
+
+  return 'gap-1 lg:gap-1.5';
+}
+
 export function HeaderNav({
   sticky: _sticky = true,
   className,
@@ -226,50 +262,60 @@ export function HeaderNav({
       return;
     }
 
+    const closeFlyout = (restoreFocus = false) => {
+      if (restoreFocus) {
+        headerRef.current
+          ?.querySelector<HTMLElement>(
+            `[aria-controls="marketing-header-flyout-${openFlyoutId}"]`
+          )
+          ?.focus();
+      }
+
+      setOpenFlyoutId(null);
+    };
     const closeIfOutside = (target: EventTarget | null) => {
       if (target instanceof Node && headerRef.current?.contains(target)) {
         return;
       }
 
-      setOpenFlyoutId(null);
+      closeFlyout();
     };
-    const handlePointerMove = (event: PointerEvent) => {
-      closeIfOutside(event.target);
+    const handlePointerLeave = () => {
+      closeFlyout();
     };
     const handleFocusIn = (event: FocusEvent) => {
       closeIfOutside(event.target);
     };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        closeFlyout(true);
+      }
+    };
 
-    document.addEventListener('pointermove', handlePointerMove);
+    const header = headerRef.current;
+    header?.addEventListener('pointerleave', handlePointerLeave);
     document.addEventListener('focusin', handleFocusIn);
+    document.addEventListener('keydown', handleKeyDown);
 
     return () => {
-      document.removeEventListener('pointermove', handlePointerMove);
+      header?.removeEventListener('pointerleave', handlePointerLeave);
       document.removeEventListener('focusin', handleFocusIn);
+      document.removeEventListener('keydown', handleKeyDown);
     };
   }, [isMarketingGlass, openFlyoutId]);
 
   const navLinkClass = cn(
     'focus-ring-themed',
-    isMarketingGlass
-      ? 'marketing-glass-header__nav-link'
-      : presentation === 'homepage-embedded'
-        ? 'homepage-header-nav-link'
-        : 'nav-link-linear'
+    getNavLinkVariantClass({ isHomepagePresentation, isMarketingGlass })
   );
+  const navGroupClass = getNavGroupVariantClass({
+    isHomepagePresentation,
+    isMarketingGlass,
+  });
   const hasNavLinks =
     !hideNav && (!!navLinks?.length || resolvedFlyoutMenus.length > 0);
   const navLinksMarkup = hasNavLinks ? (
-    <div
-      className={cn(
-        'max-md:hidden items-center md:flex',
-        isMarketingGlass
-          ? 'marketing-glass-header__nav'
-          : isHomepagePresentation
-            ? 'homepage-header-nav-group'
-            : 'gap-1 lg:gap-1.5'
-      )}
-    >
+    <div className={cn('max-md:hidden items-center md:flex', navGroupClass)}>
       {isMarketingGlass
         ? resolvedFlyoutMenus.map(menu => {
             const open = openFlyoutId === menu.id;
@@ -318,7 +364,7 @@ export function HeaderNav({
       className={cn(
         isMarketingGlass
           ? 'marketing-glass-header fixed top-0 left-0 right-0 w-full'
-          : 'fixed top-0 left-0 right-0 w-full transition-colors duration-200',
+          : 'fixed top-0 left-0 right-0 w-full transition-colors duration-subtle',
         presentation === 'homepage-embedded' || isMarketingGlass
           ? 'border-b border-transparent'
           : 'border-b',
