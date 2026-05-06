@@ -488,6 +488,21 @@ export {
   selectMetadataSubmissionSnapshotSchema,
   selectMetadataSubmissionTargetSchema,
 } from './metadata-submissions';
+// Notifications (SMS subscribe intents, cross-artist contact identity)
+export {
+  insertNotificationContactSchema,
+  insertSmsSubscribeIntentSchema,
+  type NewNotificationContact,
+  type NewSmsSubscribeIntent,
+  type NotificationContact,
+  notificationContacts,
+  type SmsContactStatus,
+  type SmsIntentStatus,
+  type SmsSubscribeIntent,
+  selectNotificationContactSchema,
+  selectSmsSubscribeIntentSchema,
+  smsSubscribeIntents,
+} from './notifications';
 // Pixel Tracking (Events, Creator Configs)
 export {
   type CreatorPixel,

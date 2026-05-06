@@ -445,6 +445,11 @@ export const notificationSubscriptions = pgTable(
     emailOtpAttempts: integer('email_otp_attempts').notNull().default(0),
     artistEmailOptInAt: timestamp('artist_email_opt_in_at'),
     artistEmailOptOutAt: timestamp('artist_email_opt_out_at'),
+    // Per-artist SMS consent ledger (set at confirmation time; never overwritten
+    // afterward to preserve TCPA audit trail across multi-artist races).
+    smsConsentAt: timestamp('sms_consent_at'),
+    smsConsentTextHash: text('sms_consent_text_hash'),
+    smsConsentVersion: text('sms_consent_version'),
     unsubscribedAt: timestamp('unsubscribed_at'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
@@ -458,6 +463,18 @@ export const notificationSubscriptions = pgTable(
     contactRequired: check(
       'notification_subscriptions_contact_required',
       drizzleSql`${table.email} IS NOT NULL OR ${table.phone} IS NOT NULL`
+    ),
+    smsConsentComplete: check(
+      'notification_subscriptions_sms_consent_complete',
+      drizzleSql`(
+        ${table.smsConsentAt} IS NULL
+        AND ${table.smsConsentTextHash} IS NULL
+        AND ${table.smsConsentVersion} IS NULL
+      ) OR (
+        ${table.smsConsentAt} IS NOT NULL
+        AND ${table.smsConsentTextHash} IS NOT NULL
+        AND ${table.smsConsentVersion} IS NOT NULL
+      )`
     ),
     creatorProfileCreatedAtIdx: index(
       'notification_subscriptions_creator_profile_id_created_at_idx'
