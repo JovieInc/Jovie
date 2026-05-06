@@ -3,7 +3,7 @@
 import { getLinearPillClassName } from '@jovie/ui';
 import { ChevronDown } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { LogoVariant } from '@/components/atoms/Logo';
 import { LogoLink } from '@/components/atoms/LogoLink';
 import { AuthActions } from '@/components/molecules/AuthActions';
@@ -218,6 +218,24 @@ function getNavGroupVariantClass({
   return 'gap-1 lg:gap-1.5';
 }
 
+function getNavContainerVariantClass({
+  containerSize,
+  isMarketingGlass,
+}: Readonly<{
+  containerSize: HeaderNavProps['containerSize'];
+  isMarketingGlass: boolean;
+}>) {
+  if (isMarketingGlass) {
+    return 'marketing-glass-header__shell';
+  }
+
+  if (containerSize === 'homepage') {
+    return 'max-w-[var(--linear-content-max)] lg:px-0';
+  }
+
+  return 'max-w-[calc(var(--linear-content-max)+3rem)]';
+}
+
 export function HeaderNav({
   sticky: _sticky = true,
   className,
@@ -240,10 +258,7 @@ export function HeaderNav({
   const [isScrolled, setIsScrolled] = useState(false);
   const isMarketingGlass = presentation === 'marketing-glass';
   const isHomepagePresentation = presentation === 'homepage-embedded';
-  const resolvedFlyoutMenus = useMemo(
-    () => (isMarketingGlass ? (flyoutMenus ?? []) : []),
-    [flyoutMenus, isMarketingGlass]
-  );
+  const resolvedFlyoutMenus = isMarketingGlass ? (flyoutMenus ?? []) : [];
 
   useEffect(() => {
     if (!isMarketingGlass) {
@@ -400,11 +415,10 @@ export function HeaderNav({
       <nav
         className={cn(
           'mx-auto w-full px-5 sm:px-6',
-          isMarketingGlass
-            ? 'marketing-glass-header__shell'
-            : _containerSize === 'homepage'
-              ? 'max-w-[var(--linear-content-max)] lg:px-0'
-              : 'max-w-[calc(var(--linear-content-max)+3rem)]'
+          getNavContainerVariantClass({
+            containerSize: _containerSize,
+            isMarketingGlass,
+          })
         )}
         aria-label='Primary navigation'
       >
