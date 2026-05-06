@@ -1,0 +1,174 @@
+/**
+ * ESLint rule to flag raw motion values that bypass the canonical
+ * DS_FOUNDATION_V1 motion tokens.
+ *
+ * Use the canonical Tailwind utilities instead:
+ *   duration-subtle      -> --ds-motion-subtle-duration (150ms)
+ *   duration-cinematic   -> --ds-motion-cinematic-duration (420ms)
+ *   ease-subtle          -> --ds-motion-subtle-easing
+ *   ease-cinematic       -> --ds-motion-cinematic-easing
+ *
+ * Bad:  className="transition-all duration-300"
+ * Bad:  style={{ transitionDuration: '300ms' }}
+ * Bad:  style={{ transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)' }}
+ * Good: className="transition-colors duration-subtle ease-subtle"
+ *
+ * Warn-level in Wave 1c; promoted to error in Wave 4 after Wave 2 migrates
+ * existing route-level CSS consumers.
+ */
+
+const RAW_MS_DURATION_REGEX = /\b\d+ms\b/;
+const CUBIC_BEZIER_REGEX = /cubic-bezier\s*\(/;
+const TRANSITION_ALL_REGEX = /\btransition-all\b/;
+const NUMERIC_DURATION_CLASS_REGEX = /\bduration-\d+\b/;
+const NUMERIC_EASE_CLASS_REGEX = /\bease-\[/;
+
+const ALLOWED_PATH_FRAGMENTS = [
+  '/apps/web/styles/',
+  '/apps/web/eslint-rules/',
+  '/.stories.',
+  '/.test.',
+  '/.spec.',
+  '/tailwind.config.',
+];
+
+function isAllowedFile(filename) {
+  const normalized = filename.replaceAll('\\', '/');
+  return ALLOWED_PATH_FRAGMENTS.some(fragment => normalized.includes(fragment));
+}
+
+function checkClassNameLiteral(node, value, context) {
+  if (typeof value !== 'string') return;
+  if (TRANSITION_ALL_REGEX.test(value)) {
+    context.report({
+      node,
+      messageId: 'transitionAll',
+    });
+  }
+  if (NUMERIC_DURATION_CLASS_REGEX.test(value)) {
+    context.report({
+      node,
+      messageId: 'numericDurationClass',
+      data: { value: value.match(NUMERIC_DURATION_CLASS_REGEX)?.[0] ?? '' },
+    });
+  }
+  if (NUMERIC_EASE_CLASS_REGEX.test(value)) {
+    context.report({
+      node,
+      messageId: 'arbitraryEaseClass',
+    });
+  }
+}
+
+function checkInlineStyleValue(node, value, context) {
+  if (typeof value !== 'string') return;
+  if (CUBIC_BEZIER_REGEX.test(value)) {
+    context.report({
+      node,
+      messageId: 'rawCubicBezier',
+    });
+  }
+  if (RAW_MS_DURATION_REGEX.test(value)) {
+    context.report({
+      node,
+      messageId: 'rawMsDuration',
+      data: { value: value.match(RAW_MS_DURATION_REGEX)?.[0] ?? '' },
+    });
+  }
+}
+
+module.exports = {
+  meta: {
+    type: 'suggestion',
+    docs: {
+      description:
+        'Disallow raw motion values in TSX/TS — use canonical DS_FOUNDATION_V1 motion tokens instead',
+      recommended: false,
+    },
+    messages: {
+      transitionAll:
+        'Avoid `transition-all` — it animates every property and ignores motion tokens. Use the explicit transition utility (e.g. `transition-colors`) and pair with `duration-subtle`/`ease-subtle` from DS_FOUNDATION_V1.',
+      numericDurationClass:
+        'Numeric duration class `{{value}}` bypasses the DS motion taxonomy. Use `duration-subtle` (150ms) or `duration-cinematic` (420ms) instead.',
+      arbitraryEaseClass:
+        'Arbitrary ease class bypasses the DS motion taxonomy. Use `ease-subtle` or `ease-cinematic` instead.',
+      rawMsDuration:
+        'Raw `{{value}}` duration in inline style bypasses the DS motion tokens. Use `var(--ds-motion-subtle-duration)` or `var(--ds-motion-cinematic-duration)`.',
+      rawCubicBezier:
+        'Raw `cubic-bezier(...)` bypasses the DS motion tokens. Use `var(--ds-motion-subtle-easing)` or `var(--ds-motion-cinematic-easing)`.',
+    },
+    schema: [],
+  },
+  create(context) {
+    if (isAllowedFile(context.filename)) {
+      return {};
+    }
+
+    return {
+      JSXAttribute(node) {
+        if (!node.name) return;
+        const attrName = node.name.name;
+
+        // className="..." string literal
+        if (
+          attrName === 'className' &&
+          node.value &&
+          node.value.type === 'Literal'
+        ) {
+          checkClassNameLiteral(node.value, node.value.value, context);
+          return;
+        }
+
+        // className={"..." } expression
+        if (
+          attrName === 'className' &&
+          node.value &&
+          node.value.type === 'JSXExpressionContainer' &&
+          node.value.expression.type === 'Literal'
+        ) {
+          checkClassNameLiteral(
+            node.value.expression,
+            node.value.expression.value,
+            context
+          );
+        }
+
+        // className={`...`} template literal (only check static parts)
+        if (
+          attrName === 'className' &&
+          node.value &&
+          node.value.type === 'JSXExpressionContainer' &&
+          node.value.expression.type === 'TemplateLiteral'
+        ) {
+          for (const quasi of node.value.expression.quasis) {
+            checkClassNameLiteral(quasi, quasi.value.cooked ?? '', context);
+          }
+        }
+      },
+
+      // style={{ transitionDuration: '300ms', transitionTimingFunction: 'cubic-bezier(...)' }}
+      Property(node) {
+        if (!node.key || !node.value) return;
+        const keyName =
+          node.key.type === 'Identifier'
+            ? node.key.name
+            : node.key.type === 'Literal'
+              ? node.key.value
+              : null;
+        if (
+          keyName !== 'transitionDuration' &&
+          keyName !== 'transitionTimingFunction' &&
+          keyName !== 'transition' &&
+          keyName !== 'animation' &&
+          keyName !== 'animationDuration' &&
+          keyName !== 'animationTimingFunction'
+        ) {
+          return;
+        }
+        if (node.value.type === 'Literal') {
+          checkInlineStyleValue(node.value, node.value.value, context);
+        }
+      },
+    };
+  },
+};
