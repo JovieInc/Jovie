@@ -7,7 +7,7 @@
  * Verifies the webhook signature using STRIPE_CONNECT_WEBHOOK_SECRET.
  */
 
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull, lt, or } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import type Stripe from 'stripe';
 import { db } from '@/lib/db';
@@ -66,25 +66,91 @@ export async function POST(request: NextRequest) {
     if (event.type === 'account.updated') {
       const account = event.data.object as Stripe.Account;
       const stripeAccountId = account.id;
+      const eventCreatedAt = new Date(event.created * 1000);
 
-      const onboardingComplete = account.details_submitted === true;
+      const chargesEnabled = account.charges_enabled === true;
       const payoutsEnabled = account.payouts_enabled === true;
+      const detailsSubmitted = account.details_submitted === true;
+      const payoutEmail =
+        typeof account.email === 'string' ? account.email : null;
+      const now = new Date();
 
-      // Update the creator profile that has this Stripe account ID
+      // Idempotency guard: only apply when this event is newer than the last
+      // event we processed for this account. Stripe replays events with the
+      // same `event.created`, and out-of-order delivery would otherwise
+      // overwrite fresh flags with stale data.
       const [updated] = await db
         .update(creatorProfiles)
         .set({
-          stripeOnboardingComplete: onboardingComplete,
+          stripeChargesEnabled: chargesEnabled,
           stripePayoutsEnabled: payoutsEnabled,
-          updatedAt: new Date(),
+          stripeDetailsSubmitted: detailsSubmitted,
+          stripeOnboardingComplete: detailsSubmitted,
+          stripePayoutEmail: payoutEmail,
+          stripeConnectLastSyncedAt: now,
+          stripeConnectLastEventAt: eventCreatedAt,
+          updatedAt: now,
         })
-        .where(eq(creatorProfiles.stripeAccountId, stripeAccountId))
+        .where(
+          and(
+            eq(creatorProfiles.stripeAccountId, stripeAccountId),
+            or(
+              isNull(creatorProfiles.stripeConnectLastEventAt),
+              lt(creatorProfiles.stripeConnectLastEventAt, eventCreatedAt)
+            )
+          )
+        )
         .returning({ id: creatorProfiles.id });
 
       if (!updated) {
-        // Account not linked to any profile — may have been disconnected
+        // Either no profile is linked to this account, OR the event is older
+        // than the last one we processed (replay). Both cases are no-ops.
         logger.warn(
-          `[Stripe Connect Webhook] No profile found for account ${stripeAccountId}`,
+          `[Stripe Connect Webhook] No update for account ${stripeAccountId} (no profile or stale event)`,
+          {
+            eventId: event.id,
+            eventCreatedAt: eventCreatedAt.toISOString(),
+          }
+        );
+      }
+    } else if (event.type === 'account.application.deauthorized') {
+      // For deauthorized events, `event.account` is the connected account id
+      // (the event object itself is the Stripe Application, not the Account).
+      const stripeAccountId = event.account;
+      if (stripeAccountId) {
+        const now = new Date();
+        const eventCreatedAt = new Date(event.created * 1000);
+        // Idempotency guard mirrors the account.updated branch: a delayed
+        // post-deauth account.updated would otherwise repopulate the cached
+        // flags via a newer eventCreatedAt vs. the row's pre-deauth
+        // lastEventAt. Bumping lastEventAt here invalidates that path.
+        // Also clears stripeAccountId so /api/stripe-connect/status reports
+        // disconnected immediately.
+        await db
+          .update(creatorProfiles)
+          .set({
+            stripeAccountId: null,
+            stripeChargesEnabled: false,
+            stripePayoutsEnabled: false,
+            stripeDetailsSubmitted: false,
+            stripeOnboardingComplete: false,
+            stripePayoutEmail: null,
+            stripeConnectLastSyncedAt: now,
+            stripeConnectLastEventAt: eventCreatedAt,
+            updatedAt: now,
+          })
+          .where(
+            and(
+              eq(creatorProfiles.stripeAccountId, stripeAccountId),
+              or(
+                isNull(creatorProfiles.stripeConnectLastEventAt),
+                lt(creatorProfiles.stripeConnectLastEventAt, eventCreatedAt)
+              )
+            )
+          );
+      } else {
+        logger.warn(
+          '[Stripe Connect Webhook] account.application.deauthorized missing event.account',
           { eventId: event.id }
         );
       }

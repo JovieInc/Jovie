@@ -262,8 +262,8 @@ export function CmdKPalette({
           </div>
           <div
             className='max-h-[420px] overflow-y-auto p-[5px]'
-            role='menu'
-            aria-label='Command results'
+            role='listbox'
+            aria-label='Command palette results'
           >
             <PaletteList
               sections={allSections}

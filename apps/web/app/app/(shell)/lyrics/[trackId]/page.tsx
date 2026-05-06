@@ -73,6 +73,9 @@ export default async function LyricsPage({ params }: Props) {
         title: track.title,
         artist,
       }}
+      initialDurationSec={
+        track.durationMs ? Math.round(track.durationMs / 1000) : 0
+      }
       trackId={trackId}
     />
   );

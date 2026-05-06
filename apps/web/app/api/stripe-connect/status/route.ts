@@ -11,10 +11,10 @@ import { requireAuth } from '@/lib/auth/require-auth';
 import { db } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { captureError, captureWarning } from '@/lib/error-tracking';
+import { captureError } from '@/lib/error-tracking';
 import { getAppFlagValue } from '@/lib/flags/server';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
-import { stripe } from '@/lib/stripe/client';
+import { getStripeConnectReadiness } from '@/lib/stripe/connect-readiness';
 
 export const runtime = 'nodejs';
 
@@ -72,31 +72,20 @@ export async function GET() {
       );
     }
 
-    // Fetch the latest status from Stripe. The account may have been deleted
-    // on Stripe's side — tolerate that (we still return our cached DB flags),
-    // but surface every failure to logs/Sentry so silent breakage is visible.
-    let payoutEmail: string | null = null;
-    try {
-      const account = await stripe.accounts.retrieve(profile.stripeAccountId);
-      payoutEmail = typeof account.email === 'string' ? account.email : null;
-    } catch (stripeErr) {
-      await captureWarning(
-        'Stripe Connect account retrieve failed',
-        stripeErr,
-        {
-          clerkUserId,
-          stripeAccountId: profile.stripeAccountId,
-          route: '/api/stripe-connect/status',
-        }
-      );
-    }
+    // Read readiness from cache; helper falls back to Stripe + writes through
+    // when the cache is stale or empty. captureWarning is emitted internally
+    // if Stripe fails on a stale cache, and the helper still returns the
+    // stale flags so the dashboard never blocks on a Stripe outage.
+    const readiness = await getStripeConnectReadiness(profile.stripeAccountId);
 
     return NextResponse.json(
       {
         connected: true,
-        onboardingComplete: profile.stripeOnboardingComplete,
-        payoutsEnabled: profile.stripePayoutsEnabled,
-        email: payoutEmail,
+        onboardingComplete:
+          readiness?.onboardingComplete ?? profile.stripeOnboardingComplete,
+        payoutsEnabled:
+          readiness?.payoutsEnabled ?? profile.stripePayoutsEnabled,
+        email: readiness?.payoutEmail ?? null,
       },
       { headers: NO_STORE_HEADERS }
     );

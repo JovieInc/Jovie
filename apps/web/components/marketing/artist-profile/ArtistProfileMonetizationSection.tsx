@@ -19,6 +19,7 @@ import {
   clampOutcomeIndex,
   getNearestOutcomeIndex,
 } from './ArtistProfileOutcomesCarousel.utils';
+import { SHELL_H2_CLASS, SHELL_LEAD_CLASS } from './ArtistProfileSectionHeader';
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
 
 interface ArtistProfileMonetizationSectionProps {
@@ -215,11 +216,11 @@ export function ArtistProfileMonetizationSection({
       <div>
         <div className='mx-auto max-w-[var(--linear-content-max)] px-5 sm:px-6 lg:px-0'>
           <div className='max-w-[34rem]'>
-            <h2 className='text-[clamp(2.7rem,5.25vw,4.6rem)] font-[650] leading-[0.94] tracking-[-0.072em] text-primary-token'>
+            <h2 className={SHELL_H2_CLASS}>
               <span className='block'>Get paid.</span>
               <span className='block'>Again and again.</span>
             </h2>
-            <p className='mt-5 max-w-[28rem] text-[clamp(1rem,1.55vw,1.16rem)] leading-[1.65] tracking-[-0.02em] text-secondary-token'>
+            <p className={`${SHELL_LEAD_CLASS} mt-5 max-w-[30rem] sm:mt-6`}>
               {monetization.subhead}
             </p>
           </div>
