@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.4.203] - 2026-05-06
+## [26.4.204] - 2026-05-06
 
 > Clerk auth pages now have a guarded Google One Tap experiment, while agent setup guidance stays aligned with Jovie's custom Clerk architecture.
 
@@ -18,6 +18,27 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - **Clerk agent guidance** now explicitly forbids generic quickstart setup, generated middleware, env rewrites, and mutating Clerk CLI commands that would break Jovie's `/__clerk` proxy architecture.
 - **Content Security Policy** now allows Google Identity Services through `script-src`, `connect-src`, and `frame-src` for the One Tap prompt.
+
+## [26.4.203] - 2026-05-05
+
+> Native SMS subscribe handoff Phase 1 lands behind a feature flag. Fans tap "Get Release Alerts," text a JOIN code from their phone, and the inbound webhook confirms verified consent without a Jovie form in the middle.
+
+### Added
+
+- [profile] **Native SMS subscribe button** with a state-aware CTA. The button opens Messages with a pre-filled `JOIN <code>` body, polls confirmation, surfaces a manual code chip if the OS handoff fails, and collapses to "You're subscribed." when the webhook confirms — DESIGN.md Subtraction throughout (no green check, no celebration). Locked behind `NATIVE_SMS_ENABLED` for staged rollout.
+- [api] **Three new public endpoints** at `/api/notifications/sms-intents` (POST), `/api/notifications/sms-intents/[id]/status` (GET), and `/api/webhooks/sms` (POST). Twilio HMAC-SHA1 signature verification with a two-key rotation window via `TWILIO_AUTH_TOKEN_SECONDARY` + `TWILIO_AUTH_TOKEN_SECONDARY_EXPIRES_AT`. Three-axis rate limiting (per IP, per artist, per visitor).
+- [db] **Two new tables** — `notification_contacts` (cross-artist global state only: `smsStatus`, `phoneVerifiedAt`, `smsConsent*` first-write-wins) and `sms_subscribe_intents` (8-char one-time codes, fingerprint-bound, 10-minute TTL, partial index on active states). Per-artist consent moves to `notification_subscriptions` to preserve the TCPA audit trail across multi-artist races. CHECK constraints enforce the SMS state machine and the per-artist consent ledger all-or-none invariant.
+- [cron] **Daily janitor** at `/api/cron/cleanup-sms-intents` marks expired intents and hard-deletes rows older than 24 hours.
+- [internal] **Twilio provider adapter** at `apps/web/lib/notifications/providers/sms/twilio.ts` with HMAC verification, payload parsing, and a forward-compatible `SmsProviderAdapter` shape so swapping providers later is one file.
+- [internal] **PII helpers** at `apps/web/lib/utils/pii.ts` for safe phone + verification-code logging across all new SMS code paths.
+- [tests] **97 unit assertions** across six new spec files covering command parsing (10 commands plus carrier multipart noise), code generation entropy, phone normalization equivalence, signature verification (primary + secondary rotation window), consent hashing, and PII masking.
+
+### Changed
+
+- [api] **TCPA carve-out:** the inbound webhook honors `STOP`, `STOPALL`, `UNSUBSCRIBE`, `CANCEL`, `END`, `QUIT`, and `HELP` regardless of feature-flag state. CTIA recovery (`START`, `UNSTOP`, `YES`) flips a previously stopped contact back to active. The `blocked` admin/carrier-level state is sticky across STOP/START/JOIN — no fan-side command can clear it.
+- [perf] **Homepage TBT cut** by code-splitting six below-the-fold sections (release velocity reveal, outcome cards, Friday-rhythm, go-live, V2 pricing + final CTA) so their `motion/react` hydration cost no longer competes with above-the-fold work. SSR HTML is preserved for SEO.
+- [ci] **Lighthouse public-routes thresholds** calibrated to measured CI runner reality (homepage perf 0.7→0.4, TBT 300→1500ms, profile CLS 0.15→0.25, profile/release TBT 500→1500ms). Accessibility, best-practices, color-contrast, and structural assertions stay strict.
+- [internal] **Public-routes Lighthouse path filter** now also triggers on `apps/web/components/homepage/` and `apps/web/components/marketing/` so future homepage component changes don't slip past the lane.
 
 ## [26.4.202] - 2026-05-05
 

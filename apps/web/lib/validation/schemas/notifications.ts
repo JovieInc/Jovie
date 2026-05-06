@@ -104,6 +104,34 @@ export const verifyEmailOtpSchema = z.object({
 export type VerifyEmailOtpInput = z.infer<typeof verifyEmailOtpSchema>;
 
 // =============================================================================
+// SMS Subscribe Intent Schema (JOV-1834)
+// =============================================================================
+
+/**
+ * Schema for `POST /api/notifications/sms-intents` — creates a short-lived
+ * native SMS subscribe intent. Returns a JOIN code that the fan texts to
+ * the Jovie messaging service.
+ */
+export const smsIntentCreateSchema = z.object({
+  artist_id: uuidSchema,
+  source: z.string().min(1).max(80).default('profile_bell'),
+  source_url: z.string().url().max(2048).optional(),
+});
+
+export type SmsIntentCreateInput = z.infer<typeof smsIntentCreateSchema>;
+
+/**
+ * Schema for `GET /api/notifications/sms-intents/[id]/status` — body shape
+ * not used; the route reads `id` from the URL and `visitor_id` from cookie.
+ * This stub keeps the validation surface consistent with other endpoints.
+ */
+export const smsIntentStatusSchema = z.object({
+  intent_id: uuidSchema,
+});
+
+export type SmsIntentStatusInput = z.infer<typeof smsIntentStatusSchema>;
+
+// =============================================================================
 // Update Subscriber Name Schema
 // =============================================================================
 
