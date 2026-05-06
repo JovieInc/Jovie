@@ -28,6 +28,21 @@ describe('HomepageHeroMockupCarousel', () => {
     expectActiveShot(secondShotId);
   });
 
+  it('updates ambient light variables with the active slide', () => {
+    render(<HomepageHeroMockupCarousel />);
+
+    const carousel = screen.getByTestId('homepage-hero-carousel');
+    expect(carousel).toHaveStyle({
+      '--homepage-ambient-primary': 'rgba(75, 134, 228, 0.34)',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Go to next slide' }));
+
+    expect(carousel).toHaveStyle({
+      '--homepage-ambient-primary': 'rgba(80, 166, 198, 0.27)',
+    });
+  });
+
   it('does not keep advancing after a click while the pointer remains over the side', () => {
     vi.useFakeTimers();
     render(<HomepageHeroMockupCarousel />);

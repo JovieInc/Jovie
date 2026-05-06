@@ -154,7 +154,6 @@ export function ProfileInlineNotificationsCTA({
     notificationsEnabled,
     subscribedChannels,
     openSubscription,
-    hydrationStatus,
   } = useSubscriptionForm({ artist, source });
   const { user } = useUserSafe();
   const nameMutation = useUpdateSubscriberNameMutation();
@@ -560,10 +559,6 @@ export function ProfileInlineNotificationsCTA({
   }, [flowOrigin, handleClose, step]);
 
   if (!notificationsEnabled) {
-    return null;
-  }
-
-  if (hydrationStatus === 'checking') {
     return null;
   }
 

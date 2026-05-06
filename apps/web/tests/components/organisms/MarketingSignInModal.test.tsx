@@ -1,10 +1,17 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const { signInMock } = vi.hoisted(() => ({
+  signInMock: vi.fn(),
+}));
 
 vi.mock('@clerk/nextjs', () => ({
   ClerkProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
-  SignIn: () => <div data-testid='clerk-signin-stub' />,
+  SignIn: (props: unknown) => {
+    signInMock(props);
+    return <div data-testid='clerk-signin-stub' />;
+  },
 }));
 
 vi.mock('@clerk/ui', () => ({ ui: {} }));
@@ -16,6 +23,11 @@ vi.mock('@/components/providers/clerkAvailability', () => ({
 import { MarketingSignInModal } from '@/components/organisms/MarketingSignInModal';
 
 describe('MarketingSignInModal', () => {
+  beforeEach(() => {
+    signInMock.mockReset();
+    globalThis.history.replaceState(null, '', '/?redirect_url=%2Fonboarding');
+  });
+
   it('renders the reserved-size skeleton while Clerk is loading', () => {
     render(<MarketingSignInModal onClose={() => undefined} />);
     expect(screen.getByTestId('marketing-signin-skeleton')).toBeInTheDocument();
@@ -25,8 +37,7 @@ describe('MarketingSignInModal', () => {
     const { container } = render(
       <MarketingSignInModal onClose={() => undefined} />
     );
-    const skeleton = screen.getByTestId('marketing-signin-skeleton');
-    const card = skeleton.parentElement as HTMLElement;
+    const card = screen.getByTestId('marketing-signin-card');
     expect(card).toHaveStyle({ minHeight: '520px' });
     expect(container).toBeTruthy();
   });
@@ -48,5 +59,15 @@ describe('MarketingSignInModal', () => {
   it('exposes a dialog role with accessible name', () => {
     render(<MarketingSignInModal onClose={() => undefined} />);
     expect(screen.getByRole('dialog')).toHaveAccessibleName('Sign in to Jovie');
+  });
+
+  it('preserves redirect_url on the Clerk sign-up footer link', () => {
+    render(<MarketingSignInModal onClose={() => undefined} />);
+
+    expect(signInMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        signUpUrl: '/signup?redirect_url=%2Fonboarding',
+      })
+    );
   });
 });

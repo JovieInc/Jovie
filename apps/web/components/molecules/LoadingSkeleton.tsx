@@ -212,7 +212,7 @@ export function SocialBarSkeleton() {
 export function AuthFormSkeleton() {
   return (
     <output
-      className='block space-y-5'
+      className='block min-h-[440px] w-full max-w-[420px] space-y-5'
       aria-label='Loading authentication form'
       aria-busy='true'
     >

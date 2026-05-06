@@ -272,20 +272,22 @@ describe('ProfileInlineNotificationsCTA flow', () => {
     expect(screen.queryByText('Sent by Test Artist')).not.toBeInTheDocument();
   });
 
-  it('renders nothing while notification hydration is checking', async () => {
+  it('keeps the inline flow reserved while notification hydration is checking', async () => {
     mockUseSubscriptionForm.mockReturnValue(
       buildFormState({
         hydrationStatus: 'checking',
       })
     );
 
-    const { container } = render(
+    render(
       <ProfileInlineNotificationsCTA
         artist={makeArtist()}
         presentation='inline'
       />
     );
 
-    expect(container).toBeEmptyDOMElement();
+    expect(
+      await screen.findByTestId('profile-mobile-notifications-flow')
+    ).toBeInTheDocument();
   });
 });

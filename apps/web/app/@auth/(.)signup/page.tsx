@@ -11,6 +11,7 @@ import {
 import { AuthFormSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { APP_ROUTES } from '@/constants/routes';
 import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
+import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 
 /**
  * Intercepted signup modal.
@@ -57,7 +58,9 @@ function SignupModalBody() {
   }, [searchParams]);
 
   const signInUrl = buildAuthRouteUrl(APP_ROUTES.SIGNIN, searchParams);
-  const redirectUrl = searchParams.get('redirect_url') ?? APP_ROUTES.ONBOARDING;
+  const redirectUrl =
+    sanitizeRedirectUrl(searchParams.get('redirect_url')) ??
+    APP_ROUTES.ONBOARDING;
 
   const statusRow = promptHint ? (
     <p aria-live='polite' className='truncate' title={promptHint}>

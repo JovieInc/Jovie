@@ -7,34 +7,35 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { getClerkProxyUrl } from '@/components/providers/clerkAvailability';
 import { APP_ROUTES } from '@/constants/routes';
+import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
 
 interface MarketingSignInModalProps {
   readonly onClose: () => void;
 }
 
 /**
- * Minimal dark Clerk appearance — closer to default Clerk than the
- * full marketing/app theme. Compact card, no heavy custom element
- * overrides, so it looks like a stock Clerk modal in dark mode.
+ * Compact Clerk appearance aligned with the full auth split view and the
+ * intercepted auth modal shell. Keep this limited to stable surface tokens so
+ * Clerk's internal step/error states can render without layout surprises.
  */
 const clerkDarkCompact = {
   variables: {
-    colorBackground: '#0a0a0c',
+    colorBackground: '#090a0c',
     colorForeground: '#f5f5f7',
     colorPrimary: '#ffffff',
-    colorPrimaryForeground: '#0a0a0c',
-    colorMuted: '#16161a',
+    colorPrimaryForeground: '#08090a',
+    colorMuted: '#14161a',
     colorMutedForeground: '#a1a1aa',
-    colorInput: '#111113',
+    colorInput: '#101216',
     colorInputForeground: '#f5f5f7',
-    colorBorder: 'rgba(255,255,255,0.08)',
+    colorBorder: 'rgba(255,255,255,0.1)',
     colorRing: 'rgba(255,255,255,0.24)',
-    borderRadius: '0.75rem',
+    borderRadius: '0.95rem',
   },
   elements: {
     rootBox: 'w-full',
-    cardBox: 'shadow-2xl',
-    card: 'bg-[#0a0a0c] border border-white/10',
+    cardBox: 'shadow-none',
+    card: 'bg-[#090a0c]/95 border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_34px_90px_rgba(0,0,0,0.42)]',
   },
 } as const;
 
@@ -49,7 +50,7 @@ function SignInSkeleton() {
     <div
       aria-hidden='true'
       data-testid='marketing-signin-skeleton'
-      className='absolute inset-0 flex flex-col gap-4 rounded-[0.75rem] border border-white/10 bg-[#0a0a0c] p-8 shadow-2xl'
+      className='absolute inset-0 flex flex-col gap-4 rounded-[0.95rem] border border-white/10 bg-[#090a0c]/95 p-8 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_34px_90px_rgba(0,0,0,0.42)]'
     >
       <div className='mx-auto h-6 w-40 animate-pulse rounded bg-white/10' />
       <div className='mx-auto mt-1 h-3 w-56 animate-pulse rounded bg-white/5' />
@@ -175,6 +176,9 @@ export function MarketingSignInModal({
 
   if (!mounted) return null;
 
+  const currentSearchParams = new URLSearchParams(globalThis.location.search);
+  const signUpUrl = buildAuthRouteUrl(APP_ROUTES.SIGNUP, currentSearchParams);
+
   // Portal to <body> so the modal escapes the marketing header's
   // backdrop-filter containing block (which would otherwise shrink
   // a `position: fixed` descendant to the header's bounds).
@@ -207,24 +211,35 @@ export function MarketingSignInModal({
         <div className='pointer-events-none absolute inset-0 flex items-center justify-center p-4'>
           <div
             ref={containerRef}
-            className='pointer-events-auto relative w-full max-w-[400px]'
+            data-testid='marketing-signin-card'
+            className='pointer-events-auto relative w-full max-w-[420px] overflow-hidden rounded-[1.65rem] border border-white/10 bg-[#07080a]/[0.94] p-3 shadow-[0_40px_120px_rgba(0,0,0,0.58),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-[2px]'
             style={{ minHeight: 520 }}
           >
+            <div
+              aria-hidden='true'
+              className='pointer-events-none absolute inset-0'
+            >
+              <div className='absolute -left-24 -top-28 h-72 w-72 rounded-full bg-[radial-gradient(circle_at_center,rgba(82,142,232,0.28),transparent_68%)] blur-3xl' />
+              <div className='absolute -bottom-28 -right-24 h-72 w-72 rounded-full bg-[radial-gradient(circle_at_center,rgba(92,185,206,0.18),transparent_70%)] blur-3xl' />
+              <div className='absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),transparent_34%,rgba(0,0,0,0.3))]' />
+            </div>
             <button
               type='button'
               aria-label='Close'
               onClick={onClose}
-              className='absolute right-2 top-2 z-20 inline-flex h-11 w-11 items-center justify-center rounded-full text-white/60 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30'
+              className='absolute right-4 top-4 z-20 inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.045] text-white/60 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30'
             >
               <X className='h-4 w-4' strokeWidth={2} />
             </button>
-            {clerkReady ? null : <SignInSkeleton />}
-            <SignIn
-              appearance={clerkDarkCompact}
-              routing='hash'
-              signUpUrl={APP_ROUTES.SIGNUP}
-              fallbackRedirectUrl={APP_ROUTES.ONBOARDING}
-            />
+            <div className='relative z-10 min-h-[496px]'>
+              {clerkReady ? null : <SignInSkeleton />}
+              <SignIn
+                appearance={clerkDarkCompact}
+                routing='hash'
+                signUpUrl={signUpUrl}
+                fallbackRedirectUrl={APP_ROUTES.ONBOARDING}
+              />
+            </div>
           </div>
         </div>
       </div>

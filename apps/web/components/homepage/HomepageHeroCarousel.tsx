@@ -14,6 +14,11 @@ interface HeroMockupShot {
   readonly title: string;
   readonly kind: HeroMockupKind;
   readonly priority: boolean;
+  readonly ambient: {
+    readonly primary: string;
+    readonly secondary: string;
+    readonly accent: string;
+  };
 }
 
 const HERO_MOCKUP_SCREENSHOTS: readonly HeroMockupShot[] = [
@@ -23,6 +28,11 @@ const HERO_MOCKUP_SCREENSHOTS: readonly HeroMockupShot[] = [
     title: 'Release Calendar',
     kind: 'desktop',
     priority: true,
+    ambient: {
+      primary: 'rgba(75, 134, 228, 0.34)',
+      secondary: 'rgba(87, 188, 214, 0.18)',
+      accent: 'rgba(206, 119, 72, 0.13)',
+    },
   },
   {
     id: 'audience-crm',
@@ -30,6 +40,11 @@ const HERO_MOCKUP_SCREENSHOTS: readonly HeroMockupShot[] = [
     title: 'Audience CRM',
     kind: 'desktop',
     priority: false,
+    ambient: {
+      primary: 'rgba(80, 166, 198, 0.27)',
+      secondary: 'rgba(109, 95, 215, 0.18)',
+      accent: 'rgba(234, 178, 95, 0.11)',
+    },
   },
   {
     id: 'profile-workspace',
@@ -37,6 +52,11 @@ const HERO_MOCKUP_SCREENSHOTS: readonly HeroMockupShot[] = [
     title: 'Profile Workspace',
     kind: 'desktop',
     priority: false,
+    ambient: {
+      primary: 'rgba(113, 111, 227, 0.28)',
+      secondary: 'rgba(74, 151, 221, 0.16)',
+      accent: 'rgba(214, 111, 139, 0.11)',
+    },
   },
   {
     id: 'tracked-links',
@@ -44,6 +64,11 @@ const HERO_MOCKUP_SCREENSHOTS: readonly HeroMockupShot[] = [
     title: 'Tracked Links',
     kind: 'desktop',
     priority: false,
+    ambient: {
+      primary: 'rgba(69, 150, 210, 0.27)',
+      secondary: 'rgba(196, 115, 84, 0.14)',
+      accent: 'rgba(100, 204, 193, 0.12)',
+    },
   },
   {
     id: 'profile-phone',
@@ -51,6 +76,11 @@ const HERO_MOCKUP_SCREENSHOTS: readonly HeroMockupShot[] = [
     title: 'Artist Profile',
     kind: 'phone',
     priority: false,
+    ambient: {
+      primary: 'rgba(105, 130, 230, 0.28)',
+      secondary: 'rgba(75, 190, 216, 0.14)',
+      accent: 'rgba(216, 126, 92, 0.12)',
+    },
   },
 ] as const;
 
@@ -169,11 +199,18 @@ export function HomepageHeroMockupCarousel() {
     setHoverDirection(null);
   };
 
+  const ambientStyle = {
+    '--homepage-ambient-primary': activeShot.ambient.primary,
+    '--homepage-ambient-secondary': activeShot.ambient.secondary,
+    '--homepage-ambient-accent': activeShot.ambient.accent,
+  } as CSSProperties;
+
   return (
     <section
       className='homepage-hero-showcase'
       aria-label='Jovie product screenshots'
       data-testid='homepage-hero-carousel'
+      style={ambientStyle}
     >
       <div className='homepage-hero-carousel__viewport'>
         <p className='sr-only' aria-live='polite'>

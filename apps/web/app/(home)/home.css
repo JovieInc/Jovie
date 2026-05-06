@@ -130,9 +130,44 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-hero-shell {
+  --homepage-ambient-primary: rgba(75, 134, 228, 0.34);
+  --homepage-ambient-secondary: rgba(87, 188, 214, 0.18);
+  --homepage-ambient-accent: rgba(206, 119, 72, 0.13);
   background: #000;
   contain: layout paint;
   box-shadow: none;
+}
+
+.homepage-hero-shell:has(
+    .homepage-hero-carousel__stage[data-active-shot="audience-crm"]
+  ) {
+  --homepage-ambient-primary: rgba(80, 166, 198, 0.27);
+  --homepage-ambient-secondary: rgba(109, 95, 215, 0.18);
+  --homepage-ambient-accent: rgba(234, 178, 95, 0.11);
+}
+
+.homepage-hero-shell:has(
+    .homepage-hero-carousel__stage[data-active-shot="profile-workspace"]
+  ) {
+  --homepage-ambient-primary: rgba(113, 111, 227, 0.28);
+  --homepage-ambient-secondary: rgba(74, 151, 221, 0.16);
+  --homepage-ambient-accent: rgba(214, 111, 139, 0.11);
+}
+
+.homepage-hero-shell:has(
+    .homepage-hero-carousel__stage[data-active-shot="tracked-links"]
+  ) {
+  --homepage-ambient-primary: rgba(69, 150, 210, 0.27);
+  --homepage-ambient-secondary: rgba(196, 115, 84, 0.14);
+  --homepage-ambient-accent: rgba(100, 204, 193, 0.12);
+}
+
+.homepage-hero-shell:has(
+    .homepage-hero-carousel__stage[data-active-shot="profile-phone"]
+  ) {
+  --homepage-ambient-primary: rgba(105, 130, 230, 0.28);
+  --homepage-ambient-secondary: rgba(75, 190, 216, 0.14);
+  --homepage-ambient-accent: rgba(216, 126, 92, 0.12);
 }
 
 .homepage-hero-shell__layer {
@@ -158,16 +193,16 @@ body:has(.home-viewport)::-webkit-scrollbar {
     90deg,
     transparent 0%,
     transparent 18%,
-    rgba(97, 153, 246, 0.42) 19%,
+    var(--homepage-ambient-primary) 19%,
     rgba(97, 153, 246, 0) 19.4%,
     transparent 36%,
-    rgba(157, 200, 255, 0.32) 37%,
+    var(--homepage-ambient-secondary) 37%,
     rgba(157, 200, 255, 0) 37.3%,
     transparent 62%,
-    rgba(97, 153, 246, 0.34) 63%,
+    var(--homepage-ambient-primary) 63%,
     rgba(97, 153, 246, 0) 63.3%,
     transparent 81%,
-    rgba(157, 200, 255, 0.38) 82%,
+    var(--homepage-ambient-secondary) 82%,
     rgba(157, 200, 255, 0) 82.3%,
     transparent 100%
   );
@@ -338,6 +373,9 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-hero-showcase {
+  --homepage-ambient-primary: rgba(75, 134, 228, 0.34);
+  --homepage-ambient-secondary: rgba(87, 188, 214, 0.18);
+  --homepage-ambient-accent: rgba(206, 119, 72, 0.13);
   position: relative;
   width: var(--homepage-carousel-width);
   margin-top: clamp(3.1rem, 4.4vw, 4.1rem);
@@ -350,21 +388,49 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-hero-showcase::before {
   content: "";
   position: absolute;
-  inset: 0 16% 0;
+  inset: -18% 10% -4%;
+  pointer-events: none;
+  border-radius: 999px;
+  background:
+    radial-gradient(
+      52% 58% at 42% 44%,
+      var(--homepage-ambient-primary) 0%,
+      transparent 68%
+    ),
+    radial-gradient(
+      38% 50% at 66% 54%,
+      var(--homepage-ambient-secondary) 0%,
+      transparent 72%
+    );
+  filter: blur(34px);
+  opacity: 0.78;
+  transition:
+    background 360ms ease,
+    opacity 240ms ease;
+}
+
+.homepage-hero-showcase::after {
+  content: "";
+  position: absolute;
+  inset: 16% 24% 10%;
   pointer-events: none;
   border-radius: 999px;
   background: radial-gradient(
-    58% 62% at 50% 48%,
-    rgba(77, 137, 218, 0.18) 0%,
-    rgba(28, 70, 122, 0.09) 42%,
-    transparent 74%
+    56% 100% at 50% 46%,
+    var(--homepage-ambient-accent) 0%,
+    transparent 72%
   );
-  filter: blur(30px);
+  filter: blur(22px);
+  opacity: 0.72;
+  transition:
+    background 360ms ease,
+    opacity 240ms ease;
 }
 
 .homepage-hero-carousel__viewport {
   position: relative;
   isolation: isolate;
+  z-index: 1;
   min-height: var(--homepage-carousel-stage-height);
   overflow: hidden;
   padding-block: 0 2rem;
@@ -405,7 +471,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-hero-mockup[data-active="true"] {
   filter: saturate(1.03) brightness(1.08) contrast(1.03)
     blur(var(--carousel-blur)) drop-shadow(0 34px 96px rgba(0, 0, 0, 0.5))
-    drop-shadow(0 0 72px rgba(64, 126, 214, 0.13));
+    drop-shadow(0 0 72px var(--homepage-ambient-primary));
 }
 
 .homepage-hero-mockup--phone {
@@ -429,9 +495,9 @@ body:has(.home-viewport)::-webkit-scrollbar {
   height: 80px;
   background: radial-gradient(
     60% 100% at 50% 100%,
-    rgba(157, 157, 255, 0.22) 0%,
-    rgba(157, 157, 255, 0.08) 40%,
-    rgba(157, 157, 255, 0) 100%
+    var(--homepage-ambient-secondary) 0%,
+    rgba(157, 157, 255, 0.08) 42%,
+    transparent 100%
   );
   pointer-events: none;
   filter: blur(14px);
