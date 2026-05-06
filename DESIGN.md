@@ -352,11 +352,37 @@ Pure neutral HSL — no hue tint. Used across both systems.
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| Marketing canonical | 1200px | **All boxed marketing content** — header, hero, every section. One width. |
-| Prose | 624px | Long-form text |
+| Marketing canonical | 1298px | **All boxed marketing content** — header, hero, every section. One width. |
+| Prose | 680px | Long-form text |
 | Pricing grid | 1024px | Pricing layout (intentional narrow) |
 
-**Rule:** All marketing sections use `max-w-[1200px]` (or `var(--linear-content-max)`). Full-bleed sections explicitly break out. No more mixed widths.
+**Rule:** All marketing sections use the canonical width (or `var(--linear-content-max)`). Full-bleed sections explicitly break out. No more mixed widths.
+
+These are surface-side aliases of `--ds-public-content-max` and `--ds-prose-max` (DS_FOUNDATION_V1).
+
+---
+
+## DS_FOUNDATION_V1 canonical decisions
+
+Wave 0 of the DS_FOUNDATION_V1 consolidation locks in the following canonical
+semantic aliases. Downstream files and components should consume these instead
+of redefining them.
+
+- **Canonical public/marketing width = 1298px** (Linear.app parity).
+  Exposed as `--ds-public-content-max` and Tailwind class `max-w-public-content`.
+- **Prose exception = 680px** for long-form reading surfaces.
+  Exposed as `--ds-prose-max` and Tailwind class `max-w-prose-canonical`.
+- **Motion taxonomy:** two intents only.
+  - `subtle` — 150ms with `--ds-motion-subtle-easing`. Use for hover, focus,
+    color, icon swap, toast. Tailwind: `duration-subtle ease-subtle`.
+  - `cinematic` — 420ms with `--ds-motion-cinematic-easing`. Use for drawers,
+    modals, audio player open/close. Tailwind: `duration-cinematic ease-cinematic`.
+  - Raw durations and easings in route code are forbidden (enforced in Wave 4).
+- **Canonical button variants:** TBD by the Wave 1 audit; this section will
+  link forward to the Wave 1 PR once it lands.
+
+See [`docs/DESIGN_TOKENS.md`](docs/DESIGN_TOKENS.md#ds_foundation_v1-canonical-decisions)
+for the canonical CSS + Tailwind references.
 
 ---
 
@@ -421,8 +447,10 @@ the app feeling consistent even as new components land.
 
 | Token | Duration | Easing | Use for |
 |-------|----------|--------|---------|
-| **subtle** (`duration-subtle ease-subtle`) | 150ms | `cubic-bezier(0.25, 0.46, 0.45, 0.94)` | Hover, focus, color, icon swap, toast, button press, anything micro |
-| **cinematic** (`duration-cinematic ease-cinematic`) | 320ms | `cubic-bezier(0.32, 0.72, 0, 1)` | Side drawers, audio player open/close, modal entry, chat composer surface morph, anything reveal-class |
+| **subtle** (`duration-subtle ease-subtle`) | 150ms | `cubic-bezier(0.4, 0, 0.2, 1)` | Hover, focus, color, icon swap, toast, button press, anything micro |
+| **cinematic** (`duration-cinematic ease-cinematic`) | 420ms | `cubic-bezier(0.22, 1, 0.36, 1)` | Side drawers, audio player open/close, modal entry, chat composer surface morph, anything reveal-class |
+
+These are surface-side aliases of `--ds-motion-*` tokens (DS_FOUNDATION_V1).
 
 **Rule of thumb:** if the user's eye has to track the move (panel sliding in,
 surface growing), it's cinematic. If the user notices it only as feedback
