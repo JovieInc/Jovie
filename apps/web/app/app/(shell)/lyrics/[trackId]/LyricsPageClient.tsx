@@ -40,9 +40,14 @@ export function LyricsPageClient({
   };
 
   // Prefer the live audio element's duration when this track is the active
-  // playback target; otherwise fall back to the persisted track length so
-  // the surface still shows duration on cold loads.
-  const durationSec = isActive ? playbackState.duration : initialDurationSec;
+  // playback target AND the audio element has finished resolving its
+  // duration. The element reports `duration === 0` until `loadedmetadata`
+  // fires, so check `> 0` to avoid a momentary regression to 0 when
+  // playback first starts.
+  const durationSec =
+    isActive && playbackState.duration > 0
+      ? playbackState.duration
+      : initialDurationSec;
   const currentTimeSec = isActive ? playbackState.currentTime : 0;
 
   return (
