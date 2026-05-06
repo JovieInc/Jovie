@@ -1,5 +1,5 @@
 {
-  "id": "01b11ebe-f047-4a25-aca3-57512c638ec6",
+  "id": "6f4a9685-02a7-4d64-a5cb-059d89cc9472",
   "prevId": "e8c9581f-ca70-4284-827d-6a2c498205fa",
   "version": "7",
   "dialect": "postgresql",
@@ -4910,6 +4910,38 @@
           "notNull": true,
           "default": false
         },
+        "stripe_charges_enabled": {
+          "name": "stripe_charges_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "stripe_details_submitted": {
+          "name": "stripe_details_submitted",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "stripe_payout_email": {
+          "name": "stripe_payout_email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stripe_connect_last_synced_at": {
+          "name": "stripe_connect_last_synced_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stripe_connect_last_event_at": {
+          "name": "stripe_connect_last_event_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
         "next_task_number": {
           "name": "next_task_number",
           "type": "integer",
@@ -5027,6 +5059,22 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_creator_profiles_stripe_account_id": {
+          "name": "idx_creator_profiles_stripe_account_id",
+          "columns": [
+            {
+              "expression": "stripe_account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "stripe_account_id IS NOT NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -11196,168 +11244,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.notification_contacts": {
-      "name": "notification_contacts",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "phone": {
-          "name": "phone",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "phone_hash": {
-          "name": "phone_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "email": {
-          "name": "email",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "email_hash": {
-          "name": "email_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "phone_verified_at": {
-          "name": "phone_verified_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "email_verified_at": {
-          "name": "email_verified_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "sms_consent_at": {
-          "name": "sms_consent_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "sms_consent_text_hash": {
-          "name": "sms_consent_text_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "sms_consent_version": {
-          "name": "sms_consent_version",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "sms_status": {
-          "name": "sms_status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'active'"
-        },
-        "first_source": {
-          "name": "first_source",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "first_source_url": {
-          "name": "first_source_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "metadata": {
-          "name": "metadata",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "'{}'::jsonb"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "notification_contacts_phone_hash_unique": {
-          "name": "notification_contacts_phone_hash_unique",
-          "columns": [
-            {
-              "expression": "phone_hash",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"notification_contacts\".\"phone_hash\" IS NOT NULL",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "notification_contacts_email_hash_unique": {
-          "name": "notification_contacts_email_hash_unique",
-          "columns": [
-            {
-              "expression": "email_hash",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"notification_contacts\".\"email_hash\" IS NOT NULL",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "notification_contacts_sms_status_idx": {
-          "name": "notification_contacts_sms_status_idx",
-          "columns": [
-            {
-              "expression": "sms_status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.notification_delivery_log": {
       "name": "notification_delivery_log",
       "schema": "",
@@ -11617,24 +11503,6 @@
         "artist_email_opt_out_at": {
           "name": "artist_email_opt_out_at",
           "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "sms_consent_at": {
-          "name": "sms_consent_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "sms_consent_text_hash": {
-          "name": "sms_consent_text_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "sms_consent_version": {
-          "name": "sms_consent_version",
-          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
@@ -15456,265 +15324,6 @@
           "value": "\n        (release_id IS NOT NULL AND track_id IS NULL AND release_track_id IS NULL)\n        OR (track_id IS NOT NULL AND release_id IS NULL AND release_track_id IS NULL)\n        OR (release_track_id IS NOT NULL AND release_id IS NULL AND track_id IS NULL)\n      "
         }
       },
-      "isRLSEnabled": false
-    },
-    "public.sms_subscribe_intents": {
-      "name": "sms_subscribe_intents",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "code_hash": {
-          "name": "code_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "creator_profile_id": {
-          "name": "creator_profile_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "visitor_id": {
-          "name": "visitor_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "audience_member_id": {
-          "name": "audience_member_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "source": {
-          "name": "source",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "source_url": {
-          "name": "source_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "country_code": {
-          "name": "country_code",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "consent_text_hash": {
-          "name": "consent_text_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "consent_version": {
-          "name": "consent_version",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "ip_hash": {
-          "name": "ip_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "user_agent_hash": {
-          "name": "user_agent_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "fingerprint_hash": {
-          "name": "fingerprint_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'created'"
-        },
-        "phone": {
-          "name": "phone",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "provider": {
-          "name": "provider",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "provider_message_id": {
-          "name": "provider_message_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "completed_at": {
-          "name": "completed_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "metadata": {
-          "name": "metadata",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "'{}'::jsonb"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "sms_subscribe_intents_code_hash_unique": {
-          "name": "sms_subscribe_intents_code_hash_unique",
-          "columns": [
-            {
-              "expression": "code_hash",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "sms_subscribe_intents_creator_profile_id_created_at_idx": {
-          "name": "sms_subscribe_intents_creator_profile_id_created_at_idx",
-          "columns": [
-            {
-              "expression": "creator_profile_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "sms_subscribe_intents_status_expires_at_idx": {
-          "name": "sms_subscribe_intents_status_expires_at_idx",
-          "columns": [
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "expires_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "sms_subscribe_intents_active_idx": {
-          "name": "sms_subscribe_intents_active_idx",
-          "columns": [
-            {
-              "expression": "expires_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"sms_subscribe_intents\".\"status\" IN ('created', 'sms_received')",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "sms_subscribe_intents_visitor_id_idx": {
-          "name": "sms_subscribe_intents_visitor_id_idx",
-          "columns": [
-            {
-              "expression": "visitor_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"sms_subscribe_intents\".\"visitor_id\" IS NOT NULL",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "sms_subscribe_intents_creator_profile_id_creator_profiles_id_fk": {
-          "name": "sms_subscribe_intents_creator_profile_id_creator_profiles_id_fk",
-          "tableFrom": "sms_subscribe_intents",
-          "tableTo": "creator_profiles",
-          "columnsFrom": ["creator_profile_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "sms_subscribe_intents_audience_member_id_audience_members_id_fk": {
-          "name": "sms_subscribe_intents_audience_member_id_audience_members_id_fk",
-          "tableFrom": "sms_subscribe_intents",
-          "tableTo": "audience_members",
-          "columnsFrom": ["audience_member_id"],
-          "columnsTo": ["id"],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.social_accounts": {

@@ -1,6 +1,6 @@
 {
-  "id": "0db4f866-2e9c-465d-8415-d7714fb523fb",
-  "prevId": "01b11ebe-f047-4a25-aca3-57512c638ec6",
+  "id": "e0c232f2-fdfc-4c5c-a801-e63a3ac9f532",
+  "prevId": "6f4a9685-02a7-4d64-a5cb-059d89cc9472",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -4910,6 +4910,38 @@
           "notNull": true,
           "default": false
         },
+        "stripe_charges_enabled": {
+          "name": "stripe_charges_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "stripe_details_submitted": {
+          "name": "stripe_details_submitted",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "stripe_payout_email": {
+          "name": "stripe_payout_email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stripe_connect_last_synced_at": {
+          "name": "stripe_connect_last_synced_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stripe_connect_last_event_at": {
+          "name": "stripe_connect_last_event_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
         "next_task_number": {
           "name": "next_task_number",
           "type": "integer",
@@ -5027,6 +5059,22 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_creator_profiles_stripe_account_id": {
+          "name": "idx_creator_profiles_stripe_account_id",
+          "columns": [
+            {
+              "expression": "stripe_account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "stripe_account_id IS NOT NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}

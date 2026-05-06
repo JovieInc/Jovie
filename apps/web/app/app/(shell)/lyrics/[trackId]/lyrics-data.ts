@@ -12,6 +12,7 @@ export interface LyricsRouteTrack {
   readonly title: string;
   readonly artist: string;
   readonly lyrics: string | null;
+  readonly durationMs: number | null;
 }
 
 function normalizeLyrics(value: string | null | undefined): string | null {
@@ -26,6 +27,19 @@ function lyricsFromMetadata(
   return typeof value === 'string' ? normalizeLyrics(value) : null;
 }
 
+/**
+ * Resolve the lyrics surface track for a given track id, scoped to a profile.
+ *
+ * Precedence (first non-null wins):
+ *   1. discogRecordings.lyrics — canonical recording (new model)
+ *   2. discogTracks.lyrics     — legacy per-release track (kept for migration)
+ *   3. discogReleases.metadata.lyrics — release-level lyrics (when the trackId
+ *      points at a release id, e.g. release-preview playback)
+ *
+ * Wrong-profile and unknown ids return null so the route can `notFound()`.
+ * Empty/whitespace-only lyric strings are normalized to null so the empty
+ * state renders deterministically.
+ */
 export async function loadLyricsRouteTrack(params: {
   readonly profileId: string;
   readonly trackId: string;
@@ -35,6 +49,7 @@ export async function loadLyricsRouteTrack(params: {
     .select({
       title: discogRecordings.title,
       lyrics: discogRecordings.lyrics,
+      durationMs: discogRecordings.durationMs,
     })
     .from(discogRecordings)
     .where(
@@ -50,6 +65,7 @@ export async function loadLyricsRouteTrack(params: {
       title: recording.title,
       artist: params.fallbackArtist,
       lyrics: normalizeLyrics(recording.lyrics),
+      durationMs: recording.durationMs ?? null,
     };
   }
 
@@ -57,6 +73,7 @@ export async function loadLyricsRouteTrack(params: {
     .select({
       title: discogTracks.title,
       lyrics: discogTracks.lyrics,
+      durationMs: discogTracks.durationMs,
     })
     .from(discogTracks)
     .where(
@@ -72,6 +89,7 @@ export async function loadLyricsRouteTrack(params: {
       title: legacyTrack.title,
       artist: params.fallbackArtist,
       lyrics: normalizeLyrics(legacyTrack.lyrics),
+      durationMs: legacyTrack.durationMs ?? null,
     };
   }
 
@@ -95,5 +113,6 @@ export async function loadLyricsRouteTrack(params: {
     title: release.title,
     artist: params.fallbackArtist,
     lyrics: lyricsFromMetadata(release.metadata),
+    durationMs: null,
   };
 }

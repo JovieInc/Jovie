@@ -1,295 +1,175 @@
 'use client';
 
-import React from 'react';
+import { Button } from '@jovie/ui';
+import React, { useCallback } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
+import {
+  getMonogramInitials,
+  getMonogramTone,
+} from '@/components/features/dashboard/organisms/dashboard-audience-table/cells/initials';
+import {
+  isSsrNowMs,
+  useNowMs,
+} from '@/components/features/dashboard/organisms/dashboard-audience-table/cells/NowMsContext';
+import { deriveAudienceState } from '@/lib/audience/derive-state';
 import { cn } from '@/lib/utils';
-import { formatTimeAgo, getFallbackName } from '@/lib/utils/audience';
-import { calculateLtv } from '@/lib/utils/ltv';
-import { capitalizeFirst } from '@/lib/utils/string-utils';
-import type { AudienceIntentLevel, AudienceMember } from '@/types';
-import { formatDollars } from './AudienceLtvCell';
+import { formatTimeAgo } from '@/lib/utils/audience';
+import type { AudienceMember } from '@/types';
 
 export interface AudienceMobileCardProps {
   readonly member: AudienceMember;
   readonly mode: 'members' | 'subscribers';
   readonly isSelected?: boolean;
   readonly onTap: (member: AudienceMember) => void;
+  readonly onAction?: (member: AudienceMember) => void;
 }
 
-const INTENT_STYLES: Record<AudienceIntentLevel, string> = {
-  high: 'text-emerald-600 dark:text-emerald-400',
-  medium: 'text-amber-600 dark:text-amber-400',
-  low: 'text-tertiary-token',
-};
+const STATE_PILL = {
+  high: 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/25',
+  rising: 'bg-amber-500/15 text-amber-300 ring-amber-500/25',
+  dormant: 'bg-zinc-700/40 text-tertiary-token ring-zinc-700/50',
+  subscriber: 'bg-violet-500/15 text-violet-200 ring-violet-500/25',
+} as const;
 
-const INTENT_DOT_STYLES: Record<AudienceIntentLevel, string> = {
-  high: 'bg-emerald-500',
-  medium: 'bg-amber-400',
-  low: 'bg-zinc-400',
-};
+const STATE_LABEL = {
+  high: 'High',
+  rising: 'Rising',
+  dormant: 'Dormant',
+  subscriber: 'Subscriber',
+} as const;
 
-const MOBILE_SOURCE_MAP: Record<string, string> = {
-  'x.com': 'X',
-  'twitter.com': 'X',
-  'instagram.com': 'Instagram',
-  'facebook.com': 'Facebook',
-  'tiktok.com': 'TikTok',
-  'youtube.com': 'YouTube',
-  'spotify.com': 'Spotify',
-  'google.com': 'Google',
-  'reddit.com': 'Reddit',
-  'linkedin.com': 'LinkedIn',
-  't.co': 'X',
-  'l.facebook.com': 'Facebook',
-  'l.instagram.com': 'Instagram',
-};
-
-const INTERNAL_HOST_SUFFIXES = ['jov.ie', 'jovie.fm'];
-
-function normalizeSourceLabel(source: string): string {
-  const normalized = source.trim().toLowerCase();
-  return (
-    MOBILE_SOURCE_MAP[normalized] ??
-    normalized.charAt(0).toUpperCase() + normalized.slice(1)
-  );
-}
-
-function isInternalReferrer(url: string): boolean {
-  try {
-    const hostname = new URL(url).hostname.replace('www.', '').toLowerCase();
-    return INTERNAL_HOST_SUFFIXES.some(
-      suffix => hostname === suffix || hostname.endsWith(`.${suffix}`)
-    );
-  } catch {
-    return false;
-  }
+function pickFallbackName(type: AudienceMember['type']): string {
+  if (type === 'email') return 'Email Subscriber';
+  if (type === 'sms') return 'SMS Subscriber';
+  return 'Visitor';
 }
 
 /**
- * AudienceMobileCard - Clean, Apple-esque card for audience members on mobile.
+ * Compact mobile card matching the redesigned audience row.
+ * Top row: monogram + name + state pill.
+ * Bottom row: last-seen + Message action.
  *
- * Uses avatar anchoring, clear typographic hierarchy, and inline metadata.
- * Memoized to prevent unnecessary re-renders in the mobile list.
+ * The card uses two sibling buttons: a "stretched" tap target absolutely
+ * positioned behind the content for the row click, and the Message button
+ * in front for the primary action. This keeps both controls semantic and
+ * un-nested without resorting to a `role='button'` div.
  */
 export const AudienceMobileCard = React.memo(function AudienceMobileCard({
   member,
   mode,
   isSelected,
   onTap,
+  onAction,
 }: AudienceMobileCardProps) {
-  const displayName = member.displayName || getFallbackName(member.type);
-  const isHighIntent = member.intentLevel === 'high';
+  const nowMs = useNowMs();
+  const name = member.displayName?.trim() ?? '';
+  // Treat the email channel as absent when it's gated from the artist so the
+  // mobile card mirrors the desktop FanCell + privacy gate.
+  const visibleEmail =
+    member.emailVisibleToArtist === false ? null : member.email;
+  const isAnonymous =
+    !name && !visibleEmail && !member.phone && !member.spotifyConnected;
+  const displayName =
+    name || (isAnonymous ? 'Anonymous Fan' : pickFallbackName(member.type));
+  const monogram = isAnonymous ? '◯' : getMonogramInitials(displayName);
+  const tone = isAnonymous
+    ? 'bg-surface-0 text-tertiary-token'
+    : getMonogramTone(displayName);
 
-  // Calculate LTV for value accent
-  const ltvBreakdown = calculateLtv({
-    tipAmountTotalCents: member.tipAmountTotalCents,
-    tipCount: member.tipCount,
-    visits: member.visits,
-    engagementScore: member.engagementScore,
-    streamingClicks: member.ltvStreamingClicks ?? 0,
-    tipClickValueCents: member.ltvTipClickValueCents ?? 0,
-    merchSalesCents: member.ltvMerchSalesCents ?? 0,
-    ticketSalesCents: member.ltvTicketSalesCents ?? 0,
-  });
-  const hasValue = ltvBreakdown.tier !== 'none';
+  // Use the SSR-safe nowMs context so the mobile card matches the desktop
+  // table's hydration behaviour. While SSR_NOW_MS is in effect, every row
+  // shows "Rising" until the post-mount tick swaps in the real clock.
+  const isSsr = isSsrNowMs(nowMs);
+  const state: keyof typeof STATE_PILL =
+    mode === 'subscribers'
+      ? 'subscriber'
+      : isSsr
+        ? 'rising'
+        : deriveAudienceState(member, nowMs);
+
+  const reachable = Boolean(visibleEmail || member.phone);
+
+  const handleCardClick = useCallback(() => onTap(member), [member, onTap]);
+
+  const handleActionClick = useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      event.stopPropagation();
+      if (!reachable) return;
+      onAction?.(member);
+    },
+    [member, onAction, reachable]
+  );
 
   return (
-    <button
-      type='button'
+    <div
       className={cn(
-        'flex w-full items-start gap-3 px-4 py-3.5 text-left transition-[background-color,color] duration-150',
-        isSelected ? 'bg-surface-0' : 'active:bg-surface-0',
-        isHighIntent && 'font-caption',
-        hasValue && 'border-l-2 border-l-emerald-500/20'
+        'relative flex w-full items-stretch gap-3 px-4 py-3 transition-[background-color,color] duration-150',
+        isSelected ? 'bg-surface-0' : 'active:bg-surface-0'
       )}
-      onClick={() => onTap(member)}
-      aria-label={`View details for ${displayName}`}
     >
-      {/* Avatar circle with intent dot */}
-      <div className='flex-shrink-0 relative mt-0.5'>
-        <div
-          className='flex size-9 items-center justify-center rounded-full bg-surface-0'
-          aria-hidden='true'
-        >
-          <Icon name='User' className='size-4 text-tertiary-token' />
-        </div>
-        <span
-          className={cn(
-            'absolute -top-0.5 -right-0.5 size-2.5 rounded-full border-2 border-white dark:border-zinc-900',
-            INTENT_DOT_STYLES[member.intentLevel]
-          )}
-          aria-hidden='true'
-        />
+      {/* Stretched tap target — absolutely positioned behind the content so
+          the Message button (which has z-10) intercepts clicks for itself. */}
+      <button
+        type='button'
+        onClick={handleCardClick}
+        aria-label={`View details for ${displayName}`}
+        className='absolute inset-0 outline-none focus-visible:bg-surface-0 focus-visible:ring-1 focus-visible:ring-(--linear-app-shell-border)'
+      />
+
+      <div
+        className={cn(
+          'pointer-events-none relative z-0 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-xs font-semibold tabular-nums self-center',
+          tone
+        )}
+        aria-hidden='true'
+      >
+        <span>{monogram}</span>
       </div>
 
-      {/* Content */}
-      <div className='flex-1 min-w-0'>
-        {/* Row 1: Name + Time */}
-        <div className='flex items-baseline justify-between gap-2'>
+      <div className='pointer-events-none relative z-0 flex-1 min-w-0 flex flex-col justify-center gap-1'>
+        <div className='flex items-center justify-between gap-2 min-w-0'>
           <TruncatedText
             lines={1}
-            className='text-mid font-semibold leading-tight text-primary-token'
+            className='text-mid font-semibold leading-tight text-primary-token min-w-0'
           >
             {displayName}
           </TruncatedText>
-          {mode === 'members' && member.lastSeenAt && (
-            <span className='flex-shrink-0 text-2xs text-tertiary-token tabular-nums'>
-              {formatTimeAgo(member.lastSeenAt)}
-            </span>
-          )}
+          <span
+            className={cn(
+              'inline-flex shrink-0 items-center rounded-md px-1.5 py-0.5 text-2xs font-medium tabular-nums ring-1 ring-inset',
+              STATE_PILL[state]
+            )}
+          >
+            {STATE_LABEL[state]}
+          </span>
         </div>
 
-        {mode === 'members' ? (
-          <MemberDetails
-            member={member}
-            hasValue={hasValue}
-            ltvCents={ltvBreakdown.totalValueCents}
-          />
-        ) : (
-          <SubscriberDetails member={member} />
-        )}
+        <div className='flex items-center justify-between gap-2'>
+          <span className='text-2xs text-tertiary-token tabular-nums'>
+            {member.lastSeenAt && !isSsr
+              ? formatTimeAgo(member.lastSeenAt)
+              : '—'}
+          </span>
+          <Button
+            type='button'
+            variant='secondary'
+            size='sm'
+            onClick={handleActionClick}
+            disabled={!reachable}
+            aria-label={`Message ${displayName}`}
+            className='pointer-events-auto relative z-10 min-h-[44px] min-w-[88px] px-3 text-xs'
+          >
+            Message
+          </Button>
+        </div>
       </div>
 
-      {/* Chevron */}
-      <div className='flex-shrink-0 self-center'>
-        <Icon
-          name='ChevronRight'
-          className='size-4 text-quaternary-token'
-          aria-hidden='true'
-        />
-      </div>
-    </button>
+      <Icon
+        name='ChevronRight'
+        className='pointer-events-none relative z-0 size-4 text-quaternary-token self-center shrink-0'
+        aria-hidden='true'
+      />
+    </div>
   );
 });
-
-/** Subtitle lines for members mode */
-function MemberDetails({
-  member,
-  hasValue,
-  ltvCents,
-}: {
-  readonly member: AudienceMember;
-  readonly hasValue: boolean;
-  readonly ltvCents: number;
-}) {
-  const isReturning = member.visits > 1;
-  const utmSource = member.utmParams?.source;
-  let source = 'Direct';
-  if (utmSource) {
-    source = normalizeSourceLabel(utmSource);
-  } else if (member.referrerHistory.length > 0) {
-    const externalReferrer = member.referrerHistory.find(
-      entry => !isInternalReferrer(entry.url)
-    );
-    source = externalReferrer
-      ? parseSourceForMobile(externalReferrer.url)
-      : 'Direct';
-  }
-
-  // City only (no country) for mobile density
-  const city = member.geoCity ?? null;
-
-  const lastAction =
-    member.latestActions.length > 0
-      ? capitalizeFirst(member.latestActions[0].label)
-      : null;
-
-  return (
-    <div className='mt-0.5 space-y-0.5'>
-      {/* Row 2: Intent + Returning + Source + City */}
-      <p className='text-2xs flex items-center gap-1.5 min-w-0'>
-        <span
-          className={cn(
-            'inline-block size-1.5 rounded-full shrink-0',
-            INTENT_DOT_STYLES[member.intentLevel]
-          )}
-          aria-hidden='true'
-        />
-        <span
-          className={cn(
-            'font-caption shrink-0',
-            INTENT_STYLES[member.intentLevel]
-          )}
-        >
-          {capitalizeFirst(member.intentLevel)}
-        </span>
-        <DotSeparator />
-        {isReturning ? (
-          <span className='font-caption text-secondary-token shrink-0'>
-            Returning
-          </span>
-        ) : (
-          <span className='text-tertiary-token shrink-0'>New</span>
-        )}
-        <DotSeparator />
-        <span className='text-tertiary-token truncate'>{source}</span>
-        {city && (
-          <>
-            <DotSeparator />
-            <span className='text-tertiary-token truncate'>{city}</span>
-          </>
-        )}
-      </p>
-
-      {/* Row 3: Last action + LTV value */}
-      {(lastAction || hasValue) && (
-        <p className='text-2xs flex items-center gap-1.5 min-w-0'>
-          {lastAction && (
-            <span className='truncate text-tertiary-token'>{lastAction}</span>
-          )}
-          {lastAction && hasValue && <DotSeparator />}
-          {hasValue && (
-            <span className='shrink-0 font-caption text-emerald-600 dark:text-emerald-400'>
-              {formatDollars(ltvCents)}
-            </span>
-          )}
-        </p>
-      )}
-    </div>
-  );
-}
-
-function parseSourceForMobile(url: string): string {
-  try {
-    const parsed = new URL(url);
-    const utmSource = parsed.searchParams.get('utm_source');
-    if (utmSource) return normalizeSourceLabel(utmSource);
-    const hostname = parsed.hostname.replace('www.', '').toLowerCase();
-    return MOBILE_SOURCE_MAP[hostname] ?? hostname;
-  } catch {
-    return url || 'Direct';
-  }
-}
-
-/** Subtitle lines for subscribers mode */
-function SubscriberDetails({ member }: { readonly member: AudienceMember }) {
-  const subscriberLabel =
-    member.type === 'email' ? 'Email Subscriber' : 'SMS Subscriber';
-  return (
-    <div className='mt-0.5 space-y-0.5'>
-      {(member.email || member.phone) && (
-        <p className='truncate text-app leading-snug text-secondary-token'>
-          {subscriberLabel}
-        </p>
-      )}
-      {member.lastSeenAt && (
-        <p className='text-2xs text-tertiary-token'>
-          Subscribed {formatTimeAgo(member.lastSeenAt)}
-        </p>
-      )}
-    </div>
-  );
-}
-
-/** Tiny dot separator for inline metadata */
-function DotSeparator() {
-  return (
-    <span
-      className='select-none text-quaternary-token shrink-0'
-      aria-hidden='true'
-    >
-      ·
-    </span>
-  );
-}
