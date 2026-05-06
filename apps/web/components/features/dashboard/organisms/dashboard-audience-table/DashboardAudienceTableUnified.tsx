@@ -339,9 +339,12 @@ export const DashboardAudienceTableUnified = memo(
 
     const [desktopTableNode, setDesktopTableNode] =
       React.useState<HTMLDivElement | null>(null);
-    const [desktopTableWidth, setDesktopTableWidth] = React.useState<number>(
-      TABLE_MIN_WIDTHS.SMALL
-    );
+    // Initialize to "wide" tier so SSR + first paint show ALL columns.
+    // Otherwise SSR renders with progressive hiding active, and the row
+    // memoization prevents restoring hidden cells once ResizeObserver
+    // measures the real width on a wide screen.
+    const [desktopTableWidth, setDesktopTableWidth] =
+      React.useState<number>(1280);
 
     React.useEffect(() => {
       const node = desktopTableNode;
