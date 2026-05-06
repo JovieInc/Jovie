@@ -4,9 +4,14 @@ import {
   markNotificationDismissed,
 } from '@/lib/notifications/preferences';
 import { ResendEmailProvider } from '@/lib/notifications/providers/resend';
+import {
+  type SendSmsResult,
+  sendTwilioSms,
+} from '@/lib/notifications/providers/sms/twilio-sender';
 import { checkQuota, incrementQuota } from '@/lib/notifications/quota';
 import { checkReputation, recordSend } from '@/lib/notifications/reputation';
 import { formatSystemSender } from '@/lib/notifications/sender-policy';
+import { isPhoneSmsSuppressed } from '@/lib/notifications/sms-suppression';
 import {
   isEmailSuppressed,
   logDelivery,
@@ -26,6 +31,21 @@ let emailProvider: EmailProvider = new ResendEmailProvider();
 
 export const setEmailProvider = (provider: EmailProvider) => {
   emailProvider = provider;
+};
+
+/**
+ * Outbound SMS provider hook. Defaults to Twilio. Tests inject a stub via
+ * `setSmsProvider`; production code should always use the default.
+ */
+export type SmsSender = (params: {
+  to: string;
+  body: string;
+}) => Promise<SendSmsResult>;
+
+let smsProvider: SmsSender = ({ to, body }) => sendTwilioSms({ to, body });
+
+export const setSmsProvider = (provider: SmsSender) => {
+  smsProvider = provider;
 };
 
 const DEFAULT_CHANNELS: NotificationDeliveryChannel[] = ['email'];
@@ -243,6 +263,95 @@ async function handleEmailChannel(
   return emailResult;
 }
 
+/**
+ * Handle sending a notification via SMS channel.
+ *
+ * SMS sends are gated by `notification_contacts.smsStatus` (the global
+ * STOP/blocked ledger). Per-artist consent and unsubscribe are enforced
+ * upstream by the release scheduler / subscribe flow; here we just trust
+ * `target.phone` and apply suppression + provider call.
+ */
+async function handleSmsChannel(
+  message: NotificationMessage,
+  target: NotificationTarget
+): Promise<NotificationChannelResult> {
+  const to = target.phone ?? null;
+  const senderContext = message.senderContext;
+
+  if (!to) {
+    return buildSkippedResult('sms', 'No phone available');
+  }
+
+  const suppression = await isPhoneSmsSuppressed(to);
+  if (suppression.suppressed) {
+    const detail = `SMS suppressed: ${suppression.reason ?? 'unknown'}`;
+    await logDelivery({
+      channel: 'sms',
+      recipientPhone: to,
+      status: 'suppressed',
+      metadata: {
+        suppressionReason: suppression.reason,
+        notificationId: message.id,
+        ...(senderContext && {
+          creatorProfileId: senderContext.creatorProfileId,
+        }),
+      },
+    });
+    return buildSkippedResult('sms', detail);
+  }
+
+  const body = message.text.trim();
+  const result = await smsProvider({ to, body });
+
+  if (result.success) {
+    await logDelivery({
+      channel: 'sms',
+      recipientPhone: to,
+      status: 'sent',
+      providerMessageId: result.providerMessageId,
+      metadata: {
+        notificationId: message.id,
+        provider: 'twilio',
+        twilioStatus: result.status,
+        ...(senderContext && {
+          creatorProfileId: senderContext.creatorProfileId,
+          emailType: senderContext.emailType,
+        }),
+      },
+    });
+    return {
+      channel: 'sms',
+      status: 'sent',
+      provider: 'twilio',
+      detail: result.providerMessageId,
+    };
+  }
+
+  await logDelivery({
+    channel: 'sms',
+    recipientPhone: to,
+    status: 'failed',
+    errorMessage: result.error,
+    metadata: {
+      notificationId: message.id,
+      provider: 'twilio',
+      twilioErrorCode: result.errorCode,
+      twilioHttpStatus: result.httpStatus,
+      retryable: result.retryable,
+      ...(senderContext && {
+        creatorProfileId: senderContext.creatorProfileId,
+      }),
+    },
+  });
+  logger.warn('[notifications] SMS send failed', {
+    error: result.error,
+    errorCode: result.errorCode,
+    httpStatus: result.httpStatus,
+    notificationId: message.id,
+  });
+  return buildErrorResult('sms', result.error);
+}
+
 export const sendNotification = async (
   message: NotificationMessage,
   target: NotificationTarget
@@ -289,6 +398,12 @@ export const sendNotification = async (
         preferences
       );
       results.push(emailResult);
+      continue;
+    }
+
+    if (channel === 'sms') {
+      const smsResult = await handleSmsChannel(message, target);
+      results.push(smsResult);
       continue;
     }
 
