@@ -42,6 +42,14 @@ vi.mock('@/lib/notifications/suppression', () => ({
   logDelivery: vi.fn(),
 }));
 
+vi.mock('@/lib/notifications/sms-suppression', () => ({
+  isPhoneSmsSuppressed: vi.fn(),
+}));
+
+vi.mock('@/lib/notifications/providers/sms/twilio-sender', () => ({
+  sendTwilioSms: vi.fn(),
+}));
+
 vi.mock('@/lib/notifications/quota', () => ({
   checkQuota: vi.fn(),
   incrementQuota: vi.fn(),
@@ -56,6 +64,7 @@ import {
   getNotificationPreferences,
   markNotificationDismissed,
 } from '@/lib/notifications/preferences';
+import { sendTwilioSms } from '@/lib/notifications/providers/sms/twilio-sender';
 import { checkQuota } from '@/lib/notifications/quota';
 import { checkReputation } from '@/lib/notifications/reputation';
 import { formatSystemSender } from '@/lib/notifications/sender-policy';
@@ -64,6 +73,7 @@ import {
   sendNotification,
   setEmailProvider,
 } from '@/lib/notifications/service';
+import { isPhoneSmsSuppressed } from '@/lib/notifications/sms-suppression';
 import {
   isEmailSuppressed,
   logDelivery,
@@ -79,7 +89,7 @@ describe('Notification Service', () => {
 
     // Default mock for preferences
     vi.mocked(getNotificationPreferences).mockResolvedValue({
-      channels: { email: true, push: false, in_app: true },
+      channels: { email: true, sms: true, push: false, in_app: true },
       marketingEmails: true,
       dismissedNotificationIds: [],
       email: 'user@example.com',
@@ -108,6 +118,19 @@ describe('Notification Service', () => {
 
     // Default mock for delivery logging
     vi.mocked(logDelivery).mockResolvedValue(undefined);
+
+    // Default SMS suppression: not suppressed
+    vi.mocked(isPhoneSmsSuppressed).mockResolvedValue({
+      suppressed: false,
+      reason: null,
+    });
+
+    // Default SMS provider: success
+    vi.mocked(sendTwilioSms).mockResolvedValue({
+      success: true,
+      providerMessageId: 'SM_test',
+      status: 'queued',
+    });
   });
 
   describe('sendNotification', () => {
@@ -134,7 +157,7 @@ describe('Notification Service', () => {
 
     it('should skip notification when channel is disabled', async () => {
       vi.mocked(getNotificationPreferences).mockResolvedValue({
-        channels: { email: false, push: false, in_app: true },
+        channels: { email: false, sms: true, push: false, in_app: true },
         marketingEmails: true,
         dismissedNotificationIds: [],
         email: 'user@example.com',
@@ -149,7 +172,7 @@ describe('Notification Service', () => {
 
     it('should skip dismissed notifications', async () => {
       vi.mocked(getNotificationPreferences).mockResolvedValue({
-        channels: { email: true, push: false, in_app: true },
+        channels: { email: true, sms: true, push: false, in_app: true },
         marketingEmails: true,
         dismissedNotificationIds: ['test-notification-1'],
         email: 'user@example.com',
@@ -164,7 +187,7 @@ describe('Notification Service', () => {
 
     it('should respect dismissible flag', async () => {
       vi.mocked(getNotificationPreferences).mockResolvedValue({
-        channels: { email: true, push: false, in_app: true },
+        channels: { email: true, sms: true, push: false, in_app: true },
         marketingEmails: true,
         dismissedNotificationIds: ['test-notification-1'],
         email: 'user@example.com',
@@ -194,7 +217,7 @@ describe('Notification Service', () => {
 
     it('should skip email when no email address available', async () => {
       vi.mocked(getNotificationPreferences).mockResolvedValue({
-        channels: { email: true, push: false, in_app: true },
+        channels: { email: true, sms: true, push: false, in_app: true },
         marketingEmails: true,
         dismissedNotificationIds: [],
         email: null,
@@ -213,7 +236,7 @@ describe('Notification Service', () => {
 
     it('should skip marketing emails when preference is disabled', async () => {
       vi.mocked(getNotificationPreferences).mockResolvedValue({
-        channels: { email: true, push: false, in_app: true },
+        channels: { email: true, sms: true, push: false, in_app: true },
         marketingEmails: false,
         dismissedNotificationIds: [],
         email: 'user@example.com',
@@ -233,7 +256,7 @@ describe('Notification Service', () => {
 
     it('should send transactional emails regardless of marketing preference', async () => {
       vi.mocked(getNotificationPreferences).mockResolvedValue({
-        channels: { email: true, push: false, in_app: true },
+        channels: { email: true, sms: true, push: false, in_app: true },
         marketingEmails: false,
         dismissedNotificationIds: [],
         email: 'user@example.com',
@@ -275,7 +298,7 @@ describe('Notification Service', () => {
 
     it('should skip unimplemented channels', async () => {
       vi.mocked(getNotificationPreferences).mockResolvedValue({
-        channels: { email: true, push: true, in_app: true },
+        channels: { email: true, sms: true, push: true, in_app: true },
         marketingEmails: true,
         dismissedNotificationIds: [],
         email: 'user@example.com',
@@ -294,7 +317,7 @@ describe('Notification Service', () => {
 
     it('should respect respectUserPreferences flag', async () => {
       vi.mocked(getNotificationPreferences).mockResolvedValue({
-        channels: { email: true, push: false, in_app: true },
+        channels: { email: true, sms: true, push: false, in_app: true },
         marketingEmails: false,
         dismissedNotificationIds: [],
         email: 'user@example.com',
@@ -365,6 +388,106 @@ describe('Notification Service', () => {
       await sendNotification(baseMessage, baseTarget);
 
       expect(isEmailSuppressed).toHaveBeenCalledWith('user@example.com');
+    });
+  });
+
+  describe('sendNotification — SMS channel', () => {
+    const smsMessage: NotificationMessage = {
+      id: 'sms-1',
+      subject: 'unused for sms',
+      text: 'New from Tim: "Blessings" — https://jov.ie/tim/blessings',
+      channels: ['sms'],
+      category: 'marketing',
+    };
+    const smsTarget: NotificationTarget = {
+      phone: '+15551112222',
+    };
+
+    it('delivers SMS through the provider when no suppression', async () => {
+      const result = await sendNotification(smsMessage, smsTarget);
+
+      expect(result.delivered).toContain('sms');
+      expect(sendTwilioSms).toHaveBeenCalledWith({
+        to: '+15551112222',
+        body: smsMessage.text,
+      });
+      expect(logDelivery).toHaveBeenCalledWith(
+        expect.objectContaining({
+          channel: 'sms',
+          status: 'sent',
+          recipientPhone: '+15551112222',
+          providerMessageId: 'SM_test',
+        })
+      );
+    });
+
+    it('skips SMS when no phone is on the target', async () => {
+      const result = await sendNotification(smsMessage, { phone: null });
+
+      expect(result.delivered).toHaveLength(0);
+      expect(result.skipped).toHaveLength(1);
+      expect(result.skipped[0].detail).toContain('No phone');
+      expect(sendTwilioSms).not.toHaveBeenCalled();
+    });
+
+    it('skips and logs SMS when phone is globally suppressed', async () => {
+      vi.mocked(isPhoneSmsSuppressed).mockResolvedValue({
+        suppressed: true,
+        reason: 'stopped',
+      });
+
+      const result = await sendNotification(smsMessage, smsTarget);
+
+      expect(result.delivered).toHaveLength(0);
+      expect(result.skipped[0].detail).toContain('SMS suppressed');
+      expect(result.skipped[0].detail).toContain('stopped');
+      expect(sendTwilioSms).not.toHaveBeenCalled();
+      expect(logDelivery).toHaveBeenCalledWith(
+        expect.objectContaining({
+          channel: 'sms',
+          status: 'suppressed',
+          recipientPhone: '+15551112222',
+        })
+      );
+    });
+
+    it('reports an error result when the provider fails', async () => {
+      vi.mocked(sendTwilioSms).mockResolvedValue({
+        success: false,
+        error: 'Recipient unsubscribed',
+        errorCode: '21610',
+        httpStatus: 400,
+        retryable: false,
+      });
+
+      const result = await sendNotification(smsMessage, smsTarget);
+
+      expect(result.delivered).toHaveLength(0);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0].error).toContain('Recipient unsubscribed');
+      expect(logDelivery).toHaveBeenCalledWith(
+        expect.objectContaining({
+          channel: 'sms',
+          status: 'failed',
+          recipientPhone: '+15551112222',
+          errorMessage: 'Recipient unsubscribed',
+        })
+      );
+    });
+
+    it('honors the channels=disabled preference for SMS', async () => {
+      vi.mocked(getNotificationPreferences).mockResolvedValue({
+        channels: { email: true, sms: false, push: false, in_app: true },
+        marketingEmails: true,
+        dismissedNotificationIds: [],
+        email: null,
+      });
+
+      const result = await sendNotification(smsMessage, smsTarget);
+
+      expect(result.delivered).toHaveLength(0);
+      expect(result.skipped[0].detail).toContain('disabled');
+      expect(sendTwilioSms).not.toHaveBeenCalled();
     });
   });
 
