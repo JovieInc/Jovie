@@ -12,9 +12,8 @@ import { cn } from '@/lib/utils';
  * (`--ds-prose-max`, 680px) via `max-w-prose-canonical`.
  */
 const widthClasses = {
-  /** @deprecated Use `'page'` (or omit and let the canonical width apply). Both `landing` and `page` resolve to the canonical 1298px width. Will be removed in DS_FOUNDATION_V1 Wave 4. */
+  /** @deprecated Use `'page'`. `landing` remains as a source-compatible alias until DS_FOUNDATION_V1 Wave 4. */
   landing: 'max-w-public-content',
-  /** @deprecated Both `landing` and `page` resolve to the canonical 1298px width. Call-site sweep happens in Wave 1d/4; the alias remains for source compatibility until then. */
   page: 'max-w-public-content',
   prose: 'max-w-prose-canonical',
 } as const;
