@@ -26,9 +26,9 @@ const NUMERIC_EASE_CLASS_REGEX = /\bease-\[/;
 const ALLOWED_PATH_FRAGMENTS = [
   '/apps/web/styles/',
   '/apps/web/eslint-rules/',
-  '/.stories.',
-  '/.test.',
-  '/.spec.',
+  '.stories.',
+  '.test.',
+  '.spec.',
   '/tailwind.config.',
 ];
 
@@ -77,6 +77,97 @@ function checkInlineStyleValue(node, value, context) {
   }
 }
 
+function getScopeForNode(node, context) {
+  const sourceCode = context.sourceCode || context.getSourceCode();
+  if (typeof sourceCode.getScope === 'function') {
+    return sourceCode.getScope(node);
+  }
+  if (typeof context.getScope === 'function') {
+    return context.getScope();
+  }
+  return null;
+}
+
+function checkIdentifierInitializer(node, context, seen) {
+  let scope = getScopeForNode(node, context);
+  while (scope) {
+    const variable = scope.variables.find(item => item.name === node.name);
+    const definition = variable?.defs?.[0];
+    const init = definition?.node?.init;
+    if (init) {
+      checkExpressionForClassNames(init, context, seen);
+      return;
+    }
+    scope = scope.upper;
+  }
+}
+
+function checkTemplateLiteral(node, context) {
+  for (const quasi of node.quasis) {
+    checkClassNameLiteral(quasi, quasi.value.cooked ?? '', context);
+  }
+}
+
+function checkExpressionForClassNames(node, context, seen = new Set()) {
+  if (!node || seen.has(node)) return;
+  seen.add(node);
+
+  switch (node.type) {
+    case 'Literal':
+      checkClassNameLiteral(node, node.value, context);
+      return;
+    case 'TemplateLiteral':
+      checkTemplateLiteral(node, context);
+      return;
+    case 'TaggedTemplateExpression':
+      checkExpressionForClassNames(node.quasi, context, seen);
+      return;
+    case 'CallExpression':
+      for (const argument of node.arguments) {
+        checkExpressionForClassNames(argument, context, seen);
+      }
+      return;
+    case 'LogicalExpression':
+    case 'BinaryExpression':
+      checkExpressionForClassNames(node.left, context, seen);
+      checkExpressionForClassNames(node.right, context, seen);
+      return;
+    case 'ConditionalExpression':
+      checkExpressionForClassNames(node.consequent, context, seen);
+      checkExpressionForClassNames(node.alternate, context, seen);
+      return;
+    case 'ArrayExpression':
+      for (const element of node.elements) {
+        checkExpressionForClassNames(element, context, seen);
+      }
+      return;
+    case 'Identifier':
+      checkIdentifierInitializer(node, context, seen);
+      return;
+    case 'ChainExpression':
+    case 'TSAsExpression':
+    case 'TSTypeAssertion':
+    case 'TSNonNullExpression':
+      checkExpressionForClassNames(node.expression, context, seen);
+      return;
+    default:
+      return;
+  }
+}
+
+function isJSXInlineStyleProperty(node) {
+  const objectExpression = node.parent;
+  const expressionContainer = objectExpression?.parent;
+  const attribute = expressionContainer?.parent;
+
+  return (
+    objectExpression?.type === 'ObjectExpression' &&
+    expressionContainer?.type === 'JSXExpressionContainer' &&
+    attribute?.type === 'JSXAttribute' &&
+    attribute.name?.name === 'style'
+  );
+}
+
 module.exports = {
   meta: {
     type: 'suggestion',
@@ -119,35 +210,19 @@ module.exports = {
           return;
         }
 
-        // className={"..." } expression
+        // className={...} expression
         if (
           attrName === 'className' &&
           node.value &&
-          node.value.type === 'JSXExpressionContainer' &&
-          node.value.expression.type === 'Literal'
+          node.value.type === 'JSXExpressionContainer'
         ) {
-          checkClassNameLiteral(
-            node.value.expression,
-            node.value.expression.value,
-            context
-          );
-        }
-
-        // className={`...`} template literal (only check static parts)
-        if (
-          attrName === 'className' &&
-          node.value &&
-          node.value.type === 'JSXExpressionContainer' &&
-          node.value.expression.type === 'TemplateLiteral'
-        ) {
-          for (const quasi of node.value.expression.quasis) {
-            checkClassNameLiteral(quasi, quasi.value.cooked ?? '', context);
-          }
+          checkExpressionForClassNames(node.value.expression, context);
         }
       },
 
       // style={{ transitionDuration: '300ms', transitionTimingFunction: 'cubic-bezier(...)' }}
       Property(node) {
+        if (!isJSXInlineStyleProperty(node)) return;
         if (!node.key || !node.value) return;
         const keyName =
           node.key.type === 'Identifier'
@@ -167,6 +242,11 @@ module.exports = {
         }
         if (node.value.type === 'Literal') {
           checkInlineStyleValue(node.value, node.value.value, context);
+        }
+        if (node.value.type === 'TemplateLiteral') {
+          for (const quasi of node.value.quasis) {
+            checkInlineStyleValue(quasi, quasi.value.cooked ?? '', context);
+          }
         }
       },
     };
