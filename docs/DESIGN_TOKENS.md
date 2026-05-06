@@ -143,6 +143,32 @@ Use the existing token prefixes:
 - `--shadow-*`
 - `--duration-*`
 
+## DS_FOUNDATION_V1 canonical decisions
+
+These are the canonical semantic aliases established by Wave 0 of the
+DS_FOUNDATION_V1 consolidation. Downstream tokens and components should consume
+these, not redefine them.
+
+- **Public/marketing content width = 1298px** (Linear.app parity).
+  - CSS: `var(--ds-public-content-max)`
+  - Tailwind: `max-w-public-content`
+- **Prose exception = 680px** for long-form reading surfaces.
+  - CSS: `var(--ds-prose-max)`
+  - Tailwind: `max-w-prose-canonical`
+- **Motion taxonomy** — only two intents are canonical:
+  - `subtle` — micro-interactions (hover, focus, color, icon swap, toast).
+    150ms.
+    - CSS: `var(--ds-motion-subtle-duration)` + `var(--ds-motion-subtle-easing)`
+    - Tailwind: `duration-subtle ease-subtle`
+  - `cinematic` — high-impact reveals (drawers, modals, audio player open/close).
+    420ms.
+    - CSS: `var(--ds-motion-cinematic-duration)` + `var(--ds-motion-cinematic-easing)`
+    - Tailwind: `duration-cinematic ease-cinematic`
+  - Raw durations and easings in route code are forbidden (will be enforced in
+    Wave 4).
+- **Canonical button variants** — TBD by the Wave 1 audit; this section will
+  link forward to the Wave 1 PR once it lands.
+
 ## Common Failure Modes
 
 - Defining the same token in multiple CSS files

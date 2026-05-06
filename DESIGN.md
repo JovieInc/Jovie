@@ -360,6 +360,30 @@ Pure neutral HSL — no hue tint. Used across both systems.
 
 ---
 
+## DS_FOUNDATION_V1 canonical decisions
+
+Wave 0 of the DS_FOUNDATION_V1 consolidation locks in the following canonical
+semantic aliases. Downstream files and components should consume these instead
+of redefining them.
+
+- **Canonical public/marketing width = 1298px** (Linear.app parity).
+  Exposed as `--ds-public-content-max` and Tailwind class `max-w-public-content`.
+- **Prose exception = 680px** for long-form reading surfaces.
+  Exposed as `--ds-prose-max` and Tailwind class `max-w-prose-canonical`.
+- **Motion taxonomy:** two intents only.
+  - `subtle` — 150ms with `--ds-motion-subtle-easing`. Use for hover, focus,
+    color, icon swap, toast. Tailwind: `duration-subtle ease-subtle`.
+  - `cinematic` — 420ms with `--ds-motion-cinematic-easing`. Use for drawers,
+    modals, audio player open/close. Tailwind: `duration-cinematic ease-cinematic`.
+  - Raw durations and easings in route code are forbidden (enforced in Wave 4).
+- **Canonical button variants:** TBD by the Wave 1 audit; this section will
+  link forward to the Wave 1 PR once it lands.
+
+See [`docs/DESIGN_TOKENS.md`](docs/DESIGN_TOKENS.md#ds_foundation_v1-canonical-decisions)
+for the canonical CSS + Tailwind references.
+
+---
+
 ## Borders & Radius
 
 ### Border Radius

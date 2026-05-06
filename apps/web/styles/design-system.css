@@ -39,6 +39,15 @@
   --profile-drawer-radius-desktop: 20px;
   --profile-action-radius: 14px;
 
+  /* DS_FOUNDATION_V1: canonical semantic aliases (do not redefine downstream) */
+  --ds-public-content-max: 1298px; /* canonical public/marketing width */
+  --ds-prose-max: 680px; /* prose exception */
+
+  --ds-motion-subtle-duration: 150ms;
+  --ds-motion-subtle-easing: cubic-bezier(0.4, 0, 0.2, 1);
+  --ds-motion-cinematic-duration: 420ms;
+  --ds-motion-cinematic-easing: cubic-bezier(0.22, 1, 0.36, 1);
+
   /* Core Theme Inputs */
   --theme-base-hue: 282;
   /* Neutral foundation hue — Linear March 2026 refresh (shifted from 272→282) */
