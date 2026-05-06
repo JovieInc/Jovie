@@ -135,6 +135,28 @@ async function updateBulkEventModerationStatus({
     return { ok: false, reason: 'not_found' };
   }
 
+  // Pre-flight ownership check: confirm every id belongs to the authed
+  // profile BEFORE issuing the UPDATE, so a mixed batch (one valid + one
+  // foreign/missing) cannot leave moderation state partially mutated. The
+  // UPDATE's WHERE-clause guard remains the authoritative defence — this
+  // pre-flight just turns "partial write + error response" into "no write +
+  // error response". A small TOCTOU window between SELECT and UPDATE is
+  // acceptable for moderation actions; the WHERE guard ensures any row
+  // deleted in between simply drops out of the affected count.
+  const owned = await db
+    .select({ id: tourDates.id })
+    .from(tourDates)
+    .where(
+      and(
+        inArray(tourDates.id, [...ids]),
+        eq(tourDates.profileId, authed.profileId)
+      )
+    );
+
+  if (owned.length !== ids.length) {
+    return { ok: false, reason: 'not_found' };
+  }
+
   const result = await db
     .update(tourDates)
     .set({
@@ -150,6 +172,10 @@ async function updateBulkEventModerationStatus({
     );
   const updated = affectedRows(result);
 
+  // Invalidate caches even on a TOCTOU partial-write so client state cannot
+  // drift from the database after a race-condition delete.
+  invalidateEventsCache(authed);
+
   if (updated !== ids.length) {
     return { ok: false, reason: 'not_found' };
   }
@@ -160,7 +186,6 @@ async function updateBulkEventModerationStatus({
     updated,
   });
 
-  invalidateEventsCache(authed);
   return {
     ok: true,
     updated,

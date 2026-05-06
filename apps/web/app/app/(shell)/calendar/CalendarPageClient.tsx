@@ -23,6 +23,7 @@ import {
   rejectEvents,
   undoRejectEvent,
 } from '@/app/app/(shell)/dashboard/tour-dates/events-actions';
+import { getEventLocalDateKey } from '@/lib/events/date';
 import { normalizeTicketUrl } from '@/lib/events/ticket-url';
 import { queryKeys } from '@/lib/queries';
 import { type EventRecord, useEventsQuery } from '@/lib/queries/useEventsQuery';
@@ -225,12 +226,21 @@ export function CalendarPageClient() {
     const map = new Map<string, EventRecord[]>();
     if (!events) return map;
     for (const e of events) {
-      const date = new Date(e.eventDate);
-      if (Number.isNaN(date.getTime())) {
+      // Bucket each event in its own IANA timezone, not the viewer's local
+      // zone — a late-night Tokyo show would otherwise drift onto the
+      // previous/next cell for a Pacific-Time creator. The grid keys are
+      // YYYY-MM-DD strings, so any zone that produces the same calendar
+      // day for the event keeps it in the same cell across creators.
+      let key: string;
+      try {
+        key = getEventLocalDateKey({
+          startDate: e.eventDate,
+          timezone: e.timezone,
+        });
+      } catch {
         // Skip events with unparseable dates rather than crashing the grid.
         continue;
       }
-      const key = localDateKey(date);
       const list = map.get(key);
       if (list) list.push(e);
       else map.set(key, [e]);
@@ -419,7 +429,7 @@ export function CalendarPageClient() {
             next.setMonth(cursor.getMonth() - 1);
             setCursor(startOfMonth(next));
           }}
-          className='h-7 w-7 grid place-items-center rounded-md text-tertiary-token hover:text-primary-token hover:bg-surface-1/70 transition-colors duration-150 ease-out'
+          className='h-7 w-7 grid place-items-center rounded-md text-tertiary-token hover:text-primary-token hover:bg-surface-1/70 transition-colors duration-subtle ease-subtle'
           aria-label='Previous month'
         >
           <ChevronLeft className='h-4 w-4' strokeWidth={2.25} />
@@ -434,7 +444,7 @@ export function CalendarPageClient() {
             next.setMonth(cursor.getMonth() + 1);
             setCursor(startOfMonth(next));
           }}
-          className='h-7 w-7 grid place-items-center rounded-md text-tertiary-token hover:text-primary-token hover:bg-surface-1/70 transition-colors duration-150 ease-out'
+          className='h-7 w-7 grid place-items-center rounded-md text-tertiary-token hover:text-primary-token hover:bg-surface-1/70 transition-colors duration-subtle ease-subtle'
           aria-label='Next month'
         >
           <ChevronRight className='h-4 w-4' strokeWidth={2.25} />
@@ -442,7 +452,7 @@ export function CalendarPageClient() {
         <button
           type='button'
           onClick={() => setCursor(startOfMonth(new Date()))}
-          className='ml-2 h-7 px-3 rounded-md text-[12px] font-caption text-tertiary-token hover:text-primary-token hover:bg-surface-1/70 transition-colors duration-150 ease-out'
+          className='ml-2 h-7 px-3 rounded-md text-[12px] font-caption text-tertiary-token hover:text-primary-token hover:bg-surface-1/70 transition-colors duration-subtle ease-subtle'
         >
           Today
         </button>
@@ -503,7 +513,7 @@ export function CalendarPageClient() {
                 type='button'
                 onClick={() => setSelectedDay(cell.date)}
                 className={cn(
-                  'relative flex flex-col items-start gap-1 min-h-[88px] px-2 pt-2 pb-1.5 border-b border-r border-(--linear-app-shell-border)/40 text-left transition-colors duration-150 ease-out',
+                  'relative flex flex-col items-start gap-1 min-h-[88px] px-2 pt-2 pb-1.5 border-b border-r border-(--linear-app-shell-border)/40 text-left transition-colors duration-subtle ease-subtle',
                   cell.inMonth
                     ? 'hover:bg-surface-1/40'
                     : 'text-quaternary-token/70',
@@ -709,6 +719,8 @@ export function CalendarPageClient() {
               <button
                 type='button'
                 onClick={() => setShowRejected(s => !s)}
+                aria-expanded={showRejected}
+                aria-controls='rejected-events-list'
                 className='text-[11px] font-caption uppercase tracking-[0.06em] text-quaternary-token hover:text-tertiary-token transition-colors'
               >
                 {showRejected
@@ -716,7 +728,10 @@ export function CalendarPageClient() {
                   : `Show rejected · ${rejectedSelectedEvents.length}`}
               </button>
               {showRejected && (
-                <ul className='mt-2 flex flex-col gap-2'>
+                <ul
+                  id='rejected-events-list'
+                  className='mt-2 flex flex-col gap-2'
+                >
                   {rejectedSelectedEvents.map(e => (
                     <EventRow
                       key={e.id}
@@ -762,7 +777,7 @@ function FilterPill(props: FilterPillProps) {
       onClick={props.onClick}
       aria-pressed={props.active}
       className={cn(
-        'h-7 px-3 rounded-md text-[11.5px] font-caption transition-colors duration-150 ease-out',
+        'h-7 px-3 rounded-md text-[11.5px] font-caption transition-colors duration-subtle ease-subtle',
         props.active
           ? props.tone === 'warn'
             ? 'bg-amber-400/15 text-amber-300'

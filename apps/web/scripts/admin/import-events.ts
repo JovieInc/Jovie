@@ -63,6 +63,26 @@ function parseArgs(argv: ReadonlyArray<string>): CliArgs {
 function parseCsv(text: string): Array<Record<string, string>> {
   const lines = text.split(/\r?\n/).filter(l => l.length > 0);
   if (lines.length === 0) return [];
+
+  // Reject quoted multi-line cells: this admin importer splits on \n
+  // BEFORE quote handling, so a cell like `"The Fillmore\nSilver Spring"`
+  // would silently become two records and shift every following column.
+  // A standards-compliant CSV reader is overkill for admin-curated input;
+  // detect unbalanced quotes per line and refuse to import rather than
+  // persist mangled rows.
+  for (const [idx, line] of lines.entries()) {
+    let count = 0;
+    for (const ch of line) {
+      if (ch === '"') count++;
+    }
+    if (count % 2 !== 0) {
+      throw new Error(
+        `Row ${idx + 1}: unbalanced quotes — multi-line CSV cells are not supported. ` +
+          `Re-export the CSV with line breaks inside cells removed or replaced.`
+      );
+    }
+  }
+
   const header = lines[0].split(',').map(h => h.trim());
   return lines.slice(1).map(line => {
     const cells = splitCsvLine(line);

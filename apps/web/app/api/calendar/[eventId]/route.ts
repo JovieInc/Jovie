@@ -49,7 +49,8 @@ export async function GET(
         and(
           eq(tourDates.id, eventId),
           eq(tourDates.eventType, 'tour'),
-          eq(tourDates.confirmationStatus, 'confirmed')
+          eq(tourDates.confirmationStatus, 'confirmed'),
+          eq(creatorProfiles.isPublic, true)
         )
       )
       .limit(1);
