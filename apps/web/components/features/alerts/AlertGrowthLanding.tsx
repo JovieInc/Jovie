@@ -60,12 +60,22 @@ const US_NATIONAL_RE = /^[2-9]\d{9}$/;
 function buildUsPhoneE164(input: string): string | null {
   const trimmed = input.trim();
   if (!trimmed) return null;
-  // Reject any non-US international format (`+44`, `+33`, etc.).
-  if (
-    /^\+/.test(trimmed) &&
-    !/^\+1[2-9]\d{9}$/.test(trimmed.replaceAll(/\s+/g, ''))
-  ) {
-    return null;
+  // For `+`-prefixed input, strip ALL non-digits before validating — the
+  // browser's `type="tel"` plus the placeholder `(555) 555-1234` actively
+  // encourage formatted entry (`+1 (555) 555-1234`, `+1-555-555-1234`),
+  // and earlier this code only stripped spaces, falsely rejecting them.
+  // Anything that's not exactly 11 digits starting with a NANP `1` after
+  // formatting is stripped (so `+44 …` and `+33 …` are still rejected).
+  if (trimmed.startsWith('+')) {
+    const plusDigits = trimmed.replaceAll(/[^\d]/g, '');
+    if (
+      plusDigits.length !== 11 ||
+      !plusDigits.startsWith('1') ||
+      !US_NATIONAL_RE.test(plusDigits.slice(1))
+    ) {
+      return null;
+    }
+    return `+${plusDigits}`;
   }
   const digits = trimmed.replaceAll(/[^\d]/g, '');
   if (digits.length === 10 && US_NATIONAL_RE.test(digits)) {
@@ -320,7 +330,9 @@ export function AlertGrowthLanding({
             <p
               id={consentId}
               className='text-secondary-token text-xs leading-relaxed'
-              data-consent-version={SMS_CONSENT_VERSION}
+              data-consent-version={
+                channel === 'sms' ? SMS_CONSENT_VERSION : undefined
+              }
             >
               {channel === 'sms' ? (
                 SMS_CONSENT_TEXT
@@ -421,8 +433,9 @@ function SubscribedState({
         You&apos;re on the list.
       </h2>
       <p className='text-secondary-token mt-2 text-sm'>
-        We&apos;ll {channel === 'sms' ? 'text' : 'email'} you when there&apos;s
-        something worth your time. Reply STOP to opt out anytime.
+        {channel === 'sms'
+          ? "We'll text you when there's something worth your time. Reply STOP to opt out anytime."
+          : "We'll email you when there's something worth your time. Unsubscribe anytime from any email."}
       </p>
     </div>
   );

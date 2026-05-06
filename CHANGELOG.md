@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.4.206] - 2026-05-06
+## [26.4.209] - 2026-05-06
 
 > Public alert-conversion landing page: each artist now has a fast `/<handle>/alerts` URL that turns paid traffic into verified SMS or email subscribers. Single CTA, channel toggle, TCPA-grade consent copy, source-link attribution carried through every click.
 
@@ -23,6 +23,15 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - [alerts] **No double-submit after success/pending-confirmation.** The submit handler bails on every non-`idle` / non-`error` state so a tap-spamming user can't trigger a second mutation.
 
 
+## [26.4.207] - 2026-05-06
+
+> The auth-unavailable fallback now reads the right verb. Visiting `/signup` no longer says "Sign in is temporarily unavailable" — it says "Sign up is temporarily unavailable." A small thing, but the prior copy made every signup-CTA click on the homepage feel like the wrong page when Clerk briefly fell back.
+
+### Fixed
+
+- [auth] Auth-unavailable fallback page now reads the auth flow from the URL: `/signup` shows "Sign up is temporarily unavailable", `/signin` keeps "Sign in is temporarily unavailable". Previously the headline was hardcoded to "Sign in" on both routes, so every homepage signup CTA looked broken whenever Clerk was unreachable.
+
+## [26.4.205] - 2026-05-06
 
 > Release-day SMS alerts now actually send. Phase 1 captured verified SMS subscribers; this release wires Twilio into the notification dispatch path so those fans receive the text when an artist's release ships.
 

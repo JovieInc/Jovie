@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { Suspense } from 'react';
 import { AlertGrowthLanding } from '@/components/features/alerts/AlertGrowthLanding';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { convertCreatorProfileToArtist } from '@/types/db';
@@ -57,5 +58,14 @@ export default async function AlertsPage({ params }: AlertsPageProps) {
 
   const artist = convertCreatorProfileToArtist(result.profile);
 
-  return <AlertGrowthLanding artist={artist} />;
+  // AlertGrowthLanding reads `?s=<code>` via useSearchParams. Without a
+  // Suspense boundary at this level, Next opts the entire route out of
+  // static generation — which contradicts `revalidate = 3600` and the
+  // CDN-caching goal. The fallback can be null because the artist+page
+  // shell renders synchronously above the form.
+  return (
+    <Suspense fallback={null}>
+      <AlertGrowthLanding artist={artist} />
+    </Suspense>
+  );
 }

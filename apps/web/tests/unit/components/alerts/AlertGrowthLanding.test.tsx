@@ -165,6 +165,20 @@ describe('<AlertGrowthLanding>', () => {
     expect(mutateAsync).not.toHaveBeenCalled();
   });
 
+  it('accepts formatted +1 US numbers and normalises to E.164', async () => {
+    render(<AlertGrowthLanding artist={ARTIST} />);
+
+    fireEvent.change(screen.getByPlaceholderText(/555/), {
+      target: { value: '+1 (555) 234-5678' },
+    });
+    fireEvent.submit(screen.getByRole('button', { name: /Get alerts/i }));
+
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
+    expect(mutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ phone: '+15552345678', channel: 'sms' })
+    );
+  });
+
   it('renders the pending-confirmation state when the API requires double opt-in', async () => {
     mutateAsync.mockResolvedValueOnce({ pendingConfirmation: true });
 
