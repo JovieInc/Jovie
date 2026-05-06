@@ -1,7 +1,7 @@
 'use client';
 
 import { Play } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { cn } from '@/lib/utils';
 import type { PublicRelease } from '../releases/types';
@@ -9,7 +9,7 @@ import type { PublicRelease } from '../releases/types';
 const YEAR_HEADER_THRESHOLD = 15;
 const RELEASE_FILTERS = [
   { key: 'all', label: 'All' },
-  { key: 'songs', label: 'Songs' },
+  { key: 'songs', label: 'Music' },
   { key: 'eps', label: 'EPs' },
   { key: 'videos', label: 'Videos' },
 ] as const;
@@ -66,6 +66,13 @@ export function ReleasesView({
       }
     });
   }, [releases]);
+
+  useEffect(() => {
+    if (!availableFilters.some(filter => filter.key === activeFilter)) {
+      setActiveFilter('all');
+    }
+  }, [activeFilter, availableFilters]);
+
   const visibleReleases = useMemo(
     () =>
       releases.filter(release => {
@@ -154,6 +161,7 @@ export function ReleasesView({
                 key={filter.key}
                 type='button'
                 onClick={() => setActiveFilter(filter.key)}
+                aria-pressed={isActive}
                 className={cn(
                   'inline-flex h-8 shrink-0 items-center rounded-full border px-3 text-[12px] font-semibold transition-colors duration-200',
                   isActive
@@ -209,7 +217,7 @@ export function ReleasesView({
       {visibleReleases.length > 1 ? (
         <div className='px-4 pb-2 pt-5'>
           <h3 className='text-[22px] font-[680] leading-none tracking-[-0.025em] text-white'>
-            Top Songs
+            More Music
           </h3>
         </div>
       ) : null}

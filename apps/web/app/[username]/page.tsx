@@ -429,12 +429,11 @@ export default async function ArtistPage({
 
   // Await tour dates + releases (started above, non-blocking — errors logged then resolve to empty)
   // Sort server-side so the client doesn't need a useMemo sort
-  const [tourDatesRaw, allReleases] = await Promise.all([
+  const [tourDatesRaw, allReleases, alertOptInVariant] = await Promise.all([
     tourDatesPromise.catch(() => [] as TourDateViewModel[]),
     releasesPromise,
+    getProfileAlertOptInVariant(alertOptInStableId),
   ]);
-  const alertOptInVariant =
-    await getProfileAlertOptInVariant(alertOptInStableId);
   const tourDates = [...tourDatesRaw].sort(
     (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
   );

@@ -84,6 +84,54 @@ interface ProfileUnifiedDrawerProps {
 
 const PAY_AMOUNTS = [5, 10, 20];
 
+function resolveRegistryKey(
+  view: DrawerView
+): keyof typeof PROFILE_VIEW_REGISTRY {
+  return view === 'releases' || view === 'tour' ? 'menu' : view;
+}
+
+function resolveViewMeta({
+  view,
+  canOpenReleasesDrawer,
+  canOpenTourDrawer,
+  registryKey,
+}: {
+  readonly view: DrawerView;
+  readonly canOpenReleasesDrawer: boolean;
+  readonly canOpenTourDrawer: boolean;
+  readonly registryKey: keyof typeof PROFILE_VIEW_REGISTRY;
+}) {
+  if (view === 'releases' && canOpenReleasesDrawer) {
+    return { title: 'Releases', subtitle: undefined };
+  }
+
+  if (view === 'tour' && canOpenTourDrawer) {
+    return { title: 'All Shows', subtitle: undefined };
+  }
+
+  return PROFILE_VIEW_REGISTRY[registryKey];
+}
+
+function resolveRenderedView({
+  view,
+  canOpenReleasesDrawer,
+  canOpenTourDrawer,
+}: {
+  readonly view: DrawerView;
+  readonly canOpenReleasesDrawer: boolean;
+  readonly canOpenTourDrawer: boolean;
+}): DrawerView {
+  if (view === 'releases' && !canOpenReleasesDrawer) {
+    return 'menu';
+  }
+
+  if (view === 'tour' && !canOpenTourDrawer) {
+    return 'menu';
+  }
+
+  return view;
+}
+
 function ContactList({
   artistHandle,
   contacts,
@@ -189,18 +237,18 @@ export function ProfileUnifiedDrawer({
   const canOpenReleasesDrawer = hasReleases && visibleReleases.length > 0;
   const canOpenTourDrawer = hasTourDates && tourDates.length > 0;
 
-  const registryKey = view === 'releases' || view === 'tour' ? 'menu' : view;
-  const meta =
-    view === 'releases' && canOpenReleasesDrawer
-      ? { title: 'Releases', subtitle: undefined }
-      : view === 'tour' && canOpenTourDrawer
-        ? { title: 'All Shows', subtitle: undefined }
-        : PROFILE_VIEW_REGISTRY[registryKey];
-  const renderedView =
-    (view === 'releases' && !canOpenReleasesDrawer) ||
-    (view === 'tour' && !canOpenTourDrawer)
-      ? 'menu'
-      : view;
+  const registryKey = resolveRegistryKey(view);
+  const meta = resolveViewMeta({
+    view,
+    canOpenReleasesDrawer,
+    canOpenTourDrawer,
+    registryKey,
+  });
+  const renderedView = resolveRenderedView({
+    view,
+    canOpenReleasesDrawer,
+    canOpenTourDrawer,
+  });
 
   const handleOpenChange = useCallback(
     (next: boolean) => {
