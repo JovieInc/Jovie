@@ -184,9 +184,23 @@ describe('keyboard-shortcuts definitions', () => {
   });
 
   describe('chord conflict detection (JOV-1827)', () => {
-    it('has no duplicate `shortcutKey` chord', () => {
-      const chords = KEYBOARD_SHORTCUTS.filter(s => s.shortcutKey).map(
-        s => s.shortcutKey!
+    it('has no duplicate `shortcutKey` chord (canonicalized)', () => {
+      // Canonicalize so semantically identical chords with different
+      // casing/modifier order can't slip through (e.g. "Alt+Shift+Q" vs
+      // "Shift+Alt+q").
+      const normalizeChord = (chord: string) => {
+        const parts = chord
+          .split('+')
+          .map(p => p.trim())
+          .filter(Boolean);
+        const key = (parts.pop() ?? '').toLowerCase();
+        const modifiers = parts
+          .map(m => `${m[0]?.toUpperCase() ?? ''}${m.slice(1).toLowerCase()}`)
+          .sort();
+        return [...modifiers, key].join('+');
+      };
+      const chords = KEYBOARD_SHORTCUTS.filter(s => s.shortcutKey).map(s =>
+        normalizeChord(s.shortcutKey!)
       );
       expect(new Set(chords).size).toBe(chords.length);
     });
