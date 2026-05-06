@@ -1,19 +1,42 @@
+'use client';
+
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { APP_ROUTES } from '@/constants/routes';
 
 interface AuthUnavailableCardProps {
   /** Whether this surface is running on a real user-facing host; enables the reset CTA. */
   readonly showResetAction?: boolean;
+  /** Override the auth flow detection (defaults to deriving from pathname). */
+  readonly mode?: 'signin' | 'signup';
+}
+
+function resolveMode(
+  override: 'signin' | 'signup' | undefined,
+  pathname: string | null
+): 'signin' | 'signup' {
+  if (override) return override;
+  if (pathname?.startsWith(APP_ROUTES.SIGNUP)) return 'signup';
+  return 'signin';
 }
 
 export function AuthUnavailableCard({
   showResetAction = false,
+  mode,
 }: AuthUnavailableCardProps = {}) {
+  const pathname = usePathname();
+  const resolvedMode = resolveMode(mode, pathname);
+  const headline =
+    resolvedMode === 'signup'
+      ? 'Sign up is temporarily unavailable'
+      : 'Sign in is temporarily unavailable';
   const actionClassName =
-    'inline-flex min-h-[3.75rem] w-full items-center justify-center rounded-full border border-white/10 bg-white px-6 text-[15px] font-[590] tracking-[-0.02em] text-[#08090a] shadow-[0_18px_42px_rgba(0,0,0,0.28)] transition-[background-color,border-color,box-shadow] duration-200 hover:border-white/15 hover:bg-[#f2f2f2] hover:shadow-[0_20px_46px_rgba(0,0,0,0.26)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/24';
+    'inline-flex min-h-[3.75rem] w-full items-center justify-center rounded-full border border-white/10 bg-white px-6 text-[15px] font-[590] tracking-[-0.02em] text-[#08090a] shadow-[0_18px_42px_rgba(0,0,0,0.28)] transition-[background-color,border-color,box-shadow] duration-subtle hover:border-white/15 hover:bg-[#f2f2f2] hover:shadow-[0_20px_46px_rgba(0,0,0,0.26)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/24';
 
   return (
     <section
       data-testid='auth-clerk-unavailable'
+      data-auth-mode={resolvedMode}
       className='w-full max-w-[30rem] space-y-6 text-center lg:text-left'
     >
       <div className='flex justify-center lg:justify-start'>
@@ -28,7 +51,7 @@ export function AuthUnavailableCard({
 
       <div className='space-y-2.5'>
         <h1 className='max-w-[10.5ch] text-[clamp(2.9rem,6.2vw,4.45rem)] font-[590] leading-[0.92] tracking-[-0.06em] text-white text-balance lg:max-w-[11.5ch]'>
-          Sign in is temporarily unavailable
+          {headline}
         </h1>
         <p className='mx-auto max-w-[26rem] text-[0.96rem] leading-[1.65] tracking-[-0.014em] text-white/60 text-pretty lg:mx-0'>
           {showResetAction
