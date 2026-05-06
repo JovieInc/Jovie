@@ -120,6 +120,7 @@ export function MarketingHeader({
     (showStagedNav ? DEFAULT_STAGED_HOMEPAGE_NAV_LINKS : MARKETING_NAV_LINKS);
   const isMinimal = variant === 'minimal';
   const presentation = isMinimal ? 'default' : 'marketing-glass';
+  const useCustomNav = !isMinimal && navLinks !== undefined;
 
   return (
     <HeaderNav
@@ -132,13 +133,21 @@ export function MarketingHeader({
       includePublicLoginInMobileNav
       containerSize='homepage'
       presentation={presentation}
-      flyoutMenus={isMinimal ? undefined : MARKETING_GLASS_FLYOUTS}
+      flyoutMenus={
+        isMinimal || useCustomNav ? undefined : MARKETING_GLASS_FLYOUTS
+      }
       mobileNavLinks={
         isMinimal
           ? resolvedNavLinks
-          : (navLinks ?? MARKETING_GLASS_MOBILE_LINKS)
+          : useCustomNav
+            ? resolvedNavLinks
+            : MARKETING_GLASS_MOBILE_LINKS
       }
-      navLinks={isMinimal ? resolvedNavLinks : MARKETING_GLASS_DESKTOP_LINKS}
+      navLinks={
+        isMinimal || useCustomNav
+          ? resolvedNavLinks
+          : MARKETING_GLASS_DESKTOP_LINKS
+      }
     />
   );
 }

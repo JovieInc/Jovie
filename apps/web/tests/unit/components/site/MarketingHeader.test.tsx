@@ -17,37 +17,41 @@ describe('MarketingHeader', () => {
     mockUsePathname.mockReturnValue('/about');
   });
 
-  it('renders the shared default marketing navigation on standard routes', () => {
+  it('renders the shared glass marketing navigation on standard routes', () => {
     render(<MarketingHeader />);
 
+    expect(screen.getByRole('button', { name: /Features/ })).toHaveAttribute(
+      'aria-controls',
+      'marketing-header-flyout-features'
+    );
+    expect(screen.getByRole('button', { name: /Resources/ })).toHaveAttribute(
+      'aria-controls',
+      'marketing-header-flyout-resources'
+    );
+    expect(screen.getByRole('link', { name: 'Pricing' })).toHaveAttribute(
+      'href',
+      '/pricing'
+    );
+    expect(screen.getByRole('link', { name: 'Contact' })).toHaveAttribute(
+      'href',
+      '/support'
+    );
+  });
+
+  it('renders explicit custom nav links consistently as simple glass links', () => {
+    render(
+      <MarketingHeader
+        navLinks={[
+          { href: '/artist-profiles', label: 'Product' },
+          { href: '/pricing', label: 'Pricing' },
+        ]}
+      />
+    );
+
+    expect(screen.queryByRole('button', { name: /Features/ })).toBeNull();
     expect(screen.getByRole('link', { name: 'Product' })).toHaveAttribute(
       'href',
       '/artist-profiles'
     );
-    expect(screen.getByRole('link', { name: 'Solutions' })).toHaveAttribute(
-      'href',
-      '/artist-notifications'
-    );
-    expect(screen.getByRole('link', { name: 'Resources' })).toHaveAttribute(
-      'href',
-      '/blog'
-    );
-  });
-
-  it('preserves the staged nav on /new', () => {
-    mockUsePathname.mockReturnValue('/new');
-
-    render(<MarketingHeader />);
-
-    expect(
-      screen.getByRole('link', { name: 'Artist Profiles' })
-    ).toHaveAttribute('href', '/artist-profiles');
-    expect(screen.getByRole('link', { name: 'Support' })).toHaveAttribute(
-      'href',
-      '/support'
-    );
-    expect(
-      screen.queryByRole('link', { name: 'Product' })
-    ).not.toBeInTheDocument();
   });
 });
