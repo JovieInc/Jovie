@@ -65,15 +65,16 @@ describe('AudienceActionCell', () => {
   it('stops propagation so the row click handler does not fire', () => {
     const ctx = makeStableContext();
     const rowClick = vi.fn();
+    // Use a <form> as the bubbling-event harness — semantic, valid HTML, and
+    // it can legally contain the cell's nested <button>.
     render(
-      // biome-ignore lint/a11y/noStaticElementInteractions: test harness simulates a row click bubbling
-      <div onClick={rowClick} onKeyDown={rowClick}>
+      <form onClick={rowClick} onKeyDown={rowClick}>
         <AudienceTableStableProvider value={ctx}>
           <AudienceActionCell member={baseMember} />
         </AudienceTableStableProvider>
-      </div>
+      </form>
     );
-    fireEvent.click(screen.getByRole('button'));
+    fireEvent.click(screen.getByRole('button', { name: /message/i }));
     expect(rowClick).not.toHaveBeenCalled();
   });
 
@@ -83,6 +84,25 @@ describe('AudienceActionCell', () => {
       <AudienceTableStableProvider value={ctx}>
         <AudienceActionCell
           member={{ ...baseMember, email: null, phone: null }}
+        />
+      </AudienceTableStableProvider>
+    );
+    expect(screen.getByRole('button')).toBeDisabled();
+  });
+
+  it('disables the button when the only contact is a gated email', () => {
+    // Greptile-flagged: emailVisibleToArtist=false must not let Message
+    // fire with a hidden email present.
+    const ctx = makeStableContext();
+    render(
+      <AudienceTableStableProvider value={ctx}>
+        <AudienceActionCell
+          member={{
+            ...baseMember,
+            email: 'hidden@example.com',
+            emailVisibleToArtist: false,
+            phone: null,
+          }}
         />
       </AudienceTableStableProvider>
     );

@@ -35,12 +35,25 @@ export function deriveAudienceState(
   const ageDays = (nowMs - lastSeenMs) / MS_PER_DAY;
 
   if (ageDays > DORMANT_AGE_DAYS) return 'dormant';
-  if (member.intentLevel === 'high') return 'high';
 
   const recentlyActive = ageDays <= RISING_AGE_DAYS;
+
+  // High-intent fans only count as "high" when they were also seen recently.
+  // A high-intent fan last seen 8-14 days ago has cooled to "rising".
+  if (member.intentLevel === 'high' && recentlyActive) return 'high';
+
   if (
     recentlyActive &&
     (member.intentLevel === 'medium' || member.visits >= RISING_VISIT_THRESHOLD)
+  ) {
+    return 'rising';
+  }
+
+  // Past the rising window but inside the dormant cutoff (8-14d) — treat
+  // high-intent and visited fans as "rising" so we don't lose them in the gap.
+  if (
+    member.intentLevel === 'high' ||
+    member.visits >= RISING_VISIT_THRESHOLD
   ) {
     return 'rising';
   }

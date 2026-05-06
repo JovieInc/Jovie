@@ -5,19 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.4.202] - 2026-05-06
+## [26.4.203] - 2026-05-06
 
 > Clerk auth pages now have a guarded Google One Tap experiment, while agent setup guidance stays aligned with Jovie's custom Clerk architecture.
 
 ### Added
 
 - **Google One Tap on auth pages** behind `NEXT_PUBLIC_GOOGLE_ONE_TAP_DISABLED`, E2E mode, and Clerk mock-mode guards. Safe `redirect_url` values are preserved, while unsafe external redirects fall back to the app or onboarding routes.
-- **Agent-only Clerk setup helper** for optional `clerk skill install -y --pm pnpm` setup without making human bootstrap depend on the Clerk CLI.
+- **Agent-only Clerk setup helper** via `./scripts/clerk-agent-setup.sh` for optional Clerk agent setup without making human bootstrap depend on the Clerk CLI.
 
 ### Changed
 
 - **Clerk agent guidance** now explicitly forbids generic quickstart setup, generated middleware, env rewrites, and mutating Clerk CLI commands that would break Jovie's `/__clerk` proxy architecture.
 - **Content Security Policy** now allows Google Identity Services through `script-src`, `connect-src`, and `frame-src` for the One Tap prompt.
+
+## [26.4.202] - 2026-05-05
+
+> Audience row follow-ups: hidden emails stay hidden across desktop and mobile, and a high-intent fan who has gone quiet for over a week is now correctly labelled as cooling instead of staying flagged as "high".
+
+### Fixed
+
+- **Hidden emails respect the privacy gate everywhere.** The Message button on both the audience table and the mobile card now stays disabled when a fan's email is gated, instead of firing with the address present. A fan whose only identity is a gated email also renders as "Anonymous Fan" instead of "Visitor".
+- **High-intent fans cool to "Rising" past the 7-day window** instead of staying labelled "High" out to 14 days. Frequent visitors keep their "Rising" badge in the 8-14 day gap so they don't drop straight to dormant.
+- **Mobile last-seen line** stays stable through SSR (renders an em dash until hydration completes) so it no longer flickers from "now" to "5d ago" on the first paint.
 
 ## [26.4.201] - 2026-05-05
 
