@@ -119,18 +119,35 @@ export async function POST(request: NextRequest) {
       const stripeAccountId = event.account;
       if (stripeAccountId) {
         const now = new Date();
+        const eventCreatedAt = new Date(event.created * 1000);
+        // Idempotency guard mirrors the account.updated branch: a delayed
+        // post-deauth account.updated would otherwise repopulate the cached
+        // flags via a newer eventCreatedAt vs. the row's pre-deauth
+        // lastEventAt. Bumping lastEventAt here invalidates that path.
+        // Also clears stripeAccountId so /api/stripe-connect/status reports
+        // disconnected immediately.
         await db
           .update(creatorProfiles)
           .set({
+            stripeAccountId: null,
             stripeChargesEnabled: false,
             stripePayoutsEnabled: false,
             stripeDetailsSubmitted: false,
             stripeOnboardingComplete: false,
             stripePayoutEmail: null,
             stripeConnectLastSyncedAt: now,
+            stripeConnectLastEventAt: eventCreatedAt,
             updatedAt: now,
           })
-          .where(eq(creatorProfiles.stripeAccountId, stripeAccountId));
+          .where(
+            and(
+              eq(creatorProfiles.stripeAccountId, stripeAccountId),
+              or(
+                isNull(creatorProfiles.stripeConnectLastEventAt),
+                lt(creatorProfiles.stripeConnectLastEventAt, eventCreatedAt)
+              )
+            )
+          );
       } else {
         logger.warn(
           '[Stripe Connect Webhook] account.application.deauthorized missing event.account',

@@ -30,10 +30,13 @@ export interface StripeConnectReadiness {
 interface CachedRow {
   readonly id: string;
   readonly stripeAccountId: string;
-  readonly stripeChargesEnabled: boolean;
-  readonly stripePayoutsEnabled: boolean;
-  readonly stripeDetailsSubmitted: boolean;
-  readonly stripeOnboardingComplete: boolean;
+  // DB columns are NOT NULL with default false at the schema level, but
+  // model them as nullable here so any historical/legacy row with a NULL
+  // boolean is normalized to false rather than leaking through the helper.
+  readonly stripeChargesEnabled: boolean | null;
+  readonly stripePayoutsEnabled: boolean | null;
+  readonly stripeDetailsSubmitted: boolean | null;
+  readonly stripeOnboardingComplete: boolean | null;
   readonly stripePayoutEmail: string | null;
   readonly stripeConnectLastSyncedAt: Date | null;
 }
@@ -49,10 +52,10 @@ function rowToReadiness(
 ): StripeConnectReadiness {
   return {
     stripeAccountId: row.stripeAccountId,
-    chargesEnabled: row.stripeChargesEnabled,
-    payoutsEnabled: row.stripePayoutsEnabled,
-    detailsSubmitted: row.stripeDetailsSubmitted,
-    onboardingComplete: row.stripeOnboardingComplete,
+    chargesEnabled: row.stripeChargesEnabled === true,
+    payoutsEnabled: row.stripePayoutsEnabled === true,
+    detailsSubmitted: row.stripeDetailsSubmitted === true,
+    onboardingComplete: row.stripeOnboardingComplete === true,
     payoutEmail: row.stripePayoutEmail,
     lastSyncedAt: row.stripeConnectLastSyncedAt,
     source,
