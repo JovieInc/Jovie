@@ -129,7 +129,9 @@ export async function suppressPhoneForStop(
         // to match the partial index for ON CONFLICT inference.
         targetWhere: drizzleSql`${notificationContacts.phoneHash} IS NOT NULL`,
         set: {
-          smsStatus: 'stopped',
+          // Preserve 'blocked' — STOP must not downgrade an admin/carrier-level
+          // permanent ban to a fan-recoverable 'stopped' state.
+          smsStatus: drizzleSql`CASE WHEN ${notificationContacts.smsStatus} = 'blocked' THEN ${notificationContacts.smsStatus} ELSE 'stopped' END`,
           updatedAt: now,
         },
       })
@@ -182,6 +184,9 @@ export async function reactivatePhoneAfterVerifiedOptIn(
   const phoneHash = hashPhoneE164(normalized);
   const now = new Date();
 
+  // Only reactivate `stopped` contacts. `blocked` is an admin/carrier-level
+  // permanent ban and must not be cleared by an inbound START/UNSTOP/YES
+  // (Greptile P1).
   const updated = await db
     .update(notificationContacts)
     .set({
@@ -192,7 +197,12 @@ export async function reactivatePhoneAfterVerifiedOptIn(
       phoneVerifiedAt: now,
       updatedAt: now,
     })
-    .where(eq(notificationContacts.phoneHash, phoneHash))
+    .where(
+      and(
+        eq(notificationContacts.phoneHash, phoneHash),
+        eq(notificationContacts.smsStatus, 'stopped')
+      )
+    )
     .returning({ id: notificationContacts.id });
 
   if (updated.length === 0) {

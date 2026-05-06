@@ -285,9 +285,10 @@ async function confirmSubscriptionFromIntent(input: {
     }
 
     // Global contact: insert with first-write-wins consent fields. On
-    // conflict (existing phone), bump phoneVerifiedAt + clear smsStatus
-    // back to 'active' so a fresh verified opt-in re-enables a previously
-    // STOP'd contact (CTIA convention via codex F3).
+    // conflict (existing phone), bump phoneVerifiedAt + reactivate from
+    // 'stopped' (CTIA convention via codex F3). Preserve 'blocked' — that
+    // state is reserved for admin/carrier-level permanent bans and must
+    // not be cleared by an inbound JOIN (Greptile P1).
     await tx
       .insert(notificationContacts)
       .values({
@@ -309,7 +310,7 @@ async function confirmSubscriptionFromIntent(input: {
         targetWhere: drizzleSql`${notificationContacts.phoneHash} IS NOT NULL`,
         set: {
           phoneVerifiedAt: now,
-          smsStatus: 'active',
+          smsStatus: drizzleSql`CASE WHEN ${notificationContacts.smsStatus} = 'blocked' THEN ${notificationContacts.smsStatus} ELSE 'active' END`,
           updatedAt: now,
         },
       });
