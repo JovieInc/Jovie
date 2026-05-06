@@ -10,21 +10,33 @@ export interface AudienceFanCellProps {
   readonly member: AudienceMember;
 }
 
-/** Mask a phone number for display: keep last 4 digits, dot the rest. */
+/**
+ * Mask a phone number for display.
+ *
+ * Format: "+CC ••• LAST4" where CC is 1–3 country-code digits and LAST4 is
+ * the last four digits. Anything we cannot confidently parse falls back to
+ * the raw input rather than an awkward fabricated layout.
+ */
 function maskPhone(phone: string): string {
-  const digits = phone.replace(/\D/g, '');
-  if (digits.length < 4) return phone;
+  const trimmed = phone.trim();
+  const digits = trimmed.replace(/\D/g, '');
+  if (digits.length < 7) return trimmed;
   const last4 = digits.slice(-4);
-  // Preserve leading "+" and country prefix if present.
-  const prefix = phone.startsWith('+')
-    ? `+${digits.slice(0, digits.length - 4 - 3) || '1'}`
-    : '';
-  return `${prefix} (${digits.slice(-10, -7) || '•••'}) ••• ${last4}`.trim();
+  const hasPlus = trimmed.startsWith('+');
+  // Country code: 1–3 leading digits when international, blank otherwise.
+  const ccLen = hasPlus ? Math.min(3, Math.max(1, digits.length - 10)) : 0;
+  const cc = ccLen > 0 ? `+${digits.slice(0, ccLen)} ` : '';
+  return `${cc}••• ${last4}`;
 }
 
-function pickIdentityChip(member: AudienceMember): string | null {
+function pickIdentityChip(
+  member: AudienceMember,
+  displayName: string
+): string | null {
   const emailVisible = member.emailVisibleToArtist !== false;
-  if (emailVisible && member.email) return member.email;
+  if (emailVisible && member.email && member.email !== displayName) {
+    return member.email;
+  }
   if (member.phone) return maskPhone(member.phone);
   return null;
 }
@@ -40,7 +52,7 @@ export const AudienceFanCell = memo(function AudienceFanCell({
   const tone = isAnonymous
     ? 'bg-surface-0 text-tertiary-token'
     : getMonogramTone(displayName);
-  const chip = isAnonymous ? null : pickIdentityChip(member);
+  const chip = isAnonymous ? null : pickIdentityChip(member, displayName);
 
   return (
     <div className='flex items-center gap-2.5 min-w-0'>

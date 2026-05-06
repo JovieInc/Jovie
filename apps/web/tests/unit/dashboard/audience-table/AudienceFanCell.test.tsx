@@ -36,6 +36,34 @@ describe('AudienceFanCell', () => {
     expect(screen.getByText('tim@example.com')).toBeInTheDocument();
   });
 
+  it('skips the email chip when displayName already equals the email', () => {
+    render(
+      <AudienceFanCell
+        member={{
+          ...baseMember,
+          displayName: 'tim@example.com',
+          emailVisibleToArtist: true,
+        }}
+      />
+    );
+    // Email shown once as the name; no duplicate chip below.
+    expect(screen.getAllByText('tim@example.com')).toHaveLength(1);
+  });
+
+  it('masks phone as "+CC ••• LAST4" when it falls back to phone', () => {
+    render(
+      <AudienceFanCell
+        member={{
+          ...baseMember,
+          displayName: 'dj_night_owl',
+          email: null,
+          phone: '+15551005',
+        }}
+      />
+    );
+    expect(screen.getByText('+1 ••• 1005')).toBeInTheDocument();
+  });
+
   it('hides email when emailVisibleToArtist is false (PII regression guard)', () => {
     render(
       <AudienceFanCell
