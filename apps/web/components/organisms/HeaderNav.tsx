@@ -1,5 +1,9 @@
+'use client';
+
 import { getLinearPillClassName } from '@jovie/ui';
+import { ChevronDown } from 'lucide-react';
 import Link from 'next/link';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { LogoVariant } from '@/components/atoms/Logo';
 import { LogoLink } from '@/components/atoms/LogoLink';
 import { AuthActions } from '@/components/molecules/AuthActions';
@@ -22,11 +26,24 @@ export interface HeaderNavProps {
   readonly hideNav?: boolean;
   readonly containerSize?: 'sm' | 'md' | 'lg' | 'xl' | 'full' | 'homepage';
   readonly navLinks?: ReadonlyArray<{ href: string; label: string }>;
+  readonly mobileNavLinks?: ReadonlyArray<{ href: string; label: string }>;
   readonly authMode?: 'client' | 'public-static';
   readonly minimalAuth?: boolean;
   readonly minimalAuthVariant?: 'link' | 'pill';
   readonly includePublicLoginInMobileNav?: boolean;
-  readonly presentation?: 'default' | 'homepage-embedded';
+  readonly presentation?: 'default' | 'homepage-embedded' | 'marketing-glass';
+  readonly flyoutMenus?: readonly HeaderFlyoutMenu[];
+}
+
+export interface HeaderFlyoutMenu {
+  readonly id: string;
+  readonly label: string;
+  readonly heading: string;
+  readonly links: ReadonlyArray<{
+    readonly href: string;
+    readonly label: string;
+    readonly description: string;
+  }>;
 }
 
 type PublicAuthActionsProps = Readonly<{
@@ -72,6 +89,99 @@ function PublicAuthActions({
   );
 }
 
+function GlassAuthActions() {
+  return (
+    <div className='hidden items-center gap-1 md:flex'>
+      <Link
+        href={APP_ROUTES.SUPPORT}
+        className='marketing-glass-header__text-link focus-ring-themed'
+      >
+        Contact
+      </Link>
+      <Link
+        href={APP_ROUTES.SIGNIN}
+        className='marketing-glass-header__text-link focus-ring-themed'
+      >
+        Sign In
+      </Link>
+      <Link
+        href={APP_ROUTES.SIGNUP}
+        className='marketing-glass-header__cta focus-ring-themed'
+      >
+        Start Free Trial
+      </Link>
+    </div>
+  );
+}
+
+function HeaderNavLink({
+  className,
+  href,
+  label,
+}: Readonly<{
+  className: string;
+  href: string;
+  label: string;
+}>) {
+  if (href.startsWith('/') && !href.startsWith('#')) {
+    return (
+      <Link href={href} className={className}>
+        {label}
+      </Link>
+    );
+  }
+
+  return (
+    <a href={href} className={className}>
+      {label}
+    </a>
+  );
+}
+
+function MarketingGlassFlyout({
+  menu,
+  open,
+}: Readonly<{
+  menu: HeaderFlyoutMenu;
+  open: boolean;
+}>) {
+  return (
+    <div
+      id={`marketing-header-flyout-${menu.id}`}
+      className={cn(
+        'marketing-glass-header__flyout',
+        open && 'marketing-glass-header__flyout--open'
+      )}
+      aria-hidden={!open}
+    >
+      <div className='marketing-glass-header__flyout-inner'>
+        <p className='marketing-glass-header__flyout-heading'>{menu.heading}</p>
+        <div className='marketing-glass-header__flyout-grid'>
+          {menu.links.map((link, index) => (
+            <Link
+              href={link.href}
+              key={`${menu.id}-${link.href}`}
+              className='marketing-glass-header__flyout-link focus-ring-themed'
+            >
+              <span className='marketing-glass-header__flyout-number'>
+                {(index + 1).toString().padStart(2, '0')}
+              </span>
+              <span className='min-w-0'>
+                <span className='marketing-glass-header__flyout-label'>
+                  {link.label}
+                </span>
+                <span className='marketing-glass-header__flyout-description'>
+                  {link.description}
+                </span>
+              </span>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function HeaderNav({
   sticky: _sticky = true,
   className,
@@ -81,40 +191,118 @@ export function HeaderNav({
   hideNav = false,
   containerSize: _containerSize = 'lg',
   navLinks,
+  mobileNavLinks,
   authMode = 'client',
   minimalAuth = false,
   minimalAuthVariant = 'link',
   includePublicLoginInMobileNav = true,
   presentation = 'default',
+  flyoutMenus,
 }: HeaderNavProps = {}) {
+  const headerRef = useRef<HTMLElement | null>(null);
+  const [openFlyoutId, setOpenFlyoutId] = useState<string | null>(null);
+  const [isScrolled, setIsScrolled] = useState(false);
+  const isMarketingGlass = presentation === 'marketing-glass';
+  const isHomepagePresentation = presentation === 'homepage-embedded';
+  const resolvedFlyoutMenus = useMemo(
+    () => (isMarketingGlass ? (flyoutMenus ?? []) : []),
+    [flyoutMenus, isMarketingGlass]
+  );
+
+  useEffect(() => {
+    if (!isMarketingGlass) {
+      return;
+    }
+
+    const handleScroll = () => setIsScrolled(window.scrollY > 16);
+    handleScroll();
+    window.addEventListener('scroll', handleScroll, { passive: true });
+
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [isMarketingGlass]);
+
+  useEffect(() => {
+    if (!isMarketingGlass || openFlyoutId === null) {
+      return;
+    }
+
+    const closeIfOutside = (target: EventTarget | null) => {
+      if (target instanceof Node && headerRef.current?.contains(target)) {
+        return;
+      }
+
+      setOpenFlyoutId(null);
+    };
+    const handlePointerMove = (event: PointerEvent) => {
+      closeIfOutside(event.target);
+    };
+    const handleFocusIn = (event: FocusEvent) => {
+      closeIfOutside(event.target);
+    };
+
+    document.addEventListener('pointermove', handlePointerMove);
+    document.addEventListener('focusin', handleFocusIn);
+
+    return () => {
+      document.removeEventListener('pointermove', handlePointerMove);
+      document.removeEventListener('focusin', handleFocusIn);
+    };
+  }, [isMarketingGlass, openFlyoutId]);
+
   const navLinkClass = cn(
     'focus-ring-themed',
-    presentation === 'homepage-embedded'
-      ? 'homepage-header-nav-link'
-      : 'nav-link-linear'
+    isMarketingGlass
+      ? 'marketing-glass-header__nav-link'
+      : presentation === 'homepage-embedded'
+        ? 'homepage-header-nav-link'
+        : 'nav-link-linear'
   );
-  const hasNavLinks = !hideNav && !!navLinks?.length;
-  const isHomepagePresentation = presentation === 'homepage-embedded';
+  const hasNavLinks =
+    !hideNav && (!!navLinks?.length || resolvedFlyoutMenus.length > 0);
   const navLinksMarkup = hasNavLinks ? (
     <div
       className={cn(
         'max-md:hidden items-center md:flex',
-        isHomepagePresentation
-          ? 'homepage-header-nav-group'
-          : 'gap-1 lg:gap-1.5'
+        isMarketingGlass
+          ? 'marketing-glass-header__nav'
+          : isHomepagePresentation
+            ? 'homepage-header-nav-group'
+            : 'gap-1 lg:gap-1.5'
       )}
     >
-      {navLinks?.map(link =>
-        link.href.startsWith('/') && !link.href.startsWith('#') ? (
-          <Link key={link.href} href={link.href} className={navLinkClass}>
-            {link.label}
-          </Link>
-        ) : (
-          <a key={link.href} href={link.href} className={navLinkClass}>
-            {link.label}
-          </a>
-        )
-      )}
+      {isMarketingGlass
+        ? resolvedFlyoutMenus.map(menu => {
+            const open = openFlyoutId === menu.id;
+
+            return (
+              <div key={menu.id} className='marketing-glass-header__nav-item'>
+                <button
+                  type='button'
+                  className={cn(
+                    navLinkClass,
+                    open && 'marketing-glass-header__nav-link--active'
+                  )}
+                  aria-expanded={open}
+                  aria-controls={`marketing-header-flyout-${menu.id}`}
+                  onMouseEnter={() => setOpenFlyoutId(menu.id)}
+                  onFocus={() => setOpenFlyoutId(menu.id)}
+                >
+                  {menu.label}
+                  <ChevronDown aria-hidden='true' size={13} strokeWidth={1.8} />
+                </button>
+                <MarketingGlassFlyout menu={menu} open={open} />
+              </div>
+            );
+          })
+        : null}
+      {navLinks?.map(link => (
+        <HeaderNavLink
+          key={link.href}
+          href={link.href}
+          label={link.label}
+          className={navLinkClass}
+        />
+      ))}
     </div>
   ) : null;
   const containerClass =
@@ -123,10 +311,15 @@ export function HeaderNav({
       : 'flex h-[var(--linear-header-height)] w-full items-center gap-6';
   return (
     <header
+      ref={headerRef}
       data-testid='header-nav'
+      data-presentation={presentation}
+      data-scrolled={isScrolled ? 'true' : undefined}
       className={cn(
-        'fixed top-0 left-0 right-0 w-full transition-colors duration-200',
-        presentation === 'homepage-embedded'
+        isMarketingGlass
+          ? 'marketing-glass-header fixed top-0 left-0 right-0 w-full'
+          : 'fixed top-0 left-0 right-0 w-full transition-colors duration-200',
+        presentation === 'homepage-embedded' || isMarketingGlass
           ? 'border-b border-transparent'
           : 'border-b',
         className
@@ -134,20 +327,20 @@ export function HeaderNav({
       style={{
         fontSynthesisWeight: 'none',
         borderColor:
-          presentation === 'homepage-embedded'
+          presentation === 'homepage-embedded' || isMarketingGlass
             ? 'transparent'
             : 'var(--linear-border-default)',
         backgroundColor:
-          presentation === 'homepage-embedded'
+          presentation === 'homepage-embedded' || isMarketingGlass
             ? 'transparent'
             : 'var(--linear-bg-header)',
         zIndex: 100,
         backdropFilter:
-          presentation === 'homepage-embedded'
+          presentation === 'homepage-embedded' || isMarketingGlass
             ? 'none'
             : `blur(var(--linear-blur-header))`,
         WebkitBackdropFilter:
-          presentation === 'homepage-embedded'
+          presentation === 'homepage-embedded' || isMarketingGlass
             ? 'none'
             : `blur(var(--linear-blur-header))`,
         minWidth: 0,
@@ -161,9 +354,11 @@ export function HeaderNav({
       <nav
         className={cn(
           'mx-auto w-full px-5 sm:px-6',
-          _containerSize === 'homepage'
-            ? 'max-w-[var(--linear-content-max)] lg:px-0'
-            : 'max-w-[calc(var(--linear-content-max)+3rem)]'
+          isMarketingGlass
+            ? 'marketing-glass-header__shell'
+            : _containerSize === 'homepage'
+              ? 'max-w-[var(--linear-content-max)] lg:px-0'
+              : 'max-w-[calc(var(--linear-content-max)+3rem)]'
         )}
         aria-label='Primary navigation'
       >
@@ -186,7 +381,9 @@ export function HeaderNav({
           {isHomepagePresentation ? null : navLinksMarkup}
 
           {/* Divider between nav and auth - desktop only */}
-          {hasNavLinks && presentation !== 'homepage-embedded' ? (
+          {hasNavLinks &&
+          presentation !== 'homepage-embedded' &&
+          !isMarketingGlass ? (
             <div
               className='mx-1.5 max-md:hidden h-4 w-px bg-(--linear-border-subtle)'
               aria-hidden='true'
@@ -200,7 +397,9 @@ export function HeaderNav({
               isHomepagePresentation && 'homepage-header-auth'
             )}
           >
-            {authMode === 'public-static' ? (
+            {authMode === 'public-static' && isMarketingGlass ? (
+              <GlassAuthActions />
+            ) : authMode === 'public-static' ? (
               <PublicAuthActions
                 minimal={minimalAuth}
                 minimalVariant={minimalAuthVariant}
@@ -214,7 +413,7 @@ export function HeaderNav({
           {hasNavLinks && (
             <div className='flex md:hidden items-center'>
               <MobileNav
-                navLinks={navLinks}
+                navLinks={mobileNavLinks ?? navLinks}
                 includePublicLogin={includePublicLoginInMobileNav}
               />
             </div>
