@@ -173,6 +173,11 @@ function transformMemberRow(member: {
     utmParams: normalizeUtmParams(member.utmParams),
     email: member.email,
     phone: member.phone,
+    // Members captured via Spotify auth or gated content are visible to the
+    // creator who owns the audience. Subscribers override this flag based on
+    // artist-email opt-in state (see fetchSubscribersData). New cells must
+    // read this flag and fall back to phone/anonymous when false.
+    emailVisibleToArtist: member.email != null,
     spotifyConnected: Boolean(member.spotifyConnected),
     purchaseCount: member.purchaseCount,
     tipAmountTotalCents: member.tipAmountTotalCents ?? 0,
