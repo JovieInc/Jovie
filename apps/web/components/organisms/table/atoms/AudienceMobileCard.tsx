@@ -8,6 +8,10 @@ import {
   getMonogramInitials,
   getMonogramTone,
 } from '@/components/features/dashboard/organisms/dashboard-audience-table/cells/initials';
+import {
+  isSsrNowMs,
+  useNowMs,
+} from '@/components/features/dashboard/organisms/dashboard-audience-table/cells/NowMsContext';
 import { deriveAudienceState } from '@/lib/audience/derive-state';
 import { cn } from '@/lib/utils';
 import { formatTimeAgo } from '@/lib/utils/audience';
@@ -51,8 +55,10 @@ export const AudienceMobileCard = React.memo(function AudienceMobileCard({
   onTap,
   onAction,
 }: AudienceMobileCardProps) {
+  const nowMs = useNowMs();
   const name = member.displayName?.trim() ?? '';
-  const isAnonymous = !name && !member.email && !member.phone;
+  const isAnonymous =
+    !name && !member.email && !member.phone && !member.spotifyConnected;
   const displayName =
     name ||
     (isAnonymous
@@ -67,10 +73,15 @@ export const AudienceMobileCard = React.memo(function AudienceMobileCard({
     ? 'bg-surface-0 text-tertiary-token'
     : getMonogramTone(displayName);
 
-  const state =
+  // Use the SSR-safe nowMs context so the mobile card matches the desktop
+  // table's hydration behaviour. While SSR_NOW_MS is in effect, every row
+  // shows "Rising" until the post-mount tick swaps in the real clock.
+  const state: keyof typeof STATE_PILL =
     mode === 'subscribers'
       ? 'subscriber'
-      : deriveAudienceState(member, Date.now());
+      : isSsrNowMs(nowMs)
+        ? 'rising'
+        : deriveAudienceState(member, nowMs);
 
   const reachable = Boolean(member.email || member.phone);
 

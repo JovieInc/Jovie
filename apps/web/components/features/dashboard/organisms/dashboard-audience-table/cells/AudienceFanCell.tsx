@@ -23,8 +23,10 @@ function maskPhone(phone: string): string {
   if (digits.length < 7) return trimmed;
   const last4 = digits.slice(-4);
   const hasPlus = trimmed.startsWith('+');
-  // Country code: 1–3 leading digits when international, blank otherwise.
-  const ccLen = hasPlus ? Math.min(3, Math.max(1, digits.length - 10)) : 0;
+  // Only emit a country code when the phone genuinely has digits beyond the
+  // standard 10-digit national number. This avoids fabricating a "+5" prefix
+  // for short test numbers like "+5551234".
+  const ccLen = hasPlus ? Math.min(3, Math.max(0, digits.length - 10)) : 0;
   const cc = ccLen > 0 ? `+${digits.slice(0, ccLen)} ` : '';
   return `${cc}••• ${last4}`;
 }
@@ -45,7 +47,10 @@ export const AudienceFanCell = memo(function AudienceFanCell({
   member,
 }: AudienceFanCellProps) {
   const name = member.displayName?.trim() ?? '';
-  const isAnonymous = !name && !member.email && !member.phone;
+  // A fan is anonymous only when we have no contact channel AND no provider
+  // identity. A Spotify-connected fan without email/phone is still identified.
+  const isAnonymous =
+    !name && !member.email && !member.phone && !member.spotifyConnected;
 
   const displayName = name || (isAnonymous ? 'Anonymous Fan' : 'Visitor');
   const monogram = isAnonymous ? '◯' : getMonogramInitials(displayName);

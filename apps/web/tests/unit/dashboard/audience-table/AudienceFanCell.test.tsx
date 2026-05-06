@@ -50,18 +50,33 @@ describe('AudienceFanCell', () => {
     expect(screen.getAllByText('tim@example.com')).toHaveLength(1);
   });
 
-  it('masks phone as "+CC ••• LAST4" when it falls back to phone', () => {
+  it('masks short phones without fabricating a country code', () => {
     render(
       <AudienceFanCell
         member={{
           ...baseMember,
           displayName: 'dj_night_owl',
           email: null,
+          // 8 digits — not a real international number; do not invent a CC.
           phone: '+15551005',
         }}
       />
     );
-    expect(screen.getByText('+1 ••• 1005')).toBeInTheDocument();
+    expect(screen.getByText('••• 1005')).toBeInTheDocument();
+  });
+
+  it('masks proper international phones as "+CC ••• LAST4"', () => {
+    render(
+      <AudienceFanCell
+        member={{
+          ...baseMember,
+          displayName: 'someone',
+          email: null,
+          phone: '+12025551234',
+        }}
+      />
+    );
+    expect(screen.getByText('+1 ••• 1234')).toBeInTheDocument();
   });
 
   it('hides email when emailVisibleToArtist is false (PII regression guard)', () => {

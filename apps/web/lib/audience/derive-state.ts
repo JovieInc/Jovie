@@ -23,6 +23,10 @@ export function deriveAudienceState(
   member: Pick<AudienceMember, 'lastSeenAt' | 'intentLevel' | 'visits'>,
   nowMs: number
 ): AudienceRowState {
+  // Guard against the SSR-context placeholder (nowMs <= 0). Without a real
+  // clock we cannot age-bucket, so fall back to a neutral state. Cells that
+  // care can detect SSR via isSsrNowMs and pick their own placeholder.
+  if (!Number.isFinite(nowMs) || nowMs <= 0) return 'rising';
   if (!member.lastSeenAt) return 'dormant';
 
   const lastSeenMs = Date.parse(member.lastSeenAt);

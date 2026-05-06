@@ -32,14 +32,13 @@ export const AudienceLastCell = memo(function AudienceLastCell({
     return <span className='text-2xs text-tertiary-token tabular-nums'>—</span>;
   }
 
-  // During SSR, render the absolute date as a stable placeholder. After mount
-  // the relative compact form takes over without a hydration mismatch since
-  // text content changes are allowed post-mount.
-  const compact = isSsrNowMs(nowMs)
-    ? // Stable "Xd" placeholder using a fixed reference (lastSeenAt itself);
-      // results in "0m" / "0h" worst case — flips on mount.
-      formatCompact(0)
-    : formatCompact(Math.max(0, nowMs - seenMs));
+  // During SSR we don't have a stable clock; render an em dash so the row
+  // does not flicker through "now → 5d" on hydration. Post-mount the real
+  // compact form takes over.
+  if (isSsrNowMs(nowMs)) {
+    return <span className='text-2xs text-tertiary-token tabular-nums'>—</span>;
+  }
+  const compact = formatCompact(Math.max(0, nowMs - seenMs));
 
   return (
     <span className='text-2xs text-tertiary-token tabular-nums'>{compact}</span>
