@@ -195,7 +195,8 @@
   /* ============================================
      LAYOUT — mode-independent
      ============================================ */
-  --linear-container-max: 1298px;
+  /* Aliased to canonical DS token (DS_FOUNDATION_V1) — both resolve to 1298px */
+  --linear-container-max: var(--ds-public-content-max);
   --linear-container-padding: 24px;
   --linear-content-max: 1200px;
   --linear-hero-section-max: 1024px;
