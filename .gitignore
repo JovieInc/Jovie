@@ -105,3 +105,8 @@ output/
 .gstack/
 .claude/skills/gstack/
 .claude/scheduled_tasks.lock
+
+# Ruflo MCP local state (sqlite + vector index, never committed)
+.claude-flow/
+.swarm/
+ruvector.db
