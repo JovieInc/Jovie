@@ -161,19 +161,34 @@ function CountdownGrid({
     return () => window.clearInterval(timer);
   }, [countdown.now, targetDate]);
 
-  if (Number.isNaN(targetDate.getTime()) || !parts || parts.total <= 0) {
+  if (Number.isNaN(targetDate.getTime()) || (parts && parts.total <= 0)) {
     return null;
   }
 
+  const visibleParts = parts ?? {
+    total: 1,
+    days: 0,
+    hours: 0,
+    minutes: 0,
+    seconds: 0,
+  };
   const cells = [
-    ['Days', formatTwoDigit(parts.days)],
-    ['Hrs', formatTwoDigit(parts.hours)],
-    ['Min', formatTwoDigit(parts.minutes)],
-    ['Sec', formatTwoDigit(parts.seconds)],
+    ['Days', formatTwoDigit(visibleParts.days)],
+    ['Hrs', formatTwoDigit(visibleParts.hours)],
+    ['Min', formatTwoDigit(visibleParts.minutes)],
+    ['Sec', formatTwoDigit(visibleParts.seconds)],
   ] as const;
+  const isPendingClientTime = parts === null;
 
   return (
-    <div className={cn('space-y-2', compact && 'space-y-1')}>
+    <div
+      className={cn(
+        'space-y-2',
+        compact && 'space-y-1',
+        isPendingClientTime && 'invisible'
+      )}
+      aria-hidden={isPendingClientTime || undefined}
+    >
       {countdown.label ? (
         <p
           className={cn(
