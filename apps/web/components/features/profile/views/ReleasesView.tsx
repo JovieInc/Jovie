@@ -7,6 +7,13 @@ import { cn } from '@/lib/utils';
 import type { PublicRelease } from '../releases/types';
 
 const YEAR_HEADER_THRESHOLD = 15;
+const AUDIO_RELEASE_TYPES = new Set([
+  'single',
+  'album',
+  'compilation',
+  'live',
+  'mixtape',
+]);
 const RELEASE_FILTERS = [
   { key: 'all', label: 'All' },
   { key: 'songs', label: 'Music' },
@@ -15,6 +22,20 @@ const RELEASE_FILTERS = [
 ] as const;
 
 type ReleaseFilter = (typeof RELEASE_FILTERS)[number]['key'];
+
+function getMoreReleasesHeading(activeFilter: ReleaseFilter): string {
+  switch (activeFilter) {
+    case 'songs':
+      return 'More Music';
+    case 'eps':
+      return 'More EPs';
+    case 'videos':
+      return 'More Videos';
+    case 'all':
+    default:
+      return 'More Releases';
+  }
+}
 
 function formatReleaseType(type: string): string {
   switch (type) {
@@ -55,7 +76,7 @@ export function ReleasesView({
     return RELEASE_FILTERS.filter(filter => {
       switch (filter.key) {
         case 'songs':
-          return types.has('single') || types.has('album');
+          return [...AUDIO_RELEASE_TYPES].some(type => types.has(type));
         case 'eps':
           return types.has('ep');
         case 'videos':
@@ -78,10 +99,7 @@ export function ReleasesView({
       releases.filter(release => {
         switch (activeFilter) {
           case 'songs':
-            return (
-              release.releaseType === 'single' ||
-              release.releaseType === 'album'
-            );
+            return AUDIO_RELEASE_TYPES.has(release.releaseType);
           case 'eps':
             return release.releaseType === 'ep';
           case 'videos':
@@ -149,6 +167,7 @@ export function ReleasesView({
       ? `View ${release.title} by ${collaborators.join(', ')}`
       : `View ${release.title}`;
   };
+  const moreReleasesHeading = getMoreReleasesHeading(activeFilter);
 
   return (
     <div className='flex flex-col' data-testid='profile-mode-drawer-releases'>
@@ -217,7 +236,7 @@ export function ReleasesView({
       {visibleReleases.length > 1 ? (
         <div className='px-4 pb-2 pt-5'>
           <h3 className='text-[22px] font-[680] leading-none tracking-[-0.025em] text-white'>
-            More Music
+            {moreReleasesHeading}
           </h3>
         </div>
       ) : null}

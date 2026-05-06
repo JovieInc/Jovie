@@ -345,7 +345,7 @@ export function ProfileUnifiedDrawer({
     };
   }, [hasValidVenmoLink, venmoLink, venmoUsername]);
 
-  const isSubView = view !== 'menu';
+  const isSubView = renderedView !== 'menu';
 
   return (
     <ProfileDrawerShell
