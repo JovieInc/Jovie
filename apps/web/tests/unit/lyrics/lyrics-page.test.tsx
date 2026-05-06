@@ -109,6 +109,7 @@ describe('LyricsPage', () => {
       title: 'Real Track',
       artist: 'WRONG_ARTIST_FROM_TRACK',
       lyrics: null,
+      durationMs: 213000,
     });
 
     render(await LyricsPage(routeParams()));
@@ -122,6 +123,7 @@ describe('LyricsPage', () => {
           // Must come from selectedProfile.displayName, NOT track.artist.
           artist: 'Bahamas',
         },
+        initialDurationSec: 213,
         trackId: 'track-1',
       },
       undefined
@@ -133,5 +135,19 @@ describe('LyricsPage', () => {
     expect(lastCallArgs?.[0]?.initialTrack?.artist).not.toBe(
       'WRONG_ARTIST_FROM_TRACK'
     );
+  });
+
+  it('passes initialDurationSec=0 when the persisted record has no duration', async () => {
+    mocks.loadLyricsRouteTrack.mockResolvedValue({
+      title: 'No Duration',
+      artist: 'WRONG',
+      lyrics: 'la la la',
+      durationMs: null,
+    });
+
+    render(await LyricsPage(routeParams()));
+
+    const lastCallArgs = mocks.lyricsPageClient.mock.calls.at(-1);
+    expect(lastCallArgs?.[0]?.initialDurationSec).toBe(0);
   });
 });
