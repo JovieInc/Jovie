@@ -308,6 +308,7 @@ export async function GET(request: NextRequest) {
         utmParams: member.utmParams ?? {},
         email: member.email,
         phone: member.phone,
+        emailVisibleToArtist: member.email != null,
         spotifyConnected: Boolean(member.spotifyConnected),
         purchaseCount: member.purchaseCount,
         tipAmountTotalCents: member.tipAmountTotalCents ?? 0,

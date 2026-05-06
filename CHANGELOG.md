@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.201] - 2026-05-05
+
+> Audience CRM rows are denser and easier to scan: monogram identity, state pill, channel signals, engagement bars, and a single Message action per row.
+
+### Changed
+
+- **Audience row redesign** to a compact six-column layout (Fan / State / Signal / Engagement / Last / Action) with monogram avatars instead of profile photos. State pill labels recently active fans as **High**, **Rising**, or **Dormant**; subscriber rows render a fixed **Subscriber** pill.
+- **Mobile card** rebuilt to match the new layout: monogram + name + state on top, last-seen + Message action on the bottom. Tap targets are 44px.
+- **Engagement** is now a 5-bar visualization (out of 5) instead of the prior wide column.
+- **Last seen** column is compact (`6h`, `2d`, `12d`) and stays stable through SSR via a shared timestamp context to avoid hydration jank.
+
+### Fixed
+
+- **Identity chip** no longer duplicates the email when `displayName` already equals the email; falls through to a masked phone or an anonymous label.
+- **Phone mask** stopped fabricating `+5` country codes for short test numbers; it only prefixes a country code when the number is long enough to have one.
+- **Anonymous fan** rule now respects Spotify-connected fans: a fan with only a Spotify identity is no longer mislabeled as anonymous.
+- [internal] Members audience now exposes an explicit `emailVisibleToArtist` flag at the data boundary so future cells can treat it as a privacy gate, mirroring the subscribers code path.
+
 ## [26.4.200] - 2026-05-05
 
 > [internal] Internal agent docs were reorganized for reliability — no user-facing changes.
