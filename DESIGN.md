@@ -352,11 +352,13 @@ Pure neutral HSL — no hue tint. Used across both systems.
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| Marketing canonical | 1200px | **All boxed marketing content** — header, hero, every section. One width. |
-| Prose | 624px | Long-form text |
+| Marketing canonical | 1298px | **All boxed marketing content** — header, hero, every section. One width. |
+| Prose | 680px | Long-form text |
 | Pricing grid | 1024px | Pricing layout (intentional narrow) |
 
-**Rule:** All marketing sections use `max-w-[1200px]` (or `var(--linear-content-max)`). Full-bleed sections explicitly break out. No more mixed widths.
+**Rule:** All marketing sections use the canonical width (or `var(--linear-content-max)`). Full-bleed sections explicitly break out. No more mixed widths.
+
+These are surface-side aliases of `--ds-public-content-max` and `--ds-prose-max` (DS_FOUNDATION_V1).
 
 ---
 
@@ -445,8 +447,10 @@ the app feeling consistent even as new components land.
 
 | Token | Duration | Easing | Use for |
 |-------|----------|--------|---------|
-| **subtle** (`duration-subtle ease-subtle`) | 150ms | `cubic-bezier(0.25, 0.46, 0.45, 0.94)` | Hover, focus, color, icon swap, toast, button press, anything micro |
-| **cinematic** (`duration-cinematic ease-cinematic`) | 320ms | `cubic-bezier(0.32, 0.72, 0, 1)` | Side drawers, audio player open/close, modal entry, chat composer surface morph, anything reveal-class |
+| **subtle** (`duration-subtle ease-subtle`) | 150ms | `cubic-bezier(0.4, 0, 0.2, 1)` | Hover, focus, color, icon swap, toast, button press, anything micro |
+| **cinematic** (`duration-cinematic ease-cinematic`) | 420ms | `cubic-bezier(0.22, 1, 0.36, 1)` | Side drawers, audio player open/close, modal entry, chat composer surface morph, anything reveal-class |
+
+These are surface-side aliases of `--ds-motion-*` tokens (DS_FOUNDATION_V1).
 
 **Rule of thumb:** if the user's eye has to track the move (panel sliding in,
 surface growing), it's cinematic. If the user notices it only as feedback
