@@ -41,15 +41,21 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(searchParamsState.value),
 }));
 
-vi.mock('@/features/auth', () => ({
-  AuthLayout: ({ children }: { children: ReactNode }) => (
-    <div data-testid='auth-layout'>{children}</div>
-  ),
-  AuthRoutePrefetch: ({ href }: { href: string }) => {
-    routerPrefetchMock(href);
-    return null;
-  },
-}));
+vi.mock('@/features/auth', async () => {
+  const actual =
+    await vi.importActual<typeof import('@/features/auth')>('@/features/auth');
+
+  return {
+    ...actual,
+    AuthLayout: ({ children }: { children: ReactNode }) => (
+      <div data-testid='auth-layout'>{children}</div>
+    ),
+    AuthRoutePrefetch: ({ href }: { href: string }) => {
+      routerPrefetchMock(href);
+      return null;
+    },
+  };
+});
 
 vi.mock('@/lib/analytics', () => ({
   track: trackMock,
@@ -75,6 +81,7 @@ import SignUpPage from '../../../app/(auth)/signup/page';
 
 describe('signup page', () => {
   afterEach(() => {
+    delete document.documentElement.dataset.e2eMode;
     vi.unstubAllEnvs();
   });
 

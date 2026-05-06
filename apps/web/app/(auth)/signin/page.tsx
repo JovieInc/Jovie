@@ -7,8 +7,11 @@ import { toast } from 'sonner';
 import { AuthFormSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { SignInTimeoutEscape } from '@/components/molecules/SignInTimeoutEscape';
 import { APP_ROUTES } from '@/constants/routes';
-import { AuthLayout, AuthRoutePrefetch } from '@/features/auth';
-import { AuthGoogleOneTap } from '@/features/auth/AuthGoogleOneTap';
+import {
+  AuthGoogleOneTap,
+  AuthLayout,
+  AuthRoutePrefetch,
+} from '@/features/auth';
 import { useNormalizeClerkHomeLink } from '@/features/auth/useNormalizeClerkHomeLink';
 import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
 

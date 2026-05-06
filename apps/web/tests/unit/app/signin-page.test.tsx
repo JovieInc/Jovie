@@ -29,15 +29,21 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(searchParamsState.value),
 }));
 
-vi.mock('@/features/auth', () => ({
-  AuthLayout: ({ children }: { children: ReactNode }) => (
-    <div data-testid='auth-layout'>{children}</div>
-  ),
-  AuthRoutePrefetch: ({ href }: { href: string }) => {
-    routerPrefetchMock(href);
-    return null;
-  },
-}));
+vi.mock('@/features/auth', async () => {
+  const actual =
+    await vi.importActual<typeof import('@/features/auth')>('@/features/auth');
+
+  return {
+    ...actual,
+    AuthLayout: ({ children }: { children: ReactNode }) => (
+      <div data-testid='auth-layout'>{children}</div>
+    ),
+    AuthRoutePrefetch: ({ href }: { href: string }) => {
+      routerPrefetchMock(href);
+      return null;
+    },
+  };
+});
 
 import { APP_ROUTES } from '@/constants/routes';
 import SignInPage from '../../../app/(auth)/signin/page';

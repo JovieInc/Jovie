@@ -6,8 +6,11 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { AuthFormSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { APP_ROUTES } from '@/constants/routes';
-import { AuthLayout, AuthRoutePrefetch } from '@/features/auth';
-import { AuthGoogleOneTap } from '@/features/auth/AuthGoogleOneTap';
+import {
+  AuthGoogleOneTap,
+  AuthLayout,
+  AuthRoutePrefetch,
+} from '@/features/auth';
 import { useNormalizeClerkHomeLink } from '@/features/auth/useNormalizeClerkHomeLink';
 import { track } from '@/lib/analytics';
 import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
