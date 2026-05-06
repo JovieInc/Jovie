@@ -7,6 +7,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { AuthFormSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthLayout, AuthRoutePrefetch } from '@/features/auth';
+import { AuthGoogleOneTap } from '@/features/auth/AuthGoogleOneTap';
 import { useNormalizeClerkHomeLink } from '@/features/auth/useNormalizeClerkHomeLink';
 import { track } from '@/lib/analytics';
 import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
@@ -201,6 +202,7 @@ function SignUpPageContent() {
           fallbackRedirectUrl={APP_ROUTES.ONBOARDING}
         />
       </div>
+      <AuthGoogleOneTap searchParams={searchParams} />
       <p className='mt-4 text-center text-2xs leading-relaxed text-white/80 lg:text-left'>
         By signing up, you agree to our{' '}
         <Link

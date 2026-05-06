@@ -3,6 +3,7 @@
 // Molecules
 export { AuthBranding } from './AuthBranding';
 export { AuthFormContainer } from './AuthFormContainer';
+export { AuthGoogleOneTap } from './AuthGoogleOneTap';
 // Organisms
 export { AuthLayout } from './AuthLayout';
 export { AuthPageSkeleton } from './AuthPageSkeleton';

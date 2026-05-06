@@ -72,6 +72,24 @@ describe('buildContentSecurityPolicy', () => {
     expect(connectSrc).toContain('https://*.ingest.us.sentry.io');
   });
 
+  it('allows Google Identity Services for One Tap', () => {
+    const csp = buildContentSecurityPolicy({
+      nonce: 'test-nonce',
+      isDev: false,
+      enableToolbar: false,
+    });
+
+    expect(findDirective(csp, 'script-src')).toContain(
+      'https://accounts.google.com'
+    );
+    expect(findDirective(csp, 'connect-src')).toContain(
+      'https://accounts.google.com'
+    );
+    expect(findDirective(csp, 'frame-src')).toContain(
+      'https://accounts.google.com'
+    );
+  });
+
   it('includes vercel analytics inline script hash in script-src', () => {
     const csp = buildContentSecurityPolicy({
       nonce: 'test-nonce',

@@ -8,6 +8,7 @@ import { AuthFormSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { SignInTimeoutEscape } from '@/components/molecules/SignInTimeoutEscape';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthLayout, AuthRoutePrefetch } from '@/features/auth';
+import { AuthGoogleOneTap } from '@/features/auth/AuthGoogleOneTap';
 import { useNormalizeClerkHomeLink } from '@/features/auth/useNormalizeClerkHomeLink';
 import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
 
@@ -93,6 +94,7 @@ function SignInPageContent() {
           initialValues={initialValues}
         />
       </div>
+      <AuthGoogleOneTap searchParams={searchParams} />
       <SignInTimeoutEscape />
     </>
   );

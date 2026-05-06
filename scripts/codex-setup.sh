@@ -24,7 +24,9 @@ fi
 
 if [[ "$CODEX_HOOK" == "1" ]]; then
   bash "$REPO_ROOT/scripts/setup.sh" "$@" >&2
+  bash "$REPO_ROOT/scripts/clerk-agent-setup.sh" >&2
   printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"Jovie setup completed successfully."}}'
 else
-  exec bash "$REPO_ROOT/scripts/setup.sh" "$@"
+  bash "$REPO_ROOT/scripts/setup.sh" "$@"
+  bash "$REPO_ROOT/scripts/clerk-agent-setup.sh"
 fi

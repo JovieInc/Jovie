@@ -35,6 +35,23 @@ On Windows PowerShell, use the Git Bash wrapper:
 
 That script verifies Node.js 22.x, pnpm 9.15.4, ripgrep, Doppler, GitHub CLI auth, installs dependencies, clears stale Turbopack cache, and syncs dev Clerk IDs when Doppler is available.
 
+After the shared bootstrap succeeds, `scripts/codex-setup.sh` runs the optional
+agent-only Clerk helper:
+
+```bash
+./scripts/clerk-agent-setup.sh
+```
+
+This helper only verifies the Clerk CLI and attempts `clerk skill install -y
+--pm pnpm`. It is not part of `scripts/setup.sh`, and it must not be treated as
+required human setup. If the Clerk CLI is missing, unsupported, or not logged in,
+the helper reports the condition and exits successfully.
+
+Codex agents may use Clerk CLI diagnostics such as `clerk --version`,
+`clerk --help`, and `clerk skill install --help`. Do not run mutating Clerk app
+setup commands in this repository, including `clerk init`, `clerk link`,
+`clerk env pull`, `clerk doctor --fix`, or generated middleware/env rewrites.
+
 ## Cleanup
 
 Codex stop hooks run:

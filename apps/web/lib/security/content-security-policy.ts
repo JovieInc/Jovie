@@ -94,6 +94,7 @@ const STATIC_CSP_PARTS = {
     'https://*.clerk.services',
     'https://*.clerk.accounts.dev',
     'https://clerk.jov.ie',
+    'https://accounts.google.com',
     'https://challenges.cloudflare.com',
     'https://r2.leadsy.ai',
     'https://tag.trovo-tag.com',
@@ -113,6 +114,7 @@ const STATIC_CSP_PARTS = {
     'https://*.clerk.services',
     'https://*.clerk.accounts.dev',
     'https://clerk.jov.ie',
+    'https://accounts.google.com',
     'https://api.stripe.com',
     'https://*.ingest.sentry.io',
     'https://*.ingest.us.sentry.io',
@@ -136,6 +138,7 @@ const STATIC_CSP_PARTS = {
     'https://*.clerk.com',
     'https://*.clerk.accounts.dev',
     'https://distinct-giraffe-5.clerk.accounts.dev',
+    'https://accounts.google.com',
     'https://challenges.cloudflare.com',
   ].join(' '),
 } as const;

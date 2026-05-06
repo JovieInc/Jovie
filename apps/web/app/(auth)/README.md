@@ -17,7 +17,14 @@ This directory contains the App Router auth pages for Jovie. The primary auth UI
 - Both pages use:
   - `routing="hash"`
   - `oauthFlow="redirect"`
+- Both pages render Clerk Google One Tap behind
+  `NEXT_PUBLIC_GOOGLE_ONE_TAP_DISABLED=1`, E2E mode, and Clerk mock-mode
+  guards. If a valid `redirect_url` is present, One Tap preserves it; otherwise
+  sign-in falls back to `/app` and sign-up falls back to `/onboarding`.
 - Clerk Dashboard configuration is the source of truth for enabled auth methods and social providers. The app no longer forces an OTP-only UI.
+- Google One Tap requires Google social login/custom credentials to be enabled
+  in the Clerk Dashboard for dev, staging, and production before the prompt will
+  work in that environment.
 
 ## Route Behavior
 

@@ -1,19 +1,27 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { clerkSignInMock, routerPrefetchMock, searchParamsState } = vi.hoisted(
-  () => ({
-    clerkSignInMock: vi.fn(),
-    routerPrefetchMock: vi.fn(),
-    searchParamsState: { value: '' },
-  })
-);
+const {
+  clerkSignInMock,
+  googleOneTapMock,
+  routerPrefetchMock,
+  searchParamsState,
+} = vi.hoisted(() => ({
+  clerkSignInMock: vi.fn(),
+  googleOneTapMock: vi.fn(),
+  routerPrefetchMock: vi.fn(),
+  searchParamsState: { value: '' },
+}));
 
 vi.mock('@clerk/nextjs', () => ({
   SignIn: (props: unknown) => {
     clerkSignInMock(props);
     return <div data-testid='clerk-sign-in' />;
+  },
+  GoogleOneTap: (props: unknown) => {
+    googleOneTapMock(props);
+    return <div data-testid='google-one-tap' />;
   },
 }));
 
@@ -35,8 +43,14 @@ import { APP_ROUTES } from '@/constants/routes';
 import SignInPage from '../../../app/(auth)/signin/page';
 
 describe('signin page', () => {
+  afterEach(() => {
+    delete document.documentElement.dataset.e2eMode;
+    vi.unstubAllEnvs();
+  });
+
   beforeEach(() => {
     clerkSignInMock.mockReset();
+    googleOneTapMock.mockReset();
     routerPrefetchMock.mockReset();
     searchParamsState.value = '';
   });
@@ -107,5 +121,88 @@ describe('signin page', () => {
         signUpUrl: '/signup?redirect_url=%2Fonboarding',
       })
     );
+  });
+
+  it('renders Google One Tap with dashboard and onboarding redirects by default', async () => {
+    render(<SignInPage />);
+
+    await waitFor(() => {
+      expect(googleOneTapMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(screen.getByTestId('google-one-tap')).toBeInTheDocument();
+    expect(googleOneTapMock).toHaveBeenCalledWith({
+      signInForceRedirectUrl: APP_ROUTES.DASHBOARD,
+      signUpForceRedirectUrl: APP_ROUTES.ONBOARDING,
+    });
+  });
+
+  it('preserves a safe redirect_url for Google One Tap', async () => {
+    searchParamsState.value =
+      'redirect_url=%2Fapp%2Fsettings%2Faccount%3Ftab%3Dbilling';
+
+    render(<SignInPage />);
+
+    await waitFor(() => {
+      expect(googleOneTapMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(googleOneTapMock).toHaveBeenCalledWith({
+      signInForceRedirectUrl: '/app/settings/account?tab=billing',
+      signUpForceRedirectUrl: '/app/settings/account?tab=billing',
+    });
+  });
+
+  it('drops an unsafe redirect_url for Google One Tap', async () => {
+    searchParamsState.value = 'redirect_url=https%3A%2F%2Fevil.example';
+
+    render(<SignInPage />);
+
+    await waitFor(() => {
+      expect(googleOneTapMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(googleOneTapMock).toHaveBeenCalledWith({
+      signInForceRedirectUrl: APP_ROUTES.DASHBOARD,
+      signUpForceRedirectUrl: APP_ROUTES.ONBOARDING,
+    });
+  });
+
+  it('does not render Google One Tap when disabled for automation or mock auth', async () => {
+    vi.stubEnv('NEXT_PUBLIC_GOOGLE_ONE_TAP_DISABLED', '1');
+
+    const { rerender } = render(<SignInPage />);
+
+    await waitFor(() => {
+      expect(clerkSignInMock).toHaveBeenCalledTimes(1);
+    });
+    expect(googleOneTapMock).not.toHaveBeenCalled();
+
+    vi.unstubAllEnvs();
+    vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
+    clerkSignInMock.mockReset();
+    rerender(<SignInPage />);
+    await waitFor(() => {
+      expect(clerkSignInMock).toHaveBeenCalledTimes(1);
+    });
+    expect(googleOneTapMock).not.toHaveBeenCalled();
+
+    vi.unstubAllEnvs();
+    vi.stubEnv('NEXT_PUBLIC_CLERK_MOCK', '1');
+    clerkSignInMock.mockReset();
+    rerender(<SignInPage />);
+    await waitFor(() => {
+      expect(clerkSignInMock).toHaveBeenCalledTimes(1);
+    });
+    expect(googleOneTapMock).not.toHaveBeenCalled();
+
+    vi.unstubAllEnvs();
+    document.documentElement.dataset.e2eMode = '1';
+    clerkSignInMock.mockReset();
+    rerender(<SignInPage />);
+    await waitFor(() => {
+      expect(clerkSignInMock).toHaveBeenCalledTimes(1);
+    });
+    expect(googleOneTapMock).not.toHaveBeenCalled();
   });
 });

@@ -28,6 +28,41 @@ The proxy path is `/__clerk`. ClerkProvider sets `proxyUrl="/__clerk"`. All Cler
 - Use `clerk.jov.ie` or `clerk.staging.jov.ie` as public-facing URLs — traffic goes through `/__clerk` path proxy only
 - Add satellite/custom proxy domains — they cost money and are unnecessary with the fetch proxy
 
+## Clerk CLI and Agent Setup Guardrails
+
+Jovie already has a custom Clerk architecture. Agents must not apply generic
+Clerk quickstarts or let Clerk-generated files rewrite app wiring.
+
+Allowed Clerk CLI use is limited to non-mutating diagnostics:
+
+- `clerk --version`
+- `clerk --help`
+- `clerk skill install --help`
+- other read-only diagnostics that do not create files, link instances, pull
+  env vars, or rewrite config
+
+Agent-only setup may run:
+
+```bash
+./scripts/clerk-agent-setup.sh
+```
+
+That helper may call `clerk skill install -y --pm pnpm`. It is intentionally
+wired from `scripts/codex-setup.sh`, not from shared `scripts/setup.sh`, so
+normal developer setup does not mutate agent/vendor instruction state. The
+helper must not fail repo setup if the Clerk CLI is missing or the agent is not
+logged in.
+
+### Do NOT run these as an agent
+
+- `clerk init`
+- `clerk link`
+- `clerk env pull`
+- `clerk doctor --fix`
+- generated `middleware.ts` creation
+- generated Clerk env rewrites
+- any setup flow that replaces the existing `/__clerk` proxy architecture
+
 ### If Clerk auth breaks
 
 1. Check the `fetch()` proxy in `proxy.ts` decodes the FAPI host from the resolved publishable key

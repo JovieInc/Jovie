@@ -1,11 +1,12 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   clearSignupClaimValueMock,
   clerkSignUpMock,
   fetchMock,
+  googleOneTapMock,
   persistSignupClaimValueMock,
   routerPrefetchMock,
   searchParamsState,
@@ -16,6 +17,7 @@ const {
   clearSignupClaimValueMock: vi.fn(),
   clerkSignUpMock: vi.fn(),
   fetchMock: vi.fn(),
+  googleOneTapMock: vi.fn(),
   persistSignupClaimValueMock: vi.fn(),
   routerPrefetchMock: vi.fn(),
   searchParamsState: { value: '' },
@@ -28,6 +30,10 @@ vi.mock('@clerk/nextjs', () => ({
   SignUp: (props: unknown) => {
     clerkSignUpMock(props);
     return <div data-testid='clerk-sign-up' />;
+  },
+  GoogleOneTap: (props: unknown) => {
+    googleOneTapMock(props);
+    return <div data-testid='google-one-tap' />;
   },
 }));
 
@@ -68,6 +74,10 @@ import { APP_ROUTES } from '@/constants/routes';
 import SignUpPage from '../../../app/(auth)/signup/page';
 
 describe('signup page', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   beforeEach(() => {
     clearSignupClaimValueMock.mockReset();
     clerkSignUpMock.mockReset();
@@ -75,6 +85,7 @@ describe('signup page', () => {
     fetchMock.mockResolvedValue({
       json: async () => ({ available: true }),
     });
+    googleOneTapMock.mockReset();
     persistSignupClaimValueMock.mockReset();
     routerPrefetchMock.mockReset();
     searchParamsState.value = '';
@@ -179,6 +190,48 @@ describe('signup page', () => {
         signInUrl: '/signin?redirect_url=%2Fonboarding',
       })
     );
+  });
+
+  it('renders Google One Tap with dashboard and onboarding redirects by default', async () => {
+    render(<SignUpPage />);
+
+    await waitFor(() => {
+      expect(googleOneTapMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(screen.getByTestId('google-one-tap')).toBeInTheDocument();
+    expect(googleOneTapMock).toHaveBeenCalledWith({
+      signInForceRedirectUrl: APP_ROUTES.DASHBOARD,
+      signUpForceRedirectUrl: APP_ROUTES.ONBOARDING,
+    });
+  });
+
+  it('preserves a safe redirect_url for Google One Tap', async () => {
+    searchParamsState.value = 'redirect_url=%2Fonboarding%3Fhandle%3Dartist';
+
+    render(<SignUpPage />);
+
+    await waitFor(() => {
+      expect(googleOneTapMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(googleOneTapMock).toHaveBeenCalledWith({
+      signInForceRedirectUrl: '/onboarding?handle=artist',
+      signUpForceRedirectUrl: '/onboarding?handle=artist',
+    });
+  });
+
+  it('does not render Google One Tap when the kill switch is enabled', async () => {
+    vi.stubEnv('NEXT_PUBLIC_GOOGLE_ONE_TAP_DISABLED', '1');
+
+    render(<SignUpPage />);
+
+    await waitFor(() => {
+      expect(clerkSignUpMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(googleOneTapMock).not.toHaveBeenCalled();
+    vi.unstubAllEnvs();
   });
 
   it('ignores invalid plan values and does not track plan intent', async () => {

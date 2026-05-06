@@ -23,4 +23,12 @@ describe('env-public', () => {
 
     expect(publicEnv.NEXT_PUBLIC_CLERK_PROXY_DISABLED).toBe('1');
   });
+
+  it('reads the Google One Tap kill switch from public env', async () => {
+    vi.stubEnv('NEXT_PUBLIC_GOOGLE_ONE_TAP_DISABLED', '1');
+
+    const { publicEnv } = await import('@/lib/env-public');
+
+    expect(publicEnv.NEXT_PUBLIC_GOOGLE_ONE_TAP_DISABLED).toBe('1');
+  });
 });
