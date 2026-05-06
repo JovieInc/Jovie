@@ -115,6 +115,17 @@ Read the file for the topic you're touching. More-local instructions override th
 
 When the user's request matches an available skill, ALWAYS invoke it using the Skill tool as your FIRST action. Full routing table (which skill handles which intent) lives in [`.claude/rules/gstack.md`](.claude/rules/gstack.md).
 
+## Coding Tasks
+
+When spawning Claude Code sessions for coding work, tell the session to use gstack skills.
+
+Examples:
+- Security audit: "Load gstack. Run /cso"
+- Code review: "Load gstack. Run /review"
+- QA test a URL: "Load gstack. Run /qa https://..."
+- Build a feature end-to-end: "Load gstack. Run /autoplan, implement the plan, then run /ship"
+- Plan before building: "Load gstack. Run /office-hours then /autoplan. Save the plan, don't implement."
+
 ## Quick Pointers
 
 - `AGENTS.md` is a symlink to this file — do not replace it with a standalone file.
