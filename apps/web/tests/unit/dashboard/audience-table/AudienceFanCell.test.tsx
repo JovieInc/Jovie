@@ -107,6 +107,25 @@ describe('AudienceFanCell', () => {
     expect(screen.getByText('Anonymous Fan')).toBeInTheDocument();
   });
 
+  it('treats a row as anonymous when the only identity is a hidden email', () => {
+    // Codex/Coderabbit-flagged: emailVisibleToArtist=false must not let a
+    // hidden email leak through the "Visitor" fallback.
+    render(
+      <AudienceFanCell
+        member={{
+          ...baseMember,
+          displayName: null,
+          email: 'hidden@example.com',
+          emailVisibleToArtist: false,
+          phone: null,
+          spotifyConnected: false,
+        }}
+      />
+    );
+    expect(screen.getByText('Anonymous Fan')).toBeInTheDocument();
+    expect(screen.queryByText('hidden@example.com')).not.toBeInTheDocument();
+  });
+
   it('renders monogram for emoji-prefixed names without splitting graphemes', () => {
     render(
       <AudienceFanCell

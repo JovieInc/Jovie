@@ -39,14 +39,21 @@ const STATE_LABEL = {
   subscriber: 'Subscriber',
 } as const;
 
+function pickFallbackName(type: AudienceMember['type']): string {
+  if (type === 'email') return 'Email Subscriber';
+  if (type === 'sms') return 'SMS Subscriber';
+  return 'Visitor';
+}
+
 /**
  * Compact mobile card matching the redesigned audience row.
  * Top row: monogram + name + state pill.
  * Bottom row: last-seen + Message action.
  *
- * The card outer is a non-button div (role=button) so the inner Message
- * action button is a valid HTML descendant. Tap behaviour is preserved
- * through the onClick + keyboard handler.
+ * The card uses two sibling buttons: a "stretched" tap target absolutely
+ * positioned behind the content for the row click, and the Message button
+ * in front for the primary action. This keeps both controls semantic and
+ * un-nested without resorting to a `role='button'` div.
  */
 export const AudienceMobileCard = React.memo(function AudienceMobileCard({
   member,
@@ -57,17 +64,14 @@ export const AudienceMobileCard = React.memo(function AudienceMobileCard({
 }: AudienceMobileCardProps) {
   const nowMs = useNowMs();
   const name = member.displayName?.trim() ?? '';
+  // Treat the email channel as absent when it's gated from the artist so the
+  // mobile card mirrors the desktop FanCell + privacy gate.
+  const visibleEmail =
+    member.emailVisibleToArtist === false ? null : member.email;
   const isAnonymous =
-    !name && !member.email && !member.phone && !member.spotifyConnected;
+    !name && !visibleEmail && !member.phone && !member.spotifyConnected;
   const displayName =
-    name ||
-    (isAnonymous
-      ? 'Anonymous Fan'
-      : member.type === 'email'
-        ? 'Email Subscriber'
-        : member.type === 'sms'
-          ? 'SMS Subscriber'
-          : 'Visitor');
+    name || (isAnonymous ? 'Anonymous Fan' : pickFallbackName(member.type));
   const monogram = isAnonymous ? '◯' : getMonogramInitials(displayName);
   const tone = isAnonymous
     ? 'bg-surface-0 text-tertiary-token'
@@ -76,25 +80,17 @@ export const AudienceMobileCard = React.memo(function AudienceMobileCard({
   // Use the SSR-safe nowMs context so the mobile card matches the desktop
   // table's hydration behaviour. While SSR_NOW_MS is in effect, every row
   // shows "Rising" until the post-mount tick swaps in the real clock.
+  const isSsr = isSsrNowMs(nowMs);
   const state: keyof typeof STATE_PILL =
     mode === 'subscribers'
       ? 'subscriber'
-      : isSsrNowMs(nowMs)
+      : isSsr
         ? 'rising'
         : deriveAudienceState(member, nowMs);
 
-  const reachable = Boolean(member.email || member.phone);
+  const reachable = Boolean(visibleEmail || member.phone);
 
   const handleCardClick = useCallback(() => onTap(member), [member, onTap]);
-  const handleCardKey = useCallback(
-    (event: React.KeyboardEvent<HTMLDivElement>) => {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        onTap(member);
-      }
-    },
-    [member, onTap]
-  );
 
   const handleActionClick = useCallback(
     (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -106,22 +102,24 @@ export const AudienceMobileCard = React.memo(function AudienceMobileCard({
   );
 
   return (
-    // biome-ignore lint/a11y/useSemanticElements: card nests an action <button> for "Message"; using a real <button> wrapper would be invalid HTML.
     <div
-      role='button'
-      tabIndex={0}
       className={cn(
-        'flex w-full items-stretch gap-3 px-4 py-3 text-left transition-[background-color,color] duration-150 outline-none',
-        isSelected ? 'bg-surface-0' : 'active:bg-surface-0',
-        'focus-visible:bg-surface-0 focus-visible:ring-1 focus-visible:ring-(--linear-app-shell-border)'
+        'relative flex w-full items-stretch gap-3 px-4 py-3 transition-[background-color,color] duration-150',
+        isSelected ? 'bg-surface-0' : 'active:bg-surface-0'
       )}
-      onClick={handleCardClick}
-      onKeyDown={handleCardKey}
-      aria-label={`View details for ${displayName}`}
     >
+      {/* Stretched tap target — absolutely positioned behind the content so
+          the Message button (which has z-10) intercepts clicks for itself. */}
+      <button
+        type='button'
+        onClick={handleCardClick}
+        aria-label={`View details for ${displayName}`}
+        className='absolute inset-0 outline-none focus-visible:bg-surface-0 focus-visible:ring-1 focus-visible:ring-(--linear-app-shell-border)'
+      />
+
       <div
         className={cn(
-          'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-xs font-semibold tabular-nums self-center',
+          'pointer-events-none relative z-0 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-xs font-semibold tabular-nums self-center',
           tone
         )}
         aria-hidden='true'
@@ -129,7 +127,7 @@ export const AudienceMobileCard = React.memo(function AudienceMobileCard({
         <span>{monogram}</span>
       </div>
 
-      <div className='flex-1 min-w-0 flex flex-col justify-center gap-1'>
+      <div className='pointer-events-none relative z-0 flex-1 min-w-0 flex flex-col justify-center gap-1'>
         <div className='flex items-center justify-between gap-2 min-w-0'>
           <TruncatedText
             lines={1}
@@ -149,7 +147,9 @@ export const AudienceMobileCard = React.memo(function AudienceMobileCard({
 
         <div className='flex items-center justify-between gap-2'>
           <span className='text-2xs text-tertiary-token tabular-nums'>
-            {member.lastSeenAt ? formatTimeAgo(member.lastSeenAt) : '—'}
+            {member.lastSeenAt && !isSsr
+              ? formatTimeAgo(member.lastSeenAt)
+              : '—'}
           </span>
           <Button
             type='button'
@@ -158,7 +158,7 @@ export const AudienceMobileCard = React.memo(function AudienceMobileCard({
             onClick={handleActionClick}
             disabled={!reachable}
             aria-label={`Message ${displayName}`}
-            className='min-h-[44px] min-w-[88px] px-3 text-xs'
+            className='pointer-events-auto relative z-10 min-h-[44px] min-w-[88px] px-3 text-xs'
           >
             Message
           </Button>
@@ -167,7 +167,7 @@ export const AudienceMobileCard = React.memo(function AudienceMobileCard({
 
       <Icon
         name='ChevronRight'
-        className='size-4 text-quaternary-token self-center shrink-0'
+        className='pointer-events-none relative z-0 size-4 text-quaternary-token self-center shrink-0'
         aria-hidden='true'
       />
     </div>

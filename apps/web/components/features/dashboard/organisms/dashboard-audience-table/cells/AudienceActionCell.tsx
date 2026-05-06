@@ -14,7 +14,11 @@ export const AudienceActionCell = memo(function AudienceActionCell({
   member,
 }: AudienceActionCellProps) {
   const { onSendNotification } = useAudienceTableStableContext();
-  const reachable = Boolean(member.email || member.phone);
+  // Gate the email channel on `emailVisibleToArtist` so a fan whose email is
+  // hidden from the artist (e.g. opt-in not confirmed) doesn't get exposed by
+  // the Message button enabling and forwarding `member.email` downstream.
+  const emailVisible = member.emailVisibleToArtist !== false;
+  const reachable = Boolean((emailVisible && member.email) || member.phone);
 
   const handleClick = useCallback(
     (event: React.MouseEvent<HTMLButtonElement>) => {

@@ -47,10 +47,15 @@ export const AudienceFanCell = memo(function AudienceFanCell({
   member,
 }: AudienceFanCellProps) {
   const name = member.displayName?.trim() ?? '';
+  // Treat email as absent when it's gated from the artist — otherwise we'd
+  // render "Visitor" instead of "Anonymous Fan" and leak that a hidden
+  // identity exists.
+  const visibleEmail =
+    member.emailVisibleToArtist === false ? null : member.email;
   // A fan is anonymous only when we have no contact channel AND no provider
   // identity. A Spotify-connected fan without email/phone is still identified.
   const isAnonymous =
-    !name && !member.email && !member.phone && !member.spotifyConnected;
+    !name && !visibleEmail && !member.phone && !member.spotifyConnected;
 
   const displayName = name || (isAnonymous ? 'Anonymous Fan' : 'Visitor');
   const monogram = isAnonymous ? '◯' : getMonogramInitials(displayName);
