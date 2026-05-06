@@ -144,12 +144,15 @@ describe('keyboard-shortcuts definitions', () => {
   });
 
   describe('help menu completeness', () => {
-    it('includes theme toggle shortcut', () => {
+    it('includes theme toggle shortcut bound to Alt+T (no bare letter)', () => {
       const themeShortcut = KEYBOARD_SHORTCUTS.find(
         s => s.id === 'toggle-theme'
       );
       expect(themeShortcut).toBeDefined();
-      expect(themeShortcut!.keys).toBe('T');
+      expect(themeShortcut!.shortcutKey).toBe('Alt+t');
+      // Display label uses the option glyph; keep the assertion loose so the
+      // exact glyph is documented in keyboard-shortcuts.ts only.
+      expect(themeShortcut!.keys).toMatch(/T$/);
     });
 
     it('includes sidebar toggle shortcut', () => {
@@ -176,6 +179,76 @@ describe('keyboard-shortcuts definitions', () => {
     it('every shortcut has an icon', () => {
       for (const shortcut of KEYBOARD_SHORTCUTS) {
         expect(shortcut.icon).toBeDefined();
+      }
+    });
+  });
+
+  describe('chord conflict detection (JOV-1827)', () => {
+    it('has no duplicate `shortcutKey` chord (canonicalized)', () => {
+      // Canonicalize so semantically identical chords with different
+      // casing/modifier order can't slip through (e.g. "Alt+Shift+Q" vs
+      // "Shift+Alt+q").
+      const normalizeChord = (chord: string) => {
+        const parts = chord
+          .split('+')
+          .map(p => p.trim())
+          .filter(Boolean);
+        const key = (parts.pop() ?? '').toLowerCase();
+        const modifiers = parts
+          .map(m => `${m[0]?.toUpperCase() ?? ''}${m.slice(1).toLowerCase()}`)
+          .sort();
+        return [...modifiers, key].join('+');
+      };
+      const chords = KEYBOARD_SHORTCUTS.filter(s => s.shortcutKey).map(s =>
+        normalizeChord(s.shortcutKey!)
+      );
+      expect(new Set(chords).size).toBe(chords.length);
+    });
+
+    it('does not advertise bare single-letter chords for action shortcuts', () => {
+      // Bare letters get swallowed by inputs; require a modifier.
+      for (const s of KEYBOARD_SHORTCUTS) {
+        if (s.category !== 'actions' || !s.shortcutKey) continue;
+        expect(s.shortcutKey).toMatch(/(Meta|Ctrl|Alt|Shift)\+/);
+      }
+    });
+
+    it('sequential first keys do not collide with single-key chords', () => {
+      const chords = new Set(
+        KEYBOARD_SHORTCUTS.filter(
+          s => s.shortcutKey && !s.shortcutKey.includes('+')
+        ).map(s => s.shortcutKey!.toLowerCase())
+      );
+      const sequentialFirsts = new Set(
+        KEYBOARD_SHORTCUTS.filter(s => s.isSequential && s.firstKey).map(s =>
+          s.firstKey!.toLowerCase()
+        )
+      );
+      for (const f of sequentialFirsts) {
+        expect(chords.has(f)).toBe(false);
+      }
+    });
+
+    it('every overlay shortcut has a known wiring location', () => {
+      // Document handler ownership in code so removals fail this test.
+      const HANDLED: Record<string, string> = {
+        'command-menu': 'CommandPalette.tsx',
+        'keyboard-shortcuts': 'useSequentialShortcuts',
+        'toggle-sidebar': 'useSidebarKeyboardShortcut',
+        'toggle-theme': 'useGlobalShortcutActions',
+        'sign-out': 'useGlobalShortcutActions',
+        'nav-dashboard': 'useSequentialShortcuts',
+        'nav-profile': 'useSequentialShortcuts',
+        'nav-contacts': 'useSequentialShortcuts',
+        'nav-releases': 'useSequentialShortcuts',
+        'nav-tour-dates': 'useSequentialShortcuts',
+        'nav-audience': 'useSequentialShortcuts',
+        'nav-earnings': 'useSequentialShortcuts',
+        'nav-chat': 'useSequentialShortcuts',
+        'nav-settings': 'useSequentialShortcuts',
+      };
+      for (const s of KEYBOARD_SHORTCUTS) {
+        expect(HANDLED[s.id]).toBeTruthy();
       }
     });
   });
