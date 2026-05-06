@@ -162,15 +162,19 @@ describe('ArtistNotificationsCTA full-screen alert flow states', () => {
     });
   });
 
-  it('renders nothing during hydration status checks to avoid SSR mismatch', async () => {
+  it('keeps the full-screen flow mounted during hydration checks', async () => {
     mockUseSubscriptionForm.mockReturnValue(
       buildFormState({ hydrationStatus: 'checking' })
     );
 
-    const { container } = await renderCTA();
+    await renderCTA();
 
-    expect(container).toBeEmptyDOMElement();
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(
+      screen.getByTestId('profile-mobile-notifications-flow')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('profile-mobile-notifications-step-email')
+    ).toBeInTheDocument();
   });
 
   it('does not render the retired fallback CTA when notifications are disabled', async () => {
