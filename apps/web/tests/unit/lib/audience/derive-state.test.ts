@@ -8,6 +8,21 @@ function daysAgo(days: number): string {
 }
 
 describe('deriveAudienceState', () => {
+  it('returns rising as a neutral SSR placeholder when nowMs <= 0', () => {
+    expect(
+      deriveAudienceState(
+        { lastSeenAt: daysAgo(1), intentLevel: 'high', visits: 99 },
+        0
+      )
+    ).toBe('rising');
+    expect(
+      deriveAudienceState(
+        { lastSeenAt: null, intentLevel: 'low', visits: 0 },
+        -1
+      )
+    ).toBe('rising');
+  });
+
   it('returns dormant when lastSeenAt is null', () => {
     expect(
       deriveAudienceState(
@@ -71,10 +86,13 @@ describe('deriveAudienceState', () => {
     ).toBe('dormant');
   });
 
-  it('returns dormant for medium intent past the rising window (>7d)', () => {
+  it('returns dormant for medium intent + low visits past the rising window', () => {
+    // Past the 7d window with low visits and medium intent: not enough signal
+    // to keep them in rising. Frequent visitors stay rising — see the
+    // "keeps frequent visitors as rising" test below.
     expect(
       deriveAudienceState(
-        { lastSeenAt: daysAgo(10), intentLevel: 'medium', visits: 5 },
+        { lastSeenAt: daysAgo(10), intentLevel: 'medium', visits: 1 },
         NOW
       )
     ).toBe('dormant');
@@ -89,9 +107,9 @@ describe('deriveAudienceState', () => {
     ).toBe('rising');
   });
 
-  it('handles boundary at exactly 14 days as not-yet-dormant', () => {
+  it('handles boundary at exactly 14 days as dormant for low-intent fallback', () => {
     // 14d is the cutoff; >14 is dormant. At exactly 14, not high, not rising
-    // (past 7d), so falls through to dormant by default.
+    // (past 7d), low intent + 1 visit, so falls through to dormant.
     expect(
       deriveAudienceState(
         { lastSeenAt: daysAgo(14), intentLevel: 'low', visits: 1 },
@@ -107,5 +125,24 @@ describe('deriveAudienceState', () => {
         NOW
       )
     ).toBe('high');
+  });
+
+  it('cools high-intent fans to rising when last seen 8-14 days ago', () => {
+    // Sentry-flagged: high intent past the recency window must not stay "high".
+    expect(
+      deriveAudienceState(
+        { lastSeenAt: daysAgo(10), intentLevel: 'high', visits: 1 },
+        NOW
+      )
+    ).toBe('rising');
+  });
+
+  it('keeps frequent visitors as rising in the 8-14 day gap', () => {
+    expect(
+      deriveAudienceState(
+        { lastSeenAt: daysAgo(10), intentLevel: 'low', visits: 5 },
+        NOW
+      )
+    ).toBe('rising');
   });
 });
