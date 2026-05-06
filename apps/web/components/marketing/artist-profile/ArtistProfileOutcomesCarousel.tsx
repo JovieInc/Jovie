@@ -80,8 +80,7 @@ export function ArtistProfileOutcomesCarousel({
             headline={outcomes.headline}
             body={outcomes.body}
             className='max-w-[38rem]'
-            headlineClassName='max-w-none text-[clamp(2.7rem,4.6vw,4.25rem)]'
-            bodyClassName='max-w-[28rem]'
+            bodyClassName='max-w-[30rem]'
           />
         </div>
 

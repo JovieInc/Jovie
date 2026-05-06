@@ -1,8 +1,9 @@
-import Link from 'next/link';
 import { APP_ROUTES } from '@/constants/routes';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import { cn } from '@/lib/utils';
+import { SHELL_H2_CLASS, SHELL_LEAD_CLASS } from './ArtistProfileSectionHeader';
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
+import { ShellCtaButton } from './ShellCtaButton';
 
 interface ArtistProfileFinalCtaProps {
   readonly finalCta: ArtistProfileLandingCopy['finalCta'];
@@ -18,31 +19,35 @@ export function ArtistProfileFinalCta({
   return (
     <ArtistProfileSectionShell
       className={cn(
-        'bg-white/[0.012]',
+        'relative bg-white/[0.012]',
         roomy &&
           'flex min-h-[56svh] items-center sm:min-h-[60svh] lg:min-h-[66svh]'
       )}
       containerClassName={cn(
-        'text-center',
+        'relative text-center',
         roomy && 'flex w-full flex-col items-center justify-center'
       )}
     >
       <h2
         data-testid='final-cta-headline'
-        className='mx-auto max-w-[14ch] text-balance text-[clamp(2.7rem,5.25vw,4.6rem)] font-[650] leading-[0.94] tracking-[-0.072em] text-primary-token lg:max-w-none'
+        className={cn(SHELL_H2_CLASS, 'mx-auto max-w-[16ch] lg:max-w-[20ch]')}
       >
         {finalCta.headline}
       </h2>
-      <p className='mx-auto mt-3 max-w-[29rem] text-[15px] leading-[1.55] text-secondary-token'>
+      <p className={cn(SHELL_LEAD_CLASS, 'mx-auto mt-5 max-w-[34rem] sm:mt-6')}>
         {finalCta.subhead}
       </p>
-      <Link
-        href={ctaHref}
-        data-testid='final-cta-action'
-        className='mt-6 inline-flex h-11 items-center justify-center rounded-full bg-white px-5 text-[14px] font-medium text-black transition-colors hover:bg-white/90'
-      >
-        {finalCta.ctaLabel}
-      </Link>
+      <div className='mt-8'>
+        <ShellCtaButton
+          href={ctaHref}
+          tone='primary'
+          context='on-dark'
+          size='lg'
+          data-testid='final-cta-action'
+        >
+          {finalCta.ctaLabel}
+        </ShellCtaButton>
+      </div>
     </ArtistProfileSectionShell>
   );
 }

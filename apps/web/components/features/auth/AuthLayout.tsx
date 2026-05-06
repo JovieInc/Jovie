@@ -9,7 +9,7 @@ import {
 } from '@jovie/ui';
 import { MoreHorizontal } from 'lucide-react';
 import Link from 'next/link';
-import { type ReactNode, useEffect, useRef } from 'react';
+import { type ReactNode, useRef } from 'react';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { AUTH_FORM_MAX_WIDTH_CLASS } from '@/features/auth/constants';
@@ -71,38 +71,14 @@ function SplitLayoutContent({
   designV1,
 }: AuthLayoutInnerProps) {
   return (
-    <div
-      className={cn(
-        'relative z-10 flex w-full flex-1 items-center justify-center',
-        designV1 ? 'max-w-[1160px]' : 'max-w-[1240px]'
-      )}
-    >
-      <div className='grid w-full gap-6 lg:min-h-[calc(100svh-7.5rem)] lg:grid-cols-[minmax(0,500px)_minmax(0,1fr)] lg:items-stretch lg:gap-7 xl:gap-10'>
-        <div className='flex min-h-0 flex-col justify-center lg:max-w-[500px] lg:justify-start lg:pt-16 lg:pb-6 xl:pt-20'>
-          {showLogo ? (
-            <div
-              className={cn(
-                'mb-5 flex justify-center transition-opacity duration-200 ease-out lg:mb-6 lg:justify-start',
-                isKeyboardVisible && 'pointer-events-none opacity-0'
-              )}
-              aria-hidden={isKeyboardVisible}
-            >
-              <Link
-                href='/'
-                className='inline-flex items-center justify-center text-white/92 transition-colors duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20'
-                aria-label='Go to homepage'
-                tabIndex={isKeyboardVisible ? -1 : undefined}
-              >
-                <BrandLogo size={20} tone='white' aria-hidden />
-              </Link>
-            </div>
-          ) : null}
-
+    <div className='relative z-10 flex w-full flex-1 items-stretch'>
+      <div className='grid w-full gap-2 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)] lg:items-stretch'>
+        <div className='flex min-h-0 flex-col items-center justify-center px-4 sm:px-8 lg:max-w-[460px] lg:px-10'>
           {showFormTitle && formTitle ? (
             <h1
               className={cn(
                 formTitleClassName,
-                'mb-8 text-center transition-all duration-200 ease-out lg:text-left',
+                'mb-6 text-center transition-all duration-200 ease-out',
                 isKeyboardVisible && 'mb-0 h-0 overflow-hidden opacity-0'
               )}
               aria-hidden={isKeyboardVisible}
@@ -117,13 +93,11 @@ function SplitLayoutContent({
             tabIndex={-1}
             className='w-full scroll-mt-4'
           >
-            <div className='mx-auto w-full max-w-[500px] lg:mx-0'>
-              {children}
-            </div>
+            <div className='mx-auto w-full max-w-[420px]'>{children}</div>
           </main>
 
           {showFooterPrompt && !isKeyboardVisible ? (
-            <p className='mt-6 text-center text-app font-normal text-white/58 animate-in fade-in-0 duration-200 lg:text-left'>
+            <p className='mt-3 text-center text-app font-normal text-white/58 animate-in fade-in-0 duration-200'>
               {footerPrompt}{' '}
               <Link
                 href={footerLinkHref}
@@ -136,11 +110,8 @@ function SplitLayoutContent({
         </div>
 
         {showLogo ? (
-          <div className='auth-desktop-only w-full lg:flex lg:min-h-full lg:justify-self-end'>
-            <AuthBrandPanel
-              variant={designV1 ? 'v1' : showcaseVariant}
-              className='ml-auto h-full w-full max-w-[620px]'
-            />
+          <div className='auth-desktop-only h-full w-full lg:flex lg:min-h-full'>
+            <AuthBrandPanel className='h-full w-full' />
           </div>
         ) : null}
       </div>
@@ -168,26 +139,6 @@ function StackLayoutContent({
           `relative z-10 flex w-full ${AUTH_FORM_MAX_WIDTH_CLASS} flex-col items-center overflow-visible`
         )}
       >
-        <div
-          className={cn(
-            'mb-6 flex h-6 w-6 items-center justify-center sm:mb-8',
-            'transition-opacity duration-200 ease-out',
-            (isKeyboardVisible || !showLogo) && 'pointer-events-none opacity-0'
-          )}
-          aria-hidden={isKeyboardVisible || !showLogo}
-        >
-          <Link
-            href='/'
-            className={`block ${LINK_FOCUS_CLASSES}`}
-            aria-label='Go to homepage'
-            tabIndex={isKeyboardVisible || !showLogo ? -1 : undefined}
-          >
-            <span className='inline-flex'>
-              <BrandLogo size={24} tone='auto' />
-            </span>
-          </Link>
-        </div>
-
         {showFormTitle && formTitle ? (
           <h1
             className={cn(
@@ -248,18 +199,9 @@ export function AuthLayout({
   const formRef = useRef<HTMLElement>(null);
   const isSplitVariant = layoutVariant === 'split';
 
-  useEffect(() => {
-    if (isKeyboardVisible && formRef.current) {
-      const timer = setTimeout(() => {
-        formRef.current?.scrollIntoView({
-          behavior: 'smooth',
-          block: 'center',
-        });
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-    return undefined;
-  }, [isKeyboardVisible]);
+  // No scrollIntoView keyboard pull-up: the shell is overflow-hidden
+  // (no scrollable ancestor), and the layout is sized to fit at every
+  // standard breakpoint without scroll.
 
   const innerProps: AuthLayoutInnerProps = {
     children,
@@ -283,15 +225,19 @@ export function AuthLayout({
       data-auth-layout-variant={layoutVariant}
       data-design-v1-auth={designV1 ? 'true' : 'false'}
       className={cn(
-        'fixed inset-0 isolate flex flex-col items-center overflow-y-auto overflow-x-clip overscroll-none max-w-[100dvw] text-white [color-scheme:dark]',
-        designV1 ? 'bg-[#06070a]' : 'bg-[#08090a]',
-        'px-4 sm:px-6',
-        isKeyboardVisible
-          ? 'pt-8 pb-4'
-          : 'pt-10 pb-10 sm:pt-14 sm:pb-12 lg:pt-16',
-        'pb-[max(1.5rem,env(safe-area-inset-bottom))]',
-        'pl-[max(1rem,env(safe-area-inset-left))]',
-        'pr-[max(1rem,env(safe-area-inset-right))]',
+        // App-shell base — sidebar/page background tone (matches Linear
+        // dark `--linear-bg-page`). The bento card sits inside as the
+        // elevated content surface with an 8px gap (matches the app
+        // shell's frame-shell-gap), so this surface reads as an
+        // extension of the shell, not a separate page. Hex-pinned
+        // because auth is dark regardless of root theme preference.
+        'fixed inset-0 isolate flex flex-col items-center overflow-hidden overscroll-none max-w-[100dvw] text-white [color-scheme:dark]',
+        'bg-[#08090a]',
+        'p-2 sm:p-2',
+        isKeyboardVisible && 'pt-1 pb-1',
+        'pb-[max(0.5rem,env(safe-area-inset-bottom))]',
+        'pl-[max(0.5rem,env(safe-area-inset-left))]',
+        'pr-[max(0.5rem,env(safe-area-inset-right))]',
         'transition-[padding] duration-200 ease-out'
       )}
     >
@@ -322,6 +268,25 @@ export function AuthLayout({
         >
           Skip to form
         </Link>
+      ) : null}
+
+      {showLogo ? (
+        <div
+          className={cn(
+            'absolute top-5 left-5 z-50 transition-opacity duration-200 ease-out sm:top-6 sm:left-7 lg:top-7 lg:left-14',
+            isKeyboardVisible && 'pointer-events-none opacity-0'
+          )}
+          aria-hidden={isKeyboardVisible}
+        >
+          <Link
+            href='/'
+            className='inline-flex items-center justify-center text-white/45 transition-colors duration-200 hover:text-white/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20'
+            aria-label='Go to homepage'
+            tabIndex={isKeyboardVisible ? -1 : undefined}
+          >
+            <BrandLogo size={18} tone='auto' aria-hidden />
+          </Link>
+        </div>
       ) : null}
 
       {showLogoutButton ? (

@@ -1,21 +1,17 @@
 'use client';
 
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import Image from 'next/image';
 import type { CSSProperties } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getMarketingExportImage } from '@/lib/screenshots/registry';
+import { ProductScreenshotFrame } from '@/components/marketing/ProductScreenshotFrame';
 
 type HeroMockupKind = 'desktop' | 'phone' | 'panel';
 type CarouselDirection = -1 | 1;
 
 interface HeroMockupShot {
   readonly id: string;
-  readonly src: string;
-  readonly alt: string;
+  readonly scenarioId: string;
   readonly title: string;
-  readonly width: number;
-  readonly height: number;
   readonly kind: HeroMockupKind;
   readonly priority: boolean;
 }
@@ -23,52 +19,36 @@ interface HeroMockupShot {
 const HERO_MOCKUP_SCREENSHOTS: readonly HeroMockupShot[] = [
   {
     id: 'release-calendar-sidebar',
-    src: getMarketingExportImage('dashboard-releases-sidebar-desktop')
-      .publicUrl,
-    alt: 'Desktop release calendar with the release sidebar open and populated catalog rows',
+    scenarioId: 'dashboard-releases-sidebar-desktop',
     title: 'Release Calendar',
-    width: 2880,
-    height: 1800,
     kind: 'desktop',
     priority: true,
   },
   {
     id: 'audience-crm',
-    src: getMarketingExportImage('dashboard-audience-desktop').publicUrl,
-    alt: 'Desktop audience CRM with fan segments and engagement signal',
+    scenarioId: 'dashboard-audience-desktop',
     title: 'Audience CRM',
-    width: 2880,
-    height: 1800,
     kind: 'desktop',
     priority: false,
   },
   {
     id: 'profile-workspace',
-    src: getMarketingExportImage('public-profile-desktop').publicUrl,
-    alt: 'Desktop artist profile management surface',
+    scenarioId: 'public-profile-desktop',
     title: 'Profile Workspace',
-    width: 2880,
-    height: 1800,
     kind: 'desktop',
     priority: false,
   },
   {
     id: 'tracked-links',
-    src: getMarketingExportImage('artist-spec-tracked-links-desktop').publicUrl,
-    alt: 'Desktop tracked links analytics for artist marketing',
+    scenarioId: 'artist-spec-tracked-links-desktop',
     title: 'Tracked Links',
-    width: 1842,
-    height: 952,
     kind: 'desktop',
     priority: false,
   },
   {
     id: 'profile-phone',
-    src: getMarketingExportImage('public-profile-mobile').publicUrl,
-    alt: 'Mobile artist profile with listen, tour, and presave actions',
+    scenarioId: 'public-profile-mobile',
     title: 'Artist Profile',
-    width: 780,
-    height: 1688,
     kind: 'phone',
     priority: false,
   },
@@ -206,16 +186,6 @@ export function HomepageHeroMockupCarousel() {
           {HERO_MOCKUP_SCREENSHOTS.map((shot, index) => {
             const offset = getOffset(index, activeIndex);
             const isActive = offset === 0;
-            // Phone shots use a hardcoded 9/19.5 frame aspect (set in CSS).
-            // Desktop/panel shots get the real capture aspect so object-fit:
-            // cover doesn't crop top/bottom (16:9 frame vs 16:10 capture).
-            const shotStyle: CSSProperties =
-              shot.kind === 'phone'
-                ? getSlideStyle(offset)
-                : ({
-                    ...getSlideStyle(offset),
-                    '--shot-aspect': `${shot.width} / ${shot.height}`,
-                  } as CSSProperties);
 
             return (
               <figure
@@ -224,21 +194,16 @@ export function HomepageHeroMockupCarousel() {
                 data-active={isActive ? 'true' : 'false'}
                 data-testid={`homepage-hero-shot-${shot.id}`}
                 key={shot.id}
-                style={shotStyle}
+                style={getSlideStyle(offset)}
               >
-                <div className='homepage-hero-mockup__frame'>
-                  <Image
-                    src={shot.src}
-                    alt={isActive ? shot.alt : ''}
-                    width={shot.width}
-                    height={shot.height}
-                    priority={shot.priority}
-                    quality={85}
-                    sizes={getHeroMockupSizes(shot.kind)}
-                    unoptimized
-                    className='homepage-hero-mockup__image'
-                  />
-                </div>
+                <ProductScreenshotFrame
+                  scenarioId={shot.scenarioId}
+                  sizes={getHeroMockupSizes(shot.kind)}
+                  priority={shot.priority}
+                  device={shot.kind === 'phone' ? 'phone' : 'desktop'}
+                  aria-hidden={!isActive}
+                  className='homepage-hero-mockup__frame'
+                />
               </figure>
             );
           })}
