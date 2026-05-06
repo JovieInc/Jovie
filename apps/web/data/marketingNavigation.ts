@@ -43,7 +43,7 @@ export const MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
         label: 'Fan Reactivation',
       },
       { href: APP_ROUTES.DEMO_VIDEO, label: 'Product Demo' },
-      { href: APP_ROUTES.HOME, label: 'Release System' },
+      { href: APP_ROUTES.LAUNCH, label: 'Release System' },
     ],
   },
   {
