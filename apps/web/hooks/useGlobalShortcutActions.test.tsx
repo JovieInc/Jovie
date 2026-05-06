@@ -4,8 +4,8 @@ import { describe, expect, it, vi } from 'vitest';
 const cycleTheme = vi.fn();
 const signOut = vi.fn();
 
-vi.mock('@clerk/nextjs', () => ({
-  useClerk: () => ({ signOut }),
+vi.mock('@/hooks/useClerkSafe', () => ({
+  useAuthSafe: () => ({ signOut }),
 }));
 vi.mock('@/components/site/theme-toggle/useThemeToggle', () => ({
   useThemeToggle: () => ({ cycleTheme }),
