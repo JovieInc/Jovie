@@ -1,0 +1,20 @@
+{
+  "name": "@jovie/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "tsc && electron .",
+    "build:staging": "ELECTRON_ENV=staging tsc && electron-builder --config electron-builder.yml --config.appId=app.jov.ie.staging --config.mac.icon=assets/icon-staging.icns",
+    "build:production": "ELECTRON_ENV=production tsc && electron-builder --config electron-builder.yml",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "electron": "^34.0.0",
+    "electron-builder": "^25.0.0",
+    "electron-updater": "^6.3.0",
+    "sharp": "^0.33.0",
+    "typescript": "^5.7.0"
+  }
+}
