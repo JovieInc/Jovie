@@ -3,7 +3,7 @@
  *
  * Persists a Mom Test interview transcript captured after onboarding.
  * Idempotent on `(userId, source)` via a unique index — duplicate submits
- * return `{ deduped: true }`. Summarization runs asynchronously via the
+ * update the latest transcript. Summarization runs asynchronously via the
  * /api/cron/summarize-interviews cron handler.
  */
 
@@ -39,6 +39,9 @@ const requestSchema = z.object({
       plan: z.string().max(64).optional().nullable(),
       locale: z.string().max(32).optional().nullable(),
       userAgent: z.string().max(512).optional().nullable(),
+      waitlistEntryId: z.string().uuid().optional().nullable(),
+      accessOutcome: z.string().max(64).optional().nullable(),
+      submittedFrom: z.string().max(64).optional().nullable(),
     })
     .default({}),
 });

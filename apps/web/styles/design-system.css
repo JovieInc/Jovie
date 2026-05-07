@@ -1309,3 +1309,18 @@
   font-family: var(--marketing-font-display);
   letter-spacing: -0.01em;
 }
+
+/* Cyan focus glow (shell-v1) — soft halo instead of the browser's harsh
+   royal-blue ring. Uses box-shadow so it inherits the element's
+   border-radius automatically and reads as a halo, not a hard ring.
+   :where() keeps specificity at 0 so component-level focus styles
+   (Clerk inputs, etc.) keep overriding this default. */
+:where(:focus-visible) {
+  outline: none;
+  box-shadow:
+    0 0 0 1px rgba(103, 232, 249, 0.18),
+    0 0 0 6px rgba(103, 232, 249, 0.08);
+  transition:
+    box-shadow 150ms cubic-bezier(0.32, 0.72, 0, 1),
+    border-color 150ms cubic-bezier(0.32, 0.72, 0, 1);
+}
