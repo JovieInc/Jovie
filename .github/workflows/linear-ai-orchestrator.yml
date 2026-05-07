@@ -152,7 +152,7 @@ jobs:
           # Rate limit: don't start new Codex work if too many agent PRs are open
           MAX_OPEN_AGENT_PRS=5
           OPEN_AGENT_PRS=$(gh pr list --state open --json headRefName --limit 200 \
-            | jq '[.[] | select(.headRefName | test("^(codex|claude|codegen-bot|linear)/"))] | length')
+            | jq '[.[] | select(.headRefName | test("^(codex|claude|codegen-bot|linear)/") or test("^[^/]+/jov-[0-9]+-"; "i"))] | length')
 
           echo "Open agent PRs: $OPEN_AGENT_PRS / $MAX_OPEN_AGENT_PRS"
 
