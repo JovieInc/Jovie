@@ -3792,27 +3792,10 @@ jobs:
       - name: Resolve failure provenance
         id: failure-provenance
         if: ${{ always() }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
 
-          api_url="${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?per_page=100"
-          response=$(curl -sS -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" "$api_url")
-          job_url=$(RESPONSE="$response" JOB_NAME="${{ github.job }}" python - <<'PY'
-          import json
-          import os
-
-          data = json.loads(os.environ["RESPONSE"])
-          job_name = os.environ["JOB_NAME"]
-          job = next((item for item in data.get("jobs", []) if item.get("name") == job_name), None)
-          print(job.get("html_url", "") if job else "")
-          PY
-          )
-
-          if [ -z "$job_url" ]; then
-            job_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}?check_suite_focus=true"
-          fi
+          job_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}?check_suite_focus=true"
 
           echo "job_name=${{ github.job }}" >> "$GITHUB_OUTPUT"
           echo "job_url=$job_url" >> "$GITHUB_OUTPUT"
