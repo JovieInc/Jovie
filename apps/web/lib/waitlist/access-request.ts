@@ -178,9 +178,6 @@ async function handleExistingEntry(params: {
       .update(waitlistEntries)
       .set(updateValues)
       .where(eq(waitlistEntries.id, existing.id));
-  }
-
-  if (existing.status === 'new') {
     await upsertUserAsPending(clerkUserId, emailRaw);
   }
 
