@@ -11,7 +11,7 @@
 # - Idempotent: skips if PR already exists for the branch
 # - Skips audit-only pushes (branches with only docs/audits and no code changes)
 # - Extracts Linear ticket ID from branch name for traceability
-# - Enables auto-merge so the PR flows through the full pipeline
+# - Creates a draft PR so verification can run before it enters the full pipeline
 # - Does NOT bypass any quality gates (CI, scope judge, auto-approve all still apply)
 
 name: Auto-PR on Agent Push
@@ -100,7 +100,7 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           BRANCH: ${{ github.ref_name }}
-          MAX_OPEN_AGENT_PRS: '10'
+          MAX_OPEN_AGENT_PRS: '5'
           MAX_WAIT_MINUTES: '6'
         run: |
           echo "Branch: $BRANCH"
