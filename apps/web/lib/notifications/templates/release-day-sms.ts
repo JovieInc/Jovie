@@ -22,7 +22,7 @@ export interface ReleaseDaySmsInputs {
 /**
  * Build the SMS body for a release-day notification.
  *
- * Format: `New from {artist}: "{title}" — {url}`. Plain ASCII (no emoji per
+ * Format: `New from {artist}: "{title}" - {url}`. Plain ASCII (no emoji per
  * UI rules; SMS bodies aren't UI but we keep tone consistent and avoid
  * GSM-7 fallback to UCS-2 which halves segment capacity). Total length is
  * capped near two SMS segments so a long title still fits without
@@ -34,14 +34,14 @@ export function buildReleaseDaySmsBody(inputs: ReleaseDaySmsInputs): string {
   const artist = inputs.artistName.trim();
   const title = inputs.releaseTitle.trim();
 
-  const fullMessage = `New from ${artist}: "${title}" — ${url}`;
+  const fullMessage = `New from ${artist}: "${title}" - ${url}`;
   if (fullMessage.length <= SMS_SOFT_LIMIT) {
     return fullMessage;
   }
 
   // URL must always survive — clamp the title instead. Keep at least 4 chars
   // of title plus an ellipsis so the trim is obviously intentional.
-  const fixedSuffix = ` — ${url}`;
+  const fixedSuffix = ` - ${url}`;
   const prefix = `New from ${artist}: "`;
   const closingQuote = '"';
   const ellipsis = '...';

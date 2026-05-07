@@ -11,7 +11,7 @@ describe('buildReleaseDaySmsBody', () => {
     });
 
     expect(body).toBe(
-      'New from Tim White: "Blessings" — https://jov.ie/tim/blessings'
+      'New from Tim White: "Blessings" - https://jov.ie/tim/blessings'
     );
   });
 
