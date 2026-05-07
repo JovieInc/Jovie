@@ -19,7 +19,9 @@ export const APP_ROUTES = {
   DASHBOARD_LINKS: '/app/dashboard/links',
   DASHBOARD_PROFILE: '/app/dashboard/profile',
   DASHBOARD_AUDIENCE: '/app/dashboard/audience',
-  DASHBOARD_LIBRARY: '/app/dashboard/library',
+  /** Legacy library path. Keep as a redirect source only. */
+  LEGACY_DASHBOARD_LIBRARY: '/app/dashboard/library',
+  DASHBOARD_LIBRARY: '/app/library',
   DASHBOARD_RELEASES: '/app/dashboard/releases',
   DASHBOARD_TASKS: '/app/dashboard/tasks',
   DASHBOARD_RELEASE_TASKS: '/app/dashboard/releases/[releaseId]/tasks',
@@ -34,6 +36,7 @@ export const APP_ROUTES = {
   TOUR_DATES: '/app/tour-dates',
   AUDIENCE: '/app/audience',
   EARNINGS: '/app/earnings',
+  LIBRARY: '/app/library',
   TASKS: '/app/dashboard/tasks',
   CHAT: '/app/chat',
   CHAT_PROFILE_PANEL: '/app/chat?panel=profile',

@@ -81,7 +81,7 @@ export const primaryNavigation: NavItem[] = [
 
 export const libraryNavItem: NavItem = {
   name: 'Library',
-  href: APP_ROUTES.DASHBOARD_LIBRARY,
+  href: APP_ROUTES.LIBRARY,
   id: 'library',
   icon: LibraryIcon,
   description: 'Browse read-only release assets and provider links',

@@ -478,7 +478,7 @@ const PRODUCT_SHOWCASE_ITEMS: readonly DesignStudioItem[] = [
     preview: LibraryViewPreview,
     demoRoute: '/demo/showcase/shell-library',
     componentPaths: [
-      'apps/web/app/app/(shell)/dashboard/library/LibrarySurface.tsx',
+      'apps/web/app/app/(shell)/library/LibrarySurface.tsx',
       'apps/web/app/exp/library-v1/page.tsx',
     ],
     screenshotScenarioIds: ['design-studio-shell-library-desktop'],

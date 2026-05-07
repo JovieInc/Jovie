@@ -3,6 +3,7 @@ import type { PublicRelease } from '@/features/profile/releases/types';
 import { ProfileCompactTemplate } from '@/features/profile/templates/ProfileCompactTemplate';
 import { buildProfilePublicViewModel } from '@/features/profile/view-models';
 import type { DiscogRelease } from '@/lib/db/schema/content';
+import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
@@ -29,6 +30,7 @@ export interface StaticArtistPageProps {
   readonly allowPhotoDownloads?: boolean;
   readonly pressPhotos?: PressPhoto[];
   readonly subscribeTwoStep?: boolean;
+  readonly alertOptInVariant?: ProfileAlertOptInVariant;
   readonly genres?: string[] | null;
   readonly tourDates?: TourDateViewModel[];
   readonly visitTrackingToken?: string;
@@ -58,6 +60,7 @@ export function StaticArtistPage({
   latestRelease,
   enableDynamicEngagement = false,
   subscribeTwoStep = false,
+  alertOptInVariant = 'button',
   genres,
   pressPhotos = [],
   allowPhotoDownloads = false,
@@ -87,6 +90,7 @@ export function StaticArtistPage({
     latestRelease,
     enableDynamicEngagement,
     subscribeTwoStep,
+    alertOptInVariant,
     genres,
     pressPhotos,
     allowPhotoDownloads,
@@ -113,6 +117,7 @@ export function StaticArtistPage({
       latestRelease={viewModel.latestRelease}
       enableDynamicEngagement={viewModel.enableDynamicEngagement}
       subscribeTwoStep={viewModel.subscribeTwoStep}
+      alertOptInVariant={viewModel.alertOptInVariant}
       genres={viewModel.genres}
       pressPhotos={viewModel.pressPhotos}
       allowPhotoDownloads={viewModel.allowPhotoDownloads}

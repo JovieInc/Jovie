@@ -152,6 +152,10 @@ const PROVIDER_CONFIG: Record<
     className: 'text-pink-600 dark:text-pink-400',
   },
   manual: { label: 'Manual', className: 'text-tertiary-token' },
+  admin_import: {
+    label: 'Admin Import',
+    className: 'text-amber-600 dark:text-amber-400',
+  },
 };
 
 const SourceCell = memo(function SourceCell({

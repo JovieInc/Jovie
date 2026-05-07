@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildLibraryReleaseAssets,
   formatLibraryReleaseDate,
-} from '@/app/app/(shell)/dashboard/library/library-data';
+} from '@/app/app/(shell)/library/library-data';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 
 function buildRelease(
@@ -30,6 +30,7 @@ describe('library data', () => {
     const assets = buildLibraryReleaseAssets([
       buildRelease({
         lyrics: 'Stored lyrics',
+        previewUrl: 'https://example.com/preview.mp3',
         providers: [
           {
             key: 'spotify',
@@ -50,6 +51,7 @@ describe('library data', () => {
         title: 'Test Release',
         artist: 'Test Artist',
         artworkUrl: 'https://example.com/art.jpg',
+        previewUrl: 'https://example.com/preview.mp3',
         smartLinkPath: '/artist/test-release',
         releaseDate: null,
         releaseType: 'single',
@@ -64,8 +66,37 @@ describe('library data', () => {
           },
         ],
         hasLyrics: true,
+        hasArtwork: true,
       },
     ]);
+  });
+
+  it('hides unavailable or invalid media URLs instead of mocking assets', () => {
+    const assets = buildLibraryReleaseAssets([
+      buildRelease({
+        artworkUrl: '',
+        previewUrl: 'javascript:alert(1)',
+        providers: [
+          {
+            key: 'spotify',
+            label: 'Spotify',
+            url: '',
+            source: 'ingested',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+            path: '/artist/test-release/spotify',
+            isPrimary: true,
+          },
+        ],
+      }),
+    ]);
+
+    expect(assets[0]).toMatchObject({
+      artworkUrl: null,
+      previewUrl: null,
+      providerCount: 0,
+      providers: [],
+      hasArtwork: false,
+    });
   });
 
   it('formats release dates without local timezone drift', () => {

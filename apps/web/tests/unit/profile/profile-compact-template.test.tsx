@@ -438,11 +438,14 @@ describe('ProfileCompactTemplate', () => {
     );
 
     const bottomNav = screen.getByTestId('profile-bottom-nav');
-    for (const label of ['Home', 'Music', 'Events', 'Alerts', 'More']) {
+    for (const label of ['Home', 'Music', 'Alerts', 'More']) {
       expect(
         within(bottomNav).getByRole('button', { name: label })
       ).toBeInTheDocument();
     }
+    expect(
+      within(bottomNav).queryByRole('button', { name: 'Events' })
+    ).not.toBeInTheDocument();
     expect(
       within(bottomNav).queryByRole('button', { name: 'Profile' })
     ).not.toBeInTheDocument();

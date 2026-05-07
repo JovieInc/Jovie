@@ -39,12 +39,12 @@ describe('DashboardNav interactions', () => {
   it('adds Library to navigation when the new design flag is enabled', () => {
     renderDashboardNav({
       renderFn: render,
-      appFlags: { DESIGN_V1: true },
+      appFlags: { SHELL_CHAT_V1: true },
     });
 
     expect(screen.getByRole('link', { name: 'Library' })).toHaveAttribute(
       'href',
-      APP_ROUTES.DASHBOARD_LIBRARY
+      APP_ROUTES.LIBRARY
     );
   });
 

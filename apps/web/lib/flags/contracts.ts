@@ -3,6 +3,7 @@ export const LEGACY_STATSIG_GATE_KEYS = {
   SMARTLINK_PRE_SAVE: 'smartlink_pre_save_campaigns',
   IOS_APPLE_MUSIC_PRIORITY: 'feature_ios_apple_music_priority',
   SUBSCRIBE_CTA_EXPERIMENT: 'experiment_subscribe_cta_variant',
+  PROFILE_ALERT_OPTIN_EXPERIMENT: 'profile_alert_optin_cta_variant',
   SPOTIFY_OAUTH: 'feature_spotify_oauth',
   STRIPE_CONNECT_ENABLED: 'stripe-connect-enabled',
   SHOW_EXAMPLE_PROFILES_CAROUSEL: 'show_example_profiles_carousel',
@@ -23,6 +24,7 @@ export type StatsigGateKey =
   (typeof LEGACY_STATSIG_GATE_KEYS)[keyof typeof LEGACY_STATSIG_GATE_KEYS];
 
 export type SubscribeCTAVariant = 'two_step' | 'inline';
+export type ProfileAlertOptInVariant = 'button' | 'toggle';
 export interface StatsigFeatureFlagsBootstrap {
   gates: Record<string, boolean>;
 }

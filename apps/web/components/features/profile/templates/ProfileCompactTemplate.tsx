@@ -27,6 +27,7 @@ import {
 } from '@/features/profile/registry';
 import type { PublicRelease } from '@/features/profile/releases/types';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
+import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import {
@@ -84,6 +85,7 @@ interface ProfileCompactTemplateProps {
   readonly featuredPlaylistFallback?: ConfirmedFeaturedPlaylistFallback | null;
   readonly enableDynamicEngagement?: boolean;
   readonly subscribeTwoStep?: boolean;
+  readonly alertOptInVariant?: ProfileAlertOptInVariant;
   readonly genres?: string[] | null;
   readonly pressPhotos?: PressPhoto[];
   readonly allowPhotoDownloads?: boolean;
@@ -205,6 +207,7 @@ export function ProfileCompactTemplate({
   featuredPlaylistFallback,
   enableDynamicEngagement = false,
   subscribeTwoStep = false,
+  alertOptInVariant = 'button',
   genres,
   pressPhotos = [],
   allowPhotoDownloads = false,
@@ -720,7 +723,10 @@ export function ProfileCompactTemplate({
                   ) : null}
                   <div className='absolute inset-0 bg-[linear-gradient(180deg,transparent_34%,rgba(0,0,0,0.58)_100%)]' />
                   <div className='absolute right-4 bottom-4 left-4'>
-                    <h1 className='text-[42px] font-semibold leading-[0.92] text-white'>
+                    <h1
+                      className='text-[42px] font-semibold leading-[0.92] text-white'
+                      data-testid='profile-compact-header'
+                    >
                       {artist.name}
                     </h1>
                   </div>
@@ -754,9 +760,7 @@ export function ProfileCompactTemplate({
           ) : null}
           <main className='relative flex h-full w-full items-stretch md:items-center'>
             {isDesktopLayout && !isV1 ? (
-              <h1 className='sr-only' data-testid='profile-header'>
-                {artist.name}
-              </h1>
+              <h1 className='sr-only'>{artist.name}</h1>
             ) : null}
             {isDesktopLayout ? (
               <div className='w-full' data-testid='profile-compact-shell'>
@@ -768,6 +772,7 @@ export function ProfileCompactTemplate({
                   showPayButton={showPayButton}
                   latestRelease={latestRelease}
                   profileSettings={profileSettings}
+                  alertOptInVariant={alertOptInVariant}
                   genres={genres}
                   pressPhotos={pressPhotos}
                   allowPhotoDownloads={allowPhotoDownloads}
@@ -815,6 +820,7 @@ export function ProfileCompactTemplate({
                   featuredPlaylistFallback={featuredPlaylistFallback}
                   enableDynamicEngagement={enableDynamicEngagement}
                   subscribeTwoStep={subscribeTwoStep}
+                  alertOptInVariant={alertOptInVariant}
                   genres={genres}
                   pressPhotos={pressPhotos}
                   allowPhotoDownloads={allowPhotoDownloads}

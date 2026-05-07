@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useProfileNotifications } from '@/components/organisms/profile-shell/ProfileNotificationsContext';
 import { useUserSafe } from '@/hooks/useClerkSafe';
 import { track } from '@/lib/analytics';
+import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import { readArtistEmailReadyFromSettings } from '@/lib/notifications/artist-email';
 import { normalizeSubscriptionEmail } from '@/lib/notifications/validation';
 import { readProfileAccentTheme } from '@/lib/profile/profile-theme';
@@ -42,6 +43,7 @@ export interface ProfileInlineNotificationsCTAProps {
   readonly onFlowClosed?: () => void;
   readonly onSubscriptionActivated?: () => void;
   readonly source?: NotificationSource;
+  readonly experimentVariant?: ProfileAlertOptInVariant;
 }
 
 const DEFAULT_ALERT_PREFS: Record<NotificationContentType, boolean> = {
@@ -134,6 +136,7 @@ export function ProfileInlineNotificationsCTA({
   onFlowClosed,
   onSubscriptionActivated,
   source,
+  experimentVariant,
 }: ProfileInlineNotificationsCTAProps) {
   const { contentPreferences, artistEmail, subscriptionDetails } =
     useProfileNotifications();
@@ -155,7 +158,7 @@ export function ProfileInlineNotificationsCTA({
     subscribedChannels,
     openSubscription,
     hydrationStatus,
-  } = useSubscriptionForm({ artist, source });
+  } = useSubscriptionForm({ artist, source, experimentVariant });
   const { user } = useUserSafe();
   const nameMutation = useUpdateSubscriberNameMutation();
   const birthdayMutation = useUpdateSubscriberBirthdayMutation();
@@ -247,10 +250,12 @@ export function ProfileInlineNotificationsCTA({
     track('subscribe_step_reveal', {
       handle: artist.handle,
       source: source ?? 'profile_inline',
+      alert_opt_in_variant: experimentVariant,
     });
   }, [
     artist.handle,
     emailInput,
+    experimentVariant,
     handleChannelChange,
     handleEmailChange,
     isSubscribed,

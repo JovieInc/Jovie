@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { HeaderNav } from '@/components/organisms/HeaderNav';
 
@@ -39,5 +39,38 @@ describe('HeaderNav flyout interactions', () => {
     expect(
       screen.getByRole('link', { name: 'Start Free Trial' })
     ).toHaveAttribute('href', '/signup');
+  });
+
+  it('closes marketing flyouts with Escape', () => {
+    render(
+      <HeaderNav
+        authMode='public-static'
+        presentation='marketing-glass'
+        flyoutMenus={[
+          {
+            id: 'features',
+            label: 'Features',
+            heading: 'Product',
+            links: [
+              {
+                href: '/artist-profiles',
+                label: 'Artist Profiles',
+                description: 'Artist profile pages',
+              },
+            ],
+          },
+        ]}
+      />
+    );
+
+    const trigger = screen.getByRole('button', { name: /Features/ });
+    fireEvent.focus(trigger);
+
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(trigger).toHaveFocus();
   });
 });

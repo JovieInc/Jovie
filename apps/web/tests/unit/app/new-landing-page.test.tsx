@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import Link from 'next/link';
 import { describe, expect, it, vi } from 'vitest';
 import NewLandingPage from '@/app/(marketing)/new/page';
@@ -43,17 +43,20 @@ vi.mock('next/navigation', () => ({
 }));
 
 describe('NewLandingPage', () => {
-  it('renders the staged homepage v2 content and staged product nav', () => {
+  it('renders the staged homepage v2 content and glass product nav', () => {
     render(<MarketingHeader />);
 
+    const featuresTrigger = screen.getByRole('button', { name: /Features/ });
+    fireEvent.focus(featuresTrigger);
+
     expect(
-      screen.getByRole('link', { name: 'Artist Profiles' })
+      screen.getByRole('link', { name: /Artist Profiles/ })
     ).toHaveAttribute('href', '/artist-profiles');
     expect(screen.getByRole('link', { name: 'Pricing' })).toHaveAttribute(
       'href',
       '/pricing'
     );
-    expect(screen.getByRole('link', { name: 'Support' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Contact' })).toHaveAttribute(
       'href',
       '/support'
     );

@@ -6,6 +6,7 @@ import {
   APP_FLAG_DEFAULTS,
   APP_FLAG_TO_STATSIG_GATE,
   LEGACY_STATSIG_GATE_KEYS,
+  type ProfileAlertOptInVariant,
   type StatsigBackedAppFlagName,
   type SubscribeCTAVariant,
 } from './contracts';
@@ -165,6 +166,20 @@ export async function getExperiment(
     );
     return {};
   }
+}
+
+export async function getProfileAlertOptInVariantValue(
+  stableId: string | null
+): Promise<ProfileAlertOptInVariant> {
+  const config = await getExperiment(
+    stableId,
+    LEGACY_STATSIG_GATE_KEYS.PROFILE_ALERT_OPTIN_EXPERIMENT
+  );
+  const variant = config.variant;
+  if (variant === 'button' || variant === 'toggle') {
+    return variant;
+  }
+  return 'button';
 }
 
 export async function getSubscribeCTAVariantValue(

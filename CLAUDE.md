@@ -115,6 +115,26 @@ Read the file for the topic you're touching. More-local instructions override th
 
 When the user's request matches an available skill, ALWAYS invoke it using the Skill tool as your FIRST action. Full routing table (which skill handles which intent) lives in [`.claude/rules/gstack.md`](.claude/rules/gstack.md).
 
+## gstack
+
+Use /browse from gstack for all web browsing. Never use mcp__claude-in-chrome__* tools.
+Available skills: /office-hours, /plan-ceo-review, /plan-eng-review, /plan-design-review,
+/design-consultation, /design-shotgun, /design-html, /review, /ship, /land-and-deploy,
+/canary, /benchmark, /browse, /open-gstack-browser, /qa, /qa-only, /design-review,
+/setup-browser-cookies, /setup-deploy, /setup-gbrain, /sync-gbrain, /retro, /investigate, /document-release,
+/codex, /cso, /autoplan, /perf-loop, /pair-agent, /careful, /freeze, /guard, /unfreeze, /gstack-upgrade, /learn.
+
+## Coding Tasks
+
+When spawning Claude Code sessions for coding work, tell the session to use gstack skills.
+
+Examples:
+- Security audit: "Load gstack. Run /cso"
+- Code review: "Load gstack. Run /review"
+- QA test a URL: "Load gstack. Run /qa https://..."
+- Build a feature end-to-end: "Load gstack. Run /autoplan, implement the plan, then run /ship"
+- Plan before building: "Load gstack. Run /office-hours then /autoplan. Save the plan, don't implement."
+
 ## Quick Pointers
 
 - `AGENTS.md` is a symlink to this file — do not replace it with a standalone file.

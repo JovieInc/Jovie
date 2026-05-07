@@ -122,4 +122,35 @@ describe('useSubscriptionForm', () => {
       Date.now() + 30_000
     );
   });
+
+  it('includes alert opt-in experiment variant in subscribe analytics', async () => {
+    mockSubscribeMutateAsync.mockResolvedValueOnce({
+      pendingConfirmation: false,
+    });
+
+    const { result } = renderHook(() =>
+      useSubscriptionForm({ artist, experimentVariant: 'toggle' })
+    );
+
+    await act(async () => {
+      result.current.handleEmailChange('fan@example.com');
+    });
+
+    await act(async () => {
+      await result.current.handleSubscribe();
+    });
+
+    expect(mockTrack).toHaveBeenCalledWith(
+      'subscribe_click',
+      expect.objectContaining({
+        alert_opt_in_variant: 'toggle',
+      })
+    );
+    expect(mockTrack).toHaveBeenCalledWith(
+      'notifications_subscribe_success',
+      expect.objectContaining({
+        alert_opt_in_variant: 'toggle',
+      })
+    );
+  });
 });

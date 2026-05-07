@@ -11,6 +11,7 @@ export interface LibraryReleaseAsset {
   readonly title: string;
   readonly artist: string;
   readonly artworkUrl: string | null;
+  readonly previewUrl: string | null;
   readonly smartLinkPath: string;
   readonly releaseDate: string | null;
   readonly releaseType: ReleaseViewModel['releaseType'];
@@ -19,25 +20,40 @@ export interface LibraryReleaseAsset {
   readonly providerCount: number;
   readonly providers: readonly LibraryProviderLink[];
   readonly hasLyrics: boolean;
+  readonly hasArtwork: boolean;
+}
+
+function normalizeHttpUrl(value: string | null | undefined): string | null {
+  const trimmed = value?.trim() ?? '';
+  if (!/^https?:\/\//i.test(trimmed)) return null;
+  return trimmed;
 }
 
 export function buildLibraryReleaseAssets(
   releases: readonly ReleaseViewModel[]
 ): LibraryReleaseAsset[] {
   return releases.map(release => {
-    const providers = release.providers
-      .map(provider => ({
-        key: provider.key,
-        label: provider.label,
-        url: provider.url?.trim() ?? '',
-      }))
-      .filter(provider => provider.url.length > 0);
+    const providers = release.providers.flatMap(provider => {
+      const url = normalizeHttpUrl(provider.url);
+      if (!url) return [];
+
+      return [
+        {
+          key: provider.key,
+          label: provider.label,
+          url,
+        },
+      ];
+    });
+    const artworkUrl = normalizeHttpUrl(release.artworkUrl);
+    const previewUrl = normalizeHttpUrl(release.previewUrl);
 
     return {
       id: release.id,
       title: release.title,
       artist: release.artistNames?.[0]?.trim() || 'Unknown Artist',
-      artworkUrl: release.artworkUrl ?? null,
+      artworkUrl,
+      previewUrl,
       smartLinkPath: release.smartLinkPath,
       releaseDate: release.releaseDate ?? null,
       releaseType: release.releaseType,
@@ -46,6 +62,7 @@ export function buildLibraryReleaseAssets(
       providerCount: providers.length,
       providers,
       hasLyrics: Boolean(release.lyrics?.trim()),
+      hasArtwork: Boolean(artworkUrl),
     };
   });
 }
