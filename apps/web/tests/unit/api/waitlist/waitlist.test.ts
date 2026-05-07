@@ -24,6 +24,8 @@ vi.mock('@clerk/nextjs/server', () => ({
   currentUser: mockCurrentUser,
 }));
 
+const mockDoesTableExist = vi.hoisted(() => vi.fn());
+
 vi.mock('@/lib/db', () => ({
   db: {
     select: mockDbSelect,
@@ -32,6 +34,7 @@ vi.mock('@/lib/db', () => ({
     execute: mockDbExecute,
     transaction: mockDbTransaction,
   },
+  doesTableExist: mockDoesTableExist,
   waitlistEntries: {},
 }));
 
@@ -156,6 +159,7 @@ describe('Waitlist API', () => {
 
     // Default: no auto-accept slot available
     mockTryReserveAutoAcceptSlot.mockResolvedValue({ shouldAutoAccept: false });
+    mockDoesTableExist.mockResolvedValue(true);
     mockFinalizeWaitlistApproval.mockResolvedValue(undefined);
     mockCaptureCriticalError.mockResolvedValue(undefined);
     mockBuildWaitlistInviteEmail.mockReturnValue({

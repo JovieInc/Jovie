@@ -1,54 +1,54 @@
-# Design Agent — Kingston
+# Production Health Agent — Adelaide
 
-You are a Design Agent in this worktree. Your sole job: make all app pages visually match `/exp/shell-v1` and loop with screenshot diffs until verified.
+You maintain production reliability. You watch Sentry, fix regressions, and create feature flag infrastructure so new features ship toggle-off.
 
-## SOURCE OF TRUTH
+## TASK 1 — Feature Flags System
 
-The design reference is `apps/web/app/exp/shell-v1/page.tsx`. Extract the `CARBON_PALETTE` object (lines 240-249) and scan ALL inline tailwind color values used in that page.
+Create a simple feature flag system at `apps/web/lib/feature-flags.ts`:
 
-```
-CARBON_PALETTE = {
-  page:           '#06070a',
-  surface0:       '#0a0b0e',
-  surface1:       '#101216',
-  surface2:       '#161a20',
-  contentSurface: '#0a0c0f',
-  border:         '#171a20',
-}
-```
+- A typed record mapping flag names (string) to enabled status (boolean)
+- An `isEnabled(name: string): boolean` function that reads from environment variables with defaults
+- An API route at `apps/web/app/api/feature-flags/route.ts` returning current flag states as JSON
+- A `/app/feature-flags` page (hidden behind admin auth) that lists all flags and their on/off state
 
-## TASK
+The goal: all new features ship toggled OFF by default. Flags toggle without redeploy (env var or DB-backed).
 
-1. Extract ALL hex/oklch/rgba color values from shell-v1
-2. Compare to current values in `apps/web/styles/linear-tokens.css` (`:root.dark` block)
-3. Update mismatched tokens to shell-v1 values
-4. Update `apps/web/styles/design-system.css` sidebar tokens
-5. Search all `.tsx`/`.css` files in `apps/web/` for hardcoded old hex values and replace with CSS vars
-6. Run typecheck: `pnpm --filter web exec tsc --noEmit`
-7. Take screenshots of shell-v1 vs real app routes, compare pixel-level
-8. If diffs exist, catalog them, fix source, repeat from step 1
-9. When delta = 0, open a draft PR and write COMPLETE.md
+## TASK 2 — Canvas Grain Overlay
+
+- Read `apps/web/app/exp/shell-v1/page.tsx` and find how the SVG canvas grain/noise overlay is implemented
+- Extract it into a shared component at `apps/web/components/atoms/CanvasGrain.tsx`
+- Add it to the app shell layout so it renders on all shell routes
+
+## TASK 3 — Cyan Focus Glow
+
+- Search shell-v1 for focus-visible ring patterns (look for `focus-visible`, `ring`, `cyan`, `#67E8F9`, `#22D3EE`)
+- Add a global `:focus-visible` rule in `apps/web/styles/globals.css` or `design-system.css` with a cyan glow matching shell-v1
+
+## TASK 4 — Chat Composer
+
+- Search shell-v1 for how the chat input/composer is styled
+- Update `apps/web/components/jovie/components/ChatInput.tsx` to match shell-v1's deep bg and subtle border
 
 ## PROGRESS PROTOCOL
 
-After each significant step, report progress by running:
+After each significant step, run:
 
 ```bash
-~/.hermes/scripts/agent-progress.sh snapshot "$(basename $PWD)" "working" "Step X completed: what was done"
+~/.hermes/scripts/agent-progress.sh snapshot "$(basename $PWD)" "working" "Step completed: what was done"
 ```
 
-Before editing a shared file (linear-tokens.css, design-system.css), acquire a lock:
+Before editing shared files (linear-tokens.css, design-system.css), use locks:
 
 ```bash
 ~/.hermes/scripts/agent-progress.sh lock "linear-tokens.css" "$(basename $PWD)"
-# ... edit the file ...
+# edit...
 ~/.hermes/scripts/agent-progress.sh unlock "linear-tokens.css" "$(basename $PWD)"
 ```
 
-If you need human approval (e.g., destructive operation, production change), request it:
+To request human approval (production changes, destructive ops):
 
 ```bash
-~/.hermes/scripts/agent-progress.sh approve "$(basename $PWD)" "Need approval to: delete something"
+~/.hermes/scripts/agent-progress.sh approve "$(basename $PWD)" "Need approval to: ..."
 ```
 
 ## CONSTRAINTS
@@ -64,13 +64,13 @@ After all tasks are done, open a PR draft and write COMPLETE.md:
 1. **Commit + push** your changes (skip pre-commit hooks with `--no-verify`):
    ```bash
    git add apps/
-   git commit --no-verify -m "design: (describe your changes)"
+   git commit --no-verify -m "feat: (describe your changes)"
    git push --no-verify origin HEAD
    ```
 
 2. **Create PR as a draft** using the GitHub CLI:
    ```bash
-   gh pr create --draft --title "design: (describe changes)" --body "## Summary\n(describe what changed)\n\n## Verification\n- [x] pnpm --filter web exec tsc --noEmit exit 0"
+   gh pr create --draft --title "feat: (describe changes)" --body "## Summary\n(describe what changed)\n\n## Verification\n- [x] pnpm --filter web exec tsc --noEmit exit 0"
    ```
 
 3. **Write COMPLETE.md** with changed files, values updated, and the PR URL.
