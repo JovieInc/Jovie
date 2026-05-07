@@ -159,6 +159,23 @@ interface CandidateTest {
   stabilityReruns?: number;
 }
 
+interface CandidateValidationResult {
+  id: string;
+  keep: boolean;
+  executed: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+interface CandidateValidationReport {
+  generatedAt: string;
+  repo: RepoKey;
+  candidateInput: string;
+  total: number;
+  kept: number;
+  results: CandidateValidationResult[];
+}
+
 interface PlaywrightReport {
   suites?: PlaywrightSuite[];
   stats?: {
@@ -635,10 +652,12 @@ function parseMutation(params: {
   const counts = countMutationStatuses(report);
   const killed = counts.Killed ?? counts.killed ?? 0;
   const survived = counts.Survived ?? counts.survived ?? 0;
-  const timedOut = counts.Timeout ?? counts.TimedOut ?? counts.timedOut ?? 0;
+  const timedOut =
+    counts.Timeout ?? counts.timeout ?? counts.TimedOut ?? counts.timedOut ?? 0;
   const noCoverage = counts.NoCoverage ?? counts.noCoverage ?? 0;
-  const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
-  const score = total > 0 ? Math.round((killed / total) * 10_000) / 100 : 0;
+  const detected = killed + timedOut;
+  const total = detected + survived + noCoverage;
+  const score = total > 0 ? Math.round((detected / total) * 10_000) / 100 : 0;
   return {
     repo: params.repo,
     module: 'mutation-hotspots',
@@ -698,7 +717,7 @@ function commandNormalize(
       lane: 'mutation-hotspots',
       total: mutation.total,
       passed: mutation.killed,
-      failed: mutation.survived,
+      failed: mutation.survived + (mutation.timedOut ?? 0),
       flaky: 0,
       skipped: mutation.noCoverage ?? 0,
       durationMs: 0,
@@ -758,7 +777,11 @@ function executeCommand(
   repoRoot: string,
   command: CandidateCommand
 ): string | null {
-  const cwd = command.cwd ? resolveFromRoot(repoRoot, command.cwd) : repoRoot;
+  const cwd = command.cwd ? path.resolve(repoRoot, command.cwd) : repoRoot;
+  const relativeCwd = path.relative(repoRoot, cwd);
+  if (relativeCwd.startsWith('..') || path.isAbsolute(relativeCwd)) {
+    return `Command "${command.name}" uses cwd outside the repository root.`;
+  }
   const result = spawnSync(command.argv[0], command.argv.slice(1), {
     cwd,
     stdio: 'inherit',
@@ -776,6 +799,7 @@ function commandValidateCandidate(
   args: Record<string, string>
 ): void {
   const repo = normalizeRepoKey(args.repo);
+  const profile = getManifest(repoRoot).repos[repo];
   const candidateInput = args.candidate
     ? resolveFromRoot(repoRoot, args.candidate)
     : path.join(repoRoot, '.agents/skills/nightly-test-agent/candidates');
@@ -812,7 +836,10 @@ function commandValidateCandidate(
       );
     }
     if (execute && errors.length === 0) {
-      const reruns = Math.max(1, candidate.stabilityReruns ?? 1);
+      const reruns = Math.max(
+        1,
+        candidate.stabilityReruns ?? profile.generationPolicy.stabilityReruns
+      );
       for (const command of candidate.commands) {
         const totalRuns = command.name.toLowerCase().includes('test')
           ? reruns
@@ -855,6 +882,15 @@ function loadJsonReports(inputDir: string): NormalizedRunReport[] {
   ).map(filePath => readJson<NormalizedRunReport>(filePath));
 }
 
+function loadCandidateValidationReports(
+  inputDir: string
+): CandidateValidationReport[] {
+  return findFiles(
+    inputDir,
+    filePath => path.basename(filePath) === 'candidate-validation.json'
+  ).map(filePath => readJson<CandidateValidationReport>(filePath));
+}
+
 function loadSelectedTargets(inputDir: string): SelectedTarget[] {
   return findFiles(
     inputDir,
@@ -876,8 +912,21 @@ function commandEmitDelta(
     ? resolveFromRoot(repoRoot, args['input-dir'])
     : dir;
   const reports = loadJsonReports(inputDir);
+  const candidateReports = loadCandidateValidationReports(inputDir);
   const selectedTargets = loadSelectedTargets(inputDir);
-  const suites = reports.flatMap(report => report.suites);
+  const candidateSuites: SuiteSummary[] = candidateReports.map(report => ({
+    lane: 'candidate-validation',
+    total: report.total,
+    passed: report.kept,
+    failed: report.total - report.kept,
+    flaky: 0,
+    skipped: 0,
+    durationMs: 0,
+  }));
+  const suites = [
+    ...reports.flatMap(report => report.suites),
+    ...candidateSuites,
+  ];
   const failures = reports.flatMap(report => report.failures);
   const mutation = reports.find(report => report.mutation)?.mutation;
   writeJson(path.join(dir, 'skill-delta.json'), {
@@ -896,6 +945,12 @@ function commandEmitDelta(
       fingerprint: failure.fingerprint,
     })),
     mutation,
+    candidateValidation: candidateReports.map(report => ({
+      total: report.total,
+      kept: report.kept,
+      failed: report.total - report.kept,
+      executed: report.results.filter(result => result.executed).length,
+    })),
   });
   const suiteRows = suites.map(
     suite =>
@@ -909,6 +964,12 @@ function commandEmitDelta(
     const message = (failure.message ?? '').replaceAll('\n', ' ').slice(0, 140);
     return `| ${failure.lane} | ${failure.testId.replaceAll('|', '\\|')} | ${failure.file ?? ''} | ${message.replaceAll('|', '\\|')} |`;
   });
+  const candidateRows = candidateReports.flatMap(report =>
+    report.results.slice(0, 20).map(result => {
+      const firstError = result.errors[0]?.replaceAll('|', '\\|') ?? '';
+      return `| ${result.id.replaceAll('|', '\\|')} | ${result.keep ? 'kept' : 'rejected'} | ${result.executed ? 'yes' : 'no'} | ${firstError} |`;
+    })
+  );
   writeText(
     path.join(dir, 'nightly-report.md'),
     [
@@ -928,6 +989,14 @@ function commandEmitDelta(
       '| Target | Score | Lanes |',
       '|---|---:|---|',
       ...(targetRows.length > 0 ? targetRows : ['| none | 0 | none |']),
+      '',
+      '## Candidate Validation',
+      '',
+      '| Candidate | Result | Executed | First Error |',
+      '|---|---|---|---|',
+      ...(candidateRows.length > 0
+        ? candidateRows
+        : ['| none | none | no | none |']),
       '',
       '## Failures',
       '',
