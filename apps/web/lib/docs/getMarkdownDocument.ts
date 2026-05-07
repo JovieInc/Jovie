@@ -1,5 +1,4 @@
 import { promises as fs } from 'node:fs';
-import DOMPurify from 'isomorphic-dompurify';
 import { toString } from 'mdast-util-to-string';
 import { cache } from 'react';
 import { remark } from 'remark';
@@ -7,6 +6,7 @@ import remarkHtml from 'remark-html';
 import { visit } from 'unist-util-visit';
 import { LEGAL_ENTITY_NAME } from '@/constants/app';
 import { resolveAppContentPath } from '@/lib/filesystem-paths';
+import { sanitizeServerHtml } from '@/lib/html/sanitize';
 import type { MarkdownDocument, TocEntry } from '@/types/docs';
 
 const slugifyHeading = (value: string): string => {
@@ -73,9 +73,8 @@ export async function createMarkdownDocument(
   const transformed = await processor.run(ast);
   const htmlResult = processor.stringify(transformed as never);
 
-  // Sanitize HTML server-side so downstream readers can remain server components
-  // and avoid pulling DOMPurify into client bundles.
-  const sanitizedHtml = DOMPurify.sanitize(htmlResult.toString());
+  // Sanitize HTML server-side so downstream readers can remain server components.
+  const sanitizedHtml = sanitizeServerHtml(htmlResult.toString());
 
   return {
     html: sanitizedHtml,

@@ -34,4 +34,15 @@ describe('createMarkdownDocument', () => {
     expect(doc.html).toContain('id="target-heading"');
     expect(doc.html).toContain('href="#target-heading"');
   });
+
+  it('removes dangerous HTML from markdown output', async () => {
+    const md =
+      '## Safe\n\n<script>alert("x")</script><a href="javascript:alert(1)" onclick="alert(2)">Bad link</a>';
+    const doc = await createMarkdownDocument(md);
+
+    expect(doc.html).toContain('Bad link');
+    expect(doc.html).not.toContain('<script');
+    expect(doc.html).not.toContain('javascript:');
+    expect(doc.html).not.toContain('onclick');
+  });
 });
