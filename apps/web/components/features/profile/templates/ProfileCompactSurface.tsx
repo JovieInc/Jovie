@@ -330,7 +330,7 @@ export function ProfileCompactSurface({
   const topChromeButtonClassName =
     'h-9! w-9! border-white/14 bg-black/24 text-white shadow-[0_10px_24px_rgba(0,0,0,0.22)] backdrop-blur-md hover:bg-black/36 active:scale-100';
   const socialIconClassName =
-    'inline-flex h-8 w-8 items-center justify-center text-white/68 transition-colors duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
+    'inline-flex h-8 w-8 items-center justify-center text-white/68 transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
   const heroHeightClassName = isHomeMode
     ? 'h-[34svh] min-h-[232px] max-h-[250px] [@media(min-height:761px)_and_(max-height:880px)]:max-h-[190px] [@media(min-height:761px)_and_(max-height:880px)]:min-h-[190px] [@media(max-height:760px)]:h-[156px] [@media(max-height:760px)]:min-h-[156px]'
     : 'h-14 border-b border-white/[0.075]';
@@ -378,9 +378,6 @@ export function ProfileCompactSurface({
         data-testid='profile-compact-surface'
         data-presentation={presentation}
       >
-        {!isHomeMode && renderMode !== 'preview' ? (
-          <h1 className='sr-only'>{artist.name}</h1>
-        ) : null}
         <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.025),transparent_34%)]' />
 
         <header
@@ -566,7 +563,7 @@ export function ProfileCompactSurface({
                   type='button'
                   onClick={openNotifications}
                   disabled={renderMode !== 'interactive'}
-                  className='flex min-h-11 w-full items-center gap-3 rounded-[14px] border border-white/10 bg-white/[0.035] px-3 text-left text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_14px_28px_-18px_rgba(0,0,0,0.55)] backdrop-blur-2xl transition-[background-color,border-color] duration-200 hover:bg-white/[0.055] disabled:cursor-default disabled:hover:bg-white/[0.035] [@media(max-height:820px)]:hidden'
+                  className='flex min-h-11 w-full items-center gap-3 rounded-[14px] border border-white/10 bg-white/[0.035] px-3 text-left text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_14px_28px_-18px_rgba(0,0,0,0.55)] backdrop-blur-2xl transition-[background-color,border-color] duration-subtle hover:bg-white/[0.055] disabled:cursor-default disabled:hover:bg-white/[0.035] [@media(max-height:820px)]:hidden'
                   data-testid='profile-hero-alerts-row'
                 >
                   <span
@@ -586,8 +583,8 @@ export function ProfileCompactSurface({
                   <span
                     className={cn(
                       alertOptInVariant === 'toggle'
-                        ? 'relative h-[26px] w-[42px] shrink-0 rounded-full border p-0.5 transition-colors duration-200'
-                        : 'inline-flex h-8 shrink-0 items-center rounded-full bg-white px-3 text-[12px] font-semibold text-black transition-colors duration-200',
+                        ? 'relative h-[26px] w-[42px] shrink-0 rounded-full border p-0.5 transition-colors duration-subtle'
+                        : 'inline-flex h-8 shrink-0 items-center rounded-full bg-white px-3 text-[12px] font-semibold text-black transition-colors duration-subtle',
                       alertOptInVariant === 'toggle' &&
                         (isSubscribed
                           ? 'border-white/42 bg-white'
@@ -598,7 +595,7 @@ export function ProfileCompactSurface({
                     {alertOptInVariant === 'toggle' ? (
                       <span
                         className={cn(
-                          'block h-[22px] w-[22px] rounded-full shadow-[0_4px_10px_rgba(0,0,0,0.22)] transition-transform duration-200',
+                          'block h-[22px] w-[22px] rounded-full shadow-[0_4px_10px_rgba(0,0,0,0.22)] transition-transform duration-subtle',
                           isSubscribed
                             ? 'translate-x-4 bg-black'
                             : 'translate-x-0 bg-white'
@@ -624,8 +621,9 @@ export function ProfileCompactSurface({
               'min-h-0 flex-1',
               showBottomNav ? 'pb-4' : 'pb-0',
               !isHomeMode &&
-                'overflow-y-auto overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+                'overflow-y-auto overscroll-contain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
             )}
+            tabIndex={isHomeMode ? undefined : 0}
           >
             {isHomeMode ? (
               <ProfileHomeRail
@@ -692,7 +690,7 @@ export function ProfileCompactSurface({
                         type='button'
                         onClick={() => onModeSelect(tab.mode)}
                         className={cn(
-                          'relative flex min-h-[52px] min-w-0 flex-col items-center justify-center gap-1 rounded-[22px] px-1.5 py-1.5 text-center transition-[background-color,color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
+                          'relative flex min-h-[52px] min-w-0 flex-col items-center justify-center gap-1 rounded-[22px] px-1.5 py-1.5 text-center transition-[background-color,color] duration-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
                           isActive
                             ? 'text-white'
                             : 'text-white/40 hover:text-white/62'
@@ -721,7 +719,7 @@ export function ProfileCompactSurface({
                       type='button'
                       onClick={onOpenMenu}
                       className={cn(
-                        'relative flex min-h-[52px] min-w-0 flex-col items-center justify-center gap-1 rounded-[22px] px-1.5 py-1.5 text-center transition-[background-color,color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
+                        'relative flex min-h-[52px] min-w-0 flex-col items-center justify-center gap-1 rounded-[22px] px-1.5 py-1.5 text-center transition-[background-color,color] duration-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
                         isMenuActive
                           ? 'text-white'
                           : 'text-white/40 hover:text-white/62'
