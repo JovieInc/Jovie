@@ -18,6 +18,12 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 
 ## Testing
 
+### Repeated review comments must become durable guardrails
+
+**Mistake:** PR review findings about the same agent failure class were fixed one PR at a time, then the next agent repeated the pattern because no test, rule, doc, or skill changed.
+
+**Rule:** When CodeRabbit, Greptile, Sentry, or a human reviewer catches a valid agent-caused issue, ask whether the same mistake can recur. Repeated patterns should produce the narrowest durable guard: a focused test for deterministic logic, a scoped `.claude/rules/*` rule for repo policy, a `LESSONS.md` entry for cross-cutting mistakes, or a gstack skill-template update for workflow behavior. Do not log every weekly finding here; only add lessons when the root cause repeats.
+
 ### Windows setup must use Git Bash, not the WSL launcher
 
 **Mistake:** In a Windows PowerShell automation shell, `bash ./scripts/setup.sh` resolved to `C:\Windows\System32\bash.exe`, the WSL launcher. WSL was denied in the sandbox, so setup looked broken even though Git for Windows Bash was installed and worked.
