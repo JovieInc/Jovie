@@ -11,6 +11,19 @@ Controller file for AI agents working in this repo. `AGENTS.md` is a symlink to 
 - Don't hide failing checks. Report exact failures and the likely cause.
 - Ask before destructive operations: data deletion, irreversible migrations, credential changes, dependency replacement, auth/payment changes, or production-impacting scripts.
 
+## Agent Role Boundary
+
+Orchestrated sessions must set `JOVIE_AGENT_PROFILE` before editing:
+
+- `default` / Chief of Staff: prioritize, dispatch, verify, update HUD/Linear. Do not code.
+- `cfo-milan-v2`: cost, runway, usage, spend routing. Do not code.
+- `founder-os`: GTM, fundraising, applications, company facts. Do not code.
+- `code-orchestrator`: plan, decompose, review, and create manifests. Do not implement.
+- `coder`: implement assigned HUD/delegation manifests only.
+- `no_agent`: deterministic scripts, HUD refresh, cron checks, usage ledger, GBrain sync.
+
+If a non-coding profile discovers work that needs product/CI changes, create or update a HUD/delegation manifest with KPI, owner, profile, runtime, cost route, GBrain queries, gstack skills, expected output, and verification. Then dispatch a `coder` profile. Do not check out teammate branches, edit code, commit, push, merge, deploy, or repair CI directly from Chief/default/code-orchestrator sessions.
+
 ## Instruction Architecture
 
 - `AGENTS.md` is the canonical cross-agent contract and is intentionally a symlink to this file. Do not replace it with a standalone file.
