@@ -22,6 +22,11 @@ If neither is present, the workflows cannot find the Linear issue and state stay
 
 ## Creating PRs with Auto-merge
 
+Agent automation has a separate capacity guard: Linear dispatch, orchestrator
+pickup, and the agent push-to-PR bridge defer new agent work when 5 agent PRs
+are already open. The push-to-PR bridge creates draft PRs; verification and
+agent pipeline jobs decide when they are ready for auto-merge.
+
 ### Option 1: Helper Script (Recommended)
 ```bash
 ./scripts/create-pr.sh "feat: add user authentication" "Implement OAuth login with Google and GitHub providers"
