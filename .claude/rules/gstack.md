@@ -68,7 +68,9 @@ gstack skill files are part of the agent control plane. Keep them fast, stable, 
 
 ## Performance Optimization Loop
 
-`/perf-loop` runs an autonomous optimization loop that measures, experiments, and keeps only improvements. State is persisted to `.context/perf/` for resume capability. The skill uses `perf:loop` (performance-optimizer.ts) as its measurement primitive and commits each accepted improvement atomically.
+`/perf-loop` runs an autonomous optimization loop that measures, experiments, and keeps only improvements. It must follow `.claude/skills/jovie-performance-hardening/SKILL.md`: baseline first, one hypothesis family per iteration, re-measure with the same method, and keep only validated wins. State is persisted to `.context/perf/` for resume capability. The skill uses `perf:loop` (performance-optimizer.ts) as its measurement primitive.
+
+Chief/default/CFO/Founder OS/Code Orchestrator profiles must not implement performance changes directly. They create a HUD/delegation manifest and dispatch a coder/performance agent with `JOVIE_AGENT_PROFILE=coder`.
 
 Runtime: ~30–50 minutes for a full run (4–10 iterations with builds).
 

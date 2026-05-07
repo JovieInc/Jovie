@@ -1,5 +1,5 @@
 ---
-description: Lead-orchestrator skill for Jovie Agent Teams mode. Use to continuously intake Linear work, dispatch teammates, run /ship, and keep PR + Linear status synchronized with retry/escalation.
+description: Lead-orchestrator skill for Jovie Agent Teams mode. Use to continuously intake Linear work, dispatch teammates, and keep PR + Linear status synchronized without direct coding by the lead.
 ---
 
 # Autopilot Lead Orchestrator Skill (Jovie)
@@ -8,7 +8,27 @@ Use this skill when operating Claude Code in **Agent Teams mode** with backgroun
 
 ## Mission
 
-Continuously intake Linear work, route tasks to teammates, ship safely through `/ship`, and keep PR + Linear state synchronized with minimal operator intervention.
+Continuously intake Linear work, route tasks to teammates, keep PR + Linear state synchronized, and prevent the lead agent from becoming the implementer.
+
+## Profile Boundary
+
+Autopilot is a lead-orchestrator workflow. The lead may prioritize, batch, dispatch, monitor, comment, update HUD/Linear state, and create repair manifests.
+
+The lead must not:
+
+- edit product, package, migration, workflow, or CI files
+- check out teammate branches to fix code
+- commit or push implementation fixes
+- run `/ship` as the task handler
+- merge, deploy, change credentials, change auth/payment, or run production-impacting scripts
+
+When a PR, issue, or batch needs implementation, the lead creates a dispatch manifest and routes it to the correct profile:
+
+- `code-orchestrator` for planning/decomposition/review strategy
+- `coder` for implementation, test fixes, conflict repair, and PR updates
+- `no_agent` for deterministic HUD, cron, usage-ledger, and GBrain sync work
+
+Every dispatch prompt must include `JOVIE_AGENT_PROFILE=<profile>` so hooks can enforce the profile boundary.
 
 ## Required Environment (hard requirements)
 
@@ -124,7 +144,7 @@ After intake, group small related issues into batches before dispatch. This avoi
 #### Solo issues (default path)
 
 - Assign unclaimed tasks (or allow self-claim)
-- Each task handler must:
+- Each task handler must be a dispatched coder or code-orchestrator session, never the lead. The handler must:
   1. Implement minimal root-cause fix
   2. Run required validation gates
   3. Run `/ship` to commit, push branch, and open PR
@@ -135,10 +155,10 @@ After intake, group small related issues into batches before dispatch. This avoi
 When picking up a stuck issue that a previous agent failed on:
 
 1. **Check for existing work** — look for branches matching the issue's `gitBranchName`, open/closed PRs, and Linear comments describing what was attempted
-2. **Assess salvageability** — if the existing branch has useful partial work, build on it. If it's broken or conflicts with main, start fresh from main
-3. **Start fresh by default** — create a new branch from main (e.g., `fix/jov-XXXX-<slug>`) rather than continuing on a potentially broken branch
-4. **Delete stale branches** — if the old branch has no useful commits, delete it to avoid confusion
-5. **Comment on the Linear issue** — note that the previous attempt stalled and a new attempt is starting, with a brief summary of what went wrong if discoverable
+2. **Create a recovery manifest** — include prior branch/PR links, likely failure mode, KPI, owner, profile, cost route, GBrain queries, gstack skills, expected output, and verification
+3. **Dispatch recovery** — route salvage/fresh-start judgment to `code-orchestrator`; route implementation to `coder`
+4. **Do not delete stale branches directly** — request cleanup approval or dispatch a no-agent cleanup manifest after confirming no open PR depends on the branch
+5. **Comment on the Linear issue** — note that the previous attempt stalled and a new attempt is being dispatched, with a brief summary of what went wrong if discoverable
 
 #### Batched issues
 
@@ -160,13 +180,15 @@ If task touches app/web runtime/db flows, run relevant scoped checks too.
 
 ### 5) Background PR Orchestration (parallel)
 
-Continuously monitor teammate PRs and run `/orchestrate` behavior:
+Continuously monitor teammate PRs and run read-only `/orchestrate` behavior:
 
-- Rebase/update branch
-- Resolve merge conflicts when safe
-- Address failing tests/CI
-- Push follow-up fixes
+- Enable safe GitHub-side auto-merge/update-branch actions where allowed
+- Detect merge conflicts, failing tests/CI, review blockers, stale branches, and duplicate PRs
+- Create repair manifests for coder/code-orchestrator profiles
+- Track owner, verification, blocker, retry count, and next action in HUD/Linear
 - Sync PR status and summary back to Linear
+
+If `/orchestrate` would require checkout/edit/commit/push, stop and dispatch a coder repair manifest instead.
 
 ### 6) Linear Status Sync Rules
 

@@ -2,6 +2,10 @@
 
 Run the resumable performance loop against Jovie's canonical end-user routes.
 
+Use the `jovie-performance-hardening` skill as the operating contract for this command. The loop is measurement-first: baseline, pick one hypothesis family, implement one coherent change cluster, re-measure, and keep only validated wins.
+
+If the current actor is Chief of Staff, default, CFO, Founder OS, or Code Orchestrator, do not implement performance fixes directly. Create a HUD/delegation manifest for a `coder` or performance agent with the required routes, metrics, gstack skills, GBrain queries, expected output, and verification commands.
+
 ## Core Commands
 
 ```bash
