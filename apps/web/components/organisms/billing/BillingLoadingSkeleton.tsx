@@ -40,7 +40,7 @@ export function BillingLoadingSkeleton() {
             <div className='space-y-3 px-3 py-3'>
               <Skeleton className='h-9 w-24' rounded='md' />
               <Skeleton className='h-8 w-full' rounded='md' />
-              <div className='h-px bg-(--linear-app-frame-seam)' />
+              <div className='h-px bg-subtle' />
               <LoadingSkeleton lines={5} height='h-4' rounded='md' />
             </div>
           </ContentSurfaceCard>

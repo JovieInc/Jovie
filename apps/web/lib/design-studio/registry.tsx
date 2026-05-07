@@ -105,7 +105,7 @@ function StudioFrame({
   return (
     <div
       className={cn(
-        'min-h-[360px] overflow-hidden rounded-lg border border-white/10 bg-[#0d0e11] text-white shadow-[0_24px_80px_rgba(0,0,0,0.35)]',
+        'min-h-[360px] overflow-hidden rounded-lg border border-subtle bg-[#0d0e11] text-white shadow-[0_24px_80px_rgba(0,0,0,0.35)]',
         className
       )}
     >
@@ -135,7 +135,7 @@ function MockArtwork({
 function MusicAiCommandPreview() {
   return (
     <StudioFrame className='grid grid-cols-[178px_1fr]'>
-      <aside className='border-r border-white/10 bg-black/35 p-3'>
+      <aside className='border-r border-subtle bg-black/35 p-3'>
         <div className='mb-5 flex items-center gap-2'>
           <div className='grid h-7 w-7 place-items-center rounded-md bg-white text-black'>
             <Sparkles className='h-3.5 w-3.5' />
@@ -168,7 +168,7 @@ function MusicAiCommandPreview() {
 
       <main className='relative p-4'>
         <div className='mx-auto max-w-[520px] space-y-3 pt-4'>
-          <div className='rounded-2xl border border-white/10 bg-white/[0.035] p-3'>
+          <div className='rounded-2xl border border-subtle bg-white/[0.035] p-3'>
             <p className='text-[12px] text-white/60'>Sora Vale</p>
             <p className='mt-1 text-[14px] leading-6 text-white'>
               Find the right track, pull release context, and draft a pitch for
@@ -181,7 +181,7 @@ function MusicAiCommandPreview() {
         </div>
 
         <div className='absolute bottom-4 left-1/2 w-[520px] max-w-[calc(100%-2rem)] -translate-x-1/2 rounded-2xl border border-white/12 bg-[#15161b] p-2 shadow-2xl'>
-          <div className='flex items-center gap-2 border-b border-white/10 px-2 py-2 text-[12px] text-white/50'>
+          <div className='flex items-center gap-2 border-b border-subtle px-2 py-2 text-[12px] text-white/50'>
             <Search className='h-3.5 w-3.5' />
             <span>/artist Sora Vale /track Midnight Static</span>
           </div>
@@ -246,7 +246,7 @@ function LibraryViewPreview() {
             Release-native assets, sorted for launch work.
           </p>
         </div>
-        <div className='rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] text-white/55'>
+        <div className='rounded-md border border-subtle bg-white/[0.04] px-2 py-1 text-[11px] text-white/55'>
           28 Assets
         </div>
       </div>
@@ -254,7 +254,7 @@ function LibraryViewPreview() {
         {LIBRARY_ASSETS.map(asset => (
           <article
             key={asset.title}
-            className='overflow-hidden rounded-lg border border-white/10 bg-white/[0.035]'
+            className='overflow-hidden rounded-lg border border-subtle bg-white/[0.035]'
           >
             <div className={cn('h-32 bg-gradient-to-br', asset.tone)} />
             <div className='space-y-2 p-3'>
@@ -286,7 +286,7 @@ function TrackViewPreview() {
                 <div
                   key={title}
                   className={cn(
-                    'grid grid-cols-[42px_1fr_auto] items-center gap-3 rounded-lg border border-white/10 px-3 py-2',
+                    'grid grid-cols-[42px_1fr_auto] items-center gap-3 rounded-lg border border-subtle px-3 py-2',
                     index === 0 ? 'bg-white/[0.06]' : 'bg-white/[0.025]'
                   )}
                 >
@@ -324,7 +324,7 @@ function TrackViewPreview() {
           }}
         />
       </div>
-      <aside className='border-l border-white/10 bg-black/25'>
+      <aside className='border-l border-subtle bg-black/25'>
         <DrawerHero
           title='Midnight Static'
           subtitle='Sora Vale · Deep End'
@@ -333,14 +333,14 @@ function TrackViewPreview() {
           meta={
             <>
               <TypeBadge label='Track' />
-              <span className='rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[10px] text-white/50'>
+              <span className='rounded border border-subtle bg-white/[0.04] px-1.5 py-0.5 text-[10px] text-white/50'>
                 ISRC USJV12600102
               </span>
             </>
           }
           onPlay={() => undefined}
         />
-        <div className='space-y-3 border-t border-white/10 p-3 text-[12px]'>
+        <div className='space-y-3 border-t border-subtle p-3 text-[12px]'>
           {[
             ['DSP Links', 'Spotify, Apple Music, YouTube'],
             ['Lyrics', 'Synced and Apple Music ready'],
@@ -422,7 +422,7 @@ function AudioBarPreview() {
 
 function SectionPreview({ variant }: Readonly<{ variant: SectionVariant }>) {
   return (
-    <div className='max-h-[360px] overflow-hidden rounded-lg border border-white/10 bg-(--linear-app-content-surface)'>
+    <div className='max-h-[360px] overflow-hidden rounded-lg border border-subtle bg-surface-1'>
       {variant.render()}
     </div>
   );

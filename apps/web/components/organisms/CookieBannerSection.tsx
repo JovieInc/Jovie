@@ -128,36 +128,15 @@ export function CookieBannerSection() {
         <aside
           aria-label='Cookie consent'
           data-testid='cookie-banner'
-          className='fixed inset-x-0 bottom-0 z-40 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-md sm:px-6 md:flex md:items-center md:justify-between md:gap-4'
-          style={{
-            backgroundColor: 'var(--linear-bg-surface-1)',
-            borderTop: '1px solid var(--linear-border-default)',
-            boxShadow: 'var(--linear-shadow-card)',
-          }}
+          className='fixed inset-x-0 bottom-0 z-40 border-t border-default bg-surface-1 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-card backdrop-blur-md sm:px-6 md:flex md:items-center md:justify-between md:gap-4'
         >
           <div className='mb-2 flex items-center justify-between gap-3 md:mb-0 md:flex-1'>
-            <p
-              style={{
-                fontSize: '12px',
-                lineHeight: '1.5',
-                color: 'var(--linear-text-secondary)',
-              }}
-            >
+            <p className='text-xs leading-normal text-secondary-token'>
               We use cookies to improve your experience.
             </p>
             <button
               type='button'
-              className='md:hidden shrink-0 transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent'
-              style={{
-                backgroundColor: 'var(--linear-bg-button)',
-                color: 'var(--linear-text-primary)',
-                border: '1px solid var(--linear-border-default)',
-                borderRadius: 'var(--linear-radius-sm)',
-                fontSize: '12px',
-                fontWeight: 'var(--linear-font-weight-medium)',
-                padding: '6px 10px',
-                height: '28px',
-              }}
+              className='md:hidden shrink-0 h-7 rounded-linear-sm border border-default bg-surface-button px-[10px] py-[6px] text-xs font-linear-medium text-primary-token transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent'
               aria-expanded={isMobileExpanded}
               aria-controls='cookie-actions'
               onClick={() => setIsMobileExpanded(prev => !prev)}

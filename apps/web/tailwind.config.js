@@ -110,6 +110,10 @@ module.exports = {
         warning: 'var(--color-warning)',
         info: 'var(--color-info)',
 
+        // Subtle separator — maps to --linear-app-frame-seam
+        // Enables bg-subtle and divide-subtle for thin dividers and skeleton fills
+        subtle: 'var(--linear-app-frame-seam)',
+
         // Surface backgrounds (generates bg-surface-0, bg-surface-1, etc.)
         surface: {
           0: 'var(--color-bg-surface-0)',

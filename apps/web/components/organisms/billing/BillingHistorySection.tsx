@@ -54,7 +54,7 @@ export function BillingHistorySection({
           !historyQuery.error &&
           (historyQuery.data?.entries &&
           historyQuery.data.entries.length > 0 ? (
-            <div className='divide-y divide-(--linear-app-frame-seam)'>
+            <div className='divide-y divide-subtle'>
               {historyQuery.data.entries.map((entry: BillingHistoryEntry) => {
                 const config = EVENT_BADGE_CONFIG[entry.eventType];
                 const IconComponent = config?.icon ?? Clock;
