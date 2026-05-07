@@ -93,7 +93,9 @@ export function TourDateCard({
       locationLabel={location}
       secondaryLocationLabel={
         tourDate.startTime
-          ? `Doors: ${tourDate.startTime}${timezoneAbbr ? ` ${timezoneAbbr}` : ''}`
+          ? 'Doors: ' +
+            tourDate.startTime +
+            (timezoneAbbr ? ' ' + timezoneAbbr : '')
           : null
       }
       imageAlt={tourDate.venueName}
@@ -103,7 +105,9 @@ export function TourDateCard({
       datePill={{
         month: monthFormatter.format(date),
         day: dayFormatter.format(date),
-        meta: `${weekdayFormatter.format(date)}${tourDate.startTime ? ` · ${tourDate.startTime}` : ''}`,
+        meta:
+          weekdayFormatter.format(date) +
+          (tourDate.startTime ? ' · ' + tourDate.startTime : ''),
       }}
       action={{
         label: actionLabel,

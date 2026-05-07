@@ -74,7 +74,7 @@ export async function GET(
     // Private profiles AND missing profiles return 404. Same surface a
     // scraper would see for either case → no profile-existence side
     // channel.
-    if (!profile || !profile.isPublic) {
+    if (!profile?.isPublic) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
@@ -87,8 +87,8 @@ export async function GET(
       `PRODID:-//Jovie//Tour Dates · ${escapeIcsText(artistName)}//EN`,
       'CALSCALE:GREGORIAN',
       'METHOD:PUBLISH',
-      `X-WR-CALNAME:${escapeIcsText(`${artistName} — tour`)}`,
-      `X-WR-CALDESC:${escapeIcsText(`Confirmed tour dates for ${artistName} · jov.ie/${profile.username}`)}`,
+      `X-WR-CALNAME:${escapeIcsText(artistName + ' — tour')}`,
+      `X-WR-CALDESC:${escapeIcsText('Confirmed tour dates for ' + artistName + ' · jov.ie/' + profile.username)}`,
     ];
 
     const stamp = formatIcsTimestamp(new Date());

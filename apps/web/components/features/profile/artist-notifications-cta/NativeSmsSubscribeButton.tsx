@@ -256,7 +256,7 @@ export function NativeSmsSubscribeButton({
           'inline-flex h-11 items-center justify-center gap-2 rounded-full px-4',
           'bg-[oklch(10%_0_0)] text-white',
           'text-[15px] font-medium tracking-[-0.165px]',
-          'transition-colors duration-150',
+          'transition-colors duration-subtle',
           'hover:bg-[oklch(15%_0_0)]',
           'disabled:cursor-not-allowed disabled:opacity-60'
         )}
@@ -296,7 +296,7 @@ export function NativeSmsSubscribeButton({
           </span>
           {intent.smsTo && (
             <a
-              href={`sms:${intent.smsTo}?body=${encodeURIComponent(`JOIN ${intent.code}`)}`}
+              href={`sms:${intent.smsTo}?body=${encodeURIComponent('JOIN ' + intent.code)}`}
               className='text-sm text-[var(--accent)] underline-offset-2 hover:underline'
             >
               Text {intent.smsTo}
