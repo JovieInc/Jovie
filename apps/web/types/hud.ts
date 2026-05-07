@@ -1,3 +1,5 @@
+import type { HermesAiOpsSummary } from '@/types/ai-ops';
+
 export type HudAccessMode = 'admin' | 'kiosk';
 
 export type HudDeploymentState =
@@ -56,5 +58,6 @@ export interface HudMetrics {
     lastIncidentAtIso: string | null;
   };
   deployments: HudDeployments;
+  aiOps: HermesAiOpsSummary;
   generatedAtIso: string;
 }
