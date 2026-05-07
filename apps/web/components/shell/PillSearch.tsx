@@ -173,7 +173,7 @@ export function PillSearch({
     if (!text) return [];
     const slash = parseSlash(text);
 
-    if (slash && slash.kind === 'choosing') {
+    if (slash?.kind === 'choosing') {
       const q = slash.query.toLowerCase();
       const fields = Object.keys(FIELD_LABEL) as FilterField[];
       const acc: Suggestion[] = [];
@@ -194,7 +194,7 @@ export function PillSearch({
       return acc.sort((a, b) => b.score - a.score).slice(0, 8);
     }
 
-    if (slash && slash.kind === 'scoped') {
+    if (slash?.kind === 'scoped') {
       const q = slash.query.toLowerCase().trim();
       const opts = fieldValueOptions(
         slash.field,
@@ -366,7 +366,7 @@ export function PillSearch({
         <button
           type='button'
           onClick={onClose}
-          className='shrink-0 inline-flex items-center h-5 px-1.5 rounded text-[10px] font-caption uppercase tracking-[0.06em] text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-150 ease-out'
+          className='shrink-0 inline-flex items-center h-5 px-1.5 rounded text-[10px] font-caption uppercase tracking-[0.06em] text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-subtle ease-out'
           aria-label='Close search'
         >
           Esc
@@ -395,7 +395,7 @@ export function PillSearch({
                   commitSuggestion(sug);
                 }}
                 className={cn(
-                  'w-full flex items-center gap-2 px-2.5 py-1.5 text-left text-[12.5px] transition-colors duration-100 ease-out',
+                  'w-full flex items-center gap-2 px-2.5 py-1.5 text-left text-[12.5px] transition-colors duration-subtle ease-out',
                   i === highlight
                     ? 'bg-cyan-500/10 text-primary-token'
                     : 'text-secondary-token hover:bg-surface-1/60'
@@ -455,7 +455,7 @@ function PillChip({
       <button
         type='button'
         onClick={onToggleOp}
-        className='px-1.5 text-tertiary-token hover:text-primary-token transition-colors duration-150 ease-out'
+        className='px-1.5 text-tertiary-token hover:text-primary-token transition-colors duration-subtle ease-out'
         title='Toggle is / is not'
       >
         {pill.op}
@@ -473,7 +473,7 @@ function PillChip({
               <button
                 type='button'
                 onClick={() => onRemoveValue(v)}
-                className='ml-1 text-cyan-300/70 hover:text-cyan-100 transition-colors duration-150 ease-out'
+                className='ml-1 text-cyan-300/70 hover:text-cyan-100 transition-colors duration-subtle ease-out'
                 aria-label={`Remove ${v}`}
               >
                 ×
@@ -485,7 +485,7 @@ function PillChip({
       <button
         type='button'
         onClick={onRemove}
-        className='px-1.5 text-cyan-300/70 hover:text-cyan-100 transition-colors duration-150 ease-out'
+        className='px-1.5 text-cyan-300/70 hover:text-cyan-100 transition-colors duration-subtle ease-out'
         aria-label='Remove filter'
       >
         ×

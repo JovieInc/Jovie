@@ -56,7 +56,7 @@ export function LatestReleaseCard({
       <ProfileMediaCard
         eyebrow={isFutureRelease ? 'New Single' : 'New Release'}
         title={release.title}
-        subtitle={`${releaseTypeLabel}${releaseYear ? ` · ${releaseYear}` : ''}`}
+        subtitle={releaseTypeLabel + (releaseYear ? ' · ' + releaseYear : '')}
         imageUrl={release.artworkUrl}
         imageAlt={`${release.title} artwork`}
         fallbackVariant='release'
