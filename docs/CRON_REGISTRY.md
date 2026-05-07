@@ -4,6 +4,16 @@
 >
 > Before creating a new cron job, read [AGENTS.md — Infrastructure & Scheduling Guardrails](../AGENTS.md#infrastructure--scheduling-guardrails-critical).
 
+## Codex Workspace Automations
+
+These are local Codex automations for agent workflow hygiene. They are not production app crons, do not run in Vercel, and must not add routes under `apps/web/app/api/cron/*`.
+
+| Name | Schedule | Purpose | Source |
+|------|----------|---------|--------|
+| `PR Comment Hardening Retro` (`pr-comment-hardening-retro`) | Mondays 09:00 America/Los_Angeles | Scans recent PR review comments, reports repeated agent mistake classes, and may open draft PRs only for bounded docs/tests/skill hardening. | Codex automation using `scripts/pr-comment-retro.mjs` |
+
+Before adding another Codex workspace automation, inspect existing Codex automations and repo schedules. Combine with this retro only when the job is about converting review feedback into durable agent hardening; keep product or production scheduling in the Vercel cron registry below.
+
 ## Production Schedule
 
 Source of truth: `apps/web/vercel.json`

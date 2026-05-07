@@ -1,7 +1,9 @@
 'use client';
 
+import { Loader2, Rocket } from 'lucide-react';
 import Image from 'next/image';
 import type { ReactNode } from 'react';
+import { useState } from 'react';
 import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentMetricRow } from '@/components/molecules/ContentMetricRow';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
@@ -10,11 +12,21 @@ import {
   getDefaultStatusTone,
   getDeploymentLabel,
   getDeploymentTone,
+  type HudTone,
 } from '@/lib/hud/tone-determination';
+import type { HermesCliRuntime, HermesDispatchRequest } from '@/types/ai-ops';
 import type { HudMetrics } from '@/types/hud';
 import { HudClockClient } from './HudClockClient';
 import { HudStatusPill } from './HudStatusPill';
 import { useHudMetricsQuery } from './useHudMetricsQuery';
+
+type HermesDispatchKind =
+  | 'triage'
+  | 'bug_patch'
+  | 'code_review'
+  | 'qa'
+  | 'investigation'
+  | 'support_draft';
 
 function formatUsd(value: number): string {
   return value.toLocaleString('en-US', {
@@ -64,6 +76,32 @@ function getDeploymentDetail(deployments: HudMetrics['deployments']): string {
   return deployments.errorMessage ?? '\u2014';
 }
 
+function getAiOpsTone(aiOps: HudMetrics['aiOps']): HudTone {
+  if (aiOps.counts.failed > 0 || aiOps.counts.blocked > 0) return 'bad';
+  if (aiOps.counts.stale > 0 || aiOps.availability === 'partial') {
+    return 'warning';
+  }
+  if (aiOps.availability === 'available') return 'good';
+  return 'neutral';
+}
+
+function getAiOpsLabel(aiOps: HudMetrics['aiOps']): string {
+  if (aiOps.counts.failed > 0) return 'Failed';
+  if (aiOps.counts.blocked > 0) return 'Blocked';
+  if (aiOps.counts.stale > 0) return 'Stale';
+  if (aiOps.counts.running > 0) return 'Running';
+  if (aiOps.dispatch.available) return 'Ready';
+  return 'Not configured';
+}
+
+function getDefaultSkills(kind: HermesDispatchKind): readonly string[] {
+  if (kind === 'qa') return ['qa'];
+  if (kind === 'code_review') return ['review'];
+  if (kind === 'investigation') return ['investigate'];
+  if (kind === 'triage') return ['autoplan'];
+  return ['autoplan', 'investigate'];
+}
+
 function SectionEyebrow({
   children,
 }: Readonly<{ readonly children: ReactNode }>) {
@@ -101,6 +139,165 @@ function DeploymentRow({
   );
 }
 
+function AiOpsItemRow({
+  item,
+}: Readonly<{
+  readonly item: HudMetrics['aiOps']['blockers'][number];
+}>) {
+  return (
+    <div className='flex items-start justify-between gap-3 rounded-xl border border-subtle bg-surface-0 px-3 py-2.5'>
+      <div className='min-w-0'>
+        <p className='truncate text-[13px] font-semibold text-primary-token'>
+          {item.summary}
+        </p>
+        <p className='mt-1 text-[11px] uppercase tracking-[0.08em] text-tertiary-token'>
+          {item.source} / {item.status}
+        </p>
+      </div>
+      <p className='shrink-0 text-right text-[11px] text-tertiary-token'>
+        {formatDeploymentTime(item.updatedAt)}
+      </p>
+    </div>
+  );
+}
+
+function HermesDispatchControls({
+  aiOps,
+  onDispatchComplete,
+}: Readonly<{
+  readonly aiOps: HudMetrics['aiOps'];
+  readonly onDispatchComplete: () => void;
+}>) {
+  const [sourceUrl, setSourceUrl] = useState('');
+  const [runtime, setRuntime] = useState<HermesCliRuntime>('codex-cli');
+  const [kind, setKind] = useState<HermesDispatchKind>('investigation');
+  const [isDispatching, setIsDispatching] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  if (!aiOps.dispatch.available) {
+    return (
+      <p className='text-[13px] leading-5 text-secondary-token'>
+        {aiOps.dispatch.unavailableReason ??
+          'Hermes dispatch is not configured.'}
+      </p>
+    );
+  }
+
+  async function dispatchWorker(dryRun: boolean) {
+    setIsDispatching(true);
+    setMessage(null);
+
+    const payload: HermesDispatchRequest = {
+      source: 'hermes',
+      sourceId: sourceUrl.trim() || `hud-${Date.now()}`,
+      sourceUrl: sourceUrl.trim() || null,
+      kind,
+      runtime,
+      priority: kind === 'bug_patch' ? 80 : 60,
+      skills: getDefaultSkills(kind),
+      allowedPaths: ['apps/web', 'scripts', '.github/workflows'],
+      verification: ['pnpm --filter web exec tsc --noEmit'],
+      dryRun,
+      prompt: sourceUrl.trim()
+        ? `Use the linked work item as source context: ${sourceUrl.trim()}`
+        : 'Pick up the highest-value scoped internal AI ops task from the provided context.',
+      owner: 'HUD',
+    };
+
+    try {
+      const response = await fetch('/api/hud/ai-ops/dispatch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const result = (await response.json()) as {
+        error?: string;
+        branchName?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(result.error ?? `Dispatch failed (${response.status})`);
+      }
+
+      setMessage(
+        dryRun
+          ? 'Dry run dispatched to Hermes worker workflow.'
+          : `Worker dispatched on ${result.branchName ?? 'agent branch'}.`
+      );
+      onDispatchComplete();
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : 'Hermes dispatch failed.'
+      );
+    } finally {
+      setIsDispatching(false);
+    }
+  }
+
+  return (
+    <div className='grid gap-3'>
+      <div className='grid gap-2 sm:grid-cols-[minmax(0,1fr)_160px_180px]'>
+        <input
+          type='url'
+          value={sourceUrl}
+          onChange={event => setSourceUrl(event.target.value)}
+          placeholder='Linear, GitHub, or Sentry URL'
+          className='min-h-10 rounded-lg border border-subtle bg-surface-0 px-3 text-[13px] text-primary-token outline-none'
+        />
+        <select
+          value={runtime}
+          onChange={event => setRuntime(event.target.value as HermesCliRuntime)}
+          className='min-h-10 rounded-lg border border-subtle bg-surface-0 px-3 text-[13px] text-primary-token outline-none'
+        >
+          {aiOps.dispatch.runtimes.map(option => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+        <select
+          value={kind}
+          onChange={event => setKind(event.target.value as HermesDispatchKind)}
+          className='min-h-10 rounded-lg border border-subtle bg-surface-0 px-3 text-[13px] text-primary-token outline-none'
+        >
+          <option value='investigation'>investigation</option>
+          <option value='bug_patch'>bug_patch</option>
+          <option value='code_review'>code_review</option>
+          <option value='qa'>qa</option>
+          <option value='triage'>triage</option>
+          <option value='support_draft'>support_draft</option>
+        </select>
+      </div>
+      <div className='flex flex-wrap gap-2'>
+        <button
+          type='button'
+          onClick={() => void dispatchWorker(false)}
+          disabled={isDispatching}
+          className='inline-flex min-h-10 items-center gap-2 rounded-lg border border-subtle bg-primary px-3 text-[13px] font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60'
+        >
+          {isDispatching ? (
+            <Loader2 className='h-4 w-4 animate-spin' aria-hidden='true' />
+          ) : (
+            <Rocket className='h-4 w-4' aria-hidden='true' />
+          )}
+          Dispatch worker
+        </button>
+        <button
+          type='button'
+          onClick={() => void dispatchWorker(true)}
+          disabled={isDispatching}
+          className='inline-flex min-h-10 items-center gap-2 rounded-lg border border-subtle bg-surface-0 px-3 text-[13px] font-semibold text-primary-token disabled:cursor-not-allowed disabled:opacity-60'
+        >
+          Dry run
+        </button>
+      </div>
+      {message ? (
+        <p className='text-[13px] leading-5 text-secondary-token'>{message}</p>
+      ) : null}
+    </div>
+  );
+}
+
 export interface HudDashboardClientProps {
   readonly initialMetrics: HudMetrics;
   readonly hudUrl: string;
@@ -112,12 +309,17 @@ export function HudDashboardClient({
   hudUrl,
   kioskToken,
 }: HudDashboardClientProps) {
-  const { data: metrics } = useHudMetricsQuery(initialMetrics, kioskToken);
+  const { data: metrics, refetch } = useHudMetricsQuery(
+    initialMetrics,
+    kioskToken
+  );
 
   const defaultTone = getDefaultStatusTone(metrics.overview.defaultStatus);
   const deploymentsTone = getDeploymentTone(metrics.deployments);
   const deploymentLabel = getDeploymentLabel(metrics.deployments);
   const deploymentDetail = getDeploymentDetail(metrics.deployments);
+  const aiOpsTone = getAiOpsTone(metrics.aiOps);
+  const aiOpsLabel = getAiOpsLabel(metrics.aiOps);
 
   return (
     <div className='mx-auto flex w-full max-w-[1560px] flex-col gap-4 px-4 py-4 sm:px-6 sm:py-6 xl:px-8'>
@@ -263,6 +465,104 @@ export function HudDashboardClient({
           </div>
         </ContentSurfaceCard>
       </div>
+
+      <ContentSurfaceCard surface='details' className='space-y-5 p-4 sm:p-5'>
+        <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
+          <div className='space-y-1'>
+            <SectionEyebrow>AI ops</SectionEyebrow>
+            <p className='text-[24px] font-[620] leading-none text-primary-token sm:text-[28px]'>
+              Hermes control plane
+            </p>
+            <p className='text-[13px] leading-5 text-secondary-token'>
+              {metrics.aiOps.mergeQueue.openAgentPrs} /{' '}
+              {metrics.aiOps.mergeQueue.openAgentPrThreshold} agent PRs open
+            </p>
+          </div>
+          <HudStatusPill label={aiOpsLabel} tone={aiOpsTone} />
+        </div>
+
+        <div className='grid gap-3 sm:grid-cols-3 lg:grid-cols-6'>
+          <ContentMetricRow
+            label='Queued'
+            value={metrics.aiOps.counts.queued.toLocaleString('en-US')}
+          />
+          <ContentMetricRow
+            label='Running'
+            value={metrics.aiOps.counts.running.toLocaleString('en-US')}
+          />
+          <ContentMetricRow
+            label='Review'
+            value={metrics.aiOps.counts.review.toLocaleString('en-US')}
+          />
+          <ContentMetricRow
+            label='Blocked'
+            value={metrics.aiOps.counts.blocked.toLocaleString('en-US')}
+          />
+          <ContentMetricRow
+            label='Failed'
+            value={metrics.aiOps.counts.failed.toLocaleString('en-US')}
+          />
+          <ContentMetricRow
+            label='Stale'
+            value={metrics.aiOps.counts.stale.toLocaleString('en-US')}
+          />
+        </div>
+
+        <div className='grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]'>
+          <div className='space-y-3'>
+            <div className='flex items-center justify-between gap-3'>
+              <SectionEyebrow>Blockers</SectionEyebrow>
+              <p className='text-[12px] text-secondary-token'>
+                {metrics.aiOps.availability}
+              </p>
+            </div>
+            {metrics.aiOps.blockers.length > 0 ? (
+              <div className='grid gap-2'>
+                {metrics.aiOps.blockers.slice(0, 4).map(item => (
+                  <AiOpsItemRow
+                    key={`${item.source}-${item.kind}-${item.url ?? item.summary}`}
+                    item={item}
+                  />
+                ))}
+              </div>
+            ) : (
+              <p className='text-[13px] text-secondary-token'>
+                No blocked worker runs or agent PRs.
+              </p>
+            )}
+          </div>
+
+          <div className='space-y-3'>
+            <SectionEyebrow>Dispatch</SectionEyebrow>
+            {metrics.accessMode === 'admin' ? (
+              <HermesDispatchControls
+                aiOps={metrics.aiOps}
+                onDispatchComplete={() => {
+                  void refetch();
+                }}
+              />
+            ) : (
+              <p className='text-[13px] leading-5 text-secondary-token'>
+                Admin access required for worker dispatch.
+              </p>
+            )}
+          </div>
+        </div>
+
+        {metrics.aiOps.recommendations.length > 0 ? (
+          <div className='border-t border-subtle pt-4'>
+            <SectionEyebrow>Next actions</SectionEyebrow>
+            <div className='mt-3 grid gap-2'>
+              {metrics.aiOps.recommendations.slice(0, 3).map(item => (
+                <AiOpsItemRow
+                  key={`${item.source}-${item.priority}-${item.summary}`}
+                  item={item}
+                />
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </ContentSurfaceCard>
 
       <ContentSurfaceCard surface='details' className='p-4 sm:p-5'>
         <div className='flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between'>

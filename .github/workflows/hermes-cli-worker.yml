@@ -1,0 +1,203 @@
+name: Hermes CLI Worker
+
+on:
+  repository_dispatch:
+    types: [hermes_cli_worker]
+  workflow_dispatch:
+    inputs:
+      source_url:
+        description: 'Source URL for the worker context'
+        required: false
+        type: string
+      kind:
+        description: 'Hermes task kind'
+        required: true
+        default: investigation
+        type: choice
+        options:
+          - investigation
+          - bug_patch
+          - code_review
+          - qa
+          - triage
+          - support_draft
+      runtime:
+        description: 'CLI runtime on the self-hosted runner'
+        required: true
+        default: codex-cli
+        type: choice
+        options:
+          - codex-cli
+          - claude-code
+          - ruflo
+      dry_run:
+        description: 'Build and validate the dispatch without launching a worker'
+        required: true
+        default: true
+        type: boolean
+
+permissions: {}
+
+concurrency:
+  group: hermes-cli-${{ github.event.client_payload.dispatchId || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  worker:
+    name: Run Hermes CLI Worker
+    runs-on: [self-hosted, hermes]
+    timeout-minutes: 120
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: read
+    env:
+      JOVIE_AGENT_PROFILE: coder
+    steps:
+      - name: Generate Jovie Bot token
+        id: app-token
+        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859 # v3.0.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+
+      - name: Checkout main
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Materialize dispatch payload
+        id: payload
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          CLIENT_PAYLOAD: ${{ toJson(github.event.client_payload) }}
+          INPUT_SOURCE_URL: ${{ inputs.source_url }}
+          INPUT_KIND: ${{ inputs.kind }}
+          INPUT_RUNTIME: ${{ inputs.runtime }}
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs');
+
+          const payloadFile = `${process.env.RUNNER_TEMP}/hermes-payload.json`;
+          const eventName = process.env.EVENT_NAME;
+          const validRuntimes = new Set(['codex-cli', 'claude-code', 'ruflo']);
+
+          function trimHyphens(value) {
+            let start = 0;
+            let end = value.length;
+
+            while (start < end && value[start] === '-') {
+              start += 1;
+            }
+
+            while (end > start && value[end - 1] === '-') {
+              end -= 1;
+            }
+
+            return value.slice(start, end);
+          }
+
+          function slug(value) {
+            const safe = trimHyphens(
+              String(value || 'manual')
+                .toLowerCase()
+                .replace(/[^a-z0-9._/-]+/g, '-')
+                .replace(/\/+/g, '-')
+                .slice(0, 64)
+            );
+            return safe || 'manual';
+          }
+
+          const payload =
+            eventName === 'repository_dispatch'
+              ? JSON.parse(process.env.CLIENT_PAYLOAD || '{}')
+              : {
+                  dispatchId: `manual-${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT}`,
+                  source: 'hermes',
+                  sourceId: `manual-${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT}`,
+                  sourceUrl: process.env.INPUT_SOURCE_URL || null,
+                  kind: process.env.INPUT_KIND,
+                  runtime: process.env.INPUT_RUNTIME,
+                  priority: 50,
+                  skills: ['autoplan'],
+                  allowedPaths: ['apps/web', 'scripts', '.github/workflows'],
+                  verification: ['pnpm --filter web exec tsc --noEmit'],
+                  dryRun: process.env.INPUT_DRY_RUN === 'true',
+                  prompt: 'Manual Hermes CLI worker dispatch.',
+                  owner: 'workflow_dispatch',
+                  branchName: `codex/hermes-${slug(process.env.INPUT_KIND)}-${process.env.GITHUB_RUN_ID}`,
+                  requestedAt: new Date().toISOString(),
+                };
+
+          if (
+            typeof payload.branchName !== 'string' ||
+            !/^codex\/[a-z0-9._/-]+$/.test(payload.branchName) ||
+            payload.branchName.includes('..')
+          ) {
+            throw new Error(`Invalid Hermes branch name: ${payload.branchName}`);
+          }
+
+          if (!validRuntimes.has(payload.runtime)) {
+            throw new Error(`Invalid Hermes runtime: ${payload.runtime}`);
+          }
+
+          fs.writeFileSync(payloadFile, `${JSON.stringify(payload, null, 2)}\n`);
+          fs.appendFileSync(
+            process.env.GITHUB_OUTPUT,
+            [
+              `payload_file=${payloadFile}`,
+              `branch_name=${payload.branchName}`,
+              `dry_run=${payload.dryRun === true ? 'true' : 'false'}`,
+              '',
+            ].join('\n')
+          );
+          NODE
+
+      - name: Create worker branch
+        if: steps.payload.outputs.dry_run != 'true'
+        env:
+          BRANCH_NAME: ${{ steps.payload.outputs.branch_name }}
+        run: |
+          git checkout -b "$BRANCH_NAME"
+
+      - name: Run Hermes CLI worker
+        env:
+          HERMES_CLIENT_PAYLOAD_FILE: ${{ steps.payload.outputs.payload_file }}
+        run: |
+          pnpm --filter @jovie/web exec tsx scripts/hermes-cli-worker.ts \
+            --payload-file "$HERMES_CLIENT_PAYLOAD_FILE" \
+            --workspace "$GITHUB_WORKSPACE"
+
+      - name: Verify worker changes
+        if: steps.payload.outputs.dry_run != 'true'
+        run: |
+          if git diff --quiet && git diff --staged --quiet && [[ -z "$(git status --porcelain)" ]]; then
+            echo "No changes produced by Hermes worker; skipping verification."
+            exit 0
+          fi
+
+          bash scripts/automation-verify.sh affected
+
+      - name: Commit and push worker branch
+        if: steps.payload.outputs.dry_run != 'true'
+        env:
+          BRANCH_NAME: ${{ steps.payload.outputs.branch_name }}
+        run: |
+          if git diff --quiet && git diff --staged --quiet && [[ -z "$(git status --porcelain)" ]]; then
+            echo "No changes produced by Hermes worker; nothing to push."
+            exit 0
+          fi
+
+          git config user.name "jovie-bot[bot]"
+          git config user.email "jovie-bot[bot]@users.noreply.github.com"
+
+          git add -A
+          git commit -m "feat: run Hermes CLI worker"
+          git push origin "HEAD:${BRANCH_NAME}"

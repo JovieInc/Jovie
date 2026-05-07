@@ -30,29 +30,29 @@ allowed-tools:
 ## Preamble (run first)
 
 ```bash
-_UPD=$($HOME/.Codex/skills/gstack/bin/gstack-update-check 2>/dev/null || .Codex/skills/gstack/bin/gstack-update-check 2>/dev/null || true)
+_UPD=$($HOME/.claude/skills/gstack/bin/gstack-update-check 2>/dev/null || .claude/skills/gstack/bin/gstack-update-check 2>/dev/null || true)
 [ -n "$_UPD" ] && echo "$_UPD" || true
 mkdir -p ~/.gstack/sessions
 touch ~/.gstack/sessions/"$PPID"
 _SESSIONS=$(find ~/.gstack/sessions -mmin -120 -type f 2>/dev/null | wc -l | tr -d ' ')
 find ~/.gstack/sessions -mmin +120 -type f -exec rm {} + 2>/dev/null || true
-_CONTRIB=$($HOME/.Codex/skills/gstack/bin/gstack-config get gstack_contributor 2>/dev/null || true)
-_PROACTIVE=$($HOME/.Codex/skills/gstack/bin/gstack-config get proactive 2>/dev/null || echo "true")
+_CONTRIB=$($HOME/.claude/skills/gstack/bin/gstack-config get gstack_contributor 2>/dev/null || true)
+_PROACTIVE=$($HOME/.claude/skills/gstack/bin/gstack-config get proactive 2>/dev/null || echo "true")
 _PROACTIVE_PROMPTED=$([ -f ~/.gstack/.proactive-prompted ] && echo "yes" || echo "no")
 _BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
 echo "BRANCH: $_BRANCH"
-_SKILL_PREFIX=$($HOME/.Codex/skills/gstack/bin/gstack-config get skill_prefix 2>/dev/null || echo "false")
+_SKILL_PREFIX=$($HOME/.claude/skills/gstack/bin/gstack-config get skill_prefix 2>/dev/null || echo "false")
 _PFX=$([ "$_SKILL_PREFIX" = "true" ] && echo "gstack-" || echo "")
 echo "PROACTIVE: $_PROACTIVE"
 echo "PROACTIVE_PROMPTED: $_PROACTIVE_PROMPTED"
 echo "SKILL_PREFIX: $_SKILL_PREFIX"
 echo "SKILL_PREFIX_VALUE: $_PFX"
-source <($HOME/.Codex/skills/gstack/bin/gstack-repo-mode 2>/dev/null) || true
+source <($HOME/.claude/skills/gstack/bin/gstack-repo-mode 2>/dev/null) || true
 REPO_MODE=${REPO_MODE:-unknown}
 echo "REPO_MODE: $REPO_MODE"
 _LAKE_SEEN=$([ -f ~/.gstack/.completeness-intro-seen ] && echo "yes" || echo "no")
 echo "LAKE_INTRO: $_LAKE_SEEN"
-_TEL=$($HOME/.Codex/skills/gstack/bin/gstack-config get telemetry 2>/dev/null || true)
+_TEL=$($HOME/.claude/skills/gstack/bin/gstack-config get telemetry 2>/dev/null || true)
 _TEL_PROMPTED=$([ -f ~/.gstack/.telemetry-prompted ] && echo "yes" || echo "no")
 _TEL_START=$(date +%s)
 _SESSION_ID="$$-$(date +%s)"
@@ -65,15 +65,15 @@ fi
 # zsh-compatible: use find instead of glob to avoid NOMATCH error
 for _PF in $(find ~/.gstack/analytics -maxdepth 1 -name '.pending-*' 2>/dev/null); do
   if [ -f "$_PF" ]; then
-    if [ "${_TEL:-off}" != "off" ] && [ -x "$HOME/.Codex/skills/gstack/bin/gstack-telemetry-log" ]; then
-      $HOME/.Codex/skills/gstack/bin/gstack-telemetry-log --event-type skill_run --skill _pending_finalize --outcome unknown --session-id "$_SESSION_ID" 2>/dev/null || true
+    if [ "${_TEL:-off}" != "off" ] && [ -x "$HOME/.claude/skills/gstack/bin/gstack-telemetry-log" ]; then
+      $HOME/.claude/skills/gstack/bin/gstack-telemetry-log --event-type skill_run --skill _pending_finalize --outcome unknown --session-id "$_SESSION_ID" 2>/dev/null || true
     fi
     rm -f "$_PF" 2>/dev/null || true
   fi
   break
 done
 # Learnings count
-eval "$(~/.Codex/skills/gstack/bin/gstack-slug 2>/dev/null)" 2>/dev/null || true
+eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)" 2>/dev/null || true
 _LEARN_FILE="${GSTACK_HOME:-$HOME/.gstack}/projects/${SLUG:-unknown}/learnings.jsonl"
 if [ -f "$_LEARN_FILE" ]; then
   _LEARN_COUNT=$(wc -l < "$_LEARN_FILE" 2>/dev/null | tr -d ' ')
@@ -81,12 +81,12 @@ if [ -f "$_LEARN_FILE" ]; then
 else
   echo "LEARNINGS: 0"
 fi
-# Check if AGENTS.md has routing rules
+# Check if CLAUDE.md has routing rules
 _HAS_ROUTING="no"
-if [ -f AGENTS.md ] && grep -q "## Skill routing" AGENTS.md 2>/dev/null; then
+if [ -f CLAUDE.md ] && grep -q "## Skill routing" CLAUDE.md 2>/dev/null; then
   _HAS_ROUTING="yes"
 fi
-_ROUTING_DECLINED=$($HOME/.Codex/skills/gstack/bin/gstack-config get routing_declined 2>/dev/null || echo "false")
+_ROUTING_DECLINED=$($HOME/.claude/skills/gstack/bin/gstack-config get routing_declined 2>/dev/null || echo "false")
 echo "HAS_ROUTING: $_HAS_ROUTING"
 echo "ROUTING_DECLINED: $_ROUTING_DECLINED"
 ```
@@ -100,9 +100,9 @@ The user opted out of proactive behavior.
 If `SKILL_PREFIX` is `"true"`, the user has namespaced skill names. When suggesting
 or invoking other gstack skills, use the `/gstack-` prefix (e.g., `/gstack-qa` instead
 of `/qa`, `/gstack-ship` instead of `/ship`). Disk paths are unaffected — always use
-`~/.Codex/skills/gstack/[skill-name]/SKILL.md` for reading skill files.
+`~/.claude/skills/gstack/[skill-name]/SKILL.md` for reading skill files.
 
-If output shows `UPGRADE_AVAILABLE <old> <new>`: read `~/.Codex/skills/gstack/gstack-upgrade/SKILL.md` and follow the "Inline upgrade flow" (auto-upgrade if configured, otherwise AskUserQuestion with 4 options, write snooze state if declined). If `JUST_UPGRADED <from> <to>`: tell user "Running gstack v{to} (just updated!)" and continue.
+If output shows `UPGRADE_AVAILABLE <old> <new>`: read `~/.claude/skills/gstack/gstack-upgrade/SKILL.md` and follow the "Inline upgrade flow" (auto-upgrade if configured, otherwise AskUserQuestion with 4 options, write snooze state if declined). If `JUST_UPGRADED <from> <to>`: tell user "Running gstack v{to} (just updated!)" and continue.
 
 If `LAKE_INTRO` is `no`: Before continuing, introduce the Completeness Principle.
 Tell the user: "gstack follows the **Boil the Lake** principle — always do the complete
@@ -128,7 +128,7 @@ Options:
 - A) Help gstack get better! (recommended)
 - B) No thanks
 
-If A: run `$HOME/.Codex/skills/gstack/bin/gstack-config set telemetry community`
+If A: run `$HOME/.claude/skills/gstack/bin/gstack-config set telemetry community`
 
 If B: ask a follow-up AskUserQuestion:
 
@@ -139,8 +139,8 @@ Options:
 - A) Sure, anonymous is fine
 - B) No thanks, fully off
 
-If B→A: run `$HOME/.Codex/skills/gstack/bin/gstack-config set telemetry anonymous`
-If B→B: run `$HOME/.Codex/skills/gstack/bin/gstack-config set telemetry off`
+If B→A: run `$HOME/.claude/skills/gstack/bin/gstack-config set telemetry anonymous`
+If B→B: run `$HOME/.claude/skills/gstack/bin/gstack-config set telemetry off`
 
 Always run:
 ```bash
@@ -160,8 +160,8 @@ Options:
 - A) Keep it on (recommended)
 - B) Turn it off — I'll type /commands myself
 
-If A: run `$HOME/.Codex/skills/gstack/bin/gstack-config set proactive true`
-If B: run `$HOME/.Codex/skills/gstack/bin/gstack-config set proactive false`
+If A: run `$HOME/.claude/skills/gstack/bin/gstack-config set proactive true`
+If B: run `$HOME/.claude/skills/gstack/bin/gstack-config set proactive false`
 
 Always run:
 ```bash
@@ -171,19 +171,19 @@ touch ~/.gstack/.proactive-prompted
 This only happens once. If `PROACTIVE_PROMPTED` is `yes`, skip this entirely.
 
 If `HAS_ROUTING` is `no` AND `ROUTING_DECLINED` is `false` AND `PROACTIVE_PROMPTED` is `yes`:
-Check if a AGENTS.md file exists in the project root. If it does not exist, create it.
+Check if a CLAUDE.md file exists in the project root. If it does not exist, create it.
 
 Use AskUserQuestion:
 
-> gstack works best when your project's AGENTS.md includes skill routing rules.
-> This tells Codex to use specialized workflows (like /ship, /investigate, /qa)
+> gstack works best when your project's CLAUDE.md includes skill routing rules.
+> This tells Claude to use specialized workflows (like /ship, /investigate, /qa)
 > instead of answering directly. It's a one-time addition, about 15 lines.
 
 Options:
-- A) Add routing rules to AGENTS.md (recommended)
+- A) Add routing rules to CLAUDE.md (recommended)
 - B) No thanks, I'll invoke skills manually
 
-If A: Append this section to the end of AGENTS.md:
+If A: Append this section to the end of CLAUDE.md:
 
 - If you are in plan mode, or the current skill is read-only/non-interactive, do **not** write or stage files automatically. Instead, show the user the exact section below and tell them to add it manually after leaving plan mode.
 - Otherwise, append this section, substituting `$_PFX` before every gstack skill name so prefixed installs get the correct routing rules:
@@ -211,7 +211,7 @@ Key routing rules:
 
 After writing the file, tell the user the change is ready for review and should be committed manually later (for example with `/ship`). Do **not** run `git add` or `git commit` automatically from this flow.
 
-If B: tell the user to run `$HOME/.Codex/skills/gstack/bin/gstack-config set routing_declined true`
+If B: tell the user to run `$HOME/.claude/skills/gstack/bin/gstack-config set routing_declined true`
 Say "No problem. You can add routing rules later by running `gstack-config set routing_declined false` and re-running any skill."
 
 This only happens once per project. If `HAS_ROUTING` is `yes` or `ROUTING_DECLINED` is `true`, skip this entirely.
@@ -299,7 +299,7 @@ Always flag anything that looks wrong — one sentence, what you noticed and its
 
 ## Search Before Building
 
-Before building anything unfamiliar, **search first.** See `~/.Codex/skills/gstack/ETHOS.md`.
+Before building anything unfamiliar, **search first.** See `~/.claude/skills/gstack/ETHOS.md`.
 - **Layer 1** (tried and true) — don't reinvent. **Layer 2** (new and popular) — scrutinize. **Layer 3** (first principles) — prize above all.
 
 **Eureka:** When first-principles reasoning contradicts conventional wisdom, name it and log:
@@ -371,8 +371,8 @@ rm -f ~/.gstack/analytics/.pending-"$_SESSION_ID" 2>/dev/null || true
 # Local + remote telemetry (both gated by _TEL setting)
 if [ "${_TEL:-off}" != "off" ]; then
   echo '{"skill":"SKILL_NAME","duration_s":"'"$_TEL_DUR"'","outcome":"OUTCOME","browse":"USED_BROWSE","session":"'"$_SESSION_ID"'","ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' >> ~/.gstack/analytics/skill-usage.jsonl 2>/dev/null || true
-  if [ -x "$HOME/.Codex/skills/gstack/bin/gstack-telemetry-log" ]; then
-    "$HOME/.Codex/skills/gstack/bin/gstack-telemetry-log" \
+  if [ -x "$HOME/.claude/skills/gstack/bin/gstack-telemetry-log" ]; then
+    "$HOME/.claude/skills/gstack/bin/gstack-telemetry-log" \
       --skill "SKILL_NAME" --duration "$_TEL_DUR" --outcome "OUTCOME" \
       --used-browse "USED_BROWSE" --session-id "$_SESSION_ID" 2>/dev/null &
   fi
@@ -409,7 +409,7 @@ When you are in plan mode and about to call ExitPlanMode:
 3. If it does NOT — run this command:
 
 \`\`\`bash
-~/.Codex/skills/gstack/bin/gstack-review-read
+~/.claude/skills/gstack/bin/gstack-review-read
 \`\`\`
 
 Then write a `## GSTACK REVIEW REPORT` section to the end of the plan file:
@@ -441,8 +441,8 @@ plan's living status.
 ```bash
 _ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
 B=""
-[ -n "$_ROOT" ] && [ -x "$_ROOT/.Codex/skills/gstack/browse/dist/browse" ] && B="$_ROOT/.Codex/skills/gstack/browse/dist/browse"
-[ -z "$B" ] && B=~/.Codex/skills/gstack/browse/dist/browse
+[ -n "$_ROOT" ] && [ -x "$_ROOT/.claude/skills/gstack/browse/dist/browse" ] && B="$_ROOT/.claude/skills/gstack/browse/dist/browse"
+[ -z "$B" ] && B=~/.claude/skills/gstack/browse/dist/browse
 if [ -x "$B" ]; then
   echo "READY: $B"
 else
@@ -452,7 +452,7 @@ fi
 
 If `NEEDS_SETUP`:
 1. Tell the user: "gstack browse needs a one-time build (~10 seconds). OK to proceed?" Then STOP and wait.
-2. Run: `cd .Codex/skills/gstack && ./setup`
+2. Run: `cd .claude/skills/gstack && ./setup`
 3. If `bun` is not installed:
    ```bash
    if ! command -v bun >/dev/null 2>&1; then
@@ -485,10 +485,10 @@ You are a **YC office hours partner**. Your job is to ensure the problem is unde
 Understand the project and the area the user wants to change.
 
 ```bash
-eval "$(~/.Codex/skills/gstack/bin/gstack-slug 2>/dev/null)"
+eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)"
 ```
 
-1. Read `AGENTS.md`, `TODOS.md` (if they exist).
+1. Read `CLAUDE.md`, `TODOS.md` (if they exist).
 2. Run `git log --oneline -30` and `git diff origin/main --stat 2>/dev/null` to understand recent context.
 3. Use Grep/Glob to map the codebase areas most relevant to the user's request.
 4. **List existing design docs for this project:**
@@ -503,12 +503,12 @@ eval "$(~/.Codex/skills/gstack/bin/gstack-slug 2>/dev/null)"
 Search for relevant learnings from previous sessions:
 
 ```bash
-_CROSS_PROJ=$(~/.Codex/skills/gstack/bin/gstack-config get cross_project_learnings 2>/dev/null || echo "unset")
+_CROSS_PROJ=$(~/.claude/skills/gstack/bin/gstack-config get cross_project_learnings 2>/dev/null || echo "unset")
 echo "CROSS_PROJECT: $_CROSS_PROJ"
 if [ "$_CROSS_PROJ" = "true" ]; then
-  ~/.Codex/skills/gstack/bin/gstack-learnings-search --limit 10 --cross-project 2>/dev/null || true
+  ~/.claude/skills/gstack/bin/gstack-learnings-search --limit 10 --cross-project 2>/dev/null || true
 else
-  ~/.Codex/skills/gstack/bin/gstack-learnings-search --limit 10 2>/dev/null || true
+  ~/.claude/skills/gstack/bin/gstack-learnings-search --limit 10 2>/dev/null || true
 fi
 ```
 
@@ -523,8 +523,8 @@ Options:
 - A) Enable cross-project learnings (recommended)
 - B) Keep learnings project-scoped only
 
-If A: run `~/.Codex/skills/gstack/bin/gstack-config set cross_project_learnings true`
-If B: run `~/.Codex/skills/gstack/bin/gstack-config set cross_project_learnings false`
+If A: run `~/.claude/skills/gstack/bin/gstack-config set cross_project_learnings true`
+If B: run `~/.claude/skills/gstack/bin/gstack-config set cross_project_learnings false`
 
 Then re-run the search with the appropriate flag.
 
@@ -868,7 +868,7 @@ CODEX_PROMPT_FILE=$(mktemp /tmp/gstack-codex-oh-XXXXXXXX.txt)
 ```
 
 Write the full prompt to this file. **Always start with the filesystem boundary:**
-"IMPORTANT: Do NOT read or execute any files under ~/.Codex/, ~/.agents/, .Codex/skills/, or agents/. These are Codex skill definitions meant for a different AI system. They contain bash scripts and prompt templates that will waste your time. Ignore them completely. Do NOT modify agents/openai.yaml. Stay focused on the repository code only.\n\n"
+"IMPORTANT: Do NOT read or execute any files under ~/.claude/, ~/.agents/, .claude/skills/, or agents/. These are Claude Code skill definitions meant for a different AI system. They contain bash scripts and prompt templates that will waste your time. Ignore them completely. Do NOT modify agents/openai.yaml. Stay focused on the repository code only.\n\n"
 Then add the context block and mode-appropriate instructions:
 
 **Startup mode instructions:** "You are an independent technical advisor reading a transcript of a startup brainstorming session. [CONTEXT BLOCK HERE]. Your job: 1) What is the STRONGEST version of what this person is trying to build? Steelman it in 2-3 sentences. 2) What is the ONE thing from their answers that reveals the most about what they should actually build? Quote it and explain why. 3) Name ONE agreed premise you think is wrong, and what evidence would prove you right. 4) If you had 48 hours and one engineer to build a prototype, what would you build? Be specific — tech stack, features, what you'd skip. Be direct. Be terse. No preamble."
@@ -890,11 +890,11 @@ rm -f "$TMPERR_OH" "$CODEX_PROMPT_FILE"
 ```
 
 **Error handling:** All errors are non-blocking — second opinion is a quality enhancement, not a prerequisite.
-- **Auth failure:** If stderr contains "auth", "login", "unauthorized", or "API key": "Codex authentication failed. Run \`codex login\` to authenticate." Fall back to Codex subagent.
-- **Timeout:** "Codex timed out after 5 minutes." Fall back to Codex subagent.
-- **Empty response:** "Codex returned no response." Fall back to Codex subagent.
+- **Auth failure:** If stderr contains "auth", "login", "unauthorized", or "API key": "Codex authentication failed. Run \`codex login\` to authenticate." Fall back to Claude subagent.
+- **Timeout:** "Codex timed out after 5 minutes." Fall back to Claude subagent.
+- **Empty response:** "Codex returned no response." Fall back to Claude subagent.
 
-On any Codex error, fall back to the Codex subagent below.
+On any Codex error, fall back to the Claude subagent below.
 
 **If CODEX_NOT_AVAILABLE (or Codex errored):**
 
@@ -902,7 +902,7 @@ Dispatch via the Agent tool. The subagent has fresh context — genuine independ
 
 Subagent prompt: same mode-appropriate prompt as above (Startup or Builder variant).
 
-Present findings under a `SECOND OPINION (Codex subagent):` header.
+Present findings under a `SECOND OPINION (Claude subagent):` header.
 
 If the subagent fails or times out: "Second opinion unavailable. Continuing to Phase 4."
 
@@ -916,18 +916,18 @@ SECOND OPINION (Codex):
 ════════════════════════════════════════════════════════════
 ```
 
-If Codex subagent ran:
+If Claude subagent ran:
 ```
-SECOND OPINION (Codex subagent):
+SECOND OPINION (Claude subagent):
 ════════════════════════════════════════════════════════════
 <full subagent output, verbatim — do not truncate or summarize>
 ════════════════════════════════════════════════════════════
 ```
 
 5. **Cross-model synthesis:** After presenting the second opinion output, provide 3-5 bullet synthesis:
-   - Where Codex agrees with the second opinion
-   - Where Codex disagrees and why
-   - Whether the challenged premise changes Codex's recommendation
+   - Where Claude agrees with the second opinion
+   - Where Claude disagrees and why
+   - Whether the challenged premise changes Claude's recommendation
 
 6. **Premise revision check:** If Codex challenged an agreed premise, use AskUserQuestion:
 
@@ -965,7 +965,7 @@ Rules:
 - One must be the **"minimal viable"** (fewest files, smallest diff, ships fastest).
 - One must be the **"ideal architecture"** (best long-term trajectory, most elegant).
 - One can be **creative/lateral** (unexpected approach, different framing of the problem).
-- If the second opinion (Codex or Codex subagent) proposed a prototype in Phase 3.5, consider using it as a starting point for the creative/lateral approach.
+- If the second opinion (Codex or Claude subagent) proposed a prototype in Phase 3.5, consider using it as a starting point for the creative/lateral approach.
 
 **RECOMMENDATION:** Choose [X] because [one-line reason].
 
@@ -978,8 +978,8 @@ Present via AskUserQuestion. Do NOT proceed without user approval of the approac
 ```bash
 _ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
 D=""
-[ -n "$_ROOT" ] && [ -x "$_ROOT/.Codex/skills/gstack/design/dist/design" ] && D="$_ROOT/.Codex/skills/gstack/design/dist/design"
-[ -z "$D" ] && D=~/.Codex/skills/gstack/design/dist/design
+[ -n "$_ROOT" ] && [ -x "$_ROOT/.claude/skills/gstack/design/dist/design" ] && D="$_ROOT/.claude/skills/gstack/design/dist/design"
+[ -z "$D" ] && D=~/.claude/skills/gstack/design/dist/design
 [ -x "$D" ] && echo "DESIGN_READY" || echo "DESIGN_NOT_AVAILABLE"
 ```
 
@@ -993,7 +993,7 @@ Generating visual mockups of the proposed design... (say "skip" if you don't nee
 **Step 1: Set up the design directory**
 
 ```bash
-eval "$(~/.Codex/skills/gstack/bin/gstack-slug 2>/dev/null)"
+eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)"
  _DESIGN_DIR=~/.gstack/projects/$SLUG/designs/mockup-$(date +%Y%m%d-%H%M%S)
 mkdir -p "$_DESIGN_DIR"
 echo "DESIGN_DIR: $_DESIGN_DIR"
@@ -1114,7 +1114,7 @@ which codex 2>/dev/null && echo "CODEX_AVAILABLE" || echo "CODEX_NOT_AVAILABLE"
 ```
 
 If Codex is available, use AskUserQuestion:
-> "Want outside design perspectives on the chosen approach? Codex proposes a visual thesis, content plan, and interaction ideas. A Codex subagent proposes an alternative aesthetic direction."
+> "Want outside design perspectives on the chosen approach? Codex proposes a visual thesis, content plan, and interaction ideas. A Claude subagent proposes an alternative aesthetic direction."
 >
 > A) Yes — get outside design voices
 > B) No — proceed without
@@ -1129,10 +1129,10 @@ codex exec "For this product approach, provide: a visual thesis (one sentence �
 ```
 Use a 5-minute timeout (`timeout: 300000`). After completion: `cat "$TMPERR_SKETCH" && rm -f "$TMPERR_SKETCH"`
 
-2. **Codex subagent** (via Agent tool):
+2. **Claude subagent** (via Agent tool):
 "For this product approach, what design direction would you recommend? What aesthetic, typography, and interaction patterns fit? What would make this approach feel inevitable to the user? Be specific — font names, hex colors, spacing values."
 
-Present Codex output under `CODEX SAYS (design sketch):` and subagent output under `Codex SUBAGENT (design direction):`.
+Present Codex output under `CODEX SAYS (design sketch):` and subagent output under `CLAUDE SUBAGENT (design direction):`.
 Error handling: all non-blocking. On failure, skip and continue.
 
 ---
@@ -1160,7 +1160,7 @@ Count the signals. You'll use this count in Phase 6 to determine which tier of c
 Write the design document to the project directory.
 
 ```bash
-eval "$(~/.Codex/skills/gstack/bin/gstack-slug 2>/dev/null)" && mkdir -p ~/.gstack/projects/$SLUG
+eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)" && mkdir -p ~/.gstack/projects/$SLUG
 USER=$(whoami)
 DATETIME=$(date +%Y%m%d-%H%M%S)
 ```
@@ -1205,7 +1205,7 @@ Supersedes: {prior filename — omit this line if first design on this branch}
 {from Phase 3}
 
 ## Cross-Model Perspective
-{If second opinion ran in Phase 3.5 (Codex or Codex subagent): independent cold read — steelman, key insight, challenged premise, prototype suggestion. Verbatim or close paraphrase. If second opinion did NOT run (skipped or unavailable): omit this section entirely — do not include it.}
+{If second opinion ran in Phase 3.5 (Codex or Claude subagent): independent cold read — steelman, key insight, challenged premise, prototype suggestion. Verbatim or close paraphrase. If second opinion did NOT run (skipped or unavailable): omit this section entirely — do not include it.}
 
 ## Approaches Considered
 ### Approach A: {name}
@@ -1262,7 +1262,7 @@ Supersedes: {prior filename — omit this line if first design on this branch}
 {from Phase 3}
 
 ## Cross-Model Perspective
-{If second opinion ran in Phase 3.5 (Codex or Codex subagent): independent cold read — coolest version, key insight, existing tools, prototype suggestion. Verbatim or close paraphrase. If second opinion did NOT run (skipped or unavailable): omit this section entirely — do not include it.}
+{If second opinion ran in Phase 3.5 (Codex or Claude subagent): independent cold read — coolest version, key insight, existing tools, prototype suggestion. Verbatim or close paraphrase. If second opinion did NOT run (skipped or unavailable): omit this section entirely — do not include it.}
 
 ## Approaches Considered
 ### Approach A: {name}
@@ -1377,7 +1377,7 @@ One paragraph that weaves specific session callbacks with the golden age framing
 - GOOD: "You pushed back when I challenged premise #2. Most people just agree."
 - BAD: "You demonstrated conviction and independent thinking."
 
-Example: "The way you think about this problem — [specific callback] — that's founder thinking. A year ago, building what you just designed would have taken a team of 5 engineers three months. Today you can build it this weekend with Codex. The engineering barrier is gone. What remains is taste — and you just demonstrated that."
+Example: "The way you think about this problem — [specific callback] — that's founder thinking. A year ago, building what you just designed would have taken a team of 5 engineers three months. Today you can build it this weekend with Claude Code. The engineering barrier is gone. What remains is taste — and you just demonstrated that."
 
 ### Beat 2: "One more thing."
 
@@ -1435,7 +1435,7 @@ After the YC plea, share 2-3 resources from the pool below. This keeps the closi
 
 **Dedup check — read before selecting:**
 ```bash
-eval "$(~/.Codex/skills/gstack/bin/gstack-slug 2>/dev/null)" 2>/dev/null || true
+eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)" 2>/dev/null || true
 SHOWN_LOG="${GSTACK_HOME:-$HOME/.gstack}/projects/${SLUG:-unknown}/resources-shown.jsonl"
 [ -f "$SHOWN_LOG" ] && cat "$SHOWN_LOG" || echo "NO_PRIOR_RESOURCES"
 ```
@@ -1512,7 +1512,7 @@ PAUL GRAHAM ESSAYS:
 
 1. Log the selected resource URLs so future sessions avoid repeats:
 ```bash
-eval "$(~/.Codex/skills/gstack/bin/gstack-slug 2>/dev/null)" 2>/dev/null || true
+eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)" 2>/dev/null || true
 SHOWN_LOG="${GSTACK_HOME:-$HOME/.gstack}/projects/${SLUG:-unknown}/resources-shown.jsonl"
 mkdir -p "$(dirname "$SHOWN_LOG")"
 ```
