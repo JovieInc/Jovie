@@ -66,6 +66,9 @@ The Linear automation path uses two workflows:
   - Trigger: `repository_dispatch` (`linear_todo_ready`) from `/api/webhooks/linear`
   - Behavior: waits for a CodeRabbit plan marker, assigns the issue to Codex in Linear, runs implementation, pushes a codex/* branch for auto-PR creation, then updates Linear to review
   - Includes bounded polling with configurable loop counts (`MAX_PLAN_WAIT_ATTEMPTS`, `PLAN_POLL_INTERVAL_SECONDS`)
+  - Burn controls: routine dispatch defaults to `model_tier: economy`; only an explicit
+    `premium` payload preserves the premium path
+  - Capacity controls: new agent work is deferred when 5 agent PRs are already open
 
 - **`linear-sync-on-merge.yml`**
   - Trigger: `pull_request.closed` (merged)
@@ -93,4 +96,8 @@ The `synthetic-monitoring.yml` workflow runs golden path tests against jov.ie on
 
 ## Agent Push-to-PR Bridge
 
-The `auto-pr-on-push.yml` workflow closes the handoff gap for agent branches (`codex/*`, `claude/*`, `codegen-bot/*`, `linear/*`) by creating a PR immediately after a push and enabling auto-merge.
+The `auto-pr-on-push.yml` workflow closes the handoff gap for agent branches
+(`codex/*`, `claude/*`, `codegen-bot/*`, `linear/*`) by creating a draft PR
+after a push. It enforces the same 5 open-agent-PR capacity cap before creating
+new draft PRs; downstream verification and agent pipeline jobs decide when a
+draft is ready and whether auto-merge is eligible.

@@ -14,6 +14,13 @@ This document explains the automation and labels used in this repo so agents can
 - Auto-merge is allowed only when CI is green and the PR is eligible.
 - Use the `auto-merge` label only for low-risk changes.
 
+## Agent burn controls
+
+- Routine Linear AI dispatch defaults to `model_tier: economy`; reserve `premium`
+  for explicit planner escalation.
+- Agent branch automation defers new work when 5 agent PRs are already open.
+- Implementation agents should inspect targeted diffs and exact relevant files instead of re-reading broad repo docs.
+
 ### Do not fight automation
 
 If an automated workflow opens a fix PR (e.g. Codex/CI healing):
