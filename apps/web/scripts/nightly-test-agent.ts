@@ -249,7 +249,15 @@ function parseArgs(argv: string[]): Record<string, string> {
 }
 
 function normalizeRepoKey(value: string | undefined): RepoKey {
-  return value === 'ops' ? 'ops' : 'jovie';
+  if (!value || value === 'jovie') {
+    return 'jovie';
+  }
+  if (value === 'ops') {
+    return 'ops';
+  }
+  throw new Error(
+    `Unsupported repo key "${value}". Expected "jovie" or "ops".`
+  );
 }
 
 function ensureDir(dir: string): void {
@@ -813,8 +821,10 @@ function loadCandidates(fileOrDir: string): CandidateTest[] {
   if (!existsSync(fileOrDir)) {
     return [];
   }
-  const files = findFiles(fileOrDir, filePath => filePath.endsWith('.json'));
-  const sourceFiles = files.length > 0 ? files : [fileOrDir];
+  const stat = statSync(fileOrDir);
+  const sourceFiles = stat.isDirectory()
+    ? findFiles(fileOrDir, filePath => filePath.endsWith('.json'))
+    : [fileOrDir];
   return sourceFiles.flatMap(filePath => {
     const parsed = JSON.parse(readFileSync(filePath, 'utf8')) as unknown;
     return Array.isArray(parsed)
@@ -866,6 +876,7 @@ function commandValidateCandidate(
   const results = candidates.map(candidate => {
     const errors: string[] = [];
     const warnings: string[] = [];
+    let executed = false;
     if (!candidate.id) errors.push('Missing id.');
     if (!candidate.targetFile) errors.push('Missing targetFile.');
     if (!candidate.sourceUnderTest) errors.push('Missing sourceUnderTest.');
@@ -901,6 +912,7 @@ function commandValidateCandidate(
           ? reruns
           : 1;
         for (let run = 0; run < totalRuns; run += 1) {
+          executed = true;
           const error = executeCommand(repoRoot, command);
           if (error) {
             errors.push(error);
@@ -912,7 +924,7 @@ function commandValidateCandidate(
     return {
       id: candidate.id,
       keep: errors.length === 0,
-      executed: execute,
+      executed,
       errors,
       warnings,
     };
