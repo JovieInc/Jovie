@@ -11,6 +11,16 @@ Controller file for AI agents working in this repo. `AGENTS.md` is a symlink to 
 - Don't hide failing checks. Report exact failures and the likely cause.
 - Ask before destructive operations: data deletion, irreversible migrations, credential changes, dependency replacement, auth/payment changes, or production-impacting scripts.
 
+## Instruction Architecture
+
+- `AGENTS.md` is the canonical cross-agent contract and is intentionally a symlink to this file. Do not replace it with a standalone file.
+- Keep host-specific wrappers thin. `CODEX.md`, Claude settings, Copilot/Gemini-style wrappers, and future agent entrypoints should point back to this contract and scoped rules instead of copying policy.
+- Put stable, shared instructions in this file or `.claude/rules/*`; put task-specific workflow in skills; put deterministic enforcement in hooks/settings/scripts when available.
+- Generated skill outputs are derived artifacts. Edit gstack `.tmpl` source files and generator code, then regenerate; do not hand-edit generated `SKILL.md` files except to unblock a generator repair.
+- Keep skill files progressively disclosed: short trigger/inputs/workflow/output in the leaf skill, detailed reference material in linked files, repeatable logic in scripts.
+- Prefer stable static prefixes and variable task context later in prompts. This improves prompt-cache reuse and reduces repeated token burn.
+- Use separate agent sessions or subagents for large side investigations, broad review, or research-heavy work when the host supports delegation and the task would otherwise lose context.
+
 ## Tool Versions (Verify Before Any Command)
 
 ```bash
@@ -114,6 +124,12 @@ Read the file for the topic you're touching. More-local instructions override th
 ## Skill routing
 
 When the user's request matches an available skill, ALWAYS invoke it using the Skill tool as your FIRST action. Full routing table (which skill handles which intent) lives in [`.claude/rules/gstack.md`](.claude/rules/gstack.md).
+
+Skill hygiene rules:
+- Do not duplicate the gstack routing table inside leaf skills.
+- Do not add broad policy, telemetry, voice, or release rules to a leaf skill unless that rule is unique to the skill.
+- If a skill workflow requires repeated shell logic, add or reuse a script instead of embedding long command prose in every skill.
+- When changing skill templates or generators, run the focused gstack checks from `.agents/skills/gstack/CLAUDE.md`.
 
 ## gstack
 
