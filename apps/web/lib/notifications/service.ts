@@ -1,3 +1,4 @@
+import { captureError } from '@/lib/error-tracking';
 import { EMAIL_REPLY_TO } from '@/lib/notifications/config';
 import {
   getNotificationPreferences,
@@ -20,7 +21,6 @@ import {
   logDelivery,
 } from '@/lib/notifications/suppression';
 import { logger } from '@/lib/utils/logger';
-import { captureError } from '@/lib/error-tracking';
 import type {
   EmailProvider,
   NotificationChannelResult,
@@ -353,12 +353,14 @@ async function handleSmsChannel(
     httpStatus: result.httpStatus,
     notificationId: message.id,
   });
-  captureError('SMS send failed', new Error(result.error), {
-    notificationId: message.id,
-    errorCode: result.errorCode,
-    httpStatus: result.httpStatus,
-    provider: 'twilio',
-  });
+  if (result.error) {
+    captureError('SMS send failed', new Error(result.error), {
+      notificationId: message.id,
+      errorCode: result.errorCode,
+      httpStatus: result.httpStatus,
+      provider: 'twilio',
+    });
+  }
 
   // Twilio error 21610 = "Attempt to send to unsubscribed recipient." If a
   // STOP webhook was missed (or the carrier opt-out happened out-of-band),

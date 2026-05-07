@@ -486,14 +486,11 @@ async function sendSmsNotification(
     error = result.errors?.[0]?.error ?? 'Unknown error';
   }
 
-  await updateNotificationStatus(
-    ctx.notification.id,
-    ctx.now,
-    status,
-    error
-  );
+  await updateNotificationStatus(ctx.notification.id, ctx.now, status, error);
 
-  return (success ? 'sent' : (result.skipped?.length ?? 0) > 0 ? 'skipped' : 'failed') as ProcessResult;
+  return (
+    success ? 'sent' : (result.skipped?.length ?? 0) > 0 ? 'skipped' : 'failed'
+  ) as ProcessResult;
 }
 
 async function processNotificationWithBatchedData(ctx: {
