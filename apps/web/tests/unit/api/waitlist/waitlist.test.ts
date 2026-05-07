@@ -216,7 +216,9 @@ describe('Waitlist API', () => {
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
             orderBy: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([]),
+              limit: vi
+                .fn()
+                .mockResolvedValue([{ id: 'entry_123', status: 'new' }]),
             }),
             limit: vi
               .fn()
