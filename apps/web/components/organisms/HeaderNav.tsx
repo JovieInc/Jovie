@@ -162,6 +162,7 @@ function MarketingGlassFlyout({
               href={link.href}
               key={`${menu.id}-${link.href}`}
               className='marketing-glass-header__flyout-link focus-ring-themed'
+              tabIndex={open ? undefined : -1}
             >
               <span className='marketing-glass-header__flyout-number'>
                 {(index + 1).toString().padStart(2, '0')}
