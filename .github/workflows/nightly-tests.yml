@@ -5,13 +5,15 @@
 #
 # REPLACES: nightly-unit-tests.yml, nightly-e2e-tests.yml
 #
-# SCHEDULE: Daily at 2:00 AM UTC (both suites run in parallel)
+# SCHEDULE: Daily at 2:00 AM America/Los_Angeles during daylight saving time
+# (both suites run in parallel). Keep UTC here until actionlint accepts
+# GitHub's timezone-aware schedule key.
 
 name: Nightly Tests
 
 on:
   schedule:
-    - cron: '0 2 * * *'
+    - cron: '0 9 * * *'
   workflow_dispatch:
     inputs:
       suite:
