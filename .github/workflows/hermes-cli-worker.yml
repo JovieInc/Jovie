@@ -89,13 +89,29 @@ jobs:
           const eventName = process.env.EVENT_NAME;
           const validRuntimes = new Set(['codex-cli', 'claude-code', 'ruflo']);
 
+          function trimHyphens(value) {
+            let start = 0;
+            let end = value.length;
+
+            while (start < end && value[start] === '-') {
+              start += 1;
+            }
+
+            while (end > start && value[end - 1] === '-') {
+              end -= 1;
+            }
+
+            return value.slice(start, end);
+          }
+
           function slug(value) {
-            const safe = String(value || 'manual')
-              .toLowerCase()
-              .replace(/[^a-z0-9._/-]+/g, '-')
-              .replace(/\/+/g, '-')
-              .replace(/^-+|-+$/g, '')
-              .slice(0, 64);
+            const safe = trimHyphens(
+              String(value || 'manual')
+                .toLowerCase()
+                .replace(/[^a-z0-9._/-]+/g, '-')
+                .replace(/\/+/g, '-')
+                .slice(0, 64)
+            );
             return safe || 'manual';
           }
 

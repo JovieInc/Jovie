@@ -93,13 +93,29 @@ function normalizeSkill(skill: string): string {
   return skill.trim().replace(/^\//, '');
 }
 
+function trimHyphens(value: string): string {
+  let start = 0;
+  let end = value.length;
+
+  while (start < end && value[start] === '-') {
+    start += 1;
+  }
+
+  while (end > start && value[end - 1] === '-') {
+    end -= 1;
+  }
+
+  return value.slice(start, end);
+}
+
 function slugify(value: string): string {
-  const slug = value
-    .toLowerCase()
-    .replace(/[^a-z0-9._/-]+/g, '-')
-    .replace(/\/+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 64);
+  const slug = trimHyphens(
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9._/-]+/g, '-')
+      .replace(/\/+/g, '-')
+      .slice(0, 64)
+  );
 
   return slug.length > 0 ? slug : 'manual';
 }
