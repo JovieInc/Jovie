@@ -542,22 +542,23 @@ export function ProfileCompactSurface({
         </header>
 
         <div className='relative z-10 flex min-h-0 flex-1 flex-col px-4 pt-2'>
+          {renderMode === 'interactive' ? (
+            <ProfileInlineNotificationsCTA
+              artist={artist}
+              onManageNotifications={onManageNotifications}
+              onRegisterReveal={registerNotificationsReveal}
+              portalContainer={notificationsPortalContainer ?? undefined}
+              variant='hero'
+              autoOpen={activeVisiblePrimaryTab === 'subscribe'}
+              hideTrigger
+              experimentVariant={alertOptInVariant}
+              onFlowClosed={returnToProfileAfterNotifications}
+              onSubscriptionActivated={handleSubscriptionActivated}
+            />
+          ) : null}
+
           {isHomeMode ? (
             <div className='shrink-0 space-y-2 pb-2'>
-              {renderMode === 'interactive' ? (
-                <ProfileInlineNotificationsCTA
-                  artist={artist}
-                  onManageNotifications={onManageNotifications}
-                  onRegisterReveal={registerNotificationsReveal}
-                  portalContainer={notificationsPortalContainer ?? undefined}
-                  variant='hero'
-                  hideTrigger
-                  experimentVariant={alertOptInVariant}
-                  onFlowClosed={returnToProfileAfterNotifications}
-                  onSubscriptionActivated={handleSubscriptionActivated}
-                />
-              ) : null}
-
               {showHeroAlertsRow ? (
                 <button
                   type='button'
