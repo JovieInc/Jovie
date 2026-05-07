@@ -469,17 +469,31 @@ async function sendSmsNotification(
     { phone: subscriber.phone }
   );
 
-  const success = result.delivered.length > 0;
-  const error = success ? null : (result.errors[0]?.error ?? 'Unknown error');
+  const success = result.delivered?.length > 0;
+
+  let status: 'sent' | 'failed' | 'cancelled';
+  let error: string | null;
+
+  if (success) {
+    status = 'sent';
+    error = null;
+  } else if ((result.skipped?.length ?? 0) > 0) {
+    // Suppressed/stopped SMS — don't bill or alarm, just mark cancelled
+    status = 'cancelled';
+    error = null;
+  } else {
+    status = 'failed';
+    error = result.errors?.[0]?.error ?? 'Unknown error';
+  }
 
   await updateNotificationStatus(
     ctx.notification.id,
     ctx.now,
-    success ? 'sent' : 'failed',
+    status,
     error
   );
 
-  return success ? 'sent' : 'failed';
+  return (success ? 'sent' : (result.skipped?.length ?? 0) > 0 ? 'skipped' : 'failed') as ProcessResult;
 }
 
 async function processNotificationWithBatchedData(ctx: {
