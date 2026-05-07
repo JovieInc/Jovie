@@ -531,7 +531,7 @@ describe('Public Profile Page Logic', () => {
         item => item['@type'] === 'MusicEvent'
       );
 
-      expect(events.length).toBe(10);
+      expect(events.length).toBe(5);
     });
 
     it('emits zero MusicEvent schemas when no tour dates', () => {

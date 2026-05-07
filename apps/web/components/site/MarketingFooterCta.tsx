@@ -98,11 +98,7 @@ export function MarketingFooterCta({
       <MarketingContainer width='page' className='relative z-10'>
         <div className='homepage-final-cta-copy mx-auto'>
           <h2 className='text-balance text-[clamp(2rem,3.4vw,3rem)] font-[680] leading-[1.05] tracking-[-0.025em] text-white'>
-<<<<<<< Updated upstream
-            Start using Jovie <span className='block'>today for free.</span>
-=======
             Request Access to <span className='block'>Jovie.</span>
->>>>>>> Stashed changes
           </h2>
           <Link
             href={APP_ROUTES.SIGNUP}

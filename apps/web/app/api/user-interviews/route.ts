@@ -7,11 +7,7 @@
  * /api/cron/summarize-interviews cron handler.
  */
 
-<<<<<<< Updated upstream
-import { eq } from 'drizzle-orm';
-=======
 import { and, sql as drizzleSql, eq } from 'drizzle-orm';
->>>>>>> Stashed changes
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getOptionalAuth } from '@/lib/auth/cached';
@@ -84,10 +80,8 @@ export async function POST(request: Request) {
         metadata,
         status: 'pending',
       })
-      .onConflictDoNothing({
+      .onConflictDoUpdate({
         target: [userInterviews.userId, userInterviews.source],
-<<<<<<< Updated upstream
-=======
         set: {
           transcript: transcript as InterviewTranscriptEntry[],
           metadata,
@@ -98,14 +92,10 @@ export async function POST(request: Request) {
           status: drizzleSql`CASE WHEN ${userInterviews.status} IN ('pending','summarizing') THEN 'pending' ELSE ${userInterviews.status} END`,
           updatedAt: new Date(),
         },
->>>>>>> Stashed changes
       })
       .returning({ id: userInterviews.id });
 
     if (inserted.length === 0) {
-<<<<<<< Updated upstream
-      return NextResponse.json({ ok: true, deduped: true });
-=======
       const [existing] = await db
         .select({ id: userInterviews.id })
         .from(userInterviews)
@@ -131,7 +121,6 @@ export async function POST(request: Request) {
         );
       }
       return NextResponse.json({ ok: true, id: existing.id, updated: true });
->>>>>>> Stashed changes
     }
 
     return NextResponse.json({ ok: true, id: inserted[0].id });

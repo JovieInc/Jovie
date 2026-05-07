@@ -81,18 +81,12 @@ export function useProfileVisitTracking(
     if (typeof window === 'undefined') return;
     if (!artistId) return;
     if (process.env.NEXT_PUBLIC_CI === 'true') return;
+    let cancelled = false;
+    const profileId = artistId;
 
     const utmParams = extractUtmParams();
     const referrer = document.referrer || undefined;
 
-<<<<<<< Updated upstream
-    trackVisitRef.current.mutate({
-      profileId: artistId,
-      referrer,
-      ...(utmParams && { utmParams }),
-      ...(trackingToken && { trackingToken }),
-    });
-=======
     function fireVisit(token?: string) {
       if (cancelled) return;
       trackVisitRef.current.mutate({
@@ -133,7 +127,6 @@ export function useProfileVisitTracking(
     return () => {
       cancelled = true;
     };
->>>>>>> Stashed changes
   }, [artistId, trackingToken]);
 }
 

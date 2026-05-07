@@ -4,8 +4,14 @@ import { APP_ROUTES } from '@/constants/routes';
 import { AuthLayout } from '@/features/auth';
 import { AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
 import { cn } from '@/lib/utils';
+import type { WaitlistAccessOutcome } from '@/lib/waitlist/access-request';
 
-export function WaitlistSuccessView() {
+interface WaitlistSuccessViewProps {
+  readonly outcome?: WaitlistAccessOutcome;
+  readonly onRetry?: () => void;
+}
+
+export function WaitlistSuccessView(_props: WaitlistSuccessViewProps = {}) {
   return (
     <AuthLayout
       formTitle="You're on the waitlist!"
