@@ -47,7 +47,7 @@ jobs:
       READY_LABEL: ${{ inputs.ready_label || 'automated' }}
       MAX_DISPATCH: ${{ inputs.max_dispatch || '2' }}
       DRY_RUN: ${{ inputs.dry_run || 'false' }}
-      MAX_OPEN_AGENT_PRS: '10'
+      MAX_OPEN_AGENT_PRS: '5'
     steps:
       - name: Generate Jovie Bot token
         id: app-token
@@ -157,7 +157,7 @@ jobs:
                     plan_ready: true,
                     verify_required: true,
                     simplify_bounded: true,
-                    model_tier: "premium"
+                    model_tier: "economy"
                   }
                 }' > "$DISPATCH_BODY"
 

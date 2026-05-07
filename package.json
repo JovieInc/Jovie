@@ -112,7 +112,8 @@
     "knip": "knip",
     "version:check": "node scripts/version-check.mjs",
     "changelog:send": "doppler run -- node scripts/send-changelog-email.mjs",
-    "video:footer:generate": "doppler run --project jovie-web --config dev -- tsx scripts/generate-footer-cta-video.ts"
+    "video:footer:generate": "doppler run --project jovie-web --config dev -- tsx scripts/generate-footer-cta-video.ts",
+    "hermes:worker": "pnpm --filter @jovie/web run hermes:worker"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.91.1",

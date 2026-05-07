@@ -1,5 +1,6 @@
 self-hosted-runner:
   labels:
+    - hermes
     - ubicloud-standard-2
     - ubicloud-standard-8
 

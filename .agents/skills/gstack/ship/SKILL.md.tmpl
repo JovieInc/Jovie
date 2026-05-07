@@ -322,6 +322,12 @@ For each classified comment:
 
 **After all comments are resolved:** If any fixes were applied, the tests from Step 3 are now stale. **Re-run tests** (Step 3) before continuing to Step 4. If no fixes were applied, continue to Step 4.
 
+**Durable hardening check:** For every VALID & ACTIONABLE or VALID BUT ALREADY FIXED Greptile comment, ask: "does this need a durable test, rule, or skill update?" Add the narrowest durable guard when the answer is yes:
+- Deterministic parser/script failures -> focused test.
+- Repeated repo-policy mistake -> `.claude/rules/*` or `LESSONS.md`.
+- Repeated workflow mistake -> edit the gstack `.tmpl` source and regenerate generated skills.
+- High-risk product/auth/billing/migration work -> create or mention a Linear follow-up instead of broadening the ship PR.
+
 ---
 
 {{ADVERSARIAL_STEP}}

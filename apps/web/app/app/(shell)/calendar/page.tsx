@@ -3,17 +3,17 @@ import { CalendarPageClient } from './CalendarPageClient';
 
 export const metadata: Metadata = {
   title: 'Calendar | Jovie',
-  description: 'Releases + release moments calendar',
+  description: 'Releases and events at a glance',
 };
 
 /**
- * Calendar route — month-grid view of releases.
+ * Calendar route — unified month-grid view of releases + events.
  *
- * Scaffold per the migration plan: ships the surface so the user can
- * iterate on the visual design via PR review comments. Pulls real
- * release data from `useRecentReleasesQuery`; wiring deeper data
- * (release moments, scheduled posts, tour dates) is a follow-up once
- * the visual baseline is approved.
+ * Releases come from `useRecentReleasesQuery`. Events (tour, livestream,
+ * listening party, AMA, signing) come from `useEventsQuery`. Synced
+ * provider events land as `pending` and surface in the day-detail
+ * sidebar with inline confirm/reject — they do not bleed to fans or
+ * notifications until the creator confirms.
  */
 export default function CalendarPage() {
   return <CalendarPageClient />;

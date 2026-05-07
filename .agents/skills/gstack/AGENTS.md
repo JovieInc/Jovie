@@ -4,6 +4,14 @@ gstack is a collection of SKILL.md files that give AI agents structured roles fo
 software development. Each skill is a specialist: CEO reviewer, eng manager,
 designer, QA lead, release engineer, debugger, and more.
 
+## Control-plane principles
+
+- Keep the root contract stable and short; keep leaf skills task-local.
+- Put shared routing, safety, telemetry, and generic voice rules in shared templates, hooks, settings, or repo rules.
+- Put repeatable deterministic work in scripts instead of long copied prose.
+- Generated `SKILL.md` files are outputs. Edit `.tmpl` files and generator code, then regenerate.
+- Treat prompt size as a budget. Prefer progressive disclosure: trigger, inputs, workflow, output, escalation in the leaf; references and examples elsewhere.
+
 ## Available skills
 
 Skills live in `.agents/skills/`. Invoke them by name (e.g., `/office-hours`).
@@ -16,7 +24,7 @@ Skills live in `.agents/skills/`. Invoke them by name (e.g., `/office-hours`).
 | `/plan-design-review` | Rate each design dimension 0-10, explain what a 10 looks like. |
 | `/design-consultation` | Build a complete design system from scratch. |
 | `/review` | Pre-landing PR review. Finds bugs that pass CI but break in prod. |
-| `/debug` | Systematic root-cause debugging. No fixes without investigation. |
+| `/investigate` | Systematic root-cause debugging. No fixes without investigation. |
 | `/design-review` | Design audit + fix loop with atomic commits. |
 | `/qa` | Open a real browser, find bugs, fix them, re-verify. |
 | `/qa-only` | Same as /qa but report only — no code changes. |
@@ -45,5 +53,6 @@ bun run skill:check      # health dashboard for all skills
 
 - SKILL.md files are **generated** from `.tmpl` templates. Edit the template, not the output.
 - Run `bun run gen:skill-docs --host codex` to regenerate Codex-specific output.
+- Run `bun run skill:size-check` after template/generator edits to prevent prompt bloat regressions.
 - The browse binary provides headless browser access. Use `$B <command>` in skills.
 - Safety skills (careful, freeze, guard) use inline advisory prose — always confirm before destructive operations.

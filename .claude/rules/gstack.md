@@ -55,9 +55,22 @@ Key routing rules:
 - Visual audit, design polish → invoke `design-review`
 - Architecture review → invoke `plan-eng-review`
 
+## Skill File Hygiene
+
+gstack skill files are part of the agent control plane. Keep them fast, stable, and maintainable:
+
+- Edit `.agents/skills/gstack/**/SKILL.md.tmpl` or generator code first. Regenerate generated `SKILL.md` files; do not hand-edit generated outputs.
+- Keep leaf skills task-local: trigger conditions, required inputs, workflow, verification, output contract, and escalation only.
+- Put shared routing, safety, telemetry, and generic voice rules in the root gstack template, hooks, settings, or `.claude/rules/*`.
+- Put repeatable commands in scripts. Long copied shell/prose blocks increase latency and drift.
+- Keep stable shared text before variable request details so provider prompt caching can work.
+- Run `bun run skill:size-check` after skill-template changes. It is a ratchet, not the final target; new work should reduce skill size when practical.
+
 ## Performance Optimization Loop
 
-`/perf-loop` runs an autonomous optimization loop that measures, experiments, and keeps only improvements. State is persisted to `.context/perf/` for resume capability. The skill uses `perf:loop` (performance-optimizer.ts) as its measurement primitive and commits each accepted improvement atomically.
+`/perf-loop` runs an autonomous optimization loop that measures, experiments, and keeps only improvements. It must follow `.claude/skills/jovie-performance-hardening/SKILL.md`: baseline first, one hypothesis family per iteration, re-measure with the same method, and keep only validated wins. State is persisted to `.context/perf/` for resume capability. The skill uses `perf:loop` (performance-optimizer.ts) as its measurement primitive.
+
+Chief/default/CFO/Founder OS/Code Orchestrator profiles must not implement performance changes directly. They create a HUD/delegation manifest and dispatch a coder/performance agent with `JOVIE_AGENT_PROFILE=coder`.
 
 Runtime: ~30–50 minutes for a full run (4–10 iterations with builds).
 

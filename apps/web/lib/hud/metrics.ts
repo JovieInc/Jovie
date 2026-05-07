@@ -6,6 +6,7 @@ import { getAdminStripeOverviewMetrics } from '@/lib/admin/stripe-metrics';
 import { checkDbHealth } from '@/lib/db';
 import { getHudDeployments } from '@/lib/deployments/github';
 import { env } from '@/lib/env-server';
+import { getHudAiOpsSummary } from '@/lib/hud/ai-ops';
 import type { HudAccessMode, HudMetrics } from '@/types/hud';
 
 function normalizeIso(value: unknown): string {
@@ -139,12 +140,14 @@ export async function getHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
     reliabilitySummary,
     dbHealth,
     deployments,
+    aiOps,
   ] = await Promise.all([
     getAdminStripeOverviewMetrics(),
     getAdminMercuryMetrics(),
     getAdminReliabilitySummary(),
     checkDbHealth(),
     getHudDeployments(),
+    getHudAiOpsSummary(generatedAt),
   ]);
 
   const financialStatus = calculateFinancialStatus(
@@ -188,6 +191,7 @@ export async function getHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
       lastIncidentAtIso,
     },
     deployments,
+    aiOps,
     generatedAtIso: generatedAt.toISOString(),
   };
 }

@@ -55,10 +55,8 @@ describe('static marketing route policy', () => {
       source: readFileSync(path, 'utf8'),
     }));
     const staticEntrypointViolations = routeSources
-      .filter(
-        ({ path, source }) =>
-          STATIC_ENTRYPOINT_FILENAMES.has(path.split(/[\\/]/).at(-1) ?? '') &&
-          !/^\s*['"]use client['"];/m.test(source)
+      .filter(({ path }) =>
+        STATIC_ENTRYPOINT_FILENAMES.has(path.split(/[\\/]/).at(-1) ?? '')
       )
       .filter(
         ({ source }) =>

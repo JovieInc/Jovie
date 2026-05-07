@@ -37,6 +37,11 @@
             "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/infra-guardrails-check.sh",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/orchestrator-boundary-check.sh",
+            "timeout": 5
           }
         ]
       },
@@ -132,6 +137,8 @@
       "Skill(ideate-quality:*)",
       "Skill(ideate-perf)",
       "Skill(ideate-perf:*)",
+      "Skill(jovie-performance-hardening)",
+      "Skill(jovie-performance-hardening:*)",
       "Skill(consolidate-ui)",
       "Skill(consolidate-ui:*)",
       "Skill(turborepo)",
@@ -162,6 +169,7 @@
       "SlashCommand(/review)",
       "SlashCommand(/browse)",
       "SlashCommand(/qa)",
+      "SlashCommand(/perf-loop)",
       "SlashCommand(/retro)",
       "SlashCommand(/gstack-upgrade)"
     ],

@@ -2,6 +2,14 @@
 
 Pull Linear issues and dispatch isolated agents in parallel, each in its own git worktree. Each agent ships its own PR independently with zero cross-contamination.
 
+## Lead Role Boundary
+
+The swarm lead is an orchestrator, not an implementer. The lead may select issues, create isolated worktrees, spawn agents, watch results, update HUD/Linear, and retry failed dispatches.
+
+The lead must not edit product code, fix validation failures, commit, push implementation changes, merge, deploy, or delete branch data as part of swarm recovery. If work needs code changes after dispatch, create a repair manifest and route it to a `coder` profile.
+
+Every spawned coding agent prompt must include `JOVIE_AGENT_PROFILE=coder`. Planning-only swarm agents should use `JOVIE_AGENT_PROFILE=code-orchestrator`.
+
 **Arguments:** Optional — number of issues to process (default: 5, max: 5 per batch)
 
 ## Required Environment
@@ -76,6 +84,9 @@ For each agent:
 **Agent prompt template:**
 
 ```
+Environment contract:
+Set JOVIE_AGENT_PROFILE=coder before editing files or running validation.
+
 You are working on Linear issue JOV-<NUMBER>: <TITLE>
 
 WORKTREE INSTRUCTIONS (CRITICAL — read these before doing ANYTHING):
@@ -177,7 +188,7 @@ Shipped: X/Y | Failed: Z | Skipped (dupes): W
 
 ## Error Handling
 
-- **Agent fails validation:** Log the failure, mark issue as blocked in Linear with error details
+- **Agent fails validation:** Log the failure and create a coder repair manifest. Do not have the swarm lead fix the branch directly.
 - **Worktree creation fails:** Clean up and retry once, then skip issue
 - **Agent crashes:** Read output file for error, retry once with fresh worktree
 - **Branch conflict:** Delete local branch, recreate worktree from origin/main
