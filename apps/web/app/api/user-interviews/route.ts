@@ -7,7 +7,11 @@
  * /api/cron/summarize-interviews cron handler.
  */
 
+<<<<<<< Updated upstream
 import { eq } from 'drizzle-orm';
+=======
+import { and, sql as drizzleSql, eq } from 'drizzle-orm';
+>>>>>>> Stashed changes
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getOptionalAuth } from '@/lib/auth/cached';
@@ -18,6 +22,7 @@ import {
   userInterviews,
 } from '@/lib/db/schema/user-interviews';
 import { captureError } from '@/lib/error-tracking';
+import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
 
@@ -81,11 +86,52 @@ export async function POST(request: Request) {
       })
       .onConflictDoNothing({
         target: [userInterviews.userId, userInterviews.source],
+<<<<<<< Updated upstream
+=======
+        set: {
+          transcript: transcript as InterviewTranscriptEntry[],
+          metadata,
+          // Preserve terminal states. A re-submission must NOT revive a
+          // dismissed/summarized/failed interview by resetting status to
+          // 'pending'. Only restart processing when the row is still in a
+          // pending/summarizing state.
+          status: drizzleSql`CASE WHEN ${userInterviews.status} IN ('pending','summarizing') THEN 'pending' ELSE ${userInterviews.status} END`,
+          updatedAt: new Date(),
+        },
+>>>>>>> Stashed changes
       })
       .returning({ id: userInterviews.id });
 
     if (inserted.length === 0) {
+<<<<<<< Updated upstream
       return NextResponse.json({ ok: true, deduped: true });
+=======
+      const [existing] = await db
+        .select({ id: userInterviews.id })
+        .from(userInterviews)
+        .where(
+          and(
+            eq(userInterviews.userId, user.id),
+            eq(userInterviews.source, source)
+          )
+        )
+        .limit(1);
+      if (!existing?.id) {
+        // Hitting this branch means the upsert did not return a row AND the
+        // row no longer exists when we look it up. That should be impossible
+        // under normal operation; surface it for investigation instead of
+        // silently returning a 200 with an undefined id.
+        logger.warn('[user-interviews] fallback lookup found no row', {
+          userId: user.id,
+          source,
+        });
+        return NextResponse.json(
+          { error: 'Interview row not found after upsert' },
+          { status: 409 }
+        );
+      }
+      return NextResponse.json({ ok: true, id: existing.id, updated: true });
+>>>>>>> Stashed changes
     }
 
     return NextResponse.json({ ok: true, id: inserted[0].id });

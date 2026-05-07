@@ -3,6 +3,7 @@
 import { Button } from '@jovie/ui';
 import Link from 'next/link';
 import { Container } from '@/components/site/Container';
+import { APP_ROUTES } from '@/constants/routes';
 
 export function NewPreFooterCTA() {
   return (
@@ -26,7 +27,11 @@ export function NewPreFooterCTA() {
 
             <div className='mt-8 flex flex-col sm:flex-row items-center justify-center gap-3'>
               <Button asChild size='lg' variant='primary'>
+<<<<<<< Updated upstream
                 <Link href='/signup'>Get started</Link>
+=======
+                <Link href={APP_ROUTES.SIGNUP}>Request Access</Link>
+>>>>>>> Stashed changes
               </Button>
               <Button asChild size='lg' variant='secondary'>
                 <Link href='#how-it-works'>See how it works</Link>

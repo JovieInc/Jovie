@@ -42,6 +42,13 @@ export interface InterviewMetadata {
   plan?: string | null;
   locale?: string | null;
   userAgent?: string | null;
+<<<<<<< Updated upstream
+=======
+  waitlistEntryId?: string | null;
+  accessOutcome?: string | null;
+  /** Known submission source today is `'onboarding_chat'`. */
+  submittedFrom?: string | null;
+>>>>>>> Stashed changes
   summary_structured?: InterviewSummaryStructured | null;
   summary_error?: string | null;
 }

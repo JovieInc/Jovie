@@ -570,7 +570,12 @@ export async function GET() {
   }
 
   const user = await currentUser();
-  const emailRaw = user?.emailAddresses?.[0]?.emailAddress ?? null;
+  // Prefer a verified email — `emailAddresses[0]` may be unverified.
+  const emailRaw =
+    user?.emailAddresses?.find(e => e.verification?.status === 'verified')
+      ?.emailAddress ??
+    user?.primaryEmailAddress?.emailAddress ??
+    null;
   if (!emailRaw) {
     return NextResponse.json(
       { hasEntry: false, status: null },
@@ -643,10 +648,22 @@ export async function POST(request: Request) {
     }
 
     const user = await currentUser();
+<<<<<<< Updated upstream
     const emailRaw = user?.emailAddresses?.[0]?.emailAddress ?? null;
     if (!emailRaw) {
       return badRequestResponse('Email is required');
     }
+=======
+    // Prefer a verified email — `emailAddresses[0]` may be unverified, which
+    // would let a caller hit the already_accepted path against an email they
+    // have not actually confirmed they own.
+    const emailRaw =
+      user?.emailAddresses?.find(e => e.verification?.status === 'verified')
+        ?.emailAddress ??
+      user?.primaryEmailAddress?.emailAddress ??
+      null;
+    if (!emailRaw) return badRequestResponse('Email is required');
+>>>>>>> Stashed changes
 
     const email = normalizeEmail(emailRaw);
     const fullName = deriveFullName({

@@ -8,7 +8,7 @@
  *
  * In light mode, Tier 1 and Tier 2 share the same white bg.
  * Card elevation is expressed through the border ring + shadow, not bg color.
- * In dark mode, surface-1 (#17171a) IS distinct from the content surface (#0f1011).
+ * In dark mode, surface-1 (#101216) IS distinct from the content surface (#0a0c0f).
  */
 export const LINEAR_SURFACE = {
   // Tier 1 — content containers inside <main>

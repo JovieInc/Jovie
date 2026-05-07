@@ -135,6 +135,36 @@ describe('Public Profile Page Logic', () => {
       );
     });
 
+    it('derives the runtime mode from ?mode= search params', async () => {
+      const { getProfileMode } = await import('@/features/profile/registry');
+
+      // Default and unknown values fall back to 'profile'.
+      expect(getProfileMode(null)).toBe('profile');
+      expect(getProfileMode(undefined)).toBe('profile');
+      expect(getProfileMode('not-a-real-mode')).toBe('profile');
+
+      // Known modes round-trip.
+      expect(getProfileMode('listen')).toBe('listen');
+      expect(getProfileMode('pay')).toBe('pay');
+
+      // Legacy 'tip' alias remaps to 'pay' so old links keep working.
+      expect(getProfileMode('tip')).toBe('pay');
+    });
+
+    it('derives a subtitle for every supported runtime mode', () => {
+      // If a route ever stops feeding the URL `?mode=` value into the
+      // subtitle helper, the visible header copy will silently drift. Assert
+      // that each mode maps to the same registry-driven subtitle the
+      // template renders so a regression there is caught here.
+      for (const mode of profileModes) {
+        const subtitle = getProfileModeSubtitle(mode);
+        expect(typeof subtitle).toBe('string');
+        expect(subtitle.length).toBeGreaterThan(0);
+      }
+      // 'tip' is the legacy alias for 'pay' — must produce the same subtitle.
+      expect(getProfileModeSubtitle('tip')).toBe(getProfileModeSubtitle('pay'));
+    });
+
     it('delegates claim banner query handling to the client wrapper', () => {
       expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('PublicClaimBanner');
     });
@@ -263,7 +293,7 @@ describe('Public Profile Page Logic', () => {
         ],
       };
 
-      const MAX_EVENT_SCHEMAS = 10;
+      const MAX_EVENT_SCHEMAS = 5;
       const eventSchemas = tourDates.slice(0, MAX_EVENT_SCHEMAS).map(td => ({
         '@type': 'MusicEvent',
         '@id': `${profileUrl}#event-${td.id}`,

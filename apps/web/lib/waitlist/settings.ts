@@ -7,16 +7,27 @@ const SETTINGS_ROW_ID = 1;
 // ---------------------------------------------------------------------------
 // In-memory cache for gate status
 // ---------------------------------------------------------------------------
+<<<<<<< Updated upstream
 // The waitlist gate setting changes rarely (admin toggle). A short TTL avoids
 // hitting the DB on every middleware request while keeping propagation latency
 // under 30 seconds. Explicitly invalidated on settings update.
 // ---------------------------------------------------------------------------
+=======
+//
+// `isWaitlistGateEnabled` is hit on every authenticated middleware
+// cache-miss via `proxy-state.ts`, so re-querying the DB on every call is
+// expensive (and `getWaitlistSettings` may run an INSERT on a cold instance).
+// Cache the boolean in-process for a short TTL — admin updates call
+// `invalidateWaitlistGateCache()` to pick up the new value immediately.
+const GATE_CACHE_TTL_MS = 30_000;
+>>>>>>> Stashed changes
 let _gateEnabledCache: { value: boolean; expiresAt: number } | null = null;
 const _GATE_CACHE_TTL_MS = 30_000; // 30s — unused while gate is hardcoded off
 
 /**
  * Check if the waitlist gate is enabled.
  *
+<<<<<<< Updated upstream
  * Hardcoded to `false` — the waitlist gate is permanently disabled so all
  * signups go straight to onboarding. The DB-backed toggle and surrounding
  * infrastructure are preserved for future demand control (re-enable by
@@ -32,6 +43,25 @@ const _GATE_CACHE_TTL_MS = 30_000; // 30s — unused while gate is hardcoded off
  */
 export async function isWaitlistGateEnabled(): Promise<boolean> {
   return false;
+=======
+ * Cached in-process for 30 seconds so authenticated middleware cache-misses
+ * don't add a DB round-trip per request. The cache is invalidated whenever
+ * `updateWaitlistSettings` runs so admin toggles still take effect on the
+ * next request.
+ */
+export async function isWaitlistGateEnabled(): Promise<boolean> {
+  const now = Date.now();
+  if (_gateEnabledCache && _gateEnabledCache.expiresAt > now) {
+    return _gateEnabledCache.value;
+  }
+
+  const settings = await getWaitlistSettings();
+  _gateEnabledCache = {
+    value: settings.gateEnabled,
+    expiresAt: now + GATE_CACHE_TTL_MS,
+  };
+  return settings.gateEnabled;
+>>>>>>> Stashed changes
 }
 
 /**
