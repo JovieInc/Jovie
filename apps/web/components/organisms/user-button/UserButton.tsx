@@ -9,6 +9,7 @@ import {
   Keyboard,
   LogOut,
   MessageSquare,
+  Monitor,
   Settings,
   Shield,
   Sparkles,
@@ -128,6 +129,19 @@ function buildDropdownItems({
       icon: Settings,
       onClick: handleSettings,
       shortcut: 'G S',
+    },
+    {
+      type: 'action' as const,
+      id: 'download-desktop',
+      label: 'Download Desktop App',
+      icon: Monitor,
+      onClick: () => {
+        window.open(
+          'https://github.com/JovieInc/Jovie/releases/latest',
+          '_blank',
+          'noopener,noreferrer'
+        );
+      },
     },
   ];
 
