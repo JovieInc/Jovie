@@ -51,6 +51,8 @@ export default {
   thresholds: {
     high: 80,
     low: 60,
+    // Telemetry-only until baseline hotspot scores are established.
+    // The workflow still preserves Stryker setup failures.
     break: 0,
   },
   concurrency: process.env.CI ? 2 : undefined,

@@ -2,9 +2,9 @@ name: Nightly Testing Agent
 
 on:
   schedule:
-    # 2:00 AM America/Los_Angeles during daylight saving time. Keep UTC here
+    # 2:30 AM America/Los_Angeles during daylight saving time. Keep UTC here
     # until the repo actionlint version accepts the GitHub `timezone` key.
-    - cron: '0 9 * * *'
+    - cron: '30 9 * * *'
   workflow_dispatch:
     inputs:
       run_unit:

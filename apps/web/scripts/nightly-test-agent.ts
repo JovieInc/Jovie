@@ -275,6 +275,17 @@ function writeJsonl(filePath: string, values: readonly unknown[]): void {
   writeText(filePath, body.length > 0 ? `${body}\n` : '');
 }
 
+function readJsonl<T>(filePath: string): T[] {
+  if (!existsSync(filePath)) {
+    return [];
+  }
+  return readFileSync(filePath, 'utf8')
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean)
+    .map(line => JSON.parse(line) as T);
+}
+
 function getManifest(repoRoot: string): NightlyManifest {
   return readJson<NightlyManifest>(
     path.join(repoRoot, '.agents/skills/nightly-test-agent/manifests.json')
@@ -302,7 +313,7 @@ function pathMatches(filePath: string, patterns: readonly string[]): boolean {
     if (cleanPattern.endsWith('/')) {
       return normalized.startsWith(cleanPattern);
     }
-    return normalized === cleanPattern || normalized.startsWith(cleanPattern);
+    return normalized === cleanPattern;
   });
 }
 
@@ -330,6 +341,49 @@ function findFiles(
     }
   }
   return found.sort();
+}
+
+function loadFailureRecords(fileOrDir: string, repo: RepoKey): FailureRecord[] {
+  if (!existsSync(fileOrDir)) {
+    return [];
+  }
+  const stat = statSync(fileOrDir);
+  const files = stat.isDirectory()
+    ? findFiles(
+        fileOrDir,
+        filePath =>
+          filePath.endsWith('.jsonl') &&
+          path.basename(filePath).includes('failure-memory')
+      )
+    : [fileOrDir];
+  return files
+    .flatMap(filePath => readJsonl<FailureRecord>(filePath))
+    .filter(record => record.repo === repo);
+}
+
+function loadFailureMemory(
+  repoRoot: string,
+  args: Record<string, string>,
+  repo: RepoKey
+): FailureRecord[] {
+  const paths = [
+    args['failure-memory']
+      ? resolveFromRoot(repoRoot, args['failure-memory'])
+      : null,
+    path.join(
+      repoRoot,
+      '.agents/skills/nightly-test-agent/failure-memory.jsonl'
+    ),
+    path.join(
+      repoRoot,
+      'apps/web/test-results/nightly-agent/failure-memory.jsonl'
+    ),
+    path.join(
+      repoRoot,
+      'apps/web/test-results/nightly-agent/failure-memory-delta.jsonl'
+    ),
+  ].filter((value): value is string => Boolean(value));
+  return paths.flatMap(filePath => loadFailureRecords(filePath, repo));
 }
 
 function fingerprint(parts: readonly string[]): string {
@@ -451,11 +505,12 @@ function commandContext(repoRoot: string, args: Record<string, string>): void {
 function commandSelect(repoRoot: string, args: Record<string, string>): void {
   const repo = normalizeRepoKey(args.repo);
   const profile = getManifest(repoRoot).repos[repo];
+  const failures = loadFailureMemory(repoRoot, args, repo);
   const limit = args.limit
     ? Number.parseInt(args.limit, 10)
     : profile.nightlyBudget.maxTargets;
   const selectedTargets = profile.riskItems
-    .map(item => scoreRiskItem({ item, profile, failures: [] }))
+    .map(item => scoreRiskItem({ item, profile, failures }))
     .sort((first, second) => second.score - first.score)
     .slice(
       0,
@@ -465,6 +520,7 @@ function commandSelect(repoRoot: string, args: Record<string, string>): void {
   writeJson(path.join(dir, 'selected-targets.json'), {
     generatedAt: new Date().toISOString(),
     repo,
+    failureMemoryRecords: failures.length,
     selectedTargets,
   });
   writeText(
