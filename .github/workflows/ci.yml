@@ -257,7 +257,7 @@ jobs:
             CHANGED_FILES=$(git diff --diff-filter=d --name-only "origin/${{ github.base_ref }}" HEAD -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.json' '*.mts' '*.mjs' ':(exclude)**/package-lock.json' ':(exclude).claude/settings.json' ':(exclude).claude/skills/**' | tr '\n' ' ')
             if [ -n "$CHANGED_FILES" ]; then
               echo "Linting changed files only: $CHANGED_FILES"
-              pnpm biome ci --reporter=github $CHANGED_FILES
+              pnpm biome ci --reporter=github --no-errors-on-unmatched $CHANGED_FILES
             else
               echo "No lintable files changed"
             fi
