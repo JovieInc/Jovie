@@ -8,6 +8,12 @@ description: Parallel agent orchestration using git worktrees for isolated branc
 
 Orchestrate multiple agents working on separate Linear issues in parallel, using git worktrees so each agent has a completely isolated working directory. Turbo 2.8+ automatically shares build cache across worktrees.
 
+## Lead Role Boundary
+
+The lead coordinates and verifies; it does not become the coder. If a delegated agent fails validation, conflicts, or review repair, the lead records the blocker and dispatches a new coder/code-orchestrator task. The lead must not check out the branch, edit product files, commit, or push implementation fixes itself.
+
+Set `JOVIE_AGENT_PROFILE=default` or `JOVIE_AGENT_PROFILE=code-orchestrator` in lead sessions. Set `JOVIE_AGENT_PROFILE=coder` in implementation sessions so repo hooks can enforce the boundary.
+
 ## When to Use
 
 - Spawning 2+ agents to work on different issues simultaneously
@@ -149,4 +155,4 @@ pnpm install
 ```
 
 ### Agent's typecheck/lint fails
-The agent should fix issues in its worktree. If it can't, it reports failure and the lead agent handles it or marks the issue as blocked.
+The agent should fix issues in its worktree. If it can't, it reports failure and the lead agent creates a repair manifest, redispatches to an authorized coder, or marks the issue as blocked. The lead does not fix the branch directly.
