@@ -138,7 +138,9 @@ export default async function ChangelogPage() {
         <div className='marketing-divider mb-10' />
         <div className='max-w-3xl'>
           {releases.length === 0 ? (
-            <p className='opacity-40'>No updates yet. Check back soon!</p>
+            <p className='text-secondary-token'>
+              No updates yet. Check back soon!
+            </p>
           ) : (
             <div className='space-y-10'>
               {releases.map(release => (
