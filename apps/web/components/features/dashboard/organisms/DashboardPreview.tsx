@@ -65,7 +65,7 @@ export function DashboardPreview({
 
       {/* Mobile Frame Preview */}
       <div className='flex justify-center'>
-        <div className='relative w-[280px] rounded-[28px] border border-(--linear-app-frame-seam) bg-surface-1 p-2 transition-transform duration-300 hover:scale-[1.01]'>
+        <div className='relative w-[280px] rounded-[28px] border border-(--linear-app-frame-seam) bg-surface-1 p-2'>
           {/* Top notch */}
           <div className='absolute left-1/2 top-2 z-10 h-3 w-20 -translate-x-1/2 rounded-b-[10px] bg-surface-1'></div>
 
