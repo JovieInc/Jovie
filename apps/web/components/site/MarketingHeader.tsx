@@ -39,51 +39,80 @@ const MARKETING_GLASS_FLYOUTS: readonly HeaderFlyoutMenu[] = [
     links: [
       {
         href: APP_ROUTES.ARTIST_PROFILES,
-        label: 'Artist Profiles',
-        description: 'A live page that routes fans to the right action.',
+        label: 'Smart release links',
+        description: 'One link for every drop.',
       },
       {
-        href: APP_ROUTES.ARTIST_NOTIFICATIONS,
-        label: 'Fan Capture',
-        description:
-          'Collect demand from releases, shows, links, and QR scans.',
+        href: APP_ROUTES.ARTIST_PROFILES,
+        label: 'Artist profiles',
+        description: 'A live page that converts.',
       },
       {
         href: APP_ROUTES.LAUNCH,
-        label: 'Release System',
-        description: 'Plan, launch, and keep each release moving.',
+        label: 'Pre-saves & countdowns',
+        description: 'Built into the same link.',
+      },
+      {
+        href: APP_ROUTES.LAUNCH,
+        label: 'Tour & city detection',
+        description: 'Show the next show first.',
       },
       {
         href: APP_ROUTES.PAY,
-        label: 'Pay',
-        description: 'Tips and support moments inside the same experience.',
+        label: 'Tip jar & instant payout',
+        description: 'Get paid in the moment.',
+      },
+      {
+        href: `${APP_ROUTES.ARTIST_PROFILES}#capture-every-fan`,
+        label: 'Fan capture',
+        description: 'Listens, scans, opt-ins.',
+      },
+      {
+        href: APP_ROUTES.ARTIST_NOTIFICATIONS,
+        label: 'Named-fan CRM',
+        description: 'Recognize who keeps showing up.',
+      },
+      {
+        href: APP_ROUTES.ARTIST_NOTIFICATIONS,
+        label: 'Direct fan messaging',
+        description: 'Write to fans who care.',
       },
     ],
   },
   {
     id: 'resources',
     label: 'Resources',
-    heading: 'Insights',
+    heading: 'Insights & solutions',
     links: [
       {
         href: APP_ROUTES.BLOG,
         label: 'Blog',
-        description: 'Release ideas and product thinking for artists.',
+        description: 'Releases, ideas, behind the scenes.',
+      },
+      {
+        href: APP_ROUTES.COMPARE,
+        label: 'Customer stories',
+        description: 'Artists running the loop.',
       },
       {
         href: APP_ROUTES.CHANGELOG,
         label: 'Changelog',
-        description: 'What shipped for artists and teams.',
+        description: 'What shipped this week.',
       },
       {
         href: APP_ROUTES.SUPPORT,
-        label: 'Support',
-        description: 'Guides, answers, and contact paths.',
+        label: 'Help center',
+        description: 'Guides and answers.',
       },
       {
         href: APP_ROUTES.COMPARE,
         label: 'Compare',
         description: 'See how Jovie fits against general-purpose tools.',
+      },
+      {
+        href: 'https://status.jov.ie',
+        label: 'Status',
+        description: 'System health.',
       },
     ],
   },

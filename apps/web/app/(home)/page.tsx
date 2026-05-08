@@ -451,7 +451,7 @@ export default async function HomePage() {
       </section>
       <div className='homepage-trust-section'>
         <HomeTrustSection
-          label='Trusted by artists on'
+          label='Trusted by artists and teams releasing on'
           presentation='inline-strip'
         />
       </div>
