@@ -188,6 +188,7 @@ export function ProfileInlineNotificationsCTA({
   const otpVerificationInFlightRef = useRef(false);
   const previousOtpLengthRef = useRef(otpCode.length);
   const pendingCompletedOtpRef = useRef<string | null>(null);
+  const autoSubmittedOtpRef = useRef<string | null>(null);
 
   const isInline = presentation === 'inline';
   const artistEmailReady = readArtistEmailReadyFromSettings(artist.settings);
@@ -446,6 +447,7 @@ export function ProfileInlineNotificationsCTA({
 
     if (otpCode.length < 6) {
       pendingCompletedOtpRef.current = null;
+      autoSubmittedOtpRef.current = null;
       return;
     }
 
@@ -457,12 +459,17 @@ export function ProfileInlineNotificationsCTA({
       return;
     }
 
+    if (autoSubmittedOtpRef.current === otpCode) {
+      return;
+    }
+
     if (isSubmitting || otpVerificationInFlightRef.current) {
       return;
     }
 
     pendingCompletedOtpRef.current = null;
-    void handleOtpSubmit();
+    autoSubmittedOtpRef.current = otpCode;
+    handleOtpSubmit().catch(() => {});
   }, [handleOtpSubmit, isSubmitting, otpCode, step]);
 
   const handleNameSubmit = useCallback(() => {
