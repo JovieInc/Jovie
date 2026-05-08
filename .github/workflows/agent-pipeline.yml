@@ -108,9 +108,9 @@ jobs:
             fi
 
             # Find the PR for this branch
-            # gh api returns a JSON array — do NOT use jq -s (slurp) which double-wraps it
-            PR_DATA=$(gh api "repos/$REPOSITORY/pulls" \
-              | jq --arg branch "$HEAD_BRANCH" '([.[] | select(.head.ref == $branch and .state == "open")] | first) as $pr | if $pr == null then null else {number: $pr.number, head_ref: $pr.head.ref, head_sha: $pr.head.sha, draft: $pr.draft, labels: [($pr.labels // [])[]?.name]} end')
+            # gh api --paginate returns one JSON array per page; jq -s joins the pages.
+            PR_DATA=$(gh api --paginate "repos/$REPOSITORY/pulls?state=open&per_page=100" \
+              | jq -s --arg branch "$HEAD_BRANCH" '([.[][] | select(.head.ref == $branch and .state == "open")] | first) as $pr | if $pr == null then null else {number: $pr.number, head_ref: $pr.head.ref, head_sha: $pr.head.sha, draft: $pr.draft, labels: [($pr.labels // [])[]?.name]} end')
 
             if [[ -z "$PR_DATA" || "$PR_DATA" == "null" ]]; then
               echo "No open PR found for branch '$HEAD_BRANCH'. Skipping."
@@ -848,13 +848,15 @@ jobs:
           SENSITIVE_SAFE="${{ steps.sensitive-check.outputs.is_safe }}"
           BLOCKING="${{ steps.check-statuses.outputs.blocking_reason }}"
           SENSITIVE_FILES="${{ steps.sensitive-check.outputs.sensitive_files }}"
+          GSTACK_PASSED="${{ steps.gstack-gates.outputs.all_passed }}"
+          GSTACK_BLOCKING="${{ steps.gstack-gates.outputs.blocking_reason }}"
 
           echo "Auto-approve skipped:"
           if [[ "$STATUSES_PASSED" != "true" ]]; then
             echo "  - Status checks not all passing: $BLOCKING"
           fi
-          if [[ "${{ steps.gstack-gates.outputs.all_passed }}" != "true" ]]; then
-            echo "  - GStack evidence missing: ${{ steps.gstack-gates.outputs.blocking_reason }}"
+          if [[ "$STATUSES_PASSED" == "true" && "$GSTACK_PASSED" != "true" ]]; then
+            echo "  - GStack evidence missing: $GSTACK_BLOCKING"
           fi
           if [[ "$SENSITIVE_SAFE" != "true" ]]; then
             echo "  - Sensitive files changed: $SENSITIVE_FILES"

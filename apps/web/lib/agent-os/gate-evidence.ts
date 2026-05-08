@@ -40,24 +40,37 @@ export function extractAgentRunArtifactsFromMarkdown(
     }
 
     const jsonStart = commentStart + ARTIFACT_COMMENT_START.length;
-    const commentEnd = markdown.indexOf(ARTIFACT_COMMENT_END, jsonStart);
+    let commentEnd = markdown.indexOf(ARTIFACT_COMMENT_END, jsonStart);
     if (commentEnd === -1) {
       break;
     }
 
-    const rawJson = markdown.slice(jsonStart, commentEnd).trim();
-    searchStart = commentEnd + ARTIFACT_COMMENT_END.length;
-    if (!rawJson) {
-      continue;
+    let foundArtifact = false;
+    while (commentEnd !== -1) {
+      const rawJson = markdown.slice(jsonStart, commentEnd).trim();
+      searchStart = commentEnd + ARTIFACT_COMMENT_END.length;
+
+      if (!rawJson) {
+        foundArtifact = true;
+        break;
+      }
+
+      try {
+        const parsed = safeParseAgentRunArtifact(JSON.parse(rawJson));
+        if (parsed.success) {
+          artifacts.push(parsed.data);
+        }
+        foundArtifact = true;
+        break;
+      } catch {
+        // A JSON string may contain "-->"; keep scanning for the real comment end.
+      }
+
+      commentEnd = markdown.indexOf(ARTIFACT_COMMENT_END, searchStart);
     }
 
-    try {
-      const parsed = safeParseAgentRunArtifact(JSON.parse(rawJson));
-      if (parsed.success) {
-        artifacts.push(parsed.data);
-      }
-    } catch {
-      continue;
+    if (!foundArtifact) {
+      break;
     }
   }
 
@@ -65,7 +78,10 @@ export function extractAgentRunArtifactsFromMarkdown(
 }
 
 function gateHasRecordedEvidence(gate: VerificationGate): boolean {
-  return gate.status === 'passed' && Boolean(gate.evidenceUrl ?? gate.summary);
+  return (
+    gate.status === 'passed' &&
+    (Boolean(gate.evidenceUrl?.trim()) || Boolean(gate.summary?.trim()))
+  );
 }
 
 export function evaluateAgentRunGateEvidence(

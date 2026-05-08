@@ -13,9 +13,18 @@ if (!evidenceFile) {
   process.exit(1);
 }
 
-const evaluation = evaluateAgentRunGateEvidence(
-  readFileSync(evidenceFile, 'utf8')
-);
+let evidenceMarkdown: string;
+try {
+  evidenceMarkdown = readFileSync(evidenceFile, 'utf8');
+} catch (error) {
+  const reason = error instanceof Error ? error.message : String(error);
+  console.error(
+    `Could not read gate evidence file "${evidenceFile}": ${reason}`
+  );
+  process.exit(1);
+}
+
+const evaluation = evaluateAgentRunGateEvidence(evidenceMarkdown);
 
 console.log(buildGateEvidenceSummary(evaluation));
 

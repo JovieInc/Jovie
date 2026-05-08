@@ -73,8 +73,14 @@ export const AGENT_RUN_GATE_EVIDENCE_NAMES = [
   'sentry.canary',
 ] as const;
 
-const nullableUrlSchema = z.union([z.string().trim().url(), z.null()]);
-const nullableTextSchema = z.union([z.string().trim().min(1), z.null()]);
+const nullableUrlSchema = z.preprocess(
+  value => (typeof value === 'string' && value.trim() === '' ? null : value),
+  z.union([z.string().trim().url(), z.null()])
+);
+const nullableTextSchema = z.preprocess(
+  value => (typeof value === 'string' && value.trim() === '' ? null : value),
+  z.union([z.string().trim().min(1), z.null()])
+);
 const isoDateTimeSchema = z.string().datetime();
 
 export const AgentRunSourceSchema = z.enum(AGENT_RUN_SOURCES);

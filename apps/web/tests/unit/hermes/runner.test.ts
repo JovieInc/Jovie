@@ -85,6 +85,10 @@ describe('Hermes CLI worker runner', () => {
         ['apps/web']
       )
     ).toThrow('Hermes worker changed files outside allowedPaths');
+
+    expect(() =>
+      findOutOfScopeHermesChangedFiles(['apps/web/..'], ['apps/web'])
+    ).toThrow('Invalid Hermes changed file path');
   });
 
   it('does not require binaries in dry-run mode', () => {

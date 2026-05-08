@@ -116,4 +116,30 @@ describe('AgentOS gate evidence', () => {
     expect(evaluation.passed).toBe(false);
     expect(evaluation.artifacts).toEqual([]);
   });
+
+  it('parses artifact comments when JSON strings contain comment terminators', () => {
+    const evaluation = evaluateAgentRunGateEvidence(
+      formatAgentRunArtifactComment({
+        ...baseArtifact,
+        summary: 'Recorded marker --> without ending the artifact.',
+      })
+    );
+
+    expect(evaluation.passed).toBe(true);
+    expect(evaluation.artifacts).toHaveLength(1);
+  });
+
+  it('accepts summary evidence when evidenceUrl is an empty string', () => {
+    const evaluation = evaluateAgentRunGateEvidence(
+      formatAgentRunArtifactComment({
+        ...baseArtifact,
+        verificationGates: baseArtifact.verificationGates.map(gate => ({
+          ...gate,
+          evidenceUrl: '',
+        })),
+      })
+    );
+
+    expect(evaluation.passed).toBe(true);
+  });
 });

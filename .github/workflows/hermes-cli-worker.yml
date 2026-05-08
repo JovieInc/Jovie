@@ -192,8 +192,8 @@ jobs:
         run: |
           CHANGED_FILES="$RUNNER_TEMP/hermes-changed-files.txt"
           {
-            git diff --name-only --diff-filter=ACMRTUXB
-            git diff --cached --name-only --diff-filter=ACMRTUXB
+            git diff --name-only --diff-filter=ACDMRTUXB
+            git diff --cached --name-only --diff-filter=ACDMRTUXB
             git ls-files --others --exclude-standard
           } | sort -u > "$CHANGED_FILES"
 

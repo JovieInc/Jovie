@@ -47,7 +47,8 @@ export function normalizeHermesChangedFile(path: string): string {
     normalized === '..' ||
     normalized.startsWith('../') ||
     normalized.includes('/../') ||
-    normalized.startsWith('/')
+    normalized.startsWith('/') ||
+    !SAFE_HERMES_PATH_REGEX.test(normalized)
   ) {
     throw new Error(`Invalid Hermes changed file path: ${path}`);
   }

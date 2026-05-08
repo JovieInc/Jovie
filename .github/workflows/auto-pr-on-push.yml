@@ -105,18 +105,25 @@ jobs:
           MAX_WAIT_MINUTES: '6'
         run: |
           write_output() {
-            printf '%s\n' "$1" >> "$GITHUB_OUTPUT"
+            local name="$1"
+            local value="${2-}"
+            local delimiter="jovie_output_${RANDOM}_${RANDOM}"
+            {
+              printf '%s<<%s\n' "$name" "$delimiter"
+              printf '%s\n' "$value"
+              printf '%s\n' "$delimiter"
+            } >> "$GITHUB_OUTPUT"
           }
 
           echo "Branch: $BRANCH"
 
           # Use jq --arg to prevent shell injection via branch name
-          EXISTING=$(gh api "repos/$REPOSITORY/pulls" \
-            | jq --arg branch "$BRANCH" '[.[] | select(.head.ref == $branch and .state == "open")] | length')
+          EXISTING=$(gh api --paginate "repos/$REPOSITORY/pulls?state=open&per_page=100" \
+            | jq -s --arg branch "$BRANCH" '[.[][] | select(.head.ref == $branch and .state == "open")] | length')
 
           if [[ "$EXISTING" -gt 0 ]]; then
             echo "PR already exists for $BRANCH. Skipping."
-            write_output "should_create=false"
+            write_output should_create false
             exit 0
           fi
 
@@ -128,24 +135,24 @@ jobs:
           while true; do
             # Use gh api (REST) instead of gh pr list (GraphQL) to avoid
             # App token scope issues with gh CLI's internal GraphQL queries
-            OPEN_AGENT_PRS=$(gh api "repos/$REPOSITORY/pulls?state=open&per_page=100" \
-              | jq '[.[] | select(.head.ref | test("^(codex|codegen-bot|linear|claude)/") or test("^[^/]+/jov-[0-9]+([_-].+)?$"; "i"))] | length')
+            OPEN_AGENT_PRS=$(gh api --paginate "repos/$REPOSITORY/pulls?state=open&per_page=100" \
+              | jq -s '[.[][] | select(.head.ref | test("^(codex|codegen-bot|linear|claude)/") or test("^[^/]+/jov-[0-9]+([_-].+)?$"; "i"))] | length')
 
             echo "Open agent PRs: $OPEN_AGENT_PRS / $MAX_OPEN_AGENT_PRS (waited ${WAITED}s)"
 
             if [[ "$OPEN_AGENT_PRS" -lt "$MAX_OPEN_AGENT_PRS" ]]; then
               echo "Capacity available. Will create PR."
-              write_output "should_create=true"
+              write_output should_create true
               break
             fi
 
             if [[ "$WAITED" -ge "$MAX_WAIT" ]]; then
               echo "::warning::Rate limit still hit after waiting ${MAX_WAIT}s ($OPEN_AGENT_PRS open agent PRs). Skipping PR for $BRANCH."
-              write_output "should_create=false"
-              write_output "capacity_blocked=true"
-              write_output "open_agent_prs=$OPEN_AGENT_PRS"
-              write_output "max_open_agent_prs=$MAX_OPEN_AGENT_PRS"
-              write_output "waited_seconds=$WAITED"
+              write_output should_create false
+              write_output capacity_blocked true
+              write_output open_agent_prs "$OPEN_AGENT_PRS"
+              write_output max_open_agent_prs "$MAX_OPEN_AGENT_PRS"
+              write_output waited_seconds "$WAITED"
               break
             fi
 
@@ -231,13 +238,20 @@ jobs:
           BRANCH: ${{ github.ref_name }}
         run: |
           write_output() {
-            printf '%s\n' "$1" >> "$GITHUB_OUTPUT"
+            local name="$1"
+            local value="${2-}"
+            local delimiter="jovie_output_${RANDOM}_${RANDOM}"
+            {
+              printf '%s<<%s\n' "$name" "$delimiter"
+              printf '%s\n' "$value"
+              printf '%s\n' "$delimiter"
+            } >> "$GITHUB_OUTPUT"
           }
 
           # Extract Linear ticket ID (JOV-123) from anywhere in the branch name
           # Handles: codex/linear-mention-jov-854-desc, linear/JOV-42-desc, claude/jov-100-fix
           TICKET=$(echo "$BRANCH" | grep -oiP 'jov-\d+' | head -1 | tr '[:lower:]' '[:upper:]' || echo "")
-          write_output "ticket=$TICKET"
+          write_output ticket "$TICKET"
 
           # Build PR title from branch name
           # Strip the agent prefix (codex/, claude/, etc.)
@@ -255,7 +269,7 @@ jobs:
           # Capitalize first letter of description
           TITLE=$(echo "$TITLE" | sed 's/\(: \)\(.\)/\1\U\2/;s/^\(.\)/\U\1/')
 
-          write_output "title=$TITLE"
+          write_output title "$TITLE"
           echo "PR title: $TITLE"
 
       - name: Fetch Linear ticket details
@@ -265,14 +279,21 @@ jobs:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
         run: |
           write_output() {
-            printf '%s\n' "$1" >> "$GITHUB_OUTPUT"
+            local name="$1"
+            local value="${2-}"
+            local delimiter="jovie_output_${RANDOM}_${RANDOM}"
+            {
+              printf '%s<<%s\n' "$name" "$delimiter"
+              printf '%s\n' "$value"
+              printf '%s\n' "$delimiter"
+            } >> "$GITHUB_OUTPUT"
           }
 
           TICKET="${{ steps.parse.outputs.ticket }}"
 
           if [[ -z "$LINEAR_API_KEY" ]]; then
             echo "No LINEAR_API_KEY. Skipping ticket lookup."
-            write_output "has_details=false"
+            write_output has_details false
             exit 0
           fi
 
@@ -292,19 +313,19 @@ jobs:
 
           if [[ -n "$ISSUE_ID" ]]; then
             echo "Found Linear issue: $ISSUE_TITLE"
-            write_output "has_details=true"
-            write_output "issue_id=$ISSUE_ID"
-            write_output "issue_title=$ISSUE_TITLE"
-            write_output "issue_url=$ISSUE_URL"
+            write_output has_details true
+            write_output issue_id "$ISSUE_ID"
+            write_output issue_title "$ISSUE_TITLE"
+            write_output issue_url "$ISSUE_URL"
 
             # Override PR title with actual ticket title
-            write_output "title=${TICKET}: ${ISSUE_TITLE}"
+            write_output title "${TICKET}: ${ISSUE_TITLE}"
 
             # Base64 encode description for safe multiline handling
-            write_output "issue_desc=$(echo "$ISSUE_DESC" | base64 -w0)"
+            write_output issue_desc "$(echo "$ISSUE_DESC" | base64 -w0)"
           else
             echo "Linear issue not found for $TICKET"
-            write_output "has_details=false"
+            write_output has_details false
           fi
 
       - name: Create PR
