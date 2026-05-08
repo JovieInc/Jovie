@@ -131,11 +131,9 @@ function tryAcquireLock() {
 
 async function runAsOwner() {
   const startedAtMs = Date.now();
-  let exitCode = 1;
 
   try {
     const result = await runCommand(command);
-    exitCode = result.exitCode;
     try {
       writeResult({
         ...invocation,
@@ -152,7 +150,7 @@ async function runAsOwner() {
         `[typecheck-singleflight] could not write shared result: ${formatError(error)}`
       );
     }
-    return exitCode;
+    return result.exitCode;
   } finally {
     releaseLock();
   }
