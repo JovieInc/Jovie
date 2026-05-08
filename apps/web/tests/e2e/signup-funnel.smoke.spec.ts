@@ -90,7 +90,7 @@ test.describe('Signup Funnel Smoke @smoke', () => {
       return;
     }
 
-    await setTestAuthBypassSession(page, 'creator');
+    await setTestAuthBypassSession(page, 'creator-ready');
 
     const appResponse = await smokeNavigateWithRetry(page, '/app/chat', {
       timeout: 120_000,

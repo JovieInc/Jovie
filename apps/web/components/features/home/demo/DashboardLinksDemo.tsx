@@ -60,10 +60,7 @@ export function DashboardLinksDemo() {
               }}
             >
               {/* Drag handle */}
-              <div
-                className='flex flex-col gap-[2px] opacity-30'
-                style={{ color: 'var(--color-text-tertiary-token)' }}
-              >
+              <div className='flex flex-col gap-[2px] opacity-30 text-tertiary-token'>
                 <span className='text-[8px] leading-none'>&#8942;&#8942;</span>
               </div>
 
@@ -95,7 +92,7 @@ export function DashboardLinksDemo() {
                         : '0%',
                       backgroundColor: 'var(--linear-accent)',
                       opacity: 0.7,
-                      transition: `width 0.8s cubic-bezier(0.34,1.56,0.64,1) ${i * 60}ms`,
+                      transition: `width 0.8s var(--ds-motion-cinematic-easing) ${i * 60}ms`,
                     }}
                   />
                 </div>
