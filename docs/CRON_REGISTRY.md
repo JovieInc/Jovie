@@ -25,8 +25,14 @@ Source of truth: `apps/web/vercel.json`
 | `/api/cron/generate-insights` | `0 5 * * *` | Daily at 05:00 UTC |
 | `/api/cron/process-ingestion-jobs` | `* * * * *` | Every minute |
 | `/api/cron/purge-pixel-ips` | `0 3 * * *` | Daily at 03:00 UTC |
+| `/api/cron/summarize-interviews` | `*/5 * * * *` | Every 5 minutes |
+| `/api/cron/generate-playlist` | `0 6 * * *` | Daily at 06:00 UTC |
+| `/api/cron/process-pre-saves` | `0 2 * * *` | Daily at 02:00 UTC |
+| `/api/cron/cleanup-sms-intents` | `0 1 * * *` | Daily at 01:00 UTC |
+| `/api/cron/monitor-metadata-submissions` | `0 * * * *` | Hourly |
+| `/api/cron/process-metadata-submissions` | `0 4 * * *` | Daily at 04:00 UTC |
 
-Only these 5 paths are scheduled in production. Other cron route files exist as standalone endpoints whose logic is called as sub-jobs of `frequent` or `daily-maintenance`.
+All 11 paths are now scheduled in production. Other cron route files exist as standalone endpoints whose logic is called as sub-jobs of `frequent` or `daily-maintenance`.
 
 **Auth:** All crons use `Authorization: Bearer ${CRON_SECRET}`. The `data-retention` route additionally uses timing-safe comparison + origin verification.
 
@@ -71,7 +77,12 @@ These have their own Vercel schedule OR exist as callable endpoints (also invoke
 | `/api/cron/generate-insights` | 300s | AI insights for eligible Pro/Founding/Growth profiles with sufficient click data | — |
 | `/api/cron/process-ingestion-jobs` | 300s | Claims up to 5 pending ingestion jobs, processes 3 concurrently | `frequent` (fallback) |
 | `/api/cron/purge-pixel-ips` | 60s | NULLs `client_ip` from pixel events >48h old (privacy); retains `ip_hash` | — |
-| `/api/cron/process-pre-saves` | default | Processes Spotify pre-saves where release date has passed; up to 500/run | — |
+| `/api/cron/summarize-interviews` | 300s (default) | Haiku-powered interview summarization; queued jobs stall without this schedule | — |
+| `/api/cron/generate-playlist` | 300s (default) | Daily AI playlist generation for admin review | — |
+| `/api/cron/process-pre-saves` | 300s (default) | Processes pending Spotify pre-saves where release date has passed; up to 500/run | — |
+| `/api/cron/cleanup-sms-intents` | 60s | Marks expired SMS subscribe intents and hard-deletes rows >24h old | — |
+| `/api/cron/monitor-metadata-submissions` | 60s | Polls third-party metadata pages for drift detection; read-only snapshot workflow | — |
+| `/api/cron/process-metadata-submissions` | 60s | Sends queued metadata submissions; processes the outbound send queue | — |
 | `/api/cron/billing-reconciliation` | 60s | Standalone entry for billing reconciliation | `daily-maintenance` |
 | `/api/cron/cleanup-idempotency-keys` | 60s | Standalone entry for key cleanup | `daily-maintenance` |
 | `/api/cron/cleanup-photos` | 60s | Standalone entry for photo cleanup | `daily-maintenance` |
