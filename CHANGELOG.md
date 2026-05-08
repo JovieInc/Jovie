@@ -5,7 +5,16 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
      7|
-     8|## [26.4.214] - 2026-05-08
+     8|## [26.4.215] - 2026-05-08
+
+> [internal] Hardens the conflict-marker pre-commit check for locale safety.
+
+### Changed
+
+- [internal] **`scripts/check-conflict-markers.sh`**: added `LC_ALL=C` to the `grep` call so the locale-English output match works correctly on all developer machines regardless of system locale.
+- [internal] **`.husky/pre-commit`**: added inline comment explaining why `set -e` is required — without it a failing sub-script wouldn't abort the hook.
+
+## [26.4.214] - 2026-05-08
 
 > [internal] Pre-commit hook now blocks commits with leftover merge conflict markers.
 
