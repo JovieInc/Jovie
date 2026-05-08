@@ -16,7 +16,7 @@ Before adding another Codex workspace automation, inspect existing Codex automat
 
 ## Production Schedule
 
-Source of truth: `apps/web/vercel.json`
+Source of truth: `vercel.json` (repo root — Vercel reads this file; `apps/web/vercel.json` has been deleted per JOV-1901 / AUTOMATION_AUDIT.md)
 
 | Cron Path | Schedule | Frequency |
 |-----------|----------|-----------|
@@ -28,11 +28,10 @@ Source of truth: `apps/web/vercel.json`
 | `/api/cron/summarize-interviews` | `*/5 * * * *` | Every 5 minutes |
 | `/api/cron/generate-playlist` | `0 6 * * *` | Daily at 06:00 UTC |
 | `/api/cron/process-pre-saves` | `0 2 * * *` | Daily at 02:00 UTC |
-| `/api/cron/cleanup-sms-intents` | `0 1 * * *` | Daily at 01:00 UTC |
 | `/api/cron/monitor-metadata-submissions` | `0 * * * *` | Hourly |
 | `/api/cron/process-metadata-submissions` | `0 4 * * *` | Daily at 04:00 UTC |
 
-All 11 paths are now scheduled in production. Other cron route files exist as standalone endpoints whose logic is called as sub-jobs of `frequent` or `daily-maintenance`.
+9 paths are currently scheduled in production. `cleanup-sms-intents` was folded into `daily-maintenance` as a sub-job per JOV-1901 (see AUTOMATION_AUDIT.md). Other cron route files exist as standalone endpoints whose logic is called as sub-jobs of `frequent` or `daily-maintenance`.
 
 **Auth:** All crons use `Authorization: Bearer ${CRON_SECRET}`. The `data-retention` route additionally uses timing-safe comparison + origin verification.
 
@@ -47,10 +46,12 @@ All 11 paths are now scheduled in production. Other cron route files exist as st
 | 1 | dbWarmPing | Every invocation | `SELECT 1` to keep Neon compute from auto-suspending |
 | 2 | campaigns | Every invocation | `processCampaigns()` (drip sends) + `cleanupExpiredSuppressions()` |
 | 3 | pixelRetry | `minute >= 30` | Retries pending pixel event forwarding to ad platforms (FB, Google, TikTok) |
-| 4 | sendNotifications | `minute < 15` | Sends pending release-day fan notifications via email |
-| 5 | leadDiscovery | Every invocation | SerpAPI lead discovery, qualification, auto-approve (gated on `leadPipelineSettings.enabled`) |
-| 6 | alphabetCache | `hour % 6 === 0 && minute < 15` | Warms Spotify alphabet cache |
-| 7 | ingestionFallback | If elapsed < 50s | Claims/processes up to 2 ingestion jobs as fallback for dedicated cron |
+| 4 | scheduleNotifications | Every invocation | Finds releases dropping in next 24h, creates `fanReleaseNotifications` rows |
+| 5 | sendNotifications | Every invocation | Sends pending release-day fan notifications via email |
+| 6 | leadDiscovery | Every invocation | SerpAPI lead discovery, qualification, auto-approve (gated on `leadPipelineSettings.enabled`) |
+| 6.5 | outreach | Every invocation | Sends a batch of pending outreach emails after auto-approve |
+| 7 | alphabetCache | `hour % 6 === 0 && minute < 15` | Warms Spotify alphabet cache |
+| 8 | ingestionFallback | If elapsed < 50s | Claims/processes up to 2 ingestion jobs as fallback for dedicated cron |
 
 Source: `apps/web/app/api/cron/frequent/route.ts`
 
@@ -60,11 +61,13 @@ Source: `apps/web/app/api/cron/frequent/route.ts`
 
 | # | Sub-job | When It Runs | What It Does |
 |---|---------|-------------|--------------|
-| 1 | scheduleNotifications | Every day | Finds releases dropping in next 24h, creates `fanReleaseNotifications` rows |
-| 2 | cleanupPhotos | Every day | Deletes orphaned `profilePhotos` (failed uploads >1-24h) + Vercel Blobs |
-| 3 | cleanupKeys | Every day | Deletes expired `dashboardIdempotencyKeys` |
-| 4 | billingReconciliation | Every day | Reconciles DB subscription status with Stripe; fixes mismatches |
+| 1 | cleanupPhotos | Every day | Deletes orphaned `profilePhotos` (failed uploads >1-24h) + Vercel Blobs |
+| 2 | cleanupKeys | Every day | Deletes expired `dashboardIdempotencyKeys` |
+| 3 | billingReconciliation | Every day | Reconciles DB subscription status with Stripe; fixes mismatches |
+| 4 | cleanupSmsIntents | Every day | Marks expired SMS subscribe intents, hard-deletes rows >24h old (folded from standalone cron per JOV-1901) |
 | 5 | dataRetention | **Sundays only** | Heavy: purges old analytics, click events, audience members, pixel events, webhook events, audit logs, chat messages, ingestion jobs per retention policy |
+
+> **Note:** `scheduleNotifications` was previously listed here but has been called directly from `/api/cron/frequent` for sub-hourly scheduling. It is NOT a daily-maintenance sub-job. See AUTOMATION_AUDIT.md for rationale.
 
 Source: `apps/web/app/api/cron/daily-maintenance/route.ts`
 
@@ -80,7 +83,7 @@ These have their own Vercel schedule OR exist as callable endpoints (also invoke
 | `/api/cron/summarize-interviews` | 300s (default) | Haiku-powered interview summarization; queued jobs stall without this schedule | — |
 | `/api/cron/generate-playlist` | 300s (default) | Daily AI playlist generation for admin review | — |
 | `/api/cron/process-pre-saves` | 300s (default) | Processes pending Spotify pre-saves where release date has passed; up to 500/run | — |
-| `/api/cron/cleanup-sms-intents` | 60s | Marks expired SMS subscribe intents and hard-deletes rows >24h old | — |
+| `/api/cron/cleanup-sms-intents` | 60s | Marks expired SMS subscribe intents and hard-deletes rows >24h old (no longer scheduled directly — called via `daily-maintenance` sub-job; file kept as admin escape hatch) | `daily-maintenance` |
 | `/api/cron/monitor-metadata-submissions` | 60s | Polls third-party metadata pages for drift detection; read-only snapshot workflow | — |
 | `/api/cron/process-metadata-submissions` | 60s | Sends queued metadata submissions; processes the outbound send queue | — |
 | `/api/cron/billing-reconciliation` | 60s | Standalone entry for billing reconciliation | `daily-maintenance` |
