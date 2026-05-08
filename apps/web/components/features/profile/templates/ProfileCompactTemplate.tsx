@@ -666,6 +666,20 @@ export function ProfileCompactTemplate({
     .slice(0, 4)
     .map(dsp => ({ id: dsp.key, url: dsp.url, label: dsp.name }));
   const isV1 = visualVariant === 'v1';
+  const hasTourDates = tourDates.length > 0;
+  const compactSurfaceShowsModeHeading = drawerOpen
+    ? drawerView === 'listen' ||
+      drawerView === 'releases' ||
+      drawerView === 'subscribe' ||
+      drawerView === 'notifications' ||
+      (drawerView === 'tour' && hasTourDates)
+    : requestedMode === 'listen' ||
+      requestedMode === 'releases' ||
+      requestedMode === 'subscribe' ||
+      (requestedMode === 'tour' && hasTourDates);
+  const shouldRenderTemplateHeading = isDesktopLayout
+    ? !isV1
+    : compactSurfaceShowsModeHeading;
 
   return (
     <ProfileNotificationsContext.Provider value={notificationsContextValue}>
@@ -758,8 +772,10 @@ export function ProfileCompactTemplate({
             </aside>
           ) : null}
           <main className='relative flex h-full w-full items-stretch md:items-center'>
-            {isDesktopLayout && !isV1 ? (
-              <h1 className='sr-only'>{artist.name}</h1>
+            {shouldRenderTemplateHeading ? (
+              <h1 className='sr-only' data-testid='profile-header'>
+                {artist.name}
+              </h1>
             ) : null}
             {isDesktopLayout ? (
               <div className='w-full' data-testid='profile-compact-shell'>
