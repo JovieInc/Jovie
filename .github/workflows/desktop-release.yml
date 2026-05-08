@@ -11,8 +11,16 @@ on:
           - production
         default: staging
 
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-release-${{ github.event.inputs.environment }}
+  cancel-in-progress: true
+
 jobs:
   build:
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:

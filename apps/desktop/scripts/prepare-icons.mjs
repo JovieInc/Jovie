@@ -8,8 +8,8 @@
  *
  * Usage: node apps/desktop/scripts/prepare-icons.mjs
  *
- * Called automatically by CI (desktop-release.yml) for staging builds.
- * Run manually before building locally if you need fresh icons.
+ * NOTE: CI (desktop-release.yml) calls gen-staging-icon.mjs, NOT this script.
+ * Run this manually when you need to regenerate both icons at once locally.
  *
  * NOTE: .icns and .ico are NOT committed. electron-builder generates them
  * at build time from the .png files.

@@ -2,23 +2,33 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { app, BrowserWindow, shell } from 'electron';
 import { autoUpdater } from 'electron-updater';
-
-const ELECTRON_ENV = process.env.ELECTRON_ENV ?? 'production';
-
-const APP_URL =
-  ELECTRON_ENV === 'staging' ? 'https://staging.app.jov.ie' : 'https://jov.ie';
+import { APP_ENV, APP_URL } from './env';
 
 // Separate userData for staging so staging and production apps coexist
-if (ELECTRON_ENV === 'staging') {
+if (APP_ENV === 'staging') {
   app.setPath('userData', path.join(app.getPath('appData'), 'Jovie-Staging'));
 }
 
 const APP_HOST = new URL(APP_URL).hostname;
 
+// Explicit allowlist of OAuth/Clerk hosts permitted to load inside the app.
+// Using endsWith() rather than includes() prevents hostname spoofing via
+// strings like "clerk.evil.com" or "evilclerk.com".
+const ALLOWED_AUTH_HOSTS = new Set<string>([
+  'accounts.google.com',
+  'appleid.apple.com',
+]);
+const ALLOWED_HOST_SUFFIXES = ['.clerk.accounts.dev', '.clerk.com'];
+
+function isAllowedAuthHost(hostname: string): boolean {
+  if (ALLOWED_AUTH_HOSTS.has(hostname)) return true;
+  return ALLOWED_HOST_SUFFIXES.some(suffix => hostname.endsWith(suffix));
+}
+
 function isAllowedUrl(urlString: string): boolean {
   try {
     const parsed = new URL(urlString);
-    return parsed.hostname === APP_HOST || parsed.hostname.includes('clerk.');
+    return parsed.hostname === APP_HOST || isAllowedAuthHost(parsed.hostname);
   } catch {
     return false;
   }
@@ -99,10 +109,11 @@ function createWindow(): BrowserWindow {
     }
   });
 
+  // Deny all child window creation. Auth redirects happen in-place via
+  // will-navigate; there is no in-app flow that requires a child window.
+  // Routing through shell.openExternal prevents unsecured child windows
+  // that would inherit default webPreferences without contextIsolation.
   win.webContents.setWindowOpenHandler(({ url }) => {
-    if (isAllowedUrl(url)) {
-      return { action: 'allow' };
-    }
     void shell.openExternal(url);
     return { action: 'deny' };
   });

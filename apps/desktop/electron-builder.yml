@@ -11,8 +11,7 @@ mac:
   target:
     - target: dmg
       arch:
-        - x64
-        - arm64
+        - universal
   icon: assets/icon.icns
 win:
   target: nsis
