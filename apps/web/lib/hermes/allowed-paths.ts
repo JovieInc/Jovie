@@ -4,7 +4,7 @@ const SAFE_HERMES_PATH_REGEX =
 function normalizePathValue(path: string): string {
   return path
     .trim()
-    .replaceAll(/\\/g, '/')
+    .replaceAll('\\', '/')
     .replace(/^\.\//, '')
     .replaceAll(/\/+/g, '/')
     .replace(/\/$/, '');
