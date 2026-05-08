@@ -24,6 +24,7 @@ if (!managedWebServerUrl.port) {
   managedWebServerUrl.port = '3100';
 }
 const managedWebServerPort = managedWebServerUrl.port;
+const useTestAuthBypass = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -56,18 +57,12 @@ export default defineConfig({
     navigationTimeout: 60_000,
     actionTimeout: 20_000,
     ...(Object.keys(extraHTTPHeaders).length > 0 && { extraHTTPHeaders }),
-    storageState: 'tests/.auth/user.json',
+    storageState: { cookies: [], origins: [] },
   },
 
   projects: [
     {
-      name: 'auth-setup',
-      testMatch: /auth\.setup\.ts/,
-      use: { storageState: { cookies: [], origins: [] } },
-    },
-    {
       name: 'chromium',
-      dependencies: ['auth-setup'],
       use: { ...devices['Desktop Chrome'] },
     },
   ],
@@ -85,6 +80,13 @@ export default defineConfig({
             NODE_ENV: 'test',
             PORT: managedWebServerPort,
             NEXT_DISABLE_TOOLBAR: '1',
+            E2E_USE_TEST_AUTH_BYPASS: useTestAuthBypass ? '1' : '0',
+            ...(useTestAuthBypass
+              ? {
+                  NEXT_PUBLIC_CLERK_MOCK: '1',
+                  NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1',
+                }
+              : {}),
           },
           url: managedWebServerUrl.origin,
           reuseExistingServer: true,
