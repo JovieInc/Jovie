@@ -344,6 +344,8 @@ jobs:
             ${{ runner.os }}-tsc-${{ github.ref }}-
             ${{ runner.os }}-tsc-
       - name: Run typecheck
+        env:
+          TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && 'origin/main' || (github.base_ref && format('origin/{0}', github.base_ref)) || '' }}
         run: pnpm turbo typecheck --affected
 
   neon-db:
