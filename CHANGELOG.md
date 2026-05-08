@@ -5,7 +5,15 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
      7|
-     8|## [26.4.209] - 2026-05-06
+     8|## [26.4.210] - 2026-05-08
+
+> [internal] Design system token cleanup for release and share surfaces.
+
+### Changed
+
+- [internal] Migrated release and share feature components to shell-v1 design tokens: replaced semi-transparent surface tokens (`bg-surface-1/30`, `/50`, `/70`, `bg-surface-2/80`) with explicit opacity values, replaced raw duration values (`duration-100`, `duration-150`, `duration-200`) with canonical motion tokens (`duration-fast`, `duration-subtle`, `duration-slow`), replaced `text-green-500` with `text-success-token`, replaced decorative hover scale/translate on smart link play button with color-only feedback, replaced `transition-all` with `transition-[transform,opacity]` on icon crossfade animation.
+
+## [26.4.209] - 2026-05-06
      9|
     10|> Public alert-conversion landing page: each artist now has a fast `/<handle>/alerts` URL that turns paid traffic into verified SMS or email subscribers. Single CTA, channel toggle, TCPA-grade consent copy, source-link attribution carried through every click.
     11|
