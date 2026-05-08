@@ -59,6 +59,8 @@ async function initializeStatsig(): Promise<void> {
       statsigInitialized = true;
       logger.info('[Statsig] Server SDK initialized', undefined, 'Statsig');
     } catch (error) {
+      statsigInitialized = false;
+      statsigClient = null;
       logger.error(
         '[Statsig] Failed to initialize server SDK',
         error,

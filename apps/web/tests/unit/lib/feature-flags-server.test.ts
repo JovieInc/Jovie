@@ -1,25 +1,46 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LEGACY_STATSIG_GATE_KEYS } from '@/lib/flags/contracts';
 
-const { getExperimentMock, getFeatureGateMock, initializeMock, shutdownMock } =
-  vi.hoisted(() => ({
-    getExperimentMock: vi.fn(() => ({ value: {} })),
-    getFeatureGateMock: vi.fn(() => ({
-      getEvaluationDetails: () => ({ reason: 'Unrecognized' }),
-      value: false,
-    })),
-    initializeMock: vi.fn().mockResolvedValue({ success: true }),
-    shutdownMock: vi.fn().mockResolvedValue({ success: true }),
+const {
+  envState,
+  getExperimentMock,
+  getFeatureGateMock,
+  initializeMock,
+  shutdownMock,
+  statsigConstructorMock,
+} = vi.hoisted(() => {
+  const getExperimentMock = vi.fn(() => ({ value: {} }));
+  const getFeatureGateMock = vi.fn(() => ({
+    getEvaluationDetails: () => ({ reason: 'Unrecognized' }),
+    value: false,
   }));
+  const initializeMock = vi.fn().mockResolvedValue({ success: true });
+  const shutdownMock = vi.fn().mockResolvedValue({ success: true });
+
+  return {
+    envState: {
+      STATSIG_SERVER_SECRET: undefined as string | undefined,
+      VERCEL_ENV: undefined as string | undefined,
+      NODE_ENV: 'test',
+    },
+    getExperimentMock,
+    getFeatureGateMock,
+    initializeMock,
+    shutdownMock,
+    statsigConstructorMock: vi.fn(function StatsigMock() {
+      return {
+        getExperiment: getExperimentMock,
+        getFeatureGate: getFeatureGateMock,
+        initialize: initializeMock,
+        shutdown: shutdownMock,
+      };
+    }),
+  };
+});
 
 // Mock the Statsig Core server SDK before importing the module under test.
 vi.mock('@statsig/statsig-node-core', () => ({
-  Statsig: vi.fn().mockImplementation(() => ({
-    getExperiment: getExperimentMock,
-    getFeatureGate: getFeatureGateMock,
-    initialize: initializeMock,
-    shutdown: shutdownMock,
-  })),
+  Statsig: statsigConstructorMock,
   StatsigUser: {
     withUserID: (userID: string) => ({ userID }),
   },
@@ -27,11 +48,7 @@ vi.mock('@statsig/statsig-node-core', () => ({
 
 // Mock env to control STATSIG_SERVER_SECRET
 vi.mock('@/lib/env-server', () => ({
-  env: {
-    STATSIG_SERVER_SECRET: undefined,
-    VERCEL_ENV: undefined,
-    NODE_ENV: 'test',
-  },
+  env: envState,
 }));
 
 vi.mock('@/lib/env-public', () => ({
@@ -44,6 +61,17 @@ describe('Statsig server initialization', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.restoreAllMocks();
+    envState.STATSIG_SERVER_SECRET = undefined;
+    envState.VERCEL_ENV = undefined;
+    envState.NODE_ENV = 'test';
+    getExperimentMock.mockReturnValue({ value: {} });
+    getFeatureGateMock.mockReturnValue({
+      getEvaluationDetails: () => ({ reason: 'Unrecognized' }),
+      value: false,
+    });
+    initializeMock.mockReset().mockResolvedValue({ success: true });
+    shutdownMock.mockReset().mockResolvedValue({ success: true });
+    statsigConstructorMock.mockClear();
     delete process.env.NODE_ENV;
     delete process.env.VERCEL_ENV;
   });
@@ -75,6 +103,25 @@ describe('Statsig server initialization', () => {
     );
 
     expect(statsigWarnings).toHaveLength(1);
+  });
+
+  it('creates a fresh Statsig client after initialization fails', async () => {
+    envState.STATSIG_SERVER_SECRET = 'secret-server-key';
+    initializeMock
+      .mockRejectedValueOnce(new Error('network unavailable'))
+      .mockResolvedValueOnce({ success: true });
+
+    const { checkGateForUser } = await import('@/lib/flags/statsig');
+
+    await expect(
+      checkGateForUser('user-1', LEGACY_STATSIG_GATE_KEYS.DESIGN_V1, true)
+    ).resolves.toBe(true);
+    await expect(
+      checkGateForUser('user-2', LEGACY_STATSIG_GATE_KEYS.DESIGN_V1, true)
+    ).resolves.toBe(true);
+
+    expect(statsigConstructorMock).toHaveBeenCalledTimes(2);
+    expect(initializeMock).toHaveBeenCalledTimes(2);
   });
 
   it('ignores client override cookies in production', async () => {

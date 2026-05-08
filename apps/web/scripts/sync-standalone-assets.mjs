@@ -142,6 +142,14 @@ function resolvePackageJson(packageName, paths) {
   }
 }
 
+function isOptionalRuntimePackageUnavailable(error) {
+  return (
+    error?.code === 'MODULE_NOT_FOUND' ||
+    (error instanceof Error &&
+      error.message.startsWith('Unable to find package.json for '))
+  );
+}
+
 function copyRuntimePackageToStandalone(
   packageName,
   resolveFrom = path.dirname(require.resolve('next/package.json'))
@@ -177,7 +185,7 @@ function copyRuntimePackageToStandalone(
     try {
       copyRuntimePackageToStandalone(dependencyName, packageRoot);
     } catch (error) {
-      if (error?.code !== 'MODULE_NOT_FOUND') {
+      if (!isOptionalRuntimePackageUnavailable(error)) {
         throw error;
       }
     }
