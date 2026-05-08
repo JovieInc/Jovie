@@ -1,47 +1,47 @@
-import 'server-only';
-
 /**
- * User status lifecycle precedence.
+ * Status precedence helper for the user lifecycle enum.
  *
- * Higher numeric rank = further along in the lifecycle. We never overwrite a
- * higher-rank status with a lower-rank one. This is the single source of truth
- * shared by the waitlist access-request flow and the onboarding intake flow,
- * so both paths agree on what counts as a downgrade.
+ * Used by waitlist intake and access-request flows to prevent silently
+ * downgrading a user's `userStatus` when concurrent paths (admin approval,
+ * webhook updates, intake submissions) race against each other.
  *
- * Rank values intentionally cluster the active-creator states (claimed,
- * onboarding, fully active) above the waitlist states. `suspended` and
- * `banned` are terminal moderation states and must never be silently moved
- * back into a lifecycle state by an automated path.
+ * Higher rank = further along the lifecycle. Treat unknown / null current
+ * statuses as the lowest rank so any new value is accepted.
+ *
+ * NOTE: This is the canonical helper. Do not duplicate this precedence
+ * table in call-sites — import `isStatusUpgrade` / `STATUS_PRECEDENCE`
+ * instead.
  */
-export const STATUS_RANK = {
+
+import type { userStatusLifecycleEnum } from '@/lib/db/schema/enums';
+
+export type UserLifecycleStatus =
+  (typeof userStatusLifecycleEnum.enumValues)[number];
+
+export const STATUS_PRECEDENCE: Record<UserLifecycleStatus, number> = {
   waitlist_pending: 1,
   waitlist_approved: 2,
   profile_claimed: 3,
   onboarding_incomplete: 4,
   active: 5,
+  // Terminal/admin-controlled states must never be silently downgraded by
+  // an intake or access-request flow. Rank them above `active` so any
+  // would-be downgrade is rejected.
   suspended: 6,
   banned: 7,
-} as const;
-
-export type LifecycleUserStatus = keyof typeof STATUS_RANK;
+};
 
 /**
- * Returns true if `next` is the same as `current` or is a forward move in the
- * lifecycle. Returns false (i.e. the write should be rejected as a downgrade)
- * if `next` would move the user backwards.
+ * Returns true if `next` is a non-downgrading transition from `current`.
  *
- * Unknown statuses are treated as "do not overwrite" — fail closed.
+ * - If `current` is null/undefined (new user), any `next` is accepted.
+ * - If `next` has equal or higher rank than `current`, accept.
+ * - Otherwise reject (would be a downgrade).
  */
 export function isStatusUpgrade(
-  current: string | null | undefined,
-  next: LifecycleUserStatus
+  current: UserLifecycleStatus | null | undefined,
+  next: UserLifecycleStatus
 ): boolean {
-  if (!current) return true;
-  const currentRank = STATUS_RANK[current as LifecycleUserStatus];
-  if (currentRank === undefined) {
-    // Unknown current status: don't downgrade, don't overwrite.
-    return false;
-  }
-  const nextRank = STATUS_RANK[next];
-  return nextRank >= currentRank;
+  if (current == null) return true;
+  return STATUS_PRECEDENCE[next] >= STATUS_PRECEDENCE[current];
 }

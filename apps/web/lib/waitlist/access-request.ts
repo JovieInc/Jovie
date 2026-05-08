@@ -20,7 +20,7 @@ import {
 import { tryReserveAutoAcceptSlot } from '@/lib/waitlist/settings';
 import {
   isStatusUpgrade,
-  type LifecycleUserStatus,
+  type UserLifecycleStatus,
 } from '@/lib/waitlist/status-precedence';
 
 const WAITLIST_LOCK_PREFIX = 'waitlist:';
@@ -135,7 +135,7 @@ async function upsertUserStatus(params: {
   readonly clerkUserId: string;
   readonly emailRaw: string;
   readonly entryId: string;
-  readonly nextStatus: LifecycleUserStatus;
+  readonly nextStatus: UserLifecycleStatus;
 }): Promise<UpsertUserStatusResult> {
   const { tx, clerkUserId, emailRaw, entryId, nextStatus } = params;
   const [existing] = await tx
