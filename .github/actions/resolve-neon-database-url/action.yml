@@ -99,23 +99,21 @@ runs:
           : null;
         const source = new URL(process.env.CREDENTIAL_SOURCE);
 
-        // Preserve credentials baked into the Neon branch URL. Branch-specific
-        // passwords can differ from the long-lived main DB secret, and replacing
-        // them causes auth and endpoint failures across downstream CI jobs.
-        const credentialSources = [fallbackCandidate, source].filter(Boolean);
+        // Keep the ephemeral branch host/database from the candidate URL, but
+        // source credentials from the stable secret when present. The Neon
+        // branch action can emit credentials that are not accepted for the
+        // project role in this repo, while the stable role password works across
+        // branches.
+        const credentialSources = [source, fallbackCandidate].filter(Boolean);
 
-        if (!candidate.username) {
-          const usernameSource = credentialSources.find((url) => url.username);
-          if (usernameSource) {
-            candidate.username = usernameSource.username;
-          }
+        const usernameSource = credentialSources.find((url) => url.username);
+        if (usernameSource) {
+          candidate.username = usernameSource.username;
         }
 
-        if (!candidate.password) {
-          const passwordSource = credentialSources.find((url) => url.password);
-          if (passwordSource) {
-            candidate.password = passwordSource.password;
-          }
+        const passwordSource = credentialSources.find((url) => url.password);
+        if (passwordSource) {
+          candidate.password = passwordSource.password;
         }
 
         console.log(candidate.toString());
