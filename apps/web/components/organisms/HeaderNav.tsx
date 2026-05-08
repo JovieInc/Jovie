@@ -352,7 +352,8 @@ export function HeaderNav({
     !hideDesktopNav &&
     (!!navLinks?.length || resolvedFlyoutMenus.length > 0);
   const mobileLinks = mobileNavLinks ?? navLinks;
-  const hasMobileNavLinks = !hideNav && !!mobileLinks?.length;
+  const hasMobileNavLinks =
+    !hideNav && !hideDesktopNav && !!mobileLinks?.length;
   const navLinksMarkup = hasDesktopNavLinks ? (
     <div className={cn('max-md:hidden items-center md:flex', navGroupClass)}>
       {isMarketingGlass

@@ -2643,9 +2643,9 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-product-control:hover {
-  border-color: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.2);
   color: #fff;
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(8, 9, 11, 0.9);
 }
 
 .homepage-product-control--prev {
