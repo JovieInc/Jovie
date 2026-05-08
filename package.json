@@ -104,7 +104,7 @@
     "clean": "node scripts/turbo-local.mjs clean && rm -rf node_modules",
     "prepare": "husky",
     "next:proxy-guard": "pnpm --filter=@jovie/web run next:proxy-guard",
-    "typecheck:web:fast": "pnpm --filter @jovie/web exec tsc -p tsconfig.typecheck.json --noEmit --incremental --tsBuildInfoFile .cache/tsbuildinfo --pretty false",
+    "typecheck:web:fast": "pnpm --filter @jovie/web run typecheck -- --pretty false",
     "pre-push": "biome check . && pnpm --filter=@jovie/web run pre-push",
     "tailwind:check": "pnpm --filter=@jovie/web run tailwind:check",
     "db:web:migrate": "doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run drizzle:migrate",
