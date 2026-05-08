@@ -100,6 +100,14 @@ function gateHasRecordedEvidence(gate: VerificationGate): boolean {
   );
 }
 
+function getGateEvidenceTimestamp(
+  artifact: AgentRunArtifact,
+  gate: VerificationGate
+): number {
+  const timestamp = gate.checkedAt ?? artifact.updatedAt ?? artifact.createdAt;
+  return Date.parse(timestamp);
+}
+
 export function evaluateAgentRunGateEvidence(
   markdown: string,
   requiredGateNames: readonly AgentRunGateEvidenceName[] = REQUIRED_NON_DRY_RUN_GSTACK_GATES,
@@ -110,29 +118,50 @@ export function evaluateAgentRunGateEvidence(
       options.sourceRunId === undefined ||
       artifact.sourceRunId === options.sourceRunId
   );
-  const passedGateNames = new Set<AgentRunGateEvidenceName>();
+  const requiredGateNameSet = new Set(requiredGateNames);
+  const latestGateState = new Map<
+    AgentRunGateEvidenceName,
+    { passed: boolean; timestamp: number; index: number }
+  >();
+  let gateIndex = 0;
 
   for (const artifact of artifacts) {
     for (const gate of artifact.verificationGates) {
+      if (!requiredGateNameSet.has(gate.name)) {
+        continue;
+      }
+
+      const timestamp = getGateEvidenceTimestamp(artifact, gate);
+      const current = latestGateState.get(gate.name);
+      const nextState = {
+        passed: gateHasRecordedEvidence(gate),
+        timestamp,
+        index: gateIndex,
+      };
+      gateIndex += 1;
+
       if (
-        requiredGateNames.includes(gate.name) &&
-        gateHasRecordedEvidence(gate)
+        current === undefined ||
+        nextState.timestamp > current.timestamp ||
+        (nextState.timestamp === current.timestamp &&
+          nextState.index > current.index)
       ) {
-        passedGateNames.add(gate.name);
+        latestGateState.set(gate.name, nextState);
       }
     }
   }
 
   const missingGateNames = requiredGateNames.filter(
-    gateName => !passedGateNames.has(gateName)
+    gateName => latestGateState.get(gateName)?.passed !== true
+  );
+  const passedGateNames = requiredGateNames.filter(
+    gateName => latestGateState.get(gateName)?.passed === true
   );
 
   return {
     passed: missingGateNames.length === 0,
     missingGateNames,
-    passedGateNames: [...passedGateNames].sort((left, right) =>
-      left.localeCompare(right)
-    ),
+    passedGateNames,
     artifacts,
   };
 }

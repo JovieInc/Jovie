@@ -859,7 +859,7 @@ jobs:
           if [[ "$STATUSES_PASSED" == "true" && "$GSTACK_PASSED" != "true" ]]; then
             echo "  - GStack evidence missing: $GSTACK_BLOCKING"
           fi
-          if [[ "$GSTACK_PASSED" == "true" && "$SENSITIVE_SAFE" != "true" ]]; then
+          if [[ "$GSTACK_PASSED" == "true" && "$SENSITIVE_SAFE" == "false" ]]; then
             echo "  - Sensitive files changed: $SENSITIVE_FILES"
           fi
 

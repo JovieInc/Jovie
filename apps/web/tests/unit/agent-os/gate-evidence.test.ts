@@ -131,6 +131,19 @@ describe('AgentOS gate evidence', () => {
     expect(evaluation.artifacts).toHaveLength(1);
   });
 
+  it('continues after unclosed malformed artifact comments', () => {
+    const evaluation = evaluateAgentRunGateEvidence(
+      [
+        '<!-- agent-run-artifact',
+        '{ "summary": "unterminated"',
+        formatAgentRunArtifactComment(baseArtifact),
+      ].join('\n')
+    );
+
+    expect(evaluation.passed).toBe(true);
+    expect(evaluation.artifacts).toHaveLength(1);
+  });
+
   it('parses artifact comments when JSON strings contain comment terminators', () => {
     const evaluation = evaluateAgentRunGateEvidence(
       formatAgentRunArtifactComment({
@@ -186,5 +199,35 @@ describe('AgentOS gate evidence', () => {
     expect(currentEvaluation.artifacts).toHaveLength(1);
     expect(missingEvaluation.passed).toBe(false);
     expect(missingEvaluation.artifacts).toEqual([]);
+  });
+
+  it('uses the latest gate evidence state for each required gate', () => {
+    const evaluation = evaluateAgentRunGateEvidence(
+      [
+        formatAgentRunArtifactComment(baseArtifact),
+        formatAgentRunArtifactComment({
+          ...baseArtifact,
+          id: 'run-gstack-2',
+          verificationGates: [
+            {
+              name: 'gstack.qa.exhaustive',
+              required: true,
+              status: 'failed',
+              evidenceUrl: null,
+              summary: '/qa --exhaustive failed',
+              checkedAt: '2026-05-08T05:00:00.000Z',
+            },
+          ],
+          updatedAt: '2026-05-08T05:00:00.000Z',
+        }),
+      ].join('\n')
+    );
+
+    expect(evaluation.passed).toBe(false);
+    expect(evaluation.missingGateNames).toEqual(['gstack.qa.exhaustive']);
+    expect(evaluation.passedGateNames).toEqual([
+      'gstack.review',
+      'gstack.ship',
+    ]);
   });
 });
