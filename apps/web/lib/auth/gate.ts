@@ -1,7 +1,7 @@
 import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
-import { sql as drizzleSql, eq } from 'drizzle-orm';
+import { desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   getDeepErrorMessage,
@@ -619,8 +619,10 @@ export async function resolveUserState(
 // Waitlist Access Helpers (exported for reuse)
 // =============================================================================
 
-// Valid waitlist statuses: 'new' (submitted), 'claimed' (approved).
-export type WaitlistStatus = 'new' | 'claimed';
+// Valid waitlist statuses (JOV-1963): 'new' (submitted, pending),
+// 'invited' (approved invite issued, treated as access granted),
+// 'claimed' (invite accepted, access granted).
+export type WaitlistStatus = 'new' | 'invited' | 'claimed';
 
 export interface WaitlistAccessResult {
   entryId: string | null;
@@ -645,10 +647,14 @@ export async function getWaitlistAccess(
  */
 async function checkWaitlistAccessInternal(email: string): Promise<{
   entryId: string | null;
-  status: 'new' | 'claimed' | null;
+  status: 'new' | 'invited' | 'claimed' | null;
 }> {
   const normalizedEmail = normalizeEmail(email);
 
+  // JOV-1963: order by createdAt DESC so the LATEST waitlist entry wins when
+  // a single email has multiple entries. Previously the query relied on
+  // arbitrary ordering, which could surface a stale `'new'` row even after
+  // the user had been invited or claimed access.
   const [entry] = await db
     .select({
       id: waitlistEntries.id,
@@ -656,15 +662,21 @@ async function checkWaitlistAccessInternal(email: string): Promise<{
     })
     .from(waitlistEntries)
     .where(drizzleSql`lower(${waitlistEntries.email}) = ${normalizedEmail}`)
+    .orderBy(desc(waitlistEntries.createdAt))
     .limit(1);
 
   if (!entry) {
     return { entryId: null, status: null };
   }
 
+  // JOV-1963: include 'invited' in the cast. The waitlist_status enum is
+  // ('new' | 'invited' | 'claimed'); the prior cast silently dropped
+  // 'invited' which let an invited row look like the "claimed" branch by
+  // accident. Now invited and claimed are both handled explicitly upstream
+  // (both grant access; 'new' redirects to /waitlist).
   return {
     entryId: entry.id,
-    status: entry.status as 'new' | 'claimed',
+    status: entry.status as 'new' | 'invited' | 'claimed',
   };
 }
 

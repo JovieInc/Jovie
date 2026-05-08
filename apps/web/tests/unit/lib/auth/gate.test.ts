@@ -88,10 +88,14 @@ const createJoinQueryMock = (result: unknown[]) => ({
 });
 
 // Helper to create mock for simple queries (waitlist)
+// JOV-1963: waitlist lookup now chains .orderBy(desc(createdAt)).limit(1)
+// to ensure the latest entry wins when multiple rows exist for one email.
 const createSimpleQueryMock = (result: unknown[]) => ({
   from: vi.fn().mockReturnValue({
     where: vi.fn().mockReturnValue({
-      limit: vi.fn().mockResolvedValue(result),
+      orderBy: vi.fn().mockReturnValue({
+        limit: vi.fn().mockResolvedValue(result),
+      }),
     }),
   }),
 });
@@ -471,8 +475,11 @@ describe('gate.ts', () => {
     });
 
     it('normalizes email to lowercase', async () => {
+      // JOV-1963: query now chains .orderBy(...).limit(1)
       const whereMock = vi.fn().mockReturnValue({
-        limit: vi.fn().mockResolvedValue([]),
+        orderBy: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([]),
+        }),
       });
 
       mockDbSelect.mockReturnValue({

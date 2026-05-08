@@ -118,6 +118,8 @@ vi.mock('drizzle-orm', () => ({
   eq: vi.fn((_col, val) => ({ eq: val })),
   and: vi.fn((...args: unknown[]) => ({ and: args })),
   sql: vi.fn((strings, ...values) => ({ sql: strings, values })),
+  // JOV-1963: gate.ts now uses desc(createdAt) to surface the latest waitlist row
+  desc: vi.fn(col => ({ desc: col })),
 }));
 
 vi.mock('@sentry/nextjs', () => ({
@@ -151,10 +153,23 @@ function createJoinSelectChain(result: unknown[]) {
   return { from: mockFrom };
 }
 
-/** Creates a simple select chain: db.select({...}).from(...).where(...).limit(...) */
+/**
+ * Creates a simple select chain used by both:
+ * - the users lookup: db.select({...}).from(...).where(...).limit(...)
+ * - the waitlist lookup: db.select({...}).from(...).where(...).orderBy(...).limit(...)
+ *
+ * JOV-1963: orderBy(desc(createdAt)) was added on the waitlist lookup
+ * to surface the latest entry when an email has multiple rows. The
+ * helper supports both shapes by returning a `where` result that has
+ * BOTH `.limit` and `.orderBy(...).limit` chains resolving to the same
+ * result.
+ */
 function createSimpleSelectChain(result: unknown[]) {
   const mockLimit = vi.fn().mockResolvedValue(result);
-  const mockWhere = vi.fn().mockReturnValue({ limit: mockLimit });
+  const mockOrderBy = vi.fn().mockReturnValue({ limit: mockLimit });
+  const mockWhere = vi
+    .fn()
+    .mockReturnValue({ limit: mockLimit, orderBy: mockOrderBy });
   const mockFrom = vi.fn().mockReturnValue({ where: mockWhere });
   return { from: mockFrom };
 }
