@@ -1,396 +1,351 @@
-import { randomUUID } from 'node:crypto';
-import { sql as drizzleSql, eq } from 'drizzle-orm';
-import { db } from '@/lib/db';
+import 'server-only';
+
+import { desc, sql as drizzleSql, eq } from 'drizzle-orm';
+import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
+import { type DbOrTransaction } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { waitlistEntries } from '@/lib/db/schema/waitlist';
-import { captureCriticalError } from '@/lib/error-tracking';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { notifySlackWaitlist } from '@/lib/notifications/providers/slack';
+import { normalizeEmail } from '@/lib/utils/email';
 import { logger } from '@/lib/utils/logger';
-import {
-  detectPlatformFromUrl,
-  extractHandleFromUrl,
-} from '@/lib/utils/social-platform';
-import { normalizeUsername, validateUsername } from '@/lib/validation/username';
+import { detectPlatformFromUrl } from '@/lib/utils/social-platform';
+import type { WaitlistRequestPayload } from '@/lib/validation/schemas';
 import {
   approveWaitlistEntryInTx,
   finalizeWaitlistApproval,
+  type WaitlistApprovalResult,
 } from '@/lib/waitlist/approval';
 import { tryReserveAutoAcceptSlot } from '@/lib/waitlist/settings';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+const WAITLIST_LOCK_PREFIX = 'waitlist:';
 
-export type SubmitAccessRequestInput = {
-  clerkUserId: string;
-  email: string;
-  emailRaw: string;
-  fullName: string;
-  data: {
-    primaryGoal?: string | null;
-    primarySocialUrl: string;
-    spotifyUrl?: string | null;
-    spotifyArtistName?: string | null;
-    heardAbout?: string | null;
-    selectedPlan?: string | null;
-  };
-};
+export type WaitlistAccessOutcome =
+  | 'accepted'
+  | 'waitlisted_gate_on'
+  | 'waitlisted_capacity_full'
+  | 'already_waitlisted'
+  | 'already_accepted'
+  | 'save_failed';
 
-export type SubmitAccessRequestResult = {
-  outcome: string | undefined;
-  status: string;
-  entryId: string | undefined;
-};
+export interface WaitlistAccessRequestInput {
+  readonly clerkUserId: string;
+  readonly email: string;
+  readonly emailRaw?: string;
+  readonly fullName: string;
+  readonly data: WaitlistRequestPayload;
+}
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+export interface WaitlistAccessRequestResult {
+  readonly entryId: string;
+  readonly status: 'new' | 'claimed' | 'invited';
+  readonly outcome: WaitlistAccessOutcome;
+}
 
-/**
- * Normalize Spotify URL (minimal normalization)
- */
+const APPROVED_USER_STATUSES = new Set([
+  'waitlist_approved',
+  'profile_claimed',
+  'onboarding_incomplete',
+  'active',
+]);
+
+// Statuses that strictly succeed `waitlist_approved` — never downgrade them
+// when re-affirming approval.
+const POST_APPROVAL_USER_STATUSES = new Set([
+  'profile_claimed',
+  'onboarding_incomplete',
+  'active',
+]);
+
 function normalizeSpotifyUrl(url: string): string {
   try {
     const parsed = new URL(url);
     parsed.protocol = 'https:';
-    const paramsToRemove = [
+    for (const param of [
       'si',
       'utm_source',
       'utm_medium',
       'utm_campaign',
       'nd',
-    ];
-    paramsToRemove.forEach(param => parsed.searchParams.delete(param));
+    ]) {
+      parsed.searchParams.delete(param);
+    }
     return parsed.toString();
   } catch {
     return url;
   }
 }
 
-/**
- * Generate a safe random handle for creator profiles
- */
-function safeRandomHandle(): string {
-  const token = randomUUID().replaceAll('-', '').slice(0, 12);
-  return `c${token}`;
-}
-
-/**
- * Find an available username by trying base handle with numeric suffixes
- */
-async function findAvailableHandle(base: string): Promise<string> {
-  const normalizedBase = normalizeUsername(base).slice(0, 30);
-  const maxAttempts = 20;
-
-  for (let i = 0; i < maxAttempts; i += 1) {
-    const suffix = i === 0 ? '' : `-${i}`;
-    const candidate = `${normalizedBase.slice(0, 30 - suffix.length)}${suffix}`;
-    if (!validateUsername(candidate).isValid) continue;
-
-    const [existing] = await db
-      .select({ id: creatorProfiles.id })
-      .from(creatorProfiles)
-      .where(eq(creatorProfiles.usernameNormalized, candidate))
-      .limit(1);
-
-    if (!existing) {
-      return candidate;
-    }
-  }
-
-  return safeRandomHandle();
-}
-
-// ---------------------------------------------------------------------------
-// Upsert / Entry helpers
-// ---------------------------------------------------------------------------
-
-function buildWaitlistUpdateValues(params: {
-  fullName: string;
-  primaryGoal: string | null | undefined;
-  primarySocialUrl: string;
-  platform: string;
-  normalizedUrl: string;
-  spotifyUrl: string | null | undefined;
-  spotifyUrlNormalized: string | null;
-  spotifyArtistName: string | null;
-  sanitizedHeardAbout: string | null;
-  selectedPlan: string | null | undefined;
+function buildEntryValues(params: {
+  readonly data: WaitlistRequestPayload;
+  readonly email: string;
+  readonly fullName: string;
 }) {
-  return {
-    fullName: params.fullName,
-    primaryGoal: params.primaryGoal ?? null,
-    primarySocialUrl: params.primarySocialUrl,
-    primarySocialPlatform: params.platform,
-    primarySocialUrlNormalized: params.normalizedUrl,
-    spotifyUrl: params.spotifyUrl ?? null,
-    spotifyUrlNormalized: params.spotifyUrlNormalized,
-    spotifyArtistName: params.spotifyArtistName,
-    heardAbout: params.sanitizedHeardAbout,
-    selectedPlan: params.selectedPlan ?? null,
-    updatedAt: new Date(),
-  };
-}
-
-async function upsertUserAsPending(userId: string, emailRaw: string) {
-  await db
-    .insert(users)
-    .values({
-      clerkId: userId,
-      email: emailRaw,
-      userStatus: 'waitlist_pending',
-    })
-    .onConflictDoUpdate({
-      target: users.clerkId,
-      set: {
-        userStatus: 'waitlist_pending',
-        updatedAt: new Date(),
-      },
-    });
-}
-
-// ---------------------------------------------------------------------------
-// Existing / New entry handlers
-// ---------------------------------------------------------------------------
-
-async function handleExistingEntry(params: {
-  existing: { id: string; status: string };
-  clerkUserId: string;
-  emailRaw: string;
-  fullName: string;
-  primaryGoal: string | null | undefined;
-  primarySocialUrl: string;
-  platform: string;
-  normalizedUrl: string;
-  spotifyUrl: string | null | undefined;
-  spotifyUrlNormalized: string | null;
-  spotifyArtistName: string | null;
-  sanitizedHeardAbout: string | null;
-  selectedPlan: string | null | undefined;
-}): Promise<SubmitAccessRequestResult> {
-  const { existing, clerkUserId, emailRaw, ...updateParams } = params;
-
-  if (existing.status === 'new') {
-    const updateValues = buildWaitlistUpdateValues(updateParams);
-    await db
-      .update(waitlistEntries)
-      .set(updateValues)
-      .where(eq(waitlistEntries.id, existing.id));
-    await upsertUserAsPending(clerkUserId, emailRaw);
-  }
-
-  return { status: existing.status, outcome: undefined, entryId: existing.id };
-}
-
-async function createNewWaitlistEntry(params: {
-  clerkUserId: string;
-  emailRaw: string;
-  email: string;
-  fullName: string;
-  primaryGoal: string | null | undefined;
-  primarySocialUrl: string;
-  platform: string;
-  normalizedUrl: string;
-  spotifyUrl: string | null | undefined;
-  spotifyUrlNormalized: string | null;
-  spotifyArtistName: string | null;
-  sanitizedHeardAbout: string | null;
-  selectedPlan: string | null | undefined;
-}): Promise<{ entryId: string }> {
-  const {
-    clerkUserId,
-    emailRaw,
-    email,
-    fullName,
-    primaryGoal,
-    primarySocialUrl,
-    platform,
-    normalizedUrl,
-    spotifyUrl,
-    spotifyUrlNormalized,
-    spotifyArtistName,
-    sanitizedHeardAbout,
-    selectedPlan,
-  } = params;
-
-  const insertValues = {
-    fullName,
-    email,
-    primaryGoal: primaryGoal ?? null,
-    primarySocialUrl,
-    primarySocialPlatform: platform,
-    primarySocialUrlNormalized: normalizedUrl,
-    spotifyUrl: spotifyUrl ?? null,
-    spotifyUrlNormalized,
-    spotifyArtistName,
-    heardAbout: sanitizedHeardAbout,
-    selectedPlan: selectedPlan ?? null,
-    status: 'new' as const,
-  };
-
-  const [entry] = await db
-    .insert(waitlistEntries)
-    .values(insertValues)
-    .returning({ id: waitlistEntries.id });
-
-  if (!entry) {
-    throw new Error('Failed to create waitlist entry');
-  }
-
-  const handleCandidate =
-    extractHandleFromUrl(normalizedUrl) ??
-    email.split('@')[0] ??
-    safeRandomHandle();
-
-  const baseHandle = validateUsername(handleCandidate).isValid
-    ? handleCandidate
-    : safeRandomHandle();
-
-  const usernameNormalized = await findAvailableHandle(baseHandle);
-
-  const trimmedName = fullName.trim();
-  const displayName = trimmedName ? trimmedName.slice(0, 50) : 'Jovie creator';
-
-  await db.insert(creatorProfiles).values({
-    creatorType: 'creator',
-    username: usernameNormalized,
-    usernameNormalized,
-    displayName,
-    isPublic: false,
-    isClaimed: false,
-    waitlistEntryId: entry.id,
-    settings: {},
-    theme: {},
-    ingestionStatus: 'idle',
-  });
-
-  await db
-    .insert(users)
-    .values({
-      clerkId: clerkUserId,
-      email: emailRaw,
-      userStatus: 'waitlist_pending',
-    })
-    .onConflictDoUpdate({
-      target: users.clerkId,
-      set: {
-        userStatus: 'waitlist_pending',
-        updatedAt: new Date(),
-      },
-    });
-
-  return { entryId: entry.id };
-}
-
-// ---------------------------------------------------------------------------
-// Main entry point
-// ---------------------------------------------------------------------------
-
-/**
- * Process a validated waitlist access request: detect platform, check for
- * existing entry, create or update, attempt auto-approval if slots are
- * available.
- */
-export async function submitWaitlistAccessRequest(
-  input: SubmitAccessRequestInput
-): Promise<SubmitAccessRequestResult> {
-  const { clerkUserId, email, emailRaw, fullName, data } = input;
-  const {
-    primaryGoal,
-    primarySocialUrl,
-    spotifyUrl,
-    spotifyArtistName,
-    heardAbout,
-    selectedPlan,
-  } = data;
-
-  const sanitizedHeardAbout = heardAbout?.trim() || null;
-  const sanitizedSpotifyArtistName = spotifyArtistName?.trim() || null;
-
-  const { platform, normalizedUrl } = detectPlatformFromUrl(primarySocialUrl);
-
-  const spotifyUrlNormalized = spotifyUrl
-    ? normalizeSpotifyUrl(spotifyUrl)
+  const { data, email, fullName } = params;
+  const { platform, normalizedUrl } = detectPlatformFromUrl(
+    data.primarySocialUrl
+  );
+  const spotifyUrlNormalized = data.spotifyUrl
+    ? normalizeSpotifyUrl(data.spotifyUrl)
     : null;
 
-  // Check for existing entry
-  const [existing] = await db
+  return {
+    fullName,
+    email,
+    primaryGoal: data.primaryGoal ?? null,
+    primarySocialUrl: data.primarySocialUrl,
+    primarySocialPlatform: platform,
+    primarySocialUrlNormalized: normalizedUrl,
+    spotifyUrl: data.spotifyUrl ?? null,
+    spotifyUrlNormalized,
+    spotifyArtistName: data.spotifyArtistName?.trim() || null,
+    heardAbout: data.heardAbout?.trim() || null,
+    selectedPlan: data.selectedPlan ?? null,
+    updatedAt: new Date(),
+    // Store a useful fallback in existing fields without inventing launch scoring.
+    primarySocialFollowerCount: null,
+  };
+}
+
+async function lockWaitlistEmail(
+  tx: DbOrTransaction,
+  normalizedEmail: string
+): Promise<void> {
+  const lockKey = WAITLIST_LOCK_PREFIX + normalizedEmail;
+  await tx.execute(
+    drizzleSql`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`
+  );
+}
+
+async function findLatestEntryByEmail(
+  tx: DbOrTransaction,
+  normalizedEmail: string
+) {
+  const [entry] = await tx
     .select({ id: waitlistEntries.id, status: waitlistEntries.status })
     .from(waitlistEntries)
-    .where(drizzleSql`lower(${waitlistEntries.email}) = ${email}`)
+    .where(drizzleSql`lower(${waitlistEntries.email}) = ${normalizedEmail}`)
+    .orderBy(desc(waitlistEntries.createdAt))
     .limit(1);
 
-  if (existing) {
-    return handleExistingEntry({
-      existing,
-      clerkUserId,
-      emailRaw,
-      fullName,
-      primaryGoal,
-      primarySocialUrl,
-      platform,
-      normalizedUrl,
-      spotifyUrl,
-      spotifyUrlNormalized,
-      spotifyArtistName: sanitizedSpotifyArtistName,
-      sanitizedHeardAbout,
-      selectedPlan,
+  return entry ?? null;
+}
+
+async function upsertUserStatus(params: {
+  readonly tx: DbOrTransaction;
+  readonly clerkUserId: string;
+  readonly emailRaw: string;
+  readonly entryId: string;
+  readonly nextStatus: 'waitlist_pending' | 'waitlist_approved';
+}): Promise<void> {
+  const { tx, clerkUserId, emailRaw, entryId, nextStatus } = params;
+  const [existing] = await tx
+    .select({ id: users.id, userStatus: users.userStatus })
+    .from(users)
+    .where(eq(users.clerkId, clerkUserId))
+    .limit(1);
+
+  if (!existing) {
+    await tx.insert(users).values({
+      clerkId: clerkUserId,
+      email: emailRaw,
+      userStatus: nextStatus,
+      waitlistEntryId: entryId,
     });
+    return;
   }
 
-  // Create new entry
-  const { entryId } = await createNewWaitlistEntry({
-    clerkUserId,
-    emailRaw,
-    email,
-    fullName,
-    primaryGoal,
-    primarySocialUrl,
-    platform,
-    normalizedUrl,
-    spotifyUrl,
-    spotifyUrlNormalized,
-    spotifyArtistName: sanitizedSpotifyArtistName,
-    sanitizedHeardAbout,
-    selectedPlan,
+  // Never downgrade an existing higher-status user.
+  // - When trying to set 'waitlist_pending', keep any of the APPROVED_USER_STATUSES.
+  // - When trying to set 'waitlist_approved', keep statuses that already imply
+  //   the user has progressed past approval (claimed a profile / completing
+  //   onboarding / fully active) so we never bump them backwards.
+  const shouldKeepStatus =
+    nextStatus === 'waitlist_pending'
+      ? APPROVED_USER_STATUSES.has(existing.userStatus)
+      : POST_APPROVAL_USER_STATUSES.has(existing.userStatus);
+
+  await tx
+    .update(users)
+    .set({
+      email: emailRaw,
+      userStatus: shouldKeepStatus ? existing.userStatus : nextStatus,
+      waitlistEntryId: entryId,
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, existing.id));
+}
+
+async function tryApproveEntry(
+  tx: DbOrTransaction,
+  entryId: string
+): Promise<WaitlistApprovalResult | null> {
+  const approvalResult = await approveWaitlistEntryInTx(tx, entryId);
+  if (approvalResult.outcome !== 'approved') return null;
+  return approvalResult;
+}
+
+async function decideAccess(params: {
+  readonly tx: DbOrTransaction;
+  readonly entryId: string;
+  readonly clerkUserId: string;
+  readonly emailRaw: string;
+}): Promise<{
+  readonly outcome: WaitlistAccessOutcome;
+  readonly approval: WaitlistApprovalResult | null;
+}> {
+  await upsertUserStatus({
+    tx: params.tx,
+    clerkUserId: params.clerkUserId,
+    emailRaw: params.emailRaw,
+    entryId: params.entryId,
+    nextStatus: 'waitlist_pending',
   });
 
-  // Fire-and-forget Slack notification
-  notifySlackWaitlist(fullName, email).catch(err => {
-    logger.warn('[waitlist] Slack notification failed', err);
-  });
+  const reservation = await tryReserveAutoAcceptSlot(params.tx);
 
-  // Attempt auto-approval
-  const { shouldAutoAccept } = await tryReserveAutoAcceptSlot();
-  if (!shouldAutoAccept) {
-    return { status: 'new', outcome: undefined, entryId };
+  if (!reservation.shouldAutoAccept) {
+    return {
+      outcome:
+        reservation.reason === 'gate_on'
+          ? 'waitlisted_gate_on'
+          : 'waitlisted_capacity_full',
+      approval: null,
+    };
   }
 
-  const approvalResult = await withSystemIngestionSession(
-    async tx => approveWaitlistEntryInTx(tx, entryId),
+  const approval = await tryApproveEntry(params.tx, params.entryId);
+  if (!approval) {
+    return { outcome: 'waitlisted_capacity_full', approval: null };
+  }
+
+  return { outcome: 'accepted', approval };
+}
+
+export async function submitWaitlistAccessRequest(
+  input: WaitlistAccessRequestInput
+): Promise<WaitlistAccessRequestResult> {
+  const normalizedEmail = normalizeEmail(input.email);
+  const emailRaw = input.emailRaw ?? input.email;
+
+  const result = await withSystemIngestionSession(
+    async tx => {
+      await lockWaitlistEmail(tx, normalizedEmail);
+
+      const existing = await findLatestEntryByEmail(tx, normalizedEmail);
+      const entryValues = buildEntryValues({
+        data: input.data,
+        email: normalizedEmail,
+        fullName: input.fullName,
+      });
+
+      if (existing) {
+        if (existing.status === 'claimed' || existing.status === 'invited') {
+          await upsertUserStatus({
+            tx,
+            clerkUserId: input.clerkUserId,
+            emailRaw,
+            entryId: existing.id,
+            nextStatus: 'waitlist_approved',
+          });
+          return {
+            entryId: existing.id,
+            status: existing.status,
+            outcome: 'already_accepted' as const,
+            approval: null as WaitlistApprovalResult | null,
+          };
+        }
+
+        await tx
+          .update(waitlistEntries)
+          .set(entryValues)
+          .where(eq(waitlistEntries.id, existing.id));
+
+        await upsertUserStatus({
+          tx,
+          clerkUserId: input.clerkUserId,
+          entryId: existing.id,
+          emailRaw,
+          nextStatus: 'waitlist_pending',
+        });
+
+        return {
+          entryId: existing.id,
+          status: existing.status,
+          outcome: 'already_waitlisted' as const,
+          approval: null as WaitlistApprovalResult | null,
+        };
+      }
+
+      const [entry] = await tx
+        .insert(waitlistEntries)
+        .values({
+          ...entryValues,
+          status: 'new',
+          createdAt: new Date(),
+        })
+        .returning({ id: waitlistEntries.id });
+
+      if (!entry) {
+        throw new Error('Failed to create waitlist entry');
+      }
+
+      const decision = await decideAccess({
+        tx,
+        entryId: entry.id,
+        clerkUserId: input.clerkUserId,
+        emailRaw,
+      });
+
+      return {
+        entryId: entry.id,
+        status:
+          decision.outcome === 'accepted'
+            ? ('claimed' as const)
+            : ('new' as const),
+        outcome: decision.outcome,
+        approval: decision.approval,
+      };
+    },
     { isolationLevel: 'serializable' }
   );
 
-  if (
-    approvalResult.outcome === 'no_profile' ||
-    approvalResult.outcome === 'no_user'
-  ) {
-    captureCriticalError(
-      `Auto-approval failed: ${approvalResult.outcome}`,
-      new Error(
-        `Unexpected outcome during auto-approval: ${approvalResult.outcome}`
-      ),
-      { entryId }
-    );
-    return { status: 'new', outcome: approvalResult.outcome, entryId };
+  // Finalize Redis cache invalidation outside the serializable transaction so
+  // we don't extend its lock window with non-DB I/O.
+  if (result.approval) {
+    await finalizeWaitlistApproval(result.approval);
+  } else if (result.outcome === 'already_accepted') {
+    // The DB already reflects approval (entry status is claimed/invited and
+    // userStatus is now waitlist_approved), but the proxy-state Redis cache
+    // may still be holding a stale waitlist_pending entry from a prior
+    // /waitlist visit. Mirror the normal-approval invalidation so middleware
+    // doesn't keep redirecting the user back to /waitlist.
+    await invalidateProxyUserStateCache(input.clerkUserId).catch(error => {
+      logger.warn(
+        '[waitlist] Failed to invalidate proxy state on already_accepted',
+        error
+      );
+    });
   }
 
-  if (approvalResult.outcome === 'approved') {
-    await finalizeWaitlistApproval(approvalResult);
-    return { status: 'claimed', outcome: 'approved', entryId };
+  // Suppress Slack pings for outcomes where the user did not transition into a
+  // genuinely new waitlist state:
+  // - already_waitlisted / already_accepted: not a new signup
+  // - waitlisted_capacity_full: daily cap is exhausted, so we'd ping for every
+  //   subsequent attempt the rest of the day even though state is unchanged.
+  const shouldNotify =
+    result.outcome !== 'already_waitlisted' &&
+    result.outcome !== 'already_accepted' &&
+    result.outcome !== 'waitlisted_capacity_full';
+  if (shouldNotify) {
+    notifySlackWaitlist(input.fullName, normalizedEmail).catch(error => {
+      logger.warn('[waitlist] Slack notification failed', error);
+    });
   }
 
-  return { status: 'new', outcome: approvalResult.outcome, entryId };
+  return {
+    entryId: result.entryId,
+    status: result.status,
+    outcome: result.outcome,
+  };
 }
