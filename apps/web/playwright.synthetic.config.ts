@@ -24,7 +24,14 @@ export default defineConfig({
   globalTimeout: 600_000, // 10 minutes total
 
   reporter: [
-    ['json', { outputFile: 'test-results/results.json' }],
+    [
+      'json',
+      {
+        outputFile:
+          process.env.SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE ??
+          'test-results/results.json',
+      },
+    ],
     ['html', { outputFolder: 'playwright-report', open: 'never' }],
     ['line'],
   ],

@@ -301,7 +301,7 @@ function CardAction({
     </>
   );
   const className = cn(
-    'inline-flex w-full items-center rounded-full bg-white text-black shadow-[0_8px_18px_rgba(0,0,0,0.24)] transition-opacity duration-200 hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black',
+    'inline-flex w-full items-center rounded-full bg-white text-black shadow-[0_8px_18px_rgba(0,0,0,0.24)] transition-opacity duration-subtle hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black',
     action.showChevron ? 'justify-between' : 'justify-center',
     compact
       ? 'h-7 gap-1 px-2.5 text-[10px] font-[680]'
@@ -388,7 +388,7 @@ export function ProfileMediaCard({
   return (
     <article
       className={cn(
-        'relative overflow-hidden rounded-[20px] border border-white/8 bg-[#0e0f12] text-left shadow-[0_18px_40px_-20px_rgba(0,0,0,0.7)]',
+        'relative overflow-hidden rounded-[20px] border border-white/8 bg-[color:var(--profile-drawer-bg)] text-left shadow-[0_18px_40px_-20px_rgba(0,0,0,0.7)]',
         compact && 'rounded-[12px]',
         className
       )}
@@ -396,7 +396,7 @@ export function ProfileMediaCard({
     >
       <div
         className={cn(
-          'relative overflow-hidden bg-[#1a1a1e]',
+          'relative overflow-hidden bg-white/[0.08]',
           RATIO_CLASS_NAMES[ratio]
         )}
       >
@@ -424,7 +424,7 @@ export function ProfileMediaCard({
           className={cn(
             'absolute inset-0',
             landscape
-              ? 'bg-[linear-gradient(90deg,#0a0a0c_0%,rgba(10,10,12,0.94)_28%,rgba(10,10,12,0.42)_58%,rgba(10,10,12,0.06)_100%)]'
+              ? 'bg-[linear-gradient(90deg,rgba(10,10,12,1)_0%,rgba(10,10,12,0.94)_28%,rgba(10,10,12,0.42)_58%,rgba(10,10,12,0.06)_100%)]'
               : 'bg-[linear-gradient(180deg,rgba(0,0,0,0.12)_0%,rgba(0,0,0,0.46)_46%,rgba(0,0,0,0.9)_100%)]'
           )}
         />

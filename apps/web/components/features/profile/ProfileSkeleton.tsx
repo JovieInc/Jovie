@@ -9,7 +9,7 @@ export function ProfileSkeleton() {
 
   return (
     <output
-      className='relative min-h-[100dvh] overflow-hidden bg-[#0a0b0e] text-white/90'
+      className='relative min-h-[100dvh] overflow-hidden bg-[color:var(--profile-stage-bg)] text-white/90'
       aria-busy='true'
       aria-label='Loading Jovie profile'
     >
@@ -25,7 +25,8 @@ export function ProfileSkeleton() {
           <div
             className={`relative h-[48dvh] max-h-[620px] min-h-[420px] w-full overflow-hidden md:h-[56dvh] md:min-h-[520px] md:rounded-t-[var(--profile-shell-card-radius)] ${pulse}`}
           >
-            <div className='absolute inset-0 bg-gradient-to-b from-white/[0.04] via-[#12141a]/60 to-[#0a0b0e]/95' />
+            {/* Gradient overlay: artistic dark hero fade — intentional profile-stage values */}
+            <div className='absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.04)_0%,rgba(18,20,26,0.6)_50%,rgba(10,11,14,0.95)_100%)]' />
 
             {/* Top bar: spotlight pill + action buttons */}
             <div className='relative flex h-full flex-col justify-between px-5 pb-6 pt-[max(env(safe-area-inset-top),1rem)] md:px-7 md:pb-8 md:pt-6'>
