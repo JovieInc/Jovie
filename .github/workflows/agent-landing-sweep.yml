@@ -54,7 +54,6 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-      issues: write
       statuses: read
 
     steps:
@@ -81,15 +80,14 @@ jobs:
           # ------------------------------------------------------------------
           # 1. Collect all open, non-draft PRs
           # ------------------------------------------------------------------
-          ALL_PRS=$(gh api "repos/$GH_REPO/pulls?state=open&per_page=100" \
-            | jq '[.[] | select(.draft == false) | {
+          ALL_PRS=$(gh api --paginate --slurp "repos/$GH_REPO/pulls?state=open&per_page=100" \
+            | jq '[.[][] | select(.draft == false) | {
                 number: .number,
                 title: .title,
                 head_ref: .head.ref,
                 head_sha: .head.sha,
                 labels: [.labels[].name],
-                auto_merge: (.auto_merge != null),
-                mergeable_state: .mergeable_state
+                auto_merge: (.auto_merge != null)
               }]')
 
           TOTAL=$(echo "$ALL_PRS" | jq 'length')
@@ -114,16 +112,9 @@ jobs:
           # ------------------------------------------------------------------
           # 3. Queue pressure check (same threshold as agent-pipeline.yml)
           # ------------------------------------------------------------------
-          READY_COUNT=$(echo "$ALL_PRS" \
-            | jq '
-              [.[] | select(
-                (.auto_merge == true) or
-                (.mergeable_state == "clean") or
-                (.mergeable_state == "unstable")
-              )] | length
-            ')
+          READY_COUNT=$(echo "$ALL_PRS" | jq '[.[] | select(.auto_merge == true)] | length')
 
-          echo "Merge-ready/auto-merge PRs in queue: $READY_COUNT / $READY_THRESHOLD"
+          echo "Auto-merge PRs in queue: $READY_COUNT / $READY_THRESHOLD"
 
           if [[ "$READY_COUNT" -ge "$READY_THRESHOLD" ]]; then
             echo "Queue pressure is high ($READY_COUNT / $READY_THRESHOLD). Skipping sweep to avoid saturation."
@@ -217,9 +208,12 @@ jobs:
             fi
 
             # Gate: CodeRabbit must not be blocking
-            CR_STATE=$(gh api "repos/$GH_REPO/pulls/$PR_NUMBER/reviews" \
-              --jq '[.[] | select(.user.login == "coderabbitai[bot]")] | sort_by(.submitted_at) | last | .state // "none"' \
-              2>/dev/null || echo "none")
+            if ! CR_STATE=$(gh api --paginate --slurp "repos/$GH_REPO/pulls/$PR_NUMBER/reviews?per_page=100" 2>/dev/null \
+              | jq -r '[.[][] | select(.user.login == "coderabbitai[bot]")] | sort_by(.submitted_at) | last | .state // "none"'); then
+              echo "Could not fetch CodeRabbit review state. Skipping."
+              SKIPPED=$((SKIPPED + 1))
+              continue
+            fi
             echo "CodeRabbit review: $CR_STATE"
 
             if [[ "$CR_STATE" == "CHANGES_REQUESTED" ]]; then
@@ -229,10 +223,14 @@ jobs:
             fi
 
             # Gate: sensitive file check
-            CHANGED_FILES=$(gh pr diff "$PR_NUMBER" --name-only 2>/dev/null || echo "")
+            if ! CHANGED_FILES=$(gh pr diff "$PR_NUMBER" --repo "$GH_REPO" --name-only 2>/dev/null); then
+              echo "Could not fetch changed files for PR #$PR_NUMBER. Skipping."
+              SKIPPED=$((SKIPPED + 1))
+              continue
+            fi
             SENSITIVE_FOUND=""
             for pattern in "${SENSITIVE_PATTERNS[@]}"; do
-              MATCHES=$(echo "$CHANGED_FILES" | grep -E "$pattern" || true)
+              MATCHES=$(echo "$CHANGED_FILES" | grep -Ei "$pattern" || true)
               if [[ -n "$MATCHES" ]]; then
                 SENSITIVE_FOUND="${SENSITIVE_FOUND}${MATCHES}\n"
               fi
@@ -243,6 +241,13 @@ jobs:
               echo -e "$SENSITIVE_FOUND"
               SKIPPED=$((SKIPPED + 1))
               continue
+            fi
+
+            EFFECTIVE_READY_COUNT=$((READY_COUNT + LANDED))
+            if [[ "$EFFECTIVE_READY_COUNT" -ge "$READY_THRESHOLD" ]]; then
+              echo "Queue pressure reached threshold ($EFFECTIVE_READY_COUNT / $READY_THRESHOLD). Skipping remaining eligible PRs."
+              SKIPPED=$((SKIPPED + 1))
+              break
             fi
 
             # All gates passed — enable auto-merge
