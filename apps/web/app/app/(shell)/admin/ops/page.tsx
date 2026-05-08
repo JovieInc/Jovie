@@ -5,8 +5,10 @@ import type {
   DailyBucket,
   ShippingVelocityResponse,
 } from '@/app/api/admin/hud/shipping-velocity/route';
+import { AgentOsRunsPanel } from '@/components/features/admin/agent-os';
 import { AdminToolPage } from '@/components/features/admin/layout/AdminToolPage';
 import { APP_ROUTES } from '@/constants/routes';
+import { AGENT_OS_ADMIN_FIXTURE_ARTIFACTS } from '@/lib/agent-os/fixtures';
 import { getHudMetrics } from '@/lib/hud/metrics';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 import { logger } from '@/lib/utils/logger';
@@ -137,6 +139,7 @@ export default async function AdminOpsPage({
         initialShippingData={shippingPrefetch?.data}
         initialShippingCachedAt={shippingPrefetch?.cachedAt}
       />
+      <AgentOsRunsPanel artifacts={AGENT_OS_ADMIN_FIXTURE_ARTIFACTS} />
     </AdminToolPage>
   );
 }
