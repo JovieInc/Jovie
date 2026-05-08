@@ -1,6 +1,8 @@
 import 'server-only';
+import { Statsig, StatsigUser } from '@statsig/statsig-node-core';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
+import { withTimeout } from '@/lib/resilience/primitives';
 import { logger } from '@/lib/utils/logger';
 import {
   APP_FLAG_DEFAULTS,
@@ -11,36 +13,46 @@ import {
   type SubscribeCTAVariant,
 } from './contracts';
 
-type StatsigClient = typeof import('statsig-node').default;
-
 let statsigInitialized = false;
-let statsigClient: StatsigClient | null = null;
-let statsigImportFailed = false;
+let statsigClient: Statsig | null = null;
 let statsigInitPromise: Promise<void> | null = null;
 let statsigWarnedNoSecret = false;
 
 const isE2ERuntime = publicEnv.NEXT_PUBLIC_E2E_MODE === '1';
+const STATSIG_INIT_TIMEOUT_MS = 10_000;
+const STATSIG_SHUTDOWN_TIMEOUT_MS = 1500;
 
-async function getStatsigClient(): Promise<StatsigClient | null> {
+function getStatsigUser(userId: string | null): StatsigUser {
+  return StatsigUser.withUserID(userId ?? 'anonymous');
+}
+
+function getStatsigClient(serverSecret: string): Statsig {
   if (statsigClient) {
     return statsigClient;
   }
 
-  if (statsigImportFailed) {
-    return null;
-  }
+  statsigClient = new Statsig(serverSecret, {
+    environment: env.VERCEL_ENV || env.NODE_ENV || 'development',
+  });
+  return statsigClient;
+}
+
+async function cleanupStatsigClientAfterInitFailure(
+  statsig: Statsig | null
+): Promise<void> {
+  if (!statsig) return;
 
   try {
-    // Statsig is optional in local/test environments; keep the specifier
-    // non-literal so Vite/Vitest do not pre-resolve it before runtime fallback.
-    const optionalModuleName = 'statsig-node';
-    const statsigModule = await import(optionalModuleName);
-    statsigClient = statsigModule.default;
-    return statsigClient;
-  } catch (error) {
-    statsigImportFailed = true;
-    logger.error('Statsig SDK is unavailable', error, 'Statsig');
-    return null;
+    await withTimeout(statsig.shutdown(), {
+      timeoutMs: STATSIG_SHUTDOWN_TIMEOUT_MS,
+      context: 'Statsig shutdown after failed initialization',
+    });
+  } catch (shutdownError) {
+    logger.warn(
+      '[Statsig] Failed to clean up server SDK after init failure',
+      shutdownError,
+      'Statsig'
+    );
   }
 }
 
@@ -63,18 +75,20 @@ async function initializeStatsig(): Promise<void> {
       return;
     }
 
+    let statsig: Statsig | null = null;
     try {
-      const statsig = await getStatsigClient();
-      if (!statsig) return;
-
-      await statsig.initialize(serverSecret, {
-        environment: {
-          tier: env.VERCEL_ENV || env.NODE_ENV || 'development',
-        },
+      statsig = getStatsigClient(serverSecret);
+      await withTimeout(statsig.initialize(), {
+        timeoutMs: STATSIG_INIT_TIMEOUT_MS,
+        context: 'Statsig initialization',
       });
       statsigInitialized = true;
       logger.info('[Statsig] Server SDK initialized', undefined, 'Statsig');
     } catch (error) {
+      const failedStatsig = statsig ?? statsigClient;
+      statsigInitialized = false;
+      statsigClient = null;
+      await cleanupStatsigClientAfterInitFailure(failedStatsig);
       logger.error(
         '[Statsig] Failed to initialize server SDK',
         error,
@@ -106,16 +120,13 @@ export async function checkGateForUser(
   }
 
   try {
-    const statsig = await getStatsigClient();
+    const statsig = statsigClient;
     if (!statsig) {
       return defaultValue;
     }
 
-    const gate = statsig.getFeatureGateSync(
-      { userID: userId ?? 'anonymous' },
-      gateKey
-    );
-    if (gate.evaluationDetails?.reason === 'Unrecognized') {
+    const gate = statsig.getFeatureGate(getStatsigUser(userId), gateKey);
+    if (gate.getEvaluationDetails().reason === 'Unrecognized') {
       return defaultValue;
     }
     return gate.value;
@@ -148,13 +159,13 @@ export async function getExperiment(
   if (!statsigInitialized) return {};
 
   try {
-    const statsig = await getStatsigClient();
+    const statsig = statsigClient;
     if (!statsig) {
       return {};
     }
 
-    const experiment = await statsig.getExperiment(
-      { userID: userId ?? 'anonymous' },
+    const experiment = statsig.getExperiment(
+      getStatsigUser(userId),
       experimentKey
     );
     return experiment.value;
@@ -197,14 +208,17 @@ export async function getSubscribeCTAVariantValue(
 }
 
 export async function shutdownStatsig(): Promise<void> {
-  if (statsigInitialized) {
-    const statsig = await getStatsigClient();
-    if (statsig) {
-      await statsig.shutdown();
+  try {
+    const statsig = statsigClient;
+    if (statsigInitialized && statsig) {
+      await withTimeout(statsig.shutdown(), {
+        timeoutMs: STATSIG_SHUTDOWN_TIMEOUT_MS,
+        context: 'Statsig shutdown',
+      });
     }
+  } finally {
+    statsigInitialized = false;
+    statsigClient = null;
+    statsigInitPromise = null;
   }
-  statsigInitialized = false;
-  statsigClient = null;
-  statsigImportFailed = false;
-  statsigInitPromise = null;
 }

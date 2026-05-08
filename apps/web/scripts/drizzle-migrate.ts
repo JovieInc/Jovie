@@ -157,9 +157,12 @@ function isRetryableConnectionError(error: unknown) {
 
   const combinedMessage = flattenErrorMessages(error).join(' ').toLowerCase();
   return (
+    combinedMessage.includes('password authentication failed') ||
     combinedMessage.includes('requested endpoint could not be found') ||
     combinedMessage.includes("you don't have access to it") ||
     combinedMessage.includes('connection terminated unexpectedly') ||
+    combinedMessage.includes('connection closed') ||
+    combinedMessage.includes('server closed the connection unexpectedly') ||
     combinedMessage.includes('timed out waiting for database connection') ||
     combinedMessage.includes('fetch failed')
   );

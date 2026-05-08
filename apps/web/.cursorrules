@@ -78,39 +78,33 @@ Jovie is a Next.js 15 application with Clerk authentication and Neon PostgreSQL 
 
 ### 1. Feature Flags with Statsig
 
-**ALWAYS use Statsig for feature flags:**
+**ALWAYS use the app flag registry for feature flags:**
 
 ```typescript
-// ✅ CORRECT: Use Statsig feature gates
-import { useFeatureGate } from '@/lib/flags/client';
-import { STATSIG_FLAGS } from '@/lib/flags';
+// ✅ CORRECT: Use runtime app flags backed by Statsig where configured
+import { useAppFlag } from '@/lib/flags/client';
 
 export function MyComponent() {
-  const { value: tippingEnabled } = useFeatureGate(STATSIG_FLAGS.TIPPING);
-  const { value: notificationsEnabled } = useFeatureGate(STATSIG_FLAGS.NOTIFICATIONS);
+  const stripeConnectEnabled = useAppFlag('STRIPE_CONNECT_ENABLED');
+  const designV1Enabled = useAppFlag('DESIGN_V1');
 
   return (
     <div>
-      {tippingEnabled && <TippingComponent />}
-      {notificationsEnabled && <NotificationsComponent />}
+      {stripeConnectEnabled && <PayoutsComponent />}
+      {designV1Enabled && <DesignV1Component />}
     </div>
   );
 }
 
 // Server-side usage:
-import { checkGateForUser } from '@/lib/flags/server';
-import { STATSIG_FLAGS } from '@/lib/flags';
+import { getAppFlagValue } from '@/lib/flags/server';
 
-const isEnabled = await checkGateForUser(STATSIG_FLAGS.TIPPING, { userID: userId });
+const isEnabled = await getAppFlagValue('STRIPE_CONNECT_ENABLED', { userId });
 ```
 
-**Available feature flags (see `lib/statsig/flags.ts` for full list):**
-- `TIPPING` - Enable tipping functionality
-- `NOTIFICATIONS` - Enable notification system
-- `ARTIST_SEARCH` - Controls artist search functionality
-- `TIP_PROMO` - Controls tip promotion features
-- `CONTACTS` - Gate artist contacts manager
-- `AVATAR_UPLOADER` - Enable avatar upload with drag/drop
+**Available app flags:** see `apps/web/lib/flags/contracts.ts`.
+Server-side Statsig evaluation uses `STATSIG_SERVER_SECRET`; there is no active
+Statsig browser SDK or public Statsig client key requirement.
 
 ### 2. Clerk-Supabase Integration
 
@@ -237,7 +231,7 @@ NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_KEY=your-anon-key
 
 # Statsig
-NEXT_PUBLIC_STATSIG_CLIENT_KEY=client-<your-statsig-client-key>
+STATSIG_SERVER_SECRET=secret-<your-statsig-server-secret>
 
 # Spotify
 SPOTIFY_CLIENT_ID=your-spotify-client-id
@@ -293,17 +287,16 @@ When updating Clerk-Supabase integration:
 ### Feature Flag Usage
 
 ```typescript
-import { useFeatureGate } from '@/lib/flags/client';
-import { STATSIG_FLAGS } from '@/lib/flags';
+import { useAppFlag } from '@/lib/flags/client';
 
 export function MyComponent() {
-  const { value: tippingEnabled } = useFeatureGate(STATSIG_FLAGS.TIPPING);
-  const { value: contactsEnabled } = useFeatureGate(STATSIG_FLAGS.CONTACTS);
+  const stripeConnectEnabled = useAppFlag('STRIPE_CONNECT_ENABLED');
+  const designV1Enabled = useAppFlag('DESIGN_V1');
 
   return (
     <div>
-      {tippingEnabled && <TippingComponent />}
-      {contactsEnabled && <ContactsComponent />}
+      {stripeConnectEnabled && <PayoutsComponent />}
+      {designV1Enabled && <DesignV1Component />}
     </div>
   );
 }

@@ -69,7 +69,7 @@ export function HomeTrustSection({
       >
         <p
           className={cn(
-            'text-center text-[12px] font-medium tracking-[0.02em] text-white/48',
+            'text-center text-[12px] font-medium tracking-[0.02em] text-white/56',
             labelMarginClass
           )}
         >

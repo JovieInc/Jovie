@@ -59,11 +59,14 @@ The public URL of your application.
 
 **Default:** `https://jov.ie`
 
-## Analytics & Feature Flags (Statsig)
+## Feature Flags (Statsig)
 
-### `NEXT_PUBLIC_STATSIG_CLIENT_KEY`
+### `STATSIG_SERVER_SECRET`
 
-Public Statsig client SDK key. Analytics and feature gates remain disabled when this is missing.
+Server-side Statsig secret used by `apps/web/lib/flags/statsig.ts`.
+Feature gates and experiments remain disabled and fall back to safe defaults
+when this is missing. The app does not currently load a Statsig browser SDK, so
+no public Statsig client key is required.
 
 ## Stripe Billing
 

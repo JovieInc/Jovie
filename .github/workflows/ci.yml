@@ -876,6 +876,9 @@ jobs:
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
           URL_ENCRYPTION_KEY: mobile-overflow-ci-url-encryption-key
           AI_GATEWAY_API_KEY: mobile-overflow-ci
+          MOBILE_OVERFLOW_WIDTHS: '320,390,430'
+          MOBILE_OVERFLOW_FOCUS_LIMIT: '8'
+          PLAYWRIGHT_WORKERS: '8'
 
       - name: Upload Playwright Artifacts on Failure
         if: failure()
@@ -2316,7 +2319,7 @@ jobs:
     needs: [ci-fast, ci-path-changes, neon-db]
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
@@ -2396,10 +2399,17 @@ jobs:
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           SENTRY_ENVIRONMENT: ci-pr-e2e
           SENTRY_RELEASE: ${{ github.sha }}
+          E2E_USE_TEST_AUTH_BYPASS: '1'
+          E2E_TEST_AUTH_PERSONA: creator-ready
+          NEXT_PUBLIC_CLERK_MOCK: '1'
+          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
+          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
+          E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
-        run: pnpm --filter=@jovie/web run e2e:smoke --project=chromium
+        run: pnpm --filter=@jovie/web exec playwright test --config=playwright.config.smoke.ts --project=chromium --reporter=line
 
       - name: Upload Playwright Artifacts on Failure
         if: failure() && steps.check_changes.outputs.run_full_ci == 'true'
@@ -2748,7 +2758,6 @@ jobs:
           E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
-          NEXT_PUBLIC_STATSIG_CLIENT_KEY: ${{ secrets.NEXT_PUBLIC_STATSIG_CLIENT_KEY }}
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
         run: |
           if [ -z "${{ steps.quarantine.outputs.allowed_specs }}" ]; then
@@ -2777,7 +2786,6 @@ jobs:
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
           # Optional: enable deterministic spotify-only UI check
-          NEXT_PUBLIC_STATSIG_CLIENT_KEY: ${{ secrets.NEXT_PUBLIC_STATSIG_CLIENT_KEY }}
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
         run: |
           cd apps/web && pnpm --filter=@jovie/web run e2e:auth-smoke --project=chromium
@@ -2796,7 +2804,6 @@ jobs:
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
-          NEXT_PUBLIC_STATSIG_CLIENT_KEY: ${{ secrets.NEXT_PUBLIC_STATSIG_CLIENT_KEY }}
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
         run: |
           if [ -z "${{ steps.quarantine.outputs.allowed_specs }}" ]; then
@@ -2816,7 +2823,6 @@ jobs:
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
-          NEXT_PUBLIC_STATSIG_CLIENT_KEY: ${{ secrets.NEXT_PUBLIC_STATSIG_CLIENT_KEY }}
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
           SENTRY_E2E_REPORTING: '1'
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
@@ -3260,7 +3266,12 @@ jobs:
           export DATABASE_URL="${{ env.DATABASE_URL }}"
           export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}"
           export CLERK_SECRET_KEY="${{ secrets.CLERK_SECRET_KEY }}"
+          export NEXT_PUBLIC_E2E_MODE=1
+          export NEXT_DISABLE_TOOLBAR=1
+          export NEXT_PUBLIC_CLERK_MOCK=1
+          export NEXT_PUBLIC_CLERK_PROXY_DISABLED=1
           export E2E_USE_TEST_AUTH_BYPASS=1
+          export E2E_TEST_AUTH_PERSONA=creator-ready
           export E2E_CLERK_USER_ID="${{ secrets.E2E_CLERK_USER_ID }}"
           export FLAGS_SECRET="${{ secrets.FLAGS_SECRET }}"
           export URL_ENCRYPTION_KEY="smoke-preview-url-encryption-key"
@@ -3295,7 +3306,12 @@ jobs:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          NEXT_PUBLIC_E2E_MODE: '1'
+          NEXT_DISABLE_TOOLBAR: '1'
+          NEXT_PUBLIC_CLERK_MOCK: '1'
+          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
           E2E_USE_TEST_AUTH_BYPASS: '1'
+          E2E_TEST_AUTH_PERSONA: creator-ready
           E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}

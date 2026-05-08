@@ -69,9 +69,9 @@ function ProductProofImage({
         width={image.width}
         height={image.height}
         loading={eager ? 'eager' : 'lazy'}
+        priority={eager}
         sizes={sizes}
         quality={85}
-        unoptimized
         className='block h-full w-full object-contain'
       />
     </div>
@@ -105,13 +105,13 @@ function HeroCarouselSlide({
         <ProductProofImage
           scenarioId={slide.desktopScreenshotKey}
           sizes='(min-width: 1024px) 58rem, (min-width: 768px) 76vw, 88vw'
-          eager={Math.abs(offset) <= 1}
+          eager={active}
           className='homepage-product-proof-frame--desktop'
         />
         <ProductProofImage
           scenarioId={slide.mobileScreenshotKey}
           sizes='(min-width: 1024px) 12rem, (min-width: 768px) 18vw, 30vw'
-          eager={Math.abs(offset) <= 1}
+          eager={active}
           className='homepage-product-proof-frame--phone'
         />
       </div>

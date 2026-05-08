@@ -1,9 +1,3 @@
-'use client';
-
-import { motion } from 'motion/react';
-import { useEffect, useRef, useState } from 'react';
-import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
-
 const LEAD_TEXT = 'Jovie helps artists release music faster';
 const SUPPORT_TEXT =
   'so they learn what works and iterate before they burn out.';
@@ -25,83 +19,29 @@ function getRevealWords(text: string) {
 
 function RevealWords({
   className,
-  delayOffset = 0,
   testId,
   wrapperClassName,
-  revealed,
-  reducedMotion,
   text,
 }: Readonly<{
   className: string;
-  delayOffset?: number;
   testId?: string;
   wrapperClassName?: string;
-  revealed: boolean;
-  reducedMotion: boolean;
   text: string;
 }>) {
   return (
     <span className={wrapperClassName} data-testid={testId}>
-      {getRevealWords(text).map(({ key, word }, index) => (
-        <motion.span
-          key={key}
-          animate={
-            revealed || reducedMotion
-              ? { opacity: 1, y: 0, filter: 'blur(0px)' }
-              : { opacity: 0.16, y: 16, filter: 'blur(8px)' }
-          }
-          className={className}
-          initial={false}
-          transition={{
-            delay: reducedMotion ? 0 : (delayOffset + index) * 0.035,
-            duration: reducedMotion ? 0 : 0.42,
-            ease: [0.22, 1, 0.36, 1],
-          }}
-        >
+      {getRevealWords(text).map(({ key, word }) => (
+        <span key={key} className={className}>
           {word}
-        </motion.span>
+        </span>
       ))}
     </span>
   );
 }
 
 export function HomepageReleaseVelocityReveal() {
-  const sectionRef = useRef<HTMLElement | null>(null);
-  const reducedMotion = useReducedMotion();
-  const [revealed, setRevealed] = useState(false);
-
-  useEffect(() => {
-    const section = sectionRef.current;
-    if (!section || reducedMotion) {
-      setRevealed(true);
-      return;
-    }
-
-    if (typeof IntersectionObserver === 'undefined') {
-      setRevealed(true);
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry?.isIntersecting) {
-          setRevealed(true);
-          observer.disconnect();
-        }
-      },
-      { rootMargin: '0px 0px -18% 0px', threshold: 0.3 }
-    );
-
-    observer.observe(section);
-
-    return () => {
-      observer.disconnect();
-    };
-  }, [reducedMotion]);
-
   return (
     <section
-      ref={sectionRef}
       aria-labelledby='homepage-release-velocity-heading'
       className='relative isolate overflow-hidden bg-[#020303] px-[var(--homepage-page-gutter)] py-20 text-center sm:py-24 lg:py-28'
       data-testid='homepage-release-velocity-reveal'
@@ -122,17 +62,12 @@ export function HomepageReleaseVelocityReveal() {
         <span aria-hidden='true'>
           <RevealWords
             className='mr-[0.18em] inline-block text-white'
-            reducedMotion={reducedMotion}
-            revealed={revealed}
             testId='homepage-release-velocity-lead'
             text={LEAD_TEXT}
             wrapperClassName='text-white'
           />
           <RevealWords
             className='mr-[0.18em] inline-block text-white/36'
-            delayOffset={LEAD_TEXT.split(' ').length}
-            reducedMotion={reducedMotion}
-            revealed={revealed}
             testId='homepage-release-velocity-support'
             text={SUPPORT_TEXT}
             wrapperClassName='text-white/36'

@@ -16,7 +16,7 @@ Non-goals: adding non-Statsig analytics SDKs, running migrations from Edge, or b
 - UX: `/dashboard/links` renders `EnhancedDashboardLinks` + `GroupedLinksManager` + `UniversalLinkInput`; suggested pills should plug into these, not a parallel flow.
 - API: `/api/dashboard/social-links` is the persistence surface; extend it instead of introducing a new endpoint.
 - RLS/session: `withDbSession` / `withDbSessionTx` set `app.clerk_user_id`; background jobs must set a safe system value (e.g., `system_ingestion`) before touching Neon.
-- Flags/analytics: Statsig gates in `lib/statsig/flags.ts`; `lib/analytics.ts` is the only analytics wrapper.
+- Flags/analytics: Statsig-backed app flags in `apps/web/lib/flags/contracts.ts`; `lib/analytics.ts` is the only analytics wrapper.
 
 ## Data model (Drizzle-ready, minimal duplication)
 
@@ -111,7 +111,7 @@ Non-goals: adding non-Statsig analytics SDKs, running migrations from Edge, or b
    - Add columns/enums above; backfill existing links.
    - Implement Linktree strategy + `ingestion_jobs` processor (Node route or script).
    - Extend `/api/dashboard/social-links` and `getProfileSocialLinks` to return state/confidence.
-   - Add Statsig flag `feature_link_ingestion` (docs + `lib/statsig/flags.ts`).
+   - Add Statsig flag `feature_link_ingestion` (docs + `apps/web/lib/flags/contracts.ts`).
 2. **Phase 2 – Dashboard suggestions**
    - Update `EnhancedDashboardLinks`/`GroupedLinksManager` to render suggestion pills from `state='suggested'`.
    - Add accept/dismiss mutations that only flip `state`/`confidence`; keep existing save shape to avoid breaking clients.
@@ -140,7 +140,7 @@ Non-goals: adding non-Statsig analytics SDKs, running migrations from Edge, or b
 - Constraints: Edge runtime for the read path; Node-only libs stay out of the handler; Statsig-only analytics/flags; no new SDKs.
 
 ### Feature flag & rollout
-- Add Statsig gate `feature_smart_link_routing` (`lib/statsig/flags.ts` + `docs/STATSIG_FEATURE_GATES.md`).
+- Add Statsig gate `feature_smart_link_routing` (`apps/web/lib/flags/contracts.ts` + `docs/STATSIG_FEATURE_GATES.md`).
 - Default off; enable on staging first; keep a kill switch for rollout.
 - Emit Statsig events via `lib/analytics.ts` only (`link_route_resolved` with slug, device, country, resolution_path, had_app_link, used_geo_override).
 
@@ -186,7 +186,7 @@ Non-goals: adding non-Statsig analytics SDKs, running migrations from Edge, or b
 - Guardrails: Statsig-only flagging/analytics; no new SDKs; do not expose sensitive URLs to bots; avoid per-user cloaking—behavior should be consistent for real human browsers vs. identified bots.
 
 ### Feature flag & events
-- Add Statsig gate `feature_sensitive_link_protection` (`lib/statsig/flags.ts` + `docs/STATSIG_FEATURE_GATES.md`). Default off, stage first.
+- Add Statsig gate `feature_sensitive_link_protection` (`apps/web/lib/flags/contracts.ts` + `docs/STATSIG_FEATURE_GATES.md`). Default off, stage first.
 - Emit Statsig event `sensitive_link_action` with { slug, sensitivity, bot_detected, action } for allow/blocked/safe_preview decisions via `lib/analytics.ts`.
 
 ### Detection strategy (Node runtime)

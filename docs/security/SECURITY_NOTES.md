@@ -107,7 +107,7 @@ _Last reviewed: 2026-04-01_
 
 - **Third-party script inventory (current)**
   - **Clerk**: Auth UI/SDK injection for sign-in and session management (`@clerk/nextjs`).
-  - **Statsig**: Feature flags + session replay plugin (loaded via `@statsig/react-bindings` and `@statsig/session-replay`).
+  - **Statsig**: Server-side feature flags and experiments only. No Statsig browser SDK or session replay script is currently loaded.
   - **Vercel Analytics**: Page analytics (`@vercel/analytics/react`).
   - **Vercel Speed Insights**: Performance RUM (`@vercel/speed-insights/react`).
   - **Vercel Toolbar**: Dev-only overlay in `app/layout.tsx` (enabled only in development).
@@ -119,9 +119,7 @@ _Last reviewed: 2026-04-01_
     - `https://va.vercel-scripts.com` (Vercel Analytics).
     - `https://vitals.vercel-insights.com` (Speed Insights).
     - `https://*.clerk.com` + `https://*.clerk.accounts.dev` (Clerk).
-    - `https://cdn.statsig.com` + `https://*.statsigcdn.com` (Statsig).
   - **connect-src**
-    - `https://api.statsig.com`, `https://statsigapi.net`, `https://*.statsigcdn.com`, `https://*.statsig.com`.
     - `https://va.vercel-scripts.com`, `https://vitals.vercel-insights.com`.
     - `https://*.clerk.com`, `https://*.clerk.accounts.dev`.
     - `https://api.stripe.com` for Stripe client calls (future-proofed).
@@ -138,7 +136,7 @@ _Last reviewed: 2026-04-01_
   - Auth: `@clerk/nextjs` 6.x.
   - DB: `@neondatabase/serverless` + `drizzle-orm`.
   - Payments: `stripe` (server) + `@stripe/stripe-js` (client).
-  - Feature flags/analytics: Statsig clients (`@statsig/react-bindings`, `@statsig/session-replay`, `@statsig/web-analytics`).
+  - Feature flags/experiments: `@statsig/statsig-node-core` server SDK.
 
 - **Lightweight dependency review process**
   - Before each production promotion **or** at least once per month:

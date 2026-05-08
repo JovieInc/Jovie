@@ -177,6 +177,7 @@
     "@radix-ui/react-toggle-group": "^1.1.11",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@sentry/nextjs": "^10.50.0",
+    "@statsig/statsig-node-core": "^0.19.3",
     "@tanstack/react-pacer": "^0.21.1",
     "@tanstack/react-query": "^5.95.2",
     "@tanstack/react-table": "^8.21.3",
@@ -195,8 +196,8 @@
     "dompurify": "^3.4.2",
     "dotenv": "^17.4.2",
     "drizzle-orm": "0.45.2",
-    "flags": "^4.0.6",
     "exceljs": "4.4.0",
+    "flags": "^4.0.6",
     "heic2any": "^0.0.4",
     "isomorphic-dompurify": "3.12.0",
     "jose": "^6.2.2",
@@ -218,7 +219,6 @@
     "server-only": "^0.0.1",
     "sharp": "^0.34.5",
     "sonner": "^2.0.7",
-    "statsig-node": "^6.5.1",
     "streamdown": "^2.5.0",
     "stripe": "^20.4.1",
     "svix": "^1.89.0",
@@ -255,7 +255,6 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@typescript-eslint/parser": "^8.57.2",
-    "vite": "8.0.9",
     "@vitejs/plugin-react": "^5.2.0",
     "@vitest/browser": "4.1.4",
     "@vitest/browser-playwright": "4.1.5",
@@ -280,6 +279,7 @@
     "tailwindcss": "^4.2.2",
     "tsx": "^4.21.0",
     "typescript": "^6.0.3",
+    "vite": "8.0.9",
     "vitest": "4.1.4"
   }
 }

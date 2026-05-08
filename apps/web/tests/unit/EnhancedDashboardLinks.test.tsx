@@ -34,10 +34,6 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
-vi.mock('@statsig/react-bindings', () => ({
-  useFeatureGate: () => ({ value: false }),
-}));
-
 vi.mock('@/features/dashboard/molecules/ProfilePreview', () => ({
   ProfilePreview: ({
     username,

@@ -1,28 +1,54 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LEGACY_STATSIG_GATE_KEYS } from '@/lib/flags/contracts';
 
-// Mock statsig-node before importing the module under test
-vi.mock(
-  'statsig-node',
-  () => ({
-    default: {
-      initialize: vi.fn(),
-      getFeatureGateSync: vi.fn(() => ({
-        value: false,
-        evaluationDetails: { reason: 'Unrecognized' },
-      })),
+const {
+  envState,
+  getExperimentMock,
+  getFeatureGateMock,
+  initializeMock,
+  shutdownMock,
+  statsigConstructorMock,
+} = vi.hoisted(() => {
+  const getExperimentMock = vi.fn(() => ({ value: {} }));
+  const getFeatureGateMock = vi.fn(() => ({
+    getEvaluationDetails: () => ({ reason: 'Unrecognized' }),
+    value: false,
+  }));
+  const initializeMock = vi.fn().mockResolvedValue({ success: true });
+  const shutdownMock = vi.fn().mockResolvedValue({ success: true });
+
+  return {
+    envState: {
+      STATSIG_SERVER_SECRET: undefined as string | undefined,
+      VERCEL_ENV: undefined as string | undefined,
+      NODE_ENV: 'test',
     },
-  }),
-  { virtual: true }
-);
+    getExperimentMock,
+    getFeatureGateMock,
+    initializeMock,
+    shutdownMock,
+    statsigConstructorMock: vi.fn(function StatsigMock() {
+      return {
+        getExperiment: getExperimentMock,
+        getFeatureGate: getFeatureGateMock,
+        initialize: initializeMock,
+        shutdown: shutdownMock,
+      };
+    }),
+  };
+});
+
+// Mock the Statsig Core server SDK before importing the module under test.
+vi.mock('@statsig/statsig-node-core', () => ({
+  Statsig: statsigConstructorMock,
+  StatsigUser: {
+    withUserID: (userID: string) => ({ userID }),
+  },
+}));
 
 // Mock env to control STATSIG_SERVER_SECRET
 vi.mock('@/lib/env-server', () => ({
-  env: {
-    STATSIG_SERVER_SECRET: undefined,
-    VERCEL_ENV: undefined,
-    NODE_ENV: 'test',
-  },
+  env: envState,
 }));
 
 vi.mock('@/lib/env-public', () => ({
@@ -35,6 +61,17 @@ describe('Statsig server initialization', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.restoreAllMocks();
+    envState.STATSIG_SERVER_SECRET = undefined;
+    envState.VERCEL_ENV = undefined;
+    envState.NODE_ENV = 'test';
+    getExperimentMock.mockReturnValue({ value: {} });
+    getFeatureGateMock.mockReturnValue({
+      getEvaluationDetails: () => ({ reason: 'Unrecognized' }),
+      value: false,
+    });
+    initializeMock.mockReset().mockResolvedValue({ success: true });
+    shutdownMock.mockReset().mockResolvedValue({ success: true });
+    statsigConstructorMock.mockClear();
     delete process.env.NODE_ENV;
     delete process.env.VERCEL_ENV;
   });
@@ -66,6 +103,102 @@ describe('Statsig server initialization', () => {
     );
 
     expect(statsigWarnings).toHaveLength(1);
+  });
+
+  it('creates a fresh Statsig client after initialization fails', async () => {
+    envState.STATSIG_SERVER_SECRET = 'secret-server-key';
+    initializeMock
+      .mockRejectedValueOnce(new Error('network unavailable'))
+      .mockResolvedValueOnce({ success: true });
+
+    const { checkGateForUser } = await import('@/lib/flags/statsig');
+
+    await expect(
+      checkGateForUser('user-1', LEGACY_STATSIG_GATE_KEYS.DESIGN_V1, true)
+    ).resolves.toBe(true);
+    await expect(
+      checkGateForUser('user-2', LEGACY_STATSIG_GATE_KEYS.DESIGN_V1, true)
+    ).resolves.toBe(true);
+
+    expect(statsigConstructorMock).toHaveBeenCalledTimes(2);
+    expect(initializeMock).toHaveBeenCalledTimes(2);
+    expect(shutdownMock).toHaveBeenCalledTimes(1);
+    expect(shutdownMock).toHaveBeenCalledWith();
+  });
+
+  it('falls back when Statsig initialization times out', async () => {
+    vi.useFakeTimers();
+
+    try {
+      envState.STATSIG_SERVER_SECRET = 'secret-server-key';
+      initializeMock.mockReturnValueOnce(new Promise(() => {}));
+
+      const { logger } = await import('@/lib/utils/logger');
+      const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+      const { checkGateForUser } = await import('@/lib/flags/statsig');
+
+      const result = checkGateForUser(
+        'user-1',
+        LEGACY_STATSIG_GATE_KEYS.DESIGN_V1,
+        true
+      );
+
+      await vi.advanceTimersByTimeAsync(10_000);
+
+      await expect(result).resolves.toBe(true);
+      expect(errorSpy).toHaveBeenCalledWith(
+        '[Statsig] Failed to initialize server SDK',
+        expect.objectContaining({
+          message: 'Statsig initialization timed out after 10000ms',
+        }),
+        'Statsig'
+      );
+      expect(statsigConstructorMock).toHaveBeenCalledTimes(1);
+      expect(initializeMock).toHaveBeenCalledTimes(1);
+      expect(shutdownMock).toHaveBeenCalledTimes(1);
+      expect(shutdownMock).toHaveBeenCalledWith();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('bounds explicit shutdown and resets the Statsig singleton', async () => {
+    vi.useFakeTimers();
+
+    try {
+      envState.STATSIG_SERVER_SECRET = 'secret-server-key';
+      getFeatureGateMock.mockReturnValue({
+        getEvaluationDetails: () => ({ reason: 'Network' }),
+        value: true,
+      });
+
+      const { checkGateForUser, shutdownStatsig } = await import(
+        '@/lib/flags/statsig'
+      );
+
+      await expect(
+        checkGateForUser('user-1', LEGACY_STATSIG_GATE_KEYS.DESIGN_V1, false)
+      ).resolves.toBe(true);
+
+      shutdownMock.mockReturnValueOnce(new Promise(() => {}));
+
+      const shutdownResult = shutdownStatsig().catch(error => error);
+      await vi.advanceTimersByTimeAsync(1500);
+
+      await expect(shutdownResult).resolves.toEqual(
+        expect.objectContaining({
+          message: 'Statsig shutdown timed out after 1500ms',
+        })
+      );
+      expect(shutdownMock).toHaveBeenCalledWith();
+
+      await expect(
+        checkGateForUser('user-2', LEGACY_STATSIG_GATE_KEYS.DESIGN_V1, false)
+      ).resolves.toBe(true);
+      expect(statsigConstructorMock).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('ignores client override cookies in production', async () => {

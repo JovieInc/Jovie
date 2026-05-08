@@ -80,7 +80,7 @@ export function NotificationsPageClient({ artist }: Props) {
             <Link
               href={BASE_URL}
               aria-label='Jovie home'
-              className='rounded-full opacity-60 transition-opacity duration-150 hover:opacity-85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+              className='rounded-full opacity-60 transition-opacity duration-subtle hover:opacity-85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
             >
               <BrandLogo
                 size={20}
@@ -98,7 +98,7 @@ export function NotificationsPageClient({ artist }: Props) {
           <ArtistNotificationsCTA
             artist={artist}
             presentation={isDesktopLayout ? 'modal' : 'overlay'}
-            portalContainer={notificationsPortalContainer}
+            portalContainer={notificationsPortalContainer ?? undefined}
             variant='button'
             autoOpen
             forceExpanded

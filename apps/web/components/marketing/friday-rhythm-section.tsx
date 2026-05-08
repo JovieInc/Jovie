@@ -281,16 +281,10 @@ function FridayRhythmContent({
         </div>
       ) : null}
 
-      <motion.div
-        animate={{
-          opacity: 1,
-          y: 0,
-        }}
+      <div
         className='mx-auto mt-12 max-w-[60rem] md:mt-16'
-        initial={false}
-        transition={{
-          duration: reducedMotion ? 0 : 0.4,
-          ease: 'easeOut',
+        style={{
+          transition: reducedMotion ? undefined : 'opacity 400ms ease-out',
         }}
       >
         <div className='relative'>
@@ -305,7 +299,7 @@ function FridayRhythmContent({
           />
           <RhythmReleaseKey />
         </div>
-      </motion.div>
+      </div>
 
       <div className='mx-auto mt-10 flex flex-col items-center gap-5 text-center'>
         <p

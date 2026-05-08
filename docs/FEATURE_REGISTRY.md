@@ -14,7 +14,7 @@ This document is the canonical feature list for Jovie. It is designed for onboar
 ## Canonical Sources
 
 - Plan capabilities and limits: `apps/web/lib/entitlements/registry.ts`
-- Statsig gates: `apps/web/lib/feature-flags/shared.ts`
+- Statsig-backed app flags: `apps/web/lib/flags/contracts.ts`
 - Homepage section flags: `apps/web/lib/flags/homepage.ts`
 - Detailed Statsig gate documentation: `docs/STATSIG_FEATURE_GATES.md`
 - **Rich feature descriptions for AI agents and marketing:** `docs/PRODUCT_CAPABILITIES.md`

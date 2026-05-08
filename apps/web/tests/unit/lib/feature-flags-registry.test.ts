@@ -30,6 +30,7 @@ const EXP_ROUTE_IMPORT_REGEX =
 /** Stable package root resolved from this test file's location. */
 const TEST_FILE_DIR = path.dirname(fileURLToPath(import.meta.url));
 const WEB_ROOT = path.resolve(TEST_FILE_DIR, '../../..');
+const REPO_ROOT = path.resolve(WEB_ROOT, '../..');
 
 /**
  * Recursively collect source files from the given root directory, skipping
@@ -63,6 +64,10 @@ function collectSourceFiles(rootDir: string): string[] {
   }
 
   return files;
+}
+
+function readRepoFile(relativePath: string): string {
+  return readFileSync(path.join(REPO_ROOT, relativePath), 'utf8');
 }
 
 describe('feature flag registry integrity', () => {
@@ -118,6 +123,47 @@ describe('feature flag registry integrity', () => {
         LEGACY_STATSIG_GATE_KEYS.DESIGN_V1
       );
     }
+  });
+
+  it('keeps Statsig docs aligned with runtime gate keys', () => {
+    const docs = readRepoFile('docs/STATSIG_FEATURE_GATES.md');
+    const runtimeGateKeys = new Set(Object.values(APP_FLAG_TO_STATSIG_GATE));
+
+    for (const gateKey of runtimeGateKeys) {
+      expect(docs).toContain(`\`${gateKey}\``);
+    }
+
+    expect(docs).toContain('`ai_chat_disabled`');
+    expect(docs).toContain('`ai_chat_force_light`');
+    expect(docs).toContain('`profile_alert_optin_cta_variant`');
+
+    for (const aliasFlag of DESIGN_V1_ALIAS_FLAGS) {
+      const legacyGateKey = LEGACY_STATSIG_GATE_KEYS[aliasFlag];
+      expect(docs).not.toContain(`| \`${legacyGateKey}\` |`);
+    }
+  });
+
+  it('documents the server-only Statsig environment contract', () => {
+    const checkedFiles = [
+      'README.md',
+      'docs/env.md',
+      '.github/workflows/ci.yml',
+    ];
+    const staleEnvNames = [
+      'NEXT_PUBLIC_STATSIG_CLIENT_KEY',
+      'STATSIG_SERVER_API_KEY',
+      'STATSIG_SERVER_SECRET_KEY',
+    ];
+
+    for (const relativePath of checkedFiles) {
+      const contents = readRepoFile(relativePath);
+      for (const envName of staleEnvNames) {
+        expect(contents).not.toContain(envName);
+      }
+    }
+
+    expect(readRepoFile('README.md')).toContain('STATSIG_SERVER_SECRET');
+    expect(readRepoFile('docs/env.md')).toContain('STATSIG_SERVER_SECRET');
   });
 
   it('limits legacy feature-flags imports to static marketing and compatibility files', () => {

@@ -45,6 +45,7 @@ const optionalCopyTargets = [
 const standaloneRuntimePackages = [
   '@next/env',
   '@swc/helpers',
+  '@statsig/statsig-node-core',
   'require-in-the-middle',
 ];
 const copiedRuntimePackages = new Set();
@@ -105,6 +106,50 @@ function materializeSymlinks(rootDir) {
   return materialized;
 }
 
+function findPackageJsonFromEntry(entryPath, packageName) {
+  let currentDir = path.dirname(entryPath);
+  const rootDir = path.parse(currentDir).root;
+
+  while (currentDir !== rootDir) {
+    const packageJsonPath = path.join(currentDir, 'package.json');
+    if (existsSync(packageJsonPath)) {
+      const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'));
+      if (packageJson.name === packageName) {
+        return packageJsonPath;
+      }
+    }
+
+    currentDir = path.dirname(currentDir);
+  }
+
+  throw new Error(
+    `Unable to find package.json for ${packageName} from ${entryPath}`
+  );
+}
+
+function resolvePackageJson(packageName, paths) {
+  try {
+    return require.resolve(`${packageName}/package.json`, { paths });
+  } catch (error) {
+    if (error?.code !== 'ERR_PACKAGE_PATH_NOT_EXPORTED') {
+      throw error;
+    }
+
+    return findPackageJsonFromEntry(
+      require.resolve(packageName, { paths }),
+      packageName
+    );
+  }
+}
+
+function isOptionalRuntimePackageUnavailable(error) {
+  return (
+    error?.code === 'MODULE_NOT_FOUND' ||
+    (error instanceof Error &&
+      error.message.startsWith('Unable to find package.json for '))
+  );
+}
+
 function copyRuntimePackageToStandalone(
   packageName,
   resolveFrom = path.dirname(require.resolve('next/package.json'))
@@ -113,9 +158,10 @@ function copyRuntimePackageToStandalone(
     return;
   }
 
-  const packageJsonPath = require.resolve(`${packageName}/package.json`, {
-    paths: [resolveFrom, path.dirname(require.resolve('next/package.json'))],
-  });
+  const packageJsonPath = resolvePackageJson(packageName, [
+    resolveFrom,
+    path.dirname(require.resolve('next/package.json')),
+  ]);
   const packageRoot = path.dirname(packageJsonPath);
   const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'));
   const destination = path.join(
@@ -131,6 +177,18 @@ function copyRuntimePackageToStandalone(
 
   for (const dependencyName of Object.keys(packageJson.dependencies ?? {})) {
     copyRuntimePackageToStandalone(dependencyName, packageRoot);
+  }
+
+  for (const dependencyName of Object.keys(
+    packageJson.optionalDependencies ?? {}
+  )) {
+    try {
+      copyRuntimePackageToStandalone(dependencyName, packageRoot);
+    } catch (error) {
+      if (!isOptionalRuntimePackageUnavailable(error)) {
+        throw error;
+      }
+    }
   }
 }
 
@@ -180,6 +238,7 @@ function createHashedExternalStubs(rootDir) {
     path.join(rootDir, 'node_modules'),
     path.join(rootDir, '.next', 'node_modules'),
     path.join(rootDir, '.next', 'server', 'node_modules'),
+    path.join(standaloneOutputRoot, 'node_modules'),
   ];
 
   // Find a real package directory by searching all candidates. Returns the
