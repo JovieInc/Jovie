@@ -57,7 +57,7 @@ test('public profile renders core elements within budget', async ({ page }) => {
   const headingText = (await heading.textContent())?.trim() ?? '';
   expect(headingText.length, 'Artist display name is empty').toBeGreaterThan(0);
 
-  const releaseOrListenAffordance = page
+  const releaseOrListenAffordances = page
     .locator(
       [
         'a[aria-label^="View "]',
@@ -70,13 +70,13 @@ test('public profile renders core elements within budget', async ({ page }) => {
         'button:has-text("Apple Music")',
       ].join(', ')
     )
-    .first();
+    .filter({ visible: true });
   await expect(
-    releaseOrListenAffordance,
+    releaseOrListenAffordances.first(),
     'No release or listen affordance visible on public profile'
   ).toBeVisible({ timeout: 5_000 });
 
-  const actionAffordance = page
+  const actionAffordances = page
     .locator(
       [
         'a[href*="/tip"]',
@@ -92,9 +92,9 @@ test('public profile renders core elements within budget', async ({ page }) => {
         '[data-mode]',
       ].join(', ')
     )
-    .first();
+    .filter({ visible: true });
   await expect(
-    actionAffordance,
+    actionAffordances.first(),
     'No support/contact/listen-mode affordance visible on public profile'
   ).toBeVisible({ timeout: 5_000 });
 

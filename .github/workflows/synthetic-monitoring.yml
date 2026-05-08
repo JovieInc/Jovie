@@ -14,7 +14,7 @@ on:
 
 jobs:
   synthetic-test:
-    name: Golden Path Synthetic Test
+    name: Production Synthetic Tests
     runs-on: ubuntu-latest
     timeout-minutes: 12
 
@@ -59,6 +59,7 @@ jobs:
           E2E_SKIP_WEB_SERVER: '1'
           E2E_SYNTHETIC_MODE: 'true'
           E2E_ENVIRONMENT: production
+          # Overrides the synthetic Playwright config's default JSON output file.
           PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/synthetic-golden-path-results.json
         run: |
           doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-golden-path.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-golden-path
@@ -72,6 +73,7 @@ jobs:
           E2E_SKIP_WEB_SERVER: '1'
           E2E_SYNTHETIC_MODE: 'true'
           E2E_ENVIRONMENT: production
+          # Overrides the synthetic Playwright config's default JSON output file.
           PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/public-profile-smoke-results.json
         run: |
           doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/public-profile-smoke.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/public-profile-smoke
@@ -229,7 +231,7 @@ jobs:
           author_name: 'Synthetic Monitoring'
           custom_payload: |
             {
-              "text": "🚨 Golden Path Test Failed - jov.ie",
+              "text": "Production Synthetic Monitoring Failed - jov.ie",
               "attachments": [
                 {
                   "color": "danger",
@@ -265,7 +267,7 @@ jobs:
           author_name: 'Synthetic Monitoring'
           custom_payload: |
             {
-              "text": "✅ Golden Path Health Check - jov.ie",
+              "text": "Production Synthetic Monitoring Passed - jov.ie",
               "attachments": [
                 {
                   "color": "good",
@@ -277,7 +279,7 @@ jobs:
                     },
                     {
                       "title": "Status",
-                      "value": "All critical user journeys passing",
+                      "value": "Configured production synthetic checks passing",
                       "short": false
                     },
                     {

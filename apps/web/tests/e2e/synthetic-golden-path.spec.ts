@@ -11,10 +11,16 @@ async function isVisibleWithin(
   locator: Locator,
   timeout: number
 ): Promise<boolean> {
-  return locator
-    .waitFor({ state: 'visible', timeout })
-    .then(() => true)
-    .catch(() => false);
+  try {
+    await locator.waitFor({ state: 'visible', timeout });
+    return true;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('Timeout')) {
+      return false;
+    }
+
+    throw error;
+  }
 }
 
 /**
@@ -99,6 +105,9 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
         ).toBeVisible({ timeout: 5000 });
         console.log(
           '[Synthetic] Email sign-up unavailable; OAuth sign-up entry is visible'
+        );
+        console.log(
+          '[Synthetic] Partial path only: onboarding/profile creation not exercised while production email signup is unavailable. See JOV-1919.'
         );
         return;
       }
