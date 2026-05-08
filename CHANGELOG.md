@@ -14,7 +14,7 @@
 - [internal] **Profile system shell-v1 token migration**: replaced hardcoded hex values (`#0a0b0f`, `#0e0f12`, `#1a1a1e`, `#ff8b8b`, `#dc2626`) with canonical design-system tokens (`--profile-stage-bg`, `--profile-drawer-bg`, `bg-white/[0.08]`, `text-error`) across `ProfileSkeleton`, `ProfileMediaCard`, `ProfileMobileNotificationsFlow`, `NativeSmsSubscribeButton`, `ProfileCompactTemplate`, and `ProfileDesktopSurface`.
 - [internal] Fixed pre-existing `duration-200` motion violations (replaced with `duration-subtle`) in all touched profile files.
 
-     8|## [26.4.211] - 2026-05-07
+## [26.4.213] - 2026-05-07
 
 > [internal] Design system token migration for marketing and homepage surfaces.
 
