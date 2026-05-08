@@ -138,7 +138,12 @@ export async function GET(request: Request) {
 
   // 6. Lead discovery + qualification + auto-approve — every invocation (15 min)
   results.leadDiscovery = await runSubJob('leadDiscovery', async () => {
-    // Fetch settings (upsert default if missing)
+    // Fetch settings (upsert default if missing).
+    // COST GATE (JOV-1901): `leadPipelineSettings.enabled` is DB-backed and
+    // defaults to false (see makeDefaultSettings() in /api/admin/leads/settings).
+    // When enabled=true, SerpAPI is called every 15 min → 96 calls/day.
+    // DO NOT flip this flag without documenting expected SerpAPI cost in the
+    // enabling PR. Keep disabled while GTM is paused.
     let [settings] = await db
       .select()
       .from(leadPipelineSettings)

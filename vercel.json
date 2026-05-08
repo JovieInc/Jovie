@@ -37,10 +37,6 @@
       "schedule": "0 2 * * *"
     },
     {
-      "path": "/api/cron/cleanup-sms-intents",
-      "schedule": "0 1 * * *"
-    },
-    {
       "path": "/api/cron/monitor-metadata-submissions",
       "schedule": "0 * * * *"
     },
