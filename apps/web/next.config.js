@@ -547,7 +547,7 @@ function exposeBaseStaticConfigForTooling(config) {
 // `withWorkflow()` must stay active even while AgentOS workflows are runtime-gated
 // so WDK directives compile before PR5 adds the first dry-run workflow.
 module.exports = exposeBaseStaticConfigForTooling(
-  withBundleAnalyzer(withVercelToolbar(withWorkflow(nextConfig)))
+  withVercelToolbar(withBundleAnalyzer(withWorkflow(nextConfig)))
 );
 
 // Sentry build plugin: source map upload + tunnel route only when upload auth
