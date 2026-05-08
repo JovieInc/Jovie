@@ -227,7 +227,7 @@ export default function OnboardingC() {
 
   return (
     <div
-      className='h-dvh w-dvw flex overflow-hidden'
+      className='h-dvh w-dvw flex overflow-hidden bg-(--linear-bg-page)'
       style={
         {
           '--linear-bg-page': PALETTE.page,
@@ -236,7 +236,6 @@ export default function OnboardingC() {
           '--linear-bg-surface-2': PALETTE.surface2,
           '--linear-app-content-surface': PALETTE.contentSurface,
           '--linear-app-shell-border': PALETTE.border,
-          background: PALETTE.page,
         } as React.CSSProperties
       }
     >
@@ -248,7 +247,7 @@ export default function OnboardingC() {
         <main className='flex-1 min-h-0 flex'>
           {/* Chat pane (always present, narrows when right rail appears) */}
           <section
-            className='flex-1 min-w-0 flex flex-col transition-[max-width] duration-500 ease-out'
+            className='flex-1 min-w-0 flex flex-col transition-[max-width] duration-cinematic ease-out'
             style={{
               maxWidth: stage.ready
                 ? '720px'
@@ -353,7 +352,7 @@ function Composer({
           e.preventDefault();
           onSubmitHandle();
         }}
-        className='flex items-center gap-2 h-12 pl-3 pr-1.5 rounded-full border border-(--linear-app-shell-border) bg-surface-1/60 focus-within:border-white/20 focus-within:bg-surface-1 transition-colors duration-150 ease-out'
+        className='flex items-center gap-2 h-12 pl-3 pr-1.5 rounded-full border border-(--linear-app-shell-border) bg-surface-1/60 focus-within:border-white/20 focus-within:bg-surface-1 transition-colors duration-subtle ease-out'
       >
         <span className='text-[14px] text-tertiary-token tabular-nums'>
           jov.ie/
@@ -370,7 +369,7 @@ function Composer({
           aria-hidden={!hasHandle}
           tabIndex={hasHandle ? 0 : -1}
           className={cn(
-            'h-9 rounded-full bg-white text-black text-[12.5px] font-caption tracking-[-0.005em] flex items-center gap-1.5 transition-all duration-200 ease-out',
+            'h-9 rounded-full bg-white text-black text-[12.5px] font-caption tracking-[-0.005em] flex items-center gap-1.5 transition-[opacity,transform,width,padding] duration-subtle ease-out',
             hasHandle
               ? 'opacity-100 translate-x-0 px-3.5 hover:brightness-110 active:scale-[0.98]'
               : 'opacity-0 -translate-x-2 px-0 w-0 overflow-hidden pointer-events-none'
@@ -442,7 +441,7 @@ function Composer({
       <button
         type='button'
         onClick={onConnectSpotify}
-        className='w-full h-12 rounded-xl border border-(--linear-app-shell-border) bg-surface-1/60 hover:bg-surface-1 hover:border-cyan-500/30 text-[13px] font-caption text-secondary-token hover:text-primary-token transition-colors duration-150 ease-out flex items-center justify-center gap-2'
+        className='w-full h-12 rounded-xl border border-(--linear-app-shell-border) bg-surface-1/60 hover:bg-surface-1 hover:border-cyan-500/30 text-[13px] font-caption text-secondary-token hover:text-primary-token transition-colors duration-subtle ease-out flex items-center justify-center gap-2'
       >
         <span className='h-4 w-4 rounded-full bg-emerald-500' />
         Connect Spotify
@@ -474,7 +473,7 @@ function Composer({
         <button
           type='button'
           onClick={() => onPickPlan(true)}
-          className='flex-1 h-11 rounded-xl bg-white text-black text-[13px] font-caption tracking-[-0.005em] hover:brightness-110 active:scale-[0.99] transition-all duration-150 ease-out flex items-center justify-center gap-1.5'
+          className='flex-1 h-11 rounded-xl bg-white text-black text-[13px] font-caption tracking-[-0.005em] hover:brightness-110 active:scale-[0.99] transition-colors duration-subtle ease-out flex items-center justify-center gap-1.5'
         >
           Yes, start the trial{' '}
           <ArrowRight className='h-3.5 w-3.5' strokeWidth={2.5} />
@@ -482,7 +481,7 @@ function Composer({
         <button
           type='button'
           onClick={() => onPickPlan(false)}
-          className='h-11 px-4 rounded-xl border border-(--linear-app-shell-border) bg-surface-1/60 hover:bg-surface-1 text-[13px] font-caption text-secondary-token hover:text-primary-token transition-colors duration-150 ease-out'
+          className='h-11 px-4 rounded-xl border border-(--linear-app-shell-border) bg-surface-1/60 hover:bg-surface-1 text-[13px] font-caption text-secondary-token hover:text-primary-token transition-colors duration-subtle ease-out'
         >
           Not yet
         </button>
@@ -513,7 +512,7 @@ function ChipRow({
           key={c}
           type='button'
           onClick={() => onPick(c)}
-          className='h-9 px-3 rounded-lg border border-(--linear-app-shell-border) bg-surface-1/40 hover:bg-surface-1 hover:border-cyan-500/30 hover:text-primary-token text-[12.5px] font-caption text-secondary-token transition-colors duration-150 ease-out'
+          className='h-9 px-3 rounded-lg border border-(--linear-app-shell-border) bg-surface-1/40 hover:bg-surface-1 hover:border-cyan-500/30 hover:text-primary-token text-[12.5px] font-caption text-secondary-token transition-colors duration-subtle ease-out'
         >
           {c}
         </button>
@@ -542,7 +541,7 @@ function FreeText({
           e.preventDefault();
           onSubmit();
         }}
-        className='flex items-center gap-2 h-11 px-3 rounded-xl border border-(--linear-app-shell-border) bg-surface-1/60 focus-within:border-cyan-500/40 focus-within:bg-surface-1 transition-colors duration-150 ease-out'
+        className='flex items-center gap-2 h-11 px-3 rounded-xl border border-(--linear-app-shell-border) bg-surface-1/60 focus-within:border-cyan-500/40 focus-within:bg-surface-1 transition-colors duration-subtle ease-out'
       >
         <FocusOnMountInput
           value={value}
@@ -552,7 +551,7 @@ function FreeText({
         />
         <button
           type='button'
-          className='h-7 w-7 rounded grid place-items-center text-quaternary-token hover:text-primary-token transition-colors duration-150 ease-out'
+          className='h-7 w-7 rounded grid place-items-center text-quaternary-token hover:text-primary-token transition-colors duration-subtle ease-out'
           aria-label='Hold to dictate (mock)'
           title='Hold to dictate'
         >
@@ -561,7 +560,7 @@ function FreeText({
         <button
           type='submit'
           disabled={!value.trim()}
-          className='h-7 w-7 rounded grid place-items-center text-cyan-300 disabled:opacity-30 hover:bg-cyan-500/10 transition-colors duration-150 ease-out'
+          className='h-7 w-7 rounded grid place-items-center text-cyan-300 disabled:opacity-30 hover:bg-cyan-500/10 transition-colors duration-subtle ease-out'
           aria-label='Send'
         >
           <SendHorizonal className='h-3.5 w-3.5' strokeWidth={2.5} />
@@ -577,7 +576,7 @@ function FreeText({
                 setValue(c);
                 setTimeout(onSubmit, 50);
               }}
-              className='h-7 px-2.5 rounded-md border border-(--linear-app-shell-border) bg-surface-1/30 hover:bg-surface-1 text-[11.5px] text-tertiary-token hover:text-secondary-token transition-colors duration-150 ease-out'
+              className='h-7 px-2.5 rounded-md border border-(--linear-app-shell-border) bg-surface-1/30 hover:bg-surface-1 text-[11.5px] text-tertiary-token hover:text-secondary-token transition-colors duration-subtle ease-out'
             >
               {c}
             </button>
@@ -595,7 +594,7 @@ function ChatBubble({ msg }: { msg: Msg }) {
   if (msg.role === 'jovie') {
     return (
       <div
-        className='flex items-start gap-2.5 animate-in fade-in slide-in-from-bottom-1 duration-300'
+        className='flex items-start gap-2.5 animate-in fade-in slide-in-from-bottom-1 duration-subtle'
         style={{ animationTimingFunction: EASE_CINEMATIC }}
       >
         <div className='h-7 w-7 rounded-full bg-surface-1 grid place-items-center shrink-0 mt-0.5'>
@@ -611,7 +610,7 @@ function ChatBubble({ msg }: { msg: Msg }) {
   }
   return (
     <div
-      className='flex justify-end animate-in fade-in slide-in-from-bottom-1 duration-300'
+      className='flex justify-end animate-in fade-in slide-in-from-bottom-1 duration-subtle'
       style={{ animationTimingFunction: EASE_CINEMATIC }}
     >
       <div className='max-w-[80%] rounded-2xl rounded-br-md bg-cyan-500/10 border border-cyan-500/20 px-3 py-1.5 text-[13.5px] text-cyan-50/95 tracking-[-0.005em]'>
@@ -634,7 +633,7 @@ function TypingIndicator() {
             className='h-1.5 w-1.5 rounded-full bg-tertiary-token animate-pulse'
             style={{
               animationDelay: `${i * 150}ms`,
-              animationDuration: '900ms',
+              animationDuration: 'var(--ds-motion-cinematic-duration)',
             }}
           />
         ))}
@@ -661,7 +660,7 @@ function RightRail({
 }) {
   return (
     <aside
-      className='hidden lg:flex flex-col w-[340px] shrink-0 border-l border-(--linear-app-shell-border)/60 bg-(--linear-app-content-surface) overflow-y-auto transition-[opacity,transform] duration-500 ease-out'
+      className='hidden lg:flex flex-col w-[340px] shrink-0 border-l border-(--linear-app-shell-border)/60 bg-(--linear-app-content-surface) overflow-y-auto transition-[opacity,transform] duration-cinematic ease-out'
       style={{
         opacity: visible ? 1 : 0,
         transform: visible ? 'translateX(0)' : 'translateX(24px)',
@@ -694,7 +693,7 @@ function RightRail({
         </div>
 
         <div
-          className='space-y-2 transition-opacity duration-500 ease-out'
+          className='space-y-2 transition-opacity duration-cinematic ease-out'
           style={{ opacity: spotifyReady ? 1 : 0 }}
         >
           <div className='text-[10px] uppercase tracking-[0.12em] text-quaternary-token/85 font-medium pt-2'>
@@ -742,7 +741,7 @@ function SidebarShim({
 }) {
   return (
     <aside
-      className='hidden lg:flex flex-col w-[224px] shrink-0 px-2 pt-3 pb-3 transition-[opacity,transform] duration-700 ease-out'
+      className='hidden lg:flex flex-col w-[224px] shrink-0 px-2 pt-3 pb-3 transition-[opacity,transform] duration-cinematic ease-out'
       style={{
         opacity: visible ? 1 : 0,
         transform: visible ? 'translateX(0)' : 'translateX(-32px)',
@@ -784,7 +783,7 @@ function SidebarShim({
 function AudioBarShim({ visible, title }: { visible: boolean; title: string }) {
   return (
     <div
-      className='shrink-0 transition-[max-height,opacity] duration-700 ease-out overflow-hidden'
+      className='shrink-0 transition-[max-height,opacity] duration-cinematic ease-out overflow-hidden'
       style={{
         maxHeight: visible ? 56 : 0,
         opacity: visible ? 1 : 0,
@@ -822,7 +821,7 @@ function ReadyCard({ handle }: { handle: string }) {
   const name = handle.replace('@', '') || 'you';
   return (
     <div
-      className='mt-2 rounded-2xl border border-cyan-500/20 bg-cyan-500/5 p-5 animate-in fade-in slide-in-from-bottom-2 duration-500'
+      className='mt-2 rounded-2xl border border-cyan-500/20 bg-cyan-500/5 p-5 animate-in fade-in slide-in-from-bottom-2 duration-cinematic'
       style={{ animationTimingFunction: EASE_CINEMATIC }}
     >
       <div className='flex items-center gap-2 text-[10.5px] uppercase tracking-[0.12em] text-cyan-300/85 font-medium'>
@@ -838,7 +837,7 @@ function ReadyCard({ handle }: { handle: string }) {
       </p>
       <Link
         href='/exp/shell-v1'
-        className='mt-4 inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-white text-black text-[12.5px] font-caption tracking-[-0.005em] hover:brightness-110 active:scale-[0.99] transition-all duration-150 ease-out'
+        className='mt-4 inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-white text-black text-[12.5px] font-caption tracking-[-0.005em] hover:brightness-110 active:scale-[0.99] transition-colors duration-subtle ease-out'
       >
         <LayoutDashboard className='h-3.5 w-3.5' strokeWidth={2.5} />
         Open dashboard
@@ -851,7 +850,7 @@ function ReadyCard({ handle }: { handle: string }) {
 function WaitlistCard() {
   return (
     <div
-      className='mt-2 rounded-2xl border border-amber-500/20 bg-amber-500/5 p-5 animate-in fade-in slide-in-from-bottom-2 duration-500'
+      className='mt-2 rounded-2xl border border-amber-500/20 bg-amber-500/5 p-5 animate-in fade-in slide-in-from-bottom-2 duration-cinematic'
       style={{ animationTimingFunction: EASE_CINEMATIC }}
     >
       <div className='flex items-center gap-2 text-[10.5px] uppercase tracking-[0.12em] text-amber-300/90 font-medium'>

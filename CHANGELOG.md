@@ -5,7 +5,15 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
      7|
-     8|## [26.4.210] - 2026-05-08
+     8|## [26.4.211] - 2026-05-07
+
+> [internal] Design system token migration for marketing and homepage surfaces.
+
+### Changed
+
+- [internal] Migrated 21 marketing and homepage components from hardcoded raw color classes (gray/zinc/neutral/slate/stone Tailwind palette classes, raw hex colors, inline `var(--linear-*)` style props) to shell-v1 canonical design tokens (`text-primary-token`, `text-tertiary-token`, `bg-surface-1`, `bg-surface-0`, `border-subtle`, `text-success`, etc.). Replaced all raw `cubic-bezier(0.34,1.56,0.64,1)` motion values with `var(--ds-motion-cinematic-easing)` in demo chart components. Replaced `transition-all` with `transition-colors` in ArtistSearch. Runtime-computed colors (brand palette, profile themes) preserved as inline styles.
+
+## [26.4.210] - 2026-05-08
 
 > [internal] Design system token cleanup for release and share surfaces.
 

@@ -63,10 +63,10 @@ describe('surface elevation guardrails', () => {
       /:root\.dark[\s\S]*--sidebar-background:\s*var\(--linear-app-sidebar-background-rgb\);/
     );
     expect(linearTokens).toMatch(
-      /:root\.dark[\s\S]*--linear-app-content-surface:\s*var\(--linear-bg-surface-0\);/
+      /:root\.dark[\s\S]*--linear-app-content-surface:\s*#0a0c0f;/
     );
     expect(linearTokens).toMatch(
-      /:root\.dark[\s\S]*--linear-app-sidebar-background-rgb:\s*8 9 10;/
+      /:root\.dark[\s\S]*--linear-app-sidebar-background-rgb:\s*6 7 10;/
     );
   });
 

@@ -114,10 +114,7 @@ export default async function ChangelogPage() {
         <h1 className='marketing-h1-linear mb-4 mt-6 max-w-[10ch]'>
           What&apos;s new
         </h1>
-        <p
-          className='marketing-lead-linear mb-4 max-w-[34rem]'
-          style={{ color: 'var(--linear-text-secondary)' }}
-        >
+        <p className='marketing-lead-linear mb-4 max-w-[34rem] text-secondary-token'>
           Follow our journey building the future of music.
         </p>
         <div className='flex flex-wrap items-center gap-3'>

@@ -18,8 +18,8 @@ import {
 } from '@/components/features/home/label-logos';
 import { cn } from '@/lib/utils';
 
-const EASE_CINEMATIC = 'cubic-bezier(0.32, 0.72, 0, 1)';
-
+// Text token vars omitted: already defined by the global design-system.css
+// dark theme and picked up automatically. Only surface/border overrides here.
 const CARBON_VARS: React.CSSProperties = {
   ['--linear-bg-page' as string]: '#06070a',
   ['--linear-app-content-surface' as string]: '#0a0c0f',
@@ -27,10 +27,6 @@ const CARBON_VARS: React.CSSProperties = {
   ['--surface-0' as string]: '#0a0b0e',
   ['--surface-1' as string]: '#101216',
   ['--surface-2' as string]: '#161a20',
-  ['--text-primary' as string]: 'rgba(255,255,255,0.92)',
-  ['--text-secondary' as string]: 'rgba(255,255,255,0.66)',
-  ['--text-tertiary' as string]: 'rgba(255,255,255,0.46)',
-  ['--text-quaternary' as string]: 'rgba(255,255,255,0.32)',
 };
 
 type Mode = 'signin' | 'signup';
@@ -88,7 +84,7 @@ export default function AuthV1Page() {
         ...CARBON_VARS,
         opacity: mounted ? 1 : 0,
         transform: mounted ? 'scale(1)' : 'scale(0.985)',
-        transition: `opacity 600ms ${EASE_CINEMATIC}, transform 600ms ${EASE_CINEMATIC}`,
+        transition: `opacity var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), transform var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing)`,
         fontFamily:
           'ui-sans-serif, -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif',
       }}
@@ -167,7 +163,7 @@ export default function AuthV1Page() {
                     value={email}
                     onChange={e => setEmail(e.target.value)}
                     placeholder='you@artistdomain.com'
-                    className='w-full h-10 px-4 rounded-full bg-(--surface-1)/80 border border-(--linear-app-shell-border) text-[13.5px] text-primary-token placeholder:text-quaternary-token outline-none focus:border-cyan-400/50 transition-colors duration-150 ease-out'
+                    className='w-full h-10 px-4 rounded-full bg-(--surface-1)/80 border border-(--linear-app-shell-border) text-[13.5px] text-primary-token placeholder:text-quaternary-token outline-none focus:border-cyan-400/50 transition-colors duration-subtle ease-out'
                   />
                   <ContinueButton submitting={submitting}>
                     Continue
@@ -185,7 +181,7 @@ export default function AuthV1Page() {
                 <button
                   type='button'
                   onClick={() => setStep('email')}
-                  className='text-[11.5px] text-tertiary-token hover:text-primary-token mt-1 transition-colors duration-150 ease-out'
+                  className='text-[11.5px] text-tertiary-token hover:text-primary-token mt-1 transition-colors duration-subtle ease-out'
                 >
                   Use a different email
                 </button>
@@ -211,7 +207,7 @@ export default function AuthV1Page() {
                   <button
                     type='button'
                     onClick={() => setMode('signin')}
-                    className='text-secondary-token hover:text-primary-token underline decoration-transparent underline-offset-[3px] hover:decoration-quaternary-token/60 transition-colors duration-150 ease-out'
+                    className='text-secondary-token hover:text-primary-token underline decoration-transparent underline-offset-[3px] hover:decoration-quaternary-token/60 transition-colors duration-subtle ease-out'
                   >
                     Sign in
                   </button>
@@ -222,7 +218,7 @@ export default function AuthV1Page() {
                   <button
                     type='button'
                     onClick={() => setMode('signup')}
-                    className='text-secondary-token hover:text-primary-token underline decoration-transparent underline-offset-[3px] hover:decoration-quaternary-token/60 transition-colors duration-150 ease-out'
+                    className='text-secondary-token hover:text-primary-token underline decoration-transparent underline-offset-[3px] hover:decoration-quaternary-token/60 transition-colors duration-subtle ease-out'
                   >
                     Create account
                   </button>
@@ -239,14 +235,14 @@ export default function AuthV1Page() {
           By continuing you agree to the{' '}
           <a
             href='https://jov.ie/terms'
-            className='underline decoration-quaternary-token/40 underline-offset-[3px] hover:text-tertiary-token transition-colors duration-150 ease-out'
+            className='underline decoration-quaternary-token/40 underline-offset-[3px] hover:text-tertiary-token transition-colors duration-subtle ease-out'
           >
             terms
           </a>{' '}
           and{' '}
           <a
             href='https://jov.ie/privacy'
-            className='underline decoration-quaternary-token/40 underline-offset-[3px] hover:text-tertiary-token transition-colors duration-150 ease-out'
+            className='underline decoration-quaternary-token/40 underline-offset-[3px] hover:text-tertiary-token transition-colors duration-subtle ease-out'
           >
             privacy policy
           </a>
@@ -415,7 +411,7 @@ function OtpInput({
           onPaste={onPaste}
           onFocus={e => e.currentTarget.select()}
           aria-label={`Digit ${i + 1} of 6`}
-          className='h-11 w-full min-w-0 rounded-xl bg-(--surface-1)/80 border border-(--linear-app-shell-border) text-[17px] tabular-nums font-mono text-center text-primary-token outline-none focus:border-cyan-400/50 transition-colors duration-150 ease-out'
+          className='h-11 w-full min-w-0 rounded-xl bg-(--surface-1)/80 border border-(--linear-app-shell-border) text-[17px] tabular-nums font-mono text-center text-primary-token outline-none focus:border-cyan-400/50 transition-colors duration-subtle ease-out'
         />
       ))}
     </div>
@@ -440,7 +436,7 @@ function GoogleButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'inline-flex items-center justify-center gap-2 h-10 px-5 rounded-full text-[13px] font-medium text-primary-token bg-(--surface-1)/80 border border-(--linear-app-shell-border) hover:bg-(--surface-2)/80 hover:border-(--linear-app-shell-border) active:scale-[0.99] transition-all duration-150 ease-out',
+        'inline-flex items-center justify-center gap-2 h-10 px-5 rounded-full text-[13px] font-medium text-primary-token bg-(--surface-1)/80 border border-(--linear-app-shell-border) hover:bg-(--surface-2)/80 hover:border-(--linear-app-shell-border) active:scale-[0.99] transition-colors duration-subtle ease-out',
         disabled && 'opacity-70'
       )}
     >
@@ -479,7 +475,7 @@ function ContinueButton({
         // Match the shell's primary action: rounded-full pill, white tone,
         // soft inner highlight + subtle drop shadow. Same vocabulary used
         // by Open Jovie / Review pitch / Install.
-        'inline-flex items-center justify-center gap-1.5 h-10 px-5 rounded-full text-[13px] font-medium bg-white text-black hover:brightness-110 active:scale-[0.99] shadow-[0_4px_14px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.45)] transition-all duration-150 ease-out',
+        'inline-flex items-center justify-center gap-1.5 h-10 px-5 rounded-full text-[13px] font-medium bg-white text-black hover:brightness-110 active:scale-[0.99] shadow-[0_4px_14px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.45)] transition-colors duration-subtle ease-out',
         submitting && 'opacity-70'
       )}
     >

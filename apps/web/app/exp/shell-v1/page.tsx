@@ -275,7 +275,7 @@ const SELECTED_ROW_CLASSES = [
   'before:h-3.5 before:w-[3px] before:rounded-full before:bg-cyan-300/0',
   'data-[focused]:before:bg-cyan-300/85',
   'data-[selected]:before:bg-cyan-300/85',
-  'before:transition-colors before:duration-150 before:ease-out',
+  'before:transition-colors before:duration-subtle before:ease-out',
 ].join(' ');
 
 const TRACK = {
@@ -1942,9 +1942,11 @@ export default function ShellV1Experiment() {
     ? {
         opacity: 0,
         pointerEvents: 'none' as const,
-        transition: `opacity 600ms ${EASE_CINEMATIC}`,
+        transition: `opacity var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing)`,
       }
-    : { transition: `opacity 600ms ${EASE_CINEMATIC}` };
+    : {
+        transition: `opacity var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing)`,
+      };
 
   const pct =
     (currentTimeSec / (playingRelease?.durationSec ?? TRACK.duration)) * 100;
@@ -2033,7 +2035,7 @@ export default function ShellV1Experiment() {
             '--linear-app-shell-radius': '12px',
             opacity: mounted ? 1 : 0,
             transform: mounted ? 'scale(1)' : 'scale(0.985)',
-            transition: `opacity 600ms ${EASE_CINEMATIC}, transform 600ms ${EASE_CINEMATIC}, background-color 200ms ease-out`,
+            transition: `opacity var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), transform var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), background-color var(--ds-motion-subtle-duration) ease-out`,
           } as React.CSSProperties
         }
         className='shell-v1 flex h-dvh w-full overflow-hidden bg-(--linear-bg-page) lg:gap-2 lg:p-2'
@@ -2148,7 +2150,7 @@ export default function ShellV1Experiment() {
                 ? 'translateX(0)'
                 : 'translateX(-12px)',
             pointerEvents: cinematic || onboardingActive ? 'none' : undefined,
-            transition: `width ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, opacity 600ms ${EASE_CINEMATIC}, transform ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
+            transition: `width ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, opacity var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), transform ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
           }}
           aria-hidden={
             sidebarMode !== 'docked' || cinematic || onboardingActive
@@ -2267,8 +2269,8 @@ export default function ShellV1Experiment() {
               barCollapsed || cinematic || onboardingActive ? 0 : 80,
             transition:
               cinematic || onboardingActive
-                ? `padding-bottom 600ms ${EASE_CINEMATIC}`
-                : 'padding-bottom 150ms ease-out',
+                ? `padding-bottom var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing)`
+                : `padding-bottom var(--ds-motion-subtle-duration) ease-out`,
           }}
         >
           <main className='relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-0 lg:rounded-[var(--linear-app-shell-radius)] lg:border lg:border-(--linear-app-shell-border) lg:bg-(--linear-app-content-surface) lg:shadow-[var(--linear-app-shell-shadow)]'>
@@ -2545,7 +2547,7 @@ export default function ShellV1Experiment() {
                 type='button'
                 onClick={() => setBarCollapsed(false)}
                 aria-label='Show audio bar (`)'
-                className='absolute bottom-3 right-3 z-30 hidden lg:grid h-7 w-7 place-items-center rounded-md text-quaternary-token hover:text-primary-token hover:bg-surface-1/70 transition-[opacity,color,background-color] duration-150 ease-out'
+                className='absolute bottom-3 right-3 z-30 hidden lg:grid h-7 w-7 place-items-center rounded-md text-quaternary-token hover:text-primary-token hover:bg-surface-1/70 transition-[opacity,color,background-color] duration-subtle ease-out'
                 style={{
                   opacity:
                     barCollapsed && !cinematic && !onboardingActive ? 1 : 0,
@@ -2574,8 +2576,8 @@ export default function ShellV1Experiment() {
             pointerEvents: cinematic || onboardingActive ? 'none' : undefined,
             transition:
               cinematic || onboardingActive
-                ? `max-height 600ms ${EASE_CINEMATIC}, opacity 600ms ${EASE_CINEMATIC}`
-                : `max-height 150ms ease-out, opacity 150ms ease-out`,
+                ? `max-height var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), opacity var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing)`
+                : `max-height var(--ds-motion-subtle-duration) ease-out, opacity var(--ds-motion-subtle-duration) ease-out`,
           }}
         >
           <AudioBar
@@ -2642,11 +2644,11 @@ export default function ShellV1Experiment() {
           onClick={() => setView('demo')}
           aria-label='Exit screening room (Esc)'
           title='Exit screening room (Esc)'
-          className='fixed top-4 right-4 z-50 h-7 w-7 grid place-items-center rounded-md text-quaternary-token hover:text-primary-token hover:bg-surface-1/70 transition-colors duration-150 ease-out'
+          className='fixed top-4 right-4 z-50 h-7 w-7 grid place-items-center rounded-md text-quaternary-token hover:text-primary-token hover:bg-surface-1/70 transition-colors duration-subtle ease-out'
           style={{
             opacity: cinematic ? 1 : 0,
             pointerEvents: cinematic ? 'auto' : 'none',
-            transition: `opacity 600ms ${EASE_CINEMATIC}`,
+            transition: `opacity var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing)`,
           }}
         >
           <X className='h-4 w-4' strokeWidth={2.25} />
@@ -2894,7 +2896,7 @@ function Sidebar({
               type='button'
               onClick={() => onSelectView?.('demo')}
               aria-label={`Back from ${contextLabel}`}
-              className='flex-1 inline-flex items-center gap-2 h-7 pl-2.5 pr-2 rounded-md hover:bg-surface-1/60 transition-colors duration-150 ease-out cursor-pointer min-w-0 text-secondary-token hover:text-primary-token'
+              className='flex-1 inline-flex items-center gap-2 h-7 pl-2.5 pr-2 rounded-md hover:bg-surface-1/60 transition-colors duration-subtle ease-out cursor-pointer min-w-0 text-secondary-token hover:text-primary-token'
             >
               <ChevronLeft
                 className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
@@ -2909,7 +2911,7 @@ function Sidebar({
             </button>
           ) : (
             <UserMenu>
-              <span className='flex-1 inline-flex items-center gap-2.5 h-7 pl-3 pr-2 rounded-md hover:bg-surface-1/60 transition-colors duration-150 ease-out cursor-pointer min-w-0'>
+              <span className='flex-1 inline-flex items-center gap-2.5 h-7 pl-3 pr-2 rounded-md hover:bg-surface-1/60 transition-colors duration-subtle ease-out cursor-pointer min-w-0'>
                 <BrandLogo
                   size={16}
                   rounded={false}
@@ -2932,7 +2934,7 @@ function Sidebar({
               if (showPin) onPin();
               else onSelectView?.('demo');
             }}
-            className='absolute right-2 h-5 w-5 rounded-full grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1 transition-[opacity,color,background-color] duration-300 ease-out'
+            className='absolute right-2 h-5 w-5 rounded-full grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1 transition-[opacity,color,background-color] duration-subtle ease-out'
             style={{
               opacity: trailingVisible ? 1 : 0,
               pointerEvents: trailingVisible ? 'auto' : 'none',
@@ -2960,7 +2962,7 @@ function Sidebar({
             <span className='relative h-2.5 w-2.5'>
               <span
                 aria-hidden='true'
-                className='absolute inset-0 grid place-items-center transition-opacity duration-300 ease-out'
+                className='absolute inset-0 grid place-items-center transition-opacity duration-subtle ease-out'
                 style={{ opacity: showPin ? 1 : 0 }}
               >
                 {variant === 'floating' ? (
@@ -2971,7 +2973,7 @@ function Sidebar({
               </span>
               <span
                 aria-hidden='true'
-                className='absolute inset-0 grid place-items-center transition-opacity duration-300 ease-out'
+                className='absolute inset-0 grid place-items-center transition-opacity duration-subtle ease-out'
                 style={{ opacity: showPin ? 0 : 1 }}
               >
                 <SquarePen className='h-2.5 w-2.5' strokeWidth={2.25} />
@@ -3003,7 +3005,7 @@ function Sidebar({
                 type='button'
                 onClick={() => settingsProps.onSelectSection(s.id)}
                 className={cn(
-                  'w-full flex flex-col items-start gap-0.5 px-2.5 py-1.5 rounded-md text-left transition-colors duration-150 ease-out',
+                  'w-full flex flex-col items-start gap-0.5 px-2.5 py-1.5 rounded-md text-left transition-colors duration-subtle ease-out',
                   active
                     ? 'bg-surface-1/80 text-primary-token'
                     : 'text-secondary-token hover:bg-surface-1/50 hover:text-primary-token'
@@ -3242,7 +3244,7 @@ function CanvasSubheader({
               type='button'
               onClick={() => onSubview(t.id)}
               className={cn(
-                'h-7 px-2.5 rounded-md text-[12.5px] font-caption tracking-[-0.012em] transition-colors duration-150 ease-out inline-flex items-center gap-1.5',
+                'h-7 px-2.5 rounded-md text-[12.5px] font-caption tracking-[-0.012em] transition-colors duration-subtle ease-out inline-flex items-center gap-1.5',
                 active
                   ? 'text-primary-token bg-surface-1/80'
                   : 'text-tertiary-token hover:text-primary-token hover:bg-surface-1/50'
@@ -3268,7 +3270,7 @@ function CanvasSubheader({
               type='button'
               onClick={onAddView}
               aria-label='Add view'
-              className='h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1/50 transition-colors duration-150 ease-out'
+              className='h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1/50 transition-colors duration-subtle ease-out'
             >
               <Plus className='h-3.5 w-3.5' strokeWidth={2.25} />
             </button>
@@ -3564,7 +3566,7 @@ function Header({
         <button
           type='button'
           onClick={onToggleSidebar}
-          className='h-7 w-7 rounded-full grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-150 ease-out shrink-0'
+          className='h-7 w-7 rounded-full grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-subtle ease-out shrink-0'
           aria-label={
             sidebarHidden
               ? 'Dock sidebar ([)'
@@ -3583,7 +3585,7 @@ function Header({
             opacity: searchOpen ? 0 : 1,
             transform: searchOpen ? 'translateY(-2px)' : 'translateY(0)',
             pointerEvents: searchOpen ? 'none' : 'auto',
-            transition: `opacity 250ms ${EASE_CINEMATIC}, transform 250ms ${EASE_CINEMATIC}`,
+            transition: `opacity var(--ds-motion-subtle-duration) var(--ds-motion-cinematic-easing), transform var(--ds-motion-subtle-duration) var(--ds-motion-cinematic-easing)`,
           }}
         >
           {trail.map((crumb, i) => (
@@ -3601,7 +3603,7 @@ function Header({
                   'truncate text-[13px] font-semibold tracking-[-0.018em]',
                   crumb.emphasis
                     ? 'text-secondary-token'
-                    : 'text-tertiary-token/80 hover:text-secondary-token cursor-default transition-colors duration-150 ease-out'
+                    : 'text-tertiary-token/80 hover:text-secondary-token cursor-default transition-colors duration-subtle ease-out'
                 )}
               >
                 {crumb.label}
@@ -3618,7 +3620,7 @@ function Header({
             opacity: searchOpen ? 1 : 0,
             transform: searchOpen ? 'translateY(0)' : 'translateY(2px)',
             pointerEvents: searchOpen ? 'auto' : 'none',
-            transition: `opacity 250ms ${EASE_CINEMATIC}, transform 250ms ${EASE_CINEMATIC}`,
+            transition: `opacity var(--ds-motion-subtle-duration) var(--ds-motion-cinematic-easing), transform var(--ds-motion-subtle-duration) var(--ds-motion-cinematic-easing)`,
           }}
         >
           <PillSearch
@@ -3643,7 +3645,7 @@ function Header({
             type='button'
             onClick={onToggleRightRail}
             className={cn(
-              'h-7 w-7 rounded-full grid place-items-center transition-colors duration-150 ease-out shrink-0',
+              'h-7 w-7 rounded-full grid place-items-center transition-colors duration-subtle ease-out shrink-0',
               rightRailOpen
                 ? 'text-primary-token bg-surface-1'
                 : 'text-quaternary-token hover:text-primary-token hover:bg-surface-1'
@@ -4022,8 +4024,7 @@ function LibraryShellEmbed({
       className='h-full w-full grid overflow-hidden'
       style={{
         gridTemplateColumns: drawerOpen ? '1fr 388px' : '1fr 0px',
-        transition:
-          'grid-template-columns 420ms cubic-bezier(0.32, 0.72, 0, 1)',
+        transition: `grid-template-columns var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing)`,
       }}
     >
       <div className='flex flex-col min-w-0 overflow-hidden'>
@@ -4282,7 +4283,7 @@ function OnboardingCanvas({ onComplete }: { onComplete: () => void }) {
                 <button
                   type='button'
                   onClick={onComplete}
-                  className='inline-flex items-center gap-1.5 h-8 px-4 rounded-full text-[12px] font-medium bg-white text-black hover:brightness-110 active:scale-[0.99] shadow-[0_4px_14px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.45)] transition-all duration-150 ease-out'
+                  className='inline-flex items-center gap-1.5 h-8 px-4 rounded-full text-[12px] font-medium bg-white text-black hover:brightness-110 active:scale-[0.99] shadow-[0_4px_14px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.45)] transition-colors duration-subtle ease-out'
                 >
                   Open Jovie
                   <ArrowRight className='h-3 w-3' strokeWidth={2.5} />
@@ -4301,7 +4302,7 @@ function OnboardingCanvas({ onComplete }: { onComplete: () => void }) {
           opacity: stage === 'welcome' ? 1 : 0,
           maxHeight: stage === 'welcome' ? 100 : 0,
           overflow: 'hidden',
-          transition: `opacity 300ms ${EASE_CINEMATIC}, max-height 600ms ${EASE_CINEMATIC}`,
+          transition: `opacity var(--ds-motion-subtle-duration) var(--ds-motion-cinematic-easing), max-height var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing)`,
         }}
       >
         <BrandLogo
@@ -4344,7 +4345,7 @@ function OnboardingCanvas({ onComplete }: { onComplete: () => void }) {
         className='shrink-0'
         style={{
           maxHeight: stage === 'welcome' ? 'calc(45vh - 80px)' : '16px',
-          transition: `max-height 600ms ${EASE_CINEMATIC}`,
+          transition: `max-height var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing)`,
         }}
       />
     </article>
@@ -4395,7 +4396,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
   const editBtn = (
     <button
       type='button'
-      className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-150 ease-out'
+      className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-subtle ease-out'
     >
       Edit
     </button>
@@ -4475,7 +4476,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           control: (
             <button
               type='button'
-              className='inline-flex items-center h-7 px-3 rounded-md text-[12px] font-medium bg-white text-black hover:brightness-110 active:scale-[0.99] transition-all duration-150 ease-out'
+              className='inline-flex items-center h-7 px-3 rounded-md text-[12px] font-medium bg-white text-black hover:brightness-110 active:scale-[0.99] transition-colors duration-subtle ease-out'
             >
               Upgrade to Pro
             </button>
@@ -4509,7 +4510,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           control: (
             <button
               type='button'
-              className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-150 ease-out'
+              className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-subtle ease-out'
             >
               Connect
             </button>
@@ -4521,7 +4522,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           control: (
             <button
               type='button'
-              className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-150 ease-out'
+              className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-subtle ease-out'
             >
               Connect
             </button>
@@ -4536,7 +4537,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           control: (
             <button
               type='button'
-              className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-secondary-token hover:text-rose-200 border border-(--linear-app-shell-border) bg-(--surface-0) hover:border-rose-400/40 hover:bg-rose-500/[0.06] transition-colors duration-150 ease-out'
+              className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-secondary-token hover:text-rose-200 border border-(--linear-app-shell-border) bg-(--surface-0) hover:border-rose-400/40 hover:bg-rose-500/[0.06] transition-colors duration-subtle ease-out'
             >
               Reset workspace
             </button>
@@ -4549,7 +4550,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           control: (
             <button
               type='button'
-              className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-secondary-token hover:text-rose-200 border border-(--linear-app-shell-border) bg-(--surface-0) hover:border-rose-400/40 hover:bg-rose-500/[0.06] transition-colors duration-150 ease-out'
+              className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-secondary-token hover:text-rose-200 border border-(--linear-app-shell-border) bg-(--surface-0) hover:border-rose-400/40 hover:bg-rose-500/[0.06] transition-colors duration-subtle ease-out'
             >
               Delete account
             </button>
@@ -4743,7 +4744,7 @@ function ReleaseRow({
       data-selected={isSelected || undefined}
       data-focused={isFocused || undefined}
       className={cn(
-        'group/row relative grid items-center gap-3 h-[52px] rounded-md pl-2 pr-3 cursor-pointer transition-colors duration-150 ease-out focus:outline-none',
+        'group/row relative grid items-center gap-3 h-[52px] rounded-md pl-2 pr-3 cursor-pointer transition-colors duration-subtle ease-out focus:outline-none',
         // [#] [art] [title/artist+badge fluid] [date] [right cluster: streams + DSP stack]
         drawerOpen
           ? 'grid-cols-[24px_40px_minmax(0,1fr)_auto]'
@@ -4758,7 +4759,7 @@ function ReleaseRow({
       <div className='relative grid place-items-center w-6'>
         <span
           className={cn(
-            'text-[12px] tabular-nums text-quaternary-token transition-opacity duration-150 ease-out',
+            'text-[12px] tabular-nums text-quaternary-token transition-opacity duration-subtle ease-out',
             (isCurrentTrack || isPlaying) && 'opacity-0',
             !isCurrentTrack && 'group-hover/row:opacity-0'
           )}
@@ -4773,7 +4774,7 @@ function ReleaseRow({
             onPlay();
           }}
           className={cn(
-            'absolute inset-0 grid place-items-center text-primary-token transition-opacity duration-150 ease-out',
+            'absolute inset-0 grid place-items-center text-primary-token transition-opacity duration-subtle ease-out',
             isCurrentTrack
               ? 'opacity-0'
               : 'opacity-0 group-hover/row:opacity-100'
@@ -4819,7 +4820,7 @@ function ReleaseRow({
               e.stopPropagation();
               onFilterByArtist(release.artist);
             }}
-            className='hover:text-primary-token transition-colors duration-150 ease-out'
+            className='hover:text-primary-token transition-colors duration-subtle ease-out'
             title='Filter by artist'
           >
             {release.artist}
@@ -4892,7 +4893,7 @@ function ReleaseRowMoreMenu({ release }: { release: Release }) {
             type='button'
             aria-label='Release actions'
             className={cn(
-              'h-5 w-5 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-opacity duration-150 ease-out',
+              'h-5 w-5 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-opacity duration-subtle ease-out',
               'opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 data-[state=open]:text-primary-token'
             )}
           >
@@ -5066,7 +5067,7 @@ function ReleaseDrawer({
       style={{
         opacity: open ? 1 : 0,
         transform: open ? 'translateX(0)' : 'translateX(16px)',
-        transition: `opacity 220ms ${EASE_CINEMATIC}, transform ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
+        transition: `opacity var(--ds-motion-subtle-duration) var(--ds-motion-cinematic-easing), transform ${DURATION_CINEMATIC}ms var(--ds-motion-cinematic-easing)`,
         width: '100%',
         minWidth: 0,
       }}
@@ -5493,7 +5494,7 @@ function DrawerDistribution({ release }: { release: Release }) {
                 <li key={p.id}>
                   <button
                     type='button'
-                    className='w-full flex items-center gap-2.5 h-7 px-2 rounded-md text-[12px] text-secondary-token hover:bg-surface-1/40 hover:text-primary-token transition-colors duration-150 ease-out'
+                    className='w-full flex items-center gap-2.5 h-7 px-2 rounded-md text-[12px] text-secondary-token hover:bg-surface-1/40 hover:text-primary-token transition-colors duration-subtle ease-out'
                   >
                     <span
                       className='h-[16px] w-[16px] rounded grid place-items-center text-[8.5px] font-semibold text-white shrink-0'
@@ -5828,7 +5829,7 @@ function TracksView({
           <button
             type='button'
             onClick={onKeyModeToggle}
-            className='w-[58px] shrink-0 inline-flex items-center justify-end gap-1 text-[9.5px] uppercase tracking-[0.12em] font-medium text-quaternary-token/85 hover:text-secondary-token transition-colors duration-150 ease-out'
+            className='w-[58px] shrink-0 inline-flex items-center justify-end gap-1 text-[9.5px] uppercase tracking-[0.12em] font-medium text-quaternary-token/85 hover:text-secondary-token transition-colors duration-subtle ease-out'
             title={`Switch to ${keyMode === 'normal' ? 'Camelot' : 'standard'} key notation`}
           >
             {keyMode === 'normal' ? 'Key' : 'Cam'}
@@ -5933,7 +5934,7 @@ function TrackRow({
       onContextMenu={e => onContextMenu?.(e, track)}
       data-focused={isFocused || undefined}
       className={cn(
-        'group/row relative flex items-center gap-3 h-[44px] pl-2 pr-3 rounded-md cursor-pointer transition-colors duration-150 ease-out focus:outline-none',
+        'group/row relative flex items-center gap-3 h-[44px] pl-2 pr-3 rounded-md cursor-pointer transition-colors duration-subtle ease-out focus:outline-none',
         !isFocused && !kbActive && 'hover:bg-surface-1/40',
         SELECTED_ROW_CLASSES
       )}
@@ -5942,7 +5943,7 @@ function TrackRow({
       <div className='relative w-5 shrink-0 grid place-items-center'>
         <span
           className={cn(
-            'text-[11px] tabular-nums text-quaternary-token transition-opacity duration-150 ease-out',
+            'text-[11px] tabular-nums text-quaternary-token transition-opacity duration-subtle ease-out',
             showPlayingBars && 'opacity-0',
             !isCurrentTrack && 'group-hover/row:opacity-0'
           )}
@@ -5957,7 +5958,7 @@ function TrackRow({
             onPlay();
           }}
           className={cn(
-            'absolute inset-0 grid place-items-center text-primary-token transition-opacity duration-150 ease-out',
+            'absolute inset-0 grid place-items-center text-primary-token transition-opacity duration-subtle ease-out',
             isCurrentTrack
               ? 'opacity-0'
               : 'opacity-0 group-hover/row:opacity-100'
@@ -6013,7 +6014,7 @@ function TrackRow({
           playing/selected row's waveform pops by contrast. */}
       <div
         className={cn(
-          'w-[176px] shrink-0 transition-opacity duration-150 ease-out',
+          'w-[176px] shrink-0 transition-opacity duration-subtle ease-out',
           isCurrentTrack || isFocused
             ? 'opacity-100'
             : 'opacity-60 group-hover/row:opacity-90'
@@ -6199,7 +6200,7 @@ function TasksView({
           </span>
           <button
             type='button'
-            className='ml-auto h-6 px-2 rounded-md text-[10.5px] uppercase tracking-[0.08em] text-tertiary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-150 ease-out'
+            className='ml-auto h-6 px-2 rounded-md text-[10.5px] uppercase tracking-[0.08em] text-tertiary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-subtle ease-out'
           >
             Filter
           </button>
@@ -6295,7 +6296,7 @@ function TaskListItem({
       onContextMenu={e => onContextMenu?.(e, task)}
       data-focused={isFocused || isSelected || undefined}
       className={cn(
-        'group/row relative flex items-start gap-3 py-2 pl-2 pr-3 rounded-md cursor-pointer transition-colors duration-150 ease-out',
+        'group/row relative flex items-start gap-3 py-2 pl-2 pr-3 rounded-md cursor-pointer transition-colors duration-subtle ease-out',
         !isFocused && !isSelected && !kbActive && 'hover:bg-surface-1/40',
         SELECTED_ROW_CLASSES
       )}
@@ -6373,7 +6374,7 @@ function TaskRowMoreMenu({ task: _task }: { task: Task }) {
             type='button'
             aria-label='Task actions'
             className={cn(
-              'h-5 w-5 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-opacity duration-150 ease-out',
+              'h-5 w-5 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-opacity duration-subtle ease-out',
               'opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 data-[state=open]:text-primary-token'
             )}
           >
