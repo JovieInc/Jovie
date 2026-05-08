@@ -38,7 +38,7 @@ function findDangerousElementEnd(
   fromIndex: number
 ): number {
   const closingStart = lowerHtml.indexOf(`</${tagName}`, fromIndex);
-  if (closingStart === -1) return fromIndex;
+  if (closingStart === -1) return lowerHtml.length;
 
   const closingEnd = lowerHtml.indexOf('>', closingStart);
   return closingEnd === -1 ? lowerHtml.length : closingEnd + 1;
@@ -114,7 +114,12 @@ function isSafeAttribute(name: string, value: string | null): boolean {
   if (value === null) return true;
   if (!DANGEROUS_URL_ATTRIBUTES.has(normalizedName)) return true;
 
-  const normalizedValue = value.trim().toLowerCase();
+  const normalizedValue = value
+    .trim()
+    .toLowerCase()
+    .replaceAll(/&#(?:(\d+)|x([0-9a-f]+));/gi, (_, dec, hex) =>
+      String.fromCharCode(hex ? parseInt(hex, 16) : parseInt(dec, 10))
+    );
   return (
     !normalizedValue.startsWith('javascript:') &&
     !normalizedValue.startsWith('data:')
@@ -129,7 +134,7 @@ function sanitizeTag(rawTag: string): string {
   const tagName = readTagName(rawTag);
   if (!tagName) return '';
 
-  let index = rawTag.indexOf(tagName) + tagName.length;
+  let index = rawTag.toLowerCase().indexOf(tagName) + tagName.length;
   const attributes: string[] = [];
 
   while (index < rawTag.length) {
