@@ -51,7 +51,7 @@ export function SmartLinkProviderButton({
   );
 
   const sharedClassName = cn(
-    'group flex w-full items-center gap-3.5 rounded-full bg-surface-1/70 px-4 py-3 ring-1 ring-inset ring-white/[0.08] backdrop-blur-sm transition-colors duration-100 hover:bg-surface-2/80',
+    'group flex w-full items-center gap-3.5 rounded-full bg-white/10 px-4 py-3 ring-1 ring-inset ring-white/[0.08] backdrop-blur-sm transition-colors duration-fast hover:bg-white/15',
     className
   );
 

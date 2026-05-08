@@ -24,7 +24,7 @@ import {
 import type { PublicShareDestination, ShareContext } from '@/lib/share/types';
 
 export const PUBLIC_SHARE_MENU_ITEM_CLASS =
-  'flex w-full items-center gap-3 rounded-[14px] px-4 py-3 text-left text-[14px] font-[470] text-white/88 transition-colors duration-150 active:bg-white/[0.06]';
+  'flex w-full items-center gap-3 rounded-[14px] px-4 py-3 text-left text-[14px] font-[470] text-white/88 transition-colors duration-subtle active:bg-white/[0.06]';
 export const PUBLIC_SHARE_MENU_ICON_CLASS = 'h-[16px] w-[16px] text-white/40';
 
 function renderDestinationIcon(icon: string) {
@@ -210,14 +210,14 @@ export function PublicShareMenu({
     triggerVariant === 'text' ? (
       <button
         type='button'
-        className='text-sm font-medium text-tertiary-token transition-colors duration-200 hover:text-primary-token'
+        className='text-sm font-medium text-tertiary-token transition-colors duration-slow hover:text-primary-token'
       >
         {title}
       </button>
     ) : (
       <button
         type='button'
-        className='inline-flex items-center gap-2 rounded-full border border-subtle bg-surface-0 px-3 py-1.5 text-[13px] font-[510] text-secondary-token transition-colors duration-150 hover:text-primary-token'
+        className='inline-flex items-center gap-2 rounded-full border border-subtle bg-surface-0 px-3 py-1.5 text-[13px] font-[510] text-secondary-token transition-colors duration-subtle hover:text-primary-token'
       >
         {title}
       </button>
