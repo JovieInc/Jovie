@@ -35,6 +35,25 @@ function getStatsigClient(serverSecret: string): Statsig {
   return statsigClient;
 }
 
+async function cleanupStatsigClientAfterInitFailure(
+  statsig: Statsig | null
+): Promise<void> {
+  if (!statsig) return;
+
+  try {
+    await withTimeout(statsig.shutdown(1000), {
+      timeoutMs: 1500,
+      context: 'Statsig shutdown after failed initialization',
+    });
+  } catch (shutdownError) {
+    logger.warn(
+      '[Statsig] Failed to clean up server SDK after init failure',
+      shutdownError,
+      'Statsig'
+    );
+  }
+}
+
 async function initializeStatsig(): Promise<void> {
   if (statsigInitialized || isE2ERuntime) return;
   if (statsigInitPromise) {
@@ -54,8 +73,9 @@ async function initializeStatsig(): Promise<void> {
       return;
     }
 
+    let statsig: Statsig | null = null;
     try {
-      const statsig = getStatsigClient(serverSecret);
+      statsig = getStatsigClient(serverSecret);
       await withTimeout(statsig.initialize(), {
         timeoutMs: 10_000,
         context: 'Statsig initialization',
@@ -63,8 +83,10 @@ async function initializeStatsig(): Promise<void> {
       statsigInitialized = true;
       logger.info('[Statsig] Server SDK initialized', undefined, 'Statsig');
     } catch (error) {
+      const failedStatsig = statsig ?? statsigClient;
       statsigInitialized = false;
       statsigClient = null;
+      await cleanupStatsigClientAfterInitFailure(failedStatsig);
       logger.error(
         '[Statsig] Failed to initialize server SDK',
         error,

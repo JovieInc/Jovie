@@ -122,6 +122,8 @@ describe('Statsig server initialization', () => {
 
     expect(statsigConstructorMock).toHaveBeenCalledTimes(2);
     expect(initializeMock).toHaveBeenCalledTimes(2);
+    expect(shutdownMock).toHaveBeenCalledTimes(1);
+    expect(shutdownMock).toHaveBeenCalledWith(1000);
   });
 
   it('falls back when Statsig initialization times out', async () => {
@@ -153,6 +155,8 @@ describe('Statsig server initialization', () => {
       );
       expect(statsigConstructorMock).toHaveBeenCalledTimes(1);
       expect(initializeMock).toHaveBeenCalledTimes(1);
+      expect(shutdownMock).toHaveBeenCalledTimes(1);
+      expect(shutdownMock).toHaveBeenCalledWith(1000);
     } finally {
       vi.useRealTimers();
     }
