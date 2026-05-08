@@ -5,7 +5,20 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
      7|
-     8|## [26.4.215] - 2026-05-08
+     8|## [26.4.216] - 2026-05-08
+
+> [internal] Admin workspace links removed from Settings page; the admin sidebar is now the single entry point for all admin workspaces.
+
+### Removed
+
+- [internal] **`SettingsAdminSection`**: removed the "Admin Workspaces" panel (9 workspace quick-links) from the admin Settings page. These links are now only accessible from the admin sidebar, which already has a Workspaces + Utilities section for all 9 IDs.
+- [internal] **`adminSettingsNavigationSections`** export: deleted from `dashboard-nav/config.ts` — it was only used by the removed panel.
+
+### Changed
+
+- [internal] **`adminNavigationSections`** (sidebar config): added the Utilities section (`investors`, `screenshots`, `share_studio`) so the admin sidebar now shows all 9 workspace IDs in one place.
+
+## [26.4.215] - 2026-05-08
 
 > [internal] Hardens the conflict-marker pre-commit check for locale safety.
 
