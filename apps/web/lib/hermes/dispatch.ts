@@ -2,6 +2,7 @@ import 'server-only';
 
 import { z } from 'zod';
 import { env } from '@/lib/env-server';
+import { normalizeHermesAllowedPaths } from '@/lib/hermes/allowed-paths';
 import { serverFetch } from '@/lib/http/server-fetch';
 import type {
   HermesCliRuntime,
@@ -185,7 +186,7 @@ export function normalizeHermesDispatchRequest(
         : [...DEFAULT_SKILLS],
     allowedPaths:
       parsed.allowedPaths && parsed.allowedPaths.length > 0
-        ? parsed.allowedPaths
+        ? normalizeHermesAllowedPaths(parsed.allowedPaths)
         : [...DEFAULT_ALLOWED_PATHS],
     verification:
       parsed.verification && parsed.verification.length > 0

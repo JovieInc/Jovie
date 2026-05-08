@@ -99,19 +99,22 @@ jobs:
         id: check
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPOSITORY: ${{ github.repository }}
           BRANCH: ${{ github.ref_name }}
           MAX_OPEN_AGENT_PRS: '5'
           MAX_WAIT_MINUTES: '6'
         run: |
+          source .github/scripts/github-output.sh
+
           echo "Branch: $BRANCH"
 
           # Use jq --arg to prevent shell injection via branch name
-          EXISTING=$(gh api repos/${{ github.repository }}/pulls \
-            | jq --arg branch "$BRANCH" '[.[] | select(.head.ref == $branch and .state == "open")] | length')
+          EXISTING=$(gh api --paginate "repos/$REPOSITORY/pulls?state=open&per_page=100" \
+            | jq -s --arg branch "$BRANCH" '[.[][] | select(.head.ref == $branch and .state == "open")] | length')
 
           if [[ "$EXISTING" -gt 0 ]]; then
             echo "PR already exists for $BRANCH. Skipping."
-            echo "should_create=false" >> "$GITHUB_OUTPUT"
+            write_output should_create false
             exit 0
           fi
 
@@ -123,20 +126,24 @@ jobs:
           while true; do
             # Use gh api (REST) instead of gh pr list (GraphQL) to avoid
             # App token scope issues with gh CLI's internal GraphQL queries
-            OPEN_AGENT_PRS=$(gh api "repos/${{ github.repository }}/pulls?state=open&per_page=100" \
-              | jq '[.[] | select(.head.ref | test("^(codex|codegen-bot|linear|claude)/") or test("^[^/]+/jov-[0-9]+([_-].+)?$"; "i"))] | length')
+            OPEN_AGENT_PRS=$(gh api --paginate "repos/$REPOSITORY/pulls?state=open&per_page=100" \
+              | jq -s '[.[][] | select(.head.ref | test("^(codex|codegen-bot|linear|claude)/") or test("^[^/]+/jov-[0-9]+([_-].+)?$"; "i"))] | length')
 
             echo "Open agent PRs: $OPEN_AGENT_PRS / $MAX_OPEN_AGENT_PRS (waited ${WAITED}s)"
 
             if [[ "$OPEN_AGENT_PRS" -lt "$MAX_OPEN_AGENT_PRS" ]]; then
               echo "Capacity available. Will create PR."
-              echo "should_create=true" >> "$GITHUB_OUTPUT"
+              write_output should_create true
               break
             fi
 
             if [[ "$WAITED" -ge "$MAX_WAIT" ]]; then
               echo "::warning::Rate limit still hit after waiting ${MAX_WAIT}s ($OPEN_AGENT_PRS open agent PRs). Skipping PR for $BRANCH."
-              echo "should_create=false" >> "$GITHUB_OUTPUT"
+              write_output should_create false
+              write_output capacity_blocked true
+              write_output open_agent_prs "$OPEN_AGENT_PRS"
+              write_output max_open_agent_prs "$MAX_OPEN_AGENT_PRS"
+              write_output waited_seconds "$WAITED"
               break
             fi
 
@@ -145,21 +152,92 @@ jobs:
             WAITED=$((WAITED + POLL_INTERVAL))
           done
 
+      - name: Record capacity blocked AgentRunArtifact
+        if: steps.diff.outputs.has_code_changes == 'true' && steps.check.outputs.capacity_blocked == 'true'
+        env:
+          BRANCH_NAME: ${{ github.ref_name }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          OPEN_AGENT_PRS: ${{ steps.check.outputs.open_agent_prs }}
+          MAX_OPEN_AGENT_PRS: ${{ steps.check.outputs.max_open_agent_prs }}
+          WAITED_SECONDS: ${{ steps.check.outputs.waited_seconds }}
+        run: |
+          ARTIFACT_FILE="$RUNNER_TEMP/agent-run-artifacts/auto-pr-capacity-blocked.json"
+          mkdir -p "$(dirname "$ARTIFACT_FILE")"
+          NOW="$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")"
+          SAFE_BRANCH="$(printf '%s' "$BRANCH_NAME" | tr -c 'a-zA-Z0-9._-' '-')"
+
+          jq -n \
+            --arg id "auto-pr-capacity-${GITHUB_RUN_ID}-${SAFE_BRANCH}" \
+            --arg runId "$GITHUB_RUN_ID" \
+            --arg branchName "$BRANCH_NAME" \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg now "$NOW" \
+            --argjson openAgentPrs "$OPEN_AGENT_PRS" \
+            --argjson maxOpenAgentPrs "$MAX_OPEN_AGENT_PRS" \
+            --argjson waitedSeconds "$WAITED_SECONDS" \
+            '{
+              id: $id,
+              source: "github",
+              sourceRunId: $runId,
+              kind: "workflow",
+              status: "blocked",
+              title: "Auto-PR capacity exhausted",
+              summary: "Auto-PR creation for \($branchName) was blocked because \($openAgentPrs) agent PRs were already open.",
+              modelRoute: "deterministic",
+              allowedActions: ["read", "open_pr"],
+              forbiddenActions: ["ready_pr", "merge", "deploy", "mutate_linear", "send_outbound", "mutate_production_data", "change_auth", "change_billing", "change_security"],
+              humanApprovalRequired: false,
+              humanGate: { required: false, status: "not_required", reason: null, reviewer: null, reviewedAt: null },
+              linearIssueId: null,
+              linearIssueUrl: null,
+              pullRequestUrl: null,
+              adminSurface: "/app/admin/ops",
+              verificationGates: [{
+                name: "github.ci",
+                required: false,
+                status: "blocked",
+                evidenceUrl: "https://github.com/\($repository)/actions/runs/\($runId)",
+                summary: "Auto-PR capacity guard blocked PR creation.",
+                checkedAt: $now
+              }],
+              costEstimate: { usd: 0, route: "deterministic", inputTokens: 0, outputTokens: 0, notes: "No model call was made." },
+              blockedReason: "Open agent PR count \($openAgentPrs) reached configured limit \($maxOpenAgentPrs) after \($waitedSeconds)s.",
+              createdAt: $now,
+              updatedAt: $now,
+              metadata: {
+                branchName: $branchName,
+                repository: $repository,
+                openAgentPrs: $openAgentPrs,
+                maxOpenAgentPrs: $maxOpenAgentPrs,
+                waitedSeconds: $waitedSeconds
+              }
+            }' > "$ARTIFACT_FILE"
+
+      - name: Upload capacity blocked AgentRunArtifact
+        if: steps.diff.outputs.has_code_changes == 'true' && steps.check.outputs.capacity_blocked == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: agent-run-artifact-auto-pr-capacity-blocked
+          path: ${{ runner.temp }}/agent-run-artifacts/auto-pr-capacity-blocked.json
+          if-no-files-found: error
+
       - name: Parse branch name
         id: parse
         if: steps.diff.outputs.has_code_changes == 'true' && steps.check.outputs.should_create == 'true'
         env:
           BRANCH: ${{ github.ref_name }}
         run: |
+          source .github/scripts/github-output.sh
 
           # Extract Linear ticket ID (JOV-123) from anywhere in the branch name
           # Handles: codex/linear-mention-jov-854-desc, linear/JOV-42-desc, claude/jov-100-fix
           TICKET=$(echo "$BRANCH" | grep -oiP 'jov-\d+' | head -1 | tr '[:lower:]' '[:upper:]' || echo "")
-          echo "ticket=$TICKET" >> "$GITHUB_OUTPUT"
+          write_output ticket "$TICKET"
 
           # Build PR title from branch name
           # Strip the agent prefix (codex/, claude/, etc.)
-          SLUG=$(echo "$BRANCH" | sed 's|^[^/]*/||')
+          SLUG="${BRANCH#*/}"
 
           if [[ -n "$TICKET" ]]; then
             # Remove ticket from slug to avoid duplication in title
@@ -173,7 +251,7 @@ jobs:
           # Capitalize first letter of description
           TITLE=$(echo "$TITLE" | sed 's/\(: \)\(.\)/\1\U\2/;s/^\(.\)/\U\1/')
 
-          echo "title=$TITLE" >> "$GITHUB_OUTPUT"
+          write_output title "$TITLE"
           echo "PR title: $TITLE"
 
       - name: Fetch Linear ticket details
@@ -182,11 +260,13 @@ jobs:
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
         run: |
+          source .github/scripts/github-output.sh
+
           TICKET="${{ steps.parse.outputs.ticket }}"
 
           if [[ -z "$LINEAR_API_KEY" ]]; then
             echo "No LINEAR_API_KEY. Skipping ticket lookup."
-            echo "has_details=false" >> "$GITHUB_OUTPUT"
+            write_output has_details false
             exit 0
           fi
 
@@ -206,19 +286,19 @@ jobs:
 
           if [[ -n "$ISSUE_ID" ]]; then
             echo "Found Linear issue: $ISSUE_TITLE"
-            echo "has_details=true" >> "$GITHUB_OUTPUT"
-            echo "issue_id=$ISSUE_ID" >> "$GITHUB_OUTPUT"
-            echo "issue_title=$ISSUE_TITLE" >> "$GITHUB_OUTPUT"
-            echo "issue_url=$ISSUE_URL" >> "$GITHUB_OUTPUT"
+            write_output has_details true
+            write_output issue_id "$ISSUE_ID"
+            write_output issue_title "$ISSUE_TITLE"
+            write_output issue_url "$ISSUE_URL"
 
             # Override PR title with actual ticket title
-            echo "title=${TICKET}: ${ISSUE_TITLE}" >> "$GITHUB_OUTPUT"
+            write_output title "${TICKET}: ${ISSUE_TITLE}"
 
             # Base64 encode description for safe multiline handling
-            echo "issue_desc=$(echo "$ISSUE_DESC" | base64 -w0)" >> "$GITHUB_OUTPUT"
+            write_output issue_desc "$(echo "$ISSUE_DESC" | base64 -w0)"
           else
             echo "Linear issue not found for $TICKET"
-            echo "has_details=false" >> "$GITHUB_OUTPUT"
+            write_output has_details false
           fi
 
       - name: Create PR

@@ -62,6 +62,7 @@ export const APP_ROUTES = {
 
   // Admin
   ADMIN: '/app/admin',
+  ADMIN_OPS: '/app/admin/ops',
   ADMIN_PEOPLE: '/app/admin/people',
   ADMIN_GROWTH: '/app/admin/growth',
   ADMIN_WAITLIST: '/app/admin/waitlist',

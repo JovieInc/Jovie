@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { normalizeHermesAllowedPaths } from '../lib/hermes/allowed-paths';
 import type { HermesCliRuntime, HermesDispatchPayload } from '../types/ai-ops';
 
 interface RuntimeCommand {
@@ -36,6 +37,7 @@ const VALID_RUNTIMES = new Set<HermesCliRuntime>([
   'claude-code',
   'ruflo',
 ]);
+const DEFAULT_ALLOWED_PATHS = ['apps/web', 'scripts', '.github/workflows'];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -45,6 +47,13 @@ function asStringArray(value: unknown): string[] {
   return Array.isArray(value)
     ? value.filter((item): item is string => typeof item === 'string')
     : [];
+}
+
+function normalizePayloadAllowedPaths(value: unknown): string[] {
+  const allowedPaths = asStringArray(value);
+  return allowedPaths.length > 0
+    ? normalizeHermesAllowedPaths(allowedPaths)
+    : [...DEFAULT_ALLOWED_PATHS];
 }
 
 function requireString(
@@ -85,7 +94,7 @@ export function parseHermesPayload(input: unknown): HermesDispatchPayload {
         ? input.priority
         : 50,
     skills: asStringArray(input.skills),
-    allowedPaths: asStringArray(input.allowedPaths),
+    allowedPaths: normalizePayloadAllowedPaths(input.allowedPaths),
     verification: asStringArray(input.verification),
     dryRun: input.dryRun === true,
     prompt: typeof input.prompt === 'string' ? input.prompt : '',
