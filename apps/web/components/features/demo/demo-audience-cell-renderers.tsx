@@ -37,7 +37,9 @@ const INTENT_CONFIG: Record<
     label: 'Medium',
   },
   low: {
-    icon: <TrendingDown className={`${ICON_CLS} text-zinc-500`} aria-hidden />,
+    icon: (
+      <TrendingDown className={`${ICON_CLS} text-tertiary-token`} aria-hidden />
+    ),
     label: 'Low',
   },
 };

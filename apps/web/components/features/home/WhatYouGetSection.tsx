@@ -33,20 +33,16 @@ const features = [
 
 export function WhatYouGetSection() {
   return (
-    <section
-      className='section-spacing-linear relative overflow-hidden'
-      style={{ backgroundColor: 'var(--linear-bg-page)' }}
-    >
+    <section className='section-spacing-linear relative overflow-hidden bg-page'>
       <Container size='homepage'>
         <div className='max-w-5xl mx-auto'>
           <h2
-            className='text-center heading-gap-linear'
+            className='text-center heading-gap-linear text-primary-token'
             style={{
               fontSize: 'var(--linear-h2-size)',
               fontWeight: 'var(--linear-font-weight-medium)',
               lineHeight: 'var(--linear-h2-leading)',
               letterSpacing: 'var(--linear-h2-tracking)',
-              color: 'var(--linear-text-primary)',
             }}
           >
             What you get
@@ -72,20 +68,20 @@ export function WhatYouGetSection() {
                   </div>
                   <div>
                     <h3
+                      className='text-primary-token'
                       style={{
                         fontSize: 'var(--linear-body-sm-size)',
                         fontWeight: 'var(--linear-font-weight-medium)',
-                        color: 'var(--linear-text-primary)',
                         marginBottom: 'var(--linear-space-1)',
                       }}
                     >
                       {feature.title}
                     </h3>
                     <p
+                      className='text-tertiary-token'
                       style={{
                         fontSize: 'var(--linear-body-sm-size)',
                         lineHeight: 1.6,
-                        color: 'var(--linear-text-tertiary)',
                       }}
                     >
                       {feature.description}

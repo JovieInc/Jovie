@@ -122,10 +122,6 @@ export function resolveCanonicalState(
     input.waitlistGateEnabled &&
     !APPROVED_STATUSES.has(input.userStatus ?? '')
   ) {
-    // User has submitted waitlist → pending
-    if (input.userStatus === 'waitlist_pending') {
-      return CanonicalUserState.WAITLIST_PENDING;
-    }
     // User hasn't submitted yet
     return CanonicalUserState.NEEDS_WAITLIST_SUBMISSION;
   }

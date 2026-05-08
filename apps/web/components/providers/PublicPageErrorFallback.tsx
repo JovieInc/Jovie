@@ -17,7 +17,7 @@ const styles: Record<string, CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
     padding: '24px',
-    backgroundColor: '#08090a',
+    backgroundColor: '#06070a',
     color: '#ffffff',
     fontFamily:
       "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
@@ -87,7 +87,7 @@ export function PublicPageErrorFallback({
         <p style={styles.description}>Try refreshing the page.</p>
         <button
           type='button'
-          className='mt-6 inline-flex h-9 cursor-pointer items-center justify-center rounded-full bg-[#e6e6e6] px-4 text-sm font-medium text-[#08090a] transition-[background] duration-150 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7170ff] active:scale-[0.97]'
+          className='mt-6 inline-flex h-9 cursor-pointer items-center justify-center rounded-full bg-[#e6e6e6] px-4 text-sm font-medium text-[#06070a] transition-[background] duration-150 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7170ff] active:scale-[0.97]'
           onClick={onRefresh}
         >
           Refresh

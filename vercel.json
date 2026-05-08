@@ -31,6 +31,22 @@
     {
       "path": "/api/cron/generate-playlist",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/process-pre-saves",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/cleanup-sms-intents",
+      "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/cron/monitor-metadata-submissions",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/process-metadata-submissions",
+      "schedule": "0 4 * * *"
     }
   ],
   "functions": {

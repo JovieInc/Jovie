@@ -506,10 +506,13 @@ export async function expandDynamicRoute(
 
   if (
     route === '/[username]/about' ||
+    route === '/[username]/alerts' ||
     route === '/[username]/claim' ||
     route === '/[username]/contact' ||
     route === '/[username]/listen' ||
     route === '/[username]/notifications' ||
+    route === '/[username]/pay' ||
+    route === '/[username]/releases' ||
     route === '/[username]/shop' ||
     route === '/[username]/subscribe' ||
     route === '/[username]/tip' ||

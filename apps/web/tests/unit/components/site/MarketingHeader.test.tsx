@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MarketingHeader } from '@/components/site/MarketingHeader';
 
@@ -36,6 +36,29 @@ describe('MarketingHeader', () => {
       'href',
       '/support'
     );
+  });
+
+  it('removes hidden flyout links from the tab order until opened', () => {
+    const { container } = render(<MarketingHeader />);
+    const featuresTrigger = screen.getByRole('button', { name: /Features/ });
+    const featuresFlyout = container.querySelector(
+      '#marketing-header-flyout-features'
+    );
+    const resourcesFlyout = container.querySelector(
+      '#marketing-header-flyout-resources'
+    );
+
+    expect(featuresFlyout).toHaveAttribute('aria-hidden', 'true');
+    expect(featuresFlyout).toHaveAttribute('inert');
+    expect(resourcesFlyout).toHaveAttribute('aria-hidden', 'true');
+    expect(resourcesFlyout).toHaveAttribute('inert');
+
+    fireEvent.mouseEnter(featuresTrigger);
+
+    expect(featuresFlyout).toHaveAttribute('aria-hidden', 'false');
+    expect(featuresFlyout).not.toHaveAttribute('inert');
+    expect(resourcesFlyout).toHaveAttribute('aria-hidden', 'true');
+    expect(resourcesFlyout).toHaveAttribute('inert');
   });
 
   it('renders explicit custom nav links consistently as simple glass links', () => {

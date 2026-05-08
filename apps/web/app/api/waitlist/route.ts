@@ -570,7 +570,12 @@ export async function GET() {
   }
 
   const user = await currentUser();
-  const emailRaw = user?.emailAddresses?.[0]?.emailAddress ?? null;
+  // Prefer a verified email — `emailAddresses[0]` may be unverified.
+  const emailRaw =
+    user?.emailAddresses?.find(e => e.verification?.status === 'verified')
+      ?.emailAddress ??
+    user?.primaryEmailAddress?.emailAddress ??
+    null;
   if (!emailRaw) {
     return NextResponse.json(
       { hasEntry: false, status: null },
@@ -643,7 +648,11 @@ export async function POST(request: Request) {
     }
 
     const user = await currentUser();
-    const emailRaw = user?.emailAddresses?.[0]?.emailAddress ?? null;
+    const emailRaw =
+      user?.emailAddresses?.find(e => e.verification?.status === 'verified')
+        ?.emailAddress ??
+      user?.primaryEmailAddress?.emailAddress ??
+      null;
     if (!emailRaw) {
       return badRequestResponse('Email is required');
     }

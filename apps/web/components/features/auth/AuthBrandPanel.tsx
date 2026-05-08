@@ -31,7 +31,7 @@ export function AuthBrandPanel({ className }: Readonly<AuthBrandPanelProps>) {
         // = `--linear-app-content-surface` in Linear dark mode). 12px radius
         // matches the app shell frame so this reads as an extension of the
         // shell. Hex-pinned because auth is dark regardless of root theme.
-        'auth-showcase-panel relative flex h-full min-h-[34rem] flex-col overflow-hidden rounded-[12px] bg-[#0f1011] text-white',
+        'auth-showcase-panel relative flex h-full min-h-[34rem] flex-col overflow-hidden rounded-[12px] bg-[#0a0b0e] text-white',
         'border border-white/[0.05]',
         'lg:min-h-[calc(100svh-1rem)]',
         className
