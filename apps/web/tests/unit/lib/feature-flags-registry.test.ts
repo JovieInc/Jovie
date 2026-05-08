@@ -100,6 +100,10 @@ describe('feature flag registry integrity', () => {
       LEGACY_STATSIG_GATE_KEYS.SHELL_CHAT_V1,
       'DESIGN_V1_CHAT_ENTITIES',
       LEGACY_STATSIG_GATE_KEYS.DESIGN_V1_CHAT_ENTITIES,
+      // CHAT_JANK_MONITOR is a legitimate app-level instrumentation flag backed
+      // by a Statsig gate; it is not an API-chat-only flag.
+      'CHAT_JANK_MONITOR',
+      LEGACY_STATSIG_GATE_KEYS.CHAT_JANK_MONITOR,
     ]);
     const chatFlagsInKeys = Object.keys(LEGACY_STATSIG_GATE_KEYS).filter(
       key => /chat/i.test(key) && !allowedShellRolloutEntries.has(key)
