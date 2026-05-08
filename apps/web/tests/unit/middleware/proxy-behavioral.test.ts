@@ -428,6 +428,107 @@ describe('proxy.ts middleware', () => {
         process.env.NODE_ENV = originalNodeEnv;
       }
     });
+
+    it('returns 503 (not a signin redirect) when staging Clerk middleware throws on a protected path (JOV-1902)', async () => {
+      // Regression test: when staging Clerk middleware throws (e.g., due to a
+      // transient domain allowlist check failure or JWT validation error), protected
+      // paths like /onboarding must NOT silently fall back to handleRequest(null),
+      // which would produce a redirect loop:
+      //   /onboarding → /signin?redirect_url=%2Fonboarding → OAuth → /onboarding → …
+      //
+      // The fix: the catch block mirrors !selectedMiddleware logic and returns 503
+      // for protected paths instead of calling handleRequest(req, null).
+      mocks.isStagingHost.mockReturnValue(true);
+      mocks.resolveClerkKeys.mockReturnValue({
+        publishableKey: 'pk_test_staging-key',
+        secretKey: 'sk_test_staging-key',
+        status: 'ok',
+      });
+      mocks.clerkMiddleware.mockImplementation(() => async () => {
+        throw new Error('Clerk staging domain not in allowlist');
+      });
+
+      const req = createUnauthenticatedRequest({
+        hostname: 'staging.jov.ie',
+        pathname: '/onboarding',
+      });
+      const res = await callMiddleware(req);
+
+      // Must return 503, NOT redirect to /signin?redirect_url=%2Fonboarding
+      expect(res.status).toBe(503);
+      expect(isRedirectTo(res, '/signin')).toBe(false);
+    });
+
+    it('falls back to unauthenticated handling when staging Clerk throws on a public path', async () => {
+      // Public (non-protected, non-auth-required) paths may still be rendered
+      // when the staging middleware throws — they don't require auth.
+      mocks.isStagingHost.mockReturnValue(true);
+      mocks.resolveClerkKeys.mockReturnValue({
+        publishableKey: 'pk_test_staging-key',
+        secretKey: 'sk_test_staging-key',
+        status: 'ok',
+      });
+      mocks.clerkMiddleware.mockImplementation(() => async () => {
+        throw new Error('Clerk staging domain not in allowlist');
+      });
+
+      const req = createUnauthenticatedRequest({
+        hostname: 'staging.jov.ie',
+        pathname: '/',
+      });
+      const res = await callMiddleware(req);
+
+      // Public paths pass through (200) — they don't require authentication
+      expect(res.status).toBeLessThan(300);
+    });
+
+    it('falls back to unauthenticated handling when staging Clerk throws on an auth page', async () => {
+      // Auth pages (/signin, /signup) are treated as public for the staging
+      // error fallback so the "Auth unavailable" UI can still render.
+      mocks.isStagingHost.mockReturnValue(true);
+      mocks.resolveClerkKeys.mockReturnValue({
+        publishableKey: 'pk_test_staging-key',
+        secretKey: 'sk_test_staging-key',
+        status: 'ok',
+      });
+      mocks.clerkMiddleware.mockImplementation(() => async () => {
+        throw new Error('Clerk staging domain not in allowlist');
+      });
+
+      const req = createUnauthenticatedRequest({
+        hostname: 'staging.jov.ie',
+        pathname: '/signin',
+      });
+      const res = await callMiddleware(req);
+
+      // Auth pages pass through (200) even when Clerk throws on staging
+      expect(res.status).toBeLessThan(300);
+    });
+
+    it('returns 503 (not a signin redirect) when staging Clerk middleware throws on /app', async () => {
+      // Extends the JOV-1902 regression: /app is also a protected path that must not
+      // redirect to /signin when the staging Clerk middleware throws — otherwise a
+      // fully authenticated user hitting /app would be bounced to /signin infinitely.
+      mocks.isStagingHost.mockReturnValue(true);
+      mocks.resolveClerkKeys.mockReturnValue({
+        publishableKey: 'pk_test_staging-key',
+        secretKey: 'sk_test_staging-key',
+        status: 'ok',
+      });
+      mocks.clerkMiddleware.mockImplementation(() => async () => {
+        throw new Error('Clerk staging domain not in allowlist');
+      });
+
+      const req = createUnauthenticatedRequest({
+        hostname: 'staging.jov.ie',
+        pathname: '/app',
+      });
+      const res = await callMiddleware(req);
+
+      // Must return 503, NOT a redirect to /signin
+      expect(res.status).toBe(503);
+      expect(isRedirectTo(res, '/signin')).toBe(false);
+    });
   });
 
   describe('auth redirects for authenticated users', () => {

@@ -144,6 +144,20 @@ const MIDDLEWARE_SYSTEM_SEGMENTS = new Set([
   'wp',
   'wp-admin',
   'xmlrpc.php',
+  // Auth routes — single-segment paths that must never be treated as usernames
+  'signin',
+  'signup',
+  'sign-in',
+  'sign-up',
+  'waitlist',
+  'onboarding',
+  'account',
+  'billing',
+  'support',
+  'sso-callback',
+  'unavailable',
+  'app',
+  'api',
 ]);
 
 /**
@@ -1030,6 +1044,17 @@ function getClerkStagingMiddleware() {
     }
 
     if (stagingPk && stagingSk) {
+      // Read proxyUrl at runtime using bracket notation to bypass webpack
+      // DefinePlugin. NEXT_PUBLIC_CLERK_PROXY_URL is inlined at build time with
+      // the production value, but staging and production share the same path
+      // (/__clerk), so the inlined value is correct. The bracket notation is
+      // used here for symmetry with the other runtime env reads above and to
+      // ensure the correct value is used if the env var differs per environment.
+      const stagingProxyUrl =
+        (process.env as Record<string, string | undefined>)[
+          'NEXT_PUBLIC_CLERK_PROXY_URL'
+        ] || '/__clerk';
+
       _clerkStagingMiddleware = clerkMiddleware(
         async (auth, req) => {
           const { userId } = await auth();
@@ -1038,6 +1063,7 @@ function getClerkStagingMiddleware() {
         {
           publishableKey: stagingPk,
           secretKey: stagingSk,
+          proxyUrl: stagingProxyUrl,
         }
       );
     }
@@ -1302,8 +1328,34 @@ export default async function middleware(
     // domain isn't in the Clerk app's allowlist. Fall back gracefully so
     // auth routes render the "Auth unavailable" card instead of a 500.
     if (isStagingHost(hostname)) {
-      console.error('[middleware] Staging Clerk error:', error);
-      return handleRequest(req, null);
+      await captureError('[middleware] Staging Clerk error', error, {
+        pathname,
+        context: 'staging_clerk_middleware',
+      });
+      // Mirror the !selectedMiddleware fallback: only treat as unauthenticated
+      // for auth pages and truly public paths. Protected paths (e.g. /onboarding,
+      // /app) must not silently fall back to null userId — that causes a redirect
+      // loop where the user completes Google OAuth but lands back at
+      // /signin?redirect_url=%2Fonboarding instead of /onboarding (JOV-1902).
+      if (
+        pathInfo.isAuthPath ||
+        (!pathInfo.isProtectedPath && !isClerkRequiredPath(pathname, pathInfo))
+      ) {
+        return handleRequest(req, null);
+      }
+      return new NextResponse(
+        JSON.stringify({
+          error: 'Service temporarily unavailable',
+          message: 'Authentication service is initializing. Please try again.',
+        }),
+        {
+          status: 503,
+          headers: {
+            'Content-Type': 'application/json',
+            'Retry-After': '5',
+          },
+        }
+      );
     }
     throw error;
   }
