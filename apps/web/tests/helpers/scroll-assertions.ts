@@ -26,7 +26,13 @@ async function readScrollMetrics(
     const el = sel
       ? (document.querySelector(sel) as HTMLElement | null)
       : (document.scrollingElement as HTMLElement | null);
-    if (!el) return { scrollTop: 0, scrollHeight: 0, clientHeight: 0 };
+    if (!el) {
+      throw new Error(
+        sel
+          ? `Scroll container not found for selector: ${sel}`
+          : 'Document scrollingElement is null — cannot measure scroll metrics'
+      );
+    }
     return {
       scrollTop: el.scrollTop,
       scrollHeight: el.scrollHeight,
