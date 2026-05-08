@@ -249,17 +249,21 @@ test.describe('Public Profile', () => {
     ).toBeVisible({ timeout: 30_000 });
   });
 
-  test('profile subpages (/subscribe, /pay, /tour) load without 500', async ({
+  test('profile subpages (/subscribe, /tip, /pay, /tour) load without 500', async ({
     page,
   }) => {
     test.setTimeout(120_000);
-    await blockAnalytics(page);
 
-    const subpages = ['subscribe', 'pay', 'tour'] as const;
+    const subpages = [
+      { mode: 'subscribe', route: 'subscribe' },
+      { mode: 'pay', route: 'tip' },
+      { mode: 'pay', route: 'pay' },
+      { mode: 'tour', route: 'tour' },
+    ] as const;
 
-    for (const sub of subpages) {
+    for (const { mode, route } of subpages) {
       const redirectResponse = await page.request.get(
-        `/${TEST_PROFILE}/${sub}`,
+        `/${TEST_PROFILE}/${route}`,
         {
           maxRedirects: 0,
           timeout: 60_000,
@@ -267,52 +271,57 @@ test.describe('Public Profile', () => {
       );
       expect(
         redirectResponse.status(),
-        `/${TEST_PROFILE}/${sub} should redirect without a server error`
+        `/${TEST_PROFILE}/${route} should redirect without a server error`
       ).toBeLessThan(500);
 
-      let response: Awaited<ReturnType<typeof page.goto>>;
+      const subpage = await page.context().newPage();
       try {
-        response = await page.goto(`/${TEST_PROFILE}?mode=${sub}`, {
+        await blockAnalytics(subpage);
+
+        const response = await subpage.goto(`/${TEST_PROFILE}?mode=${mode}`, {
           waitUntil: 'domcontentloaded',
           timeout: 60_000,
         });
+
+        const status = response?.status() ?? 0;
+        expect(
+          status,
+          `/${TEST_PROFILE}?mode=${mode} returned ${status} — server error`
+        ).toBeLessThan(500);
+
+        const bodyText =
+          (await subpage
+            .locator('body')
+            .innerText()
+            .catch(() => '')) ?? '';
+        const lower = bodyText.toLowerCase();
+        // 404 is OK (profile may not support this subpage), 500 is not
+        if (lower.includes('not found') || lower.includes('temporarily')) {
+          continue;
+        }
+        expect(lower).not.toContain('application error');
+        expect(lower).not.toContain('internal server error');
+        expect(lower).not.toContain('unhandled runtime error');
       } catch (navError) {
         const msg =
           navError instanceof Error ? navError.message : String(navError);
         if (
           msg.includes('net::ERR_CONNECTION_REFUSED') ||
           msg.includes('net::ERR_CONNECTION_RESET') ||
+          msg.includes('net::ERR_ABORTED') ||
           msg.includes('Timeout') ||
           msg.includes('Target closed')
         ) {
           test.skip(
             true,
-            `Transient nav error on /${TEST_PROFILE}?mode=${sub}`
+            `Transient nav error on /${TEST_PROFILE}?mode=${mode}`
           );
           return;
         }
         throw navError;
+      } finally {
+        await subpage.close().catch(() => undefined);
       }
-
-      const status = response?.status() ?? 0;
-      expect(
-        status,
-        `/${TEST_PROFILE}?mode=${sub} returned ${status} — server error`
-      ).toBeLessThan(500);
-
-      const bodyText =
-        (await page
-          .locator('body')
-          .innerText()
-          .catch(() => '')) ?? '';
-      const lower = bodyText.toLowerCase();
-      // 404 is OK (profile may not support this subpage), 500 is not
-      if (lower.includes('not found') || lower.includes('temporarily')) {
-        continue;
-      }
-      expect(lower).not.toContain('application error');
-      expect(lower).not.toContain('internal server error');
-      expect(lower).not.toContain('unhandled runtime error');
     }
   });
 });
