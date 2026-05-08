@@ -11,8 +11,8 @@ export const REQUIRED_NON_DRY_RUN_GSTACK_GATES = [
   'gstack.ship',
 ] as const satisfies readonly AgentRunGateEvidenceName[];
 
-const ARTIFACT_COMMENT_PATTERN =
-  /<!--\s*agent-run-artifact\s*([\s\S]*?)\s*-->/g;
+const ARTIFACT_COMMENT_START = '<!-- agent-run-artifact';
+const ARTIFACT_COMMENT_END = '-->';
 
 export interface GateEvidenceEvaluation {
   readonly passed: boolean;
@@ -31,9 +31,22 @@ export function extractAgentRunArtifactsFromMarkdown(
   markdown: string
 ): AgentRunArtifact[] {
   const artifacts: AgentRunArtifact[] = [];
+  let searchStart = 0;
 
-  for (const match of markdown.matchAll(ARTIFACT_COMMENT_PATTERN)) {
-    const rawJson = match[1]?.trim();
+  while (searchStart < markdown.length) {
+    const commentStart = markdown.indexOf(ARTIFACT_COMMENT_START, searchStart);
+    if (commentStart === -1) {
+      break;
+    }
+
+    const jsonStart = commentStart + ARTIFACT_COMMENT_START.length;
+    const commentEnd = markdown.indexOf(ARTIFACT_COMMENT_END, jsonStart);
+    if (commentEnd === -1) {
+      break;
+    }
+
+    const rawJson = markdown.slice(jsonStart, commentEnd).trim();
+    searchStart = commentEnd + ARTIFACT_COMMENT_END.length;
     if (!rawJson) {
       continue;
     }
