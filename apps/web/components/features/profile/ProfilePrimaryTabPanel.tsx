@@ -1,6 +1,7 @@
 'use client';
 
 import { Bell, CheckCircle2, ChevronRight, Mail } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 import { AboutSection } from '@/features/profile/AboutSection';
 import { ArtistNotificationsCTA } from '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA';
 import { TwoStepNotificationsCTA } from '@/features/profile/artist-notifications-cta/TwoStepNotificationsCTA';
@@ -167,6 +168,7 @@ function SubscribePanel({
   previewNotificationsState,
   onFlowClosed,
   onSubscriptionActivated,
+  keepSubscribeFlowMounted = false,
 }: Readonly<{
   artist: Artist;
   isSubscribed: boolean;
@@ -181,6 +183,7 @@ function SubscribePanel({
   previewNotificationsState?: ProfilePreviewNotificationsState;
   onFlowClosed?: () => void;
   onSubscriptionActivated?: () => void;
+  keepSubscribeFlowMounted?: boolean;
 }>) {
   if (renderMode === 'preview') {
     return (
@@ -197,7 +200,7 @@ function SubscribePanel({
     );
   }
 
-  if (!isSubscribed) {
+  if (!(isSubscribed && !keepSubscribeFlowMounted)) {
     return (
       <div
         className={NATIVE_PANEL_CLASS_NAME}
@@ -419,6 +422,25 @@ export function ProfilePrimaryTabPanel({
   onFlowClosed,
   onSubscriptionActivated,
 }: Readonly<ProfilePrimaryTabPanelProps>) {
+  const [keepSubscribeFlowMounted, setKeepSubscribeFlowMounted] =
+    useState(false);
+
+  useEffect(() => {
+    if (!isSubscribed) {
+      setKeepSubscribeFlowMounted(true);
+    }
+  }, [isSubscribed]);
+
+  const handleSubscribeFlowClosed = useCallback(() => {
+    setKeepSubscribeFlowMounted(false);
+    onFlowClosed?.();
+  }, [onFlowClosed]);
+
+  const handleSubscriptionActivated = useCallback(() => {
+    setKeepSubscribeFlowMounted(true);
+    onSubscriptionActivated?.();
+  }, [onSubscriptionActivated]);
+
   if (mode === 'listen') {
     const visibleReleases = releases.filter(release => Boolean(release.slug));
 
@@ -497,8 +519,9 @@ export function ProfilePrimaryTabPanel({
         subscribeTwoStep={subscribeTwoStep}
         alertOptInVariant={alertOptInVariant}
         previewNotificationsState={previewNotificationsState}
-        onFlowClosed={onFlowClosed}
-        onSubscriptionActivated={onSubscriptionActivated}
+        onFlowClosed={handleSubscribeFlowClosed}
+        onSubscriptionActivated={handleSubscriptionActivated}
+        keepSubscribeFlowMounted={keepSubscribeFlowMounted}
       />
     );
   }
