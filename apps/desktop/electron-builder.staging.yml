@@ -1,0 +1,30 @@
+appId: app.jov.ie.staging
+productName: Jovie Staging
+copyright: "Copyright © 2026 Jovie Inc."
+directories:
+  output: dist
+files:
+  - dist-electron/**
+  - package.json
+mac:
+  category: public.app-category.music
+  target:
+    - target: dmg
+      arch:
+        - universal
+  icon: assets/icon-staging.icns
+win:
+  target: nsis
+  icon: assets/icon-staging.ico
+linux:
+  target: AppImage
+  icon: assets/icon-staging.png
+publish:
+  provider: github
+  owner: JovieInc
+  repo: Jovie
+  # Staging builds publish as prereleases on a separate `staging` channel so
+  # that production auto-updater (which reads latest.yml) never picks up a
+  # staging build. electron-updater will read staging.yml instead.
+  releaseType: prerelease
+  channel: staging

@@ -52,7 +52,7 @@ git pull origin main
 ### Run the full CI suite locally
 
 ```bash
-pnpm --filter web exec tsc --noEmit          # typecheck
+pnpm --filter @jovie/web run typecheck -- --pretty false # typecheck
 pnpm biome check apps/web                     # lint
 pnpm vitest --run --changed                   # tests
 pnpm --filter web lint:server-boundaries       # boundaries
@@ -68,7 +68,7 @@ pnpm --filter web lint:server-boundaries       # boundaries
 ### Validate the fix
 
 ```bash
-pnpm --filter web exec tsc --noEmit && pnpm biome check apps/web && pnpm vitest --run
+pnpm --filter @jovie/web run typecheck -- --pretty false && pnpm biome check apps/web && pnpm vitest --run
 ```
 
 ### Create a fix branch and open a PR

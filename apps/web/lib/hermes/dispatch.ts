@@ -19,7 +19,9 @@ const HERMES_RUNTIMES: readonly HermesCliRuntime[] = [
 ];
 const DEFAULT_SKILLS = ['autoplan'] as const;
 const DEFAULT_ALLOWED_PATHS = ['apps/web', 'scripts', '.github/workflows'];
-const DEFAULT_VERIFICATION = ['pnpm --filter web exec tsc --noEmit'] as const;
+const DEFAULT_VERIFICATION = [
+  'pnpm --filter @jovie/web run typecheck -- --pretty false',
+] as const;
 
 const SAFE_PATH_REGEX = /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[a-zA-Z0-9._/@-]+$/;
 const SAFE_SKILL_REGEX = /^\/?[a-z][a-z0-9-]{1,48}$/;

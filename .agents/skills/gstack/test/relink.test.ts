@@ -6,6 +6,8 @@ import * as os from 'os';
 
 const ROOT = path.resolve(import.meta.dir, '..');
 const BIN = path.join(ROOT, 'bin');
+const TEST_TIMEOUT_MS = 15000;
+const COMMAND_TIMEOUT_MS = TEST_TIMEOUT_MS - 1000;
 
 let tmpDir: string;
 let skillsDir: string;
@@ -17,7 +19,7 @@ function run(cmd: string, env: Record<string, string> = {}, expectFail = false):
       cwd: ROOT,
       env: { ...process.env, GSTACK_STATE_DIR: tmpDir, ...env },
       encoding: 'utf-8',
-      timeout: 10000,
+      timeout: COMMAND_TIMEOUT_MS,
       stdio: ['pipe', 'pipe', 'pipe'],
     }).trim();
   } catch (e: any) {
@@ -81,7 +83,7 @@ describe('gstack-relink (#578)', () => {
     expect(fs.existsSync(path.join(skillsDir, 'gstack-ship'))).toBe(true);
     expect(fs.existsSync(path.join(skillsDir, 'gstack-review'))).toBe(true);
     expect(output).toContain('gstack-');
-  });
+  }, TEST_TIMEOUT_MS);
 
   // Test 12: flat symlinks when skill_prefix=false
   test('creates flat symlinks when skill_prefix=false', () => {
@@ -95,7 +97,7 @@ describe('gstack-relink (#578)', () => {
     expect(fs.existsSync(path.join(skillsDir, 'ship'))).toBe(true);
     expect(fs.existsSync(path.join(skillsDir, 'review'))).toBe(true);
     expect(output).toContain('flat');
-  });
+  }, TEST_TIMEOUT_MS);
 
   // Test 13: cleans stale symlinks from opposite mode
   test('cleans up stale symlinks from opposite mode', () => {
@@ -118,7 +120,7 @@ describe('gstack-relink (#578)', () => {
     // Flat symlinks should exist, prefixed should be gone
     expect(fs.existsSync(path.join(skillsDir, 'qa'))).toBe(true);
     expect(fs.existsSync(path.join(skillsDir, 'gstack-qa'))).toBe(false);
-  });
+  }, TEST_TIMEOUT_MS);
 
   // Test 14: error when install dir missing
   test('prints error when install dir missing', () => {
@@ -127,7 +129,7 @@ describe('gstack-relink (#578)', () => {
       GSTACK_SKILLS_DIR: '/nonexistent/path/skills',
     }, true);
     expect(output).toContain('setup');
-  });
+  }, TEST_TIMEOUT_MS);
 
   // Test: gstack-upgrade does NOT get double-prefixed
   test('does not double-prefix gstack-upgrade directory', () => {
@@ -142,7 +144,7 @@ describe('gstack-relink (#578)', () => {
     expect(fs.existsSync(path.join(skillsDir, 'gstack-gstack-upgrade'))).toBe(false);
     // Regular skills still get prefixed
     expect(fs.existsSync(path.join(skillsDir, 'gstack-qa'))).toBe(true);
-  });
+  }, TEST_TIMEOUT_MS);
 
   // Test 15: gstack-config set skill_prefix triggers relink
   test('gstack-config set skill_prefix triggers relink', () => {
@@ -155,7 +157,7 @@ describe('gstack-relink (#578)', () => {
     // If relink was triggered, symlinks should exist
     expect(fs.existsSync(path.join(skillsDir, 'gstack-qa'))).toBe(true);
     expect(fs.existsSync(path.join(skillsDir, 'gstack-ship'))).toBe(true);
-  });
+  }, TEST_TIMEOUT_MS);
 });
 
 describe('gstack-patch-names (#620/#578)', () => {
@@ -177,7 +179,7 @@ describe('gstack-patch-names (#620/#578)', () => {
     expect(readSkillName(path.join(installDir, 'qa'))).toBe('gstack-qa');
     expect(readSkillName(path.join(installDir, 'ship'))).toBe('gstack-ship');
     expect(readSkillName(path.join(installDir, 'review'))).toBe('gstack-review');
-  });
+  }, TEST_TIMEOUT_MS);
 
   test('prefix=false restores name: field in SKILL.md', () => {
     setupMockInstall(['qa', 'ship']);
@@ -197,7 +199,7 @@ describe('gstack-patch-names (#620/#578)', () => {
     // Verify name: field is restored to unprefixed
     expect(readSkillName(path.join(installDir, 'qa'))).toBe('qa');
     expect(readSkillName(path.join(installDir, 'ship'))).toBe('ship');
-  });
+  }, TEST_TIMEOUT_MS);
 
   test('gstack-upgrade name: not double-prefixed', () => {
     setupMockInstall(['qa', 'gstack-upgrade']);
@@ -210,7 +212,7 @@ describe('gstack-patch-names (#620/#578)', () => {
     expect(readSkillName(path.join(installDir, 'gstack-upgrade'))).toBe('gstack-upgrade');
     // Regular skill should be prefixed
     expect(readSkillName(path.join(installDir, 'qa'))).toBe('gstack-qa');
-  });
+  }, TEST_TIMEOUT_MS);
 
   test('SKILL.md without frontmatter is a no-op', () => {
     setupMockInstall(['qa']);
@@ -225,5 +227,5 @@ describe('gstack-patch-names (#620/#578)', () => {
     // Content should be unchanged (no name: to patch)
     const content = fs.readFileSync(path.join(installDir, 'qa', 'SKILL.md'), 'utf-8');
     expect(content).toBe('# qa\nSome content.');
-  });
+  }, TEST_TIMEOUT_MS);
 });

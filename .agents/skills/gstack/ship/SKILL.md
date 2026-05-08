@@ -390,8 +390,7 @@ You are running the `/ship` workflow. This is a **non-interactive, fully automat
 - AI-assessed coverage below minimum threshold (hard gate with user override — see Step 3.4)
 - Plan items NOT DONE with no user override (see Step 3.45)
 - Plan verification failures (see Step 3.47)
-- TODOS.md missing and user wants to create one (ask — see Step 5.5)
-- TODOS.md disorganized and user wants to reorganize (ask — see Step 5.5)
+- Linear issue creation fails for actionable deferred work (see Step 5.5)
 
 **Never stop for:**
 - Uncommitted changes (always include them)
@@ -399,7 +398,7 @@ You are running the `/ship` workflow. This is a **non-interactive, fully automat
 - CHANGELOG content (auto-generate from diff)
 - Commit message approval (auto-commit)
 - Multi-file changesets (auto-split into bisectable commits)
-- TODOS.md completed-item detection (auto-mark)
+- Legacy TODO cross-reference that does not create new follow-up work
 - Auto-fixable review findings (dead code, N+1, stale comments — fixed automatically)
 - Test coverage gaps within target threshold (auto-generate and commit, or flag in PR body)
 
@@ -500,7 +499,7 @@ service with existing deployment — verify that a distribution pipeline exists.
    - "This PR adds a new binary/tool but there's no CI/CD pipeline to build and publish it.
      Users won't be able to download the artifact after merge."
    - A) Add a release workflow now (CI/CD release pipeline — GitHub Actions or GitLab CI depending on platform)
-   - B) Defer — add to TODOS.md
+   - B) Create Required Linear follow-up issue using `review/LINEAR-followups.md`
    - C) Not needed — this is internal/web-only, existing deployment covers it
 
 4. **If release pipeline exists:** Continue silently.
@@ -738,7 +737,7 @@ Use AskUserQuestion:
 >
 > RECOMMENDATION: Choose A — fix now while the context is fresh. Completeness: 9/10.
 > A) Investigate and fix now (human: ~2-4h / CC: ~15min) — Completeness: 10/10
-> B) Add as P0 TODO — fix after this branch lands — Completeness: 7/10
+> B) Create required Linear follow-up — fix after this branch lands — Completeness: 7/10
 > C) Skip — I know about this, ship anyway — Completeness: 3/10
 
 **If REPO_MODE is `collaborative` or `unknown`:**
@@ -754,7 +753,7 @@ Use AskUserQuestion:
 > RECOMMENDATION: Choose B — assign it to whoever broke it so the right person fixes it. Completeness: 9/10.
 > A) Investigate and fix now anyway — Completeness: 10/10
 > B) Blame + assign GitHub issue to the author — Completeness: 9/10
-> C) Add as P0 TODO — Completeness: 7/10
+> C) Create required Linear follow-up — Completeness: 7/10
 > D) Skip — ship anyway — Completeness: 3/10
 
 ### Step T4: Execute the chosen action
@@ -765,11 +764,11 @@ Use AskUserQuestion:
 - Commit the fix separately from the branch's changes: `git commit -m "fix: pre-existing test failure in <test-file>"`
 - Continue with the workflow.
 
-**If "Add as P0 TODO":**
-- If `TODOS.md` exists, add the entry following the format in `review/TODOS-format.md` (or `.claude/skills/review/TODOS-format.md`).
-- If `TODOS.md` does not exist, create it with the standard header and add the entry.
-- Entry should include: title, the error output, which branch it was noticed on, and priority P0.
-- Continue with the workflow — treat the pre-existing failure as non-blocking.
+**If "Create required Linear follow-up":**
+- Create a Linear issue using the format in `~/.claude/skills/gstack/review/LINEAR-followups.md`.
+- Classify it as Required. Include the failing test name, first relevant error lines, current branch, source PR if available, and why this can be handled separately.
+- Do not add the `automated` label unless a human explicitly asks for unattended dispatch.
+- Continue with the workflow — treat the pre-existing failure as non-blocking once the Linear issue ID is captured.
 
 **If "Blame + assign GitHub issue" (collaborative only):**
 - Find who likely broke it. Check BOTH the test file AND the production code it tests:
@@ -802,7 +801,7 @@ Use AskUserQuestion:
 - Continue with the workflow.
 - Note in output: "Pre-existing test failure skipped: <test-name>"
 
-**After triage:** If any in-branch failures remain unfixed, **STOP**. Do not proceed. If all failures were pre-existing and handled (fixed, TODOed, assigned, or skipped), continue to Step 3.25.
+**After triage:** If any in-branch failures remain unfixed, **STOP**. Do not proceed. If all failures were pre-existing and handled (fixed, assigned, or captured in Linear with issue IDs), continue to Step 3.25.
 
 **If all pass:** Continue silently — just note the counts briefly.
 
@@ -1241,10 +1240,10 @@ After producing the completion checklist:
   - RECOMMENDATION: depends on item count and severity. If 1-2 minor items (docs, config), recommend B. If core functionality is missing, recommend A.
   - Options:
     A) Stop — implement the missing items before shipping
-    B) Ship anyway — defer these to a follow-up (will create P1 TODOs in Step 5.5)
+    B) Ship anyway — create required Linear follow-up issues before PR/final closeout
     C) These items were intentionally dropped — remove from scope
   - If A: STOP. List the missing items for the user to implement.
-  - If B: Continue. For each NOT DONE item, create a P1 TODO in Step 5.5 with "Deferred from plan: {plan file path}".
+  - If B: Continue. For each NOT DONE item, create a Required Linear follow-up issue using `review/LINEAR-followups.md` with "Deferred from plan: {plan file path}", then record the created issue IDs in PR/final output.
   - If C: Continue. Note in PR body: "Plan items intentionally dropped: {list}."
 
 **No plan file found:** Skip entirely. "No plan file detected — skipping plan completion audit."
@@ -1553,7 +1552,7 @@ For each classified comment:
 - Deterministic parser/script failures -> focused test.
 - Repeated repo-policy mistake -> `.claude/rules/*` or `LESSONS.md`.
 - Repeated workflow mistake -> edit the gstack `.tmpl` source and regenerate generated skills.
-- High-risk product/auth/billing/migration work -> create or mention a Linear follow-up instead of broadening the ship PR.
+- High-risk product/auth/billing/migration work -> create a Linear follow-up issue instead of broadening the ship PR. Do not merely mention it.
 
 ---
 
@@ -1781,58 +1780,45 @@ If output shows `ALREADY_BUMPED`, VERSION was already bumped on this branch (pri
 
 ---
 
-## Step 5.5: TODOS.md (auto-update)
+## Step 5.5: Linear Follow-Up Issue Capture
 
-Cross-reference the project's TODOS.md against the changes being shipped. Mark completed items automatically; prompt only if the file is missing or disorganized.
+`TODOS.md` is legacy context only. Do not create, reorganize, or add new items to it.
+Use Linear for new follow-up work. Read `.claude/skills/gstack/review/LINEAR-followups.md`
+for the canonical issue format.
 
-Read `.claude/skills/review/TODOS-format.md` for the canonical format reference.
+**1. Gather follow-up candidates**
 
-**1. Check if TODOS.md exists** in the repository root.
+Collect every actionable item discovered during this workflow that will not be implemented
+in this PR, including:
+- NOT DONE plan items from Step 3.45.
+- Meaningful deferred work from review, QA, Greptile, design review, or verification.
+- Optional polish, future product work, pre-existing failures, and test gaps worth remembering.
+- Any final/PR-body sentence that would otherwise say "did not do X", "consider later",
+  "follow-up PR", "deferred", or "future work".
 
-**If TODOS.md does not exist:** Use AskUserQuestion:
-- Message: "GStack recommends maintaining a TODOS.md organized by skill/component, then priority (P0 at top through P4, then Completed at bottom). See TODOS-format.md for the full format. Would you like to create one?"
-- Options: A) Create it now, B) Skip for now
-- If A: Create `TODOS.md` with a skeleton (# TODOS heading + ## Completed section). Continue to step 3.
-- If B: Skip the rest of Step 5.5. Continue to Step 6.
+**2. Create Linear issues before closeout**
 
-**2. Check structure and organization:**
+For each actionable follow-up:
+- Create a Linear issue on the relevant team, usually `Jovie`.
+- Use the required structure from `review/LINEAR-followups.md`.
+- Classify as `Required` when the work is needed, or `Candidate` when another agent should
+  first decide whether it is worth doing.
+- Optional work must use the title `Candidate follow-up: <title>` and include:
+  "Pickup agent must first judge whether to implement, close, or split this."
+- If the follow-up depends on this PR or source issue landing first, set `blockedBy` when
+  possible. If not possible, describe the dependency in the issue body.
+- Do not add the `automated` label by default.
 
-Read TODOS.md and verify it follows the recommended structure:
-- Items grouped under `## <Skill/Component>` headings
-- Each item has `**Priority:**` field with P0-P4 value
-- A `## Completed` section at the bottom
+**3. Reference created issue IDs**
 
-**If disorganized** (missing priority fields, no component groupings, no Completed section): Use AskUserQuestion:
-- Message: "TODOS.md doesn't follow the recommended structure (skill/component groupings, P0-P4 priority, Completed section). Would you like to reorganize it?"
-- Options: A) Reorganize now (recommended), B) Leave as-is
-- If A: Reorganize in-place following TODOS-format.md. Preserve all content — only restructure, never delete items.
-- If B: Continue to step 3 without restructuring.
+Add every created follow-up issue ID to the PR body and final output. If no follow-up work
+exists, state `Linear follow-ups: none`.
 
-**3. Detect completed TODOs:**
+**4. Defensive**
 
-This step is fully automatic — no user interaction.
-
-Use the diff and commit history already gathered in earlier steps:
-- `git diff <base>...HEAD` (full diff against the base branch)
-- `git log <base>..HEAD --oneline` (all commits being shipped)
-
-For each TODO item, check if the changes in this PR complete it by:
-- Matching commit messages against the TODO title and description
-- Checking if files referenced in the TODO appear in the diff
-- Checking if the TODO's described work matches the functional changes
-
-**Be conservative:** Only mark a TODO as completed if there is clear evidence in the diff. If uncertain, leave it alone.
-
-**4. Move completed items** to the `## Completed` section at the bottom. Append: `**Completed:** vX.Y.Z (YYYY-MM-DD)`
-
-**5. Output summary:**
-- `TODOS.md: N items marked complete (item1, item2, ...). M items remaining.`
-- Or: `TODOS.md: No completed items detected. M items remaining.`
-- Or: `TODOS.md: Created.` / `TODOS.md: Reorganized.`
-
-**6. Defensive:** If TODOS.md cannot be written (permission error, disk full), warn the user and continue. Never stop the ship workflow for a TODOS failure.
-
-Save this summary — it goes into the PR body in Step 8.
+If Linear issue creation is unavailable or fails, warn the user and do not hide the follow-up
+inside a wall of text. Mark the ship result as blocked or done-with-concerns according to the
+Completion Status Protocol.
 
 ---
 
@@ -1846,7 +1832,7 @@ Save this summary — it goes into the PR body in Step 8.
    - **Infrastructure:** migrations, config changes, route additions
    - **Models & services:** new models, services, concerns (with their tests)
    - **Controllers & views:** controllers, views, JS/React components (with their tests)
-   - **VERSION + CHANGELOG + TODOS.md:** always in the final commit
+   - **VERSION + CHANGELOG + follow-up issue references:** always in the final commit
 
 3. **Rules for splitting:**
    - A model and its test file go in the same commit
@@ -1973,16 +1959,16 @@ you missed it.>
 <If no plan file: "No plan file detected.">
 <If plan items deferred: list deferred items>
 
+## Linear follow-ups
+<List each created Linear issue ID with a one-line rationale. If none: "Linear follow-ups: none.">
+
 ## Verification Results
 <If verification ran: summary from Step 3.47 (N PASS, M FAIL, K SKIPPED)>
 <If skipped: reason (no plan, no server, no verification section)>
 <If not applicable: omit this section>
 
-## TODOS
-<If items marked complete: bullet list of completed items with version>
-<If no items completed: "No TODO items completed in this PR.">
-<If TODOS.md created or reorganized: note that>
-<If TODOS.md doesn't exist and user skipped: omit this section>
+## TODOs (legacy)
+<If legacy TODO items were incidentally completed by this PR, list them. Never add new TODO items here. If none, omit this section.>
 
 ## Test plan
 - [x] All Rails tests pass (N runs, 0 failures)
@@ -2072,7 +2058,7 @@ This step is automatic — never skip it, never ask for confirmation.
 - **Always use the 4-digit version format** from the VERSION file.
 - **Date format in CHANGELOG:** `YYYY-MM-DD`
 - **Split commits for bisectability** — each commit = one logical change.
-- **TODOS.md completion detection must be conservative.** Only mark items as completed when the diff clearly shows the work is done.
+- **TODOS.md is legacy context only.** Never add new TODO items; create Linear issues for actionable follow-ups.
 - **Use Greptile reply templates from greptile-triage.md.** Every reply includes evidence (inline diff, code references, re-rank suggestion). Never post vague replies.
 - **Never push without fresh verification evidence.** If code changed after Step 3 tests, re-run before pushing.
 - **Step 3.4 generates coverage tests.** They must pass before committing. Never commit failing tests.

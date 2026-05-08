@@ -732,7 +732,7 @@ Override: every AskUserQuestion → auto-decide using the 6 principles.
   that is NOT auto-decided. Premises require human judgment.
 - Alternatives: pick highest completeness (P1). If tied, pick simplest (P5).
   If top 2 are close → mark TASTE DECISION.
-- Scope expansion: in blast radius + <1d CC → approve (P2). Outside → defer to TODOS.md (P3).
+- Scope expansion: in blast radius + <1d CC → approve (P2). Outside → create candidate Linear follow-up (P3).
   Duplicates → reject (P4). Borderline (3-5 files) → mark TASTE DECISION.
 - All 10 review sections: run fully, auto-decide each issue, log every decision.
 - Dual voices: always run BOTH Claude subagent AND Codex if available (P6).
@@ -958,7 +958,7 @@ Override: every AskUserQuestion → auto-decide using the 6 principles.
 - Architecture choices: explicit over clever (P5). If codex disagrees with valid reason → TASTE DECISION. Scope changes both models agree on → USER CHALLENGE.
 - Evals: always include all relevant suites (P1)
 - Test plan: generate artifact at `~/.gstack/projects/$SLUG/{user}-{branch}-test-plan-{datetime}.md`
-- TODOS.md: collect all deferred scope expansions from Phase 1, auto-write
+- Linear follow-up issues: collect all deferred scope expansions from Phase 1, create issues, and record created issue IDs in the plan output.
 
 **Required execution checklist (Eng):**
 
@@ -1013,7 +1013,7 @@ Missing voice = N/A (not CONFIRMED). Single critical finding from one voice = fl
 - Test plan artifact written to disk (Section 3)
 - Failure modes registry with critical gap flags
 - Completion Summary (the full summary from the Eng skill)
-- TODOS.md updates (collected from all phases)
+- Linear follow-up issues (collected from all phases)
 
 ---
 
@@ -1129,8 +1129,8 @@ I recommend [X] — [principle]. But [Y] is also viable:
 **Theme: [topic]** — flagged in [Phase 1, Phase 3]. High-confidence signal.
 [If no themes span phases:] "No cross-phase themes — each phase's concerns were distinct."
 
-### Deferred to TODOS.md
-[Items auto-deferred with reasons]
+### Linear follow-up issues
+[Created issue IDs for items auto-deferred with reasons]
 ```
 
 **Cognitive load management:**

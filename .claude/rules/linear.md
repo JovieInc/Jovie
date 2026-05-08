@@ -21,14 +21,47 @@ When scanning Linear for issues to work on, always filter with:
 - Process or workflow changes
 - Issues filed by automated scanners that haven't been triaged
 
-## Always File a Linear Issue for Deferred Follow-Ups
+## Durable Follow-Up Capture
 
-When you identify follow-up work in the course of a task — out-of-scope refactors, next-phase features, known gaps, TODOs — and **choose not to tackle it right away**, open a Linear issue for it before closing out the current work. Do not rely on inline `// TODO` comments, PR-body bullet lists, or chat memory to track it.
+Linear is the durable destination for every actionable follow-up an agent chooses not to implement, including optional or candidate work. Before closing out the current work, any final answer, PR body, plan, review, handoff, or status update that says "did not do X", "consider later", "follow-up PR", "deferred", "future work", "not in scope", or similar must include a created Linear issue ID.
 
-- Create the issue on the relevant team (usually `Jovie`) with a clear title and description of the deferred scope.
-- If the follow-up depends on the current work landing first, use `blockedBy` to link it to the current issue so the dependency is explicit in Linear.
-- Reference the follow-up issue ID in the current PR description and in any planning/design docs so future readers can navigate to it.
-- This applies equally to scope you deferred *to ship faster* (Approach C-style decisions) and scope you noticed but chose not to do. If it's worth remembering, it's worth a Linear issue.
+Do not leave follow-up work only in inline `// TODO` comments, `TODOS.md`, PR-body bullets, chat memory, review summaries, or "remaining risks" prose. If it is worth mentioning as future work, it is worth tracking in Linear.
+
+Create follow-up issues on the relevant team, usually `Jovie`. Do not add the `automated` label by default, so optional work stays visible without being blindly dispatched by automation.
+
+### Required follow-up issue shape
+
+Use this structure for every follow-up issue:
+
+```markdown
+## Source
+- Current issue: <JOV-XXXX or "ad-hoc">
+- Source PR: <PR URL or "not opened yet">
+- Source branch/session: <branch name or session context>
+
+## Follow-up
+<What was not done. Be specific enough that another agent can find the code or workflow.>
+
+## Why it matters
+<User impact, risk reduction, cleanup value, or product reason.>
+
+## Classification
+Required / Candidate
+
+## Acceptance criteria or triage question
+<Required work gets acceptance criteria. Candidate work gets the decision question.>
+
+## Dependency
+<Use blockedBy or note that this depends on the source issue/PR landing first. Otherwise "None".>
+```
+
+For optional work, title the issue `Candidate follow-up: <title>` and include this exact note in the description:
+
+> Pickup agent must first judge whether to implement, close, or split this.
+
+If the follow-up depends on the current work landing first, use `blockedBy` to link it to the current issue when possible. If no direct relationship can be created, include the dependency in the issue description and reference the follow-up issue ID in the current PR description and any planning/design docs.
+
+This applies equally to scope deferred to ship faster, scope noticed but intentionally skipped, pre-existing failures discovered during verification, test gaps, design debt, optional polish, and future product work.
 
 ## Linear Ownership Contract
 
