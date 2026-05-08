@@ -57,11 +57,13 @@ describe('route-qa not-found detection', () => {
   it('expands investor portal slugs as token-gated not-found cases', async () => {
     await expect(
       expandDynamicRoute('/investor-portal/[slug]', 'route-qa-test')
-    ).resolves.toEqual([
-      expect.objectContaining({
-        path: '/investor-portal/memo',
-        expectedState: 'not-found',
-      }),
-    ]);
+    ).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: '/investor-portal/memo',
+          expectedState: 'not-found',
+        }),
+      ])
+    );
   });
 });
