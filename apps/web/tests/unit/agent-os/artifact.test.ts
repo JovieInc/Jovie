@@ -139,6 +139,37 @@ describe('AgentRunArtifactSchema', () => {
     );
   });
 
+  it('returns schema failures instead of throwing for malformed URLs', () => {
+    let result: ReturnType<typeof safeParseAgentRunArtifact> | null = null;
+
+    expect(() => {
+      result = safeParseAgentRunArtifact({
+        ...baseArtifact,
+        linearIssueUrl: 'not a url',
+      });
+    }).not.toThrow();
+
+    expect(result?.success).toBe(false);
+  });
+
+  it('rejects duplicate verification gate names', () => {
+    const result = safeParseAgentRunArtifact({
+      ...baseArtifact,
+      verificationGates: [
+        baseArtifact.verificationGates[0],
+        {
+          ...baseArtifact.verificationGates[1],
+          name: baseArtifact.verificationGates[0].name,
+        },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues.map(issue => issue.path)).toEqual(
+      expect.arrayContaining([['verificationGates', 1, 'name']])
+    );
+  });
+
   it('accepts read-only OpenRouter free-model artifacts with forbidden mutations', () => {
     const artifact = parseAgentRunArtifact({
       ...baseArtifact,
