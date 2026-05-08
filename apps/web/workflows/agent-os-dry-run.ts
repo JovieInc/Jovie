@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   type AgentRunArtifact,
+  AgentRunHttpUrlSchema,
   parseAgentRunArtifact,
 } from '@/lib/agent-os/artifact';
 
@@ -23,7 +24,7 @@ export const AgentOsDryRunWorkflowInputSchema = z
       .nullable()
       .optional(),
     linearIssueId: z.string().trim().min(1).max(80).nullable().optional(),
-    linearIssueUrl: z.string().trim().url().nullable().optional(),
+    linearIssueUrl: AgentRunHttpUrlSchema.nullable().optional(),
   })
   .strict();
 

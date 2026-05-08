@@ -116,6 +116,29 @@ describe('AgentRunArtifactSchema', () => {
     expect(result.error?.issues[0]?.path).toEqual(['humanApprovalRequired']);
   });
 
+  it('rejects non-http artifact URLs before UI rendering', () => {
+    const result = safeParseAgentRunArtifact({
+      ...baseArtifact,
+      linearIssueUrl: 'javascript:alert(1)',
+      pullRequestUrl: 'data:text/html,<script>alert(1)</script>',
+      verificationGates: [
+        {
+          ...baseArtifact.verificationGates[0],
+          evidenceUrl: 'javascript:alert(1)',
+        },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues.map(issue => issue.path)).toEqual(
+      expect.arrayContaining([
+        ['linearIssueUrl'],
+        ['pullRequestUrl'],
+        ['verificationGates', 0, 'evidenceUrl'],
+      ])
+    );
+  });
+
   it('accepts read-only OpenRouter free-model artifacts with forbidden mutations', () => {
     const artifact = parseAgentRunArtifact({
       ...baseArtifact,

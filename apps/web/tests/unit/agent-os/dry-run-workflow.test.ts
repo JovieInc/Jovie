@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  AgentOsDryRunWorkflowInputSchema,
   buildAgentOsDryRunArtifact,
   emitAgentOsDryRunArtifact,
 } from '@/workflows/agent-os-dry-run';
@@ -80,6 +81,14 @@ describe('AgentOS dry-run workflow artifact', () => {
 
     expect(artifact.id).toHaveLength(180);
     expect(artifact.id).toBe(`agentos-wdk-dry-run-${sourceRunId}`);
+  });
+
+  it('rejects non-http Linear URLs in workflow input', () => {
+    const result = AgentOsDryRunWorkflowInputSchema.safeParse({
+      linearIssueUrl: 'javascript:alert(1)',
+    });
+
+    expect(result.success).toBe(false);
   });
 
   it('emits the artifact and summary through the workflow writable stream', async () => {

@@ -23,15 +23,29 @@ function formatCost(artifact: AgentRunArtifact): string {
   });
 }
 
+function getSafeExternalHref(href: string | null): string | null {
+  if (!href) return null;
+
+  try {
+    const url = new URL(href);
+    return url.protocol === 'http:' || url.protocol === 'https:'
+      ? url.toString()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 function ArtifactLink({
   href,
   label,
 }: Readonly<{ readonly href: string | null; readonly label: string }>) {
-  if (!href) return null;
+  const safeHref = getSafeExternalHref(href);
+  if (!safeHref) return null;
 
   return (
     <a
-      href={href}
+      href={safeHref}
       target='_blank'
       rel='noopener noreferrer'
       className='inline-flex items-center gap-1 text-[12px] font-[520] text-secondary-token hover:text-primary-token'

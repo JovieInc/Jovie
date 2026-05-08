@@ -73,9 +73,20 @@ export const AGENT_RUN_GATE_EVIDENCE_NAMES = [
   'sentry.canary',
 ] as const;
 
+function isHttpUrl(value: string): boolean {
+  const protocol = new URL(value).protocol;
+  return protocol === 'http:' || protocol === 'https:';
+}
+
+export const AgentRunHttpUrlSchema = z
+  .string()
+  .trim()
+  .url()
+  .refine(isHttpUrl, { message: 'URL must use http or https protocol.' });
+
 const nullableUrlSchema = z.preprocess(
   value => (typeof value === 'string' && value.trim() === '' ? null : value),
-  z.union([z.string().trim().url(), z.null()])
+  z.union([AgentRunHttpUrlSchema, z.null()])
 );
 const nullableTextSchema = z.preprocess(
   value => (typeof value === 'string' && value.trim() === '' ? null : value),
