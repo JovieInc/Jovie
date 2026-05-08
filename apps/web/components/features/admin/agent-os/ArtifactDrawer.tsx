@@ -3,6 +3,16 @@ import type { AgentRunArtifact } from '@/lib/agent-os/artifact';
 import { VerificationGateList } from './VerificationGateList';
 import { WorkflowStatusPill } from './WorkflowStatusPill';
 
+const HUMAN_GATE_LABELS: Record<
+  AgentRunArtifact['humanGate']['status'],
+  string
+> = {
+  not_required: 'Not Required',
+  pending: 'Pending',
+  approved: 'Approved',
+  rejected: 'Rejected',
+};
+
 function formatCost(artifact: AgentRunArtifact): string {
   if (!artifact.costEstimate) return 'Not estimated';
   if (artifact.costEstimate.usd === 0) return '$0.00';
@@ -86,7 +96,7 @@ export function ArtifactDrawer({ artifact }: ArtifactDrawerProps) {
         <div className='rounded-lg bg-surface-1 px-3 py-2'>
           <dt className='text-tertiary-token'>Human Gate</dt>
           <dd className='mt-1 truncate font-[540] text-primary-token'>
-            {artifact.humanGate.status.replaceAll('_', ' ')}
+            {HUMAN_GATE_LABELS[artifact.humanGate.status]}
           </dd>
         </div>
       </dl>

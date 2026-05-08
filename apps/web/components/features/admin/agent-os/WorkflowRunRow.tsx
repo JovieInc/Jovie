@@ -1,5 +1,6 @@
 import { Clock3 } from 'lucide-react';
 import type { AgentRunArtifact } from '@/lib/agent-os/artifact';
+import { cn } from '@/lib/utils';
 import { WorkflowStatusPill } from './WorkflowStatusPill';
 
 function formatUpdatedAt(value: string): string {
@@ -28,7 +29,10 @@ export function WorkflowRunRow({
     <button
       type='button'
       onClick={() => onSelect?.(artifact)}
-      className='grid w-full gap-2 rounded-lg border border-subtle bg-surface-1 px-3 py-2.5 text-left transition-colors hover:bg-surface-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+      className={cn(
+        'grid w-full gap-2 rounded-lg border border-subtle bg-surface-1 px-3 py-2.5 text-left transition-colors hover:bg-surface-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
+        isSelected && 'border-(--linear-border-focus) bg-surface-0'
+      )}
       aria-pressed={isSelected}
     >
       <div className='flex min-w-0 items-start justify-between gap-3'>
