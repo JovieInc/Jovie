@@ -124,6 +124,40 @@ describe('Statsig server initialization', () => {
     expect(initializeMock).toHaveBeenCalledTimes(2);
   });
 
+  it('falls back when Statsig initialization times out', async () => {
+    vi.useFakeTimers();
+
+    try {
+      envState.STATSIG_SERVER_SECRET = 'secret-server-key';
+      initializeMock.mockReturnValueOnce(new Promise(() => {}));
+
+      const { logger } = await import('@/lib/utils/logger');
+      const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+      const { checkGateForUser } = await import('@/lib/flags/statsig');
+
+      const result = checkGateForUser(
+        'user-1',
+        LEGACY_STATSIG_GATE_KEYS.DESIGN_V1,
+        true
+      );
+
+      await vi.advanceTimersByTimeAsync(10_000);
+
+      await expect(result).resolves.toBe(true);
+      expect(errorSpy).toHaveBeenCalledWith(
+        '[Statsig] Failed to initialize server SDK',
+        expect.objectContaining({
+          message: 'Statsig initialization timed out after 10000ms',
+        }),
+        'Statsig'
+      );
+      expect(statsigConstructorMock).toHaveBeenCalledTimes(1);
+      expect(initializeMock).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('ignores client override cookies in production', async () => {
     process.env.NODE_ENV = 'production';
     process.env.VERCEL_ENV = 'production';

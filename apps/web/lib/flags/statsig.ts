@@ -2,6 +2,7 @@ import 'server-only';
 import { Statsig, StatsigUser } from '@statsig/statsig-node-core';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
+import { withTimeout } from '@/lib/resilience/primitives';
 import { logger } from '@/lib/utils/logger';
 import {
   APP_FLAG_DEFAULTS,
@@ -55,7 +56,10 @@ async function initializeStatsig(): Promise<void> {
 
     try {
       const statsig = getStatsigClient(serverSecret);
-      await statsig.initialize();
+      await withTimeout(statsig.initialize(), {
+        timeoutMs: 10_000,
+        context: 'Statsig initialization',
+      });
       statsigInitialized = true;
       logger.info('[Statsig] Server SDK initialized', undefined, 'Statsig');
     } catch (error) {
