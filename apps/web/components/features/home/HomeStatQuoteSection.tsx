@@ -51,7 +51,7 @@ export function HomeStatQuoteSection({
           <span>Jovie delivers {stat}</span>
           <span className='text-[#8A8F98]'> {body}</span>
         </h3>
-        <div className='mt-7 font-[var(--marketing-font-body)] text-sm italic text-[#62666d]'>
+        <div className='mt-7 font-[var(--marketing-font-body)] text-sm italic text-[#8A8F98]'>
           {source}
         </div>
       </div>

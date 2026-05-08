@@ -62,7 +62,7 @@ export function HomeLoopDiagramSection() {
         <div className='grid items-center gap-4 sm:grid-cols-[1fr_auto_1fr]'>
           {/* Flatline card */}
           <article className='min-h-[360px] rounded-xl border border-white/[0.06] bg-[#0a0a0b] p-5'>
-            <div className='font-[var(--marketing-font-body)] text-[10px] font-semibold uppercase tracking-[0.12em] text-[#62666d]'>
+            <div className='font-[var(--marketing-font-body)] text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8A8F98]'>
               Flatline marketing
             </div>
             <svg
@@ -108,7 +108,7 @@ export function HomeLoopDiagramSection() {
           {/* vs */}
           <div
             aria-hidden='true'
-            className='mx-auto flex h-8 w-8 items-center justify-center rounded-full border border-white/10 font-[var(--marketing-font-display)] text-sm font-bold text-[#62666d]'
+            className='mx-auto flex h-8 w-8 items-center justify-center rounded-full border border-white/10 font-[var(--marketing-font-display)] text-sm font-bold text-[#8A8F98]'
           >
             vs
           </div>
