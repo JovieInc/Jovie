@@ -14,6 +14,12 @@ export const REQUIRED_NON_DRY_RUN_GSTACK_GATES = [
 const ARTIFACT_COMMENT_START = '<!-- agent-run-artifact';
 const ARTIFACT_COMMENT_END = '-->';
 
+interface ArtifactCommentSlice {
+  readonly aborted: boolean;
+  readonly nextSearchStart: number;
+  readonly rawJson: string;
+}
+
 export interface GateEvidenceEvaluation {
   readonly passed: boolean;
   readonly missingGateNames: readonly AgentRunGateEvidenceName[];
@@ -31,6 +37,62 @@ export function formatAgentRunArtifactComment(
   return `<!-- agent-run-artifact\n${JSON.stringify(artifact, null, 2)}\n-->`;
 }
 
+function advanceSearchAfterMalformed(commentStart: number): number {
+  return commentStart + 1;
+}
+
+function parseArtifactFromSlice(rawJson: string): AgentRunArtifact | null {
+  const parsed = safeParseAgentRunArtifact(JSON.parse(rawJson));
+  return parsed.success ? parsed.data : null;
+}
+
+function canParseArtifactSlice(rawJson: string): boolean {
+  try {
+    parseArtifactFromSlice(rawJson);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function findCommentEndWithRecovery(
+  markdown: string,
+  commentStart: number,
+  jsonStart: number
+): ArtifactCommentSlice {
+  let commentEnd = markdown.indexOf(ARTIFACT_COMMENT_END, jsonStart);
+
+  if (commentEnd === -1) {
+    return {
+      aborted: true,
+      nextSearchStart: advanceSearchAfterMalformed(commentStart),
+      rawJson: '',
+    };
+  }
+
+  while (commentEnd !== -1) {
+    const rawJson = markdown.slice(jsonStart, commentEnd).trim();
+    const nextSearchStart = commentEnd + ARTIFACT_COMMENT_END.length;
+
+    if (!rawJson || canParseArtifactSlice(rawJson)) {
+      return {
+        aborted: false,
+        nextSearchStart,
+        rawJson,
+      };
+    }
+
+    // A JSON string may contain "-->"; keep scanning for the real comment end.
+    commentEnd = markdown.indexOf(ARTIFACT_COMMENT_END, nextSearchStart);
+  }
+
+  return {
+    aborted: true,
+    nextSearchStart: advanceSearchAfterMalformed(commentStart),
+    rawJson: '',
+  };
+}
+
 export function extractAgentRunArtifactsFromMarkdown(
   markdown: string
 ): AgentRunArtifact[] {
@@ -44,43 +106,20 @@ export function extractAgentRunArtifactsFromMarkdown(
     }
 
     const jsonStart = commentStart + ARTIFACT_COMMENT_START.length;
-    let commentEnd = markdown.indexOf(ARTIFACT_COMMENT_END, jsonStart);
-    if (commentEnd === -1) {
-      break;
+    const commentSlice = findCommentEndWithRecovery(
+      markdown,
+      commentStart,
+      jsonStart
+    );
+    searchStart = commentSlice.nextSearchStart;
+
+    if (commentSlice.aborted || !commentSlice.rawJson) {
+      continue;
     }
 
-    let foundArtifact = false;
-    while (commentEnd !== -1) {
-      const rawJson = markdown.slice(jsonStart, commentEnd).trim();
-      const nextSearchStart = commentEnd + ARTIFACT_COMMENT_END.length;
-      searchStart = nextSearchStart;
-
-      if (!rawJson) {
-        foundArtifact = true;
-        break;
-      }
-
-      try {
-        const parsed = safeParseAgentRunArtifact(JSON.parse(rawJson));
-        if (parsed.success) {
-          artifacts.push(parsed.data);
-        }
-        foundArtifact = true;
-        break;
-      } catch {
-        // A JSON string may contain "-->"; keep scanning for the real comment end.
-      }
-
-      commentEnd = markdown.indexOf(ARTIFACT_COMMENT_END, searchStart);
-      if (commentEnd === -1) {
-        searchStart = commentStart + 1;
-        foundArtifact = true;
-        break;
-      }
-    }
-
-    if (!foundArtifact) {
-      searchStart = commentStart + 1;
+    const artifact = parseArtifactFromSlice(commentSlice.rawJson);
+    if (artifact) {
+      artifacts.push(artifact);
     }
   }
 
