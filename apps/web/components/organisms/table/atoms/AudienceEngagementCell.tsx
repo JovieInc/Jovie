@@ -21,7 +21,7 @@ const INTENT_ICONS: Record<
     color: 'text-amber-400',
     label: 'Medium intent',
   },
-  low: { icon: Minus, color: 'text-zinc-400', label: 'Low intent' },
+  low: { icon: Minus, color: 'text-tertiary-token', label: 'Low intent' },
 };
 
 export function AudienceEngagementCell({

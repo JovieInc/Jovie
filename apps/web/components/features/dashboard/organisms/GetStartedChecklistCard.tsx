@@ -202,7 +202,7 @@ export function GetStartedChecklistCard({
       {/* Progress bar */}
       <div className='mx-3 mt-2 h-1 rounded-full bg-surface-0'>
         <div
-          className='h-1 rounded-full bg-[var(--linear-accent)] transition-all duration-300'
+          className='h-1 rounded-full bg-[var(--linear-accent)] transition-[width] duration-subtle'
           style={{
             width: `${(completedCount / CHECKLIST_ITEMS.length) * 100}%`,
           }}
@@ -265,7 +265,7 @@ export function GetStartedChecklistCard({
               key={item.id}
               className={`flex items-center gap-2 rounded-full border border-transparent px-2.5 py-1.5 transition-colors ${
                 isDone
-                  ? 'bg-surface-0/70 opacity-50'
+                  ? 'bg-surface-0 opacity-50'
                   : 'hover:border-(--linear-app-frame-seam) hover:bg-surface-0'
               }`}
             >

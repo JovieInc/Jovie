@@ -147,7 +147,7 @@ const QrPreview = memo(function QrPreview({
         style={{ width: QR_DISPLAY_SIZE, height: QR_DISPLAY_SIZE }}
         aria-hidden='true'
       >
-        <div className='h-16 w-16 rounded-md bg-gray-200 animate-pulse motion-reduce:animate-none' />
+        <div className='h-16 w-16 rounded-md bg-surface-2 animate-pulse motion-reduce:animate-none' />
       </div>
     );
   }

@@ -285,10 +285,10 @@ export function NavMenuItem({
   }>;
   const shellNavItem = useShellNavItem;
   const shellNavClassName = cn(
-    'relative flex h-6 w-full items-center gap-2 rounded-md pl-2.5 pr-2 text-[12.5px] tracking-[-0.005em] transition-colors duration-150 ease-out',
+    'relative flex h-6 w-full items-center gap-2 rounded-md pl-2.5 pr-2 text-[12.5px] tracking-[-0.005em] transition-colors duration-subtle ease-out',
     isActive
       ? 'bg-surface-1 text-primary-token'
-      : 'text-secondary-token hover:bg-surface-1/60 hover:text-primary-token',
+      : 'text-secondary-token hover:bg-surface-1 hover:text-primary-token',
     'group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0'
   );
   const shellInnerContent = (

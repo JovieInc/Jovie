@@ -19,7 +19,7 @@ type DisplayState = AudienceRowState | 'subscriber';
 const STATE_STYLES: Record<DisplayState, string> = {
   high: 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/25',
   rising: 'bg-amber-500/15 text-amber-300 ring-amber-500/25',
-  dormant: 'bg-zinc-700/40 text-tertiary-token ring-zinc-700/50',
+  dormant: 'bg-surface-0 text-tertiary-token ring-subtle',
   subscriber: 'bg-violet-500/15 text-violet-200 ring-violet-500/25',
 };
 
