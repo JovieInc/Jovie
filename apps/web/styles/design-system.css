@@ -1324,3 +1324,57 @@
     box-shadow 150ms cubic-bezier(0.32, 0.72, 0, 1),
     border-color 150ms cubic-bezier(0.32, 0.72, 0, 1);
 }
+
+/* ============================================
+   GEIST ACCENT PALETTE — feature-surface accents
+   ============================================
+
+   Nine hues sourced from the Vercel Geist palette. Each hue exposes three
+   stops: -bg (subtle fill / atmosphere), -solid (text/icon/halo), -fg (legible
+   text on -solid). Used to rotate accents across feature surfaces (Bento,
+   Profile hero, Loop diagram). Never use as primary CTA color — primary CTA
+   stays white-on-black per .linear-marketing contract above.
+
+   Source: home-page-hero handoff bundle (Claude Design 2026-04).
+*/
+:root {
+  --geist-blue-bg: #e1f0ff;
+  --geist-blue-solid: #0070f3;
+  --geist-blue-fg: #ffffff;
+  --geist-purple-bg: #f4e8ff;
+  --geist-purple-solid: #8b5cf6;
+  --geist-purple-fg: #ffffff;
+  --geist-pink-bg: #ffe4f1;
+  --geist-pink-solid: #ff0080;
+  --geist-pink-fg: #ffffff;
+  --geist-red-bg: #ffe5e5;
+  --geist-red-solid: #e00000;
+  --geist-red-fg: #ffffff;
+  --geist-amber-bg: #fff3d6;
+  --geist-amber-solid: #f5a623;
+  --geist-amber-fg: #18181b;
+  --geist-yellow-bg: #fff9c2;
+  --geist-yellow-solid: #f7d600;
+  --geist-yellow-fg: #18181b;
+  --geist-green-bg: #d3f9d8;
+  --geist-green-solid: #0cce6b;
+  --geist-green-fg: #ffffff;
+  --geist-teal-bg: #ccf5ef;
+  --geist-teal-solid: #00bcd4;
+  --geist-teal-fg: #ffffff;
+  --geist-cyan-bg: #d6f3ff;
+  --geist-cyan-solid: #22c1fc;
+  --geist-cyan-fg: #18181b;
+
+  /* Rotation order — blue, purple, pink, amber, green, teal, red, cyan, yellow.
+   * Apple-style hue rotation across feature surfaces. */
+  --geist-rotation-1: var(--geist-blue-solid);
+  --geist-rotation-2: var(--geist-purple-solid);
+  --geist-rotation-3: var(--geist-pink-solid);
+  --geist-rotation-4: var(--geist-amber-solid);
+  --geist-rotation-5: var(--geist-green-solid);
+  --geist-rotation-6: var(--geist-teal-solid);
+  --geist-rotation-7: var(--geist-red-solid);
+  --geist-rotation-8: var(--geist-cyan-solid);
+  --geist-rotation-9: var(--geist-yellow-solid);
+}
