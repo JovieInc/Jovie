@@ -59,9 +59,9 @@ jobs:
           E2E_SKIP_WEB_SERVER: '1'
           E2E_SYNTHETIC_MODE: 'true'
           E2E_ENVIRONMENT: production
-          PLAYWRIGHT_JSON_OUTPUT_NAME: test-results/results.json
+          PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/synthetic-golden-path-results.json
         run: |
-          doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-golden-path.spec.ts --project=chromium --reporter=line,json --output=test-results
+          doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-golden-path.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-golden-path
         continue-on-error: true
 
       - name: Run Public Profile Smoke Test (JOV-1653)
@@ -72,9 +72,9 @@ jobs:
           E2E_SKIP_WEB_SERVER: '1'
           E2E_SYNTHETIC_MODE: 'true'
           E2E_ENVIRONMENT: production
-          PLAYWRIGHT_JSON_OUTPUT_NAME: test-results/public-profile-smoke-results.json
+          PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/public-profile-smoke-results.json
         run: |
-          doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/public-profile-smoke.spec.ts --project=chromium --reporter=line,json --output=test-results
+          doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/public-profile-smoke.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/public-profile-smoke
         continue-on-error: true
 
       - name: Upload Public Profile Smoke Screenshots
@@ -101,7 +101,16 @@ jobs:
           node <<'NODE'
           const fs = require('node:fs');
 
-          const resultsFile = 'apps/web/test-results/results.json';
+          const resultFiles = [
+            {
+              name: 'synthetic-golden-path',
+              path: 'apps/web/test-results/synthetic-golden-path-results.json',
+            },
+            {
+              name: 'public-profile-smoke',
+              path: 'apps/web/test-results/public-profile-smoke-results.json',
+            },
+          ];
           const outputFile = process.env.GITHUB_OUTPUT;
 
           function emit(line) {
@@ -118,28 +127,43 @@ jobs:
             emit('EOF');
           }
 
-          if (!fs.existsSync(resultsFile)) {
-            emit('test_status=error');
-            emitMultiline('failed_tests', ['Test results file not found']);
-            process.exit(0);
-          }
-
-          const results = JSON.parse(fs.readFileSync(resultsFile, 'utf8'));
           const specs = [];
+          const missingResults = [];
 
-          function collectSpecs(suites = []) {
+          function collectSpecs(suites = [], source) {
             for (const suite of suites) {
-              specs.push(...(suite.specs ?? []));
-              collectSpecs(suite.suites ?? []);
+              specs.push(
+                ...(suite.specs ?? []).map(spec => ({ source, spec }))
+              );
+              collectSpecs(suite.suites ?? [], source);
             }
           }
 
-          collectSpecs(results.suites ?? []);
+          for (const resultFile of resultFiles) {
+            if (!fs.existsSync(resultFile.path)) {
+              missingResults.push(
+                `${resultFile.name}: Test results file not found (${resultFile.path})`
+              );
+              continue;
+            }
 
-          const tests = specs.flatMap(spec =>
-            (spec.tests ?? []).map(testCase => ({ spec, testCase }))
+            try {
+              const results = JSON.parse(
+                fs.readFileSync(resultFile.path, 'utf8')
+              );
+              collectSpecs(results.suites ?? [], resultFile.name);
+            } catch (error) {
+              missingResults.push(
+                `${resultFile.name}: Failed to parse ${resultFile.path}: ${error.message}`
+              );
+            }
+          }
+
+          const tests = specs.flatMap(({ source, spec }) =>
+            (spec.tests ?? []).map(testCase => ({ source, spec, testCase }))
           );
           const skipped = tests.filter(({ testCase }) =>
+            testCase.status === 'skipped' ||
             (testCase.results ?? []).some(result => result.status === 'skipped')
           );
           const flaky = tests.filter(({ testCase }) => testCase.status === 'flaky');
@@ -158,14 +182,18 @@ jobs:
           emit(`skipped_tests=${skipped.length}`);
 
           const details = [
-            ...failed.map(({ spec }) => spec.title),
+            ...missingResults,
+            ...failed.map(({ source, spec }) => `${source}: ${spec.title}`),
             ...(skipped.length > 0
-              ? ['Skipped tests:', ...skipped.map(({ spec }) => spec.title)]
+              ? [
+                  'Skipped tests:',
+                  ...skipped.map(({ source, spec }) => `${source}: ${spec.title}`),
+                ]
               : []),
           ];
           emitMultiline('failed_tests', details);
 
-          if (tests.length === 0) {
+          if (missingResults.length > 0 || tests.length === 0) {
             emit('test_status=error');
           } else if (failed.length > 0 || skipped.length > 0) {
             emit('test_status=failed');

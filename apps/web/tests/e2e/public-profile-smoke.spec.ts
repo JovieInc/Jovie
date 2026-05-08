@@ -10,8 +10,8 @@ import { expect, test } from '@playwright/test';
  *  - 200 response (not 404, not redirect loop)
  *  - Page loads within LOAD_BUDGET_MS
  *  - Artist display name renders (h1 visible, non-empty)
- *  - At least one DSP link is visible (Spotify / Apple Music / etc.)
- *  - At least one action affordance (tip / contact / listen mode)
+ *  - At least one release/listen affordance is visible
+ *  - At least one action affordance (support / contact / listen mode)
  *  - Captures a screenshot as a test artifact
  *
  * Intentionally does NOT assert on CSS / design values (per JOV-1381 learnings).
@@ -31,7 +31,7 @@ const LOAD_BUDGET_MS = Number(process.env.SMOKE_LOAD_BUDGET_MS ?? '3000');
 test('public profile renders core elements within budget', async ({ page }) => {
   test.setTimeout(60_000);
 
-  // Listen mode surfaces DSP links; default mode often hides them behind a
+  // Listen mode surfaces music links; default mode often hides them behind a
   // tab selector. Fan flow lands here from outreach messages.
   const start = Date.now();
   const response = await page.goto(`/${PROFILE_HANDLE}?mode=listen`, {
@@ -57,9 +57,11 @@ test('public profile renders core elements within budget', async ({ page }) => {
   const headingText = (await heading.textContent())?.trim() ?? '';
   expect(headingText.length, 'Artist display name is empty').toBeGreaterThan(0);
 
-  const dspLink = page
+  const releaseOrListenAffordance = page
     .locator(
       [
+        'a[aria-label^="View "]',
+        '[data-testid="latest-release-card"]',
         'a[href*="spotify"]',
         'a[href*="apple"]',
         'a[href*="music"]',
@@ -69,9 +71,10 @@ test('public profile renders core elements within budget', async ({ page }) => {
       ].join(', ')
     )
     .first();
-  await expect(dspLink, 'No DSP link visible on public profile').toBeVisible({
-    timeout: 5_000,
-  });
+  await expect(
+    releaseOrListenAffordance,
+    'No release or listen affordance visible on public profile'
+  ).toBeVisible({ timeout: 5_000 });
 
   const actionAffordance = page
     .locator(
@@ -84,13 +87,15 @@ test('public profile renders core elements within budget', async ({ page }) => {
         'button:has-text("Follow")',
         'button:has-text("Subscribe")',
         'button:has-text("Listen")',
+        'button:has-text("Support")',
+        'button:has-text("Open support")',
         '[data-mode]',
       ].join(', ')
     )
     .first();
   await expect(
     actionAffordance,
-    'No tip/contact/listen-mode affordance visible on public profile'
+    'No support/contact/listen-mode affordance visible on public profile'
   ).toBeVisible({ timeout: 5_000 });
 
   await page.screenshot({
