@@ -46,9 +46,9 @@ function parseArtifactFromSlice(rawJson: string): AgentRunArtifact | null {
   return parsed.success ? parsed.data : null;
 }
 
-function canParseArtifactSlice(rawJson: string): boolean {
+function hasCompleteJsonSlice(rawJson: string): boolean {
   try {
-    parseArtifactFromSlice(rawJson);
+    JSON.parse(rawJson);
     return true;
   } catch {
     return false;
@@ -74,7 +74,7 @@ function findCommentEndWithRecovery(
     const rawJson = markdown.slice(jsonStart, commentEnd).trim();
     const nextSearchStart = commentEnd + ARTIFACT_COMMENT_END.length;
 
-    if (!rawJson || canParseArtifactSlice(rawJson)) {
+    if (!rawJson || hasCompleteJsonSlice(rawJson)) {
       return {
         aborted: false,
         nextSearchStart,

@@ -131,6 +131,20 @@ describe('AgentOS gate evidence', () => {
     expect(evaluation.artifacts).toHaveLength(1);
   });
 
+  it('continues after schema-invalid artifact comments', () => {
+    const evaluation = evaluateAgentRunGateEvidence(
+      [
+        '<!-- agent-run-artifact',
+        '{ "id": "schema-invalid-only" }',
+        '-->',
+        formatAgentRunArtifactComment(baseArtifact),
+      ].join('\n')
+    );
+
+    expect(evaluation.passed).toBe(true);
+    expect(evaluation.artifacts).toHaveLength(1);
+  });
+
   it('continues after unclosed malformed artifact comments', () => {
     const evaluation = evaluateAgentRunGateEvidence(
       [
