@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
 
+bash scripts/check-conflict-markers.sh
 pnpm run next:proxy-guard
 pnpm exec lint-staged
