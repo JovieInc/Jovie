@@ -1,12 +1,16 @@
 # Statsig Feature Gates
 
-This document is the canonical reference for Statsig-backed gates used by the web app.
+This document is the canonical reference for Statsig-backed gates and
+experiments used by the web app.
 
 ## Scope
 
-- Source of truth for gate keys: `apps/web/lib/flags/contracts.ts` (`LEGACY_STATSIG_GATE_KEYS`)
+- Source of truth for runtime app flags:
+  `apps/web/lib/flags/contracts.ts` (`APP_FLAG_TO_STATSIG_GATE`)
 - Server-side evaluation: `apps/web/lib/flags/server.ts`
 - Client consumption: `apps/web/lib/flags/client.tsx`
+- Local route kill switches: `apps/web/app/api/chat/route.ts`
+  (`CHAT_KILL_SWITCH_GATES`)
 
 ## Gate Inventory
 
@@ -15,23 +19,33 @@ This document is the canonical reference for Statsig-backed gates used by the we
 | `billing.upgradeDirect` | `LEGACY_STATSIG_GATE_KEYS.BILLING_UPGRADE_DIRECT` | `false` | Direct checkout from upgrade button (skip pricing page) | Active |
 | `smartlink_pre_save_campaigns` | `LEGACY_STATSIG_GATE_KEYS.SMARTLINK_PRE_SAVE` | `false` | Spotify pre-save API and campaign flow | Active |
 | `feature_ios_apple_music_priority` | `LEGACY_STATSIG_GATE_KEYS.IOS_APPLE_MUSIC_PRIORITY` | `false` | iOS Apple Music prioritization | Active |
-| `experiment_subscribe_cta_variant` | `LEGACY_STATSIG_GATE_KEYS.SUBSCRIBE_CTA_EXPERIMENT` | `'two_step'` variant fallback | Subscription CTA experiment | Active |
 | `feature_spotify_oauth` | `LEGACY_STATSIG_GATE_KEYS.SPOTIFY_OAUTH` | `false` | Auth and onboarding login method selector | Active |
 | `stripe-connect-enabled` | `LEGACY_STATSIG_GATE_KEYS.STRIPE_CONNECT_ENABLED` | `false` | Stripe Connect payouts (settings + payment routes) | Active |
 | `enable_light_mode` | `LEGACY_STATSIG_GATE_KEYS.ENABLE_LIGHT_MODE` | `false` | Light mode theme toggle (footer) | Active |
-| `feature_shell_chat_v1` | `LEGACY_STATSIG_GATE_KEYS.SHELL_CHAT_V1` | `false` | Shell + chat V1 production design rollout | Active |
-| `design_v1_releases` | `LEGACY_STATSIG_GATE_KEYS.DESIGN_V1_RELEASES` | `false` | Releases-specific Design V1 view rollout (`ShellReleasesView`) | Active |
-| `design_v1_tasks` | `LEGACY_STATSIG_GATE_KEYS.DESIGN_V1_TASKS` | `false` | Tasks Design V1 rollout | Active |
-| `design_v1_chat_entities` | `LEGACY_STATSIG_GATE_KEYS.DESIGN_V1_CHAT_ENTITIES` | `false` | Chat entity panel Design V1 rollout | Active |
-| `design_v1_lyrics` | `LEGACY_STATSIG_GATE_KEYS.DESIGN_V1_LYRICS` | `false` | Lyrics Design V1 rollout | Active |
-| `design_v1_library` | `LEGACY_STATSIG_GATE_KEYS.DESIGN_V1_LIBRARY` | `false` | Read-only library Design V1 rollout | Active |
-| `design_v1_auth` | `LEGACY_STATSIG_GATE_KEYS.DESIGN_V1_AUTH` | `false` | Auth visual Design V1 rollout | Active |
-| `design_v1_onboarding` | `LEGACY_STATSIG_GATE_KEYS.DESIGN_V1_ONBOARDING` | `false` | Onboarding visual Design V1 rollout | Active |
+| `design_v1` | `LEGACY_STATSIG_GATE_KEYS.DESIGN_V1` | `false` | Unified Design V1 rollout for shell, releases, tasks, chat entities, lyrics, library, auth, and onboarding app flags | Active |
+| `ai_chat_disabled` | `CHAT_KILL_SWITCH_GATES.DISABLED` | `false` | Emergency kill switch for `/api/chat` | Active |
+| `ai_chat_force_light` | `CHAT_KILL_SWITCH_GATES.FORCE_LIGHT` | `false` | Runtime switch to route `/api/chat` to the lighter model | Active |
+
+## Experiment Inventory
+
+| Experiment key | Constant | Default behavior when Statsig is unavailable | Primary surface | Status |
+|---|---|---|---|---|
+| `experiment_subscribe_cta_variant` | `LEGACY_STATSIG_GATE_KEYS.SUBSCRIBE_CTA_EXPERIMENT` | `'two_step'` | Subscription CTA experiment | Setup |
+| `profile_alert_optin_cta_variant` | `LEGACY_STATSIG_GATE_KEYS.PROFILE_ALERT_OPTIN_EXPERIMENT` | `'button'` | Public profile alert opt-in CTA variant | Setup |
 
 ## Operational Notes
 
-- Gates are evaluated server-side with Statsig and then passed to client components via bootstrap payloads.
-- If `NEXT_PUBLIC_STATSIG_CLIENT_KEY` or `STATSIG_SERVER_SECRET_KEY` is not configured, the app degrades gracefully to safe defaults.
+- Gates and experiments are evaluated server-side with Statsig and then passed
+  to client components via bootstrap payloads. The app does not load a Statsig
+  browser SDK.
+- If `STATSIG_SERVER_SECRET` is not configured, the app degrades gracefully to
+  safe defaults.
+- `SHELL_CHAT_V1`, `DESIGN_V1_RELEASES`, `DESIGN_V1_TASKS`,
+  `DESIGN_V1_CHAT_ENTITIES`, `DESIGN_V1_LYRICS`, `DESIGN_V1_LIBRARY`,
+  `DESIGN_V1_AUTH`, and `DESIGN_V1_ONBOARDING` are app-level aliases backed by
+  the single remote `design_v1` gate. The legacy per-surface key constants are
+  compatibility names only; changing those keys in Statsig does not affect the
+  current runtime.
 - Security-sensitive authorization must still rely on server-side entitlement checks; gates are rollout controls, not permission boundaries.
 - The Design V1 rollout contract, valid flag combinations, and rollback paths live in `docs/DESIGN_V1_ROLLOUT_MATRIX.md`.
 
@@ -43,6 +57,8 @@ When adding or changing a gate:
 2. Implement or update runtime callsites.
 3. Add tests for gate-on and gate-off behavior.
 4. Update this document and `docs/FEATURE_REGISTRY.md`.
+5. Create or update the Statsig Console gate with a safe default-off rule
+   unless the rollout plan explicitly says otherwise.
 
 When ramping a gate to 100% and removing it:
 

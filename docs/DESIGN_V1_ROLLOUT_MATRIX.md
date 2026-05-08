@@ -1,29 +1,32 @@
 # Design V1 Rollout Matrix
 
 This is the operating contract for moving the experimental Design V1 surfaces
-into production behind default-off flags. It covers the full flag set, valid
-combinations, rollout order, and rollback paths. Product code must keep using
-production data adapters and must not import from `app/exp/*`.
+into production behind default-off app flags. It covers the full flag set,
+supported combinations, rollout order, and rollback paths. Product code must
+keep using production data adapters and must not import from `app/exp/*`.
 
 ## Flag Inventory
 
 | Flag | Type | Owner | Surface | Default | Rollback |
 | --- | --- | --- | --- | --- | --- |
-| `SHELL_CHAT_V1` | Runtime Statsig app flag | Shell | Authenticated shell frame, chat composer geometry, shell sidebar/audio primitives | `false` | Disable in Statsig or remove dev override |
-| `DESIGN_V1_RELEASES` | Runtime Statsig app flag | Releases | Releases table/list styling, row treatment, drawer metadata polish | `false` | Disable in Statsig or remove dev override |
-| `DESIGN_V1_TASKS` | Runtime Statsig app flag | Tasks | Tasks workspace subviews, V1 task list/detail behavior | `false` | Disable in Statsig or remove dev override |
-| `DESIGN_V1_CHAT_ENTITIES` | Runtime Statsig app flag | Chat | Chat entity chips and right-panel adapters | `false` | Disable in Statsig or remove dev override |
-| `DESIGN_V1_LYRICS` | Runtime Statsig app flag | Lyrics | `/app/lyrics/[trackId]`, lyrics button/link affordances | `false` | Disable in Statsig or remove dev override |
-| `DESIGN_V1_LIBRARY` | Runtime Statsig app flag | Library | Read-only library route from existing release/artwork data | `false` | Disable in Statsig or remove dev override |
-| `DESIGN_V1_AUTH` | Runtime Statsig app flag | Auth | Visual wrapper around existing Clerk sign-in/sign-up flows | `false` | Disable in Statsig or remove dev override |
-| `DESIGN_V1_ONBOARDING` | Runtime Statsig app flag | Onboarding | Visual wrapper around existing production onboarding actions | `false` | Disable in Statsig or remove dev override |
+| `SHELL_CHAT_V1` | Runtime app flag backed by Statsig gate `design_v1` | Shell | Authenticated shell frame, chat composer geometry, shell sidebar/audio primitives | `false` | Disable `design_v1` in Statsig or remove dev override |
+| `DESIGN_V1_RELEASES` | Runtime app flag backed by Statsig gate `design_v1` | Releases | Releases table/list styling, row treatment, drawer metadata polish | `false` | Disable `design_v1` in Statsig or remove dev override |
+| `DESIGN_V1_TASKS` | Runtime app flag backed by Statsig gate `design_v1` | Tasks | Tasks workspace subviews, V1 task list/detail behavior | `false` | Disable `design_v1` in Statsig or remove dev override |
+| `DESIGN_V1_CHAT_ENTITIES` | Runtime app flag backed by Statsig gate `design_v1` | Chat | Chat entity chips and right-panel adapters | `false` | Disable `design_v1` in Statsig or remove dev override |
+| `DESIGN_V1_LYRICS` | Runtime app flag backed by Statsig gate `design_v1` | Lyrics | `/app/lyrics/[trackId]`, lyrics button/link affordances | `false` | Disable `design_v1` in Statsig or remove dev override |
+| `DESIGN_V1_LIBRARY` | Runtime app flag backed by Statsig gate `design_v1` | Library | Read-only library route from existing release/artwork data | `false` | Disable `design_v1` in Statsig or remove dev override |
+| `DESIGN_V1_AUTH` | Runtime app flag backed by Statsig gate `design_v1` | Auth | Visual wrapper around existing Clerk sign-in/sign-up flows | `false` | Disable `design_v1` in Statsig or remove dev override |
+| `DESIGN_V1_ONBOARDING` | Runtime app flag backed by Statsig gate `design_v1` | Onboarding | Visual wrapper around existing production onboarding actions | `false` | Disable `design_v1` in Statsig or remove dev override |
 | `SHOW_HOME_V1_DESIGN` | Static build-time flag | Marketing | Homepage V1 design | `false` | Revert flag and redeploy |
 | `SHOW_PUBLIC_PROFILE_V1_DESIGN` | Static build-time flag | Public Profile | Public profile V1 design | `false` | Revert flag and redeploy |
 
 Runtime app flags are defined in `apps/web/lib/flags/contracts.ts` and
-resolved through `apps/web/lib/flags/server.ts` / `AppFlagProvider`. Static
-marketing flags are defined in `apps/web/lib/flags/marketing-static.ts` and
-must stay build-time constants so marketing pages remain fully static.
+resolved through `apps/web/lib/flags/server.ts` / `AppFlagProvider`. All
+runtime Design V1 app flags currently resolve through the single remote
+Statsig gate `design_v1`; the per-surface names are app-level aliases for
+callsite clarity, not independent Statsig rollout controls. Static marketing
+flags are defined in `apps/web/lib/flags/marketing-static.ts` and must stay
+build-time constants so marketing pages remain fully static.
 
 Static marketing flags are not remote rollout controls. The value imported from
 `marketing-static.ts` is bundled into the deployed build, so changing either
@@ -36,16 +39,15 @@ toolbar override harness, cookies, request headers, or query parameters.
 | Combination | Expected Behavior | Status |
 | --- | --- | --- |
 | All flags `false` | Current production UI and behavior. This is the default safety baseline. | Required |
-| `SHELL_CHAT_V1=true`, all surface flags `false` | V1 authenticated frame/chrome may render, but releases, tasks, lyrics, library, auth, onboarding, and public/marketing surfaces keep their legacy/product behavior. | Supported |
-| `SHELL_CHAT_V1=false`, one dashboard surface flag `true` | The flagged surface may render its V1 content inside the existing shell frame when the route supports it. It must not require shell chrome to be enabled. | Supported for independently ported surfaces |
-| `SHELL_CHAT_V1=true` plus one dashboard surface flag `true` | V1 shell frame plus the selected V1 surface. This is the preferred QA path before wider rollout. | Preferred |
-| All runtime Design V1 flags `true` | Full authenticated Design V1 smoke path. Must keep production data contracts and route permissions. | QA-only until every surface has parity |
+| `design_v1=true` | All runtime Design V1 alias flags resolve `true`. This is the supported remote rollout shape. | Supported |
+| Per-surface alias override in dev/test | Local dev tooling may present alias labels, but the stored override key is `code:DESIGN_V1`; aliases move together. | Supported for local QA labels only |
 | Static public flags `true` with runtime flags `false` | Homepage/public profile V1 can ship independently because they are build-time static surfaces. | Supported after static QA |
 | Runtime flags `true` with static public flags `false` | Authenticated app rollout without marketing/public profile changes. | Supported |
 
-Invalid combinations are implementation bugs, not product choices. A surface
-flag must degrade cleanly when other Design V1 flags are disabled unless this
-document names an explicit dependency.
+Independent per-surface remote rollout is not supported by the current
+implementation. To reintroduce it, update `APP_FLAG_TO_STATSIG_GATE`,
+`APP_FLAG_KEYS`, `APP_FLAG_OVERRIDE_KEYS`, tests, this matrix, and the Statsig
+Console gates in the same PR.
 
 ## Surface Dependencies
 
@@ -64,18 +66,15 @@ document names an explicit dependency.
 
 ## Rollout Order
 
-1. Keep all flags default `false` and land infrastructure/tests first.
-2. Validate `SHELL_CHAT_V1` with chat, sidebar, audio, and loader smoke tests.
-3. Enable one authenticated surface flag at a time in preview/dev cohorts:
-   releases, tasks, chat entities, lyrics, library.
-4. Run all runtime Design V1 flags together in QA after each individual surface
-   is green.
-5. Validate auth and onboarding separately because they touch entry and resume
+1. Keep `design_v1` default `false` and land infrastructure/tests first.
+2. Validate `design_v1` with chat, sidebar, audio, releases, tasks, lyrics,
+   library, auth, and onboarding smoke coverage.
+3. Validate auth and onboarding carefully because they touch entry and resume
    flows.
-6. Validate static homepage/public profile flags in preview builds. Static flags
+4. Validate static homepage/public profile flags in preview builds. Static flags
    require a redeploy for rollback, so do not batch them with runtime flips.
-7. Ramp runtime flags by cohort only after flag-off parity and flag-on smoke
-   are both green for the affected route.
+5. Ramp `design_v1` by cohort only after flag-off parity and flag-on smoke are
+   both green for the affected routes.
 
 ## Static Marketing Preview Procedure
 
@@ -143,7 +142,7 @@ then repeat this procedure from a fresh preview deployment.
 
 Runtime app flags:
 
-1. Disable the Statsig gate or remove the local dev override.
+1. Disable the `design_v1` Statsig gate or remove the local dev override.
 2. Confirm the route returns to the flag-off screenshot/smoke baseline.
 3. Leave follow-up code in place if flag-off parity is intact; revert only if
    the disabled code still affects production.

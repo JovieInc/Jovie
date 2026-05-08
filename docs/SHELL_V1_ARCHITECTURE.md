@@ -32,7 +32,11 @@ apps/web/app/app/layout.tsx                   # ResolvedClientProviders
 
 ## Feature flag: `SHELL_CHAT_V1`
 
-Defined in `apps/web/lib/flags/contracts.ts` (Statsig gate `feature_shell_chat_v1`, default `false`). Resolved server-side once in `apps/web/app/app/(shell)/layout.tsx`, then provided to every consumer via `AppFlagProvider`. Read in client components with `useAppFlag('SHELL_CHAT_V1')`.
+Defined in `apps/web/lib/flags/contracts.ts` as the `SHELL_CHAT_V1` app flag
+(default `false`). It is currently backed by the unified Statsig gate
+`design_v1`, resolved server-side once in `apps/web/app/app/(shell)/layout.tsx`,
+then provided to every consumer via `AppFlagProvider`. Read in client
+components with `useAppFlag('SHELL_CHAT_V1')`.
 
 When `true`:
 
@@ -43,7 +47,10 @@ When `false`:
 
 - The shell layout still renders, but consumers fall through to legacy primitives — so the flag is purely a visual rollout control. No traffic ever bypasses `(shell)/layout.tsx`.
 
-Flag plumbing: `apps/web/lib/flags/server.ts:getAppFlagValue` / `getAppFlagsSnapshot` resolve through `APP_FLAG_REGISTRY`, with dev/test overrides honored.
+Flag plumbing: `apps/web/lib/flags/server.ts:getAppFlagValue` /
+`getAppFlagsSnapshot` resolve through `APP_FLAG_REGISTRY`, with dev/test
+overrides honored. Remote rollout uses `design_v1`; the legacy
+`feature_shell_chat_v1` key is not an active runtime control.
 
 ## Releases flag boundary
 

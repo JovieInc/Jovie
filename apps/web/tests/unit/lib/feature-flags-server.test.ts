@@ -1,20 +1,29 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LEGACY_STATSIG_GATE_KEYS } from '@/lib/flags/contracts';
 
-// Mock statsig-node before importing the module under test
-vi.mock(
-  'statsig-node',
-  () => ({
-    default: {
-      initialize: vi.fn(),
-      getFeatureGateSync: vi.fn(() => ({
-        value: false,
-        evaluationDetails: { reason: 'Unrecognized' },
-      })),
-    },
-  }),
-  { virtual: true }
-);
+const { getExperimentMock, getFeatureGateMock, initializeMock, shutdownMock } =
+  vi.hoisted(() => ({
+    getExperimentMock: vi.fn(() => ({ value: {} })),
+    getFeatureGateMock: vi.fn(() => ({
+      getEvaluationDetails: () => ({ reason: 'Unrecognized' }),
+      value: false,
+    })),
+    initializeMock: vi.fn().mockResolvedValue({ success: true }),
+    shutdownMock: vi.fn().mockResolvedValue({ success: true }),
+  }));
+
+// Mock the Statsig Core server SDK before importing the module under test.
+vi.mock('@statsig/statsig-node-core', () => ({
+  Statsig: vi.fn().mockImplementation(() => ({
+    getExperiment: getExperimentMock,
+    getFeatureGate: getFeatureGateMock,
+    initialize: initializeMock,
+    shutdown: shutdownMock,
+  })),
+  StatsigUser: {
+    withUserID: (userID: string) => ({ userID }),
+  },
+}));
 
 // Mock env to control STATSIG_SERVER_SECRET
 vi.mock('@/lib/env-server', () => ({

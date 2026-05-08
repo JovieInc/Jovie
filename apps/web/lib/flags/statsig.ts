@@ -1,4 +1,5 @@
 import 'server-only';
+import { Statsig, StatsigUser } from '@statsig/statsig-node-core';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
 import { logger } from '@/lib/utils/logger';
@@ -11,37 +12,26 @@ import {
   type SubscribeCTAVariant,
 } from './contracts';
 
-type StatsigClient = typeof import('statsig-node').default;
-
 let statsigInitialized = false;
-let statsigClient: StatsigClient | null = null;
-let statsigImportFailed = false;
+let statsigClient: Statsig | null = null;
 let statsigInitPromise: Promise<void> | null = null;
 let statsigWarnedNoSecret = false;
 
 const isE2ERuntime = publicEnv.NEXT_PUBLIC_E2E_MODE === '1';
 
-async function getStatsigClient(): Promise<StatsigClient | null> {
+function getStatsigUser(userId: string | null): StatsigUser {
+  return StatsigUser.withUserID(userId ?? 'anonymous');
+}
+
+function getStatsigClient(serverSecret: string): Statsig {
   if (statsigClient) {
     return statsigClient;
   }
 
-  if (statsigImportFailed) {
-    return null;
-  }
-
-  try {
-    // Statsig is optional in local/test environments; keep the specifier
-    // non-literal so Vite/Vitest do not pre-resolve it before runtime fallback.
-    const optionalModuleName = 'statsig-node';
-    const statsigModule = await import(optionalModuleName);
-    statsigClient = statsigModule.default;
-    return statsigClient;
-  } catch (error) {
-    statsigImportFailed = true;
-    logger.error('Statsig SDK is unavailable', error, 'Statsig');
-    return null;
-  }
+  statsigClient = new Statsig(serverSecret, {
+    environment: env.VERCEL_ENV || env.NODE_ENV || 'development',
+  });
+  return statsigClient;
 }
 
 async function initializeStatsig(): Promise<void> {
@@ -64,14 +54,8 @@ async function initializeStatsig(): Promise<void> {
     }
 
     try {
-      const statsig = await getStatsigClient();
-      if (!statsig) return;
-
-      await statsig.initialize(serverSecret, {
-        environment: {
-          tier: env.VERCEL_ENV || env.NODE_ENV || 'development',
-        },
-      });
+      const statsig = getStatsigClient(serverSecret);
+      await statsig.initialize();
       statsigInitialized = true;
       logger.info('[Statsig] Server SDK initialized', undefined, 'Statsig');
     } catch (error) {
@@ -106,16 +90,13 @@ export async function checkGateForUser(
   }
 
   try {
-    const statsig = await getStatsigClient();
+    const statsig = statsigClient;
     if (!statsig) {
       return defaultValue;
     }
 
-    const gate = statsig.getFeatureGateSync(
-      { userID: userId ?? 'anonymous' },
-      gateKey
-    );
-    if (gate.evaluationDetails?.reason === 'Unrecognized') {
+    const gate = statsig.getFeatureGate(getStatsigUser(userId), gateKey);
+    if (gate.getEvaluationDetails().reason === 'Unrecognized') {
       return defaultValue;
     }
     return gate.value;
@@ -148,13 +129,13 @@ export async function getExperiment(
   if (!statsigInitialized) return {};
 
   try {
-    const statsig = await getStatsigClient();
+    const statsig = statsigClient;
     if (!statsig) {
       return {};
     }
 
-    const experiment = await statsig.getExperiment(
-      { userID: userId ?? 'anonymous' },
+    const experiment = statsig.getExperiment(
+      getStatsigUser(userId),
       experimentKey
     );
     return experiment.value;
@@ -198,13 +179,12 @@ export async function getSubscribeCTAVariantValue(
 
 export async function shutdownStatsig(): Promise<void> {
   if (statsigInitialized) {
-    const statsig = await getStatsigClient();
+    const statsig = statsigClient;
     if (statsig) {
       await statsig.shutdown();
     }
   }
   statsigInitialized = false;
   statsigClient = null;
-  statsigImportFailed = false;
   statsigInitPromise = null;
 }

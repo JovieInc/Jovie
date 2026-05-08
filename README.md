@@ -35,11 +35,10 @@ Jovie uses a modern, secure stack designed for scalability, type safety, and exc
 - **Stripe** - Payment processing with subscriptions and webhooks
 - **RevenueCat** - Cross-platform subscription management (mobile)
 
-### Analytics & Feature Flags
-- **Statsig** - Feature flags, A/B testing, and analytics
-  - `@statsig/react-bindings` - React integration
-  - `@statsig/session-replay` - User session recording
-  - `@statsig/web-analytics` - Web analytics tracking
+### Feature Flags & Experiments
+- **Statsig** - Server-side feature flags and A/B tests
+  - `@statsig/statsig-node-core` - Server SDK used by `apps/web/lib/flags/statsig.ts`
+  - `flags` - App flag registry and bootstrap payloads for client consumers
 
 ### Error Tracking & Monitoring
 - **Sentry 10** - Error tracking, performance monitoring, and session replay
@@ -71,13 +70,12 @@ Jovie uses a modern, secure stack designed for scalability, type safety, and exc
 - 🎵 **Artist Profiles** - Customizable profile pages with themes and branding
 - 🔗 **Link-in-Bio** - Centralized link hub with click tracking
 - 💸 **Tipping & Payments** - Integrated Stripe payments with subscription support
-- 📊 **Analytics Dashboard** - Real-time creator analytics with Statsig
+- 📊 **Analytics Dashboard** - Real-time creator analytics
 - 🔐 **Row Level Security** - Database-level security with Clerk JWT integration
 - 📱 **Mobile Optimized** - Responsive design with touch-friendly UI
 - ⚡ **Edge Performance** - Server-side rendering with edge optimization
 - 🌙 **Dark Mode** - System-aware theme switching
 - 🎭 **Feature Flags** - Gradual rollouts with Statsig
-- 📈 **Session Replay** - Debug user issues with Statsig session replay
 
 ## Getting Started
 
@@ -92,7 +90,7 @@ Jovie uses a modern, secure stack designed for scalability, type safety, and exc
   - [Clerk](https://clerk.com/) - Authentication
   - [Stripe](https://stripe.com/) - Payments
   - [Doppler](https://doppler.com/) - Secrets management
-  - [Statsig](https://statsig.com/) - Feature flags & analytics (optional)
+  - [Statsig](https://statsig.com/) - Feature flags and experiments (optional)
   - [Sentry](https://sentry.io/) - Error tracking (optional)
 
 ### Installation
@@ -344,9 +342,8 @@ STRIPE_SECRET_KEY=sk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
 
-# Statsig (Feature Flags & Analytics)
-NEXT_PUBLIC_STATSIG_CLIENT_KEY=client-...
-STATSIG_SERVER_API_KEY=secret-...
+# Statsig (server-side feature flags and experiments)
+STATSIG_SERVER_SECRET=secret-...
 
 # Sentry (Error Tracking)
 SENTRY_AUTH_TOKEN=...
@@ -390,7 +387,6 @@ doppler run --project jovie-web --config prd -- pnpm --filter @jovie/web run dri
 
 ### Performance
 - **Vercel Analytics** - Core Web Vitals, page performance
-- **Statsig Web Analytics** - User behavior, feature adoption
 - **Sentry Performance** - Backend performance, slow queries
 
 ### Errors
@@ -399,8 +395,7 @@ doppler run --project jovie-web --config prd -- pnpm --filter @jovie/web run dri
 - **Neon Dashboard** - Database errors, connection issues
 
 ### Feature Flags
-- **Statsig Console** - Feature rollouts, A/B tests, metrics
-- **Session Replay** - User session recordings for debugging
+- **Statsig Console** - Server-side feature rollouts and A/B tests
 
 ## Database Schema
 
