@@ -74,6 +74,10 @@ Chief/default/CFO/Founder OS/Code Orchestrator profiles must not implement perfo
 
 Runtime: ~30–50 minutes for a full run (4–10 iterations with builds).
 
+## Parallel Multi-Chunk Swarms
+
+The `/swarm` skill handles **Linear-driven** parallel agent dispatch. For ad-hoc multi-chunk work (design-system migrations, large mechanical refactors) that does not require Linear issues, use the ruflo-coordinated pattern documented in [`.claude/rules/swarm.md`](.claude/rules/swarm.md) instead.
+
 ## QA & Browse Authentication
 
 When running `/qa` or `/browse` against local Jovie, agents **MUST** use the built-in dev auth bootstrap. See `.claude/rules/auth.md` → "QA & Browse Authentication" for the canonical local flow, persona rules, and "do not" list.
