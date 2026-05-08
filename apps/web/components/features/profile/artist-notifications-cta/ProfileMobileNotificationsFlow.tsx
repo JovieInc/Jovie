@@ -504,7 +504,7 @@ export function ProfileMobileNotificationsFlow({
           footer={
             <div className='space-y-3'>
               {error ? (
-                <p className='text-sm text-error' role='alert'>
+                <p className='text-sm text-[#ff8b8b]' role='alert'>
                   {error}
                 </p>
               ) : null}
@@ -543,7 +543,7 @@ export function ProfileMobileNotificationsFlow({
           footer={
             <div className='space-y-3'>
               {error ? (
-                <p className='text-sm text-error' role='alert'>
+                <p className='text-sm text-[#ff8b8b]' role='alert'>
                   {error}
                 </p>
               ) : null}
