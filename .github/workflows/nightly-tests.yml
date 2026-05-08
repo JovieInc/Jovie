@@ -13,7 +13,8 @@ name: Nightly Tests
 
 on:
   schedule:
-    - cron: '0 9 * * *'
+    - cron: '0 2 * * *'
+      timezone: 'America/Los_Angeles'
   workflow_dispatch:
     inputs:
       suite:
