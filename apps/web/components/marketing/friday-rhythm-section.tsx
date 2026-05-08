@@ -1,6 +1,9 @@
 'use client';
 
-import { useReducedMotion as useMotionReducedMotion } from 'motion/react';
+import {
+  motion,
+  useReducedMotion as useMotionReducedMotion,
+} from 'motion/react';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ContributionGraph } from '@/components/ui/contribution-graph';
@@ -420,28 +423,34 @@ function RhythmHeartbeatLine({
       preserveAspectRatio='none'
       viewBox={`0 0 ${HEARTBEAT_WIDTH} ${HEARTBEAT_HEIGHT}`}
     >
-      <path
+      <motion.path
+        animate={{ d: heartbeatPath }}
         d={heartbeatPath}
         fill='none'
+        initial={false}
         stroke='currentColor'
         strokeLinecap='round'
         strokeLinejoin='round'
         strokeOpacity={variant === 'section' ? '0.04' : '0.025'}
         strokeWidth={variant === 'section' ? '2.6' : '2'}
-        style={{
-          transition: reducedMotion ? undefined : 'd 450ms ease-out',
+        transition={{
+          duration: reducedMotion ? 0 : 0.45,
+          ease: 'easeOut',
         }}
       />
-      <path
+      <motion.path
+        animate={{ d: heartbeatPath }}
         d={heartbeatPath}
         fill='none'
+        initial={false}
         stroke='currentColor'
         strokeLinecap='round'
         strokeLinejoin='round'
         strokeOpacity={variant === 'section' ? '0.12' : '0.07'}
         strokeWidth={variant === 'section' ? '0.62' : '0.46'}
-        style={{
-          transition: reducedMotion ? undefined : 'd 450ms ease-out',
+        transition={{
+          duration: reducedMotion ? 0 : 0.45,
+          ease: 'easeOut',
         }}
       />
     </svg>
