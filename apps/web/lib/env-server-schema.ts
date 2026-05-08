@@ -187,6 +187,9 @@ export const ServerEnvSchema = z.object({
   // AI Gateway auth (required for chat completions)
   AI_GATEWAY_API_KEY: z.string().optional(),
 
+  // AgentOS workflows are compile-ready but runtime-disabled by default.
+  AGENT_OS_WORKFLOWS_ENABLED: z.enum(['true', 'false']).optional(),
+
   // xAI / Grok image generation
   XAI_API_KEY: z.string().optional(),
   ALBUM_ART_IMAGE_MODEL: z.string().optional(),
@@ -324,6 +327,7 @@ export const ENV_KEYS = [
   'VERCEL_GIT_REPO_SLUG',
   'STATSIG_SERVER_SECRET',
   'AI_GATEWAY_API_KEY',
+  'AGENT_OS_WORKFLOWS_ENABLED',
   'XAI_API_KEY',
   'ALBUM_ART_IMAGE_MODEL',
   'ALBUM_ART_GENERATION_DAILY_LIMIT',

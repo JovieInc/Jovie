@@ -3,7 +3,8 @@ import { APP_ROUTES } from '@/constants/routes';
 
 describe('legacy settings referral redirect', () => {
   it(`redirects to ${APP_ROUTES.SETTINGS_ACCOUNT} in next.config.js`, async () => {
-    const nextConfig = await import('../../../next.config.js');
+    const nextConfigModule = await import('../../../next.config.js');
+    const nextConfig = nextConfigModule.default ?? nextConfigModule;
     const redirects = await nextConfig.redirects();
     const settingsReferralRedirect = redirects.find(
       (redirect: { source: string }) =>

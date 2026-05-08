@@ -57,6 +57,8 @@
     "hooks/**/*.ts",
     "hooks/**/*.tsx",
     "styles/**/*.ts",
+    "workflows/**/*.ts",
+    "workflows/**/*.tsx",
     "next-env.d.ts",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",

@@ -6,6 +6,7 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  readlinkSync,
   realpathSync,
   rmSync,
   writeFileSync,
@@ -18,6 +19,17 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
 const appRoot = path.resolve(scriptDir, '..');
 const standaloneOutputRoot = path.join(appRoot, '.next', 'standalone');
+const standaloneNodeModulesRoot = path.join(
+  standaloneOutputRoot,
+  'node_modules'
+);
+const workspaceNodeModulesRoot = path.resolve(
+  appRoot,
+  '..',
+  '..',
+  'node_modules'
+);
+const appNodeModulesRoot = path.join(appRoot, 'node_modules');
 const standaloneRoot = path.join(standaloneOutputRoot, 'apps', 'web');
 const standaloneNextRoot = path.join(standaloneRoot, '.next');
 
@@ -75,6 +87,38 @@ function countSymlinks(rootDir) {
   return total;
 }
 
+function resolveStandaloneSymlinkTarget(entryPath) {
+  try {
+    return realpathSync(entryPath);
+  } catch (error) {
+    if (error?.code !== 'ENOENT') {
+      throw error;
+    }
+
+    const linkTarget = readlinkSync(entryPath);
+    const standaloneTarget = path.resolve(path.dirname(entryPath), linkTarget);
+    const relativeTarget = path.relative(
+      standaloneNodeModulesRoot,
+      standaloneTarget
+    );
+
+    if (relativeTarget.startsWith('..') || path.isAbsolute(relativeTarget)) {
+      throw error;
+    }
+
+    const fallbackRoots = [appNodeModulesRoot, workspaceNodeModulesRoot];
+
+    for (const root of fallbackRoots) {
+      const fallbackTarget = path.join(root, relativeTarget);
+      if (existsSync(fallbackTarget)) {
+        return realpathSync(fallbackTarget);
+      }
+    }
+
+    throw error;
+  }
+}
+
 function materializeSymlinks(rootDir) {
   let materialized = 0;
 
@@ -82,7 +126,7 @@ function materializeSymlinks(rootDir) {
     const entryPath = path.join(rootDir, entry.name);
 
     if (entry.isSymbolicLink()) {
-      const resolvedPath = realpathSync(entryPath);
+      const resolvedPath = resolveStandaloneSymlinkTarget(entryPath);
       const resolvedStats = lstatSync(resolvedPath);
 
       rmSync(entryPath, { force: true, recursive: true });

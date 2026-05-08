@@ -3,6 +3,7 @@ const path = require('path');
 const withBundleAnalyzer = require('@next/bundle-analyzer')({
   enabled: process.env.ANALYZE === 'true',
 });
+const { withWorkflow } = require('workflow/next');
 // Read version from canonical source (version.json at monorepo root)
 const { version: APP_VERSION } = require('../../version.json');
 const isVercelPreview = process.env.VERCEL_ENV === 'preview';
@@ -525,8 +526,24 @@ const withVercelToolbar = enableVercelToolbar
   ? require('@vercel/toolbar/plugins/next')()
   : config => config;
 
-// Apply plugins in order: bundle analyzer -> vercel toolbar -> sentry
-module.exports = withBundleAnalyzer(withVercelToolbar(nextConfig));
+function exposeStaticConfigForTooling(config) {
+  if (typeof config !== 'function') {
+    return config;
+  }
+
+  return Object.assign(config, {
+    images: nextConfig.images,
+    redirects: nextConfig.redirects,
+    rewrites: nextConfig.rewrites,
+  });
+}
+
+// Apply plugins in order: workflow -> bundle analyzer -> vercel toolbar -> sentry.
+// `withWorkflow()` must stay active even while AgentOS workflows are runtime-gated
+// so WDK directives compile before PR5 adds the first dry-run workflow.
+module.exports = exposeStaticConfigForTooling(
+  withBundleAnalyzer(withVercelToolbar(withWorkflow(nextConfig)))
+);
 
 // Sentry build plugin: source map upload + tunnel route only when upload auth
 // exists. Generic CI public-audit builds run production standalone without
@@ -540,12 +557,14 @@ const shouldUseSentryPlugin =
   hasSentryAuthToken &&
   (process.env.NODE_ENV === 'production' || !!process.env.VERCEL_ENV);
 
-module.exports = shouldUseSentryPlugin
-  ? withSentryConfig(module.exports, {
-      org: 'jovie',
-      project: 'jovie-web',
-      silent: !process.env.CI,
-      widenClientFileUpload: true,
-      tunnelRoute: '/monitoring',
-    })
-  : module.exports;
+module.exports = exposeStaticConfigForTooling(
+  shouldUseSentryPlugin
+    ? withSentryConfig(module.exports, {
+        org: 'jovie',
+        project: 'jovie-web',
+        silent: !process.env.CI,
+        widenClientFileUpload: true,
+        tunnelRoute: '/monitoring',
+      })
+    : module.exports
+);
