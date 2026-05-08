@@ -538,7 +538,7 @@ export function HudDashboardClient({
               <HermesDispatchControls
                 aiOps={metrics.aiOps}
                 onDispatchComplete={() => {
-                  void refetch();
+                  refetch().catch(() => {});
                 }}
               />
             ) : (
