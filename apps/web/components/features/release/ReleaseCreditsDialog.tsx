@@ -102,7 +102,7 @@ export function ReleaseCreditsDialog({
                 View all credited collaborators for this release
               </SheetDescription>
             </SheetHeader>
-            <div className='mt-4 rounded-xl bg-surface-1/30 p-4 ring-1 ring-inset ring-white/[0.06]'>
+            <div className='mt-4 rounded-xl bg-white/5 p-4 ring-1 ring-inset ring-white/[0.06]'>
               {content}
             </div>
           </SheetContent>
@@ -127,7 +127,7 @@ export function ReleaseCreditsDialog({
           View all credited collaborators for this release
         </DialogDescription>
         <DialogBody className='mt-2'>
-          <div className='rounded-xl bg-surface-1/30 p-4 ring-1 ring-inset ring-white/[0.06]'>
+          <div className='rounded-xl bg-white/5 p-4 ring-1 ring-inset ring-white/[0.06]'>
             {content}
           </div>
         </DialogBody>
