@@ -12,6 +12,7 @@ import {
   useTransition,
 } from 'react';
 import { PreviewPanelProvider } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import { UpdateAvailablePill } from '@/components/atoms/UpdateAvailablePill';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import {
   HeaderActionsProvider,
@@ -73,7 +74,7 @@ function HeaderCommandSearchButton() {
       type='button'
       data-app-search-trigger='true'
       onClick={openCommandPalette}
-      className='inline-flex h-7 items-center gap-1.5 rounded-md border border-(--linear-app-shell-border) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_94%,transparent)] px-2 text-[12px] text-secondary-token transition-[background-color,border-color,color] duration-150 hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+      className='inline-flex h-7 items-center gap-1.5 rounded-md border border-(--linear-app-shell-border) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_94%,transparent)] px-2 text-[12px] text-secondary-token transition-[background-color,border-color,color] duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
       aria-label='Search Jovie'
     >
       <Search className='h-3.5 w-3.5' aria-hidden='true' />
@@ -130,6 +131,7 @@ function AuthShellWrapperInner({
           <HeaderChatUsageIndicator />
         ) : null}
         <HeaderProfileProgress />
+        <UpdateAvailablePill />
       </>
     ),
     [config.isDemoRoute, config.showChatUsageIndicator, designV1Enabled]

@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { app, BrowserWindow, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import { APP_ENV, APP_URL } from './env';
 
@@ -132,6 +132,24 @@ function createWindow(): BrowserWindow {
 
   return win;
 }
+
+// Wire auto-updater events to renderer IPC so the web UI can show the update pill.
+autoUpdater.on('update-available', () => {
+  for (const win of BrowserWindow.getAllWindows()) {
+    win.webContents.send('update-available');
+  }
+});
+
+autoUpdater.on('update-downloaded', () => {
+  for (const win of BrowserWindow.getAllWindows()) {
+    win.webContents.send('update-downloaded');
+  }
+});
+
+// Allow renderer to trigger quit-and-install without exposing node access.
+ipcMain.handle('quit-and-install', () => {
+  autoUpdater.quitAndInstall();
+});
 
 app.whenReady().then(() => {
   createWindow();
