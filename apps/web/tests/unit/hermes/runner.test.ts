@@ -71,6 +71,18 @@ describe('Hermes CLI worker runner', () => {
     );
   });
 
+  it('defaults empty Hermes worker allowed paths', () => {
+    const { allowedPaths: _allowedPaths, ...payloadWithoutAllowedPaths } =
+      basePayload;
+
+    expect(
+      parseHermesPayload({ ...basePayload, allowedPaths: [] }).allowedPaths
+    ).toEqual(['apps/web', 'scripts', '.github/workflows']);
+    expect(parseHermesPayload(payloadWithoutAllowedPaths).allowedPaths).toEqual(
+      ['apps/web', 'scripts', '.github/workflows']
+    );
+  });
+
   it('fails closed when Hermes changes files outside allowed paths', () => {
     expect(
       findOutOfScopeHermesChangedFiles(
