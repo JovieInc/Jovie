@@ -69,6 +69,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REPOSITORY: ${{ github.repository }}
+          AGENT_RUN_SOURCE_RUN_ID: ${{ github.event.pull_request.head.sha }}
         run: |
           EVIDENCE_FILE="$RUNNER_TEMP/agent-gate-evidence.md"
           gh pr view "$PR_NUMBER" --json body --jq '.body // ""' > "$EVIDENCE_FILE"

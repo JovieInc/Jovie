@@ -620,6 +620,7 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPOSITORY: ${{ github.repository }}
+          AGENT_RUN_SOURCE_RUN_ID: ${{ needs.guard.outputs.pr_head_sha }}
         run: |
           PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
           EVIDENCE_FILE="$RUNNER_TEMP/agent-gate-evidence.md"
@@ -858,7 +859,7 @@ jobs:
           if [[ "$STATUSES_PASSED" == "true" && "$GSTACK_PASSED" != "true" ]]; then
             echo "  - GStack evidence missing: $GSTACK_BLOCKING"
           fi
-          if [[ "$SENSITIVE_SAFE" != "true" ]]; then
+          if [[ "$GSTACK_PASSED" == "true" && "$SENSITIVE_SAFE" != "true" ]]; then
             echo "  - Sensitive files changed: $SENSITIVE_FILES"
           fi
 

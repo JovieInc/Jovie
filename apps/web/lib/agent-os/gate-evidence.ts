@@ -21,6 +21,10 @@ export interface GateEvidenceEvaluation {
   readonly artifacts: readonly AgentRunArtifact[];
 }
 
+export interface GateEvidenceEvaluationOptions {
+  readonly sourceRunId?: string;
+}
+
 export function formatAgentRunArtifactComment(
   artifact: AgentRunArtifact
 ): string {
@@ -98,9 +102,14 @@ function gateHasRecordedEvidence(gate: VerificationGate): boolean {
 
 export function evaluateAgentRunGateEvidence(
   markdown: string,
-  requiredGateNames: readonly AgentRunGateEvidenceName[] = REQUIRED_NON_DRY_RUN_GSTACK_GATES
+  requiredGateNames: readonly AgentRunGateEvidenceName[] = REQUIRED_NON_DRY_RUN_GSTACK_GATES,
+  options: GateEvidenceEvaluationOptions = {}
 ): GateEvidenceEvaluation {
-  const artifacts = extractAgentRunArtifactsFromMarkdown(markdown);
+  const artifacts = extractAgentRunArtifactsFromMarkdown(markdown).filter(
+    artifact =>
+      options.sourceRunId === undefined ||
+      artifact.sourceRunId === options.sourceRunId
+  );
   const passedGateNames = new Set<AgentRunGateEvidenceName>();
 
   for (const artifact of artifacts) {

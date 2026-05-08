@@ -24,7 +24,12 @@ try {
   process.exit(1);
 }
 
-const evaluation = evaluateAgentRunGateEvidence(evidenceMarkdown);
+const sourceRunId = process.env.AGENT_RUN_SOURCE_RUN_ID?.trim() || undefined;
+const evaluation = evaluateAgentRunGateEvidence(
+  evidenceMarkdown,
+  undefined,
+  sourceRunId ? { sourceRunId } : undefined
+);
 
 console.log(buildGateEvidenceSummary(evaluation));
 

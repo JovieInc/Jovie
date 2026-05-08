@@ -19,8 +19,8 @@ const payload = parseHermesPayload(
 );
 const changedFiles = readFileSync(changedFilesFile, 'utf8')
   .split('\n')
-  .map(file => file.trim())
-  .filter(Boolean);
+  .map(file => (file.endsWith('\r') ? file.slice(0, -1) : file))
+  .filter(file => file.length > 0);
 
 assertHermesChangedFilesAllowed(changedFiles, payload.allowedPaths);
 console.log(

@@ -156,4 +156,35 @@ describe('AgentOS gate evidence', () => {
 
     expect(evaluation.passed).toBe(true);
   });
+
+  it('can require evidence from the current source run', () => {
+    const markdown = [
+      formatAgentRunArtifactComment(baseArtifact),
+      formatAgentRunArtifactComment({
+        ...baseArtifact,
+        id: 'run-gstack-current',
+        sourceRunId: 'current-sha',
+      }),
+    ].join('\n');
+
+    const currentEvaluation = evaluateAgentRunGateEvidence(
+      markdown,
+      undefined,
+      {
+        sourceRunId: 'current-sha',
+      }
+    );
+    const missingEvaluation = evaluateAgentRunGateEvidence(
+      markdown,
+      undefined,
+      {
+        sourceRunId: 'missing-sha',
+      }
+    );
+
+    expect(currentEvaluation.passed).toBe(true);
+    expect(currentEvaluation.artifacts).toHaveLength(1);
+    expect(missingEvaluation.passed).toBe(false);
+    expect(missingEvaluation.artifacts).toEqual([]);
+  });
 });
