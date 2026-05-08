@@ -2361,7 +2361,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--linear-accent, #5e8cff);
+  color: rgb(97, 153, 246);
   font-size: 12px;
   font-weight: 620;
   line-height: 1;

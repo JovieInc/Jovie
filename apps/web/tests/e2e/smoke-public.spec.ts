@@ -249,18 +249,29 @@ test.describe('Public Profile', () => {
     ).toBeVisible({ timeout: 30_000 });
   });
 
-  test('profile subpages (/subscribe, /tip, /tour) load without 500', async ({
+  test('profile subpages (/subscribe, /pay, /tour) load without 500', async ({
     page,
   }) => {
     test.setTimeout(120_000);
     await blockAnalytics(page);
 
-    const subpages = ['/subscribe', '/tip', '/tour'] as const;
+    const subpages = ['subscribe', 'pay', 'tour'] as const;
 
     for (const sub of subpages) {
+      const redirectResponse = await page.request.get(
+        `/${TEST_PROFILE}/${sub}`,
+        {
+          maxRedirects: 0,
+        }
+      );
+      expect(
+        redirectResponse.status(),
+        `/${TEST_PROFILE}/${sub} should redirect without a server error`
+      ).toBeLessThan(500);
+
       let response: Awaited<ReturnType<typeof page.goto>>;
       try {
-        response = await page.goto(`/${TEST_PROFILE}${sub}`, {
+        response = await page.goto(`/${TEST_PROFILE}?mode=${sub}`, {
           waitUntil: 'domcontentloaded',
           timeout: 60_000,
         });
@@ -273,7 +284,10 @@ test.describe('Public Profile', () => {
           msg.includes('Timeout') ||
           msg.includes('Target closed')
         ) {
-          test.skip(true, `Transient nav error on /${TEST_PROFILE}${sub}`);
+          test.skip(
+            true,
+            `Transient nav error on /${TEST_PROFILE}?mode=${sub}`
+          );
           return;
         }
         throw navError;
@@ -282,7 +296,7 @@ test.describe('Public Profile', () => {
       const status = response?.status() ?? 0;
       expect(
         status,
-        `/${TEST_PROFILE}${sub} returned ${status} — server error`
+        `/${TEST_PROFILE}?mode=${sub} returned ${status} — server error`
       ).toBeLessThan(500);
 
       const bodyText =
