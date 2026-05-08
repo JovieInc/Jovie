@@ -48,7 +48,9 @@ test.describe('Artist Notifications Landing', () => {
     page,
   }) => {
     await expect(page.getByTestId('homepage-trust')).toBeVisible();
-    await expect(page.getByText('Trusted by artists on')).toBeVisible();
+    await expect(
+      page.getByText('Trusted by artists and teams releasing on')
+    ).toBeVisible();
     await expect(
       page.getByRole('heading', { name: /capture every fan\./i })
     ).toBeVisible();

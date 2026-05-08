@@ -47,6 +47,27 @@ const HomepageV2FinalCta = dynamic(
     })),
   { ssr: true }
 );
+const HomeBentoPairs = dynamic(
+  () =>
+    import('@/components/features/home/HomeBentoPairs').then(m => ({
+      default: m.HomeBentoPairs,
+    })),
+  { ssr: true }
+);
+const HomeLoopDiagramSection = dynamic(
+  () =>
+    import('@/components/features/home/HomeLoopDiagramSection').then(m => ({
+      default: m.HomeLoopDiagramSection,
+    })),
+  { ssr: true }
+);
+const HomeStatQuoteSection = dynamic(
+  () =>
+    import('@/components/features/home/HomeStatQuoteSection').then(m => ({
+      default: m.HomeStatQuoteSection,
+    })),
+  { ssr: true }
+);
 
 export const revalidate = false;
 
@@ -430,7 +451,7 @@ export default async function HomePage() {
       </section>
       <div className='homepage-trust-section'>
         <HomeTrustSection
-          label='Trusted by artists on'
+          label='Trusted by artists and teams releasing on'
           presentation='inline-strip'
         />
       </div>
@@ -439,6 +460,11 @@ export default async function HomePage() {
         <HomepageWorkflowStrip />
         <FridayRhythmSection />
         <HomepageProfileProofBand />
+        {FEATURE_FLAGS.SHOW_HOME_REFRESH_2026 ? <HomeBentoPairs /> : null}
+        {FEATURE_FLAGS.SHOW_HOME_REFRESH_2026 ? (
+          <HomeLoopDiagramSection />
+        ) : null}
+        {FEATURE_FLAGS.SHOW_HOME_REFRESH_2026 ? <HomeStatQuoteSection /> : null}
         {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_PRICING ? <HomepageV2Pricing /> : null}
         <HomepageFaq />
         {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_FINAL_CTA ? (
