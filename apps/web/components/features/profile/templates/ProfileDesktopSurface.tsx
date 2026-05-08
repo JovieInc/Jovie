@@ -30,6 +30,7 @@ import type {
 import type { DrawerView } from '@/features/profile/ProfileUnifiedDrawer';
 import { ProfileUnifiedDrawer } from '@/features/profile/ProfileUnifiedDrawer';
 import { resolveProfileSurfaceState } from '@/features/profile/profile-surface-state';
+import { StaticListenInterface } from '@/features/profile/StaticListenInterface';
 import { ReleasesView } from '@/features/profile/views/ReleasesView';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
@@ -672,6 +673,17 @@ export function ProfileDesktopSurface({
           )}
         </DesktopSurfaceCard>
         <div className='grid gap-3.5'>
+          <DesktopSurfaceCard title='Listen'>
+            <StaticListenInterface
+              artist={artist}
+              handle={artist.handle}
+              dspsOverride={mergedDSPs}
+              containerClassName='max-w-none'
+              providerButtonClassName='rounded-[18px] border-white/8 bg-white/[0.045] px-4 py-3.5 text-white hover:bg-white/[0.08]'
+              emptyStateClassName='rounded-[18px] border-white/8 bg-white/[0.04] shadow-none'
+              hideHelpText
+            />
+          </DesktopSurfaceCard>
           <DesktopSurfaceCard title='Latest Release'>
             <div className='space-y-4'>
               <div className='relative aspect-square overflow-hidden rounded-[22px] border border-white/8'>
