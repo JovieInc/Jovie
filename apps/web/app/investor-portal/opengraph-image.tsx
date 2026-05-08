@@ -21,7 +21,7 @@ export default function Image() {
         alignItems: 'center',
         justifyContent: 'center',
         background:
-          'radial-gradient(circle at 30% 20%, #1a1a2e 0%, #08090a 60%)',
+          'radial-gradient(circle at 30% 20%, #1a1a2e 0%, #06070a 60%)',
         fontFamily: 'Inter, system-ui, sans-serif',
       }}
     >

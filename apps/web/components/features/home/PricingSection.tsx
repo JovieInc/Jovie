@@ -3,6 +3,7 @@ import { Button } from '@jovie/ui/atoms/button';
 import { Check } from 'lucide-react';
 import Link from 'next/link';
 import { Container } from '@/components/site/Container';
+import { APP_ROUTES } from '@/constants/routes';
 import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
 
 const FREE_OUTCOMES = [
@@ -115,7 +116,9 @@ export function PricingSection() {
                 size='xl'
                 className='mt-7 w-full'
               >
-                <Link href='/signup?plan=free'>Launch for Free</Link>
+                <Link href={`${APP_ROUTES.SIGNUP}?plan=free`}>
+                  Request Access
+                </Link>
               </Button>
             </div>
 
@@ -189,7 +192,7 @@ export function PricingSection() {
                 size='xl'
                 className='mt-7 w-full text-[var(--linear-btn-primary-fg)] hover:text-[var(--linear-btn-primary-fg)]'
               >
-                <Link href='/signup?plan=pro'>Choose Pro</Link>
+                <Link href={`${APP_ROUTES.SIGNUP}?plan=pro`}>Choose Pro</Link>
               </Button>
             </div>
           </div>

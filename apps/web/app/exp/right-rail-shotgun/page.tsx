@@ -32,8 +32,8 @@ import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 
-const EASE_CINEMATIC = 'cubic-bezier(0.32, 0.72, 0, 1)';
-
+// Text token vars omitted: already defined by the global design-system.css
+// dark theme and picked up automatically. Only surface/border overrides here.
 const CARBON_VARS: React.CSSProperties = {
   ['--linear-bg-page' as string]: '#06070a',
   ['--linear-app-content-surface' as string]: '#0a0c0f',
@@ -42,10 +42,6 @@ const CARBON_VARS: React.CSSProperties = {
   ['--surface-0' as string]: '#0a0b0e',
   ['--surface-1' as string]: '#101216',
   ['--surface-2' as string]: '#161a20',
-  ['--text-primary' as string]: 'rgba(255,255,255,0.92)',
-  ['--text-secondary' as string]: 'rgba(255,255,255,0.66)',
-  ['--text-tertiary' as string]: 'rgba(255,255,255,0.46)',
-  ['--text-quaternary' as string]: 'rgba(255,255,255,0.32)',
 };
 
 // ---------------------------------------------------------------------------
@@ -146,7 +142,7 @@ export default function RightRailShotgunPage() {
       <header className='shrink-0 h-12 px-5 flex items-center gap-3 border-b border-(--linear-app-shell-border)'>
         <Link
           href='/exp/shell-v1'
-          className='inline-flex items-center gap-1 text-[12px] text-tertiary-token hover:text-primary-token transition-colors duration-150 ease-out'
+          className='inline-flex items-center gap-1 text-[12px] text-tertiary-token hover:text-primary-token transition-colors duration-subtle ease-out'
         >
           <ChevronLeft className='h-3 w-3' strokeWidth={2.25} />
           Back to shell
@@ -322,7 +318,7 @@ function ShareUrlRow() {
           setCopied(true);
           setTimeout(() => setCopied(false), 1200);
         }}
-        className='inline-flex items-center justify-center h-5 w-5 rounded text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-150 ease-out'
+        className='inline-flex items-center justify-center h-5 w-5 rounded text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-subtle ease-out'
         aria-label='Copy share URL'
       >
         {copied ? (
@@ -333,7 +329,7 @@ function ShareUrlRow() {
       </button>
       <button
         type='button'
-        className='inline-flex items-center justify-center h-5 w-5 rounded text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-150 ease-out'
+        className='inline-flex items-center justify-center h-5 w-5 rounded text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-subtle ease-out'
         aria-label='Open share URL'
       >
         <ExternalLink className='h-3 w-3' strokeWidth={2.25} />
@@ -347,7 +343,7 @@ function ActionRow() {
     <div className='mt-3 flex items-center gap-1.5'>
       <button
         type='button'
-        className='inline-flex items-center gap-1.5 h-7 px-3 rounded-md text-[12px] font-medium bg-white text-black hover:bg-white/90 transition-colors duration-150 ease-out'
+        className='inline-flex items-center gap-1.5 h-7 px-3 rounded-md text-[12px] font-medium bg-white text-black hover:bg-white/90 transition-colors duration-subtle ease-out'
       >
         <Play
           className='h-3 w-3 translate-x-px'
@@ -358,13 +354,13 @@ function ActionRow() {
       </button>
       <button
         type='button'
-        className='inline-flex items-center h-7 px-2.5 rounded-md text-[12px] text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-150 ease-out'
+        className='inline-flex items-center h-7 px-2.5 rounded-md text-[12px] text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-subtle ease-out'
       >
         Open
       </button>
       <button
         type='button'
-        className='ml-auto inline-flex items-center justify-center h-7 w-7 rounded-md text-tertiary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 hover:text-primary-token transition-colors duration-150 ease-out'
+        className='ml-auto inline-flex items-center justify-center h-7 w-7 rounded-md text-tertiary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 hover:text-primary-token transition-colors duration-subtle ease-out'
         aria-label='Pin'
       >
         <Pin className='h-3.5 w-3.5' strokeWidth={2.25} />
@@ -546,7 +542,7 @@ function CueRibbon() {
           <li key={c.at}>
             <button
               type='button'
-              className='w-full flex items-center gap-2.5 h-7 px-1 rounded text-[12px] text-secondary-token hover:bg-surface-1/40 hover:text-primary-token transition-colors duration-150 ease-out'
+              className='w-full flex items-center gap-2.5 h-7 px-1 rounded text-[12px] text-secondary-token hover:bg-surface-1/40 hover:text-primary-token transition-colors duration-subtle ease-out'
             >
               <span className='tabular-nums text-[10.5px] text-quaternary-token w-9 text-left'>
                 {Math.floor(c.at / 60)}:{String(c.at % 60).padStart(2, '0')}
@@ -642,7 +638,7 @@ function FooterBtn({
     <button
       type='button'
       className={cn(
-        'inline-flex items-center justify-center gap-1.5 h-7 rounded-md text-[12px] border border-(--linear-app-shell-border) bg-(--surface-0) transition-colors duration-150 ease-out',
+        'inline-flex items-center justify-center gap-1.5 h-7 rounded-md text-[12px] border border-(--linear-app-shell-border) bg-(--surface-0) transition-colors duration-subtle ease-out',
         danger
           ? 'text-rose-300/85 hover:bg-rose-500/10 hover:text-rose-200'
           : 'text-secondary-token hover:bg-surface-1/60 hover:text-primary-token'
@@ -745,7 +741,7 @@ function RailB() {
               type='button'
               onClick={() => setTab(t.id)}
               className={cn(
-                'h-9 px-3 text-[11.5px] font-caption tracking-[-0.005em] transition-colors duration-150 ease-out border-b -mb-px',
+                'h-9 px-3 text-[11.5px] font-caption tracking-[-0.005em] transition-colors duration-subtle ease-out border-b -mb-px',
                 active
                   ? 'text-primary-token border-cyan-300/70'
                   : 'text-tertiary-token border-transparent hover:text-primary-token'
@@ -893,7 +889,7 @@ function AccordionRow({
       <button
         type='button'
         onClick={onToggle}
-        className='w-full flex items-center gap-2 h-10 px-4 text-left hover:bg-surface-1/30 transition-colors duration-150 ease-out'
+        className='w-full flex items-center gap-2 h-10 px-4 text-left hover:bg-surface-1/30 transition-colors duration-subtle ease-out'
       >
         {openState ? (
           <ChevronDown
@@ -920,7 +916,7 @@ function AccordionRow({
         style={{
           maxHeight: openState ? 600 : 0,
           opacity: openState ? 1 : 0,
-          transition: `max-height 320ms ${EASE_CINEMATIC}, opacity 200ms ease-out`,
+          transition: `max-height var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), opacity var(--ds-motion-subtle-duration) ease-out`,
         }}
       >
         <div className='px-4 pb-3'>{children}</div>
@@ -994,7 +990,7 @@ function RailD() {
     <>
       <HeaderCard />
       <div className='shrink-0 px-3 py-2 border-b border-(--linear-app-shell-border)/60'>
-        <div className='flex items-center gap-2 h-8 px-2.5 rounded-md border border-(--linear-app-shell-border) bg-(--surface-0)/60 focus-within:border-cyan-400/40 transition-colors duration-150 ease-out'>
+        <div className='flex items-center gap-2 h-8 px-2.5 rounded-md border border-(--linear-app-shell-border) bg-(--surface-0)/60 focus-within:border-cyan-400/40 transition-colors duration-subtle ease-out'>
           <Search
             className='h-3.5 w-3.5 text-quaternary-token shrink-0'
             strokeWidth={2.25}
@@ -1021,7 +1017,7 @@ function RailD() {
                 <button
                   key={it.label}
                   type='button'
-                  className='flex items-center gap-2.5 h-8 px-4 text-left text-[12.5px] text-secondary-token hover:bg-surface-1/40 hover:text-primary-token transition-colors duration-150 ease-out'
+                  className='flex items-center gap-2.5 h-8 px-4 text-left text-[12.5px] text-secondary-token hover:bg-surface-1/40 hover:text-primary-token transition-colors duration-subtle ease-out'
                 >
                   <it.icon
                     className='h-3.5 w-3.5 shrink-0 text-quaternary-token'
@@ -1098,7 +1094,7 @@ function SplitCard({
       <button
         type='button'
         onClick={() => setOpen(v => !v)}
-        className='w-full flex items-center justify-between gap-2 h-9 px-3 hover:bg-surface-1/30 transition-colors duration-150 ease-out'
+        className='w-full flex items-center justify-between gap-2 h-9 px-3 hover:bg-surface-1/30 transition-colors duration-subtle ease-out'
       >
         <span className='text-[10px] uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
           {label}

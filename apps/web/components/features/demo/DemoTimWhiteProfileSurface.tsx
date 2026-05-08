@@ -368,7 +368,7 @@ function DemoShowcaseShell({
   return (
     <DemoClientProviders>
       <div data-testid={testId}>
-        <div className='min-h-screen bg-[#05070b] px-5 py-8 text-white sm:px-6 lg:px-8'>
+        <div className='min-h-screen bg-surface-0 px-5 py-8 text-white sm:px-6 lg:px-8'>
           <div className='mx-auto max-w-[1200px]'>
             <div className='max-w-[42rem]'>
               <p className='text-[11px] font-[600] tracking-[0.14em] text-white/42'>
@@ -410,7 +410,7 @@ function ShowcaseBoardCard({
           </p>
         ) : null}
       </div>
-      <div className='rounded-[24px] border border-white/8 bg-[#0b0f16] p-3'>
+      <div className='rounded-[24px] border border-white/8 bg-surface-1 p-3'>
         {children}
       </div>
     </article>
@@ -652,9 +652,9 @@ export function DemoTimWhiteProfileSurface() {
     return (
       <DemoClientProviders>
         <div data-testid='demo-showcase-tim-white-profile'>
-          <div className='flex min-h-screen items-center justify-center bg-[#0b0d12] px-5 py-10'>
+          <div className='flex min-h-screen items-center justify-center bg-surface-0 px-5 py-10'>
             <div
-              className='w-full max-w-[360px] rounded-[30px] border border-white/8 bg-[linear-gradient(180deg,#12161f,#0b0e14)] p-4 shadow-[0_32px_100px_rgba(0,0,0,0.46)]'
+              className='w-full max-w-[360px] rounded-[30px] border border-white/8 bg-surface-1 p-4 shadow-[0_32px_100px_rgba(0,0,0,0.46)]'
               data-testid='demo-press-assets-capture'
             >
               <div className='rounded-[24px] border border-white/8 bg-white/[0.04] p-4'>
@@ -667,7 +667,7 @@ export function DemoTimWhiteProfileSurface() {
                       Share press photos
                     </h2>
                   </div>
-                  <div className='rounded-[18px] border border-white/8 bg-[#10141c] p-2 shadow-[0_12px_40px_rgba(0,0,0,0.35)]'>
+                  <div className='rounded-[18px] border border-white/8 bg-surface-0 p-2 shadow-[0_12px_40px_rgba(0,0,0,0.35)]'>
                     <div className='rounded-[12px] bg-white/[0.04] px-3 py-2 text-[12px] font-semibold text-white'>
                       Download press photos
                     </div>
