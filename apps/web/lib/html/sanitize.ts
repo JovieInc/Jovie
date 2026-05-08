@@ -172,7 +172,10 @@ export function sanitizeServerHtml(html: string): string {
 
     sanitized += html.slice(index, tagStart);
     const tagEnd = html.indexOf('>', tagStart);
-    if (tagEnd === -1) break;
+    if (tagEnd === -1) {
+      sanitized += html.slice(tagStart);
+      break;
+    }
 
     const rawTag = html.slice(tagStart, tagEnd + 1);
     const tagName = readTagName(rawTag);

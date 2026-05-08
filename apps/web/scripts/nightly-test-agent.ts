@@ -780,8 +780,8 @@ function commandNormalize(
     suites.push({
       lane: 'mutation-hotspots',
       total: mutation.total,
-      passed: mutation.killed,
-      failed: mutation.survived + (mutation.timedOut ?? 0),
+      passed: mutation.killed + (mutation.timedOut ?? 0),
+      failed: mutation.survived,
       flaky: 0,
       skipped: mutation.noCoverage ?? 0,
       durationMs: 0,
