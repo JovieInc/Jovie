@@ -39,42 +39,42 @@ const MARKETING_GLASS_FLYOUTS: readonly HeaderFlyoutMenu[] = [
     links: [
       {
         href: APP_ROUTES.ARTIST_PROFILES,
-        label: 'Smart release links',
+        label: 'Smart Release Links',
         description: 'One link for every drop.',
       },
       {
         href: APP_ROUTES.ARTIST_PROFILES,
-        label: 'Artist profiles',
+        label: 'Artist Profiles',
         description: 'A live page that converts.',
       },
       {
         href: APP_ROUTES.LAUNCH,
-        label: 'Pre-saves & countdowns',
+        label: 'Pre-saves & Countdowns',
         description: 'Built into the same link.',
       },
       {
         href: APP_ROUTES.LAUNCH,
-        label: 'Tour & city detection',
+        label: 'Tour & City Detection',
         description: 'Show the next show first.',
       },
       {
         href: APP_ROUTES.PAY,
-        label: 'Tip jar & instant payout',
+        label: 'Tip Jar & Instant Payout',
         description: 'Get paid in the moment.',
       },
       {
         href: `${APP_ROUTES.ARTIST_PROFILES}#capture-every-fan`,
-        label: 'Fan capture',
+        label: 'Fan Capture',
         description: 'Listens, scans, opt-ins.',
       },
       {
         href: APP_ROUTES.ARTIST_NOTIFICATIONS,
-        label: 'Named-fan CRM',
+        label: 'Named-Fan CRM',
         description: 'Recognize who keeps showing up.',
       },
       {
         href: APP_ROUTES.ARTIST_NOTIFICATIONS,
-        label: 'Direct fan messaging',
+        label: 'Direct Fan Messaging',
         description: 'Write to fans who care.',
       },
     ],
@@ -91,7 +91,7 @@ const MARKETING_GLASS_FLYOUTS: readonly HeaderFlyoutMenu[] = [
       },
       {
         href: APP_ROUTES.COMPARE,
-        label: 'Customer stories',
+        label: 'Customer Stories',
         description: 'Artists running the loop.',
       },
       {
@@ -101,7 +101,7 @@ const MARKETING_GLASS_FLYOUTS: readonly HeaderFlyoutMenu[] = [
       },
       {
         href: APP_ROUTES.SUPPORT,
-        label: 'Help center',
+        label: 'Help Center',
         description: 'Guides and answers.',
       },
       {
