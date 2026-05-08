@@ -200,7 +200,7 @@ function SubscribePanel({
     );
   }
 
-  if (!(isSubscribed && !keepSubscribeFlowMounted)) {
+  if (!isSubscribed || keepSubscribeFlowMounted) {
     return (
       <div
         className={NATIVE_PANEL_CLASS_NAME}
