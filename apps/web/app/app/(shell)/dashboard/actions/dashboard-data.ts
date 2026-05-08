@@ -15,9 +15,9 @@ import { cache } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import { resolveUserState } from '@/lib/auth/gate';
-import { withDbSession, withDbSessionTx } from '@/lib/auth/session';
+import { withDbSessionTx } from '@/lib/auth/session';
 import { CACHE_TAGS, CACHE_TTL } from '@/lib/cache/tags';
-import { type DbOrTransaction, db, doesTableExist } from '@/lib/db';
+import { type DbOrTransaction, doesTableExist } from '@/lib/db';
 import { getAvatarQualityForProfile } from '@/lib/db/queries/avatar-quality';
 import { dashboardQuery } from '@/lib/db/query-timeout';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
@@ -877,13 +877,13 @@ async function fetchDashboardShellWithSession(
   clerkUserId: string
 ): Promise<CoreData> {
   try {
-    // Use withDbSession (no transaction) instead of withDbSessionTx.
-    // The shell path only reads user + profiles — no writes, no atomicity needed.
-    // This skips BEGIN/COMMIT overhead (~50-150ms on cold Neon connections) while
-    // still setting the RLS session variable via connection-scoped set_config.
-    return await withDbSession(
-      async sessionUserId =>
-        fetchDashboardBaseWithSession(db, sessionUserId, {
+    // Keep shell reads inside the transaction-scoped session. RLS depends on
+    // app.clerk_user_id being set on the same pooled connection as the profile
+    // query; a connection-scoped setup followed by pooled reads can drop the
+    // session and make complete profiles look like onboarding is required.
+    return await withDbSessionTx(
+      async (tx, sessionUserId) =>
+        fetchDashboardBaseWithSession(tx, sessionUserId, {
           includeSettings: false,
         }),
       { clerkUserId }
