@@ -194,7 +194,7 @@ function DesktopSurfaceCard({
           <button
             type='button'
             onClick={onAction}
-            className='inline-flex items-center gap-1.5 text-[13px] font-medium tracking-[-0.015em] text-white/56 transition-colors duration-200 hover:text-white'
+            className='inline-flex items-center gap-1.5 text-[13px] font-medium tracking-[-0.015em] text-white/56 transition-colors duration-subtle hover:text-white'
           >
             <span>{actionLabel}</span>
             <ChevronRight className='h-4 w-4' />
@@ -335,7 +335,7 @@ export function ProfileDesktopSurface({
   const artistEmailReady = readArtistEmailReadyFromSettings(artist.settings);
   const showArtistEmailRow = isSubscribed && artistEmailReady;
   const primaryActionControlClassName =
-    'inline-flex h-11 items-center gap-2 rounded-full bg-white px-4 text-[13px] font-semibold tracking-[-0.01em] text-black transition-colors duration-200 hover:bg-white/88';
+    'inline-flex h-11 items-center gap-2 rounded-full bg-white px-4 text-[13px] font-semibold tracking-[-0.01em] text-black transition-colors duration-subtle hover:bg-white/88';
   const PrimaryActionIcon = primaryAction.kind === 'tour' ? CalendarDays : Play;
   let primaryActionElement: React.ReactNode;
   if (primaryAction.kind === 'subscribe') {
@@ -377,7 +377,7 @@ export function ProfileDesktopSurface({
   const homeOverview = (
     <div className='grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.9fr)]'>
       <div className='grid min-h-0 gap-3.5'>
-        <section className='relative min-h-[548px] overflow-hidden rounded-[26px] bg-[#0a0c10]'>
+        <section className='relative min-h-[548px] overflow-hidden rounded-[26px] bg-[color:var(--profile-stage-bg)]'>
           <div className='absolute inset-0'>
             {heroImageUrl ? (
               <ImageWithFallback
@@ -441,7 +441,7 @@ export function ProfileDesktopSurface({
                         href={link.url}
                         target='_blank'
                         rel='noopener noreferrer'
-                        className='inline-flex h-10 w-10 items-center justify-center text-white/78 drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)] transition-colors duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+                        className='inline-flex h-10 w-10 items-center justify-center text-white/78 drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)] transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
                         aria-label={link.platform}
                       >
                         <SocialIcon
@@ -491,7 +491,7 @@ export function ProfileDesktopSurface({
                     {tourDate.ticketUrl ? (
                       <a
                         href={tourDate.ticketUrl}
-                        className='inline-flex h-9 items-center rounded-full border border-white/12 px-3 text-[12px] font-medium text-white/82 transition-colors duration-200 hover:bg-white/[0.04]'
+                        className='inline-flex h-9 items-center rounded-full border border-white/12 px-3 text-[12px] font-medium text-white/82 transition-colors duration-subtle hover:bg-white/[0.04]'
                       >
                         Tickets
                       </a>
@@ -519,7 +519,7 @@ export function ProfileDesktopSurface({
                         ? `/${artist.handle}/${release.slug}`
                         : undefined
                     }
-                    className='grid grid-cols-[56px_minmax(0,1fr)_40px_28px] items-center gap-3 rounded-[18px] bg-white/[0.025] px-3 py-3 transition-colors duration-200 hover:bg-white/[0.04]'
+                    className='grid grid-cols-[56px_minmax(0,1fr)_40px_28px] items-center gap-3 rounded-[18px] bg-white/[0.025] px-3 py-3 transition-colors duration-subtle hover:bg-white/[0.04]'
                   >
                     <div className='relative h-14 w-14 overflow-hidden rounded-[14px]'>
                       <ImageWithFallback
@@ -566,7 +566,7 @@ export function ProfileDesktopSurface({
               <button
                 type='button'
                 onClick={() => onModeSelect('subscribe')}
-                className='flex min-h-[58px] w-full items-center justify-between gap-4 rounded-[18px] border border-white/8 bg-white/[0.035] px-4 text-left transition-colors duration-200 hover:bg-white/[0.055]'
+                className='flex min-h-[58px] w-full items-center justify-between gap-4 rounded-[18px] border border-white/8 bg-white/[0.035] px-4 text-left transition-colors duration-subtle hover:bg-white/[0.055]'
               >
                 <span className='min-w-0'>
                   <span className='block truncate text-[15px] font-semibold tracking-[-0.015em] text-white'>
@@ -705,7 +705,7 @@ export function ProfileDesktopSurface({
               <button
                 type='button'
                 onClick={() => onDrawerViewChange('pay')}
-                className='inline-flex h-12 items-center rounded-full border border-white/12 px-4 text-[14px] font-medium text-white/84 transition-colors duration-200 hover:bg-white/[0.04]'
+                className='inline-flex h-12 items-center rounded-full border border-white/12 px-4 text-[14px] font-medium text-white/84 transition-colors duration-subtle hover:bg-white/[0.04]'
               >
                 Support {artist.name}
               </button>
@@ -746,7 +746,7 @@ export function ProfileDesktopSurface({
                 {tourDate.ticketUrl ? (
                   <a
                     href={tourDate.ticketUrl}
-                    className='inline-flex h-11 items-center rounded-full border border-white/12 px-4 text-[14px] font-medium text-white/84 transition-colors duration-200 hover:bg-white/[0.04]'
+                    className='inline-flex h-11 items-center rounded-full border border-white/12 px-4 text-[14px] font-medium text-white/84 transition-colors duration-subtle hover:bg-white/[0.04]'
                   >
                     Tickets
                   </a>
@@ -792,7 +792,7 @@ export function ProfileDesktopSurface({
                   type='button'
                   onClick={() => onModeSelect(tab.mode)}
                   className={cn(
-                    'inline-flex h-10 min-w-0 items-center gap-2 rounded-full px-3 text-[13px] font-medium tracking-[-0.01em] transition-colors duration-200 active:bg-white/[0.08]',
+                    'inline-flex h-10 min-w-0 items-center gap-2 rounded-full px-3 text-[13px] font-medium tracking-[-0.01em] transition-colors duration-subtle active:bg-white/[0.08]',
                     isActive
                       ? 'text-white'
                       : 'text-white/50 hover:text-white/78'
@@ -801,7 +801,7 @@ export function ProfileDesktopSurface({
                 >
                   <Icon
                     className={cn(
-                      'h-4 w-4 shrink-0 transition-colors duration-200',
+                      'h-4 w-4 shrink-0 transition-colors duration-subtle',
                       isActive && 'text-white'
                     )}
                   />
@@ -814,7 +814,7 @@ export function ProfileDesktopSurface({
           <button
             type='button'
             onClick={onOpenMenu}
-            className='inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-black/28 text-white backdrop-blur-xl transition-colors duration-200 hover:bg-black/44'
+            className='inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-black/28 text-white backdrop-blur-xl transition-colors duration-subtle hover:bg-black/44'
             aria-label='More options'
           >
             <MoreHorizontal className='h-5 w-5' />

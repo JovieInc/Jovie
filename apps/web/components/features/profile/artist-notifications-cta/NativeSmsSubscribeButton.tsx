@@ -317,10 +317,7 @@ export function NativeSmsSubscribeButton({
       )}
 
       {phase === 'error' && errorMessage && (
-        <p
-          role='alert'
-          className='text-center text-sm text-[var(--color-status-danger,_#dc2626)]'
-        >
+        <p role='alert' className='text-center text-sm text-error'>
           {errorMessage}
         </p>
       )}

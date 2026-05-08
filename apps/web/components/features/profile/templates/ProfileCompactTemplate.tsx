@@ -672,7 +672,7 @@ export function ProfileCompactTemplate({
       <div
         className={cn(
           'profile-viewport relative h-[100dvh] overflow-hidden bg-[color:var(--profile-stage-bg)] text-primary-token',
-          isV1 && 'bg-[#06070a]'
+          isV1 && 'bg-[color:var(--profile-stage-bg)]'
         )}
         style={profileAccentStyle}
         data-profile-visual-variant={visualVariant}
@@ -707,7 +707,7 @@ export function ProfileCompactTemplate({
           )}
         >
           {isDesktopLayout && isV1 ? (
-            <aside className='hidden w-[360px] shrink-0 flex-col justify-between rounded-[32px] border border-white/[0.07] bg-[#0a0c0f]/78 p-7 shadow-[0_28px_90px_rgba(0,0,0,0.32)] backdrop-blur-xl lg:flex'>
+            <aside className='hidden w-[360px] shrink-0 flex-col justify-between rounded-[32px] border border-white/[0.07] bg-[color:var(--profile-drawer-bg)]/78 p-7 shadow-[0_28px_90px_rgba(0,0,0,0.32)] backdrop-blur-xl lg:flex'>
               <div>
                 <div className='relative h-[320px] overflow-hidden rounded-[26px] bg-white/[0.04]'>
                   {heroImageUrl ? (
