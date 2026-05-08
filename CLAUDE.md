@@ -133,6 +133,7 @@ Read the file for the topic you're touching. More-local instructions override th
 | [`.claude/rules/code-style.md`](.claude/rules/code-style.md) | TypeScript, React, server/client boundaries, canonical imports, ESLint, hooks |
 | [`.claude/rules/linear.md`](.claude/rules/linear.md) | Issue gating, ownership contract |
 | [`.claude/rules/gstack.md`](.claude/rules/gstack.md) | Vendored toolkit, skill routing |
+| [`.claude/rules/swarm.md`](.claude/rules/swarm.md) | Ruflo-coordinated parallel swarms (pre-created worktrees, claims, ship recipe) |
 
 ## Skill routing
 

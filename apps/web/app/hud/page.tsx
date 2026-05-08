@@ -60,9 +60,10 @@ async function getHudAbsoluteUrl(kioskToken: string | null): Promise<string> {
 export default async function HudPage({
   searchParams,
 }: Readonly<{
-  searchParams: SearchParams;
+  searchParams: Promise<SearchParams>;
 }>) {
-  const kioskTokenRaw = searchParams.kiosk;
+  const resolvedSearchParams = await searchParams;
+  const kioskTokenRaw = resolvedSearchParams.kiosk;
   const kioskToken = typeof kioskTokenRaw === 'string' ? kioskTokenRaw : null;
 
   const auth = await authorizeHud(kioskToken);

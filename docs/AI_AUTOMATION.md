@@ -14,6 +14,13 @@ This document explains the automation and labels used in this repo so agents can
 - Auto-merge is allowed only when CI is green and the PR is eligible.
 - Use the `auto-merge` label only for low-risk changes.
 
+## Agent burn controls
+
+- Routine Linear AI dispatch defaults to `model_tier: economy`; reserve `premium`
+  for explicit planner escalation.
+- Agent branch automation defers new work when 5 agent PRs are already open.
+- Implementation agents should inspect targeted diffs and exact relevant files instead of re-reading broad repo docs.
+
 ### Do not fight automation
 
 If an automated workflow opens a fix PR (e.g. Codex/CI healing):
@@ -65,6 +72,32 @@ These labels are used to coordinate automation and prevent merge loops.
 ### `ci:manual`
 
 - CI failure requires manual intervention.
+
+## PR comment learning loop
+
+The repo uses a weekly Codex workspace automation, `PR Comment Hardening Retro`, to mine recent PR review comments for repeated agent mistakes. This is not a production app cron, not a Vercel cron route, and not a GitHub Actions schedule.
+
+Local analyzer:
+
+```bash
+node scripts/pr-comment-retro.mjs --since-days 7 --dry-run
+```
+
+Default behavior:
+
+- Scans up to 100 recently updated PRs in the current GitHub repo.
+- Counts actionable root inline findings from CodeRabbit, Greptile, Sentry, and human reviewers.
+- Ignores bot summaries, addressed confirmations, replies, nitpicks, and outdated inline comments.
+- Classifies repeated mistakes into hardening categories such as malformed state handling, path/scope gaps, silent reports, workflow scheduling, generated docs drift, auth boundaries, UI flow, and database edge cases.
+
+Durable hardening policy:
+
+- Open draft PRs only for bounded docs, tests, or skill-template hardening.
+- Prefer focused regression tests for deterministic parser/script failures.
+- Update gstack `.tmpl` files before regenerating derived `SKILL.md` files.
+- Update `LESSONS.md` only for repeated root causes, not every weekly finding.
+- Create or mention a Linear follow-up when the right fix requires product work, broad refactors, auth/billing/migration changes, or human prioritization.
+- Never auto-merge, never create app/Vercel cron routes, and never touch high-risk paths without human review.
 
 ## CodeRabbit CLI (local)
 

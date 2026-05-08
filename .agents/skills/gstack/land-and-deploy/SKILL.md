@@ -20,29 +20,29 @@ allowed-tools:
 ## Preamble (run first)
 
 ```bash
-_UPD=$($HOME/.Codex/skills/gstack/bin/gstack-update-check 2>/dev/null || .Codex/skills/gstack/bin/gstack-update-check 2>/dev/null || true)
+_UPD=$($HOME/.claude/skills/gstack/bin/gstack-update-check 2>/dev/null || .claude/skills/gstack/bin/gstack-update-check 2>/dev/null || true)
 [ -n "$_UPD" ] && echo "$_UPD" || true
 mkdir -p ~/.gstack/sessions
 touch ~/.gstack/sessions/"$PPID"
 _SESSIONS=$(find ~/.gstack/sessions -mmin -120 -type f 2>/dev/null | wc -l | tr -d ' ')
 find ~/.gstack/sessions -mmin +120 -type f -exec rm {} + 2>/dev/null || true
-_CONTRIB=$($HOME/.Codex/skills/gstack/bin/gstack-config get gstack_contributor 2>/dev/null || true)
-_PROACTIVE=$($HOME/.Codex/skills/gstack/bin/gstack-config get proactive 2>/dev/null || echo "true")
+_CONTRIB=$($HOME/.claude/skills/gstack/bin/gstack-config get gstack_contributor 2>/dev/null || true)
+_PROACTIVE=$($HOME/.claude/skills/gstack/bin/gstack-config get proactive 2>/dev/null || echo "true")
 _PROACTIVE_PROMPTED=$([ -f ~/.gstack/.proactive-prompted ] && echo "yes" || echo "no")
 _BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
 echo "BRANCH: $_BRANCH"
-_SKILL_PREFIX=$($HOME/.Codex/skills/gstack/bin/gstack-config get skill_prefix 2>/dev/null || echo "false")
+_SKILL_PREFIX=$($HOME/.claude/skills/gstack/bin/gstack-config get skill_prefix 2>/dev/null || echo "false")
 _PFX=$([ "$_SKILL_PREFIX" = "true" ] && echo "gstack-" || echo "")
 echo "PROACTIVE: $_PROACTIVE"
 echo "PROACTIVE_PROMPTED: $_PROACTIVE_PROMPTED"
 echo "SKILL_PREFIX: $_SKILL_PREFIX"
 echo "SKILL_PREFIX_VALUE: $_PFX"
-source <($HOME/.Codex/skills/gstack/bin/gstack-repo-mode 2>/dev/null) || true
+source <($HOME/.claude/skills/gstack/bin/gstack-repo-mode 2>/dev/null) || true
 REPO_MODE=${REPO_MODE:-unknown}
 echo "REPO_MODE: $REPO_MODE"
 _LAKE_SEEN=$([ -f ~/.gstack/.completeness-intro-seen ] && echo "yes" || echo "no")
 echo "LAKE_INTRO: $_LAKE_SEEN"
-_TEL=$($HOME/.Codex/skills/gstack/bin/gstack-config get telemetry 2>/dev/null || true)
+_TEL=$($HOME/.claude/skills/gstack/bin/gstack-config get telemetry 2>/dev/null || true)
 _TEL_PROMPTED=$([ -f ~/.gstack/.telemetry-prompted ] && echo "yes" || echo "no")
 _TEL_START=$(date +%s)
 _SESSION_ID="$$-$(date +%s)"
@@ -55,15 +55,15 @@ fi
 # zsh-compatible: use find instead of glob to avoid NOMATCH error
 for _PF in $(find ~/.gstack/analytics -maxdepth 1 -name '.pending-*' 2>/dev/null); do
   if [ -f "$_PF" ]; then
-    if [ "${_TEL:-off}" != "off" ] && [ -x "$HOME/.Codex/skills/gstack/bin/gstack-telemetry-log" ]; then
-      $HOME/.Codex/skills/gstack/bin/gstack-telemetry-log --event-type skill_run --skill _pending_finalize --outcome unknown --session-id "$_SESSION_ID" 2>/dev/null || true
+    if [ "${_TEL:-off}" != "off" ] && [ -x "$HOME/.claude/skills/gstack/bin/gstack-telemetry-log" ]; then
+      $HOME/.claude/skills/gstack/bin/gstack-telemetry-log --event-type skill_run --skill _pending_finalize --outcome unknown --session-id "$_SESSION_ID" 2>/dev/null || true
     fi
     rm -f "$_PF" 2>/dev/null || true
   fi
   break
 done
 # Learnings count
-eval "$(~/.Codex/skills/gstack/bin/gstack-slug 2>/dev/null)" 2>/dev/null || true
+eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)" 2>/dev/null || true
 _LEARN_FILE="${GSTACK_HOME:-$HOME/.gstack}/projects/${SLUG:-unknown}/learnings.jsonl"
 if [ -f "$_LEARN_FILE" ]; then
   _LEARN_COUNT=$(wc -l < "$_LEARN_FILE" 2>/dev/null | tr -d ' ')
@@ -71,12 +71,12 @@ if [ -f "$_LEARN_FILE" ]; then
 else
   echo "LEARNINGS: 0"
 fi
-# Check if AGENTS.md has routing rules
+# Check if CLAUDE.md has routing rules
 _HAS_ROUTING="no"
-if [ -f AGENTS.md ] && grep -q "## Skill routing" AGENTS.md 2>/dev/null; then
+if [ -f CLAUDE.md ] && grep -q "## Skill routing" CLAUDE.md 2>/dev/null; then
   _HAS_ROUTING="yes"
 fi
-_ROUTING_DECLINED=$($HOME/.Codex/skills/gstack/bin/gstack-config get routing_declined 2>/dev/null || echo "false")
+_ROUTING_DECLINED=$($HOME/.claude/skills/gstack/bin/gstack-config get routing_declined 2>/dev/null || echo "false")
 echo "HAS_ROUTING: $_HAS_ROUTING"
 echo "ROUTING_DECLINED: $_ROUTING_DECLINED"
 ```
@@ -90,9 +90,9 @@ The user opted out of proactive behavior.
 If `SKILL_PREFIX` is `"true"`, the user has namespaced skill names. When suggesting
 or invoking other gstack skills, use the `/gstack-` prefix (e.g., `/gstack-qa` instead
 of `/qa`, `/gstack-ship` instead of `/ship`). Disk paths are unaffected — always use
-`~/.Codex/skills/gstack/[skill-name]/SKILL.md` for reading skill files.
+`~/.claude/skills/gstack/[skill-name]/SKILL.md` for reading skill files.
 
-If output shows `UPGRADE_AVAILABLE <old> <new>`: read `~/.Codex/skills/gstack/gstack-upgrade/SKILL.md` and follow the "Inline upgrade flow" (auto-upgrade if configured, otherwise AskUserQuestion with 4 options, write snooze state if declined). If `JUST_UPGRADED <from> <to>`: tell user "Running gstack v{to} (just updated!)" and continue.
+If output shows `UPGRADE_AVAILABLE <old> <new>`: read `~/.claude/skills/gstack/gstack-upgrade/SKILL.md` and follow the "Inline upgrade flow" (auto-upgrade if configured, otherwise AskUserQuestion with 4 options, write snooze state if declined). If `JUST_UPGRADED <from> <to>`: tell user "Running gstack v{to} (just updated!)" and continue.
 
 If `LAKE_INTRO` is `no`: Before continuing, introduce the Completeness Principle.
 Tell the user: "gstack follows the **Boil the Lake** principle — always do the complete
@@ -118,7 +118,7 @@ Options:
 - A) Help gstack get better! (recommended)
 - B) No thanks
 
-If A: run `$HOME/.Codex/skills/gstack/bin/gstack-config set telemetry community`
+If A: run `$HOME/.claude/skills/gstack/bin/gstack-config set telemetry community`
 
 If B: ask a follow-up AskUserQuestion:
 
@@ -129,8 +129,8 @@ Options:
 - A) Sure, anonymous is fine
 - B) No thanks, fully off
 
-If B→A: run `$HOME/.Codex/skills/gstack/bin/gstack-config set telemetry anonymous`
-If B→B: run `$HOME/.Codex/skills/gstack/bin/gstack-config set telemetry off`
+If B→A: run `$HOME/.claude/skills/gstack/bin/gstack-config set telemetry anonymous`
+If B→B: run `$HOME/.claude/skills/gstack/bin/gstack-config set telemetry off`
 
 Always run:
 ```bash
@@ -150,8 +150,8 @@ Options:
 - A) Keep it on (recommended)
 - B) Turn it off — I'll type /commands myself
 
-If A: run `$HOME/.Codex/skills/gstack/bin/gstack-config set proactive true`
-If B: run `$HOME/.Codex/skills/gstack/bin/gstack-config set proactive false`
+If A: run `$HOME/.claude/skills/gstack/bin/gstack-config set proactive true`
+If B: run `$HOME/.claude/skills/gstack/bin/gstack-config set proactive false`
 
 Always run:
 ```bash
@@ -161,19 +161,19 @@ touch ~/.gstack/.proactive-prompted
 This only happens once. If `PROACTIVE_PROMPTED` is `yes`, skip this entirely.
 
 If `HAS_ROUTING` is `no` AND `ROUTING_DECLINED` is `false` AND `PROACTIVE_PROMPTED` is `yes`:
-Check if a AGENTS.md file exists in the project root. If it does not exist, create it.
+Check if a CLAUDE.md file exists in the project root. If it does not exist, create it.
 
 Use AskUserQuestion:
 
-> gstack works best when your project's AGENTS.md includes skill routing rules.
-> This tells Codex to use specialized workflows (like /ship, /investigate, /qa)
+> gstack works best when your project's CLAUDE.md includes skill routing rules.
+> This tells Claude to use specialized workflows (like /ship, /investigate, /qa)
 > instead of answering directly. It's a one-time addition, about 15 lines.
 
 Options:
-- A) Add routing rules to AGENTS.md (recommended)
+- A) Add routing rules to CLAUDE.md (recommended)
 - B) No thanks, I'll invoke skills manually
 
-If A: Append this section to the end of AGENTS.md:
+If A: Append this section to the end of CLAUDE.md:
 
 - If you are in plan mode, or the current skill is read-only/non-interactive, do **not** write or stage files automatically. Instead, show the user the exact section below and tell them to add it manually after leaving plan mode.
 - Otherwise, append this section, substituting `$_PFX` before every gstack skill name so prefixed installs get the correct routing rules:
@@ -201,7 +201,7 @@ Key routing rules:
 
 After writing the file, tell the user the change is ready for review and should be committed manually later (for example with `/ship`). Do **not** run `git add` or `git commit` automatically from this flow.
 
-If B: tell the user to run `$HOME/.Codex/skills/gstack/bin/gstack-config set routing_declined true`
+If B: tell the user to run `$HOME/.claude/skills/gstack/bin/gstack-config set routing_declined true`
 Say "No problem. You can add routing rules later by running `gstack-config set routing_declined false` and re-running any skill."
 
 This only happens once per project. If `HAS_ROUTING` is `yes` or `ROUTING_DECLINED` is `true`, skip this entirely.
@@ -289,7 +289,7 @@ Always flag anything that looks wrong — one sentence, what you noticed and its
 
 ## Search Before Building
 
-Before building anything unfamiliar, **search first.** See `~/.Codex/skills/gstack/ETHOS.md`.
+Before building anything unfamiliar, **search first.** See `~/.claude/skills/gstack/ETHOS.md`.
 - **Layer 1** (tried and true) — don't reinvent. **Layer 2** (new and popular) — scrutinize. **Layer 3** (first principles) — prize above all.
 
 **Eureka:** When first-principles reasoning contradicts conventional wisdom, name it and log:
@@ -361,8 +361,8 @@ rm -f ~/.gstack/analytics/.pending-"$_SESSION_ID" 2>/dev/null || true
 # Local + remote telemetry (both gated by _TEL setting)
 if [ "${_TEL:-off}" != "off" ]; then
   echo '{"skill":"SKILL_NAME","duration_s":"'"$_TEL_DUR"'","outcome":"OUTCOME","browse":"USED_BROWSE","session":"'"$_SESSION_ID"'","ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' >> ~/.gstack/analytics/skill-usage.jsonl 2>/dev/null || true
-  if [ -x "$HOME/.Codex/skills/gstack/bin/gstack-telemetry-log" ]; then
-    "$HOME/.Codex/skills/gstack/bin/gstack-telemetry-log" \
+  if [ -x "$HOME/.claude/skills/gstack/bin/gstack-telemetry-log" ]; then
+    "$HOME/.claude/skills/gstack/bin/gstack-telemetry-log" \
       --skill "SKILL_NAME" --duration "$_TEL_DUR" --outcome "OUTCOME" \
       --used-browse "USED_BROWSE" --session-id "$_SESSION_ID" 2>/dev/null &
   fi
@@ -399,7 +399,7 @@ When you are in plan mode and about to call ExitPlanMode:
 3. If it does NOT — run this command:
 
 \`\`\`bash
-~/.Codex/skills/gstack/bin/gstack-review-read
+~/.claude/skills/gstack/bin/gstack-review-read
 \`\`\`
 
 Then write a `## GSTACK REVIEW REPORT` section to the end of the plan file:
@@ -431,8 +431,8 @@ plan's living status.
 ```bash
 _ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
 B=""
-[ -n "$_ROOT" ] && [ -x "$_ROOT/.Codex/skills/gstack/browse/dist/browse" ] && B="$_ROOT/.Codex/skills/gstack/browse/dist/browse"
-[ -z "$B" ] && B=~/.Codex/skills/gstack/browse/dist/browse
+[ -n "$_ROOT" ] && [ -x "$_ROOT/.claude/skills/gstack/browse/dist/browse" ] && B="$_ROOT/.claude/skills/gstack/browse/dist/browse"
+[ -z "$B" ] && B=~/.claude/skills/gstack/browse/dist/browse
 if [ -x "$B" ]; then
   echo "READY: $B"
 else
@@ -442,7 +442,7 @@ fi
 
 If `NEEDS_SETUP`:
 1. Tell the user: "gstack browse needs a one-time build (~10 seconds). OK to proceed?" Then STOP and wait.
-2. Run: `cd .Codex/skills/gstack && ./setup`
+2. Run: `cd .claude/skills/gstack && ./setup`
 3. If `bun` is not installed:
    ```bash
    if ! command -v bun >/dev/null 2>&1; then
@@ -585,13 +585,13 @@ Check whether this project has been through a successful `/land-and-deploy` befo
 and whether the deploy configuration has changed since then:
 
 ```bash
-eval "$(~/.Codex/skills/gstack/bin/gstack-slug 2>/dev/null)"
+eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)"
 if [ ! -f ~/.gstack/projects/$SLUG/land-deploy-confirmed ]; then
   echo "FIRST_RUN"
 else
   # Check if deploy config has changed since confirmation
   SAVED_HASH=$(cat ~/.gstack/projects/$SLUG/land-deploy-confirmed 2>/dev/null)
-  CURRENT_HASH=$(sed -n '/## Deploy Configuration/,/^## /p' AGENTS.md 2>/dev/null | shasum -a 256 | cut -d' ' -f1)
+  CURRENT_HASH=$(sed -n '/## Deploy Configuration/,/^## /p' CLAUDE.md 2>/dev/null | shasum -a 256 | cut -d' ' -f1)
   # Also hash workflow files that affect deploy behavior
   WORKFLOW_HASH=$(find .github/workflows -maxdepth 1 \( -name '*deploy*' -o -name '*cd*' \) 2>/dev/null | xargs cat 2>/dev/null | shasum -a 256 | cut -d' ' -f1)
   COMBINED_HASH="${CURRENT_HASH}-${WORKFLOW_HASH}"
@@ -629,8 +629,8 @@ Let me take a look at your setup."
 Run the deploy configuration bootstrap to detect the platform and settings:
 
 ```bash
-# Check for persisted deploy config in AGENTS.md
-DEPLOY_CONFIG=$(grep -A 20 "## Deploy Configuration" AGENTS.md 2>/dev/null || echo "NO_CONFIG")
+# Check for persisted deploy config in CLAUDE.md
+DEPLOY_CONFIG=$(grep -A 20 "## Deploy Configuration" CLAUDE.md 2>/dev/null || echo "NO_CONFIG")
 echo "$DEPLOY_CONFIG"
 
 # If config exists, parse it
@@ -656,7 +656,7 @@ for f in $(find .github/workflows -maxdepth 1 \( -name '*.yml' -o -name '*.yaml'
 done
 ```
 
-If `PERSISTED_PLATFORM` and `PERSISTED_URL` were found in AGENTS.md, use them directly
+If `PERSISTED_PLATFORM` and `PERSISTED_URL` were found in CLAUDE.md, use them directly
 and skip manual detection. If no persisted config exists, use the auto-detected platform
 to guide deploy verification. If nothing is detected, ask the user via AskUserQuestion
 in the decision tree below.
@@ -664,7 +664,7 @@ in the decision tree below.
 If you want to persist deploy settings for future runs, suggest the user run `/setup-deploy`.
 
 Parse the output and record: the detected platform, production URL, deploy workflow (if any),
-and any persisted config from AGENTS.md.
+and any persisted config from CLAUDE.md.
 
 ### 1.5b: Command validation
 
@@ -729,9 +729,9 @@ CLI to verify the deploy worked."
 
 Check for staging environments in this order:
 
-1. **AGENTS.md persisted config:** Check for a staging URL in the Deploy Configuration section:
+1. **CLAUDE.md persisted config:** Check for a staging URL in the Deploy Configuration section:
 ```bash
-grep -i "staging" AGENTS.md 2>/dev/null | head -3
+grep -i "staging" CLAUDE.md 2>/dev/null | head -3
 ```
 
 2. **GitHub Actions staging workflow:** Check for workflow files with "staging" in the name or content:
@@ -756,7 +756,7 @@ Tell the user: "Before I merge any PR, I run a series of readiness checks — co
 Preview the readiness checks that will run at Step 3.5 (without re-running tests):
 
 ```bash
-~/.Codex/skills/gstack/bin/gstack-review-read 2>/dev/null
+~/.claude/skills/gstack/bin/gstack-review-read 2>/dev/null
 ```
 
 Show a summary of review status: which reviews have been run, how stale they are.
@@ -785,7 +785,7 @@ Present the full dry-run results to the user via AskUserQuestion:
 Save the deploy config fingerprint so we can detect future changes:
 ```bash
 mkdir -p ~/.gstack/projects/$SLUG
-CURRENT_HASH=$(sed -n '/## Deploy Configuration/,/^## /p' AGENTS.md 2>/dev/null | shasum -a 256 | cut -d' ' -f1)
+CURRENT_HASH=$(sed -n '/## Deploy Configuration/,/^## /p' CLAUDE.md 2>/dev/null | shasum -a 256 | cut -d' ' -f1)
 WORKFLOW_HASH=$(find .github/workflows -maxdepth 1 \( -name '*deploy*' -o -name '*cd*' \) 2>/dev/null | xargs cat 2>/dev/null | shasum -a 256 | cut -d' ' -f1)
 echo "${CURRENT_HASH}-${WORKFLOW_HASH}" > ~/.gstack/projects/$SLUG/land-deploy-confirmed
 ```
@@ -793,7 +793,7 @@ Continue to Step 2.
 
 **If B:** **STOP.** "Tell me what's different about your setup and I'll adjust. You can also run `/setup-deploy` to walk through the full configuration."
 
-**If C:** **STOP.** "Running `/setup-deploy` will walk through your deploy platform, production URL, and health checks in detail. It saves everything to AGENTS.md so I'll know exactly what to do next time. Run `/land-and-deploy` again when that's done."
+**If C:** **STOP.** "Running `/setup-deploy` will walk through your deploy platform, production URL, and health checks in detail. It saves everything to CLAUDE.md so I'll know exactly what to do next time. Run `/land-and-deploy` again when that's done."
 
 ---
 
@@ -849,7 +849,7 @@ Collect evidence for each check below. Track warnings (yellow) and blockers (red
 ### 3.5a: Review staleness check
 
 ```bash
-~/.Codex/skills/gstack/bin/gstack-review-read 2>/dev/null
+~/.claude/skills/gstack/bin/gstack-review-read 2>/dev/null
 ```
 
 Parse the output. For each review skill (plan-eng-review, plan-ceo-review,
@@ -895,7 +895,7 @@ Use AskUserQuestion:
 
 Read the review checklist:
 ```bash
-cat ~/.Codex/skills/gstack/review/checklist.md 2>/dev/null || echo "Checklist not found"
+cat ~/.claude/skills/gstack/review/checklist.md 2>/dev/null || echo "Checklist not found"
 ```
 Apply each checklist item to the current diff. This is the same quick review that `/ship`
 runs in its Step 3.5. Auto-fix trivial issues (whitespace, imports). For critical findings
@@ -916,7 +916,7 @@ and tell the user: "I found and fixed a few issues during the review. The fixes 
 
 **Free tests — run them now:**
 
-Read AGENTS.md to find the project's test command. If not specified, use `bun test`.
+Read CLAUDE.md to find the project's test command. If not specified, use `bun test`.
 Run the test command and capture the exit code and output.
 
 ```bash
@@ -980,7 +980,7 @@ git log --oneline --all-match --grep="docs:" $(gh pr view --json baseRefName -q 
 
 Also check if key doc files were modified:
 ```bash
-git diff --name-only $(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || echo main)...HEAD -- README.md CHANGELOG.md ARCHITECTURE.md CONTRIBUTING.md AGENTS.md VERSION
+git diff --name-only $(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || echo main)...HEAD -- README.md CHANGELOG.md ARCHITECTURE.md CONTRIBUTING.md CLAUDE.md VERSION
 ```
 
 If CHANGELOG.md and VERSION were NOT modified on this branch and the diff includes
@@ -1129,8 +1129,8 @@ Determine what kind of project this is and how to verify the deploy.
 First, run the deploy configuration bootstrap to detect or read persisted deploy settings:
 
 ```bash
-# Check for persisted deploy config in AGENTS.md
-DEPLOY_CONFIG=$(grep -A 20 "## Deploy Configuration" AGENTS.md 2>/dev/null || echo "NO_CONFIG")
+# Check for persisted deploy config in CLAUDE.md
+DEPLOY_CONFIG=$(grep -A 20 "## Deploy Configuration" CLAUDE.md 2>/dev/null || echo "NO_CONFIG")
 echo "$DEPLOY_CONFIG"
 
 # If config exists, parse it
@@ -1156,7 +1156,7 @@ for f in $(find .github/workflows -maxdepth 1 \( -name '*.yml' -o -name '*.yaml'
 done
 ```
 
-If `PERSISTED_PLATFORM` and `PERSISTED_URL` were found in AGENTS.md, use them directly
+If `PERSISTED_PLATFORM` and `PERSISTED_URL` were found in CLAUDE.md, use them directly
 and skip manual detection. If no persisted config exists, use the auto-detected platform
 to guide deploy verification. If nothing is detected, ask the user via AskUserQuestion
 in the decision tree below.
@@ -1166,7 +1166,7 @@ If you want to persist deploy settings for future runs, suggest the user run `/s
 Then run `gstack-diff-scope` to classify the changes:
 
 ```bash
-eval $(~/.Codex/skills/gstack/bin/gstack-diff-scope $(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || echo main) 2>/dev/null)
+eval $(~/.claude/skills/gstack/bin/gstack-diff-scope $(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || echo main) 2>/dev/null)
 echo "FRONTEND=$SCOPE_FRONTEND BACKEND=$SCOPE_BACKEND DOCS=$SCOPE_DOCS CONFIG=$SCOPE_CONFIG"
 ```
 
@@ -1190,7 +1190,7 @@ Look for workflow names containing "deploy", "release", "production", or "cd". I
 
 ### 5a: Staging-first option
 
-If staging was detected in Step 1.5c (or from AGENTS.md deploy config), and the changes
+If staging was detected in Step 1.5c (or from CLAUDE.md deploy config), and the changes
 include code (not docs-only), offer the staging-first option:
 
 Use AskUserQuestion:
@@ -1241,7 +1241,7 @@ gh run view <run-id> --json status,conclusion
 
 ### Strategy B: Platform CLI (Fly.io, Render, Heroku)
 
-If a deploy status command was configured in AGENTS.md (e.g., `fly status --app myapp`), use it instead of or in addition to GitHub Actions polling.
+If a deploy status command was configured in CLAUDE.md (e.g., `fly status --app myapp`), use it instead of or in addition to GitHub Actions polling.
 
 **Fly.io:** After merge, Fly deploys via GitHub Actions or `fly deploy`. Check with:
 ```bash
@@ -1266,7 +1266,7 @@ Vercel and Netlify deploy automatically on merge. No explicit deploy trigger nee
 
 ### Strategy D: Custom deploy hooks
 
-If AGENTS.md has a custom deploy status command in the "Custom deploy hooks" section, run that command and check its exit code.
+If CLAUDE.md has a custom deploy status command in the "Custom deploy hooks" section, run that command and check its exit code.
 
 ### Common: Timing and failure handling
 
@@ -1420,7 +1420,7 @@ Save report to `.gstack/deploy-reports/{date}-pr{number}-deploy.md`.
 Log to the review dashboard:
 
 ```bash
-eval "$(~/.Codex/skills/gstack/bin/gstack-slug 2>/dev/null)"
+eval "$(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)"
 mkdir -p ~/.gstack/projects/$SLUG
 ```
 

@@ -129,8 +129,8 @@ jobs:
           fi
 
           MODEL_TIER="${PAYLOAD_MODEL_TIER,,}"
-          if [[ "$MODEL_TIER" != "economy" ]]; then
-            MODEL_TIER="premium"
+          if [[ "$MODEL_TIER" != "premium" ]]; then
+            MODEL_TIER="economy"
           fi
 
           EXISTING_PR=$(gh pr list --state open --json number,title,body --jq '
@@ -150,9 +150,9 @@ jobs:
           fi
 
           # Rate limit: don't start new Codex work if too many agent PRs are open
-          MAX_OPEN_AGENT_PRS=10
+          MAX_OPEN_AGENT_PRS=5
           OPEN_AGENT_PRS=$(gh pr list --state open --json headRefName --limit 200 \
-            | jq '[.[] | select(.headRefName | test("^(codex|claude|codegen-bot|linear)/"))] | length')
+            | jq '[.[] | select(.headRefName | test("^(codex|claude|codegen-bot|linear)/") or test("^[^/]+/jov-[0-9]+([_-].+)?$"; "i"))] | length')
 
           echo "Open agent PRs: $OPEN_AGENT_PRS / $MAX_OPEN_AGENT_PRS"
 
@@ -212,8 +212,8 @@ jobs:
           fi
 
           MODEL_TIER="${DEFAULT_MODEL_TIER,,}"
-          if [[ "$MODEL_TIER" != "economy" ]]; then
-            MODEL_TIER="premium"
+          if [[ "$MODEL_TIER" != "premium" ]]; then
+            MODEL_TIER="economy"
           fi
 
           if [[ -z "$LINEAR_API_KEY" ]]; then
@@ -351,6 +351,8 @@ jobs:
 
       - name: Run Claude Code for implementation
         uses: anthropics/claude-code-action@fefa07e9c665b7320f08c3b525980457f22f58aa # v1
+        env:
+          JOVIE_AGENT_PROFILE: coder
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
@@ -375,13 +377,17 @@ jobs:
             4) Never add // biome-ignore.
             5) Find and fix sibling occurrences if this is a bug-pattern issue.
             6) Keep changes focused and minimal.
-            7) If simplify_bounded=true, run a small simplification pass on touched files only:
+            7) Keep context tight:
+               - use targeted rg searches before opening files
+               - read exact relevant files, diffs, and scoped rules only
+               - do not re-read broad repo docs or inject whole-repo context unless the failure requires it
+            8) If simplify_bounded=true, run a small simplification pass on touched files only:
                - remove dead imports/locals
                - flatten obvious nested conditionals
                - improve unclear local variable names
                - do not change behavior/API contracts
                - skip sensitive paths (.github/, drizzle/migrations/, auth/billing/security-critical)
-            8) Use model_tier as guidance for depth/cost profile:
+            9) Use model_tier as guidance for depth/cost profile:
                - premium: thorough and comprehensive
                - economy: concise and targeted
 
