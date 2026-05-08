@@ -111,11 +111,14 @@ export function useProfileVisitTracking(
             `/api/audience/visit-token?profileId=${encodeURIComponent(profileId)}`,
             { cache: 'no-store' }
           );
+          const payload = (await response.json().catch(() => null)) as {
+            token?: string | null;
+          } | null;
           // We intentionally don't re-fire the visit beacon here — the visit
           // was already recorded above. Token enrichment that arrives after
           // the visit is recorded is acceptable analytics loss for the
           // signed-fingerprint dedupe path; bounce coverage matters more.
-          await response.json().catch(() => null);
+          void payload;
         } catch {
           // best-effort
         }
