@@ -31,7 +31,7 @@ export const AudienceEngagementBars = memo(function AudienceEngagementBars({
             className={cn(
               'w-0.5 rounded-sm',
               heightClass,
-              i < filled ? 'bg-emerald-500/70' : 'bg-zinc-700/50'
+              i < filled ? 'bg-emerald-500/70' : 'bg-surface-2'
             )}
             aria-hidden='true'
           />

@@ -5,7 +5,24 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
      7|
-     8|## [26.4.211] - 2026-05-07
+     8|## [26.4.212] - 2026-05-08
+
+> [internal] Design-system token consolidation pass on the artist profile feature — no visible changes.
+
+### Changed
+
+- [internal] **Profile system shell-v1 token migration**: replaced hardcoded hex values (`#0a0b0f`, `#0e0f12`, `#1a1a1e`, `#ff8b8b`, `#dc2626`) with canonical design-system tokens (`--profile-stage-bg`, `--profile-drawer-bg`, `bg-white/[0.08]`, `text-error`) across `ProfileSkeleton`, `ProfileMediaCard`, `ProfileMobileNotificationsFlow`, `NativeSmsSubscribeButton`, `ProfileCompactTemplate`, and `ProfileDesktopSurface`.
+- [internal] Fixed pre-existing `duration-200` motion violations (replaced with `duration-subtle`) in all touched profile files.
+
+## [26.4.213] - 2026-05-07
+
+> [internal] Design system token consolidation across dashboard organisms and shared organisms — wave 1.
+
+### Changed
+
+- [internal] Migrated 44 files in `components/features/dashboard/**` and `components/organisms/**` to shell-v1 design tokens: replaced semi-transparent surface overrides (`bg-surface-0/XX`, `bg-surface-1/XX`) with solid equivalents, replaced raw numeric duration classes (`duration-150`, `duration-200`, `duration-300`, `duration-500`, `duration-700`) with canonical motion tokens (`duration-subtle`, `duration-cinematic`), replaced `transition-all` with explicit property transitions, removed decorative hover-lift (`hover:scale-*`, `hover:-translate-*`) from DashboardPreview and MismatchCard, and migrated `bg-card`/`border-border` references to `bg-surface-0`/`border-subtle`.
+
+## [26.4.211] - 2026-05-07
 
 > [internal] Design system token migration for marketing and homepage surfaces.
 
@@ -20,6 +37,7 @@
 ### Changed
 
 - [internal] Migrated release and share feature components to shell-v1 design tokens: replaced semi-transparent surface tokens (`bg-surface-1/30`, `/50`, `/70`, `bg-surface-2/80`) with explicit opacity values, replaced raw duration values (`duration-100`, `duration-150`, `duration-200`) with canonical motion tokens (`duration-fast`, `duration-subtle`, `duration-slow`), replaced `text-green-500` with `text-success-token`, replaced decorative hover scale/translate on smart link play button with color-only feedback, replaced `transition-all` with `transition-[transform,opacity]` on icon crossfade animation.
+
 
 ## [26.4.209] - 2026-05-06
      9|

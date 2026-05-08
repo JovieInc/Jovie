@@ -1,10 +1,10 @@
-type AppEnv = 'production' | 'staging';
+// APP_ENV is baked at build time by scripts/write-env.mjs → src/env.generated.ts.
+// This file is re-generated before every dev/build run so it always reflects the
+// intended target environment as a compile-time constant, rather than a runtime
+// process.env read (which is undefined inside a packaged Electron binary).
+import { APP_ENV } from './env.generated';
 
-function getAppEnv(): AppEnv {
-  const raw = process.env.ELECTRON_ENV;
-  return raw === 'staging' ? 'staging' : 'production';
-}
+export { APP_ENV };
 
-export const APP_ENV = getAppEnv();
 export const APP_URL =
   APP_ENV === 'staging' ? 'https://staging.app.jov.ie' : 'https://jov.ie';

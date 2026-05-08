@@ -45,8 +45,8 @@ function LoadingStateToggle() {
   return (
     <div className='flex items-center space-x-3'>
       <span className='text-app text-secondary-token'>Light</span>
-      <div className='relative inline-flex h-6 w-11 shrink-0 cursor-not-allowed rounded-full border border-subtle bg-surface-0 p-0.5 transition-colors duration-200 ease-out'>
-        <span className='inline-block h-5 w-5 translate-x-0 transform rounded-full bg-surface-1 shadow ring-0 transition duration-200 ease-out' />
+      <div className='relative inline-flex h-6 w-11 shrink-0 cursor-not-allowed rounded-full border border-subtle bg-surface-0 p-0.5 transition-colors duration-subtle ease-out'>
+        <span className='inline-block h-5 w-5 translate-x-0 transform rounded-full bg-surface-1 shadow ring-0 transition duration-subtle ease-out' />
       </div>
       <span className='text-app text-secondary-token'>Dark</span>
     </div>
@@ -90,7 +90,7 @@ function ThemeOptionGrid({
             onClick={() => onThemeChange(option.value)}
             disabled={isUpdating}
             className={cn(
-              'flex flex-col items-center justify-center rounded-lg border px-3 py-3 transition-all duration-200',
+              'flex flex-col items-center justify-center rounded-lg border px-3 py-3 transition-[background-color,border-color,color] duration-subtle',
               theme === option.value
                 ? 'border-(--linear-border-focus) bg-surface-0 text-primary-token'
                 : 'border-subtle bg-surface-1 text-secondary-token hover:bg-surface-0',
@@ -166,7 +166,7 @@ function ThemeToggleButton({
           disabled={isUpdating}
           onClick={onToggle}
           className={cn(
-            'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border border-subtle transition-colors duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus) disabled:cursor-not-allowed disabled:opacity-50',
+            'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border border-subtle transition-colors duration-subtle ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus) disabled:cursor-not-allowed disabled:opacity-50',
             isDark ? 'bg-(--linear-border-focus)' : 'bg-surface-0',
             'p-0.5'
           )}
@@ -177,7 +177,7 @@ function ThemeToggleButton({
           <span
             aria-hidden='true'
             className={cn(
-              'flex h-5 w-5 transform items-center justify-center rounded-full bg-surface-1 shadow ring-0 transition duration-200 ease-out',
+              'flex h-5 w-5 transform items-center justify-center rounded-full bg-surface-1 shadow ring-0 transition duration-subtle ease-out',
               isDark ? 'translate-x-5' : 'translate-x-0',
               isUpdating && 'animate-pulse motion-reduce:animate-none'
             )}

@@ -47,7 +47,7 @@ export function OnboardingCompleteStep({
         />
 
         <ContentSurfaceCard
-          className='w-full px-4 py-3 transition-opacity duration-200'
+          className='w-full px-4 py-3 transition-opacity duration-subtle'
           aria-hidden={!showSpotifyImportProgress}
           aria-live={showSpotifyImportProgress ? 'polite' : 'off'}
           inert={!showSpotifyImportProgress}
@@ -60,7 +60,7 @@ export function OnboardingCompleteStep({
           <div className='mb-2 flex items-center gap-2'>
             <div className='h-1.5 flex-1 overflow-hidden rounded-full bg-surface-0'>
               <div
-                className='h-full rounded-full bg-(--linear-accent) transition-all duration-500'
+                className='h-full rounded-full bg-accent transition-[width] duration-cinematic'
                 style={{ width: `${((spotifyImportStage + 1) / 3) * 100}%` }}
               />
             </div>
@@ -91,7 +91,7 @@ export function OnboardingCompleteStep({
 
         <div className={FORM_LAYOUT.footerHint}>
           {copied && (
-            <span className='text-success animate-in fade-in-0 duration-200'>
+            <span className='text-success animate-in fade-in-0 duration-subtle'>
               Link copied to clipboard!
             </span>
           )}

@@ -516,26 +516,31 @@ describe('No hardcoded branch names in SKILL templates', () => {
   }
 });
 
-// --- Part 7b: TODOS-format.md reference consistency ---
+// --- Part 7b: Linear follow-up reference consistency ---
 
-describe('TODOS-format.md reference consistency', () => {
-  test('review/TODOS-format.md exists and defines canonical format', () => {
-    const content = fs.readFileSync(path.join(ROOT, 'review', 'TODOS-format.md'), 'utf-8');
-    expect(content).toContain('**What:**');
-    expect(content).toContain('**Why:**');
-    expect(content).toContain('**Priority:**');
-    expect(content).toContain('**Effort:**');
-    expect(content).toContain('## Completed');
+describe('LINEAR-followups.md reference consistency', () => {
+  test('review/LINEAR-followups.md exists and defines canonical format', () => {
+    const content = fs.readFileSync(path.join(ROOT, 'review', 'LINEAR-followups.md'), 'utf-8');
+    expect(content).toContain('## Source');
+    expect(content).toContain('## Follow-up');
+    expect(content).toContain('## Why it matters');
+    expect(content).toContain('## Classification');
+    expect(content).toContain('Candidate follow-up: <title>');
+    expect(content.toLowerCase()).toContain('issue id');
   });
 
-  test('skills that write TODOs reference TODOS-format.md', () => {
+  test('skills that create follow-ups reference LINEAR-followups.md', () => {
     const shipContent = fs.readFileSync(path.join(ROOT, 'ship', 'SKILL.md'), 'utf-8');
     const ceoPlanContent = fs.readFileSync(path.join(ROOT, 'plan-ceo-review', 'SKILL.md'), 'utf-8');
     const engPlanContent = fs.readFileSync(path.join(ROOT, 'plan-eng-review', 'SKILL.md'), 'utf-8');
+    const designPlanContent = fs.readFileSync(path.join(ROOT, 'plan-design-review', 'SKILL.md'), 'utf-8');
+    const reviewContent = fs.readFileSync(path.join(ROOT, 'review', 'SKILL.md'), 'utf-8');
 
-    expect(shipContent).toContain('TODOS-format.md');
-    expect(ceoPlanContent).toContain('TODOS-format.md');
-    expect(engPlanContent).toContain('TODOS-format.md');
+    expect(shipContent).toContain('LINEAR-followups.md');
+    expect(ceoPlanContent).toContain('LINEAR-followups.md');
+    expect(engPlanContent).toContain('LINEAR-followups.md');
+    expect(designPlanContent).toContain('LINEAR-followups.md');
+    expect(reviewContent).toContain('LINEAR-followups.md');
   });
 });
 
@@ -1539,7 +1544,7 @@ describe('Test failure triage in ship skill', () => {
     expect(content).toContain('solo');
     expect(content).toContain('collaborative');
     expect(content).toContain('Investigate and fix now');
-    expect(content).toContain('Add as P0 TODO');
+    expect(content).toContain('Create required Linear follow-up');
   });
 
   test('ship/SKILL.md triage has GitHub issue assignment for collaborative mode', () => {

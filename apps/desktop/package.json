@@ -4,9 +4,13 @@
   "private": true,
   "main": "dist-electron/main.js",
   "scripts": {
+    "predev": "node scripts/write-env.mjs",
     "dev": "tsc && electron .",
-    "build:staging": "cross-env ELECTRON_ENV=staging tsc && electron-builder --config electron-builder.yml --config.appId=app.jov.ie.staging --config.mac.icon=assets/icon-staging.icns --publish always",
-    "build:production": "cross-env ELECTRON_ENV=production tsc && electron-builder --config electron-builder.yml --publish always",
+    "prebuild:staging": "cross-env ELECTRON_ENV=staging node scripts/write-env.mjs",
+    "build:staging": "tsc && electron-builder --config electron-builder.staging.yml --publish always",
+    "prebuild:production": "cross-env ELECTRON_ENV=production node scripts/write-env.mjs",
+    "build:production": "tsc && electron-builder --config electron-builder.yml --publish always",
+    "pretypecheck": "node scripts/write-env.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

@@ -56,7 +56,7 @@ const CATEGORY_CONFIG: Record<
   timing: {
     icon: Clock,
     iconClassName: 'text-tertiary-token',
-    chipClassName: 'bg-gray-500/10 dark:bg-gray-500/15',
+    chipClassName: 'bg-surface-0',
   },
 };
 

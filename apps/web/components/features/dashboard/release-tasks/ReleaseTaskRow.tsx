@@ -40,7 +40,7 @@ export function ReleaseTaskRow({ task, onToggle }: ReleaseTaskRowProps) {
         checked={isDone}
         disabled={isAi}
         onChange={() => onToggle(task.id, !isDone)}
-        className='h-3.5 w-3.5 flex-shrink-0 rounded accent-[var(--linear-accent,#5e6ad2)] cursor-pointer disabled:cursor-default disabled:opacity-60'
+        className='h-3.5 w-3.5 flex-shrink-0 rounded accent-accent cursor-pointer disabled:cursor-default disabled:opacity-60'
         aria-label={`Mark "${task.title}" as ${isDone ? 'incomplete' : 'complete'}`}
       />
 

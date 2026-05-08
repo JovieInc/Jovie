@@ -1,1 +1,1 @@
-/Users/timwhite/conductor/workspaces/jovie-v1/sao-paulo/.claude/skills/gstack/plan-design-review/SKILL.md
+../gstack/plan-design-review/SKILL.md

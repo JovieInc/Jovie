@@ -48,7 +48,7 @@ describe('Hermes dispatch', () => {
     expect(payload.skills).toEqual(['investigate']);
     expect(payload.allowedPaths).toContain('apps/web');
     expect(payload.verification).toEqual([
-      'pnpm --filter web exec tsc --noEmit',
+      'pnpm --filter @jovie/web run typecheck -- --pretty false',
     ]);
     expect(payload.branchName).toMatch(/^codex\/hermes-bug_patch-jov-123-/);
   });

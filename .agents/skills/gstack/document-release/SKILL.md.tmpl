@@ -204,25 +204,29 @@ After auditing each file individually, do a cross-doc consistency pass:
 
 ---
 
-## Step 7: TODOS.md Cleanup
+## Step 7: Legacy TODO Context + Linear Follow-Ups
 
-This is a second pass that complements `/ship`'s Step 5.5. Read `review/TODOS-format.md` (if
-available) for the canonical TODO item format.
+This is a second pass that complements `/ship`'s follow-up capture. Existing `TODOS.md`
+is legacy context only. Do not add new TODO items. Read `review/LINEAR-followups.md` for
+the canonical follow-up issue format.
 
-If TODOS.md does not exist, skip this step.
+If TODOS.md does not exist, skip the legacy cross-reference and still check for new
+follow-up work in the diff.
 
-1. **Completed items not yet marked:** Cross-reference the diff against open TODO items. If a
-   TODO is clearly completed by the changes in this branch, move it to the Completed section
-   with `**Completed:** vX.Y.Z.W (YYYY-MM-DD)`. Be conservative — only mark items with clear
-   evidence in the diff.
+1. **Legacy context:** Cross-reference the diff against open TODO items. If a TODO is clearly
+   completed by the changes in this branch, note it in the documentation summary, but do not
+   edit `TODOS.md`.
 
 2. **Items needing description updates:** If a TODO references files or components that were
-   significantly changed, its description may be stale. Use AskUserQuestion to confirm whether
-   the TODO should be updated, completed, or left as-is.
+   significantly changed, its description may be stale. Create a Linear follow-up issue only
+   if this creates actionable work that should not be lost.
 
 3. **New deferred work:** Check the diff for `TODO`, `FIXME`, `HACK`, and `XXX` comments. For
-   each one that represents meaningful deferred work (not a trivial inline note), use
-   AskUserQuestion to ask whether it should be captured in TODOS.md.
+   each one that represents meaningful deferred work (not a trivial inline note), create a
+   Linear follow-up issue before final closeout. Optional work uses the title
+   `Candidate follow-up: <title>` and must include: "Pickup agent must first judge whether to
+   implement, close, or split this." Do not add the `automated` label by default. Record and
+   include Linear issue ID(s) for every follow-up created in the final report or PR body.
 
 ---
 

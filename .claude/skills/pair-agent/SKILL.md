@@ -1,1 +1,1 @@
-/Users/timwhite/conductor/workspaces/jovie-v1/sao-paulo/.claude/skills/gstack/pair-agent/SKILL.md
+../gstack/pair-agent/SKILL.md

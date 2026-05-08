@@ -111,10 +111,18 @@ function createWindow(): BrowserWindow {
 
   // Deny all child window creation. Auth redirects happen in-place via
   // will-navigate; there is no in-app flow that requires a child window.
-  // Routing through shell.openExternal prevents unsecured child windows
-  // that would inherit default webPreferences without contextIsolation.
+  // URL validation guards against XSS-triggered file://, javascript:, or
+  // custom-scheme handoffs: only https: and mailto: are forwarded to the
+  // system browser. Everything else is silently dropped.
   win.webContents.setWindowOpenHandler(({ url }) => {
-    void shell.openExternal(url);
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol === 'https:' || parsed.protocol === 'mailto:') {
+        void shell.openExternal(url);
+      }
+    } catch {
+      // Invalid URL — ignore silently
+    }
     return { action: 'deny' };
   });
 

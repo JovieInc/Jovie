@@ -183,7 +183,7 @@ git status  # confirm clean
 # Edit only files in the assigned HOT ZONE
 
 # 4. Verify
-pnpm --filter web exec tsc --noEmit
+pnpm --filter @jovie/web run typecheck -- --pretty false
 pnpm biome check --write <edited files>
 pnpm --filter web exec vitest run <affected test file>   # if applicable
 

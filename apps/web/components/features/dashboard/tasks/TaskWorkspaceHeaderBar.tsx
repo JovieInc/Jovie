@@ -243,7 +243,7 @@ export function TaskSubviewTabs({
               'inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-[12.5px] font-semibold tracking-[-0.012em] transition-[background-color,color]',
               isActive
                 ? 'bg-surface-1 text-primary-token'
-                : 'text-tertiary-token hover:bg-surface-1/60 hover:text-primary-token'
+                : 'text-tertiary-token hover:bg-surface-1 hover:text-primary-token'
             )}
           >
             <span>{subview.label}</span>

@@ -37,11 +37,11 @@ export const ComboboxDropdown = forwardRef<
         if (isLoading && query.length > 0) {
           return (
             <output
-              className='px-4 py-3 text-sm text-gray-500'
+              className='px-4 py-3 text-sm text-secondary-token'
               aria-live='polite'
             >
               <div className='flex items-center space-x-2'>
-                <LoadingSpinner size='sm' className='text-gray-500' />
+                <LoadingSpinner size='sm' className='text-tertiary-token' />
                 <span>Searching artists...</span>
               </div>
             </output>
@@ -50,17 +50,17 @@ export const ComboboxDropdown = forwardRef<
         if (showNoResults) {
           return (
             <output
-              className='px-4 py-4 text-sm text-gray-500'
+              className='px-4 py-4 text-sm text-secondary-token'
               aria-live='polite'
             >
               <p className='mb-2'>No artists found for &quot;{query}&quot;</p>
-              <p className='text-xs text-gray-400'>
+              <p className='text-xs text-tertiary-token'>
                 Can&apos;t find your artist?{' '}
                 <a
                   href='https://artists.spotify.com'
                   target='_blank'
                   rel='noopener noreferrer'
-                  className='text-indigo-600 hover:text-indigo-500 underline'
+                  className='text-accent hover:text-accent-hover underline'
                 >
                   Verify your Spotify artist profile
                 </a>

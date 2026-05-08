@@ -1,6 +1,8 @@
 dist/
 dist-electron/
 node_modules/
+# Generated at build time by scripts/write-env.mjs — do not commit
+src/env.generated.ts
 # Generated at build time by electron-builder — do not commit
 assets/icon.icns
 assets/icon.ico

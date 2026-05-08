@@ -14,14 +14,14 @@ const TASK_LABEL_BASE =
  * Get the container class for a completed setup task item.
  */
 export function getCompletedTaskContainerClass(): string {
-  return `${TASK_CONTAINER_BASE} bg-surface-0/75`;
+  return `${TASK_CONTAINER_BASE} bg-surface-0`;
 }
 
 /**
  * Get the container class for an incomplete setup task item.
  */
 export function getIncompleteTaskContainerClass(): string {
-  return `${TASK_CONTAINER_BASE} hover:border-(--linear-app-frame-seam) hover:bg-surface-0/60`;
+  return `${TASK_CONTAINER_BASE} hover:border-(--linear-app-frame-seam) hover:bg-surface-0`;
 }
 
 /**

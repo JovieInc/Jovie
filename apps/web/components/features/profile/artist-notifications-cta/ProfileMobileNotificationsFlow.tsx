@@ -208,7 +208,7 @@ function PrimaryButton({
         activate();
       }}
       disabled={disabled}
-      className='inline-flex h-14 w-full items-center justify-center rounded-[18px] bg-white/14 px-5 text-[15px] font-semibold tracking-[-0.02em] text-white transition-colors duration-200 hover:bg-white/18 disabled:cursor-not-allowed disabled:opacity-60'
+      className='inline-flex h-14 w-full items-center justify-center rounded-[18px] bg-white/14 px-5 text-[15px] font-semibold tracking-[-0.02em] text-white transition-colors duration-subtle hover:bg-white/18 disabled:cursor-not-allowed disabled:opacity-60'
     >
       {children}
     </button>
@@ -229,7 +229,7 @@ function SecondaryTextButton({
       type='button'
       onClick={onClick}
       disabled={disabled}
-      className='inline-flex h-12 w-full items-center justify-center rounded-[18px] px-5 text-[15px] font-medium tracking-[-0.02em] text-white/58 transition-colors duration-200 hover:text-white/76 disabled:cursor-not-allowed disabled:opacity-60'
+      className='inline-flex h-12 w-full items-center justify-center rounded-[18px] px-5 text-[15px] font-medium tracking-[-0.02em] text-white/58 transition-colors duration-subtle hover:text-white/76 disabled:cursor-not-allowed disabled:opacity-60'
     >
       {children}
     </button>
@@ -794,7 +794,7 @@ export function ProfileMobileNotificationsFlow({
             <button
               type='button'
               onClick={onBack}
-              className='inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/78 transition-colors duration-200 hover:bg-white/[0.08]'
+              className='inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/78 transition-colors duration-subtle hover:bg-white/[0.08]'
               aria-label={isRootPreferencesStep ? 'Close' : 'Back'}
             >
               <ChevronLeft className='h-5 w-5' />
@@ -807,7 +807,7 @@ export function ProfileMobileNotificationsFlow({
             <button
               type='button'
               onClick={onClose}
-              className='inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/78 transition-colors duration-200 hover:bg-white/[0.08]'
+              className='inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/78 transition-colors duration-subtle hover:bg-white/[0.08]'
               aria-label='Close'
             >
               <X className='size-4.5' />
@@ -845,7 +845,10 @@ export function ProfileMobileNotificationsFlow({
   const content =
     presentation === 'overlay' ? (
       <div
-        className={cn(overlayRootClassName, 'bg-[#0a0b0f] text-white')}
+        className={cn(
+          overlayRootClassName,
+          'bg-[color:var(--profile-stage-bg)] text-white'
+        )}
         data-testid='profile-mobile-notifications-flow'
         role='dialog'
         aria-modal='true'
@@ -864,13 +867,13 @@ export function ProfileMobileNotificationsFlow({
         aria-modal='true'
         style={contentStyle}
       >
-        <div className='relative flex h-[min(760px,calc(100dvh-48px))] w-full max-w-[440px] flex-col overflow-hidden rounded-[34px] border border-white/10 bg-[#0a0b0f] shadow-[0_34px_96px_rgba(0,0,0,0.48)]'>
+        <div className='relative flex h-[min(760px,calc(100dvh-48px))] w-full max-w-[440px] flex-col overflow-hidden rounded-[34px] border border-white/10 bg-[color:var(--profile-stage-bg)] shadow-[0_34px_96px_rgba(0,0,0,0.48)]'>
           {contentBody}
         </div>
       </div>
     ) : (
       <div
-        className='relative min-h-[640px] rounded-[32px] bg-[#0a0b0f] text-white'
+        className='relative min-h-[640px] rounded-[32px] bg-[color:var(--profile-stage-bg)] text-white'
         data-testid='profile-mobile-notifications-flow'
         data-shell-variant='inline-full-height'
         style={contentStyle}

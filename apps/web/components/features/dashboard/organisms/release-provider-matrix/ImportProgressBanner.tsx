@@ -58,7 +58,7 @@ export const ImportProgressBanner = memo(function ImportProgressBanner({
     >
       <DrawerSurfaceCard
         variant='card'
-        className='flex items-center gap-3 rounded-[10px] border border-[#1DB954]/14 bg-[color-mix(in_oklab,#1DB954_4.5%,var(--linear-app-content-surface))] px-4 py-3 transition-opacity duration-200'
+        className='flex items-center gap-3 rounded-[10px] border border-[#1DB954]/14 bg-[color-mix(in_oklab,#1DB954_4.5%,var(--linear-app-content-surface))] px-4 py-3 transition-opacity duration-subtle'
       >
         <ProviderIcon provider='spotify' className='h-4.5 w-4.5' />
         <div className='flex min-w-0 flex-1 flex-col gap-1'>
@@ -75,7 +75,7 @@ export const ImportProgressBanner = memo(function ImportProgressBanner({
             </span>
           </div>
           <progress
-            className='h-1 w-full appearance-none overflow-hidden rounded-full bg-[#1DB954]/12 [&::-moz-progress-bar]:rounded-full [&::-moz-progress-bar]:bg-[#1DB954] [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-bar]:bg-[#1DB954]/12 [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-[#1DB954] [&::-webkit-progress-value]:transition-[width] [&::-webkit-progress-value]:duration-700 [&::-webkit-progress-value]:ease-out'
+            className='h-1 w-full appearance-none overflow-hidden rounded-full bg-[#1DB954]/12 [&::-moz-progress-bar]:rounded-full [&::-moz-progress-bar]:bg-[#1DB954] [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-bar]:bg-[#1DB954]/12 [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-[#1DB954] [&::-webkit-progress-value]:transition-[width] [&::-webkit-progress-value]:duration-cinematic [&::-webkit-progress-value]:ease-out'
             value={totalCount > 0 ? importedCount : undefined}
             max={totalCount > 0 ? totalCount : undefined}
             aria-label={progressLabel}
@@ -86,7 +86,7 @@ export const ImportProgressBanner = memo(function ImportProgressBanner({
         <DrawerSurfaceCard
           variant='card'
           data-testid='release-enrichment-progress-banner'
-          className='mt-2 flex items-center gap-3 rounded-[10px] border border-accent/14 bg-[color-mix(in_oklab,var(--linear-accent)_4.5%,var(--linear-app-content-surface))] px-4 py-3 transition-opacity duration-200'
+          className='mt-2 flex items-center gap-3 rounded-[10px] border border-accent/14 bg-[color-mix(in_oklab,var(--linear-accent)_4.5%,var(--linear-app-content-surface))] px-4 py-3 transition-opacity duration-subtle'
         >
           <div className='flex h-5 w-5 items-center justify-center'>
             <div className='h-4 w-4 animate-spin rounded-full border-2 border-accent/30 border-t-accent' />

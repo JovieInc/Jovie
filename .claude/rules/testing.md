@@ -124,7 +124,7 @@ Tests must be written **at feature creation time**, not retroactively. Apply cov
 Never mark a task complete without confirming the fix works:
 
 - Run the relevant test file: `pnpm --filter web exec vitest run <test-file>`
-- Run typecheck: `pnpm --filter web exec tsc --noEmit`
+- Run typecheck: `pnpm --filter @jovie/web run typecheck -- --pretty false`
 - For UI changes: confirm the component renders without errors
 - For API changes: confirm the endpoint returns expected shape
 - Paste the passing output as evidence in the PR description

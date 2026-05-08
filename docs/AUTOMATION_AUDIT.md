@@ -7,6 +7,23 @@
 
 ---
 
+## 0. AgentOS Follow-Up Decision
+
+The follow-up architecture decision is captured in [`docs/AGENT_OS_ARCHITECTURE.md`](AGENT_OS_ARCHITECTURE.md).
+
+Accepted direction:
+
+- Use Vercel Workflow/WDK as the first durable coordinator for AgentOS v1.
+- Defer Trigger.dev unless WDK fails compile, local durability, retry/queue, or operator-visibility proof points.
+- Keep GitHub Actions and GStack as the required PR, review, ship, and deploy gates.
+- Treat Hermes and Ruflo as execution adapters, not source of truth.
+- Introduce a canonical `AgentRunArtifact` contract before adding runtime integrations.
+- Keep `/hud` as a readable status board; mount dense operator workflows under `/app/admin/ops`.
+
+No cron or workflow triggers were changed by this decision note.
+
+---
+
 ## 1. Cron Registry
 
 ### Scheduled in `vercel.json` (5 entries — source of truth)

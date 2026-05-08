@@ -119,11 +119,11 @@ export const HeroSection = memo(function HeroSection({
             <div className='relative group'>
               {/* Background glow effect */}
               {showBackgroundEffects && (
-                <div className='absolute -inset-2 bg-linear-to-r from-blue-500/10 via-purple-500/10 to-cyan-500/10 rounded-2xl blur-lg opacity-40 group-hover:opacity-60 transition-opacity duration-300' />
+                <div className='absolute -inset-2 bg-linear-to-r from-blue-500/10 via-purple-500/10 to-cyan-500/10 rounded-2xl blur-lg opacity-40 group-hover:opacity-60 transition-opacity duration-subtle' />
               )}
 
               {/* Content card */}
-              <div className='relative bg-surface-0/80 backdrop-blur-xl rounded-2xl border border-subtle shadow-xl hover:shadow-2xl transition-all duration-200 hover:-translate-y-1 p-8'>
+              <div className='relative bg-surface-0/90 backdrop-blur-xl rounded-2xl border border-subtle shadow-xl hover:shadow-2xl transition-shadow duration-subtle p-8'>
                 {children}
               </div>
             </div>

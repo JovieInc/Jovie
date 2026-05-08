@@ -76,26 +76,30 @@ jobs:
           # workflow_dispatch with explicit run ID overrides evaluation (for smoke testing).
           if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ -n "$DISPATCH_RUN_ID" ]; then
             echo "Manual dispatch override: forcing autofix for run $DISPATCH_RUN_ID"
-            echo "needs_autofix=true" >> "$GITHUB_OUTPUT"
-            echo "failing_run_id=$DISPATCH_RUN_ID" >> "$GITHUB_OUTPUT"
-            # Rest of fields still come from evaluation (most recent failure context).
-            echo "failing_sha=$EVAL_FAILING_SHA" >> "$GITHUB_OUTPUT"
-            echo "failing_short_sha=$EVAL_FAILING_SHORT_SHA" >> "$GITHUB_OUTPUT"
-            echo "last_green_sha=$EVAL_LAST_GREEN_SHA" >> "$GITHUB_OUTPUT"
-            echo "failed_job_names=$EVAL_FAILED_JOB_NAMES" >> "$GITHUB_OUTPUT"
-            echo "systemic=false" >> "$GITHUB_OUTPUT"
-            echo "autofix_skip_reason=" >> "$GITHUB_OUTPUT"
+            {
+              echo "needs_autofix=true"
+              echo "failing_run_id=$DISPATCH_RUN_ID"
+              # Rest of fields still come from evaluation (most recent failure context).
+              echo "failing_sha=$EVAL_FAILING_SHA"
+              echo "failing_short_sha=$EVAL_FAILING_SHORT_SHA"
+              echo "last_green_sha=$EVAL_LAST_GREEN_SHA"
+              echo "failed_job_names=$EVAL_FAILED_JOB_NAMES"
+              echo "systemic=false"
+              echo "autofix_skip_reason="
+            } >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          echo "needs_autofix=$EVAL_NEEDS_AUTOFIX" >> "$GITHUB_OUTPUT"
-          echo "failing_run_id=$EVAL_FAILING_RUN_ID" >> "$GITHUB_OUTPUT"
-          echo "failing_sha=$EVAL_FAILING_SHA" >> "$GITHUB_OUTPUT"
-          echo "failing_short_sha=$EVAL_FAILING_SHORT_SHA" >> "$GITHUB_OUTPUT"
-          echo "last_green_sha=$EVAL_LAST_GREEN_SHA" >> "$GITHUB_OUTPUT"
-          echo "failed_job_names=$EVAL_FAILED_JOB_NAMES" >> "$GITHUB_OUTPUT"
-          echo "systemic=$EVAL_SYSTEMIC" >> "$GITHUB_OUTPUT"
-          echo "autofix_skip_reason=$EVAL_SKIP_REASON" >> "$GITHUB_OUTPUT"
+          {
+            echo "needs_autofix=$EVAL_NEEDS_AUTOFIX"
+            echo "failing_run_id=$EVAL_FAILING_RUN_ID"
+            echo "failing_sha=$EVAL_FAILING_SHA"
+            echo "failing_short_sha=$EVAL_FAILING_SHORT_SHA"
+            echo "last_green_sha=$EVAL_LAST_GREEN_SHA"
+            echo "failed_job_names=$EVAL_FAILED_JOB_NAMES"
+            echo "systemic=$EVAL_SYSTEMIC"
+            echo "autofix_skip_reason=$EVAL_SKIP_REASON"
+          } >> "$GITHUB_OUTPUT"
 
           if [ "$EVAL_SYSTEMIC" = "true" ]; then
             echo "::warning::Systemic failure detected across multiple SHAs — autofix will NOT dispatch. Human triage required."
@@ -271,6 +275,7 @@ jobs:
         id: claude
         uses: anthropics/claude-code-action@fefa07e9c665b7320f08c3b525980457f22f58aa # v1
         with:
+          allowed_bots: 'github-merge-queue[bot]'
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
             Main branch CI is red. Your job is to diagnose and fix the root cause.

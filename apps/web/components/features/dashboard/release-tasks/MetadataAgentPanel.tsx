@@ -407,7 +407,7 @@ export function MetadataAgentPanel({
               void handlePrepare();
             }}
             disabled={actionState === 'loading' || isPending}
-            className='rounded-md bg-[var(--linear-accent,#5e6ad2)] px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60'
+            className='rounded-md bg-accent px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60'
           >
             {latestRequest ? 'Rebuild Package' : 'Prepare Package'}
           </button>

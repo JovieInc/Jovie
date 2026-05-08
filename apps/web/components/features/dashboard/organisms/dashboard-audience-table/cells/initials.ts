@@ -35,10 +35,10 @@ export function getMonogramInitials(name: string | null | undefined): string {
  * with state pills).
  */
 const MONOGRAM_PALETTE = [
-  'bg-zinc-700/60 text-zinc-100',
-  'bg-slate-700/60 text-slate-100',
-  'bg-stone-700/60 text-stone-100',
-  'bg-neutral-700/60 text-neutral-100',
+  'bg-surface-2 text-primary-token',
+  'bg-surface-2 text-secondary-token',
+  'bg-surface-1 text-secondary-token',
+  'bg-surface-0 text-tertiary-token',
   'bg-indigo-900/50 text-indigo-100',
   'bg-violet-900/50 text-violet-100',
   'bg-blue-900/50 text-blue-100',
