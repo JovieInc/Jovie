@@ -12,6 +12,10 @@
 
 /* Import Linear-specific tokens for marketing pages */
 @import "./linear-tokens.css";
+/* DESIGN AGENT: Carbon palette synced to shell-v1 */
+/* Tokens updated: bg-page #06070a, surface0 #0a0b0e, surface1 #101216, 
+   surface2 #161a20, contentSurface #0a0c0f, border #171a20 */
+
 
 /* ============================================
    THEME INPUTS - The only 3 variables needed
@@ -313,28 +317,28 @@
 
 /* Dark mode - same generation logic, inverted lightness */
 :root.dark {
-  /* Dark mode surfaces — matched to Linear's exact Hex values */
-  --color-bg-base: #08090a;
+  /* Dark mode surfaces — matched to shell-v1 Carbon palette */
+  --color-bg-base: #06070a;
   /* sidebar/page bg */
-  --color-bg-surface-0: #0f1011;
+  --color-bg-surface-0: #0a0b0e;
   /* primary app surface — matches --linear-bg-surface-0 */
   --color-bg-surface-1: var(--linear-bg-surface-1);
   /* Shared card surface inside the dark app shell */
-  --color-bg-surface-2: #23252a;
+  --color-bg-surface-2: #161a20;
   /* inputs, elevated */
   --color-bg-surface-3: #2a2c32;
   /* modals, tooltips */
 
   /* Additional dark surface levels */
-  --color-bg-page: #08090a;
+  --color-bg-page: #06070a;
   /* Same as base */
   --color-bg-hover: rgba(255, 255, 255, 0.04);
   /* Row/item hover */
-  --color-bg-elevated: #0f1011;
+  --color-bg-elevated: #0a0b0e;
   /* Same as surface-0 */
-  --color-bg-input: #191b1f;
+  --color-bg-input: #101216;
   /* Same as surface-1 */
-  --color-bg-active: #23252a;
+  --color-bg-active: #161a20;
   /* Same as surface-2 */
   --color-bg-primary: lch(9.894% 0.5 282);
   --color-bg-secondary: lch(14.44% 0.5 282);
@@ -413,7 +417,7 @@
 
   /* Primary button - inverted for dark mode (Linear: rgb(230,230,230)) */
   --color-btn-primary-bg: #e6e6e6;
-  --color-btn-primary-fg: #08090a;
+  --color-btn-primary-fg: #06070a;
   --color-btn-primary-hover: #f0f0f0;
 
   /* Secondary button */
