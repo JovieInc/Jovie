@@ -107,7 +107,7 @@ Full contract: [`.claude/rules/linear.md`](.claude/rules/linear.md).
 
 Run the narrowest relevant checks:
 
-- Typecheck for TypeScript/API changes: `pnpm --filter web exec tsc --noEmit`
+- Typecheck for TypeScript/API changes: `pnpm --filter @jovie/web run typecheck -- --pretty false`
 - Lint/format for edited packages: `pnpm biome check --write apps/web`
 - Unit/integration tests for changed logic: `pnpm --filter web exec vitest run <file>`
 - Build for routing/config/cross-package changes

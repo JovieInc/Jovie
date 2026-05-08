@@ -15,7 +15,10 @@ function rgbStringToHex(value) {
   if (v.startsWith('#')) return v.toLowerCase();
   const m = v.match(/rgba?\(([^)]+)\)/);
   if (!m) return v;
-  const parts = m[1].split(/[\s,]+/).filter(Boolean).map(Number);
+  const parts = m[1]
+    .split(/[\s,]+/)
+    .filter(Boolean)
+    .map(Number);
   const [r, g, b] = parts;
   return (
     '#' +
@@ -120,8 +123,7 @@ for (const [varName, expected] of Object.entries(CARBON_PALETTE)) {
   for (const [name, tokens] of Object.entries(targets)) {
     const actual = tokens[varName];
     const actualHex = rgbStringToHex(actual);
-    const ok =
-      actualHex && actualHex.toLowerCase() === expected.toLowerCase();
+    const ok = actualHex && actualHex.toLowerCase() === expected.toLowerCase();
     console.log(
       `${ok ? '✓' : '✗'} ${name.padEnd(14)} ${varName.padEnd(34)} = ${actual}${ok ? '' : ` (expected ${expected})`}`
     );

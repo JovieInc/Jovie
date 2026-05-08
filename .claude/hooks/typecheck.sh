@@ -30,9 +30,9 @@ if [ ! -d "node_modules" ]; then
   exit 0
 fi
 
-# Run typecheck and capture output
-# Using turbo for caching - subsequent runs will be fast if no changes
-typecheck_output=$(pnpm typecheck 2>&1) || typecheck_exit=$?
+# Run coordinated web typecheck and capture output. The single-flight wrapper
+# prevents parallel agents from racing the shared incremental tsbuildinfo file.
+typecheck_output=$(pnpm --filter @jovie/web run typecheck -- --pretty false 2>&1) || typecheck_exit=$?
 
 if [ "${typecheck_exit:-0}" -ne 0 ]; then
   echo "TypeScript errors detected:"
@@ -42,7 +42,7 @@ if [ "${typecheck_exit:-0}" -ne 0 ]; then
   error_count=$(echo "$typecheck_output" | grep -c "error TS" || true)
   if [ "$error_count" -gt 50 ]; then
     echo ""
-    echo "... and $((error_count - 50)) more errors. Run 'pnpm typecheck' for full output."
+    echo "... and $((error_count - 50)) more errors. Run 'pnpm --filter @jovie/web run typecheck -- --pretty false' for full output."
   fi
   exit 1
 fi

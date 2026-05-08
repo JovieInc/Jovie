@@ -128,7 +128,7 @@ jobs:
                   priority: 50,
                   skills: ['autoplan'],
                   allowedPaths: ['apps/web', 'scripts', '.github/workflows'],
-                  verification: ['pnpm --filter web exec tsc --noEmit'],
+                  verification: ['pnpm --filter @jovie/web run typecheck -- --pretty false'],
                   dryRun: process.env.INPUT_DRY_RUN === 'true',
                   prompt: 'Manual Hermes CLI worker dispatch.',
                   owner: 'workflow_dispatch',

@@ -17,7 +17,7 @@ const basePayload: HermesDispatchPayload = {
   priority: 70,
   skills: ['investigate'],
   allowedPaths: ['apps/web'],
-  verification: ['pnpm --filter web exec tsc --noEmit'],
+  verification: ['pnpm --filter @jovie/web run typecheck -- --pretty false'],
   dryRun: false,
   prompt: 'Find the root cause.',
   owner: 'HUD',
@@ -36,7 +36,9 @@ describe('Hermes CLI worker runner', () => {
     expect(prompt).toContain('JOVIE_AGENT_PROFILE=coder');
     expect(prompt).toContain('/investigate');
     expect(prompt).toContain('Do not commit or push');
-    expect(prompt).toContain('pnpm --filter web exec tsc --noEmit');
+    expect(prompt).toContain(
+      'pnpm --filter @jovie/web run typecheck -- --pretty false'
+    );
   });
 
   it('builds Codex CLI commands with prompt on stdin', () => {

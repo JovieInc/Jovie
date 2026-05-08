@@ -240,15 +240,11 @@ export async function POST(request: Request) {
         '[onboarding/intake] Failed to attach access outcome to interview',
         error
       );
-      await captureError(
-        'onboarding intake outcome attach failed',
-        error,
-        {
-          route: '/api/onboarding/intake',
-          interviewId,
-          outcome: access.outcome,
-        }
-      );
+      await captureError('onboarding intake outcome attach failed', error, {
+        route: '/api/onboarding/intake',
+        interviewId,
+        outcome: access.outcome,
+      });
     }
 
     return NextResponse.json({
