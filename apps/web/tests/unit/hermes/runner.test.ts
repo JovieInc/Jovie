@@ -63,9 +63,9 @@ describe('Hermes CLI worker runner', () => {
   });
 
   it('normalizes allowed paths and rejects traversal', () => {
-    expect(normalizeHermesAllowedPaths(['./apps/web/', 'apps/web'])).toEqual([
-      'apps/web',
-    ]);
+    expect(
+      normalizeHermesAllowedPaths(['./apps/web/', '././apps/web', 'apps/web'])
+    ).toEqual(['apps/web']);
     expect(() => normalizeHermesAllowedPaths(['../apps/web'])).toThrow(
       'Invalid Hermes allowed path'
     );

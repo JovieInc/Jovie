@@ -2,12 +2,17 @@ const SAFE_HERMES_PATH_REGEX =
   /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[a-zA-Z0-9._/@-]+$/;
 
 function normalizePathValue(path: string): string {
-  return path
+  let normalized = path
     .trim()
     .replaceAll('\\', '/')
-    .replace(/^\.\//, '')
     .replaceAll(/\/+/g, '/')
     .replace(/\/$/, '');
+
+  while (normalized.startsWith('./')) {
+    normalized = normalized.slice(2);
+  }
+
+  return normalized;
 }
 
 function comparePath(left: string, right: string): number {
