@@ -20,9 +20,15 @@ export function HudClockClient({ locale }: HudClockClientProps) {
     });
   }, [resolvedLocale]);
 
-  const [now, setNow] = useState<Date>(() => new Date());
+  // Initialize as null to avoid SSR/client hydration mismatch: the server
+  // renders a timestamp that the client would immediately disagree with.
+  // We show nothing until the first client-side tick so React can safely
+  // hydrate without a warning.
+  const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {
+    // Set immediately on mount, then update every second.
+    setNow(new Date());
     const id = setInterval(() => {
       setNow(new Date());
     }, 1000);
@@ -31,6 +37,8 @@ export function HudClockClient({ locale }: HudClockClientProps) {
       clearInterval(id);
     };
   }, []);
+
+  if (now === null) return null;
 
   return <span>{formatter.format(now)}</span>;
 }
