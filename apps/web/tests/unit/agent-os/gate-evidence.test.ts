@@ -156,6 +156,19 @@ describe('AgentOS gate evidence', () => {
     expect(evaluation.artifacts).toHaveLength(1);
   });
 
+  it('parses artifact comments when JSON strings contain artifact start markers', () => {
+    const evaluation = evaluateAgentRunGateEvidence(
+      formatAgentRunArtifactComment({
+        ...baseArtifact,
+        summary:
+          'Recorded marker <!-- agent-run-artifact without starting a nested artifact.',
+      })
+    );
+
+    expect(evaluation.passed).toBe(true);
+    expect(evaluation.artifacts).toHaveLength(1);
+  });
+
   it('accepts summary evidence when evidenceUrl is an empty string', () => {
     const evaluation = evaluateAgentRunGateEvidence(
       formatAgentRunArtifactComment({

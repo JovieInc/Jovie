@@ -49,22 +49,11 @@ export function extractAgentRunArtifactsFromMarkdown(
       break;
     }
 
-    const firstCommentEnd = commentEnd;
-    const nextArtifactStart = markdown.indexOf(
-      ARTIFACT_COMMENT_START,
-      jsonStart
-    );
-    const malformedCommentSearchStart =
-      nextArtifactStart !== -1 && nextArtifactStart < firstCommentEnd
-        ? nextArtifactStart
-        : firstCommentEnd + ARTIFACT_COMMENT_END.length;
     let foundArtifact = false;
-    while (
-      commentEnd !== -1 &&
-      (nextArtifactStart === -1 || commentEnd < nextArtifactStart)
-    ) {
+    while (commentEnd !== -1) {
       const rawJson = markdown.slice(jsonStart, commentEnd).trim();
-      searchStart = commentEnd + ARTIFACT_COMMENT_END.length;
+      const nextSearchStart = commentEnd + ARTIFACT_COMMENT_END.length;
+      searchStart = nextSearchStart;
 
       if (!rawJson) {
         foundArtifact = true;
@@ -83,10 +72,15 @@ export function extractAgentRunArtifactsFromMarkdown(
       }
 
       commentEnd = markdown.indexOf(ARTIFACT_COMMENT_END, searchStart);
+      if (commentEnd === -1) {
+        searchStart = commentStart + 1;
+        foundArtifact = true;
+        break;
+      }
     }
 
     if (!foundArtifact) {
-      searchStart = malformedCommentSearchStart;
+      searchStart = commentStart + 1;
     }
   }
 
