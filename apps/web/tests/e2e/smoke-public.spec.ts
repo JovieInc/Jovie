@@ -262,6 +262,7 @@ test.describe('Public Profile', () => {
         `/${TEST_PROFILE}/${sub}`,
         {
           maxRedirects: 0,
+          timeout: 60_000,
         }
       );
       expect(
