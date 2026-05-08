@@ -298,16 +298,31 @@ function HermesDispatchControls({
   );
 }
 
+export type HudDensity = 'shell' | 'kiosk';
+export type HudPresentationMode = 'shell' | 'admin-kiosk' | 'token';
+
 export interface HudDashboardClientProps {
   readonly initialMetrics: HudMetrics;
-  readonly hudUrl: string;
-  readonly kioskToken: string | null;
+  /** Visual scale: shell-density matches Overview KPIs; kiosk uses TV-scale typography. */
+  readonly density?: HudDensity;
+  /**
+   * Auth/access context. Independent of `density` — admin-kiosk keeps full
+   * dispatch capability while rendering at kiosk scale. Token mode hides the
+   * Hermes dispatch UI regardless of density.
+   */
+  readonly presentationMode?: HudPresentationMode;
+  /** Required only in token presentation: the QR-target URL for the TV view. */
+  readonly hudUrl?: string;
+  /** Required only in token presentation: forwarded to the metrics refresh hook. */
+  readonly kioskToken?: string | null;
 }
 
 export function HudDashboardClient({
   initialMetrics,
+  density = 'kiosk',
+  presentationMode = 'token',
   hudUrl,
-  kioskToken,
+  kioskToken = null,
 }: HudDashboardClientProps) {
   const { data: metrics, refetch } = useHudMetricsQuery(
     initialMetrics,
@@ -321,41 +336,70 @@ export function HudDashboardClient({
   const aiOpsTone = getAiOpsTone(metrics.aiOps);
   const aiOpsLabel = getAiOpsLabel(metrics.aiOps);
 
-  return (
-    <div className='mx-auto flex w-full max-w-[1560px] flex-col gap-4 px-4 py-4 sm:px-6 sm:py-6 xl:px-8'>
-      <ContentSurfaceCard
-        surface='details'
-        className='flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5'
-      >
-        <div className='flex items-center gap-3'>
-          <div className='relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[12px] border border-subtle bg-surface-0'>
-            <Image
-              src='/brand/Jovie-Logo-Icon-White.svg'
-              alt='Jovie'
-              fill
-              sizes='44px'
-              className='object-contain p-2.5'
-              priority
-            />
-          </div>
-          <div className='min-w-0'>
-            <SectionEyebrow>HUD</SectionEyebrow>
-            <h1 className='mt-1 truncate text-[22px] font-[620] leading-none tracking-[-0.03em] text-primary-token sm:text-[24px]'>
-              {metrics.branding.startupName}
-            </h1>
-          </div>
-        </div>
-        <div className='flex flex-col items-start gap-1 sm:items-end'>
-          <div className='text-[18px] font-[620] tracking-[-0.03em] text-primary-token sm:text-[20px]'>
-            <HudClockClient />
-          </div>
-          <p className='text-[12px] text-secondary-token'>
-            Updated {formatUpdatedTime(metrics.generatedAtIso)}
-          </p>
-        </div>
-      </ContentSurfaceCard>
+  const isShell = density === 'shell';
+  const showDispatch = presentationMode !== 'token';
+  const showQrPanel = presentationMode === 'token' && Boolean(hudUrl);
 
-      <div className='grid gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.9fr)]'>
+  // Outer layout: kiosk gets the wide centered TV layout; shell defers width
+  // to the AdminToolPage container that already provides app-shell padding.
+  const outerClass = isShell
+    ? 'flex w-full flex-col gap-4'
+    : 'mx-auto flex w-full max-w-[1560px] flex-col gap-4 px-4 py-4 sm:px-6 sm:py-6 xl:px-8';
+
+  // MRR scale: shell matches Overview KPIs (~28-32px); kiosk keeps the
+  // TV-readable 44/56/72 ramp.
+  const mrrValueClass = isShell
+    ? 'text-[28px] font-[620] leading-none tracking-[-0.03em] sm:text-[32px]'
+    : 'text-[44px] font-[620] leading-none tracking-[-0.045em] sm:text-[56px] lg:text-[72px]';
+
+  // Operations / Reliability / Runway KPIs likewise scale down in shell.
+  const secondaryValueClass = isShell
+    ? 'text-[24px] font-[620] leading-none tracking-[-0.03em] sm:text-[28px]'
+    : 'text-[36px] font-[620] leading-none tracking-[-0.04em] sm:text-[42px]';
+
+  return (
+    <div className={outerClass}>
+      {!isShell ? (
+        <ContentSurfaceCard
+          surface='details'
+          className='flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5'
+        >
+          <div className='flex items-center gap-3'>
+            <div className='relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[12px] border border-subtle bg-surface-0'>
+              <Image
+                src='/brand/Jovie-Logo-Icon-White.svg'
+                alt='Jovie'
+                fill
+                sizes='44px'
+                className='object-contain p-2.5'
+                priority
+              />
+            </div>
+            <div className='min-w-0'>
+              <SectionEyebrow>HUD</SectionEyebrow>
+              <h1 className='mt-1 truncate text-[22px] font-[620] leading-none tracking-[-0.03em] text-primary-token sm:text-[24px]'>
+                {metrics.branding.startupName}
+              </h1>
+            </div>
+          </div>
+          <div className='flex flex-col items-start gap-1 sm:items-end'>
+            <div className='text-[18px] font-[620] tracking-[-0.03em] text-primary-token sm:text-[20px]'>
+              <HudClockClient />
+            </div>
+            <p className='text-[12px] text-secondary-token'>
+              Updated {formatUpdatedTime(metrics.generatedAtIso)}
+            </p>
+          </div>
+        </ContentSurfaceCard>
+      ) : null}
+
+      <div
+        className={
+          showQrPanel
+            ? 'grid gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.9fr)]'
+            : 'grid gap-4'
+        }
+      >
         <div className='grid gap-4'>
           <ContentMetricCard
             label='Monthly recurring revenue'
@@ -371,7 +415,7 @@ export function HudDashboardClient({
             }
             className='p-4 sm:p-5'
             labelClassName='uppercase tracking-[0.16em] text-tertiary-token'
-            valueClassName='text-[44px] font-[620] leading-none tracking-[-0.045em] sm:text-[56px] lg:text-[72px]'
+            valueClassName={mrrValueClass}
           />
 
           <div className='grid gap-4 lg:grid-cols-3'>
@@ -392,7 +436,7 @@ export function HudDashboardClient({
               }
               className='p-4 sm:p-5'
               labelClassName='uppercase tracking-[0.16em] text-tertiary-token'
-              valueClassName='text-[36px] font-[620] leading-none tracking-[-0.04em] sm:text-[42px]'
+              valueClassName={secondaryValueClass}
             />
             <ContentMetricCard
               label='Operations'
@@ -406,7 +450,7 @@ export function HudDashboardClient({
               }
               className='p-4 sm:p-5'
               labelClassName='uppercase tracking-[0.16em] text-tertiary-token'
-              valueClassName='text-[36px] font-[620] leading-none tracking-[-0.04em] sm:text-[42px]'
+              valueClassName={secondaryValueClass}
             />
             <ContentMetricCard
               label='Reliability'
@@ -418,53 +462,78 @@ export function HudDashboardClient({
               }
               className='p-4 sm:p-5'
               labelClassName='uppercase tracking-[0.16em] text-tertiary-token'
-              valueClassName='text-[36px] font-[620] leading-none tracking-[-0.04em] sm:text-[42px]'
+              valueClassName={secondaryValueClass}
             />
           </div>
         </div>
 
-        <ContentSurfaceCard surface='details' className='space-y-5 p-4 sm:p-5'>
-          <div className='flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between'>
-            <div className='space-y-1'>
-              <SectionEyebrow>Open on phone</SectionEyebrow>
-              <p className='text-[20px] font-[620] tracking-[-0.03em] text-primary-token'>
-                Scan to view
-              </p>
-              <p className='max-w-[28ch] text-[13px] leading-5 text-secondary-token'>
-                Open the live HUD on another device using this kiosk link.
-              </p>
-            </div>
-            <div className='rounded-[12px] border border-subtle bg-surface-0 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
-              <QRCode
-                data={hudUrl}
-                size={196}
-                label='HUD link'
-                className='rounded-lg bg-white'
-              />
-            </div>
-          </div>
-
-          <div className='border-t border-subtle pt-5'>
-            <div className='flex items-center justify-between gap-3'>
-              <SectionEyebrow>Deployments</SectionEyebrow>
-              <p className='text-[12px] text-secondary-token'>
-                {deploymentDetail}
-              </p>
-            </div>
-            {metrics.deployments.recent.length > 0 ? (
-              <div className='mt-3 grid gap-2'>
-                {metrics.deployments.recent.slice(0, 5).map(run => (
-                  <DeploymentRow key={run.id} run={run} />
-                ))}
+        {showQrPanel ? (
+          <ContentSurfaceCard
+            surface='details'
+            className='space-y-5 p-4 sm:p-5'
+          >
+            <div className='flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between'>
+              <div className='space-y-1'>
+                <SectionEyebrow>Open on phone</SectionEyebrow>
+                <p className='text-[20px] font-[620] tracking-[-0.03em] text-primary-token'>
+                  Scan to view
+                </p>
+                <p className='max-w-[28ch] text-[13px] leading-5 text-secondary-token'>
+                  Open the live HUD on another device using this kiosk link.
+                </p>
               </div>
-            ) : (
-              <p className='mt-3 text-[13px] text-secondary-token'>
-                No recent runs.
-              </p>
-            )}
-          </div>
-        </ContentSurfaceCard>
+              <div className='rounded-[12px] border border-subtle bg-surface-0 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
+                <QRCode
+                  data={hudUrl ?? ''}
+                  size={196}
+                  label='HUD link'
+                  className='rounded-lg bg-white'
+                />
+              </div>
+            </div>
+
+            <div className='border-t border-subtle pt-5'>
+              <div className='flex items-center justify-between gap-3'>
+                <SectionEyebrow>Deployments</SectionEyebrow>
+                <p className='text-[12px] text-secondary-token'>
+                  {deploymentDetail}
+                </p>
+              </div>
+              {metrics.deployments.recent.length > 0 ? (
+                <div className='mt-3 grid gap-2'>
+                  {metrics.deployments.recent.slice(0, 5).map(run => (
+                    <DeploymentRow key={run.id} run={run} />
+                  ))}
+                </div>
+              ) : (
+                <p className='mt-3 text-[13px] text-secondary-token'>
+                  No recent runs.
+                </p>
+              )}
+            </div>
+          </ContentSurfaceCard>
+        ) : null}
       </div>
+
+      {!showQrPanel ? (
+        <ContentSurfaceCard surface='details' className='space-y-3 p-4 sm:p-5'>
+          <div className='flex items-center justify-between gap-3'>
+            <SectionEyebrow>Deployments</SectionEyebrow>
+            <p className='text-[12px] text-secondary-token'>
+              {deploymentDetail}
+            </p>
+          </div>
+          {metrics.deployments.recent.length > 0 ? (
+            <div className='grid gap-2'>
+              {metrics.deployments.recent.slice(0, 5).map(run => (
+                <DeploymentRow key={run.id} run={run} />
+              ))}
+            </div>
+          ) : (
+            <p className='text-[13px] text-secondary-token'>No recent runs.</p>
+          )}
+        </ContentSurfaceCard>
+      ) : null}
 
       <ContentSurfaceCard surface='details' className='space-y-5 p-4 sm:p-5'>
         <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
@@ -534,7 +603,7 @@ export function HudDashboardClient({
 
           <div className='space-y-3'>
             <SectionEyebrow>Dispatch</SectionEyebrow>
-            {metrics.accessMode === 'admin' ? (
+            {showDispatch && metrics.accessMode === 'admin' ? (
               <HermesDispatchControls
                 aiOps={metrics.aiOps}
                 onDispatchComplete={() => {
@@ -543,7 +612,9 @@ export function HudDashboardClient({
               />
             ) : (
               <p className='text-[13px] leading-5 text-secondary-token'>
-                Admin access required for worker dispatch.
+                {showDispatch
+                  ? 'Admin access required for worker dispatch.'
+                  : 'Dispatch is hidden on the TV/wallboard view.'}
               </p>
             )}
           </div>
@@ -564,14 +635,30 @@ export function HudDashboardClient({
         ) : null}
       </ContentSurfaceCard>
 
-      <ContentSurfaceCard surface='details' className='p-4 sm:p-5'>
+      <ContentSurfaceCard
+        surface='details'
+        className='p-4 sm:p-5'
+        data-testid='hud-bottom-marker'
+      >
         <div className='flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between'>
           <div className='space-y-2'>
             <SectionEyebrow>Default status</SectionEyebrow>
-            <p className='text-[40px] font-[620] leading-none tracking-[-0.045em] text-primary-token sm:text-[52px]'>
+            <p
+              className={
+                isShell
+                  ? 'text-[26px] font-[620] leading-none tracking-[-0.03em] text-primary-token sm:text-[32px]'
+                  : 'text-[40px] font-[620] leading-none tracking-[-0.045em] text-primary-token sm:text-[52px]'
+              }
+            >
               {metrics.overview.defaultStatus.toUpperCase()}
             </p>
-            <p className='max-w-4xl text-[15px] leading-7 text-secondary-token'>
+            <p
+              className={
+                isShell
+                  ? 'max-w-4xl text-[13px] leading-6 text-secondary-token'
+                  : 'max-w-4xl text-[15px] leading-7 text-secondary-token'
+              }
+            >
               {metrics.overview.defaultStatusDetail}
             </p>
           </div>
