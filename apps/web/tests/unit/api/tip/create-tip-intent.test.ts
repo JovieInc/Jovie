@@ -77,7 +77,7 @@ describe('POST /api/create-tip-intent', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        amount: -100,
+        amount: 0,
         handle: 'taylorswift',
       }),
     });
@@ -87,6 +87,7 @@ describe('POST /api/create-tip-intent', () => {
 
     expect(response.status).toBe(400);
     expect(data.error).toBeDefined();
+    expect(mockStripePaymentIntentsCreate).not.toHaveBeenCalled();
   });
 
   it('returns 400 for invalid handle', async () => {
