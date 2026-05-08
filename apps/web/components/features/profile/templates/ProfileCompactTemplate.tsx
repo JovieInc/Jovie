@@ -773,9 +773,7 @@ export function ProfileCompactTemplate({
           ) : null}
           <main className='relative flex h-full w-full items-stretch md:items-center'>
             {shouldRenderTemplateHeading ? (
-              <h1 className='sr-only' data-testid='profile-header'>
-                {artist.name}
-              </h1>
+              <h1 className='sr-only'>{artist.name}</h1>
             ) : null}
             {isDesktopLayout ? (
               <div className='w-full' data-testid='profile-compact-shell'>
