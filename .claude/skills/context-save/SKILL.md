@@ -1,1 +1,1 @@
-/Users/timwhite/conductor/workspaces/jovie-v1/sao-paulo/.claude/skills/gstack/context-save/SKILL.md
+../gstack/context-save/SKILL.md
