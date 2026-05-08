@@ -433,6 +433,14 @@ export function ProfileInlineNotificationsCTA({
     ]
   );
 
+  useEffect(() => {
+    if (step !== 'otp' || otpCode.length !== 6 || isSubmitting) {
+      return;
+    }
+
+    void handleOtpSubmit();
+  }, [handleOtpSubmit, isSubmitting, otpCode.length, step]);
+
   const handleNameSubmit = useCallback(() => {
     const trimmed = nameInput.trim();
     setStep('birthday');
