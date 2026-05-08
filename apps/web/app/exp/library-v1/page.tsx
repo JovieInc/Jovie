@@ -45,6 +45,8 @@ const EASE_CINEMATIC = 'cubic-bezier(0.32, 0.72, 0, 1)';
 const DURATION_CINEMATIC = 420;
 
 // Carbon palette (locked theme — same tokens as shell-v1).
+// Text tokens are omitted here: they are already defined in the global
+// design-system.css and picked up automatically via the dark theme.
 const CARBON_VARS: React.CSSProperties = {
   ['--linear-bg-page' as string]: '#06070a',
   ['--linear-app-content-surface' as string]: '#0a0c0f',
@@ -53,10 +55,6 @@ const CARBON_VARS: React.CSSProperties = {
   ['--surface-0' as string]: '#0a0b0e',
   ['--surface-1' as string]: '#101216',
   ['--surface-2' as string]: '#161a20',
-  ['--text-primary' as string]: 'rgba(255,255,255,0.92)',
-  ['--text-secondary' as string]: 'rgba(255,255,255,0.66)',
-  ['--text-tertiary' as string]: 'rgba(255,255,255,0.46)',
-  ['--text-quaternary' as string]: 'rgba(255,255,255,0.32)',
 };
 
 export type AssetType =
@@ -774,7 +772,7 @@ export function LeftRail({
                 type='button'
                 onClick={() => onSavedView(v.id)}
                 className={cn(
-                  'flex items-center gap-2 h-7 px-2 rounded-md text-[12.5px] transition-colors duration-150 ease-out',
+                  'flex items-center gap-2 h-7 px-2 rounded-md text-[12.5px] transition-colors duration-subtle ease-out',
                   active
                     ? 'bg-surface-1/80 text-primary-token'
                     : 'text-secondary-token hover:bg-surface-1/50 hover:text-primary-token'
@@ -797,7 +795,7 @@ export function LeftRail({
             <button
               type='button'
               onClick={onClearAll}
-              className='text-[10.5px] uppercase tracking-[0.06em] text-tertiary-token hover:text-primary-token transition-colors duration-150 ease-out'
+              className='text-[10.5px] uppercase tracking-[0.06em] text-tertiary-token hover:text-primary-token transition-colors duration-subtle ease-out'
             >
               Clear
             </button>
@@ -973,11 +971,11 @@ function FacetGroup({
       <button
         type='button'
         onClick={() => setOpen(v => !v)}
-        className='w-full flex items-center gap-1 px-2 py-1 text-[10.5px] uppercase tracking-[0.06em] text-tertiary-token hover:text-primary-token transition-colors duration-150 ease-out'
+        className='w-full flex items-center gap-1 px-2 py-1 text-[10.5px] uppercase tracking-[0.06em] text-tertiary-token hover:text-primary-token transition-colors duration-subtle ease-out'
       >
         <ChevronRight
           className={cn(
-            'h-3 w-3 transition-transform duration-150 ease-out',
+            'h-3 w-3 transition-transform duration-subtle ease-out',
             open && 'rotate-90'
           )}
         />
@@ -1010,7 +1008,7 @@ function FacetRow({
       type='button'
       onClick={onClick}
       className={cn(
-        'flex items-center gap-2 h-6 pl-3 pr-2 rounded-md text-[12px] transition-colors duration-150 ease-out',
+        'flex items-center gap-2 h-6 pl-3 pr-2 rounded-md text-[12px] transition-colors duration-subtle ease-out',
         active
           ? 'bg-surface-1/80 text-primary-token'
           : 'text-secondary-token hover:bg-surface-1/50 hover:text-primary-token'
@@ -1108,7 +1106,7 @@ function SearchInput({
   return (
     <div
       className={cn(
-        'flex items-center gap-2 h-8 px-2.5 rounded-md border transition-colors duration-150 ease-out',
+        'flex items-center gap-2 h-8 px-2.5 rounded-md border transition-colors duration-subtle ease-out',
         focused
           ? 'border-cyan-400/40 bg-(--surface-1)/70'
           : 'border-(--linear-app-shell-border) bg-(--surface-0) hover:border-white/10'
@@ -1136,7 +1134,7 @@ function SearchInput({
         <button
           type='button'
           onClick={() => onChange('')}
-          className='shrink-0 inline-flex items-center h-5 px-1.5 rounded text-[10px] font-caption uppercase tracking-[0.06em] text-tertiary-token hover:text-primary-token bg-(--surface-2)/60 border border-(--linear-app-shell-border) transition-colors duration-150 ease-out'
+          className='shrink-0 inline-flex items-center h-5 px-1.5 rounded text-[10px] font-caption uppercase tracking-[0.06em] text-tertiary-token hover:text-primary-token bg-(--surface-2)/60 border border-(--linear-app-shell-border) transition-colors duration-subtle ease-out'
           aria-label='Clear search'
         >
           Clear
@@ -1172,7 +1170,7 @@ export function SortDropdown({
       trigger={
         <button
           type='button'
-          className='inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[12px] text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-150 ease-out data-[state=open]:text-primary-token'
+          className='inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[12px] text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-subtle ease-out data-[state=open]:text-primary-token'
         >
           <ArrowUpDown className='h-3 w-3' strokeWidth={2.25} />
           <span>{labels[sort]}</span>
@@ -1206,7 +1204,7 @@ export function ViewToggle({
         type='button'
         onClick={() => onView('grid')}
         className={cn(
-          'h-6 w-7 rounded-[5px] grid place-items-center transition-colors duration-150 ease-out',
+          'h-6 w-7 rounded-[5px] grid place-items-center transition-colors duration-subtle ease-out',
           view === 'grid'
             ? 'bg-surface-2/80 text-primary-token'
             : 'text-quaternary-token hover:text-primary-token'
@@ -1219,7 +1217,7 @@ export function ViewToggle({
         type='button'
         onClick={() => onView('table')}
         className={cn(
-          'h-6 w-7 rounded-[5px] grid place-items-center transition-colors duration-150 ease-out',
+          'h-6 w-7 rounded-[5px] grid place-items-center transition-colors duration-subtle ease-out',
           view === 'table'
             ? 'bg-surface-2/80 text-primary-token'
             : 'text-quaternary-token hover:text-primary-token'
@@ -1236,7 +1234,7 @@ function GenerateButton() {
   return (
     <button
       type='button'
-      className='inline-flex items-center gap-1.5 h-7 px-3 rounded-md text-[12px] font-medium bg-cyan-300 text-black hover:bg-cyan-200 transition-colors duration-150 ease-out'
+      className='inline-flex items-center gap-1.5 h-7 px-3 rounded-md text-[12px] font-medium bg-cyan-300 text-black hover:bg-cyan-200 transition-colors duration-subtle ease-out'
     >
       <Sparkles className='h-3.5 w-3.5' strokeWidth={2.25} />
       <span>Generate</span>
@@ -1299,7 +1297,7 @@ function AssetCard({
       type='button'
       onClick={onSelect}
       className={cn(
-        'group relative flex flex-col text-left rounded-[10px] border bg-(--linear-app-content-surface) overflow-hidden transition-colors duration-150 ease-out',
+        'group relative flex flex-col text-left rounded-[10px] border bg-(--linear-app-content-surface) overflow-hidden transition-colors duration-subtle ease-out',
         selected
           ? 'border-cyan-400/50'
           : 'border-(--linear-app-shell-border) hover:border-white/15'
@@ -1311,7 +1309,7 @@ function AssetCard({
           className='pointer-events-none absolute inset-0 rounded-[10px]'
           style={{
             boxShadow:
-              'inset 2px 0 0 0 #67e8f9, inset 0 0 0 1px rgba(103,232,249,0.08)',
+              'inset 2px 0 0 0 rgb(103 232 249), inset 0 0 0 1px rgb(103 232 249 / 0.08)',
           }}
         />
       )}
@@ -1337,10 +1335,7 @@ function AssetCard({
           <span className='opacity-50'>·</span>
           <span className='font-mono tracking-wide'>{asset.aspect}</span>
           <span className='opacity-50'>·</span>
-          <span
-            className='inline-flex items-center gap-1 truncate'
-            style={{ color: 'rgba(255,255,255,0.46)' }}
-          >
+          <span className='inline-flex items-center gap-1 truncate text-tertiary-token'>
             <span
               className='h-1.5 w-1.5 rounded-full shrink-0'
               style={{ background: release?.color }}
@@ -1356,7 +1351,7 @@ function AssetCard({
           onToggleFavorite();
         }}
         className={cn(
-          'absolute top-2 right-2 h-6 w-6 rounded-md grid place-items-center transition-colors duration-150 ease-out',
+          'absolute top-2 right-2 h-6 w-6 rounded-md grid place-items-center transition-colors duration-subtle ease-out',
           favorite
             ? 'text-amber-300 bg-black/50 backdrop-blur'
             : 'text-quaternary-token bg-black/40 backdrop-blur opacity-0 group-hover:opacity-100 hover:text-amber-300'
@@ -1369,7 +1364,7 @@ function AssetCard({
           fill={favorite ? 'currentColor' : 'none'}
         />
       </button>
-      <span className='absolute top-2 left-2 inline-flex items-center h-5 px-1.5 rounded text-[10px] font-caption uppercase tracking-[0.06em] text-primary-token bg-black/55 backdrop-blur opacity-0 group-hover:opacity-100 transition-opacity duration-150 ease-out'>
+      <span className='absolute top-2 left-2 inline-flex items-center h-5 px-1.5 rounded text-[10px] font-caption uppercase tracking-[0.06em] text-primary-token bg-black/55 backdrop-blur opacity-0 group-hover:opacity-100 transition-opacity duration-subtle ease-out'>
         Inspect
       </span>
     </button>
@@ -1455,7 +1450,7 @@ export function Table({
                 }
               }}
               className={cn(
-                'group relative grid items-center px-2 py-1 text-[12.5px] text-secondary-token text-left transition-colors duration-150 ease-out cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-cyan-400/40',
+                'group relative grid items-center px-2 py-1 text-[12.5px] text-secondary-token text-left transition-colors duration-subtle ease-out cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-cyan-400/40',
                 selected
                   ? 'bg-cyan-400/[0.08] text-primary-token'
                   : 'hover:bg-surface-1/40 hover:text-primary-token'
@@ -1469,7 +1464,7 @@ export function Table({
                 <span
                   aria-hidden
                   className='pointer-events-none absolute inset-0'
-                  style={{ boxShadow: 'inset 2px 0 0 0 #67e8f9' }}
+                  style={{ boxShadow: 'inset 2px 0 0 0 rgb(103 232 249)' }}
                 />
               )}
               <button
@@ -1479,7 +1474,7 @@ export function Table({
                   onToggleFavorite(a.id);
                 }}
                 className={cn(
-                  'inline-grid place-items-center h-6 w-6 rounded-md transition-colors duration-150 ease-out',
+                  'inline-grid place-items-center h-6 w-6 rounded-md transition-colors duration-subtle ease-out',
                   fav
                     ? 'text-amber-300'
                     : 'text-quaternary-token hover:text-amber-300'
@@ -1529,7 +1524,7 @@ export function Table({
               <span className='text-right text-tertiary-token tabular-nums'>
                 {relativeTime(a.addedAt)}
               </span>
-              <span className='inline-grid place-items-center text-quaternary-token opacity-0 group-hover:opacity-100 transition-opacity duration-150 ease-out'>
+              <span className='inline-grid place-items-center text-quaternary-token opacity-0 group-hover:opacity-100 transition-opacity duration-subtle ease-out'>
                 <MoreHorizontal className='h-3.5 w-3.5' strokeWidth={2.25} />
               </span>
             </div>
@@ -1589,7 +1584,7 @@ export function Drawer({
                 type='button'
                 onClick={() => onToggleFavorite(asset.id)}
                 className={cn(
-                  'h-6 w-6 rounded-md grid place-items-center transition-colors duration-150 ease-out',
+                  'h-6 w-6 rounded-md grid place-items-center transition-colors duration-subtle ease-out',
                   favorites.has(asset.id)
                     ? 'text-amber-300'
                     : 'text-quaternary-token hover:text-amber-300'
@@ -1605,7 +1600,7 @@ export function Drawer({
               <button
                 type='button'
                 onClick={onClose}
-                className='h-6 w-6 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-150 ease-out'
+                className='h-6 w-6 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors duration-subtle ease-out'
                 aria-label='Close'
               >
                 <X className='h-3.5 w-3.5' strokeWidth={2.25} />
@@ -1644,7 +1639,7 @@ export function Drawer({
                   <button
                     type='button'
                     onClick={() => setEditing(false)}
-                    className='h-7 px-3 rounded-md text-[12px] bg-cyan-300 text-black hover:bg-cyan-200 transition-colors duration-150 ease-out'
+                    className='h-7 px-3 rounded-md text-[12px] bg-cyan-300 text-black hover:bg-cyan-200 transition-colors duration-subtle ease-out'
                   >
                     Save
                   </button>
@@ -1656,7 +1651,7 @@ export function Drawer({
                       setDraftTags(asset.tags.join(', '));
                       setEditing(false);
                     }}
-                    className='h-7 px-3 rounded-md text-[12px] text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-150 ease-out'
+                    className='h-7 px-3 rounded-md text-[12px] text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-subtle ease-out'
                   >
                     Cancel
                   </button>
@@ -1680,7 +1675,7 @@ export function Drawer({
                     {asset.alt}
                   </p>
                 </div>
-                <span className='text-[10.5px] uppercase tracking-[0.06em] text-quaternary-token opacity-0 group-hover/title:opacity-100 transition-opacity duration-150 ease-out'>
+                <span className='text-[10.5px] uppercase tracking-[0.06em] text-quaternary-token opacity-0 group-hover/title:opacity-100 transition-opacity duration-subtle ease-out'>
                   Edit
                 </span>
               </button>
@@ -1833,7 +1828,7 @@ function ReleaseMoment({ asset }: { asset: Asset }) {
       </div>
       <button
         type='button'
-        className='text-[10.5px] uppercase tracking-[0.06em] text-tertiary-token hover:text-primary-token transition-colors duration-150 ease-out'
+        className='text-[10.5px] uppercase tracking-[0.06em] text-tertiary-token hover:text-primary-token transition-colors duration-subtle ease-out'
       >
         Open
       </button>
@@ -1853,7 +1848,7 @@ function VersionStack({ asset }: { asset: Asset }) {
         <div
           key={v.n}
           className={cn(
-            'flex items-center gap-2 px-2 py-1.5 rounded-md border transition-colors duration-150 ease-out',
+            'flex items-center gap-2 px-2 py-1.5 rounded-md border transition-colors duration-subtle ease-out',
             v.current
               ? 'border-cyan-400/30 bg-cyan-400/[0.06]'
               : 'border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/40'
@@ -1879,7 +1874,7 @@ function VersionStack({ asset }: { asset: Asset }) {
             ) : (
               <button
                 type='button'
-                className='text-[10.5px] uppercase tracking-[0.06em] text-tertiary-token hover:text-primary-token transition-colors duration-150 ease-out'
+                className='text-[10.5px] uppercase tracking-[0.06em] text-tertiary-token hover:text-primary-token transition-colors duration-subtle ease-out'
               >
                 Make current
               </button>
@@ -1924,7 +1919,7 @@ function DownloadButton({
     <button
       type='button'
       className={cn(
-        'flex flex-col items-start gap-0.5 h-12 px-2.5 rounded-md transition-colors duration-150 ease-out text-left',
+        'flex flex-col items-start gap-0.5 h-12 px-2.5 rounded-md transition-colors duration-subtle ease-out text-left',
         primary
           ? 'bg-cyan-300 text-black hover:bg-cyan-200'
           : 'border border-(--linear-app-shell-border) bg-(--surface-0) text-secondary-token hover:bg-surface-1/60 hover:text-primary-token'
@@ -1953,7 +1948,7 @@ function SecondaryAction({
   return (
     <button
       type='button'
-      className='flex-1 inline-flex items-center justify-center gap-1.5 h-7 rounded-md text-[11.5px] text-secondary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 hover:text-primary-token transition-colors duration-150 ease-out'
+      className='flex-1 inline-flex items-center justify-center gap-1.5 h-7 rounded-md text-[11.5px] text-secondary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 hover:text-primary-token transition-colors duration-subtle ease-out'
     >
       <Icon className='h-3 w-3' strokeWidth={2.25} />
       {label}
@@ -2016,7 +2011,7 @@ export function EmptyState({ onClear }: { onClear: () => void }) {
           <button
             type='button'
             onClick={onClear}
-            className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-primary-token bg-(--surface-1) border border-(--linear-app-shell-border) hover:bg-surface-2/80 transition-colors duration-150 ease-out'
+            className='inline-flex items-center h-7 px-3 rounded-md text-[12px] text-primary-token bg-(--surface-1) border border-(--linear-app-shell-border) hover:bg-surface-2/80 transition-colors duration-subtle ease-out'
           >
             Clear all filters
           </button>
