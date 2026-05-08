@@ -35,7 +35,6 @@ export function CTASection({
             level={2}
             size={variant === 'secondary' ? 'xl' : 'md'}
             align={variant === 'secondary' ? 'center' : 'left'}
-            className='text-primary-token'
           >
             {title}
           </SectionHeading>

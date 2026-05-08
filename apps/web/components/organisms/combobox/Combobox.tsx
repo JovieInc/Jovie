@@ -236,8 +236,8 @@ export const Combobox = forwardRef<HTMLDivElement, ComboboxProps>(
                         'h-12 sm:h-11 rounded-xl sm:rounded-l-none sm:rounded-r-xl',
                         'px-4 sm:px-6 flex items-center justify-center',
                         'text-sm font-medium',
-                        'bg-surface-1 text-primary-token hover:bg-surface-2 transition-colors',
-                        'disabled:bg-surface-1/50 disabled:text-disabled-token disabled:cursor-not-allowed',
+                        'bg-white text-gray-900 hover:bg-white/90 transition-colors',
+                        'disabled:bg-white/50 disabled:text-gray-500 disabled:cursor-not-allowed',
                         'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white'
                       )}
                       aria-label={`${ctaText} for ${value?.name || 'selected artist'}`}

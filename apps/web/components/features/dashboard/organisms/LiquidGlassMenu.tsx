@@ -311,7 +311,7 @@ export function LiquidGlassMenu({
                   <button
                     type='button'
                     onClick={onSignOut}
-                    className='flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-app font-caption text-secondary-token transition-colors duration-subtle hover:bg-surface-1 hover:text-primary-token active:scale-[0.98]'
+                    className='flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-app font-caption text-secondary-token transition-[background-color,color,transform] duration-subtle hover:bg-surface-1 hover:text-primary-token active:scale-[0.98]'
                   >
                     <LogOut
                       className='size-5 shrink-0 text-tertiary-token'
@@ -351,7 +351,7 @@ export function LiquidGlassMenu({
                 href={item.href}
                 aria-current={active ? 'page' : undefined}
                 className={cn(
-                  'relative flex min-w-[64px] flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 transition-colors duration-subtle',
+                  'relative flex min-w-[64px] flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 transition-[color,transform] duration-subtle',
                   'active:scale-95',
                   active
                     ? 'text-primary-token'
@@ -389,7 +389,7 @@ export function LiquidGlassMenu({
             aria-label={isExpanded ? 'Close menu' : 'More options'}
             aria-expanded={isExpanded}
             className={cn(
-              'relative flex min-w-[64px] flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 transition-colors duration-subtle',
+              'relative flex min-w-[64px] flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 transition-[color,transform] duration-subtle',
               'active:scale-95',
               isExpanded
                 ? 'text-primary-token'
@@ -413,7 +413,7 @@ export function LiquidGlassMenu({
               type='button'
               onClick={onSearchClick}
               aria-label='Search'
-              className='relative flex min-w-[64px] flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 text-tertiary-token transition-colors duration-subtle hover:text-secondary-token active:scale-95'
+              className='relative flex min-w-[64px] flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 text-tertiary-token transition-[color,transform] duration-subtle hover:text-secondary-token active:scale-95'
             >
               <Search className='h-5 w-5' aria-hidden='true' />
               <span className='text-3xs leading-tight font-caption'>
