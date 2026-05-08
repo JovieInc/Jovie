@@ -526,7 +526,12 @@ const withVercelToolbar = enableVercelToolbar
   ? require('@vercel/toolbar/plugins/next')()
   : config => config;
 
-function exposeStaticConfigForTooling(config) {
+/**
+ * Attaches base pre-plugin static config properties so config-inspection tests
+ * can call fields such as `config.redirects()` after plugins wrap the export.
+ * Plugin-level additions such as the Sentry tunnel rewrite are not reflected.
+ */
+function exposeBaseStaticConfigForTooling(config) {
   if (typeof config !== 'function') {
     return config;
   }
@@ -541,7 +546,7 @@ function exposeStaticConfigForTooling(config) {
 // Apply plugins in order: workflow -> bundle analyzer -> vercel toolbar -> sentry.
 // `withWorkflow()` must stay active even while AgentOS workflows are runtime-gated
 // so WDK directives compile before PR5 adds the first dry-run workflow.
-module.exports = exposeStaticConfigForTooling(
+module.exports = exposeBaseStaticConfigForTooling(
   withBundleAnalyzer(withVercelToolbar(withWorkflow(nextConfig)))
 );
 
@@ -557,7 +562,7 @@ const shouldUseSentryPlugin =
   hasSentryAuthToken &&
   (process.env.NODE_ENV === 'production' || !!process.env.VERCEL_ENV);
 
-module.exports = exposeStaticConfigForTooling(
+module.exports = exposeBaseStaticConfigForTooling(
   shouldUseSentryPlugin
     ? withSentryConfig(module.exports, {
         org: 'jovie',

@@ -110,7 +110,7 @@ function findStandaloneNodeModulesRoot(entryPath) {
     }
   }
 
-  return standaloneNodeModulesRoot;
+  return null;
 }
 
 function getFallbackNodeModulesRoots(nodeModulesRoot) {
@@ -136,10 +136,21 @@ function resolveStandaloneSymlinkTarget(entryPath) {
     const linkTarget = readlinkSync(entryPath);
     const standaloneTarget = path.resolve(path.dirname(entryPath), linkTarget);
     const nodeModulesRoot = findStandaloneNodeModulesRoot(entryPath);
+
+    if (nodeModulesRoot === null) {
+      throw new Error(
+        `Unable to resolve standalone symlink outside known node_modules roots: ${entryPath} -> ${standaloneTarget}`,
+        { cause: error }
+      );
+    }
+
     const relativeTarget = path.relative(nodeModulesRoot, standaloneTarget);
 
     if (relativeTarget.startsWith('..') || path.isAbsolute(relativeTarget)) {
-      throw error;
+      throw new Error(
+        `Unable to remap standalone symlink target outside ${nodeModulesRoot}: ${entryPath} -> ${standaloneTarget}`,
+        { cause: error }
+      );
     }
 
     const fallbackRoots = getFallbackNodeModulesRoots(nodeModulesRoot);
