@@ -79,15 +79,14 @@ function PricingCard({
         featured && 'homepage-pricing-card--featured'
       )}
     >
-      <p className='text-[1.1rem] font-semibold tracking-[-0.03em] text-primary-token'>
-        {title}
-      </p>
-      <p className='mt-2 text-[14px] leading-[1.6] text-secondary-token'>
-        {body}
-      </p>
-      <p className='mt-auto pt-8 text-[2.4rem] font-semibold tracking-[-0.07em] text-primary-token'>
-        {price}
-      </p>
+      <div className='homepage-pricing-card__header'>
+        <div>
+          <p className='homepage-pricing-card__title'>{title}</p>
+          <p className='homepage-pricing-card__body'>{body}</p>
+        </div>
+        <span className='homepage-pricing-card__badge'>14-day trial</span>
+      </div>
+      <p className='homepage-pricing-card__price'>{price}</p>
       {features?.length ? (
         <ul className='homepage-pricing-feature-list'>
           {features.map(feature => (
@@ -95,7 +94,7 @@ function PricingCard({
           ))}
         </ul>
       ) : null}
-      <Link href={ctaHref} className='public-action-primary mt-5 inline-flex'>
+      <Link href={ctaHref} className='homepage-pricing-card__cta'>
         {ctaLabel}
       </Link>
     </article>
@@ -106,7 +105,7 @@ export function HomepageV2Pricing() {
   const proMonthlyPrice = ENTITLEMENT_REGISTRY.pro.marketing.price?.monthly;
   const proFeatures = ENTITLEMENT_REGISTRY.pro.marketing.features
     .filter(feature => feature !== 'All Free features +')
-    .slice(0, 6);
+    .slice(0, 4);
   const proPriceDisplay =
     typeof proMonthlyPrice === 'number'
       ? `$${proMonthlyPrice}/mo`
@@ -118,24 +117,26 @@ export function HomepageV2Pricing() {
       className='homepage-story-section'
     >
       <MarketingContainer width='page'>
-        <HomepageStoryHeader
-          align='center'
-          headline={HOMEPAGE_V2_COPY.pricing.headline}
-          className='max-w-[40rem]'
-          headlineClassName='mx-auto max-w-[10ch]'
-        />
-
-        <div className='homepage-pricing-grid'>
-          <PricingCard
-            body='One plan. 14-day free trial. Then the workspace keeps running.'
-            ctaHref={`${APP_ROUTES.SIGNUP}?plan=pro`}
-            ctaLabel='Start 14-Day Free Trial'
-            featured
-            features={proFeatures}
-            price={proPriceDisplay}
-            testId='homepage-v2-pricing-pro'
-            title={ENTITLEMENT_REGISTRY.pro.marketing.displayName}
+        <div className='homepage-pricing-shell'>
+          <HomepageStoryHeader
+            align='left'
+            body='Release notifications, presaves, and audience analytics in one workspace.'
+            headline={HOMEPAGE_V2_COPY.pricing.headline}
+            className='homepage-pricing-copy'
           />
+
+          <div className='homepage-pricing-grid'>
+            <PricingCard
+              body={HOMEPAGE_V2_COPY.pricing.supportLine}
+              ctaHref={`${APP_ROUTES.SIGNUP}?plan=pro`}
+              ctaLabel='Start 14-Day Free Trial'
+              featured
+              features={proFeatures}
+              price={proPriceDisplay}
+              testId='homepage-v2-pricing-pro'
+              title={ENTITLEMENT_REGISTRY.pro.marketing.displayName}
+            />
+          </div>
         </div>
       </MarketingContainer>
     </section>

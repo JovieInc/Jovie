@@ -37,7 +37,7 @@ describe('FridayRhythmSection', () => {
     render(<FridayRhythmSection />);
 
     expect(
-      screen.getAllByRole('heading', { name: 'Make Every Friday Count.' })
+      screen.getAllByRole('heading', { name: 'Make Every Friday Count' })
     ).toHaveLength(2);
     expect(
       screen.getAllByRole('img', {
@@ -45,7 +45,7 @@ describe('FridayRhythmSection', () => {
       })
     ).not.toHaveLength(0);
     expect(
-      screen.getAllByRole('link', { name: 'Build Your Weekly Rhythm' }).at(0)
+      screen.getAllByRole('link', { name: 'Build Your Release Rhythm' }).at(0)
     ).toHaveAttribute('href', '/signup');
     expect(screen.queryByText('Less')).not.toBeInTheDocument();
     expect(screen.queryByText('More')).not.toBeInTheDocument();

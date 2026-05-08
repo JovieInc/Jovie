@@ -6,8 +6,10 @@ import { HomepageHeroMockupCarousel } from '@/components/homepage/HomepageHeroCa
 import { HomepageTrackedLink } from '@/components/homepage/HomepageTrackedLink';
 import { HERO_COPY } from '@/components/homepage/intent';
 import { FaqSection } from '@/components/marketing';
+import { ArtistProfileSpecWall } from '@/components/marketing/artist-profile/ArtistProfileSpecWall';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
+import { ARTIST_PROFILE_SPEC_TILES } from '@/data/artistProfileFeatures';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
 import {
@@ -248,21 +250,11 @@ function HomepageProductDepthBand() {
         </div>
         <div className='homepage-product-depth-band__media' aria-hidden='true'>
           <HomepageScreenshotMedia
-            scenarioId='release-tasks-desktop'
-            sizes='(min-width: 1024px) 64rem, 94vw'
+            scenarioId='dashboard-releases-sidebar-desktop'
+            sizes='(min-width: 1024px) 78rem, 94vw'
             className='homepage-product-depth-band__desktop'
           />
-          <HomepageScreenshotMedia
-            scenarioId='release-presave-mobile'
-            sizes='(min-width: 1024px) 11rem, 30vw'
-            className='homepage-product-depth-band__phone'
-          />
         </div>
-        <ul className='homepage-product-depth-band__points'>
-          {HOMEPAGE_LAUNCH_COPY.productProof.points.map(point => (
-            <li key={point}>{point}</li>
-          ))}
-        </ul>
       </div>
     </section>
   );
@@ -288,23 +280,6 @@ function HomepageWorkflowStep({
         <p>{step.body}</p>
       </div>
     </article>
-  );
-}
-
-function HomepageProfileMedia() {
-  return (
-    <div className='homepage-profile-proof-band__media' aria-hidden='true'>
-      <HomepageScreenshotMedia
-        scenarioId='public-profile-desktop'
-        sizes='(min-width: 1024px) 54rem, 92vw'
-        className='homepage-profile-proof-band__desktop'
-      />
-      <HomepageScreenshotMedia
-        scenarioId='public-profile-mobile'
-        sizes='(min-width: 1024px) 12rem, 34vw'
-        className='homepage-profile-proof-band__phone'
-      />
-    </div>
   );
 }
 
@@ -338,37 +313,31 @@ function HomepageWorkflowStrip() {
 
 function HomepageProfileProofBand() {
   return (
-    <section
+    <div
       id='artist-profiles'
       className='homepage-profile-proof-band'
-      aria-labelledby='homepage-profile-proof-heading'
       data-testid='homepage-profile-proof-band'
     >
-      <div className='homepage-profile-proof-band__inner'>
-        <div className='homepage-profile-proof-band__copy'>
-          <HomepageEyebrow>Artist Profiles</HomepageEyebrow>
-          <h2 id='homepage-profile-proof-heading'>
-            {HOMEPAGE_LAUNCH_COPY.profileProof.headline}
-          </h2>
-          <p>{HOMEPAGE_LAUNCH_COPY.profileProof.body}</p>
-          <HomepageTrackedLink
-            href={APP_ROUTES.ARTIST_PROFILES}
-            className='homepage-story-link focus-ring-themed'
-            eventName='homepage_profile_cta_clicked'
-            eventProperties={{ cta: 'explore_artist_profiles' }}
-          >
-            Explore Artist Profiles
-            <span aria-hidden='true'>→</span>
-          </HomepageTrackedLink>
-          <ul className='homepage-profile-proof-band__list'>
-            {HOMEPAGE_LAUNCH_COPY.profileProof.items.slice(0, 2).map(item => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        </div>
-        <HomepageProfileMedia />
+      <ArtistProfileSpecWall
+        specWall={{
+          headline: HOMEPAGE_LAUNCH_COPY.profileProof.headline,
+          subhead:
+            'Conversion details, routing, capture, and analytics stay attached to the artist profile.',
+        }}
+        tiles={ARTIST_PROFILE_SPEC_TILES}
+      />
+      <div className='homepage-profile-proof-band__cta'>
+        <HomepageTrackedLink
+          href={APP_ROUTES.ARTIST_PROFILES}
+          className='homepage-story-link focus-ring-themed'
+          eventName='homepage_profile_cta_clicked'
+          eventProperties={{ cta: 'explore_artist_profiles' }}
+        >
+          Explore Artist Profiles
+          <span aria-hidden='true'>→</span>
+        </HomepageTrackedLink>
       </div>
-    </section>
+    </div>
   );
 }
 

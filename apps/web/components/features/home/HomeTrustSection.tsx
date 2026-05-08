@@ -88,68 +88,97 @@ export function HomeTrustSection({
           <div
             className={cn(
               'flex min-w-0 items-center justify-center',
-              presentation === 'inline-strip' && 'sm:px-1 lg:flex-1'
+              presentation === 'inline-strip' && 'sm:px-1'
             )}
           >
             <AwalLogo
               className={cn(
-                'h-[20px] w-auto max-w-[36vw] select-none sm:h-[22px]',
+                isInlineStrip
+                  ? 'w-auto max-w-[38vw] select-none'
+                  : 'h-[20px] w-auto max-w-[36vw] select-none sm:h-[22px]',
                 logoTone
               )}
+              style={
+                isInlineStrip
+                  ? { height: 'clamp(28px, 2.4vw, 32px)' }
+                  : undefined
+              }
             />
           </div>
           <div
             className={cn(
               'flex min-w-0 items-center justify-center',
-              presentation === 'inline-strip' && 'sm:px-1 lg:flex-1'
+              presentation === 'inline-strip' && 'sm:px-1'
             )}
           >
             <TheOrchardLogo
               className={cn(
-                'h-[28px] w-auto max-w-[34vw] select-none sm:h-[31px]',
+                isInlineStrip
+                  ? 'w-auto max-w-[44vw] select-none'
+                  : 'h-[28px] w-auto max-w-[34vw] select-none sm:h-[31px]',
                 logoTone
               )}
+              style={
+                isInlineStrip ? { height: 'clamp(72px, 6vw, 86px)' } : undefined
+              }
             />
           </div>
           <div
             className={cn(
               'flex min-w-0 items-center justify-center',
-              presentation === 'inline-strip' && 'sm:px-1 lg:flex-1'
+              presentation === 'inline-strip' && 'sm:px-1'
             )}
           >
             <UniversalMusicGroupLogo
               className={cn(
                 isInlineStrip
-                  ? 'h-auto w-[168px] max-w-[42vw] select-none sm:w-[188px]'
+                  ? 'h-auto max-w-[52vw] select-none'
                   : 'h-[14px] w-auto max-w-[72vw] select-none sm:h-[16px]',
                 logoTone
               )}
+              style={
+                isInlineStrip
+                  ? { width: 'clamp(206px, 18vw, 238px)' }
+                  : undefined
+              }
             />
           </div>
           <div
             className={cn(
               'flex min-w-0 items-center justify-center',
-              presentation === 'inline-strip' && 'sm:px-1 lg:flex-1'
+              presentation === 'inline-strip' && 'sm:px-1'
             )}
           >
             <ArmadaMusicLogo
               className={cn(
-                'h-[22px] w-auto max-w-[38vw] select-none sm:h-[24px]',
+                isInlineStrip
+                  ? 'w-auto max-w-[44vw] select-none'
+                  : 'h-[22px] w-auto max-w-[38vw] select-none sm:h-[24px]',
                 logoTone
               )}
+              style={
+                isInlineStrip
+                  ? { height: 'clamp(30px, 2.6vw, 34px)' }
+                  : undefined
+              }
             />
           </div>
           <div
             className={cn(
               'flex min-w-0 items-center justify-center',
-              presentation === 'inline-strip' && 'sm:px-1 lg:flex-1'
+              presentation === 'inline-strip' && 'sm:px-1'
             )}
           >
             <BlackHoleRecordingsLogo
               className={cn(
-                'h-[16px] w-auto sm:h-[18px]',
+                isInlineStrip ? 'h-auto' : 'h-[16px] w-auto sm:h-[18px]',
                 isInlineStrip && 'opacity-75'
               )}
+              style={
+                isInlineStrip
+                  ? { width: 'clamp(144px, 12vw, 168px)' }
+                  : undefined
+              }
             />
           </div>
         </div>
