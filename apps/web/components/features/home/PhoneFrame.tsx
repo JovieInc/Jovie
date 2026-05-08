@@ -40,10 +40,7 @@ export function PhoneFrame({ children, className }: PhoneFrameProps) {
         />
 
         {/* Inner screen */}
-        <div
-          className='relative h-full w-full overflow-hidden rounded-[1.9rem]'
-          style={{ backgroundColor: 'var(--linear-bg-page)' }}
-        >
+        <div className='relative h-full w-full overflow-hidden rounded-[1.9rem] bg-page'>
           {children}
         </div>
 

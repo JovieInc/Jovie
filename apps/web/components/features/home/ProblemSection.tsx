@@ -21,28 +21,20 @@ const benefits = [
 
 export function ProblemSection() {
   return (
-    <section
-      className='section-spacing-linear'
-      style={{
-        backgroundColor: 'var(--linear-bg-page)',
-      }}
-    >
+    <section className='section-spacing-linear bg-page'>
       <Container size='homepage'>
         <div className='max-w-3xl mx-auto'>
           <h2
-            className='text-center heading-gap-linear'
+            className='text-center heading-gap-linear text-primary-token'
             style={{
               fontSize: 'var(--linear-h2-size)',
               fontWeight: 'var(--linear-font-weight-medium)',
               lineHeight: 'var(--linear-h2-leading)',
               letterSpacing: 'var(--linear-h2-tracking)',
-              color: 'var(--linear-text-primary)',
             }}
           >
             Built for growth with discipline.{' '}
-            <span style={{ color: 'var(--linear-text-tertiary)' }}>
-              Clear value. No fluff.
-            </span>
+            <span className='text-tertiary-token'>Clear value. No fluff.</span>
           </h2>
 
           <div
@@ -56,27 +48,24 @@ export function ProblemSection() {
                 style={{ gap: 'var(--linear-space-4)' }}
               >
                 <div className='flex items-center justify-center w-6 h-6 shrink-0'>
-                  <CheckCircle2
-                    className='w-5 h-5'
-                    style={{ color: 'var(--linear-success)' }}
-                  />
+                  <CheckCircle2 className='w-5 h-5 text-success' />
                 </div>
                 <div>
                   <h3
+                    className='text-primary-token'
                     style={{
                       fontSize: 'var(--linear-h4-size)',
                       fontWeight: 'var(--linear-font-weight-medium)',
-                      color: 'var(--linear-text-primary)',
                       marginBottom: 'var(--linear-space-1)',
                     }}
                   >
                     {benefit.title}
                   </h3>
                   <p
+                    className='text-tertiary-token'
                     style={{
                       fontSize: 'var(--linear-body-lg-size)',
                       lineHeight: 'var(--linear-body-lg-leading)',
-                      color: 'var(--linear-text-tertiary)',
                     }}
                   >
                     {benefit.description}

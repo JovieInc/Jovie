@@ -159,16 +159,12 @@ const LOGOS = [
 function MockBar({ url }: Readonly<{ url: string }>) {
   return (
     <div
-      className='flex items-center gap-2 px-4 py-3'
-      style={{
-        borderBottom: '1px solid var(--linear-border-subtle)',
-        fontSize: '0.75rem',
-        color: 'var(--linear-text-tertiary)',
-      }}
+      className='flex items-center gap-2 px-4 py-3 border-b border-subtle text-tertiary-token'
+      style={{ fontSize: '0.75rem' }}
     >
-      <div className='w-2 h-2 rounded-full' style={{ background: '#2a2a2a' }} />
-      <div className='w-2 h-2 rounded-full' style={{ background: '#2a2a2a' }} />
-      <div className='w-2 h-2 rounded-full' style={{ background: '#2a2a2a' }} />
+      <div className='w-2 h-2 rounded-full bg-surface-2' />
+      <div className='w-2 h-2 rounded-full bg-surface-2' />
+      <div className='w-2 h-2 rounded-full bg-surface-2' />
       <span className='ml-2'>{url}</span>
     </div>
   );
@@ -443,29 +439,24 @@ export default function LaunchPage() {
           <MockBar url='app.jov.ie — Releases' />
           {/* Banner */}
           <div
-            className='flex items-center gap-3 px-5 py-3.5'
+            className='flex items-center gap-3 px-5 py-3.5 border-b border-subtle text-secondary-token'
             style={{
               background:
                 'linear-gradient(135deg, rgba(74,222,128,0.04), rgba(59,130,246,0.04))',
-              borderBottom: '1px solid var(--linear-border-subtle)',
               fontSize: '0.8rem',
-              color: 'var(--linear-text-secondary)',
             }}
           >
             <span style={{ fontSize: '1.1rem' }}>&#10024;</span>
             <div className='flex-1'>
               <div>
-                <strong
-                  className='font-medium'
-                  style={{ color: 'var(--linear-text-primary)' }}
-                >
+                <strong className='font-medium text-primary-token'>
                   We auto-created all 21 smart links for you.
                 </strong>
               </div>
               <div
+                className='text-tertiary-token'
                 style={{
                   fontSize: '0.75rem',
-                  color: 'var(--linear-text-tertiary)',
                   marginTop: '0.15rem',
                 }}
               >
@@ -744,15 +735,12 @@ export default function LaunchPage() {
                 }}
               >
                 <span className='font-medium'>linktr.ee/timwhite</span>
-                <span style={{ color: 'var(--linear-text-tertiary)' }}>
-                  &rarr;
-                </span>
+                <span className='text-tertiary-token'>&rarr;</span>
               </div>
               <p
-                className='mt-4'
+                className='mt-4 text-tertiary-token'
                 style={{
                   fontSize: '0.78rem',
-                  color: 'var(--linear-text-tertiary)',
                   lineHeight: 1.45,
                 }}
               >
@@ -763,13 +751,7 @@ export default function LaunchPage() {
           </div>
 
           {/* With Jovie */}
-          <div
-            className='rounded-[10px] overflow-hidden'
-            style={{
-              background: 'var(--linear-bg-surface-0)',
-              border: '1px solid var(--linear-border-subtle)',
-            }}
-          >
+          <div className='rounded-[10px] overflow-hidden bg-surface-0 border border-subtle'>
             <MockBar url='Instagram · @timwhite · 5 links' />
             <div className='p-6'>
               <div
@@ -829,31 +811,19 @@ export default function LaunchPage() {
 
       {/* ═══ 11. DEEPLINK CARDS ═══ */}
       <div className={`${WRAP} pb-16`}>
-        <div
-          className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-px rounded-[10px] overflow-hidden'
-          style={{ background: 'var(--linear-border-subtle)' }}
-        >
+        <div className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-px rounded-[10px] overflow-hidden bg-subtle'>
           {/* /pay */}
-          <div
-            style={{
-              background: 'var(--linear-bg-surface-0)',
-              padding: '2rem 1.5rem',
-            }}
-          >
+          <div className='bg-surface-0 p-8'>
             <div
               className='font-mono mb-3 flex items-center gap-1'
               style={{ fontSize: '0.8rem' }}
             >
-              <span style={{ color: 'var(--linear-text-tertiary)' }}>
-                jov.ie/tim
-              </span>{' '}
-              /pay
+              <span className='text-tertiary-token'>jov.ie/tim</span> /pay
             </div>
             <p
-              className='mb-5'
+              className='mb-5 text-secondary-token'
               style={{
                 fontSize: '0.85rem',
-                color: 'var(--linear-text-secondary)',
                 lineHeight: 1.5,
               }}
             >
@@ -861,12 +831,8 @@ export default function LaunchPage() {
               it on your merch table at shows.
             </p>
             <div
-              className='rounded-md p-4'
-              style={{
-                background: 'var(--linear-bg-surface-1)',
-                border: '1px solid var(--linear-border-subtle)',
-                fontSize: '0.75rem',
-              }}
+              className='rounded-md p-4 bg-surface-1 border border-subtle'
+              style={{ fontSize: '0.75rem' }}
             >
               <div className='flex gap-2 mb-3'>
                 {['$5', '$10', '$20'].map(amt => (
@@ -907,12 +873,8 @@ export default function LaunchPage() {
                 Continue with Apple Pay
               </div>
               <div
-                className='text-center mt-2 pt-2'
-                style={{
-                  borderTop: '1px solid var(--linear-border-subtle)',
-                  fontSize: '0.65rem',
-                  color: 'var(--linear-text-tertiary)',
-                }}
+                className='text-center mt-2 pt-2 border-t border-subtle text-tertiary-token'
+                style={{ fontSize: '0.65rem' }}
               >
                 &#9634; QR code for merch table &middot; prints at any size
               </div>
@@ -920,38 +882,25 @@ export default function LaunchPage() {
           </div>
 
           {/* /tour */}
-          <div
-            style={{
-              background: 'var(--linear-bg-surface-0)',
-              padding: '2rem 1.5rem',
-            }}
-          >
+          <div className='bg-surface-0 p-8'>
             <div
               className='font-mono mb-3 flex items-center gap-1'
               style={{ fontSize: '0.8rem' }}
             >
-              <span style={{ color: 'var(--linear-text-tertiary)' }}>
-                jov.ie/tim
-              </span>{' '}
-              /tour
+              <span className='text-tertiary-token'>jov.ie/tim</span> /tour
             </div>
             <p
-              className='mb-5'
+              className='mb-5 text-secondary-token'
               style={{
                 fontSize: '0.85rem',
-                color: 'var(--linear-text-secondary)',
                 lineHeight: 1.5,
               }}
             >
               Tour dates that stay in sync. Fans find the show, buy the ticket.
             </p>
             <div
-              className='rounded-md p-4'
-              style={{
-                background: 'var(--linear-bg-surface-1)',
-                border: '1px solid var(--linear-border-subtle)',
-                fontSize: '0.75rem',
-              }}
+              className='rounded-md p-4 bg-surface-1 border border-subtle'
+              style={{ fontSize: '0.75rem' }}
             >
               {[
                 {
@@ -969,38 +918,26 @@ export default function LaunchPage() {
               ].map(td => (
                 <div
                   key={td.city}
-                  className='flex justify-between items-center py-1.5'
-                  style={{
-                    borderBottom: '1px solid rgba(255,255,255,0.04)',
-                    color: 'var(--linear-text-secondary)',
-                  }}
+                  className='flex justify-between items-center py-1.5 text-secondary-token'
+                  style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
                 >
                   <div>
                     <div
-                      className='font-medium'
-                      style={{
-                        color: 'var(--linear-text-primary)',
-                        fontSize: '0.8rem',
-                      }}
+                      className='font-medium text-primary-token'
+                      style={{ fontSize: '0.8rem' }}
                     >
                       {td.city}
                     </div>
                     <div
-                      style={{
-                        fontSize: '0.7rem',
-                        color: 'var(--linear-text-tertiary)',
-                      }}
+                      className='text-tertiary-token'
+                      style={{ fontSize: '0.7rem' }}
                     >
                       {td.venue}
                     </div>
                   </div>
                   <span
-                    className='px-2 py-0.5 rounded-sm'
-                    style={{
-                      fontSize: '0.65rem',
-                      border: '1px solid var(--linear-border-subtle)',
-                      color: 'var(--linear-text-secondary)',
-                    }}
+                    className='px-2 py-0.5 rounded-sm border border-subtle text-secondary-token'
+                    style={{ fontSize: '0.65rem' }}
                   >
                     Tickets
                   </span>
@@ -1010,39 +947,23 @@ export default function LaunchPage() {
           </div>
 
           {/* /contact */}
-          <div
-            style={{
-              background: 'var(--linear-bg-surface-0)',
-              padding: '2rem 1.5rem',
-            }}
-          >
+          <div className='bg-surface-0 p-8'>
             <div
               className='font-mono mb-3 flex items-center gap-1'
               style={{ fontSize: '0.8rem' }}
             >
-              <span style={{ color: 'var(--linear-text-tertiary)' }}>
-                jov.ie/tim
-              </span>{' '}
-              /contact
+              <span className='text-tertiary-token'>jov.ie/tim</span> /contact
             </div>
             <p
-              className='mb-5'
-              style={{
-                fontSize: '0.85rem',
-                color: 'var(--linear-text-secondary)',
-                lineHeight: 1.5,
-              }}
+              className='mb-5 text-secondary-token'
+              style={{ fontSize: '0.85rem', lineHeight: 1.5 }}
             >
               One link for every industry contact. Manager, agent, publicist,
               brand deals, fan mail.
             </p>
             <div
-              className='rounded-md p-4'
-              style={{
-                background: 'var(--linear-bg-surface-1)',
-                border: '1px solid var(--linear-border-subtle)',
-                fontSize: '0.75rem',
-              }}
+              className='rounded-md p-4 bg-surface-1 border border-subtle'
+              style={{ fontSize: '0.75rem' }}
             >
               {[
                 { role: 'Management', name: 'Sarah Kim' },
@@ -1075,39 +996,23 @@ export default function LaunchPage() {
           </div>
 
           {/* /listen */}
-          <div
-            style={{
-              background: 'var(--linear-bg-surface-0)',
-              padding: '2rem 1.5rem',
-            }}
-          >
+          <div className='bg-surface-0 p-8'>
             <div
               className='font-mono mb-3 flex items-center gap-1'
               style={{ fontSize: '0.8rem' }}
             >
-              <span style={{ color: 'var(--linear-text-tertiary)' }}>
-                jov.ie/tim
-              </span>{' '}
-              /listen
+              <span className='text-tertiary-token'>jov.ie/tim</span> /listen
             </div>
             <p
-              className='mb-5'
-              style={{
-                fontSize: '0.85rem',
-                color: 'var(--linear-text-secondary)',
-                lineHeight: 1.5,
-              }}
+              className='mb-5 text-secondary-token'
+              style={{ fontSize: '0.85rem', lineHeight: 1.5 }}
             >
               Skip the profile, go straight to the music. Detects each
               listener&apos;s preferred DSP and opens the right app.
             </p>
             <div
-              className='rounded-md p-4'
-              style={{
-                background: 'var(--linear-bg-surface-1)',
-                border: '1px solid var(--linear-border-subtle)',
-                fontSize: '0.75rem',
-              }}
+              className='rounded-md p-4 bg-surface-1 border border-subtle'
+              style={{ fontSize: '0.75rem' }}
             >
               {['Spotify', 'Apple Music', 'YouTube Music', 'Tidal'].map(dsp => (
                 <div
@@ -1188,10 +1093,7 @@ export default function LaunchPage() {
         <AiDemo />
 
         {/* ═══ 14. AI FEATURES GRID ═══ */}
-        <div
-          className='grid grid-cols-1 md:grid-cols-3 gap-px rounded-lg overflow-hidden mt-8'
-          style={{ background: 'var(--linear-border-subtle)' }}
-        >
+        <div className='grid grid-cols-1 md:grid-cols-3 gap-px rounded-lg overflow-hidden mt-8 bg-subtle'>
           {[
             {
               title: 'Spotify Canvas',
@@ -1300,17 +1202,8 @@ export default function LaunchPage() {
               ),
             },
           ].map(card => (
-            <div
-              key={card.title}
-              className='p-5'
-              style={{ background: 'var(--linear-bg-surface-0)' }}
-            >
-              <div
-                className='mb-2'
-                style={{ color: 'var(--linear-text-tertiary)' }}
-              >
-                {card.icon}
-              </div>
+            <div key={card.title} className='p-5 bg-surface-0'>
+              <div className='mb-2 text-tertiary-token'>{card.icon}</div>
               <div
                 className='font-medium mb-1.5'
                 style={{ fontSize: '0.85rem' }}
@@ -1318,9 +1211,9 @@ export default function LaunchPage() {
                 {card.title}
               </div>
               <p
+                className='text-tertiary-token'
                 style={{
                   fontSize: '0.78rem',
-                  color: 'var(--linear-text-tertiary)',
                   lineHeight: 1.45,
                 }}
               >
@@ -1452,8 +1345,7 @@ export default function LaunchPage() {
               ].map(item => (
                 <div
                   key={item.label}
-                  className='flex items-center gap-2 px-4 py-1.5'
-                  style={{ color: 'var(--linear-text-tertiary)' }}
+                  className='flex items-center gap-2 px-4 py-1.5 text-tertiary-token'
                 >
                   <span style={{ opacity: 0.5 }}>{item.icon}</span>
                   {item.label}
@@ -1485,10 +1377,7 @@ export default function LaunchPage() {
               </div>
 
               {/* Metrics */}
-              <div
-                className='grid grid-cols-3 gap-px rounded-md overflow-hidden mb-6'
-                style={{ background: 'var(--linear-border-subtle)' }}
-              >
+              <div className='grid grid-cols-3 gap-px rounded-md overflow-hidden mb-6 bg-subtle'>
                 {[
                   { label: 'Views', val: '2,847', sub: '' },
                   {
@@ -1502,16 +1391,11 @@ export default function LaunchPage() {
                     sub: '15.4% conversion',
                   },
                 ].map(m => (
-                  <div
-                    key={m.label}
-                    className='p-4'
-                    style={{ background: 'var(--linear-bg-surface-0)' }}
-                  >
+                  <div key={m.label} className='p-4 bg-surface-0'>
                     <div
-                      className='uppercase tracking-wide mb-1'
+                      className='uppercase tracking-wide mb-1 text-tertiary-token'
                       style={{
                         fontSize: '0.7rem',
-                        color: 'var(--linear-text-tertiary)',
                         letterSpacing: '0.04em',
                       }}
                     >
