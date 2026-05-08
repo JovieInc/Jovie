@@ -1,0 +1,25 @@
+name: Console Error Check
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  console-errors:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install puppeteer
+        run: pnpm add -D puppeteer
+
+      - name: Run console error check
+        run: node check-console-errors.mjs --exhaustive
