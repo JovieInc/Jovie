@@ -469,7 +469,7 @@ create_codex_runtime_root() {
     ln -snf "$agents_dir/gstack-upgrade/SKILL.md" "$codex_gstack/gstack-upgrade/SKILL.md"
   fi
   # Review runtime assets (individual files, NOT the whole review/ dir which has SKILL.md)
-  for f in checklist.md design-checklist.md greptile-triage.md TODOS-format.md; do
+  for f in checklist.md design-checklist.md greptile-triage.md TODOS-format.md LINEAR-followups.md; do
     if [ -f "$gstack_dir/review/$f" ]; then
       ln -snf "$gstack_dir/review/$f" "$codex_gstack/review/$f"
     fi
@@ -508,7 +508,7 @@ create_factory_runtime_root() {
   if [ -f "$factory_dir/gstack-upgrade/SKILL.md" ]; then
     ln -snf "$factory_dir/gstack-upgrade/SKILL.md" "$factory_gstack/gstack-upgrade/SKILL.md"
   fi
-  for f in checklist.md design-checklist.md greptile-triage.md TODOS-format.md; do
+  for f in checklist.md design-checklist.md greptile-triage.md TODOS-format.md LINEAR-followups.md; do
     if [ -f "$gstack_dir/review/$f" ]; then
       ln -snf "$gstack_dir/review/$f" "$factory_gstack/review/$f"
     fi

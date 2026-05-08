@@ -49,7 +49,7 @@ human engineering time was the bottleneck.
 
 **Anti-patterns:**
 - "Choose B — it covers 90% with less code." (If A is 70 lines more, choose A.)
-- "Let's defer tests to a follow-up PR." (Tests are the cheapest lake to boil.)
+- "Let's leave tests as untracked later work." (Tests are the cheapest lake to boil.)
 - "This would take 2 weeks." (Say: "2 weeks human / ~1 hour AI-assisted.")
 
 Read more: https://garryslist.org/posts/boil-the-ocean

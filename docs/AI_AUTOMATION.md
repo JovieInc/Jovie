@@ -25,7 +25,7 @@ This document explains the automation and labels used in this repo so agents can
 
 If an automated workflow opens a fix PR (e.g. Codex/CI healing):
 
-- Prefer incorporating the fix or making a follow-up PR.
+- Prefer incorporating the fix. If follow-up work remains, create a Linear issue for it before closing out the PR and reference the issue ID.
 - Do not repeatedly override it unless you are certain it is incorrect.
 
 ## AI automation labels
@@ -96,7 +96,7 @@ Durable hardening policy:
 - Prefer focused regression tests for deterministic parser/script failures.
 - Update gstack `.tmpl` files before regenerating derived `SKILL.md` files.
 - Update `LESSONS.md` only for repeated root causes, not every weekly finding.
-- Create or mention a Linear follow-up when the right fix requires product work, broad refactors, auth/billing/migration changes, or human prioritization.
+- Create a Linear follow-up issue when the right fix requires product work, broad refactors, auth/billing/migration changes, or human prioritization. Do not merely mention the follow-up in a PR comment or summary.
 - Never auto-merge, never create app/Vercel cron routes, and never touch high-risk paths without human review.
 
 ## CodeRabbit CLI (local)
