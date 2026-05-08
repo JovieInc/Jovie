@@ -232,7 +232,7 @@ export function FridayRhythmSection() {
     <section
       ref={sectionRef}
       aria-label='Make every Friday count.'
-      className='relative isolate bg-[#020303]'
+      className='homepage-friday-rhythm-section relative isolate bg-[#020303]'
       data-testid='friday-rhythm-section'
     >
       <RhythmAtmosphere
@@ -240,8 +240,8 @@ export function FridayRhythmSection() {
         reducedMotion={Boolean(prefersReducedMotion)}
         totalFridays={totalFridays}
       />
-      <div className='hidden min-h-[160svh] md:block'>
-        <div className='sticky top-[4.5rem] z-10 flex min-h-[calc(100svh-4.5rem)] items-center py-16'>
+      <div className='hidden md:block'>
+        <div className='relative z-10 flex items-center py-24 lg:py-32'>
           <FridayRhythmContent
             activeFridays={desktopActiveFridays}
             data={desktopData}
@@ -287,15 +287,15 @@ function FridayRhythmContent({
   const graphSummary = `Jovie rhythm model showing ${activeFridays} of ${totalFridays} Fridays active`;
 
   return (
-    <div className='mx-auto w-full max-w-[var(--homepage-section-max)] px-[var(--homepage-page-gutter)] py-20 sm:py-24 md:py-0'>
-      <div className='max-w-[45rem] text-left'>
+    <div className='homepage-friday-rhythm-content mx-auto w-full max-w-[var(--homepage-section-max)] px-[var(--homepage-page-gutter)] py-20 sm:py-24 md:py-0'>
+      <div className='homepage-friday-rhythm-copy max-w-[45rem] text-left'>
         <h2 className='text-[clamp(2.5rem,5.3vw,4.75rem)] font-semibold leading-[0.95] tracking-[-0.04em] text-white'>
           <span className='block'>Make Every Friday</span>
-          <span className='block'>Count.</span>
+          <span className='block'>Count</span>
         </h2>
         <p className='mt-5 max-w-[34rem] text-[15px] leading-[1.65] tracking-[-0.005em] text-white/56 sm:text-[16px]'>
-          Jovie turns open Fridays into a planned release rhythm people come
-          back to.
+          Jovie turns each release week into a command center for singles,
+          presaves, merch, videos, recaps, and follow-up.
         </p>
       </div>
 
@@ -354,7 +354,7 @@ function FridayRhythmContent({
           className='public-action-secondary focus-ring-themed'
           href={APP_ROUTES.SIGNUP}
         >
-          Build Your Weekly Rhythm
+          Build Your Release Rhythm
         </Link>
       </div>
     </div>
@@ -438,8 +438,8 @@ function RhythmAtmosphere({
             Math.max((progress - threshold) / 0.46, 0),
             1
           );
-          const baseOpacity = index < 2 ? 0.2 : 0.08;
-          const opacity = baseOpacity + cardProgress * (index < 2 ? 0.46 : 0.5);
+          const baseOpacity = index < 2 ? 0.34 : 0.2;
+          const opacity = baseOpacity + cardProgress * (index < 2 ? 0.5 : 0.56);
           const translateY = 36 - cardProgress * 36;
           const scale = 0.94 + cardProgress * 0.06;
 
@@ -508,7 +508,7 @@ function RhythmHeartbeatLine({
       className={cn(
         'pointer-events-none absolute z-0 overflow-visible text-[var(--linear-accent,#5e6ad2)]',
         variant === 'section'
-          ? 'left-1/2 top-[38%] h-[22rem] w-[190vw] -translate-x-1/2 opacity-45 [mask-image:linear-gradient(90deg,transparent,black_16%,black_84%,transparent)]'
+          ? 'left-1/2 top-[38%] h-[22rem] w-[190vw] -translate-x-1/2 opacity-80 [mask-image:linear-gradient(90deg,transparent,black_16%,black_84%,transparent)]'
           : 'inset-x-8 top-8 h-[calc(100%-3.25rem)] w-[calc(100%-4rem)]'
       )}
       focusable='false'
@@ -523,7 +523,7 @@ function RhythmHeartbeatLine({
         stroke='currentColor'
         strokeLinecap='round'
         strokeLinejoin='round'
-        strokeOpacity={variant === 'section' ? '0.018' : '0.025'}
+        strokeOpacity={variant === 'section' ? '0.04' : '0.025'}
         strokeWidth={variant === 'section' ? '2.6' : '2'}
         transition={{
           duration: reducedMotion ? 0 : 0.45,
@@ -538,7 +538,7 @@ function RhythmHeartbeatLine({
         stroke='currentColor'
         strokeLinecap='round'
         strokeLinejoin='round'
-        strokeOpacity={variant === 'section' ? '0.052' : '0.07'}
+        strokeOpacity={variant === 'section' ? '0.12' : '0.07'}
         strokeWidth={variant === 'section' ? '0.62' : '0.46'}
         transition={{
           duration: reducedMotion ? 0 : 0.45,
@@ -562,7 +562,7 @@ function RhythmModeButton({
     <button
       aria-pressed={active}
       className={cn(
-        'rounded-full px-4 py-2 text-[12px] font-medium transition-colors duration-150',
+        'rounded-full px-4 py-2 text-[12px] font-medium transition-colors duration-subtle',
         active ? 'bg-white text-black' : 'text-white/58 hover:text-white'
       )}
       onClick={onClick}

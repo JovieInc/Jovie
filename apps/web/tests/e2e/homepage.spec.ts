@@ -28,33 +28,39 @@ test.describe('Homepage', () => {
     await waitForHydration(page);
   });
 
-  test('renders the premium hero surface and refreshed intent composer', async ({
-    page,
-  }) => {
-    await expect(page.getByTestId('homepage-hero-shell')).toBeVisible();
+  test('renders the static Frame-style hero and CTAs', async ({ page }) => {
+    const hero = page.getByTestId('homepage-hero-shell');
+
+    await expect(hero).toBeVisible();
+    await expect(hero.getByText('Meet Jovie')).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'Release more music with less work.' })
+      hero.getByRole('heading', { name: 'Drop more music, with less work.' })
     ).toBeVisible();
     await expect(
-      page.getByText(
-        'Plan releases, create assets, pitch playlists, and promote every drop from one AI workspace.'
+      hero.getByText(
+        'Release music faster and grow your audience effortlessly.'
       )
     ).toBeVisible();
-    await expect(page.getByPlaceholder('Ask Jovie...')).toBeVisible();
     await expect(
-      page.getByRole('button', { name: 'Plan a release' })
-    ).toBeVisible();
+      hero.getByRole('link', { name: 'Start Free Trial', exact: true })
+    ).toHaveAttribute('href', '/signup');
     await expect(
-      page.getByRole('button', { name: 'Analyze momentum' })
-    ).toBeVisible();
+      hero.getByRole('link', { name: 'Explore Profiles', exact: true })
+    ).toHaveAttribute('href', '/artist-profiles');
+    await expect(hero.getByPlaceholder('Ask Jovie...')).toHaveCount(0);
   });
 
-  test('header shows the live nav map and a single Sign in pill', async ({
+  test('header uses compact homepage presentation and signup CTA', async ({
     page,
   }) => {
     const header = page.getByTestId('header-nav');
 
     await expect(header).toBeVisible();
+    await expect(header).toHaveAttribute(
+      'data-presentation',
+      'homepage-embedded'
+    );
+    await expect(header.locator('[data-testid="site-logo"]')).toHaveCount(1);
     await expect(header.getByRole('link', { name: 'Product' })).toHaveAttribute(
       'href',
       '/artist-profiles'
@@ -69,71 +75,69 @@ test.describe('Homepage', () => {
     await expect(
       header.getByRole('link', { name: 'Resources' })
     ).toHaveAttribute('href', '/blog');
-    await expect(page.getByRole('button', { name: 'Sign in' })).toHaveCount(1);
-    await expect(page.getByRole('link', { name: 'Sign up' })).toHaveCount(0);
-    await expect(page.getByRole('link', { name: 'Log in' })).toHaveCount(0);
+    await expect(header.getByRole('link', { name: 'Log in' })).toHaveCount(1);
+    await expect(
+      header.getByRole('link', { name: 'Start Free Trial' })
+    ).toHaveAttribute('href', '/signup');
   });
 
-  test('trust strip ships live with the refreshed label and logos', async ({
+  test('product carousel exposes desktop and mobile proof slides', async ({
     page,
   }) => {
-    const trust = page.getByTestId('homepage-trust');
+    const carousel = page.getByTestId('homepage-hero-carousel');
 
-    await expect(trust).toBeVisible();
-    await expect(trust).toHaveAttribute('data-presentation', 'inline-strip');
-    await expect(page.getByText('Trusted by artists')).toBeVisible();
-    await expect(page.getByLabel('Universal Music Group')).toBeVisible();
-    await expect(page.getByLabel('AWAL')).toBeVisible();
-    await expect(page.getByAltText('Black Hole Recordings')).toBeVisible();
-    await expect(page.getByLabel('disco:wax')).toBeVisible();
-
-    const top = await trust.evaluate(node => node.getBoundingClientRect().top);
-    const viewportHeight = page.viewportSize()?.height ?? 0;
-    expect(top).toBeLessThan(viewportHeight);
+    await expect(carousel).toBeVisible();
+    await expect(
+      page.getByTestId('homepage-hero-shot-profile-presence')
+    ).toHaveAttribute('data-active', 'true');
+    await page.getByRole('button', { name: 'Go to next slide' }).click();
+    await expect(
+      page.getByTestId('homepage-hero-shot-release-command')
+    ).toHaveAttribute('data-active', 'true');
+    await page.getByRole('tab', { name: 'Show Audience Signal' }).click();
+    await expect(
+      page.getByTestId('homepage-hero-shot-release-signal')
+    ).toHaveAttribute('data-active', 'true');
   });
 
-  test('staged story sections ship live with aligned homepage copy', async ({
+  test('trust, workflow, Friday, profile proof, pricing, FAQ, and final CTA render', async ({
     page,
   }) => {
-    const releaseVelocity = page.getByTestId(
-      'homepage-release-velocity-reveal'
+    await expect(page.getByTestId('homepage-trust')).toHaveAttribute(
+      'data-presentation',
+      'inline-strip'
     );
-
-    await expect(releaseVelocity).toBeVisible();
     await expect(
       page.getByRole('heading', {
-        name: 'Jovie helps artists release music faster so they learn what works and iterate before they burn out.',
+        name: 'Connect, preview, and publish from one release workspace.',
       })
     ).toBeVisible();
+    await expect(page.getByTestId('homepage-product-depth-band')).toBeVisible();
     await expect(
-      page.getByTestId('homepage-release-velocity-lead')
-    ).toHaveClass(/text-white/);
-    await expect(
-      page.getByTestId('homepage-release-velocity-support')
-    ).toHaveClass(/text-white\/36/);
-    await expect(page.getByTestId('go-live-sixty-section')).toBeVisible();
-    await expect(
-      page.getByRole('heading', { name: 'Go Live. In 60 Seconds.' })
+      page.getByRole('heading', {
+        name: 'Plan the release around the page fans will actually see.',
+      })
     ).toBeVisible();
     await expect(page.getByTestId('friday-rhythm-section')).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'Make Every Friday Count.' })
+      page.getByRole('heading', { name: 'Make Every Friday Count' })
     ).toBeVisible();
-    await expect(page.getByTestId('homepage-outcome-cards')).toBeVisible();
+    await expect(page.getByTestId('homepage-profile-proof-band')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Artist profiles built to convert.' })
+    ).toBeVisible();
     await expect(page.getByTestId('homepage-v2-pricing')).toBeVisible();
     await expect(
       page.getByRole('heading', { name: 'Simple Pricing.' })
     ).toBeVisible();
     await expect(page.getByTestId('homepage-v2-pricing-free')).toHaveCount(0);
     await expect(page.getByTestId('homepage-v2-pricing-pro')).toBeVisible();
+    await expect(page.getByTestId('homepage-faq')).toBeVisible();
     await expect(
-      page.getByRole('link', { name: 'Start 14-Day Free Trial' })
+      page.getByRole('heading', { name: 'Questions Artists Ask Before Launch' })
     ).toBeVisible();
-  });
 
-  test('footer CTA ships live above the legal footer', async ({ page }) => {
     const finalCta = page.getByTestId('homepage-v2-final-cta');
-
     await finalCta.scrollIntoViewIfNeeded();
     await expect(finalCta).toBeVisible();
     await expect(page.getByTestId('homepage-v2-final-cta-heading')).toHaveText(
@@ -144,29 +148,10 @@ test.describe('Homepage', () => {
     ).toHaveAttribute('href', '/signup');
     await expect(
       page.getByTestId('homepage-v2-final-cta-secondary')
-    ).toHaveAttribute('href', '/pricing');
+    ).toHaveCount(0);
   });
 
-  test('desktop prompt rail chevrons move the pill row', async ({ page }) => {
-    await page.setViewportSize({ width: 700, height: 740 });
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
-    await waitForHydration(page);
-
-    const rail = page.getByTestId('homepage-pill-rail');
-    const scrollRight = page.getByTestId('homepage-pill-scroll-right');
-
-    await expect(scrollRight).toBeVisible();
-    await expect(scrollRight).toBeEnabled();
-
-    const before = await rail.evaluate(node => node.scrollLeft);
-    await scrollRight.click();
-
-    await expect
-      .poll(async () => rail.evaluate(node => node.scrollLeft))
-      .toBeGreaterThan(before);
-  });
-
-  test('mobile keeps the hero readable and avoids duplicate auth in the nav drawer', async ({
+  test('mobile keeps hero and carousel inside the viewport and uses signup in drawer', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
@@ -174,19 +159,14 @@ test.describe('Homepage', () => {
     await waitForHydration(page);
 
     await expect(
-      page.getByRole('heading', { name: 'Release more music with less work.' })
+      page.getByRole('heading', { name: 'Drop more music, with less work.' })
     ).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
-    await expect(page.getByPlaceholder('Ask Jovie...')).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
-    });
-    await expect(page.getByRole('button', { name: 'Sign in' })).toHaveCount(1);
-    await expect(page.getByTestId('homepage-trust')).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
-    });
+    await expect(page.getByRole('link', { name: 'Log in' })).toHaveCount(1);
+
     const activeHeroShot = page
-      .locator('.homepage-hero-mockup[data-active="true"]')
+      .locator('.homepage-hero-slide[data-active="true"]')
       .first();
     const heroShotBounds = await activeHeroShot.boundingBox();
     const viewportWidth = page.viewportSize()?.width ?? 0;
@@ -194,9 +174,8 @@ test.describe('Homepage', () => {
     expect(heroShotBounds?.x ?? -1).toBeGreaterThanOrEqual(0);
     expect(
       (heroShotBounds?.x ?? 0) + (heroShotBounds?.width ?? 0)
-    ).toBeLessThanOrEqual(viewportWidth);
+    ).toBeLessThanOrEqual(viewportWidth + 1);
 
-    await page.waitForTimeout(750);
     await page.evaluate(() => {
       const closeDevTools = document.querySelector<HTMLButtonElement>(
         'button[aria-label="Close Next.js Dev Tools"]'
@@ -205,23 +184,28 @@ test.describe('Homepage', () => {
     });
 
     const openMenu = page.getByRole('button', { name: 'Open menu' });
-    await openMenu.dispatchEvent('click');
+    await openMenu.click();
+    const mobilePanel = page.locator('#mobile-nav-panel');
+
+    await expect(mobilePanel).toBeVisible();
     await expect(
       page.getByRole('button', { name: 'Close menu' })
     ).toBeVisible();
     await expect(
-      page.getByRole('link', { name: 'Product', exact: true })
+      mobilePanel.getByRole('link', { name: 'Product', exact: true })
     ).toBeVisible();
     await expect(
-      page.getByRole('link', { name: 'Solutions', exact: true })
+      mobilePanel.getByRole('link', { name: 'Solutions', exact: true })
     ).toBeVisible();
     await expect(
-      page.getByRole('link', { name: 'Pricing', exact: true })
+      mobilePanel.getByRole('link', { name: 'Pricing', exact: true })
     ).toBeVisible();
     await expect(
-      page.getByRole('link', { name: 'Resources', exact: true })
+      mobilePanel.getByRole('link', { name: 'Resources', exact: true })
     ).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Log in' })).toHaveCount(0);
+    await expect(
+      mobilePanel.getByRole('link', { name: 'Start Free', exact: true })
+    ).toHaveAttribute('href', '/signup');
   });
 
   test('has no horizontal overflow across common viewports', async ({

@@ -66,14 +66,16 @@ function buildNavLinks(
 function MobileNavCta({
   showAuthenticatedAction,
   close,
+  publicCtaHref = APP_ROUTES.WAITLIST,
+  publicCtaLabel = 'Sign up',
 }: Readonly<{
   showAuthenticatedAction: boolean;
   close: () => void;
+  publicCtaHref?: string;
+  publicCtaLabel?: string;
 }>) {
-  const href = showAuthenticatedAction
-    ? APP_ROUTES.DASHBOARD
-    : APP_ROUTES.WAITLIST;
-  const label = showAuthenticatedAction ? 'Open App' : 'Sign up';
+  const href = showAuthenticatedAction ? APP_ROUTES.DASHBOARD : publicCtaHref;
+  const label = showAuthenticatedAction ? 'Open App' : publicCtaLabel;
 
   return (
     <Link
@@ -81,17 +83,13 @@ function MobileNavCta({
       className={cn(
         'group flex items-center justify-center gap-2 h-[52px] rounded-xl',
         'text-[17px] font-semibold',
-        'transition-all duration-200 ease-out',
-        'active:scale-[0.98]'
+        'transition-colors duration-subtle ease-subtle'
       )}
       style={CTA_BUTTON_STYLE}
       onClick={close}
     >
       {label}
-      <ArrowRight
-        size={16}
-        className='transition-transform duration-200 group-hover:translate-x-0.5'
-      />
+      <ArrowRight size={16} className='transition-colors duration-subtle' />
     </Link>
   );
 }
@@ -99,9 +97,13 @@ function MobileNavCta({
 export function MobileNav({
   navLinks: customNavLinks,
   includePublicLogin = true,
+  publicCtaHref,
+  publicCtaLabel,
 }: {
   readonly navLinks?: ReadonlyArray<{ href: string; label: string }>;
   readonly includePublicLogin?: boolean;
+  readonly publicCtaHref?: string;
+  readonly publicCtaLabel?: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const toggleRef = useRef<HTMLButtonElement>(null);
@@ -162,7 +164,7 @@ export function MobileNav({
           'relative z-[101] inline-flex items-center justify-center size-11',
           'rounded-lg border-0 bg-transparent cursor-pointer',
           'text-primary-token',
-          'transition-all duration-200 ease-out',
+          'transition-colors duration-subtle ease-subtle',
           '[-webkit-tap-highlight-color:transparent]',
           'hover:bg-(--linear-bg-hover)',
           'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--linear-accent)'
@@ -176,7 +178,7 @@ export function MobileNav({
           <Menu
             size={20}
             className={cn(
-              'absolute inset-0 transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]',
+              'absolute inset-0 transition-[opacity,transform] duration-cinematic ease-cinematic',
               isOpen
                 ? 'opacity-0 rotate-90 scale-75'
                 : 'opacity-100 rotate-0 scale-100'
@@ -185,7 +187,7 @@ export function MobileNav({
           <X
             size={20}
             className={cn(
-              'absolute inset-0 transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]',
+              'absolute inset-0 transition-[opacity,transform] duration-cinematic ease-cinematic',
               isOpen
                 ? 'opacity-100 rotate-0 scale-100'
                 : 'opacity-0 -rotate-90 scale-75'
@@ -204,7 +206,7 @@ export function MobileNav({
             <div
               className={cn(
                 'fixed inset-0 z-[99]',
-                'transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]',
+                'transition-opacity duration-cinematic ease-cinematic',
                 'opacity-100 pointer-events-auto'
               )}
               onClick={close}
@@ -218,7 +220,7 @@ export function MobileNav({
               className={cn(
                 'fixed inset-x-0 bottom-0 z-[100]',
                 'rounded-t-[20px]',
-                'transition-all duration-[320ms] ease-[cubic-bezier(0.32,0.72,0,1)]',
+                'transition-[opacity,transform] duration-cinematic ease-cinematic',
                 'translate-y-0 opacity-100 pointer-events-auto'
               )}
               style={NAV_PANEL_STYLE}
@@ -242,8 +244,7 @@ export function MobileNav({
                       'flex items-center h-[52px] px-4 rounded-xl',
                       'text-[17px] font-medium',
                       'text-primary-token',
-                      'transition-all duration-150 ease-out',
-                      'active:scale-[0.98]',
+                      'transition-colors duration-subtle ease-subtle',
                       'hover:bg-(--linear-bg-hover)',
                       'animate-[mobile-nav-item-in_400ms_ease-out_both]'
                     )}
@@ -266,6 +267,8 @@ export function MobileNav({
                   <MobileNavCta
                     showAuthenticatedAction={showAuthenticatedAction}
                     close={close}
+                    publicCtaHref={publicCtaHref}
+                    publicCtaLabel={publicCtaLabel}
                   />
                 </div>
               </div>

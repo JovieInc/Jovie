@@ -4,6 +4,8 @@ import { HomeLegalFooter } from '@/components/homepage/HomeLegalFooter';
 import { HomeScrollWatcher } from '@/components/homepage/HomeScrollWatcher';
 import { MarketingHeader } from '@/components/site/MarketingHeader';
 
+export const revalidate = false;
+
 export default function HomeLayout({
   children,
 }: Readonly<{

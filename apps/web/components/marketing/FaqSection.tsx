@@ -10,6 +10,8 @@ interface FaqSectionProps {
   readonly className?: string;
   readonly headingClassName?: string;
   readonly heading?: string;
+  readonly analyticsEventName?: string;
+  readonly analyticsProperties?: Record<string, string | number | boolean>;
 }
 
 export function FaqSection({
@@ -17,6 +19,8 @@ export function FaqSection({
   className,
   headingClassName,
   heading = 'Frequently Asked Questions',
+  analyticsEventName,
+  analyticsProperties,
 }: FaqSectionProps) {
   return (
     <section
@@ -29,7 +33,11 @@ export function FaqSection({
       >
         {heading}
       </h2>
-      <ClientFaqAccordion items={items} />
+      <ClientFaqAccordion
+        items={items}
+        analyticsEventName={analyticsEventName}
+        analyticsProperties={analyticsProperties}
+      />
     </section>
   );
 }

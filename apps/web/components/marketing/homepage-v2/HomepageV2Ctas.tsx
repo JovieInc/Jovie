@@ -60,6 +60,7 @@ function PricingCard({
   ctaHref,
   featured = false,
   testId,
+  features,
 }: Readonly<{
   title: string;
   body: string;
@@ -68,6 +69,7 @@ function PricingCard({
   ctaHref: string;
   featured?: boolean;
   testId: string;
+  features?: readonly string[];
 }>) {
   return (
     <article
@@ -86,6 +88,13 @@ function PricingCard({
       <p className='mt-auto pt-8 text-[2.4rem] font-semibold tracking-[-0.07em] text-primary-token'>
         {price}
       </p>
+      {features?.length ? (
+        <ul className='homepage-pricing-feature-list'>
+          {features.map(feature => (
+            <li key={feature}>{feature}</li>
+          ))}
+        </ul>
+      ) : null}
       <Link href={ctaHref} className='public-action-primary mt-5 inline-flex'>
         {ctaLabel}
       </Link>
@@ -95,6 +104,9 @@ function PricingCard({
 
 export function HomepageV2Pricing() {
   const proMonthlyPrice = ENTITLEMENT_REGISTRY.pro.marketing.price?.monthly;
+  const proFeatures = ENTITLEMENT_REGISTRY.pro.marketing.features
+    .filter(feature => feature !== 'All Free features +')
+    .slice(0, 6);
   const proPriceDisplay =
     typeof proMonthlyPrice === 'number'
       ? `$${proMonthlyPrice}/mo`
@@ -119,6 +131,7 @@ export function HomepageV2Pricing() {
             ctaHref={`${APP_ROUTES.SIGNUP}?plan=pro`}
             ctaLabel='Start 14-Day Free Trial'
             featured
+            features={proFeatures}
             price={proPriceDisplay}
             testId='homepage-v2-pricing-pro'
             title={ENTITLEMENT_REGISTRY.pro.marketing.displayName}
