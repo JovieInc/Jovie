@@ -1,0 +1,14 @@
+{
+  "pages": [
+    {
+      "slug": "memo",
+      "file": "investor-memo.md",
+      "title": "Investor Memo",
+      "nav": true
+    }
+  ],
+  "deck": {
+    "slides": [],
+    "downloadFilename": "Jovie-Pitch-Deck.pdf"
+  }
+}
