@@ -32,6 +32,11 @@ const workspaceNodeModulesRoot = path.resolve(
 const appNodeModulesRoot = path.join(appRoot, 'node_modules');
 const standaloneRoot = path.join(standaloneOutputRoot, 'apps', 'web');
 const standaloneNextRoot = path.join(standaloneRoot, '.next');
+const standaloneNextNodeModulesRoot = path.join(
+  standaloneNextRoot,
+  'node_modules'
+);
+const appNextNodeModulesRoot = path.join(appRoot, '.next', 'node_modules');
 
 const copyTargets = [
   {
@@ -87,6 +92,39 @@ function countSymlinks(rootDir) {
   return total;
 }
 
+function isPathInside(candidatePath, parentPath) {
+  const relativePath = path.relative(parentPath, candidatePath);
+  return (
+    relativePath === '' ||
+    (!relativePath.startsWith('..') && !path.isAbsolute(relativePath))
+  );
+}
+
+function findStandaloneNodeModulesRoot(entryPath) {
+  for (const nodeModulesRoot of [
+    standaloneNextNodeModulesRoot,
+    standaloneNodeModulesRoot,
+  ]) {
+    if (isPathInside(entryPath, nodeModulesRoot)) {
+      return nodeModulesRoot;
+    }
+  }
+
+  return standaloneNodeModulesRoot;
+}
+
+function getFallbackNodeModulesRoots(nodeModulesRoot) {
+  if (nodeModulesRoot === standaloneNextNodeModulesRoot) {
+    return [
+      appNextNodeModulesRoot,
+      appNodeModulesRoot,
+      workspaceNodeModulesRoot,
+    ];
+  }
+
+  return [appNodeModulesRoot, workspaceNodeModulesRoot];
+}
+
 function resolveStandaloneSymlinkTarget(entryPath) {
   try {
     return realpathSync(entryPath);
@@ -97,16 +135,14 @@ function resolveStandaloneSymlinkTarget(entryPath) {
 
     const linkTarget = readlinkSync(entryPath);
     const standaloneTarget = path.resolve(path.dirname(entryPath), linkTarget);
-    const relativeTarget = path.relative(
-      standaloneNodeModulesRoot,
-      standaloneTarget
-    );
+    const nodeModulesRoot = findStandaloneNodeModulesRoot(entryPath);
+    const relativeTarget = path.relative(nodeModulesRoot, standaloneTarget);
 
     if (relativeTarget.startsWith('..') || path.isAbsolute(relativeTarget)) {
       throw error;
     }
 
-    const fallbackRoots = [appNodeModulesRoot, workspaceNodeModulesRoot];
+    const fallbackRoots = getFallbackNodeModulesRoots(nodeModulesRoot);
 
     for (const root of fallbackRoots) {
       const fallbackTarget = path.join(root, relativeTarget);

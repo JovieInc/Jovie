@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { areAgentOsWorkflowsEnabled } from '@/lib/agent-os/workflows';
 import { env } from '@/lib/env-server';
 
@@ -10,6 +10,10 @@ vi.mock('@/lib/env-server', () => ({
 }));
 
 describe('AgentOS workflow runtime gate', () => {
+  beforeEach(() => {
+    env.AGENT_OS_WORKFLOWS_ENABLED = undefined;
+  });
+
   it('defaults to disabled when unset', () => {
     env.AGENT_OS_WORKFLOWS_ENABLED = undefined;
 
