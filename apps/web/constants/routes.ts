@@ -100,6 +100,10 @@ export const APP_ROUTES = {
   // System
   UNAVAILABLE: '/unavailable',
   DESIGN_STUDIO: '/exp/page-builder',
+  /** Legacy HUD URL — redirects to /app/admin/ops (admin) or /hud-tv (token). */
+  HUD: '/hud',
+  /** Token-only TV/wallboard view of the Ops HUD. */
+  HUD_TV: '/hud-tv',
 
   // Marketing
   HOME: '/',
