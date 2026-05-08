@@ -85,7 +85,7 @@ export function SmartLinkAudioPreview({
           onClick={handleToggle}
           aria-label={isPlaying ? 'Pause preview' : 'Play preview'}
           aria-pressed={isPlaying}
-          className='flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/90 text-black transition-transform duration-100 hover:scale-105 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70'
+          className='flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/90 text-black transition-colors duration-fast hover:bg-white active:bg-white/75 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70'
         >
           {isPlaying ? (
             <Pause className='h-3 w-3' />
