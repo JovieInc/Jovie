@@ -46,7 +46,9 @@ describe('ArtistNotificationsPage', () => {
     expect(heroSection.queryByText('Capture once')).not.toBeInTheDocument();
 
     expect(screen.getByTestId('homepage-trust')).toBeInTheDocument();
-    expect(screen.getByText('Trusted by artists on')).toBeInTheDocument();
+    expect(
+      screen.getByText('Trusted by artists and teams releasing on')
+    ).toBeInTheDocument();
 
     expect(
       screen.getByRole('heading', { name: 'Capture every fan.' })

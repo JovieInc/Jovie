@@ -18,7 +18,9 @@ describe('HomeTrustSection', () => {
       'data-presentation',
       'card'
     );
-    expect(screen.getByText('Trusted by artists on')).toBeInTheDocument();
+    expect(
+      screen.getByText('Trusted by artists and teams releasing on')
+    ).toBeInTheDocument();
     expect(screen.getByLabelText('Universal Music Group')).toBeInTheDocument();
     expect(screen.getByLabelText('AWAL')).toBeInTheDocument();
   });

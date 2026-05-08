@@ -163,7 +163,7 @@ function MarketingGlassFlyout({
           {menu.links.map((link, index) => (
             <Link
               href={link.href}
-              key={`${menu.id}-${link.href}`}
+              key={`${menu.id}-${link.label}`}
               className='marketing-glass-header__flyout-link focus-ring-themed'
               tabIndex={open ? undefined : -1}
             >

@@ -12,8 +12,8 @@ interface HomeTrustSectionProps {
   readonly className?: string;
   readonly presentation?: 'card' | 'inline-strip';
   /** Label rendered above the logos. Artist-profile and release-notification
-   * surfaces use the default ("Trusted by artists on"); the homepage hero
-   * uses the shorter "Trusted by artists". */
+   * surfaces use the default ("Trusted by artists and teams releasing on");
+   * the homepage hero historically used a shorter variant. */
   readonly label?: string;
 }
 
@@ -42,20 +42,25 @@ export function HomeTrustSection({
   variant = 'default',
   className,
   presentation = 'card',
-  label = 'Trusted by artists on',
+  label = 'Trusted by artists and teams releasing on',
 }: Readonly<HomeTrustSectionProps>) {
   const isInlineStrip = presentation === 'inline-strip';
-  const logoTone = isInlineStrip ? 'text-white/68' : 'text-white/92';
+  const logoTone = 'text-white/55';
   const innerBoxClass = getInnerBoxClass(isInlineStrip, variant);
-  const labelMarginClass = getLabelMarginClass(isInlineStrip, variant);
+  const labelMarginClass = isInlineStrip
+    ? 'mb-10 sm:mb-14'
+    : getLabelMarginClass(isInlineStrip, variant);
 
   return (
     <section
       data-testid='homepage-trust'
       data-presentation={presentation}
       className={cn(
+        // Bundle pattern: dim/monochrome wide-gap row on a radial-gradient
+        // strip, separated by hairlines top + bottom. Card variant retains
+        // its bordered surface for artist-profile / notifications surfaces.
         isInlineStrip
-          ? 'relative z-[1] mx-auto w-full border-t border-white/[0.08] px-5 py-7 sm:px-6 sm:py-8 lg:px-0'
+          ? 'relative z-[1] mx-auto w-full border-t border-b border-white/[0.04] bg-[radial-gradient(60%_100%_at_50%_50%,#0a0a14_0%,#000_80%)] px-5 py-16 sm:px-6 sm:py-[88px] lg:px-0'
           : 'relative z-[1] mx-auto w-full px-5 sm:px-6 lg:px-0',
         className
       )}
@@ -63,13 +68,16 @@ export function HomeTrustSection({
     >
       <div
         className={cn(
-          'mx-auto max-w-[var(--linear-content-max)]',
+          isInlineStrip
+            ? 'mx-auto max-w-[1320px] text-center'
+            : 'mx-auto max-w-[var(--linear-content-max)]',
           innerBoxClass
         )}
       >
         <p
           className={cn(
-            'text-center text-[12px] font-medium tracking-[0.02em] text-white/56',
+            'text-center font-medium tracking-[0.02em] text-white/40',
+            isInlineStrip ? 'text-[12px]' : 'text-[12px] text-white/56',
             labelMarginClass
           )}
         >
@@ -78,7 +86,7 @@ export function HomeTrustSection({
         <div
           className={cn(
             presentation === 'inline-strip'
-              ? 'flex flex-wrap items-center justify-center gap-x-8 gap-y-5 sm:gap-x-10 sm:gap-y-4 lg:flex-nowrap lg:gap-x-10'
+              ? 'flex flex-wrap items-center justify-between gap-x-10 gap-y-8 [&>div]:[filter:grayscale(1)] sm:gap-x-14 lg:flex-nowrap lg:gap-x-8'
               : 'grid grid-cols-2 items-center justify-items-center gap-x-6 gap-y-6 sm:flex sm:flex-wrap sm:items-center sm:justify-center sm:gap-x-10 sm:gap-y-5 lg:flex-nowrap lg:justify-between',
             variant === 'compact' &&
               presentation !== 'inline-strip' &&
