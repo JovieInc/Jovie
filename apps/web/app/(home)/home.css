@@ -108,7 +108,10 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .marketing-glass-header {
   --marketing-glass-top: 0.75rem;
   --marketing-glass-height: 3.35rem;
-  --marketing-glass-gutter: max(1rem, calc(var(--homepage-page-gutter) - 1rem));
+  --marketing-glass-gutter: max(
+    clamp(0.75rem, 2vw, 1.5rem),
+    calc(var(--homepage-page-gutter, 1.75rem) - 1rem)
+  );
   --marketing-glass-shell: transparent;
   --marketing-glass-shell-scrolled: rgba(15, 16, 17, 0.72);
   --marketing-glass-border: rgba(255, 255, 255, 0.1);

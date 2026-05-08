@@ -197,6 +197,8 @@ async function prepareScenario(
   }
 
   const viewport = SCREENSHOT_VIEWPORTS[scenario.viewport];
+  // shell-v1 scenarios use deterministic demo dates internally, and mocking
+  // the browser clock can interfere with loader animation timers.
   if (!scenario.id.startsWith('shell-v1-')) {
     await page.clock.setFixedTime(
       new Date(scenario.fixedNow ?? SCREENSHOT_CLOCK_ISO)

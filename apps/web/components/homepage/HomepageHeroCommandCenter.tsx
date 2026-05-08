@@ -69,7 +69,6 @@ function ProductPane({
         width={image.width}
         height={image.height}
         priority={priority}
-        loading={priority ? 'eager' : 'lazy'}
         sizes={sizes}
         quality={85}
         className='homepage-product-pane__image'
