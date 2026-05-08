@@ -644,8 +644,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   z-index: var(--carousel-z);
   pointer-events: none;
   opacity: var(--carousel-opacity);
-  filter: saturate(1) brightness(1) blur(var(--carousel-blur))
-    drop-shadow(0 30px 88px rgba(0, 0, 0, 0.48));
+  box-shadow: 0 30px 88px rgba(0, 0, 0, 0.2);
   transform: translate3d(
       calc(-50% + var(--carousel-offset) * var(--homepage-carousel-step)),
       -50%,
@@ -654,15 +653,14 @@ body:has(.home-viewport)::-webkit-scrollbar {
     scale(var(--carousel-scale));
   transition:
     transform 520ms cubic-bezier(0.22, 0.8, 0.24, 1),
-    opacity 320ms ease,
-    filter 320ms ease;
+    opacity 320ms ease;
   will-change: transform, opacity;
 }
 
 .homepage-hero-mockup[data-active="true"] {
-  filter: saturate(1.03) brightness(1.08) contrast(1.03)
-    blur(var(--carousel-blur)) drop-shadow(0 34px 96px rgba(0, 0, 0, 0.5))
-    drop-shadow(0 0 72px rgba(64, 126, 214, 0.13));
+  box-shadow:
+    0 34px 96px rgba(0, 0, 0, 0.22),
+    0 0 72px rgba(64, 126, 214, 0.1);
 }
 
 .homepage-hero-mockup--phone {
@@ -758,9 +756,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 @media (prefers-reduced-motion: reduce) {
   .homepage-hero-mockup {
-    transition:
-      opacity 120ms ease,
-      filter 120ms ease;
+    transition: opacity 120ms ease;
   }
 }
 
