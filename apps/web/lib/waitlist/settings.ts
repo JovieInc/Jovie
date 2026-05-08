@@ -7,31 +7,35 @@ const SETTINGS_ROW_ID = 1;
 // ---------------------------------------------------------------------------
 // In-memory cache for gate status
 // ---------------------------------------------------------------------------
-// The waitlist gate setting changes rarely (admin toggle). A short TTL avoids
-// hitting the DB on every middleware request while keeping propagation latency
-// under 30 seconds. Explicitly invalidated on settings update.
-// ---------------------------------------------------------------------------
+//
+// `isWaitlistGateEnabled` is hit on every authenticated middleware
+// cache-miss via `proxy-state.ts`, so re-querying the DB on every call is
+// expensive (and `getWaitlistSettings` may run an INSERT on a cold instance).
+// Cache the boolean in-process for a short TTL — admin updates call
+// `invalidateWaitlistGateCache()` to pick up the new value immediately.
+const GATE_CACHE_TTL_MS = 30_000;
 let _gateEnabledCache: { value: boolean; expiresAt: number } | null = null;
-const _GATE_CACHE_TTL_MS = 30_000; // 30s — unused while gate is hardcoded off
 
 /**
  * Check if the waitlist gate is enabled.
  *
- * Hardcoded to `false` — the waitlist gate is permanently disabled so all
- * signups go straight to onboarding. The DB-backed toggle and surrounding
- * infrastructure are preserved for future demand control (re-enable by
- * restoring the DB-driven implementation below).
- *
- * Previous implementation (DB-backed, memory-cached):
- *   if (_gateEnabledCache && Date.now() < _gateEnabledCache.expiresAt) {
- *     return _gateEnabledCache.value;
- *   }
- *   const settings = await getWaitlistSettings();
- *   _gateEnabledCache = { value: settings.gateEnabled, expiresAt: Date.now() + GATE_CACHE_TTL_MS };
- *   return settings.gateEnabled;
+ * Cached in-process for 30 seconds so authenticated middleware cache-misses
+ * don't add a DB round-trip per request. The cache is invalidated whenever
+ * `updateWaitlistSettings` runs so admin toggles still take effect on the
+ * next request.
  */
 export async function isWaitlistGateEnabled(): Promise<boolean> {
-  return false;
+  const now = Date.now();
+  if (_gateEnabledCache && _gateEnabledCache.expiresAt > now) {
+    return _gateEnabledCache.value;
+  }
+
+  const settings = await getWaitlistSettings();
+  _gateEnabledCache = {
+    value: settings.gateEnabled,
+    expiresAt: now + GATE_CACHE_TTL_MS,
+  };
+  return settings.gateEnabled;
 }
 
 /**
@@ -75,7 +79,7 @@ async function ensureSettingsRow(
     .insert(waitlistSettings)
     .values({
       id: SETTINGS_ROW_ID,
-      gateEnabled: false,
+      gateEnabled: true,
       autoAcceptEnabled: false,
       autoAcceptDailyLimit: 0,
       autoAcceptedToday: 0,
@@ -186,7 +190,7 @@ export async function tryReserveAutoAcceptSlot(
       and(
         eq(waitlistSettings.id, SETTINGS_ROW_ID),
         eq(waitlistSettings.autoAcceptEnabled, true),
-        eq(waitlistSettings.gateEnabled, true),
+        eq(waitlistSettings.gateEnabled, false),
         drizzleSql`${waitlistSettings.autoAcceptedToday} < ${waitlistSettings.autoAcceptDailyLimit}`
       )
     )

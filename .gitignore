@@ -113,3 +113,6 @@ output/
 .claude-flow/
 .swarm/
 ruvector.db
+
+# AgentOS run artifacts (binary outputs not source-controlled)
+agentos/runs/**/artifacts/
