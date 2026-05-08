@@ -114,10 +114,10 @@ jobs:
           # ------------------------------------------------------------------
           # 3. Queue pressure check (same threshold as agent-pipeline.yml)
           # ------------------------------------------------------------------
-          READY_COUNT=$(gh api "repos/$GH_REPO/pulls?state=open&per_page=100" \
-            | jq --argjson threshold "$READY_THRESHOLD" '
-              [.[] | select(.draft == false) | select(
-                (.auto_merge != null) or
+          READY_COUNT=$(echo "$ALL_PRS" \
+            | jq '
+              [.[] | select(
+                (.auto_merge == true) or
                 (.mergeable_state == "clean") or
                 (.mergeable_state == "unstable")
               )] | length
@@ -155,7 +155,7 @@ jobs:
           LANDED=0
           SKIPPED=0
 
-          echo "$AGENT_PRS" | jq -c '.[]' | while IFS= read -r PR; do
+          while IFS= read -r PR; do
             PR_NUMBER=$(echo "$PR" | jq -r '.number')
             PR_TITLE=$(echo "$PR" | jq -r '.title')
             PR_SHA=$(echo "$PR" | jq -r '.head_sha')
@@ -193,9 +193,9 @@ jobs:
             fi
 
             # Gate: CI PR Ready check must pass
-            CI_PR_READY=$(gh api "repos/$GH_REPO/commits/$PR_SHA/check-runs" \
-              --jq '[.check_runs[] | select(.name == "PR Ready")] | sort_by(.completed_at) | last | .conclusion // "pending"' \
-              2>/dev/null || echo "unknown")
+            CI_PR_READY=$(gh api --paginate --slurp "repos/$GH_REPO/commits/$PR_SHA/check-runs?per_page=100" 2>/dev/null \
+              | jq -r '[.[].check_runs[] | select(.name == "PR Ready")] | sort_by(.completed_at) | last | .conclusion // "pending"' \
+              || echo "unknown")
             echo "CI PR Ready: $CI_PR_READY"
 
             if [[ "$CI_PR_READY" != "success" ]]; then
@@ -261,7 +261,7 @@ jobs:
               echo "::warning::Failed to enable auto-merge on PR #$PR_NUMBER (may already be queued or ineligible)."
               SKIPPED=$((SKIPPED + 1))
             fi
-          done
+          done < <(echo "$AGENT_PRS" | jq -c '.[]')
 
           echo ""
           echo "=== Sweep complete ==="
