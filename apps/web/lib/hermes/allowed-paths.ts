@@ -4,10 +4,14 @@ const SAFE_HERMES_PATH_REGEX =
 function normalizePathValue(path: string): string {
   return path
     .trim()
-    .replace(/\\/g, '/')
+    .replaceAll(/\\/g, '/')
     .replace(/^\.\//, '')
-    .replace(/\/+/g, '/')
+    .replaceAll(/\/+/g, '/')
     .replace(/\/$/, '');
+}
+
+function comparePath(left: string, right: string): number {
+  return left.localeCompare(right);
 }
 
 export function normalizeHermesAllowedPath(path: string): string {
@@ -31,7 +35,7 @@ export function normalizeHermesAllowedPaths(
   paths: readonly string[]
 ): string[] {
   const normalizedPaths = paths.map(normalizeHermesAllowedPath);
-  return [...new Set(normalizedPaths)].sort();
+  return [...new Set(normalizedPaths)].sort(comparePath);
 }
 
 export function normalizeHermesChangedFile(path: string): string {
@@ -66,7 +70,7 @@ export function findOutOfScopeHermesChangedFiles(
             file === allowedPath || file.startsWith(`${allowedPath}/`)
         )
     )
-    .sort();
+    .sort(comparePath);
 }
 
 export function assertHermesChangedFilesAllowed(

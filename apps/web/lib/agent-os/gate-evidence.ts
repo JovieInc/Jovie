@@ -80,7 +80,9 @@ export function evaluateAgentRunGateEvidence(
   return {
     passed: missingGateNames.length === 0,
     missingGateNames,
-    passedGateNames: [...passedGateNames].sort(),
+    passedGateNames: [...passedGateNames].sort((left, right) =>
+      left.localeCompare(right)
+    ),
     artifacts,
   };
 }

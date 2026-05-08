@@ -23,7 +23,7 @@ export function buildAutoPrCapacityBlockedArtifact({
   const timestamp = createdAt.toISOString();
 
   return {
-    id: `auto-pr-capacity-${runId}-${branchName.replace(/[^a-zA-Z0-9._-]+/g, '-')}`,
+    id: `auto-pr-capacity-${runId}-${branchName.replaceAll(/[^a-zA-Z0-9._-]+/g, '-')}`,
     source: 'github',
     sourceRunId: runId,
     kind: 'workflow',
