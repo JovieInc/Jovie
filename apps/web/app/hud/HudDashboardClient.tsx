@@ -564,7 +564,11 @@ export function HudDashboardClient({
         ) : null}
       </ContentSurfaceCard>
 
-      <ContentSurfaceCard surface='details' className='p-4 sm:p-5'>
+      <ContentSurfaceCard
+        surface='details'
+        className='p-4 sm:p-5'
+        data-testid='hud-bottom-marker'
+      >
         <div className='flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between'>
           <div className='space-y-2'>
             <SectionEyebrow>Default status</SectionEyebrow>

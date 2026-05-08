@@ -104,7 +104,7 @@ export default async function HudPage({
   const hudUrl = await getHudAbsoluteUrl(kioskToken);
 
   return (
-    <main className='min-h-screen bg-page text-primary-token'>
+    <main className='hud-kiosk-viewport min-h-screen bg-page text-primary-token'>
       <HudDashboardClient
         initialMetrics={metrics}
         hudUrl={hudUrl}
