@@ -18,11 +18,19 @@ test.use({
   storageState: { cookies: [], origins: [] },
 });
 
-const MOBILE_WIDTHS = [320, 360, 375, 390, 393, 402, 414, 428, 430] as const;
+const DEFAULT_MOBILE_WIDTHS = [
+  320, 360, 375, 390, 393, 402, 414, 428, 430,
+] as const;
 const MOBILE_HEIGHT = 844;
-const FOCUS_TRAVERSAL_LIMIT = 20;
+const FOCUS_TRAVERSAL_LIMIT = getPositiveIntegerEnv(
+  'MOBILE_OVERFLOW_FOCUS_LIMIT',
+  20
+);
 const OPEN_STATE_CLICK_LIMIT = 8;
 const USE_TEST_AUTH_BYPASS = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
+const MOBILE_WIDTHS =
+  getMobileWidthsFromEnv(process.env.MOBILE_OVERFLOW_WIDTHS) ??
+  DEFAULT_MOBILE_WIDTHS;
 
 const PUBLIC_SURFACE_IDS = [
   'home',
@@ -48,6 +56,23 @@ interface MobileOverflowRoute {
   readonly id: string;
   readonly path: string;
   readonly readySelectors: readonly string[];
+}
+
+function getPositiveIntegerEnv(name: string, fallback: number): number {
+  const value = process.env[name]?.trim();
+  if (!value) return fallback;
+
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function getMobileWidthsFromEnv(value: string | undefined) {
+  const widths = value
+    ?.split(',')
+    .map(width => Number.parseInt(width.trim(), 10))
+    .filter(width => Number.isFinite(width) && width > 0);
+
+  return widths && widths.length > 0 ? widths : null;
 }
 
 const PUBLIC_SURFACES_BY_ID = new Map(

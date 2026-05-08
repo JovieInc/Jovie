@@ -31,6 +31,8 @@ export interface HeaderNavProps {
   readonly minimalAuth?: boolean;
   readonly minimalAuthVariant?: 'link' | 'pill';
   readonly includePublicLoginInMobileNav?: boolean;
+  readonly mobilePublicCtaHref?: string;
+  readonly mobilePublicCtaLabel?: string;
   readonly presentation?: 'default' | 'homepage-embedded' | 'marketing-glass';
   readonly flyoutMenus?: readonly HeaderFlyoutMenu[];
 }
@@ -252,6 +254,8 @@ export function HeaderNav({
   minimalAuth = false,
   minimalAuthVariant = 'link',
   includePublicLoginInMobileNav = true,
+  mobilePublicCtaHref,
+  mobilePublicCtaLabel,
   presentation = 'default',
   flyoutMenus,
 }: HeaderNavProps = {}) {
@@ -477,6 +481,8 @@ export function HeaderNav({
               <MobileNav
                 navLinks={mobileNavLinks ?? navLinks}
                 includePublicLogin={includePublicLoginInMobileNav}
+                publicCtaHref={mobilePublicCtaHref}
+                publicCtaLabel={mobilePublicCtaLabel}
               />
             </div>
           )}

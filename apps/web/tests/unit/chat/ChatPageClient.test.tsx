@@ -145,11 +145,6 @@ vi.mock('@/lib/queries/useChatMutations', () => ({
   useAddMessagesMutation: () => ({ mutateAsync: vi.fn() }),
 }));
 
-vi.mock('@statsig/react-bindings', () => ({
-  useFeatureGate: () => ({ value: true }),
-  StatsigContext: React.createContext({ client: {} }),
-}));
-
 const baseDashboardData: DashboardData = {
   user: { id: 'user_123' },
   creatorProfiles: [

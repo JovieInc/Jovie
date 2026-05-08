@@ -186,6 +186,9 @@ export function ProfileInlineNotificationsCTA({
   const hasAutoOpenedRef = useRef(false);
   const activatedInCurrentFlowRef = useRef(false);
   const otpVerificationInFlightRef = useRef(false);
+  const previousOtpLengthRef = useRef(otpCode.length);
+  const pendingCompletedOtpRef = useRef<string | null>(null);
+  const autoSubmittedOtpRef = useRef<string | null>(null);
 
   const isInline = presentation === 'inline';
   const artistEmailReady = readArtistEmailReadyFromSettings(artist.settings);
@@ -295,7 +298,12 @@ export function ProfileInlineNotificationsCTA({
       !(isInline || autoOpen) ||
       !isFlowOpen ||
       !isSubscribed ||
-      activatedInCurrentFlowRef.current
+      activatedInCurrentFlowRef.current ||
+      (flowOrigin === 'subscribe' &&
+        (step === 'otp' ||
+          step === 'name' ||
+          step === 'birthday' ||
+          step === 'done'))
     ) {
       return;
     }
@@ -303,7 +311,7 @@ export function ProfileInlineNotificationsCTA({
     setFlowOrigin('manage');
     setCanEditPreferences(true);
     setStep('preferences');
-  }, [autoOpen, isFlowOpen, isInline, isSubscribed]);
+  }, [autoOpen, flowOrigin, isFlowOpen, isInline, isSubscribed, step]);
 
   const activeEmail = useMemo(
     () =>
@@ -427,6 +435,42 @@ export function ProfileInlineNotificationsCTA({
       subscriptionDetails.email,
     ]
   );
+
+  useEffect(() => {
+    const previousOtpLength = previousOtpLengthRef.current;
+    previousOtpLengthRef.current = otpCode.length;
+
+    if (step !== 'otp') {
+      pendingCompletedOtpRef.current = null;
+      return;
+    }
+
+    if (otpCode.length < 6) {
+      pendingCompletedOtpRef.current = null;
+      autoSubmittedOtpRef.current = null;
+      return;
+    }
+
+    if (previousOtpLength < 6) {
+      pendingCompletedOtpRef.current = otpCode;
+    }
+
+    if (pendingCompletedOtpRef.current !== otpCode) {
+      return;
+    }
+
+    if (autoSubmittedOtpRef.current === otpCode) {
+      return;
+    }
+
+    if (isSubmitting || otpVerificationInFlightRef.current) {
+      return;
+    }
+
+    pendingCompletedOtpRef.current = null;
+    autoSubmittedOtpRef.current = otpCode;
+    handleOtpSubmit().catch(() => {});
+  }, [handleOtpSubmit, isSubmitting, otpCode, step]);
 
   const handleNameSubmit = useCallback(() => {
     const trimmed = nameInput.trim();

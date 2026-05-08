@@ -216,6 +216,7 @@ export function isRetryableSeedDatabaseError(error: unknown): boolean {
     message.includes('requested endpoint could not be found') ||
     message.includes("you don't have access to it") ||
     message.includes('connection terminated unexpectedly') ||
+    message.includes('connection closed') ||
     message.includes('server closed the connection unexpectedly') ||
     message.includes('the database system is starting up') ||
     message.includes('fetch failed') ||
@@ -1082,8 +1083,8 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
   const sql = neon(databaseUrl);
   const db = drizzle(sql, { schema });
   const seedRetryOptions = {
-    attempts: process.env.CI ? 4 : 2,
-    initialDelayMs: 1_500,
+    attempts: process.env.CI ? 6 : 2,
+    initialDelayMs: process.env.CI ? 2_000 : 1_500,
     label: 'E2E seed database access',
   } as const;
 

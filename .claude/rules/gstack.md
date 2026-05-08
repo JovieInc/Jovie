@@ -66,6 +66,33 @@ gstack skill files are part of the agent control plane. Keep them fast, stable, 
 - Keep stable shared text before variable request details so provider prompt caching can work.
 - Run `bun run skill:size-check` after skill-template changes. It is a ratchet, not the final target; new work should reduce skill size when practical.
 
+## External Skill Governance
+
+Engineering agents may install third-party Agent Skills via the [`vercel-labs/skills`](https://github.com/vercel-labs/skills) CLI (`npx skills add | find | update`). The discovery skill itself is installed at `.claude/skills/find-skills/SKILL.md` and is the canonical entry point for "find me a skill that does X" workflows. Lockfile lives at `skills-lock.json` in the repo root.
+
+**Allowed sources** (install without further review):
+
+- `anthropics/*`
+- `vercel-labs/*`
+- `microsoft/*`
+- Official first-party vendor skills (Stripe, Clerk, Sentry, Vercel, etc.)
+- Jovie-owned private skills
+
+**Blocked by default** (require explicit human review before install):
+
+- Unknown community authors
+- Skills shipping executable scripts (read every script before approval)
+- Skills requesting outbound network access
+- Skills that touch credentials, fan data, payments, or artist accounts
+
+**Pre-install checks** (per `find-skills` SKILL.md): inspect install count, source reputation, GitHub stars, and the Snyk/Socket risk badges shown by `skills add` before accepting.
+
+**Telemetry**: every `npx skills` invocation must run with `DISABLE_TELEMETRY=1` and `DO_NOT_TRACK=1`. These are also set in `.claude/settings.json`'s `env` block, so any agent shell inherits them by default.
+
+**Install scope**: prefer project-scoped installs (`--agent claude-code`) so the new skill is reviewable in the PR diff. Avoid `--global`/`-g` for repo-relevant skills.
+
+**Product-surface separation**: external Agent Skills are an engineering-time tool only. They MUST NOT be exposed to artists, fans, or any user-facing Jovie surface. Artist-facing AI workflows are built as Jovie product features and tracked in Linear, not installed from the open ecosystem.
+
 ## Performance Optimization Loop
 
 `/perf-loop` runs an autonomous optimization loop that measures, experiments, and keeps only improvements. It must follow `.claude/skills/jovie-performance-hardening/SKILL.md`: baseline first, one hypothesis family per iteration, re-measure with the same method, and keep only validated wins. State is persisted to `.context/perf/` for resume capability. The skill uses `perf:loop` (performance-optimizer.ts) as its measurement primitive.

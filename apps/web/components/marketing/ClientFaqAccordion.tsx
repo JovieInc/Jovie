@@ -2,6 +2,7 @@
 
 import { Minus, Plus } from 'lucide-react';
 import { useId, useState } from 'react';
+import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 
 interface ClientFaqAccordionProps {
@@ -9,10 +10,14 @@ interface ClientFaqAccordionProps {
     readonly question: string;
     readonly answer: string;
   }[];
+  readonly analyticsEventName?: string;
+  readonly analyticsProperties?: Record<string, string | number | boolean>;
 }
 
 export function ClientFaqAccordion({
   items,
+  analyticsEventName,
+  analyticsProperties,
 }: Readonly<ClientFaqAccordionProps>) {
   const sectionId = useId();
   const [openIndex, setOpenIndex] = useState<number | null>(null);
@@ -34,16 +39,24 @@ export function ClientFaqAccordion({
               type='button'
               aria-expanded={isOpen}
               aria-controls={panelId}
-              className='focus-ring-themed flex w-full items-start justify-between gap-6 rounded-md py-5 text-left text-[17px] font-semibold leading-[1.35] tracking-[-0.018em] text-primary-token transition-opacity duration-150 hover:opacity-90'
+              className='focus-ring-themed flex w-full items-start justify-between gap-6 rounded-md py-5 text-left text-[17px] font-semibold leading-[1.35] tracking-[-0.018em] text-primary-token transition-opacity duration-subtle hover:opacity-90'
               onClick={() => {
-                setOpenIndex(isOpen ? null : index);
+                const nextIndex = isOpen ? null : index;
+                setOpenIndex(nextIndex);
+                if (analyticsEventName && nextIndex !== null) {
+                  track(analyticsEventName, {
+                    ...analyticsProperties,
+                    question: item.question,
+                    index,
+                  });
+                }
               }}
             >
               <span>{item.question}</span>
               <span
                 aria-hidden='true'
                 className={cn(
-                  'mt-0.5 shrink-0 transition-colors duration-150',
+                  'mt-0.5 shrink-0 transition-colors duration-subtle',
                   isOpen ? 'text-primary-token' : 'text-secondary-token'
                 )}
               >
@@ -60,7 +73,7 @@ export function ClientFaqAccordion({
               aria-hidden={!isOpen}
               style={{ visibility: isOpen ? 'visible' : 'hidden' }}
               className={cn(
-                'grid overflow-hidden transition-[grid-template-rows,opacity,margin] duration-200 ease-out motion-reduce:transition-none',
+                'grid overflow-hidden transition-[grid-template-rows,opacity,margin] duration-subtle ease-subtle motion-reduce:transition-none',
                 isOpen
                   ? 'mt-1 grid-rows-[1fr] opacity-100'
                   : 'mt-0 grid-rows-[0fr] opacity-0'

@@ -534,11 +534,7 @@ export function ProfileCompactSurface({
                 </div>
               </div>
             </div>
-          ) : renderMode === 'preview' ? null : (
-            <h1 className='sr-only' data-testid='profile-header'>
-              {artist.name}
-            </h1>
-          )}
+          ) : null}
         </header>
 
         <div className='relative z-10 flex min-h-0 flex-1 flex-col px-4 pt-2'>

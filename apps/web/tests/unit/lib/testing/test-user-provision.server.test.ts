@@ -87,6 +87,25 @@ describe('test-user-provision.server', () => {
     expect(mockCreateUser).not.toHaveBeenCalled();
   });
 
+  it('does not call Clerk when mock auth is enabled', async () => {
+    vi.stubEnv('NEXT_PUBLIC_CLERK_MOCK', '1');
+    const { ensureClerkTestUser } = await import(
+      '@/lib/testing/test-user-provision.server'
+    );
+
+    await expect(
+      ensureClerkTestUser({
+        email: 'browse-ready+clerk_test@jov.ie',
+        username: 'browse-ready-user',
+        firstName: 'Browse',
+        lastName: 'Ready',
+      })
+    ).resolves.toBe('user_dev_browse_ready_clerk_test_jov_ie');
+
+    expect(mockGetUserList).not.toHaveBeenCalled();
+    expect(mockCreateUser).not.toHaveBeenCalled();
+  });
+
   it('does not treat non-auth Clerk errors with trace ids as fallback cases', async () => {
     mockGetUserList.mockRejectedValue({
       status: 429,

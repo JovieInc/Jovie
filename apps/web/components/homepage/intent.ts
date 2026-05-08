@@ -1,3 +1,5 @@
+import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
+
 export const HOMEPAGE_INTENT_KEY = 'jovie_homepage_intent';
 
 export const HOMEPAGE_INTENT_EXPERIMENT_ID = 'homepage_intent_pills_v1';
@@ -44,11 +46,7 @@ export const PILLS: readonly HomepagePill[] = [
   },
 ] as const;
 
-export const HERO_COPY = {
-  eyebrow: 'Meet Jovie',
-  headline: 'Drop more music, with less work.',
-  subhead: 'Release music faster and grow your audience effortlessly.',
-} as const;
+export const HERO_COPY = HOMEPAGE_LAUNCH_COPY.hero;
 
 export interface HomepageIntent {
   readonly source: 'homepage';

@@ -751,7 +751,10 @@ describe('proxy.ts middleware', () => {
     it('does not have clerk rewrites — middleware fetch proxy handles this', async () => {
       const { readFile } = await import('node:fs/promises');
       const { resolve } = await import('node:path');
-      const raw = await readFile(resolve(process.cwd(), 'vercel.json'), 'utf8');
+      const raw = await readFile(
+        resolve(process.cwd(), '../../vercel.json'),
+        'utf8'
+      );
       const cfg = JSON.parse(raw) as {
         rewrites?: Array<{ source: string; destination: string }>;
       };

@@ -75,30 +75,21 @@ import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 ### 3. Feature Flag Integration
 
 ```tsx
-import { useFeatureGate } from '@statsig/react-bindings';
-import { STATSIG_FLAGS } from '@/lib/statsig/flags';
+import { useAppFlag } from '@/lib/flags/client';
 
-function ProfilePage({ userOwnsProfile }) {
-  const { value: avatarUploaderEnabled } = useFeatureGate(
-    STATSIG_FLAGS.AVATAR_UPLOADER
-  );
-  const canUpload = userOwnsProfile && avatarUploaderEnabled;
-  
-  return (
-    <AvatarUploadable
-      src={user.avatar}
-      alt="Profile photo"
-      name={user.name}
-      uploadable={canUpload}
-      onUpload={handleUpload}
-    />
-  );
+function ReleaseToolbar() {
+  const showExtras = useAppFlag('SHOW_RELEASE_TOOLBAR_EXTRAS');
+
+  if (!showExtras) return null;
+
+  return <ReleaseToolbarExtras />;
 }
 ```
 
 **Guardrails:**
-- Use Statsig gates (`STATSIG_FLAGS.AVATAR_UPLOADER`) instead of custom providers.
-- Keep Avatar display-only when the gate is off; do not introduce alternate analytics SDKs.
+- Use runtime app flags from `@/lib/flags/*` instead of direct Statsig React
+  bindings or custom providers.
+- Keep flagged UI absent or display-only when the gate is off; do not introduce alternate analytics SDKs.
 - AvatarUploadable defaults to JPEG/PNG/WebP and a 4MB max size to match `/api/images/upload`; extend the API before allowing other formats or larger uploads.
 - Use semantic tokens (e.g., `bg-surface-*`, `text-primary-token`) and avoid raw hex/RGB.
 

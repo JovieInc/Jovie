@@ -66,7 +66,7 @@ export function ProfileDrawerShell({
             <button
               type='button'
               onClick={onBack}
-              className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/[0.04] text-white/44 transition-colors duration-150 hover:bg-white/[0.08] hover:text-white/74 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
+              className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/[0.04] text-white/44 transition-colors duration-subtle hover:bg-white/[0.08] hover:text-white/74 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
               aria-label='Back'
               data-testid='profile-drawer-back-button'
             >
@@ -104,7 +104,7 @@ export function ProfileDrawerShell({
             <button
               type='button'
               onClick={() => onOpenChange(false)}
-              className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/[0.04] text-white/44 transition-colors duration-150 hover:bg-white/[0.08] hover:text-white/74 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
+              className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/[0.04] text-white/44 transition-colors duration-subtle hover:bg-white/[0.08] hover:text-white/74 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
               aria-label='Close'
               data-testid='profile-drawer-close-button'
             >
@@ -222,15 +222,12 @@ export function ProfileDrawerShell({
             style={drawerHeightStyle}
             data-testid={dataTestId}
             aria-labelledby={titleId}
-            aria-describedby={accessibleDescriptionId}
           >
             <Drawer.Title asChild>
               <span className='sr-only'>{title}</span>
             </Drawer.Title>
             <Drawer.Description asChild>
-              <span id={accessibleDescriptionId} className='sr-only'>
-                {accessibleDescription}
-              </span>
+              <span className='sr-only'>{accessibleDescription}</span>
             </Drawer.Description>
             {header}
             {body}

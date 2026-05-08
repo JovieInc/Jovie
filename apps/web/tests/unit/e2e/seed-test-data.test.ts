@@ -22,6 +22,13 @@ describe('seedTestData database retry classifier', () => {
     expect(isRetryableSeedDatabaseError(error)).toBe(true);
   });
 
+  it('treats Neon closed connections as retryable', () => {
+    const error = new Error('Failed query');
+    error.cause = new Error('connection closed');
+
+    expect(isRetryableSeedDatabaseError(error)).toBe(true);
+  });
+
   it('does not retry non-transient validation failures', () => {
     const error = new Error('duplicate key value violates unique constraint');
 

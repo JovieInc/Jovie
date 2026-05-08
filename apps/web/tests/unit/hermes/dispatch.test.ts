@@ -42,11 +42,12 @@ describe('Hermes dispatch', () => {
       kind: 'bug_patch',
       runtime: 'codex-cli',
       skills: ['/investigate'],
+      allowedPaths: ['./apps/web/', 'apps/web'],
       dryRun: true,
     });
 
     expect(payload.skills).toEqual(['investigate']);
-    expect(payload.allowedPaths).toContain('apps/web');
+    expect(payload.allowedPaths).toEqual(['apps/web']);
     expect(payload.verification).toEqual([
       'pnpm --filter @jovie/web run typecheck -- --pretty false',
     ]);

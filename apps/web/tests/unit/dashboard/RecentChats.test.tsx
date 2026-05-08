@@ -36,11 +36,6 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush, replace: vi.fn(), back: vi.fn() }),
 }));
 
-vi.mock('@statsig/react-bindings', () => ({
-  useFeatureGate: () => ({ value: true }),
-  StatsigContext: React.createContext({ client: {} }),
-}));
-
 vi.mock('@/lib/queries/useChatConversationsQuery', () => ({
   useChatConversationsQuery: () => ({ data: mockConversations }),
 }));

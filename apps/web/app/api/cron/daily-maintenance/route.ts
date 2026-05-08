@@ -8,6 +8,7 @@
  * - Cleanup orphaned photos: every day
  * - Cleanup expired idempotency keys: every day
  * - Billing reconciliation: every day (safety net for webhooks)
+ * - Cleanup SMS subscribe intents: every day (folded from standalone cron per JOV-1901)
  * - Data retention: Sundays only (heavy operation)
  *
  * Each sub-job runs in an independent try-catch so one failure
@@ -24,6 +25,7 @@ import { logger } from '@/lib/utils/logger';
 import { runReconciliation } from '../billing-reconciliation/route';
 import { cleanupExpiredKeys } from '../cleanup-idempotency-keys/route';
 import { cleanupOrphanedPhotos } from '../cleanup-photos/route';
+import { cleanupSmsIntents } from '../cleanup-sms-intents/route';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300; // 5 minutes for all sub-jobs
@@ -90,7 +92,13 @@ export async function GET(request: Request) {
     }
   );
 
-  // 4. Data retention — Sundays only (heavy operation)
+  // 4. Cleanup SMS subscribe intents (folded from standalone cron per JOV-1901)
+  results.cleanupSmsIntents = await runSubJob(
+    'cleanupSmsIntents',
+    cleanupSmsIntents
+  );
+
+  // 5. Data retention — Sundays only (heavy operation)
   const isSunday = new Date().getDay() === 0;
   results.dataRetention = isSunday
     ? await runSubJob('dataRetention', runDataRetentionCleanup)

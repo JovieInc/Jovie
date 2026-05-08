@@ -40,11 +40,6 @@ vi.mock('sonner', () => ({
   },
 }));
 
-vi.mock('@statsig/react-bindings', () => ({
-  useFeatureGate: () => ({ value: true }),
-  StatsigContext: React.createContext({ client: {} }),
-}));
-
 vi.mock('@/lib/queries/useChatConversationsQuery', () => ({
   useChatConversationsQuery: () => ({ data: undefined }),
 }));

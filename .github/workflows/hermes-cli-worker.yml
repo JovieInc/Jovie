@@ -185,6 +185,22 @@ jobs:
 
           bash scripts/automation-verify.sh affected
 
+      - name: Enforce allowed changed files
+        if: steps.payload.outputs.dry_run != 'true'
+        env:
+          HERMES_CLIENT_PAYLOAD_FILE: ${{ steps.payload.outputs.payload_file }}
+        run: |
+          CHANGED_FILES="$RUNNER_TEMP/hermes-changed-files.txt"
+          {
+            git diff --name-only --diff-filter=ACDMRTUXB
+            git diff --cached --name-only --diff-filter=ACDMRTUXB
+            git ls-files --others --exclude-standard
+          } | sort -u > "$CHANGED_FILES"
+
+          pnpm --filter @jovie/web exec tsx scripts/assert-hermes-changed-files.ts \
+            "$HERMES_CLIENT_PAYLOAD_FILE" \
+            "$CHANGED_FILES"
+
       - name: Commit and push worker branch
         if: steps.payload.outputs.dry_run != 'true'
         env:

@@ -118,8 +118,13 @@ export function MarketingHeader({
     navLinks ??
     (showStagedNav ? DEFAULT_STAGED_HOMEPAGE_NAV_LINKS : MARKETING_NAV_LINKS);
   const isMinimal = variant === 'minimal';
-  const presentation = isMinimal ? 'default' : 'marketing-glass';
-  const useCustomNav = !isMinimal && navLinks !== undefined;
+  const isHomepage = variant === 'homepage';
+  const presentation = isMinimal
+    ? 'default'
+    : isHomepage
+      ? 'homepage-embedded'
+      : 'marketing-glass';
+  const useCustomNav = !isMinimal && (isHomepage || navLinks !== undefined);
   const hasSimpleNav = isMinimal || useCustomNav;
   const resolvedFlyoutMenus = hasSimpleNav
     ? undefined
@@ -143,6 +148,8 @@ export function MarketingHeader({
       containerSize='homepage'
       presentation={presentation}
       flyoutMenus={resolvedFlyoutMenus}
+      mobilePublicCtaHref={isHomepage ? APP_ROUTES.SIGNUP : undefined}
+      mobilePublicCtaLabel={isHomepage ? 'Start Free' : undefined}
       mobileNavLinks={resolvedMobileNavLinks}
       navLinks={resolvedDesktopNavLinks}
     />

@@ -18,7 +18,7 @@ export default function NotFound() {
             {/* Error code — oversized, muted, architectural */}
             <div className='mb-8 select-none'>
               <span
-                className='block text-[120px] md:text-[160px] font-semibold leading-none tracking-tighter text-primary-token/[0.34]'
+                className='block text-[120px] md:text-[160px] font-semibold leading-none tracking-tighter text-primary-token/[0.42]'
                 aria-hidden='true'
               >
                 404
@@ -37,7 +37,7 @@ export default function NotFound() {
 
               <Link
                 href='/'
-                className='inline-flex items-center justify-center h-8 px-4 text-[13px] font-medium rounded-lg bg-[var(--color-btn-primary-bg)] text-[var(--color-btn-primary-fg)] hover:bg-[var(--color-btn-primary-hover)] transition-colors duration-100'
+                className='inline-flex items-center justify-center h-8 px-4 text-[13px] font-medium rounded-lg bg-[var(--color-btn-primary-bg)] text-[var(--color-btn-primary-fg)] hover:bg-[var(--color-btn-primary-hover)] transition-colors duration-subtle'
               >
                 Return home
               </Link>
