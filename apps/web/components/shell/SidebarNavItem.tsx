@@ -30,34 +30,30 @@ export function SidebarNavItem({
   nested,
   tight,
 }: SidebarNavItemProps) {
+  const nonCollapsedSize = tight ? 'h-6 pl-2.5 pr-2' : 'h-7 pl-3 pr-2';
+  const inactiveColor = nested
+    ? 'text-tertiary-token hover:bg-surface-1/40 hover:text-primary-token'
+    : 'text-secondary-token hover:bg-surface-1/60 hover:text-primary-token';
+  const inactiveIconColor = nested
+    ? 'text-quaternary-token'
+    : 'text-tertiary-token';
+
   const button = (
     <button
       type='button'
       onClick={item.onActivate}
       className={cn(
-        'relative flex items-center rounded-md w-full transition-colors duration-150 ease-out tracking-[-0.005em]',
+        'relative flex items-center rounded-md w-full transition-colors duration-subtle ease-out tracking-[-0.005em]',
         tight ? 'gap-2 text-[12.5px]' : 'gap-2.5 text-[13px]',
-        collapsed
-          ? 'h-8 w-10 mx-auto justify-center'
-          : tight
-            ? 'h-6 pl-2.5 pr-2'
-            : 'h-7 pl-3 pr-2',
-        item.active
-          ? 'text-primary-token bg-surface-1'
-          : nested
-            ? 'text-tertiary-token hover:bg-surface-1/40 hover:text-primary-token'
-            : 'text-secondary-token hover:bg-surface-1/60 hover:text-primary-token'
+        collapsed ? 'h-8 w-10 mx-auto justify-center' : nonCollapsedSize,
+        item.active ? 'text-primary-token bg-surface-1' : inactiveColor
       )}
     >
       <item.icon
         className={cn(
           'shrink-0',
           tight ? 'h-3 w-3' : 'h-3.5 w-3.5',
-          item.active
-            ? 'text-primary-token'
-            : nested
-              ? 'text-quaternary-token'
-              : 'text-tertiary-token'
+          item.active ? 'text-primary-token' : inactiveIconColor
         )}
         strokeWidth={2.25}
       />

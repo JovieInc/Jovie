@@ -166,12 +166,10 @@ export function CmdKPalette({
 
       const key = pickerItemKey(item);
       if (additionalIds.has(key)) {
-        const id =
-          item.kind === 'nav'
-            ? item.nav.id
-            : item.kind === 'skill'
-              ? item.skill.id
-              : item.entity.id;
+        let id: string;
+        if (item.kind === 'nav') id = item.nav.id;
+        else if (item.kind === 'skill') id = item.skill.id;
+        else id = item.entity.id;
         onAdditionalSelect?.(id);
         handleClose();
         return;

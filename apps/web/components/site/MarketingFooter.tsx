@@ -73,12 +73,9 @@ export function MarketingFooter({
   showCta = true,
 }: Readonly<MarketingFooterProps>) {
   const pathname = usePathname();
-  const resolvedVariant =
-    variant === 'auto'
-      ? pathname && MINIMAL_FOOTER_PATHS.has(pathname)
-        ? 'minimal'
-        : 'expanded'
-      : variant;
+  const isMinimalPath = pathname && MINIMAL_FOOTER_PATHS.has(pathname);
+  const autoVariant = isMinimalPath ? 'minimal' : 'expanded';
+  const resolvedVariant = variant === 'auto' ? autoVariant : variant;
   const isMinimal = resolvedVariant === 'minimal';
   const pageOwnsFinalCta =
     typeof pathname === 'string' && PAGE_OWNS_FINAL_CTA_PATHS.has(pathname);
