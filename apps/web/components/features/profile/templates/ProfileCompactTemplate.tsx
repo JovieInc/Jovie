@@ -671,8 +671,7 @@ export function ProfileCompactTemplate({
     <ProfileNotificationsContext.Provider value={notificationsContextValue}>
       <div
         className={cn(
-          'profile-viewport relative h-[100dvh] overflow-hidden bg-[color:var(--profile-stage-bg)] text-primary-token',
-          isV1 && 'bg-[color:var(--profile-stage-bg)]'
+          'profile-viewport relative h-[100dvh] overflow-hidden bg-[color:var(--profile-stage-bg)] text-primary-token'
         )}
         style={profileAccentStyle}
         data-profile-visual-variant={visualVariant}
