@@ -104,16 +104,7 @@ jobs:
           MAX_OPEN_AGENT_PRS: '5'
           MAX_WAIT_MINUTES: '6'
         run: |
-          write_output() {
-            local name="$1"
-            local value="${2-}"
-            local delimiter="jovie_output_${RANDOM}_${RANDOM}"
-            {
-              printf '%s<<%s\n' "$name" "$delimiter"
-              printf '%s\n' "$value"
-              printf '%s\n' "$delimiter"
-            } >> "$GITHUB_OUTPUT"
-          }
+          source .github/scripts/github-output.sh
 
           echo "Branch: $BRANCH"
 
@@ -237,16 +228,7 @@ jobs:
         env:
           BRANCH: ${{ github.ref_name }}
         run: |
-          write_output() {
-            local name="$1"
-            local value="${2-}"
-            local delimiter="jovie_output_${RANDOM}_${RANDOM}"
-            {
-              printf '%s<<%s\n' "$name" "$delimiter"
-              printf '%s\n' "$value"
-              printf '%s\n' "$delimiter"
-            } >> "$GITHUB_OUTPUT"
-          }
+          source .github/scripts/github-output.sh
 
           # Extract Linear ticket ID (JOV-123) from anywhere in the branch name
           # Handles: codex/linear-mention-jov-854-desc, linear/JOV-42-desc, claude/jov-100-fix
@@ -278,16 +260,7 @@ jobs:
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
         run: |
-          write_output() {
-            local name="$1"
-            local value="${2-}"
-            local delimiter="jovie_output_${RANDOM}_${RANDOM}"
-            {
-              printf '%s<<%s\n' "$name" "$delimiter"
-              printf '%s\n' "$value"
-              printf '%s\n' "$delimiter"
-            } >> "$GITHUB_OUTPUT"
-          }
+          source .github/scripts/github-output.sh
 
           TICKET="${{ steps.parse.outputs.ticket }}"
 
