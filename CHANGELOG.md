@@ -16,6 +16,14 @@
 
 ## [26.4.213] - 2026-05-07
 
+> [internal] Design system token consolidation across dashboard organisms and shared organisms — wave 1.
+
+### Changed
+
+- [internal] Migrated 44 files in `components/features/dashboard/**` and `components/organisms/**` to shell-v1 design tokens: replaced semi-transparent surface overrides (`bg-surface-0/XX`, `bg-surface-1/XX`) with solid equivalents, replaced raw numeric duration classes (`duration-150`, `duration-200`, `duration-300`, `duration-500`, `duration-700`) with canonical motion tokens (`duration-subtle`, `duration-cinematic`), replaced `transition-all` with explicit property transitions, removed decorative hover-lift (`hover:scale-*`, `hover:-translate-*`) from DashboardPreview and MismatchCard, and migrated `bg-card`/`border-border` references to `bg-surface-0`/`border-subtle`.
+
+## [26.4.211] - 2026-05-07
+
 > [internal] Design system token migration for marketing and homepage surfaces.
 
 ### Changed
