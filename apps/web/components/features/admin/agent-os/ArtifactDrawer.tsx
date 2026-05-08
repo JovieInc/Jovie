@@ -48,6 +48,7 @@ function ArtifactLink({
       href={safeHref}
       target='_blank'
       rel='noopener noreferrer'
+      aria-label={`${label} (opens in a new tab)`}
       className='inline-flex items-center gap-1 text-[12px] font-[520] text-secondary-token hover:text-primary-token'
     >
       {label}
