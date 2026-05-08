@@ -78,6 +78,7 @@ export const AppShellFrame = memo(function AppShellFrame({
           )}
         >
           <div
+            data-testid='app-shell-scroll'
             className={cn(
               'flex flex-1 min-h-0 min-w-0 flex-col pb-[var(--dev-toolbar-height,0px)]',
               isTableRoute
