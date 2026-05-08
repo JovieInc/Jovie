@@ -167,3 +167,22 @@ export const DESIGN_V1_ALIAS_FLAGS = [
 ] as const satisfies readonly AppFlagName[];
 
 export type DesignV1AliasFlagName = (typeof DESIGN_V1_ALIAS_FLAGS)[number];
+
+/**
+ * Flags that live in APP_FLAG_DEFAULTS but intentionally have NO Statsig gate mapping.
+ * These are resolved entirely by the local default — there is no dashboard control.
+ *
+ * EVERY entry here must have an inline comment explaining why it is exempted.
+ * This set is the baseline frozen after PR #8271. Any new flag added to APP_FLAG_DEFAULTS
+ * without a corresponding APP_FLAG_TO_STATSIG_GATE entry MUST be added here with a
+ * justification, or the flag-registration-guardrail test will fail.
+ */
+export const LOCAL_DEFAULT_ONLY_FLAGS = new Set<AppFlagName>([
+  'THREADS_ENABLED', // dev-only / not yet productionized; no gate created
+  'PWA_INSTALL_BANNER', // kill-switch style; default-false means feature is off until explicitly wired
+  'SHOW_RELEASE_TOOLBAR_EXTRAS', // internal dev/staging visual toggle; not user-facing
+  'PLAYLIST_ENGINE', // early prototype; not ready for remote control
+  'ALBUM_ART_GENERATION', // default-true feature; controlled by Statsig experiment separately in usage, not a gate
+  'CHAT_JANK_MONITOR', // monitoring-only flag; was missing Statsig gate (bug fixed in #8271 — kept here for local-dev override support)
+  'RELEASE_PLAN_DEMO', // YC wedge demo page; admin/internal only, not externally gated
+]);

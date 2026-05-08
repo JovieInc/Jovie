@@ -5,13 +5,11 @@ on:
     branches: [main]
     paths:
       - "apps/ios/**"
-      - "package.json"
       - ".github/workflows/ios-ci.yml"
   push:
     branches: [main]
     paths:
       - "apps/ios/**"
-      - "package.json"
       - ".github/workflows/ios-ci.yml"
   workflow_dispatch:
 
@@ -119,5 +117,4 @@ jobs:
             -project apps/ios/Jovie.xcodeproj \
             -scheme Jovie \
             -destination '${{ steps.simulator.outputs.destination }}' \
-            -skip-testing:JovieUITests/testCopyURLButtonShowsCopiedState \
             CODE_SIGNING_ALLOWED=NO
