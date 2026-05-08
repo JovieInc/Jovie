@@ -75,36 +75,34 @@ describe('isWaitlistGateEnabled', () => {
     isWaitlistGateEnabled = mod.isWaitlistGateEnabled;
   });
 
-  it('returns the DB-backed gate setting', async () => {
-    setupDbSelectMock(createMockSettings({ gateEnabled: true }));
-
+  it('returns false (gate permanently disabled)', async () => {
     const result = await isWaitlistGateEnabled();
 
-    expect(result).toBe(true);
-    expect(mockDbSelect).toHaveBeenCalled();
+    expect(result).toBe(false);
+    // Gate is hardcoded off — no DB query needed
+    expect(mockDbSelect).not.toHaveBeenCalled();
   });
 
-  it('does not use a warm in-memory cache for the launch gate', async () => {
-    setupDbSelectMock(createMockSettings({ gateEnabled: false }));
-
+  it('always returns false regardless of repeated calls', async () => {
     const first = await isWaitlistGateEnabled();
     const second = await isWaitlistGateEnabled();
 
     expect(first).toBe(false);
     expect(second).toBe(false);
-    expect(mockDbSelect).toHaveBeenCalledTimes(2);
+    expect(mockDbSelect).not.toHaveBeenCalled();
   });
 
-  it('continues reading from DB after cache invalidation', async () => {
+  it('continues returning false after cache invalidation', async () => {
     const mod = await import('@/lib/waitlist/settings');
-    setupDbSelectMock(createMockSettings({ gateEnabled: true }));
 
-    await isWaitlistGateEnabled();
+    const before = await isWaitlistGateEnabled();
     mod.invalidateWaitlistGateCache();
+    const after = await isWaitlistGateEnabled();
 
-    const result = await isWaitlistGateEnabled();
-    expect(result).toBe(true);
-    expect(mockDbSelect).toHaveBeenCalledTimes(2);
+    expect(before).toBe(false);
+    expect(after).toBe(false);
+    // Still no DB calls needed — hardcoded
+    expect(mockDbSelect).not.toHaveBeenCalled();
   });
 });
 
@@ -133,10 +131,47 @@ describe('tryReserveAutoAcceptSlot', () => {
     expect(mockDbUpdate).not.toHaveBeenCalled();
   });
 
-  it('reserves a slot when the gate is off and capacity remains', async () => {
+  it('immediately accepts without consuming a slot when the gate is off', async () => {
+    // Gate off = open floodgates; auto-accept counter is bypassed
     setupDbSelectMock(
       createMockSettings({
         gateEnabled: false,
+        autoAcceptEnabled: true,
+        autoAcceptDailyLimit: 2,
+        autoAcceptedToday: 1,
+      })
+    );
+
+    await expect(tryReserveAutoAcceptSlot()).resolves.toEqual({
+      shouldAutoAccept: true,
+      reason: 'reserved',
+    });
+    // No DB update needed — counter bypass when gate is off
+    expect(mockDbUpdate).not.toHaveBeenCalled();
+  });
+
+  it('returns gate_on when auto accept is disabled while gate is on', async () => {
+    // When gate is on but autoAcceptEnabled=false, the gate_on path is taken
+    setupDbSelectMock(
+      createMockSettings({
+        gateEnabled: true,
+        autoAcceptEnabled: false,
+        autoAcceptDailyLimit: 2,
+        autoAcceptedToday: 0,
+      })
+    );
+
+    await expect(tryReserveAutoAcceptSlot()).resolves.toEqual({
+      shouldAutoAccept: false,
+      reason: 'gate_on',
+    });
+    expect(mockDbUpdate).not.toHaveBeenCalled();
+  });
+
+  it('reserves a slot when the gate is on, auto accept is enabled, and capacity remains', async () => {
+    setupDbSelectMock(
+      createMockSettings({
+        gateEnabled: true,
         autoAcceptEnabled: true,
         autoAcceptDailyLimit: 2,
         autoAcceptedToday: 1,
@@ -156,27 +191,10 @@ describe('tryReserveAutoAcceptSlot', () => {
     });
   });
 
-  it('does not reserve when auto accept is disabled', async () => {
-    setupDbSelectMock(
-      createMockSettings({
-        gateEnabled: false,
-        autoAcceptEnabled: false,
-        autoAcceptDailyLimit: 2,
-        autoAcceptedToday: 0,
-      })
-    );
-
-    await expect(tryReserveAutoAcceptSlot()).resolves.toEqual({
-      shouldAutoAccept: false,
-      reason: 'auto_accept_disabled',
-    });
-    expect(mockDbUpdate).not.toHaveBeenCalled();
-  });
-
   it('does not reserve when the daily cap is already full', async () => {
     setupDbSelectMock(
       createMockSettings({
-        gateEnabled: false,
+        gateEnabled: true,
         autoAcceptEnabled: true,
         autoAcceptDailyLimit: 1,
         autoAcceptedToday: 1,
@@ -193,7 +211,7 @@ describe('tryReserveAutoAcceptSlot', () => {
   it('fails closed when a concurrent reservation takes the last slot', async () => {
     setupDbSelectMock(
       createMockSettings({
-        gateEnabled: false,
+        gateEnabled: true,
         autoAcceptEnabled: true,
         autoAcceptDailyLimit: 1,
         autoAcceptedToday: 0,

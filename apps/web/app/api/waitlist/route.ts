@@ -516,10 +516,7 @@ async function processValidatedRequest(params: {
     { isolationLevel: 'serializable' }
   );
 
-  if (
-    approvalResult.outcome === 'no_profile' ||
-    approvalResult.outcome === 'no_user'
-  ) {
+  if (approvalResult.outcome === 'no_user') {
     captureCriticalError(
       `Auto-approval failed: ${approvalResult.outcome}`,
       new Error(

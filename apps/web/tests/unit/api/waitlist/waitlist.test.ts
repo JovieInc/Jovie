@@ -530,7 +530,7 @@ describe('Waitlist API', () => {
       expect(mockBuildWaitlistInviteEmail).not.toHaveBeenCalled();
     });
 
-    it('captures critical error and returns new status when auto-approval yields no_profile', async () => {
+    it('captures critical error and returns new status when auto-approval yields no_user', async () => {
       mockAuth.mockResolvedValue({ userId: 'user_noprofile' });
       mockCurrentUser.mockResolvedValue({
         emailAddresses: [
@@ -569,7 +569,7 @@ describe('Waitlist API', () => {
         shouldAutoAccept: true,
       });
       mockWithSystemIngestionSession.mockResolvedValue({
-        outcome: 'no_profile',
+        outcome: 'no_user',
       });
 
       const { POST } = await routeModulePromise;
@@ -588,7 +588,7 @@ describe('Waitlist API', () => {
       expect(response.status).toBe(200);
       expect(data.status).toBe('new');
       expect(mockCaptureCriticalError).toHaveBeenCalledWith(
-        expect.stringContaining('no_profile'),
+        expect.stringContaining('no_user'),
         expect.any(Error),
         expect.any(Object)
       );

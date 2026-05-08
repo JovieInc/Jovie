@@ -74,12 +74,17 @@ function createInsertReturning(rows: unknown[], rejection?: Error) {
     ? vi.fn().mockRejectedValue(rejection)
     : vi.fn().mockResolvedValue(rows);
   const onConflictDoUpdate = vi.fn().mockReturnValue({ returning });
-  const values = vi.fn().mockReturnValue({ onConflictDoUpdate });
+  const onConflictDoNothing = vi.fn().mockReturnValue({ returning });
+  const values = vi.fn().mockReturnValue({
+    onConflictDoUpdate,
+    onConflictDoNothing,
+  });
 
   return {
     builder: { values },
     values,
     onConflictDoUpdate,
+    onConflictDoNothing,
     returning,
   };
 }
@@ -123,7 +128,12 @@ describe('Onboarding Intake API', () => {
     vi.clearAllMocks();
     mockGetCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
     mockCurrentUser.mockResolvedValue({
-      emailAddresses: [{ emailAddress: 'Test@Example.com' }],
+      emailAddresses: [
+        {
+          emailAddress: 'Test@Example.com',
+          verification: { status: 'verified' },
+        },
+      ],
       fullName: 'Test User',
       username: 'testuser',
     });
