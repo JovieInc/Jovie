@@ -50,13 +50,19 @@ The main CI workflow `ci.yml` is the gatekeeper for PRs to `main`. It includes:
 - **Smoke tests** - validates critical paths after deploy
 - **Lighthouse CI** - performance metrics on each deploy
 
-## Auto-Merge
+## Agent Landing Sweep
 
-The `auto-merge.yml` workflow handles automatic merging for:
+The `agent-landing-sweep.yml` workflow runs every 15 minutes as a scheduled fallback for the event-driven approve job in `agent-pipeline.yml`. It sweeps open, non-draft agent PRs and enables auto-merge on any that pass all guardrails:
 
-- Dependabot PRs (patch/minor updates)
-- Codegen PRs
-- PRs with `auto-merge` label (after CI passes)
+- CI PR Ready check passed
+- Scope judge passed
+- CodeRabbit not blocking
+- No sensitive files changed (auth, billing, migrations, CI, etc.)
+- No `needs-human` label
+- Has `automerge`, `auto-approved`, or `ai:ready-to-merge` label
+- Queue pressure below threshold (12 PRs already queued)
+
+This catches PRs that the event-driven pipeline missed due to delivery delays or race conditions.
 
 ## Linear AI Automation
 
