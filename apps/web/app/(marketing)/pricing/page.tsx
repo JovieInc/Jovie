@@ -466,10 +466,7 @@ export default function PricingPage() {
         </MarketingContainer>
       </section>
 
-      <section
-        className='border-t py-20 md:py-24'
-        style={{ borderColor: 'var(--linear-border-subtle)' }}
-      >
+      <section className='border-t border-subtle py-20 md:py-24'>
         <MarketingContainer width='page'>
           <div className='mx-auto max-w-[58rem]'>
             <div className='max-w-[28rem]'>
@@ -488,10 +485,7 @@ export default function PricingPage() {
         </MarketingContainer>
       </section>
 
-      <section
-        className='border-t py-20 md:py-28'
-        style={{ borderColor: 'var(--linear-border-subtle)' }}
-      >
+      <section className='border-t border-subtle py-20 md:py-28'>
         <MarketingContainer width='page'>
           <div className='text-center'>
             <h2 className='text-[clamp(2.1rem,4vw,3.5rem)] font-semibold tracking-[-0.05em] text-primary-token'>

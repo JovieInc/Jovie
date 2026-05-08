@@ -41,7 +41,7 @@
 
 :is(.cl-signIn-root, .cl-signUp-root) {
   --clerk-color-primary: #ffffff;
-  --clerk-color-primary-foreground: #08090a;
+  --clerk-color-primary-foreground: #06070a;
   --clerk-color-foreground: #ffffff;
   --clerk-color-neutral: #ffffff;
   --clerk-color-muted-foreground: rgba(255, 255, 255, 0.64);
@@ -221,13 +221,13 @@
 :is(.cl-signIn-root, .cl-signUp-root) .cl-socialButtonsBlockButton__google {
   border-color: rgba(255, 255, 255, 0.14);
   background: #ffffff;
-  color: #08090a;
+  color: #06070a;
 }
 
 :is(.cl-signIn-root, .cl-signUp-root)
   .cl-socialButtonsBlockButton__google
   .cl-socialButtonsBlockButtonText {
-  color: #08090a;
+  color: #06070a;
 }
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-socialButtonsBlockButton__spotify {
@@ -348,7 +348,7 @@
   border: 0;
   border-radius: var(--clerk-radius-pill);
   background: #ffffff;
-  color: #08090a;
+  color: #06070a;
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset;
   font-size: 0.875rem;
   font-weight: 600;

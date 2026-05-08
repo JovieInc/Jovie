@@ -201,7 +201,12 @@ describe('Waitlist API', () => {
     it('returns waitlist entry status for authenticated user', async () => {
       mockAuth.mockResolvedValue({ userId: 'user_123' });
       mockCurrentUser.mockResolvedValue({
-        emailAddresses: [{ emailAddress: 'test@example.com' }],
+        emailAddresses: [
+          {
+            emailAddress: 'test@example.com',
+            verification: { status: 'verified' },
+          },
+        ],
       });
       mockDbSelect.mockReturnValue({
         from: vi.fn().mockReturnValue({
@@ -250,7 +255,12 @@ describe('Waitlist API', () => {
     it('returns 400 for invalid request body', async () => {
       mockAuth.mockResolvedValue({ userId: 'user_123' });
       mockCurrentUser.mockResolvedValue({
-        emailAddresses: [{ emailAddress: 'test@example.com' }],
+        emailAddresses: [
+          {
+            emailAddress: 'test@example.com',
+            verification: { status: 'verified' },
+          },
+        ],
         fullName: 'Test User',
       });
       mockDbExecute.mockResolvedValue({ rows: [{ table_exists: true }] });
@@ -282,7 +292,12 @@ describe('Waitlist API', () => {
     it.skip('creates waitlist entry successfully', async () => {
       mockAuth.mockResolvedValue({ userId: 'user_123' });
       mockCurrentUser.mockResolvedValue({
-        emailAddresses: [{ emailAddress: 'test@example.com' }],
+        emailAddresses: [
+          {
+            emailAddress: 'test@example.com',
+            verification: { status: 'verified' },
+          },
+        ],
         fullName: 'Test User',
       });
       mockDbExecute.mockResolvedValue({ rows: [{ table_exists: true }] });
@@ -325,7 +340,12 @@ describe('Waitlist API', () => {
     it('does not downgrade user status when re-submitting with a claimed entry', async () => {
       mockAuth.mockResolvedValue({ userId: 'user_claimed' });
       mockCurrentUser.mockResolvedValue({
-        emailAddresses: [{ emailAddress: 'claimed@example.com' }],
+        emailAddresses: [
+          {
+            emailAddress: 'claimed@example.com',
+            verification: { status: 'verified' },
+          },
+        ],
         fullName: 'Claimed User',
       });
       mockDbExecute.mockResolvedValue({ rows: [{ table_exists: true }] });
@@ -383,7 +403,12 @@ describe('Waitlist API', () => {
     it('does not send welcome email when auto-approval succeeds (user bypassed waitlist)', async () => {
       mockAuth.mockResolvedValue({ userId: 'user_auto' });
       mockCurrentUser.mockResolvedValue({
-        emailAddresses: [{ emailAddress: 'auto@example.com' }],
+        emailAddresses: [
+          {
+            emailAddress: 'auto@example.com',
+            verification: { status: 'verified' },
+          },
+        ],
         fullName: 'Auto User',
       });
       mockDbExecute.mockResolvedValue({ rows: [{ table_exists: true }] });
@@ -451,7 +476,12 @@ describe('Waitlist API', () => {
     it('does not send welcome email when auto-approval slot is not available', async () => {
       mockAuth.mockResolvedValue({ userId: 'user_no_slot' });
       mockCurrentUser.mockResolvedValue({
-        emailAddresses: [{ emailAddress: 'noslot@example.com' }],
+        emailAddresses: [
+          {
+            emailAddress: 'noslot@example.com',
+            verification: { status: 'verified' },
+          },
+        ],
         fullName: 'No Slot User',
       });
       mockDbExecute.mockResolvedValue({ rows: [{ table_exists: true }] });
@@ -503,7 +533,12 @@ describe('Waitlist API', () => {
     it('captures critical error and returns new status when auto-approval yields no_profile', async () => {
       mockAuth.mockResolvedValue({ userId: 'user_noprofile' });
       mockCurrentUser.mockResolvedValue({
-        emailAddresses: [{ emailAddress: 'noprofile@example.com' }],
+        emailAddresses: [
+          {
+            emailAddress: 'noprofile@example.com',
+            verification: { status: 'verified' },
+          },
+        ],
         fullName: 'No Profile User',
       });
       mockDbExecute.mockResolvedValue({ rows: [{ table_exists: true }] });
@@ -601,7 +636,12 @@ describe('Waitlist API', () => {
 
       mockAuth.mockResolvedValue({ userId: 'user_123' });
       mockCurrentUser.mockResolvedValue({
-        emailAddresses: [{ emailAddress: 'test@example.com' }],
+        emailAddresses: [
+          {
+            emailAddress: 'test@example.com',
+            verification: { status: 'verified' },
+          },
+        ],
         fullName: 'Test User',
       });
       mockDbExecute.mockResolvedValue({ rows: [{ table_exists: true }] });

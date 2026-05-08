@@ -16,7 +16,7 @@ const FEATURE_SKELETON_KEYS = Array.from(
 
 export default function PricingLoading() {
   return (
-    <div className='min-h-screen bg-white dark:bg-[#0a0a0b]'>
+    <div className='min-h-screen bg-page'>
       <div className='mx-auto max-w-7xl px-4 py-20 sm:py-28 sm:px-6 lg:px-8'>
         {/* Header skeleton */}
         <div className='text-center mb-20'>
@@ -30,7 +30,7 @@ export default function PricingLoading() {
             {TIER_SKELETON_KEYS.map(key => (
               <div
                 key={key}
-                className='rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-8'
+                className='rounded-xl border border-subtle bg-surface-1 p-8'
               >
                 {/* Tier name */}
                 <div className='h-4 w-16 skeleton rounded-md mb-4' />

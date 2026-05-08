@@ -232,7 +232,7 @@ export function AuthLayout({
         // extension of the shell, not a separate page. Hex-pinned
         // because auth is dark regardless of root theme preference.
         'fixed inset-0 isolate flex flex-col items-center overflow-hidden overscroll-none max-w-[100dvw] text-white [color-scheme:dark]',
-        'bg-[#08090a]',
+        'bg-[#06070a]',
         'p-2 sm:p-2',
         isKeyboardVisible && 'pt-1 pb-1',
         'pb-[max(0.5rem,env(safe-area-inset-bottom))]',
