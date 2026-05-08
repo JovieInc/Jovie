@@ -24,7 +24,6 @@ Source of truth: `vercel.json` (repo root — Vercel reads this file; `apps/web/
 | `/api/cron/daily-maintenance` | `0 0 * * *` | Daily at midnight UTC |
 | `/api/cron/generate-insights` | `0 5 * * *` | Daily at 05:00 UTC |
 | `/api/cron/process-ingestion-jobs` | `* * * * *` | Every minute |
-| `/api/cron/purge-pixel-ips` | `0 3 * * *` | Daily at 03:00 UTC |
 | `/api/cron/summarize-interviews` | `*/5 * * * *` | Every 5 minutes |
 | `/api/cron/generate-playlist` | `0 6 * * *` | Daily at 06:00 UTC |
 | `/api/cron/process-pre-saves` | `0 2 * * *` | Daily at 02:00 UTC |
@@ -49,9 +48,9 @@ Source of truth: `vercel.json` (repo root — Vercel reads this file; `apps/web/
 | 4 | scheduleNotifications | Every invocation | Finds releases dropping in next 24h, creates `fanReleaseNotifications` rows |
 | 5 | sendNotifications | Every invocation | Sends pending release-day fan notifications via email |
 | 6 | leadDiscovery | Every invocation | SerpAPI lead discovery, qualification, auto-approve (gated on `leadPipelineSettings.enabled`) |
-| 6.5 | outreach | Every invocation | Sends a batch of pending outreach emails after auto-approve |
-| 7 | alphabetCache | `hour % 6 === 0 && minute < 15` | Warms Spotify alphabet cache |
-| 8 | ingestionFallback | If elapsed < 50s | Claims/processes up to 2 ingestion jobs as fallback for dedicated cron |
+| 7 | outreach | Every invocation | Sends a batch of pending outreach emails after auto-approve |
+| 8 | alphabetCache | `hour % 6 === 0 && minute < 15` | Warms Spotify alphabet cache |
+| 9 | ingestionFallback | If elapsed < 50s | Claims/processes up to 2 ingestion jobs as fallback for dedicated cron |
 
 Source: `apps/web/app/api/cron/frequent/route.ts`
 
@@ -92,7 +91,7 @@ These have their own Vercel schedule OR exist as callable endpoints (also invoke
 | `/api/cron/data-retention` | 300s | Standalone entry with enhanced auth | `daily-maintenance` |
 | `/api/cron/pixel-forwarding` | 60s | Forwards up to 500 pixel events to ad platforms | `frequent` |
 | `/api/cron/process-campaigns` | 60s | Processes drip campaign sends | `frequent` |
-| `/api/cron/schedule-release-notifications` | 60s | Schedules release-day notifications | `daily-maintenance` |
+| `/api/cron/schedule-release-notifications` | 60s | Schedules release-day notifications | `frequent` |
 | `/api/cron/send-release-notifications` | 120s | Sends notifications; recovers stuck rows >10min; max 100/run | `frequent` |
 
 ## Adding Logic to an Existing Cron
