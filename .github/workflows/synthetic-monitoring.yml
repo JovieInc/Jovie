@@ -59,8 +59,7 @@ jobs:
           E2E_SKIP_WEB_SERVER: '1'
           E2E_SYNTHETIC_MODE: 'true'
           E2E_ENVIRONMENT: production
-          # Overrides the synthetic Playwright config's default JSON output file.
-          PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/synthetic-golden-path-results.json
+          SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/synthetic-golden-path-results.json
         run: |
           doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-golden-path.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-golden-path
         continue-on-error: true
@@ -73,8 +72,7 @@ jobs:
           E2E_SKIP_WEB_SERVER: '1'
           E2E_SYNTHETIC_MODE: 'true'
           E2E_ENVIRONMENT: production
-          # Overrides the synthetic Playwright config's default JSON output file.
-          PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/public-profile-smoke-results.json
+          SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/public-profile-smoke-results.json
         run: |
           doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/public-profile-smoke.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/public-profile-smoke
         continue-on-error: true
@@ -168,6 +166,14 @@ jobs:
             testCase.status === 'skipped' ||
             (testCase.results ?? []).some(result => result.status === 'skipped')
           );
+          const warnings = tests.flatMap(({ source, spec, testCase }) =>
+            (testCase.results ?? []).flatMap(result =>
+              [...(result.stdout ?? []), ...(result.stderr ?? [])]
+                .map(entry => entry.text ?? '')
+                .filter(text => text.includes('[Synthetic][warning]'))
+                .map(text => `${source}: ${spec.title}: ${text.trim()}`)
+            )
+          );
           const flaky = tests.filter(({ testCase }) => testCase.status === 'flaky');
           const failed = tests.filter(
             ({ testCase }) => testCase.status === 'unexpected'
@@ -182,6 +188,7 @@ jobs:
           emit(`passed_tests=${passed.length}`);
           emit(`flaky_tests=${flaky.length}`);
           emit(`skipped_tests=${skipped.length}`);
+          emit(`warning_count=${warnings.length}`);
 
           const details = [
             ...missingResults,
@@ -194,6 +201,10 @@ jobs:
               : []),
           ];
           emitMultiline('failed_tests', details);
+          emitMultiline('test_warnings', warnings);
+          for (const warning of warnings) {
+            console.log(`::warning::${warning}`);
+          }
 
           if (missingResults.length > 0 || tests.length === 0) {
             emit('test_status=error');
@@ -279,7 +290,7 @@ jobs:
                     },
                     {
                       "title": "Status",
-                      "value": "Configured production synthetic checks passing",
+                      "value": "Configured production synthetic checks passing (${{ steps.test-results.outputs.warning_count }} warnings)",
                       "short": false
                     },
                     {

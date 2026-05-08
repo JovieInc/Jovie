@@ -6,6 +6,8 @@ test.use({ storageState: { cookies: [], origins: [] } });
 
 const HOMEPAGE_INTENT_PROMPT = 'Help me launch my artist profile';
 const SIGNUP_PATH = '/signup';
+const SIGNUP_COVERAGE_WARNING =
+  'Onboarding/profile creation not exercised while production email signup is unavailable. See JOV-1919.';
 
 async function isVisibleWithin(
   locator: Locator,
@@ -106,91 +108,94 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
         console.log(
           '[Synthetic] Email sign-up unavailable; OAuth sign-up entry is visible'
         );
-        console.log(
-          '[Synthetic] Partial path only: onboarding/profile creation not exercised while production email signup is unavailable. See JOV-1919.'
-        );
-        return;
-      }
+        test.info().annotations.push({
+          type: 'synthetic-warning',
+          description: SIGNUP_COVERAGE_WARNING,
+        });
+        console.warn(`[Synthetic][warning] ${SIGNUP_COVERAGE_WARNING}`);
+      } else {
+        await emailInput.fill(testEmail);
 
-      await emailInput.fill(testEmail);
+        const passwordInput = page
+          .locator('input[name="password"], input[type="password"]')
+          .first();
+        await passwordInput.fill('SyntheticTest123!');
 
-      const passwordInput = page
-        .locator('input[name="password"], input[type="password"]')
-        .first();
-      await passwordInput.fill('SyntheticTest123!');
+        // Handle both test and production Clerk flows
+        const submitButton = page
+          .getByRole('button', { name: /continue|sign up/i })
+          .first();
+        await submitButton.click();
 
-      // Handle both test and production Clerk flows
-      const submitButton = page
-        .getByRole('button', { name: /continue|sign up/i })
-        .first();
-      await submitButton.click();
+        // Wait for navigation after submit instead of arbitrary timeout
+        await page.waitForLoadState('domcontentloaded');
 
-      // Wait for navigation after submit instead of arbitrary timeout
-      await page.waitForLoadState('domcontentloaded');
-
-      // Production environment might require email verification
-      // Skip verification if in test mode, otherwise handle production flow
-      if (process.env.E2E_ENVIRONMENT === 'production') {
-        // In production, we might need to handle verification differently
-        // This is a placeholder for production-specific verification handling
-        try {
-          const verifyButton = page.getByRole('button', {
-            name: /verify|continue/i,
-          });
-          if (await verifyButton.isVisible({ timeout: 5000 })) {
-            await verifyButton.click();
+        // Production environment might require email verification
+        // Skip verification if in test mode, otherwise handle production flow
+        if (process.env.E2E_ENVIRONMENT === 'production') {
+          // In production, we might need to handle verification differently
+          // This is a placeholder for production-specific verification handling
+          try {
+            const verifyButton = page.getByRole('button', {
+              name: /verify|continue/i,
+            });
+            if (await verifyButton.isVisible({ timeout: 5000 })) {
+              await verifyButton.click();
+            }
+          } catch {
+            console.log('[Synthetic] No verification step needed');
           }
-        } catch {
-          console.log('[Synthetic] No verification step needed');
         }
+
+        // CRITICAL PATH 4: Onboarding flow
+        console.log('[Synthetic] Step 4: Onboarding flow test');
+        await expect(page).toHaveURL('/onboarding', { timeout: 45000 });
+
+        const usernameInput = page.getByLabel('Claim your handle');
+        await expect(usernameInput).toBeVisible({ timeout: 15000 });
+
+        await usernameInput.fill(testHandle);
+        // Poll for validation to clear instead of arbitrary wait
+        await expect
+          .poll(
+            async () => {
+              const claimBtn = page.getByTestId('onboarding-handle-submit');
+              return claimBtn.isEnabled().catch(() => false);
+            },
+            { timeout: SMOKE_TIMEOUTS.VISIBILITY, intervals: [300, 500, 1000] }
+          )
+          .toBeTruthy();
+
+        const claimButton = page.getByTestId('onboarding-handle-submit');
+        await expect(claimButton).toBeEnabled({ timeout: 15000 });
+        await claimButton.click();
+
+        // CRITICAL PATH 5: Onboarding continuation
+        console.log('[Synthetic] Step 5: Onboarding continuation test');
+        await expect(page).toHaveURL(/\/onboarding.*resume=spotify/, {
+          timeout: 45000,
+        });
+
+        await expect(
+          page.getByPlaceholder(
+            /search by artist name or paste a spotify link/i
+          )
+        ).toBeVisible({ timeout: 15000 });
+
+        // CRITICAL PATH 6: Public profile accessibility
+        console.log('[Synthetic] Step 6: Public profile test');
+        await page.goto(`/${testHandle}`, {
+          waitUntil: 'commit',
+          timeout: SMOKE_TIMEOUTS.NAVIGATION,
+        });
+        await waitForHydration(page);
+
+        await expect(page).toHaveURL(`/${testHandle}`);
+        const publicProfile = page.locator('[data-test="public-profile-root"]');
+        await expect(publicProfile).toBeVisible({ timeout: 15000 });
+
+        console.log('[Synthetic] ✅ All critical paths verified successfully');
       }
-
-      // CRITICAL PATH 4: Onboarding flow
-      console.log('[Synthetic] Step 4: Onboarding flow test');
-      await expect(page).toHaveURL('/onboarding', { timeout: 45000 });
-
-      const usernameInput = page.getByLabel('Claim your handle');
-      await expect(usernameInput).toBeVisible({ timeout: 15000 });
-
-      await usernameInput.fill(testHandle);
-      // Poll for validation to clear instead of arbitrary wait
-      await expect
-        .poll(
-          async () => {
-            const claimBtn = page.getByTestId('onboarding-handle-submit');
-            return claimBtn.isEnabled().catch(() => false);
-          },
-          { timeout: SMOKE_TIMEOUTS.VISIBILITY, intervals: [300, 500, 1000] }
-        )
-        .toBeTruthy();
-
-      const claimButton = page.getByTestId('onboarding-handle-submit');
-      await expect(claimButton).toBeEnabled({ timeout: 15000 });
-      await claimButton.click();
-
-      // CRITICAL PATH 5: Onboarding continuation
-      console.log('[Synthetic] Step 5: Onboarding continuation test');
-      await expect(page).toHaveURL(/\/onboarding.*resume=spotify/, {
-        timeout: 45000,
-      });
-
-      await expect(
-        page.getByPlaceholder(/search by artist name or paste a spotify link/i)
-      ).toBeVisible({ timeout: 15000 });
-
-      // CRITICAL PATH 6: Public profile accessibility
-      console.log('[Synthetic] Step 6: Public profile test');
-      await page.goto(`/${testHandle}`, {
-        waitUntil: 'commit',
-        timeout: SMOKE_TIMEOUTS.NAVIGATION,
-      });
-      await waitForHydration(page);
-
-      await expect(page).toHaveURL(`/${testHandle}`);
-      const publicProfile = page.locator('[data-test="public-profile-root"]');
-      await expect(publicProfile).toBeVisible({ timeout: 15000 });
-
-      console.log('[Synthetic] ✅ All critical paths verified successfully');
     } catch (error) {
       console.error('[Synthetic] ❌ Critical path failure:', error);
 
