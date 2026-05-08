@@ -117,6 +117,20 @@ describe('AgentOS gate evidence', () => {
     expect(evaluation.artifacts).toEqual([]);
   });
 
+  it('continues after malformed artifact comments', () => {
+    const evaluation = evaluateAgentRunGateEvidence(
+      [
+        '<!-- agent-run-artifact',
+        'not json',
+        '-->',
+        formatAgentRunArtifactComment(baseArtifact),
+      ].join('\n')
+    );
+
+    expect(evaluation.passed).toBe(true);
+    expect(evaluation.artifacts).toHaveLength(1);
+  });
+
   it('parses artifact comments when JSON strings contain comment terminators', () => {
     const evaluation = evaluateAgentRunGateEvidence(
       formatAgentRunArtifactComment({

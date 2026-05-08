@@ -61,7 +61,7 @@ jobs:
           persist-credentials: false
 
       - name: Install main policy dependencies
-        run: pnpm --dir policy-main install --offline --frozen-lockfile
+        run: pnpm --dir policy-main install --frozen-lockfile
 
       - name: Require GStack gate evidence
         working-directory: policy-main
