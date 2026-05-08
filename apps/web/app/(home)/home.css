@@ -106,16 +106,19 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .marketing-glass-header {
-  --marketing-glass-top: clamp(0.75rem, 1.7vw, 1.15rem);
-  --marketing-glass-height: 3.75rem;
-  --marketing-glass-gutter: clamp(0.75rem, 2vw, 1.5rem);
-  --marketing-glass-shell: rgba(12, 13, 16, 0.72);
-  --marketing-glass-shell-scrolled: rgba(10, 11, 14, 0.88);
-  --marketing-glass-border: rgba(255, 255, 255, 0.13);
-  --marketing-glass-border-strong: rgba(255, 255, 255, 0.22);
+  --marketing-glass-top: 0.75rem;
+  --marketing-glass-height: 3.35rem;
+  --marketing-glass-gutter: max(
+    clamp(0.75rem, 2vw, 1.5rem),
+    calc(var(--homepage-page-gutter, 1.75rem) - 1rem)
+  );
+  --marketing-glass-shell: transparent;
+  --marketing-glass-shell-scrolled: rgba(15, 16, 17, 0.72);
+  --marketing-glass-border: rgba(255, 255, 255, 0.1);
+  --marketing-glass-border-strong: rgba(255, 255, 255, 0.13);
   --marketing-glass-text: rgba(255, 255, 255, 0.92);
   --marketing-glass-muted: rgba(255, 255, 255, 0.58);
-  --marketing-glass-subtle: rgba(255, 255, 255, 0.08);
+  --marketing-glass-subtle: transparent;
   top: calc(var(--marketing-glass-top) + env(safe-area-inset-top)) !important;
   pointer-events: none;
   color: var(--marketing-glass-text);
@@ -126,62 +129,66 @@ body:has(.home-viewport)::-webkit-scrollbar {
   display: flex;
   min-height: var(--marketing-glass-height);
   max-width: min(
-    76.5rem,
+    88rem,
     calc(100vw - var(--marketing-glass-gutter) * 2)
   ) !important;
   align-items: center;
-  padding-inline: clamp(0.85rem, 1.5vw, 1.15rem) !important;
-  border: 1px solid var(--marketing-glass-border);
+  padding-inline: 1rem 0.35rem !important;
+  border: 1px solid transparent;
   border-radius: 999px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.1), transparent 78%),
-    var(--marketing-glass-shell);
-  box-shadow:
-    0 18px 60px rgba(0, 0, 0, 0.36),
-    inset 0 1px 0 rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(22px) saturate(165%);
-  -webkit-backdrop-filter: blur(22px) saturate(165%);
+  background: var(--marketing-glass-shell);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   transition:
     background-color 180ms ease,
     border-color 180ms ease,
-    box-shadow 180ms ease;
+    box-shadow 180ms ease,
+    backdrop-filter 180ms ease,
+    -webkit-backdrop-filter 180ms ease;
 }
 
-.marketing-glass-header[data-scrolled="true"] .marketing-glass-header__shell {
+.marketing-glass-header[data-scrolled="true"] .marketing-glass-header__shell,
+.marketing-glass-header:has(.marketing-glass-header__flyout--open)
+  .marketing-glass-header__shell {
   border-color: var(--marketing-glass-border-strong);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent 78%),
-    var(--marketing-glass-shell-scrolled);
+  background: var(--marketing-glass-shell-scrolled);
   box-shadow:
-    0 20px 70px rgba(0, 0, 0, 0.44),
-    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+    0 14px 42px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(22px) saturate(165%);
+  -webkit-backdrop-filter: blur(22px) saturate(165%);
 }
 
 .marketing-glass-header__nav {
-  gap: 0.25rem;
-  margin-left: clamp(1rem, 2.6vw, 2.25rem);
-  padding: 0.22rem;
-  border: 1px solid var(--marketing-glass-subtle);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.045);
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  gap: 0.375rem;
+  margin-left: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  transform: translate(-50%, -50%);
 }
 
 .marketing-glass-header__nav-item {
-  position: relative;
+  position: static;
 }
 
 .marketing-glass-header__nav-link,
 .marketing-glass-header__text-link {
   display: inline-flex;
-  min-height: 2.25rem;
+  min-height: 2.05rem;
   align-items: center;
   justify-content: center;
   gap: 0.35rem;
   border-radius: 999px;
   color: rgba(255, 255, 255, 0.76);
   font-family: var(--marketing-font-body);
-  font-size: 0.8125rem;
-  font-weight: 600;
+  font-size: 0.875rem;
+  font-weight: 500;
   letter-spacing: 0;
   line-height: 1;
   text-decoration: none;
@@ -192,13 +199,13 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .marketing-glass-header__nav-link {
-  padding-inline: 0.82rem;
+  padding-inline: 0.875rem;
   border: 0;
   background: transparent;
 }
 
 .marketing-glass-header__text-link {
-  padding-inline: 0.78rem;
+  padding-inline: 0.875rem;
 }
 
 .marketing-glass-header__nav-link:hover,
@@ -212,17 +219,17 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 .marketing-glass-header__cta {
   display: inline-flex;
-  min-height: 2.35rem;
+  min-height: 2.15rem;
   align-items: center;
   justify-content: center;
-  padding-inline: 1rem;
+  padding-inline: 1.125rem;
   border: 1px solid rgba(255, 255, 255, 0.92);
   border-radius: 999px;
   background: #ffffff;
   color: #050506;
   font-family: var(--marketing-font-body);
-  font-size: 0.8125rem;
-  font-weight: 700;
+  font-size: 0.84375rem;
+  font-weight: 600;
   letter-spacing: 0;
   line-height: 1;
   text-decoration: none;
@@ -239,43 +246,46 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .marketing-glass-header__flyout {
-  position: absolute;
-  top: calc(100% + 0.72rem);
+  position: fixed;
+  top: calc(
+    var(--marketing-glass-top) +
+    env(safe-area-inset-top) +
+    var(--marketing-glass-height) +
+    0.5rem
+  );
   left: 50%;
-  width: min(35rem, calc(100vw - 2rem));
-  transform: translateX(-50%);
+  width: min(88rem, calc(100vw - var(--marketing-glass-gutter) * 2));
+  transform: translate(-50%, -0.5rem);
   pointer-events: none;
   opacity: 0;
   visibility: hidden;
   transition:
     opacity 130ms ease,
+    transform 130ms ease,
     visibility 130ms ease;
 }
 
 .marketing-glass-header__flyout--open {
   pointer-events: auto;
   opacity: 1;
+  transform: translate(-50%, 0);
   visibility: visible;
 }
 
 .marketing-glass-header__flyout-inner {
   overflow: hidden;
   border: 1px solid var(--marketing-glass-border);
-  border-radius: 1.25rem;
-  background:
-    radial-gradient(circle at 16% 0%, rgba(82, 138, 255, 0.18), transparent 34%),
-    rgba(8, 9, 12, 0.94);
-  box-shadow:
-    0 22px 70px rgba(0, 0, 0, 0.48),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  border-radius: 1.5rem;
+  background: rgba(15, 16, 17, 0.98);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(24px) saturate(160%);
   -webkit-backdrop-filter: blur(24px) saturate(160%);
 }
 
 .marketing-glass-header__flyout-heading {
   margin: 0;
-  padding: 1rem 1rem 0.2rem;
-  color: var(--marketing-glass-muted);
+  padding: 2.25rem 2.5rem 0;
+  color: rgba(255, 255, 255, 0.36);
   font-family: var(--marketing-font-body);
   font-size: 0.72rem;
   font-weight: 700;
@@ -288,15 +298,17 @@ body:has(.home-viewport)::-webkit-scrollbar {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.25rem;
-  padding: 0.75rem;
+  column-gap: 4rem;
+  row-gap: 0.875rem;
+  padding: 1.375rem 2.25rem 2.5rem;
 }
 
 .marketing-glass-header__flyout-link {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: 0.75rem;
-  min-height: 5.25rem;
-  padding: 0.8rem;
+  min-height: auto;
+  padding: 0.5rem 0.25rem;
   border: 1px solid transparent;
   border-radius: 0.95rem;
   color: #ffffff;
@@ -329,8 +341,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .marketing-glass-header__flyout-label {
   color: rgba(255, 255, 255, 0.94);
   font-family: var(--marketing-font-display);
-  font-size: 0.94rem;
-  font-weight: 650;
+  font-size: 1.375rem;
+  font-weight: 600;
   line-height: 1.2;
 }
 
@@ -338,7 +350,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   margin-top: 0.28rem;
   color: rgba(255, 255, 255, 0.56);
   font-family: var(--marketing-font-body);
-  font-size: 0.8rem;
+  font-size: 0.8125rem;
   font-weight: 500;
   line-height: 1.35;
 }
@@ -512,6 +524,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   font-weight: 800;
   line-height: 1.04;
   letter-spacing: -0.025em;
+  text-wrap: balance;
   margin-left: auto;
   margin-right: auto;
   max-width: min(22ch, var(--homepage-hero-copy-max));
@@ -532,6 +545,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   font-weight: 400;
   line-height: 1.45;
   letter-spacing: 0;
+  text-wrap: balance;
   color: rgba(234, 234, 255, 0.5);
 }
 
@@ -2377,6 +2391,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   font-size: clamp(4rem, 5.56vw, 5rem);
   line-height: 1.04;
   letter-spacing: -0.045em;
+  text-wrap: balance;
 }
 
 .homepage-hero-subhead {
@@ -2384,6 +2399,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   margin-top: clamp(1.1rem, 2vw, 1.45rem);
   font-size: clamp(1.06rem, 1.45vw, 1.32rem);
   line-height: 1.45;
+  text-wrap: balance;
 }
 
 .homepage-hero-actions {
@@ -2560,6 +2576,165 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 .homepage-hero-carousel__controls > * {
   pointer-events: auto;
+}
+
+.homepage-hero-command-center {
+  --homepage-product-rail-height: clamp(29rem, 43vw, 38rem);
+  --homepage-product-desktop-width: calc(
+    var(--homepage-product-rail-height) *
+    1.6
+  );
+  position: relative;
+  width: 100vw;
+  max-width: none;
+  margin-top: clamp(2.5rem, 4.4vw, 4rem);
+  padding-inline: 0;
+  overflow: hidden;
+}
+
+.homepage-hero-command-center::before {
+  position: absolute;
+  inset: 18% 0 -16%;
+  z-index: 0;
+  content: "";
+  background:
+    radial-gradient(
+      60% 62% at 47% 55%,
+      rgba(104, 124, 177, 0.18) 0%,
+      rgba(104, 124, 177, 0.07) 45%,
+      transparent 74%
+    ),
+    linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.92) 82%);
+  filter: blur(22px);
+  opacity: 0.78;
+  pointer-events: none;
+}
+
+.homepage-product-controls {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: 0;
+  z-index: 4;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.homepage-product-control {
+  position: absolute;
+  display: grid;
+  width: 2.85rem;
+  height: 2.85rem;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.86);
+  background: rgba(8, 9, 11, 0.66);
+  box-shadow:
+    0 18px 52px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  pointer-events: auto;
+  backdrop-filter: blur(20px) saturate(1.35);
+  -webkit-backdrop-filter: blur(20px) saturate(1.35);
+  transition:
+    color 160ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+.homepage-product-control:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  background: rgba(8, 9, 11, 0.9);
+}
+
+.homepage-product-control--prev {
+  left: max(var(--homepage-page-gutter), calc((100vw - 88rem) / 2));
+}
+
+.homepage-product-control--next {
+  right: max(var(--homepage-page-gutter), calc((100vw - 88rem) / 2));
+}
+
+.homepage-product-rail {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: 100%;
+  height: var(--homepage-product-rail-height);
+  align-items: center;
+  gap: clamp(0.875rem, 1.4vw, 1.25rem);
+  padding-inline: max(
+    var(--homepage-page-gutter),
+    calc((100vw - var(--homepage-product-desktop-width)) / 2)
+  );
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-padding-inline: max(
+    var(--homepage-page-gutter),
+    calc((100vw - var(--homepage-product-desktop-width)) / 2)
+  );
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  mask-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    #000 5%,
+    #000 91%,
+    transparent 100%
+  );
+}
+
+.homepage-product-rail::-webkit-scrollbar {
+  display: none;
+}
+
+.homepage-product-pane {
+  position: relative;
+  flex: 0 0 auto;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.085);
+  border-radius: clamp(1rem, 1.7vw, 1.45rem);
+  background: #050608;
+  box-shadow:
+    0 36px 100px rgba(0, 0, 0, 0.52),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  scroll-snap-align: center;
+}
+
+.homepage-product-pane__image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+}
+
+.homepage-product-pane--desktop {
+  aspect-ratio: 1.6;
+}
+
+.homepage-product-pane--phone {
+  aspect-ratio: 0.462;
+  border-radius: clamp(1.45rem, 2.4vw, 2.1rem);
+  box-shadow:
+    0 34px 100px rgba(0, 0, 0, 0.58),
+    inset 0 0 0 5px rgba(255, 255, 255, 0.035);
+}
+
+.homepage-product-pane--release {
+  opacity: 0.96;
+}
+
+.homepage-hero-positioning {
+  margin: 0 0 1rem;
+  color: rgba(151, 186, 255, 0.92);
+  font-size: 13px;
+  font-weight: 640;
+  line-height: 1.3;
+  letter-spacing: 0;
 }
 
 .homepage-trust-section {
@@ -3564,4 +3739,70 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .home-viewport .marketing-footer-premium .mf-baseband {
   margin-top: clamp(2rem, 3.6vw, 2.8rem);
   padding-top: clamp(1.15rem, 2vw, 1.45rem);
+}
+
+@media (max-width: 1023px) {
+  .homepage-hero-command-center {
+    --homepage-product-rail-height: clamp(24rem, 53vw, 32rem);
+  }
+
+  .homepage-product-rail {
+    height: var(--homepage-product-rail-height);
+  }
+}
+
+@media (max-width: 767px) {
+  .homepage-hero-inner {
+    padding-top: calc(var(--linear-header-height) + 2.85rem);
+    padding-bottom: clamp(3.25rem, 9vw, 4.25rem);
+  }
+
+  .homepage-hero-positioning {
+    margin-bottom: 0.85rem;
+    font-size: 12px;
+  }
+
+  .homepage-hero-headline {
+    max-width: 9.1ch;
+    font-size: clamp(3rem, 13vw, 3.85rem);
+    line-height: 0.98;
+  }
+
+  .homepage-hero-command-center {
+    --homepage-product-rail-height: clamp(20rem, 76vw, 24rem);
+    --homepage-product-desktop-width: min(
+      calc(100vw - var(--homepage-page-gutter) * 2),
+      calc(var(--homepage-product-rail-height) * 1.6)
+    );
+    margin-top: 2.2rem;
+  }
+
+  .homepage-product-controls {
+    top: 50%;
+    right: 0;
+    bottom: auto;
+  }
+
+  .homepage-product-control {
+    width: 2.2rem;
+    height: 2.2rem;
+  }
+
+  .homepage-product-control--prev {
+    left: 0.75rem;
+  }
+
+  .homepage-product-control--next {
+    right: 0.75rem;
+  }
+
+  .homepage-product-rail {
+    height: var(--homepage-product-rail-height);
+    gap: 0.75rem;
+    padding-inline: max(
+      var(--homepage-page-gutter),
+      calc((100vw - var(--homepage-product-desktop-width)) / 2)
+    );
+    mask-image: linear-gradient(90deg, #000 0%, #000 88%, transparent 100%);
+  }
 }

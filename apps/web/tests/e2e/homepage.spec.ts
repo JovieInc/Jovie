@@ -32,13 +32,13 @@ test.describe('Homepage', () => {
     const hero = page.getByTestId('homepage-hero-shell');
 
     await expect(hero).toBeVisible();
-    await expect(hero.getByText('Meet Jovie')).toBeVisible();
+    await expect(hero.getByText('Release operating system')).toBeVisible();
     await expect(
-      hero.getByRole('heading', { name: 'Drop more music, with less work.' })
+      hero.getByRole('heading', { name: 'Release more music with less work' })
     ).toBeVisible();
     await expect(
       hero.getByText(
-        'Release music faster and grow your audience effortlessly.'
+        'Plan the drop, route every fan, and keep the next release moving.'
       )
     ).toBeVisible();
     await expect(
@@ -58,24 +58,20 @@ test.describe('Homepage', () => {
     await expect(header).toBeVisible();
     await expect(header).toHaveAttribute(
       'data-presentation',
-      'homepage-embedded'
+      'marketing-glass'
     );
-    await expect(header.locator('[data-testid="site-logo"]')).toHaveCount(1);
-    await expect(header.getByRole('link', { name: 'Product' })).toHaveAttribute(
-      'href',
-      '/artist-profiles'
-    );
+    await expect(header.locator('a[href="/"]').first()).toBeVisible();
     await expect(
-      header.getByRole('link', { name: 'Solutions' })
-    ).toHaveAttribute('href', '/artist-notifications');
+      header.getByRole('button', { name: 'Features' })
+    ).toBeVisible();
+    await expect(
+      header.getByRole('button', { name: 'Resources' })
+    ).toBeVisible();
     await expect(header.getByRole('link', { name: 'Pricing' })).toHaveAttribute(
       'href',
       '/pricing'
     );
-    await expect(
-      header.getByRole('link', { name: 'Resources' })
-    ).toHaveAttribute('href', '/blog');
-    await expect(header.getByRole('link', { name: 'Log in' })).toHaveCount(1);
+    await expect(header.getByRole('link', { name: 'Sign in' })).toHaveCount(1);
     await expect(
       header.getByRole('link', { name: 'Start Free Trial' })
     ).toHaveAttribute('href', '/signup');
@@ -84,20 +80,37 @@ test.describe('Homepage', () => {
   test('product carousel exposes desktop and mobile proof slides', async ({
     page,
   }) => {
-    const carousel = page.getByTestId('homepage-hero-carousel');
+    const carousel = page.getByTestId('homepage-hero-command-center');
 
     await expect(carousel).toBeVisible();
     await expect(
-      page.getByTestId('homepage-hero-shot-profile-presence')
-    ).toHaveAttribute('data-active', 'true');
-    await page.getByRole('button', { name: 'Go to next slide' }).click();
+      carousel.getByAltText('The Deep End release page with fan action buttons')
+    ).toBeVisible();
     await expect(
-      page.getByTestId('homepage-hero-shot-release-command')
-    ).toHaveAttribute('data-active', 'true');
-    await page.getByRole('tab', { name: 'Show Audience Signal' }).click();
+      carousel.getByAltText(
+        'Jovie releases page with release status, assets, and launch progress'
+      )
+    ).toBeVisible();
     await expect(
-      page.getByTestId('homepage-hero-shot-release-signal')
-    ).toHaveAttribute('data-active', 'true');
+      carousel.getByAltText(
+        'Tim White artist profile with release and fan actions'
+      )
+    ).toBeVisible();
+    await page.waitForFunction(() => {
+      const releaseImage = document.querySelector<HTMLImageElement>(
+        'img[alt="Jovie releases page with release status, assets, and launch progress"]'
+      );
+      if (!releaseImage) return false;
+      const rect = releaseImage.getBoundingClientRect();
+      const imageCenter = rect.left + rect.width / 2;
+      return Math.abs(imageCenter - window.innerWidth / 2) < 12;
+    });
+    await expect(
+      carousel.getByRole('button', { name: 'Next product preview' })
+    ).toBeVisible();
+    await expect(
+      carousel.getByRole('button', { name: 'Previous product preview' })
+    ).toBeVisible();
   });
 
   test('trust, workflow, Friday, profile proof, pricing, FAQ, and final CTA render', async ({
@@ -159,16 +172,14 @@ test.describe('Homepage', () => {
     await waitForHydration(page);
 
     await expect(
-      page.getByRole('heading', { name: 'Drop more music, with less work.' })
+      page.getByRole('heading', { name: 'Release more music with less work' })
     ).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
-    await expect(page.getByRole('link', { name: 'Log in' })).toHaveCount(1);
+    await expect(page.getByTestId('header-nav')).toBeVisible();
 
-    const activeHeroShot = page
-      .locator('.homepage-hero-slide[data-active="true"]')
-      .first();
-    const heroShotBounds = await activeHeroShot.boundingBox();
+    const heroProductRail = page.getByTestId('homepage-hero-command-center');
+    const heroShotBounds = await heroProductRail.boundingBox();
     const viewportWidth = page.viewportSize()?.width ?? 0;
 
     expect(heroShotBounds?.x ?? -1).toBeGreaterThanOrEqual(0);
@@ -192,16 +203,19 @@ test.describe('Homepage', () => {
       page.getByRole('button', { name: 'Close menu' })
     ).toBeVisible();
     await expect(
-      mobilePanel.getByRole('link', { name: 'Product', exact: true })
+      mobilePanel.getByRole('link', { name: 'Artist Profiles', exact: true })
     ).toBeVisible();
     await expect(
-      mobilePanel.getByRole('link', { name: 'Solutions', exact: true })
+      mobilePanel.getByRole('link', {
+        name: 'Smart Release Links',
+        exact: true,
+      })
     ).toBeVisible();
     await expect(
       mobilePanel.getByRole('link', { name: 'Pricing', exact: true })
     ).toBeVisible();
     await expect(
-      mobilePanel.getByRole('link', { name: 'Resources', exact: true })
+      mobilePanel.getByRole('link', { name: 'Blog', exact: true })
     ).toBeVisible();
     await expect(
       mobilePanel.getByRole('link', { name: 'Start Free', exact: true })

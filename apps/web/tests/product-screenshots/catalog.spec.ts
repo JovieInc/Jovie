@@ -197,9 +197,13 @@ async function prepareScenario(
   }
 
   const viewport = SCREENSHOT_VIEWPORTS[scenario.viewport];
-  await page.clock.setFixedTime(
-    new Date(scenario.fixedNow ?? SCREENSHOT_CLOCK_ISO)
-  );
+  // shell-v1 scenarios use deterministic demo dates internally, and mocking
+  // the browser clock can interfere with loader animation timers.
+  if (!scenario.id.startsWith('shell-v1-')) {
+    await page.clock.setFixedTime(
+      new Date(scenario.fixedNow ?? SCREENSHOT_CLOCK_ISO)
+    );
+  }
   await page.emulateMedia({
     reducedMotion: scenario.reducedMotion ? 'reduce' : 'no-preference',
   });
@@ -232,6 +236,37 @@ async function prepareScenario(
       await waitForSettle(page);
       await expect(dspsTab).toHaveAttribute('aria-selected', 'true');
     }
+  }
+
+  if (
+    scenario.interaction === 'open-shell-library' ||
+    scenario.interaction === 'open-shell-releases'
+  ) {
+    await waitForSettle(page, 250);
+  }
+
+  if (scenario.interaction === 'open-shell-library') {
+    await expect(page.getByText('All assets').first()).toBeVisible({
+      timeout: TIMEOUTS.CONTENT_VISIBLE,
+    });
+  }
+
+  if (scenario.interaction === 'open-shell-releases') {
+    await expect(page.getByText('Lost in the Light').first()).toBeVisible({
+      timeout: TIMEOUTS.CONTENT_VISIBLE,
+    });
+  }
+
+  if (scenario.id === 'release-presave-mobile') {
+    await expect(
+      page.getByRole('heading', { name: 'The Deep End' })
+    ).toBeVisible({
+      timeout: TIMEOUTS.CONTENT_VISIBLE,
+    });
+    await expect(page.getByText('Cosmic Gate & Tim White')).toBeVisible();
+    await expect(page.getByAltText('The Deep End artwork')).toBeVisible();
+    await expect(page.getByText('Listen everywhere')).toBeVisible();
+    await expect(page.getByTestId('smart-link-brand-mark')).toHaveCount(0);
   }
 
   await waitForImages(page).catch(() => {});
