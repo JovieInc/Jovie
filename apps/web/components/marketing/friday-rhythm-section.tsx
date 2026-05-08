@@ -281,16 +281,10 @@ function FridayRhythmContent({
         </div>
       ) : null}
 
-      <motion.div
-        animate={{
-          opacity: 1,
-          y: 0,
-        }}
+      <div
         className='mx-auto mt-12 max-w-[60rem] md:mt-16'
-        initial={false}
-        transition={{
-          duration: reducedMotion ? 0 : 0.4,
-          ease: 'easeOut',
+        style={{
+          transition: reducedMotion ? undefined : 'opacity 400ms ease-out',
         }}
       >
         <div className='relative'>
@@ -305,7 +299,7 @@ function FridayRhythmContent({
           />
           <RhythmReleaseKey />
         </div>
-      </motion.div>
+      </div>
 
       <div className='mx-auto mt-10 flex flex-col items-center gap-5 text-center'>
         <p
@@ -429,34 +423,28 @@ function RhythmHeartbeatLine({
       preserveAspectRatio='none'
       viewBox={`0 0 ${HEARTBEAT_WIDTH} ${HEARTBEAT_HEIGHT}`}
     >
-      <motion.path
-        animate={{ d: heartbeatPath }}
+      <path
         d={heartbeatPath}
         fill='none'
-        initial={false}
         stroke='currentColor'
         strokeLinecap='round'
         strokeLinejoin='round'
         strokeOpacity={variant === 'section' ? '0.04' : '0.025'}
         strokeWidth={variant === 'section' ? '2.6' : '2'}
-        transition={{
-          duration: reducedMotion ? 0 : 0.45,
-          ease: 'easeOut',
+        style={{
+          transition: reducedMotion ? undefined : 'd 450ms ease-out',
         }}
       />
-      <motion.path
-        animate={{ d: heartbeatPath }}
+      <path
         d={heartbeatPath}
         fill='none'
-        initial={false}
         stroke='currentColor'
         strokeLinecap='round'
         strokeLinejoin='round'
         strokeOpacity={variant === 'section' ? '0.12' : '0.07'}
         strokeWidth={variant === 'section' ? '0.62' : '0.46'}
-        transition={{
-          duration: reducedMotion ? 0 : 0.45,
-          ease: 'easeOut',
+        style={{
+          transition: reducedMotion ? undefined : 'd 450ms ease-out',
         }}
       />
     </svg>

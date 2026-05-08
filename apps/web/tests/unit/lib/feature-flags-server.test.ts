@@ -123,7 +123,7 @@ describe('Statsig server initialization', () => {
     expect(statsigConstructorMock).toHaveBeenCalledTimes(2);
     expect(initializeMock).toHaveBeenCalledTimes(2);
     expect(shutdownMock).toHaveBeenCalledTimes(1);
-    expect(shutdownMock).toHaveBeenCalledWith(1000);
+    expect(shutdownMock).toHaveBeenCalledWith();
   });
 
   it('falls back when Statsig initialization times out', async () => {
@@ -156,7 +156,46 @@ describe('Statsig server initialization', () => {
       expect(statsigConstructorMock).toHaveBeenCalledTimes(1);
       expect(initializeMock).toHaveBeenCalledTimes(1);
       expect(shutdownMock).toHaveBeenCalledTimes(1);
-      expect(shutdownMock).toHaveBeenCalledWith(1000);
+      expect(shutdownMock).toHaveBeenCalledWith();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('bounds explicit shutdown and resets the Statsig singleton', async () => {
+    vi.useFakeTimers();
+
+    try {
+      envState.STATSIG_SERVER_SECRET = 'secret-server-key';
+      getFeatureGateMock.mockReturnValue({
+        getEvaluationDetails: () => ({ reason: 'Network' }),
+        value: true,
+      });
+
+      const { checkGateForUser, shutdownStatsig } = await import(
+        '@/lib/flags/statsig'
+      );
+
+      await expect(
+        checkGateForUser('user-1', LEGACY_STATSIG_GATE_KEYS.DESIGN_V1, false)
+      ).resolves.toBe(true);
+
+      shutdownMock.mockReturnValueOnce(new Promise(() => {}));
+
+      const shutdownResult = shutdownStatsig().catch(error => error);
+      await vi.advanceTimersByTimeAsync(1500);
+
+      await expect(shutdownResult).resolves.toEqual(
+        expect.objectContaining({
+          message: 'Statsig shutdown timed out after 1500ms',
+        })
+      );
+      expect(shutdownMock).toHaveBeenCalledWith();
+
+      await expect(
+        checkGateForUser('user-2', LEGACY_STATSIG_GATE_KEYS.DESIGN_V1, false)
+      ).resolves.toBe(true);
+      expect(statsigConstructorMock).toHaveBeenCalledTimes(2);
     } finally {
       vi.useRealTimers();
     }

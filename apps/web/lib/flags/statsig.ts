@@ -19,6 +19,8 @@ let statsigInitPromise: Promise<void> | null = null;
 let statsigWarnedNoSecret = false;
 
 const isE2ERuntime = publicEnv.NEXT_PUBLIC_E2E_MODE === '1';
+const STATSIG_INIT_TIMEOUT_MS = 10_000;
+const STATSIG_SHUTDOWN_TIMEOUT_MS = 1500;
 
 function getStatsigUser(userId: string | null): StatsigUser {
   return StatsigUser.withUserID(userId ?? 'anonymous');
@@ -41,8 +43,8 @@ async function cleanupStatsigClientAfterInitFailure(
   if (!statsig) return;
 
   try {
-    await withTimeout(statsig.shutdown(1000), {
-      timeoutMs: 1500,
+    await withTimeout(statsig.shutdown(), {
+      timeoutMs: STATSIG_SHUTDOWN_TIMEOUT_MS,
       context: 'Statsig shutdown after failed initialization',
     });
   } catch (shutdownError) {
@@ -77,7 +79,7 @@ async function initializeStatsig(): Promise<void> {
     try {
       statsig = getStatsigClient(serverSecret);
       await withTimeout(statsig.initialize(), {
-        timeoutMs: 10_000,
+        timeoutMs: STATSIG_INIT_TIMEOUT_MS,
         context: 'Statsig initialization',
       });
       statsigInitialized = true;
@@ -206,13 +208,17 @@ export async function getSubscribeCTAVariantValue(
 }
 
 export async function shutdownStatsig(): Promise<void> {
-  if (statsigInitialized) {
+  try {
     const statsig = statsigClient;
-    if (statsig) {
-      await statsig.shutdown();
+    if (statsigInitialized && statsig) {
+      await withTimeout(statsig.shutdown(), {
+        timeoutMs: STATSIG_SHUTDOWN_TIMEOUT_MS,
+        context: 'Statsig shutdown',
+      });
     }
+  } finally {
+    statsigInitialized = false;
+    statsigClient = null;
+    statsigInitPromise = null;
   }
-  statsigInitialized = false;
-  statsigClient = null;
-  statsigInitPromise = null;
 }

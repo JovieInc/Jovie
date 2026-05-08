@@ -388,7 +388,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 .homepage-hero-shell {
   background: #000;
-  contain: layout paint;
   box-shadow: none;
 }
 
@@ -436,33 +435,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
     rgba(0, 0, 0, 0.6) 75%,
     transparent 100%
   );
-  filter: blur(0.5px);
-  opacity: 0.55;
+  opacity: 0.42;
   mix-blend-mode: screen;
-  animation: heroBeamPulse 8s ease-in-out infinite;
-}
-
-@keyframes heroBeamPulse {
-  0%,
-  100% {
-    opacity: 0.42;
-    transform: translateY(0);
-  }
-  35% {
-    opacity: 0.72;
-    transform: translateY(-1.5%);
-  }
-  65% {
-    opacity: 0.5;
-    transform: translateY(0.8%);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .homepage-hero-shell__beam {
-    animation: none;
-    opacity: 0.4;
-  }
 }
 
 .homepage-hero-shell__grid-wrap {
@@ -536,13 +510,11 @@ body:has(.home-viewport)::-webkit-scrollbar {
   font-size: clamp(46px, 5.45vw, 72px);
   font-weight: 600;
   line-height: 1.04;
-  letter-spacing: -0.045em;
-  text-wrap: balance;
+  letter-spacing: 0;
   margin-left: auto;
   margin-right: auto;
   max-width: min(22ch, var(--homepage-hero-copy-max));
   color: rgb(252, 252, 252);
-  text-shadow: 0 12px 34px rgba(0, 0, 0, 0.28);
 }
 
 .homepage-hero-copy {
@@ -559,7 +531,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   font-weight: 400;
   line-height: 1.45;
   letter-spacing: 0;
-  text-wrap: balance;
   color: rgba(234, 234, 255, 0.5);
 }
 
@@ -616,7 +587,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
     rgba(28, 70, 122, 0.09) 42%,
     transparent 74%
   );
-  filter: blur(30px);
+  opacity: 0.72;
 }
 
 .homepage-hero-carousel__viewport {
@@ -689,7 +660,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
     rgba(157, 157, 255, 0) 100%
   );
   pointer-events: none;
-  filter: blur(14px);
   z-index: -1;
 }
 

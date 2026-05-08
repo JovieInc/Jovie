@@ -1,8 +1,4 @@
-'use client';
-
-import { motion } from 'motion/react';
 import type { CSSProperties } from 'react';
-import { useMemo } from 'react';
 import type { ContributionData } from '@/components/ui/contribution-graph.types';
 import { cn } from '@/lib/utils';
 
@@ -137,68 +133,8 @@ export function ContributionGraph({
   ariaLabel,
   reducedMotion = false,
 }: ContributionGraphProps) {
-  const dataByDate = useMemo(
-    () => new Map(data.map(day => [day.date, day])),
-    [data]
-  );
-
-  const { cells, monthLabels } = useMemo(() => {
-    const startDate = new Date(Date.UTC(year, 0, 1));
-    const firstSunday = new Date(startDate);
-    firstSunday.setUTCDate(startDate.getUTCDate() - startDate.getUTCDay());
-
-    const generatedCells: CalendarCell[] = [];
-    const labels: Array<{
-      readonly id: string;
-      readonly label: string;
-      readonly columnStart: number;
-      readonly monthIndex: number;
-    }> = [];
-    const seenMonths = new Set<string>();
-
-    for (let weekIndex = 0; weekIndex < WEEK_COUNT; weekIndex += 1) {
-      const weekDate = new Date(firstSunday);
-      weekDate.setUTCDate(firstSunday.getUTCDate() + weekIndex * DAY_COUNT);
-
-      if (weekDate.getUTCFullYear() === year) {
-        const monthKey = `${year}-${weekDate.getUTCMonth()}`;
-
-        if (!seenMonths.has(monthKey)) {
-          seenMonths.add(monthKey);
-          labels.push({
-            id: monthKey,
-            label: MONTHS[weekDate.getUTCMonth()] ?? '',
-            columnStart: weekIndex + 2,
-            monthIndex: weekDate.getUTCMonth(),
-          });
-        }
-      }
-
-      for (let dayIndex = 0; dayIndex < DAY_COUNT; dayIndex += 1) {
-        const currentDate = new Date(firstSunday);
-        currentDate.setUTCDate(
-          firstSunday.getUTCDate() + weekIndex * DAY_COUNT + dayIndex
-        );
-
-        const date = dateKeyFromDate(currentDate);
-        const inYear = currentDate.getUTCFullYear() === year;
-        const contribution = dataByDate.get(date);
-
-        generatedCells.push({
-          date,
-          count: contribution?.count ?? 0,
-          level: contribution?.level ?? 0,
-          accentColor: contribution?.accentColor,
-          accentMuted: contribution?.accentMuted,
-          label: contribution?.label,
-          inYear,
-          dayIndex,
-        });
-      }
-    }
-
-    return { cells: generatedCells, monthLabels: labels };
-  }, [dataByDate, year]);
+  const dataByDate = new Map(data.map(day => [day.date, day]));
+  const { cells, monthLabels } = getCalendarCells(dataByDate, year);
 
   return (
     <div className={cn('w-full text-white/55', className)}>
@@ -272,16 +208,7 @@ export function ContributionGraph({
                     : undefined
                 }
               >
-                <motion.div
-                  animate={{
-                    opacity,
-                    scale: isActive ? 1.02 : 0.86,
-                  }}
-                  transition={
-                    reducedMotion
-                      ? { duration: 0 }
-                      : { duration: 0.28, ease: 'easeOut' }
-                  }
+                <div
                   className={cn(
                     'h-full w-full rounded-[3px]',
                     getLevelClassName(day.level, day.inYear),
@@ -290,7 +217,14 @@ export function ContributionGraph({
                       !day.accentColor &&
                       'shadow-[0_0_18px_rgba(94,106,210,0.24)]'
                   )}
-                  style={activeCellStyle}
+                  style={{
+                    ...activeCellStyle,
+                    opacity,
+                    transform: `scale(${isActive ? 1.02 : 0.86})`,
+                    transition: reducedMotion
+                      ? undefined
+                      : 'opacity 280ms ease-out, transform 280ms ease-out',
+                  }}
                 />
               </div>
             );
@@ -320,3 +254,72 @@ export function ContributionGraph({
 }
 
 export default ContributionGraph;
+
+function getCalendarCells(
+  dataByDate: ReadonlyMap<string, ContributionData>,
+  year: number
+): {
+  readonly cells: readonly CalendarCell[];
+  readonly monthLabels: readonly {
+    readonly id: string;
+    readonly label: string;
+    readonly columnStart: number;
+    readonly monthIndex: number;
+  }[];
+} {
+  const startDate = new Date(Date.UTC(year, 0, 1));
+  const firstSunday = new Date(startDate);
+  firstSunday.setUTCDate(startDate.getUTCDate() - startDate.getUTCDay());
+
+  const cells: CalendarCell[] = [];
+  const monthLabels: {
+    readonly id: string;
+    readonly label: string;
+    readonly columnStart: number;
+    readonly monthIndex: number;
+  }[] = [];
+  const seenMonths = new Set<string>();
+
+  for (let weekIndex = 0; weekIndex < WEEK_COUNT; weekIndex += 1) {
+    const weekDate = new Date(firstSunday);
+    weekDate.setUTCDate(firstSunday.getUTCDate() + weekIndex * DAY_COUNT);
+
+    if (weekDate.getUTCFullYear() === year) {
+      const monthKey = `${year}-${weekDate.getUTCMonth()}`;
+
+      if (!seenMonths.has(monthKey)) {
+        seenMonths.add(monthKey);
+        monthLabels.push({
+          id: monthKey,
+          label: MONTHS[weekDate.getUTCMonth()] ?? '',
+          columnStart: weekIndex + 2,
+          monthIndex: weekDate.getUTCMonth(),
+        });
+      }
+    }
+
+    for (let dayIndex = 0; dayIndex < DAY_COUNT; dayIndex += 1) {
+      const currentDate = new Date(firstSunday);
+      currentDate.setUTCDate(
+        firstSunday.getUTCDate() + weekIndex * DAY_COUNT + dayIndex
+      );
+
+      const date = dateKeyFromDate(currentDate);
+      const inYear = currentDate.getUTCFullYear() === year;
+      const contribution = dataByDate.get(date);
+
+      cells.push({
+        date,
+        count: contribution?.count ?? 0,
+        level: contribution?.level ?? 0,
+        accentColor: contribution?.accentColor,
+        accentMuted: contribution?.accentMuted,
+        label: contribution?.label,
+        inYear,
+        dayIndex,
+      });
+    }
+  }
+
+  return { cells, monthLabels };
+}
