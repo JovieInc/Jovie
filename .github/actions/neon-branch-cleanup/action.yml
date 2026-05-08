@@ -95,6 +95,15 @@ runs:
         while IFS= read -r branch_name; do
           [ -z "$branch_name" ] && continue
 
+          # Parallel CI jobs for the same workflow run may create multiple Neon
+          # branches. Never delete a sibling branch that another in-flight job
+          # still needs.
+          current_run_suffix="${GITHUB_RUN_ID:-}-${GITHUB_RUN_ATTEMPT:-}"
+          if [[ "$current_run_suffix" != "-" && "$branch_name" == *"-$current_run_suffix" ]]; then
+            echo "Skipping current workflow run branch: $branch_name"
+            continue
+          fi
+
           # Skip protected branches
           is_protected_branch=false
           for protected in "${PROTECTED_ARRAY[@]}"; do
