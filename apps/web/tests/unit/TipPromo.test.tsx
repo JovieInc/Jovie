@@ -57,9 +57,9 @@ describe('PayPromo', () => {
 
     render(<PayPromo />);
 
-    // Check section has dark background and white text
+    // Check section has surface-0 background and primary-token text (shell-v1 tokens)
     const section = screen.getByText('Pay,').closest('section');
-    expect(section).toHaveClass('bg-zinc-900', 'text-white');
+    expect(section).toHaveClass('bg-surface-0', 'text-primary-token');
 
     // Check CTA button styling - CTAButton uses bg-surface-1 base with hover:bg-surface-2
     const ctaButton = screen.getByRole('link', { name: 'See it live' });
