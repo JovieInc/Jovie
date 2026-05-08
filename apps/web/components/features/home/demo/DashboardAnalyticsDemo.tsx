@@ -46,22 +46,10 @@ export function DashboardAnalyticsDemo() {
         ].map(card => (
           <div
             key={card.label}
-            className='rounded-lg px-3 py-2.5'
-            style={{
-              backgroundColor: 'var(--linear-bg-surface-1)',
-              border: '1px solid var(--linear-border-subtle)',
-            }}
+            className='rounded-lg px-3 py-2.5 bg-surface-1 border border-subtle'
           >
-            <p
-              className='text-[11px]'
-              style={{ color: 'var(--linear-text-tertiary)' }}
-            >
-              {card.label}
-            </p>
-            <p
-              className='mt-0.5 text-lg font-semibold tabular-nums'
-              style={{ color: 'var(--linear-text-primary)' }}
-            >
+            <p className='text-[11px] text-tertiary-token'>{card.label}</p>
+            <p className='mt-0.5 text-lg font-semibold tabular-nums text-primary-token'>
               {card.value}
             </p>
           </div>
@@ -69,17 +57,8 @@ export function DashboardAnalyticsDemo() {
       </div>
 
       {/* Area chart (CSS-only) */}
-      <div
-        className='rounded-lg px-4 py-3'
-        style={{
-          backgroundColor: 'var(--linear-bg-surface-1)',
-          border: '1px solid var(--linear-border-subtle)',
-        }}
-      >
-        <p
-          className='mb-3 text-xs font-medium'
-          style={{ color: 'var(--linear-text-secondary)' }}
-        >
+      <div className='rounded-lg px-4 py-3 bg-surface-1 border border-subtle'>
+        <p className='mb-3 text-xs font-medium text-secondary-token'>
           Clicks — Last 30 days
         </p>
         <div className='flex items-end gap-[3px]' style={{ height: 100 }}>
@@ -93,33 +72,21 @@ export function DashboardAnalyticsDemo() {
                   height: visible ? `${heightPct}%` : '0%',
                   backgroundColor: 'var(--linear-accent)',
                   opacity: 0.7 + (i / DAILY_CLICKS.length) * 0.3,
-                  transition: `height 0.6s cubic-bezier(0.34,1.56,0.64,1) ${i * 20}ms`,
+                  transition: `height 0.6s var(--ds-motion-cinematic-easing) ${i * 20}ms`,
                 }}
               />
             );
           })}
         </div>
-        <div
-          className='mt-2 flex justify-between text-[10px]'
-          style={{ color: 'var(--linear-text-tertiary)' }}
-        >
+        <div className='mt-2 flex justify-between text-[10px] text-tertiary-token'>
           <span>{DAILY_CLICKS[0].date}</span>
           <span>{DAILY_CLICKS.at(-1)?.date}</span>
         </div>
       </div>
 
       {/* Platform breakdown */}
-      <div
-        className='rounded-lg px-4 py-3'
-        style={{
-          backgroundColor: 'var(--linear-bg-surface-1)',
-          border: '1px solid var(--linear-border-subtle)',
-        }}
-      >
-        <p
-          className='mb-3 text-xs font-medium'
-          style={{ color: 'var(--linear-text-secondary)' }}
-        >
+      <div className='rounded-lg px-4 py-3 bg-surface-1 border border-subtle'>
+        <p className='mb-3 text-xs font-medium text-secondary-token'>
           Clicks by platform
         </p>
         <div className='space-y-2'>
@@ -127,29 +94,20 @@ export function DashboardAnalyticsDemo() {
             const widthPct = (p.clicks / maxPlatformClicks) * 100;
             return (
               <div key={p.platform} className='flex items-center gap-3'>
-                <span
-                  className='w-20 shrink-0 text-xs'
-                  style={{ color: 'var(--linear-text-secondary)' }}
-                >
+                <span className='w-20 shrink-0 text-xs text-secondary-token'>
                   {p.platform}
                 </span>
-                <div
-                  className='relative h-4 flex-1 overflow-hidden rounded-full'
-                  style={{ backgroundColor: 'var(--linear-bg-surface-2)' }}
-                >
+                <div className='relative h-4 flex-1 overflow-hidden rounded-full bg-surface-2'>
                   <div
                     className='h-full rounded-full'
                     style={{
                       width: visible ? `${widthPct}%` : '0%',
                       backgroundColor: p.color,
-                      transition: `width 0.8s cubic-bezier(0.34,1.56,0.64,1) ${i * 80}ms`,
+                      transition: `width 0.8s var(--ds-motion-cinematic-easing) ${i * 80}ms`,
                     }}
                   />
                 </div>
-                <span
-                  className='w-12 shrink-0 text-right text-xs tabular-nums'
-                  style={{ color: 'var(--linear-text-tertiary)' }}
-                >
+                <span className='w-12 shrink-0 text-right text-xs tabular-nums text-tertiary-token'>
                   {p.clicks.toLocaleString()}
                 </span>
               </div>

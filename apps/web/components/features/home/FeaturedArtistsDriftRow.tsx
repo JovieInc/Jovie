@@ -110,7 +110,7 @@ export function FeaturedArtistsDriftRow({
               title={creator.name}
               className='group flex flex-col items-center'
             >
-              <div className='relative w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-full overflow-hidden border-2 border-neutral-200 dark:border-neutral-800 group-hover:border-neutral-400 dark:group-hover:border-neutral-600 transition-colors'>
+              <div className='relative w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-full overflow-hidden border-2 border-subtle group-hover:border-default transition-colors'>
                 <Image
                   src={creator.src}
                   alt={creator.alt || creator.name}

@@ -40,12 +40,12 @@ export function ArtistSearch() {
           value={query}
           onChange={e => setQuery(e.target.value)}
           placeholder='Search for your artist name...'
-          className='w-full px-4 py-3 pl-12 pr-4 text-lg bg-surface-0/80 backdrop-blur-sm border border-default rounded-xl text-primary-token placeholder:text-tertiary-token focus-visible:ring-2 focus-visible:ring-accent focus-visible:border-transparent transition-all duration-slower'
+          className='w-full px-4 py-3 pl-12 pr-4 text-lg bg-surface-0/80 backdrop-blur-sm border border-default rounded-xl text-primary-token placeholder:text-tertiary-token focus-visible:ring-2 focus-visible:ring-accent focus-visible:border-transparent transition-colors duration-slower'
           disabled={isSearching}
         />
         <div className='absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none'>
           <svg
-            className='h-5 w-5 text-gray-400 dark:text-white/50'
+            className='h-5 w-5 text-tertiary-token'
             fill='none'
             viewBox='0 0 24 24'
             stroke='currentColor'
