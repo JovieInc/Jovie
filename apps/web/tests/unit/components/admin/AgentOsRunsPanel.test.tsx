@@ -1,11 +1,17 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AgentOsRunsPanel } from '@/components/features/admin/agent-os';
 import { AGENT_OS_ADMIN_FIXTURE_ARTIFACTS } from '@/lib/agent-os/fixtures';
 
+const originalScrollIntoView = Element.prototype.scrollIntoView;
+
 beforeAll(() => {
   Element.prototype.scrollIntoView = vi.fn();
+});
+
+afterAll(() => {
+  Element.prototype.scrollIntoView = originalScrollIntoView;
 });
 
 describe('AgentOsRunsPanel', () => {

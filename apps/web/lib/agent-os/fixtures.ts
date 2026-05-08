@@ -2,6 +2,15 @@ import { APP_ROUTES } from '@/constants/routes';
 import type { AgentRunArtifact, VerificationGate } from './artifact';
 
 const CREATED_AT = '2026-05-08T18:00:00.000Z';
+const CHECKED_AT = '2026-05-08T20:30:00.000Z';
+
+type FixtureArtifactInput = Omit<
+  AgentRunArtifact,
+  'adminSurface' | 'createdAt' | 'metadata'
+> & {
+  readonly createdAt?: string;
+  readonly metadata?: Record<string, unknown>;
+};
 
 function gate(
   name: VerificationGate['name'],
@@ -15,15 +24,58 @@ function gate(
     status,
     evidenceUrl: null,
     summary,
-    checkedAt:
-      status === 'missing' || status === 'queued'
-        ? null
-        : '2026-05-08T20:30:00.000Z',
+    checkedAt: status === 'missing' || status === 'queued' ? null : CHECKED_AT,
+  };
+}
+
+function noHumanGate(): AgentRunArtifact['humanGate'] {
+  return {
+    required: false,
+    status: 'not_required',
+    reason: null,
+    reviewer: null,
+    reviewedAt: null,
+  };
+}
+
+function pendingHumanGate(reason: string): AgentRunArtifact['humanGate'] {
+  return {
+    required: true,
+    status: 'pending',
+    reason,
+    reviewer: null,
+    reviewedAt: null,
+  };
+}
+
+function zeroCost(
+  route: AgentRunArtifact['modelRoute'],
+  notes: string,
+  inputTokens: number | null = 0,
+  outputTokens: number | null = 0
+): AgentRunArtifact['costEstimate'] {
+  return {
+    usd: 0,
+    route,
+    inputTokens,
+    outputTokens,
+    notes,
+  };
+}
+
+function fixtureArtifact(input: FixtureArtifactInput): AgentRunArtifact {
+  const { createdAt = CREATED_AT, metadata, ...artifact } = input;
+
+  return {
+    ...artifact,
+    adminSurface: APP_ROUTES.ADMIN_OPS,
+    createdAt,
+    metadata: { fixture: true, ...metadata },
   };
 }
 
 export const AGENT_OS_ADMIN_FIXTURE_ARTIFACTS: readonly AgentRunArtifact[] = [
-  {
+  fixtureArtifact({
     id: 'agentos-run-queued-wdk-health',
     source: 'vercel-workflow',
     sourceRunId: 'wrun_agentos_health_001',
@@ -46,36 +98,21 @@ export const AGENT_OS_ADMIN_FIXTURE_ARTIFACTS: readonly AgentRunArtifact[] = [
       'change_security',
     ],
     humanApprovalRequired: false,
-    humanGate: {
-      required: false,
-      status: 'not_required',
-      reason: null,
-      reviewer: null,
-      reviewedAt: null,
-    },
+    humanGate: noHumanGate(),
     linearIssueId: 'JOV-1971',
     linearIssueUrl:
       'https://linear.app/jovie/issue/JOV-1971/agentos-vercel-workflow-dry-run-artifact-proof',
     pullRequestUrl: 'https://github.com/JovieInc/Jovie/pull/8282',
-    adminSurface: APP_ROUTES.ADMIN_OPS,
     verificationGates: [
       gate('github.ci', 'queued', 'Waiting for GitHub Actions.'),
       gate('gstack.qa.exhaustive', 'missing', 'QA evidence not recorded yet.'),
       gate('gstack.review', 'missing', 'Review evidence not recorded yet.'),
     ],
-    costEstimate: {
-      usd: 0,
-      route: 'deterministic',
-      inputTokens: 0,
-      outputTokens: 0,
-      notes: 'No model call.',
-    },
+    costEstimate: zeroCost('deterministic', 'No model call.'),
     blockedReason: null,
-    createdAt: CREATED_AT,
     updatedAt: '2026-05-08T18:05:00.000Z',
-    metadata: { fixture: true },
-  },
-  {
+  }),
+  fixtureArtifact({
     id: 'agentos-run-running-main-tail',
     source: 'ci',
     sourceRunId: '25582719008',
@@ -88,35 +125,20 @@ export const AGENT_OS_ADMIN_FIXTURE_ARTIFACTS: readonly AgentRunArtifact[] = [
     allowedActions: ['read', 'summarize'],
     forbiddenActions: ['merge', 'deploy', 'mutate_linear', 'send_outbound'],
     humanApprovalRequired: false,
-    humanGate: {
-      required: false,
-      status: 'not_required',
-      reason: null,
-      reviewer: null,
-      reviewedAt: null,
-    },
+    humanGate: noHumanGate(),
     linearIssueId: 'JOV-1971',
     linearIssueUrl:
       'https://linear.app/jovie/issue/JOV-1971/agentos-vercel-workflow-dry-run-artifact-proof',
     pullRequestUrl: 'https://github.com/JovieInc/Jovie/pull/8282',
-    adminSurface: APP_ROUTES.ADMIN_OPS,
     verificationGates: [
       gate('github.ci', 'running', 'Main CI is still reporting active jobs.'),
       gate('sentry.canary', 'running', 'Production Sentry soak is active.'),
     ],
-    costEstimate: {
-      usd: 0,
-      route: 'deterministic',
-      inputTokens: 0,
-      outputTokens: 0,
-      notes: 'Status read only.',
-    },
+    costEstimate: zeroCost('deterministic', 'Status read only.'),
     blockedReason: null,
-    createdAt: CREATED_AT,
     updatedAt: '2026-05-08T22:45:00.000Z',
-    metadata: { fixture: true },
-  },
-  {
+  }),
+  fixtureArtifact({
     id: 'agentos-run-review-gstack-ship',
     source: 'github',
     sourceRunId: '8282',
@@ -137,37 +159,29 @@ export const AGENT_OS_ADMIN_FIXTURE_ARTIFACTS: readonly AgentRunArtifact[] = [
       'change_security',
     ],
     humanApprovalRequired: true,
-    humanGate: {
-      required: true,
-      status: 'pending',
-      reason: 'Human approval required before AgentOS moves beyond dry-run.',
-      reviewer: null,
-      reviewedAt: null,
-    },
+    humanGate: pendingHumanGate(
+      'Human approval required before AgentOS moves beyond dry-run.'
+    ),
     linearIssueId: 'JOV-1926',
     linearIssueUrl:
       'https://linear.app/jovie/issue/JOV-1926/agentos-enforce-gstack-gates-before-non-dry-run-agents',
     pullRequestUrl: 'https://github.com/JovieInc/Jovie/pull/8282',
-    adminSurface: APP_ROUTES.ADMIN_OPS,
     verificationGates: [
       gate('gstack.qa.exhaustive', 'passed', 'Focused QA evidence recorded.'),
       gate('gstack.review', 'passed', 'Bot and human review threads resolved.'),
       gate('gstack.ship', 'passed', 'Ship gate evidence recorded.'),
       gate('gstack.land-and-deploy', 'running', 'Landing sequence active.'),
     ],
-    costEstimate: {
-      usd: 0,
-      route: 'codex-cli',
-      inputTokens: null,
-      outputTokens: null,
-      notes: 'Local coding agent route.',
-    },
+    costEstimate: zeroCost(
+      'codex-cli',
+      'Local coding agent route.',
+      null,
+      null
+    ),
     blockedReason: null,
-    createdAt: CREATED_AT,
     updatedAt: '2026-05-08T22:20:00.000Z',
-    metadata: { fixture: true },
-  },
-  {
+  }),
+  fixtureArtifact({
     id: 'agentos-run-blocked-trigger-check',
     source: 'github',
     sourceRunId: '75105012992',
@@ -180,19 +194,13 @@ export const AGENT_OS_ADMIN_FIXTURE_ARTIFACTS: readonly AgentRunArtifact[] = [
     allowedActions: ['read', 'summarize', 'draft'],
     forbiddenActions: ['deploy', 'merge', 'mutate_production_data'],
     humanApprovalRequired: true,
-    humanGate: {
-      required: true,
-      status: 'pending',
-      reason:
-        'Infra owner must disable or reconfigure the Trigger.dev project.',
-      reviewer: null,
-      reviewedAt: null,
-    },
+    humanGate: pendingHumanGate(
+      'Infra owner must disable or reconfigure the Trigger.dev project.'
+    ),
     linearIssueId: 'JOV-1994',
     linearIssueUrl:
       'https://linear.app/jovie/issue/JOV-1994/agentos-disable-stale-triggerdev-production-deploy-check-while-wdk-is',
     pullRequestUrl: null,
-    adminSurface: APP_ROUTES.ADMIN_OPS,
     verificationGates: [
       gate(
         'github.ci',
@@ -200,20 +208,12 @@ export const AGENT_OS_ADMIN_FIXTURE_ARTIFACTS: readonly AgentRunArtifact[] = [
         'External Trigger.dev check reports missing trigger.config.ts.'
       ),
     ],
-    costEstimate: {
-      usd: 0,
-      route: 'deterministic',
-      inputTokens: 0,
-      outputTokens: 0,
-      notes: 'Infra status only.',
-    },
+    costEstimate: zeroCost('deterministic', 'Infra status only.'),
     blockedReason:
       'Trigger.dev deploy integration expects trigger.config.ts before the fallback runtime PR exists.',
-    createdAt: CREATED_AT,
     updatedAt: '2026-05-08T22:40:00.000Z',
-    metadata: { fixture: true },
-  },
-  {
+  }),
+  fixtureArtifact({
     id: 'agentos-run-failed-unsafe-payload',
     source: 'hermes',
     sourceRunId: 'hermes_dispatch_rejected_001',
@@ -226,18 +226,11 @@ export const AGENT_OS_ADMIN_FIXTURE_ARTIFACTS: readonly AgentRunArtifact[] = [
     allowedActions: ['read', 'classify', 'summarize'],
     forbiddenActions: ['write_code', 'merge', 'deploy', 'mutate_linear'],
     humanApprovalRequired: false,
-    humanGate: {
-      required: false,
-      status: 'not_required',
-      reason: null,
-      reviewer: null,
-      reviewedAt: null,
-    },
+    humanGate: noHumanGate(),
     linearIssueId: 'JOV-1926',
     linearIssueUrl:
       'https://linear.app/jovie/issue/JOV-1926/agentos-enforce-gstack-gates-before-non-dry-run-agents',
     pullRequestUrl: null,
-    adminSurface: APP_ROUTES.ADMIN_OPS,
     verificationGates: [
       gate(
         'github.scope-judge',
@@ -245,19 +238,11 @@ export const AGENT_OS_ADMIN_FIXTURE_ARTIFACTS: readonly AgentRunArtifact[] = [
         'Changed-file guard rejected out-of-scope paths.'
       ),
     ],
-    costEstimate: {
-      usd: 0,
-      route: 'deterministic',
-      inputTokens: 0,
-      outputTokens: 0,
-      notes: 'Rejected before model routing.',
-    },
+    costEstimate: zeroCost('deterministic', 'Rejected before model routing.'),
     blockedReason: null,
-    createdAt: CREATED_AT,
     updatedAt: '2026-05-08T19:15:00.000Z',
-    metadata: { fixture: true },
-  },
-  {
+  }),
+  fixtureArtifact({
     id: 'agentos-run-done-schema-pr',
     source: 'github',
     sourceRunId: '8240',
@@ -270,33 +255,18 @@ export const AGENT_OS_ADMIN_FIXTURE_ARTIFACTS: readonly AgentRunArtifact[] = [
     allowedActions: ['read', 'summarize'],
     forbiddenActions: ['merge', 'deploy', 'mutate_production_data'],
     humanApprovalRequired: false,
-    humanGate: {
-      required: false,
-      status: 'not_required',
-      reason: null,
-      reviewer: null,
-      reviewedAt: null,
-    },
+    humanGate: noHumanGate(),
     linearIssueId: 'JOV-1923',
     linearIssueUrl:
       'https://linear.app/jovie/issue/JOV-1923/agentos-shared-agentrunartifact-schema',
     pullRequestUrl: 'https://github.com/JovieInc/Jovie/pull/8240',
-    adminSurface: APP_ROUTES.ADMIN_OPS,
     verificationGates: [
       gate('github.ci', 'passed', 'CI passed.'),
       gate('gstack.review', 'passed', 'Review gate passed.'),
       gate('gstack.ship', 'passed', 'Ship gate passed.'),
     ],
-    costEstimate: {
-      usd: 0,
-      route: 'deterministic',
-      inputTokens: 0,
-      outputTokens: 0,
-      notes: 'No model call.',
-    },
+    costEstimate: zeroCost('deterministic', 'No model call.'),
     blockedReason: null,
-    createdAt: CREATED_AT,
-    updatedAt: '2026-05-08T17:30:00.000Z',
-    metadata: { fixture: true },
-  },
+    updatedAt: '2026-05-08T18:30:00.000Z',
+  }),
 ];

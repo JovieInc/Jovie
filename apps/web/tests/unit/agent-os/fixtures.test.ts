@@ -9,6 +9,14 @@ describe('AGENT_OS_ADMIN_FIXTURE_ARTIFACTS', () => {
     }
   });
 
+  it('keeps fixture update timestamps at or after creation', () => {
+    for (const artifact of AGENT_OS_ADMIN_FIXTURE_ARTIFACTS) {
+      expect(new Date(artifact.updatedAt).getTime()).toBeGreaterThanOrEqual(
+        new Date(artifact.createdAt).getTime()
+      );
+    }
+  });
+
   it('covers the admin ops v1 run states', () => {
     const statuses = new Set(
       AGENT_OS_ADMIN_FIXTURE_ARTIFACTS.map(artifact => artifact.status)
