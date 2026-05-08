@@ -1,8 +1,9 @@
+import { ArrowRight } from 'lucide-react';
 import type { Metadata } from 'next';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
-import { HomepageHeroMockupCarousel } from '@/components/homepage/HomepageHeroCarousel';
+import { HomepageHeroCommandCenter } from '@/components/homepage/HomepageHeroCommandCenter';
 import { HomepageTrackedLink } from '@/components/homepage/HomepageTrackedLink';
 import { HERO_COPY } from '@/components/homepage/intent';
 import { FaqSection } from '@/components/marketing';
@@ -220,7 +221,7 @@ function HomepageHeroActions() {
         }}
       >
         {HERO_COPY.secondaryCta.label}
-        <span aria-hidden='true'>→</span>
+        <ArrowRight aria-hidden='true' size={15} strokeWidth={1.9} />
       </HomepageTrackedLink>
     </div>
   );
@@ -228,10 +229,12 @@ function HomepageHeroActions() {
 
 function HomepageScreenshotMedia({
   className,
+  priority = false,
   scenarioId,
   sizes,
 }: Readonly<{
   className?: string;
+  priority?: boolean;
   scenarioId: string;
   sizes: string;
 }>) {
@@ -244,6 +247,7 @@ function HomepageScreenshotMedia({
         alt={image.alt}
         width={image.width}
         height={image.height}
+        loading={priority ? 'eager' : 'lazy'}
         sizes={sizes}
         quality={85}
         unoptimized
@@ -274,6 +278,7 @@ function HomepageProductDepthBand() {
             scenarioId='dashboard-releases-sidebar-desktop'
             sizes='(min-width: 1024px) 78rem, 94vw'
             className='homepage-product-depth-band__desktop'
+            priority
           />
         </div>
       </div>
@@ -384,13 +389,17 @@ function HomePageShell({ children }: { readonly children: React.ReactNode }) {
       <script type='application/ld+json'>{WEBSITE_SCHEMA}</script>
       <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
       <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
-      <script type='application/ld+json'>{FAQ_SCHEMA}</script>
+      {FEATURE_FLAGS.SHOW_HOMEPAGE_UNLOCKED_SECTIONS ? (
+        <script type='application/ld+json'>{FAQ_SCHEMA}</script>
+      ) : null}
       {children}
     </>
   );
 }
 
 export default async function HomePage() {
+  const showUnlockedSections = FEATURE_FLAGS.SHOW_HOMEPAGE_UNLOCKED_SECTIONS;
+
   if (FEATURE_FLAGS.SHOW_HOME_V1_DESIGN) {
     const { HomeV1Design } = await import(
       '@/components/features/home/HomeV1Design'
@@ -431,7 +440,7 @@ export default async function HomePage() {
 
           <div className='homepage-hero-inner relative z-[3] mx-auto flex w-full max-w-none min-w-0 flex-1 flex-col items-center justify-start'>
             <div className='homepage-hero-copy w-full min-w-0'>
-              <p className='homepage-hero-eyebrow text-center'>
+              <p className='homepage-hero-positioning text-center'>
                 {HERO_COPY.eyebrow}
               </p>
               <h1
@@ -445,7 +454,7 @@ export default async function HomePage() {
               </p>
               <HomepageHeroActions />
             </div>
-            <HomepageHeroMockupCarousel />
+            <HomepageHeroCommandCenter />
           </div>
         </div>
       </section>
@@ -456,17 +465,23 @@ export default async function HomePage() {
         />
       </div>
       <div className='homepage-story-stack'>
-        <HomepageProductDepthBand />
-        <HomepageWorkflowStrip />
-        <FridayRhythmSection />
-        <HomepageProfileProofBand />
-        {FEATURE_FLAGS.SHOW_HOME_REFRESH_2026 ? <HomeBentoPairs /> : null}
-        {FEATURE_FLAGS.SHOW_HOME_REFRESH_2026 ? (
+        {showUnlockedSections ? <HomepageProductDepthBand /> : null}
+        {showUnlockedSections ? <HomepageWorkflowStrip /> : null}
+        {showUnlockedSections ? <FridayRhythmSection /> : null}
+        {showUnlockedSections ? <HomepageProfileProofBand /> : null}
+        {showUnlockedSections && FEATURE_FLAGS.SHOW_HOME_REFRESH_2026 ? (
+          <HomeBentoPairs />
+        ) : null}
+        {showUnlockedSections && FEATURE_FLAGS.SHOW_HOME_REFRESH_2026 ? (
           <HomeLoopDiagramSection />
         ) : null}
-        {FEATURE_FLAGS.SHOW_HOME_REFRESH_2026 ? <HomeStatQuoteSection /> : null}
-        {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_PRICING ? <HomepageV2Pricing /> : null}
-        <HomepageFaq />
+        {showUnlockedSections && FEATURE_FLAGS.SHOW_HOME_REFRESH_2026 ? (
+          <HomeStatQuoteSection />
+        ) : null}
+        {showUnlockedSections && FEATURE_FLAGS.SHOW_HOMEPAGE_V2_PRICING ? (
+          <HomepageV2Pricing />
+        ) : null}
+        {showUnlockedSections ? <HomepageFaq /> : null}
         {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_FINAL_CTA ? (
           <HomepageV2FinalCta />
         ) : null}

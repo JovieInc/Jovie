@@ -129,6 +129,7 @@ export interface MarketingHeaderProps
     readonly logoSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
     readonly logoVariant?: LogoVariant;
     readonly navLinks?: readonly MarketingHeaderNavLink[];
+    readonly showHomepageCenterNav?: boolean;
     readonly variant?: MarketingHeaderVariant;
   }> {}
 
@@ -139,6 +140,7 @@ export function MarketingHeader({
   logoSize = 'xs',
   logoVariant = 'word',
   navLinks,
+  showHomepageCenterNav = true,
   variant = 'landing',
 }: MarketingHeaderProps) {
   const pathname = usePathname();
@@ -148,13 +150,10 @@ export function MarketingHeader({
     (showStagedNav ? DEFAULT_STAGED_HOMEPAGE_NAV_LINKS : MARKETING_NAV_LINKS);
   const isMinimal = variant === 'minimal';
   const isHomepage = variant === 'homepage';
-  const presentation = isMinimal
-    ? 'default'
-    : isHomepage
-      ? 'homepage-embedded'
-      : 'marketing-glass';
-  const useCustomNav = !isMinimal && (isHomepage || navLinks !== undefined);
+  const presentation = isMinimal ? 'default' : 'marketing-glass';
+  const useCustomNav = !isMinimal && navLinks !== undefined;
   const hasSimpleNav = isMinimal || useCustomNav;
+  const hideCenterNav = isMinimal || (isHomepage && !showHomepageCenterNav);
   const resolvedFlyoutMenus = hasSimpleNav
     ? undefined
     : MARKETING_GLASS_FLYOUTS;
@@ -171,6 +170,7 @@ export function MarketingHeader({
       logoVariant={logoVariant}
       authMode='public-static'
       hideNav={isMinimal}
+      hideDesktopNav={hideCenterNav}
       minimalAuth={isMinimal}
       minimalAuthVariant='link'
       includePublicLoginInMobileNav
@@ -181,6 +181,7 @@ export function MarketingHeader({
       mobilePublicCtaLabel={isHomepage ? 'Start Free' : undefined}
       mobileNavLinks={resolvedMobileNavLinks}
       navLinks={resolvedDesktopNavLinks}
+      showContactLink={!isHomepage}
     />
   );
 }

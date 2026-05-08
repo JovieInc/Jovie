@@ -52,6 +52,7 @@ interface SmartLinkShellProps {
   /** Content overlaid at the bottom of the hero artwork (title, artist, play button) */
   readonly heroOverlay?: React.ReactNode;
   readonly onMenuOpen: () => void;
+  readonly showBrandMark?: boolean;
   /** Wraps the artwork image (e.g., for context menu). Must render a relative h-full w-full container. */
   readonly artworkWrapper?: (img: React.ReactNode) => React.ReactNode;
 }
@@ -74,6 +75,7 @@ export function SmartLinkShell({
   children,
   heroOverlay,
   onMenuOpen,
+  showBrandMark = true,
   artworkWrapper,
 }: SmartLinkShellProps) {
   const artworkImage = artworkUrl ? (
@@ -105,12 +107,16 @@ export function SmartLinkShell({
           <PublicSurfaceHeader
             className='px-5 pt-[max(env(safe-area-inset-top),20px)]'
             leftSlot={
-              <BrandLogo
-                size={22}
-                tone='white'
-                rounded={false}
-                className='opacity-45 drop-shadow-[0_1px_4px_rgba(0,0,0,0.4)]'
-              />
+              showBrandMark ? (
+                <span data-testid='smart-link-brand-mark'>
+                  <BrandLogo
+                    size={22}
+                    tone='white'
+                    rounded={false}
+                    className='opacity-45 drop-shadow-[0_1px_4px_rgba(0,0,0,0.4)]'
+                  />
+                </span>
+              ) : null
             }
             rightSlot={
               <button

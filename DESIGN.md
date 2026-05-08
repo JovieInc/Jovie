@@ -100,6 +100,18 @@ poster composition; Inter at 80px reads narrow and tech-y in this context.
 | H2 | 24px | 36px | 48px |
 | Body LG | 16px | — | 17px |
 
+### Line Break Quality
+
+- Marketing headlines, hero subheads, CTA copy, card titles, and nav labels
+  must not leave a single orphan word on the final line at desktop, tablet, or
+  mobile widths.
+- Prefer `text-wrap: balance`, tighter `max-width` values, nonbreaking phrase
+  groups, or copy edits over manual `<br>` tags. Use manual breaks only at a
+  natural phrase boundary and verify every responsive breakpoint.
+- When a line has to wrap, it should break at the sentence's logic: clause,
+  object, or paired phrase. Never accept a wrap that strands one word or makes
+  the final line visually weaker than the line above it.
+
 ### OpenType Features
 
 ```css

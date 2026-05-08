@@ -117,6 +117,13 @@ The `DashboardHeader` breadcrumb already renders the page name prominently. Do N
 - Never lowercase the first word of a visible label or heading.
 - Use `capitalizeFirst()` from `apps/web/lib/utils/string-utils.ts` for dynamic data from the database.
 
+### Line Break Quality
+
+- Hero headlines, subheads, section leads, card titles, CTA labels, and nav items must be checked for orphaned final lines on desktop, tablet, and mobile.
+- A single word on the last line is a design bug. Fix it with `text-wrap: balance`, a better `max-width`, nonbreaking phrase groups, or a copy edit.
+- Do not add hard `<br>` tags unless the break is a natural phrase boundary and has been verified at responsive widths.
+- Browser QA for marketing sections must include a visual scan for awkward wraps, clipped text, and lines that feel visually unbalanced.
+
 ### Subtraction Principle (Tim White Canon)
 
 - UI cleanup must follow the subtraction principle: remove before adding.

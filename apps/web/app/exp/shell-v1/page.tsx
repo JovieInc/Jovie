@@ -74,8 +74,10 @@ import {
   Users,
   X,
 } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 import {
   createContext,
+  Suspense,
   useCallback,
   useContext,
   useEffect,
@@ -93,6 +95,7 @@ import type {
 import {
   emptyFilters as emptyLibraryFilters,
   generateAssets as generateLibraryAssets,
+  LIBRARY_DEMO_NOW_MS,
   Drawer as LibraryDrawer,
   EmptyState as LibraryEmptyState,
   Grid as LibraryGrid,
@@ -216,6 +219,23 @@ type CanvasView =
   | 'settings'
   | 'thread'
   | 'onboarding';
+
+function parseCanvasViewParam(value: string | null): CanvasView {
+  switch (value) {
+    case 'demo':
+    case 'releases':
+    case 'tracks':
+    case 'tasks':
+    case 'library':
+    case 'lyrics':
+    case 'settings':
+    case 'thread':
+    case 'onboarding':
+      return value;
+    default:
+      return 'demo';
+  }
+}
 
 type TrackInfo = {
   id: string;
@@ -412,6 +432,21 @@ const ADMIN_WORKSPACE: Workspace = {
   initials: 'AD',
   items: ADMIN_ITEMS,
 };
+
+function canvasViewForNavItem(label: string): CanvasView | null {
+  switch (label) {
+    case 'Dashboard':
+      return 'demo';
+    case 'Releases':
+      return 'releases';
+    case 'Tasks':
+      return 'tasks';
+    case 'Library':
+      return 'library';
+    default:
+      return null;
+  }
+}
 
 // --- Releases mock ---------------------------------------------------------
 type ReleaseType = 'Single' | 'EP' | 'Album';
@@ -1502,7 +1537,9 @@ function formatStreams(n: number) {
   return `${(n / 1_000_000).toFixed(1)}M`;
 }
 
-export default function ShellV1Experiment() {
+function ShellV1ExperimentContent() {
+  const searchParams = useSearchParams();
+  const initialView = parseCanvasViewParam(searchParams.get('view'));
   const [sidebarMode, setSidebarMode] = useState<'docked' | 'floating'>(
     'docked'
   );
@@ -1518,7 +1555,7 @@ export default function ShellV1Experiment() {
   const [loaderPhase, setLoaderPhase] = useState<'bloom' | 'reveal' | 'done'>(
     'bloom'
   );
-  const [view, setView] = useState<CanvasView>('demo');
+  const [view, setView] = useState<CanvasView>(initialView);
   // Install / upgrade banner — togglable from the dev picker so the
   // styled state is reviewable. Off by default.
   const [installBannerOpen, setInstallBannerOpen] = useState(false);
@@ -2662,6 +2699,14 @@ export default function ShellV1Experiment() {
   );
 }
 
+export default function ShellV1Experiment() {
+  return (
+    <Suspense fallback={<div className='min-h-screen bg-[#050608]' />}>
+      <ShellV1ExperimentContent />
+    </Suspense>
+  );
+}
+
 // Cold-start loader. Black canvas with the Jovie mark blooming centered,
 // then gliding toward where it lives in the sidebar (~24px x 24px from
 // top-left of the page) while the app fades in underneath. The mark in
@@ -3103,15 +3148,28 @@ function Sidebar({
                 collapsed={collapsed}
                 tight={tight}
               >
-                {ws.items.map(item => (
-                  <SidebarNavItem
-                    key={item.label}
-                    item={item}
-                    collapsed={collapsed}
-                    nested={!collapsed}
-                    tight={tight}
-                  />
-                ))}
+                {ws.items.map(item => {
+                  const view = canvasViewForNavItem(item.label);
+                  return (
+                    <SidebarNavItem
+                      key={item.label}
+                      item={{
+                        ...item,
+                        active:
+                          view !== null
+                            ? activeView === view
+                            : item.active && activeView === 'demo',
+                        onActivate:
+                          view && onSelectView
+                            ? () => onSelectView(view)
+                            : item.onActivate,
+                      }}
+                      collapsed={collapsed}
+                      nested={!collapsed}
+                      tight={tight}
+                    />
+                  );
+                })}
               </SidebarSection>
             ))}
           </div>
@@ -3781,15 +3839,7 @@ function DashboardHome() {
     []
   );
   const current = sorted[index] ?? sorted[0];
-  const hour = new Date().getHours();
-  const greeting =
-    hour < 5
-      ? 'Up late, Tim'
-      : hour < 12
-        ? 'Good morning, Tim'
-        : hour < 18
-          ? 'Afternoon, Tim'
-          : 'Evening, Tim';
+  const greeting = 'Good morning, Tim';
   const advance = () => setIndex(i => (i + 1) % sorted.length);
 
   return (
@@ -3944,7 +3994,8 @@ const LIBRARY_SAVED_PREDICATES: Record<
   review: a => a.status === 'review',
   'this-noise': a => a.release === 'this-noise',
   'this-week': a => {
-    const days = (Date.now() - new Date(a.addedAt).getTime()) / 86400000;
+    const days =
+      (LIBRARY_DEMO_NOW_MS - new Date(a.addedAt).getTime()) / 86400000;
     return days <= 7 && a.generatedBy === 'jovie';
   },
 };

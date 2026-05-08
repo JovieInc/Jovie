@@ -12,14 +12,15 @@ export interface HomepageHeroCarouselSlide {
 
 export const HOMEPAGE_LAUNCH_COPY = {
   seo: {
-    title: 'Jovie | Drop more music, with less work.',
+    title: 'Jovie | Release more music with less work',
     description:
       'Jovie gives artists one workspace for profiles, releases, fan capture, and release momentum.',
   },
   hero: {
-    eyebrow: 'Meet Jovie',
-    headline: 'Drop more music, with less work.',
-    subhead: 'Release music faster and grow your audience effortlessly.',
+    eyebrow: 'Release operating system',
+    headline: 'Release more music with less work',
+    subhead:
+      'Plan the drop, route every fan, and keep the next release moving.',
     primaryCta: {
       label: 'Start Free Trial',
       href: APP_ROUTES.SIGNUP,
