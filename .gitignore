@@ -39,6 +39,9 @@ apps/web/artifacts/
 # vercel
 .vercel
 
+# Vercel Workflow DevKit local world state
+.workflow-data/
+
 # typescript
 *.tsbuildinfo
 .cache/

@@ -43,9 +43,20 @@ export const DEV_OVERLAY_SELECTORS = [
   // Next.js dev overlays
   '[data-nextjs-dialog-overlay]',
   '[data-nextjs-toast]',
+  '[data-nextjs-dev-tools-button]',
   'nextjs-portal',
+  '#nextjs-dev-tools-menu',
+  '#nextjs__container_errors_label',
   // Next.js dev build indicator — explicit selector in case nextjs-portal doesn't catch it
   '[data-nextjs-build-indicator]',
+] as const;
+
+const DEV_OVERLAY_TEXT_PATTERNS = [
+  '\\b\\d+\\s+Issue(s)?\\b',
+  'Unhandled Runtime Error',
+  'Build Error',
+  'Hydration failed',
+  'In HTML,\\s*<button>\\s*cannot be a descendant',
 ] as const;
 
 /** Wait for network to settle and animations to finish */
@@ -73,21 +84,39 @@ export async function hideTransientUI(page: Page) {
  * Call after hideTransientUI() and before page.screenshot() to catch regressions.
  */
 export async function assertNoDevOverlays(page: Page) {
-  const results = await page.evaluate((selectors: readonly string[]) => {
-    const visible: string[] = [];
-    for (const selector of selectors) {
-      const els = document.querySelectorAll(selector);
-      for (const el of els) {
-        const htmlEl = el as HTMLElement;
-        const style = window.getComputedStyle(htmlEl);
-        if (style.display !== 'none' && style.visibility !== 'hidden') {
-          visible.push(selector);
-          break;
+  const results = await page.evaluate(
+    ({
+      selectors,
+      textPatterns,
+    }: {
+      readonly selectors: readonly string[];
+      readonly textPatterns: readonly string[];
+    }) => {
+      const visible: string[] = [];
+      for (const selector of selectors) {
+        const els = document.querySelectorAll(selector);
+        for (const el of els) {
+          const htmlEl = el as HTMLElement;
+          const style = window.getComputedStyle(htmlEl);
+          if (style.display !== 'none' && style.visibility !== 'hidden') {
+            visible.push(selector);
+            break;
+          }
         }
       }
+      const visibleText = document.body.innerText;
+      for (const pattern of textPatterns) {
+        if (new RegExp(pattern, 'i').test(visibleText)) {
+          visible.push(pattern);
+        }
+      }
+      return visible;
+    },
+    {
+      selectors: DEV_OVERLAY_SELECTORS,
+      textPatterns: DEV_OVERLAY_TEXT_PATTERNS,
     }
-    return visible;
-  }, DEV_OVERLAY_SELECTORS);
+  );
 
   if (results.length > 0) {
     throw new Error(

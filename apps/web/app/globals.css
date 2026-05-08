@@ -80,6 +80,24 @@ body:has(.profile-viewport) {
   }
 }
 
+/* HUD kiosk page — token-only TV/wallboard rendering. Scrolls on the document
+   so the bottom cards (AI ops, Default status hero) are reachable. Only applied
+   when the kiosk-mode <main> is the dominant surface; admin/shell renderings
+   of the same body component must NOT include this class so they keep using
+   the AppShellFrame internal scroll container. */
+html:has(.hud-kiosk-viewport) {
+  height: auto;
+  min-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: auto;
+}
+body:has(.hud-kiosk-viewport) {
+  height: auto;
+  min-height: 100%;
+  overflow: visible;
+  overscroll-behavior: auto;
+}
+
 /* Compact profile — override CTA styles so button ↔ composer is zero-shift */
 .compact-subscribe-section {
   /* Kill heading — not needed in compact */

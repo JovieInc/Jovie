@@ -30,6 +30,7 @@ export type AdminOutreachQueue = (typeof adminOutreachQueues)[number];
 
 export type AdminWorkspaceId =
   | 'overview'
+  | 'ops'
   | 'people'
   | 'growth'
   | 'platform_connections'
@@ -50,6 +51,7 @@ export interface AdminNavRegistryItem {
 
 export const ADMIN_PRIMARY_WORKSPACE_IDS = [
   'overview',
+  'ops',
   'people',
   'growth',
   'platform_connections',
@@ -68,6 +70,13 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     label: 'Overview',
     href: APP_ROUTES.ADMIN,
     description: 'Operator launchpad for business, people, and system health',
+    section: 'workspaces',
+  },
+  {
+    id: 'ops',
+    label: 'Ops',
+    href: APP_ROUTES.ADMIN_OPS,
+    description: 'Live operations: deploys, AI ops, runway, blockers',
     section: 'workspaces',
   },
   {

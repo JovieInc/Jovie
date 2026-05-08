@@ -6,6 +6,7 @@ import {
   CalendarDays,
   CheckSquare,
   FolderKanban,
+  Gauge,
   HandCoins,
   Home,
   IdCard,
@@ -174,6 +175,7 @@ export const settingsNavigation: NavItem[] = [
 
 const adminIconById = {
   overview: LayoutDashboard,
+  ops: Gauge,
   people: Users,
   growth: FolderKanban,
   platform_connections: Cable,
@@ -218,14 +220,6 @@ export interface AdminNavSection {
 
 export const adminNavigationSections: AdminNavSection[] = [
   {
-    label: 'Workspaces',
-    items: adminNavigation,
-  },
-];
-
-export const adminSettingsNavigationSections: AdminNavSection[] = [
-  {
-    // Settings keeps quick links to the primary workspaces alongside utilities.
     label: 'Workspaces',
     items: adminNavigation,
   },

@@ -5,7 +5,7 @@ set -euo pipefail
 # Uses git's built-in conflict marker detector, fails fast before lint/typecheck.
 output=$(LC_ALL=C git diff --cached --check 2>&1 || true)
 
-if echo "$output" | grep -q "leftover conflict marker"; then
+if echo "$output" | LC_ALL=C grep -q "leftover conflict marker"; then
   echo "ERROR: Merge conflict markers found in staged files:"
   echo "$output" | grep "leftover conflict marker"
   echo ""

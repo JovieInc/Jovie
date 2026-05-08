@@ -55,6 +55,28 @@ Key routing rules:
 - Visual audit, design polish → invoke `design-review`
 - Architecture review → invoke `plan-eng-review`
 
+## gbrain (long-term memory layer)
+
+For cross-session recall and prior-art lookup, consult gbrain via MCP **only when the question touches durable founder/strategic context**. Do not ritually query for purely local code questions.
+
+Conditional triggers:
+- Decisions involving people, companies, customers, fundraising, pricing, or competitive positioning
+- Repeated strategic questions ("did we already decide X?")
+- Architectural rationale that spans more than one session
+- Cross-repo recall (Jovie code + ops + meetings + email + calendar once those senses are wired)
+
+When triggered, prefer:
+- `mcp__gbrain__query` — natural-language hybrid search (vector + keyword + graph)
+- `mcp__gbrain__get` — fetch a known page by slug
+- `mcp__gbrain__graph_query` — typed-edge traversal (e.g., who advised whom)
+
+Skip when:
+- The question is pure local code (use Grep, Read, the codebase docs in `docs/`)
+- MCP tools aren't loaded in the session (call out as "gbrain unavailable" instead of failing)
+- gbrain doctor health is < 70 (check via `gbrain doctor --fast --json`)
+
+After shipping a non-trivial decision, write a brief decision page so the next agent (or future you) can find it. ruflo agentdb is for swarm-session memory; gbrain is for long-term founder/personal memory. They are complementary, not redundant.
+
 ## Skill File Hygiene
 
 gstack skill files are part of the agent control plane. Keep them fast, stable, and maintainable:

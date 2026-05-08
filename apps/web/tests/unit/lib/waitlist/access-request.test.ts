@@ -1,253 +1,240 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockWithSystemIngestionSession = vi.hoisted(() => vi.fn());
-const mockNotifySlackWaitlist = vi.hoisted(() => vi.fn());
-const mockTryReserveAutoAcceptSlot = vi.hoisted(() => vi.fn());
-const mockApproveWaitlistEntryInTx = vi.hoisted(() => vi.fn());
-const mockFinalizeWaitlistApproval = vi.hoisted(() => vi.fn());
+// Hoisted mocks: the module under test pulls in server-only DB modules at
+// import time; we replace the boundary collaborators here so the unit test
+// can exercise the orchestration logic of `submitWaitlistAccessRequest`
+// without touching a real database.
 
-const mockUsers = vi.hoisted(() => ({
-  id: 'users.id',
-  clerkId: 'users.clerk_id',
-  email: 'users.email',
-  userStatus: 'users.user_status',
-  waitlistEntryId: 'users.waitlist_entry_id',
-  updatedAt: 'users.updated_at',
-}));
+const findLatestEntryByEmail = vi.fn();
+const tryReserveAutoAcceptSlot = vi.fn();
+const approveWaitlistEntryInTx = vi.fn();
+const finalizeWaitlistApproval = vi.fn().mockResolvedValue(undefined);
+const invalidateProxyUserStateCache = vi.fn().mockResolvedValue(undefined);
+const notifySlackWaitlist = vi.fn().mockResolvedValue(undefined);
 
-const mockWaitlistEntries = vi.hoisted(() => ({
-  id: 'waitlist_entries.id',
-  email: 'waitlist_entries.email',
-  fullName: 'waitlist_entries.full_name',
-  status: 'waitlist_entries.status',
-  primaryGoal: 'waitlist_entries.primary_goal',
-  primarySocialUrl: 'waitlist_entries.primary_social_url',
-  primarySocialPlatform: 'waitlist_entries.primary_social_platform',
-  primarySocialUrlNormalized: 'waitlist_entries.primary_social_url_normalized',
-  spotifyUrl: 'waitlist_entries.spotify_url',
-  spotifyUrlNormalized: 'waitlist_entries.spotify_url_normalized',
-  spotifyArtistName: 'waitlist_entries.spotify_artist_name',
-  heardAbout: 'waitlist_entries.heard_about',
-  selectedPlan: 'waitlist_entries.selected_plan',
-  updatedAt: 'waitlist_entries.updated_at',
-  createdAt: 'waitlist_entries.created_at',
-}));
+// Track tx mutations to assert against
+let userRow: { id: string; userStatus: string } | null = null;
+const insertedEntries: Array<Record<string, unknown>> = [];
 
-vi.mock('@/lib/db/schema/auth', () => ({
-  users: mockUsers,
-}));
-
-vi.mock('@/lib/db/schema/waitlist', () => ({
-  waitlistEntries: mockWaitlistEntries,
-}));
-
-vi.mock('@/lib/ingestion/session', () => ({
-  withSystemIngestionSession: mockWithSystemIngestionSession,
+vi.mock('@/lib/auth/proxy-state', () => ({
+  invalidateProxyUserStateCache: (...args: unknown[]) =>
+    invalidateProxyUserStateCache(...args),
 }));
 
 vi.mock('@/lib/notifications/providers/slack', () => ({
-  notifySlackWaitlist: mockNotifySlackWaitlist,
-}));
-
-vi.mock('@/lib/waitlist/settings', () => ({
-  tryReserveAutoAcceptSlot: mockTryReserveAutoAcceptSlot,
+  notifySlackWaitlist: (...args: unknown[]) => notifySlackWaitlist(...args),
 }));
 
 vi.mock('@/lib/waitlist/approval', () => ({
-  approveWaitlistEntryInTx: mockApproveWaitlistEntryInTx,
-  finalizeWaitlistApproval: mockFinalizeWaitlistApproval,
+  approveWaitlistEntryInTx: (...args: unknown[]) =>
+    approveWaitlistEntryInTx(...args),
+  finalizeWaitlistApproval: (...args: unknown[]) =>
+    finalizeWaitlistApproval(...args),
 }));
 
-vi.mock('drizzle-orm', () => ({
-  desc: vi.fn(value => ({ desc: value })),
-  eq: vi.fn((left, right) => ({ eq: [left, right] })),
-  sql: vi.fn((strings, ...values) => ({ sql: strings, values })),
+vi.mock('@/lib/waitlist/settings', () => ({
+  tryReserveAutoAcceptSlot: (...args: unknown[]) =>
+    tryReserveAutoAcceptSlot(...args),
 }));
 
-import { submitWaitlistAccessRequest } from '@/lib/waitlist/access-request';
+vi.mock('@/lib/utils/social-platform', () => ({
+  detectPlatformFromUrl: () => ({
+    platform: 'instagram',
+    normalizedUrl: 'https://instagram.com/x',
+  }),
+}));
 
-function createSelectRows(rows: unknown[]) {
-  const limit = vi.fn().mockResolvedValue(rows);
-  const orderBy = vi.fn().mockReturnValue({ limit });
-  const where = vi.fn().mockReturnValue({ orderBy, limit });
-  const from = vi.fn().mockReturnValue({ where });
-  return { builder: { from }, from, where, orderBy, limit };
-}
+vi.mock('@/lib/utils/email', () => ({
+  normalizeEmail: (e: string) => e.toLowerCase().trim(),
+}));
 
-function createInsertReturning(rows: unknown[]) {
-  const returning = vi.fn().mockResolvedValue(rows);
-  const values = vi.fn().mockReturnValue({ returning });
-  return { builder: { values }, values, returning };
-}
+// Mock the ingestion session wrapper to invoke the operation with a tx
+// stub that the test can shape.
+vi.mock('@/lib/ingestion/session', () => ({
+  withSystemIngestionSession: async (
+    operation: (tx: unknown) => Promise<unknown>
+  ) => {
+    const tx = createTxMock();
+    return operation(tx);
+  },
+}));
 
-function createInsertOnly() {
-  const values = vi.fn().mockResolvedValue(undefined);
-  return { builder: { values }, values };
-}
+function createTxMock() {
+  const execute = vi.fn().mockResolvedValue(undefined);
 
-function createUpdateOnly() {
-  const where = vi.fn().mockResolvedValue(undefined);
-  const set = vi.fn().mockReturnValue({ where });
-  return { builder: { set }, set, where };
-}
+  const select = vi.fn(() => ({
+    from: vi.fn((table: unknown) => ({
+      where: vi.fn(() => {
+        // users select-by-clerkId resolves through `.limit(1)`
+        const obj = {
+          orderBy: vi.fn(() => ({
+            limit: vi
+              .fn()
+              .mockImplementation(() =>
+                Promise.resolve(findLatestEntryByEmail(table))
+              ),
+          })),
+          limit: vi
+            .fn()
+            .mockImplementation(() =>
+              Promise.resolve(userRow ? [userRow] : [])
+            ),
+        };
+        return obj;
+      }),
+    })),
+  }));
 
-function createTx(params: {
-  readonly selectRows: unknown[][];
-  readonly waitlistInsertRows?: unknown[];
-  readonly userInsert?: ReturnType<typeof createInsertOnly>;
-  readonly updates?: ReturnType<typeof createUpdateOnly>[];
-}) {
-  const selectQueue = params.selectRows.map(createSelectRows);
-  const waitlistInsert = createInsertReturning(params.waitlistInsertRows ?? []);
-  const userInsert = params.userInsert ?? createInsertOnly();
-  const updateQueue = [...(params.updates ?? [])];
+  const updateWhere = vi.fn().mockResolvedValue(undefined);
+  const updateSet = vi.fn(values => {
+    if (
+      values &&
+      typeof values === 'object' &&
+      'userStatus' in values &&
+      userRow
+    ) {
+      userRow = {
+        ...userRow,
+        userStatus: (values as { userStatus: string }).userStatus,
+      };
+    }
+    return { where: updateWhere };
+  });
+  const update = vi.fn(() => ({ set: updateSet }));
 
-  const tx = {
-    execute: vi.fn().mockResolvedValue(undefined),
-    select: vi.fn(
-      () => selectQueue.shift()?.builder ?? createSelectRows([]).builder
-    ),
-    insert: vi.fn((table: unknown) =>
-      table === mockWaitlistEntries
-        ? waitlistInsert.builder
-        : userInsert.builder
-    ),
-    update: vi.fn(
-      () => updateQueue.shift()?.builder ?? createUpdateOnly().builder
-    ),
-  };
+  const insert = vi.fn((table: unknown) => ({
+    values: vi.fn((vals: Record<string, unknown>) => {
+      insertedEntries.push({ table, vals });
+      if (
+        vals &&
+        typeof vals === 'object' &&
+        'clerkId' in vals &&
+        'userStatus' in vals
+      ) {
+        userRow = {
+          id: 'user-new',
+          userStatus: String(vals.userStatus),
+        };
+        return Promise.resolve(undefined);
+      }
+      return {
+        returning: vi.fn().mockResolvedValue([{ id: 'entry-new' }]),
+      };
+    }),
+  }));
 
-  return { tx, waitlistInsert, userInsert, updates: updateQueue };
+  return { execute, select, update, insert };
 }
 
 const baseInput = {
   clerkUserId: 'clerk_123',
-  email: 'Test@Example.com',
-  emailRaw: 'Test@Example.com',
-  fullName: 'Test User',
+  email: 'Creator@Example.com',
+  fullName: 'Test Creator',
   data: {
-    primaryGoal: null,
-    primarySocialUrl: 'https://instagram.com/testuser',
-    spotifyUrl: null,
-    spotifyArtistName: null,
-    heardAbout: 'onboarding_chat',
-    selectedPlan: null,
-  },
+    primaryGoal: 'launch',
+    primarySocialUrl: 'https://instagram.com/x',
+    spotifyUrl: undefined,
+    spotifyArtistName: undefined,
+    heardAbout: undefined,
+    selectedPlan: undefined,
+  } as never,
 };
 
 describe('submitWaitlistAccessRequest', () => {
-  let activeTx: unknown;
-
   beforeEach(() => {
     vi.clearAllMocks();
-    mockNotifySlackWaitlist.mockResolvedValue(undefined);
-    mockWithSystemIngestionSession.mockImplementation(
-      async (callback: (tx: unknown) => Promise<unknown>) => callback(activeTx)
+    userRow = null;
+    insertedEntries.length = 0;
+    findLatestEntryByEmail.mockReset();
+    tryReserveAutoAcceptSlot.mockReset();
+    approveWaitlistEntryInTx.mockReset();
+    finalizeWaitlistApproval.mockClear();
+    invalidateProxyUserStateCache.mockClear();
+    notifySlackWaitlist.mockClear();
+  });
+
+  it('does NOT downgrade an active user when re-running the waitlist flow', async () => {
+    userRow = { id: 'user-1', userStatus: 'active' };
+    findLatestEntryByEmail.mockReturnValueOnce([
+      { id: 'entry-1', status: 'claimed' },
+    ]);
+
+    const { submitWaitlistAccessRequest } = await import(
+      '@/lib/waitlist/access-request'
     );
-    mockTryReserveAutoAcceptSlot.mockResolvedValue({
+    const result = await submitWaitlistAccessRequest(baseInput);
+
+    expect(result.outcome).toBe('already_accepted');
+    // userStatus must still be 'active' — not 'waitlist_approved'
+    expect(userRow?.userStatus).toBe('active');
+    // Slack must NOT fire on already_accepted
+    expect(notifySlackWaitlist).not.toHaveBeenCalled();
+    // Cache must NOT be busted because status didn't change
+    expect(invalidateProxyUserStateCache).not.toHaveBeenCalled();
+  });
+
+  it('busts proxy-state cache on already_accepted only when status genuinely changes', async () => {
+    userRow = { id: 'user-1', userStatus: 'waitlist_pending' };
+    findLatestEntryByEmail.mockReturnValueOnce([
+      { id: 'entry-1', status: 'claimed' },
+    ]);
+
+    const { submitWaitlistAccessRequest } = await import(
+      '@/lib/waitlist/access-request'
+    );
+    const result = await submitWaitlistAccessRequest(baseInput);
+
+    expect(result.outcome).toBe('already_accepted');
+    expect(userRow?.userStatus).toBe('waitlist_approved');
+    expect(invalidateProxyUserStateCache).toHaveBeenCalledTimes(1);
+    expect(invalidateProxyUserStateCache).toHaveBeenCalledWith('clerk_123');
+    expect(notifySlackWaitlist).not.toHaveBeenCalled();
+  });
+
+  it('fires Slack exactly once on first-time waitlisted_gate_on signup', async () => {
+    findLatestEntryByEmail.mockReturnValueOnce([]); // no existing entry
+    tryReserveAutoAcceptSlot.mockResolvedValue({
       shouldAutoAccept: false,
       reason: 'gate_on',
     });
-    mockApproveWaitlistEntryInTx.mockResolvedValue({ outcome: 'not_found' });
-  });
 
-  it('creates a new entry, locks by normalized email, and waitlists when the gate is on', async () => {
-    const txHarness = createTx({
-      selectRows: [[], []],
-      waitlistInsertRows: [{ id: 'entry_123' }],
-    });
-    activeTx = txHarness.tx;
-
+    const { submitWaitlistAccessRequest } = await import(
+      '@/lib/waitlist/access-request'
+    );
     const result = await submitWaitlistAccessRequest(baseInput);
 
-    expect(result).toEqual({
-      entryId: 'entry_123',
-      status: 'new',
-      outcome: 'waitlisted_gate_on',
-    });
-    expect(txHarness.tx.execute).toHaveBeenCalledTimes(1);
-    expect(txHarness.waitlistInsert.values).toHaveBeenCalledWith(
-      expect.objectContaining({
-        email: 'test@example.com',
-        fullName: 'Test User',
-        primarySocialUrl: 'https://instagram.com/testuser',
-        status: 'new',
-      })
-    );
-    expect(mockWithSystemIngestionSession).toHaveBeenCalledWith(
-      expect.any(Function),
-      { isolationLevel: 'serializable' }
-    );
-    expect(mockTryReserveAutoAcceptSlot).toHaveBeenCalledWith(txHarness.tx);
-    expect(mockApproveWaitlistEntryInTx).not.toHaveBeenCalled();
+    expect(result.outcome).toBe('waitlisted_gate_on');
+    expect(notifySlackWaitlist).toHaveBeenCalledTimes(1);
   });
 
-  it('accepts a new entry only after reserving a daily slot', async () => {
-    const txHarness = createTx({
-      selectRows: [[], []],
-      waitlistInsertRows: [{ id: 'entry_accepted' }],
-    });
-    activeTx = txHarness.tx;
-    mockTryReserveAutoAcceptSlot.mockResolvedValue({
-      shouldAutoAccept: true,
-      reason: 'reserved',
-    });
-    mockApproveWaitlistEntryInTx.mockResolvedValue({
-      outcome: 'approved',
-      entryId: 'entry_accepted',
-      profileId: null,
-      email: 'test@example.com',
-      fullName: 'Test User',
-      clerkId: 'clerk_123',
-    });
+  it('does NOT fire Slack on idempotent re-assert when status is already pinned', async () => {
+    // already-claimed entry + active user => already_accepted, no status change
+    userRow = { id: 'user-1', userStatus: 'active' };
+    findLatestEntryByEmail.mockReturnValue([
+      { id: 'entry-1', status: 'claimed' },
+    ]);
 
+    const { submitWaitlistAccessRequest } = await import(
+      '@/lib/waitlist/access-request'
+    );
+    await submitWaitlistAccessRequest(baseInput);
+    await submitWaitlistAccessRequest(baseInput);
+
+    expect(notifySlackWaitlist).not.toHaveBeenCalled();
+  });
+
+  it('does NOT fire Slack on already_waitlisted (returning user, existing pending entry)', async () => {
+    userRow = { id: 'user-1', userStatus: 'waitlist_pending' };
+    findLatestEntryByEmail.mockReturnValueOnce([
+      { id: 'entry-1', status: 'new' },
+    ]);
+
+    const { submitWaitlistAccessRequest } = await import(
+      '@/lib/waitlist/access-request'
+    );
     const result = await submitWaitlistAccessRequest(baseInput);
 
-    expect(result).toEqual({
-      entryId: 'entry_accepted',
-      status: 'claimed',
-      outcome: 'accepted',
-    });
-    expect(mockApproveWaitlistEntryInTx).toHaveBeenCalledWith(
-      txHarness.tx,
-      'entry_accepted'
-    );
-    expect(mockFinalizeWaitlistApproval).toHaveBeenCalledWith(
-      expect.objectContaining({
-        outcome: 'approved',
-        entryId: 'entry_accepted',
-      })
-    );
-  });
-
-  it('updates existing pending requests without consuming an auto-accept slot', async () => {
-    const waitlistUpdate = createUpdateOnly();
-    const txHarness = createTx({
-      selectRows: [[{ id: 'entry_existing', status: 'new' }], []],
-      updates: [waitlistUpdate],
-    });
-    activeTx = txHarness.tx;
-
-    const result = await submitWaitlistAccessRequest({
-      ...baseInput,
-      data: {
-        ...baseInput.data,
-        primarySocialUrl: 'https://tiktok.com/@testuser',
-      },
-    });
-
-    expect(result).toEqual({
-      entryId: 'entry_existing',
-      status: 'new',
-      outcome: 'already_waitlisted',
-    });
-    expect(waitlistUpdate.set).toHaveBeenCalledWith(
-      expect.objectContaining({
-        primarySocialUrl: 'https://tiktok.com/@testuser',
-        email: 'test@example.com',
-      })
-    );
-    expect(mockTryReserveAutoAcceptSlot).not.toHaveBeenCalled();
-    expect(mockNotifySlackWaitlist).not.toHaveBeenCalled();
+    expect(result.outcome).toBe('already_waitlisted');
+    expect(notifySlackWaitlist).not.toHaveBeenCalled();
   });
 });

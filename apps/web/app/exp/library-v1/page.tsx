@@ -43,6 +43,9 @@ import { cn } from '@/lib/utils';
 
 const EASE_CINEMATIC = 'cubic-bezier(0.32, 0.72, 0, 1)';
 const DURATION_CINEMATIC = 420;
+export const LIBRARY_DEMO_NOW_MS = new Date(
+  '2026-04-25T12:00:00.000Z'
+).getTime();
 
 // Carbon palette (locked theme — same tokens as shell-v1).
 // Text tokens are omitted here: they are already defined in the global
@@ -164,6 +167,44 @@ const TYPES: AssetType[] = [
   'remix_art',
   'master',
 ];
+
+const EDITORIAL_POSTERS = {
+  cover: [
+    '/img/releases/the-deep-end.jpg',
+    '/img/releases/take-me-over.jpg',
+    '/images/mock-profile/tim-white-dont-look-down-card.jpg',
+  ],
+  reel: [
+    '/images/mock-profile/tim-white-dont-look-down-hero.jpg',
+    '/images/mock-profile/tim-white-dont-look-down-card.jpg',
+    '/images/hero/tim-profile.avif',
+  ],
+  visualizer: [
+    '/img/releases/never-say-a-word.jpg',
+    '/images/mock-profile/tim-white-dont-look-down-card.jpg',
+    '/img/releases/the-deep-end.jpg',
+  ],
+  lyric_clip: [
+    '/images/mock-profile/tim-white-dont-look-down-hero.jpg',
+    '/images/mock-profile/tim-white-dont-look-down-card.jpg',
+    '/images/hero/tim-profile.avif',
+  ],
+  alt_crop: [
+    '/images/mock-profile/tim-white-dont-look-down-card.jpg',
+    '/img/releases/never-say-a-word.jpg',
+    '/img/releases/the-deep-end.jpg',
+  ],
+  remix_art: [
+    '/img/releases/take-me-over.jpg',
+    '/img/releases/never-say-a-word.jpg',
+    '/images/mock-profile/tim-white-dont-look-down-card.jpg',
+  ],
+  master: [
+    '/img/releases/the-deep-end.jpg',
+    '/img/releases/take-me-over.jpg',
+    '/images/mock-profile/tim-white-dont-look-down-hero.jpg',
+  ],
+} satisfies Record<AssetType, readonly string[]>;
 
 // Deterministic mock data — repeatable visuals across reloads.
 export function generateAssets(): Asset[] {
@@ -350,13 +391,13 @@ export function generateAssets(): Asset[] {
     const status = statusCycle[i % statusCycle.length];
     const generatedBy = generatedCycle[i % generatedCycle.length];
     const dayOffset = (i * 1.7) % 14;
-    const captured = new Date(Date.now() - dayOffset * 86400000).toISOString();
-    const added = new Date(
-      Date.now() - Math.max(0, dayOffset - 1) * 86400000
+    const captured = new Date(
+      LIBRARY_DEMO_NOW_MS - dayOffset * 86400000
     ).toISOString();
-    const releaseColor =
-      RELEASES.find(r => r.id === seed.release)?.color ?? '#22d3ee';
-    const poster = posterFor(seed.type, releaseColor, i);
+    const added = new Date(
+      LIBRARY_DEMO_NOW_MS - Math.max(0, dayOffset - 1) * 86400000
+    ).toISOString();
+    const poster = posterFor(seed.type, i);
     return {
       id: `asset-${String(i + 1).padStart(2, '0')}`,
       title: seed.title,
@@ -396,22 +437,9 @@ export function generateAssets(): Asset[] {
   });
 }
 
-function posterFor(type: AssetType, releaseColor: string, i: number): string {
-  // Inline SVG data URI — deterministic, no network. Tinted with release color.
-  const seed = (i * 53 + 17) % 360;
-  const hue1 = seed;
-  const hue2 = (seed + 80) % 360;
-  const grain =
-    type === 'cover' || type === 'master' || type === 'remix_art'
-      ? 'circle'
-      : 'lines';
-  // eslint-disable-next-line @jovie/icon-usage -- inline SVG poster string, not a UI icon
-  const svg = `<?xml version='1.0'?><svg xmlns='http://www.w3.org/2000/svg' width='800' height='800' viewBox='0 0 800 800'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='hsl(${hue1}, 50%, 18%)'/><stop offset='1' stop-color='hsl(${hue2}, 60%, 8%)'/></linearGradient><radialGradient id='r' cx='0.7' cy='0.3' r='0.8'><stop offset='0' stop-color='${releaseColor}' stop-opacity='0.55'/><stop offset='1' stop-color='${releaseColor}' stop-opacity='0'/></radialGradient></defs><rect width='800' height='800' fill='url(%23g)'/><rect width='800' height='800' fill='url(%23r)'/>${
-    grain === 'circle'
-      ? `<circle cx='${200 + ((i * 17) % 400)}' cy='${200 + ((i * 23) % 400)}' r='${120 + ((i * 7) % 80)}' fill='${releaseColor}' fill-opacity='0.18'/>`
-      : `<g stroke='${releaseColor}' stroke-opacity='0.22' stroke-width='1.5'><line x1='0' y1='${200 + i * 6}' x2='800' y2='${260 + i * 4}'/><line x1='0' y1='${360 + i * 5}' x2='800' y2='${420 + i * 3}'/><line x1='0' y1='${520 + i * 4}' x2='800' y2='${560 + i * 2}'/></g>`
-  }</svg>`;
-  return `data:image/svg+xml;utf8,${svg.replace(/#/g, '%23').replace(/"/g, "'")}`;
+function posterFor(type: AssetType, i: number): string {
+  const posters = EDITORIAL_POSTERS[type];
+  return posters[i % posters.length] ?? posters[0];
 }
 
 function tagsFor(type: AssetType, release: string): string[] {
@@ -467,7 +495,8 @@ const SAVED_VIEWS: SavedView[] = [
     id: 'this-week',
     label: 'Generated this week',
     predicate: a => {
-      const days = (Date.now() - new Date(a.addedAt).getTime()) / 86400000;
+      const days =
+        (LIBRARY_DEMO_NOW_MS - new Date(a.addedAt).getTime()) / 86400000;
       return days <= 7 && a.generatedBy === 'jovie';
     },
   },
@@ -506,7 +535,7 @@ function hasFilters(f: Filters): boolean {
 }
 
 function relativeTime(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime();
+  const ms = LIBRARY_DEMO_NOW_MS - new Date(iso).getTime();
   const days = Math.floor(ms / 86400000);
   if (days === 0) return 'today';
   if (days === 1) return 'yesterday';
@@ -1293,11 +1322,9 @@ function AssetCard({
   const release = RELEASES.find(r => r.id === asset.release);
   const TypeIcon = TYPE_ICONS[asset.type];
   return (
-    <button
-      type='button'
-      onClick={onSelect}
+    <div
       className={cn(
-        'group relative flex flex-col text-left rounded-[10px] border bg-(--linear-app-content-surface) overflow-hidden transition-colors duration-subtle ease-out',
+        'group relative flex flex-col overflow-hidden rounded-[10px] border bg-(--linear-app-content-surface) text-left transition-colors duration-subtle ease-out focus-within:ring-1 focus-within:ring-cyan-400/40',
         selected
           ? 'border-cyan-400/50'
           : 'border-(--linear-app-shell-border) hover:border-white/15'
@@ -1313,37 +1340,46 @@ function AssetCard({
           }}
         />
       )}
-      <Poster asset={asset} />
-      <div className='flex flex-col gap-1 px-2.5 pt-2 pb-2.5 min-w-0'>
-        <div className='flex items-center gap-1.5 min-w-0'>
-          <span
-            className={cn(
-              'h-1.5 w-1.5 rounded-full shrink-0',
-              STATUS_DOT[asset.status]
-            )}
-          />
-          <p
-            className='text-[12.5px] font-medium text-primary-token truncate'
-            style={{ letterSpacing: '-0.005em' }}
-          >
-            {asset.title}
-          </p>
-        </div>
-        <div className='flex items-center gap-1.5 text-[10.5px] text-quaternary-token'>
-          <TypeIcon className='h-3 w-3' strokeWidth={2.25} />
-          <span>{TYPE_LABELS[asset.type]}</span>
-          <span className='opacity-50'>·</span>
-          <span className='font-mono tracking-wide'>{asset.aspect}</span>
-          <span className='opacity-50'>·</span>
-          <span className='inline-flex items-center gap-1 truncate text-tertiary-token'>
+      <button
+        type='button'
+        onClick={onSelect}
+        className='flex w-full cursor-pointer flex-col text-left outline-none'
+      >
+        <Poster asset={asset} />
+        <div className='flex flex-col gap-1 px-2.5 pt-2 pb-2.5 min-w-0'>
+          <div className='flex items-center gap-1.5 min-w-0'>
             <span
-              className='h-1.5 w-1.5 rounded-full shrink-0'
-              style={{ background: release?.color }}
+              className={cn(
+                'h-1.5 w-1.5 rounded-full shrink-0',
+                STATUS_DOT[asset.status]
+              )}
             />
-            <span className='truncate'>{release?.title}</span>
-          </span>
+            <p
+              className='text-[12.5px] font-medium text-primary-token truncate'
+              style={{ letterSpacing: '-0.005em' }}
+            >
+              {asset.title}
+            </p>
+          </div>
+          <div className='flex items-center gap-1.5 text-[10.5px] text-quaternary-token'>
+            <TypeIcon className='h-3 w-3' strokeWidth={2.25} />
+            <span>{TYPE_LABELS[asset.type]}</span>
+            <span className='opacity-50'>·</span>
+            <span className='font-mono tracking-wide'>{asset.aspect}</span>
+            <span className='opacity-50'>·</span>
+            <span className='inline-flex items-center gap-1 truncate text-tertiary-token'>
+              <span
+                className='h-1.5 w-1.5 rounded-full shrink-0'
+                style={{ background: release?.color }}
+              />
+              <span className='truncate'>{release?.title}</span>
+            </span>
+          </div>
         </div>
-      </div>
+        <span className='absolute top-2 left-2 inline-flex items-center h-5 px-1.5 rounded text-[10px] font-caption uppercase tracking-[0.06em] text-primary-token bg-black/55 backdrop-blur opacity-0 group-hover:opacity-100 transition-opacity duration-subtle ease-out'>
+          Inspect
+        </span>
+      </button>
       <button
         type='button'
         onClick={e => {
@@ -1364,10 +1400,7 @@ function AssetCard({
           fill={favorite ? 'currentColor' : 'none'}
         />
       </button>
-      <span className='absolute top-2 left-2 inline-flex items-center h-5 px-1.5 rounded text-[10px] font-caption uppercase tracking-[0.06em] text-primary-token bg-black/55 backdrop-blur opacity-0 group-hover:opacity-100 transition-opacity duration-subtle ease-out'>
-        Inspect
-      </span>
-    </button>
+    </div>
   );
 }
 
