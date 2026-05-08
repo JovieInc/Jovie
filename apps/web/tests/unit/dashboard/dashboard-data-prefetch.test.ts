@@ -55,16 +55,18 @@ vi.mock('react', async () => {
 
   return {
     ...actual,
-    cache: <T>(fn: () => Promise<T>) => {
+    cache: <TArgs extends unknown[], TResult>(
+      fn: (...args: TArgs) => Promise<TResult>
+    ) => {
       if (!cacheStore.has(fn)) {
         cacheStore.set(fn, { promise: null });
       }
       const entry = cacheStore.get(fn)!;
-      return () => {
+      return (...args: TArgs) => {
         if (!entry.promise) {
-          entry.promise = fn();
+          entry.promise = fn(...args);
         }
-        return entry.promise as Promise<T>;
+        return entry.promise as Promise<TResult>;
       };
     },
   };
@@ -273,8 +275,9 @@ describe('dashboard data prefetch', () => {
   });
 
   it('retries shell user lookup after auth reconciliation when the clerk row is missing', async () => {
-    // The shell path uses withDbSession (no transaction) + db directly.
-    // Mock db to return empty on first user lookup, then found on retry.
+    // The shell path must keep profile reads inside the same transaction-scoped
+    // session because creator profile visibility depends on RLS.
+    // Mock tx to return empty on first user lookup, then found on retry.
     const profile = {
       id: 'profile_1',
       userId: 'user_db_1',
@@ -287,9 +290,8 @@ describe('dashboard data prefetch', () => {
       updatedAt: new Date('2026-03-31T00:00:00.000Z'),
     };
 
-    const { db } = await import('@/lib/db');
-    const dbSelectMock = vi.mocked(db.select);
-    dbSelectMock
+    const selectMock = vi
+      .fn()
       .mockReturnValueOnce({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
@@ -317,6 +319,9 @@ describe('dashboard data prefetch', () => {
           }),
         }),
       } as never);
+    withDbSessionTxMock.mockImplementationOnce(async handler =>
+      handler({ select: selectMock }, 'user_123')
+    );
 
     const { getDashboardShellData } = await import(
       '@/app/app/(shell)/dashboard/actions/dashboard-data'
@@ -327,6 +332,10 @@ describe('dashboard data prefetch', () => {
     expect(resolveUserStateMock).toHaveBeenCalledWith({
       createDbUserIfMissing: true,
     });
+    expect(withDbSessionTxMock).toHaveBeenCalledWith(expect.any(Function), {
+      clerkUserId: 'user_123',
+    });
+    expect(withDbSessionMock).not.toHaveBeenCalled();
     expect(result.user?.id).toBe('user_db_1');
     expect(result.selectedProfile?.id).toBe('profile_1');
     expect(result.needsOnboarding).toBe(false);
@@ -343,9 +352,8 @@ describe('dashboard data prefetch', () => {
       updatedAt: new Date('2026-03-31T00:00:00.000Z'),
     };
 
-    // Shell path now uses withDbSession (no transaction).
     // First call returns empty profile, second returns recovered profile.
-    withDbSessionMock
+    withDbSessionTxMock
       .mockImplementationOnce(async () => ({
         ...baseDashboardResponse,
         creatorProfiles: [],
@@ -365,7 +373,8 @@ describe('dashboard data prefetch', () => {
 
     const result = await getDashboardShellData('user_123');
 
-    expect(withDbSessionMock).toHaveBeenCalledTimes(2);
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(2);
+    expect(withDbSessionMock).not.toHaveBeenCalled();
     expect(result.selectedProfile?.id).toBe('profile_1');
     expect(result.needsOnboarding).toBe(false);
   });

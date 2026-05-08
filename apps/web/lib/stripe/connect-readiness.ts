@@ -93,7 +93,7 @@ export async function getStripeConnectReadiness(
     .where(eq(creatorProfiles.stripeAccountId, stripeAccountId))
     .limit(1);
 
-  if (!row || !row.stripeAccountId) return null;
+  if (!row?.stripeAccountId) return null;
 
   const cached = row as CachedRow;
 

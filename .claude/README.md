@@ -31,6 +31,7 @@ All files in this directory are checked into the repo and shared across the team
 | `/neon-backup` | Create a manual Neon database backup |
 | `/clean` | Run E2E smoke tests, fix console errors, open PR |
 | `/perf-check` | React/Next.js performance audit |
+| `/perf-loop` | Measurement-first closed-loop performance hardening |
 | `/a11y-audit` | Accessibility and UX compliance audit |
 | `/sonar-fix` | Fix SonarCloud findings |
 | `/ideate` | Run ideation analysis for improvements |
@@ -58,6 +59,8 @@ Hooks run automatically on agent events. Configured in `settings.json`.
 |---------|------|---------|---------|
 | `Bash` | `bash-safety-check.sh` | 5s | Block dangerous shell commands |
 | `Edit\|Write` | `file-protection-check.sh` | 5s | Protect critical files from edits |
+| `Edit\|Write` | `infra-guardrails-check.sh` | 5s | Guard cron and scheduling changes |
+| `Edit\|Write` | `orchestrator-boundary-check.sh` | 5s | Block non-coding profiles from product/CI edits |
 
 ### PostToolUse
 | Matcher | Hook | Timeout | Purpose |
@@ -87,6 +90,7 @@ Use `/review` explicitly when you want the simplify + pre-landing review workflo
 |-------|-------------|
 | `coderabbit-review` | Run CodeRabbit AI code review on changes |
 | `consolidate-ui` | Consolidate UI component patterns |
+| `jovie-performance-hardening` | Measurement-first performance, database, CI, and test-speed hardening loop |
 | `turborepo` | Turborepo monorepo expert (builds, caching, worktrees, OOM) |
 
 ## Adding New Commands

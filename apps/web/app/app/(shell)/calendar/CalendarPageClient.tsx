@@ -288,7 +288,7 @@ export function CalendarPageClient() {
 
   const invalidateEvents = useCallback(() => {
     if (!profileId) return;
-    void queryClient.invalidateQueries({
+    queryClient.invalidateQueries({
       queryKey: queryKeys.events.list(profileId),
     });
   }, [profileId, queryClient]);
@@ -474,7 +474,9 @@ export function CalendarPageClient() {
             onClick={() => setFilter('events')}
           />
           <FilterPill
-            label={`Needs review${pendingCount > 0 ? ` · ${pendingCount}` : ''}`}
+            label={
+              'Needs review' + (pendingCount > 0 ? ' · ' + pendingCount : '')
+            }
             active={filter === 'needs_review'}
             onClick={() => setFilter('needs_review')}
             tone={pendingCount > 0 ? 'warn' : 'default'}

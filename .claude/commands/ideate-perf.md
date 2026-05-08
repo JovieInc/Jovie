@@ -7,6 +7,8 @@ tags: [ideation, performance, optimization, bundle]
 
 Analyze the codebase to identify performance bottlenecks, optimization opportunities, and efficiency improvements across bundle size, runtime, and network.
 
+For implementation or closed-loop optimization, route to the `jovie-performance-hardening` skill. `/ideate-perf` is discovery-only and must not make code changes.
+
 ## Arguments
 
 - `[path]` - Target directory (default: `apps/web`)

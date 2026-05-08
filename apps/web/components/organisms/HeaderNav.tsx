@@ -153,6 +153,7 @@ function MarketingGlassFlyout({
         open && 'marketing-glass-header__flyout--open'
       )}
       aria-hidden={!open}
+      inert={!open}
     >
       <div className='marketing-glass-header__flyout-inner'>
         <p className='marketing-glass-header__flyout-heading'>{menu.heading}</p>

@@ -1,11 +1,27 @@
 ---
-description: Review and process all open PRs (including drafts) to completion with AI agent assignment and validation
+description: Review and process open PRs with strict profile separation. Chief/default profile runs read-only triage and dispatch manifests; coder profiles may repair branches with validation.
 allowed-tools: Bash(gh:*), Bash(git:*), Bash(pnpm:*), Bash(jq:*)
 ---
 
 # Orchestrate PR Workflow
 
 Process ALL open pull requests to zero. Run once, walk away, come back to an empty queue.
+
+## Profile Gate
+
+This command has two modes:
+
+- **Lead/read-only mode:** Chief of Staff, default, CFO, Founder OS, and Code Orchestrator profiles may inventory PRs, classify blockers, enable safe GitHub-side auto-merge/update-branch actions, comment with status, and create repair manifests.
+- **Implementation mode:** only a dispatched `coder` profile with a HUD/delegation manifest may check out branches, edit files, commit, push, or run repair validation.
+
+Before any checkout/edit/commit/push action, verify all of these are true:
+
+1. `JOVIE_AGENT_PROFILE=coder` or equivalent runtime profile is set.
+2. A manifest exists with `hud_id`, `kpi`, `owner`, `hermes_profile`, `runtime`, `model_route`, `worktree`, `gstack_skills`, `gbrain_queries`, `hard_gates`, `expected_output`, and `verification`.
+3. The manifest authorizes this PR and this branch.
+4. No hard gate is present: merge, deploy, destructive cleanup, credential/auth/payment change, migration, dependency replacement, or production-impacting script.
+
+If any item is missing, do not repair directly. Create or update a repair manifest and dispatch it to the correct profile.
 
 ## Linear State — Hands Off
 
@@ -89,11 +105,11 @@ Before doing any fix-up work, identify PRs that address the same concern:
 For each duplicate set:
 1. **Compare quality**: Which PR has better code, more complete implementation, passing checks?
 2. **Pick the winner**: Choose the PR with the most progress / best implementation
-3. **Close the loser**: Close the redundant PR with a comment explaining why:
+3. **Close the loser only in lead/read-only mode if it is clearly redundant and has no unique commits worth preserving.** Otherwise create a coder manifest to salvage/cherry-pick the useful commits. Close with a comment explaining why:
 ```bash
 gh pr close <LOSER_NUMBER> --comment "Closing in favor of #<WINNER_NUMBER> which provides a more complete implementation of the same change."
 ```
-4. If the losing PR has useful commits not in the winner, cherry-pick them:
+4. If the losing PR has useful commits not in the winner, lead mode must dispatch a coder repair manifest. Implementation mode may cherry-pick them:
 ```bash
 git checkout <winner-branch>
 git cherry-pick <useful-commit-sha>
@@ -102,7 +118,7 @@ git push
 
 ## Phase 3: Fix Blocking Issues (Sorted by Easiest First)
 
-Process remaining PRs in this order:
+Process remaining PRs in this order. Lead/read-only mode creates repair manifests for each blocking PR and stops before checkout/edit/commit/push. Implementation mode may execute the repair only when the profile gate above passes.
 1. **COMMENT_PENDING** — just needs replies/fixes to review comments
 2. **FAILING_CHECKS** — lint/type/test failures
 3. **REVIEW_BLOCKED** — needs review dismissal or re-review
@@ -121,18 +137,19 @@ gh pr view <NUMBER> --json comments
 
 **Process each comment:**
 1. **Read the comment** — understand what's being asked
-2. **Check out the branch**: `git checkout <branch-name> && git pull`
-3. **Assess the comment:**
+2. **Profile gate** — if not running as authorized `coder`, create a repair manifest and skip direct repair
+3. **Check out the branch**: `git checkout <branch-name> && git pull`
+4. **Assess the comment:**
    - If it's a valid code concern: fix the code
    - If it's a style/nit suggestion: apply it if it improves the code, otherwise reply explaining why not
    - If it's an AI-generated false positive: reply explaining why the current code is correct
    - If it's a question: answer it
-4. **Make the fix** — edit the files, commit, push
-5. **Reply to the comment** confirming the fix:
+5. **Make the fix** — edit the files, commit, push
+6. **Reply to the comment** confirming the fix:
 ```bash
 gh api repos/{owner}/{repo}/pulls/<NUMBER>/comments/<COMMENT_ID>/replies --method POST -f body="Fixed in <SHA>."
 ```
-6. **Resolve the conversation** if GitHub supports it via API
+7. **Resolve the conversation** if GitHub supports it via API
 
 **IMPORTANT**: After addressing all comments on a PR, run `/verify` to catch issues before pushing. This prevents review ping-pong.
 
@@ -145,8 +162,9 @@ gh pr checks <NUMBER>
 ```
 
 1. **Identify failures**: lint, typecheck, tests, build, security
-2. **Check out the branch**: `git checkout <branch-name> && git pull`
-3. **Fix each failure type:**
+2. **Profile gate** — if not running as authorized `coder`, create a repair manifest and skip direct repair
+3. **Check out the branch**: `git checkout <branch-name> && git pull`
+4. **Fix each failure type:**
 
    **Lint failures:**
    ```bash
@@ -171,8 +189,8 @@ gh pr checks <NUMBER>
    pnpm --filter web lint:server-boundaries
    ```
 
-4. **Commit and push** all fixes
-5. **Run `/verify`** before pushing to ensure no regressions
+5. **Commit and push** all fixes
+6. **Run `/verify`** before pushing to ensure no regressions
 
 ### 3c. Dismiss Blocking Reviews (Only When Comments Are Addressed)
 
@@ -191,7 +209,7 @@ gh api repos/{owner}/{repo}/pulls/<NUMBER>/reviews/<REVIEW_ID>/dismissals --meth
 
 ### 3d. Resolve Merge Conflicts
 
-For each PR with conflicts:
+For each PR with conflicts. Lead/read-only mode records conflict details and dispatches a coder manifest; only implementation mode resolves conflicts directly:
 
 1. **Check out the branch** and update from main:
 ```bash
