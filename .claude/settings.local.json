@@ -10,7 +10,17 @@
       "Bash(gh pr view 5310 --json state,title,mergeable,statusCheckRollup,headRefName,url,reviews,isDraft)",
       "Bash(python3 -c \":*)",
       "Bash(git add:*)",
-      "Bash(GIT_EDITOR=true git rebase --continue)"
+      "Bash(GIT_EDITOR=true git rebase --continue)",
+      "Bash(*)",
+      "mcp__ruflo__*",
+      "Read(*)",
+      "Edit(*)",
+      "Write(*)",
+      "Glob(*)",
+      "Grep(*)",
+      "Skill(*)",
+      "SlashCommand(*)",
+      "Agent(*)"
     ]
   }
 }
