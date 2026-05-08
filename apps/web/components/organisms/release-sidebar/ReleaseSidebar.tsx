@@ -276,7 +276,7 @@ function getDspAvatarItems(
       }),
       label,
       glyph: getProviderGlyph(label, provider.key),
-      colorClass: PROVIDER_COLOR_CLASS[provider.key] ?? 'bg-slate-500/90',
+      colorClass: PROVIDER_COLOR_CLASS[provider.key] ?? 'bg-surface-2',
     };
   });
 
@@ -289,7 +289,7 @@ function getDspAvatarItems(
         status: 'missing' as const,
         label,
         glyph: getProviderGlyph(label, key),
-        colorClass: PROVIDER_COLOR_CLASS[key] ?? 'bg-slate-500/90',
+        colorClass: PROVIDER_COLOR_CLASS[key] ?? 'bg-surface-2',
       };
     });
 
@@ -394,7 +394,7 @@ function ReleaseEntityHeader({
                 disabled={!previewUrl}
                 aria-pressed={isPlaying}
                 className={cn(
-                  'absolute inset-0 flex items-center justify-center rounded-lg transition-all duration-160',
+                  'absolute inset-0 flex items-center justify-center rounded-lg transition-[background-color,opacity] duration-subtle',
                   'bg-black/0 opacity-0',
                   'group-hover/artwork:bg-black/40 group-hover/artwork:opacity-100',
                   'aria-[pressed=true]:bg-black/40 aria-[pressed=true]:opacity-100',

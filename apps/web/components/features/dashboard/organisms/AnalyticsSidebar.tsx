@@ -115,7 +115,7 @@ function FunnelStage({
       <div className={cn('h-1.5 rounded-full', TRACK_BG)}>
         <div
           className={cn(
-            'h-full rounded-full transition-[width] duration-300 ease-out',
+            'h-full rounded-full transition-[width] duration-cinematic ease-out',
             BAR_OPACITY[barIndex] ?? BAR_OPACITY.at(-1)
           )}
           style={{ width: `${Math.max(barPercent, 2)}%` }}
@@ -315,7 +315,7 @@ export function AnalyticsSidebarView({
     >
       <div
         className={cn(
-          'flex min-h-0 flex-1 flex-col space-y-2 transition-opacity duration-150',
+          'flex min-h-0 flex-1 flex-col space-y-2 transition-opacity duration-subtle',
           isFetching && !loading && 'opacity-70'
         )}
       >

@@ -155,7 +155,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
       <button
         type='button'
         onClick={() => onToggle(index)}
-        className={cn(SWIPE_ACTION_CLASS, 'bg-gray-500')}
+        className={cn(SWIPE_ACTION_CLASS, 'bg-surface-2')}
         aria-label={visible ? 'Hide link' : 'Show link'}
       >
         <Icon name={visible ? 'EyeOff' : 'Eye'} className='h-4 w-4' />
@@ -184,7 +184,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
         <div
           className={cn(
             'flex items-center gap-2 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-3 sm:gap-3 sm:px-4',
-            'transition-all duration-200',
+            'transition-[border-color,box-shadow,opacity] duration-subtle',
             !visible && 'opacity-50',
             isLastAdded && 'ring-2 ring-accent ring-offset-2 ring-offset-base'
           )}

@@ -47,8 +47,7 @@ function ChannelDot({ status, label }: ChannelDotProps) {
             'bg-emerald-500/25 text-emerald-200 ring-1 ring-inset ring-emerald-500/40',
           status === 'pending' &&
             'border border-amber-500/60 text-amber-300/80',
-          status === 'missing' &&
-            'border border-zinc-700/60 text-tertiary-token'
+          status === 'missing' && 'border border-subtle text-tertiary-token'
         )}
         aria-label={tooltip}
         role='img'

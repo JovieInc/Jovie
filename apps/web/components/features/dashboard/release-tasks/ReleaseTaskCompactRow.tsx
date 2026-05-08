@@ -23,7 +23,7 @@ export function ReleaseTaskCompactRow({
         checked={isDone}
         disabled={isAi}
         onChange={() => onToggle(task.id, !isDone)}
-        className='h-3 w-3 flex-shrink-0 rounded accent-[var(--linear-accent,#5e6ad2)] cursor-pointer disabled:cursor-default disabled:opacity-60'
+        className='h-3 w-3 flex-shrink-0 rounded accent-accent cursor-pointer disabled:cursor-default disabled:opacity-60'
         aria-label={`Mark "${task.title}" as ${isDone ? 'incomplete' : 'complete'}`}
       />
       <button
@@ -33,7 +33,7 @@ export function ReleaseTaskCompactRow({
           isDone
             ? 'text-tertiary-token line-through opacity-60'
             : 'text-primary-token'
-        } ${isAi ? 'opacity-70' : 'hover:text-[var(--linear-accent,#5e6ad2)]'}`}
+        } ${isAi ? 'opacity-70' : 'hover:text-accent'}`}
       >
         {task.title}
         {isAi && <span className='ml-1 text-3xs text-purple-500'>AI</span>}

@@ -39,7 +39,7 @@ export function AudienceIntentScoreCell({
   } else {
     icon = (
       <TrendingDown
-        className='h-3.5 w-3.5 shrink-0 text-zinc-500'
+        className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
         aria-hidden='true'
       />
     );

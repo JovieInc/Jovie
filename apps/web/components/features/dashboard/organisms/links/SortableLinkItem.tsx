@@ -178,7 +178,7 @@ export const SortableLinkItem = React.memo(function SortableLinkItem<
       <button
         type='button'
         onClick={() => onToggle(index)}
-        className={cn(SWIPE_ACTION_CLASS, 'bg-gray-500')}
+        className={cn(SWIPE_ACTION_CLASS, 'bg-surface-2')}
         aria-label={visible ? 'Hide link' : 'Show link'}
       >
         <Icon name={visible ? 'EyeOff' : 'Eye'} className='h-4 w-4' />

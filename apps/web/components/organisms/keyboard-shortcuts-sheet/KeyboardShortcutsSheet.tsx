@@ -171,7 +171,7 @@ export function KeyboardShortcutsSheet() {
         hideClose
         onAnimationEnd={handleAnimationEnd}
       >
-        <div className='sticky top-0 z-10 shrink-0 bg-surface-0/95 backdrop-blur-md'>
+        <div className='sticky top-0 z-10 shrink-0 bg-surface-0 backdrop-blur-md'>
           <SheetHeader className='flex flex-row items-center gap-2 space-y-0 px-3 py-2'>
             <Button
               variant='ghost'
