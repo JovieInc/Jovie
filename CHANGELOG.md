@@ -5,7 +5,17 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
      7|
-     8|## [26.4.216] - 2026-05-08
+     8|## [26.4.217] - 2026-05-08
+
+> You can now update Jovie from right inside the app. A blue "Update" pill appears in the header when a new version is ready — click it to apply instantly.
+
+### Added
+
+- **Update pill in app header**: a compact "Update" button appears in the `/app/*` titlebar row when a new version is available. Click triggers an instant update — no need to manually refresh or relaunch.
+- Desktop (Electron) update detection uses `electron-updater` IPC events (`update-available`, `update-downloaded`) for background update checks.
+- Web update detection polls the build hash every 5 minutes; on drift the pill appears and clicking reloads to the new build.
+
+## [26.4.216] - 2026-05-08
 
 > [internal] Admin workspace links removed from Settings page; the admin sidebar is now the single entry point for all admin workspaces.
 
