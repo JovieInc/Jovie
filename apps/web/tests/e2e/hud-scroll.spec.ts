@@ -93,6 +93,13 @@ test.describe('App-shell scroll-pane regression', () => {
         'dev-auth bypass not enabled — set E2E_USE_TEST_AUTH_BYPASS=1'
       );
 
+      // Pin the viewport BEFORE the overflow pre-check so it matches the
+      // viewport that `assertScrollable` will measure at. Without this, a
+      // taller runner-default viewport could let the pre-check pass while
+      // the helper's stricter overflow precondition fails at 1280x720,
+      // surfacing a hard error where we intended a clean test.skip.
+      await page.setViewportSize({ width: 1280, height: 720 });
+
       await page.goto(route.bypass);
       await page.waitForURL(route.expectedPath, { timeout: 30_000 });
 
