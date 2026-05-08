@@ -87,7 +87,7 @@ These rules will block your changes if violated.
 
 - Skip any issue labeled `human-review-required` or whose description contains "This issue requires human review".
 - Mark issues `In Progress` before editing. `Done` is automated on merge. `In Review` is automated for orchestrator-dispatched PRs; set it manually only for ad-hoc PRs.
-- File a Linear issue for any deferred follow-up; don't rely on `// TODO` or PR-body bullets.
+- File a Linear issue for any actionable follow-up, including optional/candidate work. Final answers, PR bodies, plans, and reviews must not mention "did not do X", "consider later", "deferred", "future work", or "follow-up PR" unless they include the created Linear issue ID. Do not rely on `// TODO`, `TODOS.md`, PR bullets, or chat memory.
 
 Full contract: [`.claude/rules/linear.md`](.claude/rules/linear.md).
 

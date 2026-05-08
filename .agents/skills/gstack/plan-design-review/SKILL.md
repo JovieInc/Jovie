@@ -559,7 +559,7 @@ Then read:
 - The plan file (current plan or branch diff)
 - CLAUDE.md — project conventions
 - DESIGN.md — if it exists, ALL design decisions calibrate against it
-- TODOS.md — any design-related TODOs this plan touches
+- TODOS.md — legacy context for design-related TODOs this plan touches, if present
 
 Map:
 * What is the UI scope of this plan? (pages, components, interactions)
@@ -1107,10 +1107,11 @@ Design decisions considered and explicitly deferred, with one-line rationale eac
 ### "What already exists" section
 Existing DESIGN.md, UI patterns, and components that the plan should reuse.
 
-### TODOS.md updates
-After all review passes are complete, present each potential TODO as its own individual AskUserQuestion. Never batch TODOs — one per question. Never silently skip this step.
+### Linear follow-up issues
 
-For design debt: missing a11y, unresolved responsive behavior, deferred empty states. Each TODO gets:
+After all review passes are complete, present each potential follow-up as its own individual AskUserQuestion. Never batch follow-ups — one per question. Never silently skip this step. Follow the format in `.claude/skills/gstack/review/LINEAR-followups.md`.
+
+For design debt: missing a11y, unresolved responsive behavior, deferred empty states. Each follow-up gets:
 * **What:** One-line description of the work.
 * **Why:** The concrete problem it solves or value it unlocks.
 * **Pros:** What you gain by doing this work.
@@ -1118,7 +1119,7 @@ For design debt: missing a11y, unresolved responsive behavior, deferred empty st
 * **Context:** Enough detail that someone picking this up in 3 months understands the motivation.
 * **Depends on / blocked by:** Any prerequisites.
 
-Then present options: **A)** Add to TODOS.md **B)** Skip — not valuable enough **C)** Build it now in this PR instead of deferring.
+Then present options: **A)** Create Linear follow-up issue and display the created issue ID **B)** Skip as not actionable **C)** Schedule implementation via a follow-up workflow/PR — do not implement in this review skill. Optional work uses the title `Candidate follow-up: <title>` and must include: "Pickup agent must first judge whether to implement, close, or split this."
 
 ### Completion Summary
 ```
@@ -1137,7 +1138,7 @@ Then present options: **A)** Add to TODOS.md **B)** Skip — not valuable enough
   +--------------------------------------------------------------------+
   | NOT in scope         | written (___ items)                         |
   | What already exists  | written                                     |
-  | TODOS.md updates     | ___ items proposed                          |
+  | Linear follow-ups    | ___ issues created / ___ proposed           |
   | Approved Mockups     | ___ generated, ___ approved                  |
   | Decisions made       | ___ added to plan                           |
   | Decisions deferred   | ___ (listed below)                          |

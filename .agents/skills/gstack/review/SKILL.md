@@ -673,7 +673,7 @@ The plan completion results augment the existing Scope Drift Detection. If a pla
 - **Items in the diff that don't match any plan item** become evidence for **SCOPE CREEP** detection.
 - **HIGH-impact discrepancies** trigger AskUserQuestion:
   - Show the investigation findings
-  - Options: A) Stop and implement missing items, B) Ship anyway + create P1 TODOs, C) Intentionally dropped
+  - Options: A) Stop and implement missing items, B) Ship anyway + create required Linear follow-up issues using `review/LINEAR-followups.md` and record their IDs, C) Intentionally dropped
 
 This is **INFORMATIONAL** unless HIGH-impact discrepancies are found (then it gates via AskUserQuestion).
 
@@ -1056,7 +1056,7 @@ Before replying to any comment, run the **Escalation Detection** algorithm from 
    - Deterministic parser/script failures -> focused test.
    - Repeated repo-policy mistake -> `.claude/rules/*` or `LESSONS.md`.
    - Repeated workflow mistake -> edit the gstack `.tmpl` source and regenerate generated skills.
-   - High-risk product/auth/billing/migration work -> create or mention a Linear follow-up instead of broadening this review.
+   - High-risk product/auth/billing/migration work -> create a Linear follow-up issue instead of broadening this review. Do not merely mention it.
 
 ---
 
