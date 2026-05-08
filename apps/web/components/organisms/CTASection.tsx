@@ -35,22 +35,12 @@ export function CTASection({
             level={2}
             size={variant === 'secondary' ? 'xl' : 'md'}
             align={variant === 'secondary' ? 'center' : 'left'}
-            className={
-              variant === 'secondary'
-                ? 'text-primary-token'
-                : 'text-primary-token'
-            }
+            className='text-primary-token'
           >
             {title}
           </SectionHeading>
           {description && (
-            <p
-              className={`text-lg sm:text-xl leading-relaxed ${
-                variant === 'secondary'
-                  ? 'text-primary-token'
-                  : 'text-secondary-token'
-              }`}
-            >
+            <p className='text-lg sm:text-xl leading-relaxed text-secondary-token'>
               {description}
             </p>
           )}

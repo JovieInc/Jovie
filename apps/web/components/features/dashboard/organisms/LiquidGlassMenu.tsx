@@ -182,7 +182,7 @@ function MenuItemLink({
     <Link
       href={item.href}
       className={cn(
-        'flex items-center gap-3 rounded-lg px-3 py-2.5 text-app font-caption transition-colors duration-subtle',
+        'flex items-center gap-3 rounded-lg px-3 py-2.5 text-app font-caption transition-[background-color,color,transform] duration-subtle',
         'active:scale-[0.98]',
         active
           ? 'bg-bg-surface-2 text-primary-token'

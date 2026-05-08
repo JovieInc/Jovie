@@ -5,7 +5,7 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
      7|
-     8|## [26.4.212] - 2026-05-07
+     8|## [26.4.212] - 2026-05-08
 
 > [internal] Design-system token consolidation pass on the artist profile feature — no visible changes.
 

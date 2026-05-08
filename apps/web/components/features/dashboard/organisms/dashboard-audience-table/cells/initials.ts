@@ -38,7 +38,7 @@ const MONOGRAM_PALETTE = [
   'bg-surface-2 text-primary-token',
   'bg-surface-2 text-secondary-token',
   'bg-surface-1 text-secondary-token',
-  'bg-surface-2 text-primary-token',
+  'bg-surface-1 text-primary-token',
   'bg-indigo-900/50 text-indigo-100',
   'bg-violet-900/50 text-violet-100',
   'bg-blue-900/50 text-blue-100',
