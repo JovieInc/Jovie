@@ -2,7 +2,11 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const STATIC_ROUTE_ROOTS = ['app/(marketing)', 'app/(dynamic)/legal'];
+const STATIC_ROUTE_ROOTS = [
+  'app/(home)',
+  'app/(marketing)',
+  'app/(dynamic)/legal',
+];
 const ROUTE_FILE_EXTENSIONS = new Set(['.ts', '.tsx']);
 const STATIC_ENTRYPOINT_FILENAMES = new Set([
   'layout.ts',
@@ -22,6 +26,9 @@ const FORBIDDEN_REQUEST_TIME_PATTERNS: readonly RegExp[] = [
   /\bheaders\s*\(/,
   /\bcookies\s*\(/,
   /cache\s*:\s*['"]no-store['"]/,
+  /from\s+['"]@\/lib\/db['"]/,
+  /from\s+['"]@\/lib\/config\/pricing['"]/,
+  /from\s+['"]server-only['"]/,
 ];
 
 function listRouteFiles(directory: string): string[] {

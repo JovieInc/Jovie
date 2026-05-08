@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HomepageHeroMockupCarousel } from '@/components/homepage/HomepageHeroCarousel';
 
@@ -9,78 +9,51 @@ function expectActiveShot(testId: string) {
 }
 
 describe('HomepageHeroMockupCarousel', () => {
-  const firstShotId = 'homepage-hero-shot-release-calendar-sidebar';
-  const secondShotId = 'homepage-hero-shot-audience-crm';
-  const thirdShotId = 'homepage-hero-shot-profile-workspace';
+  const firstShotId = 'homepage-hero-shot-profile-presence';
+  const secondShotId = 'homepage-hero-shot-release-command';
+  const fourthShotId = 'homepage-hero-shot-release-signal';
 
   afterEach(() => {
     window.matchMedia = originalMatchMedia;
     vi.useRealTimers();
   });
 
-  it('shows the desktop release calendar by default and advances on click', () => {
+  it('shows the artist profile proof by default and advances on click', () => {
     render(<HomepageHeroMockupCarousel />);
 
     expectActiveShot(firstShotId);
+    expect(
+      screen.getByText(
+        /Showing Artist Profile: A profile that looks ready before fans arrive\./
+      )
+    ).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'Go to next slide' }));
 
     expectActiveShot(secondShotId);
   });
 
-  it('does not keep advancing after a click while the pointer remains over the side', () => {
+  it('jumps to a selected product proof dot', () => {
+    render(<HomepageHeroMockupCarousel />);
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Show Audience Signal' }));
+
+    expectActiveShot(fourthShotId);
+  });
+
+  it('does not auto-advance on hover', () => {
     vi.useFakeTimers();
     render(<HomepageHeroMockupCarousel />);
 
-    const nextButton = screen.getByRole('button', {
-      name: 'Go to next slide',
-    });
+    fireEvent.mouseEnter(
+      screen.getByRole('button', { name: 'Go to next slide' })
+    );
+    vi.advanceTimersByTime(2200);
 
-    fireEvent.mouseEnter(nextButton);
-    fireEvent.click(nextButton);
-    expectActiveShot(secondShotId);
-
-    act(() => {
-      vi.advanceTimersByTime(1600);
-    });
-    expectActiveShot(secondShotId);
+    expectActiveShot(firstShotId);
   });
 
-  it('advances only while a side hover is active', () => {
-    vi.useFakeTimers();
-    render(<HomepageHeroMockupCarousel />);
-
-    const nextButton = screen.getByRole('button', {
-      name: 'Go to next slide',
-    });
-
-    act(() => {
-      vi.advanceTimersByTime(2200);
-    });
-    expectActiveShot(firstShotId);
-
-    fireEvent.mouseEnter(nextButton);
-    expectActiveShot(firstShotId);
-
-    act(() => {
-      vi.advanceTimersByTime(700);
-    });
-    expectActiveShot(secondShotId);
-
-    act(() => {
-      vi.advanceTimersByTime(700);
-    });
-    expectActiveShot(thirdShotId);
-
-    fireEvent.mouseLeave(nextButton);
-
-    act(() => {
-      vi.advanceTimersByTime(2200);
-    });
-    expectActiveShot(thirdShotId);
-  });
-
-  it('does not hover-advance when reduced motion is enabled', () => {
+  it('marks reduced motion without disabling manual controls', () => {
     window.matchMedia = vi.fn().mockImplementation(query => ({
       matches: query === '(prefers-reduced-motion: reduce)',
       media: query,
@@ -92,19 +65,14 @@ describe('HomepageHeroMockupCarousel', () => {
       dispatchEvent: vi.fn(),
     }));
 
-    vi.useFakeTimers();
     render(<HomepageHeroMockupCarousel />);
 
-    const nextButton = screen.getByRole('button', {
-      name: 'Go to next slide',
-    });
+    fireEvent.click(screen.getByRole('button', { name: 'Go to next slide' }));
 
-    fireEvent.mouseEnter(nextButton);
-
-    act(() => {
-      vi.advanceTimersByTime(2200);
-    });
-
-    expectActiveShot(firstShotId);
+    expectActiveShot(secondShotId);
+    expect(screen.getByTestId('homepage-hero-carousel')).toHaveAttribute(
+      'data-reduced-motion',
+      'true'
+    );
   });
 });

@@ -47,11 +47,11 @@ interface MarketingFooterProps {
 }
 
 const markLinkClassName =
-  '-m-1.5 inline-flex rounded-full p-1.5 text-white/[0.92] transition-opacity duration-150 hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
+  '-m-1.5 inline-flex rounded-full p-1.5 text-white/[0.92] transition-opacity duration-subtle hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
 const footerLinkClassName =
-  'mf-link inline-flex w-fit rounded-[5px] text-[15px] leading-[1.45] tracking-[-0.005em] text-white/[0.72] transition-colors duration-150 hover:text-white focus-visible:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
+  'mf-link inline-flex w-fit rounded-[5px] text-[15px] leading-[1.45] tracking-[-0.005em] text-white/[0.72] transition-colors duration-subtle hover:text-white focus-visible:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
 const footerLegalLinkClassName =
-  'mf-legal-link inline-flex w-fit rounded-[5px] text-[12px] leading-5 tracking-[-0.01em] text-white/[0.34] transition-colors duration-150 hover:text-white/70 focus-visible:text-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
+  'mf-legal-link inline-flex w-fit rounded-[5px] text-[12px] leading-5 tracking-[-0.01em] text-white/[0.34] transition-colors duration-subtle hover:text-white/70 focus-visible:text-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
 
 function FooterLink({ link }: Readonly<{ link: MarketingFooterLink }>) {
   return (
@@ -83,6 +83,10 @@ export function MarketingFooter({
   const pageOwnsFinalCta =
     typeof pathname === 'string' && PAGE_OWNS_FINAL_CTA_PATHS.has(pathname);
   const shouldShowCta = showCta && !isMinimal && !pageOwnsFinalCta;
+  const footerColumns =
+    pathname === APP_ROUTES.HOME
+      ? MARKETING_FOOTER_COLUMNS.filter(column => column.title !== 'Connect')
+      : MARKETING_FOOTER_COLUMNS;
 
   return (
     <footer
@@ -125,20 +129,20 @@ export function MarketingFooter({
               >
                 <BrandLogo size={22} tone='white' rounded={false} aria-hidden />
               </Link>
-              <p className='mf-mark-tagline'>
-                Tools for artists to release music, capture fans, and earn
-                without the platform tax.
-              </p>
+              <p className='mf-mark-tagline'>Tools for music creators.</p>
             </div>
 
             <nav
               className={cn(
-                'grid grid-cols-2 gap-x-8 gap-y-10 sm:grid-cols-3 lg:grid-cols-5 lg:gap-x-12 xl:gap-x-16',
+                'grid grid-cols-2 gap-x-8 gap-y-10 sm:grid-cols-3 lg:gap-x-12 xl:gap-x-16',
+                footerColumns.length === 4
+                  ? 'lg:grid-cols-4'
+                  : 'lg:grid-cols-5',
                 shouldShowCta && 'mt-[clamp(3.25rem,5vw,4.6rem)]'
               )}
               aria-label='Footer'
             >
-              {MARKETING_FOOTER_COLUMNS.map(column => (
+              {footerColumns.map(column => (
                 <section key={column.title}>
                   <h2 className='mf-eyebrow mf-eyebrow--caps'>
                     {column.title}

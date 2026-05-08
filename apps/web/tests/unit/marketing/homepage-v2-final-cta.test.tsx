@@ -14,6 +14,9 @@ describe('HomepageV2FinalCta', () => {
       screen.getByTestId('homepage-v2-final-cta-primary')
     ).toBeInTheDocument();
     expect(
+      screen.queryByTestId('homepage-v2-final-cta-secondary')
+    ).not.toBeInTheDocument();
+    expect(
       screen.queryByTestId('homepage-v2-final-cta-background')
     ).not.toBeInTheDocument();
     expect(
