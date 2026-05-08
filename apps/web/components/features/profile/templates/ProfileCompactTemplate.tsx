@@ -668,18 +668,12 @@ export function ProfileCompactTemplate({
   const isV1 = visualVariant === 'v1';
   const hasTourDates = tourDates.length > 0;
   const compactSurfaceShowsModeHeading = drawerOpen
-    ? drawerView === 'about' ||
-      drawerView === 'contact' ||
-      drawerView === 'listen' ||
-      drawerView === 'pay' ||
+    ? drawerView === 'listen' ||
       drawerView === 'releases' ||
       drawerView === 'subscribe' ||
       drawerView === 'notifications' ||
       (drawerView === 'tour' && hasTourDates)
-    : requestedMode === 'about' ||
-      requestedMode === 'contact' ||
-      requestedMode === 'listen' ||
-      requestedMode === 'pay' ||
+    : requestedMode === 'listen' ||
       requestedMode === 'releases' ||
       requestedMode === 'subscribe' ||
       (requestedMode === 'tour' && hasTourDates);
