@@ -126,7 +126,7 @@ export function MarketingFooter({
               >
                 <BrandLogo size={22} tone='white' rounded={false} aria-hidden />
               </Link>
-              <p className='mf-mark-tagline'>Tools for music creators.</p>
+              <p className='mf-mark-tagline'>Built for artists. By artists.</p>
             </div>
 
             <nav

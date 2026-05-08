@@ -519,7 +519,7 @@ describe('Public Profile Page Logic', () => {
       ).toBe(false);
     });
 
-    it('adds MusicEvent schemas for tour dates, capped at 10', () => {
+    it('adds MusicEvent schemas for tour dates, capped at 5', () => {
       const tourDates: TourDateForTest[] = Array.from(
         { length: 15 },
         (_, i) => ({

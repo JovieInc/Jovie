@@ -39,7 +39,9 @@ describe('MarketingFooter', () => {
     expect(
       screen.queryByTestId('marketing-footer-cta')
     ).not.toBeInTheDocument();
-    expect(screen.getByText('Tools for music creators.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Built for artists. By artists.')
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole('heading', { name: 'Connect' })
     ).not.toBeInTheDocument();

@@ -531,22 +531,23 @@ export function ProfileCompactSurface({
         </header>
 
         <div className='relative z-10 flex min-h-0 flex-1 flex-col px-4 pt-2'>
+          {renderMode === 'interactive' ? (
+            <ProfileInlineNotificationsCTA
+              artist={artist}
+              onManageNotifications={onManageNotifications}
+              onRegisterReveal={registerNotificationsReveal}
+              portalContainer={notificationsPortalContainer ?? undefined}
+              variant='hero'
+              autoOpen={activeVisiblePrimaryTab === 'subscribe'}
+              hideTrigger
+              experimentVariant={alertOptInVariant}
+              onFlowClosed={returnToProfileAfterNotifications}
+              onSubscriptionActivated={handleSubscriptionActivated}
+            />
+          ) : null}
+
           {isHomeMode ? (
             <div className='shrink-0 space-y-2 pb-2'>
-              {renderMode === 'interactive' ? (
-                <ProfileInlineNotificationsCTA
-                  artist={artist}
-                  onManageNotifications={onManageNotifications}
-                  onRegisterReveal={registerNotificationsReveal}
-                  portalContainer={notificationsPortalContainer ?? undefined}
-                  variant='hero'
-                  hideTrigger
-                  experimentVariant={alertOptInVariant}
-                  onFlowClosed={returnToProfileAfterNotifications}
-                  onSubscriptionActivated={handleSubscriptionActivated}
-                />
-              ) : null}
-
               {showHeroAlertsRow ? (
                 <button
                   type='button'
@@ -610,8 +611,9 @@ export function ProfileCompactSurface({
               'min-h-0 flex-1',
               showBottomNav ? 'pb-4' : 'pb-0',
               !isHomeMode &&
-                'overflow-y-auto overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+                'overflow-y-auto overscroll-contain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
             )}
+            tabIndex={isHomeMode ? undefined : 0}
           >
             {isHomeMode ? (
               <ProfileHomeRail

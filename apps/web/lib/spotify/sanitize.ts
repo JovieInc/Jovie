@@ -11,8 +11,8 @@
  * - Numeric values are clamped to valid ranges
  */
 
-import DOMPurify from 'isomorphic-dompurify';
 import { captureWarning } from '@/lib/error-tracking';
+import { stripHtmlToText } from '@/lib/html/sanitize';
 
 // ============================================================================
 // Types
@@ -86,8 +86,7 @@ const ALLOWED_EXTERNAL_DOMAINS: Record<string, string[]> = {
  * @returns Sanitized text string
  */
 export function sanitizeText(text: string, maxLength: number): string {
-  // Remove all HTML tags - DOMPurify with ALLOWED_TAGS: [] strips everything
-  const sanitized = DOMPurify.sanitize(text, { ALLOWED_TAGS: [] });
+  const sanitized = stripHtmlToText(text);
 
   // Trim and limit length
   return sanitized.slice(0, maxLength).trim();

@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 import { memo } from 'react';
+import { CanvasGrain } from '@/components/atoms/CanvasGrain';
+import { isEnabled } from '@/lib/feature-flags';
 import { cn } from '@/lib/utils';
 
 export type AppShellFrameVariant = 'legacy' | 'shellChatV1';
@@ -61,12 +63,13 @@ export const AppShellFrame = memo(function AppShellFrame({
       <main
         id='main-content'
         className={cn(
-          'flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-0',
+          'relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-0',
           isShellChatV1
             ? 'lg:rounded-[var(--linear-app-shell-radius)] lg:border-t lg:border-r lg:border-b lg:border-(--linear-app-shell-border) lg:bg-(--linear-app-content-surface) lg:shadow-[var(--linear-app-shell-shadow)] lg:pt-px'
             : 'lg:border-l lg:border-subtle'
         )}
       >
+        {isEnabled('CANVAS_GRAIN') && <CanvasGrain />}
         {header}
         <div
           className={cn(

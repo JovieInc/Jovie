@@ -508,9 +508,10 @@ body:has(.home-viewport)::-webkit-scrollbar {
   font-family:
     var(--font-satoshi), "Satoshi", -apple-system, "system-ui", sans-serif;
   font-size: clamp(46px, 5.45vw, 72px);
-  font-weight: 600;
+  /* Match --linear-h1-weight 800 from Claude Design home-page-hero spec. */
+  font-weight: 800;
   line-height: 1.04;
-  letter-spacing: 0;
+  letter-spacing: -0.025em;
   margin-left: auto;
   margin-right: auto;
   max-width: min(22ch, var(--homepage-hero-copy-max));
@@ -733,22 +734,21 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-trust-section {
   position: relative;
   z-index: 1;
-  padding: clamp(2.75rem, 4vw, 3.875rem) var(--homepage-page-gutter)
-    clamp(5.5rem, 8vw, 8.5rem);
   background: #000;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
 
-.homepage-trust-section > section {
+/* Inline-strip variant owns its own band chrome (radial bg + hairlines). */
+.homepage-trust-section > section[data-presentation="inline-strip"] {
+  margin-inline: auto;
+}
+
+/* Card variant retains the historical wrapper chrome on artist-profile and
+ * release-notification surfaces. */
+.homepage-trust-section > section[data-presentation="card"] {
   max-width: var(--homepage-section-max);
   margin-inline: auto;
-  border: 0;
-  padding: 0;
-}
-
-.homepage-trust-section [data-presentation="inline-strip"] {
-  border-top: 0;
-  padding: 0;
+  padding: clamp(2.75rem, 4vw, 3.875rem) var(--homepage-page-gutter)
+    clamp(5.5rem, 8vw, 8.5rem);
 }
 
 .homepage-trust-section svg {

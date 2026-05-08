@@ -158,18 +158,23 @@
      TYPE SCALE (Desktop) — mode-independent
      ============================================ */
   --linear-h1-size: 64px;
-  --linear-h1-weight: 510;
+  /* Marketing display weight bumped to 800 per Claude Design home-page-hero
+   * spec (2026-04). Replaces Linear's 510 default for marketing surfaces;
+   * app/product surfaces remain on Inter at default weights elsewhere. */
+  --linear-h1-weight: 800;
   --linear-h1-leading: 67.84px;
   /* Linear renders 1.06 ratio: 64px × 1.06 = 67.84px (verified 2026-03-23) */
-  --linear-h1-tracking: -1.408px;
+  --linear-h1-tracking: -1.6px;
+  /* Tracking tightened to -0.025em at 64px to match Satoshi 800 cadence. */
   --linear-h2-size: 48px;
-  --linear-h2-weight: 510;
-  --linear-h2-leading: 48px;
-  --linear-h2-tracking: -1.056px;
+  --linear-h2-weight: 700;
+  --linear-h2-leading: 50.4px;
+  /* H2 leading 1.05 to balance the heavier weight (was 1.0 at 510). */
+  --linear-h2-tracking: -0.96px;
   --linear-h3-size: 20px;
-  --linear-h3-weight: 590;
+  --linear-h3-weight: 600;
   --linear-h3-leading: 26.6px;
-  --linear-h3-tracking: -0.24px;
+  --linear-h3-tracking: -0.3px;
   --linear-h4-size: 18px;
   --linear-h4-weight: 538;
   --linear-h4-leading: 24px;

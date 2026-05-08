@@ -550,8 +550,8 @@ jobs:
         uses: ./.github/actions/resolve-neon-database-url
         with:
           connection_file: /tmp/neon-db-connection/connection.json
-          candidate_json_key: db_url_pooled
-          fallback_json_key: db_url
+          candidate_json_key: db_url
+          fallback_json_key: db_url_pooled
           credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
           credential_fallback_url: ${{ secrets.DATABASE_URL }}
 
@@ -2319,7 +2319,7 @@ jobs:
     needs: [ci-fast, ci-path-changes, neon-db]
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
@@ -2357,8 +2357,8 @@ jobs:
         id: resolve-e2e-smoke-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
-          candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
-          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url }}
+          candidate_url: ${{ steps.neon-branch.outputs.db_url }}
+          fallback_candidate_url: ${{ steps.neon-branch.outputs.db_url_pooled }}
           credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
           credential_fallback_url: ${{ secrets.DATABASE_URL }}
 
@@ -2610,8 +2610,8 @@ jobs:
         uses: ./.github/actions/resolve-neon-database-url
         with:
           connection_file: /tmp/neon-db-connection/connection.json
-          candidate_json_key: db_url_pooled
-          fallback_json_key: db_url
+          candidate_json_key: db_url
+          fallback_json_key: db_url_pooled
           credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
           credential_fallback_url: ${{ secrets.DATABASE_URL }}
 
@@ -2673,8 +2673,8 @@ jobs:
         uses: ./.github/actions/resolve-neon-database-url
         with:
           connection_file: /tmp/neon-db-connection/connection.json
-          candidate_json_key: db_url_pooled
-          fallback_json_key: db_url
+          candidate_json_key: db_url
+          fallback_json_key: db_url_pooled
           credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
           credential_fallback_url: ${{ secrets.DATABASE_URL }}
 
@@ -3810,27 +3810,10 @@ jobs:
       - name: Resolve failure provenance
         id: failure-provenance
         if: ${{ always() }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
 
-          api_url="${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?per_page=100"
-          response=$(curl -sS -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" "$api_url")
-          job_url=$(RESPONSE="$response" JOB_NAME="${{ github.job }}" python - <<'PY'
-          import json
-          import os
-
-          data = json.loads(os.environ["RESPONSE"])
-          job_name = os.environ["JOB_NAME"]
-          job = next((item for item in data.get("jobs", []) if item.get("name") == job_name), None)
-          print(job.get("html_url", "") if job else "")
-          PY
-          )
-
-          if [ -z "$job_url" ]; then
-            job_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}?check_suite_focus=true"
-          fi
+          job_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}?check_suite_focus=true"
 
           echo "job_name=${{ github.job }}" >> "$GITHUB_OUTPUT"
           echo "job_url=$job_url" >> "$GITHUB_OUTPUT"
