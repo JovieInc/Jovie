@@ -83,8 +83,13 @@ async function ensureIntakeUser(params: {
 
   // We never want this insert to overwrite fields on an existing row — in
   // particular `userStatus` (a concurrent admin approval may have already set
-  // `waitlist_approved`). Use `onConflictDoNothing()` to make that intent
-  // explicit, then re-select the existing row.
+  // `waitlist_approved`, or a finished onboarding may have set `active`).
+  //
+  // Use `onConflictDoNothing()` to make the no-overwrite intent explicit and
+  // prevent any future accidental field additions from silently downgrading
+  // status. The status precedence helper (`isStatusUpgrade`) guards the
+  // re-select path defensively in case a future caller introduces a write
+  // here. See `lib/waitlist/status-precedence.ts`.
   const [created] = await db
     .insert(users)
     .values({
@@ -176,17 +181,19 @@ export async function POST(request: Request) {
 
     const clerkUser = await currentUser();
     // Verified emails are the source of truth for identity. Picking
-    // `emailAddresses[0]` can pick an unverified address that the user has
-    // not actually confirmed they own — which would let them hit the
-    // already_accepted path against another claimant's email.
-    const emailRaw =
-      clerkUser?.emailAddresses?.find(
-        e => e.verification?.status === 'verified'
-      )?.emailAddress ??
-      clerkUser?.primaryEmailAddress?.emailAddress ??
-      null;
+    // `emailAddresses[0]` (or even `primaryEmailAddress`) can pick an
+    // unverified address that the user has not actually confirmed they
+    // own — which would let them hit the `already_accepted` path against
+    // another claimant's email and silently elevate their status to
+    // `waitlist_approved`. Fail closed on unverified addresses.
+    const emailRaw = clerkUser?.emailAddresses?.find(
+      e => e.verification?.status === 'verified'
+    )?.emailAddress;
     if (!emailRaw) {
-      return NextResponse.json({ error: 'Email is required' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Email not verified', code: 'email_unverified' },
+        { status: 403 }
+      );
     }
 
     const email = normalizeEmail(emailRaw);
