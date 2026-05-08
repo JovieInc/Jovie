@@ -186,6 +186,7 @@ export function ProfileInlineNotificationsCTA({
   const hasAutoOpenedRef = useRef(false);
   const activatedInCurrentFlowRef = useRef(false);
   const otpVerificationInFlightRef = useRef(false);
+  const previousOtpLengthRef = useRef(otpCode.length);
 
   const isInline = presentation === 'inline';
   const artistEmailReady = readArtistEmailReadyFromSettings(artist.settings);
@@ -434,7 +435,15 @@ export function ProfileInlineNotificationsCTA({
   );
 
   useEffect(() => {
-    if (step !== 'otp' || otpCode.length !== 6 || isSubmitting) {
+    const previousOtpLength = previousOtpLengthRef.current;
+    previousOtpLengthRef.current = otpCode.length;
+
+    if (
+      step !== 'otp' ||
+      previousOtpLength >= 6 ||
+      otpCode.length !== 6 ||
+      isSubmitting
+    ) {
       return;
     }
 
