@@ -317,6 +317,57 @@ describe('ProfileInlineNotificationsCTA', () => {
     expect(await screen.findByText('Alerts')).toBeInTheDocument();
   });
 
+  it('submits a completed OTP after the email submit settles', async () => {
+    const handleSubscribe = vi.fn().mockResolvedValue('pending_confirmation');
+    const handleVerifyOtp = vi.fn().mockResolvedValue('subscribed');
+    mockUseSubscriptionForm.mockReturnValue(
+      buildFormState({
+        emailInput: 'fan@test.com',
+        handleSubscribe,
+        handleVerifyOtp,
+      })
+    );
+
+    const view = render(
+      <ProfileInlineNotificationsCTA artist={makeArtist()} autoOpen />
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Continue' }));
+    expect(await screen.findByText('Enter the code')).toBeInTheDocument();
+
+    mockUseSubscriptionForm.mockReturnValue(
+      buildFormState({
+        emailInput: 'fan@test.com',
+        otpCode: '123456',
+        isSubmitting: true,
+        handleSubscribe,
+        handleVerifyOtp,
+      })
+    );
+    view.rerender(
+      <ProfileInlineNotificationsCTA artist={makeArtist()} autoOpen />
+    );
+
+    expect(handleVerifyOtp).not.toHaveBeenCalled();
+
+    mockUseSubscriptionForm.mockReturnValue(
+      buildFormState({
+        emailInput: 'fan@test.com',
+        otpCode: '123456',
+        isSubmitting: false,
+        handleSubscribe,
+        handleVerifyOtp,
+      })
+    );
+    view.rerender(
+      <ProfileInlineNotificationsCTA artist={makeArtist()} autoOpen />
+    );
+
+    await waitFor(() => {
+      expect(handleVerifyOtp).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('submits Jovie preferences and artist email consent together', async () => {
     const mutateAsync = vi.fn().mockResolvedValue(undefined);
     mockUpdateContentPreferencesMutation.mockReturnValue({

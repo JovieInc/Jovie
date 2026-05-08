@@ -187,6 +187,7 @@ export function ProfileInlineNotificationsCTA({
   const activatedInCurrentFlowRef = useRef(false);
   const otpVerificationInFlightRef = useRef(false);
   const previousOtpLengthRef = useRef(otpCode.length);
+  const pendingCompletedOtpRef = useRef<string | null>(null);
 
   const isInline = presentation === 'inline';
   const artistEmailReady = readArtistEmailReadyFromSettings(artist.settings);
@@ -438,17 +439,31 @@ export function ProfileInlineNotificationsCTA({
     const previousOtpLength = previousOtpLengthRef.current;
     previousOtpLengthRef.current = otpCode.length;
 
-    if (
-      step !== 'otp' ||
-      previousOtpLength >= 6 ||
-      otpCode.length !== 6 ||
-      isSubmitting
-    ) {
+    if (step !== 'otp') {
+      pendingCompletedOtpRef.current = null;
       return;
     }
 
+    if (otpCode.length < 6) {
+      pendingCompletedOtpRef.current = null;
+      return;
+    }
+
+    if (previousOtpLength < 6) {
+      pendingCompletedOtpRef.current = otpCode;
+    }
+
+    if (pendingCompletedOtpRef.current !== otpCode) {
+      return;
+    }
+
+    if (isSubmitting || otpVerificationInFlightRef.current) {
+      return;
+    }
+
+    pendingCompletedOtpRef.current = null;
     void handleOtpSubmit();
-  }, [handleOtpSubmit, isSubmitting, otpCode.length, step]);
+  }, [handleOtpSubmit, isSubmitting, otpCode, step]);
 
   const handleNameSubmit = useCallback(() => {
     const trimmed = nameInput.trim();
