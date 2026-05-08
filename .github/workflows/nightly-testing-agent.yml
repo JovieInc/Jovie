@@ -1,0 +1,204 @@
+name: Nightly Testing Agent
+
+on:
+  schedule:
+    - cron: '30 2 * * *'
+      timezone: 'America/Los_Angeles'
+  workflow_dispatch:
+    inputs:
+      run_unit:
+        description: Run the deterministic Vitest telemetry lane
+        type: boolean
+        default: true
+      run_mutation:
+        description: Run the Stryker mutation hotspot lane
+        type: boolean
+        default: true
+      validate_candidates:
+        description: Validate candidate tests committed under the skill candidates directory
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-testing-agent-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  context:
+    name: Build Agent Context
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 20
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Build compact context
+        run: >-
+          pnpm --filter=@jovie/web run test:nightly-agent:context --
+          --out apps/web/test-results/nightly-agent/context
+
+      - name: Select risk-ranked targets
+        run: >-
+          pnpm --filter=@jovie/web run test:nightly-agent:select --
+          --out apps/web/test-results/nightly-agent/context
+
+      - name: Upload agent context
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: nightly-agent-context-${{ github.run_id }}
+          path: apps/web/test-results/nightly-agent/
+          retention-days: 30
+
+  deterministic:
+    name: Deterministic Unit Telemetry
+    needs: [context]
+    if: ${{ github.event_name == 'schedule' || inputs.run_unit }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Run unit suite
+        id: unit
+        continue-on-error: true
+        run: pnpm --filter=@jovie/web run test
+        env:
+          CI: 'true'
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+
+      - name: Normalize unit telemetry
+        if: always()
+        run: >-
+          pnpm --filter=@jovie/web run test:nightly-agent:normalize --
+          --junit apps/web/test-report.junit.xml
+          --out apps/web/test-results/nightly-agent/deterministic
+          --name normalized-results.json
+
+      - name: Upload deterministic telemetry
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: nightly-agent-deterministic-${{ github.run_id }}
+          path: |
+            apps/web/test-report.junit.xml
+            apps/web/test-results/nightly-agent/
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Preserve unit failure signal
+        if: steps.unit.outcome == 'failure'
+        run: exit 1
+
+  mutation-hotspots:
+    name: Mutation Hotspots
+    needs: [context]
+    if: ${{ github.event_name == 'schedule' || inputs.run_mutation }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 20
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Run Stryker hotspot mutation lane
+        id: mutation
+        continue-on-error: true
+        run: pnpm --filter=@jovie/web run test:mutation:hotspots
+        env:
+          CI: 'true'
+
+      - name: Normalize mutation telemetry
+        if: always()
+        run: >-
+          pnpm --filter=@jovie/web run test:nightly-agent:normalize --
+          --mutation apps/web/reports/mutation/mutation.json
+          --out apps/web/test-results/nightly-agent/mutation
+          --name normalized-results.json
+
+      - name: Upload mutation telemetry
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: nightly-agent-mutation-${{ github.run_id }}
+          path: |
+            apps/web/reports/mutation/
+            apps/web/reports/stryker-incremental.json
+            apps/web/test-results/nightly-agent/
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Preserve mutation setup failure signal
+        if: steps.mutation.outcome == 'failure'
+        run: exit 1
+
+  candidate-validation:
+    name: Candidate Test Validation
+    needs: [context]
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.validate_candidates }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Validate candidate metadata and focused commands
+        run: >-
+          pnpm --filter=@jovie/web run test:nightly-agent:validate-candidate --
+          --out apps/web/test-results/nightly-agent/candidate-validation
+          --execute true
+
+      - name: Upload candidate validation report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: nightly-agent-candidate-validation-${{ github.run_id }}
+          path: apps/web/test-results/nightly-agent/
+          if-no-files-found: ignore
+          retention-days: 30
+
+  report:
+    name: Emit Agent Report
+    needs: [context, deterministic, mutation-hotspots, candidate-validation]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Download agent artifacts
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v6.0.0
+        with:
+          pattern: nightly-agent-*-${{ github.run_id }}
+          path: apps/web/test-results/nightly-agent/incoming
+          merge-multiple: true
+
+      - name: Emit compact report and skill delta
+        run: >-
+          pnpm --filter=@jovie/web run test:nightly-agent:emit-delta --
+          --input-dir apps/web/test-results/nightly-agent/incoming
+
+      - name: Add report to job summary
+        run: cat apps/web/test-results/nightly-agent/nightly-report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload final report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: nightly-agent-report-${{ github.run_id }}
+          path: apps/web/test-results/nightly-agent/
+          retention-days: 90

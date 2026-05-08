@@ -7,7 +7,7 @@
  * - HTML content (with anti-spam protection detection)
  */
 
-import DOMPurify from 'isomorphic-dompurify';
+import { stripHtmlToText } from '@/lib/html/sanitize';
 import { logger } from '@/lib/utils/logger';
 
 /**
@@ -218,13 +218,8 @@ export function extractEmailsFromHtml(html: string): string[] {
     }
   }
 
-  // Extract from text content (bio, descriptions)
-  // Use DOMPurify to remove all HTML and preserve visible text safely.
-  const textContent = DOMPurify.sanitize(html, {
-    ALLOWED_TAGS: [],
-    ALLOWED_ATTR: [],
-    KEEP_CONTENT: true,
-  }).replaceAll(/\s+/g, ' ');
+  // Extract from visible text content only.
+  const textContent = stripHtmlToText(html).replaceAll(/\s+/g, ' ');
 
   for (const email of extractEmailsFromText(textContent)) {
     emails.add(email);
