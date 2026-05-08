@@ -295,7 +295,12 @@ export function ProfileInlineNotificationsCTA({
       !(isInline || autoOpen) ||
       !isFlowOpen ||
       !isSubscribed ||
-      activatedInCurrentFlowRef.current
+      activatedInCurrentFlowRef.current ||
+      (flowOrigin === 'subscribe' &&
+        (step === 'otp' ||
+          step === 'name' ||
+          step === 'birthday' ||
+          step === 'done'))
     ) {
       return;
     }
@@ -303,7 +308,7 @@ export function ProfileInlineNotificationsCTA({
     setFlowOrigin('manage');
     setCanEditPreferences(true);
     setStep('preferences');
-  }, [autoOpen, isFlowOpen, isInline, isSubscribed]);
+  }, [autoOpen, flowOrigin, isFlowOpen, isInline, isSubscribed, step]);
 
   const activeEmail = useMemo(
     () =>
