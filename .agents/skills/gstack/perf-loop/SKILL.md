@@ -8,6 +8,7 @@ description: |
 allowed-tools:
   - Bash
   - Read
+  - Write
   - Grep
   - Glob
   - Edit
@@ -33,12 +34,45 @@ Load and follow `.claude/skills/jovie-performance-hardening/SKILL.md`.
 
 ## Required Output
 
-Return:
+Return the full deliverable set required by
+`.claude/skills/jovie-performance-hardening/SKILL.md`:
+
+### A. Brief Verdict
 
 - bottleneck
 - root cause
-- before metric
-- after metric
-- accepted or reverted fix
-- checks run
+- accepted fix
+- measured delta
 - remaining risk
+
+### B. Change Ledger
+
+One row per iteration:
+
+- hypothesis
+- files
+- before
+- after
+- verdict
+
+### C. Budget Status
+
+- passed
+- failed
+- tightened
+- deferred with reason
+
+### D. Next Move
+
+- next highest-leverage bottleneck
+- whether to continue loop or stop
+
+### E. Artifact Paths
+
+Point to:
+
+- perf baseline
+- route measurements
+- Lighthouse reports
+- bundle report
+- test perf baseline/report
