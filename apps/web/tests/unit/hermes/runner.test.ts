@@ -1,4 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  assertHermesChangedFilesAllowed,
+  findOutOfScopeHermesChangedFiles,
+  normalizeHermesAllowedPaths,
+} from '@/lib/hermes/allowed-paths';
 import type { HermesDispatchPayload } from '@/types/ai-ops';
 import {
   buildHermesWorkerPrompt,
@@ -55,6 +60,31 @@ describe('Hermes CLI worker runner', () => {
     expect(() =>
       parseHermesPayload({ ...basePayload, runtime: 'unknown' })
     ).toThrow('Unsupported Hermes runtime');
+  });
+
+  it('normalizes allowed paths and rejects traversal', () => {
+    expect(normalizeHermesAllowedPaths(['./apps/web/', 'apps/web'])).toEqual([
+      'apps/web',
+    ]);
+    expect(() => normalizeHermesAllowedPaths(['../apps/web'])).toThrow(
+      'Invalid Hermes allowed path'
+    );
+  });
+
+  it('fails closed when Hermes changes files outside allowed paths', () => {
+    expect(
+      findOutOfScopeHermesChangedFiles(
+        ['apps/web/lib/hermes/dispatch.ts', 'docs/notes.md'],
+        ['apps/web']
+      )
+    ).toEqual(['docs/notes.md']);
+
+    expect(() =>
+      assertHermesChangedFilesAllowed(
+        ['apps/web/lib/hermes/dispatch.ts', '.github/workflows/ci.yml'],
+        ['apps/web']
+      )
+    ).toThrow('Hermes worker changed files outside allowedPaths');
   });
 
   it('does not require binaries in dry-run mode', () => {

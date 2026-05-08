@@ -34,6 +34,7 @@ jobs:
     timeout-minutes: 25
     permissions:
       contents: read
+      issues: read
       pull-requests: write
     steps:
       - name: Checkout PR branch
@@ -51,6 +52,19 @@ jobs:
 
       - name: Run affected lint
         run: pnpm turbo lint --affected
+
+      - name: Require GStack gate evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          EVIDENCE_FILE="$RUNNER_TEMP/agent-gate-evidence.md"
+          gh pr view "$PR_NUMBER" --json body --jq '.body // ""' > "$EVIDENCE_FILE"
+          gh api --paginate "repos/$REPOSITORY/issues/$PR_NUMBER/comments" \
+            --jq '.[].body // ""' >> "$EVIDENCE_FILE"
+
+          pnpm --filter @jovie/web exec tsx scripts/check-agent-gate-evidence.ts "$EVIDENCE_FILE"
 
       - name: Generate Jovie Bot token
         id: app-token

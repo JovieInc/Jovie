@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { normalizeHermesAllowedPaths } from '../lib/hermes/allowed-paths';
 import type { HermesCliRuntime, HermesDispatchPayload } from '../types/ai-ops';
 
 interface RuntimeCommand {
@@ -85,7 +86,9 @@ export function parseHermesPayload(input: unknown): HermesDispatchPayload {
         ? input.priority
         : 50,
     skills: asStringArray(input.skills),
-    allowedPaths: asStringArray(input.allowedPaths),
+    allowedPaths: normalizeHermesAllowedPaths(
+      asStringArray(input.allowedPaths)
+    ),
     verification: asStringArray(input.verification),
     dryRun: input.dryRun === true,
     prompt: typeof input.prompt === 'string' ? input.prompt : '',
