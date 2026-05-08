@@ -1,9 +1,6 @@
 'use client';
 
-import {
-  motion,
-  useReducedMotion as useMotionReducedMotion,
-} from 'motion/react';
+import { useReducedMotion as useMotionReducedMotion } from 'motion/react';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ContributionGraph } from '@/components/ui/contribution-graph';
