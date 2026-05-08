@@ -120,13 +120,10 @@ describe('Public Profile Page Logic', () => {
         'Error fetching public profile tour dates'
       );
       expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-        'const tourDatesPromise = getPublicTourDates({'
+        'const tourDatesPromise = getPublicTourDates(profile.id)'
       );
       expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-        'public-profile-tour-dates-${profileId}'
-      );
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-        'createProfileTag(usernameNormalized)'
+        'tourDatesPromise.catch(() => [] as TourDateViewModel[])'
       );
     });
 
