@@ -194,7 +194,7 @@ export function ProfileCompactSurface({
   previewNotificationsState = {
     kind: 'button',
     tone: 'quiet',
-    label: 'Turn on alerts',
+    label: 'Get alerts',
   },
   dataTestId,
   hideMoreMenu = false,
@@ -568,7 +568,9 @@ export function ProfileCompactSurface({
                         )}
                       />
                     ) : (
-                      <span>{isSubscribed ? 'Manage' : 'Turn On'}</span>
+                      <span>
+                        {isSubscribed ? 'Manage alerts' : 'Get alerts'}
+                      </span>
                     )}
                   </span>
                 </button>
