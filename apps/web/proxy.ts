@@ -734,6 +734,10 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     // /waitlist during RSC navigation causes layout hierarchy mismatches that
     // manifest as "page not found" errors on the client.
     if (userState) {
+      const isInviteRedemptionPath = isWaitlistInviteRedirect(
+        req.nextUrl.pathname + req.nextUrl.search
+      );
+
       // Rewrite banned/deleted users to generic unavailable page.
       // Uses rewrite (not redirect) so the URL bar stays on whatever page
       // they were visiting — no dedicated path to discover.
@@ -751,6 +755,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       } else if (
         userState.needsWaitlist &&
         pathname !== '/waitlist' &&
+        !isInviteRedemptionPath &&
         !pathname.startsWith('/api/') &&
         pathname !== '/app' &&
         !pathname.startsWith('/app/')
@@ -761,6 +766,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       } else if (
         userState.needsOnboarding &&
         pathname !== '/onboarding' &&
+        !isInviteRedemptionPath &&
         !pathname.startsWith('/api/') &&
         pathname !== '/app' &&
         !pathname.startsWith('/app/')

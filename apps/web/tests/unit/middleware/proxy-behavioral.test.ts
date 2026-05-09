@@ -598,6 +598,34 @@ describe('proxy.ts middleware', () => {
       expect(locationUrl.searchParams.get('token')).toBe('secure-token');
     });
 
+    it('lets needsOnboarding users redeem waitlist invite links', async () => {
+      mocks.getUserState.mockResolvedValue(USER_STATES.needsOnboarding);
+
+      const req = createAuthenticatedRequest('clerk_user_1', {
+        pathname: '/waitlist/invite',
+        searchParams: { token: 'secure-token' },
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBeLessThan(300);
+      expect(res.headers.get('location')).toBeNull();
+      expect(res.headers.get('x-middleware-rewrite')).toBeNull();
+    });
+
+    it('lets waitlisted users redeem waitlist invite links', async () => {
+      mocks.getUserState.mockResolvedValue(USER_STATES.needsWaitlist);
+
+      const req = createAuthenticatedRequest('clerk_user_1', {
+        pathname: '/waitlist/invite',
+        searchParams: { token: 'secure-token' },
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBeLessThan(300);
+      expect(res.headers.get('location')).toBeNull();
+      expect(res.headers.get('x-middleware-rewrite')).toBeNull();
+    });
+
     it('redirects active user away from /waitlist to /app', async () => {
       mocks.getUserState.mockResolvedValue(USER_STATES.active);
 
