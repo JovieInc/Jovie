@@ -7,7 +7,10 @@ import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { userInterviews } from '@/lib/db/schema/user-interviews';
 import { captureError } from '@/lib/error-tracking';
-import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
+import {
+  enforceOnboardingRateLimit,
+  getOnboardingRateLimitMessage,
+} from '@/lib/onboarding/rate-limit';
 import { normalizeEmail } from '@/lib/utils/email';
 import { extractClientIPFromRequest } from '@/lib/utils/ip-extraction';
 import { logger } from '@/lib/utils/logger';
@@ -170,11 +173,26 @@ export async function POST(request: Request) {
 
     if (process.env.NODE_ENV !== 'development') {
       const clientIP = extractClientIPFromRequest({ headers: request.headers });
-      await enforceOnboardingRateLimit({
-        userId: clerkUserId,
-        ip: clientIP,
-        checkIP: true,
-      });
+      try {
+        await enforceOnboardingRateLimit({
+          userId: clerkUserId,
+          ip: clientIP,
+          checkIP: true,
+        });
+      } catch (error) {
+        const rateLimitMessage = getOnboardingRateLimitMessage(error);
+        if (!rateLimitMessage) throw error;
+
+        return NextResponse.json(
+          {
+            success: false,
+            outcome: 'rate_limited',
+            code: 'rate_limited',
+            error: rateLimitMessage,
+          },
+          { status: 429 }
+        );
+      }
     }
 
     const body = await request.json();

@@ -7,6 +7,7 @@ const mockDbSelect = vi.hoisted(() => vi.fn());
 const mockDbInsert = vi.hoisted(() => vi.fn());
 const mockSubmitWaitlistAccessRequest = vi.hoisted(() => vi.fn());
 const mockCaptureError = vi.hoisted(() => vi.fn());
+const mockEnforceOnboardingRateLimit = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: mockGetCachedAuth,
@@ -52,7 +53,14 @@ vi.mock('@/lib/utils/email', () => ({
 }));
 
 vi.mock('@/lib/onboarding/rate-limit', () => ({
-  enforceOnboardingRateLimit: vi.fn().mockResolvedValue(undefined),
+  enforceOnboardingRateLimit: mockEnforceOnboardingRateLimit,
+  getOnboardingRateLimitMessage: (error: unknown) => {
+    if (!(error instanceof Error)) return null;
+    const prefix = '[RATE_LIMITED] ';
+    return error.message.startsWith(prefix)
+      ? error.message.slice(prefix.length)
+      : null;
+  },
 }));
 
 vi.mock('@/lib/utils/ip-extraction', () => ({
@@ -104,8 +112,10 @@ function makeRequest(body: unknown): Request {
 
 describe('POST /api/onboarding/intake — email verification gate', () => {
   beforeEach(() => {
+    vi.unstubAllEnvs();
     vi.clearAllMocks();
     mockGetCachedAuth.mockResolvedValue({ userId: 'user_clerk_1' });
+    mockEnforceOnboardingRateLimit.mockResolvedValue(undefined);
   });
 
   it('returns 403 with email_unverified when user has no verified email', async () => {
@@ -174,6 +184,28 @@ describe('POST /api/onboarding/intake — email verification gate', () => {
     const res = await POST(makeRequest(VALID_BODY));
     expect(res.status).toBe(401);
     expect(mockCurrentUser).not.toHaveBeenCalled();
+  });
+
+  it('returns 429 when onboarding intake is rate limited', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    mockEnforceOnboardingRateLimit.mockRejectedValue(
+      new Error(
+        '[RATE_LIMITED] Too many onboarding attempts. Please try again in 1 hour.'
+      )
+    );
+
+    const res = await POST(makeRequest(VALID_BODY));
+
+    expect(res.status).toBe(429);
+    const json = await res.json();
+    expect(json).toMatchObject({
+      success: false,
+      outcome: 'rate_limited',
+      code: 'rate_limited',
+      error: 'Too many onboarding attempts. Please try again in 1 hour.',
+    });
+    expect(mockCurrentUser).not.toHaveBeenCalled();
+    expect(mockSubmitWaitlistAccessRequest).not.toHaveBeenCalled();
   });
 
   it('returns 400 when payload is invalid', async () => {

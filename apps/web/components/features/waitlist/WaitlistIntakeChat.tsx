@@ -5,6 +5,7 @@ import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { cn } from '@/lib/utils';
 import type { WaitlistAccessOutcome } from '@/lib/waitlist/access-request';
+import type { WaitlistDisplayOutcome } from './WaitlistOutcomeView';
 import { WaitlistSuccessView } from './WaitlistSuccessView';
 
 interface WaitlistIntakeChatProps {
@@ -105,7 +106,7 @@ export function WaitlistIntakeChat({
   const [input, setInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [outcome, setOutcome] = useState<WaitlistAccessOutcome | null>(null);
+  const [outcome, setOutcome] = useState<WaitlistDisplayOutcome | null>(null);
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
@@ -203,7 +204,7 @@ export function WaitlistIntakeChat({
       });
 
       const payload = (await response.json().catch(() => null)) as {
-        outcome?: WaitlistAccessOutcome;
+        outcome?: WaitlistAccessOutcome | 'rate_limited';
         error?: string;
       } | null;
 

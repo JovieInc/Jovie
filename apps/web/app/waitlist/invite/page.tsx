@@ -3,7 +3,10 @@ import { headers } from 'next/headers';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getCachedAuth } from '@/lib/auth/cached';
-import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
+import {
+  enforceOnboardingRateLimit,
+  getOnboardingRateLimitMessage,
+} from '@/lib/onboarding/rate-limit';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { redeemWaitlistInviteToken } from '@/lib/waitlist/redeem';
 
@@ -71,11 +74,18 @@ export default async function WaitlistInvitePage({
   }
 
   const requestHeaders = await headers();
-  await enforceOnboardingRateLimit({
-    userId,
-    ip: extractClientIP(requestHeaders),
-    checkIP: true,
-  });
+  try {
+    await enforceOnboardingRateLimit({
+      userId,
+      ip: extractClientIP(requestHeaders),
+      checkIP: true,
+    });
+  } catch (error) {
+    const rateLimitMessage = getOnboardingRateLimitMessage(error);
+    if (!rateLimitMessage) throw error;
+
+    return <InviteMessage title='Too many attempts' body={rateLimitMessage} />;
+  }
 
   const result = await redeemWaitlistInviteToken({
     token,
