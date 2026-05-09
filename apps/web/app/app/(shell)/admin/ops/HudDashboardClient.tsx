@@ -4,6 +4,8 @@ import { Loader2, Rocket } from 'lucide-react';
 import Image from 'next/image';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
+import type { DailyBucket } from '@/components/features/admin/ShippingVelocityChart';
+import { ShippingVelocityChart } from '@/components/features/admin/ShippingVelocityChart';
 import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentMetricRow } from '@/components/molecules/ContentMetricRow';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
@@ -315,6 +317,10 @@ export interface HudDashboardClientProps {
   readonly hudUrl?: string;
   /** Required only in token presentation: forwarded to the metrics refresh hook. */
   readonly kioskToken?: string | null;
+  /** Pre-fetched shipping velocity data from the server (avoids loading flash). */
+  readonly initialShippingData?: DailyBucket[];
+  /** ISO timestamp of when shipping data was last cached. */
+  readonly initialShippingCachedAt?: string;
 }
 
 export function HudDashboardClient({
@@ -323,6 +329,8 @@ export function HudDashboardClient({
   presentationMode = 'token',
   hudUrl,
   kioskToken = null,
+  initialShippingData,
+  initialShippingCachedAt,
 }: HudDashboardClientProps) {
   const { data: metrics, refetch } = useHudMetricsQuery(
     initialMetrics,
@@ -392,6 +400,15 @@ export function HudDashboardClient({
           </div>
         </ContentSurfaceCard>
       ) : null}
+
+      {/* Shipping Velocity Chart — always first in the ops dashboard */}
+      <ContentSurfaceCard surface='details' className='p-0 overflow-hidden'>
+        <ShippingVelocityChart
+          initialData={initialShippingData}
+          initialRange='7d'
+          cachedAt={initialShippingCachedAt}
+        />
+      </ContentSurfaceCard>
 
       <div
         className={

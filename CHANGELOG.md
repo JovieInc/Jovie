@@ -5,7 +5,16 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
      7|
-     8|## [26.4.217] - 2026-05-08
+     8|## [26.4.218] - 2026-05-08
+
+> [internal] Ops HUD now shows a live shipping velocity chart — merged, opened, and closed PRs per day via GitHub GraphQL, cached in Redis.
+
+### Added
+
+- **[internal] Shipping velocity chart in `/app/admin/ops`**: cinematic Recharts area chart showing PR velocity (merged, opened, closed) over 7D / 30D / 1Y. Purple hero line for merged PRs, ghost green for opened, hidden red for closed-without-merge (toggle to reveal). Click any series to spotlight it; click empty area or the series legend again to reset.
+- **[internal] GitHub GraphQL PR velocity API** (`GET /api/admin/hud/shipping-velocity`): cursor-paginated GraphQL query (5000 pts/hr) with Redis 20-min TTL cache, graceful fallback when token or Redis is unavailable.
+
+## [26.4.217] - 2026-05-08
 
 > You can now update Jovie from right inside the app. A blue "Update" pill appears in the header when a new version is ready — click it to apply instantly.
 
