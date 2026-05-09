@@ -40,20 +40,22 @@ describe('getAdminMercuryMetrics', () => {
     process.env.MERCURY_API_TOKEN = 'token';
     process.env.MERCURY_CHECKING_ACCOUNT_ID = 'acct_123';
 
+    // Mercury API returns amounts in USD dollars (not cents).
+    // $2,500.00 balance, $50.00 + $25.00 debits = $75.00 burn rate.
     fetchMock
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          availableBalance: 250000,
+          availableBalance: 2500,
         }),
       })
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
           transactions: [
-            { amount: 5000, direction: 'debit' },
-            { amount: 2500, direction: 'debit' },
-            { amount: 4000, direction: 'credit' },
+            { amount: 50, direction: 'debit' },
+            { amount: 25, direction: 'debit' },
+            { amount: 40, direction: 'credit' },
           ],
         }),
       });
