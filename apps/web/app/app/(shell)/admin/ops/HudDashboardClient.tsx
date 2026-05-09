@@ -81,6 +81,24 @@ function getDeploymentDetail(deployments: HudMetrics['deployments']): string {
   return deployments.errorMessage ?? '\u2014';
 }
 
+function formatReliabilitySubtitle(
+  reliability: HudMetrics['reliability']
+): string {
+  const p95 =
+    reliability.p95LatencyMs === null
+      ? '\u2014'
+      : `${reliability.p95LatencyMs.toFixed(0)}ms`;
+  return `${reliability.unresolvedSentryIssues24h.toLocaleString('en-US')} unresolved | p95 ${p95}`;
+}
+
+function formatDefaultStatusLabel(
+  status: HudMetrics['overview']['defaultStatus']
+): string {
+  if (status === 'alive') return 'Alive';
+  if (status === 'dead') return 'Dead';
+  return 'Unknown';
+}
+
 const DEPLOYMENT_STATE_LABELS: Record<HudDeploymentState, string> = {
   success: 'Success',
   failure: 'Failure',
@@ -529,18 +547,26 @@ export function HudDashboardClient({
           />
           <ContentMetricCard
             label='Runway'
-            value={formatRunway(metrics.overview.runwayMonths)}
+            value={
+              metrics.overview.financialDataAvailable
+                ? formatRunway(metrics.overview.runwayMonths)
+                : '\u2014'
+            }
             subtitle={
-              <div className='mt-2 grid gap-1.5'>
-                <ContentMetricRow
-                  label='Cash'
-                  value={formatUsd(metrics.overview.balanceUsd)}
-                />
-                <ContentMetricRow
-                  label='Burn (30d)'
-                  value={formatUsd(metrics.overview.burnRateUsd)}
-                />
-              </div>
+              metrics.overview.financialDataAvailable ? (
+                <div className='mt-2 grid gap-1.5'>
+                  <ContentMetricRow
+                    label='Cash'
+                    value={formatUsd(metrics.overview.balanceUsd)}
+                  />
+                  <ContentMetricRow
+                    label='Burn (30d)'
+                    value={formatUsd(metrics.overview.burnRateUsd)}
+                  />
+                </div>
+              ) : (
+                'Unavailable'
+              )
             }
             className='p-3'
             valueClassName={secondaryValueClass}
@@ -558,12 +584,8 @@ export function HudDashboardClient({
           />
           <ContentMetricCard
             label='Reliability'
-            value={`${(100 - metrics.reliability.errorRatePercent).toFixed(1)}%`}
-            subtitle={
-              metrics.reliability.p95LatencyMs === null
-                ? 'p95 -'
-                : `p95 ${metrics.reliability.p95LatencyMs.toFixed(0)}ms`
-            }
+            value={`${metrics.reliability.reliabilityScorePercent.toFixed(1)}%`}
+            subtitle={formatReliabilitySubtitle(metrics.reliability)}
             className='p-3'
             valueClassName={secondaryValueClass}
           />
@@ -601,18 +623,14 @@ export function HudDashboardClient({
               <div className='space-y-2'>
                 <SectionEyebrow>Default status</SectionEyebrow>
                 <p className='text-[26px] font-[620] leading-none tracking-[-0.03em] text-primary-token sm:text-[32px]'>
-                  {metrics.overview.defaultStatus === 'alive'
-                    ? 'Alive'
-                    : 'Dead'}
+                  {formatDefaultStatusLabel(metrics.overview.defaultStatus)}
                 </p>
                 <p className='max-w-4xl text-[13px] leading-6 text-secondary-token'>
                   {metrics.overview.defaultStatusDetail}
                 </p>
               </div>
               <HudStatusPill
-                label={
-                  metrics.overview.defaultStatus === 'alive' ? 'Alive' : 'Dead'
-                }
+                label={formatDefaultStatusLabel(metrics.overview.defaultStatus)}
                 tone={defaultTone}
               />
             </div>
@@ -695,18 +713,26 @@ export function HudDashboardClient({
           <div className='grid grid-cols-2 xl:grid-cols-2 gap-3'>
             <ContentMetricCard
               label='Runway'
-              value={formatRunway(metrics.overview.runwayMonths)}
+              value={
+                metrics.overview.financialDataAvailable
+                  ? formatRunway(metrics.overview.runwayMonths)
+                  : '—'
+              }
               subtitle={
-                <div className='mt-2 grid gap-1.5'>
-                  <ContentMetricRow
-                    label='Cash'
-                    value={formatUsd(metrics.overview.balanceUsd)}
-                  />
-                  <ContentMetricRow
-                    label='Burn (30d)'
-                    value={formatUsd(metrics.overview.burnRateUsd)}
-                  />
-                </div>
+                metrics.overview.financialDataAvailable ? (
+                  <div className='mt-2 grid gap-1.5'>
+                    <ContentMetricRow
+                      label='Cash'
+                      value={formatUsd(metrics.overview.balanceUsd)}
+                    />
+                    <ContentMetricRow
+                      label='Burn (30d)'
+                      value={formatUsd(metrics.overview.burnRateUsd)}
+                    />
+                  </div>
+                ) : (
+                  'Unavailable'
+                )
               }
               className='p-3'
               labelClassName='uppercase tracking-[0.16em] text-tertiary-token'
@@ -728,12 +754,8 @@ export function HudDashboardClient({
             />
             <ContentMetricCard
               label='Reliability'
-              value={`${(100 - metrics.reliability.errorRatePercent).toFixed(1)}%`}
-              subtitle={
-                metrics.reliability.p95LatencyMs === null
-                  ? 'p95 —'
-                  : `p95 ${metrics.reliability.p95LatencyMs.toFixed(0)}ms`
-              }
+              value={`${metrics.reliability.reliabilityScorePercent.toFixed(1)}%`}
+              subtitle={formatReliabilitySubtitle(metrics.reliability)}
               className='p-3 col-span-2'
               labelClassName='uppercase tracking-[0.16em] text-tertiary-token'
               valueClassName={secondaryValueClass}
@@ -1007,9 +1029,7 @@ export function HudDashboardClient({
             </p>
           </div>
           <HudStatusPill
-            label={
-              metrics.overview.defaultStatus === 'alive' ? 'Alive' : 'Dead'
-            }
+            label={formatDefaultStatusLabel(metrics.overview.defaultStatus)}
             tone={defaultTone}
           />
         </div>

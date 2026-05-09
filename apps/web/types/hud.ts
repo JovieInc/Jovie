@@ -31,8 +31,10 @@ export interface HudOverviewMetrics {
   balanceUsd: number;
   burnRateUsd: number;
   runwayMonths: number | null;
-  defaultStatus: 'alive' | 'dead';
+  defaultStatus: 'alive' | 'dead' | 'unknown';
   defaultStatusDetail: string;
+  /** True when Mercury data is available; false means financial fields are stubs */
+  financialDataAvailable: boolean;
 }
 
 export interface HudOperationsStatus {
@@ -53,9 +55,12 @@ export interface HudMetrics {
   operations: HudOperationsStatus;
   reliability: {
     errorRatePercent: number;
+    /** Pre-computed reliability score: 100 - errorRatePercent, clamped [0, 100] */
+    reliabilityScorePercent: number;
     p95LatencyMs: number | null;
     incidents24h: number;
     lastIncidentAtIso: string | null;
+    unresolvedSentryIssues24h: number;
   };
   deployments: HudDeployments;
   aiOps: HermesAiOpsSummary;

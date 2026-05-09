@@ -3,6 +3,10 @@ import 'server-only';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
+import {
+  computeMercuryDefaultStatus,
+  type MercuryDefaultStatus,
+} from './hud-metric-derivations';
 
 const MERCURY_BASE_URL =
   env.MERCURY_API_BASE_URL?.trim() || 'https://api.mercury.com/api/v1';
@@ -45,6 +49,13 @@ export interface AdminMercuryMetrics {
   isConfigured: boolean;
   /** Indicates whether the Mercury API call succeeded */
   isAvailable: boolean;
+  /**
+   * Explicit default-status signal.
+   * - 'alive'  — balance > burn (runway > profitability horizon)
+   * - 'dead'   — balance <= burn (runway ends before profitability)
+   * - 'unknown' — Mercury is unavailable or data is missing; must NOT be shown as dead
+   */
+  defaultStatus: MercuryDefaultStatus;
   /** Error message if Mercury API call failed */
   errorMessage?: string;
 }
@@ -194,6 +205,7 @@ export async function getAdminMercuryMetrics(): Promise<AdminMercuryMetrics> {
       burnWindowDays: 30,
       isConfigured: false,
       isAvailable: false,
+      defaultStatus: 'unknown',
       errorMessage:
         'Mercury credentials not configured (set MERCURY_API_TOKEN or MERCURY_API_KEY and MERCURY_CHECKING_ACCOUNT_ID or MERCURY_ACCOUNT_ID)',
     };
@@ -237,6 +249,7 @@ export async function getAdminMercuryMetrics(): Promise<AdminMercuryMetrics> {
       burnWindowDays: 30,
       isConfigured: true,
       isAvailable: true,
+      defaultStatus: computeMercuryDefaultStatus(true, balanceUsd, burnRateUsd),
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
@@ -247,6 +260,7 @@ export async function getAdminMercuryMetrics(): Promise<AdminMercuryMetrics> {
       burnWindowDays: 30,
       isConfigured: true,
       isAvailable: false,
+      defaultStatus: 'unknown',
       errorMessage: `Mercury API error: ${message}`,
     };
   }
