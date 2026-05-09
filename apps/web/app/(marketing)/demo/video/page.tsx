@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { APP_ROUTES } from '@/constants/routes';
 import { DemoVideoPlayer } from '@/features/demo/DemoVideoPlayer';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 
@@ -42,7 +43,7 @@ export default function ProductDemoPage() {
           </a>
         )}
         <Link
-          href='/signup'
+          href={APP_ROUTES.SIGNUP}
           className='inline-flex h-12 items-center rounded-full bg-white px-8 text-sm font-semibold text-black transition-opacity hover:opacity-90'
         >
           Try it free
