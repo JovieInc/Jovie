@@ -177,18 +177,27 @@ export async function getHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
     overview: {
       mrrUsd: stripeMetrics.mrrUsd,
       activeSubscribers: stripeMetrics.activeSubscribers,
-      balanceUsd: mercuryMetrics.balanceUsd,
-      burnRateUsd: mercuryMetrics.burnRateUsd,
-      runwayMonths: financialStatus.runwayMonths,
-      defaultStatus: financialStatus.isDefaultAlive ? 'alive' : 'dead',
+      balanceUsd: mercuryMetrics.isAvailable ? mercuryMetrics.balanceUsd : 0,
+      burnRateUsd: mercuryMetrics.isAvailable ? mercuryMetrics.burnRateUsd : 0,
+      runwayMonths: mercuryMetrics.isAvailable
+        ? financialStatus.runwayMonths
+        : null,
+      defaultStatus: mercuryMetrics.isAvailable
+        ? financialStatus.isDefaultAlive
+          ? 'alive'
+          : 'dead'
+        : 'unknown',
       defaultStatusDetail: financialStatus.defaultStatusDetail,
+      financialDataAvailable: mercuryMetrics.isAvailable,
     },
     operations: operationsStatus,
     reliability: {
       errorRatePercent: reliabilitySummary.errorRatePercent,
+      reliabilityScorePercent: reliabilitySummary.reliabilityScorePercent,
       p95LatencyMs: reliabilitySummary.p95LatencyMs,
       incidents24h: reliabilitySummary.incidents24h,
       lastIncidentAtIso,
+      unresolvedSentryIssues24h: reliabilitySummary.unresolvedSentryIssues24h,
     },
     deployments,
     aiOps,
