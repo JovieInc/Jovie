@@ -19,16 +19,19 @@ vi.mock('../artist-notifications-cta/ArtistNotificationsCTA', () => ({
     artist,
     presentation,
     forceExpanded,
+    source,
   }: {
     readonly artist: Artist;
     readonly presentation?: string;
     readonly forceExpanded?: boolean;
+    readonly source?: string;
   }) => (
     <div
       data-testid='artist-notifications-cta'
       data-artist-handle={artist.handle}
       data-presentation={presentation}
       data-force-expanded={String(forceExpanded)}
+      data-source={source ?? ''}
     />
   ),
 }));
@@ -37,14 +40,17 @@ vi.mock('../artist-notifications-cta/TwoStepNotificationsCTA', () => ({
   TwoStepNotificationsCTA: ({
     artist,
     startExpanded,
+    source,
   }: {
     readonly artist: Artist;
     readonly startExpanded?: boolean;
+    readonly source?: string;
   }) => (
     <div
       data-testid='two-step-notifications-cta'
       data-artist-handle={artist.handle}
       data-start-expanded={String(startExpanded)}
+      data-source={source ?? ''}
     />
   ),
 }));
@@ -135,5 +141,23 @@ describe('SubscribeForm', () => {
     expect(
       screen.getByTestId('artist-notifications-cta').dataset.artistHandle
     ).toBe('djexample');
+  });
+
+  it('forwards source prop to TwoStepNotificationsCTA (analytics attribution)', () => {
+    render(
+      <SubscribeForm artist={makeArtist()} twoStep source='profile_inline' />
+    );
+
+    expect(
+      screen.getByTestId('two-step-notifications-cta').dataset.source
+    ).toBe('profile_inline');
+  });
+
+  it('forwards source prop to ArtistNotificationsCTA (analytics attribution)', () => {
+    render(<SubscribeForm artist={makeArtist()} source='tour_drawer' />);
+
+    expect(screen.getByTestId('artist-notifications-cta').dataset.source).toBe(
+      'tour_drawer'
+    );
   });
 });
