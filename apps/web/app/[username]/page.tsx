@@ -426,7 +426,8 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
     releasesPromise,
     // stableId is null for ISR renders — returns the default 'button' variant.
     // AnonCookieBootstrap resolves the per-user variant on the client side.
-    getProfileAlertOptInVariant(null),
+    // .catch ensures a Statsig outage doesn't fail the whole ISR page render.
+    getProfileAlertOptInVariant(null).catch(() => 'button' as const),
   ]);
   const tourDates = [...tourDatesRaw].sort(
     (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
