@@ -141,6 +141,17 @@ describe('getProfileRouteConfig', () => {
       getProfileRouteConfig('does-not-exist' as ProfileRouteKey)
     ).toThrow(/Unknown route key/);
   });
+
+  it('does not return prototype properties for poison keys', () => {
+    // Prototype-key bypass guard: __proto__, constructor, toString etc.
+    // must not bypass the unknown-key check and return a non-config object.
+    const poisonKeys = ['__proto__', 'constructor', 'toString', 'valueOf'];
+    for (const key of poisonKeys) {
+      expect(() => getProfileRouteConfig(key as ProfileRouteKey)).toThrow(
+        /Unknown route key/
+      );
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -206,6 +217,14 @@ describe('getRouteConfigForMode', () => {
 
   it('unknown mode → profile-root fallback', () => {
     expect(getRouteConfigForMode('invalid-garbage').key).toBe('profile-root');
+  });
+
+  it('prototype poison keys → profile-root fallback (no bypass)', () => {
+    // __proto__, constructor, toString etc. must not traverse the prototype chain.
+    const poisonKeys = ['__proto__', 'constructor', 'toString', 'valueOf'];
+    for (const key of poisonKeys) {
+      expect(getRouteConfigForMode(key).key).toBe('profile-root');
+    }
   });
 });
 

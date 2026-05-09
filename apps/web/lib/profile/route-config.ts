@@ -567,12 +567,11 @@ export const PROFILE_ROUTE_CONFIG: Record<ProfileRouteKey, ProfileRouteConfig> =
 export function getProfileRouteConfig(
   key: ProfileRouteKey
 ): ProfileRouteConfig {
-  const config = PROFILE_ROUTE_CONFIG[key];
-  if (!config) {
+  if (!Object.hasOwn(PROFILE_ROUTE_CONFIG, key)) {
     throw new Error(`[profile/route-config] Unknown route key: ${key}`);
   }
 
-  return config;
+  return PROFILE_ROUTE_CONFIG[key];
 }
 
 /**
@@ -586,7 +585,7 @@ export function getRouteConfigForMode(
 ): ProfileRouteConfig {
   if (!mode) return PROFILE_ROUTE_CONFIG['profile-root'];
 
-  const modeKeyMap: Record<string, ProfileRouteKey> = {
+  const modeKeyMap = {
     profile: 'profile-root',
     listen: 'mode-listen',
     subscribe: 'mode-subscribe',
@@ -596,9 +595,11 @@ export function getRouteConfigForMode(
     contact: 'mode-contact',
     pay: 'mode-pay',
     tip: 'mode-pay', // tip is a legacy alias for pay
-  };
+  } as const satisfies Record<string, ProfileRouteKey>;
 
-  const key = modeKeyMap[mode] ?? 'profile-root';
+  const key = Object.hasOwn(modeKeyMap, mode)
+    ? modeKeyMap[mode as keyof typeof modeKeyMap]
+    : 'profile-root';
   return PROFILE_ROUTE_CONFIG[key];
 }
 
