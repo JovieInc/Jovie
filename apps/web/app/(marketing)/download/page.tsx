@@ -4,6 +4,7 @@ import Link from 'next/link';
 import {
   FaqSection,
   MarketingContainer,
+  MarketingFeatureGrid,
   MarketingHero,
 } from '@/components/marketing';
 import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
@@ -118,8 +119,8 @@ export default async function DownloadPage() {
           <h2 className='marketing-h2-linear text-primary-token'>
             What you get.
           </h2>
-          <div className='mt-8 grid gap-8 sm:grid-cols-2'>
-            {[
+          <MarketingFeatureGrid
+            items={[
               {
                 title: 'Native macOS shell',
                 description:
@@ -140,17 +141,8 @@ export default async function DownloadPage() {
                 description:
                   'One download for both Apple Silicon and Intel. The right architecture is selected automatically.',
               },
-            ].map(feature => (
-              <div key={feature.title}>
-                <h3 className='font-medium text-primary-token'>
-                  {feature.title}
-                </h3>
-                <p className='mt-2 text-sm leading-relaxed text-secondary-token'>
-                  {feature.description}
-                </p>
-              </div>
-            ))}
-          </div>
+            ]}
+          />
         </section>
       </MarketingContainer>
 

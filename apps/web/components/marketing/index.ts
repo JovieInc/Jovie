@@ -6,6 +6,8 @@ export type { MarketingContainerProps } from './MarketingContainer';
 export { MarketingContainer } from './MarketingContainer';
 export type { MarketingContentShellProps } from './MarketingContentShell';
 export { MarketingContentShell } from './MarketingContentShell';
+export type { MarketingFeatureGridProps } from './MarketingFeatureGrid';
+export { MarketingFeatureGrid } from './MarketingFeatureGrid';
 export type { MarketingHeroProps } from './MarketingHero';
 export { MarketingHero } from './MarketingHero';
 export type { MarketingMetricCardProps } from './MarketingMetricCard';
