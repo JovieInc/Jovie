@@ -1,14 +1,35 @@
 import { redirect } from 'next/navigation';
+import { WaitlistIntakeChat } from '@/components/features/waitlist/WaitlistIntakeChat';
+import { WaitlistSuccessView } from '@/components/features/waitlist/WaitlistSuccessView';
+import { APP_ROUTES } from '@/constants/routes';
+import { CanonicalUserState, resolveUserState } from '@/lib/auth/gate';
 
-/**
- * Waitlist gate is permanently disabled — all signups go straight to onboarding.
- * This page exists as a server-side redirect for bookmarks, stale caches, and
- * CTA links that still point to /waitlist.
- *
- * The waitlist infrastructure (DB tables, API routes, admin tools) is preserved
- * for future demand control. To re-enable, restore isWaitlistGateEnabled() in
- * lib/waitlist/settings.ts and restore this page from git history.
- */
-export default function WaitlistPage() {
-  redirect('/onboarding');
+export default async function WaitlistPage() {
+  const authResult = await resolveUserState();
+
+  if (authResult.state === CanonicalUserState.UNAUTHENTICATED) {
+    redirect(`${APP_ROUTES.SIGNUP}?redirect_url=${APP_ROUTES.WAITLIST}`);
+  }
+
+  if (authResult.state === CanonicalUserState.BANNED) {
+    redirect(APP_ROUTES.UNAVAILABLE);
+  }
+
+  if (authResult.state === CanonicalUserState.USER_CREATION_FAILED) {
+    redirect('/error/user-creation-failed');
+  }
+
+  if (authResult.state === CanonicalUserState.ACTIVE) {
+    redirect(APP_ROUTES.DASHBOARD);
+  }
+
+  if (authResult.state === CanonicalUserState.NEEDS_ONBOARDING) {
+    redirect(APP_ROUTES.ONBOARDING);
+  }
+
+  if (authResult.state === CanonicalUserState.WAITLIST_PENDING) {
+    return <WaitlistSuccessView />;
+  }
+
+  return <WaitlistIntakeChat userEmail={authResult.context.email} />;
 }

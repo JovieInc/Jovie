@@ -270,7 +270,7 @@ export const HOME_FINAL_CTA_CONTENT: HomeFinalCtaContent = {
 export const HOMEPAGE_FINAL_CTA_CONTENT: HomeFinalCtaContent = {
   title: 'Stay in the studio.',
   body: 'Jovie automates the busy work, so you can stick to what you\u2019re good at: making great music.',
-  primaryCtaLabel: 'Start free trial',
+  primaryCtaLabel: 'Request Access',
 };
 
 /* ── Auto-Notify ─────────────────────────────────────── */

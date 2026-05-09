@@ -7,6 +7,7 @@ const {
   mockDbSelect,
   mockDbInsert,
   mockEq,
+  mockSql,
   mockIsWaitlistGateEnabled,
 } = vi.hoisted(() => ({
   mockCachedAuth: vi.fn(),
@@ -14,15 +15,22 @@ const {
   mockDbSelect: vi.fn(),
   mockDbInsert: vi.fn(),
   mockEq: vi.fn(),
+  mockSql: vi.fn(),
   mockIsWaitlistGateEnabled: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock('drizzle-orm', async importOriginal => {
   const actual = await importOriginal<typeof import('drizzle-orm')>();
   mockEq.mockImplementation((...args: any[]) => (actual as any).eq(...args));
+  mockSql.mockImplementation((strings: TemplateStringsArray, ...values) => ({
+    strings,
+    values,
+  }));
   return {
     ...actual,
     eq: ((...args: any[]) => mockEq(...args)) as unknown as typeof actual.eq,
+    sql: ((strings: TemplateStringsArray, ...values: unknown[]) =>
+      mockSql(strings, ...values)) as unknown as typeof actual.sql,
   };
 });
 
@@ -80,10 +88,14 @@ const createJoinQueryMock = (result: unknown[]) => ({
 });
 
 // Helper to create mock for simple queries (waitlist)
+// JOV-1963: waitlist lookup now chains .orderBy(desc(createdAt)).limit(1)
+// to ensure the latest entry wins when multiple rows exist for one email.
 const createSimpleQueryMock = (result: unknown[]) => ({
   from: vi.fn().mockReturnValue({
     where: vi.fn().mockReturnValue({
-      limit: vi.fn().mockResolvedValue(result),
+      orderBy: vi.fn().mockReturnValue({
+        limit: vi.fn().mockResolvedValue(result),
+      }),
     }),
   }),
 });
@@ -463,8 +475,11 @@ describe('gate.ts', () => {
     });
 
     it('normalizes email to lowercase', async () => {
+      // JOV-1963: query now chains .orderBy(...).limit(1)
       const whereMock = vi.fn().mockReturnValue({
-        limit: vi.fn().mockResolvedValue([]),
+        orderBy: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([]),
+        }),
       });
 
       mockDbSelect.mockReturnValue({
@@ -475,11 +490,10 @@ describe('gate.ts', () => {
 
       await getWaitlistAccess('  TEST@EXAMPLE.COM  ');
 
-      // Verify the normalized value is passed into Drizzle eq()
-      expect(mockEq).toHaveBeenCalled();
-      expect(mockEq.mock.calls[0]?.[1]).toBe('test@example.com');
-      // And that where() receives the exact SQL expression returned by eq()
-      expect(whereMock).toHaveBeenCalledWith(mockEq.mock.results[0]?.value);
+      // Verify the normalized value is included in the lower(email) SQL guard.
+      expect(mockSql).toHaveBeenCalled();
+      expect(mockSql.mock.calls[0]?.[2]).toBe('test@example.com');
+      expect(whereMock).toHaveBeenCalledWith(mockSql.mock.results[0]?.value);
     });
   });
 });

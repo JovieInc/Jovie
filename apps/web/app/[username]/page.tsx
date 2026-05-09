@@ -9,10 +9,7 @@ import { AUDIENCE_ANON_COOKIE, BASE_URL } from '@/constants/app';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
 import { DesktopQrOverlayClient } from '@/features/profile/DesktopQrOverlayClient';
 import { ProfileViewTracker } from '@/features/profile/ProfileViewTracker';
-import {
-  getProfileMode,
-  getProfileModeDefinition,
-} from '@/features/profile/registry';
+import { getProfileModeDefinition } from '@/features/profile/registry';
 import { StaticArtistPage } from '@/features/profile/StaticArtistPage';
 import { JoviePixel } from '@/features/tracking/JoviePixel';
 import { getClientTrackingToken } from '@/lib/analytics/tracking-token';
@@ -270,9 +267,6 @@ interface Props {
   readonly params: Promise<{
     readonly username: string;
   }>;
-  readonly searchParams?: Promise<{
-    readonly mode?: string | string[];
-  }>;
 }
 
 async function getPublicTourDates(
@@ -313,17 +307,9 @@ async function getPublicReleases(
   }
 }
 
-export default async function ArtistPage({
-  params,
-  searchParams,
-}: Readonly<Props>) {
+export default async function ArtistPage({ params }: Readonly<Props>) {
   const { username } = await params;
-  const resolvedSearchParams = await searchParams;
-  const requestedMode = getProfileMode(
-    Array.isArray(resolvedSearchParams?.mode)
-      ? resolvedSearchParams?.mode[0]
-      : resolvedSearchParams?.mode
-  );
+  const initialMode = 'profile';
 
   // Early reject obviously invalid usernames before hitting the database
   if (
@@ -412,8 +398,8 @@ export default async function ArtistPage({
     artist.name
   );
   const showPayButton = links.some(link => link.platform === 'venmo');
-  const showBackButton = requestedMode !== 'profile';
-  const subtitle = getProfileModeDefinition(requestedMode).subtitle;
+  const showBackButton = false;
+  const subtitle = getProfileModeDefinition(initialMode).subtitle;
 
   // Read profile photo download settings
   const profileSettings =
@@ -477,7 +463,7 @@ export default async function ArtistPage({
       {/* Server-side pixel tracking */}
       {isPublicNoAuthSmoke ? null : <JoviePixel profileId={profile.id} />}
       <StaticArtistPage
-        mode={requestedMode}
+        mode={initialMode}
         artist={artist}
         socialLinks={links}
         viewerCountryCode={viewerCountryCode}

@@ -116,4 +116,12 @@ describe('public profile contract guard', () => {
       '--profile-shell-header-max-width'
     );
   });
+
+  it('does not reserve hidden notifications CTA space above the compact profile rail', () => {
+    const contents = readFileSync(PROFILE_COMPACT_SURFACE, 'utf8');
+
+    expect(contents).toContain('hideTrigger');
+    expect(contents).not.toContain('profile-inline-cta-placeholder');
+    expect(contents).not.toContain('min-h-[116px]');
+  });
 });
