@@ -33,7 +33,7 @@ describe('Admin Waitlist Disapprove API', () => {
     });
   });
 
-  it('returns success and new status when disapproval succeeds', async () => {
+  it('returns success and waitlisted status when disapproval succeeds', async () => {
     mockWithSystemIngestionSession.mockResolvedValueOnce({
       outcome: 'disapproved',
       clerkId: 'user_123',
@@ -53,7 +53,7 @@ describe('Admin Waitlist Disapprove API', () => {
 
     expect(response.status).toBe(200);
     expect(data.success).toBe(true);
-    expect(data.status).toBe('new');
+    expect(data.status).toBe('waitlisted');
     expect(mockFinalizeWaitlistDisapproval).toHaveBeenCalled();
   });
 
@@ -76,7 +76,7 @@ describe('Admin Waitlist Disapprove API', () => {
 
     expect(response.status).toBe(200);
     expect(data.success).toBe(true);
-    expect(data.status).toBe('new');
+    expect(data.status).toBe('waitlisted');
     expect(mockFinalizeWaitlistDisapproval).not.toHaveBeenCalled();
   });
 });

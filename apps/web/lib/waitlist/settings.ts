@@ -49,6 +49,7 @@ export function invalidateWaitlistGateCache(): void {
 export interface WaitlistGateSettings {
   gateEnabled: boolean;
   autoAcceptEnabled: boolean;
+  autoAcceptAfterDays: number;
   autoAcceptDailyLimit: number;
   autoAcceptedToday: number;
   autoAcceptResetsAt: Date;
@@ -81,6 +82,7 @@ async function ensureSettingsRow(
       id: SETTINGS_ROW_ID,
       gateEnabled: true,
       autoAcceptEnabled: false,
+      autoAcceptAfterDays: 7,
       autoAcceptDailyLimit: 0,
       autoAcceptedToday: 0,
       autoAcceptResetsAt: getStartOfNextDayUTC(now),
@@ -128,6 +130,7 @@ export async function getWaitlistSettings(
 export async function updateWaitlistSettings(input: {
   gateEnabled: boolean;
   autoAcceptEnabled: boolean;
+  autoAcceptAfterDays: number;
   autoAcceptDailyLimit: number;
 }): Promise<WaitlistGateSettings> {
   const current = await ensureSettingsRow();
@@ -138,6 +141,7 @@ export async function updateWaitlistSettings(input: {
     .set({
       gateEnabled: input.gateEnabled,
       autoAcceptEnabled: input.autoAcceptEnabled,
+      autoAcceptAfterDays: Math.max(1, Math.trunc(input.autoAcceptAfterDays)),
       autoAcceptDailyLimit: Math.max(0, Math.trunc(input.autoAcceptDailyLimit)),
       autoAcceptedToday:
         current.autoAcceptResetsAt <= now ? 0 : current.autoAcceptedToday,
@@ -190,7 +194,7 @@ export async function tryReserveAutoAcceptSlot(
       and(
         eq(waitlistSettings.id, SETTINGS_ROW_ID),
         eq(waitlistSettings.autoAcceptEnabled, true),
-        eq(waitlistSettings.gateEnabled, false),
+        eq(waitlistSettings.gateEnabled, true),
         drizzleSql`${waitlistSettings.autoAcceptedToday} < ${waitlistSettings.autoAcceptDailyLimit}`
       )
     )

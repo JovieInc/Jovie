@@ -41,9 +41,16 @@ const STATUS_VARIANTS: Record<
   'primary' | 'secondary' | 'success' | 'error' | 'warning'
 > = {
   new: 'secondary',
+  chat_started: 'secondary',
+  qualified: 'secondary',
+  waitlisted: 'secondary',
   invited: 'primary',
+  approved: 'primary',
   claimed: 'success',
+  signed_up: 'success',
   rejected: 'error',
+  expired: 'warning',
+  blocked: 'error',
 };
 
 export interface WaitlistMobileCardProps {
@@ -71,7 +78,11 @@ export const WaitlistMobileCard = React.memo(function WaitlistMobileCard({
 }: WaitlistMobileCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const isApproved = entry.status === 'invited' || entry.status === 'claimed';
+  const isApproved =
+    entry.status === 'invited' ||
+    entry.status === 'approved' ||
+    entry.status === 'claimed' ||
+    entry.status === 'signed_up';
   const isApproving = approveStatus === 'approving';
   const isDisapproving = approveStatus === 'disapproving';
   const statusVariant = STATUS_VARIANTS[entry.status] ?? 'secondary';

@@ -51,6 +51,14 @@ vi.mock('@/lib/utils/email', () => ({
   normalizeEmail: (email: string) => email.toLowerCase().trim(),
 }));
 
+vi.mock('@/lib/onboarding/rate-limit', () => ({
+  enforceOnboardingRateLimit: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@/lib/utils/ip-extraction', () => ({
+  extractClientIPFromRequest: vi.fn().mockReturnValue('127.0.0.1'),
+}));
+
 vi.mock('@/lib/validation/schemas', async () => {
   const { z } = await import('zod');
   return {

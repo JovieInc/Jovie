@@ -4,6 +4,11 @@ import type { DbOrTransaction } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { waitlistEntries } from '@/lib/db/schema/waitlist';
+import { insertWaitlistAuditLog } from '@/lib/waitlist/audit';
+import {
+  isWaitlistApprovedStatus,
+  isWaitlistPendingStatus,
+} from '@/lib/waitlist/state-machine';
 
 export type WaitlistApprovalResult =
   | { outcome: 'not_found' }
@@ -25,7 +30,13 @@ export type WaitlistDisapprovalResult =
 
 export async function approveWaitlistEntryInTx(
   tx: DbOrTransaction,
-  entryId: string
+  entryId: string,
+  options: {
+    actorUserId?: string | null;
+    actorType?: 'system' | 'admin' | 'job';
+    reason?: string | null;
+    targetStatus?: 'approved' | 'invited';
+  } = {}
 ): Promise<WaitlistApprovalResult> {
   const now = new Date();
 
@@ -43,7 +54,7 @@ export async function approveWaitlistEntryInTx(
 
   if (!entry) return { outcome: 'not_found' };
 
-  if (entry.status !== 'new' && entry.status !== 'invited') {
+  if (entry.status === 'signed_up') {
     return { outcome: 'already_processed', status: entry.status };
   }
 
@@ -55,6 +66,21 @@ export async function approveWaitlistEntryInTx(
 
   if (!user) {
     return { outcome: 'no_user' };
+  }
+
+  if (isWaitlistApprovedStatus(entry.status)) {
+    return {
+      outcome: 'approved',
+      entryId: entry.id,
+      profileId: null,
+      email: entry.email,
+      fullName: entry.fullName,
+      clerkId: user.clerkId,
+    };
+  }
+
+  if (!isWaitlistPendingStatus(entry.status)) {
+    return { outcome: 'already_processed', status: entry.status };
   }
 
   const [profile] = await tx
@@ -101,10 +127,28 @@ export async function approveWaitlistEntryInTx(
       .where(eq(creatorProfiles.id, profile.id));
   }
 
+  const targetStatus = options.targetStatus ?? 'invited';
+
   await tx
     .update(waitlistEntries)
-    .set({ status: 'claimed', updatedAt: now })
+    .set({
+      status: targetStatus,
+      approvedAt: now,
+      invitedAt: targetStatus === 'invited' ? now : null,
+      adminActorId: options.actorUserId ?? null,
+      statusReason: options.reason ?? 'approved',
+      updatedAt: now,
+    })
     .where(eq(waitlistEntries.id, entry.id));
+
+  await insertWaitlistAuditLog(tx, {
+    waitlistEntryId: entry.id,
+    fromStatus: entry.status,
+    toStatus: targetStatus,
+    actorUserId: options.actorUserId ?? null,
+    actorType: options.actorType ?? 'system',
+    reason: options.reason ?? 'approved',
+  });
 
   await tx
     .update(users)
@@ -150,7 +194,9 @@ export async function disapproveWaitlistEntryInTx(
     .limit(1);
 
   if (!entry) return { outcome: 'not_found' };
-  if (entry.status === 'new') return { outcome: 'already_new' };
+  if (entry.status === 'new' || entry.status === 'waitlisted') {
+    return { outcome: 'already_new' };
+  }
 
   const [user] = await tx
     .select({ id: users.id, clerkId: users.clerkId })
@@ -179,8 +225,21 @@ export async function disapproveWaitlistEntryInTx(
 
   await tx
     .update(waitlistEntries)
-    .set({ status: 'new', updatedAt: now })
+    .set({
+      status: 'waitlisted',
+      statusReason: 'approval_removed',
+      waitlistedAt: now,
+      updatedAt: now,
+    })
     .where(eq(waitlistEntries.id, entry.id));
+
+  await insertWaitlistAuditLog(tx, {
+    waitlistEntryId: entry.id,
+    fromStatus: entry.status,
+    toStatus: 'waitlisted',
+    actorType: 'admin',
+    reason: 'approval_removed',
+  });
 
   if (user) {
     await tx

@@ -1,21 +1,24 @@
+import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
+import { waitlistEntries } from '@/lib/db/schema/waitlist';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { waitlistApproveSchema } from '@/lib/validation/schemas';
-import {
-  disapproveWaitlistEntryInTx,
-  finalizeWaitlistDisapproval,
-} from '@/lib/waitlist/approval';
+import { insertWaitlistAuditLog } from '@/lib/waitlist/audit';
+import { enqueueWaitlistEmailJob } from '@/lib/waitlist/email-jobs';
+import { isWaitlistInviteRedeemableStatus } from '@/lib/waitlist/state-machine';
 
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 export async function POST(request: Request) {
-  let entitlements;
+  let entitlements:
+    | Awaited<ReturnType<typeof getCurrentUserEntitlements>>
+    | undefined;
   try {
     entitlements = await getCurrentUserEntitlements();
     if (!entitlements.isAuthenticated) {
@@ -33,7 +36,7 @@ export async function POST(request: Request) {
     }
 
     const parsedBody = await parseJsonBody<unknown>(request, {
-      route: `POST ${APP_ROUTES.ADMIN_WAITLIST}/disapprove`,
+      route: `POST ${APP_ROUTES.ADMIN_WAITLIST}/resend-invite`,
       headers: NO_STORE_HEADERS,
     });
     if (!parsedBody.ok) {
@@ -49,7 +52,47 @@ export async function POST(request: Request) {
     }
 
     const result = await withSystemIngestionSession(
-      async tx => disapproveWaitlistEntryInTx(tx, parsed.data.entryId),
+      async tx => {
+        const [entry] = await tx
+          .select({ id: waitlistEntries.id, status: waitlistEntries.status })
+          .from(waitlistEntries)
+          .where(eq(waitlistEntries.id, parsed.data.entryId))
+          .for('update')
+          .limit(1);
+
+        if (!entry) {
+          return { outcome: 'not_found' as const };
+        }
+
+        if (!isWaitlistInviteRedeemableStatus(entry.status)) {
+          return {
+            outcome: 'not_invitable' as const,
+            status: entry.status,
+          };
+        }
+
+        const now = new Date();
+        await enqueueWaitlistEmailJob(
+          tx,
+          {
+            entryId: entry.id,
+            type: 'approval_invite',
+            force: true,
+          },
+          { dedupScope: `resend:${now.getTime()}` }
+        );
+
+        await insertWaitlistAuditLog(tx, {
+          waitlistEntryId: entry.id,
+          fromStatus: entry.status,
+          toStatus: entry.status,
+          actorUserId: entitlements?.userId ?? null,
+          actorType: 'admin',
+          reason: 'approval_invite_resent',
+        });
+
+        return { outcome: 'queued' as const, status: entry.status };
+      },
       { isolationLevel: 'serializable' }
     );
 
@@ -60,41 +103,38 @@ export async function POST(request: Request) {
       );
     }
 
-    if (result.outcome === 'already_new') {
+    if (result.outcome === 'not_invitable') {
       return NextResponse.json(
         {
-          success: true,
-          status: 'waitlisted',
-          message: 'Entry is already unapproved',
+          success: false,
+          error: `Cannot resend invite for status: ${result.status}`,
         },
-        { status: 200, headers: NO_STORE_HEADERS }
+        { status: 409, headers: NO_STORE_HEADERS }
       );
     }
-
-    await finalizeWaitlistDisapproval(result);
 
     return NextResponse.json(
       {
         success: true,
-        status: 'waitlisted',
-        message: 'Waitlist approval revoked successfully.',
+        status: result.status,
+        message: 'Invite email queued.',
       },
       { status: 200, headers: NO_STORE_HEADERS }
     );
   } catch (error) {
     await captureCriticalError(
-      'Admin action failed: disapprove waitlist entry',
+      'Admin action failed: resend waitlist invite',
       error instanceof Error ? error : new Error(String(error)),
       {
-        route: `${APP_ROUTES.ADMIN_WAITLIST}/disapprove`,
-        action: 'disapprove_waitlist',
+        route: `${APP_ROUTES.ADMIN_WAITLIST}/resend-invite`,
+        action: 'resend_waitlist_invite',
         adminEmail: entitlements?.email ?? 'unknown',
         timestamp: new Date().toISOString(),
       }
     );
 
     return NextResponse.json(
-      { success: false, error: 'Failed to disapprove waitlist entry' },
+      { success: false, error: 'Failed to resend invite' },
       { status: 500, headers: NO_STORE_HEADERS }
     );
   }

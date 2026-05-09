@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // without touching a real database.
 
 const findLatestEntryByEmail = vi.fn();
+const getWaitlistSettings = vi.fn();
 const tryReserveAutoAcceptSlot = vi.fn();
 const approveWaitlistEntryInTx = vi.fn();
 const finalizeWaitlistApproval = vi.fn().mockResolvedValue(undefined);
@@ -33,6 +34,7 @@ vi.mock('@/lib/waitlist/approval', () => ({
 }));
 
 vi.mock('@/lib/waitlist/settings', () => ({
+  getWaitlistSettings: (...args: unknown[]) => getWaitlistSettings(...args),
   tryReserveAutoAcceptSlot: (...args: unknown[]) =>
     tryReserveAutoAcceptSlot(...args),
 }));
@@ -118,6 +120,9 @@ function createTxMock() {
         return Promise.resolve(undefined);
       }
       return {
+        onConflictDoNothing: vi.fn(() => ({
+          returning: vi.fn().mockResolvedValue([{ id: 'job-1' }]),
+        })),
         returning: vi.fn().mockResolvedValue([{ id: 'entry-new' }]),
       };
     }),
@@ -146,6 +151,15 @@ describe('submitWaitlistAccessRequest', () => {
     userRow = null;
     insertedEntries.length = 0;
     findLatestEntryByEmail.mockReset();
+    getWaitlistSettings.mockReset();
+    getWaitlistSettings.mockResolvedValue({
+      gateEnabled: true,
+      autoAcceptEnabled: false,
+      autoAcceptAfterDays: 7,
+      autoAcceptDailyLimit: 0,
+      autoAcceptedToday: 0,
+      autoAcceptResetsAt: new Date(Date.now() + 86_400_000),
+    });
     tryReserveAutoAcceptSlot.mockReset();
     approveWaitlistEntryInTx.mockReset();
     finalizeWaitlistApproval.mockClear();

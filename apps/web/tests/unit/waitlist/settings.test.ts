@@ -19,6 +19,7 @@ vi.mock('@/lib/db/schema/waitlist', () => ({
     id: 'id',
     gateEnabled: 'gate_enabled',
     autoAcceptEnabled: 'auto_accept_enabled',
+    autoAcceptAfterDays: 'auto_accept_after_days',
     autoAcceptDailyLimit: 'auto_accept_daily_limit',
     autoAcceptedToday: 'auto_accepted_today',
     autoAcceptResetsAt: 'auto_accept_resets_at',
@@ -36,6 +37,7 @@ function createMockSettings(
   overrides: Partial<{
     gateEnabled: boolean;
     autoAcceptEnabled: boolean;
+    autoAcceptAfterDays: number;
     autoAcceptDailyLimit: number;
     autoAcceptedToday: number;
   }> = {}
@@ -44,6 +46,7 @@ function createMockSettings(
     id: 1,
     gateEnabled: overrides.gateEnabled ?? true,
     autoAcceptEnabled: overrides.autoAcceptEnabled ?? false,
+    autoAcceptAfterDays: overrides.autoAcceptAfterDays ?? 7,
     autoAcceptDailyLimit: overrides.autoAcceptDailyLimit ?? 0,
     autoAcceptedToday: overrides.autoAcceptedToday ?? 0,
     autoAcceptResetsAt: new Date(Date.now() + 86_400_000), // tomorrow
@@ -312,6 +315,7 @@ describe('updateWaitlistSettings invalidates cache', () => {
     await updateWaitlistSettings({
       gateEnabled: false,
       autoAcceptEnabled: false,
+      autoAcceptAfterDays: 7,
       autoAcceptDailyLimit: 0,
     });
 

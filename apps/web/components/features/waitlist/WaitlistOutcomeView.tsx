@@ -58,7 +58,7 @@ const OUTCOME_COPY: Record<
   },
   save_failed: {
     title: "We Couldn't Save This",
-    body: 'Your answers are still on this device. Try again so we can save the transcript before reviewing access.',
+    body: 'Your answers are still on this device. Try again so we can save the required fields before reviewing access.',
     icon: RotateCcw,
   },
 };

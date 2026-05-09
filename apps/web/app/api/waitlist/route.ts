@@ -102,8 +102,12 @@ export async function GET() {
   const [entry] = await db
     .select({ id: waitlistEntries.id, status: waitlistEntries.status })
     .from(waitlistEntries)
-    .where(drizzleSql`lower(${waitlistEntries.email}) = ${email}`)
-    .orderBy(desc(waitlistEntries.createdAt))
+    .where(
+      drizzleSql`${waitlistEntries.emailNormalized} = ${email} OR lower(${waitlistEntries.email}) = ${email}`
+    )
+    .orderBy(
+      drizzleSql`${waitlistEntries.canonical} DESC, ${waitlistEntries.createdAt} DESC`
+    )
     .limit(1);
 
   const invite = await (async () => {
@@ -184,6 +188,7 @@ export async function POST(request: Request) {
       emailRaw,
       fullName,
       data: parseResult.data,
+      source: 'waitlist_form',
     });
 
     return NextResponse.json(

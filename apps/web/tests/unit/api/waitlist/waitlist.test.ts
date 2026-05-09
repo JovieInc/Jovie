@@ -14,11 +14,13 @@ const mockDbExecute = vi.hoisted(() => vi.fn());
 const mockDbTransaction = vi.hoisted(() => vi.fn());
 const mockSendNotification = vi.hoisted(() => vi.fn());
 const mockBuildWaitlistInviteEmail = vi.hoisted(() => vi.fn());
+const mockGetWaitlistSettings = vi.hoisted(() => vi.fn());
 const mockTryReserveAutoAcceptSlot = vi.hoisted(() => vi.fn());
 const mockWithSystemIngestionSession = vi.hoisted(() => vi.fn());
 const mockFinalizeWaitlistApproval = vi.hoisted(() => vi.fn());
 const mockCaptureCriticalError = vi.hoisted(() => vi.fn());
 const mockApproveWaitlistEntryInTx = vi.hoisted(() => vi.fn());
+const mockEnqueueWaitlistEmailJob = vi.hoisted(() => vi.fn());
 
 vi.mock('@clerk/nextjs/server', () => ({
   auth: mockAuth,
@@ -64,7 +66,12 @@ vi.mock('@/lib/waitlist/invite', () => ({
 }));
 
 vi.mock('@/lib/waitlist/settings', () => ({
+  getWaitlistSettings: mockGetWaitlistSettings,
   tryReserveAutoAcceptSlot: mockTryReserveAutoAcceptSlot,
+}));
+
+vi.mock('@/lib/waitlist/email-jobs', () => ({
+  enqueueWaitlistEmailJob: mockEnqueueWaitlistEmailJob,
 }));
 
 vi.mock('@/lib/ingestion/session', () => ({
@@ -159,6 +166,14 @@ describe('Waitlist API', () => {
     );
 
     // Default: no auto-accept slot available
+    mockGetWaitlistSettings.mockResolvedValue({
+      gateEnabled: true,
+      autoAcceptEnabled: false,
+      autoAcceptAfterDays: 7,
+      autoAcceptDailyLimit: 0,
+      autoAcceptedToday: 0,
+      autoAcceptResetsAt: new Date(Date.now() + 86_400_000),
+    });
     mockTryReserveAutoAcceptSlot.mockResolvedValue({ shouldAutoAccept: false });
     // Default: approval not granted
     mockApproveWaitlistEntryInTx.mockResolvedValue({
@@ -167,6 +182,7 @@ describe('Waitlist API', () => {
     mockDoesTableExist.mockResolvedValue(true);
     mockFinalizeWaitlistApproval.mockResolvedValue(undefined);
     mockCaptureCriticalError.mockResolvedValue(undefined);
+    mockEnqueueWaitlistEmailJob.mockResolvedValue('job-1');
     mockBuildWaitlistInviteEmail.mockReturnValue({
       message: {
         id: 'waitlist_welcome:profile_auto',
@@ -513,7 +529,7 @@ describe('Waitlist API', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data.status).toBe('claimed');
+      expect(data.status).toBe('approved');
       expect(mockFinalizeWaitlistApproval).toHaveBeenCalled();
 
       // Auto-approved users should NOT get the "off the waitlist" email
@@ -576,7 +592,7 @@ describe('Waitlist API', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data.status).toBe('new');
+      expect(data.status).toBe('waitlisted');
       expect(mockSendNotification).not.toHaveBeenCalled();
       expect(mockBuildWaitlistInviteEmail).not.toHaveBeenCalled();
     });
@@ -642,7 +658,7 @@ describe('Waitlist API', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data.status).toBe('new');
+      expect(data.status).toBe('waitlisted');
       expect(mockSendNotification).not.toHaveBeenCalled();
       expect(mockFinalizeWaitlistApproval).not.toHaveBeenCalled();
     });

@@ -13,6 +13,7 @@ import {
 } from '@/lib/queries';
 
 const MAX_AUTO_ACCEPT_DAILY_LIMIT = 10_000;
+const MAX_AUTO_ACCEPT_AFTER_DAYS = 365;
 
 function clampDailyLimit(value: number): number {
   if (!Number.isFinite(value)) {
@@ -20,6 +21,14 @@ function clampDailyLimit(value: number): number {
   }
 
   return Math.min(MAX_AUTO_ACCEPT_DAILY_LIMIT, Math.max(0, Math.trunc(value)));
+}
+
+function clampAfterDays(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 7;
+  }
+
+  return Math.min(MAX_AUTO_ACCEPT_AFTER_DAYS, Math.max(1, Math.trunc(value)));
 }
 
 export function WaitlistSettingsPanel() {
@@ -49,6 +58,7 @@ export function WaitlistSettingsPanel() {
     save({
       gateEnabled: settings.gateEnabled,
       autoAcceptEnabled: settings.autoAcceptEnabled,
+      autoAcceptAfterDays: clampAfterDays(settings.autoAcceptAfterDays),
       autoAcceptDailyLimit: clampDailyLimit(settings.autoAcceptDailyLimit),
     });
   };
@@ -119,7 +129,7 @@ export function WaitlistSettingsPanel() {
           <SettingsToggleRow
             icon={<UserPlus className='h-4 w-4' aria-hidden />}
             title='Auto-accept'
-            description='When the manual gate is disabled, approve the first daily slots before waitlisting the rest.'
+            description='Approve eligible waitlisted people after the configured age and daily limit.'
             checked={settings.autoAcceptEnabled}
             onCheckedChange={checked =>
               setSettings(current =>
@@ -128,6 +138,37 @@ export function WaitlistSettingsPanel() {
             }
             ariaLabel='Toggle auto-accept'
             disabled={saving}
+          />
+        </div>
+
+        <div className='py-3.5'>
+          <SettingsActionRow
+            icon={<Hash className='h-4 w-4' aria-hidden />}
+            title='Auto-accept after'
+            description='Minimum days on the waitlist before scheduled approval'
+            action={
+              <Input
+                type='number'
+                min={1}
+                max={MAX_AUTO_ACCEPT_AFTER_DAYS}
+                value={settings.autoAcceptAfterDays}
+                onChange={event => {
+                  const next = Number.parseInt(event.target.value, 10);
+                  setSettings(current =>
+                    current
+                      ? {
+                          ...current,
+                          autoAcceptAfterDays: clampAfterDays(next),
+                        }
+                      : current
+                  );
+                }}
+                size='sm'
+                className='w-24 text-right tabular-nums'
+                disabled={saving}
+                aria-label='Auto-accept after days'
+              />
+            }
           />
         </div>
 

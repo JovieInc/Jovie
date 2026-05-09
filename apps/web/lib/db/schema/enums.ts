@@ -193,6 +193,14 @@ export const waitlistStatusEnum = pgEnum('waitlist_status', [
   'new',
   'invited',
   'claimed',
+  'chat_started',
+  'qualified',
+  'waitlisted',
+  'approved',
+  'signed_up',
+  'rejected',
+  'expired',
+  'blocked',
 ]);
 
 export const waitlistInviteStatusEnum = pgEnum('waitlist_invite_status', [

@@ -302,6 +302,13 @@
       "when": 1778051270639,
       "tag": "0042_calendar_events_trust_gate",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1778307491160,
+      "tag": "0043_harden_waitlist_onboarding",
+      "breakpoints": true
     }
   ]
 }

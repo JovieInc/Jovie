@@ -527,9 +527,11 @@ export {
 // Waitlist mutations (admin + public)
 export {
   type ApproveWaitlistInput,
+  type ResendWaitlistInviteInput,
   type UpdateWaitlistStatusInput,
   useApproveWaitlistMutation,
   useDisapproveWaitlistMutation,
+  useResendWaitlistInviteMutation,
   useUpdateWaitlistStatusMutation,
   useWaitlistSubmitMutation,
   type WaitlistMutationResponse,

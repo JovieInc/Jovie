@@ -1,6 +1,7 @@
 import 'server-only';
 
-import { desc, sql as drizzleSql, eq } from 'drizzle-orm';
+import { createHash } from 'node:crypto';
+import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import { type DbOrTransaction } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -17,7 +18,21 @@ import {
   finalizeWaitlistApproval,
   type WaitlistApprovalResult,
 } from '@/lib/waitlist/approval';
-import { tryReserveAutoAcceptSlot } from '@/lib/waitlist/settings';
+import { insertWaitlistAuditLog } from '@/lib/waitlist/audit';
+import { enqueueWaitlistEmailJob } from '@/lib/waitlist/email-jobs';
+import {
+  evaluateWaitlistQualification,
+  type QualificationDecision,
+} from '@/lib/waitlist/qualification';
+import {
+  getWaitlistSettings,
+  tryReserveAutoAcceptSlot,
+} from '@/lib/waitlist/settings';
+import {
+  isWaitlistApprovedStatus,
+  isWaitlistPendingStatus,
+  type WaitlistStatus,
+} from '@/lib/waitlist/state-machine';
 import {
   isStatusUpgrade,
   type UserLifecycleStatus,
@@ -39,11 +54,12 @@ export interface WaitlistAccessRequestInput {
   readonly emailRaw?: string;
   readonly fullName: string;
   readonly data: WaitlistRequestPayload;
+  readonly source?: string;
 }
 
 export interface WaitlistAccessRequestResult {
   readonly entryId: string;
-  readonly status: 'new' | 'claimed' | 'invited';
+  readonly status: WaitlistStatus;
   readonly outcome: WaitlistAccessOutcome;
 }
 
@@ -66,12 +82,28 @@ function normalizeSpotifyUrl(url: string): string {
   }
 }
 
+function hashEmailForWaitlist(email: string): string {
+  return createHash('sha256').update(email).digest('hex');
+}
+
+function buildQualificationInputs(data: WaitlistRequestPayload) {
+  return {
+    primaryGoal: data.primaryGoal ?? null,
+    primarySocialUrl: data.primarySocialUrl,
+    spotifyUrl: data.spotifyUrl ?? null,
+    spotifyArtistName: data.spotifyArtistName?.trim() || null,
+    heardAbout: data.heardAbout?.trim() || null,
+    selectedPlan: data.selectedPlan ?? null,
+  };
+}
+
 function buildEntryValues(params: {
   readonly data: WaitlistRequestPayload;
   readonly email: string;
   readonly fullName: string;
+  readonly source: string;
 }) {
-  const { data, email, fullName } = params;
+  const { data, email, fullName, source } = params;
   const { platform, normalizedUrl } = detectPlatformFromUrl(
     data.primarySocialUrl
   );
@@ -82,6 +114,8 @@ function buildEntryValues(params: {
   return {
     fullName,
     email,
+    emailNormalized: email,
+    emailHash: hashEmailForWaitlist(email),
     primaryGoal: data.primaryGoal ?? null,
     primarySocialUrl: data.primarySocialUrl,
     primarySocialPlatform: platform,
@@ -91,6 +125,9 @@ function buildEntryValues(params: {
     spotifyArtistName: data.spotifyArtistName?.trim() || null,
     heardAbout: data.heardAbout?.trim() || null,
     selectedPlan: data.selectedPlan ?? null,
+    source,
+    canonical: true,
+    qualificationInputs: buildQualificationInputs(data),
     updatedAt: new Date(),
     // Store a useful fallback in existing fields without inventing launch scoring.
     primarySocialFollowerCount: null,
@@ -114,8 +151,12 @@ async function findLatestEntryByEmail(
   const [entry] = await tx
     .select({ id: waitlistEntries.id, status: waitlistEntries.status })
     .from(waitlistEntries)
-    .where(drizzleSql`lower(${waitlistEntries.email}) = ${normalizedEmail}`)
-    .orderBy(desc(waitlistEntries.createdAt))
+    .where(
+      drizzleSql`${waitlistEntries.emailNormalized} = ${normalizedEmail} OR lower(${waitlistEntries.email}) = ${normalizedEmail}`
+    )
+    .orderBy(
+      drizzleSql`${waitlistEntries.canonical} DESC, ${waitlistEntries.createdAt} DESC`
+    )
     .limit(1);
 
   return entry ?? null;
@@ -185,9 +226,15 @@ async function upsertUserStatus(params: {
 
 async function tryApproveEntry(
   tx: DbOrTransaction,
-  entryId: string
+  entryId: string,
+  targetStatus: 'approved' | 'invited',
+  reason: string
 ): Promise<WaitlistApprovalResult | null> {
-  const approvalResult = await approveWaitlistEntryInTx(tx, entryId);
+  const approvalResult = await approveWaitlistEntryInTx(tx, entryId, {
+    targetStatus,
+    actorType: 'system',
+    reason,
+  });
   if (approvalResult.outcome !== 'approved') return null;
   return approvalResult;
 }
@@ -197,10 +244,13 @@ async function decideAccess(params: {
   readonly entryId: string;
   readonly clerkUserId: string;
   readonly emailRaw: string;
+  readonly email: string;
+  readonly data: WaitlistRequestPayload;
 }): Promise<{
   readonly outcome: WaitlistAccessOutcome;
   readonly approval: WaitlistApprovalResult | null;
   readonly statusChange: UpsertUserStatusResult;
+  readonly qualification: QualificationDecision;
 }> {
   const statusChange = await upsertUserStatus({
     tx: params.tx,
@@ -210,34 +260,87 @@ async function decideAccess(params: {
     nextStatus: 'waitlist_pending',
   });
 
-  const reservation = await tryReserveAutoAcceptSlot(params.tx);
+  const settings = await getWaitlistSettings(params.tx);
+  const mode = settings.gateEnabled ? 'waitlist_enabled' : 'open_signup';
+  let qualification = evaluateWaitlistQualification({
+    email: params.email,
+    payload: params.data,
+    config: { mode },
+  });
 
-  if (!reservation.shouldAutoAccept) {
+  let reservation: Awaited<ReturnType<typeof tryReserveAutoAcceptSlot>> | null =
+    null;
+  if (
+    qualification.status === 'waitlisted' &&
+    qualification.reasonCode === 'waitlist_gate_enabled'
+  ) {
+    reservation = await tryReserveAutoAcceptSlot(params.tx);
+    if (reservation.shouldAutoAccept) {
+      qualification = evaluateWaitlistQualification({
+        email: params.email,
+        payload: params.data,
+        config: { mode, autoAcceptReserved: true },
+      });
+    } else if (reservation.reason === 'capacity_full') {
+      qualification = evaluateWaitlistQualification({
+        email: params.email,
+        payload: params.data,
+        config: { mode, autoAcceptReserved: false },
+      });
+    }
+  }
+
+  if (qualification.status === 'blocked') {
     return {
-      outcome:
-        reservation.reason === 'gate_on'
-          ? 'waitlisted_gate_on'
-          : 'waitlisted_capacity_full',
+      outcome: 'waitlisted_gate_on',
       approval: null,
       statusChange,
+      qualification,
     };
   }
 
-  const approval = await tryApproveEntry(params.tx, params.entryId);
+  if (qualification.status === 'waitlisted') {
+    return {
+      outcome:
+        reservation?.reason === 'capacity_full'
+          ? 'waitlisted_capacity_full'
+          : 'waitlisted_gate_on',
+      approval: null,
+      statusChange,
+      qualification,
+    };
+  }
+
+  const approval = await tryApproveEntry(
+    params.tx,
+    params.entryId,
+    'approved',
+    qualification.reasonCode
+  );
   if (!approval) {
+    const failedQualification: QualificationDecision = {
+      ...qualification,
+      status: 'waitlisted',
+      reasonCode: 'waitlist_capacity_full',
+      details: {
+        ...qualification.details,
+        approval: 'failed',
+      },
+    };
     return {
       outcome: 'waitlisted_capacity_full',
       approval: null,
       statusChange,
+      qualification: failedQualification,
     };
   }
 
-  return { outcome: 'accepted', approval, statusChange };
+  return { outcome: 'accepted', approval, statusChange, qualification };
 }
 
 interface InternalTransactionResult {
   readonly entryId: string;
-  readonly status: 'new' | 'claimed' | 'invited';
+  readonly status: WaitlistStatus;
   readonly outcome: WaitlistAccessOutcome;
   readonly approval: WaitlistApprovalResult | null;
   readonly statusChange: UpsertUserStatusResult;
@@ -263,10 +366,11 @@ export async function submitWaitlistAccessRequest(
           data: input.data,
           email: normalizedEmail,
           fullName: input.fullName,
+          source: input.source ?? 'waitlist_form',
         });
 
         if (existing) {
-          if (existing.status === 'claimed' || existing.status === 'invited') {
+          if (isWaitlistApprovedStatus(existing.status)) {
             const statusChange = await upsertUserStatus({
               tx,
               clerkUserId: input.clerkUserId,
@@ -285,7 +389,18 @@ export async function submitWaitlistAccessRequest(
 
           await tx
             .update(waitlistEntries)
-            .set(entryValues)
+            .set({
+              ...entryValues,
+              qualificationResult: {
+                status: 'waitlisted',
+                reasonCode: 'already_waitlisted',
+              },
+              status: isWaitlistPendingStatus(existing.status)
+                ? 'waitlisted'
+                : existing.status,
+              statusReason: 'already_waitlisted',
+              waitlistedAt: new Date(),
+            })
             .where(eq(waitlistEntries.id, existing.id));
 
           const statusChange = await upsertUserStatus({
@@ -309,7 +424,8 @@ export async function submitWaitlistAccessRequest(
           .insert(waitlistEntries)
           .values({
             ...entryValues,
-            status: 'new',
+            status: 'chat_started',
+            statusReason: 'chat_started',
             createdAt: new Date(),
           })
           .returning({ id: waitlistEntries.id });
@@ -323,14 +439,51 @@ export async function submitWaitlistAccessRequest(
           entryId: entry.id,
           clerkUserId: input.clerkUserId,
           emailRaw,
+          email: normalizedEmail,
+          data: input.data,
         });
+
+        const nextStatus = decision.qualification.status;
+        const now = new Date();
+        await tx
+          .update(waitlistEntries)
+          .set({
+            status: nextStatus,
+            statusReason: decision.qualification.reasonCode,
+            qualificationResult: {
+              qualified: decision.qualification.qualified,
+              status: decision.qualification.status,
+              reasonCode: decision.qualification.reasonCode,
+              details: decision.qualification.details,
+            },
+            qualifiedAt: decision.qualification.qualified ? now : null,
+            waitlistedAt: nextStatus === 'waitlisted' ? now : null,
+            approvedAt: nextStatus === 'approved' ? now : undefined,
+            blockedAt: nextStatus === 'blocked' ? now : null,
+            updatedAt: now,
+          })
+          .where(eq(waitlistEntries.id, entry.id));
+
+        await insertWaitlistAuditLog(tx, {
+          waitlistEntryId: entry.id,
+          fromStatus: 'chat_started',
+          toStatus: nextStatus,
+          actorUserId: input.clerkUserId,
+          actorType: 'user',
+          reason: decision.qualification.reasonCode,
+          metadata: decision.qualification.details,
+        });
+
+        if (nextStatus === 'waitlisted') {
+          await enqueueWaitlistEmailJob(tx, {
+            entryId: entry.id,
+            type: 'waitlist_confirmation',
+          });
+        }
 
         return {
           entryId: entry.id,
-          status:
-            decision.outcome === 'accepted'
-              ? ('claimed' as const)
-              : ('new' as const),
+          status: nextStatus,
           outcome: decision.outcome,
           approval: decision.approval,
           statusChange: decision.statusChange,
@@ -388,6 +541,13 @@ export async function submitWaitlistAccessRequest(
       logger.warn('[waitlist] Slack notification failed', error);
     });
   }
+
+  logger.info('[waitlist] Access request processed', {
+    entryId: result.entryId,
+    outcome: result.outcome,
+    status: result.status,
+    source: input.source ?? 'waitlist_form',
+  });
 
   return {
     entryId: result.entryId,

@@ -157,12 +157,13 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
         icon: <CheckCircle className='h-3.5 w-3.5' />,
         onClick: async () => {
           const eligible = selectedEntries.filter(
-            e => e.status === 'new' || e.status === 'invited'
+            e =>
+              e.status === 'new' ||
+              e.status === 'waitlisted' ||
+              e.status === 'qualified'
           );
           if (eligible.length === 0) {
-            toast.info(
-              'No entries eligible for approval (must have status "new" or "invited")'
-            );
+            toast.info('No entries eligible for approval');
             return;
           }
           await Promise.all(
@@ -179,12 +180,14 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
         icon: <XCircle className='h-3.5 w-3.5' />,
         onClick: async () => {
           const eligible = selectedEntries.filter(
-            e => e.status === 'invited' || e.status === 'claimed'
+            e =>
+              e.status === 'invited' ||
+              e.status === 'approved' ||
+              e.status === 'claimed' ||
+              e.status === 'signed_up'
           );
           if (eligible.length === 0) {
-            toast.info(
-              'No entries eligible for disapproval (must be invited or claimed)'
-            );
+            toast.info('No entries eligible for disapproval');
             return;
           }
           await Promise.all(
@@ -201,14 +204,24 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
 
   // Group entries by status for Kanban board
   const kanbanColumns = useMemo<KanbanColumn<WaitlistEntryRow>[]>(() => {
-    const newEntries = entries.filter(e => e.status === 'new');
-    const invitedEntries = entries.filter(e => e.status === 'invited');
-    const claimedEntries = entries.filter(e => e.status === 'claimed');
+    const newEntries = entries.filter(
+      e =>
+        e.status === 'new' ||
+        e.status === 'chat_started' ||
+        e.status === 'qualified' ||
+        e.status === 'waitlisted'
+    );
+    const invitedEntries = entries.filter(
+      e => e.status === 'invited' || e.status === 'approved'
+    );
+    const claimedEntries = entries.filter(
+      e => e.status === 'claimed' || e.status === 'signed_up'
+    );
 
     return [
       {
-        id: 'new',
-        title: 'New',
+        id: 'waitlisted',
+        title: 'Waitlisted',
         items: newEntries,
         count: newEntries.length,
         accent: '#3b82f6', // blue
@@ -221,8 +234,8 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
         accent: '#8b5cf6', // purple
       },
       {
-        id: 'claimed',
-        title: 'Claimed',
+        id: 'signed_up',
+        title: 'Signed up',
         items: claimedEntries,
         count: claimedEntries.length,
         accent: '#10b981', // green
@@ -244,25 +257,23 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
   const handleItemMove = useCallback(
     async (itemId: string, fromColumnId: string, toColumnId: string) => {
       try {
-        if (toColumnId === 'claimed') {
+        if (toColumnId === 'signed_up') {
           // Use proper approval flow — updates users.userStatus, activeProfileId,
           // profile fields, and invalidates proxy cache
           await approveMutation.mutateAsync({ entryId: itemId });
-        } else if (toColumnId === 'new') {
+        } else if (toColumnId === 'waitlisted') {
           // Use proper disapproval flow — reverts user status and profile
           await disapproveMutation.mutateAsync({ entryId: itemId });
-        } else if (fromColumnId === 'claimed' && toColumnId === 'invited') {
-          // Block claimed→invited: no backend path to partially revert approval.
-          // Admin should move to New first, then to Invited if needed.
+        } else if (fromColumnId === 'signed_up' && toColumnId === 'invited') {
           toast.error(
-            'Move claimed entries to New first, then to Invited if needed.'
+            'Move signed-up entries to Waitlisted first, then to Invited if needed.'
           );
           return;
         } else {
           // Transitional status updates (e.g. new→invited) use simple status update
           await updateStatusMutation.mutateAsync({
             entryId: itemId,
-            status: toColumnId as 'new' | 'invited' | 'claimed',
+            status: toColumnId as 'waitlisted' | 'invited' | 'signed_up',
           });
         }
       } catch (error) {

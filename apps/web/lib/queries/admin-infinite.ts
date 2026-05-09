@@ -94,7 +94,18 @@ export interface WaitlistEntryRow {
   spotifyUrlNormalized: string | null;
   spotifyArtistName: string | null;
   heardAbout: string | null;
-  status: 'new' | 'invited' | 'claimed';
+  status:
+    | 'new'
+    | 'invited'
+    | 'claimed'
+    | 'chat_started'
+    | 'qualified'
+    | 'waitlisted'
+    | 'approved'
+    | 'signed_up'
+    | 'rejected'
+    | 'expired'
+    | 'blocked';
   primarySocialFollowerCount: number | null;
   createdAt: Date;
   updatedAt: Date;

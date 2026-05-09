@@ -5,6 +5,7 @@ const mockWithSystemIngestionSession = vi.hoisted(() => vi.fn());
 const mockSendNotification = vi.hoisted(() => vi.fn());
 const mockBuildWaitlistInviteEmail = vi.hoisted(() => vi.fn());
 const mockInvalidateProxyUserStateCache = vi.hoisted(() => vi.fn());
+const mockEnqueueWaitlistEmailJob = vi.hoisted(() => vi.fn());
 
 const {
   mockWaitlistEntries,
@@ -38,6 +39,10 @@ vi.mock('@/lib/waitlist/invite', () => ({
   buildWaitlistInviteEmail: mockBuildWaitlistInviteEmail,
 }));
 
+vi.mock('@/lib/waitlist/email-jobs', () => ({
+  enqueueWaitlistEmailJob: mockEnqueueWaitlistEmailJob,
+}));
+
 vi.mock('@/lib/db/schema', () => ({
   creatorProfiles: mockCreatorProfiles,
   waitlistEntries: mockWaitlistEntries,
@@ -60,6 +65,7 @@ describe('Admin Waitlist Approve API', () => {
       inviteUrl: 'https://example.com/signin',
     });
     mockSendNotification.mockResolvedValue({ delivered: ['email'] });
+    mockEnqueueWaitlistEmailJob.mockResolvedValue('job-1');
   });
 
   it('rejects concurrent approvals after the entry is processed', async () => {
@@ -104,8 +110,8 @@ describe('Admin Waitlist Approve API', () => {
 
     expect(firstResponse.status).toBe(200);
     expect(firstData.success).toBe(true);
-    expect(secondResponse.status).toBe(409);
-    expect(secondData.error).toBe(
+    expect(secondResponse.status).toBe(200);
+    expect(secondData.message).toBe(
       'Entry already processed with status: invited'
     );
     expect(mockWithSystemIngestionSession).toHaveBeenCalledWith(
@@ -114,7 +120,7 @@ describe('Admin Waitlist Approve API', () => {
     );
   });
 
-  it('sends welcome email on successful approval', async () => {
+  it('returns success when approval queues invite delivery', async () => {
     const entryId = '22222222-2222-4222-8222-222222222222';
     const profileId = 'profile_456';
     const email = 'newuser@example.com';
@@ -151,15 +157,10 @@ describe('Admin Waitlist Approve API', () => {
     expect(response.status).toBe(200);
     expect(data.success).toBe(true);
 
-    // Verify email building was called with correct params
-    expect(mockBuildWaitlistInviteEmail).toHaveBeenCalledWith({
-      email,
-      fullName,
-      dedupKey: `waitlist_welcome:${profileId}`,
-    });
-
-    // Verify notification was sent
-    expect(mockSendNotification).toHaveBeenCalledWith(mockMessage, mockTarget);
+    expect(data.status).toBe('invited');
+    expect(data.message).toBe('Access approved. Invite email queued.');
+    expect(mockBuildWaitlistInviteEmail).not.toHaveBeenCalled();
+    expect(mockSendNotification).not.toHaveBeenCalled();
   });
 
   it('approves access when no profile exists yet', async () => {
@@ -196,11 +197,7 @@ describe('Admin Waitlist Approve API', () => {
     expect(data.success).toBe(true);
     expect(data.profileId).toBe(null);
     expect(data.waitlistEntryId).toBe(entryId);
-    expect(mockBuildWaitlistInviteEmail).toHaveBeenCalledWith(
-      expect.objectContaining({
-        dedupKey: `waitlist_welcome:${entryId}`,
-      })
-    );
+    expect(data.status).toBe('invited');
   });
 
   it('returns 422 when user has not signed in yet', async () => {
@@ -263,7 +260,7 @@ describe('Admin Waitlist Approve API', () => {
 
     const response = await POST(request);
 
-    expect(response.status).toBe(409);
+    expect(response.status).toBe(200);
     expect(mockBuildWaitlistInviteEmail).not.toHaveBeenCalled();
     expect(mockSendNotification).not.toHaveBeenCalled();
   });

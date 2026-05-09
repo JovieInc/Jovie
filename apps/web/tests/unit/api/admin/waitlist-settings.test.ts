@@ -31,6 +31,7 @@ describe('Admin waitlist settings API', () => {
     mockGetWaitlistSettings.mockResolvedValue({
       gateEnabled: true,
       autoAcceptEnabled: false,
+      autoAcceptAfterDays: 14,
       autoAcceptDailyLimit: 0,
       autoAcceptedToday: 0,
       autoAcceptResetsAt: new Date('2026-02-26T00:00:00Z'),
@@ -38,6 +39,7 @@ describe('Admin waitlist settings API', () => {
     mockUpdateWaitlistSettings.mockResolvedValue({
       gateEnabled: true,
       autoAcceptEnabled: true,
+      autoAcceptAfterDays: 7,
       autoAcceptDailyLimit: 5,
       autoAcceptedToday: 1,
       autoAcceptResetsAt: new Date('2026-02-26T00:00:00Z'),
@@ -86,6 +88,7 @@ describe('Admin waitlist settings API', () => {
         body: JSON.stringify({
           gateEnabled: true,
           autoAcceptEnabled: true,
+          autoAcceptAfterDays: 7,
           autoAcceptDailyLimit: 5,
         }),
       }
@@ -99,6 +102,7 @@ describe('Admin waitlist settings API', () => {
     expect(mockUpdateWaitlistSettings).toHaveBeenCalledWith({
       gateEnabled: true,
       autoAcceptEnabled: true,
+      autoAcceptAfterDays: 7,
       autoAcceptDailyLimit: 5,
     });
   });
@@ -116,6 +120,7 @@ describe('Admin waitlist settings API', () => {
         body: JSON.stringify({
           gateEnabled: true,
           autoAcceptEnabled: true,
+          autoAcceptAfterDays: 7,
           autoAcceptDailyLimit: 5,
         }),
       }

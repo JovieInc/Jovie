@@ -7,6 +7,7 @@ import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
+import { insertWaitlistAuditLog } from '@/lib/waitlist/audit';
 
 export const runtime = 'nodejs';
 
@@ -14,11 +15,25 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 const updateStatusSchema = z.object({
   entryId: z.string().uuid(),
-  status: z.enum(['new', 'invited', 'claimed']),
+  status: z.enum([
+    'new',
+    'chat_started',
+    'qualified',
+    'waitlisted',
+    'invited',
+    'approved',
+    'claimed',
+    'signed_up',
+    'rejected',
+    'expired',
+    'blocked',
+  ]),
 });
 
 export async function POST(request: Request) {
-  let entitlements;
+  let entitlements:
+    | Awaited<ReturnType<typeof getCurrentUserEntitlements>>
+    | undefined;
   try {
     entitlements = await getCurrentUserEntitlements();
     if (!entitlements.isAuthenticated) {
@@ -34,6 +49,7 @@ export async function POST(request: Request) {
         { status: 403, headers: NO_STORE_HEADERS }
       );
     }
+    const adminUserId = entitlements.userId;
 
     const parsedBody = await parseJsonBody<unknown>(request, {
       route: `POST ${APP_ROUTES.ADMIN_WAITLIST}/update-status`,
@@ -70,14 +86,42 @@ export async function POST(request: Request) {
           return { outcome: 'not_found' as const };
         }
 
+        const statusTimestamps = {
+          ...(parsed.data.status === 'qualified' ? { qualifiedAt: now } : {}),
+          ...(parsed.data.status === 'waitlisted' ? { waitlistedAt: now } : {}),
+          ...(parsed.data.status === 'approved' ? { approvedAt: now } : {}),
+          ...(parsed.data.status === 'invited'
+            ? { approvedAt: now, invitedAt: now }
+            : {}),
+          ...(parsed.data.status === 'signed_up' ||
+          parsed.data.status === 'claimed'
+            ? { signedUpAt: now }
+            : {}),
+          ...(parsed.data.status === 'rejected' ? { rejectedAt: now } : {}),
+          ...(parsed.data.status === 'expired' ? { expiredAt: now } : {}),
+          ...(parsed.data.status === 'blocked' ? { blockedAt: now } : {}),
+        };
+
         // Update waitlist entry status
         await tx
           .update(waitlistEntries)
           .set({
             status: parsed.data.status,
+            statusReason: 'admin_status_update',
+            adminActorId: adminUserId,
+            ...statusTimestamps,
             updatedAt: now,
           })
           .where(eq(waitlistEntries.id, entry.id));
+
+        await insertWaitlistAuditLog(tx, {
+          waitlistEntryId: entry.id,
+          fromStatus: entry.status,
+          toStatus: parsed.data.status,
+          actorUserId: adminUserId,
+          actorType: 'admin',
+          reason: 'admin_status_update',
+        });
 
         return {
           outcome: 'updated' as const,

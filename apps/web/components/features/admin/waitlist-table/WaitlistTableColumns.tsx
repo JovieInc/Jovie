@@ -177,7 +177,10 @@ export function useWaitlistColumns({
         header: 'Actions',
         cell: entry => {
           const isApproved =
-            entry.status === 'invited' || entry.status === 'claimed';
+            entry.status === 'invited' ||
+            entry.status === 'approved' ||
+            entry.status === 'claimed' ||
+            entry.status === 'signed_up';
           const approveStatus = approveStatuses[entry.id] ?? 'idle';
           const isApproving = approveStatus === 'approving';
           const isDisapproving = approveStatus === 'disapproving';

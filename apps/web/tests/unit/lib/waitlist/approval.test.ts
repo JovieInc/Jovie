@@ -29,9 +29,13 @@ function createTxMock(selectResults: QueryResult[]) {
   }));
 
   return {
-    tx: { select, update } as unknown as Parameters<
-      typeof approveWaitlistEntryInTx
-    >[0],
+    tx: {
+      select,
+      update,
+      insert: vi.fn(() => ({
+        values: vi.fn().mockResolvedValue(undefined),
+      })),
+    } as unknown as Parameters<typeof approveWaitlistEntryInTx>[0],
     updateSet,
   };
 }

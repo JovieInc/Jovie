@@ -19,6 +19,7 @@ import {
 } from '@/lib/dsp-enrichment/jobs';
 import { processReleaseEnrichmentJob } from '@/lib/dsp-enrichment/jobs/release-enrichment';
 import { processSendClaimInviteJob } from '@/lib/email/jobs/send-claim-invite';
+import { processWaitlistEmailJob } from '@/lib/waitlist/email-jobs';
 import { processBeaconsJob } from './jobs/beacons';
 import { processInstagramJob } from './jobs/instagram';
 import { processLayloJob } from './jobs/laylo';
@@ -93,6 +94,8 @@ export async function processJob(
       return processTwitterJob(tx, job.payload);
     case 'send_claim_invite':
       return processSendClaimInviteJob(tx, job.payload);
+    case 'send_waitlist_email':
+      return processWaitlistEmailJob(tx, job.payload);
     case 'dsp_artist_discovery':
       return processDspArtistDiscoveryJob(tx, job.payload);
     case 'dsp_track_enrichment':

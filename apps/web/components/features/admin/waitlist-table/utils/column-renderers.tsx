@@ -137,24 +137,40 @@ export function renderHeardAboutCell(value: string | null) {
  * Renders the status badge cell
  */
 export function renderStatusCell(status: WaitlistEntryRow['status']) {
-  const statusLabels: Record<WaitlistEntryRow['status'], string> = {
-    new: 'New',
+  const statusLabels: Record<string, string> = {
+    new: 'Waitlisted',
+    chat_started: 'Chat started',
+    qualified: 'Qualified',
+    waitlisted: 'Waitlisted',
     invited: 'Invited',
-    claimed: 'Claimed',
+    approved: 'Approved',
+    claimed: 'Signed up',
+    signed_up: 'Signed up',
+    rejected: 'Rejected',
+    expired: 'Expired',
+    blocked: 'Blocked',
   };
 
   const statusVariants: Record<
-    WaitlistEntryRow['status'],
+    string,
     'primary' | 'secondary' | 'success' | 'warning' | 'error'
   > = {
-    new: 'primary',
-    invited: 'warning',
+    new: 'secondary',
+    chat_started: 'secondary',
+    qualified: 'secondary',
+    waitlisted: 'secondary',
+    invited: 'primary',
+    approved: 'primary',
     claimed: 'success',
+    signed_up: 'success',
+    rejected: 'error',
+    expired: 'warning',
+    blocked: 'error',
   };
 
   return (
-    <Badge size='sm' variant={statusVariants[status]}>
-      {statusLabels[status]}
+    <Badge size='sm' variant={statusVariants[status] ?? 'secondary'}>
+      {statusLabels[status] ?? status}
     </Badge>
   );
 }

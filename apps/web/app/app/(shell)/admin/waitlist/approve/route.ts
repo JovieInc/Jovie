@@ -4,20 +4,21 @@ import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
-import { sendNotification } from '@/lib/notifications/service';
 import { waitlistApproveSchema } from '@/lib/validation/schemas';
 import {
   approveWaitlistEntryInTx,
   finalizeWaitlistApproval,
 } from '@/lib/waitlist/approval';
-import { buildWaitlistInviteEmail } from '@/lib/waitlist/invite';
+import { enqueueWaitlistEmailJob } from '@/lib/waitlist/email-jobs';
 
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 export async function POST(request: Request) {
-  let entitlements;
+  let entitlements:
+    | Awaited<ReturnType<typeof getCurrentUserEntitlements>>
+    | undefined;
   try {
     entitlements = await getCurrentUserEntitlements();
     if (!entitlements.isAuthenticated) {
@@ -33,6 +34,7 @@ export async function POST(request: Request) {
         { status: 403, headers: NO_STORE_HEADERS }
       );
     }
+    const adminUserId = entitlements.userId;
 
     const parsedBody = await parseJsonBody<unknown>(request, {
       route: `POST ${APP_ROUTES.ADMIN_WAITLIST}/approve`,
@@ -51,7 +53,25 @@ export async function POST(request: Request) {
     }
 
     const result = await withSystemIngestionSession(
-      async tx => approveWaitlistEntryInTx(tx, parsed.data.entryId),
+      async tx => {
+        const approval = await approveWaitlistEntryInTx(
+          tx,
+          parsed.data.entryId,
+          {
+            actorUserId: adminUserId,
+            actorType: 'admin',
+            reason: 'manual_approval',
+            targetStatus: 'invited',
+          }
+        );
+        if (approval.outcome === 'approved') {
+          await enqueueWaitlistEmailJob(tx, {
+            entryId: approval.entryId,
+            type: 'approval_invite',
+          });
+        }
+        return approval;
+      },
       { isolationLevel: 'serializable' }
     );
 
@@ -65,10 +85,11 @@ export async function POST(request: Request) {
     if (result.outcome === 'already_processed') {
       return NextResponse.json(
         {
-          success: false,
-          error: `Entry already processed with status: ${result.status}`,
+          success: true,
+          status: result.status,
+          message: `Entry already processed with status: ${result.status}`,
         },
-        { status: 409, headers: NO_STORE_HEADERS }
+        { status: 200, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -85,33 +106,13 @@ export async function POST(request: Request) {
 
     await finalizeWaitlistApproval(result);
 
-    // Send welcome email after successful approval
-    const { message, target } = buildWaitlistInviteEmail({
-      email: result.email,
-      fullName: result.fullName,
-      dedupKey: `waitlist_welcome:${result.profileId ?? result.entryId}`,
-    });
-
-    // Fire-and-forget: don't block the response on email delivery
-    sendNotification(message, target).catch(error => {
-      captureCriticalError(
-        'Failed to send waitlist welcome email',
-        error instanceof Error ? error : new Error(String(error)),
-        {
-          profileId: result.profileId ?? 'pending-onboarding',
-          waitlistEntryId: result.entryId,
-          email: result.email,
-        }
-      );
-    });
-
     return NextResponse.json(
       {
         success: true,
-        status: 'claimed',
+        status: 'invited',
         profileId: result.profileId,
         waitlistEntryId: result.entryId,
-        message: 'Access approved. User can continue onboarding immediately.',
+        message: 'Access approved. Invite email queued.',
       },
       { status: 200, headers: NO_STORE_HEADERS }
     );

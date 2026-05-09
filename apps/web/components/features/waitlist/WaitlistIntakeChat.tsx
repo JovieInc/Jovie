@@ -302,8 +302,8 @@ export function WaitlistIntakeChat({
                 Request Access
               </h1>
               <p className='mt-1 text-[13px] leading-5 text-white/52'>
-                Answer a few launch questions. Your transcript is saved before
-                access is decided.
+                Answer a few launch questions. We save only the fields needed to
+                decide access.
               </p>
             </div>
 
