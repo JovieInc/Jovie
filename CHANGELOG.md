@@ -5,6 +5,20 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.222] - 2026-05-08
+
+> [internal] Central profile route config and canonical shell barrel for the public artist surface — consolidates routing logic, removes dead feature-flag code, and deletes 16 legacy files from the JOV-2021 hardening phase.
+
+### Added
+
+- [internal] `apps/web/lib/profile/route-config.ts` — single source of truth for public profile route configuration. Exports `PROFILE_ROUTE_CONFIG`, `TOP_LEVEL_ROUTE_KEYS`, `BOTTOM_TAB_KEYS`, `REDIRECT_SINK_ROUTE_KEYS`, and full TypeScript types (`ProfileRouteCategory`, `ProfileRouteKey`, `ProfileRouteConfig`). Includes bidirectional reverse-completeness tests to guard against missing entries.
+- [internal] `apps/web/components/features/profile/shell/index.ts` — canonical barrel re-exporting `ProfileCompactTemplate`, `ProfileCompactSurface`, and `ProfileDesktopSurface`. All imports of profile shell components should go through this barrel.
+
+### Removed
+
+- [internal] Removed `SHOW_PUBLIC_PROFILE_V1_DESIGN` dead feature flag and all call-sites (flag was always true after JOV-2019 landed).
+- [internal] Deleted 16 legacy profile surface files superseded by the canonical shell stack (JOV-2021 cleanup phase).
+
 ## [26.4.221] - 2026-05-09
 
 > [internal] Ops now opens as a constrained command-center cockpit: AgentOS runs lead the page, deployments are supporting context, and approvals stay beside the active work.
