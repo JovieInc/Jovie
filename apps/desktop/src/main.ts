@@ -1,6 +1,14 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  type IpcMainInvokeEvent,
+  ipcMain,
+  Menu,
+  type MenuItemConstructorOptions,
+  shell,
+} from 'electron';
 import { autoUpdater } from 'electron-updater';
 import { APP_ENV, APP_URL } from './env';
 
@@ -9,7 +17,19 @@ if (APP_ENV === 'staging') {
   app.setPath('userData', path.join(app.getPath('appData'), 'Jovie-Staging'));
 }
 
-const APP_HOST = new URL(APP_URL).hostname;
+const APP_ORIGIN = new URL(APP_URL).origin;
+const SETTINGS_URL = new URL('/app/settings', APP_URL).toString();
+const APP_BACKGROUND_COLOR = '#09090b';
+const ENABLE_DEVTOOLS = APP_ENV !== 'production' || !app.isPackaged;
+const UPDATE_AVAILABLE_CHANNEL = 'update-available';
+const UPDATE_DOWNLOADED_CHANNEL = 'update-downloaded';
+const QUIT_AND_INSTALL_CHANNEL = 'quit-and-install';
+
+type UpdateChannel =
+  | typeof UPDATE_AVAILABLE_CHANNEL
+  | typeof UPDATE_DOWNLOADED_CHANNEL;
+
+let updateReadyToInstall = false;
 
 // Explicit allowlist of OAuth/Clerk hosts permitted to load inside the app.
 // Using endsWith() rather than includes() prevents hostname spoofing via
@@ -21,17 +41,53 @@ const ALLOWED_AUTH_HOSTS = new Set<string>([
 const ALLOWED_HOST_SUFFIXES = ['.clerk.accounts.dev', '.clerk.com'];
 
 function isAllowedAuthHost(hostname: string): boolean {
-  if (ALLOWED_AUTH_HOSTS.has(hostname)) return true;
-  return ALLOWED_HOST_SUFFIXES.some(suffix => hostname.endsWith(suffix));
+  const normalizedHostname = hostname.toLowerCase();
+  if (ALLOWED_AUTH_HOSTS.has(normalizedHostname)) return true;
+  return ALLOWED_HOST_SUFFIXES.some(suffix =>
+    normalizedHostname.endsWith(suffix)
+  );
 }
 
-function isAllowedUrl(urlString: string): boolean {
+function parseUrl(urlString: string): URL | null {
   try {
-    const parsed = new URL(urlString);
-    return parsed.hostname === APP_HOST || isAllowedAuthHost(parsed.hostname);
+    return new URL(urlString);
   } catch {
-    return false;
+    return null;
   }
+}
+
+function isAllowedInAppUrl(parsed: URL): boolean {
+  if (parsed.protocol !== 'https:') return false;
+  return parsed.origin === APP_ORIGIN || isAllowedAuthHost(parsed.hostname);
+}
+
+function isAllowedExternalUrl(parsed: URL): boolean {
+  return parsed.protocol === 'https:' || parsed.protocol === 'mailto:';
+}
+
+type UrlDisposition = 'in-app' | 'external' | 'blocked';
+
+function getUrlDisposition(urlString: string): UrlDisposition {
+  const parsed = parseUrl(urlString);
+  if (!parsed) return 'blocked';
+  if (isAllowedInAppUrl(parsed)) return 'in-app';
+  if (isAllowedExternalUrl(parsed)) return 'external';
+  return 'blocked';
+}
+
+function openExternalUrl(urlString: string): void {
+  const parsed = parseUrl(urlString);
+  if (!parsed || !isAllowedExternalUrl(parsed)) return;
+  void shell.openExternal(parsed.toString());
+}
+
+function getIpcSenderUrl(event: IpcMainInvokeEvent): string {
+  return event.senderFrame?.url ?? event.sender.getURL();
+}
+
+function isTrustedIpcSender(event: IpcMainInvokeEvent): boolean {
+  const parsed = parseUrl(getIpcSenderUrl(event));
+  return parsed?.origin === APP_ORIGIN;
 }
 
 interface WindowState {
@@ -81,10 +137,22 @@ function saveWindowState(win: BrowserWindow): void {
   }
 }
 
-function createWindow(): BrowserWindow {
+function showWindow(win: BrowserWindow): void {
+  if (win.isDestroyed()) return;
+  if (win.isMinimized()) {
+    win.restore();
+  }
+  win.show();
+  win.focus();
+}
+
+function createWindow(initialUrl = APP_URL): BrowserWindow {
   const windowState = loadWindowState();
 
   const win = new BrowserWindow({
+    show: false,
+    backgroundColor: APP_BACKGROUND_COLOR,
+    paintWhenInitiallyHidden: true,
     width: windowState.width,
     height: windowState.height,
     x: windowState.x,
@@ -94,35 +162,68 @@ function createWindow(): BrowserWindow {
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     webPreferences: {
       contextIsolation: true,
+      devTools: ENABLE_DEVTOOLS,
       nodeIntegration: false,
+      nodeIntegrationInSubFrames: false,
+      nodeIntegrationInWorker: false,
       preload: path.join(__dirname, 'preload.js'),
+      sandbox: true,
+      webSecurity: true,
+      webviewTag: false,
     },
   });
 
-  void win.loadURL(APP_URL);
+  win.once('ready-to-show', () => {
+    showWindow(win);
+  });
+
+  void win.loadURL(initialUrl);
+
+  win.webContents.session.setPermissionRequestHandler(
+    (_webContents, _permission, callback) => {
+      callback(false);
+    }
+  );
+
+  win.webContents.session.setPermissionCheckHandler(() => false);
 
   // Navigation guard — keep browsing inside the app host + Clerk auth flows
-  win.webContents.on('will-navigate', (event, url) => {
-    if (!isAllowedUrl(url)) {
-      event.preventDefault();
-      void shell.openExternal(url);
+  win.webContents.on('will-navigate', event => {
+    const disposition = getUrlDisposition(event.url);
+    if (disposition === 'in-app') return;
+
+    event.preventDefault();
+    if (disposition === 'external') {
+      openExternalUrl(event.url);
+    }
+  });
+
+  win.webContents.on('will-frame-navigate', event => {
+    if (event.isMainFrame || getUrlDisposition(event.url) === 'in-app') return;
+    event.preventDefault();
+  });
+
+  win.webContents.on('will-redirect', event => {
+    const disposition = getUrlDisposition(event.url);
+    if (disposition === 'in-app') return;
+
+    event.preventDefault();
+    if (event.isMainFrame && disposition === 'external') {
+      openExternalUrl(event.url);
     }
   });
 
   // Deny all child window creation. Auth redirects happen in-place via
-  // will-navigate; there is no in-app flow that requires a child window.
-  // URL validation guards against XSS-triggered file://, javascript:, or
-  // custom-scheme handoffs: only https: and mailto: are forwarded to the
-  // system browser. Everything else is silently dropped.
+  // navigation guards. Internal targets stay in the app, safe external links
+  // open in the system browser, and unsafe protocols are silently dropped.
   win.webContents.setWindowOpenHandler(({ url }) => {
-    try {
-      const parsed = new URL(url);
-      if (parsed.protocol === 'https:' || parsed.protocol === 'mailto:') {
-        void shell.openExternal(url);
-      }
-    } catch {
-      // Invalid URL — ignore silently
+    const disposition = getUrlDisposition(url);
+    if (disposition === 'in-app') {
+      void win.loadURL(url);
+    } else if (disposition === 'external') {
+      openExternalUrl(url);
     }
+
     return { action: 'deny' };
   });
 
@@ -133,25 +234,133 @@ function createWindow(): BrowserWindow {
   return win;
 }
 
+function openPreferences(): void {
+  const win =
+    BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
+  if (!win) {
+    createWindow(SETTINGS_URL);
+    return;
+  }
+
+  void win.loadURL(SETTINGS_URL);
+  showWindow(win);
+}
+
+function buildViewMenu(): MenuItemConstructorOptions[] {
+  const viewMenu: MenuItemConstructorOptions[] = [];
+
+  if (ENABLE_DEVTOOLS) {
+    viewMenu.push(
+      { role: 'reload' },
+      { role: 'forceReload' },
+      { role: 'toggleDevTools' },
+      { type: 'separator' }
+    );
+  }
+
+  viewMenu.push(
+    { role: 'resetZoom' },
+    { role: 'zoomIn' },
+    { role: 'zoomOut' },
+    { type: 'separator' },
+    { role: 'togglefullscreen' }
+  );
+
+  return viewMenu;
+}
+
+function buildApplicationMenu(): Menu {
+  const viewMenu = buildViewMenu();
+  const template: MenuItemConstructorOptions[] = [
+    { role: 'editMenu' },
+    { label: 'View', submenu: viewMenu },
+    { role: 'windowMenu' },
+  ];
+
+  if (process.platform === 'darwin') {
+    template.unshift(
+      {
+        label: app.name,
+        submenu: [
+          { role: 'about' },
+          { type: 'separator' },
+          {
+            label: 'Preferences...',
+            accelerator: 'Command+,',
+            click: openPreferences,
+          },
+          { type: 'separator' },
+          { role: 'services' },
+          { type: 'separator' },
+          { role: 'hide' },
+          { role: 'hideOthers' },
+          { role: 'unhide' },
+          { type: 'separator' },
+          { role: 'quit', accelerator: 'Command+Q' },
+        ],
+      },
+      {
+        label: 'File',
+        submenu: [{ role: 'close', accelerator: 'Command+W' }],
+      }
+    );
+  } else {
+    template.unshift({
+      label: 'File',
+      submenu: [
+        {
+          label: 'Preferences...',
+          accelerator: 'Ctrl+,',
+          click: openPreferences,
+        },
+        { type: 'separator' },
+        { role: 'quit' },
+      ],
+    });
+  }
+
+  return Menu.buildFromTemplate(template);
+}
+
+function sendToAppWindows(channel: UpdateChannel): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    const parsed = parseUrl(win.webContents.getURL());
+    if (parsed?.origin === APP_ORIGIN) {
+      win.webContents.send(channel);
+    }
+  }
+}
+
 // Wire auto-updater events to renderer IPC so the web UI can show the update pill.
 autoUpdater.on('update-available', () => {
-  for (const win of BrowserWindow.getAllWindows()) {
-    win.webContents.send('update-available');
-  }
+  updateReadyToInstall = false;
+  sendToAppWindows(UPDATE_AVAILABLE_CHANNEL);
 });
 
 autoUpdater.on('update-downloaded', () => {
-  for (const win of BrowserWindow.getAllWindows()) {
-    win.webContents.send('update-downloaded');
-  }
+  updateReadyToInstall = true;
+  sendToAppWindows(UPDATE_DOWNLOADED_CHANNEL);
 });
 
 // Allow renderer to trigger quit-and-install without exposing node access.
-ipcMain.handle('quit-and-install', () => {
-  autoUpdater.quitAndInstall();
-});
+ipcMain.handle(
+  QUIT_AND_INSTALL_CHANNEL,
+  (event: IpcMainInvokeEvent, ...args: unknown[]) => {
+    if (!isTrustedIpcSender(event) || args.length !== 0) {
+      return { ok: false, reason: 'invalid-request' };
+    }
+
+    if (!updateReadyToInstall) {
+      return { ok: false, reason: 'update-not-downloaded' };
+    }
+
+    autoUpdater.quitAndInstall();
+    return { ok: true };
+  }
+);
 
 app.whenReady().then(() => {
+  Menu.setApplicationMenu(buildApplicationMenu());
   createWindow();
 
   // Auto-update: check on launch then every 30 minutes

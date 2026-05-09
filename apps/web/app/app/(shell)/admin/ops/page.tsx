@@ -5,10 +5,9 @@ import type {
   DailyBucket,
   ShippingVelocityResponse,
 } from '@/app/api/admin/hud/shipping-velocity/route';
-import { AgentOsRunsPanel } from '@/components/features/admin/agent-os';
 import { AdminToolPage } from '@/components/features/admin/layout/AdminToolPage';
 import { APP_ROUTES } from '@/constants/routes';
-import { AGENT_OS_ADMIN_FIXTURE_ARTIFACTS } from '@/lib/agent-os/fixtures';
+import { env } from '@/lib/env-server';
 import { getHudMetrics } from '@/lib/hud/metrics';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 import { logger } from '@/lib/utils/logger';
@@ -48,27 +47,16 @@ async function getInitialShippingData(): Promise<{
   cachedAt: string;
 } | null> {
   try {
-    // Import the route handler logic directly to avoid an extra HTTP round-trip.
-    // We call getRedis + GitHub logic via the same module but need to bypass
-    // the auth check since we are already in an authenticated admin server component.
-    // Instead, use a relative internal fetch to keep concerns separate and avoid
-    // coupling the page to route internals. Timeout is generous (5s) since
-    // this is a best-effort server prefetch — the client will refetch on failure.
-    const base = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : 'http://localhost:3000';
+    // Best-effort server prefetch for deployed admin views. In local dev,
+    // Next may choose a fallback port, and RSC has no reliable request origin
+    // here; the client chart fetch is the source of truth in that case.
+    if (!env.VERCEL_URL) return null;
+
+    const base = `https://${env.VERCEL_URL}`;
 
     const response = await fetch(
       `${base}/api/admin/hud/shipping-velocity?range=7d`,
       {
-        headers: {
-          // Internal server-to-server call — pass a sentinel to indicate
-          // this is an SSR prefetch so the route doesn't reject for missing
-          // auth cookies. The admin layout already enforced auth.
-          // We use a lightweight approach: simply forward cookies from a
-          // different path is not possible in RSC without next/headers.
-          // Accept fallback: the component will client-fetch if this returns null.
-        },
         signal: AbortSignal.timeout(5000),
         cache: 'no-store',
       }
@@ -139,7 +127,6 @@ export default async function AdminOpsPage({
         initialShippingData={shippingPrefetch?.data}
         initialShippingCachedAt={shippingPrefetch?.cachedAt}
       />
-      <AgentOsRunsPanel artifacts={AGENT_OS_ADMIN_FIXTURE_ARTIFACTS} />
     </AdminToolPage>
   );
 }

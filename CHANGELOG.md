@@ -5,6 +5,46 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.223] - 2026-05-09
+
+> The homepage now leads with a sharper release command center, verified proof, and a product-led workspace story without leaking internal tools into marketing screenshots.
+
+### Added
+
+- **Homepage product statement break**: adds a Linear-inspired "Meet Jovie" statement between verified logos and the Workspace chapter so the page has better pacing before the second large product screenshot.
+- **Integrated Workspace chapter**: replaces the old command-center/workflow pair with one product-led section using the seeded releases workspace and anchored release-management callouts.
+
+### Changed
+
+- **Homepage hero and proof strip**: tightens the sticky header, verified-logo treatment, hero carousel framing, and section transitions around the current Shell v1 product screenshots.
+- **Marketing screenshot fixtures**: seeds Shell v1 releases/library captures with real Tim White and verified release data, full tables, matching artwork, and an open release rail.
+
+### Fixed
+
+- **Admin-free marketing captures**: Shell v1 screenshot routes now use `capture=marketing` so homepage assets do not expose admin/internal navigation.
+
+## [26.4.222] - 2026-05-08
+
+> [internal] Central profile route config and canonical shell barrel for the public artist surface — consolidates routing logic, removes dead feature-flag code, and deletes 16 legacy files from the JOV-2021 hardening phase.
+
+### Added
+
+- [internal] `apps/web/lib/profile/route-config.ts` — single source of truth for public profile route configuration. Exports `PROFILE_ROUTE_CONFIG`, `TOP_LEVEL_ROUTE_KEYS`, `BOTTOM_TAB_KEYS`, `REDIRECT_SINK_ROUTE_KEYS`, and full TypeScript types (`ProfileRouteCategory`, `ProfileRouteKey`, `ProfileRouteConfig`). Includes bidirectional reverse-completeness tests to guard against missing entries.
+- [internal] `apps/web/components/features/profile/shell/index.ts` — canonical barrel re-exporting `ProfileCompactTemplate`, `ProfileCompactSurface`, and `ProfileDesktopSurface`. All imports of profile shell components should go through this barrel.
+
+### Removed
+
+- [internal] Removed `SHOW_PUBLIC_PROFILE_V1_DESIGN` dead feature flag and all call-sites (flag was always true after JOV-2019 landed).
+- [internal] Deleted 16 legacy profile surface files superseded by the canonical shell stack (JOV-2021 cleanup phase).
+
+## [26.4.221] - 2026-05-09
+
+> [internal] Ops now opens as a constrained command-center cockpit: AgentOS runs lead the page, deployments are supporting context, and approvals stay beside the active work.
+
+### Changed
+
+- [internal] Reworked `/app/admin/ops` into a shell-v1 cockpit with a max-width admin surface, board-first AgentOS lanes, compact deployment feed, persistent approval/detail rail, and denser run metadata tucked into popovers.
+
 ## [26.4.220] - 2026-05-08
 
 > [internal] Canonical UX contract for the public artist profile surface: route categories, bottom tab bar, navigation, alert/subscribe, and copy — plus the P0 decision to restore ISR by removing `force-dynamic` and moving the cookie read client-side.

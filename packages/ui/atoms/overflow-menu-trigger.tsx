@@ -10,7 +10,7 @@ const overflowTriggerVariants = cva(
   [
     'relative inline-flex shrink-0 items-center justify-center rounded-full border bg-transparent transition-[background-color,color,border-color] duration-150',
     'hover:border-default hover:bg-surface-0 hover:text-primary-token',
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-accent)/30 focus-visible:ring-offset-1',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/35 focus-visible:ring-offset-1 focus-visible:ring-offset-(--linear-bg-page)',
     'text-tertiary-token',
   ],
   {

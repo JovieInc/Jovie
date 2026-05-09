@@ -7,22 +7,42 @@ import { useEffect, useState } from 'react';
 // ---------------------------------------------------------------------------
 
 export interface ElectronAPI {
-  readonly versions: NodeJS.ProcessVersions;
+  readonly platform: NodeJS.Platform;
+  readonly electronVersion: string;
   /** Register a callback that fires when electron-updater detects a new version. */
-  readonly onUpdateAvailable: (cb: () => void) => void;
+  readonly onUpdateAvailable: (cb: () => void) => () => void;
   /** Register a callback that fires when the update download is complete. */
-  readonly onUpdateDownloaded: (cb: () => void) => void;
+  readonly onUpdateDownloaded: (cb: () => void) => () => void;
   /** Trigger quit-and-install in the main process. */
-  readonly installUpdateAndRestart: () => void;
+  readonly installUpdateAndRestart: () => Promise<{
+    readonly ok: boolean;
+    readonly reason?: string;
+  }>;
 }
 
 // ---------------------------------------------------------------------------
 // Safe accessor — returns undefined when running in a browser context
 // ---------------------------------------------------------------------------
 
-function getElectronAPI(): ElectronAPI | undefined {
+export function getElectronAPI(): ElectronAPI | undefined {
   if (typeof window === 'undefined') return undefined;
   return (window as Window & { electronAPI?: ElectronAPI }).electronAPI;
+}
+
+export function isElectronRuntime(): boolean {
+  if (typeof window === 'undefined') return false;
+  if (getElectronAPI()) return true;
+  return document.documentElement.dataset.desktopRuntime === 'electron';
+}
+
+export function useIsElectronRuntime(): boolean {
+  const [isElectron, setIsElectron] = useState(false);
+
+  useEffect(() => {
+    setIsElectron(isElectronRuntime());
+  }, []);
+
+  return isElectron;
 }
 
 // ---------------------------------------------------------------------------
@@ -35,7 +55,7 @@ export interface DesktopUpdateState {
   /** True once the update download completes (ready to install). */
   readonly downloaded: boolean;
   /** Trigger quit-and-install. No-op outside Electron. */
-  readonly install: () => void;
+  readonly install: () => Promise<void>;
 }
 
 /**
@@ -53,12 +73,21 @@ export function useDesktopUpdate(): DesktopUpdateState {
     const api = getElectronAPI();
     if (!api) return;
 
-    api.onUpdateAvailable(() => setAvailable(true));
-    api.onUpdateDownloaded(() => setDownloaded(true));
+    const unsubscribeAvailable = api.onUpdateAvailable(() =>
+      setAvailable(true)
+    );
+    const unsubscribeDownloaded = api.onUpdateDownloaded(() =>
+      setDownloaded(true)
+    );
+
+    return () => {
+      unsubscribeAvailable();
+      unsubscribeDownloaded();
+    };
   }, []);
 
-  const install = () => {
-    getElectronAPI()?.installUpdateAndRestart();
+  const install = async () => {
+    await getElectronAPI()?.installUpdateAndRestart();
   };
 
   return { available, downloaded, install };

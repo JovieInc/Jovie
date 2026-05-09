@@ -28,6 +28,7 @@ import {
 import { Tooltip } from '@/components/shell/Tooltip';
 import { BASE_URL } from '@/constants/domains';
 import { copyToClipboard } from '@/hooks/useClipboard';
+import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import type { KeyboardShortcut } from '@/lib/keyboard-shortcuts';
 import { cn } from '@/lib/utils';
 import type { NavItem } from './types';
@@ -114,6 +115,7 @@ export function NavMenuItem({
   useShellNavItem = false,
 }: NavMenuItemProps) {
   const router = useRouter();
+  const isElectronRuntime = useIsElectronRuntime();
   const pendingNavigationRef = useRef(false);
   const clearPendingNavigationListenersRef = useRef<(() => void) | null>(null);
   // Memoize tooltip to prevent creating new objects on every render,
@@ -389,10 +391,12 @@ export function NavMenuItem({
           <Copy className='mr-2 h-3.5 w-3.5' />
           Copy link
         </ContextMenuItem>
-        <ContextMenuItem onSelect={handleOpenInNewTab}>
-          <ExternalLink className='mr-2 h-3.5 w-3.5' />
-          Open in new tab
-        </ContextMenuItem>
+        {isElectronRuntime ? null : (
+          <ContextMenuItem onSelect={handleOpenInNewTab}>
+            <ExternalLink className='mr-2 h-3.5 w-3.5' />
+            Open in new tab
+          </ContextMenuItem>
+        )}
       </ContextMenuContent>
     </ContextMenu>
   );

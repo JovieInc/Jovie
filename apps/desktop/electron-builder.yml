@@ -1,21 +1,51 @@
 appId: app.jov.ie
 productName: Jovie
+executableName: Jovie
 copyright: "Copyright © 2026 Jovie Inc."
+artifactName: Jovie-${version}-${arch}.${ext}
 directories:
   output: dist
+afterPack: scripts/apply-electron-fuses.cjs
 files:
   - dist-electron/**
   - package.json
 mac:
   category: public.app-category.music
+  darkModeSupport: true
+  hardenedRuntime: true
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.inherit.plist
+  extendInfo:
+    NSAppTransportSecurity:
+      NSAllowsArbitraryLoads: false
+  notarize: true
   target:
     - target: dmg
       arch:
         - universal
-  icon: assets/icon.icns
+    - target: zip
+      arch:
+        - universal
+  icon: assets/icon.png
+dmg:
+  title: Jovie
+  background: assets/dmg-background.png
+  iconSize: 96
+  iconTextSize: 12
+  window:
+    width: 660
+    height: 400
+  contents:
+    - x: 180
+      y: 218
+      type: file
+    - x: 480
+      y: 218
+      type: link
+      path: /Applications
 win:
   target: nsis
-  icon: assets/icon.ico
+  icon: assets/icon.png
 linux:
   target: AppImage
   icon: assets/icon.png

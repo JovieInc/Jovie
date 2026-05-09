@@ -1,4 +1,3 @@
-export { ArtistPageShell } from './ArtistPageShell';
 export type {
   ProfileIdentityFields,
   ProfileMode,

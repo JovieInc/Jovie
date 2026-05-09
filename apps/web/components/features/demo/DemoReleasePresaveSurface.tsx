@@ -40,8 +40,12 @@ export function DemoReleasePresaveSurface() {
     artistName: THE_DEEP_END_ARTIST,
     artworkUrl: THE_DEEP_END_ARTWORK,
   });
+  const spotifyConfig = DSP_LOGO_CONFIG.spotify;
   const appleConfig = DSP_LOGO_CONFIG.apple_music;
+  const youtubeMusicConfig = DSP_LOGO_CONFIG.youtube_music;
   const soundcloudConfig = DSP_LOGO_CONFIG.soundcloud;
+  const tidalConfig = DSP_LOGO_CONFIG.tidal;
+  const amazonMusicConfig = DSP_LOGO_CONFIG.amazon_music;
 
   return (
     <DemoClientProviders>
@@ -51,6 +55,7 @@ export function DemoReleasePresaveSurface() {
           artworkAlt='The Deep End artwork'
           onMenuOpen={() => setMenuOpen(true)}
           showBrandMark={false}
+          showMenuButton={false}
           heroOverlay={
             <div className='absolute inset-x-0 bottom-5 z-10 px-5'>
               <p className='mb-2 inline-flex rounded-full border border-white/[0.1] bg-black/35 px-2.5 py-1 text-[11px] font-[520] uppercase tracking-[0.08em] text-white/72 backdrop-blur-xl'>
@@ -75,14 +80,30 @@ export function DemoReleasePresaveSurface() {
                 href={THE_DEEP_END_LISTEN_URL}
               />
               <SmartLinkProviderButton
+                label='Spotify'
+                iconPath={spotifyConfig?.iconPath}
+              />
+              <SmartLinkProviderButton
                 label='Apple Music'
                 iconPath={appleConfig?.iconPath}
                 href={THE_DEEP_END_APPLE_URL}
               />
               <SmartLinkProviderButton
+                label='YouTube Music'
+                iconPath={youtubeMusicConfig?.iconPath}
+              />
+              <SmartLinkProviderButton
                 label='SoundCloud'
                 iconPath={soundcloudConfig?.iconPath}
                 href={THE_DEEP_END_SOUNDCLOUD_URL}
+              />
+              <SmartLinkProviderButton
+                label='TIDAL'
+                iconPath={tidalConfig?.iconPath}
+              />
+              <SmartLinkProviderButton
+                label='Amazon Music'
+                iconPath={amazonMusicConfig?.iconPath}
               />
             </div>
 

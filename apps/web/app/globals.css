@@ -35,6 +35,68 @@ body {
   overscroll-behavior: none;
 }
 
+html[data-desktop-runtime="electron"] {
+  --electron-titlebar-height: 40px;
+}
+
+html[data-desktop-runtime="electron"] body {
+  background: rgb(var(--sidebar-background));
+  font-family:
+    -apple-system, BlinkMacSystemFont, var(--font-inter), "Inter", sans-serif;
+}
+
+[data-electron-titlebar="true"] {
+  display: none;
+}
+
+html[data-desktop-runtime="electron"] [data-app-shell-frame="true"] {
+  box-sizing: border-box;
+  padding-top: var(--electron-titlebar-height);
+}
+
+html[data-desktop-runtime="electron"] [data-electron-titlebar="true"] {
+  -webkit-app-region: drag;
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 60;
+  display: block;
+  height: var(--electron-titlebar-height);
+  user-select: none;
+  background: rgb(var(--sidebar-background));
+  border-bottom: 1px solid rgb(var(--sidebar-border));
+}
+
+html[data-desktop-runtime="electron"] [data-electron-drag-region="true"] {
+  -webkit-app-region: drag;
+}
+
+html[data-desktop-runtime="electron"]
+  :where(
+    a,
+    button,
+    input,
+    textarea,
+    select,
+    summary,
+    [role="button"],
+    [role="menuitem"],
+    [data-electron-no-drag="true"],
+    [data-radix-popper-content-wrapper]
+  ) {
+  -webkit-app-region: no-drag;
+}
+
+html[data-desktop-runtime="electron"] [data-electron-update-pill="true"] {
+  position: fixed;
+  top: 7px;
+  right: 12px;
+  z-index: 80;
+  height: 26px;
+  padding-inline: 12px;
+  border-radius: 999px;
+  box-shadow: none;
+}
+
 /* Marketing pages use document scrolling rather than app-shell scroll panes.
    Only override html — setting overflow-y:auto on body promotes overflow-x:clip
    to overflow-x:hidden, which creates a scroll container that breaks sticky. */
@@ -624,15 +686,15 @@ body {
 @layer components {
   /* Focus ring utilities */
   .focus-ring {
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-500/50 dark:focus-visible:ring-white/40 dark:focus-visible:ring-offset-gray-900;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-focus/50 focus-visible:ring-offset-(--linear-bg-page);
   }
   .focus-ring-transparent-offset {
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-transparent focus-visible:ring-gray-500/50 dark:focus-visible:ring-white/40;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/50 focus-visible:ring-offset-transparent;
   }
   /* Button component styles */
   .btn {
     @apply inline-flex items-center justify-center rounded-full text-[13px] font-medium transition-colors duration-normal disabled:opacity-50 disabled:pointer-events-none;
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-500/50 dark:focus-visible:ring-white/40 dark:focus-visible:ring-offset-gray-900;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-focus/50 focus-visible:ring-offset-(--linear-bg-page);
   }
   .btn-primary {
     background-color: var(--color-btn-primary-bg);
@@ -1637,7 +1699,12 @@ body {
   }
   .focus-ring-themed {
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2;
-    --tw-ring-color: var(--color-focus-ring);
+    --tw-ring-color: color-mix(
+      in oklab,
+      var(--color-focus-ring) 52%,
+      transparent
+    );
+    --tw-ring-offset-color: var(--color-bg-page);
   }
 }
 
@@ -1810,7 +1877,11 @@ body {
   }
   .input-focus-glow {
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:shadow-lg transition-all duration-slow;
-    --tw-ring-color: var(--color-accent);
+    --tw-ring-color: color-mix(
+      in oklab,
+      var(--color-focus-ring) 40%,
+      transparent
+    );
   }
   .btn-press {
     @apply transform transition-transform duration-100 ease-out active:scale-95;

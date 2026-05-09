@@ -32,7 +32,7 @@ export const SidebarInput = React.forwardRef<
       ref={ref}
       data-sidebar='input'
       className={cn(
-        'h-8 w-full bg-sidebar-input-background border border-sidebar-input-border shadow-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+        'h-8 w-full bg-sidebar-input-background border border-sidebar-input-border shadow-none focus-visible:border-(--linear-border-focus) focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/24',
         className
       )}
       {...props}
@@ -65,7 +65,7 @@ export const SidebarFooter = React.forwardRef<
       ref={ref}
       data-sidebar='footer'
       className={cn(
-        'shrink-0 flex flex-col gap-1.5 overflow-hidden p-2 transition-all duration-normal ease-interactive',
+        'shrink-0 flex flex-col gap-1.5 overflow-hidden p-2 transition-[padding] duration-normal ease-interactive',
         'group-data-[collapsible=icon]:px-0',
         className
       )}

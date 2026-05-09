@@ -304,8 +304,8 @@
   );
   --color-skeleton-shimmer: oklch(100% 0 0);
 
-  /* Focus ring — Linear: #7170ff (extracted 2026-03-16) */
-  --color-focus-ring: var(--color-accent);
+  /* Focus ring — Jovie/Linear keyboard focus token */
+  --color-focus-ring: var(--linear-border-focus);
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
 
@@ -1310,16 +1310,18 @@
   letter-spacing: -0.01em;
 }
 
-/* Cyan focus glow (shell-v1) — soft halo instead of the browser's harsh
-   royal-blue ring. Uses box-shadow so it inherits the element's
-   border-radius automatically and reads as a halo, not a hard ring.
+/* Keyboard focus fallback — tokenized Jovie focus halo instead of the
+   browser's default ring. Uses box-shadow so it inherits the element's
+   border-radius automatically.
    :where() keeps specificity at 0 so component-level focus styles
    (Clerk inputs, etc.) keep overriding this default. */
 :where(:focus-visible) {
   outline: none;
   box-shadow:
-    0 0 0 1px rgba(103, 232, 249, 0.18),
-    0 0 0 6px rgba(103, 232, 249, 0.08);
+    0 0 0 var(--focus-ring-width)
+    color-mix(in oklab, var(--color-focus-ring) 58%, transparent),
+    0 0 0 calc(var(--focus-ring-width) + var(--focus-ring-offset))
+    color-mix(in oklab, var(--color-focus-ring) 18%, transparent);
   transition:
     box-shadow 150ms cubic-bezier(0.32, 0.72, 0, 1),
     border-color 150ms cubic-bezier(0.32, 0.72, 0, 1);

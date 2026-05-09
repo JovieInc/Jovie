@@ -134,6 +134,32 @@ describe('screenshot registry', () => {
     }
   });
 
+  it('opens the Shell v1 releases hero screenshot on a seeded release detail rail', () => {
+    const scenario = SCREENSHOT_SCENARIOS.find(
+      currentScenario => currentScenario.id === 'shell-v1-releases-desktop'
+    );
+
+    expect(scenario?.route).toBe(
+      '/exp/shell-v1?view=releases&release=the-deep-end&capture=marketing'
+    );
+    expect(scenario?.interaction).toBe('open-shell-releases');
+    expect(scenario?.publicExportPath).toBe('shell-v1-releases.png');
+  });
+
+  it('keeps Shell v1 marketing screenshots out of admin mode', () => {
+    const shellScenarios = SCREENSHOT_SCENARIOS.filter(
+      scenario =>
+        scenario.id.startsWith('shell-v1-') &&
+        scenario.consumers.includes('marketing-export')
+    );
+
+    expect(shellScenarios.length).toBeGreaterThan(0);
+
+    for (const scenario of shellScenarios) {
+      expect(scenario.route).toContain('capture=marketing');
+    }
+  });
+
   it('freezes the capture section screenshot on the subscribed state', () => {
     const scenario = SCREENSHOT_SCENARIOS.find(
       currentScenario =>
