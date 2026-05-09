@@ -16,7 +16,7 @@ import {
   UserRound,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { AboutSection } from '@/features/profile/AboutSection';
@@ -32,6 +32,7 @@ import { ProfileUnifiedDrawer } from '@/features/profile/ProfileUnifiedDrawer';
 import { resolveProfileSurfaceState } from '@/features/profile/profile-surface-state';
 import { StaticListenInterface } from '@/features/profile/StaticListenInterface';
 import { ReleasesView } from '@/features/profile/views/ReleasesView';
+import { useAlertOptInVariant } from '@/hooks/useAlertOptInVariant';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import { readArtistEmailReadyFromSettings } from '@/lib/notifications/artist-email';
@@ -255,33 +256,7 @@ export function ProfileDesktopSurface({
   isUnsubscribing = false,
 }: ProfileDesktopSurfaceProps) {
   // Hydrate the alert opt-in variant client-side so /{username} can be ISR-cached.
-  const [resolvedAlertOptInVariant, setResolvedAlertOptInVariant] =
-    useState<ProfileAlertOptInVariant>(alertOptInVariant);
-
-  useEffect(() => {
-    const stableId =
-      document.cookie
-        .split('; ')
-        .find(row => row.startsWith('jv_aid='))
-        ?.split('=')[1] ?? null;
-
-    if (!stableId || alertOptInVariant !== 'button') return;
-
-    void fetch(
-      `/api/audience/alert-variant?stableId=${encodeURIComponent(stableId)}`,
-      { method: 'GET', cache: 'no-store' }
-    )
-      .then(res => (res.ok ? res.json() : null))
-      .then((data: { variant?: ProfileAlertOptInVariant } | null) => {
-        if (data?.variant && data.variant !== resolvedAlertOptInVariant) {
-          setResolvedAlertOptInVariant(data.variant);
-        }
-      })
-      .catch(() => {
-        // Non-fatal — keep the default 'button' variant
-      });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally fires once on mount
-  }, []);
+  const resolvedAlertOptInVariant = useAlertOptInVariant(alertOptInVariant);
 
   const [notificationsPortalContainer, setNotificationsPortalContainer] =
     useState<HTMLDivElement | null>(null);

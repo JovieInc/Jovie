@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
@@ -33,6 +33,7 @@ import { resolveProfileSurfaceState } from '@/features/profile/profile-surface-s
 import { getProfileModeDefinition } from '@/features/profile/registry';
 import type { PublicRelease } from '@/features/profile/releases/types';
 import { SubscriptionConfirmedBanner } from '@/features/profile/SubscriptionConfirmedBanner';
+import { useAlertOptInVariant } from '@/hooks/useAlertOptInVariant';
 import type { UserLocation } from '@/hooks/useUserLocation';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
@@ -222,38 +223,7 @@ export function ProfileCompactSurface({
 }: Readonly<ProfileCompactSurfaceProps>) {
   // Hydrate the alert opt-in variant client-side so the /{username} page can
   // be ISR-cached without reading the jv_aid cookie during server rendering.
-  // The prop provides the SSR default ('button'); we update after mount if
-  // the Statsig experiment assigns a different value for this visitor.
-  const [resolvedAlertOptInVariant, setResolvedAlertOptInVariant] =
-    useState<ProfileAlertOptInVariant>(alertOptInVariant);
-
-  useEffect(() => {
-    // Read the anon stable ID from the cookie set by the audience tracking layer
-    const stableId =
-      document.cookie
-        .split('; ')
-        .find(row => row.startsWith('jv_aid='))
-        ?.split('=')[1] ?? null;
-
-    // Skip the fetch if we already have a non-default server-provided value
-    // (e.g. Storybook / dashboard preview passes the variant directly)
-    if (!stableId || alertOptInVariant !== 'button') return;
-
-    void fetch(
-      `/api/audience/alert-variant?stableId=${encodeURIComponent(stableId)}`,
-      { method: 'GET', cache: 'no-store' }
-    )
-      .then(res => (res.ok ? res.json() : null))
-      .then((data: { variant?: ProfileAlertOptInVariant } | null) => {
-        if (data?.variant && data.variant !== resolvedAlertOptInVariant) {
-          setResolvedAlertOptInVariant(data.variant);
-        }
-      })
-      .catch(() => {
-        // Network errors are non-fatal — keep the default 'button' variant
-      });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally fires once on mount
-  }, []);
+  const resolvedAlertOptInVariant = useAlertOptInVariant(alertOptInVariant);
 
   const [notificationsPortalContainer, setNotificationsPortalContainer] =
     useState<HTMLDivElement | null>(null);
