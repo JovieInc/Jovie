@@ -2689,6 +2689,11 @@ body:has(.home-viewport)::-webkit-scrollbar {
   display: none;
 }
 
+.homepage-product-rail:focus-within {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
 .homepage-product-pane {
   position: relative;
   flex: 0 0 auto;
