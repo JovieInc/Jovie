@@ -79,7 +79,16 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
 
-    const body = (await request.json()) as unknown;
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: 'Invalid JSON payload' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
     if (
       typeof body !== 'object' ||
       body === null ||
@@ -91,9 +100,9 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
 
-    const { issueId } = body as { issueId: string };
+    const issueId = (body as { issueId: string }).issueId.trim();
 
-    if (!issueId.trim()) {
+    if (!issueId) {
       return NextResponse.json(
         { error: 'issueId must not be empty' },
         { status: 400, headers: NO_STORE_HEADERS }

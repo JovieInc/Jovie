@@ -120,7 +120,8 @@ export async function fetchTimActionIssues(): Promise<TimActionsResponse> {
         response.status,
         response.statusText
       );
-      return { issues: [], fetchedAt, available: false };
+      // available stays true — API key is configured, this is a transient failure
+      return { issues: [], fetchedAt, available: true };
     }
 
     const payload = (await response.json()) as LinearGraphQLResponse;
@@ -130,7 +131,8 @@ export async function fetchTimActionIssues(): Promise<TimActionsResponse> {
         '[hud/linear-actions] Linear GraphQL errors',
         payload.errors[0]?.message
       );
-      return { issues: [], fetchedAt, available: false };
+      // available stays true — API key is configured, this is a transient/schema error
+      return { issues: [], fetchedAt, available: true };
     }
 
     const nodes = payload.data?.issues?.nodes ?? [];
@@ -166,7 +168,8 @@ export async function fetchTimActionIssues(): Promise<TimActionsResponse> {
       '[hud/linear-actions] Failed to fetch tim-action issues',
       error
     );
-    return { issues: [], fetchedAt, available: false };
+    // available stays true — API key is configured, this is a transient network error
+    return { issues: [], fetchedAt, available: true };
   }
 }
 

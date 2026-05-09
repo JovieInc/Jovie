@@ -1,8 +1,9 @@
 'use client';
 
 import { Check, ExternalLink } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import type {
   TimActionIssue,
   TimActionsResponse,
@@ -75,7 +76,7 @@ function ActionRow({ issue, onClose, isClosing }: Readonly<ActionRowProps>) {
           rel='noopener noreferrer'
           className='group flex items-center gap-1.5'
         >
-          <p className='truncate text-[13px] font-semibold text-primary-token group-hover:text-[#FACC15] transition-colors'>
+          <p className='truncate text-[13px] font-semibold text-primary-token transition-colors group-hover:text-[#FACC15]'>
             {issue.title}
           </p>
           <ExternalLink
@@ -114,6 +115,8 @@ function ActionRow({ issue, onClose, isClosing }: Readonly<ActionRowProps>) {
 
 export function TimActionRequiredSection() {
   const [data, setData] = useState<TimActionsResponse | null>(null);
+  // isInitialLoad tracks whether we've ever received data — only show skeleton on first load
+  const isInitialLoadRef = useRef(true);
   const [isLoading, setIsLoading] = useState(true);
   const [closingIds, setClosingIds] = useState<Set<string>>(new Set());
   const [optimisticallyClosedIds, setOptimisticallyClosedIds] = useState<
@@ -121,7 +124,10 @@ export function TimActionRequiredSection() {
   >(new Set());
 
   const fetchData = useCallback(async (signal?: AbortSignal) => {
-    setIsLoading(true);
+    // Only show the skeleton on the very first load; background polls are silent
+    if (isInitialLoadRef.current) {
+      setIsLoading(true);
+    }
     try {
       const response = await fetch(FETCH_URL, { signal });
       if (!response.ok) {
@@ -133,6 +139,7 @@ export function TimActionRequiredSection() {
       if (error instanceof Error && error.name === 'AbortError') return;
       // Silently fail — the HUD should not break if Linear is unavailable
     } finally {
+      isInitialLoadRef.current = false;
       setIsLoading(false);
     }
   }, []);
@@ -204,52 +211,54 @@ export function TimActionRequiredSection() {
   );
 
   return (
-    <div className='space-y-2.5'>
-      {/* Section header */}
-      <div className='flex items-center gap-2'>
-        {/* Amber accent dot matching the #FACC15 tim-action-required label color */}
-        <span
-          className='h-2 w-2 shrink-0 rounded-full'
-          style={{ backgroundColor: '#FACC15' }}
-          aria-hidden='true'
-        />
-        <p className='text-[11px] font-semibold uppercase tracking-[0.16em] text-tertiary-token'>
-          Tim Action Required
-        </p>
-        {!isLoading && visibleIssues.length > 0 ? (
-          <span className='ml-auto text-[11px] tabular-nums text-tertiary-token'>
-            {visibleIssues.length}
-          </span>
-        ) : null}
-      </div>
+    <ContentSurfaceCard surface='details' className='p-3'>
+      <div className='space-y-2.5'>
+        {/* Section header */}
+        <div className='flex items-center gap-2'>
+          {/* Amber accent dot matching the #FACC15 tim-action-required label color */}
+          <span
+            className='h-2 w-2 shrink-0 rounded-full'
+            style={{ backgroundColor: '#FACC15' }}
+            aria-hidden='true'
+          />
+          <p className='text-[11px] font-semibold uppercase tracking-[0.16em] text-tertiary-token'>
+            Tim Action Required
+          </p>
+          {!isLoading && visibleIssues.length > 0 ? (
+            <span className='ml-auto text-[11px] tabular-nums text-tertiary-token'>
+              {visibleIssues.length}
+            </span>
+          ) : null}
+        </div>
 
-      {/* Content */}
-      {isLoading ? (
-        <div className='grid gap-2'>
-          {[1, 2].map(i => (
-            <div
-              key={i}
-              className='h-[52px] rounded-xl border border-subtle bg-surface-0 animate-pulse'
-              aria-hidden='true'
-            />
-          ))}
-        </div>
-      ) : visibleIssues.length > 0 ? (
-        <div className='grid gap-2'>
-          {visibleIssues.map(issue => (
-            <ActionRow
-              key={issue.id}
-              issue={issue}
-              onClose={handleClose}
-              isClosing={closingIds.has(issue.id)}
-            />
-          ))}
-        </div>
-      ) : (
-        <p className='text-[13px] leading-5 text-secondary-token'>
-          Nothing on your plate. Everything that needs hands is automated.
-        </p>
-      )}
-    </div>
+        {/* Content */}
+        {isLoading ? (
+          <div className='grid gap-2'>
+            {[1, 2].map(i => (
+              <div
+                key={i}
+                className='h-[52px] animate-pulse rounded-xl border border-subtle bg-surface-0'
+                aria-hidden='true'
+              />
+            ))}
+          </div>
+        ) : visibleIssues.length > 0 ? (
+          <div className='grid gap-2'>
+            {visibleIssues.map(issue => (
+              <ActionRow
+                key={issue.id}
+                issue={issue}
+                onClose={handleClose}
+                isClosing={closingIds.has(issue.id)}
+              />
+            ))}
+          </div>
+        ) : (
+          <p className='text-[13px] leading-5 text-secondary-token'>
+            Nothing on your plate. Everything that needs hands is automated.
+          </p>
+        )}
+      </div>
+    </ContentSurfaceCard>
   );
 }

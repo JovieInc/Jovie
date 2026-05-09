@@ -446,9 +446,8 @@ export function HudDashboardClient({
       ) : null}
 
       {/* Tim Action Required — personal manual items, surfaces above everything else */}
-      <ContentSurfaceCard surface='details' className='p-3'>
-        <TimActionRequiredSection />
-      </ContentSurfaceCard>
+      {/* ContentSurfaceCard is rendered by TimActionRequiredSection itself so it can self-hide */}
+      <TimActionRequiredSection />
 
       {/* Top section: chart + metrics side-by-side on XL screens */}
       <div className='grid gap-3 xl:grid-cols-[2fr_1fr]'>
