@@ -505,7 +505,14 @@ export function AgentOsRunsPanel({
         actionsClassName='ml-0 w-full max-w-full flex-wrap justify-start sm:ml-auto sm:w-auto sm:justify-end'
       />
 
-      <div className='grid gap-3 p-3 md:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] 2xl:grid-cols-[minmax(0,1fr)_520px_360px]'>
+      <div
+        className={cn(
+          'grid gap-3 p-3 md:grid-cols-[minmax(0,1fr)_minmax(280px,360px)]',
+          deploymentsPanel
+            ? '2xl:grid-cols-[minmax(0,1fr)_520px_360px]'
+            : '2xl:grid-cols-[minmax(0,1fr)_360px]'
+        )}
+      >
         <div className='min-w-0'>
           {viewMode === 'board' ? (
             <AgentOsBoard
@@ -545,7 +552,12 @@ export function AgentOsRunsPanel({
           </div>
         ) : null}
 
-        <div className='grid content-start gap-3 md:col-start-2 md:row-start-2 2xl:sticky 2xl:top-3 2xl:col-start-auto 2xl:row-start-auto'>
+        <div
+          className={cn(
+            'grid content-start gap-3 md:col-start-2 2xl:sticky 2xl:top-3 2xl:col-start-auto 2xl:row-start-auto',
+            deploymentsPanel ? 'md:row-start-2' : 'md:row-start-1'
+          )}
+        >
           <ApprovalQueuePanel
             artifacts={rows}
             selectedId={selectedArtifact?.id ?? null}
