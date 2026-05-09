@@ -1,6 +1,6 @@
 'use client';
 
-import { Loader2, Rocket } from 'lucide-react';
+import { Loader2, Rocket, X } from 'lucide-react';
 import Image from 'next/image';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
@@ -143,8 +143,14 @@ function DeploymentRow({
 
 function AiOpsItemRow({
   item,
+  onDismiss,
+  isDismissed,
+  onUndismiss,
 }: Readonly<{
   readonly item: HudMetrics['aiOps']['blockers'][number];
+  readonly onDismiss?: () => void;
+  readonly isDismissed?: boolean;
+  readonly onUndismiss?: () => void;
 }>) {
   return (
     <div className='flex items-start justify-between gap-3 rounded-xl border border-subtle bg-surface-0 px-3 py-2.5'>
@@ -156,9 +162,28 @@ function AiOpsItemRow({
           {item.source} / {item.status}
         </p>
       </div>
-      <p className='shrink-0 text-right text-[11px] text-tertiary-token'>
-        {formatDeploymentTime(item.updatedAt)}
-      </p>
+      <div className='flex shrink-0 items-center gap-1.5 text-right text-[11px] text-tertiary-token'>
+        <p>{formatDeploymentTime(item.updatedAt)}</p>
+        {isDismissed && onUndismiss ? (
+          <button
+            type='button'
+            onClick={onUndismiss}
+            aria-label='Restore item'
+            className='rounded px-1 py-0.5 text-[11px] text-tertiary-token hover:text-primary-token'
+          >
+            Undo
+          </button>
+        ) : onDismiss ? (
+          <button
+            type='button'
+            onClick={onDismiss}
+            aria-label='Dismiss item'
+            className='rounded p-0.5 text-tertiary-token hover:text-primary-token'
+          >
+            <X className='h-3.5 w-3.5' aria-hidden='true' />
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -323,6 +348,10 @@ export interface HudDashboardClientProps {
   readonly initialShippingCachedAt?: string;
 }
 
+function makeItemKey(item: HudMetrics['aiOps']['blockers'][number]): string {
+  return `${item.source}|${item.summary}|${item.updatedAt}`;
+}
+
 export function HudDashboardClient({
   initialMetrics,
   density = 'kiosk',
@@ -336,6 +365,20 @@ export function HudDashboardClient({
     initialMetrics,
     kioskToken
   );
+
+  const [dismissedKeys, setDismissedKeys] = useState<Set<string>>(new Set());
+
+  function dismissItem(item: HudMetrics['aiOps']['blockers'][number]) {
+    setDismissedKeys(prev => new Set([...prev, makeItemKey(item)]));
+  }
+
+  function undismissItem(item: HudMetrics['aiOps']['blockers'][number]) {
+    setDismissedKeys(prev => {
+      const next = new Set(prev);
+      next.delete(makeItemKey(item));
+      return next;
+    });
+  }
 
   const defaultTone = getDefaultStatusTone(metrics.overview.defaultStatus);
   const deploymentsTone = getDeploymentTone(metrics.deployments);
@@ -351,8 +394,8 @@ export function HudDashboardClient({
   // Outer layout: kiosk gets the wide centered TV layout; shell defers width
   // to the AdminToolPage container that already provides app-shell padding.
   const outerClass = isShell
-    ? 'flex w-full flex-col gap-4'
-    : 'mx-auto flex w-full max-w-[1560px] flex-col gap-4 px-4 py-4 sm:px-6 sm:py-6 xl:px-8';
+    ? 'flex w-full flex-col gap-3'
+    : 'mx-auto flex w-full max-w-[1560px] flex-col gap-3 px-4 py-4 sm:px-6 sm:py-6 xl:px-8';
 
   // MRR scale: shell matches Overview KPIs (~28-32px); kiosk keeps the
   // TV-readable 44/56/72 ramp.
@@ -401,23 +444,19 @@ export function HudDashboardClient({
         </ContentSurfaceCard>
       ) : null}
 
-      {/* Shipping Velocity Chart — always first in the ops dashboard */}
-      <ContentSurfaceCard surface='details' className='p-0 overflow-hidden'>
-        <ShippingVelocityChart
-          initialData={initialShippingData}
-          initialRange='7d'
-          cachedAt={initialShippingCachedAt}
-        />
-      </ContentSurfaceCard>
+      {/* Top section: chart + metrics side-by-side on XL screens */}
+      <div className='grid gap-3 xl:grid-cols-[2fr_1fr]'>
+        {/* Shipping Velocity Chart */}
+        <ContentSurfaceCard surface='details' className='p-0 overflow-hidden'>
+          <ShippingVelocityChart
+            initialData={initialShippingData}
+            initialRange='7d'
+            cachedAt={initialShippingCachedAt}
+          />
+        </ContentSurfaceCard>
 
-      <div
-        className={
-          showQrPanel
-            ? 'grid gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.9fr)]'
-            : 'grid gap-4'
-        }
-      >
-        <div className='grid gap-4'>
+        {/* MRR + small metric tiles */}
+        <div className='grid gap-3 content-start'>
           <ContentMetricCard
             label='Monthly recurring revenue'
             value={formatUsd(metrics.overview.mrrUsd)}
@@ -430,17 +469,17 @@ export function HudDashboardClient({
             headerRight={
               <HudStatusPill label={deploymentLabel} tone={deploymentsTone} />
             }
-            className='p-4 sm:p-5'
+            className='p-3'
             labelClassName='uppercase tracking-[0.16em] text-tertiary-token'
             valueClassName={mrrValueClass}
           />
 
-          <div className='grid gap-4 lg:grid-cols-3'>
+          <div className='grid grid-cols-2 xl:grid-cols-2 gap-3'>
             <ContentMetricCard
               label='Runway'
               value={formatRunway(metrics.overview.runwayMonths)}
               subtitle={
-                <div className='mt-3 grid gap-2'>
+                <div className='mt-2 grid gap-1.5'>
                   <ContentMetricRow
                     label='Cash'
                     value={formatUsd(metrics.overview.balanceUsd)}
@@ -451,7 +490,7 @@ export function HudDashboardClient({
                   />
                 </div>
               }
-              className='p-4 sm:p-5'
+              className='p-3'
               labelClassName='uppercase tracking-[0.16em] text-tertiary-token'
               valueClassName={secondaryValueClass}
             />
@@ -465,7 +504,7 @@ export function HudDashboardClient({
                   ? 'DB latency —'
                   : `DB latency ${metrics.operations.dbLatencyMs.toFixed(0)}ms`
               }
-              className='p-4 sm:p-5'
+              className='p-3'
               labelClassName='uppercase tracking-[0.16em] text-tertiary-token'
               valueClassName={secondaryValueClass}
             />
@@ -477,18 +516,38 @@ export function HudDashboardClient({
                   ? 'p95 —'
                   : `p95 ${metrics.reliability.p95LatencyMs.toFixed(0)}ms`
               }
-              className='p-4 sm:p-5'
+              className='p-3 col-span-2'
               labelClassName='uppercase tracking-[0.16em] text-tertiary-token'
               valueClassName={secondaryValueClass}
             />
           </div>
         </div>
+      </div>
 
-        {showQrPanel ? (
-          <ContentSurfaceCard
-            surface='details'
-            className='space-y-5 p-4 sm:p-5'
-          >
+      {/* Deployments + optional QR panel */}
+      {showQrPanel ? (
+        <div className='grid gap-3 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.9fr)]'>
+          <ContentSurfaceCard surface='details' className='space-y-3 p-3'>
+            <div className='flex items-center justify-between gap-3'>
+              <SectionEyebrow>Deployments</SectionEyebrow>
+              <p className='text-[12px] text-secondary-token'>
+                {deploymentDetail}
+              </p>
+            </div>
+            {metrics.deployments.recent.length > 0 ? (
+              <div className='grid gap-2'>
+                {metrics.deployments.recent.slice(0, 5).map(run => (
+                  <DeploymentRow key={run.id} run={run} />
+                ))}
+              </div>
+            ) : (
+              <p className='text-[13px] text-secondary-token'>
+                No recent runs.
+              </p>
+            )}
+          </ContentSurfaceCard>
+
+          <ContentSurfaceCard surface='details' className='space-y-4 p-3'>
             <div className='flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between'>
               <div className='space-y-1'>
                 <SectionEyebrow>Open on phone</SectionEyebrow>
@@ -508,32 +567,10 @@ export function HudDashboardClient({
                 />
               </div>
             </div>
-
-            <div className='border-t border-subtle pt-5'>
-              <div className='flex items-center justify-between gap-3'>
-                <SectionEyebrow>Deployments</SectionEyebrow>
-                <p className='text-[12px] text-secondary-token'>
-                  {deploymentDetail}
-                </p>
-              </div>
-              {metrics.deployments.recent.length > 0 ? (
-                <div className='mt-3 grid gap-2'>
-                  {metrics.deployments.recent.slice(0, 5).map(run => (
-                    <DeploymentRow key={run.id} run={run} />
-                  ))}
-                </div>
-              ) : (
-                <p className='mt-3 text-[13px] text-secondary-token'>
-                  No recent runs.
-                </p>
-              )}
-            </div>
           </ContentSurfaceCard>
-        ) : null}
-      </div>
-
-      {!showQrPanel ? (
-        <ContentSurfaceCard surface='details' className='space-y-3 p-4 sm:p-5'>
+        </div>
+      ) : (
+        <ContentSurfaceCard surface='details' className='space-y-3 p-3'>
           <div className='flex items-center justify-between gap-3'>
             <SectionEyebrow>Deployments</SectionEyebrow>
             <p className='text-[12px] text-secondary-token'>
@@ -550,9 +587,10 @@ export function HudDashboardClient({
             <p className='text-[13px] text-secondary-token'>No recent runs.</p>
           )}
         </ContentSurfaceCard>
-      ) : null}
+      )}
 
-      <ContentSurfaceCard surface='details' className='space-y-5 p-4 sm:p-5'>
+      {/* AI Ops / Hermes control plane */}
+      <ContentSurfaceCard surface='details' className='space-y-4 p-3'>
         <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
           <div className='space-y-1'>
             <SectionEyebrow>AI ops</SectionEyebrow>
@@ -594,7 +632,7 @@ export function HudDashboardClient({
           />
         </div>
 
-        <div className='grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]'>
+        <div className='grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]'>
           <div className='space-y-3'>
             <div className='flex items-center justify-between gap-3'>
               <SectionEyebrow>Blockers</SectionEyebrow>
@@ -602,20 +640,51 @@ export function HudDashboardClient({
                 {metrics.aiOps.availability}
               </p>
             </div>
-            {metrics.aiOps.blockers.length > 0 ? (
-              <div className='grid gap-2'>
-                {metrics.aiOps.blockers.slice(0, 4).map(item => (
-                  <AiOpsItemRow
-                    key={`${item.source}-${item.kind}-${item.url ?? item.summary}`}
-                    item={item}
-                  />
-                ))}
-              </div>
-            ) : (
-              <p className='text-[13px] text-secondary-token'>
-                No blocked worker runs or agent PRs.
-              </p>
-            )}
+            {(() => {
+              const visible = metrics.aiOps.blockers
+                .slice(0, 4)
+                .filter(item => !dismissedKeys.has(makeItemKey(item)));
+              const dismissed = metrics.aiOps.blockers
+                .slice(0, 4)
+                .filter(item => dismissedKeys.has(makeItemKey(item)));
+
+              return (
+                <>
+                  {visible.length > 0 ? (
+                    <div className='grid gap-2'>
+                      {visible.map(item => (
+                        <AiOpsItemRow
+                          key={`${item.source}-${item.kind}-${item.url ?? item.summary}`}
+                          item={item}
+                          onDismiss={() => dismissItem(item)}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <p className='text-[13px] text-secondary-token'>
+                      No blocked worker runs or agent PRs.
+                    </p>
+                  )}
+                  {dismissed.length > 0 ? (
+                    <details className='group'>
+                      <summary className='cursor-pointer list-none text-[11px] font-semibold uppercase tracking-[0.12em] text-tertiary-token hover:text-secondary-token'>
+                        Dismissed ({dismissed.length})
+                      </summary>
+                      <div className='mt-2 grid gap-2'>
+                        {dismissed.map(item => (
+                          <AiOpsItemRow
+                            key={`dismissed-${item.source}-${item.kind}-${item.url ?? item.summary}`}
+                            item={item}
+                            isDismissed
+                            onUndismiss={() => undismissItem(item)}
+                          />
+                        ))}
+                      </div>
+                    </details>
+                  ) : null}
+                </>
+              );
+            })()}
           </div>
 
           <div className='space-y-3'>
@@ -637,27 +706,63 @@ export function HudDashboardClient({
           </div>
         </div>
 
-        {metrics.aiOps.recommendations.length > 0 ? (
-          <div className='border-t border-subtle pt-4'>
-            <SectionEyebrow>Next actions</SectionEyebrow>
-            <div className='mt-3 grid gap-2'>
-              {metrics.aiOps.recommendations.slice(0, 3).map(item => (
-                <AiOpsItemRow
-                  key={`${item.source}-${item.priority}-${item.summary}`}
-                  item={item}
-                />
-              ))}
+        {(() => {
+          const allRecs = metrics.aiOps.recommendations.slice(0, 3);
+          const visibleRecs = allRecs.filter(
+            item => !dismissedKeys.has(makeItemKey(item))
+          );
+          const dismissedRecs = allRecs.filter(item =>
+            dismissedKeys.has(makeItemKey(item))
+          );
+
+          if (allRecs.length === 0) return null;
+
+          return (
+            <div className='border-t border-subtle pt-3'>
+              <SectionEyebrow>Next actions</SectionEyebrow>
+              {visibleRecs.length > 0 ? (
+                <div className='mt-2 grid gap-2'>
+                  {visibleRecs.map(item => (
+                    <AiOpsItemRow
+                      key={`${item.source}-${item.priority}-${item.summary}`}
+                      item={item}
+                      onDismiss={() => dismissItem(item)}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <p className='mt-2 text-[13px] text-secondary-token'>
+                  All next actions dismissed.
+                </p>
+              )}
+              {dismissedRecs.length > 0 ? (
+                <details className='mt-2'>
+                  <summary className='cursor-pointer list-none text-[11px] font-semibold uppercase tracking-[0.12em] text-tertiary-token hover:text-secondary-token'>
+                    Dismissed ({dismissedRecs.length})
+                  </summary>
+                  <div className='mt-2 grid gap-2'>
+                    {dismissedRecs.map(item => (
+                      <AiOpsItemRow
+                        key={`dismissed-rec-${item.source}-${item.priority}-${item.summary}`}
+                        item={item}
+                        isDismissed
+                        onUndismiss={() => undismissItem(item)}
+                      />
+                    ))}
+                  </div>
+                </details>
+              ) : null}
             </div>
-          </div>
-        ) : null}
+          );
+        })()}
       </ContentSurfaceCard>
 
       <ContentSurfaceCard
         surface='details'
-        className='p-4 sm:p-5'
+        className='p-3'
         data-testid='hud-bottom-marker'
       >
-        <div className='flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between'>
+        <div className='flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between'>
           <div className='space-y-2'>
             <SectionEyebrow>Default status</SectionEyebrow>
             <p

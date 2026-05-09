@@ -25,7 +25,7 @@ describe('AgentOsRunsPanel', () => {
       screen.getAllByText('Main post-merge verification').length
     ).toBeGreaterThan(0);
     expect(
-      screen.getAllByText('Trigger.dev deploy check mismatch').length
+      screen.getAllByText('Agent PR needs human review').length
     ).toBeGreaterThan(0);
     expect(
       screen.getAllByText('Unsafe dispatch payload rejected').length
@@ -54,15 +54,12 @@ describe('AgentOsRunsPanel', () => {
 
     await userEvent.click(
       within(screen.getByRole('table')).getByTestId(
-        'agent-os-run-agentos-run-blocked-trigger-check'
+        'agent-os-run-agentos-run-blocked-needs-human'
       )
     );
 
     expect(screen.getByTestId('agent-os-artifact-drawer')).toHaveTextContent(
-      'Trigger.dev deploy check mismatch'
-    );
-    expect(screen.getByTestId('agent-os-artifact-drawer')).toHaveTextContent(
-      'Trigger.dev deploy integration expects trigger.config.ts'
+      'Agent PR needs human review'
     );
   });
 

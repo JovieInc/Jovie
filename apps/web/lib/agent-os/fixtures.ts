@@ -258,32 +258,28 @@ const AGENT_OS_ADMIN_FIXTURE_SEEDS: readonly FixtureSeed[] = [
     updatedAt: '2026-05-08T22:20:00.000Z',
   },
   {
-    id: 'agentos-run-blocked-trigger-check',
+    id: 'agentos-run-blocked-needs-human',
     source: 'github',
-    sourceRunId: '75105012992',
+    sourceRunId: '75105012999',
     kind: 'deploy_readiness',
     status: 'blocked',
-    title: 'Trigger.dev deploy check mismatch',
+    title: 'Agent PR needs human review',
     summary:
-      'External Trigger.dev production deployment integration is active while AgentOS is intentionally WDK-first.',
+      'An agent-authored PR has the needs-human label set, blocking automatic merge progression until an operator clears it.',
     allowedActions: ['read', 'summarize', 'draft'],
     forbiddenActions: ['deploy', 'merge', 'mutate_production_data'],
     humanApprovalReason:
-      'Infra owner must disable or reconfigure the Trigger.dev project.',
+      'Operator must review and remove the needs-human label to resume.',
     linearIssue: {
       id: 'JOV-1994',
-      slug: 'agentos-disable-stale-triggerdev-production-deploy-check-while-wdk-is',
+      slug: 'agentos-enforce-gstack-gates-before-non-dry-run-agents',
     },
     verificationGates: [
-      gate(
-        'github.ci',
-        'blocked',
-        'External Trigger.dev check reports missing trigger.config.ts.'
-      ),
+      gate('github.ci', 'blocked', 'needs-human label is blocking auto-merge.'),
     ],
     costNotes: 'Infra status only.',
     blockedReason:
-      'Trigger.dev deploy integration expects trigger.config.ts before the fallback runtime PR exists.',
+      'PR cannot progress past review until a human removes the blocking label.',
     updatedAt: '2026-05-08T22:40:00.000Z',
   },
   {
