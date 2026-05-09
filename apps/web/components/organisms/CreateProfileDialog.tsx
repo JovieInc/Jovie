@@ -1,16 +1,19 @@
 'use client';
 
 import {
+  Button,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  Input,
+  Label,
 } from '@jovie/ui';
 import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState, useTransition } from 'react';
+import { type FormEvent, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { createAdditionalProfile } from '@/app/app/(shell)/dashboard/actions/switch-profile';
 
@@ -36,7 +39,7 @@ export function CreateProfileDialog({
     setError(null);
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
 
@@ -70,7 +73,7 @@ export function CreateProfileDialog({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className='sm:max-w-[400px]'>
         <DialogHeader>
-          <DialogTitle>Add artist profile</DialogTitle>
+          <DialogTitle>Add Artist Profile</DialogTitle>
           <DialogDescription>
             Create a new artist profile you can switch between from the sidebar.
           </DialogDescription>
@@ -78,13 +81,8 @@ export function CreateProfileDialog({
 
         <form onSubmit={handleSubmit} className='space-y-4'>
           <div className='space-y-2'>
-            <label
-              htmlFor='create-profile-display-name'
-              className='text-sm font-medium'
-            >
-              Display name
-            </label>
-            <input
+            <Label htmlFor='create-profile-display-name'>Display Name</Label>
+            <Input
               id='create-profile-display-name'
               type='text'
               value={displayName}
@@ -93,20 +91,14 @@ export function CreateProfileDialog({
                 setError(null);
               }}
               placeholder='Artist name'
-              className='flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
               autoFocus
               disabled={isPending}
             />
           </div>
 
           <div className='space-y-2'>
-            <label
-              htmlFor='create-profile-username'
-              className='text-sm font-medium'
-            >
-              Username
-            </label>
-            <input
+            <Label htmlFor='create-profile-username'>Username</Label>
+            <Input
               id='create-profile-username'
               type='text'
               value={username}
@@ -117,7 +109,6 @@ export function CreateProfileDialog({
                 setError(null);
               }}
               placeholder='username'
-              className='flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
               disabled={isPending}
             />
           </div>
@@ -129,22 +120,21 @@ export function CreateProfileDialog({
           )}
 
           <DialogFooter>
-            <button
+            <Button
               type='button'
               onClick={handleClose}
-              className='inline-flex h-9 items-center justify-center rounded-md border border-input bg-transparent px-4 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
+              variant='secondary'
               disabled={isPending}
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type='submit'
-              className='inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50'
               disabled={isPending || !displayName.trim() || !username.trim()}
             >
               {isPending && <Loader2 className='size-3.5 animate-spin' />}
-              Create profile
-            </button>
+              Create Profile
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

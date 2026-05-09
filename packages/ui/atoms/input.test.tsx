@@ -57,6 +57,17 @@ describe('Input', () => {
       );
     });
 
+    it('applies Jovie focus token classes', () => {
+      render(<Input data-testid='input' />);
+      const input = screen.getByTestId('input');
+      expect(input.className).toContain(
+        'focus-visible:border-(--linear-border-focus)'
+      );
+      expect(input.className).toContain(
+        'focus-visible:ring-(--linear-border-focus)'
+      );
+    });
+
     it('applies error variant classes', () => {
       render(<Input variant='error' data-testid='input' />);
       const input = screen.getByTestId('input');

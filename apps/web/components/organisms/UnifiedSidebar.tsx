@@ -467,6 +467,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
       )}
     >
       <SidebarHeader
+        data-electron-drag-region='true'
         className={cn(
           'relative justify-center gap-0 px-2.5',
           'h-(--linear-app-header-height-compact) py-0.5'

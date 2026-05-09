@@ -17,7 +17,7 @@ import { CloseButtonIcon } from './close-button';
 const dialogCloseButtonClassName =
   'absolute right-3 top-3 rounded-(--linear-app-radius-item) p-1 text-(--linear-text-tertiary) opacity-70 transition-colors duration-normal ease-interactive ' +
   'hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) hover:opacity-100 ' +
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 ' +
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) ' +
   'disabled:pointer-events-none';
 
 const Dialog = DialogPrimitive.Root;

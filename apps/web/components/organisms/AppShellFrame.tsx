@@ -47,9 +47,10 @@ export const AppShellFrame = memo(function AppShellFrame({
 
   return (
     <div
+      data-app-shell-frame='true'
       data-shell-design={variant}
       className={cn(
-        'flex h-full w-full overflow-hidden',
+        'relative flex h-full w-full overflow-hidden',
         isShellChatV1 ? 'bg-(--linear-bg-page)' : 'bg-base',
         /* PWA safe area: pad top for notch/Dynamic Island in standalone mode (mobile only) */
         'max-lg:pt-[env(safe-area-inset-top)]',
@@ -58,6 +59,11 @@ export const AppShellFrame = memo(function AppShellFrame({
         containerClassName
       )}
     >
+      <div
+        aria-hidden='true'
+        data-electron-titlebar='true'
+        data-electron-drag-region='true'
+      />
       {sidebar}
 
       <main

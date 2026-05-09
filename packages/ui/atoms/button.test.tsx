@@ -22,6 +22,24 @@ describe('Button', () => {
     expect(btn.className).toContain('h-7');
   });
 
+  it('uses the Jovie focus token', () => {
+    render(<Button>Press</Button>);
+    const btn = screen.getByRole('button');
+    expect(btn.className).toContain(
+      'focus-visible:ring-(--linear-border-focus)'
+    );
+    expect(btn.className).toContain(
+      'focus-visible:ring-offset-(--linear-bg-page)'
+    );
+  });
+
+  it('uses raised control styling for secondary buttons', () => {
+    render(<Button variant='secondary'>Press</Button>);
+    const btn = screen.getByRole('button');
+    expect(btn.className).toContain('shadow-[');
+    expect(btn.className).toContain('hover:border-(--linear-border-default)');
+  });
+
   it('forwards refs', () => {
     const ref = React.createRef<HTMLButtonElement>();
     render(<Button ref={ref}>Hi</Button>);
