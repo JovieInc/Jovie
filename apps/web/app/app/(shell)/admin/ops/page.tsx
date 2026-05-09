@@ -57,14 +57,6 @@ async function getInitialShippingData(): Promise<{
     const response = await fetch(
       `${base}/api/admin/hud/shipping-velocity?range=7d`,
       {
-        headers: {
-          // Internal server-to-server call — pass a sentinel to indicate
-          // this is an SSR prefetch so the route doesn't reject for missing
-          // auth cookies. The admin layout already enforced auth.
-          // We use a lightweight approach: simply forward cookies from a
-          // different path is not possible in RSC without next/headers.
-          // Accept fallback: the component will client-fetch if this returns null.
-        },
         signal: AbortSignal.timeout(5000),
         cache: 'no-store',
       }

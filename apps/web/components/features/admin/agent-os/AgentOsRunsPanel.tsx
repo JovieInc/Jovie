@@ -81,6 +81,11 @@ function countPassedRequiredGates(artifact: AgentRunArtifact): string {
   return `${passed}/${requiredTotal}`;
 }
 
+function formatGateProgressLabel(artifact: AgentRunArtifact): string {
+  const progress = countPassedRequiredGates(artifact);
+  return progress.includes('gate') ? progress : `Gates ${progress}`;
+}
+
 function formatUpdatedAt(value: string): string {
   return new Intl.DateTimeFormat('en-US', {
     month: 'short',
@@ -226,7 +231,7 @@ function AgentOsBoardCard({
           {artifact.source}
         </p>
         <p className='truncate tabular-nums'>
-          Gates {countPassedRequiredGates(artifact)}
+          {formatGateProgressLabel(artifact)}
         </p>
       </div>
     </div>
