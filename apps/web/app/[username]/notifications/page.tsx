@@ -11,13 +11,36 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { username } = await params;
+  const result = await getProfileAndLinks(username);
+
+  // Resolve the display name so the metadata reflects the artist name, not
+  // just the raw URL segment. Falls back to the username if not found.
+  const artistName =
+    result.profile?.display_name ?? result.profile?.username ?? username;
+
+  const canonicalUsername =
+    result.profile?.username_normalized ?? username.toLowerCase();
 
   return {
-    title: `Get notifications from ${username}`,
-    description: `Manage alerts for ${username}'s music, shows, and merch updates.`,
+    title: `Get notifications from ${artistName}`,
+    description: `Manage alerts for ${artistName}'s music, shows, and merch updates.`,
+    metadataBase: new URL(BASE_URL),
     alternates: {
-      canonical: `${BASE_URL}/${username.toLowerCase()}/notifications`,
+      canonical: `${BASE_URL}/${canonicalUsername}/notifications`,
     },
+    openGraph: {
+      type: 'website',
+      title: `Get notifications from ${artistName}`,
+      description: `Manage alerts for ${artistName}'s music, shows, and merch updates.`,
+      url: `${BASE_URL}/${canonicalUsername}/notifications`,
+      siteName: 'Jovie',
+    },
+    twitter: {
+      card: 'summary',
+      title: `Get notifications from ${artistName}`,
+      description: `Manage alerts for ${artistName}'s music, shows, and merch updates.`,
+    },
+    robots: { index: false, follow: false },
   };
 }
 
