@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.220] - 2026-05-08
+
+> [internal] Canonical UX contract for the public artist profile surface: route categories, bottom tab bar, navigation, alert/subscribe, and copy — plus the P0 decision to restore ISR by removing `force-dynamic` and moving the cookie read client-side.
+
+### Added
+
+- [internal] `docs/public-profile-surface-spec.md` — canonical UX contract for `/{username}/*` referenced by JOV-2021 through JOV-2027. Covers route categories (live, demo, preview, admin, legacy), bottom tab bar contract (four fixed primary tabs: Home/Music/Events/Alerts), navigation contract (drawer model, URL handling, tab persistence), alert/subscribe contract (canonical CTA label "Get alerts", component hierarchy), and a 37-entry copy table. Includes the binding P0 ISR/cookies decision: remove `export const dynamic = 'force-dynamic'` from `app/[username]/page.tsx`, move `AUDIENCE_ANON_COOKIE` read to a client component, and switch to `revalidateTag('profile:{username}')` for cache invalidation.
+
 ## [26.4.219] - 2026-05-09
 
 > [internal] Public profile surface audit: route matrix, component duplication map, legacy cleanup list, and risk register for the /{username} surface — feeds JOV-2021 through JOV-2029 hardening backlog.
