@@ -76,27 +76,23 @@ export function buildProfileDescription(
 ): string {
   const cleanBio = sanitizeMetadataText(bio);
   const cleanLocation = sanitizeMetadataText(location);
+  // Sanitize and filter genres once so empty strings (e.g. "<script>" → "") are
+  // excluded from the final composition rather than producing awkward fragments.
+  const cleanGenres =
+    genres?.map(g => sanitizeMetadataText(g)).filter(Boolean) ?? [];
 
   if (cleanBio) {
     const snippet = truncateMetadataText(cleanBio, 155);
     const genreSuffix =
-      genres && genres.length > 0
-        ? `. ${genres
-            .slice(0, 3)
-            .map(g => sanitizeMetadataText(g))
-            .join(', ')} artist`
+      cleanGenres.length > 0
+        ? `. ${cleanGenres.slice(0, 3).join(', ')} artist`
         : '';
     return `${snippet}${genreSuffix}. Stream on Spotify, Apple Music & more on ${APP_NAME}.`;
   }
 
   const locationPrefix = cleanLocation ? `${cleanLocation}-based ` : '';
   const genreText =
-    genres && genres.length > 0
-      ? `${genres
-          .slice(0, 3)
-          .map(g => sanitizeMetadataText(g))
-          .join(', ')} `
-      : '';
+    cleanGenres.length > 0 ? `${cleanGenres.slice(0, 3).join(', ')} ` : '';
   const descriptor = `${locationPrefix}${genreText}`.trim();
   return descriptor
     ? `${descriptor} artist. Stream ${artistName}'s music on Spotify, Apple Music & more on ${APP_NAME}.`
@@ -156,8 +152,11 @@ export function buildPublicProfileMetadata(
 ): Metadata {
   const { profile, genres } = input;
 
+  // Sanitize display_name and username independently so the fallback chain
+  // never reintroduces unsanitized artist-provided text into metadata fields.
   const artistName =
-    sanitizeMetadataText(profile.display_name || profile.username) ||
+    sanitizeMetadataText(profile.display_name) ||
+    sanitizeMetadataText(profile.username) ||
     profile.username;
 
   const canonicalUrl = buildProfileCanonicalUrl(profile);
@@ -221,7 +220,10 @@ export function buildPublicProfileMetadata(
     },
     other: {
       ...(profile.is_verified && { 'profile:verified': 'true' }),
-      ...(profile.location && {
+      // Use the sanitized value for both the truthy check and the emitted value
+      // so an HTML-only location string (e.g. "<b></b>") doesn't produce a
+      // blank geo.placename entry.
+      ...(sanitizeMetadataText(profile.location) && {
         'geo.placename': sanitizeMetadataText(profile.location),
       }),
     },

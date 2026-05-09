@@ -190,6 +190,19 @@ describe('buildProfileDescription', () => {
     const desc = buildProfileDescription('Artist', '', null, null);
     expect(desc).toContain("Stream Artist's music");
   });
+
+  it('filters out empty-after-sanitize genre strings', () => {
+    // Genre strings that reduce to empty after sanitization must not produce
+    // awkward fragments like ". ,  artist" in the description.
+    const desc = buildProfileDescription('Artist', 'Bio text.', null, [
+      '<script>evil</script>',
+      'Pop',
+    ]);
+    expect(desc).toContain('Pop');
+    expect(desc).not.toContain('<script>');
+    // The evil genre sanitizes to '' and must be excluded from the suffix
+    expect(desc).not.toMatch(/\.\s+,/);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -233,6 +246,22 @@ describe('buildPublicProfileMetadata', () => {
     });
     expect(String(meta.title)).not.toContain('<script>');
     expect(String(meta.title)).toContain('Artist');
+  });
+
+  it('sanitizes username fallback independently when display_name is null', () => {
+    // username is also artist-provided; it must be sanitized when used as the
+    // fallback title, not passed through raw.
+    const meta = buildPublicProfileMetadata({
+      profile: {
+        ...minimalProfile,
+        username: '<b>myartist</b>',
+        username_normalized: 'myartist',
+        display_name: null,
+      },
+      genres: null,
+    });
+    expect(String(meta.title)).not.toContain('<b>');
+    expect(String(meta.title)).toContain('myartist');
   });
 
   it('sets alternates.canonical to the normalized profile URL', () => {
