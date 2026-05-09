@@ -1760,6 +1760,10 @@ function ShellV1ExperimentContent() {
   const [selectedReleaseId, setSelectedReleaseId] = useState<string | null>(
     initialReleaseId
   );
+  useEffect(() => {
+    setView(initialView);
+    setSelectedReleaseId(initialReleaseId);
+  }, [initialView, initialReleaseId]);
   // Mock playback position in seconds for the currently playing track.
   // Click a row's waveform → updates this → bottom bar's scrub reflects it.
   const [currentTimeSec, setCurrentTimeSec] = useState(78);
@@ -2124,6 +2128,7 @@ function ShellV1ExperimentContent() {
   const currentTrack: TrackInfo = playingRelease
     ? trackFromRelease(playingRelease)
     : trackFromRelease(RELEASES[0]);
+  const playingDurationSec = playingRelease?.durationSec ?? TRACK.duration;
 
   // Cinematic cold-start sequence. Three phases, total ~900ms:
   //   bloom  (0..380ms): black canvas + centered Jovie mark scales in
@@ -2171,8 +2176,7 @@ function ShellV1ExperimentContent() {
         transition: `opacity var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing)`,
       };
 
-  const pct =
-    (currentTimeSec / (playingRelease?.durationSec ?? TRACK.duration)) * 100;
+  const pct = (currentTimeSec / playingDurationSec) * 100;
 
   // Spacebar = playback toggle. Sidebar collapse uses [ (Linear-style),
   // bar visibility uses Cmd/Ctrl+\. Hold ⌘J anywhere to dictate to Jovie.
@@ -2810,7 +2814,7 @@ function ShellV1ExperimentContent() {
             onPlay={() => setIsPlaying(p => !p)}
             onCollapse={() => setBarCollapsed(true)}
             currentTime={currentTimeSec}
-            duration={TRACK.duration}
+            duration={playingDurationSec}
             loopMode={loopMode}
             onCycleLoop={() =>
               setLoopMode(m =>
@@ -2854,7 +2858,7 @@ function ShellV1ExperimentContent() {
             isPlaying={isPlaying}
             onPlay={() => setIsPlaying(p => !p)}
             currentTime={currentTimeSec}
-            duration={TRACK.duration}
+            duration={playingDurationSec}
             track={toNowPlayingTrack(currentTrack)}
           />
         </div>
@@ -4144,7 +4148,7 @@ function renderWithEntities(
   const before = text.slice(0, bestStart);
   const match = text.slice(bestStart, bestEnd);
   const after = text.slice(bestEnd);
-  const entity = lookupReleaseEntityByAlbum(bestRelease.album, bestRelease.id);
+  const entity = releaseToEntityPopover(bestRelease);
   return (
     <>
       {before}

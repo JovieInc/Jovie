@@ -150,7 +150,11 @@ export function HomepageWorkspaceSection({
               <motion.li
                 className={`homepage-workspace-callout homepage-workspace-callout--${callout.key}`}
                 key={callout.title}
-                style={shouldReduceMotion ? undefined : calloutMotion[index]}
+                style={
+                  shouldReduceMotion
+                    ? undefined
+                    : (calloutMotion[index] ?? undefined)
+                }
               >
                 <span>{callout.number}</span>
                 <h3>{callout.title}</h3>
