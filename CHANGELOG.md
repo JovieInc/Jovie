@@ -5,6 +5,16 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.224.0] - 2026-05-09
+
+> [internal] ISR-enables the public artist profile page by moving the A/B experiment cookie read to the client — unlocking CDN caching for all `/{username}` routes.
+
+### Changed
+
+- **[internal] Profile page ISR**: removes `dynamic = 'force-dynamic'` from `/{username}/page.tsx`; the `jv_aid` audience cookie is now read client-side after hydration instead of during server rendering, allowing Next.js ISR to cache the page at the CDN edge.
+- **[internal] Alert opt-in variant hydration**: adds `GET /api/audience/alert-variant` — a no-store endpoint that resolves the Statsig `profile_alert_opt_in` variant for a given anonymous stable ID. Called by the new `useAlertOptInVariant` hook after mount.
+- **[internal] Shared hydration hook**: extracts `useAlertOptInVariant` from `ProfileCompactSurface` and `ProfileDesktopSurface` into a shared hook; fixes a cookie parse bug where `.split('=')[1]` would truncate base64-padded values.
+
 ## [26.4.223] - 2026-05-09
 
 > The homepage now leads with a sharper release command center, verified proof, and a product-led workspace story without leaking internal tools into marketing screenshots.
