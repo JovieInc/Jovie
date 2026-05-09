@@ -95,7 +95,7 @@ export async function processJob(
     case 'send_claim_invite':
       return processSendClaimInviteJob(tx, job.payload);
     case 'send_waitlist_email':
-      return processWaitlistEmailJob(tx, job.payload);
+      return processWaitlistEmailJob(tx, job.payload, { jobId: job.id });
     case 'dsp_artist_discovery':
       return processDspArtistDiscoveryJob(tx, job.payload);
     case 'dsp_track_enrichment':

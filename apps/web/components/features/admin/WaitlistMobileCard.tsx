@@ -78,11 +78,8 @@ export const WaitlistMobileCard = React.memo(function WaitlistMobileCard({
 }: WaitlistMobileCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const isApproved =
-    entry.status === 'invited' ||
-    entry.status === 'approved' ||
-    entry.status === 'claimed' ||
-    entry.status === 'signed_up';
+  const isApproved = entry.status === 'invited' || entry.status === 'approved';
+  const isSignedUp = entry.status === 'signed_up' || entry.status === 'claimed';
   const isApproving = approveStatus === 'approving';
   const isDisapproving = approveStatus === 'disapproving';
   const statusVariant = STATUS_VARIANTS[entry.status] ?? 'secondary';
@@ -104,6 +101,7 @@ export const WaitlistMobileCard = React.memo(function WaitlistMobileCard({
   const getApproveButtonLabel = (): string => {
     if (isApproving) return 'Approving…';
     if (isDisapproving) return 'Disapproving…';
+    if (isSignedUp) return 'Signed up';
     if (isApproved) return 'Disapprove';
     return 'Approve';
   };
@@ -156,7 +154,7 @@ export const WaitlistMobileCard = React.memo(function WaitlistMobileCard({
           <Button
             size='sm'
             variant='secondary'
-            disabled={isApproving || isDisapproving}
+            disabled={isSignedUp || isApproving || isDisapproving}
             onClick={onApprove}
             className='flex-1'
           >

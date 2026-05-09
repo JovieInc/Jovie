@@ -232,6 +232,29 @@ describe('Waitlist API', () => {
       expect(data.hasEntry).toBe(false);
     });
 
+    it('does not fall back to an unverified primary email', async () => {
+      mockAuth.mockResolvedValue({ userId: 'user_123' });
+      mockCurrentUser.mockResolvedValue({
+        emailAddresses: [
+          {
+            emailAddress: 'unverified@example.com',
+            verification: { status: 'unverified' },
+          },
+        ],
+        primaryEmailAddress: {
+          emailAddress: 'unverified@example.com',
+        },
+      });
+
+      const { GET } = await routeModulePromise;
+      const response = await GET();
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.hasEntry).toBe(false);
+      expect(mockDbSelect).not.toHaveBeenCalled();
+    });
+
     it('returns waitlist entry status for authenticated user', async () => {
       mockAuth.mockResolvedValue({ userId: 'user_123' });
       mockCurrentUser.mockResolvedValue({
@@ -323,6 +346,41 @@ describe('Waitlist API', () => {
 
       expect(response.status).toBe(400);
       expect(data.success).toBe(false);
+    });
+
+    it('rejects submissions when only the primary email is unverified', async () => {
+      mockAuth.mockResolvedValue({ userId: 'user_123' });
+      mockCurrentUser.mockResolvedValue({
+        emailAddresses: [
+          {
+            emailAddress: 'unverified@example.com',
+            verification: { status: 'unverified' },
+          },
+        ],
+        primaryEmailAddress: {
+          emailAddress: 'unverified@example.com',
+        },
+        fullName: 'Unverified User',
+      });
+      mockDoesTableExist.mockResolvedValue(true);
+
+      const { POST } = await routeModulePromise;
+      const request = new Request('http://localhost/api/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          primaryGoal: 'streams',
+          primarySocialUrl: 'https://instagram.com/unverified',
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(403);
+      expect(data.success).toBe(false);
+      expect(data.code).toBe('email_unverified');
+      expect(mockDbTransaction).not.toHaveBeenCalled();
     });
 
     it.skip('creates waitlist entry successfully', async () => {

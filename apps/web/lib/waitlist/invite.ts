@@ -49,6 +49,7 @@ export function buildWaitlistInviteEmail({
     message: {
       id: dedupKey ?? `waitlist_invite:${email}`,
       dedupKey,
+      idempotencyKey: dedupKey,
       category: 'transactional',
       subject,
       text,
@@ -81,6 +82,7 @@ export function buildWaitlistConfirmationEmail({
     message: {
       id: dedupKey ?? `waitlist_confirmation:${email}`,
       dedupKey,
+      idempotencyKey: dedupKey,
       category: 'transactional',
       subject: `You're on the ${APP_NAME} waitlist`,
       text,
@@ -107,6 +109,7 @@ export function buildWaitlistWelcomeEmail({
     message: {
       id: dedupKey ?? `waitlist_welcome:${email}`,
       dedupKey,
+      idempotencyKey: dedupKey,
       category: 'transactional',
       subject: welcome.subject,
       text: welcome.text,

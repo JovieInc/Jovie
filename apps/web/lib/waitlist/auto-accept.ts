@@ -23,7 +23,7 @@ import {
   approveWaitlistEntryInTx,
   finalizeWaitlistApproval,
 } from '@/lib/waitlist/approval';
-import { enqueueWaitlistEmailJob } from '@/lib/waitlist/email-jobs';
+import { enqueueWaitlistApprovalInviteEmail } from '@/lib/waitlist/email-jobs';
 import {
   getWaitlistSettings,
   tryReserveAutoAcceptSlot,
@@ -171,6 +171,20 @@ export async function runWaitlistAutoAccept(
       const approval = await withSerializableRetry(() =>
         withSystemIngestionSession(
           async tx => {
+            const [lockedCandidate] = await tx
+              .select({
+                id: waitlistEntries.id,
+                status: waitlistEntries.status,
+              })
+              .from(waitlistEntries)
+              .where(eq(waitlistEntries.id, candidate.id))
+              .for('update')
+              .limit(1);
+
+            if (!lockedCandidate || lockedCandidate.status !== 'waitlisted') {
+              return { outcome: 'skipped' as const };
+            }
+
             const reservation = await tryReserveAutoAcceptSlot(tx);
             if (!reservation.shouldAutoAccept) {
               return { outcome: 'capacity_full' as const };
@@ -183,9 +197,8 @@ export async function runWaitlistAutoAccept(
             });
 
             if (result.outcome === 'approved') {
-              await enqueueWaitlistEmailJob(tx, {
-                entryId: result.entryId,
-                type: 'approval_invite',
+              await enqueueWaitlistApprovalInviteEmail(tx, result.entryId, {
+                now,
               });
             }
 

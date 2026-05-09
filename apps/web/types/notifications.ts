@@ -51,6 +51,7 @@ export interface SenderContext {
 export interface NotificationMessage {
   id?: string;
   dedupKey?: string;
+  idempotencyKey?: string;
   category: NotificationCategory;
   subject: string;
   text: string;
@@ -88,6 +89,7 @@ export interface EmailMessage {
   subject: string;
   text: string;
   html?: string;
+  idempotencyKey?: string;
   replyTo?: string;
   headers?: Record<string, string>;
   from?: string;

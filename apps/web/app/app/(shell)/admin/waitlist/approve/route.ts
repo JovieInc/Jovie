@@ -9,7 +9,7 @@ import {
   approveWaitlistEntryInTx,
   finalizeWaitlistApproval,
 } from '@/lib/waitlist/approval';
-import { enqueueWaitlistEmailJob } from '@/lib/waitlist/email-jobs';
+import { enqueueWaitlistApprovalInviteEmail } from '@/lib/waitlist/email-jobs';
 
 export const runtime = 'nodejs';
 
@@ -65,10 +65,7 @@ export async function POST(request: Request) {
           }
         );
         if (approval.outcome === 'approved') {
-          await enqueueWaitlistEmailJob(tx, {
-            entryId: approval.entryId,
-            type: 'approval_invite',
-          });
+          await enqueueWaitlistApprovalInviteEmail(tx, approval.entryId);
         }
         return approval;
       },

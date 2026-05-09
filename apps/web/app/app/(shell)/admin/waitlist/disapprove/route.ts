@@ -71,6 +71,16 @@ export async function POST(request: Request) {
       );
     }
 
+    if (result.outcome === 'terminal') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Cannot disapprove entry with status: ${result.status}`,
+        },
+        { status: 409, headers: NO_STORE_HEADERS }
+      );
+    }
+
     await finalizeWaitlistDisapproval(result);
 
     return NextResponse.json(

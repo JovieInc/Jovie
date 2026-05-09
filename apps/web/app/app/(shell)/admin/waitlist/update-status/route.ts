@@ -8,6 +8,10 @@ import { captureCriticalError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { insertWaitlistAuditLog } from '@/lib/waitlist/audit';
+import {
+  canTransitionWaitlistStatus,
+  type WaitlistStatus,
+} from '@/lib/waitlist/state-machine';
 
 export const runtime = 'nodejs';
 
@@ -20,13 +24,7 @@ const updateStatusSchema = z.object({
     'chat_started',
     'qualified',
     'waitlisted',
-    'invited',
-    'approved',
-    'claimed',
-    'signed_up',
     'rejected',
-    'expired',
-    'blocked',
   ]),
 });
 
@@ -86,20 +84,23 @@ export async function POST(request: Request) {
           return { outcome: 'not_found' as const };
         }
 
+        if (
+          !canTransitionWaitlistStatus(
+            entry.status as WaitlistStatus,
+            parsed.data.status
+          )
+        ) {
+          return {
+            outcome: 'invalid_transition' as const,
+            fromStatus: entry.status,
+            toStatus: parsed.data.status,
+          };
+        }
+
         const statusTimestamps = {
           ...(parsed.data.status === 'qualified' ? { qualifiedAt: now } : {}),
           ...(parsed.data.status === 'waitlisted' ? { waitlistedAt: now } : {}),
-          ...(parsed.data.status === 'approved' ? { approvedAt: now } : {}),
-          ...(parsed.data.status === 'invited'
-            ? { approvedAt: now, invitedAt: now }
-            : {}),
-          ...(parsed.data.status === 'signed_up' ||
-          parsed.data.status === 'claimed'
-            ? { signedUpAt: now }
-            : {}),
           ...(parsed.data.status === 'rejected' ? { rejectedAt: now } : {}),
-          ...(parsed.data.status === 'expired' ? { expiredAt: now } : {}),
-          ...(parsed.data.status === 'blocked' ? { blockedAt: now } : {}),
         };
 
         // Update waitlist entry status
@@ -135,6 +136,16 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { success: false, error: 'Waitlist entry not found' },
         { status: 404, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    if (result.outcome === 'invalid_transition') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Invalid waitlist transition: ${result.fromStatus} -> ${result.toStatus}`,
+        },
+        { status: 409, headers: NO_STORE_HEADERS }
       );
     }
 

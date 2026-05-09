@@ -177,10 +177,9 @@ export function useWaitlistColumns({
         header: 'Actions',
         cell: entry => {
           const isApproved =
-            entry.status === 'invited' ||
-            entry.status === 'approved' ||
-            entry.status === 'claimed' ||
-            entry.status === 'signed_up';
+            entry.status === 'invited' || entry.status === 'approved';
+          const isSignedUp =
+            entry.status === 'signed_up' || entry.status === 'claimed';
           const approveStatus = approveStatuses[entry.id] ?? 'idle';
           const isApproving = approveStatus === 'approving';
           const isDisapproving = approveStatus === 'disapproving';
@@ -190,7 +189,7 @@ export function useWaitlistColumns({
               <Button
                 size='sm'
                 variant='secondary'
-                disabled={isApproving || isDisapproving}
+                disabled={isSignedUp || isApproving || isDisapproving}
                 onClick={() => {
                   onApprove(entry);
                 }}
@@ -198,6 +197,7 @@ export function useWaitlistColumns({
                 {(() => {
                   if (isApproving) return 'Approving…';
                   if (isDisapproving) return 'Disapproving…';
+                  if (isSignedUp) return 'Signed up';
                   if (isApproved) return 'Disapprove';
                   return 'Approve';
                 })()}

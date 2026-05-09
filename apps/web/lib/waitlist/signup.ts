@@ -6,6 +6,7 @@ import { users } from '@/lib/db/schema/auth';
 import { waitlistEntries } from '@/lib/db/schema/waitlist';
 import { insertWaitlistAuditLog } from '@/lib/waitlist/audit';
 import { enqueueSignedUpWelcomeEmail } from '@/lib/waitlist/email-jobs';
+import { isWaitlistSignupEligibleStatus } from '@/lib/waitlist/state-machine';
 import { isStatusUpgrade } from '@/lib/waitlist/status-precedence';
 
 export async function markWaitlistSignedUpInTx(
@@ -27,15 +28,6 @@ export async function markWaitlistSignedUpInTx(
 
   if (!user) return { entryId: null };
 
-  const nextUserStatus = isStatusUpgrade(user.userStatus, 'active')
-    ? 'active'
-    : user.userStatus;
-
-  await tx
-    .update(users)
-    .set({ userStatus: nextUserStatus, updatedAt: now })
-    .where(eq(users.id, user.id));
-
   const [entry] = await tx
     .select({
       id: waitlistEntries.id,
@@ -50,7 +42,39 @@ export async function markWaitlistSignedUpInTx(
     .for('update')
     .limit(1);
 
-  if (!entry) return { entryId: null };
+  if (!entry) {
+    if (
+      user.waitlistEntryId ||
+      user.userStatus === 'waitlist_pending' ||
+      user.userStatus === 'waitlist_approved'
+    ) {
+      throw new Error(
+        'Approved waitlist access is required to complete signup'
+      );
+    }
+
+    const nextUserStatus = isStatusUpgrade(user.userStatus, 'active')
+      ? 'active'
+      : user.userStatus;
+    await tx
+      .update(users)
+      .set({ userStatus: nextUserStatus, updatedAt: now })
+      .where(eq(users.id, user.id));
+    return { entryId: null };
+  }
+
+  if (!isWaitlistSignupEligibleStatus(entry.status)) {
+    throw new Error('Approved waitlist access is required to complete signup');
+  }
+
+  const nextUserStatus = isStatusUpgrade(user.userStatus, 'active')
+    ? 'active'
+    : user.userStatus;
+
+  await tx
+    .update(users)
+    .set({ userStatus: nextUserStatus, updatedAt: now })
+    .where(eq(users.id, user.id));
 
   if (entry.status !== 'signed_up') {
     await tx

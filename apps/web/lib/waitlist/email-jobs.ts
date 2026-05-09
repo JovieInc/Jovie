@@ -8,6 +8,7 @@ import { ingestionJobs } from '@/lib/db/schema/ingestion';
 import { waitlistEntries } from '@/lib/db/schema/waitlist';
 import { sendNotification } from '@/lib/notifications/service';
 import { logger } from '@/lib/utils/logger';
+import { decryptPII, encryptPII } from '@/lib/utils/pii-encryption';
 import {
   buildWaitlistConfirmationEmail,
   buildWaitlistInviteEmail,
@@ -18,7 +19,11 @@ import {
   shouldSendWaitlistConfirmationForStatus,
   shouldSendWaitlistWelcomeForStatus,
 } from '@/lib/waitlist/state-machine';
-import { generateWaitlistInviteTokenPair } from '@/lib/waitlist/tokens';
+import {
+  generateWaitlistInviteTokenPair,
+  hashWaitlistInviteToken,
+  type WaitlistInviteTokenPair,
+} from '@/lib/waitlist/tokens';
 import type { NotificationChannelResult } from '@/types/notifications';
 
 export const waitlistEmailTypeSchema = z.enum([
@@ -31,12 +36,29 @@ export const waitlistEmailJobPayloadSchema = z.object({
   entryId: z.string().uuid(),
   type: waitlistEmailTypeSchema,
   force: z.boolean().optional().default(false),
+  encryptedInviteToken: z.string().min(32).optional(),
 });
 
 export type WaitlistEmailType = z.infer<typeof waitlistEmailTypeSchema>;
 export type WaitlistEmailJobPayload = z.input<
   typeof waitlistEmailJobPayloadSchema
 >;
+
+function encryptInviteTokenForJob(token: string): string {
+  const encryptedToken = encryptPII(token);
+  if (!encryptedToken) {
+    throw new Error('Failed to encrypt waitlist invite token');
+  }
+  return encryptedToken;
+}
+
+function decryptInviteTokenForJob(encryptedToken: string): string {
+  const token = decryptPII(encryptedToken);
+  if (!token) {
+    throw new Error('Failed to decrypt waitlist invite token');
+  }
+  return token;
+}
 
 export async function enqueueWaitlistEmailJob(
   tx: DbOrTransaction,
@@ -76,6 +98,83 @@ export async function enqueueWaitlistEmailJob(
 
   if (job) return job.id;
   return dedupKey;
+}
+
+async function issueWaitlistInviteToken(
+  tx: DbOrTransaction,
+  entryId: string,
+  options: { force?: boolean; now?: Date } = {}
+): Promise<WaitlistInviteTokenPair | null> {
+  const now = options.now ?? new Date();
+  const [entry] = await tx
+    .select({
+      id: waitlistEntries.id,
+      status: waitlistEntries.status,
+      inviteTokenHash: waitlistEntries.inviteTokenHash,
+      inviteTokenExpiresAt: waitlistEntries.inviteTokenExpiresAt,
+    })
+    .from(waitlistEntries)
+    .where(eq(waitlistEntries.id, entryId))
+    .for('update')
+    .limit(1);
+
+  if (!entry || !isWaitlistInviteRedeemableStatus(entry.status)) {
+    return null;
+  }
+
+  if (
+    entry.inviteTokenHash &&
+    entry.inviteTokenExpiresAt &&
+    entry.inviteTokenExpiresAt.getTime() > now.getTime() &&
+    !options.force
+  ) {
+    return null;
+  }
+
+  const tokenPair = generateWaitlistInviteTokenPair(now);
+  await tx
+    .update(waitlistEntries)
+    .set({
+      inviteTokenHash: tokenPair.tokenHash,
+      inviteTokenExpiresAt: tokenPair.expiresAt,
+      inviteTokenRedeemedAt: null,
+      updatedAt: now,
+    })
+    .where(eq(waitlistEntries.id, entry.id));
+
+  return tokenPair;
+}
+
+export async function enqueueWaitlistApprovalInviteEmail(
+  tx: DbOrTransaction,
+  entryId: string,
+  options: {
+    force?: boolean;
+    runAt?: Date;
+    priority?: number;
+    maxAttempts?: number;
+    dedupScope?: string;
+    now?: Date;
+  } = {}
+): Promise<string | null> {
+  const tokenPair = await issueWaitlistInviteToken(tx, entryId, options);
+  if (!tokenPair) return null;
+
+  return enqueueWaitlistEmailJob(
+    tx,
+    {
+      entryId,
+      type: 'approval_invite',
+      force: options.force,
+      encryptedInviteToken: encryptInviteTokenForJob(tokenPair.token),
+    },
+    {
+      runAt: options.runAt,
+      priority: options.priority,
+      maxAttempts: options.maxAttempts,
+      dedupScope: options.dedupScope ?? `token:${tokenPair.tokenHash}`,
+    }
+  );
 }
 
 function getEmailResult(
@@ -141,6 +240,32 @@ async function markEntryEmailResult(params: {
   }
 }
 
+async function scrubInviteTokenFromJobPayload(params: {
+  tx: DbOrTransaction;
+  jobId: string | undefined;
+  payload: z.infer<typeof waitlistEmailJobPayloadSchema>;
+}) {
+  if (
+    !params.jobId ||
+    params.payload.type !== 'approval_invite' ||
+    !params.payload.encryptedInviteToken
+  ) {
+    return;
+  }
+
+  await params.tx
+    .update(ingestionJobs)
+    .set({
+      payload: {
+        entryId: params.payload.entryId,
+        type: params.payload.type,
+        force: params.payload.force,
+      },
+      updatedAt: new Date(),
+    })
+    .where(eq(ingestionJobs.id, params.jobId));
+}
+
 export interface WaitlistEmailJobResult {
   entryId: string;
   type: WaitlistEmailType;
@@ -150,7 +275,8 @@ export interface WaitlistEmailJobResult {
 
 export async function processWaitlistEmailJob(
   tx: DbOrTransaction,
-  rawPayload: unknown
+  rawPayload: unknown,
+  options: { jobId?: string } = {}
 ): Promise<WaitlistEmailJobResult> {
   const payload = waitlistEmailJobPayloadSchema.parse(rawPayload);
   const now = new Date();
@@ -163,6 +289,8 @@ export async function processWaitlistEmailJob(
       status: waitlistEntries.status,
       waitlistEmailSentAt: waitlistEntries.waitlistEmailSentAt,
       inviteEmailSentAt: waitlistEntries.inviteEmailSentAt,
+      inviteTokenHash: waitlistEntries.inviteTokenHash,
+      inviteTokenExpiresAt: waitlistEntries.inviteTokenExpiresAt,
     })
     .from(waitlistEntries)
     .where(eq(waitlistEntries.id, payload.entryId))
@@ -239,17 +367,81 @@ export async function processWaitlistEmailJob(
 
   let rawToken: string | null = null;
   if (payload.type === 'approval_invite') {
-    const tokenPair = generateWaitlistInviteTokenPair(now);
-    rawToken = tokenPair.token;
-    await tx
-      .update(waitlistEntries)
-      .set({
-        inviteTokenHash: tokenPair.tokenHash,
-        inviteTokenExpiresAt: tokenPair.expiresAt,
-        inviteTokenRedeemedAt: null,
-        updatedAt: now,
-      })
-      .where(eq(waitlistEntries.id, entry.id));
+    if (payload.encryptedInviteToken) {
+      rawToken = decryptInviteTokenForJob(payload.encryptedInviteToken);
+      const payloadTokenHash = hashWaitlistInviteToken(rawToken);
+      if (entry.inviteTokenHash && entry.inviteTokenHash !== payloadTokenHash) {
+        const detail = 'Stale approval invite job skipped';
+        await markEntryEmailResult({
+          tx,
+          entryId: entry.id,
+          type: payload.type,
+          result: { channel: 'email', status: 'skipped', detail },
+        });
+        return {
+          entryId: entry.id,
+          type: payload.type,
+          status: 'skipped',
+          detail,
+        };
+      }
+
+      if (
+        entry.inviteTokenExpiresAt &&
+        entry.inviteTokenExpiresAt.getTime() <= now.getTime()
+      ) {
+        const detail = 'Queued approval invite token expired; resend invite';
+        await markEntryEmailResult({
+          tx,
+          entryId: entry.id,
+          type: payload.type,
+          result: { channel: 'email', status: 'error', error: detail },
+        });
+        throw new Error(detail);
+      }
+
+      if (!entry.inviteTokenHash || !entry.inviteTokenExpiresAt) {
+        const tokenPair = generateWaitlistInviteTokenPair(now);
+        await tx
+          .update(waitlistEntries)
+          .set({
+            inviteTokenHash: payloadTokenHash,
+            inviteTokenExpiresAt: tokenPair.expiresAt,
+            inviteTokenRedeemedAt: null,
+            updatedAt: now,
+          })
+          .where(eq(waitlistEntries.id, entry.id));
+      }
+    } else {
+      if (
+        entry.inviteTokenHash &&
+        entry.inviteTokenExpiresAt &&
+        entry.inviteTokenExpiresAt.getTime() > now.getTime() &&
+        !payload.force
+      ) {
+        const detail =
+          'Approval invite token already issued; use resend invite to rotate it';
+        await markEntryEmailResult({
+          tx,
+          entryId: entry.id,
+          type: payload.type,
+          result: { channel: 'email', status: 'error', error: detail },
+        });
+        throw new Error(detail);
+      }
+
+      const tokenPair = generateWaitlistInviteTokenPair(now);
+      rawToken = tokenPair.token;
+      await tx
+        .update(waitlistEntries)
+        .set({
+          inviteTokenHash: tokenPair.tokenHash,
+          inviteTokenExpiresAt: tokenPair.expiresAt,
+          inviteTokenRedeemedAt: null,
+          updatedAt: now,
+        })
+        .where(eq(waitlistEntries.id, entry.id));
+    }
   }
 
   if (payload.type === 'waitlist_confirmation') {
@@ -348,6 +540,10 @@ export async function processWaitlistEmailJob(
           dedupKey: `waitlist_invite:${entry.id}`,
         });
 
+  if (payload.type === 'approval_invite' && rawToken) {
+    email.message.idempotencyKey = `waitlist_invite:${entry.id}:${hashWaitlistInviteToken(rawToken)}`;
+  }
+
   const dispatch = await sendNotification(email.message, email.target);
   const emailResult = getEmailResult(dispatch.results);
   await markEntryEmailResult({
@@ -367,6 +563,12 @@ export async function processWaitlistEmailJob(
     });
     throw new Error(error);
   }
+
+  await scrubInviteTokenFromJobPayload({
+    tx,
+    jobId: options.jobId,
+    payload,
+  });
 
   return {
     entryId: entry.id,

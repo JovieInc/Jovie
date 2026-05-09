@@ -46,7 +46,7 @@ export class ResendEmailProvider implements EmailProvider {
 
     try {
       const resend = getClient();
-      const response = await resend.emails.send({
+      const request = {
         from: message.from ?? formatSystemSender(),
         to: [message.to],
         subject: message.subject,
@@ -59,7 +59,12 @@ export class ResendEmailProvider implements EmailProvider {
           content: attachment.content,
           contentType: attachment.contentType,
         })),
-      });
+      };
+      const response = message.idempotencyKey
+        ? await resend.emails.send(request, {
+            idempotencyKey: message.idempotencyKey,
+          })
+        : await resend.emails.send(request);
 
       if (response.error) {
         throw new Error(response.error.message);

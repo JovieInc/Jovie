@@ -77,25 +77,24 @@ export function createStatusActionMenuItems(
   ) => Promise<void>,
   resendInvite?: (entry: Pick<WaitlistEntryRow, 'id'>) => Promise<void>
 ): ContextMenuItemType[] {
-  const isApproved =
-    entry.status === 'invited' ||
-    entry.status === 'approved' ||
-    entry.status === 'claimed' ||
-    entry.status === 'signed_up';
+  const isApproved = entry.status === 'invited' || entry.status === 'approved';
+  const isSignedUp = entry.status === 'signed_up' || entry.status === 'claimed';
   const canResendInvite =
     entry.status === 'invited' || entry.status === 'approved';
 
-  const items: ContextMenuItemType[] = [
-    {
-      id: 'approve',
-      label: isApproved ? 'Disapprove' : 'Approve',
-      icon: <ClipboardList className='h-3.5 w-3.5' />,
-      onClick: () => {
-        void approveEntry({ id: entry.id, status: entry.status });
-      },
-      disabled: false,
-    },
-  ];
+  const items: ContextMenuItemType[] = isSignedUp
+    ? []
+    : [
+        {
+          id: 'approve',
+          label: isApproved ? 'Disapprove' : 'Approve',
+          icon: <ClipboardList className='h-3.5 w-3.5' />,
+          onClick: () => {
+            void approveEntry({ id: entry.id, status: entry.status });
+          },
+          disabled: false,
+        },
+      ];
 
   if (canResendInvite && resendInvite) {
     items.push({

@@ -17,10 +17,7 @@ interface UseApproveEntryProps {
 }
 
 const isApprovedStatus = (status: WaitlistEntryRow['status']) =>
-  status === 'invited' ||
-  status === 'approved' ||
-  status === 'claimed' ||
-  status === 'signed_up';
+  status === 'invited' || status === 'approved';
 
 export function useApproveEntry({ onRowUpdate }: UseApproveEntryProps) {
   const [approveStatuses, setApproveStatuses] = useState<

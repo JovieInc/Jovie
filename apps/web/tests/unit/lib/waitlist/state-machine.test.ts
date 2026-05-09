@@ -4,6 +4,7 @@ import {
   isWaitlistApprovedStatus,
   isWaitlistInviteRedeemableStatus,
   isWaitlistPendingStatus,
+  isWaitlistSignupEligibleStatus,
   shouldSendWaitlistConfirmationForStatus,
   shouldSendWaitlistWelcomeForStatus,
 } from '@/lib/waitlist/state-machine';
@@ -36,6 +37,11 @@ describe('waitlist state machine', () => {
     expect(isWaitlistInviteRedeemableStatus('rejected')).toBe(false);
     expect(isWaitlistInviteRedeemableStatus('blocked')).toBe(false);
     expect(isWaitlistInviteRedeemableStatus('expired')).toBe(false);
+
+    expect(isWaitlistSignupEligibleStatus('approved')).toBe(true);
+    expect(isWaitlistSignupEligibleStatus('invited')).toBe(true);
+    expect(isWaitlistSignupEligibleStatus('waitlisted')).toBe(false);
+    expect(isWaitlistSignupEligibleStatus('rejected')).toBe(false);
 
     expect(shouldSendWaitlistConfirmationForStatus('waitlisted')).toBe(true);
     expect(shouldSendWaitlistConfirmationForStatus('approved')).toBe(false);

@@ -26,6 +26,7 @@ export type WaitlistApprovalResult =
 export type WaitlistDisapprovalResult =
   | { outcome: 'not_found' }
   | { outcome: 'already_new' }
+  | { outcome: 'terminal'; status: string }
   | { outcome: 'disapproved'; clerkId: string | null };
 
 export async function approveWaitlistEntryInTx(
@@ -194,6 +195,9 @@ export async function disapproveWaitlistEntryInTx(
     .limit(1);
 
   if (!entry) return { outcome: 'not_found' };
+  if (entry.status === 'signed_up' || entry.status === 'claimed') {
+    return { outcome: 'terminal', status: entry.status };
+  }
   if (entry.status === 'new' || entry.status === 'waitlisted') {
     return { outcome: 'already_new' };
   }
@@ -229,6 +233,13 @@ export async function disapproveWaitlistEntryInTx(
       status: 'waitlisted',
       statusReason: 'approval_removed',
       waitlistedAt: now,
+      inviteTokenHash: null,
+      inviteTokenExpiresAt: null,
+      inviteTokenRedeemedAt: null,
+      inviteEmailStatus: null,
+      inviteEmailProviderMessageId: null,
+      inviteEmailLastError: null,
+      inviteEmailSentAt: null,
       updatedAt: now,
     })
     .where(eq(waitlistEntries.id, entry.id));

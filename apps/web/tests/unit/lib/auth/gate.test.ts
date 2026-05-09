@@ -138,7 +138,12 @@ describe('gate.ts', () => {
     it('returns BANNED for soft-deleted users', async () => {
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
       mockCachedCurrentUser.mockResolvedValue({
-        emailAddresses: [{ emailAddress: 'test@example.com' }],
+        emailAddresses: [
+          {
+            emailAddress: 'test@example.com',
+            verification: { status: 'verified' },
+          },
+        ],
       });
 
       // Mock JOIN query returning user with deletedAt set (no profile)
@@ -165,7 +170,12 @@ describe('gate.ts', () => {
     it('returns BANNED for banned status', async () => {
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
       mockCachedCurrentUser.mockResolvedValue({
-        emailAddresses: [{ emailAddress: 'test@example.com' }],
+        emailAddresses: [
+          {
+            emailAddress: 'test@example.com',
+            verification: { status: 'verified' },
+          },
+        ],
       });
 
       mockDbSelect.mockReturnValue(
@@ -191,7 +201,12 @@ describe('gate.ts', () => {
     it('returns BANNED for suspended status', async () => {
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
       mockCachedCurrentUser.mockResolvedValue({
-        emailAddresses: [{ emailAddress: 'test@example.com' }],
+        emailAddresses: [
+          {
+            emailAddress: 'test@example.com',
+            verification: { status: 'verified' },
+          },
+        ],
       });
 
       mockDbSelect.mockReturnValue(
@@ -217,7 +232,12 @@ describe('gate.ts', () => {
     it('returns NEEDS_ONBOARDING when user has no profile', async () => {
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
       mockCachedCurrentUser.mockResolvedValue({
-        emailAddresses: [{ emailAddress: 'test@example.com' }],
+        emailAddresses: [
+          {
+            emailAddress: 'test@example.com',
+            verification: { status: 'verified' },
+          },
+        ],
       });
 
       // Single JOIN query: user exists but no profile (profileId is null)
@@ -252,7 +272,12 @@ describe('gate.ts', () => {
     it('returns NEEDS_ONBOARDING when profile is incomplete', async () => {
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
       mockCachedCurrentUser.mockResolvedValue({
-        emailAddresses: [{ emailAddress: 'test@example.com' }],
+        emailAddresses: [
+          {
+            emailAddress: 'test@example.com',
+            verification: { status: 'verified' },
+          },
+        ],
       });
 
       // Single JOIN query: user with incomplete profile (missing username)
@@ -286,7 +311,12 @@ describe('gate.ts', () => {
     it('returns ACTIVE for fully onboarded user', async () => {
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
       mockCachedCurrentUser.mockResolvedValue({
-        emailAddresses: [{ emailAddress: 'test@example.com' }],
+        emailAddresses: [
+          {
+            emailAddress: 'test@example.com',
+            verification: { status: 'verified' },
+          },
+        ],
       });
 
       // Single JOIN query: user with complete profile
@@ -362,7 +392,12 @@ describe('gate.ts', () => {
     it('returns NEEDS_DB_USER when createDbUserIfMissing is false', async () => {
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
       mockCachedCurrentUser.mockResolvedValue({
-        emailAddresses: [{ emailAddress: 'test@example.com' }],
+        emailAddresses: [
+          {
+            emailAddress: 'test@example.com',
+            verification: { status: 'verified' },
+          },
+        ],
       });
 
       // No DB user found (JOIN query returns empty)

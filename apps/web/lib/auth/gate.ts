@@ -474,9 +474,7 @@ export async function resolveUserState(
   // Prefer a verified address over index [0] which may be unverified.
   const email =
     clerkUser?.emailAddresses?.find(e => e.verification?.status === 'verified')
-      ?.emailAddress ??
-    clerkUser?.primaryEmailAddress?.emailAddress ??
-    null;
+      ?.emailAddress ?? null;
 
   // 2. Query DB user AND profile in a single JOIN query (performance optimization)
   // This reduces database round trips from 2 to 1

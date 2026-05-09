@@ -180,18 +180,14 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
         icon: <XCircle className='h-3.5 w-3.5' />,
         onClick: async () => {
           const eligible = selectedEntries.filter(
-            e =>
-              e.status === 'invited' ||
-              e.status === 'approved' ||
-              e.status === 'claimed' ||
-              e.status === 'signed_up'
+            e => e.status === 'invited' || e.status === 'approved'
           );
           if (eligible.length === 0) {
             toast.info('No entries eligible for disapproval');
             return;
           }
           await Promise.all(
-            eligible.map(e => approveEntry({ id: e.id, status: e.status }))
+            eligible.map(e => disapproveMutation.mutateAsync({ entryId: e.id }))
           );
           toast.success(
             `Disapproved ${eligible.length} entr${eligible.length === 1 ? 'y' : 'ies'}`
@@ -200,7 +196,7 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
         },
       },
     ];
-  }, [entries, selectedIds, clearSelection, approveEntry]);
+  }, [entries, selectedIds, clearSelection, approveEntry, disapproveMutation]);
 
   // Group entries by status for Kanban board
   const kanbanColumns = useMemo<KanbanColumn<WaitlistEntryRow>[]>(() => {
@@ -257,23 +253,23 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
   const handleItemMove = useCallback(
     async (itemId: string, fromColumnId: string, toColumnId: string) => {
       try {
-        if (toColumnId === 'signed_up') {
-          // Use proper approval flow — updates users.userStatus, activeProfileId,
-          // profile fields, and invalidates proxy cache
+        if (toColumnId === 'signed_up' || fromColumnId === 'signed_up') {
+          toast.error(
+            'Signed-up entries are terminal. Update the user account instead.'
+          );
+          return;
+        }
+
+        if (toColumnId === 'invited') {
           await approveMutation.mutateAsync({ entryId: itemId });
         } else if (toColumnId === 'waitlisted') {
           // Use proper disapproval flow — reverts user status and profile
           await disapproveMutation.mutateAsync({ entryId: itemId });
-        } else if (fromColumnId === 'signed_up' && toColumnId === 'invited') {
-          toast.error(
-            'Move signed-up entries to Waitlisted first, then to Invited if needed.'
-          );
-          return;
         } else {
-          // Transitional status updates (e.g. new→invited) use simple status update
+          // Transitional status updates use the constrained admin status route.
           await updateStatusMutation.mutateAsync({
             entryId: itemId,
-            status: toColumnId as 'waitlisted' | 'invited' | 'signed_up',
+            status: toColumnId as 'waitlisted',
           });
         }
       } catch (error) {

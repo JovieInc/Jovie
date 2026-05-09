@@ -33,11 +33,8 @@ export function WaitlistKanbanCard({
   approveStatus = 'idle',
   onApprove,
 }: WaitlistKanbanCardProps) {
-  const isApproved =
-    entry.status === 'invited' ||
-    entry.status === 'approved' ||
-    entry.status === 'claimed' ||
-    entry.status === 'signed_up';
+  const isApproved = entry.status === 'invited' || entry.status === 'approved';
+  const isSignedUp = entry.status === 'signed_up' || entry.status === 'claimed';
   const statusVariant = STATUS_VARIANTS[entry.status] ?? 'secondary';
   const platformLabel =
     PLATFORM_LABELS[entry.primarySocialPlatform] ?? entry.primarySocialPlatform;
@@ -132,13 +129,16 @@ export function WaitlistKanbanCard({
             variant='primary'
             className='h-8 w-full text-xs'
             disabled={
-              approveStatus === 'approving' || approveStatus === 'disapproving'
+              isSignedUp ||
+              approveStatus === 'approving' ||
+              approveStatus === 'disapproving'
             }
             onClick={onApprove}
           >
             {(() => {
               if (approveStatus === 'approving') return 'Approving…';
               if (approveStatus === 'disapproving') return 'Disapproving…';
+              if (isSignedUp) return 'Signed up';
               return isApproved ? 'Disapprove' : 'Approve';
             })()}
           </Button>

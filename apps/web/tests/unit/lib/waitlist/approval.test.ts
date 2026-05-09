@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { approveWaitlistEntryInTx } from '@/lib/waitlist/approval';
+import {
+  approveWaitlistEntryInTx,
+  disapproveWaitlistEntryInTx,
+} from '@/lib/waitlist/approval';
 
 type QueryResult = Array<Record<string, unknown>>;
 
@@ -181,5 +184,59 @@ describe('approveWaitlistEntryInTx', () => {
         activeProfileId: null,
       })
     );
+  });
+});
+
+describe('disapproveWaitlistEntryInTx', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('clears invite token and email metadata so later re-approval can issue a fresh invite', async () => {
+    const { tx, updateSet } = createTxMock([
+      [
+        {
+          id: 'entry-1',
+          email: 'creator@example.com',
+          status: 'approved',
+        },
+      ],
+      [{ id: 'user-1', clerkId: 'clerk_123' }],
+      [],
+    ]);
+
+    const result = await disapproveWaitlistEntryInTx(tx, 'entry-1');
+
+    expect(result).toEqual({
+      outcome: 'disapproved',
+      clerkId: 'clerk_123',
+    });
+    expect(updateSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'waitlisted',
+        inviteTokenHash: null,
+        inviteTokenExpiresAt: null,
+        inviteTokenRedeemedAt: null,
+        inviteEmailStatus: null,
+        inviteEmailSentAt: null,
+      })
+    );
+  });
+
+  it('treats legacy claimed entries as terminal', async () => {
+    const { tx, updateSet } = createTxMock([
+      [
+        {
+          id: 'entry-1',
+          email: 'creator@example.com',
+          status: 'claimed',
+        },
+      ],
+    ]);
+
+    const result = await disapproveWaitlistEntryInTx(tx, 'entry-1');
+
+    expect(result).toEqual({ outcome: 'terminal', status: 'claimed' });
+    expect(updateSet).not.toHaveBeenCalled();
   });
 });

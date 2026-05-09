@@ -58,6 +58,33 @@ async function upsertApprovedUser(params: {
     .where(eq(users.id, existing.id));
 }
 
+async function hasLinkedApprovedUser(params: {
+  tx: DbOrTransaction;
+  clerkUserId: string;
+  entryId: string;
+}): Promise<boolean> {
+  const [existing] = await params.tx
+    .select({
+      waitlistEntryId: users.waitlistEntryId,
+      userStatus: users.userStatus,
+    })
+    .from(users)
+    .where(eq(users.clerkId, params.clerkUserId))
+    .for('update')
+    .limit(1);
+
+  if (!existing || existing.waitlistEntryId !== params.entryId) {
+    return false;
+  }
+
+  return (
+    existing.userStatus === 'waitlist_approved' ||
+    existing.userStatus === 'profile_claimed' ||
+    existing.userStatus === 'onboarding_incomplete' ||
+    existing.userStatus === 'active'
+  );
+}
+
 export async function redeemWaitlistInviteToken(input: {
   token: string;
   clerkUserId: string;
@@ -77,6 +104,7 @@ export async function redeemWaitlistInviteToken(input: {
             emailNormalized: waitlistEntries.emailNormalized,
             status: waitlistEntries.status,
             inviteTokenExpiresAt: waitlistEntries.inviteTokenExpiresAt,
+            inviteTokenRedeemedAt: waitlistEntries.inviteTokenRedeemedAt,
           })
           .from(waitlistEntries)
           .where(eq(waitlistEntries.inviteTokenHash, tokenHash))
@@ -100,6 +128,32 @@ export async function redeemWaitlistInviteToken(input: {
 
         if (!isWaitlistInviteRedeemableStatus(entry.status)) {
           return { outcome: 'invalid' as const };
+        }
+
+        if (entry.inviteTokenRedeemedAt) {
+          if (
+            entry.status !== 'approved' ||
+            !entry.inviteTokenExpiresAt ||
+            entry.inviteTokenExpiresAt.getTime() <= now.getTime()
+          ) {
+            return { outcome: 'invalid' as const };
+          }
+
+          const linkedApprovedUser = await hasLinkedApprovedUser({
+            tx,
+            clerkUserId: input.clerkUserId,
+            entryId: entry.id,
+          });
+
+          if (!linkedApprovedUser) {
+            return { outcome: 'invalid' as const };
+          }
+
+          return {
+            outcome: 'approved' as const,
+            entryId: entry.id,
+            clerkId: input.clerkUserId,
+          };
         }
 
         if (

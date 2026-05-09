@@ -8,7 +8,7 @@ import { parseJsonBody } from '@/lib/http/parse-json';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { waitlistApproveSchema } from '@/lib/validation/schemas';
 import { insertWaitlistAuditLog } from '@/lib/waitlist/audit';
-import { enqueueWaitlistEmailJob } from '@/lib/waitlist/email-jobs';
+import { enqueueWaitlistApprovalInviteEmail } from '@/lib/waitlist/email-jobs';
 import { isWaitlistInviteRedeemableStatus } from '@/lib/waitlist/state-machine';
 
 export const runtime = 'nodejs';
@@ -72,15 +72,11 @@ export async function POST(request: Request) {
         }
 
         const now = new Date();
-        await enqueueWaitlistEmailJob(
-          tx,
-          {
-            entryId: entry.id,
-            type: 'approval_invite',
-            force: true,
-          },
-          { dedupScope: `resend:${now.getTime()}` }
-        );
+        await enqueueWaitlistApprovalInviteEmail(tx, entry.id, {
+          force: true,
+          dedupScope: `resend:${now.getTime()}`,
+          now,
+        });
 
         await insertWaitlistAuditLog(tx, {
           waitlistEntryId: entry.id,
