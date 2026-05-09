@@ -64,7 +64,23 @@ WITH ranked_entries AS (
     "id",
     row_number() OVER (
       PARTITION BY lower(trim("email"))
-      ORDER BY "created_at" DESC, "id" DESC
+      ORDER BY
+        CASE "status"
+          WHEN 'claimed' THEN 90
+          WHEN 'signed_up' THEN 90
+          WHEN 'approved' THEN 80
+          WHEN 'invited' THEN 80
+          WHEN 'blocked' THEN 75
+          WHEN 'rejected' THEN 70
+          WHEN 'waitlisted' THEN 50
+          WHEN 'qualified' THEN 40
+          WHEN 'chat_started' THEN 30
+          WHEN 'new' THEN 20
+          WHEN 'expired' THEN 10
+          ELSE 0
+        END DESC,
+        "created_at" DESC,
+        "id" DESC
     ) AS row_number
   FROM "waitlist_entries"
 )
