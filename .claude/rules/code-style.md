@@ -322,6 +322,19 @@ After any correction from a human reviewer:
 
 If you realize mid-task that you've made an assumption that turned out wrong, document it immediately without being asked.
 
+### The Shame-on-Me Clause
+
+Fool me once, shame on you. Fool me twice, shame on me. When a bug, regression, or operational gap reaches production AND no test, lint rule, hook, or guardrail caught it, the absence of the guardrail is the real failure — not the bug.
+
+When you find a gap of this shape (e.g. a feature flag shipped without proper Statsig registration, an external service call without a timeout, a public route accidentally rendered SSR), close it in the same workflow:
+
+1. Fix the immediate bug.
+2. Identify the smallest test, lint rule, type-level assertion, hook, or CI check that would have caught it. Verify it fails on the buggy state and passes after the fix.
+3. Add that guardrail in the same PR (or a tightly-coupled follow-up PR opened in the same session).
+4. Do not merge unless the prevention is in place.
+
+Do not ask for permission to add the prevention test. It is not optional, it is the cost of admission. Ship it, review it, land it autonomously.
+
 ## Claude Hooks Reference
 
 Hooks in `.claude/hooks/` run automatically on every tool use. You cannot bypass them.

@@ -5,6 +5,7 @@ import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import { type DbOrTransaction } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { waitlistEntries } from '@/lib/db/schema/waitlist';
+import { withSerializableRetry } from '@/lib/db/serializable-retry';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { notifySlackWaitlist } from '@/lib/notifications/providers/slack';
 import { normalizeEmail } from '@/lib/utils/email';
@@ -17,6 +18,10 @@ import {
   type WaitlistApprovalResult,
 } from '@/lib/waitlist/approval';
 import { tryReserveAutoAcceptSlot } from '@/lib/waitlist/settings';
+import {
+  isStatusUpgrade,
+  type UserLifecycleStatus,
+} from '@/lib/waitlist/status-precedence';
 
 const WAITLIST_LOCK_PREFIX = 'waitlist:';
 
@@ -41,21 +46,6 @@ export interface WaitlistAccessRequestResult {
   readonly status: 'new' | 'claimed' | 'invited';
   readonly outcome: WaitlistAccessOutcome;
 }
-
-const APPROVED_USER_STATUSES = new Set([
-  'waitlist_approved',
-  'profile_claimed',
-  'onboarding_incomplete',
-  'active',
-]);
-
-// Statuses that strictly succeed `waitlist_approved` — never downgrade them
-// when re-affirming approval.
-const POST_APPROVAL_USER_STATUSES = new Set([
-  'profile_claimed',
-  'onboarding_incomplete',
-  'active',
-]);
 
 function normalizeSpotifyUrl(url: string): string {
   try {
@@ -131,13 +121,22 @@ async function findLatestEntryByEmail(
   return entry ?? null;
 }
 
+interface UpsertUserStatusResult {
+  /** Status the user had before this write (null if user did not exist). */
+  readonly previousStatus: string | null;
+  /** Status the user has after this write. */
+  readonly newStatus: string;
+  /** True if the user existed before this call. */
+  readonly existed: boolean;
+}
+
 async function upsertUserStatus(params: {
   readonly tx: DbOrTransaction;
   readonly clerkUserId: string;
   readonly emailRaw: string;
   readonly entryId: string;
-  readonly nextStatus: 'waitlist_pending' | 'waitlist_approved';
-}): Promise<void> {
+  readonly nextStatus: UserLifecycleStatus;
+}): Promise<UpsertUserStatusResult> {
   const { tx, clerkUserId, emailRaw, entryId, nextStatus } = params;
   const [existing] = await tx
     .select({ id: users.id, userStatus: users.userStatus })
@@ -152,28 +151,36 @@ async function upsertUserStatus(params: {
       userStatus: nextStatus,
       waitlistEntryId: entryId,
     });
-    return;
+    return {
+      previousStatus: null,
+      newStatus: nextStatus,
+      existed: false,
+    };
   }
 
-  // Never downgrade an existing higher-status user.
-  // - When trying to set 'waitlist_pending', keep any of the APPROVED_USER_STATUSES.
-  // - When trying to set 'waitlist_approved', keep statuses that already imply
-  //   the user has progressed past approval (claimed a profile / completing
-  //   onboarding / fully active) so we never bump them backwards.
-  const shouldKeepStatus =
-    nextStatus === 'waitlist_pending'
-      ? APPROVED_USER_STATUSES.has(existing.userStatus)
-      : POST_APPROVAL_USER_STATUSES.has(existing.userStatus);
+  // Use the canonical status-precedence rule: never downgrade a
+  // higher-ranked status to a lower-ranked one, regardless of which
+  // direction we're nominally trying to move. This keeps `active`,
+  // `onboarding_incomplete`, `profile_claimed`, `suspended`, and `banned`
+  // safe from being reset by a re-submitted waitlist request.
+  const upgrade = isStatusUpgrade(existing.userStatus, nextStatus);
+  const finalStatus = upgrade ? nextStatus : existing.userStatus;
 
   await tx
     .update(users)
     .set({
       email: emailRaw,
-      userStatus: shouldKeepStatus ? existing.userStatus : nextStatus,
+      userStatus: finalStatus,
       waitlistEntryId: entryId,
       updatedAt: new Date(),
     })
     .where(eq(users.id, existing.id));
+
+  return {
+    previousStatus: existing.userStatus,
+    newStatus: finalStatus,
+    existed: true,
+  };
 }
 
 async function tryApproveEntry(
@@ -193,8 +200,9 @@ async function decideAccess(params: {
 }): Promise<{
   readonly outcome: WaitlistAccessOutcome;
   readonly approval: WaitlistApprovalResult | null;
+  readonly statusChange: UpsertUserStatusResult;
 }> {
-  await upsertUserStatus({
+  const statusChange = await upsertUserStatus({
     tx: params.tx,
     clerkUserId: params.clerkUserId,
     emailRaw: params.emailRaw,
@@ -211,15 +219,28 @@ async function decideAccess(params: {
           ? 'waitlisted_gate_on'
           : 'waitlisted_capacity_full',
       approval: null,
+      statusChange,
     };
   }
 
   const approval = await tryApproveEntry(params.tx, params.entryId);
   if (!approval) {
-    return { outcome: 'waitlisted_capacity_full', approval: null };
+    return {
+      outcome: 'waitlisted_capacity_full',
+      approval: null,
+      statusChange,
+    };
   }
 
-  return { outcome: 'accepted', approval };
+  return { outcome: 'accepted', approval, statusChange };
+}
+
+interface InternalTransactionResult {
+  readonly entryId: string;
+  readonly status: 'new' | 'claimed' | 'invited';
+  readonly outcome: WaitlistAccessOutcome;
+  readonly approval: WaitlistApprovalResult | null;
+  readonly statusChange: UpsertUserStatusResult;
 }
 
 export async function submitWaitlistAccessRequest(
@@ -228,98 +249,117 @@ export async function submitWaitlistAccessRequest(
   const normalizedEmail = normalizeEmail(input.email);
   const emailRaw = input.emailRaw ?? input.email;
 
-  const result = await withSystemIngestionSession(
-    async tx => {
-      await lockWaitlistEmail(tx, normalizedEmail);
+  // Wrap the serializable transaction with bounded retry on transient
+  // 40001/40P01 conflicts. This block must be idempotent; the transaction
+  // takes a per-email advisory lock as its first statement so retried
+  // attempts re-serialize cleanly.
+  const result = await withSerializableRetry<InternalTransactionResult>(() =>
+    withSystemIngestionSession(
+      async tx => {
+        await lockWaitlistEmail(tx, normalizedEmail);
 
-      const existing = await findLatestEntryByEmail(tx, normalizedEmail);
-      const entryValues = buildEntryValues({
-        data: input.data,
-        email: normalizedEmail,
-        fullName: input.fullName,
-      });
+        const existing = await findLatestEntryByEmail(tx, normalizedEmail);
+        const entryValues = buildEntryValues({
+          data: input.data,
+          email: normalizedEmail,
+          fullName: input.fullName,
+        });
 
-      if (existing) {
-        if (existing.status === 'claimed' || existing.status === 'invited') {
-          await upsertUserStatus({
+        if (existing) {
+          if (existing.status === 'claimed' || existing.status === 'invited') {
+            const statusChange = await upsertUserStatus({
+              tx,
+              clerkUserId: input.clerkUserId,
+              emailRaw,
+              entryId: existing.id,
+              nextStatus: 'waitlist_approved',
+            });
+            return {
+              entryId: existing.id,
+              status: existing.status,
+              outcome: 'already_accepted' as const,
+              approval: null,
+              statusChange,
+            };
+          }
+
+          await tx
+            .update(waitlistEntries)
+            .set(entryValues)
+            .where(eq(waitlistEntries.id, existing.id));
+
+          const statusChange = await upsertUserStatus({
             tx,
             clerkUserId: input.clerkUserId,
-            emailRaw,
             entryId: existing.id,
-            nextStatus: 'waitlist_approved',
+            emailRaw,
+            nextStatus: 'waitlist_pending',
           });
+
           return {
             entryId: existing.id,
             status: existing.status,
-            outcome: 'already_accepted' as const,
-            approval: null as WaitlistApprovalResult | null,
+            outcome: 'already_waitlisted' as const,
+            approval: null,
+            statusChange,
           };
         }
 
-        await tx
-          .update(waitlistEntries)
-          .set(entryValues)
-          .where(eq(waitlistEntries.id, existing.id));
+        const [entry] = await tx
+          .insert(waitlistEntries)
+          .values({
+            ...entryValues,
+            status: 'new',
+            createdAt: new Date(),
+          })
+          .returning({ id: waitlistEntries.id });
 
-        await upsertUserStatus({
+        if (!entry) {
+          throw new Error('Failed to create waitlist entry');
+        }
+
+        const decision = await decideAccess({
           tx,
+          entryId: entry.id,
           clerkUserId: input.clerkUserId,
-          entryId: existing.id,
           emailRaw,
-          nextStatus: 'waitlist_pending',
         });
 
         return {
-          entryId: existing.id,
-          status: existing.status,
-          outcome: 'already_waitlisted' as const,
-          approval: null as WaitlistApprovalResult | null,
+          entryId: entry.id,
+          status:
+            decision.outcome === 'accepted'
+              ? ('claimed' as const)
+              : ('new' as const),
+          outcome: decision.outcome,
+          approval: decision.approval,
+          statusChange: decision.statusChange,
         };
-      }
-
-      const [entry] = await tx
-        .insert(waitlistEntries)
-        .values({
-          ...entryValues,
-          status: 'new',
-          createdAt: new Date(),
-        })
-        .returning({ id: waitlistEntries.id });
-
-      if (!entry) {
-        throw new Error('Failed to create waitlist entry');
-      }
-
-      const decision = await decideAccess({
-        tx,
-        entryId: entry.id,
-        clerkUserId: input.clerkUserId,
-        emailRaw,
-      });
-
-      return {
-        entryId: entry.id,
-        status:
-          decision.outcome === 'accepted'
-            ? ('claimed' as const)
-            : ('new' as const),
-        outcome: decision.outcome,
-        approval: decision.approval,
-      };
-    },
-    { isolationLevel: 'serializable' }
+      },
+      { isolationLevel: 'serializable' }
+    )
   );
+
+  // True if the user's `userStatus` actually moved between previous and new
+  // values inside the transaction. Idempotent re-submits where status was
+  // pinned by the precedence guard return false here, so we don't bust the
+  // proxy-state cache or re-fire Slack on no-op writes.
+  const statusActuallyChanged =
+    result.statusChange.previousStatus !== result.statusChange.newStatus;
 
   // Finalize Redis cache invalidation outside the serializable transaction so
   // we don't extend its lock window with non-DB I/O.
   if (result.approval) {
     await finalizeWaitlistApproval(result.approval);
-  } else if (result.outcome === 'already_accepted') {
+  } else if (result.outcome === 'already_accepted' && statusActuallyChanged) {
     // The DB already reflects approval (entry status is claimed/invited and
     // userStatus is now waitlist_approved), but the proxy-state Redis cache
     // may still be holding a stale waitlist_pending entry from a prior
     // /waitlist visit. Mirror the normal-approval invalidation so middleware
     // doesn't keep redirecting the user back to /waitlist.
+    //
+    // Only bust the cache when the userStatus row actually changed; otherwise
+    // we'd thrash the cache on every idempotent re-assert.
     await invalidateProxyUserStateCache(input.clerkUserId).catch(error => {
       logger.warn(
         '[waitlist] Failed to invalidate proxy state on already_accepted',
@@ -328,16 +368,22 @@ export async function submitWaitlistAccessRequest(
     });
   }
 
-  // Suppress Slack pings for outcomes where the user did not transition into a
-  // genuinely new waitlist state:
-  // - already_waitlisted / already_accepted: not a new signup
-  // - waitlisted_capacity_full: daily cap is exhausted, so we'd ping for every
-  //   subsequent attempt the rest of the day even though state is unchanged.
-  const shouldNotify =
+  // Slack idempotency: only ping on a true new-state transition. Suppress for
+  // outcomes where the user did not transition into a genuinely new waitlist
+  // state, AND for any retried waitlist_pending write where the user already
+  // existed and the status didn't change.
+  const isNewSignupOutcome =
     result.outcome !== 'already_waitlisted' &&
     result.outcome !== 'already_accepted' &&
     result.outcome !== 'waitlisted_capacity_full';
-  if (shouldNotify) {
+  // For outcomes that count as a signup, additionally require that the row
+  // is genuinely new OR the user moved into a higher-rank status. This
+  // guards against an obscure case where two near-simultaneous requests for
+  // a returning user with a stale entry could both produce
+  // `waitlisted_gate_on` despite no real state change.
+  const isStatusFreshlyAssigned =
+    !result.statusChange.existed || statusActuallyChanged;
+  if (isNewSignupOutcome && isStatusFreshlyAssigned) {
     notifySlackWaitlist(input.fullName, normalizedEmail).catch(error => {
       logger.warn('[waitlist] Slack notification failed', error);
     });

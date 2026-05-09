@@ -104,3 +104,4 @@ All API routes run on **Node.js runtime** (the Next.js default). Do not use Edge
 | `docs/WEBHOOK_MAP.md` | Which webhooks handle this provider's events? |
 | `docs/API_ROUTE_MAP.md` | Does an API endpoint already exist for this? What auth does it need? |
 | `docs/FEATURE_REGISTRY.md` | What feature flags exist? What are their current states? |
+| `docs/COST_MONITORING.md` | What stops a runaway code path from blowing up the bill? Provider spend caps + the cost-anomaly auto-rollback gate. |

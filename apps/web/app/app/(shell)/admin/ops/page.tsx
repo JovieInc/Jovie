@@ -1,10 +1,16 @@
 import { Maximize2 } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import type {
+  DailyBucket,
+  ShippingVelocityResponse,
+} from '@/app/api/admin/hud/shipping-velocity/route';
 import { AdminToolPage } from '@/components/features/admin/layout/AdminToolPage';
 import { APP_ROUTES } from '@/constants/routes';
+import { env } from '@/lib/env-server';
 import { getHudMetrics } from '@/lib/hud/metrics';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
+import { logger } from '@/lib/utils/logger';
 import { HudDashboardClient } from './HudDashboardClient';
 
 export const runtime = 'nodejs';
@@ -36,6 +42,35 @@ function resolvePresentationMode(value: unknown): PresentationMode {
  * prevents an invalid kiosk URL from silently escalating to admin-rendered
  * content.
  */
+async function getInitialShippingData(): Promise<{
+  data: DailyBucket[];
+  cachedAt: string;
+} | null> {
+  try {
+    // Best-effort server prefetch for deployed admin views. In local dev,
+    // Next may choose a fallback port, and RSC has no reliable request origin
+    // here; the client chart fetch is the source of truth in that case.
+    if (!env.VERCEL_URL) return null;
+
+    const base = `https://${env.VERCEL_URL}`;
+
+    const response = await fetch(
+      `${base}/api/admin/hud/shipping-velocity?range=7d`,
+      {
+        signal: AbortSignal.timeout(5000),
+        cache: 'no-store',
+      }
+    );
+
+    if (!response.ok) return null;
+    const result = (await response.json()) as ShippingVelocityResponse;
+    return { data: result.data, cachedAt: result.cachedAt };
+  } catch (err) {
+    logger.error('[admin/ops] Failed to prefetch shipping velocity', err);
+    return null;
+  }
+}
+
 export default async function AdminOpsPage({
   searchParams,
 }: Readonly<{ readonly searchParams: Promise<SearchParams> }>) {
@@ -45,7 +80,10 @@ export default async function AdminOpsPage({
   // The admin layout has already verified admin entitlement; getHudMetrics
   // accepts the access mode for downstream auth-aware features (e.g. AI ops
   // dispatch UI). Admin sees full dispatch; kiosk-token would not.
-  const metrics = await getHudMetrics('admin');
+  const [metrics, shippingPrefetch] = await Promise.all([
+    getHudMetrics('admin'),
+    getInitialShippingData(),
+  ]);
 
   // In admin-kiosk presentation, render the kiosk-density body inside the
   // shell so admins keep their navigation. The full standalone TV experience
@@ -57,6 +95,8 @@ export default async function AdminOpsPage({
           initialMetrics={metrics}
           density='kiosk'
           presentationMode='admin-kiosk'
+          initialShippingData={shippingPrefetch?.data}
+          initialShippingCachedAt={shippingPrefetch?.cachedAt}
         />
       </div>
     );
@@ -72,11 +112,11 @@ export default async function AdminOpsPage({
           href={PRESENTATION_VIEW_HREF}
           target='_blank'
           rel='noopener'
-          aria-label='Open presentation view in a new tab'
+          aria-label='Open TV view in a new tab'
           className='inline-flex h-8 items-center gap-1.5 rounded-lg border border-subtle bg-surface-0 px-2.5 text-[12px] font-[540] text-secondary-token transition-colors hover:bg-surface-1 hover:text-primary-token'
         >
           <Maximize2 className='h-3.5 w-3.5' aria-hidden='true' />
-          Presentation view
+          TV view
         </Link>
       }
     >
@@ -84,6 +124,8 @@ export default async function AdminOpsPage({
         initialMetrics={metrics}
         density='shell'
         presentationMode='shell'
+        initialShippingData={shippingPrefetch?.data}
+        initialShippingCachedAt={shippingPrefetch?.cachedAt}
       />
     </AdminToolPage>
   );

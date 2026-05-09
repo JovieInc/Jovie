@@ -42,13 +42,15 @@ function hashHandleForMetadata(handle: string): string {
 
 /**
  * Convert amount to cents with overflow protection.
- * Converts dollars (potentially fractional) to cents, then clamps.
+ * Converts dollars to cents and fails closed if validation ever drifts.
  * Maximum: 50000 cents ($500), Minimum: 100 cents ($1)
  */
-function amountToCents(amount: number): number {
-  // Convert to cents first, then clamp
+function amountToCents(amount: number): number | null {
   const cents = Math.round(amount * 100);
-  return Math.max(100, Math.min(50000, cents));
+  if (!Number.isSafeInteger(cents) || cents < 100 || cents > 50000) {
+    return null;
+  }
+  return cents;
 }
 
 export async function POST(req: NextRequest) {
@@ -107,6 +109,12 @@ export async function POST(req: NextRequest) {
 
     // Convert to cents with overflow protection
     const amountInCents = amountToCents(amount);
+    if (amountInCents === null) {
+      return NextResponse.json(
+        { error: 'Invalid tip request' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
 
     // Look up the creator profile to store an immutable profile_id in metadata.
     // This avoids issues with handle renames and keeps PII out of Stripe metadata.

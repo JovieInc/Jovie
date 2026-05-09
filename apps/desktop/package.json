@@ -1,15 +1,23 @@
 {
   "name": "@jovie/desktop",
   "version": "0.1.0",
+  "description": "Jovie desktop app",
+  "author": "Jovie Inc.",
   "private": true,
   "main": "dist-electron/main.js",
   "scripts": {
     "predev": "node scripts/write-env.mjs",
     "dev": "tsc && electron .",
-    "prebuild:staging": "cross-env ELECTRON_ENV=staging node scripts/write-env.mjs",
+    "prepare:assets": "node scripts/prepare-icons.mjs && node scripts/generate-dmg-background.mjs",
+    "prepare:dmg-background": "node scripts/generate-dmg-background.mjs",
+    "prebuild:staging": "cross-env ELECTRON_ENV=staging node scripts/write-env.mjs && pnpm run prepare:assets",
     "build:staging": "tsc && electron-builder --config electron-builder.staging.yml --publish always",
-    "prebuild:production": "cross-env ELECTRON_ENV=production node scripts/write-env.mjs",
+    "prebuild:production": "cross-env ELECTRON_ENV=production node scripts/write-env.mjs && pnpm run prepare:assets",
     "build:production": "tsc && electron-builder --config electron-builder.yml --publish always",
+    "prepackage:staging": "cross-env ELECTRON_ENV=staging node scripts/write-env.mjs && pnpm run prepare:assets",
+    "package:staging": "tsc && electron-builder --config electron-builder.staging.yml --publish never",
+    "prepackage:production": "cross-env ELECTRON_ENV=production node scripts/write-env.mjs && pnpm run prepare:assets",
+    "package:production": "tsc && electron-builder --config electron-builder.yml --publish never",
     "pretypecheck": "node scripts/write-env.mjs",
     "typecheck": "tsc --noEmit"
   },
@@ -17,9 +25,10 @@
     "electron-updater": "^6.3.0"
   },
   "devDependencies": {
+    "@electron/fuses": "^2.1.1",
     "@types/node": "^22.0.0",
     "cross-env": "^7.0.3",
-    "electron": "^39.8.5",
+    "electron": "^42.0.0",
     "electron-builder": "^25.0.0",
     "sharp": "^0.33.0",
     "typescript": "^5.7.0"

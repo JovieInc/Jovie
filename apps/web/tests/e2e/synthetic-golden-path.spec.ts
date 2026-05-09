@@ -4,7 +4,7 @@ import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 // Override global storageState to run these tests as unauthenticated
 test.use({ storageState: { cookies: [], origins: [] } });
 
-const HOMEPAGE_INTENT_PROMPT = 'Help me launch my artist profile';
+const HOMEPAGE_PRIMARY_CTA_TEST_ID = 'homepage-primary-cta';
 const SIGNUP_PATH = '/signup';
 const SIGNUP_COVERAGE_WARNING =
   'Onboarding/profile creation not exercised while production email signup is unavailable. See JOV-1919.';
@@ -77,15 +77,14 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
       await waitForHydration(page);
 
       // Essential homepage entry point
-      const promptInput = page.locator('#homepage-intent-input');
-      await expect(promptInput).toBeVisible({
+      const primaryCta = page.getByTestId(HOMEPAGE_PRIMARY_CTA_TEST_ID);
+      await expect(primaryCta).toBeVisible({
         timeout: 15000,
       });
 
       // CRITICAL PATH 2: Sign up flow initiation
       console.log('[Synthetic] Step 2: Sign up flow test');
-      await promptInput.fill(HOMEPAGE_INTENT_PROMPT);
-      await page.getByRole('button', { name: 'Submit prompt' }).click();
+      await primaryCta.click();
       await expect(page).toHaveURL(new RegExp(SIGNUP_PATH), {
         timeout: 20000,
       });
@@ -311,7 +310,10 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
     }
 
     // Check for performance-critical elements
-    await expect(page.locator('#homepage-intent-input')).toBeVisible({
+    await expect(page.getByTestId('homepage-hero-shell')).toBeVisible({
+      timeout: 5000,
+    });
+    await expect(page.getByTestId(HOMEPAGE_PRIMARY_CTA_TEST_ID)).toBeVisible({
       timeout: 5000,
     });
 

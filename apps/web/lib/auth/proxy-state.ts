@@ -203,11 +203,10 @@ function determineUserState(
     | undefined,
   waitlistEnabled: boolean
 ): ProxyUserState {
-  // No DB user → needs waitlist/signup (or onboarding if waitlist is disabled)
+  // No DB user → needs intake. Gate OFF only changes the access decision after
+  // intake; it does not skip the launch request flow.
   if (!result?.dbUserId) {
-    return waitlistEnabled
-      ? { ...DEFAULT_WAITLIST_STATE }
-      : { ...NEEDS_ONBOARDING_STATE };
+    return { ...DEFAULT_WAITLIST_STATE };
   }
 
   // Banned or soft-deleted users are blocked immediately
@@ -223,6 +222,11 @@ function determineUserState(
   const isWaitlistApproved = APPROVED_STATUSES.includes(
     result.userStatus as (typeof APPROVED_STATUSES)[number]
   );
+
+  // Pending users stay on the waitlist even when rolling daily capacity opens.
+  if (result.userStatus === 'waitlist_pending') {
+    return { ...DEFAULT_WAITLIST_STATE };
+  }
 
   // Not approved + waitlist enabled → send to waitlist
   if (!isWaitlistApproved && waitlistEnabled) {

@@ -1,7 +1,7 @@
 import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
-import { eq } from 'drizzle-orm';
+import { desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   getDeepErrorMessage,
@@ -15,9 +15,12 @@ import { captureCriticalError, captureError } from '@/lib/error-tracking';
 import { normalizeEmail } from '@/lib/utils/email';
 import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
 import { getCachedAuth, getCachedCurrentUser } from './cached';
-import { CanonicalUserState } from './canonical-user-state';
+import {
+  CanonicalUserState,
+  getRedirectForState,
+  resolveCanonicalState,
+} from './canonical-user-state';
 import { syncEmailFromClerk } from './clerk-sync';
-import { resolveProfileState } from './profile-state-resolver';
 import { checkUserStatus } from './status-checker';
 
 export type { UserStateInput } from './canonical-user-state';
@@ -344,25 +347,35 @@ async function handleMissingDbUser(
     throw new TypeError('Email is required for user creation');
   }
 
-  // Check waitlist status before creating user (only when waitlist is enabled)
+  // Check waitlist status before creating user. Gate OFF opens daily intake
+  // capacity; it does not skip the access request flow for brand-new accounts.
   let waitlistEntryId: string | undefined;
 
-  if (waitlistGateEnabled) {
-    const waitlistResult = await checkWaitlistAccessInternal(email);
+  const waitlistResult = await checkWaitlistAccessInternal(email);
 
-    if (waitlistResult.status === 'new' || !waitlistResult.status) {
-      return {
-        state: CanonicalUserState.NEEDS_WAITLIST_SUBMISSION,
-        clerkUserId,
-        dbUserId: null,
-        profileId: null,
-        redirectTo: '/waitlist',
-        context: { ...baseContext, email },
-      };
-    }
-
-    waitlistEntryId = waitlistResult.entryId ?? undefined;
+  if (waitlistResult.status === 'new') {
+    return {
+      state: CanonicalUserState.WAITLIST_PENDING,
+      clerkUserId,
+      dbUserId: null,
+      profileId: null,
+      redirectTo: '/waitlist',
+      context: { ...baseContext, email },
+    };
   }
+
+  if (!waitlistResult.status) {
+    return {
+      state: CanonicalUserState.NEEDS_WAITLIST_SUBMISSION,
+      clerkUserId,
+      dbUserId: null,
+      profileId: null,
+      redirectTo: '/waitlist',
+      context: { ...baseContext, email },
+    };
+  }
+
+  waitlistEntryId = waitlistResult.entryId ?? undefined;
 
   // Create the user (without waitlist entry when waitlist is disabled)
   const newUserId = await createUserWithRetry(
@@ -528,6 +541,8 @@ export async function resolveUserState(
 
   // 2b. If no DB user exists, create one if requested
   let dbUserId: string | null = dbUser?.id ?? null;
+  let currentUserStatus = dbUser?.userStatus ?? null;
+  let currentDeletedAt = dbUser?.deletedAt ?? null;
 
   // Profile from the JOIN query (only valid if dbUser exists)
   let profile = dbResult?.profileId
@@ -562,19 +577,36 @@ export async function resolveUserState(
 
     // Otherwise, we got the new user ID
     dbUserId = creationResult.dbUserId;
+    const [createdUser] = await db
+      .select({
+        userStatus: users.userStatus,
+        deletedAt: users.deletedAt,
+      })
+      .from(users)
+      .where(eq(users.id, dbUserId))
+      .limit(1);
+    currentUserStatus = createdUser?.userStatus ?? null;
+    currentDeletedAt = createdUser?.deletedAt ?? null;
     // New user won't have a profile yet
     profile = null;
   }
 
-  // Resolve user state based on profile status
-  const profileState = resolveProfileState(profile);
+  const waitlistGateEnabled = await isWaitlistGateEnabled();
+  const state = resolveCanonicalState({
+    isAuthenticated: true,
+    hasDbUser: Boolean(dbUserId),
+    userStatus: currentUserStatus,
+    deletedAt: currentDeletedAt,
+    waitlistGateEnabled,
+    profile,
+  });
 
   return {
-    state: profileState.state,
+    state,
     clerkUserId,
     dbUserId,
-    profileId: profileState.profileId,
-    redirectTo: profileState.redirectTo,
+    profileId: profile?.id ?? null,
+    redirectTo: getRedirectForState(state),
     context: {
       isAdmin: dbUser?.isAdmin ?? false,
       isPro: dbUser?.isPro ?? false,
@@ -587,8 +619,10 @@ export async function resolveUserState(
 // Waitlist Access Helpers (exported for reuse)
 // =============================================================================
 
-// Valid waitlist statuses: 'new' (submitted), 'claimed' (approved).
-export type WaitlistStatus = 'new' | 'claimed';
+// Valid waitlist statuses (JOV-1963): 'new' (submitted, pending),
+// 'invited' (approved invite issued, treated as access granted),
+// 'claimed' (invite accepted, access granted).
+export type WaitlistStatus = 'new' | 'invited' | 'claimed';
 
 export interface WaitlistAccessResult {
   entryId: string | null;
@@ -613,26 +647,36 @@ export async function getWaitlistAccess(
  */
 async function checkWaitlistAccessInternal(email: string): Promise<{
   entryId: string | null;
-  status: 'new' | 'claimed' | null;
+  status: 'new' | 'invited' | 'claimed' | null;
 }> {
   const normalizedEmail = normalizeEmail(email);
 
+  // JOV-1963: order by createdAt DESC so the LATEST waitlist entry wins when
+  // a single email has multiple entries. Previously the query relied on
+  // arbitrary ordering, which could surface a stale `'new'` row even after
+  // the user had been invited or claimed access.
   const [entry] = await db
     .select({
       id: waitlistEntries.id,
       status: waitlistEntries.status,
     })
     .from(waitlistEntries)
-    .where(eq(waitlistEntries.email, normalizedEmail))
+    .where(drizzleSql`lower(${waitlistEntries.email}) = ${normalizedEmail}`)
+    .orderBy(desc(waitlistEntries.createdAt))
     .limit(1);
 
   if (!entry) {
     return { entryId: null, status: null };
   }
 
+  // JOV-1963: include 'invited' in the cast. The waitlist_status enum is
+  // ('new' | 'invited' | 'claimed'); the prior cast silently dropped
+  // 'invited' which let an invited row look like the "claimed" branch by
+  // accident. Now invited and claimed are both handled explicitly upstream
+  // (both grant access; 'new' redirects to /waitlist).
   return {
     entryId: entry.id,
-    status: entry.status as 'new' | 'claimed',
+    status: entry.status as 'new' | 'invited' | 'claimed',
   };
 }
 

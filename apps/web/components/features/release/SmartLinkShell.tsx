@@ -45,16 +45,26 @@ export function useSmartLinkShare(
   }, [title, artistName, onClose]);
 }
 
-interface SmartLinkShellProps {
+type SmartLinkShellBaseProps = {
   readonly artworkUrl: string | null;
   readonly artworkAlt?: string;
   readonly children: React.ReactNode;
   /** Content overlaid at the bottom of the hero artwork (title, artist, play button) */
   readonly heroOverlay?: React.ReactNode;
-  readonly onMenuOpen: () => void;
+  readonly showBrandMark?: boolean;
   /** Wraps the artwork image (e.g., for context menu). Must render a relative h-full w-full container. */
   readonly artworkWrapper?: (img: React.ReactNode) => React.ReactNode;
-}
+};
+
+type SmartLinkShellProps =
+  | (SmartLinkShellBaseProps & {
+      readonly showMenuButton?: true;
+      readonly onMenuOpen: () => void;
+    })
+  | (SmartLinkShellBaseProps & {
+      readonly showMenuButton: false;
+      readonly onMenuOpen?: () => void;
+    });
 
 function ArtworkFallback() {
   return (
@@ -74,6 +84,8 @@ export function SmartLinkShell({
   children,
   heroOverlay,
   onMenuOpen,
+  showBrandMark = true,
+  showMenuButton = true,
   artworkWrapper,
 }: SmartLinkShellProps) {
   const artworkImage = artworkUrl ? (
@@ -105,23 +117,29 @@ export function SmartLinkShell({
           <PublicSurfaceHeader
             className='px-5 pt-[max(env(safe-area-inset-top),20px)]'
             leftSlot={
-              <BrandLogo
-                size={22}
-                tone='white'
-                rounded={false}
-                className='opacity-45 drop-shadow-[0_1px_4px_rgba(0,0,0,0.4)]'
-              />
+              showBrandMark ? (
+                <span data-testid='smart-link-brand-mark'>
+                  <BrandLogo
+                    size={22}
+                    tone='white'
+                    rounded={false}
+                    className='opacity-45 drop-shadow-[0_1px_4px_rgba(0,0,0,0.4)]'
+                  />
+                </span>
+              ) : null
             }
             rightSlot={
-              <button
-                type='button'
-                onClick={onMenuOpen}
-                className='flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.08] bg-black/25 text-white/70 backdrop-blur-2xl transition-colors duration-subtle hover:bg-black/40'
-                aria-label='More options'
-                aria-haspopup='dialog'
-              >
-                <MoreHorizontal className='h-[15px] w-[15px]' />
-              </button>
+              showMenuButton && onMenuOpen ? (
+                <button
+                  type='button'
+                  onClick={onMenuOpen}
+                  className='flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.08] bg-black/25 text-white/70 backdrop-blur-2xl transition-colors duration-subtle hover:bg-black/40'
+                  aria-label='More options'
+                  aria-haspopup='dialog'
+                >
+                  <MoreHorizontal className='h-[15px] w-[15px]' />
+                </button>
+              ) : null
             }
           />
 

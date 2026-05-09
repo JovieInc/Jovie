@@ -18,6 +18,7 @@ export const LEGACY_STATSIG_GATE_KEYS = {
   DESIGN_V1_LIBRARY: 'design_v1_library',
   DESIGN_V1_AUTH: 'design_v1_auth',
   DESIGN_V1_ONBOARDING: 'design_v1_onboarding',
+  CHAT_JANK_MONITOR: 'chat_jank_monitor',
 } as const;
 
 export type StatsigGateKey =
@@ -43,15 +44,19 @@ export const APP_FLAG_DEFAULTS = {
   ALBUM_ART_GENERATION: true,
   CHAT_JANK_MONITOR: false,
   RELEASE_PLAN_DEMO: false,
-  DESIGN_V1: false,
-  SHELL_CHAT_V1: false,
-  DESIGN_V1_RELEASES: false,
-  DESIGN_V1_TASKS: false,
-  DESIGN_V1_CHAT_ENTITIES: false,
-  DESIGN_V1_LYRICS: false,
-  DESIGN_V1_LIBRARY: false,
-  DESIGN_V1_AUTH: false,
-  DESIGN_V1_ONBOARDING: false,
+  // DESIGN_V1 and all its surface aliases are permanently enabled.
+  // Statsig gate "design_v1" is also set to 100% rollout.
+  // The true default here ensures the new design is on even if Statsig is
+  // unavailable or the gate evaluation falls through.
+  DESIGN_V1: true,
+  SHELL_CHAT_V1: true,
+  DESIGN_V1_RELEASES: true,
+  DESIGN_V1_TASKS: true,
+  DESIGN_V1_CHAT_ENTITIES: true,
+  DESIGN_V1_LYRICS: true,
+  DESIGN_V1_LIBRARY: true,
+  DESIGN_V1_AUTH: true,
+  DESIGN_V1_ONBOARDING: true,
 } as const;
 
 export type AppFlagName = keyof typeof APP_FLAG_DEFAULTS;
@@ -114,6 +119,7 @@ export const APP_FLAG_TO_STATSIG_GATE = {
   SPOTIFY_OAUTH: LEGACY_STATSIG_GATE_KEYS.SPOTIFY_OAUTH,
   STRIPE_CONNECT_ENABLED: LEGACY_STATSIG_GATE_KEYS.STRIPE_CONNECT_ENABLED,
   ENABLE_LIGHT_MODE: LEGACY_STATSIG_GATE_KEYS.ENABLE_LIGHT_MODE,
+  CHAT_JANK_MONITOR: LEGACY_STATSIG_GATE_KEYS.CHAT_JANK_MONITOR,
   DESIGN_V1: LEGACY_STATSIG_GATE_KEYS.DESIGN_V1,
   SHELL_CHAT_V1: LEGACY_STATSIG_GATE_KEYS.DESIGN_V1,
   DESIGN_V1_RELEASES: LEGACY_STATSIG_GATE_KEYS.DESIGN_V1,
@@ -165,3 +171,22 @@ export const DESIGN_V1_ALIAS_FLAGS = [
 ] as const satisfies readonly AppFlagName[];
 
 export type DesignV1AliasFlagName = (typeof DESIGN_V1_ALIAS_FLAGS)[number];
+
+/**
+ * Flags that live in APP_FLAG_DEFAULTS but intentionally have NO Statsig gate mapping.
+ * These are resolved entirely by the local default — there is no dashboard control.
+ *
+ * EVERY entry here must have an inline comment explaining why it is exempted.
+ * This set is the baseline frozen after PR #8271. Any new flag added to APP_FLAG_DEFAULTS
+ * without a corresponding APP_FLAG_TO_STATSIG_GATE entry MUST be added here with a
+ * justification, or the flag-registration-guardrail test will fail.
+ */
+export const LOCAL_DEFAULT_ONLY_FLAGS = new Set<AppFlagName>([
+  'THREADS_ENABLED', // dev-only / not yet productionized; no gate created
+  'PWA_INSTALL_BANNER', // kill-switch style; default-false means feature is off until explicitly wired
+  'SHOW_RELEASE_TOOLBAR_EXTRAS', // internal dev/staging visual toggle; not user-facing
+  'PLAYLIST_ENGINE', // early prototype; not ready for remote control
+  'ALBUM_ART_GENERATION', // default-true feature; controlled by Statsig experiment separately in usage, not a gate
+  'CHAT_JANK_MONITOR', // monitoring-only flag; was missing Statsig gate (bug fixed in #8271 — kept here for local-dev override support)
+  'RELEASE_PLAN_DEMO', // YC wedge demo page; admin/internal only, not externally gated
+]);

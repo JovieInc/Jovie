@@ -172,11 +172,34 @@ function SignUpOauthErrorBanner() {
   );
 }
 
+/**
+ * Clerk appearance override for the signup page only.
+ * Hides Clerk's built-in "Create your account" header because we render our
+ * own "Request Access" heading. Also hides the Clerk footer sign-in link when
+ * an OAuth error banner is present to satisfy the subtraction principle (one
+ * error message, one action).
+ */
+const SIGNUP_APPEARANCE_HIDE_HEADER = {
+  elements: {
+    headerTitle: 'hidden',
+    headerSubtitle: 'hidden',
+  },
+} as const;
+
+const SIGNUP_APPEARANCE_HIDE_HEADER_AND_FOOTER = {
+  elements: {
+    headerTitle: 'hidden',
+    headerSubtitle: 'hidden',
+    footer: 'hidden',
+  },
+} as const;
+
 function SignUpPageContent() {
   const [isMounted, setIsMounted] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const searchParams = useSearchParams();
   const signInUrl = buildAuthRouteUrl(APP_ROUTES.SIGNIN, searchParams);
+  const oauthError = searchParams.get('oauth_error');
 
   useNormalizeClerkHomeLink(containerRef);
 
@@ -188,17 +211,34 @@ function SignUpPageContent() {
     return <AuthFormSkeleton />;
   }
 
+  // When oauth_error is present, hide Clerk's own footer sign-in link to avoid
+  // a redundant third prompt alongside our error banner + its action link.
+  const signUpAppearance = oauthError
+    ? SIGNUP_APPEARANCE_HIDE_HEADER_AND_FOOTER
+    : SIGNUP_APPEARANCE_HIDE_HEADER;
+
   return (
     <>
-      <AuthRoutePrefetch href={APP_ROUTES.SIGNIN} />
-      <SignUpClaimDataPersistence />
+      <AuthRoutePrefetch href={APP_ROUTES.WAITLIST} />
+      {/* P0: heading first so it anchors the form visually */}
+      <div className='mb-4 text-center lg:text-left'>
+        <h1 className='text-[22px] font-semibold leading-7 text-white'>
+          Request Access
+        </h1>
+        <p className='mt-2 text-[13px] leading-5 text-white/58'>
+          Create an account to start your private launch request.
+        </p>
+      </div>
+      {/* P2: banner and error notice render below the heading */}
       <SignUpOauthErrorBanner />
+      <SignUpClaimDataPersistence />
       <div ref={containerRef}>
         <SignUp
           routing='hash'
           oauthFlow='redirect'
           signInUrl={signInUrl}
-          fallbackRedirectUrl={APP_ROUTES.ONBOARDING}
+          fallbackRedirectUrl={APP_ROUTES.WAITLIST}
+          appearance={signUpAppearance}
         />
       </div>
       <p className='mt-4 text-center text-2xs leading-relaxed text-white/80'>
@@ -228,7 +268,7 @@ function SignUpPageContent() {
 export default function SignUpPage() {
   return (
     <AuthLayout
-      formTitle='Create your account'
+      formTitle='Request Access'
       showFormTitle={false}
       showFooterPrompt={false}
       layoutVariant='split'

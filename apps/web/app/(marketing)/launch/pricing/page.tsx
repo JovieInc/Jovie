@@ -95,7 +95,7 @@ export default function PricingPage() {
               href={APP_ROUTES.SIGNUP}
               className='focus-ring inline-block mt-7 px-5 py-2.5 rounded-md font-medium text-sm transition-colors border border-subtle hover:bg-white/[0.04]'
             >
-              Get started free
+              Request Access
             </Link>
           </div>
 
@@ -123,7 +123,7 @@ export default function PricingPage() {
               href={`${APP_ROUTES.SIGNUP}?plan=pro`}
               className='public-action-primary focus-ring mt-7'
             >
-              Get started
+              Request Access
             </Link>
           </div>
 
@@ -151,7 +151,7 @@ export default function PricingPage() {
                 href={`${APP_ROUTES.SIGNUP}?plan=max`}
                 className='focus-ring inline-block mt-7 px-5 py-2.5 rounded-md font-medium text-sm transition-colors border border-subtle hover:bg-white/[0.04]'
               >
-                Get started
+                Request Access
               </Link>
             </div>
           )}

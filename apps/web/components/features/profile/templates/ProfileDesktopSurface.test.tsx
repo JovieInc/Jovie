@@ -82,8 +82,31 @@ vi.mock('@/features/profile/ProfileUnifiedDrawer', () => ({
   ),
 }));
 
+vi.mock('@/features/profile/StaticListenInterface', () => ({
+  StaticListenInterface: ({
+    dspsOverride = [],
+  }: {
+    readonly dspsOverride?: ReadonlyArray<{ readonly name: string }>;
+  }) => (
+    <div data-testid='mock-static-listen-interface'>
+      {dspsOverride.map(dsp => (
+        <button key={dsp.name} type='button'>
+          {dsp.name}
+        </button>
+      ))}
+    </div>
+  ),
+}));
+
 vi.mock('@/lib/profile-dsps', () => ({
-  getCanonicalProfileDSPs: () => [],
+  getCanonicalProfileDSPs: () => [
+    {
+      key: 'spotify',
+      name: 'Spotify',
+      url: 'https://open.spotify.com/artist/4u',
+      config: {},
+    },
+  ],
 }));
 
 vi.mock('@/lib/dsp', () => ({
@@ -158,5 +181,32 @@ describe('ProfileDesktopSurface', () => {
       'data-presentation',
       'modal'
     );
+  });
+
+  it('renders DSP actions in desktop listen mode', () => {
+    render(
+      <ProfileDesktopSurface
+        artist={artist}
+        socialLinks={[]}
+        contacts={contacts}
+        photoDownloadSizes={[]}
+        drawerOpen={false}
+        drawerView='menu'
+        activeMode='listen'
+        onModeSelect={vi.fn()}
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        profileHref='/timwhite'
+        isSubscribed={false}
+        contentPrefs={contentPrefs}
+        onTogglePref={vi.fn()}
+        onUnsubscribe={vi.fn()}
+      />
+    );
+
+    expect(screen.getByTestId('mock-static-listen-interface')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Spotify' })).toBeVisible();
   });
 });

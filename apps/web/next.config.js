@@ -257,10 +257,12 @@ const nextConfig = {
       { source: '/app/tour-dates', destination: '/app/settings/touring' },
       { source: '/app/dashboard', destination: '/app' },
       { source: '/app/dashboard/overview', destination: '/app' },
-      {
-        source: '/app/dashboard/earnings',
-        destination: '/app/settings/artist-profile?tab=earn#pay',
-      },
+      // NOTE: /app/dashboard/earnings intentionally omitted here.
+      // The earnings page.tsx handles auth-aware redirection: unauthenticated
+      // users are sent to /signin?redirect_url=/app/dashboard/earnings so they
+      // return to this deep-link after sign-in, not to the settings page.
+      // Putting a static redirect here bypasses Clerk middleware and sends
+      // unauthenticated users to /app/settings/artist-profile instead of /signin.
       {
         source: '/app/dashboard/links',
         destination: '/app/chat?panel=profile',

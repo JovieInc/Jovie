@@ -126,7 +126,7 @@ export default async function ChangelogPage() {
           )}
           <Link
             href='/changelog/feed.xml'
-            className='text-xs opacity-40 hover:opacity-70 transition-opacity'
+            className='text-xs text-secondary-token transition-colors hover:text-primary-token'
           >
             RSS Feed
           </Link>

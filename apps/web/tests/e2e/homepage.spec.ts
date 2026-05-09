@@ -32,13 +32,13 @@ test.describe('Homepage', () => {
     const hero = page.getByTestId('homepage-hero-shell');
 
     await expect(hero).toBeVisible();
-    await expect(hero.getByText('Meet Jovie')).toBeVisible();
+    await expect(hero.getByText('Release operating system')).toBeVisible();
     await expect(
-      hero.getByRole('heading', { name: 'Drop more music, with less work.' })
+      hero.getByRole('heading', { name: 'Release more music with less work' })
     ).toBeVisible();
     await expect(
       hero.getByText(
-        'Release music faster and grow your audience effortlessly.'
+        'Plan the drop, route every fan, and keep the next release moving.'
       )
     ).toBeVisible();
     await expect(
@@ -58,24 +58,20 @@ test.describe('Homepage', () => {
     await expect(header).toBeVisible();
     await expect(header).toHaveAttribute(
       'data-presentation',
-      'homepage-embedded'
+      'marketing-glass'
     );
-    await expect(header.locator('[data-testid="site-logo"]')).toHaveCount(1);
-    await expect(header.getByRole('link', { name: 'Product' })).toHaveAttribute(
-      'href',
-      '/artist-profiles'
-    );
+    await expect(header.locator('a[href="/"]').first()).toBeVisible();
     await expect(
-      header.getByRole('link', { name: 'Solutions' })
-    ).toHaveAttribute('href', '/artist-notifications');
+      header.getByRole('button', { name: 'Features' })
+    ).toBeVisible();
+    await expect(
+      header.getByRole('button', { name: 'Resources' })
+    ).toBeVisible();
     await expect(header.getByRole('link', { name: 'Pricing' })).toHaveAttribute(
       'href',
       '/pricing'
     );
-    await expect(
-      header.getByRole('link', { name: 'Resources' })
-    ).toHaveAttribute('href', '/blog');
-    await expect(header.getByRole('link', { name: 'Log in' })).toHaveCount(1);
+    await expect(header.getByRole('link', { name: 'Sign in' })).toHaveCount(1);
     await expect(
       header.getByRole('link', { name: 'Start Free Trial' })
     ).toHaveAttribute('href', '/signup');
@@ -84,40 +80,132 @@ test.describe('Homepage', () => {
   test('product carousel exposes desktop and mobile proof slides', async ({
     page,
   }) => {
-    const carousel = page.getByTestId('homepage-hero-carousel');
+    const carousel = page.getByTestId('homepage-hero-command-center');
 
     await expect(carousel).toBeVisible();
     await expect(
-      page.getByTestId('homepage-hero-shot-profile-presence')
-    ).toHaveAttribute('data-active', 'true');
-    await page.getByRole('button', { name: 'Go to next slide' }).click();
+      carousel.getByAltText('The Deep End release page with fan action buttons')
+    ).toBeVisible();
     await expect(
-      page.getByTestId('homepage-hero-shot-release-command')
-    ).toHaveAttribute('data-active', 'true');
-    await page.getByRole('tab', { name: 'Show Audience Signal' }).click();
+      carousel.getByAltText(
+        'Jovie releases page with release status, assets, and launch progress'
+      )
+    ).toBeVisible();
     await expect(
-      page.getByTestId('homepage-hero-shot-release-signal')
-    ).toHaveAttribute('data-active', 'true');
+      carousel.getByAltText(
+        'Tim White artist profile with release and fan actions'
+      )
+    ).toBeVisible();
+    await page.waitForFunction(() => {
+      const releaseImage = document.querySelector<HTMLImageElement>(
+        'img[alt="Jovie releases page with release status, assets, and launch progress"]'
+      );
+      if (!releaseImage) return false;
+      const rect = releaseImage.getBoundingClientRect();
+      const imageCenter = rect.left + rect.width / 2;
+      return Math.abs(imageCenter - window.innerWidth / 2) < 12;
+    });
+    await expect(
+      carousel.getByRole('button', { name: 'Next product preview' })
+    ).toBeVisible();
+    await expect(
+      carousel.getByRole('button', { name: 'Previous product preview' })
+    ).toBeVisible();
+    await page.waitForFunction(() => {
+      const carouselEl = document.querySelector(
+        '[data-testid="homepage-hero-command-center"]'
+      );
+      if (!carouselEl) return false;
+      const visibleImages = Array.from(
+        carouselEl.querySelectorAll<HTMLImageElement>('img')
+      ).filter(img => {
+        const rect = img.getBoundingClientRect();
+        return rect.width > 0 && rect.right > 0 && rect.left < innerWidth;
+      });
+      return (
+        visibleImages.length >= 3 &&
+        visibleImages.every(img => img.complete && img.naturalWidth > 0)
+      );
+    });
+
+    const visibleImageQuality = await carousel
+      .locator('img')
+      .evaluateAll(images =>
+        images
+          .map(img => {
+            const rect = img.getBoundingClientRect();
+            return {
+              alt: img.alt,
+              clientWidth: rect.width,
+              naturalWidth: img.naturalWidth,
+              visible:
+                rect.width > 0 && rect.right > 0 && rect.left < innerWidth,
+              requiredWidth: Math.ceil(rect.width * devicePixelRatio),
+            };
+          })
+          .filter(image => image.visible)
+      );
+
+    expect(visibleImageQuality.length).toBeGreaterThanOrEqual(3);
+    for (const image of visibleImageQuality) {
+      expect(
+        image.naturalWidth,
+        `${image.alt} should be loaded at device pixel ratio quality`
+      ).toBeGreaterThanOrEqual(image.requiredWidth);
+    }
   });
 
-  test('trust, workflow, Friday, profile proof, pricing, FAQ, and final CTA render', async ({
+  test('trust, product statement, workspace, Friday, profile proof, pricing, FAQ, and final CTA render', async ({
     page,
   }) => {
     await expect(page.getByTestId('homepage-trust')).toHaveAttribute(
       'data-presentation',
       'inline-strip'
     );
+    await expect(page.getByTestId('homepage-story-stack')).toHaveAttribute(
+      'data-proof-transition',
+      'true'
+    );
+    await expect(page.getByTestId('homepage-workspace-section')).toBeVisible();
+    const proofParallaxAnimation = await page.evaluate(() => {
+      const supportsScrollTimeline = CSS.supports('animation-timeline: view()');
+      const logoGrid = document.querySelector('.homepage-trust-logo-grid');
+      return supportsScrollTimeline && logoGrid
+        ? getComputedStyle(logoGrid).animationName
+        : 'unsupported';
+    });
+    if (proofParallaxAnimation !== 'unsupported') {
+      expect(proofParallaxAnimation).toBe('homepage-proof-logos-parallax');
+    }
+    await expect(page.getByTestId('homepage-product-statement')).toBeVisible();
+    await expect(page.getByText('Meet Jovie')).toBeVisible();
     await expect(
       page.getByRole('heading', {
-        name: 'Connect, preview, and publish from one release workspace.',
+        name: /A release operating system for serious artists\./,
       })
     ).toBeVisible();
-    await expect(page.getByTestId('homepage-product-depth-band')).toBeVisible();
+    await expect(page.getByText('Go live. In 60 seconds.')).toBeVisible();
     await expect(
       page.getByRole('heading', {
-        name: 'Plan the release around the page fans will actually see.',
+        name: 'One workspace. For every release.',
       })
     ).toBeVisible();
+    await expect(
+      page.getByTestId('homepage-workspace-screenshot').locator('img')
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Import the release' })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Generate the plan' })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Run the tasks' })
+    ).toBeVisible();
+    await expect(page.getByTestId('homepage-product-depth-band')).toHaveCount(
+      0
+    );
+    await expect(page.getByTestId('homepage-workflow-strip')).toHaveCount(0);
     await expect(page.getByTestId('friday-rhythm-section')).toBeVisible();
     await expect(
       page.getByRole('heading', { name: 'Make Every Friday Count' })
@@ -159,16 +247,14 @@ test.describe('Homepage', () => {
     await waitForHydration(page);
 
     await expect(
-      page.getByRole('heading', { name: 'Drop more music, with less work.' })
+      page.getByRole('heading', { name: 'Release more music with less work' })
     ).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
-    await expect(page.getByRole('link', { name: 'Log in' })).toHaveCount(1);
+    await expect(page.getByTestId('header-nav')).toBeVisible();
 
-    const activeHeroShot = page
-      .locator('.homepage-hero-slide[data-active="true"]')
-      .first();
-    const heroShotBounds = await activeHeroShot.boundingBox();
+    const heroProductRail = page.getByTestId('homepage-hero-command-center');
+    const heroShotBounds = await heroProductRail.boundingBox();
     const viewportWidth = page.viewportSize()?.width ?? 0;
 
     expect(heroShotBounds?.x ?? -1).toBeGreaterThanOrEqual(0);
@@ -192,16 +278,19 @@ test.describe('Homepage', () => {
       page.getByRole('button', { name: 'Close menu' })
     ).toBeVisible();
     await expect(
-      mobilePanel.getByRole('link', { name: 'Product', exact: true })
+      mobilePanel.getByRole('link', { name: 'Artist Profiles', exact: true })
     ).toBeVisible();
     await expect(
-      mobilePanel.getByRole('link', { name: 'Solutions', exact: true })
+      mobilePanel.getByRole('link', {
+        name: 'Smart Release Links',
+        exact: true,
+      })
     ).toBeVisible();
     await expect(
       mobilePanel.getByRole('link', { name: 'Pricing', exact: true })
     ).toBeVisible();
     await expect(
-      mobilePanel.getByRole('link', { name: 'Resources', exact: true })
+      mobilePanel.getByRole('link', { name: 'Blog', exact: true })
     ).toBeVisible();
     await expect(
       mobilePanel.getByRole('link', { name: 'Start Free', exact: true })

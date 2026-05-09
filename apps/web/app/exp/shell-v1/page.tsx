@@ -74,8 +74,10 @@ import {
   Users,
   X,
 } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 import {
   createContext,
+  Suspense,
   useCallback,
   useContext,
   useEffect,
@@ -93,6 +95,7 @@ import type {
 import {
   emptyFilters as emptyLibraryFilters,
   generateAssets as generateLibraryAssets,
+  LIBRARY_DEMO_NOW_MS,
   Drawer as LibraryDrawer,
   EmptyState as LibraryEmptyState,
   Grid as LibraryGrid,
@@ -217,6 +220,23 @@ type CanvasView =
   | 'thread'
   | 'onboarding';
 
+function parseCanvasViewParam(value: string | null): CanvasView {
+  switch (value) {
+    case 'demo':
+    case 'releases':
+    case 'tracks':
+    case 'tasks':
+    case 'library':
+    case 'lyrics':
+    case 'settings':
+    case 'thread':
+    case 'onboarding':
+      return value;
+    default:
+      return 'demo';
+  }
+}
+
 type TrackInfo = {
   id: string;
   title: string;
@@ -279,15 +299,15 @@ const SELECTED_ROW_CLASSES = [
 ].join(' ');
 
 const TRACK = {
-  title: 'Lost in the Light',
-  artist: 'Bahamas',
-  album: 'Bahamas Is Afie',
+  title: 'The Deep End',
+  artist: 'Cosmic Gate & Tim White',
+  album: 'Materia Chapter.One',
   version: 'Album Version',
-  bpm: 96,
-  key: 'A min',
-  artwork: 'https://picsum.photos/seed/lost-in-the-light/400/400',
+  bpm: 128,
+  key: 'F min',
+  artwork: '/img/releases/the-deep-end.jpg',
   currentTime: 78,
-  duration: 213,
+  duration: 205,
 };
 
 // Demo loop section (percent-of-track) used when loopMode === 'section'.
@@ -340,24 +360,24 @@ type Thread = {
 const THREADS: Thread[] = [
   {
     id: 'thr-1',
-    title: 'Generating lyric video for Lost in the Light',
+    title: 'Rendering 9:16 lyric video for The Deep End',
     status: 'running',
     entityKind: 'release',
-    entityId: 'lost-in-the-light',
+    entityId: 'the-deep-end',
     updatedAt: '2026-04-26T09:48:00Z',
   },
   {
     id: 'thr-2',
-    title: 'Drafting Detroit booking pitch',
+    title: 'Drafting Movement Festival booking pitch',
     status: 'running',
     updatedAt: '2026-04-26T09:31:00Z',
   },
   {
     id: 'thr-3',
-    title: 'Spotify Canvas regenerated for Stronger Than That',
+    title: 'Spotify Canvas approved for Take Me Over',
     status: 'complete',
     entityKind: 'release',
-    entityId: 'stronger-than-that',
+    entityId: 'take-me-over',
     updatedAt: '2026-04-26T08:12:00Z',
     unread: true,
   },
@@ -379,7 +399,7 @@ const THREADS: Thread[] = [
   },
   {
     id: 'thr-6',
-    title: 'Rendering 9:16 lyric video for All the Time',
+    title: 'Generating vertical lyric video for Never Say A Word',
     status: 'running',
     entityKind: 'task',
     entityId: 'J-126',
@@ -402,8 +422,13 @@ const ADMIN_ITEMS: NavItem[] = [
 ];
 
 const ARTIST_WORKSPACES: Workspace[] = [
-  { id: 'bahamas', name: 'Bahamas', initials: 'BA', items: ARTIST_ITEMS },
-  { id: 'sade', name: 'Sade', initials: 'SA', items: [] },
+  { id: 'tim-white', name: 'Tim White', initials: 'TW', items: ARTIST_ITEMS },
+  {
+    id: 'cosmic-gate',
+    name: 'Cosmic Gate',
+    initials: 'CG',
+    items: [],
+  },
 ];
 
 const ADMIN_WORKSPACE: Workspace = {
@@ -412,6 +437,21 @@ const ADMIN_WORKSPACE: Workspace = {
   initials: 'AD',
   items: ADMIN_ITEMS,
 };
+
+function canvasViewForNavItem(label: string): CanvasView | null {
+  switch (label) {
+    case 'Dashboard':
+      return 'demo';
+    case 'Releases':
+      return 'releases';
+    case 'Tasks':
+      return 'tasks';
+    case 'Library':
+      return 'library';
+    default:
+      return null;
+  }
+}
 
 // --- Releases mock ---------------------------------------------------------
 type ReleaseType = 'Single' | 'EP' | 'Album';
@@ -450,74 +490,325 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
-    id: 'lost-in-the-light',
-    title: 'Lost in the Light',
-    artist: 'Bahamas',
-    album: 'Bahamas Is Afie',
+    id: 'the-deep-end',
+    title: 'The Deep End',
+    artist: 'Cosmic Gate & Tim White',
+    album: 'Materia Chapter.One',
     type: 'Single',
-    releaseDate: '2026-04-12',
-    artwork: 'https://picsum.photos/seed/lost-in-the-light/400/400',
-    bpm: 96,
-    key: 'A min',
+    releaseDate: '2017-03-03',
+    artwork: '/img/releases/the-deep-end.jpg',
+    bpm: 128,
+    key: 'F min',
     version: 'Album Version',
     dsps: { spotify: 'live', apple: 'live', youtube: 'live', tidal: 'live' },
-    weeklyStreams: 12_400,
-    weeklyDelta: 8,
-    tasksOpen: 0,
+    weeklyStreams: 18_300,
+    weeklyDelta: 11,
+    tasksOpen: 1,
     pitchReady: true,
     agent: 'idle',
-    durationSec: 213,
+    durationSec: 205,
     waveformSeed: 1,
     cues: [
       { at: 6, kind: 'intro', label: 'Intro' },
-      { at: 26, kind: 'verse', label: 'Verse 1' },
-      { at: 52, kind: 'chorus', label: 'Chorus' },
-      { at: 73, kind: 'verse', label: 'Verse 2' },
-      { at: 88, kind: 'drop', label: 'Drop' },
+      { at: 31, kind: 'verse', label: 'Vocal' },
+      { at: 72, kind: 'chorus', label: 'Hook' },
+      { at: 98, kind: 'drop', label: 'Drop' },
+      { at: 154, kind: 'outro', label: 'Outro' },
     ],
   },
   {
-    id: 'stronger-than-that',
-    title: 'Stronger Than That',
-    artist: 'Bahamas',
-    album: 'Sad Hunk',
-    type: 'EP',
-    releaseDate: '2026-03-28',
-    artwork: 'https://picsum.photos/seed/stronger-than-that/400/400',
-    bpm: 112,
-    key: 'D maj',
+    id: 'never-say-a-word',
+    title: 'Never Say A Word',
+    artist: 'Tim White',
+    album: 'Never Say A Word',
+    type: 'Single',
+    releaseDate: '2024-06-21',
+    artwork: '/img/releases/never-say-a-word.jpg',
+    bpm: 122,
+    key: 'G min',
     version: 'Studio',
+    dsps: {
+      spotify: 'live',
+      apple: 'live',
+      youtube: 'live',
+      tidal: 'pending',
+    },
+    weeklyStreams: 14_860,
+    weeklyDelta: 18,
+    tasksOpen: 2,
+    pitchReady: true,
+    agent: 'syncing-art',
+    durationSec: 198,
+    waveformSeed: 7,
+    cues: [
+      { at: 4, kind: 'intro', label: 'Intro' },
+      { at: 28, kind: 'verse', label: 'Verse' },
+      { at: 56, kind: 'chorus', label: 'Chorus' },
+      { at: 92, kind: 'bridge', label: 'Bridge' },
+    ],
+  },
+  {
+    id: 'take-me-over',
+    title: 'Take Me Over',
+    artist: 'Tim White feat. Erica Gibson',
+    album: 'Take Me Over',
+    type: 'Single',
+    releaseDate: '2014-05-06',
+    artwork: '/img/releases/take-me-over.jpg',
+    bpm: 128,
+    key: 'A min',
+    version: 'Single Edit',
+    dsps: {
+      spotify: 'live',
+      apple: 'live',
+      youtube: 'live',
+      tidal: 'missing',
+    },
+    weeklyStreams: 9_420,
+    weeklyDelta: 6,
+    tasksOpen: 0,
+    pitchReady: true,
+    agent: 'idle',
+    durationSec: 232,
+    waveformSeed: 11,
+    cues: [
+      { at: 8, kind: 'intro', label: 'Intro' },
+      { at: 40, kind: 'verse', label: 'Verse' },
+      { at: 74, kind: 'chorus', label: 'Hook' },
+      { at: 128, kind: 'drop', label: 'Drop' },
+    ],
+  },
+  {
+    id: 'all-this-noise',
+    title: 'All This Noise',
+    artist: 'Tim White',
+    album: 'All This Noise',
+    type: 'EP',
+    releaseDate: '2015-08-27',
+    artwork: '/images/mock-profile/tim-white-dont-look-down-card.jpg',
+    bpm: 126,
+    key: 'C maj',
+    version: 'EP',
+    dsps: { spotify: 'live', apple: 'live', youtube: 'live', tidal: 'error' },
+    weeklyStreams: 7_980,
+    weeklyDelta: 4,
+    tasksOpen: 1,
+    pitchReady: true,
+    agent: 'idle',
+    durationSec: 219,
+    waveformSeed: 17,
+    cues: [
+      { at: 12, kind: 'intro', label: 'Intro' },
+      { at: 48, kind: 'verse', label: 'Verse' },
+      { at: 90, kind: 'chorus', label: 'Chorus' },
+      { at: 132, kind: 'drop', label: 'Drop' },
+      { at: 180, kind: 'outro', label: 'Outro' },
+    ],
+  },
+  {
+    id: 'save-the-night',
+    title: 'Save The Night',
+    artist: 'Tim White',
+    album: 'All This Noise',
+    type: 'Single',
+    releaseDate: '2015-08-27',
+    artwork: '/images/mock-profile/drawer-releases/release-1.png',
+    bpm: 102,
+    key: 'G maj',
+    version: 'Studio',
+    dsps: { spotify: 'live', apple: 'live', youtube: 'live', tidal: 'live' },
+    weeklyStreams: 6_240,
+    weeklyDelta: 12,
+    tasksOpen: 0,
+    pitchReady: true,
+    agent: 'idle',
+    durationSec: 191,
+    waveformSeed: 23,
+    cues: [
+      { at: 5, kind: 'intro', label: 'Intro' },
+      { at: 22, kind: 'verse', label: 'Verse' },
+      { at: 60, kind: 'chorus', label: 'Chorus' },
+      { at: 110, kind: 'bridge', label: 'Bridge' },
+    ],
+  },
+  {
+    id: 'trying-too-hard',
+    title: 'Trying Too Hard',
+    artist: 'Tim White',
+    album: 'All This Noise',
+    type: 'Single',
+    releaseDate: '2015-08-27',
+    artwork: '/images/mock-profile/drawer-releases/release-2.png',
+    bpm: 124,
+    key: 'B min',
+    version: 'EP Mix',
+    dsps: { spotify: 'live', apple: 'live', youtube: 'live', tidal: 'live' },
+    weeklyStreams: 3_810,
+    weeklyDelta: -2,
+    tasksOpen: 0,
+    pitchReady: true,
+    agent: 'idle',
+    durationSec: 200,
+    waveformSeed: 31,
+    cues: [
+      { at: 6, kind: 'intro', label: 'Intro' },
+      { at: 28, kind: 'verse', label: 'Verse 1' },
+      { at: 70, kind: 'chorus', label: 'Chorus' },
+      { at: 110, kind: 'verse', label: 'Verse 2' },
+      { at: 150, kind: 'outro', label: 'Outro' },
+    ],
+  },
+  {
+    id: 'california',
+    title: 'California',
+    artist: 'Tim White',
+    album: 'All This Noise',
+    type: 'Single',
+    releaseDate: '2015-08-27',
+    artwork: '/images/mock-profile/drawer-releases/release-3.png',
+    bpm: 118,
+    key: 'D maj',
+    version: 'EP Mix',
+    dsps: { spotify: 'live', apple: 'live', youtube: 'live', tidal: 'live' },
+    weeklyStreams: 3_250,
+    weeklyDelta: 5,
+    tasksOpen: 0,
+    pitchReady: true,
+    agent: 'idle',
+    durationSec: 232,
+    waveformSeed: 37,
+    cues: [
+      { at: 6, kind: 'intro', label: 'Intro' },
+      { at: 30, kind: 'verse', label: 'Verse' },
+      { at: 70, kind: 'chorus', label: 'Hook' },
+      { at: 124, kind: 'outro', label: 'Outro' },
+    ],
+  },
+  {
+    id: 'become-one',
+    title: 'Become One',
+    artist: 'Tim White',
+    album: 'All This Noise',
+    type: 'Single',
+    releaseDate: '2015-08-27',
+    artwork: '/images/mock-profile/drawer-releases/release-4.png',
+    bpm: 120,
+    key: 'E min',
+    version: 'EP Mix',
     dsps: {
       spotify: 'live',
       apple: 'live',
       youtube: 'pending',
       tidal: 'missing',
     },
-    weeklyStreams: 8_730,
-    weeklyDelta: 3,
-    tasksOpen: 2,
+    weeklyStreams: 2_960,
+    weeklyDelta: 2,
+    tasksOpen: 1,
     pitchReady: false,
     agent: 'rescanning-dsps',
-    durationSec: 198,
-    waveformSeed: 7,
+    durationSec: 206,
+    waveformSeed: 41,
     cues: [
-      { at: 4, kind: 'intro', label: 'Intro' },
-      { at: 30, kind: 'verse', label: 'Verse' },
-      { at: 60, kind: 'drop', label: 'Drop' },
-      { at: 96, kind: 'bridge', label: 'Bridge' },
+      { at: 7, kind: 'intro', label: 'Intro' },
+      { at: 32, kind: 'verse', label: 'Verse' },
+      { at: 66, kind: 'chorus', label: 'Hook' },
+      { at: 118, kind: 'drop', label: 'Drop' },
     ],
   },
   {
-    id: 'all-the-time',
-    title: 'All the Time',
-    artist: 'Bahamas',
-    album: 'Earthtones',
+    id: 'revival',
+    title: 'Revival',
+    artist: 'Tom Fall & Tim White',
+    album: 'Revival',
     type: 'Single',
-    releaseDate: '2026-05-09',
-    artwork: 'https://picsum.photos/seed/all-the-time/400/400',
-    bpm: 88,
-    key: 'F maj',
-    version: 'Single Edit',
+    releaseDate: '2016-04-15',
+    artwork: '/images/mock-profile/drawer-releases/release-5.png',
+    bpm: 128,
+    key: 'F min',
+    version: 'Original Mix',
+    dsps: { spotify: 'live', apple: 'live', youtube: 'live', tidal: 'live' },
+    weeklyStreams: 2_620,
+    weeklyDelta: 1,
+    tasksOpen: 0,
+    pitchReady: true,
+    agent: 'idle',
+    durationSec: 226,
+    waveformSeed: 47,
+    cues: [
+      { at: 8, kind: 'intro', label: 'Intro' },
+      { at: 36, kind: 'verse', label: 'Build' },
+      { at: 84, kind: 'drop', label: 'Drop' },
+      { at: 172, kind: 'outro', label: 'Outro' },
+    ],
+  },
+  {
+    id: 'sober',
+    title: 'Sober',
+    artist: 'Jochen Miller & Tim White',
+    album: 'Sober',
+    type: 'Single',
+    releaseDate: '2016-09-02',
+    artwork: '/images/mock-profile/drawer-releases/release-6.png',
+    bpm: 128,
+    key: 'A maj',
+    version: 'Original Mix',
+    dsps: {
+      spotify: 'live',
+      apple: 'live',
+      youtube: 'live',
+      tidal: 'pending',
+    },
+    weeklyStreams: 2_310,
+    weeklyDelta: -1,
+    tasksOpen: 0,
+    pitchReady: true,
+    agent: 'idle',
+    durationSec: 218,
+    waveformSeed: 53,
+    cues: [
+      { at: 8, kind: 'intro', label: 'Intro' },
+      { at: 42, kind: 'verse', label: 'Vocal' },
+      { at: 92, kind: 'drop', label: 'Drop' },
+      { at: 160, kind: 'outro', label: 'Outro' },
+    ],
+  },
+  {
+    id: 'wheels-up',
+    title: 'Wheels Up',
+    artist: 'Lynx & Tim White',
+    album: 'Wheels Up',
+    type: 'Single',
+    releaseDate: '2018-03-16',
+    artwork: '/images/mock-profile/tim-white-dont-look-down-hero.jpg',
+    bpm: 126,
+    key: 'C min',
+    version: 'Original Mix',
+    dsps: { spotify: 'live', apple: 'live', youtube: 'live', tidal: 'live' },
+    weeklyStreams: 1_980,
+    weeklyDelta: 3,
+    tasksOpen: 0,
+    pitchReady: true,
+    agent: 'idle',
+    durationSec: 214,
+    waveformSeed: 59,
+    cues: [
+      { at: 4, kind: 'intro', label: 'Intro' },
+      { at: 34, kind: 'verse', label: 'Verse' },
+      { at: 76, kind: 'drop', label: 'Drop' },
+      { at: 148, kind: 'outro', label: 'Outro' },
+    ],
+  },
+  {
+    id: 'dont-look-down',
+    title: "Don't Look Down",
+    artist: 'Tim White',
+    album: "Don't Look Down",
+    type: 'Single',
+    releaseDate: '2026-05-22',
+    artwork: '/images/mock-profile/tim-white-dont-look-down-card.jpg',
+    bpm: 124,
+    key: 'C min',
+    version: 'Campaign Draft',
     dsps: {
       spotify: 'pending',
       apple: 'pending',
@@ -529,93 +820,13 @@ const RELEASES: Release[] = [
     tasksOpen: 5,
     pitchReady: false,
     agent: 'generating-pitch',
-    durationSec: 224,
-    waveformSeed: 11,
+    durationSec: 204,
+    waveformSeed: 61,
     cues: [
       { at: 8, kind: 'intro', label: 'Intro' },
-      { at: 40, kind: 'verse', label: 'Verse' },
-      { at: 78, kind: 'chorus', label: 'Chorus' },
-      { at: 124, kind: 'outro', label: 'Outro' },
-    ],
-  },
-  {
-    id: 'sunshine-on-my-back',
-    title: 'Sunshine on My Back',
-    artist: 'Bahamas',
-    album: 'Earthtones',
-    type: 'Album',
-    releaseDate: '2026-02-04',
-    artwork: 'https://picsum.photos/seed/sunshine-on-my-back/400/400',
-    bpm: 124,
-    key: 'C maj',
-    version: 'Album',
-    dsps: { spotify: 'live', apple: 'live', youtube: 'live', tidal: 'error' },
-    weeklyStreams: 24_180,
-    weeklyDelta: -4,
-    tasksOpen: 1,
-    pitchReady: true,
-    agent: 'idle',
-    durationSec: 247,
-    waveformSeed: 17,
-    cues: [
-      { at: 12, kind: 'intro', label: 'Intro' },
-      { at: 48, kind: 'verse', label: 'Verse' },
-      { at: 90, kind: 'chorus', label: 'Chorus' },
-      { at: 132, kind: 'drop', label: 'Drop' },
-      { at: 180, kind: 'outro', label: 'Outro' },
-    ],
-  },
-  {
-    id: 'opening-act',
-    title: 'Opening Act',
-    artist: 'Bahamas',
-    album: 'Earthtones',
-    type: 'Single',
-    releaseDate: '2026-01-19',
-    artwork: 'https://picsum.photos/seed/opening-act/400/400',
-    bpm: 102,
-    key: 'G maj',
-    version: 'Studio',
-    dsps: { spotify: 'live', apple: 'live', youtube: 'live', tidal: 'live' },
-    weeklyStreams: 6_240,
-    weeklyDelta: 12,
-    tasksOpen: 0,
-    pitchReady: true,
-    agent: 'idle',
-    durationSec: 184,
-    waveformSeed: 23,
-    cues: [
-      { at: 5, kind: 'intro', label: 'Intro' },
-      { at: 22, kind: 'verse', label: 'Verse' },
-      { at: 60, kind: 'chorus', label: 'Chorus' },
-      { at: 110, kind: 'bridge', label: 'Bridge' },
-    ],
-  },
-  {
-    id: 'bittersweet',
-    title: 'Bittersweet',
-    artist: 'Bahamas',
-    album: 'Bahamas Is Afie',
-    type: 'Single',
-    releaseDate: '2025-12-02',
-    artwork: 'https://picsum.photos/seed/bittersweet/400/400',
-    bpm: 76,
-    key: 'B min',
-    version: 'Acoustic',
-    dsps: { spotify: 'live', apple: 'live', youtube: 'live', tidal: 'live' },
-    weeklyStreams: 3_810,
-    weeklyDelta: -2,
-    tasksOpen: 0,
-    pitchReady: true,
-    agent: 'idle',
-    durationSec: 232,
-    waveformSeed: 31,
-    cues: [
-      { at: 6, kind: 'intro', label: 'Intro' },
-      { at: 28, kind: 'verse', label: 'Verse 1' },
-      { at: 70, kind: 'chorus', label: 'Chorus' },
-      { at: 110, kind: 'verse', label: 'Verse 2' },
-      { at: 150, kind: 'outro', label: 'Outro' },
+      { at: 38, kind: 'verse', label: 'Verse' },
+      { at: 82, kind: 'chorus', label: 'Hook' },
+      { at: 126, kind: 'drop', label: 'Drop' },
     ],
   },
 ];
@@ -687,47 +898,40 @@ const ENTITY_RELEASES: EntityPopoverData[] = RELEASES.map(
 const ENTITY_ARTISTS: EntityPopoverData[] = [
   {
     kind: 'artist',
-    id: 'bahamas',
-    label: 'Bahamas',
-    handle: 'bahamasmusic',
-    followers: 482_000,
-    verified: true,
-    popularity: 64,
-  },
-  {
-    kind: 'artist',
-    id: 'sade',
-    label: 'Sade',
-    handle: 'sade',
-    followers: 9_400_000,
-    verified: true,
-    popularity: 81,
-  },
-  {
-    kind: 'artist',
-    id: 'frank-ocean',
-    label: 'Frank Ocean',
-    handle: 'frankocean',
-    followers: 14_200_000,
-    verified: true,
-    popularity: 88,
-  },
-  {
-    kind: 'artist',
-    id: 'tycho',
-    label: 'Tycho',
-    handle: 'tycho',
-    followers: 1_100_000,
-    verified: true,
-    popularity: 70,
-  },
-  {
-    kind: 'artist',
     id: 'tim-white',
     label: 'Tim White',
     handle: 'timwhite',
-    followers: 1_240,
+    followers: 18_400,
+    verified: true,
+    popularity: 58,
     isYou: true,
+  },
+  {
+    kind: 'artist',
+    id: 'cosmic-gate',
+    label: 'Cosmic Gate',
+    handle: 'cosmicgate',
+    followers: 1_900_000,
+    verified: true,
+    popularity: 76,
+  },
+  {
+    kind: 'artist',
+    id: 'erica-gibson',
+    label: 'Erica Gibson',
+    handle: 'ericagibson',
+    followers: 24_000,
+    verified: true,
+    popularity: 44,
+  },
+  {
+    kind: 'artist',
+    id: 'black-hole-recordings',
+    label: 'Black Hole Recordings',
+    handle: 'blackholerecordings',
+    followers: 860_000,
+    verified: true,
+    popularity: 61,
   },
 ];
 
@@ -799,23 +1003,23 @@ const ENTITY_EVENTS: EntityPopoverData[] = [
 const ENTITY_TRACKS_DEMO: EntityPopoverData[] = [
   {
     kind: 'track',
-    id: 'lost-in-the-light-track',
-    label: 'Lost in the Light',
-    artist: 'Bahamas',
-    releaseTitle: 'Bahamas Is Afie',
-    durationSec: 213,
-    bpm: 96,
-    keyName: 'A min',
+    id: 'the-deep-end-track',
+    label: 'The Deep End',
+    artist: 'Cosmic Gate & Tim White',
+    releaseTitle: 'Materia Chapter.One',
+    durationSec: 205,
+    bpm: 128,
+    keyName: 'F min',
   },
   {
     kind: 'track',
-    id: 'stronger-than-that-track',
-    label: 'Stronger Than That',
-    artist: 'Bahamas',
-    releaseTitle: 'Sad Hunk',
-    durationSec: 198,
-    bpm: 112,
-    keyName: 'D maj',
+    id: 'take-me-over-track',
+    label: 'Take Me Over',
+    artist: 'Tim White feat. Erica Gibson',
+    releaseTitle: 'Take Me Over',
+    durationSec: 232,
+    bpm: 128,
+    keyName: 'A min',
   },
 ];
 
@@ -853,13 +1057,16 @@ function lookupReleaseEntityByAlbum(
   album: string,
   excludeId?: string
 ): EntityPopoverData {
-  // Album titles are not always unique to a single release in the demo —
-  // pick the first match that isn't the current row. Falls through to a
-  // minimal stub so the popover still renders for off-roster album names.
-  const found = ENTITY_RELEASES.find(
+  // Album titles are not always unique in the demo. Prefer another release
+  // from the same album, then fall back to the current album's canonical row.
+  const foundByTitle = ENTITY_RELEASES.find(
     r => r.kind === 'release' && r.label === album && r.id !== excludeId
   );
-  if (found) return found;
+  if (foundByTitle) return foundByTitle;
+  const foundByAlbum =
+    RELEASES.find(r => r.album === album && r.id !== excludeId) ??
+    RELEASES.find(r => r.album === album);
+  if (foundByAlbum) return releaseToEntityPopover(foundByAlbum);
   return { kind: 'release', id: `release:${album}`, label: album };
 }
 
@@ -889,24 +1096,30 @@ type Track = {
 };
 
 const ARTIST_POOL = [
-  'Bahamas',
-  'Sade',
-  'Frank Ocean',
-  'Anderson .Paak',
   'Tim White',
+  'Cosmic Gate',
   'Erica Gibson',
-  'Tycho',
-  'Bonobo',
-  'Khruangbin',
-  'BADBADNOTGOOD',
+  'Tom Fall',
+  'Jochen Miller',
+  'Lynx',
+  'Vigel',
+  'Black Hole Recordings',
+  'Wake Your Mind Records',
+  'Armada Music',
 ];
 const TITLE_POOL = [
-  'Lost in the Light',
-  'Stronger Than That',
-  'All the Time',
-  'Sunshine on My Back',
-  'Opening Act',
-  'Bittersweet',
+  'The Deep End',
+  'Take Me Over',
+  'Never Say A Word',
+  "Don't Look Down",
+  'All This Noise',
+  'Save The Night',
+  'Trying Too Hard',
+  'California',
+  'Become One',
+  'Revival',
+  'Sober',
+  'Wheels Up',
   'Late Night Drift',
   'Slow Burn',
   'High Tide',
@@ -943,12 +1156,12 @@ const TITLE_POOL = [
   'Quiet Now',
 ];
 const ALBUM_POOL = [
-  'Earthtones',
-  'Bahamas Is Afie',
-  'Sad Hunk',
-  'Live to Be Free',
-  'Mid-set',
-  'B-sides',
+  'Materia Chapter.One',
+  'Take Me Over',
+  'Never Say A Word',
+  'All This Noise',
+  "Don't Look Down",
+  'Release Drafts',
   '—',
 ];
 const KEY_PAIRS: Array<[string, string]> = [
@@ -966,12 +1179,12 @@ const KEY_PAIRS: Array<[string, string]> = [
   ['A maj', '11B'],
 ];
 const ARTWORK_POOL = [
-  'https://picsum.photos/seed/jovie-art-a/400/400',
-  'https://picsum.photos/seed/jovie-art-b/400/400',
-  'https://picsum.photos/seed/jovie-art-c/400/400',
-  'https://picsum.photos/seed/jovie-art-d/400/400',
-  'https://picsum.photos/seed/jovie-art-e/400/400',
-  'https://picsum.photos/seed/jovie-art-f/400/400',
+  '/img/releases/the-deep-end.jpg',
+  '/img/releases/take-me-over.jpg',
+  '/img/releases/never-say-a-word.jpg',
+  '/images/mock-profile/tim-white-dont-look-down-card.jpg',
+  '/images/mock-profile/drawer-releases/release-1.png',
+  '/images/mock-profile/drawer-releases/release-2.png',
 ];
 
 function pick<T>(arr: readonly T[], i: number): T {
@@ -1059,24 +1272,24 @@ function generateTracks(n: number): Track[] {
 
 const TRACKS: Track[] = [
   {
-    id: 'lost-in-the-light-track',
-    releaseId: 'lost-in-the-light',
-    title: 'Lost in the Light',
-    artist: 'Bahamas',
-    album: 'Bahamas Is Afie',
+    id: 'the-deep-end-track',
+    releaseId: 'the-deep-end',
+    title: 'The Deep End',
+    artist: 'Cosmic Gate & Tim White',
+    album: 'Materia Chapter.One',
     type: 'Single',
-    bpm: 96,
-    keyNormal: 'A min',
-    keyCamelot: '8A',
+    bpm: 128,
+    keyNormal: 'F min',
+    keyCamelot: '4A',
     rating: 5,
-    energy: 6,
-    durationSec: 213,
+    energy: 9,
+    durationSec: 205,
     isrc: 'USRC12500001',
     status: 'live',
     hasVideo: true,
     hasCanvas: true,
-    artwork: 'https://picsum.photos/seed/lost-in-the-light/400/400',
-    bpmTone: 'mid',
+    artwork: '/img/releases/the-deep-end.jpg',
+    bpmTone: 'high',
     waveformSeed: 1,
     cues: [
       { at: 6, kind: 'intro', label: 'Intro' },
@@ -1086,15 +1299,15 @@ const TRACKS: Track[] = [
     ],
   },
   {
-    id: 'lost-extended-mix',
-    releaseId: 'lost-in-the-light',
-    title: 'Lost in the Light',
-    artist: 'Bahamas',
-    album: 'Bahamas Is Afie',
+    id: 'the-deep-end-extended-mix',
+    releaseId: 'the-deep-end',
+    title: 'The Deep End',
+    artist: 'Cosmic Gate & Tim White',
+    album: 'Materia Chapter.One',
     type: 'Single',
     bpm: 124,
-    keyNormal: 'A min',
-    keyCamelot: '8A',
+    keyNormal: 'F min',
+    keyCamelot: '4A',
     rating: 4,
     energy: 8,
     durationSec: 348,
@@ -1102,7 +1315,7 @@ const TRACKS: Track[] = [
     status: 'live',
     hasVideo: false,
     hasCanvas: true,
-    artwork: 'https://picsum.photos/seed/lost-in-the-light/400/400',
+    artwork: '/img/releases/the-deep-end.jpg',
     bpmTone: 'high',
     waveformSeed: 2,
     cues: [
@@ -1113,24 +1326,24 @@ const TRACKS: Track[] = [
     ],
   },
   {
-    id: 'stronger',
-    releaseId: 'stronger-than-that',
-    title: 'Stronger Than That',
-    artist: 'Bahamas',
-    album: 'Sad Hunk',
-    type: 'EP',
-    bpm: 112,
-    keyNormal: 'D maj',
-    keyCamelot: '10B',
+    id: 'take-me-over-track',
+    releaseId: 'take-me-over',
+    title: 'Take Me Over',
+    artist: 'Tim White feat. Erica Gibson',
+    album: 'Take Me Over',
+    type: 'Single',
+    bpm: 128,
+    keyNormal: 'A min',
+    keyCamelot: '8A',
     rating: 4,
     energy: 7,
-    durationSec: 198,
+    durationSec: 232,
     isrc: 'USRC12500003',
     status: 'live',
     hasVideo: false,
     hasCanvas: true,
-    artwork: 'https://picsum.photos/seed/stronger-than-that/400/400',
-    bpmTone: 'mid',
+    artwork: '/img/releases/take-me-over.jpg',
+    bpmTone: 'high',
     waveformSeed: 7,
     cues: [
       { at: 4, kind: 'intro', label: 'Intro' },
@@ -1140,23 +1353,23 @@ const TRACKS: Track[] = [
     ],
   },
   {
-    id: 'all-the-time',
-    releaseId: 'all-the-time',
-    title: 'All the Time',
-    artist: 'Bahamas',
-    album: 'Earthtones',
+    id: 'never-say-a-word-track',
+    releaseId: 'never-say-a-word',
+    title: 'Never Say A Word',
+    artist: 'Tim White',
+    album: 'Never Say A Word',
     type: 'Single',
-    bpm: 88,
-    keyNormal: 'F maj',
-    keyCamelot: '7B',
+    bpm: 122,
+    keyNormal: 'G min',
+    keyCamelot: '6A',
     rating: 3,
-    energy: 4,
-    durationSec: 224,
+    energy: 6,
+    durationSec: 198,
     status: 'scheduled',
     hasVideo: false,
     hasCanvas: false,
-    artwork: 'https://picsum.photos/seed/all-the-time/400/400',
-    bpmTone: 'low',
+    artwork: '/img/releases/never-say-a-word.jpg',
+    bpmTone: 'mid',
     waveformSeed: 11,
     cues: [
       { at: 8, kind: 'intro', label: 'Intro' },
@@ -1165,13 +1378,13 @@ const TRACKS: Track[] = [
     ],
   },
   {
-    id: 'sunshine',
-    releaseId: 'sunshine-on-my-back',
-    title: 'Sunshine on My Back',
-    artist: 'Bahamas',
-    album: 'Earthtones',
-    type: 'Album',
-    bpm: 124,
+    id: 'all-this-noise-track',
+    releaseId: 'all-this-noise',
+    title: 'All This Noise',
+    artist: 'Tim White',
+    album: 'All This Noise',
+    type: 'EP',
+    bpm: 126,
     keyNormal: 'C maj',
     keyCamelot: '8B',
     rating: 5,
@@ -1181,7 +1394,7 @@ const TRACKS: Track[] = [
     status: 'live',
     hasVideo: true,
     hasCanvas: true,
-    artwork: 'https://picsum.photos/seed/lost-in-the-light/400/400',
+    artwork: '/images/mock-profile/tim-white-dont-look-down-card.jpg',
     bpmTone: 'high',
     waveformSeed: 17,
     cues: [
@@ -1192,11 +1405,11 @@ const TRACKS: Track[] = [
     ],
   },
   {
-    id: 'opening-act',
-    releaseId: 'opening-act',
-    title: 'Opening Act',
-    artist: 'Bahamas',
-    album: 'Earthtones',
+    id: 'save-the-night-track',
+    releaseId: 'save-the-night',
+    title: 'Save The Night',
+    artist: 'Tim White',
+    album: 'All This Noise',
     type: 'Single',
     bpm: 102,
     keyNormal: 'G maj',
@@ -1208,7 +1421,7 @@ const TRACKS: Track[] = [
     status: 'live',
     hasVideo: false,
     hasCanvas: false,
-    artwork: 'https://picsum.photos/seed/stronger-than-that/400/400',
+    artwork: '/images/mock-profile/drawer-releases/release-1.png',
     bpmTone: 'mid',
     waveformSeed: 23,
     cues: [
@@ -1218,11 +1431,11 @@ const TRACKS: Track[] = [
     ],
   },
   {
-    id: 'bittersweet',
-    releaseId: 'bittersweet',
-    title: 'Bittersweet',
-    artist: 'Bahamas',
-    album: 'Bahamas Is Afie',
+    id: 'become-one-track',
+    releaseId: 'become-one',
+    title: 'Become One',
+    artist: 'Tim White',
+    album: 'All This Noise',
     type: 'Single',
     bpm: 76,
     keyNormal: 'B min',
@@ -1234,7 +1447,7 @@ const TRACKS: Track[] = [
     status: 'live',
     hasVideo: false,
     hasCanvas: true,
-    artwork: 'https://picsum.photos/seed/all-the-time/400/400',
+    artwork: '/images/mock-profile/drawer-releases/release-4.png',
     bpmTone: 'low',
     waveformSeed: 31,
     cues: [
@@ -1247,7 +1460,7 @@ const TRACKS: Track[] = [
     id: 'untitled-demo-04',
     releaseId: null,
     title: 'Untitled Demo 04',
-    artist: 'Bahamas',
+    artist: 'Tim White',
     album: '—',
     type: 'Single',
     bpm: 118,
@@ -1259,7 +1472,7 @@ const TRACKS: Track[] = [
     status: 'draft',
     hasVideo: false,
     hasCanvas: false,
-    artwork: 'https://picsum.photos/seed/lost-in-the-light/400/400',
+    artwork: '/images/mock-profile/tim-white-dont-look-down-hero.jpg',
     bpmTone: 'mid',
     waveformSeed: 37,
     cues: [
@@ -1290,39 +1503,39 @@ type Task = {
 const TASKS: Task[] = [
   {
     id: 'J-128',
-    title: 'Confirm artwork for Lost in the Light',
+    title: 'Confirm artwork for The Deep End',
     description:
       'Final mastered files came back. Need to approve the cover art crop for the Spotify Canvas before the smart link goes live next Friday.',
     status: 'in_progress',
     priority: 'high',
     assignee: 'you',
-    releaseId: 'lost-in-the-light',
+    releaseId: 'the-deep-end',
     dueIso: '2026-04-30',
     updatedIso: '2026-04-25',
     labels: ['design', 'distribution'],
   },
   {
     id: 'J-127',
-    title: 'Approve playlist pitch for Stronger Than That',
+    title: 'Approve playlist pitch for Take Me Over',
     description:
       'Jovie drafted a 3-paragraph pitch tuned for indie-folk Spotify editorial. Skim it, edit anything that feels off, and submit.',
     status: 'todo',
     priority: 'high',
     assignee: 'you',
-    releaseId: 'stronger-than-that',
+    releaseId: 'take-me-over',
     dueIso: '2026-04-28',
     updatedIso: '2026-04-25',
     labels: ['pitch'],
   },
   {
     id: 'J-126',
-    title: 'Generate vertical lyric video for All the Time',
+    title: 'Generate vertical lyric video for Never Say A Word',
     description:
       'Stems are uploaded. Jovie will render a 9:16 lyric video with three style passes; pick one when ready.',
     status: 'in_progress',
     priority: 'medium',
     assignee: 'jovie',
-    releaseId: 'all-the-time',
+    releaseId: 'never-say-a-word',
     dueIso: '2026-05-02',
     updatedIso: '2026-04-25',
     labels: ['video', 'social'],
@@ -1333,7 +1546,7 @@ const TASKS: Task[] = [
     status: 'todo',
     priority: 'medium',
     assignee: 'you',
-    releaseId: 'all-the-time',
+    releaseId: 'never-say-a-word',
     dueIso: '2026-05-05',
     updatedIso: '2026-04-24',
     labels: ['social'],
@@ -1351,13 +1564,13 @@ const TASKS: Task[] = [
   },
   {
     id: 'J-123',
-    title: 'Backfill UPC for Sunshine on My Back',
+    title: 'Backfill UPC for All This Noise',
     description:
       'TIDAL flagged the missing UPC. Jovie can pull it from the distributor — confirm the metadata is accurate before sync.',
     status: 'backlog',
     priority: 'medium',
     assignee: 'jovie',
-    releaseId: 'sunshine-on-my-back',
+    releaseId: 'all-this-noise',
     dueIso: null,
     updatedIso: '2026-04-23',
     labels: ['distribution'],
@@ -1375,11 +1588,11 @@ const TASKS: Task[] = [
   },
   {
     id: 'J-121',
-    title: 'Tag Bittersweet stems for the remix pack',
+    title: 'Tag Become One stems for the remix pack',
     status: 'todo',
     priority: 'low',
     assignee: 'you',
-    releaseId: 'bittersweet',
+    releaseId: 'become-one',
     dueIso: null,
     updatedIso: '2026-04-22',
     labels: ['catalog'],
@@ -1401,7 +1614,7 @@ const TASKS: Task[] = [
     status: 'done',
     priority: 'low',
     assignee: 'jovie',
-    releaseId: 'opening-act',
+    releaseId: 'dont-look-down',
     dueIso: null,
     updatedIso: '2026-04-20',
     labels: ['distribution'],
@@ -1431,9 +1644,8 @@ const TASKS: Task[] = [
 ];
 
 // --- Lyrics mock -----------------------------------------------------------
-// Karaoke-style timed lyrics for the currently playing track ("Lost in the
-// Light", 213s). Sixteen lines, hand-paced so verses breathe and the chorus
-// lands on the cue at 0:52. Bahamas-ish: warm, wistful, road-weary.
+// Karaoke-style timed lyrics for the currently playing demo track. Sixteen
+// lines, hand-paced so verses breathe and the chorus lands on the cue at 0:52.
 type LyricLine = { startSec: number; text: string };
 const MOCK_LYRICS: LyricLine[] = [
   { startSec: 6, text: 'I was sleeping in the back of the car' },
@@ -1474,7 +1686,7 @@ function trackFromRelease(r: Release): TrackInfo {
     ).padStart(5, '0')}`,
     // Only the canonical demo track has timed lyrics in MOCK_LYRICS; other
     // releases play but expose no lyrics surface (Mic2 hides for them).
-    hasLyrics: r.id === 'lost-in-the-light',
+    hasLyrics: r.id === 'the-deep-end',
   };
 }
 
@@ -1502,7 +1714,18 @@ function formatStreams(n: number) {
   return `${(n / 1_000_000).toFixed(1)}M`;
 }
 
-export default function ShellV1Experiment() {
+function ShellV1ExperimentContent() {
+  const searchParams = useSearchParams();
+  const initialView = parseCanvasViewParam(searchParams.get('view'));
+  const initialReleaseParam = searchParams.get('release');
+  const hideInternalTools =
+    searchParams.get('capture') === 'marketing' ||
+    searchParams.get('marketing') === '1';
+  const initialReleaseId =
+    initialView === 'releases' &&
+    RELEASES.some(release => release.id === initialReleaseParam)
+      ? initialReleaseParam
+      : null;
   const [sidebarMode, setSidebarMode] = useState<'docked' | 'floating'>(
     'docked'
   );
@@ -1518,7 +1741,7 @@ export default function ShellV1Experiment() {
   const [loaderPhase, setLoaderPhase] = useState<'bloom' | 'reveal' | 'done'>(
     'bloom'
   );
-  const [view, setView] = useState<CanvasView>('demo');
+  const [view, setView] = useState<CanvasView>(initialView);
   // Install / upgrade banner — togglable from the dev picker so the
   // styled state is reviewable. Off by default.
   const [installBannerOpen, setInstallBannerOpen] = useState(false);
@@ -1535,8 +1758,12 @@ export default function ShellV1Experiment() {
     RELEASES[0].id
   );
   const [selectedReleaseId, setSelectedReleaseId] = useState<string | null>(
-    null
+    initialReleaseId
   );
+  useEffect(() => {
+    setView(initialView);
+    setSelectedReleaseId(initialReleaseId);
+  }, [initialView, initialReleaseId]);
   // Mock playback position in seconds for the currently playing track.
   // Click a row's waveform → updates this → bottom bar's scrub reflects it.
   const [currentTimeSec, setCurrentTimeSec] = useState(78);
@@ -1901,6 +2128,7 @@ export default function ShellV1Experiment() {
   const currentTrack: TrackInfo = playingRelease
     ? trackFromRelease(playingRelease)
     : trackFromRelease(RELEASES[0]);
+  const playingDurationSec = playingRelease?.durationSec ?? TRACK.duration;
 
   // Cinematic cold-start sequence. Three phases, total ~900ms:
   //   bloom  (0..380ms): black canvas + centered Jovie mark scales in
@@ -1948,8 +2176,7 @@ export default function ShellV1Experiment() {
         transition: `opacity var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing)`,
       };
 
-  const pct =
-    (currentTimeSec / (playingRelease?.durationSec ?? TRACK.duration)) * 100;
+  const pct = (currentTimeSec / playingDurationSec) * 100;
 
   // Spacebar = playback toggle. Sidebar collapse uses [ (Linear-style),
   // bar visibility uses Cmd/Ctrl+\. Hold ⌘J anywhere to dictate to Jovie.
@@ -2167,6 +2394,7 @@ export default function ShellV1Experiment() {
             onSelectThread={openThread}
             onThreadContextMenu={onThreadContextMenu}
             libraryAssetCount={libraryAllAssets.length}
+            hideInternalTools={hideInternalTools}
             nowPlaying={{
               track: currentTrack,
               isPlaying,
@@ -2217,6 +2445,7 @@ export default function ShellV1Experiment() {
           onSelectThread={openThread}
           onThreadContextMenu={onThreadContextMenu}
           libraryAssetCount={libraryAllAssets.length}
+          hideInternalTools={hideInternalTools}
           nowPlaying={{
             track: currentTrack,
             isPlaying,
@@ -2585,7 +2814,7 @@ export default function ShellV1Experiment() {
             onPlay={() => setIsPlaying(p => !p)}
             onCollapse={() => setBarCollapsed(true)}
             currentTime={currentTimeSec}
-            duration={TRACK.duration}
+            duration={playingDurationSec}
             loopMode={loopMode}
             onCycleLoop={() =>
               setLoopMode(m =>
@@ -2629,7 +2858,7 @@ export default function ShellV1Experiment() {
             isPlaying={isPlaying}
             onPlay={() => setIsPlaying(p => !p)}
             currentTime={currentTimeSec}
-            duration={TRACK.duration}
+            duration={playingDurationSec}
             track={toNowPlayingTrack(currentTrack)}
           />
         </div>
@@ -2662,6 +2891,14 @@ export default function ShellV1Experiment() {
   );
 }
 
+export default function ShellV1Experiment() {
+  return (
+    <Suspense fallback={<div className='min-h-screen bg-[#050608]' />}>
+      <ShellV1ExperimentContent />
+    </Suspense>
+  );
+}
+
 // Cold-start loader. Black canvas with the Jovie mark blooming centered,
 // then gliding toward where it lives in the sidebar (~24px x 24px from
 // top-left of the page) while the app fades in underneath. The mark in
@@ -2680,6 +2917,7 @@ function FloatingSidebarLayer({
   onSelectThread,
   onThreadContextMenu,
   libraryAssetCount,
+  hideInternalTools = false,
   nowPlaying,
   installBanner,
 }: {
@@ -2695,6 +2933,7 @@ function FloatingSidebarLayer({
   onSelectThread?: (id: string) => void;
   onThreadContextMenu?: (e: React.MouseEvent, thread: Thread) => void;
   libraryAssetCount: number;
+  hideInternalTools?: boolean;
   nowPlaying?: {
     track: TrackInfo;
     isPlaying: boolean;
@@ -2763,6 +3002,7 @@ function FloatingSidebarLayer({
           onSelectThread={onSelectThread}
           onThreadContextMenu={onThreadContextMenu}
           libraryAssetCount={libraryAssetCount}
+          hideInternalTools={hideInternalTools}
           nowPlaying={nowPlaying}
           installBanner={installBanner}
         />
@@ -2784,6 +3024,7 @@ function Sidebar({
   onSelectThread,
   onThreadContextMenu,
   libraryAssetCount,
+  hideInternalTools = false,
   nowPlaying,
   installBanner,
 }: {
@@ -2816,6 +3057,7 @@ function Sidebar({
   onThreadContextMenu?: (e: React.MouseEvent, thread: Thread) => void;
   // Asset count for the Library nav item — when 0, hide the row.
   libraryAssetCount: number;
+  hideInternalTools?: boolean;
   // Simplified now-playing pinned to the sidebar bottom. Only renders
   // when the audio bar is open at the bottom of the canvas — that's
   // when the floating bottom-left card disappears and is replaced by
@@ -2868,8 +3110,8 @@ function Sidebar({
   const showPin = justOpened;
   // Per-workspace open state. Active workspace defaults open.
   const [openWs, setOpenWs] = useState<Record<string, boolean>>({
-    bahamas: true,
-    sade: false,
+    'tim-white': true,
+    'cosmic-gate': false,
     admin: false,
   });
 
@@ -2910,7 +3152,7 @@ function Sidebar({
               </span>
             </button>
           ) : (
-            <UserMenu>
+            <UserMenu hideInternalTools={hideInternalTools}>
               <span className='flex-1 inline-flex items-center gap-2.5 h-7 pl-3 pr-2 rounded-md hover:bg-surface-1/60 transition-colors duration-subtle ease-out cursor-pointer min-w-0'>
                 <BrandLogo
                   size={16}
@@ -3103,7 +3345,48 @@ function Sidebar({
                 collapsed={collapsed}
                 tight={tight}
               >
-                {ws.items.map(item => (
+                {ws.items.map(item => {
+                  const view = canvasViewForNavItem(item.label);
+                  return (
+                    <SidebarNavItem
+                      key={item.label}
+                      item={{
+                        ...item,
+                        active:
+                          view !== null
+                            ? activeView === view
+                            : item.active && activeView === 'demo',
+                        onActivate:
+                          view && onSelectView
+                            ? () => onSelectView(view)
+                            : item.onActivate,
+                      }}
+                      collapsed={collapsed}
+                      nested={!collapsed}
+                      tight={tight}
+                    />
+                  );
+                })}
+              </SidebarSection>
+            ))}
+          </div>
+
+          {hideInternalTools ? null : (
+            <div>
+              <SidebarSection
+                name={ADMIN_WORKSPACE.name}
+                open={openWs[ADMIN_WORKSPACE.id] ?? false}
+                onToggle={() =>
+                  setOpenWs(s => ({
+                    ...s,
+                    [ADMIN_WORKSPACE.id]: !(s[ADMIN_WORKSPACE.id] ?? false),
+                  }))
+                }
+                itemCount={ADMIN_WORKSPACE.items.length}
+                collapsed={collapsed}
+                tight={tight}
+              >
+                {ADMIN_WORKSPACE.items.map(item => (
                   <SidebarNavItem
                     key={item.label}
                     item={item}
@@ -3113,35 +3396,8 @@ function Sidebar({
                   />
                 ))}
               </SidebarSection>
-            ))}
-          </div>
-
-          {/* Admin — separate, no section header */}
-          <div>
-            <SidebarSection
-              name={ADMIN_WORKSPACE.name}
-              open={openWs[ADMIN_WORKSPACE.id] ?? false}
-              onToggle={() =>
-                setOpenWs(s => ({
-                  ...s,
-                  [ADMIN_WORKSPACE.id]: !(s[ADMIN_WORKSPACE.id] ?? false),
-                }))
-              }
-              itemCount={ADMIN_WORKSPACE.items.length}
-              collapsed={collapsed}
-              tight={tight}
-            >
-              {ADMIN_WORKSPACE.items.map(item => (
-                <SidebarNavItem
-                  key={item.label}
-                  item={item}
-                  collapsed={collapsed}
-                  nested={!collapsed}
-                  tight={tight}
-                />
-              ))}
-            </SidebarSection>
-          </div>
+            </div>
+          )}
         </nav>
       )}
 
@@ -3694,7 +3950,13 @@ function pageActionForView(view: CanvasView): {
   }
 }
 
-function UserMenu({ children }: { children: React.ReactNode }) {
+function UserMenu({
+  children,
+  hideInternalTools = false,
+}: Readonly<{
+  children: React.ReactNode;
+  hideInternalTools?: boolean;
+}>) {
   return (
     <ShellDropdown
       align='start'
@@ -3717,7 +3979,9 @@ function UserMenu({ children }: { children: React.ReactNode }) {
         entity={ENTITY_CURRENT_USER}
       />
       <ShellDropdown.Item icon={Settings} label='Settings' shortcut='⌘,' />
-      <ShellDropdown.Item icon={Shield} label='Admin' />
+      {hideInternalTools ? null : (
+        <ShellDropdown.Item icon={Shield} label='Admin' />
+      )}
       <ShellDropdown.Separator />
       <ShellDropdown.Item icon={LogOut} label='Sign out' tone='danger' />
     </ShellDropdown>
@@ -3758,16 +4022,16 @@ const SUGGESTIONS: JovieSuggestion[] = [
   {
     id: 'sug-3',
     kind: 'release',
-    title: 'Lost in the Light needs Spotify Canvas',
-    body: 'Drops in 6 days. I have three Canvas options ready — pick one, or I’ll ship the lead pick on Wednesday.',
+    title: 'The Deep End needs Spotify Canvas',
+    body: 'The release is live. I have three Canvas options ready — pick one, or I’ll ship the lead pick on Wednesday.',
     action: 'Pick Canvas',
     rank: 3,
   },
   {
     id: 'sug-4',
     kind: 'pitch',
-    title: 'Editorial pitch ready for Stronger Than That',
-    body: 'I drafted the Spotify editorial pitch. It hits Indigo (folk-pop) and Fresh Finds. Send when you’re ready.',
+    title: 'Editorial pitch ready for Take Me Over',
+    body: 'I drafted the Spotify editorial pitch. It highlights the Erica Gibson feature and the release story. Send when you’re ready.',
     action: 'Send pitch',
     rank: 4,
   },
@@ -3781,15 +4045,7 @@ function DashboardHome() {
     []
   );
   const current = sorted[index] ?? sorted[0];
-  const hour = new Date().getHours();
-  const greeting =
-    hour < 5
-      ? 'Up late, Tim'
-      : hour < 12
-        ? 'Good morning, Tim'
-        : hour < 18
-          ? 'Afternoon, Tim'
-          : 'Evening, Tim';
+  const greeting = 'Good morning, Tim';
   const advance = () => setIndex(i => (i + 1) % sorted.length);
 
   return (
@@ -3870,7 +4126,7 @@ type ContextMenuItem =
 // Render a string with any matching release titles wrapped in EntityRef.
 // Releases are matched by literal substring (case-insensitive). First match
 // wins so we don't double-wrap overlapping titles. Used in Task list /
-// detail to make "Confirm artwork for Lost in the Light" hoverable.
+// detail to make release-specific task titles hoverable.
 function renderWithEntities(
   text: string,
   releases: Release[],
@@ -3892,7 +4148,7 @@ function renderWithEntities(
   const before = text.slice(0, bestStart);
   const match = text.slice(bestStart, bestEnd);
   const after = text.slice(bestEnd);
-  const entity = lookupReleaseEntityByAlbum(bestRelease.album, bestRelease.id);
+  const entity = releaseToEntityPopover(bestRelease);
   return (
     <>
       {before}
@@ -3942,9 +4198,10 @@ const LIBRARY_SAVED_PREDICATES: Record<
   approved: a => a.status === 'approved',
   reels: a => a.aspect === '9:16',
   review: a => a.status === 'review',
-  'this-noise': a => a.release === 'this-noise',
+  'deep-end': a => a.release === 'the-deep-end',
   'this-week': a => {
-    const days = (Date.now() - new Date(a.addedAt).getTime()) / 86400000;
+    const days =
+      (LIBRARY_DEMO_NOW_MS - new Date(a.addedAt).getTime()) / 86400000;
     return days <= 7 && a.generatedBy === 'jovie';
   },
 };
@@ -4170,7 +4427,7 @@ function mockThreadMarkdown(thread: Thread): string {
       '2. Generated 3 candidate frames at 1080×1920',
       '3. Locking the chorus crop now',
       '',
-      'I’ll drop the final clip in **Lost in the Light** when ready.',
+      'I’ll drop the final clip in **The Deep End** when ready.',
     ].join('\n');
   }
   return [
@@ -4178,7 +4435,7 @@ function mockThreadMarkdown(thread: Thread): string {
     '',
     '- Lyric video (1080×1920, 0:34) — added to the library',
     '- Smart link updated with a Spotify Canvas variant',
-    '- Pinned a quick approval task on **Lost in the Light**',
+    '- Pinned a quick approval task on **The Deep End**',
     '',
     'Open the release page to confirm the render before I push it live.',
   ].join('\n');
@@ -4199,17 +4456,17 @@ function ThreadView({ thread }: { thread: Thread }) {
       {thread.status === 'complete' && (
         <>
           <ThreadImageCard
-            prompt='Lost in the Light · Spotify Canvas'
+            prompt='The Deep End · Spotify Canvas'
             status='ready'
             previewUrl={THREAD_DEMO_PREVIEW}
           />
           <ThreadAudioCard
-            title='Lost in the Light'
-            artist='Bahamas'
+            title='The Deep End'
+            artist='Cosmic Gate & Tim White'
             duration='3:33'
           />
           <ThreadVideoCard
-            title='Lost in the Light · lyric video'
+            title='The Deep End · lyric video'
             durationSec={34}
           />
         </>
@@ -4217,7 +4474,7 @@ function ThreadView({ thread }: { thread: Thread }) {
       {thread.status === 'running' && (
         <>
           <ThreadImageCard
-            prompt='Lost in the Light · Spotify Canvas'
+            prompt='The Deep End · Spotify Canvas'
             status='generating'
           />
           <ThreadTurn speaker='jovie' subtle>
@@ -5059,6 +5316,7 @@ function ReleaseDrawer({
   return (
     <aside
       aria-hidden={!open}
+      data-testid='shell-v1-release-drawer'
       // Each card floats on the page bg as its own elevated peer — no
       // dividing line between drawer and canvas, no shared border. The gap
       // around the cards is the visual separator. Page bg is darkest;
@@ -5983,8 +6241,8 @@ function TrackRow({
       <ArtworkThumb src={track.artwork} title={track.title} size={28} />
 
       {/* Title (with feat. subtitle for collabs). We're inside an artist
-          context (Bahamas / Dashboard breadcrumb), so the primary artist
-          is implicit — only collaborators surface here. */}
+          context, so the primary artist is implicit — only collaborators
+          surface here. */}
       <div className='flex-1 min-w-0'>
         <div className='flex items-baseline gap-2 min-w-0'>
           <span className='truncate text-[13px] font-caption text-primary-token tracking-[-0.012em]'>

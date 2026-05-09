@@ -17,6 +17,7 @@ import {
   enrichProfileFromDsp,
 } from '@/app/onboarding/actions/enrich-profile';
 import type { CompletionResult } from '@/app/onboarding/actions/types';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   getOnboardingCompletionMethod,
   toDurationMs,
@@ -371,7 +372,9 @@ export function useOnboardingSubmit({
       );
 
       if (shouldRedirectToSignIn) {
-        router.push(`/signin?redirect_url=${encodeURIComponent(redirectUrl)}`);
+        router.push(
+          `${APP_ROUTES.SIGNIN}?redirect_url=${encodeURIComponent(redirectUrl)}`
+        );
         return;
       }
 

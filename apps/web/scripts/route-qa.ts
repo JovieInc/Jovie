@@ -368,7 +368,12 @@ export async function expandDynamicRoute(
         buildDynamicCase(
           `/investor-portal/${page.slug}`,
           `${source} -> investor-portal/${page.slug}`,
-          route
+          route,
+          {
+            expectedState: 'not-found',
+            notes:
+              'Investor portal routes are token-gated and intentionally return not-found without an investor token.',
+          }
         )
       );
     } catch (error) {

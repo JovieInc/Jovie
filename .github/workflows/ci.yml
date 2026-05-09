@@ -878,7 +878,9 @@ jobs:
           AI_GATEWAY_API_KEY: mobile-overflow-ci
           MOBILE_OVERFLOW_WIDTHS: '320,390,430'
           MOBILE_OVERFLOW_FOCUS_LIMIT: '8'
-          PLAYWRIGHT_WORKERS: '8'
+          # This guard fans out 76 mobile route checks through a single Next dev
+          # server. Keep worker pressure low enough to avoid CI heap OOMs.
+          PLAYWRIGHT_WORKERS: '2'
 
       - name: Upload Playwright Artifacts on Failure
         if: failure()
@@ -2636,6 +2638,16 @@ jobs:
           GIT_BRANCH: ${{ github.ref_name }}
           ALLOW_PROD_MIGRATIONS: 'true'
 
+      - name: Seed E2E DB
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: pnpm --filter=@jovie/web exec tsx tests/seed-test-data.ts
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          NODE_ENV: test
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
+          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
+
   ci-e2e-tests:
     name: Full E2E (Preview)
     environment: Preview – jovie
@@ -2747,6 +2759,7 @@ jobs:
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
+          E2E_SKIP_SEED: '1'
           SMOKE_ONLY: '1'
           E2E_USE_TEST_AUTH_BYPASS: '1'
           SENTRY_E2E_REPORTING: '1'
@@ -2772,6 +2785,7 @@ jobs:
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
+          E2E_SKIP_SEED: '1'
           SMOKE_ONLY: '1'
           E2E_USE_TEST_AUTH_BYPASS: '1'
           SENTRY_E2E_REPORTING: '1'
@@ -2795,6 +2809,7 @@ jobs:
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
+          E2E_SKIP_SEED: '1'
           SENTRY_E2E_REPORTING: '1'
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           SENTRY_ENVIRONMENT: ci-main-e2e
@@ -2818,6 +2833,7 @@ jobs:
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
+          E2E_SKIP_SEED: '1'
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}

@@ -24,6 +24,7 @@ export interface HeaderNavProps {
   readonly logoSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   readonly logoVariant?: LogoVariant;
   readonly hideNav?: boolean;
+  readonly hideDesktopNav?: boolean;
   readonly containerSize?: 'sm' | 'md' | 'lg' | 'xl' | 'full' | 'homepage';
   readonly navLinks?: ReadonlyArray<{ href: string; label: string }>;
   readonly mobileNavLinks?: ReadonlyArray<{ href: string; label: string }>;
@@ -35,6 +36,7 @@ export interface HeaderNavProps {
   readonly mobilePublicCtaLabel?: string;
   readonly presentation?: 'default' | 'homepage-embedded' | 'marketing-glass';
   readonly flyoutMenus?: readonly HeaderFlyoutMenu[];
+  readonly showContactLink?: boolean;
 }
 
 export interface HeaderFlyoutMenu {
@@ -85,26 +87,30 @@ function PublicAuthActions({
           className: 'focus-ring-themed shrink-0 whitespace-nowrap',
         })}
       >
-        Start Free Trial
+        Request Access
       </Link>
     </div>
   );
 }
 
-function GlassAuthActions() {
+function GlassAuthActions({
+  showContactLink = true,
+}: Readonly<{ showContactLink?: boolean }>) {
   return (
     <div className='hidden items-center gap-1 md:flex'>
-      <Link
-        href={APP_ROUTES.SUPPORT}
-        className='marketing-glass-header__text-link focus-ring-themed'
-      >
-        Contact
-      </Link>
+      {showContactLink ? (
+        <Link
+          href={APP_ROUTES.SUPPORT}
+          className='marketing-glass-header__text-link focus-ring-themed'
+        >
+          Contact
+        </Link>
+      ) : null}
       <Link
         href={APP_ROUTES.SIGNIN}
         className='marketing-glass-header__text-link focus-ring-themed'
       >
-        Sign In
+        Sign in
       </Link>
       <Link
         href={APP_ROUTES.SIGNUP}
@@ -247,6 +253,7 @@ export function HeaderNav({
   logoSize = 'sm',
   logoVariant = 'word',
   hideNav = false,
+  hideDesktopNav = false,
   containerSize: _containerSize = 'lg',
   navLinks,
   mobileNavLinks,
@@ -258,6 +265,7 @@ export function HeaderNav({
   mobilePublicCtaLabel,
   presentation = 'default',
   flyoutMenus,
+  showContactLink = true,
 }: HeaderNavProps = {}) {
   const headerRef = useRef<HTMLElement | null>(null);
   const [openFlyoutId, setOpenFlyoutId] = useState<string | null>(null);
@@ -301,7 +309,13 @@ export function HeaderNav({
 
       closeFlyout();
     };
-    const handlePointerLeave = () => {
+    const handlePointerLeave = (event: PointerEvent) => {
+      if (
+        event.relatedTarget instanceof Node &&
+        headerRef.current?.contains(event.relatedTarget)
+      ) {
+        return;
+      }
       closeFlyout();
     };
     const handleFocusIn = (event: FocusEvent) => {
@@ -333,9 +347,14 @@ export function HeaderNav({
     isHomepagePresentation,
     isMarketingGlass,
   });
-  const hasNavLinks =
-    !hideNav && (!!navLinks?.length || resolvedFlyoutMenus.length > 0);
-  const navLinksMarkup = hasNavLinks ? (
+  const hasDesktopNavLinks =
+    !hideNav &&
+    !hideDesktopNav &&
+    (!!navLinks?.length || resolvedFlyoutMenus.length > 0);
+  const mobileLinks = mobileNavLinks ?? navLinks;
+  const hasMobileNavLinks =
+    !hideNav && !hideDesktopNav && !!mobileLinks?.length;
+  const navLinksMarkup = hasDesktopNavLinks ? (
     <div className={cn('max-md:hidden items-center md:flex', navGroupClass)}>
       {isMarketingGlass
         ? resolvedFlyoutMenus.map(menu => {
@@ -447,7 +466,7 @@ export function HeaderNav({
           {isHomepagePresentation ? null : navLinksMarkup}
 
           {/* Divider between nav and auth - desktop only */}
-          {hasNavLinks &&
+          {hasDesktopNavLinks &&
           presentation !== 'homepage-embedded' &&
           !isMarketingGlass ? (
             <div
@@ -464,7 +483,7 @@ export function HeaderNav({
             )}
           >
             {authMode === 'public-static' && isMarketingGlass ? (
-              <GlassAuthActions />
+              <GlassAuthActions showContactLink={showContactLink} />
             ) : authMode === 'public-static' ? (
               <PublicAuthActions
                 minimal={minimalAuth}
@@ -476,10 +495,10 @@ export function HeaderNav({
           </div>
 
           {/* Mobile hamburger menu - shown on small screens only */}
-          {hasNavLinks && (
+          {hasMobileNavLinks && (
             <div className='flex md:hidden items-center'>
               <MobileNav
-                navLinks={mobileNavLinks ?? navLinks}
+                navLinks={mobileLinks}
                 includePublicLogin={includePublicLoginInMobileNav}
                 publicCtaHref={mobilePublicCtaHref}
                 publicCtaLabel={mobilePublicCtaLabel}

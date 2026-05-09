@@ -27,7 +27,7 @@ export async function RedesignedHero() {
             aria-hidden='true'
             className='mr-2 inline-block h-1.5 w-1.5 rounded-full bg-[var(--linear-success)]'
           />{' '}
-          Free forever · Live in 60 seconds
+          Private launch access. No credit card required.
         </p>
       </div>
     </section>

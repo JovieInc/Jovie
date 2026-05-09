@@ -13,9 +13,9 @@ export const closeButtonStyles = {
   hover:
     'hover:bg-interactive-hover hover:text-primary-token hover:opacity-100',
   focus:
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)',
   disabled: 'disabled:pointer-events-none',
-  offset: 'ring-offset-background',
+  offset: 'ring-offset-(--linear-bg-page)',
 } as const;
 
 /**

@@ -184,7 +184,10 @@ export function getDeterministicTestClerkId(email: string): string {
 }
 
 function shouldUseDeterministicClerkTestUser(): boolean {
-  return process.env.NEXT_PUBLIC_CLERK_MOCK === '1';
+  return (
+    process.env.NEXT_PUBLIC_CLERK_MOCK === '1' ||
+    process.env.E2E_USE_TEST_AUTH_BYPASS === '1'
+  );
 }
 
 function resolveMatchedSeedUser(

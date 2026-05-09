@@ -21,6 +21,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { useKeyboardShortcutsSafe } from '@/contexts/KeyboardShortcutsContext';
 import { track } from '@/lib/analytics';
 import { COOKIE_BANNER_REQUIRED_COOKIE } from '@/lib/cookies/consent-regions';
+import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { GLYPH_CMD, GLYPH_OPT, GLYPH_SHIFT } from '@/lib/keyboard-shortcuts';
 import { Icon } from '../../atoms/Icon';
 import { Avatar } from '../../molecules/Avatar/Avatar';
@@ -59,6 +60,7 @@ interface BuildDropdownItemsParams {
   handleSignOut: () => void;
   setIsFeedbackOpen: (open: boolean) => void;
   handleOpenShortcuts?: () => void;
+  isElectronRuntime: boolean;
 }
 
 function buildDropdownItems({
@@ -76,6 +78,7 @@ function buildDropdownItems({
   handleSignOut,
   setIsFeedbackOpen,
   handleOpenShortcuts,
+  isElectronRuntime,
 }: BuildDropdownItemsParams): CommonDropdownItem[] {
   const items: CommonDropdownItem[] = [
     // Profile card
@@ -130,7 +133,10 @@ function buildDropdownItems({
       onClick: handleSettings,
       shortcut: 'G S',
     },
-    {
+  ];
+
+  if (!isElectronRuntime) {
+    items.push({
       type: 'action' as const,
       id: 'download-desktop',
       label: 'Download Desktop App',
@@ -142,8 +148,8 @@ function buildDropdownItems({
           'noopener,noreferrer'
         );
       },
-    },
-  ];
+    });
+  }
 
   // Add "Learn More" submenu with keyboard shortcuts and legal links
   const learnMoreItems: CommonDropdownItem[] = [];
@@ -283,6 +289,7 @@ export function UserButton({
   trigger,
 }: UserButtonProps) {
   const keyboardShortcuts = useKeyboardShortcutsSafe();
+  const isElectronRuntime = useIsElectronRuntime();
   const handleFeedbackSubmit = useCallback(async (feedback: string) => {
     const trimmedFeedback = feedback.trim();
 
@@ -380,6 +387,7 @@ export function UserButton({
     handleSignOut,
     setIsFeedbackOpen,
     handleOpenShortcuts: keyboardShortcuts?.open,
+    isElectronRuntime,
   });
 
   // Custom trigger — use provided trigger prop or build default

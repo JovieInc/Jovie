@@ -124,6 +124,11 @@ const AUTH_INTERACTIONS = [
   { id: 'header-navigation', optional: true },
 ] as const satisfies readonly PublicInteractionSpec[];
 
+const MARKETING_CONVERSION_INTERACTIONS = [
+  { id: 'cookie-banner', optional: true },
+  { id: 'header-navigation', optional: true },
+] as const satisfies readonly PublicInteractionSpec[];
+
 function replacePathToken(
   template: string,
   token: string,
@@ -252,7 +257,7 @@ const MARKETING_SURFACES = [
     minMainTextLength: 120,
     lighthouse: false,
     perfGroups: ['marketing-public'],
-    interactions: GLOBAL_INTERACTIONS,
+    interactions: MARKETING_CONVERSION_INTERACTIONS,
   },
   {
     id: 'marketing-launch-pricing',

@@ -95,6 +95,18 @@ These have their own Vercel schedule OR exist as callable endpoints (also invoke
 | `/api/cron/schedule-release-notifications` | 60s | Schedules release-day notifications | `daily-maintenance` |
 | `/api/cron/send-release-notifications` | 120s | Sends notifications; recovers stuck rows >10min; max 100/run | `frequent` |
 
+## LLM Model Usage in Web App Crons
+
+> **OpenRouter free-model swap status (JOV-1970):** OpenRouter is not yet integrated in `apps/web/`. The three LLM-calling crons currently use Anthropic models directly. Swap to `nvidia/llama-3.3-nemotron-super-49b-v1:free` is deferred to JOV-1970.
+
+| Cron | File | SDK | Model |
+|------|------|-----|-------|
+| `generate-insights` | `lib/services/insights/insight-generator.ts` | Vercel AI SDK Gateway (`@ai-sdk/gateway`) | `anthropic/claude-haiku-4-5-20251001` (via `INSIGHT_MODEL` constant) |
+| `summarize-interviews` | `lib/interviews/summarize.ts` | Anthropic SDK directly (`@anthropic-ai/sdk`) | `claude-haiku-4-5-20251001` (hard-coded) |
+| `generate-playlist` | `lib/playlists/generate-concept.ts` + `curate-tracklist.ts` | Anthropic SDK directly (`@anthropic-ai/sdk`) | `claude-haiku-4-5-20251001` (concept) + `claude-sonnet-4-20250514` (tracklist, hard-coded) |
+
+To swap these to OpenRouter free Nemotron, see JOV-1970 for the full integration checklist.
+
 ## Adding Logic to an Existing Cron
 
 1. **Prefer adding a sub-job** to `frequent` (sub-hourly) or `daily-maintenance` (daily) rather than creating a new route

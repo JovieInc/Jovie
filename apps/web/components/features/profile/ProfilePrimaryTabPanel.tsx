@@ -447,18 +447,31 @@ export function ProfilePrimaryTabPanel({
     if (visibleReleases.length > 0) {
       return (
         <div
-          className={NATIVE_PANEL_CLASS_NAME}
+          className='-mx-4 space-y-4 pb-2'
           data-testid='profile-primary-tab-releases'
         >
-          <div className='px-4 pb-2 pt-3'>
-            <h2 className='text-[22px] font-[680] leading-none tracking-[-0.025em] text-white'>
-              Music
-            </h2>
+          <div>
+            <div className='px-4 pb-2 pt-3'>
+              <h2 className='text-[22px] font-[680] leading-none tracking-[-0.025em] text-white'>
+                Music
+              </h2>
+            </div>
+            <ReleasesView
+              releases={visibleReleases}
+              artistHandle={artist.handle}
+              artistName={artist.name}
+            />
           </div>
-          <ReleasesView
-            releases={visibleReleases}
-            artistHandle={artist.handle}
-            artistName={artist.name}
+          <StaticListenInterface
+            artist={artist}
+            handle={artist.handle}
+            dspsOverride={dsps}
+            enableDynamicEngagement={enableDynamicEngagement}
+            renderMode={renderMode}
+            containerClassName='max-w-none px-4'
+            providerButtonClassName='rounded-[22px] border-white/8 bg-white/[0.045] px-4 py-3.5 text-white hover:bg-white/[0.08]'
+            emptyStateClassName='border-white/8 bg-white/[0.04] shadow-none'
+            hideHelpText
           />
         </div>
       );

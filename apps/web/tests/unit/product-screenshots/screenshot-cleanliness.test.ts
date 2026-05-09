@@ -16,6 +16,9 @@ describe('Product Screenshot Overlay Selectors', () => {
       '#vercel-toolbar',
       // Next.js dev build indicator
       '[data-nextjs-build-indicator]',
+      // Next.js dev tools bottom-left issue button
+      '#nextjs-dev-tools-menu',
+      '[data-nextjs-dev-tools-button]',
     ];
 
     const selectors: readonly string[] = DEV_OVERLAY_SELECTORS;

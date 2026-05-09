@@ -116,6 +116,60 @@ describe('AgentRunArtifactSchema', () => {
     expect(result.error?.issues[0]?.path).toEqual(['humanApprovalRequired']);
   });
 
+  it('rejects non-http artifact URLs before UI rendering', () => {
+    const result = safeParseAgentRunArtifact({
+      ...baseArtifact,
+      linearIssueUrl: 'javascript:alert(1)',
+      pullRequestUrl: 'data:text/html,<script>alert(1)</script>',
+      verificationGates: [
+        {
+          ...baseArtifact.verificationGates[0],
+          evidenceUrl: 'javascript:alert(1)',
+        },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues.map(issue => issue.path)).toEqual(
+      expect.arrayContaining([
+        ['linearIssueUrl'],
+        ['pullRequestUrl'],
+        ['verificationGates', 0, 'evidenceUrl'],
+      ])
+    );
+  });
+
+  it('returns schema failures instead of throwing for malformed URLs', () => {
+    let result: ReturnType<typeof safeParseAgentRunArtifact> | null = null;
+
+    expect(() => {
+      result = safeParseAgentRunArtifact({
+        ...baseArtifact,
+        linearIssueUrl: 'not a url',
+      });
+    }).not.toThrow();
+
+    expect(result?.success).toBe(false);
+  });
+
+  it('rejects duplicate verification gate names', () => {
+    const result = safeParseAgentRunArtifact({
+      ...baseArtifact,
+      verificationGates: [
+        baseArtifact.verificationGates[0],
+        {
+          ...baseArtifact.verificationGates[1],
+          name: baseArtifact.verificationGates[0].name,
+        },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues.map(issue => issue.path)).toEqual(
+      expect.arrayContaining([['verificationGates', 1, 'name']])
+    );
+  });
+
   it('accepts read-only OpenRouter free-model artifacts with forbidden mutations', () => {
     const artifact = parseAgentRunArtifact({
       ...baseArtifact,

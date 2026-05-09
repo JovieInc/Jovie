@@ -8,11 +8,11 @@ import { waitlistEntries } from '@/lib/db/schema/waitlist';
 export type WaitlistApprovalResult =
   | { outcome: 'not_found' }
   | { outcome: 'already_processed'; status: string }
-  | { outcome: 'no_profile' }
   | { outcome: 'no_user' }
   | {
       outcome: 'approved';
-      profileId: string;
+      entryId: string;
+      profileId: string | null;
       email: string;
       fullName: string;
       clerkId: string | null;
@@ -47,16 +47,6 @@ export async function approveWaitlistEntryInTx(
     return { outcome: 'already_processed', status: entry.status };
   }
 
-  const [profile] = await tx
-    .select({ id: creatorProfiles.id })
-    .from(creatorProfiles)
-    .where(eq(creatorProfiles.waitlistEntryId, entry.id))
-    .limit(1);
-
-  if (!profile) {
-    return { outcome: 'no_profile' };
-  }
-
   const [user] = await tx
     .select({ id: users.id, clerkId: users.clerkId })
     .from(users)
@@ -67,43 +57,49 @@ export async function approveWaitlistEntryInTx(
     return { outcome: 'no_user' };
   }
 
-  const [existingClaimedProfile] = await tx
+  const [profile] = await tx
     .select({ id: creatorProfiles.id })
     .from(creatorProfiles)
-    .where(
-      and(
-        eq(creatorProfiles.userId, user.id),
-        eq(creatorProfiles.isClaimed, true),
-        ne(creatorProfiles.id, profile.id)
-      )
-    )
-    .for('update')
+    .where(eq(creatorProfiles.waitlistEntryId, entry.id))
     .limit(1);
 
-  if (existingClaimedProfile) {
+  if (profile) {
+    const [existingClaimedProfile] = await tx
+      .select({ id: creatorProfiles.id })
+      .from(creatorProfiles)
+      .where(
+        and(
+          eq(creatorProfiles.userId, user.id),
+          eq(creatorProfiles.isClaimed, true),
+          ne(creatorProfiles.id, profile.id)
+        )
+      )
+      .for('update')
+      .limit(1);
+
+    if (existingClaimedProfile) {
+      await tx
+        .update(creatorProfiles)
+        .set({
+          userId: null,
+          isClaimed: false,
+          onboardingCompletedAt: null,
+          updatedAt: now,
+        })
+        .where(eq(creatorProfiles.id, existingClaimedProfile.id));
+    }
+
     await tx
       .update(creatorProfiles)
       .set({
-        userId: null,
-        isClaimed: false,
-        onboardingCompletedAt: null,
+        userId: user.id,
+        isClaimed: true,
+        isPublic: false,
+        claimedAt: now,
         updatedAt: now,
       })
-      .where(eq(creatorProfiles.id, existingClaimedProfile.id));
+      .where(eq(creatorProfiles.id, profile.id));
   }
-
-  await tx
-    .update(creatorProfiles)
-    .set({
-      userId: user.id,
-      isClaimed: true,
-      isPublic: true,
-      claimedAt: now,
-      // onboardingCompletedAt intentionally NOT set — user must complete onboarding
-      // to choose their handle, upload avatar, connect Spotify, etc.
-      updatedAt: now,
-    })
-    .where(eq(creatorProfiles.id, profile.id));
 
   await tx
     .update(waitlistEntries)
@@ -113,15 +109,17 @@ export async function approveWaitlistEntryInTx(
   await tx
     .update(users)
     .set({
-      userStatus: 'active',
-      activeProfileId: profile.id,
+      userStatus: 'waitlist_approved',
+      waitlistEntryId: entry.id,
+      activeProfileId: profile?.id ?? null,
       updatedAt: now,
     })
     .where(eq(users.id, user.id));
 
   return {
     outcome: 'approved',
-    profileId: profile.id,
+    entryId: entry.id,
+    profileId: profile?.id ?? null,
     email: entry.email,
     fullName: entry.fullName,
     clerkId: user.clerkId,

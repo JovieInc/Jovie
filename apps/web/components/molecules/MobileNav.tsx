@@ -238,7 +238,7 @@ export function MobileNav({
               <div className='flex flex-col gap-1 px-4 pt-1'>
                 {navLinks.map((link, index) => (
                   <Link
-                    key={link.href}
+                    key={`${link.href}-${link.label}`}
                     href={link.href}
                     className={cn(
                       'flex items-center h-[52px] px-4 rounded-xl',

@@ -4,8 +4,97 @@
      4|
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
+
+## [26.4.223] - 2026-05-09
+
+> The homepage now leads with a sharper release command center, verified proof, and a product-led workspace story without leaking internal tools into marketing screenshots.
+
+### Added
+
+- **Homepage product statement break**: adds a Linear-inspired "Meet Jovie" statement between verified logos and the Workspace chapter so the page has better pacing before the second large product screenshot.
+- **Integrated Workspace chapter**: replaces the old command-center/workflow pair with one product-led section using the seeded releases workspace and anchored release-management callouts.
+
+### Changed
+
+- **Homepage hero and proof strip**: tightens the sticky header, verified-logo treatment, hero carousel framing, and section transitions around the current Shell v1 product screenshots.
+- **Marketing screenshot fixtures**: seeds Shell v1 releases/library captures with real Tim White and verified release data, full tables, matching artwork, and an open release rail.
+
+### Fixed
+
+- **Admin-free marketing captures**: Shell v1 screenshot routes now use `capture=marketing` so homepage assets do not expose admin/internal navigation.
+
+## [26.4.222] - 2026-05-08
+
+> [internal] Central profile route config and canonical shell barrel for the public artist surface — consolidates routing logic, removes dead feature-flag code, and deletes 16 legacy files from the JOV-2021 hardening phase.
+
+### Added
+
+- [internal] `apps/web/lib/profile/route-config.ts` — single source of truth for public profile route configuration. Exports `PROFILE_ROUTE_CONFIG`, `TOP_LEVEL_ROUTE_KEYS`, `BOTTOM_TAB_KEYS`, `REDIRECT_SINK_ROUTE_KEYS`, and full TypeScript types (`ProfileRouteCategory`, `ProfileRouteKey`, `ProfileRouteConfig`). Includes bidirectional reverse-completeness tests to guard against missing entries.
+- [internal] `apps/web/components/features/profile/shell/index.ts` — canonical barrel re-exporting `ProfileCompactTemplate`, `ProfileCompactSurface`, and `ProfileDesktopSurface`. All imports of profile shell components should go through this barrel.
+
+### Removed
+
+- [internal] Removed `SHOW_PUBLIC_PROFILE_V1_DESIGN` dead feature flag and all call-sites (flag was always true after JOV-2019 landed).
+- [internal] Deleted 16 legacy profile surface files superseded by the canonical shell stack (JOV-2021 cleanup phase).
+
+## [26.4.221] - 2026-05-09
+
+> [internal] Ops now opens as a constrained command-center cockpit: AgentOS runs lead the page, deployments are supporting context, and approvals stay beside the active work.
+
+### Changed
+
+- [internal] Reworked `/app/admin/ops` into a shell-v1 cockpit with a max-width admin surface, board-first AgentOS lanes, compact deployment feed, persistent approval/detail rail, and denser run metadata tucked into popovers.
+
+## [26.4.220] - 2026-05-08
+
+> [internal] Canonical UX contract for the public artist profile surface: route categories, bottom tab bar, navigation, alert/subscribe, and copy — plus the P0 decision to restore ISR by removing `force-dynamic` and moving the cookie read client-side.
+
+### Added
+
+- [internal] `docs/public-profile-surface-spec.md` — canonical UX contract for `/{username}/*` referenced by JOV-2021 through JOV-2027. Covers route categories (live, demo, preview, admin, legacy), bottom tab bar contract (four fixed primary tabs: Home/Music/Events/Alerts), navigation contract (drawer model, URL handling, tab persistence), alert/subscribe contract (canonical CTA label "Get alerts", component hierarchy), and a 37-entry copy table. Includes the binding P0 ISR/cookies decision: remove `export const dynamic = 'force-dynamic'` from `app/[username]/page.tsx`, move `AUDIENCE_ANON_COOKIE` read to a client component, and switch to `revalidateTag('profile:{username}')` for cache invalidation.
+
+## [26.4.219] - 2026-05-09
+
+> [internal] Public profile surface audit: route matrix, component duplication map, legacy cleanup list, and risk register for the /{username} surface — feeds JOV-2021 through JOV-2029 hardening backlog.
+
+### Added
+
+- [internal] `docs/public-profile-hardening-audit.md` — read-only audit of the public profile surface covering 26 route/state combinations, 9 component duplication categories, 11 legacy cleanup items, and a risk register. Spawned sub-issues JOV-2021 through JOV-2029 for implementation work.
+
      7|
-     8|## [26.4.215] - 2026-05-08
+     8|## [26.4.218] - 2026-05-08
+
+> [internal] Ops HUD now shows a live shipping velocity chart — merged, opened, and closed PRs per day via GitHub GraphQL, cached in Redis.
+
+### Added
+
+- **[internal] Shipping velocity chart in `/app/admin/ops`**: cinematic Recharts area chart showing PR velocity (merged, opened, closed) over 7D / 30D / 1Y. Purple hero line for merged PRs, ghost green for opened, hidden red for closed-without-merge (toggle to reveal). Click any series to spotlight it; click empty area or the series legend again to reset.
+- **[internal] GitHub GraphQL PR velocity API** (`GET /api/admin/hud/shipping-velocity`): cursor-paginated GraphQL query (5000 pts/hr) with Redis 20-min TTL cache, graceful fallback when token or Redis is unavailable.
+
+## [26.4.217] - 2026-05-08
+
+> You can now update Jovie from right inside the app. A blue "Update" pill appears in the header when a new version is ready — click it to apply instantly.
+
+### Added
+
+- **Update pill in app header**: a compact "Update" button appears in the `/app/*` titlebar row when a new version is available. Click triggers an instant update — no need to manually refresh or relaunch.
+- Desktop (Electron) update detection uses `electron-updater` IPC events (`update-available`, `update-downloaded`) for background update checks.
+- Web update detection polls the build hash every 5 minutes; on drift the pill appears and clicking reloads to the new build.
+
+## [26.4.216] - 2026-05-08
+
+> [internal] Admin workspace links removed from Settings page; the admin sidebar is now the single entry point for all admin workspaces.
+
+### Removed
+
+- [internal] **`SettingsAdminSection`**: removed the "Admin Workspaces" panel (9 workspace quick-links) from the admin Settings page. These links are now only accessible from the admin sidebar, which already has a Workspaces + Utilities section for all 9 IDs.
+- [internal] **`adminSettingsNavigationSections`** export: deleted from `dashboard-nav/config.ts` — it was only used by the removed panel.
+
+### Changed
+
+- [internal] **`adminNavigationSections`** (sidebar config): added the Utilities section (`investors`, `screenshots`, `share_studio`) so the admin sidebar now shows all 9 workspace IDs in one place.
+
+## [26.4.215] - 2026-05-08
 
 > [internal] Hardens the conflict-marker pre-commit check for locale safety.
 

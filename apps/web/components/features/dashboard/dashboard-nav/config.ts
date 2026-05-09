@@ -223,14 +223,6 @@ export const adminNavigationSections: AdminNavSection[] = [
     label: 'Workspaces',
     items: adminNavigation,
   },
-];
-
-export const adminSettingsNavigationSections: AdminNavSection[] = [
-  {
-    // Settings keeps quick links to the primary workspaces alongside utilities.
-    label: 'Workspaces',
-    items: adminNavigation,
-  },
   {
     label: 'Utilities',
     items: adminSettingsNavigation,

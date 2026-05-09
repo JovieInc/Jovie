@@ -362,7 +362,7 @@ jobs:
               route_code="${response##*$'\n'}"
               route_body="${response%$'\n'*}"
 
-              if [ "$route_code" = "200" ] && [ ${#route_body} -ge "$min_chars" ] && ! echo "$route_body" | grep -qi "application error\|internal server error\|something went wrong\|error occurred\|this page could not be found"; then
+              if [ "$route_code" = "200" ] && [ ${#route_body} -ge "$min_chars" ] && ! echo "$route_body" | grep -qi "application error\|internal server error\|something went wrong\|error occurred\|this page could not be found\|temporarily unavailable\|auth unavailable"; then
                 echo "✅ ${route_label} renders correctly"
                 return 0
               fi
