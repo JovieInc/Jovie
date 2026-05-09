@@ -45,6 +45,7 @@ const BOARD_STATUSES = [
   'review',
   'blocked',
   'failed',
+  'stale',
   'done',
 ] as const satisfies readonly AgentRunStatus[];
 
@@ -209,7 +210,7 @@ function AgentOsBoardCard({
           type='button'
           onClick={() => onSelect(artifact)}
           aria-pressed={isSelected}
-          className='min-w-0 flex-1 text-left focus-visible:outline-none'
+          className='min-w-0 flex-1 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus) focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface)'
         >
           <p className='line-clamp-2 text-[13px] font-[560] leading-5 text-primary-token'>
             {artifact.title}

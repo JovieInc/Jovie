@@ -7,6 +7,7 @@ import type {
 } from '@/app/api/admin/hud/shipping-velocity/route';
 import { AdminToolPage } from '@/components/features/admin/layout/AdminToolPage';
 import { APP_ROUTES } from '@/constants/routes';
+import { env } from '@/lib/env-server';
 import { getHudMetrics } from '@/lib/hud/metrics';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 import { logger } from '@/lib/utils/logger';
@@ -49,9 +50,9 @@ async function getInitialShippingData(): Promise<{
     // Best-effort server prefetch for deployed admin views. In local dev,
     // Next may choose a fallback port, and RSC has no reliable request origin
     // here; the client chart fetch is the source of truth in that case.
-    if (!process.env.VERCEL_URL) return null;
+    if (!env.VERCEL_URL) return null;
 
-    const base = `https://${process.env.VERCEL_URL}`;
+    const base = `https://${env.VERCEL_URL}`;
 
     const response = await fetch(
       `${base}/api/admin/hud/shipping-velocity?range=7d`,
