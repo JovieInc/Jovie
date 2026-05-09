@@ -214,25 +214,26 @@ function AgentOsBoardCard({
         <button
           type='button'
           onClick={() => onSelect(artifact)}
+          aria-label={artifact.title}
           aria-pressed={isSelected}
           className='min-w-0 flex-1 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus) focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface)'
         >
           <p className='line-clamp-2 text-[13px] font-[560] leading-5 text-primary-token'>
             {artifact.title}
           </p>
+          <div className='mt-2 grid gap-1 text-[11.5px] leading-4 text-tertiary-token'>
+            <p className='truncate font-[520] text-secondary-token'>
+              {artifact.source}
+            </p>
+            <p className='truncate tabular-nums'>
+              {formatGateProgressLabel(artifact)}
+            </p>
+          </div>
         </button>
         <div className='flex shrink-0 items-center gap-1'>
           <WorkflowStatusPill status={artifact.status} />
           <AgentRunDetailPopover artifact={artifact} />
         </div>
-      </div>
-      <div className='grid gap-1 text-[11.5px] leading-4 text-tertiary-token'>
-        <p className='truncate font-[520] text-secondary-token'>
-          {artifact.source}
-        </p>
-        <p className='truncate tabular-nums'>
-          {formatGateProgressLabel(artifact)}
-        </p>
       </div>
     </div>
   );
@@ -535,7 +536,13 @@ export function AgentOsRunsPanel({
                 }
                 getRowId={artifact => artifact.id}
                 onRowClick={artifact => setSelectedId(artifact.id)}
-                getRowClassName={getRowClassName}
+                getRowClassName={artifact =>
+                  cn(
+                    getRowClassName(artifact),
+                    artifact.id === selectedArtifact?.id &&
+                      'bg-surface-0 ring-1 ring-inset ring-(--linear-border-focus)'
+                  )
+                }
                 getRowTestId={artifact => `agent-os-run-${artifact.id}`}
                 enableVirtualization={false}
                 minWidth='700px'
