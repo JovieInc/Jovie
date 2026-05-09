@@ -76,6 +76,13 @@ function detectMetaBot(userAgent: string): boolean {
   return META_BOT_REGEX.test(userAgent);
 }
 
+function isWaitlistInviteRedirect(redirectUrl: string | null): boolean {
+  return (
+    redirectUrl === '/waitlist/invite' ||
+    redirectUrl?.startsWith('/waitlist/invite?') === true
+  );
+}
+
 // ============================================================================
 // Public Profile Audience Block Check
 // ============================================================================
@@ -706,6 +713,9 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         req.nextUrl.searchParams.get('redirect_url')
       );
 
+      if (redirectUrl && isWaitlistInviteRedirect(redirectUrl)) {
+        return NextResponse.redirect(new URL(redirectUrl, req.url));
+      }
       if (userState.needsWaitlist) {
         return NextResponse.redirect(new URL('/waitlist', req.url));
       }

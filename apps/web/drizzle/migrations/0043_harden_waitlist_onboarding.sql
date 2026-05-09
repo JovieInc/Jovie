@@ -65,7 +65,7 @@ WITH ranked_entries AS (
     row_number() OVER (
       PARTITION BY lower(trim("email"))
       ORDER BY
-        CASE "status"
+        CASE "status"::text
           WHEN 'claimed' THEN 90
           WHEN 'signed_up' THEN 90
           WHEN 'approved' THEN 80

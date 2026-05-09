@@ -26,7 +26,7 @@ describe('waitlist hardening migration', () => {
       )
     );
 
-    expect(block.indexOf('CASE "status"')).toBeLessThan(
+    expect(block.indexOf('CASE "status"::text')).toBeLessThan(
       block.indexOf('"created_at" DESC')
     );
     expect(statusRanks.get('claimed')).toBeGreaterThan(
