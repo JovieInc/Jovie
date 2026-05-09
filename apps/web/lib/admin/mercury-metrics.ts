@@ -149,8 +149,15 @@ async function getCheckingTransactions(
 
   const transactions: MercuryTransaction[] = [];
   let cursor: string | undefined;
+  // Safety guard: cap pagination to avoid unbounded iteration if Mercury
+  // returns unexpectedly many pages (each request has its own 8s timeout).
+  const MAX_PAGES = 20;
+  let pageCount = 0;
 
   for (;;) {
+    if (pageCount >= MAX_PAGES) break;
+    pageCount++;
+
     const response = await fetchMercury<MercuryTransactionsResponse>(
       `/accounts/${mercuryEnv.checkingAccountId}/transactions`,
       {
