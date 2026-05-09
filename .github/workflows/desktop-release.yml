@@ -1,8 +1,11 @@
 name: desktop-release
 
 # Triggers:
-# - Auto on push to main when desktop code, version, or this workflow changes
+# - Auto on push to main when VERSION or this workflow changes
 #   → builds + publishes a production release to GitHub Releases.
+#   Desktop-only code changes alone do NOT trigger a release; bump VERSION to
+#   ship them. This avoids republishing the same semver and producing an
+#   updater no-op when desktop code lands without a version bump.
 # - Manual workflow_dispatch lets you target staging or re-run production.
 #
 # Signing & notarization:
@@ -17,7 +20,6 @@ on:
   push:
     branches: [main]
     paths:
-      - "apps/desktop/**"
       - "VERSION"
       - ".github/workflows/desktop-release.yml"
   workflow_dispatch:
