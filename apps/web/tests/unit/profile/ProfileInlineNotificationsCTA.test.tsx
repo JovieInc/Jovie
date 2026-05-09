@@ -165,7 +165,7 @@ describe('ProfileInlineNotificationsCTA', () => {
 
     render(<ProfileInlineNotificationsCTA artist={makeArtist()} />);
 
-    fireEvent.click(screen.getByRole('button', { name: /turn on alerts/i }));
+    fireEvent.click(screen.getByRole('button', { name: /get alerts/i }));
 
     expect(formState.handleChannelChange).toHaveBeenCalledWith('email');
     expect(formState.openSubscription).toHaveBeenCalled();
@@ -180,7 +180,7 @@ describe('ProfileInlineNotificationsCTA', () => {
 
     render(<ProfileInlineNotificationsCTA artist={makeArtist()} />);
 
-    fireEvent.click(screen.getByRole('button', { name: /turn on alerts/i }));
+    fireEvent.click(screen.getByRole('button', { name: /get alerts/i }));
 
     expect(await screen.findByText('Enter your email')).toBeInTheDocument();
   });
