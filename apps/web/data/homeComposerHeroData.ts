@@ -78,7 +78,7 @@ export const DEMO_ARTIST = {
 } as const;
 
 export const DEMO_TOUR = {
-  date: 'May 12',
+  date: 'May 12, 2025 (archived)',
   venue: 'Brooklyn Steel',
   city: 'Brooklyn, NY',
   provider: 'Bandsintown',

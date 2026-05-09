@@ -11,7 +11,7 @@
  * without importing any live data or session hooks.
  */
 
-import { Music2, Send } from 'lucide-react';
+import { Music2, Pause, Play, Send } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import { useEffect, useReducer, useRef, useState } from 'react';
 
@@ -51,6 +51,7 @@ type DemoAction =
   | { readonly type: 'append-char'; readonly char: string }
   | { readonly type: 'show-entity' }
   | { readonly type: 'reset' }
+  | { readonly type: 'sync-reduced-motion' }
   | { readonly type: 'pause' }
   | { readonly type: 'resume' };
 
@@ -64,6 +65,12 @@ function demoReducer(state: DemoState, action: DemoAction): DemoState {
       return { ...state, phase: 'entity' };
     case 'reset':
       return { phase: 'empty', typedText: '', isPaused: false };
+    case 'sync-reduced-motion':
+      return {
+        phase: 'typing',
+        typedText: TYPEWRITER_QUERY,
+        isPaused: true,
+      };
     case 'pause':
       return { ...state, isPaused: true };
     case 'resume':
@@ -88,10 +95,8 @@ function geometryFor(mode: SurfaceMode, stacked: boolean) {
 
 function SendButton() {
   return (
-    <button
-      type='button'
-      aria-label='Send'
-      tabIndex={-1}
+    <span
+      aria-hidden='true'
       className='flex h-7 w-7 shrink-0 items-center justify-center rounded-full shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_0_0_0.5px_rgba(0,0,0,0.14),0_1px_3px_rgba(0,0,0,0.18)]'
       style={{ background: SEND_BTN_BG }}
     >
@@ -101,7 +106,7 @@ function SendButton() {
         className='text-[#1a1a1e] translate-x-[0.5px]'
         aria-hidden='true'
       />
-    </button>
+    </span>
   );
 }
 
@@ -297,12 +302,25 @@ export function HomeComposerHero() {
   const prefersReducedMotion = useReducedMotion();
 
   const [state, dispatch] = useReducer(demoReducer, {
-    phase: prefersReducedMotion ? 'typing' : 'empty',
-    typedText: prefersReducedMotion ? TYPEWRITER_QUERY : '',
-    isPaused: !!prefersReducedMotion,
+    phase: 'empty',
+    typedText: '',
+    isPaused: false,
   });
 
   const [isStacked, setIsStacked] = useState(false);
+  const reducedMotionRef = useRef<boolean | null>(null);
+  const containerRef = useRef<HTMLElement>(null);
+  const pauseControlRef = useRef<HTMLButtonElement>(null);
+  const resumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const reducedMotion = !!prefersReducedMotion;
+    if (reducedMotionRef.current === reducedMotion) return;
+    reducedMotionRef.current = reducedMotion;
+    dispatch(
+      reducedMotion ? { type: 'sync-reduced-motion' } : { type: 'reset' }
+    );
+  }, [prefersReducedMotion]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -353,38 +371,67 @@ export function HomeComposerHero() {
     }
   }, [prefersReducedMotion, state.phase, state.typedText, state.isPaused]);
 
-  // ── Hover pause / resume (via ref + addEventListener) ────────────────
+  // ── User-controlled pause / resume (via ref + addEventListener) ──────
   // Using addEventListener instead of JSX handlers to keep the section
   // element free of interactive attributes (Biome a11y).
 
-  const containerRef = useRef<HTMLElement>(null);
-  const resumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   useEffect(() => {
     const el = containerRef.current;
-    if (!el || prefersReducedMotion) return;
+    const pauseControl = pauseControlRef.current;
+    if ((!el && !pauseControl) || prefersReducedMotion) return;
 
-    const onEnter = () => {
+    const clearResumeTimer = () => {
       if (resumeTimerRef.current) {
         clearTimeout(resumeTimerRef.current);
         resumeTimerRef.current = null;
       }
+    };
+
+    const pauseDemo = () => {
+      clearResumeTimer();
       dispatch({ type: 'pause' });
     };
 
-    const onLeave = () => {
+    const scheduleResume = () => {
+      clearResumeTimer();
       resumeTimerRef.current = setTimeout(() => {
         dispatch({ type: 'resume' });
         resumeTimerRef.current = null;
       }, RESUME_DELAY_AFTER_HOVER);
     };
 
-    el.addEventListener('mouseenter', onEnter);
-    el.addEventListener('mouseleave', onLeave);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== ' ' && event.key !== 'Enter') return;
+      event.preventDefault();
+      if (!event.repeat) pauseDemo();
+    };
+
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (event.key !== ' ' && event.key !== 'Enter') return;
+      event.preventDefault();
+      scheduleResume();
+    };
+
+    el?.addEventListener('mouseenter', pauseDemo);
+    el?.addEventListener('mouseleave', scheduleResume);
+    el?.addEventListener('touchstart', pauseDemo);
+    el?.addEventListener('touchend', scheduleResume);
+    el?.addEventListener('touchcancel', scheduleResume);
+    pauseControl?.addEventListener('focus', pauseDemo);
+    pauseControl?.addEventListener('blur', scheduleResume);
+    pauseControl?.addEventListener('keydown', onKeyDown);
+    pauseControl?.addEventListener('keyup', onKeyUp);
     return () => {
-      el.removeEventListener('mouseenter', onEnter);
-      el.removeEventListener('mouseleave', onLeave);
-      if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
+      el?.removeEventListener('mouseenter', pauseDemo);
+      el?.removeEventListener('mouseleave', scheduleResume);
+      el?.removeEventListener('touchstart', pauseDemo);
+      el?.removeEventListener('touchend', scheduleResume);
+      el?.removeEventListener('touchcancel', scheduleResume);
+      pauseControl?.removeEventListener('focus', pauseDemo);
+      pauseControl?.removeEventListener('blur', scheduleResume);
+      pauseControl?.removeEventListener('keydown', onKeyDown);
+      pauseControl?.removeEventListener('keyup', onKeyUp);
+      clearResumeTimer();
     };
   }, [prefersReducedMotion]);
 
@@ -403,6 +450,24 @@ export function HomeComposerHero() {
       aria-label='Jovie AI composer demo'
       className='relative w-full'
     >
+      <button
+        ref={pauseControlRef}
+        type='button'
+        aria-label={
+          state.isPaused
+            ? 'Resume Jovie composer demo'
+            : 'Pause Jovie composer demo'
+        }
+        aria-pressed={state.isPaused}
+        className='pointer-events-none absolute left-4 top-4 z-[2] flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-black/70 text-white/70 opacity-0 shadow-[0_8px_24px_rgba(0,0,0,0.25)] transition-opacity focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/35'
+      >
+        {state.isPaused ? (
+          <Play size={14} strokeWidth={1.8} aria-hidden='true' />
+        ) : (
+          <Pause size={14} strokeWidth={1.8} aria-hidden='true' />
+        )}
+      </button>
+
       {/* Giant 'j' ornament — behind everything */}
       <div
         aria-hidden='true'
