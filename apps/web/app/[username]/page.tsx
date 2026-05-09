@@ -1,11 +1,12 @@
 import { type Metadata } from 'next';
-import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 
-export const dynamic = 'force-dynamic';
+// No `export const dynamic` here — the parent layout sets `revalidate: 3600`
+// (ISR). The public profile route must stay ISR-cacheable; avoid any Dynamic
+// API (cookies(), headers()) in this RSC tree.
 
 import type { PublicRelease } from '@/components/features/profile/releases/types';
-import { AUDIENCE_ANON_COOKIE, BASE_URL } from '@/constants/app';
+import { BASE_URL } from '@/constants/app';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
 import { DesktopQrOverlayClient } from '@/features/profile/DesktopQrOverlayClient';
 import { ProfileViewTracker } from '@/features/profile/ProfileViewTracker';
@@ -26,7 +27,8 @@ import { toPublicContacts } from '@/lib/contacts/mapper';
 import type { DiscogRelease } from '@/lib/db/schema';
 import { getReleasesForProfileLite } from '@/lib/discography/queries';
 import { captureError } from '@/lib/error-tracking';
-import { getProfileAlertOptInVariant } from '@/lib/flags/server';
+// ISR-safe: profile-variant.ts does NOT import cookies() — no dynamic opt-in
+import { getProfileAlertOptInVariant } from '@/lib/flags/profile-variant';
 import { getConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import { isShopEnabled } from '@/lib/profile/shop-settings';
 import { getUpcomingTourDatesForProfile } from '@/lib/tour-dates/queries';
@@ -322,9 +324,13 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
 
   const isPublicNoAuthSmoke = process.env.PUBLIC_NOAUTH_SMOKE === '1';
   const viewerCountryCode = null;
-  const cookieStore = await cookies();
-  const alertOptInStableId =
-    cookieStore.get(AUDIENCE_ANON_COOKIE)?.value ?? null;
+
+  // IMPORTANT: Do NOT read cookies() here — it would opt this ISR route into
+  // dynamic rendering, defeating the revalidate: 3600 set in layout.tsx.
+  // The jv_aid cookie is set by middleware on every request (analytics still
+  // work). The alertOptInVariant defaults to 'button' for ISR; ProfileCompactTemplate
+  // renders AnonCookieBootstrap which resolves the per-user variant client-side
+  // via /api/profile/audience-anon-cookie and updates its own state.
 
   const profileResult = await getProfileAndLinks(username);
   const {
@@ -418,7 +424,10 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
   const [tourDatesRaw, allReleases, alertOptInVariant] = await Promise.all([
     tourDatesPromise.catch(() => [] as TourDateViewModel[]),
     releasesPromise,
-    getProfileAlertOptInVariant(alertOptInStableId),
+    // stableId is null for ISR renders — returns the default 'button' variant.
+    // AnonCookieBootstrap resolves the per-user variant on the client side.
+    // .catch ensures a Statsig outage doesn't fail the whole ISR page render.
+    getProfileAlertOptInVariant(null).catch(() => 'button' as const),
   ]);
   const tourDates = [...tourDatesRaw].sort(
     (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
