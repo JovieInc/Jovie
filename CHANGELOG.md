@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.221] - 2026-05-09
+
+> [internal] Ops now opens as a constrained command-center cockpit: AgentOS runs lead the page, deployments are supporting context, and approvals stay beside the active work.
+
+### Changed
+
+- [internal] Reworked `/app/admin/ops` into a shell-v1 cockpit with a max-width admin surface, board-first AgentOS lanes, compact deployment feed, persistent approval/detail rail, and denser run metadata tucked into popovers.
+
 ## [26.4.220] - 2026-05-08
 
 > [internal] Canonical UX contract for the public artist profile surface: route categories, bottom tab bar, navigation, alert/subscribe, and copy — plus the P0 decision to restore ISR by removing `force-dynamic` and moving the cookie read client-side.

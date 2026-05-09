@@ -210,6 +210,10 @@ export function TimActionRequiredSection() {
     issue => !optimisticallyClosedIds.has(issue.id)
   );
 
+  if (!isLoading && visibleIssues.length === 0) {
+    return null;
+  }
+
   return (
     <ContentSurfaceCard surface='details' className='p-3'>
       <div className='space-y-2.5'>
@@ -242,7 +246,7 @@ export function TimActionRequiredSection() {
               />
             ))}
           </div>
-        ) : visibleIssues.length > 0 ? (
+        ) : (
           <div className='grid gap-2'>
             {visibleIssues.map(issue => (
               <ActionRow
@@ -253,10 +257,6 @@ export function TimActionRequiredSection() {
               />
             ))}
           </div>
-        ) : (
-          <p className='text-[13px] leading-5 text-secondary-token'>
-            Nothing on your plate. Everything that needs hands is automated.
-          </p>
         )}
       </div>
     </ContentSurfaceCard>

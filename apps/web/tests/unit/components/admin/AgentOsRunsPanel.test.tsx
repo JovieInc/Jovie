@@ -53,13 +53,36 @@ describe('AgentOsRunsPanel', () => {
     expect(drawer).toHaveTextContent('Verification Gates');
 
     await userEvent.click(
-      within(screen.getByRole('table')).getByTestId(
-        'agent-os-run-agentos-run-blocked-needs-human'
-      )
+      within(
+        screen.getByTestId(
+          'agent-os-board-card-agentos-run-blocked-needs-human'
+        )
+      ).getByRole('button', { name: 'Agent PR needs human review' })
     );
 
     expect(screen.getByTestId('agent-os-artifact-drawer')).toHaveTextContent(
       'Agent PR needs human review'
+    );
+
+    await userEvent.click(
+      screen.getByRole('button', {
+        name: 'Inspect Agent PR needs human review',
+      })
+    );
+
+    expect(screen.getByTestId('popover-content')).toHaveTextContent(
+      'Verification Gates'
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: /Table/i }));
+    await userEvent.click(
+      within(screen.getByRole('table')).getByTestId(
+        'agent-os-run-agentos-run-running-main-tail'
+      )
+    );
+
+    expect(screen.getByTestId('agent-os-artifact-drawer')).toHaveTextContent(
+      'Main post-merge verification'
     );
   });
 
