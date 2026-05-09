@@ -4,12 +4,14 @@ import { Loader2, Rocket, X } from 'lucide-react';
 import Image from 'next/image';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
+import { AgentOsRunsPanel } from '@/components/features/admin/agent-os';
 import type { DailyBucket } from '@/components/features/admin/ShippingVelocityChart';
 import { ShippingVelocityChart } from '@/components/features/admin/ShippingVelocityChart';
 import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentMetricRow } from '@/components/molecules/ContentMetricRow';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { QRCode } from '@/components/molecules/QRCode';
+import { AGENT_OS_ADMIN_FIXTURE_ARTIFACTS } from '@/lib/agent-os/fixtures';
 import {
   getDefaultStatusTone,
   getDeploymentLabel,
@@ -756,6 +758,10 @@ export function HudDashboardClient({
           );
         })()}
       </ContentSurfaceCard>
+
+      {isShell && metrics.accessMode === 'admin' ? (
+        <AgentOsRunsPanel artifacts={AGENT_OS_ADMIN_FIXTURE_ARTIFACTS} />
+      ) : null}
 
       <ContentSurfaceCard
         surface='details'
