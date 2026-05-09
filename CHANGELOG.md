@@ -5,6 +5,24 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.224] - 2026-05-09
+
+> [internal] Extracts the bottom tab bar from ProfileCompactSurface into a canonical BottomTabBar component, adds safe-area nav constants, and removes 6 legacy V2 profile files and their tests.
+
+### Added
+
+- **[internal] `BottomTabBar` component** (`components/features/profile/nav/BottomTabBar.tsx`): canonical extracted bottom tab bar for the public profile compact surface — 4 primary tabs (Home/Music/Events/Alerts), conditional Events tab, optional More menu trigger, aria-current/aria-expanded/aria-haspopup, 44pt touch targets via `min-h-[52px]`, iOS safe-area padding, and responsive grid columns.
+- **[internal] `lib/profile/nav-constants.ts`**: `TAB_BAR_HEIGHT_REM`, `CONTENT_SAFE_AREA_BOTTOM_PADDING`, and `TAB_BAR_INTERNAL_SAFE_AREA_MIN_PX` — published surface contract for JOV-2023/JOV-2024 desktop work.
+- **[internal] 26 unit tests for `BottomTabBar`**: covers tab rendering (with/without tour dates), More button visibility and aria-expanded, active state aria-current, font-semibold/medium, onTabSelect/onOpenMenu handlers, grid column counts (3/4/4/5), touch target class, data-testid, and safe-area wrapper class.
+
+### Changed
+
+- **[internal] `ProfileCompactSurface`**: removes 80-line inline tab bar, now renders `<BottomTabBar>` via shell slot.
+
+### Removed
+
+- **[internal] Deleted 6 legacy V2 chain files**: `ProfileFeaturedCard.tsx`, `ProfileScrollBody.tsx`, `ProfileSkeleton.stories.tsx`, `ProfileViewportShell.tsx`, `ProgressiveArtistPage.tsx`, `PublicProfileTemplateV2.tsx` and their corresponding test files (1,358 lines removed).
+
 ## [26.4.223] - 2026-05-09
 
 > The homepage now leads with a sharper release command center, verified proof, and a product-led workspace story without leaking internal tools into marketing screenshots.
