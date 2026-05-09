@@ -5,6 +5,21 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.226] - 2026-05-09
+
+> [internal] Canonical metadata builder for all public artist profile routes — adds a shared lib/profile/metadata.ts that every /[username] route's generateMetadata now delegates to. Redirect-sink sub-routes (listen, releases, subscribe, tip, tour, pay, contact, [...slug]) gain noindex metadata guards.
+
+### Added
+
+- **[internal] `lib/profile/metadata.ts`**: shared metadata factory for all public profile routes. Provides `buildPublicProfileMetadata` (full OG + Twitter Card + canonical URL + robots + genre keywords + geo.placename), `sanitizeMetadataText` (HTML-strip artist bio/name/location before embedding in meta tags), `truncateMetadataText` (word-boundary truncation for descriptions), `buildProfileCanonicalUrl` (normalized slug resolution), and static fallback constants `PROFILE_NOT_FOUND_METADATA` / `PROFILE_ERROR_METADATA` / `REDIRECT_SINK_METADATA`.
+- **[internal] 43 unit tests** for the metadata builder covering all edge cases: null/undefined inputs, HTML injection, XSS in display_name, canonical URL normalization, description priority order, genre keywords, verified badge, geo.placename sanitization, and noindex on all error/not-found/redirect states.
+- **[internal] `generateMetadata` on 9 redirect-sink routes**: `[...slug]`, `contact`, `listen`, `pay`, `releases`, `subscribe`, `tip`, `tour` — all return `REDIRECT_SINK_METADATA` (`robots: noindex, nofollow`) so crawlers don't independently index transient redirect paths.
+
+### Changed
+
+- **[internal] `app/[username]/page.tsx` `generateMetadata`**: delegates to `buildPublicProfileMetadata` from the shared builder. Removed the local `buildProfileMetadata` and `buildProfileDescription` duplicates; returns `PROFILE_ERROR_METADATA` (noindex) on fetch errors instead of an ad-hoc object.
+- **[internal] `app/[username]/notifications/page.tsx` `generateMetadata`**: now resolves the artist display name from the profile loader rather than using the raw URL segment; adds `metadataBase`, full OG tags, Twitter card, and `robots: noindex`; sanitizes the artist name with `sanitizeMetadataText`.
+
 ## [26.4.225] - 2026-05-09
 
 > Jovie now has a real download page for the Mac app at jov.ie/download — version, system requirements, FAQ, and a button that always serves the latest signed release.
