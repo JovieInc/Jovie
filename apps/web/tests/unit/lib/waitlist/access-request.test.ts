@@ -303,4 +303,32 @@ describe('submitWaitlistAccessRequest', () => {
         ?.waitlistedAt
     ).toBeInstanceOf(Date);
   });
+
+  it('requeues an expired waitlist row when the user resubmits', async () => {
+    const originalWaitlistedAt = new Date('2026-04-01T00:00:00.000Z');
+    userRow = { id: 'user-1', userStatus: 'waitlist_pending' };
+    findLatestEntryByEmail.mockReturnValueOnce([
+      {
+        id: 'entry-1',
+        status: 'expired',
+        waitlistedAt: originalWaitlistedAt,
+      },
+    ]);
+
+    const { submitWaitlistAccessRequest } = await import(
+      '@/lib/waitlist/access-request'
+    );
+    const result = await submitWaitlistAccessRequest(baseInput);
+
+    expect(result.outcome).toBe('already_waitlisted');
+    expect(result.status).toBe('waitlisted');
+    expect(
+      updatedRows.find(row => row.statusReason === 'already_waitlisted')?.status
+    ).toBe('waitlisted');
+    expect(
+      updatedRows.find(row => row.statusReason === 'already_waitlisted')
+        ?.waitlistedAt
+    ).toBe(originalWaitlistedAt);
+    expect(notifySlackWaitlist).not.toHaveBeenCalled();
+  });
 });

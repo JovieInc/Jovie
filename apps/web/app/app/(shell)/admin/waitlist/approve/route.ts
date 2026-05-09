@@ -14,6 +14,7 @@ import { enqueueWaitlistApprovalInviteEmail } from '@/lib/waitlist/email-jobs';
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+const APPROVAL_IDEMPOTENT_STATUSES = new Set(['approved', 'invited']);
 
 export async function POST(request: Request) {
   let entitlements:
@@ -80,6 +81,17 @@ export async function POST(request: Request) {
     }
 
     if (result.outcome === 'already_processed') {
+      if (!APPROVAL_IDEMPOTENT_STATUSES.has(result.status)) {
+        return NextResponse.json(
+          {
+            success: false,
+            status: result.status,
+            error: `Entry cannot be approved from status: ${result.status}`,
+          },
+          { status: 409, headers: NO_STORE_HEADERS }
+        );
+      }
+
       return NextResponse.json(
         {
           success: true,

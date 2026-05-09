@@ -233,12 +233,12 @@ describe('Admin Waitlist Approve API', () => {
     expect(mockSendNotification).not.toHaveBeenCalled();
   });
 
-  it('does not send email when entry is already processed', async () => {
+  it('does not send email when entry is already invited', async () => {
     const entryId = '33333333-3333-4333-8333-333333333333';
 
     mockWithSystemIngestionSession.mockResolvedValueOnce({
       outcome: 'already_processed',
-      status: 'claimed',
+      status: 'invited',
     });
 
     mockGetCurrentUserEntitlements.mockResolvedValue({
@@ -261,6 +261,76 @@ describe('Admin Waitlist Approve API', () => {
     const response = await POST(request);
 
     expect(response.status).toBe(200);
+    expect(mockBuildWaitlistInviteEmail).not.toHaveBeenCalled();
+    expect(mockSendNotification).not.toHaveBeenCalled();
+  });
+
+  it('returns 409 when an admin approves a rejected entry', async () => {
+    const entryId = '66666666-6666-4666-8666-666666666666';
+
+    mockWithSystemIngestionSession.mockResolvedValueOnce({
+      outcome: 'already_processed',
+      status: 'rejected',
+    });
+
+    mockGetCurrentUserEntitlements.mockResolvedValue({
+      userId: 'admin_123',
+      email: 'admin@example.com',
+      isAuthenticated: true,
+      isAdmin: true,
+      isPro: true,
+      hasAdvancedFeatures: true,
+      canRemoveBranding: true,
+    });
+
+    const response = await POST(
+      new Request('http://localhost/app/admin/waitlist/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entryId }),
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(data.success).toBe(false);
+    expect(data.status).toBe('rejected');
+    expect(data.error).toBe('Entry cannot be approved from status: rejected');
+    expect(mockBuildWaitlistInviteEmail).not.toHaveBeenCalled();
+    expect(mockSendNotification).not.toHaveBeenCalled();
+  });
+
+  it('returns 409 when an admin approves a signed-up entry', async () => {
+    const entryId = '77777777-7777-4777-8777-777777777777';
+
+    mockWithSystemIngestionSession.mockResolvedValueOnce({
+      outcome: 'already_processed',
+      status: 'signed_up',
+    });
+
+    mockGetCurrentUserEntitlements.mockResolvedValue({
+      userId: 'admin_123',
+      email: 'admin@example.com',
+      isAuthenticated: true,
+      isAdmin: true,
+      isPro: true,
+      hasAdvancedFeatures: true,
+      canRemoveBranding: true,
+    });
+
+    const response = await POST(
+      new Request('http://localhost/app/admin/waitlist/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entryId }),
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(data.success).toBe(false);
+    expect(data.status).toBe('signed_up');
+    expect(data.error).toBe('Entry cannot be approved from status: signed_up');
     expect(mockBuildWaitlistInviteEmail).not.toHaveBeenCalled();
     expect(mockSendNotification).not.toHaveBeenCalled();
   });

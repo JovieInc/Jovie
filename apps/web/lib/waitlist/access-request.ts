@@ -391,9 +391,11 @@ export async function submitWaitlistAccessRequest(
             };
           }
 
-          const nextExistingStatus = isWaitlistPendingStatus(existing.status)
-            ? 'waitlisted'
-            : existing.status;
+          const nextExistingStatus =
+            isWaitlistPendingStatus(existing.status) ||
+            existing.status === 'expired'
+              ? 'waitlisted'
+              : existing.status;
 
           await tx
             .update(waitlistEntries)
