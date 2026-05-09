@@ -16,7 +16,7 @@ import {
   UserRound,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { AboutSection } from '@/features/profile/AboutSection';
@@ -254,6 +254,35 @@ export function ProfileDesktopSurface({
   onUnsubscribe = () => {},
   isUnsubscribing = false,
 }: ProfileDesktopSurfaceProps) {
+  // Hydrate the alert opt-in variant client-side so /{username} can be ISR-cached.
+  const [resolvedAlertOptInVariant, setResolvedAlertOptInVariant] =
+    useState<ProfileAlertOptInVariant>(alertOptInVariant);
+
+  useEffect(() => {
+    const stableId =
+      document.cookie
+        .split('; ')
+        .find(row => row.startsWith('jv_aid='))
+        ?.split('=')[1] ?? null;
+
+    if (!stableId || alertOptInVariant !== 'button') return;
+
+    void fetch(
+      `/api/audience/alert-variant?stableId=${encodeURIComponent(stableId)}`,
+      { method: 'GET', cache: 'no-store' }
+    )
+      .then(res => (res.ok ? res.json() : null))
+      .then((data: { variant?: ProfileAlertOptInVariant } | null) => {
+        if (data?.variant && data.variant !== resolvedAlertOptInVariant) {
+          setResolvedAlertOptInVariant(data.variant);
+        }
+      })
+      .catch(() => {
+        // Non-fatal — keep the default 'button' variant
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally fires once on mount
+  }, []);
+
   const [notificationsPortalContainer, setNotificationsPortalContainer] =
     useState<HTMLDivElement | null>(null);
   const mergedDSPs = useMemo(
@@ -346,7 +375,7 @@ export function ProfileDesktopSurface({
         portalContainer={notificationsPortalContainer}
         variant='hero'
         presentation='modal'
-        experimentVariant={alertOptInVariant}
+        experimentVariant={resolvedAlertOptInVariant}
         onManageNotifications={() => onModeSelect('subscribe')}
       />
     );
@@ -577,7 +606,7 @@ export function ProfileDesktopSurface({
                     New music, shows, and merch.
                   </span>
                 </span>
-                {alertOptInVariant === 'toggle' ? (
+                {resolvedAlertOptInVariant === 'toggle' ? (
                   <span
                     className='relative h-[26px] w-[42px] shrink-0 rounded-full border border-white/16 bg-white/10 p-0.5'
                     aria-hidden='true'
@@ -847,7 +876,7 @@ export function ProfileDesktopSurface({
             portalContainer={notificationsPortalContainer}
             autoOpen
             hideTrigger
-            experimentVariant={alertOptInVariant}
+            experimentVariant={resolvedAlertOptInVariant}
             onFlowClosed={onAlertsModalClose}
           />
         ) : null}

@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
@@ -220,6 +220,41 @@ export function ProfileCompactSurface({
   hideMoreMenu = false,
   headerSocialLinksOverride,
 }: Readonly<ProfileCompactSurfaceProps>) {
+  // Hydrate the alert opt-in variant client-side so the /{username} page can
+  // be ISR-cached without reading the jv_aid cookie during server rendering.
+  // The prop provides the SSR default ('button'); we update after mount if
+  // the Statsig experiment assigns a different value for this visitor.
+  const [resolvedAlertOptInVariant, setResolvedAlertOptInVariant] =
+    useState<ProfileAlertOptInVariant>(alertOptInVariant);
+
+  useEffect(() => {
+    // Read the anon stable ID from the cookie set by the audience tracking layer
+    const stableId =
+      document.cookie
+        .split('; ')
+        .find(row => row.startsWith('jv_aid='))
+        ?.split('=')[1] ?? null;
+
+    // Skip the fetch if we already have a non-default server-provided value
+    // (e.g. Storybook / dashboard preview passes the variant directly)
+    if (!stableId || alertOptInVariant !== 'button') return;
+
+    void fetch(
+      `/api/audience/alert-variant?stableId=${encodeURIComponent(stableId)}`,
+      { method: 'GET', cache: 'no-store' }
+    )
+      .then(res => (res.ok ? res.json() : null))
+      .then((data: { variant?: ProfileAlertOptInVariant } | null) => {
+        if (data?.variant && data.variant !== resolvedAlertOptInVariant) {
+          setResolvedAlertOptInVariant(data.variant);
+        }
+      })
+      .catch(() => {
+        // Network errors are non-fatal — keep the default 'button' variant
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally fires once on mount
+  }, []);
+
   const [notificationsPortalContainer, setNotificationsPortalContainer] =
     useState<HTMLDivElement | null>(null);
   const [showRecentActivationRow, setShowRecentActivationRow] = useState(false);
@@ -542,7 +577,7 @@ export function ProfileCompactSurface({
               variant='hero'
               autoOpen={activeVisiblePrimaryTab === 'subscribe'}
               hideTrigger
-              experimentVariant={alertOptInVariant}
+              experimentVariant={resolvedAlertOptInVariant}
               onFlowClosed={returnToProfileAfterNotifications}
               onSubscriptionActivated={handleSubscriptionActivated}
             />
@@ -574,17 +609,17 @@ export function ProfileCompactSurface({
                   </span>
                   <span
                     className={cn(
-                      alertOptInVariant === 'toggle'
+                      resolvedAlertOptInVariant === 'toggle'
                         ? 'relative h-[26px] w-[42px] shrink-0 rounded-full border p-0.5 transition-colors duration-subtle'
                         : 'inline-flex h-8 shrink-0 items-center rounded-full bg-white px-3 text-[12px] font-semibold text-black transition-colors duration-subtle',
-                      alertOptInVariant === 'toggle' &&
+                      resolvedAlertOptInVariant === 'toggle' &&
                         (isSubscribed
                           ? 'border-white/42 bg-white'
                           : 'border-white/16 bg-white/10')
                     )}
                     aria-hidden='true'
                   >
-                    {alertOptInVariant === 'toggle' ? (
+                    {resolvedAlertOptInVariant === 'toggle' ? (
                       <span
                         className={cn(
                           'block h-[22px] w-[22px] rounded-full shadow-[0_4px_10px_rgba(0,0,0,0.22)] transition-transform duration-subtle',
@@ -641,7 +676,7 @@ export function ProfileCompactSurface({
                 dsps={mergedDSPs}
                 enableDynamicEngagement={enableDynamicEngagement}
                 subscribeTwoStep={subscribeTwoStep}
-                alertOptInVariant={alertOptInVariant}
+                alertOptInVariant={resolvedAlertOptInVariant}
                 isSubscribed={isSubscribed}
                 contentPrefs={contentPrefs}
                 onTogglePref={onTogglePref}

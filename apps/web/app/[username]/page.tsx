@@ -1,11 +1,8 @@
 import { type Metadata } from 'next';
-import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 
-export const dynamic = 'force-dynamic';
-
 import type { PublicRelease } from '@/components/features/profile/releases/types';
-import { AUDIENCE_ANON_COOKIE, BASE_URL } from '@/constants/app';
+import { BASE_URL } from '@/constants/app';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
 import { DesktopQrOverlayClient } from '@/features/profile/DesktopQrOverlayClient';
 import { ProfileViewTracker } from '@/features/profile/ProfileViewTracker';
@@ -26,7 +23,6 @@ import { toPublicContacts } from '@/lib/contacts/mapper';
 import type { DiscogRelease } from '@/lib/db/schema';
 import { getReleasesForProfileLite } from '@/lib/discography/queries';
 import { captureError } from '@/lib/error-tracking';
-import { getProfileAlertOptInVariant } from '@/lib/flags/server';
 import { getConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import { isShopEnabled } from '@/lib/profile/shop-settings';
 import { getUpcomingTourDatesForProfile } from '@/lib/tour-dates/queries';
@@ -322,9 +318,6 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
 
   const isPublicNoAuthSmoke = process.env.PUBLIC_NOAUTH_SMOKE === '1';
   const viewerCountryCode = null;
-  const cookieStore = await cookies();
-  const alertOptInStableId =
-    cookieStore.get(AUDIENCE_ANON_COOKIE)?.value ?? null;
 
   const profileResult = await getProfileAndLinks(username);
   const {
@@ -415,10 +408,12 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
 
   // Await tour dates + releases (started above, non-blocking — errors logged then resolve to empty)
   // Sort server-side so the client doesn't need a useMemo sort
-  const [tourDatesRaw, allReleases, alertOptInVariant] = await Promise.all([
+  // Note: alertOptInVariant is resolved client-side after hydration to preserve ISR caching.
+  // ProfileCompactSurface and ProfileDesktopSurface both default to 'button' and hydrate
+  // the correct variant via /api/audience/alert-variant once mounted.
+  const [tourDatesRaw, allReleases] = await Promise.all([
     tourDatesPromise.catch(() => [] as TourDateViewModel[]),
     releasesPromise,
-    getProfileAlertOptInVariant(alertOptInStableId),
   ]);
   const tourDates = [...tourDatesRaw].sort(
     (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
@@ -478,7 +473,6 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
         allowPhotoDownloads={allowPhotoDownloads}
         pressPhotos={pressPhotos}
         subscribeTwoStep
-        alertOptInVariant={alertOptInVariant}
         genres={genres}
         tourDates={tourDates}
         visitTrackingToken={visitTrackingToken}
