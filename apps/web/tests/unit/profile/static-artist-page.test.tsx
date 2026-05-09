@@ -22,7 +22,6 @@ vi.mock('@/features/profile/templates/ProfileCompactTemplate', () => ({
         props.showSubscriptionConfirmedBanner
       ),
       'data-hide-more-menu': String(props.hideMoreMenu),
-      'data-visual-variant': String(props.visualVariant),
       'data-mount-id': mountIdRef.current,
     });
   },
@@ -176,56 +175,6 @@ describe('StaticArtistPage', () => {
     expect(screen.getByTestId('profile-compact-template')).toHaveAttribute(
       'data-hide-more-menu',
       'true'
-    );
-  });
-
-  it('keeps the public profile V1 visual variant off by default', async () => {
-    const { StaticArtistPage } = await import(
-      '@/features/profile/StaticArtistPage'
-    );
-
-    render(
-      <StaticArtistPage
-        mode='profile'
-        artist={mockArtist}
-        socialLinks={mockSocialLinks}
-        contacts={[]}
-        subtitle='Artist'
-        showBackButton={false}
-      />
-    );
-
-    expect(screen.getByTestId('profile-compact-template')).toHaveAttribute(
-      'data-visual-variant',
-      'default'
-    );
-  });
-
-  it('routes the public profile V1 flag into the compact template visual variant', async () => {
-    vi.doMock('@/lib/flags/marketing-static', () => ({
-      FEATURE_FLAGS: {
-        SHOW_PUBLIC_PROFILE_V1_DESIGN: true,
-      },
-    }));
-
-    const { StaticArtistPage } = await import(
-      '@/features/profile/StaticArtistPage'
-    );
-
-    render(
-      <StaticArtistPage
-        mode='profile'
-        artist={mockArtist}
-        socialLinks={mockSocialLinks}
-        contacts={[]}
-        subtitle='Artist'
-        showBackButton={false}
-      />
-    );
-
-    expect(screen.getByTestId('profile-compact-template')).toHaveAttribute(
-      'data-visual-variant',
-      'v1'
     );
   });
 
