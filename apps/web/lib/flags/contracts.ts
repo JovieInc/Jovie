@@ -44,15 +44,19 @@ export const APP_FLAG_DEFAULTS = {
   ALBUM_ART_GENERATION: true,
   CHAT_JANK_MONITOR: false,
   RELEASE_PLAN_DEMO: false,
-  DESIGN_V1: false,
-  SHELL_CHAT_V1: false,
-  DESIGN_V1_RELEASES: false,
-  DESIGN_V1_TASKS: false,
-  DESIGN_V1_CHAT_ENTITIES: false,
-  DESIGN_V1_LYRICS: false,
-  DESIGN_V1_LIBRARY: false,
-  DESIGN_V1_AUTH: false,
-  DESIGN_V1_ONBOARDING: false,
+  // DESIGN_V1 and all its surface aliases are permanently enabled.
+  // Statsig gate "design_v1" is also set to 100% rollout.
+  // The true default here ensures the new design is on even if Statsig is
+  // unavailable or the gate evaluation falls through.
+  DESIGN_V1: true,
+  SHELL_CHAT_V1: true,
+  DESIGN_V1_RELEASES: true,
+  DESIGN_V1_TASKS: true,
+  DESIGN_V1_CHAT_ENTITIES: true,
+  DESIGN_V1_LYRICS: true,
+  DESIGN_V1_LIBRARY: true,
+  DESIGN_V1_AUTH: true,
+  DESIGN_V1_ONBOARDING: true,
 } as const;
 
 export type AppFlagName = keyof typeof APP_FLAG_DEFAULTS;
