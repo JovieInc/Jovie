@@ -350,6 +350,70 @@ interface InternalTransactionResult {
   readonly statusChange: UpsertUserStatusResult;
 }
 
+async function handleExistingEntryResubmission(params: {
+  readonly tx: DbOrTransaction;
+  readonly existing: NonNullable<
+    Awaited<ReturnType<typeof findLatestEntryByEmail>>
+  >;
+  readonly entryValues: ReturnType<typeof buildEntryValues>;
+  readonly clerkUserId: string;
+  readonly emailRaw: string;
+}): Promise<InternalTransactionResult> {
+  const { tx, existing, entryValues, clerkUserId, emailRaw } = params;
+
+  if (isWaitlistApprovedStatus(existing.status)) {
+    const statusChange = await upsertUserStatus({
+      tx,
+      clerkUserId,
+      emailRaw,
+      entryId: existing.id,
+      nextStatus: 'waitlist_approved',
+    });
+    return {
+      entryId: existing.id,
+      status: existing.status,
+      outcome: 'already_accepted',
+      approval: null,
+      statusChange,
+    };
+  }
+
+  const nextExistingStatus =
+    isWaitlistPendingStatus(existing.status) || existing.status === 'expired'
+      ? 'waitlisted'
+      : existing.status;
+
+  await tx
+    .update(waitlistEntries)
+    .set({
+      ...entryValues,
+      qualificationResult: {
+        status: 'waitlisted',
+        reasonCode: 'already_waitlisted',
+      },
+      status: nextExistingStatus,
+      statusReason: 'already_waitlisted',
+      waitlistedAt: existing.waitlistedAt ?? new Date(),
+    })
+    .where(eq(waitlistEntries.id, existing.id));
+
+  const statusChange = await upsertUserStatus({
+    tx,
+    clerkUserId,
+    entryId: existing.id,
+    emailRaw,
+    nextStatus: 'waitlist_pending',
+  });
+
+  return {
+    entryId: existing.id,
+    status: nextExistingStatus,
+    outcome: 'already_waitlisted',
+    approval: null,
+    statusChange,
+  };
+}
+
 export async function submitWaitlistAccessRequest(
   input: WaitlistAccessRequestInput
 ): Promise<WaitlistAccessRequestResult> {
@@ -374,58 +438,13 @@ export async function submitWaitlistAccessRequest(
         });
 
         if (existing) {
-          if (isWaitlistApprovedStatus(existing.status)) {
-            const statusChange = await upsertUserStatus({
-              tx,
-              clerkUserId: input.clerkUserId,
-              emailRaw,
-              entryId: existing.id,
-              nextStatus: 'waitlist_approved',
-            });
-            return {
-              entryId: existing.id,
-              status: existing.status,
-              outcome: 'already_accepted' as const,
-              approval: null,
-              statusChange,
-            };
-          }
-
-          const nextExistingStatus =
-            isWaitlistPendingStatus(existing.status) ||
-            existing.status === 'expired'
-              ? 'waitlisted'
-              : existing.status;
-
-          await tx
-            .update(waitlistEntries)
-            .set({
-              ...entryValues,
-              qualificationResult: {
-                status: 'waitlisted',
-                reasonCode: 'already_waitlisted',
-              },
-              status: nextExistingStatus,
-              statusReason: 'already_waitlisted',
-              waitlistedAt: existing.waitlistedAt ?? new Date(),
-            })
-            .where(eq(waitlistEntries.id, existing.id));
-
-          const statusChange = await upsertUserStatus({
+          return handleExistingEntryResubmission({
             tx,
+            existing,
+            entryValues,
             clerkUserId: input.clerkUserId,
-            entryId: existing.id,
             emailRaw,
-            nextStatus: 'waitlist_pending',
           });
-
-          return {
-            entryId: existing.id,
-            status: nextExistingStatus,
-            outcome: 'already_waitlisted' as const,
-            approval: null,
-            statusChange,
-          };
         }
 
         const [entry] = await tx
@@ -436,9 +455,27 @@ export async function submitWaitlistAccessRequest(
             statusReason: 'chat_started',
             createdAt: new Date(),
           })
+          .onConflictDoNothing({
+            target: waitlistEntries.emailNormalized,
+            where: drizzleSql`${waitlistEntries.canonical} = true`,
+          })
           .returning({ id: waitlistEntries.id });
 
         if (!entry) {
+          const concurrentExisting = await findLatestEntryByEmail(
+            tx,
+            normalizedEmail
+          );
+          if (concurrentExisting) {
+            return handleExistingEntryResubmission({
+              tx,
+              existing: concurrentExisting,
+              entryValues,
+              clerkUserId: input.clerkUserId,
+              emailRaw,
+            });
+          }
+
           throw new Error('Failed to create waitlist entry');
         }
 

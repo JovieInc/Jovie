@@ -17,6 +17,7 @@ const notifySlackWaitlist = vi.fn().mockResolvedValue(undefined);
 let userRow: { id: string; userStatus: string } | null = null;
 const insertedEntries: Array<Record<string, unknown>> = [];
 const updatedRows: Array<Record<string, unknown>> = [];
+let waitlistInsertReturnRows: Array<{ id: string }> = [{ id: 'entry-new' }];
 
 vi.mock('@/lib/auth/proxy-state', () => ({
   invalidateProxyUserStateCache: (...args: unknown[]) =>
@@ -123,11 +124,17 @@ function createTxMock() {
         };
         return Promise.resolve(undefined);
       }
+      const isEmailJob = 'jobType' in vals;
+      const returning = vi
+        .fn()
+        .mockResolvedValue(
+          isEmailJob ? [{ id: 'job-1' }] : waitlistInsertReturnRows
+        );
       return {
         onConflictDoNothing: vi.fn(() => ({
-          returning: vi.fn().mockResolvedValue([{ id: 'job-1' }]),
+          returning,
         })),
-        returning: vi.fn().mockResolvedValue([{ id: 'entry-new' }]),
+        returning,
       };
     }),
   }));
@@ -155,6 +162,7 @@ describe('submitWaitlistAccessRequest', () => {
     userRow = null;
     insertedEntries.length = 0;
     updatedRows.length = 0;
+    waitlistInsertReturnRows = [{ id: 'entry-new' }];
     findLatestEntryByEmail.mockReset();
     findLatestEntryByEmail.mockReturnValue([]);
     getWaitlistSettings.mockReset();
@@ -225,6 +233,30 @@ describe('submitWaitlistAccessRequest', () => {
 
     expect(result.outcome).toBe('waitlisted_gate_on');
     expect(notifySlackWaitlist).toHaveBeenCalledTimes(1);
+  });
+
+  it('handles canonical email insert races as idempotent waitlist submissions', async () => {
+    waitlistInsertReturnRows = [];
+    findLatestEntryByEmail
+      .mockReturnValueOnce([])
+      .mockReturnValueOnce([
+        { id: 'entry-race-winner', status: 'new', waitlistedAt: null },
+      ]);
+
+    const { submitWaitlistAccessRequest } = await import(
+      '@/lib/waitlist/access-request'
+    );
+    const result = await submitWaitlistAccessRequest(baseInput);
+
+    expect(result).toMatchObject({
+      entryId: 'entry-race-winner',
+      status: 'waitlisted',
+      outcome: 'already_waitlisted',
+    });
+    expect(
+      updatedRows.find(row => row.statusReason === 'already_waitlisted')?.status
+    ).toBe('waitlisted');
+    expect(notifySlackWaitlist).not.toHaveBeenCalled();
   });
 
   it('does NOT fire Slack on idempotent re-assert when status is already pinned', async () => {

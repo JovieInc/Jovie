@@ -135,6 +135,9 @@ function createTransactionMock(
     const mockValues = vi.fn().mockReturnValue({
       returning: mockReturning,
       onConflictDoUpdate: mockOnConflict,
+      onConflictDoNothing: vi.fn().mockReturnValue({
+        returning: mockReturning,
+      }),
     });
     const mockWhere = vi.fn().mockReturnValue({
       limit: vi.fn().mockResolvedValue(selectResult),
@@ -574,6 +577,9 @@ describe('Waitlist API', () => {
         values: vi.fn().mockReturnValue({
           returning: mockReturning,
           onConflictDoUpdate: mockOnConflict,
+          onConflictDoNothing: vi.fn().mockReturnValue({
+            returning: mockReturning,
+          }),
         }),
       });
       mockDbUpdate.mockReturnValue({
@@ -663,6 +669,9 @@ describe('Waitlist API', () => {
         values: vi.fn().mockReturnValue({
           returning: mockReturning,
           onConflictDoUpdate: mockOnConflict,
+          onConflictDoNothing: vi.fn().mockReturnValue({
+            returning: mockReturning,
+          }),
         }),
       });
       mockDbUpdate.mockReturnValue({
@@ -726,6 +735,9 @@ describe('Waitlist API', () => {
         values: vi.fn().mockReturnValue({
           returning: mockReturning,
           onConflictDoUpdate: mockOnConflict,
+          onConflictDoNothing: vi.fn().mockReturnValue({
+            returning: mockReturning,
+          }),
         }),
       });
       mockDbUpdate.mockReturnValue({
