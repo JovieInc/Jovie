@@ -46,8 +46,12 @@ export function getDeploymentLabel(deployments: HudDeployments): string {
 }
 
 /**
- * Get the visual tone for default alive/dead status.
+ * Get the visual tone for default alive/dead/unknown status.
  */
-export function getDefaultStatusTone(defaultStatus: 'alive' | 'dead'): HudTone {
-  return defaultStatus === 'alive' ? 'good' : 'bad';
+export function getDefaultStatusTone(
+  defaultStatus: 'alive' | 'dead' | 'unknown'
+): HudTone {
+  if (defaultStatus === 'alive') return 'good';
+  if (defaultStatus === 'dead') return 'bad';
+  return 'warning';
 }
