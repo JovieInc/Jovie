@@ -1,21 +1,28 @@
 'use client';
 
-import { ClerkProvider, SignIn } from '@clerk/nextjs';
+import { ClerkProvider, SignIn, SignUp } from '@clerk/nextjs';
 import { ui } from '@clerk/ui';
 import { X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { getClerkProxyUrl } from '@/components/providers/clerkAvailability';
 import { APP_ROUTES } from '@/constants/routes';
 
-interface MarketingSignInModalProps {
+export type AuthModalMode = 'signin' | 'signup';
+
+interface AuthModalProps {
+  /**
+   * Initial mode. When not supplied, falls back to reading the
+   * `?auth=` URL parameter (signin | signup), then defaults to signin.
+   */
+  readonly defaultMode?: AuthModalMode;
   readonly onClose: () => void;
 }
 
 /**
- * Minimal dark Clerk appearance — closer to default Clerk than the
- * full marketing/app theme. Compact card, no heavy custom element
- * overrides, so it looks like a stock Clerk modal in dark mode.
+ * Minimal dark Clerk appearance — compact card, no heavy custom element
+ * overrides, looks like a stock Clerk modal in dark mode.
  */
 const clerkDarkCompact = {
   variables: {
@@ -39,16 +46,16 @@ const clerkDarkCompact = {
 } as const;
 
 /**
- * Reserved-size loading placeholder that mirrors the final Clerk compact
- * card layout (header, OAuth row, divider, input, primary button, footer
- * link). Absolutely positioned so Clerk's real card mounts on top without
- * reflow — eliminates the small-then-layoutshift flash on cold loads.
+ * Reserved-size loading placeholder that mirrors the Clerk compact card layout
+ * (header, OAuth row, divider, input, primary button, footer link).
+ * Absolutely positioned so Clerk's real card mounts on top without reflow —
+ * eliminates the small-then-layout-shift flash on cold loads.
  */
-function SignInSkeleton() {
+function AuthModalSkeleton({ testId }: Readonly<{ readonly testId?: string }>) {
   return (
     <div
       aria-hidden='true'
-      data-testid='marketing-signin-skeleton'
+      data-testid={testId ?? 'auth-modal-skeleton'}
       className='absolute inset-0 flex flex-col gap-4 rounded-[0.75rem] border border-white/10 bg-[#0a0a0c] p-8 shadow-2xl'
     >
       <div className='mx-auto h-6 w-40 animate-pulse rounded bg-white/10' />
@@ -71,29 +78,52 @@ function SignInSkeleton() {
   );
 }
 
-export function MarketingSignInModal({
-  onClose,
-}: Readonly<MarketingSignInModalProps>) {
+/**
+ * Inner component that reads URL params (requires Suspense boundary).
+ */
+function AuthModalInner({ defaultMode, onClose }: Readonly<AuthModalProps>) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Derive initial mode: prop → URL param → default
+  const urlMode = searchParams.get('auth') as AuthModalMode | null;
+  const resolvedInitialMode: AuthModalMode =
+    defaultMode ?? (urlMode === 'signup' ? 'signup' : 'signin');
+
+  const [mode, setMode] = useState<AuthModalMode>(resolvedInitialMode);
   const [mounted, setMounted] = useState(false);
   const [clerkReady, setClerkReady] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
 
+  // Close the modal and clean up the ?auth= URL param
+  const handleClose = useCallback(() => {
+    const url = new URL(globalThis.location.href);
+    if (url.searchParams.has('auth')) {
+      url.searchParams.delete('auth');
+      router.replace(`${url.pathname}${url.search}${url.hash}`);
+    }
+    onClose();
+  }, [onClose, router]);
+
+  // Toggle mode without unmounting the portal — preserves Clerk state (email prefill)
+  const toggleMode = useCallback(() => {
+    setClerkReady(false);
+    setMode(prev => (prev === 'signin' ? 'signup' : 'signin'));
+  }, []);
+
   useEffect(() => {
     setMounted(true);
-    // Remember the element that opened the modal so focus can return on
-    // close. Typically the marketing-header "Sign in" button.
     previouslyFocusedRef.current =
       (document.activeElement as HTMLElement | null) ?? null;
 
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        onClose();
+        handleClose();
         return;
       }
       if (event.key !== 'Tab') return;
-      // Focus trap: cycle tab order inside the modal so keyboard users
-      // can't escape to the page behind the backdrop.
+      // Focus trap: cycle tab order inside the modal
       const root = containerRef.current;
       if (!root) return;
       const focusables = root.querySelectorAll<HTMLElement>(
@@ -117,13 +147,12 @@ export function MarketingSignInModal({
         first.focus();
       }
     };
+
     document.addEventListener('keydown', onKey);
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    // Snapshot the current URL hash so we can restore it if Clerk's
-    // `routing='hash'` writes step fragments (e.g. `#/sign-in/factor-one`)
-    // that would otherwise stick around when the modal is dismissed.
     const previousHash = globalThis.location.hash;
+
     return () => {
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = previousOverflow;
@@ -131,17 +160,14 @@ export function MarketingSignInModal({
         const url = `${globalThis.location.pathname}${globalThis.location.search}${previousHash}`;
         globalThis.history.replaceState(null, '', url);
       }
-      // Restore focus to whatever triggered the modal.
       const prev = previouslyFocusedRef.current;
       if (prev && typeof prev.focus === 'function') {
         prev.focus();
       }
     };
-  }, [onClose]);
+  }, [handleClose]);
 
-  // Move focus into the modal once Clerk mounts its form. Clerk renders
-  // async (bundles + network), so watch the container with a
-  // MutationObserver and focus the first input as soon as it appears.
+  // Move focus into the modal once Clerk mounts its form
   useEffect(() => {
     if (!mounted) return;
     const container = containerRef.current;
@@ -165,24 +191,21 @@ export function MarketingSignInModal({
       if (focusFirstInput()) observer.disconnect();
     });
     observer.observe(container, { childList: true, subtree: true });
-    // Safety: stop watching after 5s even if Clerk never rendered.
-    const timeout = globalThis.setTimeout(() => observer.disconnect(), 5000);
+    const timeout = globalThis.setTimeout(() => {
+      observer.disconnect();
+      setClerkReady(true);
+    }, 5000);
     return () => {
       observer.disconnect();
       globalThis.clearTimeout(timeout);
     };
-  }, [mounted]);
+  }, [mounted, mode]);
 
   if (!mounted) return null;
 
-  // Portal to <body> so the modal escapes the marketing header's
-  // backdrop-filter containing block (which would otherwise shrink
-  // a `position: fixed` descendant to the header's bounds).
-  //
-  // proxyUrl routes Clerk traffic through the /__clerk middleware proxy
-  // exactly like ClientProviders + AuthClientProviders. Without it, prod
-  // (pk_live_) sign-ins bypass the proxy and break the FAPI host contract
-  // documented in CLAUDE.md.
+  const isSignIn = mode === 'signin';
+  const ariaLabel = isSignIn ? 'Sign in to Jovie' : 'Create your Jovie account';
+
   return createPortal(
     <ClerkProvider
       appearance={clerkDarkCompact}
@@ -195,40 +218,97 @@ export function MarketingSignInModal({
       <div
         role='dialog'
         aria-modal='true'
-        aria-label='Sign in to Jovie'
+        aria-label={ariaLabel}
         className='fixed inset-0 z-[100]'
       >
+        {/* Backdrop */}
         <button
           type='button'
-          aria-label='Close sign in'
-          onClick={onClose}
+          aria-label='Close'
+          onClick={handleClose}
           className='absolute inset-0 bg-black/70 backdrop-blur-sm'
         />
-        <div className='pointer-events-none absolute inset-0 flex items-center justify-center p-4'>
+
+        {/* Modal container — centered, compact, responsive */}
+        <div className='pointer-events-none absolute inset-0 flex items-center justify-center px-4 py-4'>
           <div
             ref={containerRef}
-            className='pointer-events-auto relative w-full max-w-[400px]'
-            style={{ minHeight: 520 }}
+            className='pointer-events-auto relative w-full max-w-[420px]'
+            style={{
+              maxHeight: 'min(560px, calc(100svh - 32px))',
+            }}
           >
+            {/* Skeleton placeholder — prevents layout shift while Clerk loads */}
+            {clerkReady ? null : (
+              <AuthModalSkeleton testId='auth-modal-skeleton' />
+            )}
+
+            {/* Close button */}
             <button
               type='button'
               aria-label='Close'
-              onClick={onClose}
+              onClick={handleClose}
               className='absolute right-2 top-2 z-20 inline-flex h-11 w-11 items-center justify-center rounded-full text-white/60 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30'
             >
               <X className='h-4 w-4' strokeWidth={2} />
             </button>
-            {clerkReady ? null : <SignInSkeleton />}
-            <SignIn
-              appearance={clerkDarkCompact}
-              routing='hash'
-              signUpUrl={APP_ROUTES.SIGNUP}
-              fallbackRedirectUrl={APP_ROUTES.ONBOARDING}
-            />
+
+            {/* Clerk form — SignIn or SignUp based on mode */}
+            {isSignIn ? (
+              <SignIn
+                appearance={clerkDarkCompact}
+                routing='hash'
+                signUpUrl={APP_ROUTES.SIGNUP}
+                fallbackRedirectUrl={APP_ROUTES.ONBOARDING}
+              />
+            ) : (
+              <SignUp
+                appearance={clerkDarkCompact}
+                routing='hash'
+                signInUrl={APP_ROUTES.SIGNIN}
+                fallbackRedirectUrl={APP_ROUTES.WAITLIST}
+              />
+            )}
+
+            {/* Mode toggle — switches without unmounting portal */}
+            <div className='mt-3 flex justify-center'>
+              <button
+                type='button'
+                onClick={toggleMode}
+                className='text-[12px] text-white/50 transition-colors hover:text-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 rounded-sm px-1'
+              >
+                {isSignIn
+                  ? 'Need an account? Sign up'
+                  : 'Have an account? Sign in'}
+              </button>
+            </div>
           </div>
         </div>
       </div>
     </ClerkProvider>,
     document.body
+  );
+}
+
+/**
+ * Canonical auth modal for Jovie marketing surfaces.
+ *
+ * Supports both sign-in and sign-up modes with an internal toggle that
+ * preserves Clerk state (email prefill) across switches. URL parameter
+ * integration: `?auth=signin` or `?auth=signup` opens the modal in the
+ * right mode. Closing removes the param via `router.replace`.
+ *
+ * Sizing: `w-full max-w-[420px]`, `max-h-[min(560px,calc(100svh-32px))]`,
+ * `px-4` on viewports <420px so it never bleeds to edge. Stays compact at
+ * ultra-wide (1920–3440px) — a focused dialog, not a stranded card.
+ *
+ * Portal-rendered to `<body>` to escape any `backdrop-filter` containing
+ * blocks in the header.
+ */
+export function AuthModal(props: Readonly<AuthModalProps>) {
+  return (
+    <Suspense fallback={null}>
+      <AuthModalInner {...props} />
+    </Suspense>
   );
 }

@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('@clerk/nextjs', () => ({
   ClerkProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
   SignIn: () => <div data-testid='clerk-signin-stub' />,
+  SignUp: () => <div data-testid='clerk-signup-stub' />,
 }));
 
 vi.mock('@clerk/ui', () => ({ ui: {} }));
@@ -13,40 +14,39 @@ vi.mock('@/components/providers/clerkAvailability', () => ({
   getClerkProxyUrl: () => 'https://example.test/__clerk',
 }));
 
-import { MarketingSignInModal } from '@/components/organisms/MarketingSignInModal';
+import { AuthModal } from '@/components/organisms/AuthModal';
 
-describe('MarketingSignInModal', () => {
+describe('AuthModal (via MarketingSignInModal compat shim)', () => {
   it('renders the reserved-size skeleton while Clerk is loading', () => {
-    render(<MarketingSignInModal onClose={() => undefined} />);
-    expect(screen.getByTestId('marketing-signin-skeleton')).toBeInTheDocument();
-  });
-
-  it('reserves ≥520px min-height on the card wrapper to prevent layout shift', () => {
-    const { container } = render(
-      <MarketingSignInModal onClose={() => undefined} />
-    );
-    const skeleton = screen.getByTestId('marketing-signin-skeleton');
-    const card = skeleton.parentElement as HTMLElement;
-    expect(card).toHaveStyle({ minHeight: '520px' });
-    expect(container).toBeTruthy();
+    render(<AuthModal onClose={() => undefined} />);
+    expect(screen.getByTestId('auth-modal-skeleton')).toBeInTheDocument();
   });
 
   it('calls onClose when Escape is pressed', () => {
     const onClose = vi.fn();
-    render(<MarketingSignInModal onClose={onClose} />);
+    render(<AuthModal onClose={onClose} />);
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('calls onClose when the backdrop is clicked', () => {
+  it('calls onClose when the backdrop close button is clicked', () => {
     const onClose = vi.fn();
-    render(<MarketingSignInModal onClose={onClose} />);
-    fireEvent.click(screen.getByLabelText('Close sign in'));
+    render(<AuthModal onClose={onClose} />);
+    // The backdrop button and close X button both have aria-label='Close'
+    const closeButtons = screen.getAllByLabelText('Close');
+    fireEvent.click(closeButtons[0]);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('exposes a dialog role with accessible name', () => {
-    render(<MarketingSignInModal onClose={() => undefined} />);
+  it('exposes a dialog role with accessible name for sign-in mode', () => {
+    render(<AuthModal onClose={() => undefined} defaultMode='signin' />);
     expect(screen.getByRole('dialog')).toHaveAccessibleName('Sign in to Jovie');
+  });
+
+  it('exposes a dialog role with accessible name for sign-up mode', () => {
+    render(<AuthModal onClose={() => undefined} defaultMode='signup' />);
+    expect(screen.getByRole('dialog')).toHaveAccessibleName(
+      'Create your Jovie account'
+    );
   });
 });
