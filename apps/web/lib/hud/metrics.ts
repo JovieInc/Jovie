@@ -154,6 +154,8 @@ export async function getHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
     stripeMetrics,
     mercuryMetrics
   );
+  const financialDataAvailable =
+    stripeMetrics.isAvailable && mercuryMetrics.isAvailable;
 
   const operationsStatus: HudMetrics['operations'] = {
     status: dbHealth.healthy ? 'ok' : 'degraded',
@@ -179,16 +181,16 @@ export async function getHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
       activeSubscribers: stripeMetrics.activeSubscribers,
       balanceUsd: mercuryMetrics.isAvailable ? mercuryMetrics.balanceUsd : 0,
       burnRateUsd: mercuryMetrics.isAvailable ? mercuryMetrics.burnRateUsd : 0,
-      runwayMonths: mercuryMetrics.isAvailable
+      runwayMonths: financialDataAvailable
         ? financialStatus.runwayMonths
         : null,
-      defaultStatus: mercuryMetrics.isAvailable
+      defaultStatus: financialDataAvailable
         ? financialStatus.isDefaultAlive
           ? 'alive'
           : 'dead'
         : 'unknown',
       defaultStatusDetail: financialStatus.defaultStatusDetail,
-      financialDataAvailable: mercuryMetrics.isAvailable,
+      financialDataAvailable,
     },
     operations: operationsStatus,
     reliability: {

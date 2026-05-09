@@ -33,7 +33,7 @@ export interface HudOverviewMetrics {
   runwayMonths: number | null;
   defaultStatus: 'alive' | 'dead' | 'unknown';
   defaultStatusDetail: string;
-  /** True when Mercury data is available; false means financial fields are stubs */
+  /** True when Stripe and Mercury data are available; false means financial fields are partial or stubs */
   financialDataAvailable: boolean;
 }
 
