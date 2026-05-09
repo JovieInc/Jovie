@@ -44,7 +44,7 @@ const PROFILE_SHELL = join(
 
 const REPRESENTATIVE_PROFILE_ENTRYPOINTS = [
   join(ROOT, 'app', '[username]', 'page.tsx'),
-  join(ROOT, 'components', 'features', 'profile', 'ProgressiveArtistPage.tsx'),
+  // ProgressiveArtistPage.tsx deleted in JOV-2022 legacy cleanup (no live route callers)
   join(ROOT, 'components', 'features', 'demo', 'DemoPublicProfileSurface.tsx'),
   join(
     ROOT,

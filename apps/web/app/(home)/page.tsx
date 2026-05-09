@@ -2,11 +2,11 @@ import { ArrowRight } from 'lucide-react';
 import type { Metadata } from 'next';
 import dynamic from 'next/dynamic';
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
-import { HomepageHeroCommandCenter } from '@/components/homepage/HomepageHeroCommandCenter';
 import { HomepageTrackedLink } from '@/components/homepage/HomepageTrackedLink';
 import { HERO_COPY } from '@/components/homepage/intent';
 import { FaqSection } from '@/components/marketing';
 import { ArtistProfileSpecWall } from '@/components/marketing/artist-profile/ArtistProfileSpecWall';
+import { HomeComposerHero } from '@/components/marketing/HomeComposerHero';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { ARTIST_PROFILE_SPEC_TILES } from '@/data/artistProfileFeatures';
@@ -76,12 +76,6 @@ const HomepageWorkspaceSection = dynamic(
   { ssr: true }
 );
 
-const HERO_PRODUCT_IMAGES = {
-  library: getMarketingExportImage('shell-v1-library-desktop'),
-  profile: getMarketingExportImage('tim-white-profile-live-mobile'),
-  release: getMarketingExportImage('release-presave-mobile'),
-  releases: getMarketingExportImage('shell-v1-releases-desktop'),
-};
 const WORKSPACE_SCREENSHOT = getMarketingExportImage(
   HOMEPAGE_LAUNCH_COPY.workspace.screenshotKey
 );
@@ -410,7 +404,7 @@ export default async function HomePage() {
               </p>
               <HomepageHeroActions />
             </div>
-            <HomepageHeroCommandCenter images={HERO_PRODUCT_IMAGES} />
+            <HomeComposerHero />
           </div>
         </div>
       </section>

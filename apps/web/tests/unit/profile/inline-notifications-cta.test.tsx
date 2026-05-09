@@ -180,7 +180,7 @@ describe('ProfileInlineNotificationsCTA flow', () => {
 
     render(<ProfileInlineNotificationsCTA artist={makeArtist()} />);
 
-    fireEvent.click(screen.getByRole('button', { name: /turn on alerts/i }));
+    fireEvent.click(screen.getByRole('button', { name: /get alerts/i }));
 
     expect(screen.getByTestId('mobile-email-input')).toBeInTheDocument();
     expect(handleEmailChange).toHaveBeenCalledWith('clerk@example.com');
@@ -196,7 +196,7 @@ describe('ProfileInlineNotificationsCTA flow', () => {
 
     render(<ProfileInlineNotificationsCTA artist={makeArtist()} />);
 
-    fireEvent.click(screen.getByRole('button', { name: /turn on alerts/i }));
+    fireEvent.click(screen.getByRole('button', { name: /get alerts/i }));
     fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
 
     await waitFor(() => {
@@ -248,7 +248,7 @@ describe('ProfileInlineNotificationsCTA flow', () => {
 
     render(<ProfileInlineNotificationsCTA artist={makeArtist()} />);
 
-    fireEvent.click(screen.getByRole('button', { name: /turn on alerts/i }));
+    fireEvent.click(screen.getByRole('button', { name: /get alerts/i }));
     fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
     fireEvent.click(await screen.findByRole('button', { name: /^verify$/i }));
 
