@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { BASE_URL } from '@/constants/app';
+import { APP_NAME, BASE_URL } from '@/constants/app';
+import { sanitizeMetadataText } from '@/lib/profile/metadata';
 import { convertCreatorProfileToArtist } from '@/types/db';
 import { getProfileAndLinks } from '../_lib/public-profile-loader';
 import { NotificationsPageClient } from './NotificationsPageClient';
@@ -16,7 +17,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // Resolve the display name so the metadata reflects the artist name, not
   // just the raw URL segment. Falls back to the username if not found.
   const artistName =
-    result.profile?.display_name ?? result.profile?.username ?? username;
+    sanitizeMetadataText(
+      result.profile?.display_name ?? result.profile?.username ?? username
+    ) || username;
 
   const canonicalUsername =
     result.profile?.username_normalized ?? username.toLowerCase();
@@ -33,7 +36,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       title: `Get notifications from ${artistName}`,
       description: `Manage alerts for ${artistName}'s music, shows, and merch updates.`,
       url: `${BASE_URL}/${canonicalUsername}/notifications`,
-      siteName: 'Jovie',
+      siteName: APP_NAME,
     },
     twitter: {
       card: 'summary',
