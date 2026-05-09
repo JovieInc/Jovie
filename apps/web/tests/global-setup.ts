@@ -112,7 +112,9 @@ async function globalSetup() {
   });
 
   // Seed test database with required profiles for smoke tests
-  if (process.env.DATABASE_URL) {
+  if (process.env.E2E_SKIP_SEED === '1') {
+    console.log('ℹ E2E_SKIP_SEED=1, skipping test data seeding');
+  } else if (process.env.DATABASE_URL) {
     try {
       console.log('🌱 Seeding test data...');
       await seedTestData();

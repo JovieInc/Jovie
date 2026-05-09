@@ -99,9 +99,32 @@ async function parseJsonSafely<T>(response: APIResponse): Promise<T | null> {
 }
 
 export function canFallbackToBypassUserId(
-  persona: 'creator' | 'admin' | null
+  persona: DevTestAuthPersona | null
 ): boolean {
   return persona === 'creator';
+}
+
+async function resolveBypassUserIdFromLocalProvisioning(
+  fallbackUserId: string,
+  persona: DevTestAuthPersona | null
+): Promise<string | null> {
+  if (!persona || !isTestAuthBypassEnabled()) {
+    return null;
+  }
+
+  try {
+    const { ensureDevTestAuthActor } = await import(
+      '@/lib/auth/dev-test-auth.server'
+    );
+    const actor = await ensureDevTestAuthActor(persona);
+    return actor.clerkUserId?.trim() || fallbackUserId;
+  } catch (error) {
+    console.warn(
+      `[clerk-auth] Failed to locally provision ${persona} test auth persona`,
+      error instanceof Error ? error.message : String(error)
+    );
+    return null;
+  }
 }
 
 async function resolveBypassUserId(
@@ -132,6 +155,19 @@ async function resolveBypassUserId(
       return payload.userId?.trim() || fallbackUserId;
     } catch {
       if (attempt === 3) {
+        const locallyProvisionedUserId =
+          await resolveBypassUserIdFromLocalProvisioning(
+            fallbackUserId,
+            persona
+          );
+
+        if (locallyProvisionedUserId) {
+          console.warn(
+            `[clerk-auth] Falling back to local provisioning for ${persona} persona after session bootstrap failed`
+          );
+          return locallyProvisionedUserId;
+        }
+
         if (canFallbackToBypassUserId(persona)) {
           console.warn(
             `[clerk-auth] Falling back to configured bypass user for ${persona} persona after session bootstrap failed`
