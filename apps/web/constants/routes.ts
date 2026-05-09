@@ -125,6 +125,7 @@ export const APP_ROUTES = {
   LAUNCH: '/launch',
   LAUNCH_PRICING: '/launch/pricing',
   CHANGELOG: '/changelog',
+  DOWNLOAD: '/download',
   SUPPORT: '/support',
   PAY: '/pay',
 

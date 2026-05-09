@@ -5,6 +5,17 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.225] - 2026-05-09
+
+> Jovie now has a real download page for the Mac app at jov.ie/download — version, system requirements, FAQ, and a button that always serves the latest signed release.
+
+### Added
+
+- **Download page (`/download`)**: public marketing page for the Mac app with hero, features, system requirements, FAQ, and legal footer. Designed to match the rest of jov.ie.
+- **Auto-updating download link**: the download button always serves the latest signed DMG without manual page edits — the link resolves at click time against our public release feed.
+- [internal] `/api/desktop/download` route 302-redirects to the latest universal DMG asset on GitHub Releases via a server-only helper (`lib/desktop/github-releases.ts`).
+- [internal] `APP_ROUTES.DOWNLOAD` constant added; in-app `UserButton` "Download Desktop App" item now opens `/download` instead of the raw GitHub URL.
+
 ## [26.4.224] - 2026-05-09
 
 > [internal] Extracts the bottom tab bar from ProfileCompactSurface into a canonical BottomTabBar component, adds safe-area nav constants, and removes 6 legacy V2 profile files and their tests.
