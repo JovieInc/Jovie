@@ -1,6 +1,25 @@
 name: desktop-release
 
+# Triggers:
+# - Auto on push to main when desktop code, version, or this workflow changes
+#   → builds + publishes a production release to GitHub Releases.
+# - Manual workflow_dispatch lets you target staging or re-run production.
+#
+# Signing & notarization:
+# - Requires GH secrets: APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID,
+#   MAC_CERTIFICATE_BASE64, MAC_CERTIFICATE_PASSWORD.
+# - When secrets are absent (e.g. a fork PR), the macOS build skips signing
+#   gracefully and produces an unsigned DMG. Auto-update will not work for
+#   unsigned builds; that's by design — they're for sanity checks only.
+# - See apps/desktop/SIGNING.md for one-time setup.
+
 on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/desktop/**"
+      - "VERSION"
+      - ".github/workflows/desktop-release.yml"
   workflow_dispatch:
     inputs:
       environment:
@@ -9,23 +28,30 @@ on:
         options:
           - staging
           - production
-        default: staging
+        default: production
 
 permissions:
   contents: write
 
 concurrency:
-  group: desktop-release-${{ github.event.inputs.environment }}
-  cancel-in-progress: true
+  # On push, github.event.inputs.environment is empty → group becomes
+  # "desktop-release-production" (the default for push). On manual dispatch,
+  # the chosen environment is used. cancel-in-progress=false so a queued
+  # production build doesn't get killed by a slow staging build.
+  group: desktop-release-${{ github.event.inputs.environment || 'production' }}
+  cancel-in-progress: false
 
 jobs:
   build:
-    timeout-minutes: 30
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
         os: [macos-latest, windows-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
+    env:
+      ENVIRONMENT: ${{ github.event.inputs.environment || 'production' }}
+      HAS_MAC_SIGNING_CREDENTIALS: ${{ secrets.MAC_CERTIFICATE_BASE64 != '' && secrets.MAC_CERTIFICATE_PASSWORD != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -40,17 +66,69 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Generate staging icon
-        if: ${{ inputs.environment == 'staging' }}
+        if: env.ENVIRONMENT == 'staging'
         run: node apps/desktop/scripts/gen-staging-icon.mjs
+
+      # macOS code signing: import the Developer ID Application cert into a
+      # temporary keychain so electron-builder + codesign can find it.
+      # If MAC_CERTIFICATE_BASE64 is absent, this step no-ops and the build
+      # continues unsigned (electron-builder will warn, not fail).
+      - name: Import Apple Developer cert (macOS)
+        if: matrix.os == 'macos-latest' && env.HAS_MAC_SIGNING_CREDENTIALS == 'true'
+        env:
+          MAC_CERTIFICATE_BASE64: ${{ secrets.MAC_CERTIFICATE_BASE64 }}
+          MAC_CERTIFICATE_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN_PATH="$RUNNER_TEMP/jovie-build.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 24)"
+          CERT_PATH="$RUNNER_TEMP/cert.p12"
+
+          echo "$MAC_CERTIFICATE_BASE64" | base64 --decode > "$CERT_PATH"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          security import "$CERT_PATH" \
+            -P "$MAC_CERTIFICATE_PASSWORD" \
+            -A -t cert -f pkcs12 \
+            -k "$KEYCHAIN_PATH"
+
+          # Prepend our keychain to the user's keychain search list so codesign
+          # can find the imported identity. Unquoted expansion is intentional —
+          # the security CLI takes each keychain path as a separate argument.
+          EXISTING_KEYCHAINS=$(security list-keychain -d user | tr -d '"')
+          # shellcheck disable=SC2086
+          security list-keychain -d user -s "$KEYCHAIN_PATH" $EXISTING_KEYCHAINS
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASSWORD" \
+            "$KEYCHAIN_PATH" >/dev/null
+
+          # Echo identity for build-log breadcrumb (no secret in output).
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH" || true
+
+          rm -f "$CERT_PATH"
+          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
 
       - name: Build desktop app
         env:
-          ELECTRON_ENV: ${{ inputs.environment }}
+          ELECTRON_ENV: ${{ env.ENVIRONMENT }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
-          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          # Apple notarization (notarytool). All three required by
+          # electron-builder when notarize: true is set; if any are missing,
+          # electron-builder skips notarization with a warning.
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: pnpm --filter @jovie/desktop build:${{ inputs.environment }}
+          # CSC_LINK is the alternative to MAC_CERTIFICATE_BASE64 when not
+          # using a pre-imported keychain. Left unset; we use the keychain
+          # set up above instead.
+          CSC_KEYCHAIN: ${{ env.KEYCHAIN_PATH }}
+        run: pnpm --filter @jovie/desktop build:${{ env.ENVIRONMENT }}
+
+      - name: Clean up keychain
+        if: always() && matrix.os == 'macos-latest' && env.KEYCHAIN_PATH != ''
+        run: |
+          security delete-keychain "$KEYCHAIN_PATH" || true
