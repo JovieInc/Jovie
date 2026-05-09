@@ -124,11 +124,11 @@ export default async function AdminOpsPage({
           href={PRESENTATION_VIEW_HREF}
           target='_blank'
           rel='noopener'
-          aria-label='Open presentation view in a new tab'
+          aria-label='Open TV view in a new tab'
           className='inline-flex h-8 items-center gap-1.5 rounded-lg border border-subtle bg-surface-0 px-2.5 text-[12px] font-[540] text-secondary-token transition-colors hover:bg-surface-1 hover:text-primary-token'
         >
           <Maximize2 className='h-3.5 w-3.5' aria-hidden='true' />
-          Presentation view
+          TV view
         </Link>
       }
     >
