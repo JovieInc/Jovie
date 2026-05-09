@@ -4,6 +4,15 @@
      4|
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
+
+## [26.4.219] - 2026-05-09
+
+> [internal] Public profile surface audit: route matrix, component duplication map, legacy cleanup list, and risk register for the /{username} surface — feeds JOV-2021 through JOV-2029 hardening backlog.
+
+### Added
+
+- [internal] `docs/public-profile-hardening-audit.md` — read-only audit of the public profile surface covering 26 route/state combinations, 9 component duplication categories, 11 legacy cleanup items, and a risk register. Spawned sub-issues JOV-2021 through JOV-2029 for implementation work.
+
      7|
      8|## [26.4.218] - 2026-05-08
 
