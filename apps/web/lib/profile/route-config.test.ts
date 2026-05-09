@@ -321,6 +321,14 @@ describe('TOP_LEVEL_ROUTE_KEYS', () => {
     expect(TOP_LEVEL_ROUTE_KEYS).toContain('mode-tour');
     expect(TOP_LEVEL_ROUTE_KEYS).toContain('mode-subscribe');
   });
+
+  it('is complete for all top-level registry entries', () => {
+    const registryTopLevelKeys = Object.values(PROFILE_ROUTE_CONFIG)
+      .filter(entry => entry.category === 'top-level')
+      .map(entry => entry.key)
+      .sort();
+    expect([...TOP_LEVEL_ROUTE_KEYS].sort()).toEqual(registryTopLevelKeys);
+  });
 });
 
 describe('REDIRECT_SINK_ROUTE_KEYS', () => {
@@ -347,6 +355,16 @@ describe('REDIRECT_SINK_ROUTE_KEYS', () => {
     expect(sinkModes).toContain('releases');
     expect(sinkModes).toContain('subscribe');
     expect(sinkModes).toContain('tour');
+  });
+
+  it('is complete for all redirect-sink registry entries', () => {
+    const registryRedirectSinkKeys = Object.values(PROFILE_ROUTE_CONFIG)
+      .filter(entry => entry.category === 'redirect-sink')
+      .map(entry => entry.key)
+      .sort();
+    expect([...REDIRECT_SINK_ROUTE_KEYS].sort()).toEqual(
+      registryRedirectSinkKeys
+    );
   });
 });
 

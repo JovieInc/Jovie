@@ -84,7 +84,7 @@ export type ProfileRouteKey =
 // ---------------------------------------------------------------------------
 
 /**
- * The four primary tabs + the "More" trigger.
+ * The four primary tabs.
  * Order is fixed per spec §2.1.
  */
 export const BOTTOM_TAB_KEYS = [
