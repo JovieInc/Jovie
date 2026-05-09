@@ -24,10 +24,7 @@ import {
   evaluateWaitlistQualification,
   type QualificationDecision,
 } from '@/lib/waitlist/qualification';
-import {
-  getWaitlistSettings,
-  tryReserveAutoAcceptSlot,
-} from '@/lib/waitlist/settings';
+import { getWaitlistSettings } from '@/lib/waitlist/settings';
 import {
   isWaitlistApprovedStatus,
   isWaitlistPendingStatus,
@@ -266,33 +263,11 @@ async function decideAccess(params: {
 
   const settings = await getWaitlistSettings(params.tx);
   const mode = settings.gateEnabled ? 'waitlist_enabled' : 'open_signup';
-  let qualification = evaluateWaitlistQualification({
+  const qualification = evaluateWaitlistQualification({
     email: params.email,
     payload: params.data,
     config: { mode },
   });
-
-  let reservation: Awaited<ReturnType<typeof tryReserveAutoAcceptSlot>> | null =
-    null;
-  if (
-    qualification.status === 'waitlisted' &&
-    qualification.reasonCode === 'waitlist_gate_enabled'
-  ) {
-    reservation = await tryReserveAutoAcceptSlot(params.tx);
-    if (reservation.shouldAutoAccept) {
-      qualification = evaluateWaitlistQualification({
-        email: params.email,
-        payload: params.data,
-        config: { mode, autoAcceptReserved: true },
-      });
-    } else if (reservation.reason === 'capacity_full') {
-      qualification = evaluateWaitlistQualification({
-        email: params.email,
-        payload: params.data,
-        config: { mode, autoAcceptReserved: false },
-      });
-    }
-  }
 
   if (qualification.status === 'blocked') {
     return {
@@ -305,10 +280,7 @@ async function decideAccess(params: {
 
   if (qualification.status === 'waitlisted') {
     return {
-      outcome:
-        reservation?.reason === 'capacity_full'
-          ? 'waitlisted_capacity_full'
-          : 'waitlisted_gate_on',
+      outcome: 'waitlisted_gate_on',
       approval: null,
       statusChange,
       qualification,

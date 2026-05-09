@@ -146,18 +146,17 @@ describe('tryReserveAutoAcceptSlot', () => {
     getWaitlistSettings = mod.getWaitlistSettings;
   });
 
-  it('never reserves a slot when the manual gate is on', async () => {
+  it('does not reserve a slot when auto-accept is disabled', async () => {
     setupDbSelectMock(createMockSettings({ gateEnabled: true }));
 
     await expect(tryReserveAutoAcceptSlot()).resolves.toEqual({
       shouldAutoAccept: false,
-      reason: 'gate_on',
+      reason: 'auto_accept_disabled',
     });
     expect(mockDbUpdate).not.toHaveBeenCalled();
   });
 
-  it('immediately accepts without consuming a slot when the gate is off', async () => {
-    // Gate off = open floodgates; auto-accept counter is bypassed
+  it('reserves capacity even when the gate is off', async () => {
     setupDbSelectMock(
       createMockSettings({
         gateEnabled: false,
@@ -166,17 +165,22 @@ describe('tryReserveAutoAcceptSlot', () => {
         autoAcceptedToday: 1,
       })
     );
+    mockDbUpdate.mockReturnValue({
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([{ id: 1 }]),
+        }),
+      }),
+    });
 
     await expect(tryReserveAutoAcceptSlot()).resolves.toEqual({
       shouldAutoAccept: true,
       reason: 'reserved',
     });
-    // No DB update needed — counter bypass when gate is off
-    expect(mockDbUpdate).not.toHaveBeenCalled();
+    expect(mockDbUpdate).toHaveBeenCalled();
   });
 
-  it('returns gate_on when auto accept is disabled while gate is on', async () => {
-    // When gate is on but autoAcceptEnabled=false, the gate_on path is taken
+  it('returns auto_accept_disabled when auto accept is disabled while gate is on', async () => {
     setupDbSelectMock(
       createMockSettings({
         gateEnabled: true,
@@ -188,7 +192,7 @@ describe('tryReserveAutoAcceptSlot', () => {
 
     await expect(tryReserveAutoAcceptSlot()).resolves.toEqual({
       shouldAutoAccept: false,
-      reason: 'gate_on',
+      reason: 'auto_accept_disabled',
     });
     expect(mockDbUpdate).not.toHaveBeenCalled();
   });

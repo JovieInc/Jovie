@@ -163,20 +163,13 @@ export async function tryReserveAutoAcceptSlot(
   dbOrTx?: DbOrTransaction
 ): Promise<{
   shouldAutoAccept: boolean;
-  reason: 'gate_on' | 'auto_accept_disabled' | 'capacity_full' | 'reserved';
+  reason: 'auto_accept_disabled' | 'capacity_full' | 'reserved';
 }> {
   const client = dbOrTx ?? db;
   const settings = await getWaitlistSettings(client);
 
-  // Gate off = open floodgates. Matches the hardcoded `isWaitlistGateEnabled`
-  // intent: when the gate is down everyone goes straight through onboarding
-  // without consuming the autoAccept counter.
-  if (!settings.gateEnabled) {
-    return { shouldAutoAccept: true, reason: 'reserved' };
-  }
-
   if (!settings.autoAcceptEnabled || settings.autoAcceptDailyLimit <= 0) {
-    return { shouldAutoAccept: false, reason: 'gate_on' };
+    return { shouldAutoAccept: false, reason: 'auto_accept_disabled' };
   }
 
   if (settings.autoAcceptedToday >= settings.autoAcceptDailyLimit) {
@@ -194,7 +187,6 @@ export async function tryReserveAutoAcceptSlot(
       and(
         eq(waitlistSettings.id, SETTINGS_ROW_ID),
         eq(waitlistSettings.autoAcceptEnabled, true),
-        eq(waitlistSettings.gateEnabled, true),
         drizzleSql`${waitlistSettings.autoAcceptedToday} < ${waitlistSettings.autoAcceptDailyLimit}`
       )
     )

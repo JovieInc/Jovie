@@ -219,11 +219,15 @@ describe('submitWaitlistAccessRequest', () => {
     expect(notifySlackWaitlist).not.toHaveBeenCalled();
   });
 
-  it('fires Slack exactly once on first-time waitlisted_gate_on signup', async () => {
+  it('waitlists fresh submissions even when delayed auto-accept has capacity', async () => {
     findLatestEntryByEmail.mockReturnValueOnce([]); // no existing entry
-    tryReserveAutoAcceptSlot.mockResolvedValue({
-      shouldAutoAccept: false,
-      reason: 'gate_on',
+    getWaitlistSettings.mockResolvedValueOnce({
+      gateEnabled: true,
+      autoAcceptEnabled: true,
+      autoAcceptAfterDays: 7,
+      autoAcceptDailyLimit: 10,
+      autoAcceptedToday: 0,
+      autoAcceptResetsAt: new Date(Date.now() + 86_400_000),
     });
 
     const { submitWaitlistAccessRequest } = await import(
@@ -232,6 +236,9 @@ describe('submitWaitlistAccessRequest', () => {
     const result = await submitWaitlistAccessRequest(baseInput);
 
     expect(result.outcome).toBe('waitlisted_gate_on');
+    expect(result.status).toBe('waitlisted');
+    expect(tryReserveAutoAcceptSlot).not.toHaveBeenCalled();
+    expect(approveWaitlistEntryInTx).not.toHaveBeenCalled();
     expect(notifySlackWaitlist).toHaveBeenCalledTimes(1);
   });
 
