@@ -84,4 +84,38 @@ describe('WaitlistInvitePage', () => {
     );
     expect(mockRedeemWaitlistInviteToken).not.toHaveBeenCalled();
   });
+
+  it('passes every verified Clerk email to invite redemption', async () => {
+    mockCurrentUser.mockResolvedValue({
+      emailAddresses: [
+        {
+          emailAddress: 'primary@example.com',
+          verification: { status: 'verified' },
+        },
+        {
+          emailAddress: 'invited@example.com',
+          verification: { status: 'verified' },
+        },
+        {
+          emailAddress: 'unverified@example.com',
+          verification: { status: 'unverified' },
+        },
+      ],
+    });
+    mockRedeemWaitlistInviteToken.mockResolvedValue({
+      outcome: 'invalid',
+    });
+
+    await WaitlistInvitePage({
+      searchParams: Promise.resolve({ token: 'secure-token' }),
+    });
+
+    expect(mockRedeemWaitlistInviteToken).toHaveBeenCalledWith(
+      expect.objectContaining({
+        token: 'secure-token',
+        clerkUserId: 'clerk_123',
+        verifiedEmails: ['primary@example.com', 'invited@example.com'],
+      })
+    );
+  });
 });

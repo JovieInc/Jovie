@@ -26,6 +26,7 @@ type Row = Record<string, unknown>;
 
 function createTxMock(selectResults: Row[][]) {
   const selectQueue = [...selectResults];
+  const insertValues = vi.fn().mockResolvedValue(undefined);
   const select = vi.fn(() => ({
     from: vi.fn(() => ({
       where: vi.fn(() => ({
@@ -46,8 +47,9 @@ function createTxMock(selectResults: Row[][]) {
       set: vi.fn(() => ({ where: vi.fn().mockResolvedValue(undefined) })),
     })),
     insert: vi.fn(() => ({
-      values: vi.fn().mockResolvedValue(undefined),
+      values: insertValues,
     })),
+    insertValues,
   } as never;
 }
 
@@ -154,5 +156,43 @@ describe('redeemWaitlistInviteToken', () => {
     });
 
     expect(result).toEqual({ outcome: 'invalid' });
+  });
+
+  it('accepts an invite sent to any verified email on the Clerk account', async () => {
+    const inviteToken = 'fresh-token-with-enough-entropy-for-tests';
+    const tx = createTxMock([
+      [
+        {
+          id: 'entry-1',
+          email: 'invited@example.com',
+          emailNormalized: 'invited@example.com',
+          status: 'invited',
+          inviteTokenExpiresAt: new Date(Date.now() + 60_000),
+          inviteTokenRedeemedAt: null,
+        },
+      ],
+      [],
+    ]);
+    mockWithSystemIngestionSession.mockImplementation(async callback =>
+      callback(tx)
+    );
+
+    const result = await redeemWaitlistInviteToken({
+      token: inviteToken,
+      clerkUserId: 'clerk_123',
+      verifiedEmails: ['primary@example.com', 'Invited@Example.com'],
+    });
+
+    expect(result).toEqual({
+      outcome: 'approved',
+      entryId: 'entry-1',
+      clerkId: 'clerk_123',
+    });
+    const txWithInsert = tx as unknown as {
+      insertValues: ReturnType<typeof vi.fn>;
+    };
+    expect(txWithInsert.insertValues).toHaveBeenCalledWith(
+      expect.objectContaining({ email: 'Invited@Example.com' })
+    );
   });
 });

@@ -60,11 +60,13 @@ export default async function WaitlistInvitePage({
   }
 
   const clerkUser = await currentUser();
-  const verifiedEmail =
-    clerkUser?.emailAddresses?.find(e => e.verification?.status === 'verified')
-      ?.emailAddress ?? null;
+  const verifiedEmails =
+    clerkUser?.emailAddresses
+      ?.filter(e => e.verification?.status === 'verified')
+      .map(e => e.emailAddress)
+      .filter(email => email.trim().length > 0) ?? [];
 
-  if (!verifiedEmail) {
+  if (verifiedEmails.length === 0) {
     return (
       <InviteMessage
         title='Verify your email'
@@ -90,7 +92,7 @@ export default async function WaitlistInvitePage({
   const result = await redeemWaitlistInviteToken({
     token,
     clerkUserId: userId,
-    verifiedEmail,
+    verifiedEmails,
   });
 
   if (result.outcome === 'approved') {

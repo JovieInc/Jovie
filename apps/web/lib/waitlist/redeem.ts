@@ -88,9 +88,16 @@ async function hasLinkedApprovedUser(params: {
 export async function redeemWaitlistInviteToken(input: {
   token: string;
   clerkUserId: string;
-  verifiedEmail: string;
+  verifiedEmail?: string;
+  verifiedEmails?: readonly string[];
 }): Promise<WaitlistInviteRedeemResult> {
-  const normalizedEmail = normalizeEmail(input.verifiedEmail);
+  const verifiedEmails = [
+    ...(input.verifiedEmails ?? []),
+    ...(input.verifiedEmail ? [input.verifiedEmail] : []),
+  ];
+  const normalizedEmails = new Map(
+    verifiedEmails.map(email => [normalizeEmail(email), email] as const)
+  );
   const tokenHash = hashWaitlistInviteToken(input.token);
 
   const result = await withSerializableRetry(() =>
@@ -114,7 +121,8 @@ export async function redeemWaitlistInviteToken(input: {
         if (!entry) return { outcome: 'invalid' as const };
 
         const entryEmail = entry.emailNormalized || normalizeEmail(entry.email);
-        if (entryEmail !== normalizedEmail) {
+        const matchedVerifiedEmail = normalizedEmails.get(entryEmail);
+        if (!matchedVerifiedEmail) {
           return { outcome: 'email_mismatch' as const, entryId: entry.id };
         }
 
@@ -187,7 +195,7 @@ export async function redeemWaitlistInviteToken(input: {
         await upsertApprovedUser({
           tx,
           clerkUserId: input.clerkUserId,
-          email: input.verifiedEmail,
+          email: matchedVerifiedEmail,
           entryId: entry.id,
         });
 

@@ -19,17 +19,18 @@ function createTxMock(userRows: Row[], entryRows: Row[]) {
   const updateWhere = vi.fn().mockResolvedValue(undefined);
   const updateSet = vi.fn(() => ({ where: updateWhere }));
   const update = vi.fn(() => ({ set: updateSet }));
+  const limit = vi
+    .fn()
+    .mockImplementation(() => Promise.resolve(selectQueue.shift() ?? []));
+  const forUpdate = vi.fn(() => ({ limit }));
+  const orderBy = vi.fn(() => ({ for: forUpdate }));
+  const where = vi.fn(() => ({
+    for: forUpdate,
+    orderBy,
+  }));
   const select = vi.fn(() => ({
     from: vi.fn(() => ({
-      where: vi.fn(() => ({
-        for: vi.fn(() => ({
-          limit: vi
-            .fn()
-            .mockImplementation(() =>
-              Promise.resolve(selectQueue.shift() ?? [])
-            ),
-        })),
-      })),
+      where,
     })),
   }));
 
@@ -39,6 +40,8 @@ function createTxMock(userRows: Row[], entryRows: Row[]) {
       update,
     } as unknown as Parameters<typeof markWaitlistSignedUpInTx>[0],
     updateSet,
+    where,
+    orderBy,
   };
 }
 
@@ -99,5 +102,31 @@ describe('markWaitlistSignedUpInTx', () => {
       })
     );
     expect(mockEnqueueSignedUpWelcomeEmail).toHaveBeenCalledWith(tx, 'entry-1');
+  });
+
+  it('uses canonical email fallback when a legacy user lacks waitlistEntryId', async () => {
+    const { tx, updateSet, orderBy } = createTxMock(
+      [
+        {
+          id: 'user-1',
+          email: 'creator@example.com',
+          userStatus: 'waitlist_approved',
+          waitlistEntryId: null,
+        },
+      ],
+      [{ id: 'entry-canonical', status: 'approved' }]
+    );
+
+    const result = await markWaitlistSignedUpInTx(tx, 'clerk_123');
+
+    expect(result).toEqual({ entryId: 'entry-canonical' });
+    expect(orderBy).toHaveBeenCalled();
+    expect(updateSet).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'signed_up' })
+    );
+    expect(mockEnqueueSignedUpWelcomeEmail).toHaveBeenCalledWith(
+      tx,
+      'entry-canonical'
+    );
   });
 });

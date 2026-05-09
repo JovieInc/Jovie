@@ -28,16 +28,18 @@ export async function markWaitlistSignedUpInTx(
 
   if (!user) return { entryId: null };
 
+  const waitlistLookupPredicate = user.waitlistEntryId
+    ? eq(waitlistEntries.id, user.waitlistEntryId)
+    : drizzleSql`${waitlistEntries.canonical} = true AND (${waitlistEntries.emailNormalized} = lower(${user.email}) OR lower(${waitlistEntries.email}) = lower(${user.email}))`;
   const [entry] = await tx
     .select({
       id: waitlistEntries.id,
       status: waitlistEntries.status,
     })
     .from(waitlistEntries)
-    .where(
-      user.waitlistEntryId
-        ? eq(waitlistEntries.id, user.waitlistEntryId)
-        : drizzleSql`lower(${waitlistEntries.email}) = lower(${user.email})`
+    .where(waitlistLookupPredicate)
+    .orderBy(
+      drizzleSql`${waitlistEntries.canonical} DESC, ${waitlistEntries.createdAt} DESC`
     )
     .for('update')
     .limit(1);
