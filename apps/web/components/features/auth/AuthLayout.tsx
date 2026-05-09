@@ -71,14 +71,16 @@ function SplitLayoutContent({
   designV1,
 }: AuthLayoutInnerProps) {
   return (
-    <div className='relative z-10 flex w-full flex-1 items-stretch'>
-      <div className='grid w-full gap-2 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)] lg:items-stretch'>
-        <div className='flex min-h-0 flex-col items-center justify-center px-4 sm:px-8 lg:max-w-[460px] lg:px-10'>
+    <div className='relative z-10 flex w-full flex-1 items-stretch justify-center'>
+      {/* max-w constrains the split layout on ultra-wide displays so the form
+          column doesn't strand at the left with an enormous dead-space right panel */}
+      <div className='grid w-full max-w-[1440px] gap-2 lg:grid-cols-[minmax(0,480px)_minmax(0,1fr)] lg:items-stretch'>
+        <div className='flex min-h-0 flex-col items-center justify-center px-4 sm:px-8 lg:max-w-[480px] lg:px-10'>
           {showFormTitle && formTitle ? (
             <h1
               className={cn(
                 formTitleClassName,
-                'mb-6 text-center transition-all duration-200 ease-out',
+                'mb-6 text-center transition-[margin,height,opacity] duration-subtle ease-subtle',
                 isKeyboardVisible && 'mb-0 h-0 overflow-hidden opacity-0'
               )}
               aria-hidden={isKeyboardVisible}
@@ -97,7 +99,7 @@ function SplitLayoutContent({
           </main>
 
           {showFooterPrompt && !isKeyboardVisible ? (
-            <p className='mt-3 text-center text-app font-normal text-white/58 animate-in fade-in-0 duration-200'>
+            <p className='mt-3 text-center text-app font-normal text-white/58 animate-in fade-in-0 duration-subtle'>
               {footerPrompt}{' '}
               <Link
                 href={footerLinkHref}
@@ -143,7 +145,7 @@ function StackLayoutContent({
           <h1
             className={cn(
               formTitleClassName,
-              'transition-all duration-200 ease-out',
+              'transition-[margin,height,opacity] duration-subtle ease-subtle',
               isKeyboardVisible && 'mb-0 h-0 overflow-hidden opacity-0'
             )}
             aria-hidden={isKeyboardVisible}
@@ -163,7 +165,7 @@ function StackLayoutContent({
       </div>
 
       {showFooterPrompt && !isKeyboardVisible ? (
-        <p className='relative z-10 mt-auto pt-8 text-center text-app font-normal text-[lch(68%_1.35_282)] animate-in fade-in-0 duration-200'>
+        <p className='relative z-10 mt-auto pt-8 text-center text-app font-normal text-[lch(68%_1.35_282)] animate-in fade-in-0 duration-subtle'>
           {footerPrompt}{' '}
           <Link
             href={footerLinkHref}
@@ -238,7 +240,7 @@ export function AuthLayout({
         'pb-[max(0.5rem,env(safe-area-inset-bottom))]',
         'pl-[max(0.5rem,env(safe-area-inset-left))]',
         'pr-[max(0.5rem,env(safe-area-inset-right))]',
-        'transition-[padding] duration-200 ease-out'
+        'transition-[padding] duration-subtle ease-subtle'
       )}
     >
       <div
@@ -273,14 +275,14 @@ export function AuthLayout({
       {showLogo ? (
         <div
           className={cn(
-            'absolute top-5 left-5 z-50 transition-opacity duration-200 ease-out sm:top-6 sm:left-7 lg:top-7 lg:left-14',
+            'absolute top-5 left-5 z-50 transition-opacity duration-subtle ease-subtle sm:top-6 sm:left-7 lg:top-7 lg:left-14',
             isKeyboardVisible && 'pointer-events-none opacity-0'
           )}
           aria-hidden={isKeyboardVisible}
         >
           <Link
             href='/'
-            className='inline-flex items-center justify-center text-white/45 transition-colors duration-200 hover:text-white/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20'
+            className='inline-flex items-center justify-center text-white/45 transition-colors duration-subtle hover:text-white/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20'
             aria-label='Go to homepage'
             tabIndex={isKeyboardVisible ? -1 : undefined}
           >
