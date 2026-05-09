@@ -28,7 +28,8 @@ import { toPublicContacts } from '@/lib/contacts/mapper';
 import type { DiscogRelease } from '@/lib/db/schema';
 import { getReleasesForProfileLite } from '@/lib/discography/queries';
 import { captureError } from '@/lib/error-tracking';
-import { getProfileAlertOptInVariant } from '@/lib/flags/server';
+// ISR-safe: profile-variant.ts does NOT import cookies() — no dynamic opt-in
+import { getProfileAlertOptInVariant } from '@/lib/flags/profile-variant';
 import { getConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import { isShopEnabled } from '@/lib/profile/shop-settings';
 import { getUpcomingTourDatesForProfile } from '@/lib/tour-dates/queries';
