@@ -79,6 +79,7 @@ export function SubscribeForm({
         onFlowClosed={onFlowClosed}
         onSubscriptionActivated={onSubscriptionActivated}
         experimentVariant={experimentVariant}
+        source={source}
       />
     );
   }
