@@ -21,6 +21,7 @@ This document covers the cost-anomaly defense layer. It exists because of a real
 This is the primary defense. Walk this checklist on initial setup and re-verify quarterly as baseline traffic grows.
 
 ### Vercel
+
 - Dashboard: **Settings → Billing → Spend Management**
 - Action: enable hard cap (pauses project at limit; does NOT just alert)
 - Recommended: 3-5x current monthly baseline
@@ -28,30 +29,36 @@ This is the primary defense. Walk this checklist on initial setup and re-verify 
 - Verify: take a screenshot of the configured cap and attach to the verification PR
 
 ### Anthropic
+
 - Dashboard: **Console → Plans & Billing → Usage limits**
 - Action: set both **daily** and **monthly** caps
 - Recommended daily: 2x typical day's spend (gives runaway ~12 hours before hard stop)
 - Critical because we have 3 LLM-calling crons (`generate-insights`, `summarize-interviews`, `generate-playlist`) with no per-call ledger
 
 ### OpenAI (if used)
+
 - Dashboard: **Billing → Usage limits**
 - Action: set both **soft** (email alert) and **hard** (refuses requests) limits
 - Recommended hard limit: 3x typical monthly spend
 
 ### Resend
+
 - Dashboard: **Settings → API rate limit**
 - Action: cap requests/hour at 10x typical send volume
 - Critical because `frequent` cron's `sendNotifications` sub-job can fan out to many fans on release-day events
 
 ### Twilio (if used)
+
 - Dashboard: **Console → Usage triggers**
 - Action: set daily SMS spend cap with notification + suspend action
 
 ### Neon
+
 - Already configured: compute autosuspend
 - Verify: autosuspend timeout = 5 minutes (Neon dashboard → branch settings)
 
 ### R2 / Cloudflare
+
 - R2 has no native spend cap as of writing; rely on Layer 2 and bandwidth alerts in Cloudflare dashboard
 
 ---

@@ -40,6 +40,7 @@ on:
     # Every 15 minutes. GH Actions cron has up to several minutes of drift
     # under load; that's acceptable for cost monitoring.
     - cron: '*/15 * * * *'
+      timezone: 'America/Los_Angeles'
   workflow_dispatch:
     inputs:
       dry_run:
@@ -206,6 +207,7 @@ jobs:
         uses: ./.github/actions/setup-node-pnpm
 
       - name: Auto-rollback on anomaly
+        id: rollback
         if: steps.evaluate.outputs.status == 'anomaly' && env.DRY_RUN == 'false'
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -214,15 +216,16 @@ jobs:
         run: |
           echo "Cost anomaly gate FAILED. Triggering auto-rollback..."
 
-          ./node_modules/.bin/vercel rollback --yes --token "$VERCEL_TOKEN" 2>&1 || {
+          if ./node_modules/.bin/vercel rollback --yes --token "$VERCEL_TOKEN" 2>&1; then
+            echo "Auto-rollback completed"
+            echo "rollback_status=success" >> "$GITHUB_OUTPUT"
+          else
             echo "Auto-rollback failed or not supported. Manual intervention required."
-            exit 0
-          }
-
-          echo "Auto-rollback completed"
+            echo "rollback_status=failed" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Slack alert on anomaly
-        if: steps.evaluate.outputs.status == 'anomaly' && env.SLACK_WEBHOOK_URL != ''
+        if: steps.evaluate.outputs.status == 'anomaly' && secrets.SLACK_WEBHOOK_URL != ''
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
@@ -238,6 +241,8 @@ jobs:
             COLOR="danger"
           fi
 
+          ROLLBACK_STATUS="${{ steps.rollback.outputs.rollback_status }}"
+
           curl -sS -X POST "$SLACK_WEBHOOK_URL" \
             -H 'Content-Type: application/json' \
             -d "$(jq -n \
@@ -249,6 +254,7 @@ jobs:
               --arg lookback "$LOOKBACK_MINUTES" \
               --arg multiplier "$THRESHOLD_MULTIPLIER" \
               --arg dry_run "$DRY_RUN" \
+              --arg rollback_status "$ROLLBACK_STATUS" \
               --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
               '{
                 text: $headline,
@@ -260,11 +266,21 @@ jobs:
                     {title: "Baseline", value: ($baseline + " (4-week avg)"), short: true},
                     {title: "Threshold", value: ($multiplier + "x baseline"), short: true},
                     {title: "Dry Run", value: $dry_run, short: true},
+                    {title: "Rollback Status", value: (if $rollback_status == "" then "n/a (dry run)" else $rollback_status end), short: true},
                     {title: "Action", value: ("<" + $run_url + "|View Run>  •  See docs/COST_MONITORING.md for runbook"), short: false}
                   ]
                 }]
               }'
             )" || true
+
+      - name: Ensure required labels exist
+        if: steps.evaluate.outputs.status == 'anomaly' && env.DRY_RUN == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Idempotent — gh label create fails silently if the label already exists.
+          gh label create cost-monitoring --description "Cost monitoring and anomaly detection" --color "e4e669" 2>/dev/null || true
+          gh label create incident --description "Production incident or rollback" --color "d93f0b" 2>/dev/null || true
 
       - name: Open GitHub issue on anomaly
         if: steps.evaluate.outputs.status == 'anomaly' && env.DRY_RUN == 'false'
@@ -274,6 +290,7 @@ jobs:
           CURRENT="${{ steps.current.outputs.count }}"
           BASELINE="${{ steps.baseline.outputs.average }}"
           REASON="${{ steps.evaluate.outputs.reason }}"
+          ROLLBACK_STATUS="${{ steps.rollback.outputs.rollback_status }}"
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           BODY_FILE=$(mktemp)
           {
@@ -282,6 +299,7 @@ jobs:
             printf '**Current event volume:** %s (last %s min)\n' "$CURRENT" "$LOOKBACK_MINUTES"
             printf '**Baseline (4-week avg):** %s\n' "$BASELINE"
             printf '**Threshold:** %sx baseline OR %s absolute floor\n\n' "$THRESHOLD_MULTIPLIER" "$ABSOLUTE_FLOOR"
+            printf '**Rollback status:** %s\n\n' "$ROLLBACK_STATUS"
             printf '**Workflow run:** %s\n\n' "$RUN_URL"
             printf '## Required follow-up\n\n'
             printf '1. Confirm rollback succeeded and verify production points to the prior deployment.\n'
