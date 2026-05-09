@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   isAccessDeniedError,
   isAccountExistsError,
@@ -32,7 +33,7 @@ interface SsoCallbackHandlerProps {
 function SsoLoadingState({ isStalled }: { readonly isStalled: boolean }) {
   return (
     <output
-      className='flex flex-col items-center justify-center gap-4 animate-in fade-in duration-500 ease-out'
+      className='flex flex-col items-center justify-center gap-4 animate-in fade-in duration-cinematic ease-out'
       aria-busy='true'
       aria-live='polite'
     >
@@ -44,7 +45,7 @@ function SsoLoadingState({ isStalled }: { readonly isStalled: boolean }) {
         <p className='text-xs text-tertiary-token/70 text-center max-w-xs'>
           This is taking longer than expected. You can{' '}
           <Link
-            href='/signin'
+            href={APP_ROUTES.SIGNIN}
             className='text-primary-token underline focus-ring-themed rounded-md'
           >
             try signing in again
@@ -146,7 +147,7 @@ export function SsoCallbackHandler({
 
         // Redirect to signup page with error classification so it can
         // show the appropriate error message using existing OAuth error UI
-        router.replace(`/signup?oauth_error=${errorType}`);
+        router.replace(`${APP_ROUTES.SIGNUP}?oauth_error=${errorType}`);
       });
   }, [
     clerk,
