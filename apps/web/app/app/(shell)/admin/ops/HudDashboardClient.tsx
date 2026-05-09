@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 import { useState } from 'react';
 import type { DailyBucket } from '@/components/features/admin/ShippingVelocityChart';
 import { ShippingVelocityChart } from '@/components/features/admin/ShippingVelocityChart';
+import { TimActionRequiredSection } from '@/components/features/admin/TimActionRequiredSection';
 import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentMetricRow } from '@/components/molecules/ContentMetricRow';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
@@ -443,6 +444,11 @@ export function HudDashboardClient({
           </div>
         </ContentSurfaceCard>
       ) : null}
+
+      {/* Tim Action Required — personal manual items, surfaces above everything else */}
+      <ContentSurfaceCard surface='details' className='p-3'>
+        <TimActionRequiredSection />
+      </ContentSurfaceCard>
 
       {/* Top section: chart + metrics side-by-side on XL screens */}
       <div className='grid gap-3 xl:grid-cols-[2fr_1fr]'>
