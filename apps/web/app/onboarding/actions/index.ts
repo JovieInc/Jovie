@@ -349,7 +349,9 @@ export async function completeOnboarding({
                 normalizedUsername,
                 trimmedDisplayName
               );
-              await markWaitlistSignedUpInTx(tx, clerkUserId);
+              if (pendingClaim.mode !== 'direct_profile') {
+                await markWaitlistSignedUpInTx(tx, clerkUserId);
+              }
               return result;
             }
 

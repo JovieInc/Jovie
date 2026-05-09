@@ -380,6 +380,10 @@ describe('completeOnboarding', () => {
       })
     );
     expect(mockReservePrebuiltProfileForUser).not.toHaveBeenCalled();
+    expect(mockMarkWaitlistSignedUpInTx).toHaveBeenCalledWith(
+      expect.anything(),
+      'clerk-user-123'
+    );
     expect(mockClearPendingClaimContext).toHaveBeenCalled();
   });
 
@@ -408,6 +412,7 @@ describe('completeOnboarding', () => {
       })
     );
     expect(mockClaimPrebuiltProfileForUser).not.toHaveBeenCalled();
+    expect(mockMarkWaitlistSignedUpInTx).not.toHaveBeenCalled();
     expect(mockClearPendingClaimContext).not.toHaveBeenCalled();
   });
 
