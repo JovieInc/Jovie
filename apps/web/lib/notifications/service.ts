@@ -252,7 +252,7 @@ async function handleEmailChannel(
     subject: message.subject,
     text: message.text,
     html: message.html,
-    idempotencyKey: message.idempotencyKey ?? message.dedupKey ?? message.id,
+    idempotencyKey: message.idempotencyKey,
     replyTo,
     headers: message.headers,
     from: fromAddress,
