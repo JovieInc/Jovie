@@ -1,9 +1,9 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('@/components/organisms/MarketingSignInModal', () => ({
-  MarketingSignInModal: ({ onClose }: { onClose: () => void }) => (
-    <div data-testid='marketing-signin-modal'>
+vi.mock('@/components/organisms/AuthModal', () => ({
+  AuthModal: ({ onClose }: { onClose: () => void }) => (
+    <div data-testid='auth-modal'>
       <button type='button' onClick={onClose}>
         close
       </button>
@@ -16,22 +16,16 @@ import { MarketingSignInLink } from '@/components/organisms/MarketingSignInLink'
 describe('MarketingSignInLink', () => {
   it('does not mount the modal until the button is clicked', () => {
     render(<MarketingSignInLink />);
-    expect(
-      screen.queryByTestId('marketing-signin-modal')
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId('auth-modal')).not.toBeInTheDocument();
   });
 
   it('opens the modal on click and closes it again', async () => {
     render(<MarketingSignInLink />);
     fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
-    const modal = await waitFor(() =>
-      screen.getByTestId('marketing-signin-modal')
-    );
+    const modal = await waitFor(() => screen.getByTestId('auth-modal'));
     fireEvent.click(modal.querySelector('button') as HTMLButtonElement);
     await waitFor(() =>
-      expect(
-        screen.queryByTestId('marketing-signin-modal')
-      ).not.toBeInTheDocument()
+      expect(screen.queryByTestId('auth-modal')).not.toBeInTheDocument()
     );
   });
 
