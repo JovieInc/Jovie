@@ -548,7 +548,7 @@ describe('Waitlist API', () => {
       expect(pendingUpsert).toBeUndefined();
     });
 
-    it('does not send welcome email when auto-approval succeeds (user bypassed waitlist)', async () => {
+    it('does not send invite email when open signup approval succeeds', async () => {
       mockAuth.mockResolvedValue({ userId: 'user_auto' });
       mockCurrentUser.mockResolvedValue({
         emailAddresses: [
@@ -588,12 +588,16 @@ describe('Waitlist API', () => {
         }),
       });
 
-      // Auto-accept slot available
-      mockTryReserveAutoAcceptSlot.mockResolvedValue({
-        shouldAutoAccept: true,
+      mockGetWaitlistSettings.mockResolvedValueOnce({
+        gateEnabled: false,
+        autoAcceptEnabled: true,
+        autoAcceptAfterDays: 7,
+        autoAcceptDailyLimit: 10,
+        autoAcceptedToday: 0,
+        autoAcceptResetsAt: new Date(Date.now() + 86_400_000),
       });
 
-      // Approval succeeds — approveWaitlistEntryInTx returns approved outcome
+      // Open signup approval succeeds — approveWaitlistEntryInTx returns approved outcome
       mockApproveWaitlistEntryInTx.mockResolvedValue({
         outcome: 'approved',
         profileId: 'profile_auto',
@@ -635,13 +639,14 @@ describe('Waitlist API', () => {
       expect(response.status).toBe(200);
       expect(data.status).toBe('approved');
       expect(mockFinalizeWaitlistApproval).toHaveBeenCalled();
+      expect(mockTryReserveAutoAcceptSlot).not.toHaveBeenCalled();
 
-      // Auto-approved users should NOT get the "off the waitlist" email
+      // Open-signup approvals should NOT get the "off the waitlist" email
       expect(mockSendNotification).not.toHaveBeenCalled();
       expect(mockBuildWaitlistInviteEmail).not.toHaveBeenCalled();
     });
 
-    it('does not send welcome email when auto-approval slot is not available', async () => {
+    it('does not approve fresh submissions when delayed auto-accept has capacity', async () => {
       mockAuth.mockResolvedValue({ userId: 'user_no_slot' });
       mockCurrentUser.mockResolvedValue({
         emailAddresses: [
@@ -680,9 +685,13 @@ describe('Waitlist API', () => {
         }),
       });
 
-      // No auto-accept slot
-      mockTryReserveAutoAcceptSlot.mockResolvedValue({
-        shouldAutoAccept: false,
+      mockGetWaitlistSettings.mockResolvedValueOnce({
+        gateEnabled: true,
+        autoAcceptEnabled: true,
+        autoAcceptAfterDays: 7,
+        autoAcceptDailyLimit: 10,
+        autoAcceptedToday: 0,
+        autoAcceptResetsAt: new Date(Date.now() + 86_400_000),
       });
 
       const { POST } = await routeModulePromise;
@@ -700,11 +709,13 @@ describe('Waitlist API', () => {
 
       expect(response.status).toBe(200);
       expect(data.status).toBe('waitlisted');
+      expect(mockTryReserveAutoAcceptSlot).not.toHaveBeenCalled();
+      expect(mockApproveWaitlistEntryInTx).not.toHaveBeenCalled();
       expect(mockSendNotification).not.toHaveBeenCalled();
       expect(mockBuildWaitlistInviteEmail).not.toHaveBeenCalled();
     });
 
-    it('returns new status and no email when slot reserved but approval fails', async () => {
+    it('returns waitlisted status and no email when delayed auto-accept is disabled', async () => {
       mockAuth.mockResolvedValue({ userId: 'user_noapproval' });
       mockCurrentUser.mockResolvedValue({
         emailAddresses: [
@@ -746,14 +757,6 @@ describe('Waitlist API', () => {
         }),
       });
 
-      // Slot reserved but approveWaitlistEntryInTx returns non-approved outcome
-      mockTryReserveAutoAcceptSlot.mockResolvedValue({
-        shouldAutoAccept: true,
-      });
-      mockApproveWaitlistEntryInTx.mockResolvedValue({
-        outcome: 'capacity_full',
-      });
-
       const { POST } = await routeModulePromise;
       const request = new Request('http://localhost/api/waitlist', {
         method: 'POST',
@@ -769,6 +772,8 @@ describe('Waitlist API', () => {
 
       expect(response.status).toBe(200);
       expect(data.status).toBe('waitlisted');
+      expect(mockTryReserveAutoAcceptSlot).not.toHaveBeenCalled();
+      expect(mockApproveWaitlistEntryInTx).not.toHaveBeenCalled();
       expect(mockSendNotification).not.toHaveBeenCalled();
       expect(mockFinalizeWaitlistApproval).not.toHaveBeenCalled();
     });
