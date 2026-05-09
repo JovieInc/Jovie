@@ -29,6 +29,8 @@ import {
   tryReserveAutoAcceptSlot,
 } from '@/lib/waitlist/settings';
 
+const AUTO_ACCEPT_ELIGIBLE_STATUSES = ['new', 'waitlisted'] as const;
+
 export interface WaitlistAutoAcceptResult {
   enabled: boolean;
   scanned: number;
@@ -126,11 +128,7 @@ export async function runWaitlistAutoAccept(
   }
 
   const cutoff = getCutoffDate(settings.autoAcceptAfterDays, now);
-  const limit = Math.min(
-    options.maxCandidates ?? 10_000,
-    capacityRemaining,
-    10_000
-  );
+  const limit = Math.min(options.maxCandidates ?? 10_000, 10_000);
 
   const candidates = await db
     .select({
@@ -141,7 +139,7 @@ export async function runWaitlistAutoAccept(
     .where(
       and(
         eq(waitlistEntries.canonical, true),
-        eq(waitlistEntries.status, 'waitlisted'),
+        inArray(waitlistEntries.status, AUTO_ACCEPT_ELIGIBLE_STATUSES),
         lte(waitlistEntries.waitlistedAt, cutoff)
       )
     )
@@ -181,7 +179,12 @@ export async function runWaitlistAutoAccept(
               .for('update')
               .limit(1);
 
-            if (!lockedCandidate || lockedCandidate.status !== 'waitlisted') {
+            if (
+              !lockedCandidate ||
+              !AUTO_ACCEPT_ELIGIBLE_STATUSES.includes(
+                lockedCandidate.status as (typeof AUTO_ACCEPT_ELIGIBLE_STATUSES)[number]
+              )
+            ) {
               return { outcome: 'skipped' as const };
             }
 

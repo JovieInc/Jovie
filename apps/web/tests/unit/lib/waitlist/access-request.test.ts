@@ -250,6 +250,7 @@ describe('submitWaitlistAccessRequest', () => {
     const result = await submitWaitlistAccessRequest(baseInput);
 
     expect(result.outcome).toBe('already_waitlisted');
+    expect(result.status).toBe('waitlisted');
     expect(notifySlackWaitlist).not.toHaveBeenCalled();
   });
 });

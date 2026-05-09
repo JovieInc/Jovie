@@ -387,6 +387,10 @@ export async function submitWaitlistAccessRequest(
             };
           }
 
+          const nextExistingStatus = isWaitlistPendingStatus(existing.status)
+            ? 'waitlisted'
+            : existing.status;
+
           await tx
             .update(waitlistEntries)
             .set({
@@ -395,9 +399,7 @@ export async function submitWaitlistAccessRequest(
                 status: 'waitlisted',
                 reasonCode: 'already_waitlisted',
               },
-              status: isWaitlistPendingStatus(existing.status)
-                ? 'waitlisted'
-                : existing.status,
+              status: nextExistingStatus,
               statusReason: 'already_waitlisted',
               waitlistedAt: new Date(),
             })
@@ -413,7 +415,7 @@ export async function submitWaitlistAccessRequest(
 
           return {
             entryId: existing.id,
-            status: existing.status,
+            status: nextExistingStatus,
             outcome: 'already_waitlisted' as const,
             approval: null,
             statusChange,
