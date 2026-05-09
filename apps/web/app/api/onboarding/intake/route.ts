@@ -22,6 +22,8 @@ import {
 
 export const runtime = 'nodejs';
 
+const ONBOARDING_CHAT_INTERVIEW_STATUS = 'dismissed' as const;
+
 // Canonical step ids for the onboarding chat (mirrors StepId in
 // `components/features/waitlist/WaitlistIntakeChat.tsx`). Validating here
 // guards against drift between client and server.
@@ -134,14 +136,14 @@ async function upsertOnboardingInterview(params: {
       source: 'onboarding_chat',
       transcript: [],
       metadata,
-      status: 'pending',
+      status: ONBOARDING_CHAT_INTERVIEW_STATUS,
     })
     .onConflictDoUpdate({
       target: [userInterviews.userId, userInterviews.source],
       set: {
         transcript: [],
         metadata,
-        status: 'pending',
+        status: ONBOARDING_CHAT_INTERVIEW_STATUS,
         updatedAt: new Date(),
       },
     })

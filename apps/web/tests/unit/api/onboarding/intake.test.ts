@@ -25,11 +25,29 @@ vi.mock('@/lib/db', () => ({
 }));
 
 vi.mock('@/lib/db/schema/auth', () => ({
-  users: {},
+  users: {
+    id: 'users.id',
+    clerkId: 'users.clerk_id',
+    email: 'users.email',
+    userStatus: 'users.user_status',
+  },
 }));
 
 vi.mock('@/lib/db/schema/user-interviews', () => ({
-  userInterviews: {},
+  userInterviews: {
+    id: 'user_interviews.id',
+    userId: 'user_interviews.user_id',
+    source: 'user_interviews.source',
+    transcript: 'user_interviews.transcript',
+    metadata: 'user_interviews.metadata',
+    status: 'user_interviews.status',
+    updatedAt: 'user_interviews.updated_at',
+  },
+}));
+
+vi.mock('drizzle-orm', () => ({
+  and: vi.fn((...conditions: unknown[]) => ({ and: conditions })),
+  eq: vi.fn((column: unknown, value: unknown) => ({ eq: [column, value] })),
 }));
 
 vi.mock('@/lib/waitlist/access-request', () => ({
@@ -108,6 +126,28 @@ function makeRequest(body: unknown): Request {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
   });
+}
+
+function setupSuccessfulIntakeDb() {
+  mockDbSelect.mockReturnValue({
+    from: vi.fn().mockReturnValue({
+      where: vi.fn().mockReturnValue({
+        limit: vi.fn().mockResolvedValue([
+          {
+            id: 'user_db_1',
+            userStatus: 'waitlist_pending',
+          },
+        ]),
+      }),
+    }),
+  });
+
+  const returning = vi.fn().mockResolvedValue([{ id: 'interview_1' }]);
+  const onConflictDoUpdate = vi.fn().mockReturnValue({ returning });
+  const values = vi.fn().mockReturnValue({ onConflictDoUpdate });
+  mockDbInsert.mockReturnValue({ values });
+
+  return { onConflictDoUpdate, values };
 }
 
 describe('POST /api/onboarding/intake — email verification gate', () => {
@@ -220,5 +260,56 @@ describe('POST /api/onboarding/intake — email verification gate', () => {
 
     const res = await POST(makeRequest({ bogus: true }));
     expect(res.status).toBe(400);
+  });
+
+  it('stores privacy-preserving intake metadata without queueing summarization', async () => {
+    mockCurrentUser.mockResolvedValue({
+      fullName: 'User Person',
+      username: 'userhandle',
+      emailAddresses: [
+        {
+          emailAddress: 'User@Example.com',
+          verification: { status: 'verified' },
+        },
+      ],
+    });
+    mockSubmitWaitlistAccessRequest.mockResolvedValue({
+      outcome: 'waitlisted_gate_on',
+      status: 'waitlisted',
+      entryId: 'waitlist_entry_1',
+    });
+    const { onConflictDoUpdate, values } = setupSuccessfulIntakeDb();
+
+    const res = await POST(makeRequest(VALID_BODY));
+
+    expect(res.status).toBe(200);
+    expect(values).toHaveBeenCalledTimes(2);
+    expect(values.mock.calls[0]?.[0]).toMatchObject({
+      source: 'onboarding_chat',
+      transcript: [],
+      status: 'dismissed',
+    });
+    expect(values.mock.calls[1]?.[0]).toMatchObject({
+      source: 'onboarding_chat',
+      transcript: [],
+      status: 'dismissed',
+      metadata: expect.objectContaining({
+        accessOutcome: 'waitlisted_gate_on',
+        waitlistEntryId: 'waitlist_entry_1',
+        submittedFrom: 'onboarding_chat',
+      }),
+    });
+    expect(onConflictDoUpdate.mock.calls[0]?.[0].set).toMatchObject({
+      transcript: [],
+      status: 'dismissed',
+    });
+    expect(onConflictDoUpdate.mock.calls[1]?.[0].set).toMatchObject({
+      transcript: [],
+      status: 'dismissed',
+      metadata: expect.objectContaining({
+        accessOutcome: 'waitlisted_gate_on',
+        waitlistEntryId: 'waitlist_entry_1',
+      }),
+    });
   });
 });
