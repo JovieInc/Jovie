@@ -80,7 +80,7 @@ export async function approveWaitlistEntryInTx(
     };
   }
 
-  if (!isWaitlistPendingStatus(entry.status)) {
+  if (entry.status !== 'expired' && !isWaitlistPendingStatus(entry.status)) {
     return { outcome: 'already_processed', status: entry.status };
   }
 
@@ -136,6 +136,8 @@ export async function approveWaitlistEntryInTx(
       status: targetStatus,
       approvedAt: now,
       invitedAt: targetStatus === 'invited' ? now : null,
+      expiredAt: null,
+      inviteTokenRedeemedAt: null,
       adminActorId: options.actorUserId ?? null,
       statusReason: options.reason ?? 'approved',
       updatedAt: now,

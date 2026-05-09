@@ -185,6 +185,41 @@ describe('approveWaitlistEntryInTx', () => {
       })
     );
   });
+
+  it('re-approves expired invites so admins can send a fresh invite', async () => {
+    const { tx, updateSet } = createTxMock([
+      [
+        {
+          id: 'entry-1',
+          email: 'creator@example.com',
+          fullName: 'Creator',
+          status: 'expired',
+        },
+      ],
+      [{ id: 'user-1', clerkId: 'clerk_123' }],
+      [],
+    ]);
+
+    const result = await approveWaitlistEntryInTx(tx, 'entry-1');
+
+    expect(result).toEqual({
+      outcome: 'approved',
+      entryId: 'entry-1',
+      profileId: null,
+      email: 'creator@example.com',
+      fullName: 'Creator',
+      clerkId: 'clerk_123',
+    });
+    expect(updateSet).toHaveBeenCalledTimes(2);
+    expect(updateSet).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        status: 'invited',
+        expiredAt: null,
+        inviteTokenRedeemedAt: null,
+      })
+    );
+  });
 });
 
 describe('disapproveWaitlistEntryInTx', () => {
