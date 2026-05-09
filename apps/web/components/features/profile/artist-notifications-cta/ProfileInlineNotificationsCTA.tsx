@@ -616,7 +616,7 @@ export function ProfileInlineNotificationsCTA({
     return null;
   }
 
-  const triggerLabel = isSubscribed ? 'Manage Alerts' : 'Turn on alerts';
+  const triggerLabel = isSubscribed ? 'Manage alerts' : 'Get alerts';
   const triggerClassName = getTriggerClassName(variant);
   const trigger =
     isInline || hideTrigger ? null : (

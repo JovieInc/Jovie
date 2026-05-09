@@ -7,7 +7,7 @@
 
 ## [26.4.226] - 2026-05-09
 
-> [internal] Canonical metadata builder for all public artist profile routes — adds a shared lib/profile/metadata.ts that every /[username] route's generateMetadata now delegates to. Redirect-sink sub-routes (listen, releases, subscribe, tip, tour, pay, contact, [...slug]) gain noindex metadata guards.
+> [internal] Canonical metadata builder for all public artist profile routes — adds a shared lib/profile/metadata.ts that every /[username] route's generateMetadata now delegates to. Redirect-sink sub-routes (listen, releases, subscribe, tip, tour, pay, contact, [...slug]) gain noindex metadata guards. The alerts button now says "Get alerts" everywhere on artist profiles — consistent label, consistent intent.
 
 ### Added
 
@@ -19,6 +19,11 @@
 
 - **[internal] `app/[username]/page.tsx` `generateMetadata`**: delegates to `buildPublicProfileMetadata` from the shared builder. Removed the local `buildProfileMetadata` and `buildProfileDescription` duplicates; returns `PROFILE_ERROR_METADATA` (noindex) on fetch errors instead of an ad-hoc object.
 - **[internal] `app/[username]/notifications/page.tsx` `generateMetadata`**: now resolves the artist display name from the profile loader rather than using the raw URL segment; adds `metadataBase`, full OG tags, Twitter card, and `robots: noindex`; sanitizes the artist name with `sanitizeMetadataText`.
+
+### Fixed
+
+- [internal] Canonical `SubscribeForm` wrapper component locks the "Get alerts" CTA label across all profile surfaces (spec §4.1). Previously, nine call-sites used inconsistent labels ("Turn On Alerts", "Turn on alerts", "Turn On") that conflicted with the spec.
+- [internal] `source` analytics tag now correctly passes through the two-step (email → SMS) flow; previously dropped in `TwoStepNotificationsCTA`, causing attribution gaps in subscribe analytics.
 
 ## [26.4.225] - 2026-05-09
 

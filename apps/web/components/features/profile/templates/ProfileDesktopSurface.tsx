@@ -586,7 +586,7 @@ export function ProfileDesktopSurface({
                   </span>
                 ) : (
                   <span className='inline-flex h-8 shrink-0 items-center rounded-full bg-white px-3 text-[12px] font-semibold text-black'>
-                    Turn On
+                    Get alerts
                   </span>
                 )}
               </button>
