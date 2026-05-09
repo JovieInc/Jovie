@@ -16,6 +16,7 @@ const notifySlackWaitlist = vi.fn().mockResolvedValue(undefined);
 // Track tx mutations to assert against
 let userRow: { id: string; userStatus: string } | null = null;
 const insertedEntries: Array<Record<string, unknown>> = [];
+const updatedRows: Array<Record<string, unknown>> = [];
 
 vi.mock('@/lib/auth/proxy-state', () => ({
   invalidateProxyUserStateCache: (...args: unknown[]) =>
@@ -89,6 +90,9 @@ function createTxMock() {
 
   const updateWhere = vi.fn().mockResolvedValue(undefined);
   const updateSet = vi.fn(values => {
+    if (values && typeof values === 'object') {
+      updatedRows.push(values as Record<string, unknown>);
+    }
     if (
       values &&
       typeof values === 'object' &&
@@ -150,6 +154,7 @@ describe('submitWaitlistAccessRequest', () => {
     vi.clearAllMocks();
     userRow = null;
     insertedEntries.length = 0;
+    updatedRows.length = 0;
     findLatestEntryByEmail.mockReset();
     findLatestEntryByEmail.mockReturnValue([]);
     getWaitlistSettings.mockReset();
@@ -252,5 +257,50 @@ describe('submitWaitlistAccessRequest', () => {
     expect(result.outcome).toBe('already_waitlisted');
     expect(result.status).toBe('waitlisted');
     expect(notifySlackWaitlist).not.toHaveBeenCalled();
+  });
+
+  it('preserves original waitlist age when a pending user resubmits', async () => {
+    const originalWaitlistedAt = new Date('2026-04-01T00:00:00.000Z');
+    userRow = { id: 'user-1', userStatus: 'waitlist_pending' };
+    findLatestEntryByEmail.mockReturnValueOnce([
+      {
+        id: 'entry-1',
+        status: 'waitlisted',
+        waitlistedAt: originalWaitlistedAt,
+      },
+    ]);
+
+    const { submitWaitlistAccessRequest } = await import(
+      '@/lib/waitlist/access-request'
+    );
+    const result = await submitWaitlistAccessRequest(baseInput);
+
+    expect(result.outcome).toBe('already_waitlisted');
+    expect(
+      updatedRows.find(row => row.statusReason === 'already_waitlisted')
+        ?.waitlistedAt
+    ).toBe(originalWaitlistedAt);
+  });
+
+  it('fills waitlist age when a legacy pending row is missing it', async () => {
+    userRow = { id: 'user-1', userStatus: 'waitlist_pending' };
+    findLatestEntryByEmail.mockReturnValueOnce([
+      {
+        id: 'entry-1',
+        status: 'new',
+        waitlistedAt: null,
+      },
+    ]);
+
+    const { submitWaitlistAccessRequest } = await import(
+      '@/lib/waitlist/access-request'
+    );
+    const result = await submitWaitlistAccessRequest(baseInput);
+
+    expect(result.outcome).toBe('already_waitlisted');
+    expect(
+      updatedRows.find(row => row.statusReason === 'already_waitlisted')
+        ?.waitlistedAt
+    ).toBeInstanceOf(Date);
   });
 });

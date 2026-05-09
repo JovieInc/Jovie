@@ -172,6 +172,7 @@ export async function runWaitlistAutoAccept(
             const [lockedCandidate] = await tx
               .select({
                 id: waitlistEntries.id,
+                email: waitlistEntries.email,
                 status: waitlistEntries.status,
               })
               .from(waitlistEntries)
@@ -184,6 +185,24 @@ export async function runWaitlistAutoAccept(
               !AUTO_ACCEPT_ELIGIBLE_STATUSES.includes(
                 lockedCandidate.status as (typeof AUTO_ACCEPT_ELIGIBLE_STATUSES)[number]
               )
+            ) {
+              return { outcome: 'skipped' as const };
+            }
+
+            const [user] = await tx
+              .select({ id: users.id, userStatus: users.userStatus })
+              .from(users)
+              .where(
+                drizzleSql`lower(${users.email}) = lower(${lockedCandidate.email})`
+              )
+              .for('update')
+              .limit(1);
+
+            if (
+              !user ||
+              user.userStatus === 'banned' ||
+              user.userStatus === 'suspended' ||
+              user.userStatus === 'active'
             ) {
               return { outcome: 'skipped' as const };
             }

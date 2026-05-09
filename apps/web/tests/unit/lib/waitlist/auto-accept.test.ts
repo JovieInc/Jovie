@@ -40,6 +40,8 @@ type CandidateRow = {
 let candidateRows: CandidateRow[] = [];
 let suppressionRows: Array<{ emailHash: string }> = [];
 let userRows: Array<{ email: string; userStatus: string }> = [];
+let transactionUserRows: Array<{ id: string; userStatus: string }> | null =
+  null;
 let lastCandidateLimit: number | null = null;
 
 const hashEmailForTest = (email: string) =>
@@ -145,16 +147,30 @@ function createRowsQuery<T>(rows: T[]) {
 
 function createTxMock() {
   return {
-    select: vi.fn(() => ({
+    select: vi.fn((projection: Record<string, unknown>) => ({
       from: vi.fn(() => ({
         where: vi.fn((condition: { value?: unknown }) => ({
           for: vi.fn(() => ({
             limit: vi.fn(async () => {
+              if ('userStatus' in projection) {
+                return (
+                  transactionUserRows ?? [
+                    { id: 'user-1', userStatus: 'waitlist_pending' },
+                  ]
+                );
+              }
+
               const candidate = candidateRows.find(
                 row => row.id === condition.value
               );
               return candidate
-                ? [{ id: candidate.id, status: candidate.status }]
+                ? [
+                    {
+                      id: candidate.id,
+                      email: candidate.email,
+                      status: candidate.status,
+                    },
+                  ]
                 : [];
             }),
           })),
@@ -171,6 +187,7 @@ describe('runWaitlistAutoAccept', () => {
     candidateRows = [];
     suppressionRows = [];
     userRows = [];
+    transactionUserRows = null;
     lastCandidateLimit = null;
 
     mockGetWaitlistSettings.mockResolvedValue({
@@ -294,5 +311,24 @@ describe('runWaitlistAutoAccept', () => {
       'valid-1',
       expect.anything()
     );
+  });
+
+  it('does not consume auto-accept capacity for rows without a matching user', async () => {
+    candidateRows = [
+      { id: 'stale-entry', email: 'stale@example.com', status: 'waitlisted' },
+    ];
+    transactionUserRows = [];
+
+    const { runWaitlistAutoAccept } = await import(
+      '@/lib/waitlist/auto-accept'
+    );
+    const result = await runWaitlistAutoAccept({
+      now: new Date('2026-05-09T00:00:00Z'),
+    });
+
+    expect(result).toMatchObject({ scanned: 1, approved: 0, skipped: 1 });
+    expect(mockTryReserveAutoAcceptSlot).not.toHaveBeenCalled();
+    expect(mockApproveWaitlistEntryInTx).not.toHaveBeenCalled();
+    expect(mockEnqueueWaitlistApprovalInviteEmail).not.toHaveBeenCalled();
   });
 });

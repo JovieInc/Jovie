@@ -149,7 +149,11 @@ async function findLatestEntryByEmail(
   normalizedEmail: string
 ) {
   const [entry] = await tx
-    .select({ id: waitlistEntries.id, status: waitlistEntries.status })
+    .select({
+      id: waitlistEntries.id,
+      status: waitlistEntries.status,
+      waitlistedAt: waitlistEntries.waitlistedAt,
+    })
     .from(waitlistEntries)
     .where(
       drizzleSql`${waitlistEntries.emailNormalized} = ${normalizedEmail} OR lower(${waitlistEntries.email}) = ${normalizedEmail}`
@@ -401,7 +405,7 @@ export async function submitWaitlistAccessRequest(
               },
               status: nextExistingStatus,
               statusReason: 'already_waitlisted',
-              waitlistedAt: new Date(),
+              waitlistedAt: existing.waitlistedAt ?? new Date(),
             })
             .where(eq(waitlistEntries.id, existing.id));
 
