@@ -5,6 +5,24 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.223] - 2026-05-09
+
+> The homepage now leads with a sharper release command center, verified proof, and a product-led workspace story without leaking internal tools into marketing screenshots.
+
+### Added
+
+- **Homepage product statement break**: adds a Linear-inspired "Meet Jovie" statement between verified logos and the Workspace chapter so the page has better pacing before the second large product screenshot.
+- **Integrated Workspace chapter**: replaces the old command-center/workflow pair with one product-led section using the seeded releases workspace and anchored release-management callouts.
+
+### Changed
+
+- **Homepage hero and proof strip**: tightens the sticky header, verified-logo treatment, hero carousel framing, and section transitions around the current Shell v1 product screenshots.
+- **Marketing screenshot fixtures**: seeds Shell v1 releases/library captures with real Tim White and verified release data, full tables, matching artwork, and an open release rail.
+
+### Fixed
+
+- **Admin-free marketing captures**: Shell v1 screenshot routes now use `capture=marketing` so homepage assets do not expose admin/internal navigation.
+
 ## [26.4.222] - 2026-05-08
 
 > [internal] Central profile route config and canonical shell barrel for the public artist surface — consolidates routing logic, removes dead feature-flag code, and deletes 16 legacy files from the JOV-2021 hardening phase.

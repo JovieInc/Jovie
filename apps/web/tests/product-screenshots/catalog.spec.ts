@@ -187,6 +187,22 @@ async function syncPublicExport(catalogPath: string, publicExportPath: string) {
   await copyFile(catalogPath, exportPath);
 }
 
+async function assertNoShellInternalChrome(
+  page: import('@playwright/test').Page,
+  scenario: (typeof SCREENSHOT_SCENARIOS)[number]
+) {
+  if (
+    !scenario.id.startsWith('shell-v1-') ||
+    !scenario.consumers.includes('marketing-export')
+  ) {
+    return;
+  }
+
+  await expect(
+    page.locator('.shell-v1 aside').getByText('Admin', { exact: true })
+  ).toHaveCount(0);
+}
+
 async function prepareScenario(
   page: import('@playwright/test').Page,
   id: string
@@ -245,16 +261,38 @@ async function prepareScenario(
     await waitForSettle(page, 250);
   }
 
+  await assertNoShellInternalChrome(page, scenario);
+
   if (scenario.interaction === 'open-shell-library') {
     await expect(page.getByText('All assets').first()).toBeVisible({
       timeout: TIMEOUTS.CONTENT_VISIBLE,
     });
+    await expect(page.getByText('The Deep End — album art')).toBeVisible();
+    await expect(page.getByText('Take Me Over').first()).toBeVisible();
+    await expect(
+      page.getByText('Tim White press photo 03', { exact: true })
+    ).toBeVisible();
   }
 
   if (scenario.interaction === 'open-shell-releases') {
-    await expect(page.getByText('Lost in the Light').first()).toBeVisible({
+    await expect(page.getByText('The Deep End').first()).toBeVisible({
       timeout: TIMEOUTS.CONTENT_VISIBLE,
     });
+    await expect(
+      page.getByText('Cosmic Gate & Tim White').first()
+    ).toBeVisible();
+    await expect(page.getByText('Take Me Over').first()).toBeVisible();
+    await expect(page.getByTestId('shell-v1-release-drawer')).toBeVisible();
+    await page.getByRole('tab', { name: 'Distribution' }).click();
+    await expect(
+      page.getByRole('tab', { name: 'Distribution' })
+    ).toHaveAttribute('aria-selected', 'true');
+    await expect(
+      page
+        .getByTestId('shell-v1-release-drawer')
+        .getByText('Spotify', { exact: true })
+        .first()
+    ).toBeVisible();
   }
 
   if (scenario.id === 'release-presave-mobile') {
@@ -266,7 +304,12 @@ async function prepareScenario(
     await expect(page.getByText('Cosmic Gate & Tim White')).toBeVisible();
     await expect(page.getByAltText('The Deep End artwork')).toBeVisible();
     await expect(page.getByText('Listen everywhere')).toBeVisible();
+    await expect(page.getByText('Spotify')).toBeVisible();
+    await expect(page.getByText('Amazon Music')).toBeVisible();
     await expect(page.getByTestId('smart-link-brand-mark')).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: 'More options' })
+    ).toHaveCount(0);
   }
 
   await waitForImages(page).catch(() => {});

@@ -1,7 +1,6 @@
 import { ArrowRight } from 'lucide-react';
 import type { Metadata } from 'next';
 import dynamic from 'next/dynamic';
-import Image from 'next/image';
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
 import { HomepageHeroCommandCenter } from '@/components/homepage/HomepageHeroCommandCenter';
 import { HomepageTrackedLink } from '@/components/homepage/HomepageTrackedLink';
@@ -68,6 +67,23 @@ const HomeStatQuoteSection = dynamic(
       default: m.HomeStatQuoteSection,
     })),
   { ssr: true }
+);
+const HomepageWorkspaceSection = dynamic(
+  () =>
+    import('@/components/homepage/HomepageWorkspaceSection').then(m => ({
+      default: m.HomepageWorkspaceSection,
+    })),
+  { ssr: true }
+);
+
+const HERO_PRODUCT_IMAGES = {
+  library: getMarketingExportImage('shell-v1-library-desktop'),
+  profile: getMarketingExportImage('tim-white-profile-live-mobile'),
+  release: getMarketingExportImage('release-presave-mobile'),
+  releases: getMarketingExportImage('shell-v1-releases-desktop'),
+};
+const WORKSPACE_SCREENSHOT = getMarketingExportImage(
+  HOMEPAGE_LAUNCH_COPY.workspace.screenshotKey
 );
 
 export const revalidate = false;
@@ -194,12 +210,6 @@ const ORGANIZATION_SCHEMA = buildOrganizationSchema({
 
 const FAQ_SCHEMA = buildFaqSchema([...HOMEPAGE_LAUNCH_COPY.faq]);
 
-function HomepageEyebrow({
-  children,
-}: Readonly<{ children: React.ReactNode }>) {
-  return <p className='homepage-section-eyebrow'>{children}</p>;
-}
-
 function HomepageHeroActions() {
   return (
     <div className='homepage-hero-actions'>
@@ -225,116 +235,6 @@ function HomepageHeroActions() {
         <ArrowRight aria-hidden='true' size={15} strokeWidth={1.9} />
       </HomepageTrackedLink>
     </div>
-  );
-}
-
-function HomepageScreenshotMedia({
-  className,
-  priority = false,
-  scenarioId,
-  sizes,
-}: Readonly<{
-  className?: string;
-  priority?: boolean;
-  scenarioId: string;
-  sizes: string;
-}>) {
-  const image = getMarketingExportImage(scenarioId);
-
-  return (
-    <div className={className}>
-      <Image
-        src={image.publicUrl}
-        alt={image.alt}
-        width={image.width}
-        height={image.height}
-        loading={priority ? 'eager' : 'lazy'}
-        sizes={sizes}
-        quality={85}
-        unoptimized
-      />
-    </div>
-  );
-}
-
-function HomepageProductDepthBand() {
-  return (
-    <section
-      className='homepage-product-depth-band'
-      aria-labelledby='homepage-product-depth-heading'
-      data-testid='homepage-product-depth-band'
-    >
-      <div className='homepage-product-depth-band__inner'>
-        <div className='homepage-product-depth-band__copy'>
-          <HomepageEyebrow>
-            {HOMEPAGE_LAUNCH_COPY.productProof.eyebrow}
-          </HomepageEyebrow>
-          <h2 id='homepage-product-depth-heading'>
-            {HOMEPAGE_LAUNCH_COPY.productProof.headline}
-          </h2>
-          <p>{HOMEPAGE_LAUNCH_COPY.productProof.body}</p>
-        </div>
-        <div className='homepage-product-depth-band__media' aria-hidden='true'>
-          <HomepageScreenshotMedia
-            scenarioId='dashboard-releases-sidebar-desktop'
-            sizes='(min-width: 1024px) 78rem, 94vw'
-            className='homepage-product-depth-band__desktop'
-            priority
-          />
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function HomepageWorkflowStep({
-  index,
-  step,
-}: Readonly<{
-  index: number;
-  step: (typeof HOMEPAGE_LAUNCH_COPY.workflow.steps)[number];
-}>) {
-  return (
-    <article className='homepage-workflow-strip__step'>
-      <HomepageScreenshotMedia
-        scenarioId={step.screenshotKey}
-        sizes='(min-width: 1024px) 24rem, (min-width: 768px) 34vw, 86vw'
-        className='homepage-workflow-strip__step-media'
-      />
-      <div className='homepage-workflow-strip__step-copy'>
-        <span>{(index + 1).toString().padStart(2, '0')}</span>
-        <h3>{step.title}</h3>
-        <p>{step.body}</p>
-      </div>
-    </article>
-  );
-}
-
-function HomepageWorkflowStrip() {
-  return (
-    <section
-      id='release-workflow'
-      className='homepage-workflow-strip'
-      aria-labelledby='homepage-workflow-heading'
-    >
-      <div className='homepage-workflow-strip__inner'>
-        <div className='homepage-workflow-strip__copy'>
-          <HomepageEyebrow>
-            {HOMEPAGE_LAUNCH_COPY.workflow.eyebrow}
-          </HomepageEyebrow>
-          <h2 id='homepage-workflow-heading'>
-            <span>{HOMEPAGE_LAUNCH_COPY.workflow.headlineMuted}</span>{' '}
-            {HOMEPAGE_LAUNCH_COPY.workflow.headline}
-          </h2>
-          <p>{HOMEPAGE_LAUNCH_COPY.workflow.body}</p>
-        </div>
-        <div className='homepage-workflow-strip__steps'>
-          {HOMEPAGE_LAUNCH_COPY.workflow.steps.map((step, index) => (
-            <HomepageWorkflowStep index={index} key={step.title} step={step} />
-          ))}
-        </div>
-      </div>
-    </section>
   );
 }
 
@@ -368,6 +268,26 @@ function HomepageProfileProofBand() {
   );
 }
 
+function HomepageProductStatement() {
+  const copy = HOMEPAGE_LAUNCH_COPY.productStatement;
+
+  return (
+    <section
+      className='homepage-product-statement'
+      aria-labelledby='homepage-product-statement-heading'
+      data-testid='homepage-product-statement'
+    >
+      <div className='homepage-product-statement__inner'>
+        <p className='homepage-section-eyebrow'>{copy.eyebrow}</p>
+        <h2 id='homepage-product-statement-heading'>
+          <span className='homepage-product-statement__lead'>{copy.lead}</span>{' '}
+          <span className='homepage-product-statement__body'>{copy.body}</span>
+        </h2>
+      </div>
+    </section>
+  );
+}
+
 function HomepageFaq() {
   return (
     <div id='faq' className='homepage-faq-section' data-testid='homepage-faq'>
@@ -379,6 +299,41 @@ function HomepageFaq() {
         analyticsEventName='homepage_faq_opened'
         analyticsProperties={{ source: 'homepage' }}
       />
+    </div>
+  );
+}
+
+function HomepageUnlockedSections() {
+  return (
+    <>
+      <HomepageProductStatement />
+      <HomepageWorkspaceSection screenshot={WORKSPACE_SCREENSHOT} />
+      <FridayRhythmSection />
+      <HomepageProfileProofBand />
+      {FEATURE_FLAGS.SHOW_HOME_REFRESH_2026 ? <HomeBentoPairs /> : null}
+      {FEATURE_FLAGS.SHOW_HOME_REFRESH_2026 ? <HomeLoopDiagramSection /> : null}
+      {FEATURE_FLAGS.SHOW_HOME_REFRESH_2026 ? <HomeStatQuoteSection /> : null}
+      {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_PRICING ? <HomepageV2Pricing /> : null}
+      <HomepageFaq />
+    </>
+  );
+}
+
+function HomepageStoryStack({
+  showUnlockedSections,
+}: Readonly<{ showUnlockedSections: boolean }>) {
+  const className = showUnlockedSections
+    ? 'homepage-story-stack homepage-story-stack--proof-transition'
+    : 'homepage-story-stack';
+
+  return (
+    <div
+      className={className}
+      data-proof-transition={showUnlockedSections ? 'true' : 'false'}
+      data-testid='homepage-story-stack'
+    >
+      {showUnlockedSections ? <HomepageUnlockedSections /> : null}
+      {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_FINAL_CTA ? <HomepageV2FinalCta /> : null}
     </div>
   );
 }
@@ -455,7 +410,7 @@ export default async function HomePage() {
               </p>
               <HomepageHeroActions />
             </div>
-            <HomepageHeroCommandCenter />
+            <HomepageHeroCommandCenter images={HERO_PRODUCT_IMAGES} />
           </div>
         </div>
       </section>
@@ -465,28 +420,7 @@ export default async function HomePage() {
           presentation='inline-strip'
         />
       </div>
-      <div className='homepage-story-stack'>
-        {showUnlockedSections ? <HomepageProductDepthBand /> : null}
-        {showUnlockedSections ? <HomepageWorkflowStrip /> : null}
-        {showUnlockedSections ? <FridayRhythmSection /> : null}
-        {showUnlockedSections ? <HomepageProfileProofBand /> : null}
-        {showUnlockedSections && FEATURE_FLAGS.SHOW_HOME_REFRESH_2026 ? (
-          <HomeBentoPairs />
-        ) : null}
-        {showUnlockedSections && FEATURE_FLAGS.SHOW_HOME_REFRESH_2026 ? (
-          <HomeLoopDiagramSection />
-        ) : null}
-        {showUnlockedSections && FEATURE_FLAGS.SHOW_HOME_REFRESH_2026 ? (
-          <HomeStatQuoteSection />
-        ) : null}
-        {showUnlockedSections && FEATURE_FLAGS.SHOW_HOMEPAGE_V2_PRICING ? (
-          <HomepageV2Pricing />
-        ) : null}
-        {showUnlockedSections ? <HomepageFaq /> : null}
-        {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_FINAL_CTA ? (
-          <HomepageV2FinalCta />
-        ) : null}
-      </div>
+      <HomepageStoryStack showUnlockedSections={showUnlockedSections} />
     </HomePageShell>
   );
 }

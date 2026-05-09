@@ -348,14 +348,14 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
     {
       id: 'shell-v1-dashboard-desktop',
       title: 'Shell v1 — Dashboard',
-      route: '/exp/shell-v1',
+      route: '/exp/shell-v1?capture=marketing',
       waitFor: '.shell-v1',
       publicExportPath: 'shell-v1-dashboard.png',
     },
     {
       id: 'shell-v1-library-desktop',
       title: 'Shell v1 — Library',
-      route: '/exp/shell-v1?view=library',
+      route: '/exp/shell-v1?view=library&capture=marketing',
       waitFor: '.shell-v1',
       interaction: 'open-shell-library',
       publicExportPath: 'shell-v1-library.png',
@@ -363,7 +363,8 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
     {
       id: 'shell-v1-releases-desktop',
       title: 'Shell v1 — Releases',
-      route: '/exp/shell-v1?view=releases',
+      route:
+        '/exp/shell-v1?view=releases&release=the-deep-end&capture=marketing',
       waitFor: '.shell-v1',
       interaction: 'open-shell-releases',
       publicExportPath: 'shell-v1-releases.png',
