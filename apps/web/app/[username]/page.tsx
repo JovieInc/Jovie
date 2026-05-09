@@ -1,11 +1,13 @@
 import { type Metadata } from 'next';
-import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 
-export const dynamic = 'force-dynamic';
+// No `export const dynamic` here — the parent layout sets `revalidate: 3600`
+// (ISR). The public profile route must stay ISR-cacheable; avoid any Dynamic
+// API (cookies(), headers()) in this RSC tree.
 
+import { AnonCookieBootstrap } from '@/components/features/profile/AnonCookieBootstrap';
 import type { PublicRelease } from '@/components/features/profile/releases/types';
-import { AUDIENCE_ANON_COOKIE, BASE_URL } from '@/constants/app';
+import { BASE_URL } from '@/constants/app';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
 import { DesktopQrOverlayClient } from '@/features/profile/DesktopQrOverlayClient';
 import { ProfileViewTracker } from '@/features/profile/ProfileViewTracker';
@@ -322,9 +324,12 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
 
   const isPublicNoAuthSmoke = process.env.PUBLIC_NOAUTH_SMOKE === '1';
   const viewerCountryCode = null;
-  const cookieStore = await cookies();
-  const alertOptInStableId =
-    cookieStore.get(AUDIENCE_ANON_COOKIE)?.value ?? null;
+
+  // IMPORTANT: Do NOT read cookies() here — it would opt this ISR route into
+  // dynamic rendering, defeating the revalidate: 3600 set in layout.tsx.
+  // The jv_aid cookie is set by middleware on every request (analytics still
+  // work). The alertOptInVariant defaults to 'button' for ISR; AnonCookieBootstrap
+  // resolves the per-user variant client-side via /api/profile/audience-anon-cookie.
 
   const profileResult = await getProfileAndLinks(username);
   const {
@@ -418,7 +423,9 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
   const [tourDatesRaw, allReleases, alertOptInVariant] = await Promise.all([
     tourDatesPromise.catch(() => [] as TourDateViewModel[]),
     releasesPromise,
-    getProfileAlertOptInVariant(alertOptInStableId),
+    // stableId is null for ISR renders — returns the default 'button' variant.
+    // AnonCookieBootstrap resolves the per-user variant on the client side.
+    getProfileAlertOptInVariant(null),
   ]);
   const tourDates = [...tourDatesRaw].sort(
     (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
@@ -449,6 +456,10 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
       <script type='application/ld+json'>
         {safeJsonLdStringify(structuredData)}
       </script>
+
+      {/* Bootstraps the per-user jv_aid identity client-side without reading
+          cookies() in the RSC tree, keeping this route ISR-cacheable. */}
+      <AnonCookieBootstrap />
 
       {isPublicNoAuthSmoke ? null : (
         <ProfileViewTracker handle={artist.handle} artistId={artist.id} />
