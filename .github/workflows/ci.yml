@@ -878,7 +878,9 @@ jobs:
           AI_GATEWAY_API_KEY: mobile-overflow-ci
           MOBILE_OVERFLOW_WIDTHS: '320,390,430'
           MOBILE_OVERFLOW_FOCUS_LIMIT: '8'
-          PLAYWRIGHT_WORKERS: '8'
+          # This guard fans out 76 mobile route checks through a single Next dev
+          # server. Keep worker pressure low enough to avoid CI heap OOMs.
+          PLAYWRIGHT_WORKERS: '2'
 
       - name: Upload Playwright Artifacts on Failure
         if: failure()
