@@ -10,6 +10,7 @@ import {
   useState,
 } from 'react';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
+import { AnonCookieBootstrap } from '@/components/features/profile/AnonCookieBootstrap';
 import {
   ProfileNotificationsContext,
   useProfileShell,
@@ -221,6 +222,11 @@ export function ProfileCompactTemplate({
   hideMoreMenu = false,
   visualVariant = 'default',
 }: ProfileCompactTemplateProps) {
+  // alertOptInVariant starts as the ISR-rendered default ('button').
+  // AnonCookieBootstrap resolves the per-user Statsig variant on mount and
+  // updates this state, so real visitors see their assigned experiment variant.
+  const [resolvedAlertOptInVariant, setResolvedAlertOptInVariant] =
+    useState<ProfileAlertOptInVariant>(alertOptInVariant);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerView, setDrawerView] = useState<DrawerView>('menu');
   const [drawerPresentation, setDrawerPresentation] =
@@ -678,6 +684,9 @@ export function ProfileCompactTemplate({
 
   return (
     <ProfileNotificationsContext.Provider value={notificationsContextValue}>
+      {/* Resolves the per-user jv_aid variant client-side after ISR hydration.
+          Renders null; updates resolvedAlertOptInVariant state on mount. */}
+      <AnonCookieBootstrap onVariantResolved={setResolvedAlertOptInVariant} />
       <div
         className={cn(
           'profile-viewport relative h-[100dvh] overflow-hidden bg-[color:var(--profile-stage-bg)] text-primary-token'
@@ -725,7 +734,7 @@ export function ProfileCompactTemplate({
                   showPayButton={showPayButton}
                   latestRelease={latestRelease}
                   profileSettings={profileSettings}
-                  alertOptInVariant={alertOptInVariant}
+                  alertOptInVariant={resolvedAlertOptInVariant}
                   genres={genres}
                   pressPhotos={pressPhotos}
                   allowPhotoDownloads={allowPhotoDownloads}
@@ -773,7 +782,7 @@ export function ProfileCompactTemplate({
                   featuredPlaylistFallback={featuredPlaylistFallback}
                   enableDynamicEngagement={enableDynamicEngagement}
                   subscribeTwoStep={subscribeTwoStep}
-                  alertOptInVariant={alertOptInVariant}
+                  alertOptInVariant={resolvedAlertOptInVariant}
                   genres={genres}
                   pressPhotos={pressPhotos}
                   allowPhotoDownloads={allowPhotoDownloads}

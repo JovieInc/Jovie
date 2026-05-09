@@ -17,7 +17,17 @@ import { getProfileAlertOptInVariant } from '@/lib/flags/server';
 export async function GET(): Promise<NextResponse> {
   const cookieStore = await cookies();
   const stableId = cookieStore.get(AUDIENCE_ANON_COOKIE)?.value ?? null;
-  const alertOptInVariant = await getProfileAlertOptInVariant(stableId);
+
+  // Best-effort: fall back to the default variant if Statsig is unavailable.
+  // The client component already handles null/missing responses gracefully.
+  let alertOptInVariant: Awaited<
+    ReturnType<typeof getProfileAlertOptInVariant>
+  >;
+  try {
+    alertOptInVariant = await getProfileAlertOptInVariant(stableId);
+  } catch {
+    alertOptInVariant = 'button';
+  }
 
   return NextResponse.json(
     { alertOptInVariant },

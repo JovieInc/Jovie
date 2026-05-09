@@ -5,7 +5,6 @@ import { notFound } from 'next/navigation';
 // (ISR). The public profile route must stay ISR-cacheable; avoid any Dynamic
 // API (cookies(), headers()) in this RSC tree.
 
-import { AnonCookieBootstrap } from '@/components/features/profile/AnonCookieBootstrap';
 import type { PublicRelease } from '@/components/features/profile/releases/types';
 import { BASE_URL } from '@/constants/app';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
@@ -329,8 +328,9 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
   // IMPORTANT: Do NOT read cookies() here — it would opt this ISR route into
   // dynamic rendering, defeating the revalidate: 3600 set in layout.tsx.
   // The jv_aid cookie is set by middleware on every request (analytics still
-  // work). The alertOptInVariant defaults to 'button' for ISR; AnonCookieBootstrap
-  // resolves the per-user variant client-side via /api/profile/audience-anon-cookie.
+  // work). The alertOptInVariant defaults to 'button' for ISR; ProfileCompactTemplate
+  // renders AnonCookieBootstrap which resolves the per-user variant client-side
+  // via /api/profile/audience-anon-cookie and updates its own state.
 
   const profileResult = await getProfileAndLinks(username);
   const {
@@ -457,10 +457,6 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
       <script type='application/ld+json'>
         {safeJsonLdStringify(structuredData)}
       </script>
-
-      {/* Bootstraps the per-user jv_aid identity client-side without reading
-          cookies() in the RSC tree, keeping this route ISR-cacheable. */}
-      <AnonCookieBootstrap />
 
       {isPublicNoAuthSmoke ? null : (
         <ProfileViewTracker handle={artist.handle} artistId={artist.id} />
