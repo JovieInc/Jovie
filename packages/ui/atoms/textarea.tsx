@@ -11,7 +11,7 @@ const textareaVariants = cva(
     'text-[13px] font-[400] tracking-[-0.011em] text-(--linear-text-primary)',
     'placeholder:text-(--linear-text-tertiary)',
     'hover:border-(--linear-border-default)',
-    'focus-visible:outline-none focus-visible:border-(--color-accent)',
+    'focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/24',
     'disabled:cursor-not-allowed disabled:opacity-50',
     'transition-all duration-normal ease-interactive',
     'min-h-[80px]',

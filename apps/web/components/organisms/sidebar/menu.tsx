@@ -47,8 +47,8 @@ const sidebarMenuButtonVariants = cva(
     'hover:border-[color-mix(in_oklab,var(--linear-app-frame-seam)_58%,transparent)] hover:bg-[color-mix(in_oklab,var(--color-sidebar-accent)_82%,transparent)] hover:text-sidebar-item-foreground',
     // Active state — soft emphasis while keeping shell understated
     'data-[active=true]:border-[color-mix(in_oklab,var(--linear-app-frame-seam)_80%,transparent)] data-[active=true]:bg-[color-mix(in_oklab,var(--color-sidebar-accent-active)_88%,var(--linear-app-content-surface))] data-[active=true]:text-sidebar-item-foreground data-[active=true]:shadow-[inset_0_1px_0_rgba(255,255,255,0.03),inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-frame-seam)_62%,transparent)]',
-    // Focus state - subtle bg like Linear (no rings)
-    'focus-visible:border-[color-mix(in_oklab,var(--linear-border-focus)_62%,transparent)] focus-visible:bg-sidebar-accent focus-visible:outline-none',
+    // Focus state - subtle bg plus tokenized keyboard ring
+    'focus-visible:border-[color-mix(in_oklab,var(--linear-border-focus)_62%,transparent)] focus-visible:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/35',
     // Disabled state
     'disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50',
     // Menu action spacing
@@ -195,7 +195,7 @@ export const SidebarMenuAction = React.forwardRef<
       className={cn(
         'relative flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-item-icon outline-none transition-[background-color,color] duration-normal ease-interactive',
         'hover:text-sidebar-foreground hover:bg-sidebar-accent',
-        'focus-visible:bg-sidebar-accent focus-visible:text-sidebar-foreground focus-visible:outline-none',
+        'focus-visible:bg-sidebar-accent focus-visible:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/35',
         '[&>svg]:size-3 [&>svg]:shrink-0',
         // Increases the hit area of the button on mobile.
         'after:absolute after:-inset-2 after:lg:hidden',
@@ -245,7 +245,7 @@ export const SidebarMenuSkeleton = React.forwardRef<
       ref={ref}
       data-sidebar='menu-skeleton'
       className={cn(
-        'rounded-md h-7 flex gap-2 px-2 items-center transition-all duration-normal ease-interactive',
+        'rounded-md h-7 flex gap-2 px-2 items-center transition-[padding,width] duration-normal ease-interactive',
         'group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center',
         className
       )}
@@ -258,7 +258,7 @@ export const SidebarMenuSkeleton = React.forwardRef<
         />
       )}
       <Skeleton
-        className='h-4 flex-1 max-w-[--skeleton-width] transition-opacity duration-200 group-data-[collapsible=icon]:hidden'
+        className='h-4 flex-1 max-w-[--skeleton-width] transition-opacity duration-subtle group-data-[collapsible=icon]:hidden'
         data-sidebar='menu-skeleton-text'
         style={
           {
@@ -313,7 +313,7 @@ export const SidebarMenuSubButton = React.forwardRef<
       className={cn(
         'flex min-h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-full px-2.5 text-app leading-[1.15] text-sidebar-item-foreground outline-none transition-[background-color,color,box-shadow] duration-normal ease-interactive [font-weight:var(--font-weight-nav)]',
         'hover:bg-sidebar-accent hover:text-sidebar-item-foreground',
-        'focus-visible:bg-sidebar-accent focus-visible:outline-none',
+        'focus-visible:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/35',
         'active:bg-sidebar-accent active:text-sidebar-item-foreground',
         'disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50',
         '[&>span:last-child]:truncate [&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:text-sidebar-item-icon [&>svg]:transition-colors',
