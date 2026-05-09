@@ -15,7 +15,7 @@ const GATE_LABELS: Record<VerificationGate['name'], string> = {
   'sentry.canary': 'Sentry / Canary',
 };
 
-function formatGateName(name: VerificationGate['name']): string {
+export function formatGateName(name: VerificationGate['name']): string {
   return GATE_LABELS[name];
 }
 
@@ -26,18 +26,18 @@ interface VerificationGateListProps {
 export function VerificationGateList({ gates }: VerificationGateListProps) {
   if (gates.length === 0) {
     return (
-      <div className='rounded-lg bg-surface-0 px-3 py-3 text-[12px] text-tertiary-token'>
+      <div className='border-subtle border-t py-3 text-[12px] text-tertiary-token'>
         No gates recorded.
       </div>
     );
   }
 
   return (
-    <div className='grid gap-2'>
+    <div className='grid'>
       {gates.map(gate => (
         <div
           key={gate.name}
-          className='grid gap-2 rounded-lg bg-surface-1 px-3 py-2.5 sm:grid-cols-[minmax(0,1fr)_auto]'
+          className='grid gap-2 border-subtle border-t py-2.5 sm:grid-cols-[minmax(0,1fr)_auto]'
         >
           <div className='min-w-0'>
             <div className='flex min-w-0 items-center gap-2'>
