@@ -3,6 +3,16 @@ import type { AgentRunArtifact } from '@/lib/agent-os/artifact';
 import { cn } from '@/lib/utils';
 import { WorkflowStatusPill } from './WorkflowStatusPill';
 
+const HUMAN_GATE_LABELS: Record<
+  AgentRunArtifact['humanGate']['status'],
+  string
+> = {
+  not_required: 'Not Required',
+  pending: 'Review Required',
+  approved: 'Approved',
+  rejected: 'Rejected',
+};
+
 function formatUpdatedAt(value: string): string {
   return new Intl.DateTimeFormat('en-US', {
     month: 'short',
@@ -40,7 +50,14 @@ export function WorkflowRunRow({
             {artifact.summary}
           </p>
         </div>
-        <WorkflowStatusPill status={artifact.status} />
+        <div className='grid shrink-0 justify-items-end gap-1'>
+          <WorkflowStatusPill status={artifact.status} />
+          {artifact.humanApprovalRequired ? (
+            <span className='rounded-md border border-warning/20 bg-surface-0 px-1.5 py-0.5 text-[10.5px] font-[520] text-warning'>
+              {HUMAN_GATE_LABELS[artifact.humanGate.status]}
+            </span>
+          ) : null}
+        </div>
       </div>
       <div className='flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-tertiary-token'>
         <span>{artifact.modelRoute}</span>

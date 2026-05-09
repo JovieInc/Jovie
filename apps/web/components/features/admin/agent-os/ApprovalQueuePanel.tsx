@@ -21,7 +21,7 @@ export function ApprovalQueuePanel({
   const approvalArtifacts = artifacts.filter(needsApproval);
 
   return (
-    <div className='rounded-lg border border-subtle bg-surface-0 p-3'>
+    <div className='border-subtle border-t pt-3'>
       <div className='flex items-center justify-between gap-3'>
         <p className='text-[12.5px] font-[560] text-primary-token'>
           Approval Queue

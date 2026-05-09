@@ -20,7 +20,7 @@ import {
   type HudTone,
 } from '@/lib/hud/tone-determination';
 import type { HermesCliRuntime, HermesDispatchRequest } from '@/types/ai-ops';
-import type { HudMetrics } from '@/types/hud';
+import type { HudDeploymentState, HudMetrics } from '@/types/hud';
 import { HudClockClient } from './HudClockClient';
 import { HudStatusPill } from './HudStatusPill';
 import { useHudMetricsQuery } from './useHudMetricsQuery';
@@ -81,6 +81,22 @@ function getDeploymentDetail(deployments: HudMetrics['deployments']): string {
   return deployments.errorMessage ?? '\u2014';
 }
 
+const DEPLOYMENT_STATE_LABELS: Record<HudDeploymentState, string> = {
+  success: 'Success',
+  failure: 'Failure',
+  in_progress: 'In Progress',
+  unknown: 'Unknown',
+  not_configured: 'Not Configured',
+};
+
+const DEPLOYMENT_STATE_DOT_CLASSNAMES: Record<HudDeploymentState, string> = {
+  success: 'bg-success',
+  failure: 'bg-destructive',
+  in_progress: 'bg-info',
+  unknown: 'bg-tertiary-token',
+  not_configured: 'bg-tertiary-token',
+};
+
 function getAiOpsTone(aiOps: HudMetrics['aiOps']): HudTone {
   if (aiOps.counts.failed > 0 || aiOps.counts.blocked > 0) return 'bad';
   if (aiOps.counts.stale > 0 || aiOps.availability === 'partial') {
@@ -117,6 +133,40 @@ function SectionEyebrow({
   );
 }
 
+function CompactDeploymentRow({
+  run,
+}: Readonly<{
+  readonly run: HudMetrics['deployments']['recent'][number];
+}>) {
+  return (
+    <div className='grid gap-1.5 border-subtle border-b py-2.5 last:border-b-0'>
+      <div className='flex min-w-0 items-center justify-between gap-3'>
+        <div className='flex min-w-0 items-center gap-2'>
+          <span
+            className={`h-1.5 w-1.5 shrink-0 rounded-full ${DEPLOYMENT_STATE_DOT_CLASSNAMES[run.status]}`}
+            aria-hidden='true'
+          />
+          <p className='truncate text-[13px] font-[590] text-primary-token'>
+            {DEPLOYMENT_STATE_LABELS[run.status]}
+          </p>
+        </div>
+        <p className='shrink-0 text-[12px] font-[560] tabular-nums text-primary-token'>
+          #{run.runNumber}
+        </p>
+      </div>
+      <p
+        className='truncate text-[12px] leading-4 text-secondary-token'
+        title={run.branch ?? undefined}
+      >
+        {run.branch ?? '\u2014'}
+      </p>
+      <p className='text-[11px] text-tertiary-token'>
+        {formatDeploymentTime(run.createdAtIso)}
+      </p>
+    </div>
+  );
+}
+
 function DeploymentRow({
   run,
 }: Readonly<{
@@ -140,6 +190,39 @@ function DeploymentRow({
           {run.status}
         </p>
       </div>
+    </div>
+  );
+}
+
+function DeploymentsPanel({
+  deployments,
+  detail,
+}: Readonly<{
+  readonly deployments: HudMetrics['deployments'];
+  readonly detail: string;
+}>) {
+  return (
+    <div
+      className='max-w-[560px] space-y-2 border-subtle border-t pt-3'
+      data-testid='ops-deployments-panel'
+    >
+      <div className='flex items-center justify-between gap-3'>
+        <p className='text-[12.5px] font-[560] text-primary-token'>
+          Deployments
+        </p>
+        <p className='truncate text-[11px] text-tertiary-token' title={detail}>
+          {detail}
+        </p>
+      </div>
+      {deployments.recent.length > 0 ? (
+        <div>
+          {deployments.recent.slice(0, 5).map(run => (
+            <CompactDeploymentRow key={run.id} run={run} />
+          ))}
+        </div>
+      ) : (
+        <p className='text-[13px] text-secondary-token'>No recent runs.</p>
+      )}
     </div>
   );
 }
@@ -397,7 +480,7 @@ export function HudDashboardClient({
   // Outer layout: kiosk gets the wide centered TV layout; shell defers width
   // to the AdminToolPage container that already provides app-shell padding.
   const outerClass = isShell
-    ? 'flex w-full flex-col gap-3'
+    ? 'mx-auto flex w-full max-w-[1680px] flex-col gap-3'
     : 'mx-auto flex w-full max-w-[1560px] flex-col gap-3 px-4 py-4 sm:px-6 sm:py-6 xl:px-8';
 
   // MRR scale: shell matches Overview KPIs (~28-32px); kiosk keeps the
@@ -410,6 +493,134 @@ export function HudDashboardClient({
   const secondaryValueClass = isShell
     ? 'text-[24px] font-[620] leading-none tracking-[-0.03em] sm:text-[28px]'
     : 'text-[36px] font-[620] leading-none tracking-[-0.04em] sm:text-[42px]';
+
+  const aiOpsSummary = (
+    <span>
+      {metrics.aiOps.mergeQueue.openAgentPrs} /{' '}
+      {metrics.aiOps.mergeQueue.openAgentPrThreshold} agent PRs open | Running{' '}
+      {metrics.aiOps.counts.running.toLocaleString('en-US')} | Review{' '}
+      {metrics.aiOps.counts.review.toLocaleString('en-US')} | Blocked{' '}
+      {metrics.aiOps.counts.blocked.toLocaleString('en-US')} | Failed{' '}
+      {metrics.aiOps.counts.failed.toLocaleString('en-US')} | Stale{' '}
+      {metrics.aiOps.counts.stale.toLocaleString('en-US')}
+    </span>
+  );
+
+  if (isShell) {
+    return (
+      <div className={outerClass}>
+        <TimActionRequiredSection />
+
+        <div className='grid gap-3 md:grid-cols-2 xl:grid-cols-4'>
+          <ContentMetricCard
+            label='MRR'
+            value={formatUsd(metrics.overview.mrrUsd)}
+            subtitle={
+              <span>
+                {metrics.overview.activeSubscribers.toLocaleString('en-US')}{' '}
+                subscribers
+              </span>
+            }
+            headerRight={
+              <HudStatusPill label={deploymentLabel} tone={deploymentsTone} />
+            }
+            className='p-3'
+            valueClassName={mrrValueClass}
+          />
+          <ContentMetricCard
+            label='Runway'
+            value={formatRunway(metrics.overview.runwayMonths)}
+            subtitle={
+              <div className='mt-2 grid gap-1.5'>
+                <ContentMetricRow
+                  label='Cash'
+                  value={formatUsd(metrics.overview.balanceUsd)}
+                />
+                <ContentMetricRow
+                  label='Burn (30d)'
+                  value={formatUsd(metrics.overview.burnRateUsd)}
+                />
+              </div>
+            }
+            className='p-3'
+            valueClassName={secondaryValueClass}
+          />
+          <ContentMetricCard
+            label='Operations'
+            value={metrics.operations.status === 'ok' ? 'Healthy' : 'Degraded'}
+            subtitle={
+              metrics.operations.dbLatencyMs === null
+                ? 'DB latency -'
+                : `DB latency ${metrics.operations.dbLatencyMs.toFixed(0)}ms`
+            }
+            className='p-3'
+            valueClassName={secondaryValueClass}
+          />
+          <ContentMetricCard
+            label='Reliability'
+            value={`${(100 - metrics.reliability.errorRatePercent).toFixed(1)}%`}
+            subtitle={
+              metrics.reliability.p95LatencyMs === null
+                ? 'p95 -'
+                : `p95 ${metrics.reliability.p95LatencyMs.toFixed(0)}ms`
+            }
+            className='p-3'
+            valueClassName={secondaryValueClass}
+          />
+        </div>
+
+        {metrics.accessMode === 'admin' ? (
+          <AgentOsRunsPanel
+            artifacts={AGENT_OS_ADMIN_FIXTURE_ARTIFACTS}
+            summary={aiOpsSummary}
+            status={<HudStatusPill label={aiOpsLabel} tone={aiOpsTone} />}
+            deploymentsPanel={
+              <DeploymentsPanel
+                deployments={metrics.deployments}
+                detail={deploymentDetail}
+              />
+            }
+          />
+        ) : null}
+
+        <div className='grid gap-3 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.9fr)]'>
+          <ContentSurfaceCard surface='details' className='overflow-hidden p-0'>
+            <ShippingVelocityChart
+              initialData={initialShippingData}
+              initialRange='7d'
+              cachedAt={initialShippingCachedAt}
+            />
+          </ContentSurfaceCard>
+
+          <ContentSurfaceCard
+            surface='details'
+            className='p-3'
+            data-testid='hud-bottom-marker'
+          >
+            <div className='flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between'>
+              <div className='space-y-2'>
+                <SectionEyebrow>Default status</SectionEyebrow>
+                <p className='text-[26px] font-[620] leading-none tracking-[-0.03em] text-primary-token sm:text-[32px]'>
+                  {metrics.overview.defaultStatus === 'alive'
+                    ? 'Alive'
+                    : 'Dead'}
+                </p>
+                <p className='max-w-4xl text-[13px] leading-6 text-secondary-token'>
+                  {metrics.overview.defaultStatusDetail}
+                </p>
+              </div>
+              <HudStatusPill
+                label={
+                  metrics.overview.defaultStatus === 'alive' ? 'Alive' : 'Dead'
+                }
+                tone={defaultTone}
+              />
+            </div>
+          </ContentSurfaceCard>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={outerClass}>
