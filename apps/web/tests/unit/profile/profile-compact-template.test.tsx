@@ -18,7 +18,6 @@ import {
   vi,
 } from 'vitest';
 import type { PublicRelease } from '@/components/features/profile/releases/types';
-import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist } from '@/types/db';
 
@@ -219,15 +218,6 @@ const mockReleases = [
     artistNames: ['Test Artist'],
   },
 ] satisfies readonly PublicRelease[];
-
-function mockDsp(key: string, name: string, url: string) {
-  return {
-    key,
-    name,
-    url,
-    config: {} as never,
-  };
-}
 
 function mockViewport(width: 'mobile' | 'desktop') {
   const previousMatchMedia = window.matchMedia;
@@ -1187,114 +1177,6 @@ describe('ProfileCompactTemplate', () => {
     restoreViewport();
   });
 
-  it('marks the flagged public profile V1 shell on mobile smoke render', async () => {
-    render(
-      <ProfileCompactTemplate
-        mode='profile'
-        artist={mockArtist}
-        socialLinks={[]}
-        contacts={[]}
-        visualVariant='v1'
-      />
-    );
-
-    expect(screen.getByTestId('profile-compact-shell')).toBeInTheDocument();
-    expect(
-      screen
-        .getByTestId('profile-compact-shell')
-        .closest('[data-profile-visual-variant]')
-    ).toHaveAttribute('data-profile-visual-variant', 'v1');
-  });
-
-  it('keeps flagged public profile V1 desktop DSP links in canonical order', async () => {
-    const restoreViewport = mockViewport('desktop');
-    mockCanonicalProfileDSPs.mockReturnValue([
-      mockDsp('spotify', 'Spotify', 'https://open.spotify.com/artist/test'),
-      mockDsp(
-        'apple_music',
-        'Apple Music',
-        'https://music.apple.com/artist/test'
-      ),
-      mockDsp('youtube', 'YouTube', 'https://youtube.com/@test'),
-      mockDsp('deezer', 'Deezer', 'https://www.deezer.com/artist/test'),
-      mockDsp('tidal', 'Tidal', 'https://tidal.com/browse/artist/test'),
-    ]);
-
-    render(
-      <ProfileCompactTemplate
-        mode='profile'
-        artist={{
-          ...mockArtist,
-          tagline: 'Official music, shows, and updates.',
-          image_url: 'https://example.com/artist.jpg',
-        }}
-        socialLinks={[]}
-        contacts={[]}
-        visualVariant='v1'
-      />
-    );
-
-    await screen.findByText('Listen And Follow');
-
-    const dspLinks = screen
-      .getAllByRole('link')
-      .filter(link =>
-        ['Spotify', 'Apple Music', 'YouTube', 'Deezer'].includes(
-          link.textContent?.trim() ?? ''
-        )
-      );
-
-    expect(dspLinks.map(link => link.textContent?.trim())).toEqual([
-      'Spotify',
-      'Apple Music',
-      'YouTube',
-      'Deezer',
-    ]);
-    expect(dspLinks.map(link => link.getAttribute('href'))).toEqual([
-      'https://open.spotify.com/artist/test',
-      'https://music.apple.com/artist/test',
-      'https://youtube.com/@test',
-      'https://www.deezer.com/artist/test',
-    ]);
-    expect(
-      screen.queryByRole('link', { name: 'Tidal' })
-    ).not.toBeInTheDocument();
-
-    restoreViewport();
-  });
-
-  it('keeps the flagged public profile V1 desktop trust surface accessible', async () => {
-    const restoreViewport = mockViewport('desktop');
-    mockCanonicalProfileDSPs.mockReturnValue([
-      mockDsp('spotify', 'Spotify', 'https://open.spotify.com/artist/test'),
-      mockDsp(
-        'apple_music',
-        'Apple Music',
-        'https://music.apple.com/artist/test'
-      ),
-    ]);
-
-    const { container } = render(
-      <ProfileCompactTemplate
-        mode='profile'
-        artist={{
-          ...mockArtist,
-          tagline: 'Official music, shows, and updates.',
-          image_url: 'https://example.com/artist.jpg',
-        }}
-        socialLinks={[]}
-        contacts={[]}
-        visualVariant='v1'
-      />
-    );
-
-    expect(await screen.findByText('Listen And Follow')).toBeInTheDocument();
-
-    await expectNoA11yViolations(container);
-
-    restoreViewport();
-  });
-
   it('passes pay, contact, tour, subscribe, and release variants into the desktop smoke surface', async () => {
     const restoreViewport = mockViewport('desktop');
 
@@ -1342,7 +1224,6 @@ describe('ProfileCompactTemplate', () => {
         },
       ],
       releases: mockReleases,
-      visualVariant: 'v1' as const,
     };
 
     const view = render(
