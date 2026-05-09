@@ -20,6 +20,7 @@ import {
   ensureUserRecord,
   setActiveProfileForUser,
 } from '@/lib/testing/test-user-provision.server';
+import { normalizeEmail } from '@/lib/utils/email';
 import { logger } from '@/lib/utils/logger';
 
 const FIXTURE_BASE_TIME = new Date('2099-01-01T12:00:00.000Z');
@@ -199,6 +200,7 @@ async function seedWaitlist() {
 
       return {
         ...entry,
+        emailNormalized: normalizeEmail(entry.email),
         createdAt,
         updatedAt: createdAt,
       };

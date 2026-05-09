@@ -208,6 +208,11 @@ export function WaitlistIntakeChat({
         error?: string;
       } | null;
 
+      if (payload?.outcome === 'rate_limited') {
+        setOutcome('rate_limited');
+        return;
+      }
+
       if (!response.ok || !payload?.outcome) {
         setOutcome('save_failed');
         return;

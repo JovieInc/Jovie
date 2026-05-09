@@ -7,7 +7,10 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { waitlistEntries, waitlistInvites } from '@/lib/db/schema/waitlist';
 import { captureError, sanitizeErrorResponse } from '@/lib/error-tracking';
 import { RETRY_AFTER_SERVICE } from '@/lib/http/headers';
-import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
+import {
+  enforceOnboardingRateLimit,
+  getOnboardingRateLimitMessage,
+} from '@/lib/onboarding/rate-limit';
 import { normalizeEmail } from '@/lib/utils/email';
 import { extractClientIPFromRequest } from '@/lib/utils/ip-extraction';
 import { logger } from '@/lib/utils/logger';
@@ -145,7 +148,25 @@ export async function POST(request: Request) {
 
     if (!isDev) {
       const clientIP = extractClientIPFromRequest({ headers: request.headers });
-      await enforceOnboardingRateLimit({ userId, ip: clientIP, checkIP: true });
+      try {
+        await enforceOnboardingRateLimit({
+          userId,
+          ip: clientIP,
+          checkIP: true,
+        });
+      } catch (error) {
+        const rateLimitMessage = getOnboardingRateLimitMessage(error);
+        if (!rateLimitMessage) throw error;
+
+        return NextResponse.json(
+          {
+            success: false,
+            code: 'rate_limited',
+            error: rateLimitMessage,
+          },
+          { status: 429, headers: NO_STORE_HEADERS }
+        );
+      }
     }
 
     const hasWaitlistTable = await ensureWaitlistTable();

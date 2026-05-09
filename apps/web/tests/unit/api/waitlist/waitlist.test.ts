@@ -21,6 +21,7 @@ const mockFinalizeWaitlistApproval = vi.hoisted(() => vi.fn());
 const mockCaptureCriticalError = vi.hoisted(() => vi.fn());
 const mockApproveWaitlistEntryInTx = vi.hoisted(() => vi.fn());
 const mockEnqueueWaitlistEmailJob = vi.hoisted(() => vi.fn());
+const mockEnforceOnboardingRateLimit = vi.hoisted(() => vi.fn());
 
 vi.mock('@clerk/nextjs/server', () => ({
   auth: mockAuth,
@@ -88,7 +89,14 @@ vi.mock('@/lib/notifications/providers/slack', () => ({
 }));
 
 vi.mock('@/lib/onboarding/rate-limit', () => ({
-  enforceOnboardingRateLimit: vi.fn().mockResolvedValue(undefined),
+  enforceOnboardingRateLimit: mockEnforceOnboardingRateLimit,
+  getOnboardingRateLimitMessage: (error: unknown) => {
+    if (!(error instanceof Error)) return null;
+    const prefix = '[RATE_LIMITED] ';
+    return error.message.startsWith(prefix)
+      ? error.message.slice(prefix.length)
+      : null;
+  },
 }));
 
 vi.mock('@/lib/utils/ip-extraction', () => ({
@@ -183,6 +191,7 @@ describe('Waitlist API', () => {
     mockFinalizeWaitlistApproval.mockResolvedValue(undefined);
     mockCaptureCriticalError.mockResolvedValue(undefined);
     mockEnqueueWaitlistEmailJob.mockResolvedValue('job-1');
+    mockEnforceOnboardingRateLimit.mockResolvedValue(undefined);
     mockBuildWaitlistInviteEmail.mockReturnValue({
       message: {
         id: 'waitlist_welcome:profile_auto',
@@ -346,6 +355,37 @@ describe('Waitlist API', () => {
 
       expect(response.status).toBe(400);
       expect(data.success).toBe(false);
+    });
+
+    it('returns 429 when a waitlist submission is rate limited', async () => {
+      mockAuth.mockResolvedValue({ userId: 'user_123' });
+      mockEnforceOnboardingRateLimit.mockRejectedValue(
+        new Error(
+          '[RATE_LIMITED] Too many onboarding attempts. Please try again in 1 hour.'
+        )
+      );
+
+      const { POST } = await routeModulePromise;
+      const request = new Request('http://localhost/api/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          primaryGoal: 'streams',
+          primarySocialUrl: 'https://instagram.com/test',
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(429);
+      expect(data).toMatchObject({
+        success: false,
+        code: 'rate_limited',
+        error: 'Too many onboarding attempts. Please try again in 1 hour.',
+      });
+      expect(mockCurrentUser).not.toHaveBeenCalled();
+      expect(mockDbTransaction).not.toHaveBeenCalled();
     });
 
     it('rejects submissions when only the primary email is unverified', async () => {
