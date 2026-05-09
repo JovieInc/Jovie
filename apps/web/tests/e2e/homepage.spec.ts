@@ -111,26 +111,101 @@ test.describe('Homepage', () => {
     await expect(
       carousel.getByRole('button', { name: 'Previous product preview' })
     ).toBeVisible();
+    await page.waitForFunction(() => {
+      const carouselEl = document.querySelector(
+        '[data-testid="homepage-hero-command-center"]'
+      );
+      if (!carouselEl) return false;
+      const visibleImages = Array.from(
+        carouselEl.querySelectorAll<HTMLImageElement>('img')
+      ).filter(img => {
+        const rect = img.getBoundingClientRect();
+        return rect.width > 0 && rect.right > 0 && rect.left < innerWidth;
+      });
+      return (
+        visibleImages.length >= 3 &&
+        visibleImages.every(img => img.complete && img.naturalWidth > 0)
+      );
+    });
+
+    const visibleImageQuality = await carousel
+      .locator('img')
+      .evaluateAll(images =>
+        images
+          .map(img => {
+            const rect = img.getBoundingClientRect();
+            return {
+              alt: img.alt,
+              clientWidth: rect.width,
+              naturalWidth: img.naturalWidth,
+              visible:
+                rect.width > 0 && rect.right > 0 && rect.left < innerWidth,
+              requiredWidth: Math.ceil(rect.width * devicePixelRatio),
+            };
+          })
+          .filter(image => image.visible)
+      );
+
+    expect(visibleImageQuality.length).toBeGreaterThanOrEqual(3);
+    for (const image of visibleImageQuality) {
+      expect(
+        image.naturalWidth,
+        `${image.alt} should be loaded at device pixel ratio quality`
+      ).toBeGreaterThanOrEqual(image.requiredWidth);
+    }
   });
 
-  test('trust, workflow, Friday, profile proof, pricing, FAQ, and final CTA render', async ({
+  test('trust, product statement, workspace, Friday, profile proof, pricing, FAQ, and final CTA render', async ({
     page,
   }) => {
     await expect(page.getByTestId('homepage-trust')).toHaveAttribute(
       'data-presentation',
       'inline-strip'
     );
+    await expect(page.getByTestId('homepage-story-stack')).toHaveAttribute(
+      'data-proof-transition',
+      'true'
+    );
+    await expect(page.getByTestId('homepage-workspace-section')).toBeVisible();
+    const proofParallaxAnimation = await page.evaluate(() => {
+      const supportsScrollTimeline = CSS.supports('animation-timeline: view()');
+      const logoGrid = document.querySelector('.homepage-trust-logo-grid');
+      return supportsScrollTimeline && logoGrid
+        ? getComputedStyle(logoGrid).animationName
+        : 'unsupported';
+    });
+    if (proofParallaxAnimation !== 'unsupported') {
+      expect(proofParallaxAnimation).toBe('homepage-proof-logos-parallax');
+    }
+    await expect(page.getByTestId('homepage-product-statement')).toBeVisible();
+    await expect(page.getByText('Meet Jovie')).toBeVisible();
     await expect(
       page.getByRole('heading', {
-        name: 'Connect, preview, and publish from one release workspace.',
+        name: /A release operating system for serious artists\./,
       })
     ).toBeVisible();
-    await expect(page.getByTestId('homepage-product-depth-band')).toBeVisible();
+    await expect(page.getByText('Go live. In 60 seconds.')).toBeVisible();
     await expect(
       page.getByRole('heading', {
-        name: 'Plan the release around the page fans will actually see.',
+        name: 'One workspace. For every release.',
       })
     ).toBeVisible();
+    await expect(
+      page.getByTestId('homepage-workspace-screenshot').locator('img')
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Import the release' })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Generate the plan' })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Run the tasks' })
+    ).toBeVisible();
+    await expect(page.getByTestId('homepage-product-depth-band')).toHaveCount(
+      0
+    );
+    await expect(page.getByTestId('homepage-workflow-strip')).toHaveCount(0);
     await expect(page.getByTestId('friday-rhythm-section')).toBeVisible();
     await expect(
       page.getByRole('heading', { name: 'Make Every Friday Count' })

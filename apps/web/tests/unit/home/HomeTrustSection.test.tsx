@@ -26,7 +26,7 @@ describe('HomeTrustSection', () => {
   });
 
   it('renders the homepage inline strip presentation when requested', () => {
-    render(
+    const { container } = render(
       <HomeTrustSection
         presentation='inline-strip'
         label='Trusted by artists'
@@ -40,5 +40,9 @@ describe('HomeTrustSection', () => {
     expect(screen.getByText('Trusted by artists')).toBeInTheDocument();
     expect(screen.getByAltText('Black Hole Recordings')).toBeInTheDocument();
     expect(screen.queryByLabelText('disco:wax')).not.toBeInTheDocument();
+    expect(container.querySelector('.homepage-trust-logo-grid')).toBeTruthy();
+    expect(
+      container.querySelectorAll('.homepage-trust-logo-slot')
+    ).toHaveLength(5);
   });
 });

@@ -124,6 +124,11 @@ describe('SmartLinkShell', () => {
     expect(onMenuOpen).toHaveBeenCalledTimes(1);
   });
 
+  it('can hide the menu button for clean marketing screenshots', () => {
+    render(<SmartLinkShell {...defaultProps} showMenuButton={false} />);
+    expect(screen.queryByRole('button', { name: /more options/i })).toBeNull();
+  });
+
   it('renders children content', () => {
     render(<SmartLinkShell {...defaultProps} />);
     expect(screen.getByTestId('children-content')).toHaveTextContent('Content');

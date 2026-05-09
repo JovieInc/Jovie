@@ -35,37 +35,36 @@ export const HOMEPAGE_LAUNCH_COPY = {
     href: APP_ROUTES.SIGNUP,
     support: 'Free profile. 14-day Pro trial.',
   },
-  productProof: {
-    eyebrow: 'Release Command Center',
-    headline: 'Plan the release around the page fans will actually see.',
-    body: 'Tasks, presaves, copy, fan actions, and profile updates stay attached to the same product surface.',
-    points: [
-      'A working dashboard for the artist team.',
-      'A polished public view for every fan touchpoint.',
+  workspace: {
+    kicker: 'Go live. In 60 seconds.',
+    headline: 'One workspace. For every release.',
+    headlineLines: ['One workspace.', 'For every release.'],
+    screenshotKey: 'shell-v1-releases-desktop',
+    callouts: [
+      {
+        key: 'import',
+        number: '01',
+        title: 'Import the release',
+        body: 'Jovie pulls artwork, credits, links, dates, and status into the workspace automatically.',
+      },
+      {
+        key: 'publish',
+        number: '02',
+        title: 'Generate the plan',
+        body: 'Turn the release into tasks for profile updates, DSP links, fan capture, and launch timing.',
+      },
+      {
+        key: 'review',
+        number: '03',
+        title: 'Run the tasks',
+        body: 'Let Jovie handle the next action or assign it to your team with the context attached.',
+      },
     ],
   },
-  workflow: {
-    eyebrow: 'Release Workflow',
-    headlineMuted: 'Connect, preview, and publish',
-    headline: 'from one release workspace.',
-    body: 'Connect your artist source, review the page, and publish the next release without rebuilding the campaign.',
-    steps: [
-      {
-        title: 'Connect',
-        body: 'Bring in your artist profile, release details, and links.',
-        screenshotKey: 'public-profile-desktop',
-      },
-      {
-        title: 'Preview',
-        body: 'See the profile, release page, fan actions, and routing together.',
-        screenshotKey: 'release-presave-mobile',
-      },
-      {
-        title: 'Publish',
-        body: 'Share one Jovie presence that keeps updating after launch.',
-        screenshotKey: 'artist-spec-tracked-links-desktop',
-      },
-    ],
+  productStatement: {
+    eyebrow: 'Meet Jovie',
+    lead: 'A release operating system for serious artists.',
+    body: 'Import the drop. Generate the work. Keep the next release moving.',
   },
   intentBand: {
     eyebrow: 'Ask Jovie',
@@ -131,7 +130,7 @@ export const HOMEPAGE_HERO_CAROUSEL_SLIDES: readonly HomepageHeroCarouselSlide[]
         'Tasks, presaves, copy, and release timing stay in one place instead of another scattered checklist.',
       desktopScreenshotKey: 'release-tasks-desktop',
       mobileScreenshotKey: 'release-presave-mobile',
-      ctaAnchor: '#release-workflow',
+      ctaAnchor: '#release-workspace',
     },
     {
       id: 'fan-routing',

@@ -1,46 +1,60 @@
 'use client';
 
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import Image from 'next/image';
+import Image, { type ImageLoader } from 'next/image';
 import { useLayoutEffect, useRef } from 'react';
-import { getMarketingExportImage } from '@/lib/screenshots/registry';
 
-const LIBRARY_IMAGE = getMarketingExportImage('shell-v1-library-desktop');
-const PROFILE_IMAGE = getMarketingExportImage('tim-white-profile-live-mobile');
-const RELEASE_IMAGE = getMarketingExportImage('release-presave-mobile');
-const RELEASES_IMAGE = getMarketingExportImage('shell-v1-releases-desktop');
+type HomepageMarketingImage = {
+  readonly publicUrl: string;
+  readonly width: number;
+  readonly height: number;
+  readonly alt: string;
+};
 
-const PRODUCT_PANES = [
-  {
-    image: RELEASE_IMAGE,
-    alt: 'The Deep End release page with fan action buttons',
-    sizes: '(min-width: 1280px) 18rem, (min-width: 768px) 24vw, 34vw',
-    className: 'homepage-product-pane--phone homepage-product-pane--release',
-    priority: true,
-  },
-  {
-    image: RELEASES_IMAGE,
-    alt: 'Jovie releases page with release status, assets, and launch progress',
-    sizes: '(min-width: 1280px) 68rem, (min-width: 768px) 76vw, 88vw',
-    className: 'homepage-product-pane--desktop',
-    initial: true,
-    priority: true,
-  },
-  {
-    image: PROFILE_IMAGE,
-    alt: 'Tim White artist profile with release and fan actions',
-    sizes: '(min-width: 1280px) 18rem, (min-width: 768px) 24vw, 34vw',
-    className: 'homepage-product-pane--phone',
-    priority: true,
-  },
-  {
-    image: LIBRARY_IMAGE,
-    alt: 'Jovie media library with release assets organized for review',
-    sizes: '(min-width: 1280px) 68rem, (min-width: 768px) 76vw, 88vw',
-    className: 'homepage-product-pane--desktop homepage-product-pane--library',
-    priority: false,
-  },
-] as const;
+const sourceScreenshotLoader: ImageLoader = ({ src, width }) =>
+  `${src}?w=${width}`;
+
+export type HomepageHeroCommandCenterImages = {
+  readonly library: HomepageMarketingImage;
+  readonly profile: HomepageMarketingImage;
+  readonly release: HomepageMarketingImage;
+  readonly releases: HomepageMarketingImage;
+};
+
+function buildProductPanes(images: HomepageHeroCommandCenterImages) {
+  return [
+    {
+      image: images.release,
+      alt: 'The Deep End release page with fan action buttons',
+      sizes: '(min-width: 1280px) 18rem, (min-width: 768px) 24vw, 34vw',
+      className: 'homepage-product-pane--phone homepage-product-pane--release',
+      priority: true,
+    },
+    {
+      image: images.releases,
+      alt: 'Jovie releases page with release status, assets, and launch progress',
+      sizes: '(min-width: 1280px) 68rem, (min-width: 768px) 76vw, 88vw',
+      className: 'homepage-product-pane--desktop',
+      initial: true,
+      priority: true,
+    },
+    {
+      image: images.profile,
+      alt: 'Tim White artist profile with release and fan actions',
+      sizes: '(min-width: 1280px) 18rem, (min-width: 768px) 24vw, 34vw',
+      className: 'homepage-product-pane--phone',
+      priority: true,
+    },
+    {
+      image: images.library,
+      alt: 'Jovie media library with release assets organized for review',
+      sizes: '(min-width: 1280px) 68rem, (min-width: 768px) 76vw, 88vw',
+      className:
+        'homepage-product-pane--desktop homepage-product-pane--library',
+      priority: false,
+    },
+  ] as const;
+}
 
 function ProductPane({
   alt,
@@ -52,7 +66,7 @@ function ProductPane({
 }: Readonly<{
   alt: string;
   className: string;
-  image: ReturnType<typeof getMarketingExportImage>;
+  image: HomepageMarketingImage;
   initial?: boolean;
   priority?: boolean;
   sizes: string;
@@ -68,7 +82,9 @@ function ProductPane({
         alt={alt}
         width={image.width}
         height={image.height}
-        priority={priority}
+        loader={sourceScreenshotLoader}
+        loading={priority ? 'eager' : 'lazy'}
+        fetchPriority={priority ? 'high' : 'auto'}
         sizes={sizes}
         quality={85}
         className='homepage-product-pane__image'
@@ -77,8 +93,11 @@ function ProductPane({
   );
 }
 
-export function HomepageHeroCommandCenter() {
+export function HomepageHeroCommandCenter({
+  images,
+}: Readonly<{ images: HomepageHeroCommandCenterImages }>) {
   const railRef = useRef<HTMLDivElement>(null);
+  const productPanes = buildProductPanes(images);
 
   function scrollProductRail(direction: -1 | 1) {
     const rail = railRef.current;
@@ -154,7 +173,7 @@ export function HomepageHeroCommandCenter() {
         >
           Skip Product Previews
         </a>
-        {PRODUCT_PANES.map(pane => (
+        {productPanes.map(pane => (
           <ProductPane
             key={pane.alt}
             image={pane.image}

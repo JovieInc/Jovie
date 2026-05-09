@@ -106,11 +106,11 @@ export interface Asset {
 }
 
 const RELEASES = [
-  { id: 'this-noise', title: 'This Noise', color: '#22d3ee' },
-  { id: 'lost-frequency', title: 'Lost Frequency', color: '#a78bfa' },
-  { id: 'glass-empires', title: 'Glass Empires', color: '#fb923c' },
-  { id: 'echo-tape', title: 'Echo Tape', color: '#34d399' },
-  { id: 'lucid-hours', title: 'Lucid Hours', color: '#f472b6' },
+  { id: 'the-deep-end', title: 'The Deep End', color: '#22d3ee' },
+  { id: 'take-me-over', title: 'Take Me Over', color: '#a78bfa' },
+  { id: 'never-say-a-word', title: 'Never Say A Word', color: '#f472b6' },
+  { id: 'dont-look-down', title: "Don't Look Down", color: '#818cf8' },
+  { id: 'press-kit', title: 'Tim White Press Kit', color: '#34d399' },
 ];
 
 const TYPE_LABELS: Record<AssetType, string> = {
@@ -206,142 +206,165 @@ const EDITORIAL_POSTERS = {
   ],
 } satisfies Record<AssetType, readonly string[]>;
 
+type AssetSeed = Partial<Asset> & Pick<Asset, 'title' | 'type' | 'release'>;
+
+function assetSeed({
+  alt,
+  poster,
+  release,
+  title,
+  type,
+}: Readonly<{
+  alt?: string;
+  poster: string;
+  release: string;
+  title: string;
+  type: AssetType;
+}>): AssetSeed {
+  return { alt, poster, release, title, type };
+}
+
+function releaseAssetSeeds({
+  displayTitle,
+  entries,
+  poster,
+  release,
+}: Readonly<{
+  displayTitle: string;
+  entries: readonly (readonly [AssetType, string, string?])[];
+  poster: string;
+  release: string;
+}>): AssetSeed[] {
+  return entries.map(([type, suffix, alt]) =>
+    assetSeed({
+      alt: alt ?? `${displayTitle} ${suffix}`,
+      poster,
+      release,
+      title: `${displayTitle} — ${suffix}`,
+      type,
+    })
+  );
+}
+
+const LIBRARY_ASSET_SEEDS: readonly AssetSeed[] = [
+  ...releaseAssetSeeds({
+    displayTitle: 'The Deep End',
+    entries: [
+      [
+        'cover',
+        'album art',
+        'Cosmic Gate and Tim White The Deep End album art',
+      ],
+      ['reel', 'vertical teaser 01'],
+      ['visualizer', 'visualizer frame'],
+      ['visualizer', 'smart link hero crop'],
+      ['remix_art', 'remix art prep'],
+    ],
+    poster: '/img/releases/the-deep-end.jpg',
+    release: 'the-deep-end',
+  }),
+  ...releaseAssetSeeds({
+    displayTitle: 'Take Me Over feat. Erica Gibson',
+    entries: [
+      [
+        'cover',
+        'album art',
+        'Tim White Take Me Over featuring Erica Gibson album art',
+      ],
+      ['alt_crop', 'square crop'],
+      ['lyric_clip', 'lyric clip'],
+      ['master', 'master'],
+      ['remix_art', 'remix art prep'],
+    ],
+    poster: '/img/releases/take-me-over.jpg',
+    release: 'take-me-over',
+  }),
+  ...releaseAssetSeeds({
+    displayTitle: 'Never Say A Word',
+    entries: [
+      ['cover', 'album art', 'Tim White Never Say A Word album art'],
+      ['reel', 'vertical teaser'],
+      ['lyric_clip', 'lyric clip 01'],
+      ['visualizer', 'visualizer'],
+      ['master', 'master'],
+    ],
+    poster: '/img/releases/never-say-a-word.jpg',
+    release: 'never-say-a-word',
+  }),
+  ...releaseAssetSeeds({
+    displayTitle: "Don't Look Down",
+    entries: [
+      ['cover', 'card artwork', "Tim White Don't Look Down card artwork"],
+      ['visualizer', 'visualizer'],
+      ['master', 'master'],
+    ],
+    poster: '/images/mock-profile/tim-white-dont-look-down-card.jpg',
+    release: 'dont-look-down',
+  }),
+  ...[
+    [
+      'dont-look-down',
+      "Don't Look Down — hero crop",
+      'alt_crop',
+      '/images/mock-profile/tim-white-dont-look-down-hero.jpg',
+      "Tim White Don't Look Down hero crop",
+    ],
+    [
+      'dont-look-down',
+      "Don't Look Down — reel teaser",
+      'reel',
+      '/images/mock-profile/tim-white-dont-look-down-hero.jpg',
+      "Tim White Don't Look Down reel teaser",
+    ],
+    [
+      'press-kit',
+      'Tim White press photo 01',
+      'alt_crop',
+      '/images/avatars/tim-white-founder.jpg',
+      'Tim White press photo 01',
+    ],
+    [
+      'press-kit',
+      'Tim White press photo 02',
+      'alt_crop',
+      '/images/hero/tim-profile.avif',
+      'Tim White press photo 02',
+    ],
+    [
+      'press-kit',
+      'Tim White press photo 03',
+      'alt_crop',
+      '/images/avatars/tim-white.jpg',
+      'Tim White press photo 03',
+    ],
+    [
+      'press-kit',
+      'Tim White press photo 03 — square crop',
+      'cover',
+      '/images/avatars/tim-white.jpg',
+      'Tim White press photo 03 square crop',
+    ],
+    [
+      'press-kit',
+      'Tim White press photo 02 — reel crop',
+      'reel',
+      '/images/hero/tim-profile.avif',
+      'Tim White press photo 02 vertical crop',
+    ],
+  ].map(([release, title, type, poster, alt]) =>
+    assetSeed({
+      alt,
+      poster,
+      release,
+      title,
+      type: type as AssetType,
+    })
+  ),
+] as const;
+
 // Deterministic mock data — repeatable visuals across reloads.
 export function generateAssets(): Asset[] {
-  const seeds: Array<
-    Partial<Asset> & Pick<Asset, 'title' | 'type' | 'release'>
-  > = [
-    {
-      title: 'This Noise — cover (final)',
-      type: 'cover',
-      release: 'this-noise',
-    },
-    {
-      title: 'This Noise — vertical teaser 01',
-      type: 'reel',
-      release: 'this-noise',
-    },
-    {
-      title: 'This Noise — vertical teaser 02',
-      type: 'reel',
-      release: 'this-noise',
-    },
-    {
-      title: 'This Noise — visualizer A',
-      type: 'visualizer',
-      release: 'this-noise',
-    },
-    {
-      title: 'This Noise — visualizer B',
-      type: 'visualizer',
-      release: 'this-noise',
-    },
-    {
-      title: 'This Noise — chorus lyric clip',
-      type: 'lyric_clip',
-      release: 'this-noise',
-    },
-    {
-      title: 'This Noise — square crop alt',
-      type: 'alt_crop',
-      release: 'this-noise',
-    },
-    {
-      title: 'This Noise — remix art (Carbon)',
-      type: 'remix_art',
-      release: 'this-noise',
-    },
-    {
-      title: 'Lost Frequency — cover',
-      type: 'cover',
-      release: 'lost-frequency',
-    },
-    {
-      title: 'Lost Frequency — reel cut 01',
-      type: 'reel',
-      release: 'lost-frequency',
-    },
-    {
-      title: 'Lost Frequency — reel cut 02',
-      type: 'reel',
-      release: 'lost-frequency',
-    },
-    {
-      title: 'Lost Frequency — visualizer A',
-      type: 'visualizer',
-      release: 'lost-frequency',
-    },
-    {
-      title: 'Lost Frequency — alt crop wide',
-      type: 'alt_crop',
-      release: 'lost-frequency',
-    },
-    {
-      title: 'Lost Frequency — master',
-      type: 'master',
-      release: 'lost-frequency',
-    },
-    { title: 'Glass Empires — cover', type: 'cover', release: 'glass-empires' },
-    {
-      title: 'Glass Empires — vertical promo',
-      type: 'reel',
-      release: 'glass-empires',
-    },
-    {
-      title: 'Glass Empires — visualizer',
-      type: 'visualizer',
-      release: 'glass-empires',
-    },
-    {
-      title: 'Glass Empires — lyric clip 01',
-      type: 'lyric_clip',
-      release: 'glass-empires',
-    },
-    {
-      title: 'Glass Empires — lyric clip 02',
-      type: 'lyric_clip',
-      release: 'glass-empires',
-    },
-    {
-      title: 'Glass Empires — remix art',
-      type: 'remix_art',
-      release: 'glass-empires',
-    },
-    { title: 'Echo Tape — cover', type: 'cover', release: 'echo-tape' },
-    { title: 'Echo Tape — reel teaser', type: 'reel', release: 'echo-tape' },
-    {
-      title: 'Echo Tape — visualizer A',
-      type: 'visualizer',
-      release: 'echo-tape',
-    },
-    {
-      title: 'Echo Tape — visualizer B',
-      type: 'visualizer',
-      release: 'echo-tape',
-    },
-    {
-      title: 'Echo Tape — alt crop portrait',
-      type: 'alt_crop',
-      release: 'echo-tape',
-    },
-    { title: 'Lucid Hours — cover', type: 'cover', release: 'lucid-hours' },
-    {
-      title: 'Lucid Hours — reel cut 01',
-      type: 'reel',
-      release: 'lucid-hours',
-    },
-    {
-      title: 'Lucid Hours — reel cut 02',
-      type: 'reel',
-      release: 'lucid-hours',
-    },
-    {
-      title: 'Lucid Hours — visualizer',
-      type: 'visualizer',
-      release: 'lucid-hours',
-    },
-    { title: 'Lucid Hours — master', type: 'master', release: 'lucid-hours' },
-  ];
+  const seeds = LIBRARY_ASSET_SEEDS;
 
   const aspectByType: Record<AssetType, Aspect> = {
     cover: '1:1',
@@ -397,7 +420,9 @@ export function generateAssets(): Asset[] {
     const added = new Date(
       LIBRARY_DEMO_NOW_MS - Math.max(0, dayOffset - 1) * 86400000
     ).toISOString();
-    const poster = posterFor(seed.type, i);
+    const releaseTitle =
+      RELEASES.find(r => r.id === seed.release)?.title ?? seed.release;
+    const poster = seed.poster ?? posterFor(seed.type, i);
     return {
       id: `asset-${String(i + 1).padStart(2, '0')}`,
       title: seed.title,
@@ -427,11 +452,11 @@ export function generateAssets(): Asset[] {
       favorite: i % 5 === 0,
       versionCount: 1 + (i % 4),
       popularity: 100 - i * 3,
-      alt: `${TYPE_LABELS[seed.type]} for ${RELEASES.find(r => r.id === seed.release)?.title}`,
+      alt: seed.alt ?? `${TYPE_LABELS[seed.type]} for ${releaseTitle}`,
       tags: tagsFor(seed.type, seed.release),
       promptSeed:
         generatedBy === 'jovie'
-          ? `${TYPE_LABELS[seed.type].toLowerCase()} for ${RELEASES.find(r => r.id === seed.release)?.title}, carbon palette, electric cyan accent, restrained motion`
+          ? `${TYPE_LABELS[seed.type].toLowerCase()} for ${releaseTitle}, carbon palette, electric cyan accent, restrained motion`
           : undefined,
     };
   });
@@ -460,7 +485,7 @@ export type SavedViewId =
   | 'approved'
   | 'reels'
   | 'review'
-  | 'this-noise'
+  | 'deep-end'
   | 'this-week';
 
 interface SavedView {
@@ -487,9 +512,9 @@ const SAVED_VIEWS: SavedView[] = [
     predicate: a => a.status === 'review',
   },
   {
-    id: 'this-noise',
-    label: 'This Noise',
-    predicate: a => a.release === 'this-noise',
+    id: 'deep-end',
+    label: 'The Deep End',
+    predicate: a => a.release === 'the-deep-end',
   },
   {
     id: 'this-week',
@@ -509,6 +534,40 @@ export interface Filters {
   statuses: Set<Status>;
   channels: Set<Channel>;
   generatedBy: Set<GeneratedBy>;
+}
+
+function filterSetAllows<T>(selected: ReadonlySet<T>, value: T): boolean {
+  return selected.size === 0 || selected.has(value);
+}
+
+function assetMatchesFilters(asset: Asset, filters: Filters): boolean {
+  const matchesChannel =
+    filters.channels.size === 0 ||
+    asset.channels.some(channel => filters.channels.has(channel));
+
+  return (
+    filterSetAllows(filters.types, asset.type) &&
+    filterSetAllows(filters.aspects, asset.aspect) &&
+    filterSetAllows(filters.releases, asset.release) &&
+    filterSetAllows(filters.statuses, asset.status) &&
+    filterSetAllows(filters.generatedBy, asset.generatedBy) &&
+    matchesChannel
+  );
+}
+
+function assetMatchesSearch(asset: Asset, query: string): boolean {
+  if (!query) return true;
+  const haystack = `${asset.title} ${asset.tags.join(' ')} ${asset.alt}`;
+  return haystack.toLowerCase().includes(query);
+}
+
+function compareAssetsBy(sort: SortKey) {
+  return (a: Asset, b: Asset) => {
+    if (sort === 'addedAt') return b.addedAt.localeCompare(a.addedAt);
+    if (sort === 'capturedAt') return b.capturedAt.localeCompare(a.capturedAt);
+    if (sort === 'status') return a.status.localeCompare(b.status);
+    return b.popularity - a.popularity;
+  };
 }
 
 export function emptyFilters(): Filters {
@@ -576,33 +635,9 @@ export default function LibraryV1Page() {
     const q = search.trim().toLowerCase();
     return allAssets
       .filter(savedPredicate)
-      .filter(a => {
-        if (filters.types.size && !filters.types.has(a.type)) return false;
-        if (filters.aspects.size && !filters.aspects.has(a.aspect))
-          return false;
-        if (filters.releases.size && !filters.releases.has(a.release))
-          return false;
-        if (filters.statuses.size && !filters.statuses.has(a.status))
-          return false;
-        if (filters.channels.size) {
-          const hit = a.channels.some(c => filters.channels.has(c));
-          if (!hit) return false;
-        }
-        if (filters.generatedBy.size && !filters.generatedBy.has(a.generatedBy))
-          return false;
-        if (q) {
-          const hay = `${a.title} ${a.tags.join(' ')} ${a.alt}`.toLowerCase();
-          if (!hay.includes(q)) return false;
-        }
-        return true;
-      })
-      .sort((a, b) => {
-        if (sort === 'addedAt') return b.addedAt.localeCompare(a.addedAt);
-        if (sort === 'capturedAt')
-          return b.capturedAt.localeCompare(a.capturedAt);
-        if (sort === 'status') return a.status.localeCompare(b.status);
-        return b.popularity - a.popularity;
-      });
+      .filter(asset => assetMatchesFilters(asset, filters))
+      .filter(asset => assetMatchesSearch(asset, q))
+      .sort(compareAssetsBy(sort));
   }, [allAssets, savedView, filters, search, sort]);
 
   const selected = filteredAssets.find(a => a.id === selectedId) ?? null;
