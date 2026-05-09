@@ -33,7 +33,7 @@ describe('DashboardNav interactions', () => {
       'href',
       APP_ROUTES.DASHBOARD_AUDIENCE
     );
-    expect(screen.queryByRole('link', { name: 'Library' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Library' })).toBeInTheDocument();
   });
 
   it('adds Library to navigation when the new design flag is enabled', () => {
@@ -84,7 +84,9 @@ describe('DashboardNav interactions', () => {
     renderDashboardNav({ renderFn: render });
 
     const profileButton = screen.getByRole('button', { name: 'Profile' });
-    const iconNode = profileButton.querySelector('[data-sidebar-icon]');
+    // In the new shell nav design (DESIGN_V1 on by default), the icon is rendered
+    // directly as an SVG element rather than inside a data-sidebar-icon wrapper span.
+    const iconNode = profileButton.querySelector('svg');
     const labelNode = profileButton.querySelector('span.truncate');
 
     expect(iconNode).toBeTruthy();

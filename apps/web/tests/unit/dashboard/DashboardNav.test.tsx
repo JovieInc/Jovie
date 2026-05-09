@@ -24,7 +24,7 @@ describe('DashboardNav', () => {
     expect(getByRole('link', { name: 'Releases' })).toBeDefined();
     expect(getByRole('link', { name: 'Tasks' })).toBeDefined();
     expect(getByRole('link', { name: 'Audience' })).toBeDefined();
-    expect(queryByRole('link', { name: 'Library' })).toBeNull();
+    expect(getByRole('link', { name: 'Library' })).toBeDefined();
     expect(queryByRole('link', { name: 'Earnings' })).toBeNull();
   });
 
