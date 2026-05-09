@@ -74,8 +74,12 @@ export const AGENT_RUN_GATE_EVIDENCE_NAMES = [
 ] as const;
 
 function isHttpUrl(value: string): boolean {
-  const protocol = new URL(value).protocol;
-  return protocol === 'http:' || protocol === 'https:';
+  try {
+    const protocol = new URL(value).protocol;
+    return protocol === 'http:' || protocol === 'https:';
+  } catch {
+    return false;
+  }
 }
 
 export const AgentRunHttpUrlSchema = z
@@ -212,6 +216,18 @@ export const AgentRunArtifactSchema = z
         message: 'Blocked runs must include blockedReason.',
         path: ['blockedReason'],
       });
+    }
+
+    const gateNames = new Set<VerificationGate['name']>();
+    for (const [index, gate] of artifact.verificationGates.entries()) {
+      if (gateNames.has(gate.name)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'verificationGates must use unique names.',
+          path: ['verificationGates', index, 'name'],
+        });
+      }
+      gateNames.add(gate.name);
     }
   });
 

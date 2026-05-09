@@ -148,6 +148,12 @@ export function HomepageHeroCommandCenter() {
         </button>
       </div>
       <div ref={railRef} className='homepage-product-rail'>
+        <a
+          href='#homepage-product-previews-end'
+          className='sr-only focus:not-sr-only focus:absolute focus:left-6 focus:top-6 focus:z-10 focus:rounded-md focus:bg-surface-0 focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-token focus-ring-themed'
+        >
+          Skip Product Previews
+        </a>
         {PRODUCT_PANES.map(pane => (
           <ProductPane
             key={pane.alt}
@@ -160,6 +166,9 @@ export function HomepageHeroCommandCenter() {
           />
         ))}
       </div>
+      <span id='homepage-product-previews-end' className='sr-only'>
+        End of Product Previews
+      </span>
     </section>
   );
 }

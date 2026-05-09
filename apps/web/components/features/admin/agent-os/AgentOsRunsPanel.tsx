@@ -4,7 +4,7 @@ import { Badge } from '@jovie/ui';
 import type { CellContext, ColumnDef } from '@tanstack/react-table';
 import { createColumnHelper } from '@tanstack/react-table';
 import { Bot, GitPullRequestArrow } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { type ComponentProps, useEffect, useMemo, useState } from 'react';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { TableEmptyState, UnifiedTable } from '@/components/organisms/table';
@@ -15,6 +15,17 @@ import { WorkflowRunRow } from './WorkflowRunRow';
 import { WorkflowStatusPill } from './WorkflowStatusPill';
 
 const columnHelper = createColumnHelper<AgentRunArtifact>();
+type BadgeVariant = ComponentProps<typeof Badge>['variant'];
+
+const HUMAN_GATE_BADGES: Record<
+  AgentRunArtifact['humanGate']['status'],
+  { readonly label: string; readonly variant: BadgeVariant }
+> = {
+  not_required: { label: 'Not required', variant: 'secondary' },
+  pending: { label: 'Review Required', variant: 'warning' },
+  approved: { label: 'Approved', variant: 'success' },
+  rejected: { label: 'Rejected', variant: 'destructive' },
+};
 
 function countPassedRequiredGates(artifact: AgentRunArtifact): string {
   const required = artifact.verificationGates.filter(gate => gate.required);
@@ -74,17 +85,11 @@ function renderHumanGateCell({ row }: CellContext<AgentRunArtifact, unknown>) {
       <span className='text-[12px] text-tertiary-token'>Not required</span>
     );
   }
+  const humanGateBadge = HUMAN_GATE_BADGES[row.original.humanGate.status];
 
   return (
-    <Badge
-      variant={
-        row.original.humanGate.status === 'approved' ? 'success' : 'warning'
-      }
-      size='sm'
-    >
-      {row.original.humanGate.status === 'approved'
-        ? 'Approved'
-        : 'Review Required'}
+    <Badge variant={humanGateBadge.variant} size='sm'>
+      {humanGateBadge.label}
     </Badge>
   );
 }
@@ -143,7 +148,20 @@ export function AgentOsRunsPanel({ artifacts }: AgentOsRunsPanelProps) {
   );
   const rows = useMemo(() => [...artifacts], [artifacts]);
   const selectedArtifact =
-    rows.find(artifact => artifact.id === selectedId) ?? rows[0] ?? null;
+    selectedId === null
+      ? null
+      : (rows.find(artifact => artifact.id === selectedId) ?? null);
+
+  useEffect(() => {
+    const nextSelectedId = rows[0]?.id ?? null;
+    const selectedIdStillExists = rows.some(
+      artifact => artifact.id === selectedId
+    );
+
+    if (!selectedIdStillExists && selectedId !== nextSelectedId) {
+      setSelectedId(nextSelectedId);
+    }
+  }, [rows, selectedId]);
 
   return (
     <ContentSurfaceCard

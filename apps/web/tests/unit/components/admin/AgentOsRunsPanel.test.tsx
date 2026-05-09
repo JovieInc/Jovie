@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AgentOsRunsPanel } from '@/components/features/admin/agent-os';
@@ -53,7 +53,9 @@ describe('AgentOsRunsPanel', () => {
     expect(drawer).toHaveTextContent('Verification Gates');
 
     await userEvent.click(
-      screen.getAllByTestId('agent-os-run-agentos-run-blocked-trigger-check')[0]
+      within(screen.getByRole('table')).getByTestId(
+        'agent-os-run-agentos-run-blocked-trigger-check'
+      )
     );
 
     expect(screen.getByTestId('agent-os-artifact-drawer')).toHaveTextContent(
@@ -75,5 +77,30 @@ describe('AgentOsRunsPanel', () => {
     ).toBeGreaterThan(0);
 
     expect(screen.getByText('No approvals waiting.')).toBeInTheDocument();
+  });
+
+  it('labels rejected human gates without showing them as review required', () => {
+    const artifact = AGENT_OS_ADMIN_FIXTURE_ARTIFACTS[0];
+
+    render(
+      <AgentOsRunsPanel
+        artifacts={[
+          {
+            ...artifact,
+            humanApprovalRequired: true,
+            humanGate: {
+              required: true,
+              status: 'rejected',
+              reason: 'Operator rejected this run.',
+              reviewer: 'ops@example.com',
+              reviewedAt: artifact.updatedAt,
+            },
+          },
+        ]}
+      />
+    );
+
+    expect(screen.getAllByText('Rejected').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Review Required')).not.toBeInTheDocument();
   });
 });

@@ -135,7 +135,7 @@ function fixtureArtifact(input: FixtureArtifactInput): AgentRunArtifact {
     ...artifact,
     adminSurface: APP_ROUTES.ADMIN_OPS,
     createdAt,
-    metadata: { fixture: true, ...metadata },
+    metadata: { ...metadata, fixture: true },
   };
 }
 
