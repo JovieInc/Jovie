@@ -21,6 +21,10 @@ export function useAlertOptInVariant(
     useState<ProfileAlertOptInVariant>(serverVariant);
 
   useEffect(() => {
+    // Keep local state aligned when the server-provided default changes (e.g.
+    // navigating between profiles in a SPA context without a full remount).
+    setVariant(serverVariant);
+
     // Read the anon stable ID from the cookie set by the audience tracking layer.
     // Use slice to handle cookie values that contain '=' (e.g. base64 padding).
     const stableId =
@@ -33,21 +37,24 @@ export function useAlertOptInVariant(
     // a non-default value (e.g. Storybook / dashboard preview).
     if (!stableId || serverVariant !== 'button') return;
 
+    const controller = new AbortController();
+
     void fetch(
       `/api/audience/alert-variant?stableId=${encodeURIComponent(stableId)}`,
-      { cache: 'no-store' }
+      { cache: 'no-store', signal: controller.signal }
     )
       .then(res => (res.ok ? res.json() : null))
       .then((data: { variant?: ProfileAlertOptInVariant } | null) => {
-        if (data?.variant) {
+        if (data?.variant === 'button' || data?.variant === 'toggle') {
           setVariant(data.variant);
         }
       })
       .catch(() => {
-        // Network errors are non-fatal — keep the default 'button' variant.
+        // Network errors and AbortErrors are non-fatal — keep the server variant.
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally fires once on mount
-  }, []);
+
+    return () => controller.abort();
+  }, [serverVariant]);
 
   return variant;
 }

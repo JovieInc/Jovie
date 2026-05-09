@@ -15,6 +15,7 @@
 
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
+import { captureError } from '@/lib/error-tracking';
 import { getProfileAlertOptInVariant } from '@/lib/flags/server';
 
 const NO_STORE_HEADERS = {
@@ -31,8 +32,16 @@ export async function GET(request: NextRequest) {
   try {
     const variant = await getProfileAlertOptInVariant(stableId);
     return NextResponse.json({ variant }, { headers: NO_STORE_HEADERS });
-  } catch {
-    // Fail open: return the safe default so the UI is never broken
+  } catch (error) {
+    // Log for observability, but fail open so the UI is never broken.
+    try {
+      await captureError('Alert variant resolution failed', error, {
+        stableId,
+        route: '/api/audience/alert-variant',
+      });
+    } catch {
+      // Best-effort telemetry — never let logging break the response.
+    }
     return NextResponse.json(
       { variant: 'button' },
       { headers: NO_STORE_HEADERS }
