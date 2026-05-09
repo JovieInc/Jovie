@@ -151,6 +151,7 @@ describe('submitWaitlistAccessRequest', () => {
     userRow = null;
     insertedEntries.length = 0;
     findLatestEntryByEmail.mockReset();
+    findLatestEntryByEmail.mockReturnValue([]);
     getWaitlistSettings.mockReset();
     getWaitlistSettings.mockResolvedValue({
       gateEnabled: true,
