@@ -35,9 +35,12 @@ export const AGENT_RUN_STATUSES = [
 export const AGENT_RUN_MODEL_ROUTES = [
   'deterministic',
   'openrouter-free',
+  'kilo-free',
+  'openrouter-cheap',
   'ai-sdk-gateway',
   'claude-code',
   'codex-cli',
+  'airme-agent',
 ] as const;
 
 export const AGENT_RUN_ACTIONS = [
