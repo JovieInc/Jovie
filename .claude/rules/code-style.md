@@ -218,7 +218,7 @@ useQuery({
 
 ## Custom ESLint Rules
 
-11 custom rules in `apps/web/eslint-rules/` run via `pnpm --filter web lint:eslint`. Violations block CI.
+12 custom rules in `apps/web/eslint-rules/` run via `pnpm --filter web lint:eslint`. Violations block CI.
 
 | Rule | What It Blocks | Fix |
 |------|---------------|-----|
@@ -233,6 +233,7 @@ useQuery({
 | `require-query-cache-config` | `useQuery` without `staleTime` and `gcTime` | Add both, or spread a preset from `lib/queries/cache-strategies.ts` |
 | `readonly-component-props` | Props interface/type properties without `readonly` modifier | Add `readonly` before each property (auto-fixable) |
 | `edge-runtime-node-imports` | `node:fs`, `crypto`, `stripe`, `path`, `stream` in files with `export const runtime = 'edge'` | Remove the Node-only import or remove the Edge runtime declaration |
+| `no-direct-electron-bridge` | Direct `window.electronAPI` access (or via `globalThis`/`self`/TS cast) outside `apps/web/lib/desktop/electron-bridge.ts` | Import the guarded wrapper: `import { useDesktopUpdate, isDesktopEnvironment } from '@/lib/desktop/electron-bridge'`. Stale installed binaries may expose a partial bridge — wrappers handle missing methods gracefully + capture Sentry warning. |
 
 **Run:** `pnpm --filter web lint:eslint` (all rules) or `pnpm --filter web lint:server-boundaries` (boundary rules only).
 

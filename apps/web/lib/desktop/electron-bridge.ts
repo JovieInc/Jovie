@@ -1,37 +1,191 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { captureWarning } from '@/lib/error-tracking';
 
 // ---------------------------------------------------------------------------
-// ElectronAPI type — mirrors what preload.ts exposes via contextBridge
+// ElectronAPI contract — mirrors what apps/desktop/src/preload.ts exposes.
+//
+// THIS IS THE CONTRACT. Any change to the preload bridge MUST update this
+// type AND bump the contract version below so the renderer can detect
+// stale binaries and fail gracefully instead of throwing at the user.
 // ---------------------------------------------------------------------------
 
 export interface ElectronAPI {
   readonly platform: NodeJS.Platform;
   readonly electronVersion: string;
   /** Register a callback that fires when electron-updater detects a new version. */
-  readonly onUpdateAvailable: (cb: () => void) => () => void;
+  readonly onUpdateAvailable: (cb: () => void) => void | (() => void);
   /** Register a callback that fires when the update download is complete. */
-  readonly onUpdateDownloaded: (cb: () => void) => () => void;
+  readonly onUpdateDownloaded: (cb: () => void) => void | (() => void);
   /** Trigger quit-and-install in the main process. */
-  readonly installUpdateAndRestart: () => Promise<{
+  readonly installUpdateAndRestart: () => void | Promise<{
     readonly ok: boolean;
     readonly reason?: string;
   }>;
 }
 
+type InstallUpdateResult = Awaited<
+  ReturnType<ElectronAPI['installUpdateAndRestart']>
+>;
+
+/** Public download fallback when the auto-update bridge is unusable. */
+const RELEASE_DOWNLOAD_URL =
+  'https://github.com/JovieInc/Jovie/releases/latest';
+
 // ---------------------------------------------------------------------------
-// Safe accessor — returns undefined when running in a browser context
+// Defensive bridge accessor
+//
+// "Shame-on-me" prevention: a stale installed binary may expose a partial
+// `window.electronAPI` (e.g. only `versions`). Calling missing methods used
+// to throw a raw `TypeError` that surfaced as `E.onUpdateAvailable is not a
+// function` in production. Now every accessor checks `typeof === 'function'`
+// first, captures a one-time Sentry warning identifying the missing method
+// and the installed app's version, and falls back to a no-op or a download
+// link so the user is never confronted with a raw renderer error.
 // ---------------------------------------------------------------------------
 
-export function getElectronAPI(): ElectronAPI | undefined {
+const reportedMissing = new Set<string>();
+const noopUnsubscribe = () => undefined;
+
+function reportMissingBridgeMethod(method: keyof ElectronAPI): void {
+  if (reportedMissing.has(method)) return;
+  reportedMissing.add(method);
+
+  const raw = (globalThis as { window?: { electronAPI?: unknown } }).window
+    ?.electronAPI;
+  const installedVersion =
+    typeof raw === 'object' && raw !== null && 'versions' in raw
+      ? ((raw as { versions?: { app?: string } }).versions?.app ?? 'unknown')
+      : 'unknown';
+
+  void captureWarning(
+    `electronAPI.${method} missing — stale desktop binary?`,
+    `Renderer expected window.electronAPI.${method} but it was not a function. ` +
+      `Likely the installed Jovie desktop app predates the bridge change that added this method. ` +
+      `User should download the latest release from ${RELEASE_DOWNLOAD_URL}.`,
+    {
+      route: 'desktop/electron-bridge',
+      bridgeMethod: method,
+      installedAppVersion: installedVersion,
+    }
+  );
+}
+
+function getRawElectronAPI(): Partial<ElectronAPI> | undefined {
   if (typeof window === 'undefined') return undefined;
-  return (window as Window & { electronAPI?: ElectronAPI }).electronAPI;
+  const raw = (window as Window & { electronAPI?: Partial<ElectronAPI> })
+    .electronAPI;
+  if (!raw || typeof raw !== 'object') return undefined;
+  return raw;
+}
+
+export function getElectronAPI(): ElectronAPI | undefined {
+  const api = getRawElectronAPI();
+  if (!api) return undefined;
+  if (
+    typeof api.platform === 'string' &&
+    typeof api.electronVersion === 'string' &&
+    typeof api.onUpdateAvailable === 'function' &&
+    typeof api.onUpdateDownloaded === 'function' &&
+    typeof api.installUpdateAndRestart === 'function'
+  ) {
+    return api as ElectronAPI;
+  }
+  return undefined;
+}
+
+/**
+ * Returns true when running inside the Electron desktop shell (regardless of
+ * which bridge methods exist). Use this to gate desktop-only UI; for actual
+ * bridge calls always go through the wrappers below — never the raw object.
+ */
+export function isDesktopEnvironment(): boolean {
+  return getRawElectronAPI() !== undefined;
+}
+
+/**
+ * Subscribe to "update-available" if the bridge supports it.
+ * No-op + Sentry warning if the installed binary lacks the method.
+ */
+function safeOnUpdateAvailable(cb: () => void): () => void {
+  const api = getRawElectronAPI();
+  if (!api) return noopUnsubscribe;
+  if (typeof api.onUpdateAvailable !== 'function') {
+    reportMissingBridgeMethod('onUpdateAvailable');
+    return noopUnsubscribe;
+  }
+  const unsubscribe = api.onUpdateAvailable(cb);
+  return typeof unsubscribe === 'function' ? unsubscribe : noopUnsubscribe;
+}
+
+function safeOnUpdateDownloaded(cb: () => void): () => void {
+  const api = getRawElectronAPI();
+  if (!api) return noopUnsubscribe;
+  if (typeof api.onUpdateDownloaded !== 'function') {
+    reportMissingBridgeMethod('onUpdateDownloaded');
+    return noopUnsubscribe;
+  }
+  const unsubscribe = api.onUpdateDownloaded(cb);
+  return typeof unsubscribe === 'function' ? unsubscribe : noopUnsubscribe;
+}
+
+function openManualDownload(): void {
+  // Fallback: open the releases page in the system browser (or in-app).
+  // window.open is safe in both browser and Electron contexts; Electron's
+  // shell handler will route it via shell.openExternal.
+  if (typeof window !== 'undefined') {
+    window.open(RELEASE_DOWNLOAD_URL, '_blank', 'noopener,noreferrer');
+  }
+}
+
+function reportInstallFailure(error: unknown): void {
+  void captureWarning(
+    'installUpdateAndRestart threw — falling back to manual download',
+    error,
+    { route: 'desktop/electron-bridge' }
+  );
+  openManualDownload();
+}
+
+function handleInstallResult(result: InstallUpdateResult): void {
+  if (result && result.ok === false) {
+    reportInstallFailure(
+      new Error(result.reason ?? 'installUpdateAndRestart returned ok=false')
+    );
+  }
+}
+
+/**
+ * Trigger quit-and-install. If the bridge is missing the method (stale
+ * binary), opens the GitHub releases page so the user can manually download
+ * the latest signed build — the fix for the chicken-and-egg where unsigned
+ * stale binaries can't auto-update themselves.
+ */
+function safeInstallUpdateAndRestart(): void {
+  const api = getRawElectronAPI();
+
+  if (api && typeof api.installUpdateAndRestart === 'function') {
+    try {
+      const result = api.installUpdateAndRestart();
+      if (result && typeof result.then === 'function') {
+        void result.then(handleInstallResult).catch(reportInstallFailure);
+      }
+      return;
+    } catch (error) {
+      reportInstallFailure(error);
+      return;
+    }
+  } else if (api) {
+    reportMissingBridgeMethod('installUpdateAndRestart');
+  }
+
+  openManualDownload();
 }
 
 export function isElectronRuntime(): boolean {
   if (typeof window === 'undefined') return false;
-  if (getElectronAPI()) return true;
+  if (isDesktopEnvironment()) return true;
   return document.documentElement.dataset.desktopRuntime === 'electron';
 }
 
@@ -54,29 +208,25 @@ export interface DesktopUpdateState {
   readonly available: boolean;
   /** True once the update download completes (ready to install). */
   readonly downloaded: boolean;
-  /** Trigger quit-and-install. No-op outside Electron. */
-  readonly install: () => Promise<void>;
+  /** Trigger quit-and-install, or fall back to opening the download page. */
+  readonly install: () => void;
 }
 
 /**
  * useDesktopUpdate — subscribes to Electron auto-updater IPC events.
  *
- * Returns `available: false` when running in a plain browser context
- * (no Electron), so callers can safely compose with useWebUpdate without
- * any platform guards.
+ * Returns `available: false` when running in a plain browser context or when
+ * the installed desktop binary's bridge is partial/stale. Never throws.
  */
 export function useDesktopUpdate(): DesktopUpdateState {
   const [available, setAvailable] = useState(false);
   const [downloaded, setDownloaded] = useState(false);
 
   useEffect(() => {
-    const api = getElectronAPI();
-    if (!api) return;
-
-    const unsubscribeAvailable = api.onUpdateAvailable(() =>
+    const unsubscribeAvailable = safeOnUpdateAvailable(() =>
       setAvailable(true)
     );
-    const unsubscribeDownloaded = api.onUpdateDownloaded(() =>
+    const unsubscribeDownloaded = safeOnUpdateDownloaded(() =>
       setDownloaded(true)
     );
 
@@ -86,9 +236,18 @@ export function useDesktopUpdate(): DesktopUpdateState {
     };
   }, []);
 
-  const install = async () => {
-    await getElectronAPI()?.installUpdateAndRestart();
+  return {
+    available,
+    downloaded,
+    install: safeInstallUpdateAndRestart,
   };
-
-  return { available, downloaded, install };
 }
+
+// Exported for tests only — do not call directly from product code.
+export const __testing = {
+  reset: () => reportedMissing.clear(),
+  safeInstallUpdateAndRestart,
+  safeOnUpdateAvailable,
+  safeOnUpdateDownloaded,
+  RELEASE_DOWNLOAD_URL,
+};
