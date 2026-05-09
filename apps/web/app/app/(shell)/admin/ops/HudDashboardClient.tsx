@@ -510,7 +510,7 @@ export function HudDashboardClient({
             />
             <ContentMetricCard
               label='Reliability'
-              value={`${metrics.reliability.errorRatePercent.toFixed(2)}%`}
+              value={`${(100 - metrics.reliability.errorRatePercent).toFixed(1)}%`}
               subtitle={
                 metrics.reliability.p95LatencyMs === null
                   ? 'p95 —'
