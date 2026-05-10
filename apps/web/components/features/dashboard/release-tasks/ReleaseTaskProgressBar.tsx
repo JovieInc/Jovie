@@ -1,5 +1,14 @@
 'use client';
 
+import { motion } from 'motion/react';
+
+const SPRING = {
+  type: 'spring',
+  damping: 10,
+  mass: 0.75,
+  stiffness: 100,
+} as const;
+
 interface ReleaseTaskProgressBarProps {
   readonly done: number;
   readonly total: number;
@@ -37,10 +46,18 @@ export function ReleaseTaskProgressBar({
           </>
         )}
       </p>
-      <div className='h-1 w-full rounded-full bg-surface-1'>
-        <div
-          className='h-1 rounded-full bg-accent transition-[width] duration-cinematic ease-out'
-          style={{ width: `${pct}%` }}
+      <div
+        className='h-1 w-full rounded-full bg-surface-1'
+        role='progressbar'
+        aria-valuenow={pct}
+        aria-valuemin={0}
+        aria-valuemax={100}
+      >
+        <motion.div
+          className='h-1 rounded-full bg-accent'
+          initial={{ width: 0 }}
+          animate={{ width: `${pct}%` }}
+          transition={SPRING}
         />
       </div>
     </div>

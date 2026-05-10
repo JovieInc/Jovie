@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.227] - 2026-05-09
+
+> [internal] Progress bars across the dashboard now animate in with a spring/bounce effect using Framer Motion.
+
+### Changed
+
+- **[internal] Spring animation on all progress bars**: replaced CSS `transition-all` with `motion.div` spring animation (`damping: 10, mass: 0.75, stiffness: 100`) in `ReleaseTaskProgressBar`, `ProfileCompletionCard`, `ImportProgressBanner`, and `ProgressIndicator`. Native `<progress>` elements replaced with accessible `role="progressbar"` div wrappers where needed for animation compatibility.
+
 ## [26.4.226] - 2026-05-09
 
 > [internal] Canonical metadata builder for all public artist profile routes — adds a shared lib/profile/metadata.ts that every /[username] route's generateMetadata now delegates to. Redirect-sink sub-routes (listen, releases, subscribe, tip, tour, pay, contact, [...slug]) gain noindex metadata guards. The alerts button now says "Get alerts" everywhere on artist profiles — consistent label, consistent intent.
