@@ -3208,7 +3208,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-spec-wall-card:nth-child(8) .homepage-spec-wall-card__pulse {
-  animation-delay: -700ms;
+  animation-delay: -4200ms;
 }
 
 .homepage-spec-wall-card h3 {
