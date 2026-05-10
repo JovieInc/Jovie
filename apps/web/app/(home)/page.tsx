@@ -244,6 +244,7 @@ function HomepageHeroActions() {
       <HomepageTrackedLink
         href={HERO_COPY.primaryCta.href}
         data-testid='homepage-primary-cta'
+        data-cta-sign-up='true'
         className='public-action-primary focus-ring-themed'
         eventName='homepage_hero_cta_clicked'
         eventProperties={{ cta: 'primary', label: HERO_COPY.primaryCta.label }}

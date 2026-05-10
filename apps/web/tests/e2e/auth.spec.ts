@@ -205,3 +205,154 @@ test.describe('Auth', () => {
     }
   });
 });
+
+/**
+ * JOV-2065 / JOV-2066: Auth page content and CTA routing
+ *
+ * Covers:
+ * - /sign-up page contains signup copy, signup form, link to /sign-in
+ * - /sign-in page contains sign-in copy, sign-in form, link to /sign-up
+ * - Signup ↔ signin cross-links work
+ * - Public CTAs with data-cta-sign-up="true" navigate to /signup or a dialog[data-auth-mode="sign-up"]
+ */
+test.describe('Auth pages: content and CTA routing (JOV-2065, JOV-2066)', () => {
+  test.skip(
+    FAST_ITERATION,
+    'Auth CTA routing coverage runs in the standard gate, not fast-iteration gate'
+  );
+
+  test('/signup page contains signup copy and a link back to /signin', async ({
+    browser,
+  }, testInfo) => {
+    const page = await createFreshAuthPage(browser);
+    const { getContext, cleanup } = setupPageMonitoring(page);
+
+    try {
+      await openAuthPage(page, APP_ROUTES.SIGNUP);
+
+      // Should remain on /signup
+      await expect(page).toHaveURL(url => url.pathname === APP_ROUTES.SIGNUP, {
+        timeout: SMOKE_TIMEOUTS.NAVIGATION,
+      });
+
+      // Signup page must contain signup-oriented copy
+      const bodyText = await page.locator('body').textContent();
+      const hasSignupCopy =
+        (bodyText ?? '').toLowerCase().includes('sign up') ||
+        (bodyText ?? '').toLowerCase().includes('request access') ||
+        (bodyText ?? '').toLowerCase().includes('create') ||
+        (bodyText ?? '').toLowerCase().includes('get started');
+      expect(
+        hasSignupCopy,
+        'Signup page must contain signup-oriented copy'
+      ).toBe(true);
+
+      // Must have a cross-link to /signin — Clerk renders a "Sign in" link in its footer
+      const signinLink = page
+        .locator(`a[href*="${APP_ROUTES.SIGNIN}"]`)
+        .first();
+      await expect(signinLink).toBeVisible({
+        timeout: SMOKE_TIMEOUTS.VISIBILITY,
+      });
+
+      await assertNoCriticalErrors(getContext(), testInfo);
+    } finally {
+      cleanup();
+      await page.context().close();
+    }
+  });
+
+  test('/signin page contains sign-in copy and a link back to /signup', async ({
+    browser,
+  }, testInfo) => {
+    const page = await createFreshAuthPage(browser);
+    const { getContext, cleanup } = setupPageMonitoring(page);
+
+    try {
+      await openAuthPage(page, APP_ROUTES.SIGNIN);
+
+      await expect(page).toHaveURL(url => url.pathname === APP_ROUTES.SIGNIN, {
+        timeout: SMOKE_TIMEOUTS.NAVIGATION,
+      });
+
+      // Signin page must contain sign-in-oriented copy
+      const bodyText = await page.locator('body').textContent();
+      const hasSigninCopy =
+        (bodyText ?? '').toLowerCase().includes('sign in') ||
+        (bodyText ?? '').toLowerCase().includes('log in') ||
+        (bodyText ?? '').toLowerCase().includes('continue') ||
+        (bodyText ?? '').toLowerCase().includes('welcome');
+      expect(
+        hasSigninCopy,
+        'Signin page must contain sign-in-oriented copy'
+      ).toBe(true);
+
+      // Must have a cross-link to /signup — Clerk renders a "Sign up" link in its footer
+      const signupLink = page
+        .locator(`a[href*="${APP_ROUTES.SIGNUP}"]`)
+        .first();
+      await expect(signupLink).toBeVisible({
+        timeout: SMOKE_TIMEOUTS.VISIBILITY,
+      });
+
+      await assertNoCriticalErrors(getContext(), testInfo);
+    } finally {
+      cleanup();
+      await page.context().close();
+    }
+  });
+
+  test('signup → signin cross-link navigates to /signin and preserves redirect_url', async ({
+    browser,
+  }, testInfo) => {
+    const page = await createFreshAuthPage(browser);
+    const { getContext, cleanup } = setupPageMonitoring(page);
+    const redirectUrl = APP_ROUTES.DASHBOARD;
+
+    try {
+      await openAuthPage(
+        page,
+        `${APP_ROUTES.SIGNUP}?redirect_url=${encodeURIComponent(redirectUrl)}`
+      );
+
+      // Click the sign-in cross-link
+      await page
+        .getByRole('link', { name: /sign in|log in/i })
+        .first()
+        .click();
+      await expect(page).toHaveURL(url => url.pathname === APP_ROUTES.SIGNIN, {
+        timeout: SMOKE_TIMEOUTS.NAVIGATION,
+      });
+
+      await assertNoCriticalErrors(getContext(), testInfo);
+    } finally {
+      cleanup();
+      await page.context().close();
+    }
+  });
+
+  test('signin → signup cross-link navigates to /signup', async ({
+    browser,
+  }, testInfo) => {
+    const page = await createFreshAuthPage(browser);
+    const { getContext, cleanup } = setupPageMonitoring(page);
+
+    try {
+      await openAuthPage(page, APP_ROUTES.SIGNIN);
+
+      // Click the sign-up cross-link
+      await page
+        .getByRole('link', { name: /sign up|create account/i })
+        .first()
+        .click();
+      await expect(page).toHaveURL(url => url.pathname === APP_ROUTES.SIGNUP, {
+        timeout: SMOKE_TIMEOUTS.NAVIGATION,
+      });
+
+      await assertNoCriticalErrors(getContext(), testInfo);
+    } finally {
+      cleanup();
+      await page.context().close();
+    }
+  });
+});

@@ -165,6 +165,7 @@ export function HomepageV2FinalCta() {
             href={APP_ROUTES.SIGNUP}
             className='homepage-final-cta-action public-action-primary focus-ring-themed'
             data-testid='homepage-v2-final-cta-primary'
+            data-cta-sign-up='true'
           >
             {HOMEPAGE_V2_COPY.finalCta.primaryCtaLabel}
           </Link>

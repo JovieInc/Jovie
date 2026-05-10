@@ -60,6 +60,7 @@ export function HomepageArtistProfilesCarousel({
                 className='homepage-artist-profiles-section__primary focus-ring-themed'
                 eventName='homepage_profile_cta_clicked'
                 eventProperties={{ cta: 'claim_profile' }}
+                data-cta-sign-up='true'
               >
                 {copy.primaryCta.label}
               </HomepageTrackedLink>
