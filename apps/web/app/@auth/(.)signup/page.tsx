@@ -1,14 +1,13 @@
 'use client';
 
-import { SignUp } from '@clerk/nextjs';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { AuthModalShell } from '@/components/auth/AuthModalShell';
+import { AuthShell } from '@/components/features/auth/AuthShell';
 import {
   HOMEPAGE_PROMPT_HINT_TRUNCATE,
   readHomepageIntent,
 } from '@/components/homepage/intent-store';
-import { AuthFormSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { APP_ROUTES } from '@/constants/routes';
 import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
 
@@ -16,9 +15,9 @@ import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
  * Intercepted signup modal.
  *
  * Activates on desktop (≥768px) when `router.push('/signup?...')` is called
- * from a same-origin page. Renders the Clerk `<SignUp />` card inside our
- * shared modal shell over the homepage. Chat DOM stays mounted behind —
- * parallel routes keep `children` intact while this slot renders.
+ * from a same-origin page. Renders the canonical AuthShell inside our shared
+ * modal shell so the modal and the full-page route share the exact same
+ * content model, links, and provider list (JOV-2064).
  *
  * Dismissal (via shell): Escape, backdrop click, or browser-back.
  * Refresh on /signup renders the full-page /signup instead (intercepts
@@ -26,13 +25,7 @@ import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
  */
 function SignupModalBody() {
   const searchParams = useSearchParams();
-  const [isMounted, setIsMounted] = useState(false);
   const [promptHint, setPromptHint] = useState<string | null>(null);
-
-  // Mirror the signin page's pattern: skeleton-first, Clerk mounts on client only.
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
 
   // Hydrate the intent hint from localStorage (text only — the load-bearing
   // restoration happens on /onboarding after the OAuth round-trip).
@@ -75,16 +68,12 @@ function SignupModalBody() {
       statusRow={statusRow}
       backButtonLabel={promptHint ? 'Back to chat' : 'Go back'}
     >
-      {isMounted ? (
-        <SignUp
-          routing='hash'
-          oauthFlow='redirect'
-          signInUrl={signInUrl}
-          fallbackRedirectUrl={redirectUrl}
-        />
-      ) : (
-        <AuthFormSkeleton />
-      )}
+      <AuthShell
+        mode='sign-up'
+        compact
+        oppositeModeUrl={signInUrl}
+        fallbackRedirectUrl={redirectUrl}
+      />
     </AuthModalShell>
   );
 }

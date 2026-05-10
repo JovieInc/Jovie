@@ -26,6 +26,7 @@ import {
   shouldBypassClerkForRequest,
 } from '@/lib/auth/clerk-middleware-bypass';
 import { sanitizeRedirectUrl } from '@/lib/auth/constants';
+import { decodeFapiHostFromPublishableKey } from '@/lib/auth/decode-fapi-host';
 import type { ProxyUserState } from '@/lib/auth/proxy-state';
 import { getUserState, isKnownActiveUser } from '@/lib/auth/proxy-state';
 import { isStagingHost, resolveClerkKeys } from '@/lib/auth/staging-clerk-keys';
@@ -1130,14 +1131,12 @@ export default async function middleware(
     pathname.startsWith('/clerk/') ||
     pathname === '/clerk'
   ) {
-    const pk = resolveClerkKeys(hostname).publishableKey ?? '';
-    let fapiHost = '';
-    try {
-      const b64 = pk.replace(/^pk_(live|test)_/, '');
-      fapiHost = b64 ? atob(b64).replace(/\$$/, '') : '';
-    } catch {
-      // malformed key
-    }
+    // Resolve the FAPI host from the active publishable key. Staging and
+    // production live on different Clerk instances (different keys), so the
+    // host MUST be decoded at runtime — never hardcoded.
+    // See: .claude/rules/auth.md → Clerk Auth Proxy Architecture.
+    const pk = resolveClerkKeys(hostname).publishableKey;
+    const fapiHost = decodeFapiHostFromPublishableKey(pk);
     if (!fapiHost) {
       return NextResponse.json(
         {
@@ -1229,7 +1228,11 @@ export default async function middleware(
         headers: resHeaders,
       });
     } catch (err) {
-      console.error('[clerk-proxy] fetch failed:', err);
+      await captureError('[clerk-proxy] fetch failed', err, {
+        pathname,
+        hostname,
+        context: 'clerk_proxy_fetch',
+      });
       return NextResponse.json({ error: 'Clerk proxy error' }, { status: 502 });
     }
   }

@@ -1,20 +1,23 @@
 'use client';
 
-import { SignIn } from '@clerk/nextjs';
 import { useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import { AuthFormSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { SignInTimeoutEscape } from '@/components/molecules/SignInTimeoutEscape';
 import { APP_ROUTES } from '@/constants/routes';
-import { AuthLayout, AuthRoutePrefetch } from '@/features/auth';
-import { useNormalizeClerkHomeLink } from '@/features/auth/useNormalizeClerkHomeLink';
-import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
+import { AuthLayout, AuthRoutePrefetch, AuthShell } from '@/features/auth';
 
 /**
- * Sign-in page using Clerk's prebuilt components for reliability.
+ * Sign-in page using the canonical AuthShell (JOV-2064).
+ *
+ * Both the full-page route and the intercepted modal route render the same
+ * AuthShell content model, so the typography, links, and provider list stay
+ * in lockstep. Provider buttons are gated by `lib/auth/oauth-providers.ts`.
  */
-// Keep this validation lightweight for prefill only; extraction paths use stricter domain filtering.
+
+// Keep this validation lightweight for prefill only; extraction paths use
+// stricter domain filtering.
 function isValidEmail(value: string): boolean {
   if (value.length === 0 || value.length > 254) return false;
 
@@ -48,21 +51,13 @@ function isValidEmail(value: string): boolean {
 }
 
 function SignInPageContent() {
-  const [isMounted, setIsMounted] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
   const searchParams = useSearchParams();
   const email = searchParams.get('email')?.trim() ?? '';
   const resetConfirmed = searchParams.get('reset') === '1';
-  const initialValues = isValidEmail(email)
-    ? { emailAddress: email }
-    : undefined;
-  const signUpUrl = buildAuthRouteUrl(APP_ROUTES.SIGNUP, searchParams);
-
-  useNormalizeClerkHomeLink(containerRef);
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
+  const initialValues = useMemo(
+    () => (isValidEmail(email) ? { emailAddress: email } : undefined),
+    [email]
+  );
 
   useEffect(() => {
     if (resetConfirmed) {
@@ -72,27 +67,10 @@ function SignInPageContent() {
     }
   }, [resetConfirmed]);
 
-  if (!isMounted) {
-    return (
-      <>
-        <AuthFormSkeleton />
-        <SignInTimeoutEscape />
-      </>
-    );
-  }
-
   return (
     <>
       <AuthRoutePrefetch href={APP_ROUTES.SIGNUP} />
-      <div ref={containerRef}>
-        <SignIn
-          routing='hash'
-          oauthFlow='redirect'
-          signUpUrl={signUpUrl}
-          fallbackRedirectUrl={APP_ROUTES.DASHBOARD}
-          initialValues={initialValues}
-        />
-      </div>
+      <AuthShell mode='sign-in' initialValues={initialValues} />
       <SignInTimeoutEscape />
     </>
   );
