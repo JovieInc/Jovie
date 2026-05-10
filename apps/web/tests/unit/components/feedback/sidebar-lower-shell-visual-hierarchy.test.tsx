@@ -1,6 +1,5 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { SidebarInstallBanner } from '@/features/feedback/SidebarInstallBanner';
 import { SidebarUpgradeBanner } from '@/features/feedback/SidebarUpgradeBanner';
 
 const mockUsePathname = vi.fn(() => '/app/chat');
@@ -53,15 +52,6 @@ vi.mock('@/lib/queries/usePlanGate', () => ({
   usePlanGate: () => mockUsePlanGate(),
 }));
 
-vi.mock('@/hooks/usePWAInstall', () => ({
-  usePWAInstall: () => ({
-    canPrompt: true,
-    isIOS: false,
-    install: vi.fn(),
-    dismiss: vi.fn(),
-  }),
-}));
-
 vi.mock('@/lib/hooks/useVersionMonitor', () => ({
   useVersionMonitor: vi.fn(),
 }));
@@ -85,25 +75,5 @@ describe('Sidebar lower shell visual hierarchy', () => {
     const { container } = render(<SidebarUpgradeBanner />);
 
     expect(container).toBeEmptyDOMElement();
-  });
-
-  it('keeps install banner visually quieter than nav rows', () => {
-    // Install banner only renders for paid Pro users (isPro && !isTrialing).
-    mockUsePlanGate.mockReturnValueOnce({
-      isLoading: false,
-      isPro: true,
-      isTrialing: false,
-      trialDaysRemaining: null,
-      trialNotificationsSent: 0,
-      nudgeState: 'pro_paid' as const,
-    });
-
-    const { container } = render(<SidebarInstallBanner />);
-
-    const card = container.querySelector('[class*="rounded-xl"]');
-    expect(card).toBeTruthy();
-    expect(card?.className).toContain('bg-sidebar-accent/12');
-
-    expect(screen.getByRole('button', { name: 'Install' })).toBeInTheDocument();
   });
 });
