@@ -2,7 +2,7 @@
 
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import Image from 'next/image';
-import { useLayoutEffect, useRef } from 'react';
+import { useRef } from 'react';
 
 type HomepageMarketingImage = {
   readonly publicUrl: string;
@@ -21,26 +21,25 @@ export type HomepageHeroCommandCenterImages = {
 function buildProductPanes(images: HomepageHeroCommandCenterImages) {
   return [
     {
-      image: images.release,
-      alt: 'The Deep End release page with fan action buttons',
-      sizes: '(min-width: 1280px) 18rem, (min-width: 768px) 24vw, 34vw',
-      className: 'homepage-product-pane--phone homepage-product-pane--release',
-      priority: true,
-    },
-    {
       image: images.releases,
       alt: 'Jovie releases page with release status, assets, and launch progress',
       sizes: '(min-width: 1280px) 68rem, (min-width: 768px) 76vw, 88vw',
       className: 'homepage-product-pane--desktop',
-      initial: true,
       priority: true,
+    },
+    {
+      image: images.release,
+      alt: 'The Deep End release page with fan action buttons',
+      sizes: '(min-width: 1280px) 18rem, (min-width: 768px) 24vw, 34vw',
+      className: 'homepage-product-pane--phone homepage-product-pane--release',
+      priority: false,
     },
     {
       image: images.profile,
       alt: 'Tim White artist profile with release and fan actions',
       sizes: '(min-width: 1280px) 18rem, (min-width: 768px) 24vw, 34vw',
       className: 'homepage-product-pane--phone',
-      priority: true,
+      priority: false,
     },
     {
       image: images.library,
@@ -57,32 +56,26 @@ function ProductPane({
   alt,
   className,
   image,
-  initial = false,
   priority = false,
   sizes,
 }: Readonly<{
   alt: string;
   className: string;
   image: HomepageMarketingImage;
-  initial?: boolean;
   priority?: boolean;
   sizes: string;
 }>) {
   return (
-    <figure
-      className={`homepage-product-pane ${className}`}
-      data-product-pane
-      data-initial-pane={initial ? 'true' : undefined}
-    >
+    <figure className={`homepage-product-pane ${className}`} data-product-pane>
       <Image
         src={image.publicUrl}
         alt={alt}
         width={image.width}
         height={image.height}
         loading={priority ? 'eager' : 'lazy'}
+        priority={priority}
         fetchPriority={priority ? 'high' : 'auto'}
         sizes={sizes}
-        unoptimized
         className='homepage-product-pane__image'
       />
     </figure>
@@ -127,17 +120,6 @@ export function HomepageHeroCommandCenter({
     });
   }
 
-  useLayoutEffect(() => {
-    const rail = railRef.current;
-    const initialPane = rail?.querySelector<HTMLElement>(
-      '[data-initial-pane="true"]'
-    );
-    if (!rail || !initialPane) return;
-
-    rail.scrollLeft =
-      initialPane.offsetLeft - (rail.clientWidth - initialPane.offsetWidth) / 2;
-  }, []);
-
   return (
     <section
       aria-label='Jovie release operating system preview'
@@ -176,7 +158,6 @@ export function HomepageHeroCommandCenter({
             alt={pane.alt}
             sizes={pane.sizes}
             className={pane.className}
-            initial={'initial' in pane ? pane.initial : false}
             priority={pane.priority}
           />
         ))}

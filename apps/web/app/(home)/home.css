@@ -4868,13 +4868,15 @@ body:has(.home-viewport)::-webkit-scrollbar {
   }
 
   .homepage-hero-headline {
+    font-family: -apple-system, system-ui, sans-serif;
     max-width: 9.1ch;
     font-size: clamp(3rem, 13vw, 3.85rem);
+    letter-spacing: 0;
     line-height: 0.98;
   }
 
   .homepage-hero-command-center {
-    --homepage-product-rail-height: clamp(20rem, 76vw, 24rem);
+    --homepage-product-rail-height: clamp(13rem, 52vw, 15rem);
     --homepage-product-desktop-width: min(
       calc(100vw - var(--homepage-page-gutter) * 2),
       calc(var(--homepage-product-rail-height) * 1.6)

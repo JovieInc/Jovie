@@ -102,9 +102,9 @@ export function HomepageWorkspaceSection({
               alt={screenshot.alt}
               width={screenshot.width}
               height={screenshot.height}
-              loading='eager'
+              loading='lazy'
+              fetchPriority='low'
               sizes='(min-width: 1280px) 86rem, (min-width: 768px) 94vw, 170vw'
-              unoptimized
             />
           </div>
 
