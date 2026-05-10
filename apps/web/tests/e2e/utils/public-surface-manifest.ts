@@ -847,7 +847,8 @@ const SMART_LINK_SURFACES = [
         DEFAULTS.countdownReleaseSlug
       ),
     readySelectors: ['h1'],
-    readyText: /coming soon|turn on notifications|turn on alerts|notify/i,
+    readyText:
+      /coming soon|turn on notifications|get alerts|turn on alerts|notify/i,
     mainSelector: 'main',
     minMainTextLength: 45,
     lighthouse: false,

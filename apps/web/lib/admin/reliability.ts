@@ -7,6 +7,7 @@ import { sqlTimestamp } from '@/lib/db/sql-helpers';
 import { getHudDeployments } from '@/lib/deployments/github';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import { getRedis } from '@/lib/redis';
+import { computeReliabilityScore } from './hud-metric-derivations';
 import { getAdminSentryMetrics } from './sentry-metrics';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -16,6 +17,8 @@ const DISABLED_RELIABILITY_TABLES = new Set<string>();
 
 export interface AdminReliabilitySummary {
   errorRatePercent: number;
+  /** Pre-computed reliability score: Math.max(0, Math.min(100, 100 - errorRatePercent)) */
+  reliabilityScorePercent: number;
   p95LatencyMs: number | null;
   incidents24h: number;
   lastIncidentAt: Date | null;
@@ -72,6 +75,14 @@ export async function getAdminReliabilitySummary(): Promise<AdminReliabilitySumm
         ? null
         : (deployments.current?.status ?? null),
   };
+
+  function withReliabilityScore(
+    errorRatePercent: number
+  ): Pick<AdminReliabilitySummary, 'reliabilityScorePercent'> {
+    return {
+      reliabilityScorePercent: computeReliabilityScore(errorRatePercent),
+    };
+  }
   let hasStripeEvents = false;
 
   try {
@@ -85,6 +96,7 @@ export async function getAdminReliabilitySummary(): Promise<AdminReliabilitySumm
   if (!hasStripeEvents) {
     return {
       errorRatePercent: 0,
+      ...withReliabilityScore(0),
       incidents24h: 0,
       lastIncidentAt: null,
       ...reliabilityBase,
@@ -112,6 +124,7 @@ export async function getAdminReliabilitySummary(): Promise<AdminReliabilitySumm
 
       return {
         errorRatePercent: 0,
+        ...withReliabilityScore(0),
         incidents24h: 0,
         lastIncidentAt: null,
         ...reliabilityBase,
@@ -148,6 +161,7 @@ export async function getAdminReliabilitySummary(): Promise<AdminReliabilitySumm
 
       return {
         errorRatePercent: 0,
+        ...withReliabilityScore(0),
         incidents24h: 0,
         lastIncidentAt: null,
         ...reliabilityBase,
@@ -159,6 +173,7 @@ export async function getAdminReliabilitySummary(): Promise<AdminReliabilitySumm
 
     return {
       errorRatePercent,
+      ...withReliabilityScore(errorRatePercent),
       incidents24h: Number(incidentCount),
       lastIncidentAt,
       ...reliabilityBase,
@@ -168,6 +183,7 @@ export async function getAdminReliabilitySummary(): Promise<AdminReliabilitySumm
 
     return {
       errorRatePercent: 0,
+      ...withReliabilityScore(0),
       incidents24h: 0,
       lastIncidentAt: null,
       ...reliabilityBase,

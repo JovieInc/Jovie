@@ -142,11 +142,7 @@ function buildDropdownItems({
       label: 'Download Desktop App',
       icon: Monitor,
       onClick: () => {
-        window.open(
-          'https://github.com/JovieInc/Jovie/releases/latest',
-          '_blank',
-          'noopener,noreferrer'
-        );
+        window.open(APP_ROUTES.DOWNLOAD, '_blank', 'noopener,noreferrer');
       },
     });
   }

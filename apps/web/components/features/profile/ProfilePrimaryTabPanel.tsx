@@ -81,8 +81,8 @@ function PreviewAlertsPanel({
     state.kind === 'status'
       ? 'Alerts On'
       : isSubscribed
-        ? 'Manage Alerts'
-        : 'Turn On Alerts';
+        ? 'Manage alerts'
+        : 'Get alerts';
   const resolvedBody =
     state.helper ??
     (state.kind === 'status'
@@ -115,7 +115,7 @@ function PreviewAlertsPanel({
         {state.kind === 'button' ? (
           <div className='inline-flex items-center gap-2 rounded-full border border-white/14 bg-white/[0.08] px-4 py-3 text-sm font-semibold text-white'>
             <Bell className='h-4 w-4' />
-            <span>{isSubscribed ? 'Manage alerts' : 'Turn on alerts'}</span>
+            <span>{isSubscribed ? 'Manage alerts' : 'Get alerts'}</span>
           </div>
         ) : null}
 
@@ -192,7 +192,7 @@ function SubscribePanel({
           previewNotificationsState ?? {
             kind: 'button',
             tone: 'quiet',
-            label: 'Turn on alerts',
+            label: 'Get alerts',
           }
         }
         isSubscribed={isSubscribed}
