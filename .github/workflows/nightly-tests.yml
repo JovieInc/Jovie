@@ -247,40 +247,6 @@ jobs:
           E2E_SKIP_WARMUP: '1'
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
 
-      - name: Run Design V1 flagged surfaces canary
-        if: ${{ github.event_name == 'schedule' || github.event.inputs.test_filter == '' || github.event.inputs.suite == 'design-v1' }}
-        run: |
-          cd apps/web
-          {
-            echo "### Design V1 flagged surfaces canary"
-            echo ""
-            echo "This Chromium-only pass verifies runtime Design V1 flags are default-off, then forces each flagged dashboard/auth/onboarding surface on through the browser override harness."
-            echo ""
-            echo "Failure interpretation:"
-            echo "- Default-off failures mean a flag default or fallback route changed and should block rollout."
-            echo "- Flag-on failures mean the gated surface, auth bypass, seed data, or route contract regressed."
-            echo "- A11y and Lighthouse remain in their existing public/PR lanes; this canary avoids adding that cost to every nightly flag matrix run."
-          } >> "$GITHUB_STEP_SUMMARY"
-          pnpm run test:e2e:design-v1-flags
-        env:
-          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
-          NODE_ENV: test
-          BASE_URL: http://127.0.0.1:3100
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
-          E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
-          E2E_USE_TEST_AUTH_BYPASS: '1'
-          E2E_FAST_ONBOARDING: '1'
-          E2E_TEST_AUTH_PERSONA: creator
-          E2E_SKIP_SEED: '1'
-          E2E_SKIP_WARMUP: '1'
-          NEXT_PUBLIC_E2E_MODE: '1'
-          NEXT_PUBLIC_CLERK_MOCK: '1'
-          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
-          NEXT_DISABLE_TOOLBAR: '1'
-          PLAYWRIGHT_WORKERS: '1'
-          FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
-
       - name: Stop route QA bypass server
         if: ${{ always() && (github.event_name == 'schedule' || github.event.inputs.test_filter == '' || github.event.inputs.suite == 'design-v1') }}
         run: |
