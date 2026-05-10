@@ -593,6 +593,69 @@ describe('Notification Service', () => {
       expect(customProvider.sendEmail).toHaveBeenCalled();
     });
 
+    it('does not promote dedup keys to provider idempotency keys', async () => {
+      const customProvider = {
+        provider: 'debug' as const,
+        sendEmail: vi.fn().mockResolvedValue({
+          channel: 'email',
+          status: 'sent',
+          provider: 'debug',
+          detail: 'debug-id',
+        }),
+      };
+
+      setEmailProvider(customProvider);
+
+      await sendNotification(
+        {
+          id: 'notification-id',
+          dedupKey: 'stable-dedup-key',
+          subject: 'Your code',
+          text: 'Use code 123456',
+          category: 'transactional',
+        },
+        { email: 'user@example.com' }
+      );
+
+      expect(customProvider.sendEmail).toHaveBeenCalledWith(
+        expect.not.objectContaining({
+          idempotencyKey: expect.any(String),
+        })
+      );
+    });
+
+    it('passes explicit provider idempotency keys', async () => {
+      const customProvider = {
+        provider: 'debug' as const,
+        sendEmail: vi.fn().mockResolvedValue({
+          channel: 'email',
+          status: 'sent',
+          provider: 'debug',
+          detail: 'debug-id',
+        }),
+      };
+
+      setEmailProvider(customProvider);
+
+      await sendNotification(
+        {
+          id: 'notification-id',
+          dedupKey: 'stable-dedup-key',
+          idempotencyKey: 'provider-idempotency-key',
+          subject: 'Invite',
+          text: 'Use this invite',
+          category: 'transactional',
+        },
+        { email: 'user@example.com' }
+      );
+
+      expect(customProvider.sendEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          idempotencyKey: 'provider-idempotency-key',
+        })
+      );
+    });
+
     it('uses system sender with dynamic "via Jovie" formatting', async () => {
       const customProvider = {
         provider: 'debug' as const,

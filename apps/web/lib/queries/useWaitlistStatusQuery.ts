@@ -6,7 +6,19 @@ import { queryKeys } from './keys';
 
 export interface WaitlistStatusResponse {
   hasEntry: boolean;
-  status: 'pending' | 'invited' | 'claimed' | null;
+  status:
+    | 'new'
+    | 'chat_started'
+    | 'qualified'
+    | 'waitlisted'
+    | 'invited'
+    | 'approved'
+    | 'claimed'
+    | 'signed_up'
+    | 'rejected'
+    | 'expired'
+    | 'blocked'
+    | null;
   inviteUsername: string | null;
 }
 

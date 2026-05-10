@@ -202,6 +202,7 @@ export type WaitlistApprovePayload = z.infer<typeof waitlistApproveSchema>;
 export const waitlistSettingsUpdateSchema = z.object({
   gateEnabled: z.boolean(),
   autoAcceptEnabled: z.boolean(),
+  autoAcceptAfterDays: z.number().int().min(1).max(365),
   autoAcceptDailyLimit: z.number().int().min(0).max(10_000),
 });
 

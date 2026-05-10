@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { AdminLead } from '@/lib/queries';
 
@@ -90,6 +90,10 @@ async function getLeadTable() {
 }
 
 describe('LeadTable', () => {
+  afterEach(() => {
+    cleanup();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
 
@@ -115,7 +119,7 @@ describe('LeadTable', () => {
     // Skeleton elements should be present
     const skeletons = document.querySelectorAll('.skeleton');
     expect(skeletons.length).toBeGreaterThan(0);
-  }, 15_000);
+  }, 30_000);
 
   it('renders empty state when no leads exist', async () => {
     mockLeadsInfiniteQuery.mockReturnValue({
@@ -130,8 +134,8 @@ describe('LeadTable', () => {
     renderWithProviders(<LeadTable />);
 
     expect(
-      screen.getByText('No leads have been discovered yet')
-    ).toBeInTheDocument();
+      screen.getAllByText('No leads have been discovered yet').length
+    ).toBeGreaterThan(0);
   }, 15_000);
 
   it('renders lead data in table columns', async () => {

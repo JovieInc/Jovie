@@ -7,8 +7,13 @@ import { APP_ROUTES } from '@/constants/routes';
 import { cn } from '@/lib/utils';
 import type { WaitlistAccessOutcome } from '@/lib/waitlist/access-request';
 
+export type WaitlistDisplayOutcome =
+  | WaitlistAccessOutcome
+  | 'pending'
+  | 'rate_limited';
+
 interface WaitlistOutcomeViewProps {
-  readonly outcome: WaitlistAccessOutcome | 'pending';
+  readonly outcome: WaitlistDisplayOutcome;
   readonly onRetry?: () => void;
 }
 
@@ -58,8 +63,13 @@ const OUTCOME_COPY: Record<
   },
   save_failed: {
     title: "We Couldn't Save This",
-    body: 'Your answers are still on this device. Try again so we can save the transcript before reviewing access.',
+    body: 'Your answers are still on this device. Try again so we can save the required fields before reviewing access.',
     icon: RotateCcw,
+  },
+  rate_limited: {
+    title: 'Too Many Attempts',
+    body: 'Please wait a moment before trying again. Your answers are still on this device.',
+    icon: Clock3,
   },
 };
 
@@ -69,7 +79,8 @@ export function WaitlistOutcomeView({
 }: Readonly<WaitlistOutcomeViewProps>) {
   const copy = OUTCOME_COPY[outcome];
   const Icon = copy.icon;
-  const canRetry = outcome === 'save_failed' && onRetry;
+  const canRetry =
+    (outcome === 'save_failed' || outcome === 'rate_limited') && onRetry;
 
   return (
     <section className='w-full rounded-2xl border border-white/[0.08] bg-[#0a0c0f] px-5 py-6 text-white shadow-[0_24px_90px_rgba(0,0,0,0.38)] sm:px-6'>

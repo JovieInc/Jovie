@@ -7,7 +7,10 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { waitlistEntries, waitlistInvites } from '@/lib/db/schema/waitlist';
 import { captureError, sanitizeErrorResponse } from '@/lib/error-tracking';
 import { RETRY_AFTER_SERVICE } from '@/lib/http/headers';
-import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
+import {
+  enforceOnboardingRateLimit,
+  getOnboardingRateLimitMessage,
+} from '@/lib/onboarding/rate-limit';
 import { normalizeEmail } from '@/lib/utils/email';
 import { extractClientIPFromRequest } from '@/lib/utils/ip-extraction';
 import { logger } from '@/lib/utils/logger';
@@ -84,12 +87,11 @@ export async function GET() {
   }
 
   const user = await currentUser();
-  // Prefer a verified email — `emailAddresses[0]` may be unverified.
+  // Verified emails are the source of truth for identity. Do not fall back to
+  // `primaryEmailAddress` because Clerk can expose an unverified primary.
   const emailRaw =
     user?.emailAddresses?.find(e => e.verification?.status === 'verified')
-      ?.emailAddress ??
-    user?.primaryEmailAddress?.emailAddress ??
-    null;
+      ?.emailAddress ?? null;
   if (!emailRaw) {
     return NextResponse.json(
       { hasEntry: false, status: null },
@@ -102,8 +104,12 @@ export async function GET() {
   const [entry] = await db
     .select({ id: waitlistEntries.id, status: waitlistEntries.status })
     .from(waitlistEntries)
-    .where(drizzleSql`lower(${waitlistEntries.email}) = ${email}`)
-    .orderBy(desc(waitlistEntries.createdAt))
+    .where(
+      drizzleSql`${waitlistEntries.emailNormalized} = ${email} OR lower(${waitlistEntries.email}) = ${email}`
+    )
+    .orderBy(
+      drizzleSql`${waitlistEntries.canonical} DESC, ${waitlistEntries.createdAt} DESC`
+    )
     .limit(1);
 
   const invite = await (async () => {
@@ -142,7 +148,25 @@ export async function POST(request: Request) {
 
     if (!isDev) {
       const clientIP = extractClientIPFromRequest({ headers: request.headers });
-      await enforceOnboardingRateLimit({ userId, ip: clientIP, checkIP: true });
+      try {
+        await enforceOnboardingRateLimit({
+          userId,
+          ip: clientIP,
+          checkIP: true,
+        });
+      } catch (error) {
+        const rateLimitMessage = getOnboardingRateLimitMessage(error);
+        if (!rateLimitMessage) throw error;
+
+        return NextResponse.json(
+          {
+            success: false,
+            code: 'rate_limited',
+            error: rateLimitMessage,
+          },
+          { status: 429, headers: NO_STORE_HEADERS }
+        );
+      }
     }
 
     const hasWaitlistTable = await ensureWaitlistTable();
@@ -160,10 +184,17 @@ export async function POST(request: Request) {
     // have not actually confirmed they own.
     const emailRaw =
       user?.emailAddresses?.find(e => e.verification?.status === 'verified')
-        ?.emailAddress ??
-      user?.primaryEmailAddress?.emailAddress ??
-      null;
-    if (!emailRaw) return badRequestResponse('Email is required');
+        ?.emailAddress ?? null;
+    if (!emailRaw) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Email not verified',
+          code: 'email_unverified',
+        },
+        { status: 403, headers: NO_STORE_HEADERS }
+      );
+    }
 
     const email = normalizeEmail(emailRaw);
     const fullName = deriveFullName({
@@ -184,6 +215,7 @@ export async function POST(request: Request) {
       emailRaw,
       fullName,
       data: parseResult.data,
+      source: 'waitlist_form',
     });
 
     return NextResponse.json(

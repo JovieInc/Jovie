@@ -177,7 +177,7 @@ describe('user-created-handler', () => {
     );
   });
 
-  it('sends founder welcome from founder sender policy', async () => {
+  it('does not send founder welcome from Clerk webhook', async () => {
     const context = makeContext('user.created', {
       id: 'user_founder_email',
       first_name: 'Riley',
@@ -193,13 +193,7 @@ describe('user-created-handler', () => {
 
     await userCreatedHandler.handle(context);
 
-    expect(mockSendEmail).toHaveBeenCalledWith(
-      expect.objectContaining({
-        to: 'riley@example.com',
-        from: 'Tim White <tim@send.jov.ie>',
-        replyTo: 'tim@jov.ie',
-      })
-    );
+    expect(mockSendEmail).not.toHaveBeenCalled();
   });
 
   it('should handle errors gracefully', async () => {

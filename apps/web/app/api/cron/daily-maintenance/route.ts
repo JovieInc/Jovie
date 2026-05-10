@@ -9,6 +9,7 @@
  * - Cleanup expired idempotency keys: every day
  * - Billing reconciliation: every day (safety net for webhooks)
  * - Cleanup SMS subscribe intents: every day (folded from standalone cron per JOV-1901)
+ * - Waitlist auto-accept: every day when enabled
  * - Data retention: Sundays only (heavy operation)
  *
  * Each sub-job runs in an independent try-catch so one failure
@@ -22,6 +23,7 @@ import { runDataRetentionCleanup } from '@/lib/analytics/data-retention';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
+import { runWaitlistAutoAccept } from '@/lib/waitlist/auto-accept';
 import { runReconciliation } from '../billing-reconciliation/route';
 import { cleanupExpiredKeys } from '../cleanup-idempotency-keys/route';
 import { cleanupOrphanedPhotos } from '../cleanup-photos/route';
@@ -98,7 +100,13 @@ export async function GET(request: Request) {
     cleanupSmsIntents
   );
 
-  // 5. Data retention — Sundays only (heavy operation)
+  // 5. Waitlist auto-accept — no-op unless enabled by admin settings
+  results.waitlistAutoAccept = await runSubJob(
+    'waitlistAutoAccept',
+    runWaitlistAutoAccept
+  );
+
+  // 6. Data retention — Sundays only (heavy operation)
   const isSunday = new Date().getDay() === 0;
   results.dataRetention = isSunday
     ? await runSubJob('dataRetention', runDataRetentionCleanup)

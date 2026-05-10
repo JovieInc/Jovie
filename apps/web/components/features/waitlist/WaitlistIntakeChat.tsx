@@ -5,6 +5,7 @@ import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { cn } from '@/lib/utils';
 import type { WaitlistAccessOutcome } from '@/lib/waitlist/access-request';
+import type { WaitlistDisplayOutcome } from './WaitlistOutcomeView';
 import { WaitlistSuccessView } from './WaitlistSuccessView';
 
 interface WaitlistIntakeChatProps {
@@ -105,7 +106,7 @@ export function WaitlistIntakeChat({
   const [input, setInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [outcome, setOutcome] = useState<WaitlistAccessOutcome | null>(null);
+  const [outcome, setOutcome] = useState<WaitlistDisplayOutcome | null>(null);
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
@@ -203,9 +204,14 @@ export function WaitlistIntakeChat({
       });
 
       const payload = (await response.json().catch(() => null)) as {
-        outcome?: WaitlistAccessOutcome;
+        outcome?: WaitlistAccessOutcome | 'rate_limited';
         error?: string;
       } | null;
+
+      if (payload?.outcome === 'rate_limited') {
+        setOutcome('rate_limited');
+        return;
+      }
 
       if (!response.ok || !payload?.outcome) {
         setOutcome('save_failed');
@@ -302,8 +308,8 @@ export function WaitlistIntakeChat({
                 Request Access
               </h1>
               <p className='mt-1 text-[13px] leading-5 text-white/52'>
-                Answer a few launch questions. Your transcript is saved before
-                access is decided.
+                Answer a few launch questions. We save only the fields needed to
+                decide access.
               </p>
             </div>
 

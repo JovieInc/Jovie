@@ -14,6 +14,7 @@ const hoisted = vi.hoisted(() => {
   const invalidateProxyUserStateCacheMock = vi.fn();
   const attributeLeadSignupFromClerkUserIdMock = vi.fn();
   const invalidateProfileCacheMock = vi.fn();
+  const markWaitlistSignedUpInTxMock = vi.fn();
   const enforceOnboardingRateLimitMock = vi.fn();
   const revalidatePathMock = vi.fn();
   const captureErrorMock = vi.fn();
@@ -30,6 +31,7 @@ const hoisted = vi.hoisted(() => {
     getCachedAuthMock,
     headersMock,
     invalidateProfileCacheMock,
+    markWaitlistSignedUpInTxMock,
     invalidateProxyUserStateCacheMock,
     revalidatePathMock,
     withDbSessionTxMock,
@@ -146,6 +148,10 @@ vi.mock('@/app/onboarding/actions/sync', () => ({
   runBackgroundSyncOperations: vi.fn(),
 }));
 
+vi.mock('@/lib/waitlist/signup', () => ({
+  markWaitlistSignedUpInTx: hoisted.markWaitlistSignedUpInTxMock,
+}));
+
 describe('completeOnboarding', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -209,6 +215,7 @@ describe('completeOnboarding', () => {
       expect.anything(),
       'db_user_123'
     );
+    expect(hoisted.markWaitlistSignedUpInTxMock).not.toHaveBeenCalled();
     expect(hoisted.captureErrorMock).not.toHaveBeenCalledWith(
       'completeOnboarding failed',
       expect.anything(),

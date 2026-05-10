@@ -86,4 +86,25 @@ describe('ResendEmailProvider', () => {
       })
     );
   });
+
+  it('passes an idempotency key to Resend when provided', async () => {
+    const provider = new ResendEmailProvider();
+
+    const result = await provider.sendEmail({
+      to: 'artist@jov.ie',
+      subject: 'Invite',
+      text: 'Hello',
+      html: '<p>Hello</p>',
+      idempotencyKey: 'waitlist_invite:entry:token-hash',
+    });
+
+    expect(result.status).toBe('sent');
+    expect(mockResendSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: ['artist@jov.ie'],
+        subject: 'Invite',
+      }),
+      { idempotencyKey: 'waitlist_invite:entry:token-hash' }
+    );
+  });
 });

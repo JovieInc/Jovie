@@ -32,6 +32,7 @@ const {
   mockReservePrebuiltProfileForUser,
   mockResolveClerkIdentity,
   mockRunBackgroundSyncOperations,
+  mockMarkWaitlistSignedUpInTx,
   mockUpdateExistingProfile,
   mockValidateUsername,
   mockWithDbSessionTx,
@@ -73,6 +74,7 @@ const {
   mockReservePrebuiltProfileForUser: vi.fn(),
   mockResolveClerkIdentity: vi.fn(),
   mockRunBackgroundSyncOperations: vi.fn(),
+  mockMarkWaitlistSignedUpInTx: vi.fn(),
   mockUpdateExistingProfile: vi.fn(),
   mockValidateUsername: vi.fn(),
   mockWithDbSessionTx: vi.fn(),
@@ -192,6 +194,10 @@ vi.mock('@/app/onboarding/actions/sync', () => ({
 vi.mock('@/app/onboarding/actions/validation', () => ({
   ensureEmailAvailable: mockEnsureEmailAvailable,
   ensureHandleAvailable: mockEnsureHandleAvailable,
+}));
+
+vi.mock('@/lib/waitlist/signup', () => ({
+  markWaitlistSignedUpInTx: mockMarkWaitlistSignedUpInTx,
 }));
 
 import { completeOnboarding } from '@/app/onboarding/actions';
@@ -374,6 +380,10 @@ describe('completeOnboarding', () => {
       })
     );
     expect(mockReservePrebuiltProfileForUser).not.toHaveBeenCalled();
+    expect(mockMarkWaitlistSignedUpInTx).toHaveBeenCalledWith(
+      expect.anything(),
+      'clerk-user-123'
+    );
     expect(mockClearPendingClaimContext).toHaveBeenCalled();
   });
 
@@ -402,6 +412,7 @@ describe('completeOnboarding', () => {
       })
     );
     expect(mockClaimPrebuiltProfileForUser).not.toHaveBeenCalled();
+    expect(mockMarkWaitlistSignedUpInTx).not.toHaveBeenCalled();
     expect(mockClearPendingClaimContext).not.toHaveBeenCalled();
   });
 

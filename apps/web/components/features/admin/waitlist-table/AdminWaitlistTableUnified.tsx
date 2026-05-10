@@ -33,9 +33,17 @@ const columnHelper = createColumnHelper<WaitlistEntryRow>();
 
 // Status display labels for grouping
 const STATUS_LABELS: Record<string, string> = {
-  new: 'New',
+  new: 'Waitlisted',
+  chat_started: 'Chat started',
+  qualified: 'Qualified',
+  waitlisted: 'Waitlisted',
   invited: 'Invited',
-  claimed: 'Claimed',
+  approved: 'Approved',
+  claimed: 'Signed up',
+  signed_up: 'Signed up',
+  rejected: 'Rejected',
+  expired: 'Expired',
+  blocked: 'Blocked',
 };
 
 export function AdminWaitlistTableUnified({
@@ -48,7 +56,7 @@ export function AdminWaitlistTableUnified({
   groupingEnabled = false,
   externalSelection,
 }: WaitlistTableProps) {
-  const { approveEntry } = useApproveEntry({
+  const { approveEntry, resendInvite } = useApproveEntry({
     onRowUpdate: () => {
       // No-op for now since we're using server-side refresh
     },
@@ -96,9 +104,14 @@ export function AdminWaitlistTableUnified({
   // Create context menu items for a waitlist entry
   const createContextMenuItems = useCallback(
     (entry: WaitlistEntryRow): ContextMenuItemType[] => {
-      return buildContextMenuItems(entry, safeCopyToClipboard, approveEntry);
+      return buildContextMenuItems(
+        entry,
+        safeCopyToClipboard,
+        approveEntry,
+        resendInvite
+      );
     },
-    [approveEntry, safeCopyToClipboard]
+    [approveEntry, resendInvite, safeCopyToClipboard]
   );
 
   // Define columns using TanStack Table

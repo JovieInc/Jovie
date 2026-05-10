@@ -76,6 +76,13 @@ function detectMetaBot(userAgent: string): boolean {
   return META_BOT_REGEX.test(userAgent);
 }
 
+function isWaitlistInviteRedirect(redirectUrl: string | null): boolean {
+  return (
+    redirectUrl === '/waitlist/invite' ||
+    redirectUrl?.startsWith('/waitlist/invite?') === true
+  );
+}
+
 // ============================================================================
 // Public Profile Audience Block Check
 // ============================================================================
@@ -706,6 +713,9 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         req.nextUrl.searchParams.get('redirect_url')
       );
 
+      if (redirectUrl && isWaitlistInviteRedirect(redirectUrl)) {
+        return NextResponse.redirect(new URL(redirectUrl, req.url));
+      }
       if (userState.needsWaitlist) {
         return NextResponse.redirect(new URL('/waitlist', req.url));
       }
@@ -724,6 +734,10 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     // /waitlist during RSC navigation causes layout hierarchy mismatches that
     // manifest as "page not found" errors on the client.
     if (userState) {
+      const isInviteRedemptionPath = isWaitlistInviteRedirect(
+        req.nextUrl.pathname + req.nextUrl.search
+      );
+
       // Rewrite banned/deleted users to generic unavailable page.
       // Uses rewrite (not redirect) so the URL bar stays on whatever page
       // they were visiting — no dedicated path to discover.
@@ -741,6 +755,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       } else if (
         userState.needsWaitlist &&
         pathname !== '/waitlist' &&
+        !isInviteRedemptionPath &&
         !pathname.startsWith('/api/') &&
         pathname !== '/app' &&
         !pathname.startsWith('/app/')
@@ -751,6 +766,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       } else if (
         userState.needsOnboarding &&
         pathname !== '/onboarding' &&
+        !isInviteRedemptionPath &&
         !pathname.startsWith('/api/') &&
         pathname !== '/app' &&
         !pathname.startsWith('/app/')

@@ -40,6 +40,7 @@ import { withTimeout } from '@/lib/resilience/primitives';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { isContentClean } from '@/lib/validation/content-filter';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
+import { markWaitlistSignedUpInTx } from '@/lib/waitlist/signup';
 import { handleBackgroundAvatarUpload } from './avatar';
 import { logOnboardingError } from './errors';
 import { profileIsPublishable } from './helpers';
@@ -336,9 +337,10 @@ export async function completeOnboarding({
         withDbSessionTx(
           async (tx, clerkUserId: string) => {
             const existingUser = await fetchExistingUser(tx, clerkUserId);
+            let result: CompletionResult;
 
             if (pendingClaim) {
-              return applyPendingClaimTx(
+              result = await applyPendingClaimTx(
                 tx,
                 clerkUserId,
                 pendingClaim,
@@ -347,6 +349,10 @@ export async function completeOnboarding({
                 normalizedUsername,
                 trimmedDisplayName
               );
+              if (pendingClaim.mode !== 'direct_profile') {
+                await markWaitlistSignedUpInTx(tx, clerkUserId);
+              }
+              return result;
             }
 
             // If the user record does not exist, the stored function will create both user + profile
@@ -355,16 +361,18 @@ export async function completeOnboarding({
                 await ensureEmailAvailable(tx, clerkUserId, userEmail);
               }
               await ensureHandleAvailable(tx, normalizedUsername, null);
-              return createUserAndProfile(
+              result = await createUserAndProfile(
                 tx,
                 clerkUserId,
                 userEmail,
                 normalizedUsername,
                 trimmedDisplayName
               );
+              await markWaitlistSignedUpInTx(tx, clerkUserId);
+              return result;
             }
 
-            return applyExistingUserProfileTx(
+            result = await applyExistingUserProfileTx(
               tx,
               clerkUserId,
               existingUser.id,
@@ -373,6 +381,8 @@ export async function completeOnboarding({
               trimmedDisplayName,
               username
             );
+            await markWaitlistSignedUpInTx(tx, clerkUserId);
+            return result;
           },
           { isolationLevel: 'serializable' }
         ),

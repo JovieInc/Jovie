@@ -1,11 +1,13 @@
 'use client';
 
 import { AuthLayout } from '@/features/auth';
-import type { WaitlistAccessOutcome } from '@/lib/waitlist/access-request';
-import { WaitlistOutcomeView } from './WaitlistOutcomeView';
+import {
+  type WaitlistDisplayOutcome,
+  WaitlistOutcomeView,
+} from './WaitlistOutcomeView';
 
 interface WaitlistSuccessViewProps {
-  readonly outcome?: WaitlistAccessOutcome | 'pending';
+  readonly outcome?: WaitlistDisplayOutcome;
   readonly onRetry?: () => void;
 }
 

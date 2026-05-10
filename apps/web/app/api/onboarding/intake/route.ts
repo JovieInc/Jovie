@@ -5,12 +5,14 @@ import { z } from 'zod';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
-import {
-  type InterviewTranscriptEntry,
-  userInterviews,
-} from '@/lib/db/schema/user-interviews';
+import { userInterviews } from '@/lib/db/schema/user-interviews';
 import { captureError } from '@/lib/error-tracking';
+import {
+  enforceOnboardingRateLimit,
+  getOnboardingRateLimitMessage,
+} from '@/lib/onboarding/rate-limit';
 import { normalizeEmail } from '@/lib/utils/email';
+import { extractClientIPFromRequest } from '@/lib/utils/ip-extraction';
 import { logger } from '@/lib/utils/logger';
 import { waitlistRequestSchema } from '@/lib/validation/schemas';
 import {
@@ -19,6 +21,8 @@ import {
 } from '@/lib/waitlist/access-request';
 
 export const runtime = 'nodejs';
+
+const ONBOARDING_CHAT_INTERVIEW_STATUS = 'dismissed' as const;
 
 // Canonical step ids for the onboarding chat (mirrors StepId in
 // `components/features/waitlist/WaitlistIntakeChat.tsx`). Validating here
@@ -114,7 +118,6 @@ async function ensureIntakeUser(params: {
 
 async function upsertOnboardingInterview(params: {
   readonly userId: string;
-  readonly transcript: InterviewTranscriptEntry[];
   readonly metadata: Record<string, unknown>;
   readonly outcome?: WaitlistAccessOutcome;
   readonly waitlistEntryId?: string;
@@ -131,16 +134,16 @@ async function upsertOnboardingInterview(params: {
     .values({
       userId: params.userId,
       source: 'onboarding_chat',
-      transcript: params.transcript,
+      transcript: [],
       metadata,
-      status: 'pending',
+      status: ONBOARDING_CHAT_INTERVIEW_STATUS,
     })
     .onConflictDoUpdate({
       target: [userInterviews.userId, userInterviews.source],
       set: {
-        transcript: params.transcript,
+        transcript: [],
         metadata,
-        status: 'pending',
+        status: ONBOARDING_CHAT_INTERVIEW_STATUS,
         updatedAt: new Date(),
       },
     })
@@ -168,6 +171,30 @@ export async function POST(request: Request) {
     const { userId: clerkUserId } = await getCachedAuth();
     if (!clerkUserId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (process.env.NODE_ENV !== 'development') {
+      const clientIP = extractClientIPFromRequest({ headers: request.headers });
+      try {
+        await enforceOnboardingRateLimit({
+          userId: clerkUserId,
+          ip: clientIP,
+          checkIP: true,
+        });
+      } catch (error) {
+        const rateLimitMessage = getOnboardingRateLimitMessage(error);
+        if (!rateLimitMessage) throw error;
+
+        return NextResponse.json(
+          {
+            success: false,
+            outcome: 'rate_limited',
+            code: 'rate_limited',
+            error: rateLimitMessage,
+          },
+          { status: 429 }
+        );
+      }
     }
 
     const body = await request.json();
@@ -208,7 +235,6 @@ export async function POST(request: Request) {
     try {
       interviewId = await upsertOnboardingInterview({
         userId: dbUser.id,
-        transcript: parsed.data.transcript as InterviewTranscriptEntry[],
         metadata: parsed.data.metadata,
       });
     } catch (error) {
@@ -227,6 +253,7 @@ export async function POST(request: Request) {
       emailRaw,
       fullName,
       data: parsed.data.waitlist,
+      source: 'onboarding_chat',
     });
 
     // Best-effort attach of the access decision to the interview row. The
@@ -237,7 +264,6 @@ export async function POST(request: Request) {
     try {
       await upsertOnboardingInterview({
         userId: dbUser.id,
-        transcript: parsed.data.transcript as InterviewTranscriptEntry[],
         metadata: parsed.data.metadata,
         outcome: access.outcome,
         waitlistEntryId: access.entryId,

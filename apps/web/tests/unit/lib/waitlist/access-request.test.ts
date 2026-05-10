@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // without touching a real database.
 
 const findLatestEntryByEmail = vi.fn();
+const getWaitlistSettings = vi.fn();
 const tryReserveAutoAcceptSlot = vi.fn();
 const approveWaitlistEntryInTx = vi.fn();
 const finalizeWaitlistApproval = vi.fn().mockResolvedValue(undefined);
@@ -15,6 +16,8 @@ const notifySlackWaitlist = vi.fn().mockResolvedValue(undefined);
 // Track tx mutations to assert against
 let userRow: { id: string; userStatus: string } | null = null;
 const insertedEntries: Array<Record<string, unknown>> = [];
+const updatedRows: Array<Record<string, unknown>> = [];
+let waitlistInsertReturnRows: Array<{ id: string }> = [{ id: 'entry-new' }];
 
 vi.mock('@/lib/auth/proxy-state', () => ({
   invalidateProxyUserStateCache: (...args: unknown[]) =>
@@ -33,6 +36,7 @@ vi.mock('@/lib/waitlist/approval', () => ({
 }));
 
 vi.mock('@/lib/waitlist/settings', () => ({
+  getWaitlistSettings: (...args: unknown[]) => getWaitlistSettings(...args),
   tryReserveAutoAcceptSlot: (...args: unknown[]) =>
     tryReserveAutoAcceptSlot(...args),
 }));
@@ -87,6 +91,9 @@ function createTxMock() {
 
   const updateWhere = vi.fn().mockResolvedValue(undefined);
   const updateSet = vi.fn(values => {
+    if (values && typeof values === 'object') {
+      updatedRows.push(values as Record<string, unknown>);
+    }
     if (
       values &&
       typeof values === 'object' &&
@@ -117,8 +124,17 @@ function createTxMock() {
         };
         return Promise.resolve(undefined);
       }
+      const isEmailJob = 'jobType' in vals;
+      const returning = vi
+        .fn()
+        .mockResolvedValue(
+          isEmailJob ? [{ id: 'job-1' }] : waitlistInsertReturnRows
+        );
       return {
-        returning: vi.fn().mockResolvedValue([{ id: 'entry-new' }]),
+        onConflictDoNothing: vi.fn(() => ({
+          returning,
+        })),
+        returning,
       };
     }),
   }));
@@ -145,7 +161,19 @@ describe('submitWaitlistAccessRequest', () => {
     vi.clearAllMocks();
     userRow = null;
     insertedEntries.length = 0;
+    updatedRows.length = 0;
+    waitlistInsertReturnRows = [{ id: 'entry-new' }];
     findLatestEntryByEmail.mockReset();
+    findLatestEntryByEmail.mockReturnValue([]);
+    getWaitlistSettings.mockReset();
+    getWaitlistSettings.mockResolvedValue({
+      gateEnabled: true,
+      autoAcceptEnabled: false,
+      autoAcceptAfterDays: 7,
+      autoAcceptDailyLimit: 0,
+      autoAcceptedToday: 0,
+      autoAcceptResetsAt: new Date(Date.now() + 86_400_000),
+    });
     tryReserveAutoAcceptSlot.mockReset();
     approveWaitlistEntryInTx.mockReset();
     finalizeWaitlistApproval.mockClear();
@@ -191,11 +219,15 @@ describe('submitWaitlistAccessRequest', () => {
     expect(notifySlackWaitlist).not.toHaveBeenCalled();
   });
 
-  it('fires Slack exactly once on first-time waitlisted_gate_on signup', async () => {
+  it('waitlists fresh submissions even when delayed auto-accept has capacity', async () => {
     findLatestEntryByEmail.mockReturnValueOnce([]); // no existing entry
-    tryReserveAutoAcceptSlot.mockResolvedValue({
-      shouldAutoAccept: false,
-      reason: 'gate_on',
+    getWaitlistSettings.mockResolvedValueOnce({
+      gateEnabled: true,
+      autoAcceptEnabled: true,
+      autoAcceptAfterDays: 7,
+      autoAcceptDailyLimit: 10,
+      autoAcceptedToday: 0,
+      autoAcceptResetsAt: new Date(Date.now() + 86_400_000),
     });
 
     const { submitWaitlistAccessRequest } = await import(
@@ -204,7 +236,34 @@ describe('submitWaitlistAccessRequest', () => {
     const result = await submitWaitlistAccessRequest(baseInput);
 
     expect(result.outcome).toBe('waitlisted_gate_on');
+    expect(result.status).toBe('waitlisted');
+    expect(tryReserveAutoAcceptSlot).not.toHaveBeenCalled();
+    expect(approveWaitlistEntryInTx).not.toHaveBeenCalled();
     expect(notifySlackWaitlist).toHaveBeenCalledTimes(1);
+  });
+
+  it('handles canonical email insert races as idempotent waitlist submissions', async () => {
+    waitlistInsertReturnRows = [];
+    findLatestEntryByEmail
+      .mockReturnValueOnce([])
+      .mockReturnValueOnce([
+        { id: 'entry-race-winner', status: 'new', waitlistedAt: null },
+      ]);
+
+    const { submitWaitlistAccessRequest } = await import(
+      '@/lib/waitlist/access-request'
+    );
+    const result = await submitWaitlistAccessRequest(baseInput);
+
+    expect(result).toMatchObject({
+      entryId: 'entry-race-winner',
+      status: 'waitlisted',
+      outcome: 'already_waitlisted',
+    });
+    expect(
+      updatedRows.find(row => row.statusReason === 'already_waitlisted')?.status
+    ).toBe('waitlisted');
+    expect(notifySlackWaitlist).not.toHaveBeenCalled();
   });
 
   it('does NOT fire Slack on idempotent re-assert when status is already pinned', async () => {
@@ -235,6 +294,80 @@ describe('submitWaitlistAccessRequest', () => {
     const result = await submitWaitlistAccessRequest(baseInput);
 
     expect(result.outcome).toBe('already_waitlisted');
+    expect(result.status).toBe('waitlisted');
+    expect(notifySlackWaitlist).not.toHaveBeenCalled();
+  });
+
+  it('preserves original waitlist age when a pending user resubmits', async () => {
+    const originalWaitlistedAt = new Date('2026-04-01T00:00:00.000Z');
+    userRow = { id: 'user-1', userStatus: 'waitlist_pending' };
+    findLatestEntryByEmail.mockReturnValueOnce([
+      {
+        id: 'entry-1',
+        status: 'waitlisted',
+        waitlistedAt: originalWaitlistedAt,
+      },
+    ]);
+
+    const { submitWaitlistAccessRequest } = await import(
+      '@/lib/waitlist/access-request'
+    );
+    const result = await submitWaitlistAccessRequest(baseInput);
+
+    expect(result.outcome).toBe('already_waitlisted');
+    expect(
+      updatedRows.find(row => row.statusReason === 'already_waitlisted')
+        ?.waitlistedAt
+    ).toBe(originalWaitlistedAt);
+  });
+
+  it('fills waitlist age when a legacy pending row is missing it', async () => {
+    userRow = { id: 'user-1', userStatus: 'waitlist_pending' };
+    findLatestEntryByEmail.mockReturnValueOnce([
+      {
+        id: 'entry-1',
+        status: 'new',
+        waitlistedAt: null,
+      },
+    ]);
+
+    const { submitWaitlistAccessRequest } = await import(
+      '@/lib/waitlist/access-request'
+    );
+    const result = await submitWaitlistAccessRequest(baseInput);
+
+    expect(result.outcome).toBe('already_waitlisted');
+    expect(
+      updatedRows.find(row => row.statusReason === 'already_waitlisted')
+        ?.waitlistedAt
+    ).toBeInstanceOf(Date);
+  });
+
+  it('requeues an expired waitlist row when the user resubmits', async () => {
+    const originalWaitlistedAt = new Date('2026-04-01T00:00:00.000Z');
+    userRow = { id: 'user-1', userStatus: 'waitlist_pending' };
+    findLatestEntryByEmail.mockReturnValueOnce([
+      {
+        id: 'entry-1',
+        status: 'expired',
+        waitlistedAt: originalWaitlistedAt,
+      },
+    ]);
+
+    const { submitWaitlistAccessRequest } = await import(
+      '@/lib/waitlist/access-request'
+    );
+    const result = await submitWaitlistAccessRequest(baseInput);
+
+    expect(result.outcome).toBe('already_waitlisted');
+    expect(result.status).toBe('waitlisted');
+    expect(
+      updatedRows.find(row => row.statusReason === 'already_waitlisted')?.status
+    ).toBe('waitlisted');
+    expect(
+      updatedRows.find(row => row.statusReason === 'already_waitlisted')
+        ?.waitlistedAt
+    ).toBe(originalWaitlistedAt);
     expect(notifySlackWaitlist).not.toHaveBeenCalled();
   });
 });

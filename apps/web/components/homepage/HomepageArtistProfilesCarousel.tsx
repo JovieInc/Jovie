@@ -122,20 +122,27 @@ export function HomepageArtistProfilesCarousel({
                   className={`homepage-artist-profile-card homepage-artist-profile-card--${card.glow}`}
                   key={card.id}
                 >
-                  <h3>{card.title}</h3>
-                  <div className='homepage-artist-profile-card__phone'>
-                    <div className='homepage-artist-profile-card__screen'>
-                      <Image
-                        src={card.image.publicUrl}
-                        alt={card.image.alt}
-                        width={card.image.width}
-                        height={card.image.height}
-                        loading='eager'
-                        sizes='(min-width: 1280px) 224px, (min-width: 768px) 21vw, 66vw'
-                        unoptimized
-                      />
+                  <HomepageTrackedLink
+                    href={copy.secondaryCta.href}
+                    className='homepage-artist-profile-card__link'
+                    eventName='homepage_profile_preview_clicked'
+                    eventProperties={{ card: card.id }}
+                  >
+                    <h3>{card.title}</h3>
+                    <div className='homepage-artist-profile-card__phone'>
+                      <div className='homepage-artist-profile-card__screen'>
+                        <Image
+                          src={card.image.publicUrl}
+                          alt={card.image.alt}
+                          width={card.image.width}
+                          height={card.image.height}
+                          loading='lazy'
+                          sizes='(min-width: 1280px) 224px, (min-width: 768px) 21vw, 66vw'
+                          unoptimized
+                        />
+                      </div>
                     </div>
-                  </div>
+                  </HomepageTrackedLink>
                 </li>
               ))}
             </ol>

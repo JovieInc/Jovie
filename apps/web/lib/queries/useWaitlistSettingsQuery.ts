@@ -9,6 +9,7 @@ import { handleMutationError, handleMutationSuccess } from './mutation-utils';
 export interface WaitlistSettingsResponse {
   gateEnabled: boolean;
   autoAcceptEnabled: boolean;
+  autoAcceptAfterDays: number;
   autoAcceptDailyLimit: number;
   autoAcceptedToday: number;
   autoAcceptResetsAt: string;
@@ -21,6 +22,7 @@ interface WaitlistSettingsApiResponse {
 export interface WaitlistSettingsUpdateInput {
   gateEnabled: boolean;
   autoAcceptEnabled: boolean;
+  autoAcceptAfterDays: number;
   autoAcceptDailyLimit: number;
 }
 

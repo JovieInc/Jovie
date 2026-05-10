@@ -5,6 +5,7 @@ import type { WaitlistEntryRow } from '@/lib/admin/types';
 import {
   useApproveWaitlistMutation,
   useDisapproveWaitlistMutation,
+  useResendWaitlistInviteMutation,
 } from '@/lib/queries';
 import type { ApproveStatus } from './types';
 
@@ -16,7 +17,7 @@ interface UseApproveEntryProps {
 }
 
 const isApprovedStatus = (status: WaitlistEntryRow['status']) =>
-  status === 'invited' || status === 'claimed';
+  status === 'invited' || status === 'approved';
 
 export function useApproveEntry({ onRowUpdate }: UseApproveEntryProps) {
   const [approveStatuses, setApproveStatuses] = useState<
@@ -25,6 +26,7 @@ export function useApproveEntry({ onRowUpdate }: UseApproveEntryProps) {
 
   const approveWaitlistMutation = useApproveWaitlistMutation();
   const disapproveWaitlistMutation = useDisapproveWaitlistMutation();
+  const resendInviteMutation = useResendWaitlistInviteMutation();
 
   const approveEntry = useCallback(
     async (entry: Pick<WaitlistEntryRow, 'id' | 'status'>) => {
@@ -40,13 +42,13 @@ export function useApproveEntry({ onRowUpdate }: UseApproveEntryProps) {
         if (currentlyApproved) {
           await disapproveWaitlistMutation.mutateAsync({ entryId });
           onRowUpdate(entryId, {
-            status: 'new',
+            status: 'waitlisted',
             updatedAt: new Date(),
           });
         } else {
           await approveWaitlistMutation.mutateAsync({ entryId });
           onRowUpdate(entryId, {
-            status: 'claimed',
+            status: 'invited',
             updatedAt: new Date(),
           });
         }
@@ -59,5 +61,25 @@ export function useApproveEntry({ onRowUpdate }: UseApproveEntryProps) {
     [approveWaitlistMutation, disapproveWaitlistMutation, onRowUpdate]
   );
 
-  return { approveStatuses, approveEntry };
+  const resendInvite = useCallback(
+    async (entry: Pick<WaitlistEntryRow, 'id'>) => {
+      const { id: entryId } = entry;
+
+      setApproveStatuses(prev => ({
+        ...prev,
+        [entryId]: 'approving',
+      }));
+
+      try {
+        await resendInviteMutation.mutateAsync({ entryId });
+        onRowUpdate(entryId, { updatedAt: new Date() });
+        setApproveStatuses(prev => ({ ...prev, [entryId]: 'success' }));
+      } catch {
+        setApproveStatuses(prev => ({ ...prev, [entryId]: 'error' }));
+      }
+    },
+    [onRowUpdate, resendInviteMutation]
+  );
+
+  return { approveStatuses, approveEntry, resendInvite };
 }

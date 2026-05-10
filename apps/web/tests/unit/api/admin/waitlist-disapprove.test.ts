@@ -33,7 +33,7 @@ describe('Admin Waitlist Disapprove API', () => {
     });
   });
 
-  it('returns success and new status when disapproval succeeds', async () => {
+  it('returns success and waitlisted status when disapproval succeeds', async () => {
     mockWithSystemIngestionSession.mockResolvedValueOnce({
       outcome: 'disapproved',
       clerkId: 'user_123',
@@ -53,7 +53,7 @@ describe('Admin Waitlist Disapprove API', () => {
 
     expect(response.status).toBe(200);
     expect(data.success).toBe(true);
-    expect(data.status).toBe('new');
+    expect(data.status).toBe('waitlisted');
     expect(mockFinalizeWaitlistDisapproval).toHaveBeenCalled();
   });
 
@@ -76,7 +76,55 @@ describe('Admin Waitlist Disapprove API', () => {
 
     expect(response.status).toBe(200);
     expect(data.success).toBe(true);
-    expect(data.status).toBe('new');
+    expect(data.status).toBe('waitlisted');
+    expect(mockFinalizeWaitlistDisapproval).not.toHaveBeenCalled();
+  });
+
+  it('rejects disapproval for signed-up entries', async () => {
+    mockWithSystemIngestionSession.mockResolvedValueOnce({
+      outcome: 'terminal',
+      status: 'signed_up',
+    });
+
+    const response = await POST(
+      new Request('http://localhost/app/admin/waitlist/disapprove', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          entryId: '55555555-5555-4555-8555-555555555555',
+        }),
+      })
+    );
+
+    const data = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(data.success).toBe(false);
+    expect(data.error).toContain('signed_up');
+    expect(mockFinalizeWaitlistDisapproval).not.toHaveBeenCalled();
+  });
+
+  it('rejects disapproval for legacy claimed entries', async () => {
+    mockWithSystemIngestionSession.mockResolvedValueOnce({
+      outcome: 'terminal',
+      status: 'claimed',
+    });
+
+    const response = await POST(
+      new Request('http://localhost/app/admin/waitlist/disapprove', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          entryId: '66666666-6666-4666-8666-666666666666',
+        }),
+      })
+    );
+
+    const data = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(data.success).toBe(false);
+    expect(data.error).toContain('claimed');
     expect(mockFinalizeWaitlistDisapproval).not.toHaveBeenCalled();
   });
 });

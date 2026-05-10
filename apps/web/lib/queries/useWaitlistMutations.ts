@@ -20,7 +20,11 @@ export interface DisapproveWaitlistInput {
 
 export interface UpdateWaitlistStatusInput {
   entryId: string;
-  status: 'new' | 'invited' | 'claimed';
+  status: 'new' | 'chat_started' | 'qualified' | 'waitlisted' | 'rejected';
+}
+
+export interface ResendWaitlistInviteInput {
+  entryId: string;
 }
 
 export interface WaitlistMutationResponse {
@@ -149,6 +153,39 @@ async function updateWaitlistStatus(
   }
 }
 
+async function resendWaitlistInvite(
+  input: ResendWaitlistInviteInput
+): Promise<WaitlistMutationResponse> {
+  try {
+    const payload = await fetchWithTimeout<{
+      success?: boolean;
+      status?: string;
+      error?: string;
+    }>(`${APP_ROUTES.ADMIN_WAITLIST}/resend-invite`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(input),
+    });
+
+    if (!payload.success) {
+      throw new Error(payload.error ?? 'Failed to resend waitlist invite');
+    }
+
+    return {
+      success: true,
+      status: payload.status,
+    };
+  } catch (error) {
+    if (error instanceof FetchError) {
+      throw new Error('Failed to resend waitlist invite');
+    }
+    throw error;
+  }
+}
+
 /**
  * TanStack Query mutation hook for approving a waitlist entry.
  *
@@ -204,6 +241,17 @@ export function useUpdateWaitlistStatusMutation() {
 
   return useMutation({
     mutationFn: updateWaitlistStatus,
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.waitlist.all });
+    },
+  });
+}
+
+export function useResendWaitlistInviteMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: resendWaitlistInvite,
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.waitlist.all });
     },

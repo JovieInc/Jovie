@@ -1,7 +1,7 @@
 import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
-import { desc, sql as drizzleSql, eq } from 'drizzle-orm';
+import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   getDeepErrorMessage,
@@ -14,6 +14,11 @@ import { waitlistEntries } from '@/lib/db/schema/waitlist';
 import { captureCriticalError, captureError } from '@/lib/error-tracking';
 import { normalizeEmail } from '@/lib/utils/email';
 import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
+import {
+  type WaitlistStatus as CanonicalWaitlistStatus,
+  isWaitlistApprovedStatus,
+  isWaitlistPendingStatus,
+} from '@/lib/waitlist/state-machine';
 import { getCachedAuth, getCachedCurrentUser } from './cached';
 import {
   CanonicalUserState,
@@ -353,7 +358,7 @@ async function handleMissingDbUser(
 
   const waitlistResult = await checkWaitlistAccessInternal(email);
 
-  if (waitlistResult.status === 'new') {
+  if (isWaitlistPendingStatus(waitlistResult.status)) {
     return {
       state: CanonicalUserState.WAITLIST_PENDING,
       clerkUserId,
@@ -367,6 +372,17 @@ async function handleMissingDbUser(
   if (!waitlistResult.status) {
     return {
       state: CanonicalUserState.NEEDS_WAITLIST_SUBMISSION,
+      clerkUserId,
+      dbUserId: null,
+      profileId: null,
+      redirectTo: '/waitlist',
+      context: { ...baseContext, email },
+    };
+  }
+
+  if (!isWaitlistApprovedStatus(waitlistResult.status)) {
+    return {
+      state: CanonicalUserState.WAITLIST_PENDING,
       clerkUserId,
       dbUserId: null,
       profileId: null,
@@ -458,9 +474,7 @@ export async function resolveUserState(
   // Prefer a verified address over index [0] which may be unverified.
   const email =
     clerkUser?.emailAddresses?.find(e => e.verification?.status === 'verified')
-      ?.emailAddress ??
-    clerkUser?.primaryEmailAddress?.emailAddress ??
-    null;
+      ?.emailAddress ?? null;
 
   // 2. Query DB user AND profile in a single JOIN query (performance optimization)
   // This reduces database round trips from 2 to 1
@@ -619,10 +633,7 @@ export async function resolveUserState(
 // Waitlist Access Helpers (exported for reuse)
 // =============================================================================
 
-// Valid waitlist statuses (JOV-1963): 'new' (submitted, pending),
-// 'invited' (approved invite issued, treated as access granted),
-// 'claimed' (invite accepted, access granted).
-export type WaitlistStatus = 'new' | 'invited' | 'claimed';
+export type WaitlistStatus = CanonicalWaitlistStatus;
 
 export interface WaitlistAccessResult {
   entryId: string | null;
@@ -647,7 +658,7 @@ export async function getWaitlistAccess(
  */
 async function checkWaitlistAccessInternal(email: string): Promise<{
   entryId: string | null;
-  status: 'new' | 'invited' | 'claimed' | null;
+  status: WaitlistStatus | null;
 }> {
   const normalizedEmail = normalizeEmail(email);
 
@@ -661,22 +672,21 @@ async function checkWaitlistAccessInternal(email: string): Promise<{
       status: waitlistEntries.status,
     })
     .from(waitlistEntries)
-    .where(drizzleSql`lower(${waitlistEntries.email}) = ${normalizedEmail}`)
-    .orderBy(desc(waitlistEntries.createdAt))
+    .where(
+      drizzleSql`${waitlistEntries.emailNormalized} = ${normalizedEmail} OR lower(${waitlistEntries.email}) = ${normalizedEmail}`
+    )
+    .orderBy(
+      drizzleSql`${waitlistEntries.canonical} DESC, ${waitlistEntries.createdAt} DESC`
+    )
     .limit(1);
 
   if (!entry) {
     return { entryId: null, status: null };
   }
 
-  // JOV-1963: include 'invited' in the cast. The waitlist_status enum is
-  // ('new' | 'invited' | 'claimed'); the prior cast silently dropped
-  // 'invited' which let an invited row look like the "claimed" branch by
-  // accident. Now invited and claimed are both handled explicitly upstream
-  // (both grant access; 'new' redirects to /waitlist).
   return {
     entryId: entry.id,
-    status: entry.status as 'new' | 'invited' | 'claimed',
+    status: entry.status,
   };
 }
 

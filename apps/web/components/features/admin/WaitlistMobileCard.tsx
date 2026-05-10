@@ -14,37 +14,12 @@ import {
 import React, { useState } from 'react';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import type { WaitlistEntryRow } from '@/lib/admin/types';
-
-/** Map platform ID to display name */
-const PLATFORM_LABELS: Record<string, string> = {
-  instagram: 'Instagram',
-  tiktok: 'TikTok',
-  youtube: 'YouTube',
-  x: 'X',
-  twitch: 'Twitch',
-  linktree: 'Linktree',
-  facebook: 'Facebook',
-  threads: 'Threads',
-  snapchat: 'Snapchat',
-  unknown: 'Unknown',
-};
-
-const PRIMARY_GOAL_LABELS: Record<string, string> = {
-  streams: 'Streams',
-  merch: 'Merch',
-  tickets: 'Tickets',
-};
-
-/** Map status to badge variant */
-const STATUS_VARIANTS: Record<
-  string,
-  'primary' | 'secondary' | 'success' | 'error' | 'warning'
-> = {
-  new: 'secondary',
-  invited: 'primary',
-  claimed: 'success',
-  rejected: 'error',
-};
+import {
+  PLATFORM_LABELS,
+  PRIMARY_GOAL_LABELS,
+  STATUS_LABELS,
+  STATUS_VARIANTS,
+} from './waitlist-table/constants';
 
 export interface WaitlistMobileCardProps {
   readonly entry: WaitlistEntryRow;
@@ -71,7 +46,8 @@ export const WaitlistMobileCard = React.memo(function WaitlistMobileCard({
 }: WaitlistMobileCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const isApproved = entry.status === 'invited' || entry.status === 'claimed';
+  const isApproved = entry.status === 'invited' || entry.status === 'approved';
+  const isSignedUp = entry.status === 'signed_up' || entry.status === 'claimed';
   const isApproving = approveStatus === 'approving';
   const isDisapproving = approveStatus === 'disapproving';
   const statusVariant = STATUS_VARIANTS[entry.status] ?? 'secondary';
@@ -93,6 +69,7 @@ export const WaitlistMobileCard = React.memo(function WaitlistMobileCard({
   const getApproveButtonLabel = (): string => {
     if (isApproving) return 'Approving…';
     if (isDisapproving) return 'Disapproving…';
+    if (isSignedUp) return 'Signed up';
     if (isApproved) return 'Disapprove';
     return 'Approve';
   };
@@ -117,7 +94,7 @@ export const WaitlistMobileCard = React.memo(function WaitlistMobileCard({
             </a>
           </div>
           <Badge size='sm' variant={statusVariant} className='flex-shrink-0'>
-            {entry.status}
+            {STATUS_LABELS[entry.status]}
           </Badge>
         </div>
 
@@ -145,7 +122,7 @@ export const WaitlistMobileCard = React.memo(function WaitlistMobileCard({
           <Button
             size='sm'
             variant='secondary'
-            disabled={isApproving || isDisapproving}
+            disabled={isSignedUp || isApproving || isDisapproving}
             onClick={onApprove}
             className='flex-1'
           >

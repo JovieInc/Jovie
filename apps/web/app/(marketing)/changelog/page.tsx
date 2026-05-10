@@ -167,7 +167,7 @@ export default async function ChangelogPage() {
                       v{release.version}
                     </Badge>
                     {release.date && (
-                      <span className='text-xs opacity-40'>
+                      <span className='text-xs text-tertiary-token'>
                         {formatDate(release.date)}
                       </span>
                     )}

@@ -760,17 +760,22 @@ export {
 
 // Waitlist
 export {
+  insertWaitlistAuditLogSchema,
   insertWaitlistEntrySchema,
   insertWaitlistInviteSchema,
   insertWaitlistSettingsSchema,
+  type NewWaitlistAuditLog,
   type NewWaitlistEntry,
   type NewWaitlistInvite,
+  selectWaitlistAuditLogSchema,
   selectWaitlistEntrySchema,
   selectWaitlistInviteSchema,
   selectWaitlistSettingsSchema,
+  type WaitlistAuditLog,
   type WaitlistEntry,
   type WaitlistInvite,
   type WaitlistSettings,
+  waitlistAuditLogs,
   waitlistEntries,
   waitlistInvites,
   waitlistSettings,

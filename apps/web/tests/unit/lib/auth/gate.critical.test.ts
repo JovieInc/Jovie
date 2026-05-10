@@ -675,6 +675,29 @@ describe('@critical gate.ts', () => {
       expect(mockCaptureError).toHaveBeenCalled();
     });
 
+    it('does not create a DB user from an unverified primary email', async () => {
+      mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
+      mockCachedCurrentUser.mockResolvedValue({
+        emailAddresses: [
+          {
+            emailAddress: 'unverified@example.com',
+            verification: { status: 'unverified' },
+          },
+        ],
+        primaryEmailAddress: {
+          emailAddress: 'unverified@example.com',
+        },
+      });
+
+      mockDbSelect.mockReturnValue(createJoinSelectChain([]));
+
+      await expect(resolveUserState()).rejects.toThrow(
+        'Email is required for user creation'
+      );
+      expect(mockDbInsert).not.toHaveBeenCalled();
+      expect(mockCaptureError).toHaveBeenCalled();
+    });
+
     it('uses joined profile data when resolving canonical state', async () => {
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
       mockCachedCurrentUser.mockResolvedValue(mockClerkUser());

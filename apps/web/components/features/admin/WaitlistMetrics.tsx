@@ -1,4 +1,4 @@
-import { CheckCircle2, MailCheck, UserPlus2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2, MailCheck, UserPlus2 } from 'lucide-react';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import type { WaitlistMetrics as WaitlistMetricsType } from '@/lib/admin/types';
 import { cn } from '@/lib/utils';
@@ -47,12 +47,12 @@ interface WaitlistMetricsProps {
 export function WaitlistMetrics({ metrics }: WaitlistMetricsProps) {
   return (
     <div
-      className='grid gap-3 sm:grid-cols-3'
+      className='grid gap-3 sm:grid-cols-4'
       data-testid='admin-waitlist-content'
     >
       <MetricCard
-        label='New'
-        value={metrics.new}
+        label='Waitlisted'
+        value={metrics.waitlisted}
         icon={UserPlus2}
         colorClass='text-accent'
         bgClass='bg-accent/10'
@@ -65,11 +65,18 @@ export function WaitlistMetrics({ metrics }: WaitlistMetricsProps) {
         bgClass='bg-secondary/10'
       />
       <MetricCard
-        label='Claimed'
-        value={metrics.claimed}
+        label='Signed up'
+        value={metrics.signedUp}
         icon={CheckCircle2}
         colorClass='text-success-token'
         bgClass='bg-success/10'
+      />
+      <MetricCard
+        label='Email failures'
+        value={metrics.emailFailures}
+        icon={AlertCircle}
+        colorClass='text-destructive'
+        bgClass='bg-destructive/10'
       />
     </div>
   );
