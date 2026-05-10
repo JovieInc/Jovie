@@ -19640,7 +19640,12 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "waitlist_settings_auto_accept_after_days_range": {
+          "name": "waitlist_settings_auto_accept_after_days_range",
+          "value": "\"auto_accept_after_days\" >= 1 AND \"auto_accept_after_days\" <= 365"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.webhook_events": {

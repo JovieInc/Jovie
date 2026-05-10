@@ -215,6 +215,7 @@ describe('completeOnboarding', () => {
       expect.anything(),
       'db_user_123'
     );
+    expect(hoisted.markWaitlistSignedUpInTxMock).not.toHaveBeenCalled();
     expect(hoisted.captureErrorMock).not.toHaveBeenCalledWith(
       'completeOnboarding failed',
       expect.anything(),

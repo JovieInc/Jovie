@@ -65,6 +65,10 @@ export async function markWaitlistSignedUpInTx(
     return { entryId: null };
   }
 
+  if (entry.status === 'signed_up') {
+    return { entryId: entry.id };
+  }
+
   if (!isWaitlistSignupEligibleStatus(entry.status)) {
     throw new Error('Approved waitlist access is required to complete signup');
   }
@@ -78,28 +82,27 @@ export async function markWaitlistSignedUpInTx(
     .set({ userStatus: nextUserStatus, updatedAt: now })
     .where(eq(users.id, user.id));
 
-  if (entry.status !== 'signed_up') {
-    await tx
-      .update(waitlistEntries)
-      .set({
-        status: 'signed_up',
-        signedUpAt: now,
-        inviteTokenRedeemedAt: now,
-        statusReason: 'onboarding_completed',
-        updatedAt: now,
-      })
-      .where(eq(waitlistEntries.id, entry.id));
+  await tx
+    .update(waitlistEntries)
+    .set({
+      status: 'signed_up',
+      signedUpAt: now,
+      inviteTokenRedeemedAt: now,
+      statusReason: 'onboarding_completed',
+      updatedAt: now,
+    })
+    .where(eq(waitlistEntries.id, entry.id));
 
-    await insertWaitlistAuditLog(tx, {
-      waitlistEntryId: entry.id,
-      fromStatus: entry.status,
-      toStatus: 'signed_up',
-      actorUserId: clerkUserId,
-      actorType: 'user',
-      reason: 'onboarding_completed',
-    });
-  }
+  await insertWaitlistAuditLog(tx, {
+    waitlistEntryId: entry.id,
+    fromStatus: entry.status,
+    toStatus: 'signed_up',
+    actorUserId: clerkUserId,
+    actorType: 'user',
+    reason: 'onboarding_completed',
+  });
 
   await enqueueSignedUpWelcomeEmail(tx, entry.id);
+
   return { entryId: entry.id };
 }

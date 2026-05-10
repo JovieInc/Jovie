@@ -188,8 +188,8 @@ async function seedReleases(profileIds: readonly string[]) {
 async function seedWaitlist() {
   await db.delete(waitlistEntries).where(
     inArray(
-      waitlistEntries.email,
-      WAITLIST_FIXTURES.map(entry => entry.email)
+      waitlistEntries.emailNormalized,
+      WAITLIST_FIXTURES.map(entry => normalizeEmail(entry.email))
     )
   );
 

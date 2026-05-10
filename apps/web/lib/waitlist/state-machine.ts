@@ -20,7 +20,6 @@ export const WAITLIST_SIGNUP_ELIGIBLE_STATUSES = new Set<WaitlistStatus>([
   'invited',
   'approved',
   'claimed',
-  'signed_up',
 ]);
 
 export const WAITLIST_TERMINAL_STATUSES = new Set<WaitlistStatus>([
@@ -75,7 +74,7 @@ export function isWaitlistInviteRedeemableStatus(
 
 export function isWaitlistSignupEligibleStatus(
   status: string | null | undefined
-): status is 'invited' | 'approved' | 'claimed' | 'signed_up' {
+): status is 'invited' | 'approved' | 'claimed' {
   return Boolean(
     status && WAITLIST_SIGNUP_ELIGIBLE_STATUSES.has(status as WaitlistStatus)
   );

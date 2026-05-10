@@ -1,4 +1,4 @@
-import { desc, sql as drizzleSql } from 'drizzle-orm';
+import { and, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { db, doesTableExist } from '@/lib/db';
 import { type WaitlistEntry, waitlistEntries } from '@/lib/db/schema/waitlist';
 
@@ -62,6 +62,7 @@ export async function getWaitlistMetrics(): Promise<WaitlistMetrics> {
         count: drizzleSql<number>`count(*)::int`,
       })
       .from(waitlistEntries)
+      .where(eq(waitlistEntries.canonical, true))
       .groupBy(waitlistEntries.status);
 
     const metrics: WaitlistMetrics = {
@@ -95,7 +96,10 @@ export async function getWaitlistMetrics(): Promise<WaitlistMetrics> {
       })
       .from(waitlistEntries)
       .where(
-        drizzleSql`${waitlistEntries.waitlistEmailStatus} = 'error' OR ${waitlistEntries.inviteEmailStatus} = 'error'`
+        and(
+          eq(waitlistEntries.canonical, true),
+          drizzleSql`${waitlistEntries.waitlistEmailStatus} = 'error' OR ${waitlistEntries.inviteEmailStatus} = 'error'`
+        )
       );
 
     metrics.emailFailures = emailFailures?.count ?? 0;
@@ -131,7 +135,8 @@ export async function getAdminWaitlistEntries(
     // Get total count
     const [countResult] = await db
       .select({ count: drizzleSql<number>`count(*)::int` })
-      .from(waitlistEntries);
+      .from(waitlistEntries)
+      .where(eq(waitlistEntries.canonical, true));
 
     const total = countResult?.count ?? 0;
 
@@ -139,6 +144,7 @@ export async function getAdminWaitlistEntries(
     const entries = await db
       .select()
       .from(waitlistEntries)
+      .where(eq(waitlistEntries.canonical, true))
       .orderBy(desc(waitlistEntries.createdAt))
       .limit(pageSize)
       .offset(offset);

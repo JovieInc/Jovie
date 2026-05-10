@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { encryptPII } from '@/lib/utils/pii-encryption';
 import { processWaitlistEmailJob } from '@/lib/waitlist/email-jobs';
 import { hashWaitlistInviteToken } from '@/lib/waitlist/tokens';
 
@@ -41,6 +42,8 @@ describe('processWaitlistEmailJob', () => {
       results: [{ channel: 'email', status: 'sent', detail: 'message-id' }],
     });
     const inviteToken = 'retry-token-with-enough-entropy-for-the-test-fixture';
+    const encryptedInviteToken = encryptPII(inviteToken);
+    expect(encryptedInviteToken).toBeTruthy();
     const { tx, updateSet } = createTxMock([
       {
         id: '11111111-1111-4111-8111-111111111111',
@@ -59,7 +62,7 @@ describe('processWaitlistEmailJob', () => {
       {
         entryId: '11111111-1111-4111-8111-111111111111',
         type: 'approval_invite',
-        encryptedInviteToken: inviteToken,
+        encryptedInviteToken: encryptedInviteToken ?? '',
       },
       {
         jobId: 'job-1',
@@ -67,9 +70,10 @@ describe('processWaitlistEmailJob', () => {
     );
 
     expect(result.status).toBe('sent');
-    expect(updateSet).not.toHaveBeenCalledWith(
-      expect.objectContaining({ inviteTokenHash: expect.any(String) })
+    const tokenHashWrites = updateSet.mock.calls.filter(([value]) =>
+      Object.hasOwn(value as object, 'inviteTokenHash')
     );
+    expect(tokenHashWrites).toHaveLength(0);
     expect(mockSendNotification).toHaveBeenCalledOnce();
     expect(mockSendNotification.mock.calls[0]?.[0].text).toContain(
       `token=${inviteToken}`

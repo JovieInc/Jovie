@@ -180,6 +180,7 @@ async function upsertUserStatus(params: {
   readonly nextStatus: UserLifecycleStatus;
 }): Promise<UpsertUserStatusResult> {
   const { tx, clerkUserId, emailRaw, entryId, nextStatus } = params;
+  const email = normalizeEmail(emailRaw);
   const [existing] = await tx
     .select({ id: users.id, userStatus: users.userStatus })
     .from(users)
@@ -189,7 +190,7 @@ async function upsertUserStatus(params: {
   if (!existing) {
     await tx.insert(users).values({
       clerkId: clerkUserId,
-      email: emailRaw,
+      email,
       userStatus: nextStatus,
       waitlistEntryId: entryId,
     });
@@ -211,7 +212,7 @@ async function upsertUserStatus(params: {
   await tx
     .update(users)
     .set({
-      email: emailRaw,
+      email,
       userStatus: finalStatus,
       waitlistEntryId: entryId,
       updatedAt: new Date(),

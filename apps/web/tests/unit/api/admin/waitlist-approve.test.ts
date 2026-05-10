@@ -2,10 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockGetCurrentUserEntitlements = vi.hoisted(() => vi.fn());
 const mockWithSystemIngestionSession = vi.hoisted(() => vi.fn());
-const mockSendNotification = vi.hoisted(() => vi.fn());
-const mockBuildWaitlistInviteEmail = vi.hoisted(() => vi.fn());
 const mockInvalidateProxyUserStateCache = vi.hoisted(() => vi.fn());
-const mockEnqueueWaitlistEmailJob = vi.hoisted(() => vi.fn());
+const mockApproveWaitlistEntryInTx = vi.hoisted(() => vi.fn());
+const mockFinalizeWaitlistApproval = vi.hoisted(() => vi.fn());
+const mockEnqueueWaitlistApprovalInviteEmail = vi.hoisted(() => vi.fn());
 
 const {
   mockWaitlistEntries,
@@ -31,16 +31,13 @@ vi.mock('@/lib/ingestion/session', () => ({
   withSystemIngestionSession: mockWithSystemIngestionSession,
 }));
 
-vi.mock('@/lib/notifications/service', () => ({
-  sendNotification: mockSendNotification,
-}));
-
-vi.mock('@/lib/waitlist/invite', () => ({
-  buildWaitlistInviteEmail: mockBuildWaitlistInviteEmail,
+vi.mock('@/lib/waitlist/approval', () => ({
+  approveWaitlistEntryInTx: mockApproveWaitlistEntryInTx,
+  finalizeWaitlistApproval: mockFinalizeWaitlistApproval,
 }));
 
 vi.mock('@/lib/waitlist/email-jobs', () => ({
-  enqueueWaitlistEmailJob: mockEnqueueWaitlistEmailJob,
+  enqueueWaitlistApprovalInviteEmail: mockEnqueueWaitlistApprovalInviteEmail,
 }));
 
 vi.mock('@/lib/db/schema', () => ({
@@ -54,24 +51,19 @@ vi.mock('@/lib/db/schema', () => ({
 import { POST } from '@/app/app/(shell)/admin/waitlist/approve/route';
 
 describe('Admin Waitlist Approve API', () => {
-  const mockMessage = { id: 'test', subject: 'Welcome' };
-  const mockTarget = { email: 'user@example.com' };
-
   beforeEach(() => {
     vi.clearAllMocks();
-    mockBuildWaitlistInviteEmail.mockReturnValue({
-      message: mockMessage,
-      target: mockTarget,
-      inviteUrl: 'https://example.com/signin',
-    });
-    mockSendNotification.mockResolvedValue({ delivered: ['email'] });
-    mockEnqueueWaitlistEmailJob.mockResolvedValue('job-1');
+    mockWithSystemIngestionSession.mockImplementation(async operation =>
+      operation({} as never)
+    );
+    mockFinalizeWaitlistApproval.mockResolvedValue(undefined);
+    mockEnqueueWaitlistApprovalInviteEmail.mockResolvedValue('job-1');
   });
 
   it('rejects concurrent approvals after the entry is processed', async () => {
     const entryId = '11111111-1111-4111-8111-111111111111';
 
-    mockWithSystemIngestionSession
+    mockApproveWaitlistEntryInTx
       .mockResolvedValueOnce({
         outcome: 'approved',
         entryId,
@@ -126,7 +118,7 @@ describe('Admin Waitlist Approve API', () => {
     const email = 'newuser@example.com';
     const fullName = 'New User';
 
-    mockWithSystemIngestionSession.mockResolvedValueOnce({
+    mockApproveWaitlistEntryInTx.mockResolvedValueOnce({
       outcome: 'approved',
       entryId,
       profileId,
@@ -159,14 +151,16 @@ describe('Admin Waitlist Approve API', () => {
 
     expect(data.status).toBe('invited');
     expect(data.message).toBe('Access approved. Invite email queued.');
-    expect(mockBuildWaitlistInviteEmail).not.toHaveBeenCalled();
-    expect(mockSendNotification).not.toHaveBeenCalled();
+    expect(mockEnqueueWaitlistApprovalInviteEmail).toHaveBeenCalledWith(
+      expect.anything(),
+      entryId
+    );
   });
 
   it('approves access when no profile exists yet', async () => {
     const entryId = '44444444-4444-4444-8444-444444444444';
 
-    mockWithSystemIngestionSession.mockResolvedValueOnce({
+    mockApproveWaitlistEntryInTx.mockResolvedValueOnce({
       outcome: 'approved',
       entryId,
       profileId: null,
@@ -203,7 +197,7 @@ describe('Admin Waitlist Approve API', () => {
   it('returns 422 when user has not signed in yet', async () => {
     const entryId = '55555555-5555-4555-8555-555555555555';
 
-    mockWithSystemIngestionSession.mockResolvedValueOnce({
+    mockApproveWaitlistEntryInTx.mockResolvedValueOnce({
       outcome: 'no_user',
     });
 
@@ -229,14 +223,13 @@ describe('Admin Waitlist Approve API', () => {
     expect(response.status).toBe(422);
     expect(data.success).toBe(false);
     expect(data.error).toMatch(/sign in/i);
-    expect(mockBuildWaitlistInviteEmail).not.toHaveBeenCalled();
-    expect(mockSendNotification).not.toHaveBeenCalled();
+    expect(mockEnqueueWaitlistApprovalInviteEmail).not.toHaveBeenCalled();
   });
 
   it('does not send email when entry is already invited', async () => {
     const entryId = '33333333-3333-4333-8333-333333333333';
 
-    mockWithSystemIngestionSession.mockResolvedValueOnce({
+    mockApproveWaitlistEntryInTx.mockResolvedValueOnce({
       outcome: 'already_processed',
       status: 'invited',
     });
@@ -261,14 +254,13 @@ describe('Admin Waitlist Approve API', () => {
     const response = await POST(request);
 
     expect(response.status).toBe(200);
-    expect(mockBuildWaitlistInviteEmail).not.toHaveBeenCalled();
-    expect(mockSendNotification).not.toHaveBeenCalled();
+    expect(mockEnqueueWaitlistApprovalInviteEmail).not.toHaveBeenCalled();
   });
 
   it('returns 409 when an admin approves a rejected entry', async () => {
     const entryId = '66666666-6666-4666-8666-666666666666';
 
-    mockWithSystemIngestionSession.mockResolvedValueOnce({
+    mockApproveWaitlistEntryInTx.mockResolvedValueOnce({
       outcome: 'already_processed',
       status: 'rejected',
     });
@@ -296,14 +288,13 @@ describe('Admin Waitlist Approve API', () => {
     expect(data.success).toBe(false);
     expect(data.status).toBe('rejected');
     expect(data.error).toBe('Entry cannot be approved from status: rejected');
-    expect(mockBuildWaitlistInviteEmail).not.toHaveBeenCalled();
-    expect(mockSendNotification).not.toHaveBeenCalled();
+    expect(mockEnqueueWaitlistApprovalInviteEmail).not.toHaveBeenCalled();
   });
 
   it('returns 409 when an admin approves a signed-up entry', async () => {
     const entryId = '77777777-7777-4777-8777-777777777777';
 
-    mockWithSystemIngestionSession.mockResolvedValueOnce({
+    mockApproveWaitlistEntryInTx.mockResolvedValueOnce({
       outcome: 'already_processed',
       status: 'signed_up',
     });
@@ -331,7 +322,6 @@ describe('Admin Waitlist Approve API', () => {
     expect(data.success).toBe(false);
     expect(data.status).toBe('signed_up');
     expect(data.error).toBe('Entry cannot be approved from status: signed_up');
-    expect(mockBuildWaitlistInviteEmail).not.toHaveBeenCalled();
-    expect(mockSendNotification).not.toHaveBeenCalled();
+    expect(mockEnqueueWaitlistApprovalInviteEmail).not.toHaveBeenCalled();
   });
 });

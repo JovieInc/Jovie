@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { WaitlistRequestPayload } from '@/lib/validation/schemas';
 import { evaluateWaitlistQualification } from '@/lib/waitlist/qualification';
 import {
   canTransitionWaitlistStatus,
@@ -11,13 +12,13 @@ import {
 } from '@/lib/waitlist/tokens';
 
 const basePayload = {
-  primaryGoal: 'launch',
+  primaryGoal: 'streams',
   primarySocialUrl: 'https://instagram.com/artist',
   spotifyUrl: 'https://open.spotify.com/artist/abc',
   spotifyArtistName: 'Artist',
   heardAbout: 'friend',
   selectedPlan: undefined,
-} as never;
+} satisfies WaitlistRequestPayload;
 
 describe('waitlist critical flow contracts', () => {
   it('chat onboarding -> immediate approval -> signup -> welcome email contract', () => {

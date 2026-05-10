@@ -62,7 +62,9 @@ export async function approveWaitlistEntryInTx(
   const [user] = await tx
     .select({ id: users.id, clerkId: users.clerkId })
     .from(users)
-    .where(drizzleSql`lower(${users.email}) = lower(${entry.email})`)
+    .where(
+      drizzleSql`lower(trim(${users.email})) = lower(trim(${entry.email}))`
+    )
     .limit(1);
 
   if (!user) {
@@ -207,7 +209,9 @@ export async function disapproveWaitlistEntryInTx(
   const [user] = await tx
     .select({ id: users.id, clerkId: users.clerkId })
     .from(users)
-    .where(drizzleSql`lower(${users.email}) = lower(${entry.email})`)
+    .where(
+      drizzleSql`lower(trim(${users.email})) = lower(trim(${entry.email}))`
+    )
     .limit(1);
 
   const [profile] = await tx

@@ -44,20 +44,28 @@ SET
     WHEN "status" = 'new' AND "waitlisted_at" IS NULL THEN "created_at"
     ELSE "waitlisted_at"
   END,
+  "approved_at" = CASE
+    WHEN "status" IN ('approved', 'invited', 'claimed', 'signed_up') AND "approved_at" IS NULL
+      THEN COALESCE("invited_at", "signed_up_at", "updated_at", "created_at")
+    ELSE "approved_at"
+  END,
   "invited_at" = CASE
-    WHEN "status" = 'invited' AND "invited_at" IS NULL THEN "updated_at"
+    WHEN "status" IN ('invited', 'claimed', 'signed_up') AND "invited_at" IS NULL
+      THEN COALESCE("approved_at", "signed_up_at", "updated_at", "created_at")
     ELSE "invited_at"
   END,
   "signed_up_at" = CASE
-    WHEN "status" = 'claimed' AND "signed_up_at" IS NULL THEN "updated_at"
+    WHEN "status" IN ('claimed', 'signed_up') AND "signed_up_at" IS NULL
+      THEN COALESCE("invited_at", "approved_at", "updated_at", "created_at")
     ELSE "signed_up_at"
   END
 WHERE "email_normalized" IS NULL
   OR "source" IS NULL
   OR "canonical" IS NULL
   OR ("status" = 'new' AND "waitlisted_at" IS NULL)
-  OR ("status" = 'invited' AND "invited_at" IS NULL)
-  OR ("status" = 'claimed' AND "signed_up_at" IS NULL);
+  OR ("status" IN ('approved', 'invited', 'claimed', 'signed_up') AND "approved_at" IS NULL)
+  OR ("status" IN ('invited', 'claimed', 'signed_up') AND "invited_at" IS NULL)
+  OR ("status" IN ('claimed', 'signed_up') AND "signed_up_at" IS NULL);
 
 WITH ranked_entries AS (
   SELECT
@@ -109,8 +117,13 @@ CREATE INDEX IF NOT EXISTS "idx_waitlist_entries_invite_token_hash"
 ALTER TABLE "waitlist_settings" ADD COLUMN IF NOT EXISTS "auto_accept_after_days" integer DEFAULT 7;
 UPDATE "waitlist_settings"
 SET "auto_accept_after_days" = 7
-WHERE "auto_accept_after_days" IS NULL;
+WHERE "auto_accept_after_days" IS NULL
+  OR "auto_accept_after_days" < 1
+  OR "auto_accept_after_days" > 365;
 ALTER TABLE "waitlist_settings" ALTER COLUMN "auto_accept_after_days" SET NOT NULL;
+ALTER TABLE "waitlist_settings" DROP CONSTRAINT IF EXISTS "waitlist_settings_auto_accept_after_days_range";
+ALTER TABLE "waitlist_settings" ADD CONSTRAINT "waitlist_settings_auto_accept_after_days_range"
+  CHECK ("auto_accept_after_days" >= 1 AND "auto_accept_after_days" <= 365);
 
 CREATE TABLE IF NOT EXISTS "waitlist_audit_logs" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,

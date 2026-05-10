@@ -11,7 +11,7 @@ interface BuildWaitlistInviteEmailParams {
   email: string;
   fullName?: string | null;
   appUrl?: string;
-  dedupKey?: string;
+  dedupKey: string;
   token?: string;
 }
 
@@ -47,7 +47,7 @@ export function buildWaitlistInviteEmail({
       email,
     },
     message: {
-      id: dedupKey ?? `waitlist_invite:${email}`,
+      id: dedupKey,
       dedupKey,
       idempotencyKey: dedupKey,
       category: 'transactional',
@@ -80,7 +80,7 @@ export function buildWaitlistConfirmationEmail({
   return {
     target: { email },
     message: {
-      id: dedupKey ?? `waitlist_confirmation:${email}`,
+      id: dedupKey,
       dedupKey,
       idempotencyKey: dedupKey,
       category: 'transactional',
@@ -107,7 +107,7 @@ export function buildWaitlistWelcomeEmail({
   return {
     target: { email },
     message: {
-      id: dedupKey ?? `waitlist_welcome:${email}`,
+      id: dedupKey,
       dedupKey,
       idempotencyKey: dedupKey,
       category: 'transactional',

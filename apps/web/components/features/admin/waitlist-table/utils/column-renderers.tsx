@@ -15,7 +15,12 @@ import {
 } from '@/components/organisms/table';
 import { PlatformPill } from '@/features/dashboard/atoms/PlatformPill';
 import type { WaitlistEntryRow } from '@/lib/admin/types';
-import { PLATFORM_LABELS, PRIMARY_GOAL_LABELS } from '../constants';
+import {
+  PLATFORM_LABELS,
+  PRIMARY_GOAL_LABELS,
+  STATUS_LABELS,
+  STATUS_VARIANTS,
+} from '../constants';
 
 /**
  * Renders a name cell with primary token styling
@@ -137,40 +142,9 @@ export function renderHeardAboutCell(value: string | null) {
  * Renders the status badge cell
  */
 export function renderStatusCell(status: WaitlistEntryRow['status']) {
-  const statusLabels: Record<string, string> = {
-    new: 'Waitlisted',
-    chat_started: 'Chat started',
-    qualified: 'Qualified',
-    waitlisted: 'Waitlisted',
-    invited: 'Invited',
-    approved: 'Approved',
-    claimed: 'Signed up',
-    signed_up: 'Signed up',
-    rejected: 'Rejected',
-    expired: 'Expired',
-    blocked: 'Blocked',
-  };
-
-  const statusVariants: Record<
-    string,
-    'primary' | 'secondary' | 'success' | 'warning' | 'error'
-  > = {
-    new: 'secondary',
-    chat_started: 'secondary',
-    qualified: 'secondary',
-    waitlisted: 'secondary',
-    invited: 'primary',
-    approved: 'primary',
-    claimed: 'success',
-    signed_up: 'success',
-    rejected: 'error',
-    expired: 'warning',
-    blocked: 'error',
-  };
-
   return (
-    <Badge size='sm' variant={statusVariants[status] ?? 'secondary'}>
-      {statusLabels[status] ?? status}
+    <Badge size='sm' variant={STATUS_VARIANTS[status]}>
+      {STATUS_LABELS[status]}
     </Badge>
   );
 }

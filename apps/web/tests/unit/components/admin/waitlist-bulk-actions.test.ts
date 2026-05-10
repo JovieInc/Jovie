@@ -67,7 +67,7 @@ describe('Waitlist bulk approve/disapprove filtering', () => {
     expect(eligible.map(e => e.id)).toEqual(['2', '3']);
   });
 
-  it('bulk approve returns empty when no entries have status "new"', () => {
+  it('bulk approve returns empty when no entries have an approvable status', () => {
     const entries = [
       createEntry({ id: '1', status: 'invited' }),
       createEntry({ id: '2', status: 'claimed' }),
@@ -75,7 +75,12 @@ describe('Waitlist bulk approve/disapprove filtering', () => {
     const selectedIds = new Set(['1', '2']);
     const selectedEntries = entries.filter(e => selectedIds.has(e.id));
 
-    const eligible = selectedEntries.filter(e => e.status === 'new');
+    const eligible = selectedEntries.filter(
+      e =>
+        e.status === 'new' ||
+        e.status === 'qualified' ||
+        e.status === 'waitlisted'
+    );
 
     expect(eligible).toHaveLength(0);
   });

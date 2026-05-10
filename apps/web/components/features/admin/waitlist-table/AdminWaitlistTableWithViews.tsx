@@ -37,7 +37,6 @@ import {
   useAdminWaitlistInfiniteQuery,
   useApproveWaitlistMutation,
   useDisapproveWaitlistMutation,
-  useUpdateWaitlistStatusMutation,
 } from '@/lib/queries';
 import { AdminWaitlistTableUnified } from './AdminWaitlistTableUnified';
 import {
@@ -102,7 +101,6 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
   });
 
   // TanStack Query mutations for waitlist status changes
-  const updateStatusMutation = useUpdateWaitlistStatusMutation();
   const approveMutation = useApproveWaitlistMutation();
   const disapproveMutation = useDisapproveWaitlistMutation();
 
@@ -216,8 +214,8 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
 
     return [
       {
-        id: 'waitlisted',
-        title: 'Waitlisted',
+        id: 'pipeline',
+        title: 'Pipeline',
         items: newEntries,
         count: newEntries.length,
         accent: '#3b82f6', // blue
@@ -262,15 +260,11 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
 
         if (toColumnId === 'invited') {
           await approveMutation.mutateAsync({ entryId: itemId });
-        } else if (toColumnId === 'waitlisted') {
+        } else if (toColumnId === 'pipeline') {
           // Use proper disapproval flow — reverts user status and profile
           await disapproveMutation.mutateAsync({ entryId: itemId });
         } else {
-          // Transitional status updates use the constrained admin status route.
-          await updateStatusMutation.mutateAsync({
-            entryId: itemId,
-            status: toColumnId as 'waitlisted',
-          });
+          toast.error('Unsupported waitlist status update.');
         }
       } catch (error) {
         console.error('Failed to update waitlist status:', error);
@@ -280,7 +274,7 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
         });
       }
     },
-    [approveMutation, disapproveMutation, updateStatusMutation]
+    [approveMutation, disapproveMutation]
   );
 
   return (

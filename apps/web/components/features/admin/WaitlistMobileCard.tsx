@@ -14,44 +14,12 @@ import {
 import React, { useState } from 'react';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import type { WaitlistEntryRow } from '@/lib/admin/types';
-
-/** Map platform ID to display name */
-const PLATFORM_LABELS: Record<string, string> = {
-  instagram: 'Instagram',
-  tiktok: 'TikTok',
-  youtube: 'YouTube',
-  x: 'X',
-  twitch: 'Twitch',
-  linktree: 'Linktree',
-  facebook: 'Facebook',
-  threads: 'Threads',
-  snapchat: 'Snapchat',
-  unknown: 'Unknown',
-};
-
-const PRIMARY_GOAL_LABELS: Record<string, string> = {
-  streams: 'Streams',
-  merch: 'Merch',
-  tickets: 'Tickets',
-};
-
-/** Map status to badge variant */
-const STATUS_VARIANTS: Record<
-  string,
-  'primary' | 'secondary' | 'success' | 'error' | 'warning'
-> = {
-  new: 'secondary',
-  chat_started: 'secondary',
-  qualified: 'secondary',
-  waitlisted: 'secondary',
-  invited: 'primary',
-  approved: 'primary',
-  claimed: 'success',
-  signed_up: 'success',
-  rejected: 'error',
-  expired: 'warning',
-  blocked: 'error',
-};
+import {
+  PLATFORM_LABELS,
+  PRIMARY_GOAL_LABELS,
+  STATUS_LABELS,
+  STATUS_VARIANTS,
+} from './waitlist-table/constants';
 
 export interface WaitlistMobileCardProps {
   readonly entry: WaitlistEntryRow;
@@ -126,7 +94,7 @@ export const WaitlistMobileCard = React.memo(function WaitlistMobileCard({
             </a>
           </div>
           <Badge size='sm' variant={statusVariant} className='flex-shrink-0'>
-            {entry.status}
+            {STATUS_LABELS[entry.status]}
           </Badge>
         </div>
 

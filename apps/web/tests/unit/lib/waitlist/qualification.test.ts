@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest';
+import type { WaitlistRequestPayload } from '@/lib/validation/schemas';
 import { evaluateWaitlistQualification } from '@/lib/waitlist/qualification';
 
 const payload = {
-  primaryGoal: 'launch',
+  primaryGoal: 'streams',
   primarySocialUrl: 'https://instagram.com/example',
   spotifyUrl: undefined,
   spotifyArtistName: undefined,
   heardAbout: undefined,
   selectedPlan: undefined,
-} as never;
+} satisfies WaitlistRequestPayload;
 
 describe('evaluateWaitlistQualification', () => {
   it('approves qualified users when signup is open', () => {
@@ -67,6 +68,51 @@ describe('evaluateWaitlistQualification', () => {
       qualified: false,
       status: 'blocked',
       reasonCode: 'blocked_email_domain',
+    });
+  });
+
+  it('waitlists qualified users when the gate is hard closed', () => {
+    expect(
+      evaluateWaitlistQualification({
+        email: 'artist@example.com',
+        payload,
+        config: { mode: 'hard_closed' },
+      })
+    ).toMatchObject({
+      qualified: true,
+      status: 'waitlisted',
+      reasonCode: 'hard_closed',
+    });
+  });
+
+  it('waitlists invalid primary social URLs with a deterministic reason', () => {
+    expect(
+      evaluateWaitlistQualification({
+        email: 'artist@example.com',
+        payload: {
+          ...payload,
+          primarySocialUrl: 'not-a-url',
+        },
+        config: { mode: 'open_signup' },
+      })
+    ).toMatchObject({
+      qualified: false,
+      status: 'waitlisted',
+      reasonCode: 'invalid_primary_social_url',
+    });
+  });
+
+  it('waitlists users when reserved auto-accept capacity is exhausted', () => {
+    expect(
+      evaluateWaitlistQualification({
+        email: 'artist@example.com',
+        payload,
+        config: { mode: 'waitlist_enabled', autoAcceptReserved: false },
+      })
+    ).toMatchObject({
+      qualified: true,
+      status: 'waitlisted',
+      reasonCode: 'waitlist_capacity_full',
     });
   });
 });

@@ -1,6 +1,7 @@
 import { sql as drizzleSql } from 'drizzle-orm';
 import {
   boolean,
+  check,
   index,
   integer,
   jsonb,
@@ -147,17 +148,28 @@ export const waitlistInvites = pgTable(
 );
 
 // Admin-configurable waitlist gating and auto-accept settings (singleton row)
-export const waitlistSettings = pgTable('waitlist_settings', {
-  id: integer('id').primaryKey().default(1),
-  gateEnabled: boolean('gate_enabled').default(true).notNull(),
-  autoAcceptEnabled: boolean('auto_accept_enabled').default(false).notNull(),
-  autoAcceptAfterDays: integer('auto_accept_after_days').default(7).notNull(),
-  autoAcceptDailyLimit: integer('auto_accept_daily_limit').default(0).notNull(),
-  autoAcceptedToday: integer('auto_accepted_today').default(0).notNull(),
-  autoAcceptResetsAt: timestamp('auto_accept_resets_at').notNull(),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+export const waitlistSettings = pgTable(
+  'waitlist_settings',
+  {
+    id: integer('id').primaryKey().default(1),
+    gateEnabled: boolean('gate_enabled').default(true).notNull(),
+    autoAcceptEnabled: boolean('auto_accept_enabled').default(false).notNull(),
+    autoAcceptAfterDays: integer('auto_accept_after_days').default(7).notNull(),
+    autoAcceptDailyLimit: integer('auto_accept_daily_limit')
+      .default(0)
+      .notNull(),
+    autoAcceptedToday: integer('auto_accepted_today').default(0).notNull(),
+    autoAcceptResetsAt: timestamp('auto_accept_resets_at').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  table => ({
+    autoAcceptAfterDaysRange: check(
+      'waitlist_settings_auto_accept_after_days_range',
+      drizzleSql`${table.autoAcceptAfterDays} >= 1 AND ${table.autoAcceptAfterDays} <= 365`
+    ),
+  })
+);
 
 // Schema validations
 export const insertWaitlistEntrySchema = createInsertSchema(waitlistEntries);
