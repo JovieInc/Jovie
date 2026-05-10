@@ -5,6 +5,16 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.239] - 2026-05-12
+
+> Artist profile cards no longer stretch too tall on large monitors, footer sections breathe a bit more, and the spec-wall animations on the homepage now stagger instead of firing all at once.
+
+### Changed
+
+- **Artist profile height cap**: at 1280px+ viewports the hero card no longer stretches past 640px (640px at xl, 680px at 2xl), keeping proportions tight on large monitors.
+- **Footer vertical padding**: all footer variants now use responsive padding — py-12 on mobile, py-16 on desktop, py-20 on ultrawide — giving each footer section more breathing room.
+- **Homepage spec-wall animation stagger**: spec-wall cards now animate in with staggered delays (0ms, −600ms, −1200ms … −4200ms) so the pulse effect ripples across cards instead of triggering all at once.
+
 ## [26.4.238] - 2026-05-12
 
 > [internal] Homepage content cleanup: removed the spec-wall section with internal sales language, dropped three text-only placeholder logos from the trust bar, and reordered sections so "Go live in 60 seconds" appears directly below the hero.
