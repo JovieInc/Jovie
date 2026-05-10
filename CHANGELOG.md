@@ -5,7 +5,7 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.4.230.0] - 2026-05-10
+## [26.4.231.0] - 2026-05-10
 
 > Hardens auth: Clerk proxy now fails closed on a missing or malformed publishable key, OAuth provider buttons are hidden unless explicitly enabled via env flag, and the sign-in/sign-up UI is unified under a single AuthShell component.
 
@@ -17,13 +17,21 @@
 
 ### Changed
 
-- **Clerk proxy** (`proxy.ts`): replaced inline FAPI host decoding with `decodeFapiHostFromPublishableKey()` and upgraded proxy errors from `console.error` to `captureError` for Sentry tracking.
+- **Clerk proxy** (`proxy.ts`): replaced inline FAPI host decoding with `decodeFapiHostFromPublishableKey()` and upgraded proxy errors from `console.error` to `captureError` with structured error fields for Sentry tracking.
 - **Sign-in page** and **sign-up page**: refactored to delegate rendering to `AuthShell`; each page retains only its URL-parameter extraction and toast logic.
 
 ### Added (tests)
 
 - [internal] Unit tests for `decode-fapi-host.ts` and `oauth-providers.ts` (45 + 103 cases).
 - [internal] Extended `signin-page` and `signup-page` unit tests to cover `AuthShell` delegation paths.
+
+## [26.4.230] - 2026-05-10
+
+> Apple Sign In now works on jov.ie. The login flow was returning an error for everyone trying to sign in with Apple — including Hide My Email — while Google login worked. Fixed.
+
+### Fixed
+
+- **Apple Sign In production callback**: removed manual `host` and `content-length` headers from the Clerk FAPI proxy in `apps/web/proxy.ts`. Edge fetch (undici) rejects manual override of these on POST bodies, which is why Apple's `response_mode=form_post` callback to `/__clerk/v1/oauth_callback` 502'd while Google's GET-based callback worked. Also scoped Referer forwarding to OAuth callback paths only and added structured error capture so the next proxy failure surfaces its actual exception name + message.
 
 ## [26.4.229] - 2026-05-10
 

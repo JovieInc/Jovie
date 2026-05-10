@@ -156,7 +156,7 @@ export function AddPlatformDialog({
                 value={artistName}
                 onChange={e => setArtistName(e.target.value)}
                 placeholder='Artist name on this platform'
-                className='w-full rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-app text-primary-token placeholder:text-quaternary-token focus:outline-none focus:ring-1 focus:ring-accent/50'
+                className='w-full rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-app text-primary-token placeholder:text-quaternary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/50'
               />
             </div>
             <div>
@@ -169,7 +169,7 @@ export function AddPlatformDialog({
                 value={url}
                 onChange={e => setUrl(e.target.value)}
                 placeholder={PROVIDER_PLACEHOLDERS[selectedProvider]}
-                className='w-full rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-app text-primary-token placeholder:text-quaternary-token focus:outline-none focus:ring-1 focus:ring-accent/50'
+                className='w-full rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-app text-primary-token placeholder:text-quaternary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/50'
               />
             </div>
             {error && (

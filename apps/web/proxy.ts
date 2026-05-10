@@ -1149,7 +1149,6 @@ export default async function middleware(
     const subpath = pathname.replace(/^\/__clerk\/?|^\/clerk\/?/, '');
     const targetUrl = `https://${fapiHost}/${subpath}${req.nextUrl.search}`;
 
-    // Read body FIRST so content-length stays accurate
     let body: ArrayBuffer | null = null;
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       try {
@@ -1159,9 +1158,13 @@ export default async function middleware(
       }
     }
 
-    // Build clean headers — only forward what Clerk needs
+    // Build clean headers — only forward what Clerk needs.
+    // Do NOT set `host` (fetch sets it from URL; manual setting is rejected by
+    // Edge fetch on POST bodies in some undici builds) or `content-length`
+    // (undici computes from body; manual override throws TypeError on POST).
+    // This was the root cause of Apple OAuth `response_mode=form_post` callbacks
+    // 502'ing while Google's GET callbacks worked.
     const headers = new Headers();
-    headers.set('host', fapiHost);
     headers.set('origin', `https://${fapiHost}`);
     const ct = req.headers.get('content-type');
     if (ct) headers.set('content-type', ct);
@@ -1173,8 +1176,12 @@ export default async function middleware(
     if (ua) headers.set('user-agent', ua);
     const auth = req.headers.get('authorization');
     if (auth) headers.set('authorization', auth);
-    if (body && body.byteLength > 0) {
-      headers.set('content-length', String(body.byteLength));
+    // Forward Referer ONLY for OAuth callback paths — Apple's form_post chain
+    // sets it to https://appleid.apple.com and FAPI may use it to validate the
+    // callback. Other Clerk endpoints don't need it; keep blast radius small.
+    if (pathname.includes('/oauth_callback')) {
+      const referer = req.headers.get('referer');
+      if (referer) headers.set('referer', referer);
     }
 
     try {
@@ -1228,12 +1235,24 @@ export default async function middleware(
         headers: resHeaders,
       });
     } catch (err) {
+      const errName = err instanceof Error ? err.name : 'UnknownError';
+      const errMessage = err instanceof Error ? err.message : String(err);
       await captureError('[clerk-proxy] fetch failed', err, {
         pathname,
         hostname,
         context: 'clerk_proxy_fetch',
+        errName,
+        errMessage,
+        method: req.method,
       });
-      return NextResponse.json({ error: 'Clerk proxy error' }, { status: 502 });
+      return NextResponse.json(
+        {
+          error: 'Clerk proxy error',
+          code: errName,
+          hint: errMessage,
+        },
+        { status: 502 }
+      );
     }
   }
 

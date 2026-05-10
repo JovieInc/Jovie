@@ -137,6 +137,7 @@ export default function PricingPage() {
                 Artist profiles are free forever. Pro adds the release tools
                 when you need them.
               </p>
+              {/* copy-lint-allow: waitlist — intentional; describes the paid plan access flow */}
               <p className='mt-6 text-[13px] font-medium tracking-[-0.01em] text-tertiary-token'>
                 Paid plans open from the waitlist with the plan request saved.
               </p>
