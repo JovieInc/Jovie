@@ -3859,9 +3859,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-artist-profiles-carousel__rail {
-  display: flex;
-  gap: clamp(1rem, 1.7vw, 1.5rem);
-  margin: 0;
+  position: relative;
   padding: 0 max(var(--homepage-page-gutter), 4vw) 0.8rem 0;
   overflow-x: auto;
   overscroll-behavior-x: contain;
@@ -3870,8 +3868,57 @@ body:has(.home-viewport)::-webkit-scrollbar {
   scrollbar-width: none;
 }
 
+.homepage-artist-profiles-carousel__rail:focus-visible {
+  outline: 2px solid rgba(68, 182, 255, 0.85);
+  outline-offset: 0.45rem;
+  border-radius: 1.4rem;
+}
+
+.homepage-artist-profiles-carousel__keyboard-controls {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.homepage-artist-profiles-carousel__keyboard-controls:focus-within {
+  top: 0.9rem;
+  left: 0.9rem;
+  z-index: 4;
+  display: flex;
+  width: auto;
+  height: auto;
+  gap: 0.5rem;
+  clip: auto;
+  clip-path: none;
+  overflow: visible;
+  white-space: normal;
+}
+
+.homepage-artist-profiles-carousel__keyboard-controls button {
+  display: inline-flex;
+  width: 2.25rem;
+  height: 2.25rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(9, 12, 18, 0.88);
+  color: rgba(255, 255, 255, 0.92);
+}
+
 .homepage-artist-profiles-carousel__rail::-webkit-scrollbar {
   display: none;
+}
+
+.homepage-artist-profiles-carousel__list {
+  display: flex;
+  gap: clamp(1rem, 1.7vw, 1.5rem);
+  margin: 0;
+  padding: 0;
 }
 
 .homepage-artist-profile-card {
@@ -4038,7 +4085,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
     width: calc(100vw - var(--homepage-page-gutter));
   }
 
-  .homepage-artist-profiles-carousel__rail {
+  .homepage-artist-profiles-carousel__list {
     gap: 0.95rem;
   }
 

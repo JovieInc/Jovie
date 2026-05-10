@@ -23,7 +23,7 @@ export type HomepageArtistProfileCard = {
 export function HomepageArtistProfilesCarousel({
   cards,
 }: Readonly<{ cards: readonly HomepageArtistProfileCard[] }>) {
-  const railRef = useRef<HTMLOListElement | null>(null);
+  const railRef = useRef<HTMLDivElement | null>(null);
   const copy = HOMEPAGE_LAUNCH_COPY.artistProfiles;
 
   const scrollRail = (direction: 'previous' | 'next') => {
@@ -93,40 +93,60 @@ export function HomepageArtistProfilesCarousel({
             </button>
           </div>
 
-          <ol
+          <div
             ref={railRef}
             className='homepage-artist-profiles-carousel__rail'
-            aria-label='Artist profile outcomes'
           >
-            {cards.map(card => (
-              <li
-                className={`homepage-artist-profile-card homepage-artist-profile-card--${card.glow}`}
-                key={card.id}
+            <div className='homepage-artist-profiles-carousel__keyboard-controls'>
+              <button
+                type='button'
+                aria-label='Scroll artist profile previews left'
+                onClick={() => scrollRail('previous')}
               >
-                <HomepageTrackedLink
-                  href={copy.secondaryCta.href}
-                  className='homepage-artist-profile-card__link'
-                  eventName='homepage_profile_preview_clicked'
-                  eventProperties={{ card: card.id }}
+                <ChevronLeft aria-hidden='true' size={16} strokeWidth={1.9} />
+              </button>
+              <button
+                type='button'
+                aria-label='Scroll artist profile previews right'
+                onClick={() => scrollRail('next')}
+              >
+                <ChevronRight aria-hidden='true' size={16} strokeWidth={1.9} />
+              </button>
+            </div>
+            <ol
+              className='homepage-artist-profiles-carousel__list'
+              aria-label='Artist profile outcomes'
+            >
+              {cards.map(card => (
+                <li
+                  className={`homepage-artist-profile-card homepage-artist-profile-card--${card.glow}`}
+                  key={card.id}
                 >
-                  <h3>{card.title}</h3>
-                  <div className='homepage-artist-profile-card__phone'>
-                    <div className='homepage-artist-profile-card__screen'>
-                      <Image
-                        src={card.image.publicUrl}
-                        alt={card.image.alt}
-                        width={card.image.width}
-                        height={card.image.height}
-                        loading='lazy'
-                        sizes='(min-width: 1280px) 224px, (min-width: 768px) 21vw, 66vw'
-                        unoptimized
-                      />
+                  <HomepageTrackedLink
+                    href={copy.secondaryCta.href}
+                    className='homepage-artist-profile-card__link'
+                    eventName='homepage_profile_preview_clicked'
+                    eventProperties={{ card: card.id }}
+                  >
+                    <h3>{card.title}</h3>
+                    <div className='homepage-artist-profile-card__phone'>
+                      <div className='homepage-artist-profile-card__screen'>
+                        <Image
+                          src={card.image.publicUrl}
+                          alt={card.image.alt}
+                          width={card.image.width}
+                          height={card.image.height}
+                          loading='lazy'
+                          sizes='(min-width: 1280px) 224px, (min-width: 768px) 21vw, 66vw'
+                          unoptimized
+                        />
+                      </div>
                     </div>
-                  </div>
-                </HomepageTrackedLink>
-              </li>
-            ))}
-          </ol>
+                  </HomepageTrackedLink>
+                </li>
+              ))}
+            </ol>
+          </div>
         </div>
       </div>
     </section>
