@@ -59,13 +59,21 @@ surfaces:
       Already in stryker.config.mjs mutate[]; add a registry.test.ts targeted by Stryker testFiles.
     last_reviewed: 2026-05-10
 
-  - id: proxy-clerk-routing
-    surface: Clerk auth proxy routing
+  # proxy.ts is one 1412-line file. Three logical regions (Clerk routing,
+  # investor portal, audience block) share the file, so file-level v8 coverage
+  # reports the same number for all three. Until the extraction documented in
+  # docs/PROXY_EXTRACTION_CANDIDATES.md ships, track proxy.ts as a single
+  # surface. Per-region key_ranges are kept so future per-line tracking can
+  # split this row without losing context.
+  - id: proxy
+    surface: Proxy middleware (auth + investor + audience)
     glob: apps/web/proxy.ts
     key_ranges:
+      - apps/web/proxy.ts:97-246
+      - apps/web/proxy.ts:249-453
       - apps/web/proxy.ts:1028-1402
     blast_radius: 5
-    reversibility: 4
+    reversibility: 5
     visibility: 5
     target_coverage: 85
     target_e2e: 2
@@ -73,46 +81,11 @@ surfaces:
     last_incident: null
     lessons_ref: null
     notes: >-
-      clerkProductionMiddleware + middleware entrypoint + matcher config.
-      /__clerk fetch proxy must decode FAPI host from active publishable key.
-      Three env key pairs (dev/stg/prd) must not cross.
-    last_reviewed: 2026-05-10
-
-  - id: proxy-investor-portal
-    surface: Investor portal token validation
-    glob: apps/web/proxy.ts
-    key_ranges:
-      - apps/web/proxy.ts:249-453
-    blast_radius: 4
-    reversibility: 5
-    visibility: 4
-    target_coverage: 90
-    target_e2e: 0
-    owner: '@itstimwhite'
-    last_incident: null
-    lessons_ref: null
-    notes: >-
-      handleInvestorRequest validates tokens against investor_links table.
-      Must cover: expired, inactive, missing, replayed-from-other-IP, valid.
-      Path-based auth; legacy subdomain redirects to /investor-portal.
-    last_reviewed: 2026-05-10
-
-  - id: proxy-audience-block
-    surface: Audience block + fingerprint
-    glob: apps/web/proxy.ts
-    key_ranges:
-      - apps/web/proxy.ts:97-246
-    blast_radius: 3
-    reversibility: 3
-    visibility: 5
-    target_coverage: 85
-    target_e2e: 1
-    owner: '@itstimwhite'
-    last_incident: null
-    lessons_ref: null
-    notes: >-
-      maskIpAddress + createFingerprint + JOIN against audience_blocks.
-      Must cover every block reason. Telemetry shape is part of the contract.
+      Houses Clerk auth proxy (1028-1402), investor portal token validation
+      (249-453), audience block + fingerprint (97-246), and main request
+      router (490-856). Per-region coverage requires the extraction plan in
+      docs/PROXY_EXTRACTION_CANDIDATES.md. Until then, this surface tracks
+      the file as one. Three env Clerk key pairs (dev/stg/prd) must not cross.
     last_reviewed: 2026-05-10
 
   - id: dev-test-auth-bypass
@@ -273,9 +246,7 @@ The heatmap generator computes a numeric priority score and joins it with measur
 |---------|------|-------|-----|-----|------------|------------|
 | Stripe webhooks | `apps/web/app/api/stripe/webhooks/**` | 5 | 5 | 3 | 90% | 1 |
 | Entitlements registry | `apps/web/lib/entitlements/**` | 5 | 4 | 4 | 95% | 0 |
-| Clerk auth proxy routing | `apps/web/proxy.ts` | 5 | 4 | 5 | 85% | 2 |
-| Investor portal token | `apps/web/proxy.ts:249-453` | 4 | 5 | 4 | 90% | 0 |
-| Audience block + fingerprint | `apps/web/proxy.ts:97-246` | 3 | 3 | 5 | 85% | 1 |
+| Proxy middleware (auth + investor + audience) | `apps/web/proxy.ts` | 5 | 5 | 5 | 85% | 2 |
 | Dev test-auth bypass | `apps/web/app/api/dev/test-auth/**` | 5 | 5 | 2 | 90% | 0 |
 | API route contracts | `apps/web/app/api/**/route.ts` | 3 | 3 | 4 | 80% | 0 |
 | Webhook signatures | `apps/web/app/api/webhooks/**` | 4 | 4 | 1 | 85% | 0 |

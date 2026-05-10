@@ -3,22 +3,24 @@
  * Test coverage heatmap generator.
  *
  * Reads:
- *   docs/TEST_RISK_REGISTER.md             — YAML front-matter, hand-curated surface taxonomy
- *   apps/web/coverage/coverage-final.json  — v8 line/branch coverage per file
- *   apps/web/reports/stryker-incremental.json — Stryker mutation score per file (optional)
- *   .context/test-coverage-snapshot.json   — previous snapshot, for Δ7d (optional)
+ *   docs/TEST_RISK_REGISTER.md                       — hand-curated surface taxonomy (YAML front-matter)
+ *   apps/web/coverage/coverage-final.json            — v8 line/branch coverage per file
+ *   apps/web/reports/stryker-incremental.json        — Stryker mutation score per file (optional)
+ *   apps/web/reports/test-coverage-snapshot.json     — previous baseline, for Δ7d (optional)
+ *   apps/web/tests/quarantine/flaky-tests.json       — flake report from test:flaky (optional)
  *
  * Writes:
- *   docs/TEST_COVERAGE_HEATMAP.md          — committed, idempotent (only writes on change)
- *   .context/test-coverage-snapshot.json   — gitignored snapshot used by --check-pr
+ *   docs/TEST_COVERAGE_HEATMAP.md                    — committed, idempotent (only writes on change)
+ *   apps/web/reports/test-coverage-snapshot.json     — committed by the nightly cron;
+ *                                                       canonical baseline that --check-pr compares against
  *
  * Modes:
- *   (default)         — regenerate the heatmap
- *   --check-pr        — compare current coverage to the snapshot in main; exit 1 if any RED surface dropped ≥3pp
- *   --dry-run         — print outputs, don't write
+ *   (default)    — regenerate heatmap + snapshot
+ *   --check-pr   — compare current coverage to committed snapshot; exit 1 if any RED surface dropped ≥3pp
+ *   --dry-run    — print outputs to stdout, don't write
  *
  * Owner: Jovie test platform
- * Spec: docs/TEST_RISK_REGISTER.md
+ * Spec:  docs/TEST_RISK_REGISTER.md
  */
 
 import { execSync } from 'node:child_process';
@@ -30,9 +32,11 @@ import { fileURLToPath } from 'node:url';
 const REPO_ROOT = resolve(fileURLToPath(import.meta.url), '..', '..');
 const REGISTER_PATH = resolve(REPO_ROOT, 'docs/TEST_RISK_REGISTER.md');
 const HEATMAP_PATH = resolve(REPO_ROOT, 'docs/TEST_COVERAGE_HEATMAP.md');
+// Committed baseline — written by the nightly cron, consumed by --check-pr
+// in any PR context. Lives next to Stryker's incremental file by convention.
 const SNAPSHOT_PATH = resolve(
   REPO_ROOT,
-  '.context/test-coverage-snapshot.json'
+  'apps/web/reports/test-coverage-snapshot.json'
 );
 const COVERAGE_PATH = resolve(
   REPO_ROOT,
@@ -73,7 +77,7 @@ interface SurfaceMetrics {
   integration_count: number;
   e2e_count: number;
   mutation_score: number | null;
-  meaningful_assertion_ratio: number;
+  meaningful_assertion_ratio: number | null;
   status: 'RED' | 'YELLOW' | 'GREEN';
   risk_score: number;
   delta_7d: number;
@@ -389,8 +393,10 @@ async function computeMetrics(
     }
   }
 
-  const coverage_score =
-    branch_pct * 0.4 + coverage_pct * 0.4 + assertionRatio * 100 * 0.2;
+  // Risk score uses line + branch coverage only. Once a real
+  // meaningful_assertion_ratio is wired (AST parse), reintroduce as a weight.
+  // Excluding it now avoids a hardcoded constant uniformly biasing scores.
+  const coverage_score = branch_pct * 0.5 + coverage_pct * 0.5;
   const e2eBonus =
     e2eCount >= surface.target_e2e && surface.target_e2e > 0 ? -5 : 0;
   const riskScore =
@@ -419,7 +425,7 @@ async function computeMetrics(
     integration_count: integrationCount,
     e2e_count: e2eCount,
     mutation_score: mutationScore,
-    meaningful_assertion_ratio: Math.round(assertionRatio * 100) / 100,
+    meaningful_assertion_ratio: assertionRatio,
     status,
     risk_score: Math.round(riskScore * 10) / 10,
     delta_7d,
@@ -475,7 +481,7 @@ function countSurfaceTests(
   unitCount: number;
   integrationCount: number;
   e2eCount: number;
-  assertionRatio: number;
+  assertionRatio: number | null;
 } {
   const tokens = extractTokens(surface);
   const matches = (testPath: string) =>
@@ -485,9 +491,12 @@ function countSurfaceTests(
   const integrationCount = inventory.integration.filter(matches).length;
   const e2eCount = inventory.e2e.filter(matches).length;
 
-  // Stub for assertion ratio — would require parsing each test file.
-  // Conservative default: 0.5 (assumes tests have meaningful assertions).
-  const assertionRatio = 0.5;
+  // Meaningful assertion ratio would require AST-parsing each test file
+  // (count expect() calls vs executed statements). Until that lands, return
+  // null so the risk-score formula doesn't apply a constant inflation factor.
+  // See scripts/test-truth-guard.mjs for the zero-expect detector that should
+  // feed this number in a follow-up.
+  const assertionRatio: number | null = null;
 
   return { unitCount, integrationCount, e2eCount, assertionRatio };
 }
