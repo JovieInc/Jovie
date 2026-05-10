@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.228] - 2026-05-09
+
+> Refreshed the Mac download page copy: clearer hero, six-feature grid, an expanded FAQ, and a final download call-to-action at the bottom.
+
+### Changed
+
+- **Mac download page copy refresh**: rewrote `/download` hero subhead, expanded the feature grid from 4 to 6 items, added a "Do I need a Jovie account?" FAQ entry, and added a final CTA section. Replaced "Universal" with "Apple Silicon + Intel" and split signing/notarization metadata onto its own line.
+
 ## [26.4.227] - 2026-05-09
 
 > [internal] Progress bars across the dashboard now animate in with a spring/bounce effect using Framer Motion.
