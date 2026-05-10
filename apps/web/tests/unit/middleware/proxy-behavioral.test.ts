@@ -840,7 +840,10 @@ describe('proxy.ts middleware', () => {
         expect(init.method).toBe('GET');
         expect(init.redirect).toBe('manual');
         const headers = init.headers as Headers;
-        expect(headers.get('host')).toBe(stagingFapiHost);
+        // Host is intentionally NOT forwarded — fetch() sets it from the
+        // target URL, and manual override breaks Edge fetch on POST bodies
+        // (root cause of Apple OAuth form_post 502s).
+        expect(headers.get('host')).toBeNull();
         expect(headers.get('origin')).toBe(`https://${stagingFapiHost}`);
       } finally {
         if (previousPublishableKey === undefined) {

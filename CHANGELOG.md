@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.230] - 2026-05-10
+
+> Apple Sign In now works on jov.ie. The login flow was returning an error for everyone trying to sign in with Apple — including Hide My Email — while Google login worked. Fixed.
+
+### Fixed
+
+- **Apple Sign In production callback**: removed manual `host` and `content-length` headers from the Clerk FAPI proxy in `apps/web/proxy.ts`. Edge fetch (undici) rejects manual override of these on POST bodies, which is why Apple's `response_mode=form_post` callback to `/__clerk/v1/oauth_callback` 502'd while Google's GET-based callback worked. Also scoped Referer forwarding to OAuth callback paths only and added structured error capture so the next proxy failure surfaces its actual exception name + message.
+
 ## [26.4.229] - 2026-05-10
 
 > [internal] Added P0 smoke tests for the cookie banner and chat page, and extended the visual regression matrix to cover 7 canonical viewport widths.
