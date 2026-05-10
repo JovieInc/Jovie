@@ -91,6 +91,8 @@
     "test:guard": "pnpm --filter=@jovie/web run test:guard",
     "test:profile": "pnpm --filter=@jovie/web run test:profile",
     "test:flaky": "pnpm --filter=@jovie/web run test:flaky",
+    "test:coverage:report": "tsx scripts/audit-test-coverage.ts",
+    "test:coverage:diff": "tsx scripts/audit-test-coverage.ts --check-pr",
     "admin:green": "doppler run --project jovie-web --config dev -- pnpm --filter=@jovie/web run admin:green",
     "admin:green:record": "doppler run --project jovie-web --config dev -- pnpm --filter=@jovie/web run admin:green:record",
     "admin:green:watch": "doppler run --project jovie-web --config dev -- pnpm --filter=@jovie/web run admin:green:watch",
