@@ -14,6 +14,8 @@ const requireQueryCacheConfigRule = require('./eslint-rules/require-query-cache-
 const requireAbortSignalRule = require('./eslint-rules/require-abort-signal');
 const noRawMotionValuesRule = require('./eslint-rules/no-raw-motion-values');
 const noDirectElectronBridgeRule = require('./eslint-rules/no-direct-electron-bridge');
+const noBannedMarketingCopyRule = require('./eslint-rules/no-banned-marketing-copy');
+const noRawFocusRingRule = require('./eslint-rules/no-raw-focus-ring');
 
 const [nextBase, nextTypescript, nextIgnores] = nextConfig;
 
@@ -36,6 +38,8 @@ const baseConfig = {
         'require-abort-signal': requireAbortSignalRule,
         'no-raw-motion-values': noRawMotionValuesRule,
         'no-direct-electron-bridge': noDirectElectronBridgeRule,
+        'no-banned-marketing-copy': noBannedMarketingCopyRule,
+        'no-raw-focus-ring': noRawFocusRingRule,
       },
     },
   },
@@ -182,6 +186,12 @@ const baseConfig = {
     // Prevent renderer code from reaching past the guarded electron-bridge
     // wrapper — installed binaries may expose a partial bridge.
     '@jovie/no-direct-electron-bridge': 'error',
+    // Marketing copy guardrails — prevent placeholder/internal text on public pages
+    // (Scoped to app/(marketing)/** via the rule's internal file filter)
+    '@jovie/no-banned-marketing-copy': 'error',
+    // Design-system focus ring enforcement — interactive elements must use
+    // canonical focus-ring-themed or focus-visible:* utilities
+    '@jovie/no-raw-focus-ring': 'warn',
   },
 };
 
