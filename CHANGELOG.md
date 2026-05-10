@@ -5,6 +5,26 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.230.0] - 2026-05-10
+
+> Hardens auth: Clerk proxy now fails closed on a missing or malformed publishable key, OAuth provider buttons are hidden unless explicitly enabled via env flag, and the sign-in/sign-up UI is unified under a single AuthShell component.
+
+### Added
+
+- **`lib/auth/decode-fapi-host.ts`**: canonical helper that decodes the Clerk FAPI host from a publishable key. Returns `null` on any malformed input so callers always fail closed (JOV-2062).
+- **`lib/auth/oauth-providers.ts`**: fail-closed OAuth provider guard. A provider button only appears when `NEXT_PUBLIC_CLERK_OAUTH_<PROVIDER>_ENABLED=1` is set — any other value keeps it hidden. Prevents Apple "invalid client" errors from leaking into production (JOV-2062).
+- **`AuthShell` component**: unified auth surface shared by the full-page sign-in/sign-up routes and the intercepted modal. Provider guard and appearance config are applied in one place so disabled OAuth buttons cannot re-appear (JOV-2064).
+
+### Changed
+
+- **Clerk proxy** (`proxy.ts`): replaced inline FAPI host decoding with `decodeFapiHostFromPublishableKey()` and upgraded proxy errors from `console.error` to `captureError` for Sentry tracking.
+- **Sign-in page** and **sign-up page**: refactored to delegate rendering to `AuthShell`; each page retains only its URL-parameter extraction and toast logic.
+
+### Added (tests)
+
+- [internal] Unit tests for `decode-fapi-host.ts` and `oauth-providers.ts` (45 + 103 cases).
+- [internal] Extended `signin-page` and `signup-page` unit tests to cover `AuthShell` delegation paths.
+
 ## [26.4.229] - 2026-05-10
 
 > [internal] Added P0 smoke tests for the cookie banner and chat page, and extended the visual regression matrix to cover 7 canonical viewport widths.
