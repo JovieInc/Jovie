@@ -1,15 +1,21 @@
-import { ArrowRight } from 'lucide-react';
+import {
+  ArrowRight,
+  Bot,
+  ImageIcon,
+  MailPlus,
+  ShieldCheck,
+  SlidersHorizontal,
+  Timer,
+  Zap,
+} from 'lucide-react';
 import type { Metadata } from 'next';
 import dynamic from 'next/dynamic';
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
+import { HomepageHeroCommandCenter } from '@/components/homepage/HomepageHeroCommandCenter';
 import { HomepageTrackedLink } from '@/components/homepage/HomepageTrackedLink';
 import { HERO_COPY } from '@/components/homepage/intent';
 import { FaqSection } from '@/components/marketing';
-import { ArtistProfileSpecWall } from '@/components/marketing/artist-profile/ArtistProfileSpecWall';
-import { HomeComposerHero } from '@/components/marketing/HomeComposerHero';
 import { APP_NAME, BASE_URL } from '@/constants/app';
-import { APP_ROUTES } from '@/constants/routes';
-import { ARTIST_PROFILE_SPEC_TILES } from '@/data/artistProfileFeatures';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
 import {
@@ -47,6 +53,13 @@ const HomepageV2FinalCta = dynamic(
     })),
   { ssr: true }
 );
+const HomeComposerHero = dynamic(
+  () =>
+    import('@/components/marketing/HomeComposerHero').then(m => ({
+      default: m.HomeComposerHero,
+    })),
+  { ssr: true }
+);
 const HomeBentoPairs = dynamic(
   () =>
     import('@/components/features/home/HomeBentoPairs').then(m => ({
@@ -75,9 +88,30 @@ const HomepageWorkspaceSection = dynamic(
     })),
   { ssr: true }
 );
+const HomepageArtistProfilesCarousel = dynamic(
+  () =>
+    import('@/components/homepage/HomepageArtistProfilesCarousel').then(m => ({
+      default: m.HomepageArtistProfilesCarousel,
+    })),
+  { ssr: true }
+);
 
+const HERO_PRODUCT_IMAGES = {
+  library: getMarketingExportImage('shell-v1-library-desktop'),
+  profile: getMarketingExportImage('tim-white-profile-live-mobile'),
+  release: getMarketingExportImage('release-presave-mobile'),
+  releases: getMarketingExportImage('shell-v1-releases-desktop'),
+};
 const WORKSPACE_SCREENSHOT = getMarketingExportImage(
   HOMEPAGE_LAUNCH_COPY.workspace.screenshotKey
+);
+const ARTIST_PROFILE_CARDS = HOMEPAGE_LAUNCH_COPY.artistProfiles.cards.map(
+  card => ({
+    id: card.id,
+    title: card.title,
+    image: getMarketingExportImage(card.screenshotScenarioId),
+    glow: card.glow,
+  })
 );
 
 export const revalidate = false;
@@ -232,38 +266,9 @@ function HomepageHeroActions() {
   );
 }
 
-function HomepageProfileProofBand() {
-  return (
-    <div
-      id='artist-profiles'
-      className='homepage-profile-proof-band'
-      data-testid='homepage-profile-proof-band'
-    >
-      <ArtistProfileSpecWall
-        specWall={{
-          headline: HOMEPAGE_LAUNCH_COPY.profileProof.headline,
-          subhead:
-            'Conversion details, routing, capture, and analytics stay attached to the artist profile.',
-        }}
-        tiles={ARTIST_PROFILE_SPEC_TILES}
-      />
-      <div className='homepage-profile-proof-band__cta'>
-        <HomepageTrackedLink
-          href={APP_ROUTES.ARTIST_PROFILES}
-          className='homepage-story-link focus-ring-themed'
-          eventName='homepage_profile_cta_clicked'
-          eventProperties={{ cta: 'explore_artist_profiles' }}
-        >
-          Explore Artist Profiles
-          <span aria-hidden='true'>→</span>
-        </HomepageTrackedLink>
-      </div>
-    </div>
-  );
-}
-
 function HomepageProductStatement() {
   const copy = HOMEPAGE_LAUNCH_COPY.productStatement;
+  const aiCopy = HOMEPAGE_LAUNCH_COPY.aiComposer;
 
   return (
     <section
@@ -274,9 +279,92 @@ function HomepageProductStatement() {
       <div className='homepage-product-statement__inner'>
         <p className='homepage-section-eyebrow'>{copy.eyebrow}</p>
         <h2 id='homepage-product-statement-heading'>
-          <span className='homepage-product-statement__lead'>{copy.lead}</span>{' '}
+          <span className='homepage-product-statement__lead'>{copy.lead}</span>
           <span className='homepage-product-statement__body'>{copy.body}</span>
         </h2>
+        <div
+          className='homepage-product-statement__ai'
+          data-testid='homepage-ai-composer-demo'
+        >
+          <div className='homepage-product-statement__ai-copy'>
+            <h3>{aiCopy.headline}</h3>
+            <p>{aiCopy.body}</p>
+          </div>
+          <HomeComposerHero />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function HomepageGoLiveStepsSection() {
+  const copy = HOMEPAGE_LAUNCH_COPY.productStatement;
+
+  return (
+    <section
+      className='homepage-go-live-section'
+      aria-labelledby='homepage-go-live-heading'
+      data-testid='homepage-go-live-section'
+    >
+      <div className='homepage-go-live-section__inner'>
+        <h2 id='homepage-go-live-heading'>
+          {HOMEPAGE_LAUNCH_COPY.workspace.kicker}
+        </h2>
+        <ol className='homepage-go-live-section__cards'>
+          {copy.cards.map(card => (
+            <li className='homepage-go-live-card' key={card.title}>
+              <span>{card.number}</span>
+              <h3>{card.title}</h3>
+              <p>{card.body}</p>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </section>
+  );
+}
+
+const SPEC_WALL_ICONS = [
+  Timer,
+  Bot,
+  ImageIcon,
+  Zap,
+  SlidersHorizontal,
+  MailPlus,
+];
+
+function HomepageSpecWall() {
+  const copy = HOMEPAGE_LAUNCH_COPY.specWall;
+
+  return (
+    <section
+      className='homepage-spec-wall-section'
+      aria-labelledby='homepage-spec-wall-heading'
+      data-testid='homepage-spec-wall-section'
+    >
+      <div className='homepage-spec-wall-section__inner'>
+        <div className='homepage-spec-wall-section__header'>
+          <h2 id='homepage-spec-wall-heading'>{copy.headline}</h2>
+          <p>{copy.body}</p>
+        </div>
+        <div className='homepage-spec-wall-grid'>
+          {copy.items.map((item, index) => {
+            const Icon = SPEC_WALL_ICONS[index] ?? ShieldCheck;
+
+            return (
+              <article
+                className={`homepage-spec-wall-card homepage-spec-wall-card--${item.accent}`}
+                key={item.title}
+              >
+                <span className='homepage-spec-wall-card__icon'>
+                  <Icon aria-hidden='true' size={18} strokeWidth={1.8} />
+                </span>
+                <h3>{item.title}</h3>
+                <p>{item.body}</p>
+              </article>
+            );
+          })}
+        </div>
       </div>
     </section>
   );
@@ -287,7 +375,7 @@ function HomepageFaq() {
     <div id='faq' className='homepage-faq-section' data-testid='homepage-faq'>
       <FaqSection
         items={HOMEPAGE_LAUNCH_COPY.faq}
-        heading='Questions Artists Ask Before Launch'
+        heading='Frequently Asked Questions'
         headingClassName='homepage-story-heading'
         className='mx-auto w-full max-w-[760px] px-[var(--homepage-page-gutter)] py-[var(--homepage-section-space)]'
         analyticsEventName='homepage_faq_opened'
@@ -302,11 +390,15 @@ function HomepageUnlockedSections() {
     <>
       <HomepageProductStatement />
       <HomepageWorkspaceSection screenshot={WORKSPACE_SCREENSHOT} />
-      <FridayRhythmSection />
-      <HomepageProfileProofBand />
+      <HomepageGoLiveStepsSection />
+      {FEATURE_FLAGS.SHOW_HOMEPAGE_FRIDAY_RHYTHM ? (
+        <FridayRhythmSection />
+      ) : null}
+      <HomepageArtistProfilesCarousel cards={ARTIST_PROFILE_CARDS} />
       {FEATURE_FLAGS.SHOW_HOME_REFRESH_2026 ? <HomeBentoPairs /> : null}
       {FEATURE_FLAGS.SHOW_HOME_REFRESH_2026 ? <HomeLoopDiagramSection /> : null}
       {FEATURE_FLAGS.SHOW_HOME_REFRESH_2026 ? <HomeStatQuoteSection /> : null}
+      <HomepageSpecWall />
       {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_PRICING ? <HomepageV2Pricing /> : null}
       <HomepageFaq />
     </>
@@ -390,9 +482,6 @@ export default async function HomePage() {
 
           <div className='homepage-hero-inner relative z-[3] mx-auto flex w-full max-w-none min-w-0 flex-1 flex-col items-center justify-start'>
             <div className='homepage-hero-copy w-full min-w-0'>
-              <p className='homepage-hero-positioning text-center'>
-                {HERO_COPY.eyebrow}
-              </p>
               <h1
                 id='home-hero-heading'
                 className='homepage-hero-headline self-center text-center text-white'
@@ -404,7 +493,7 @@ export default async function HomePage() {
               </p>
               <HomepageHeroActions />
             </div>
-            <HomeComposerHero />
+            <HomepageHeroCommandCenter images={HERO_PRODUCT_IMAGES} />
           </div>
         </div>
       </section>

@@ -216,15 +216,6 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       viewport: 'mobile',
     },
     {
-      id: 'tim-white-profile-presave-mobile',
-      title: 'Tim White Profile — Presave Countdown',
-      route: '/demo/showcase/tim-white-profile?release=presave',
-      waitFor: '[data-testid="demo-showcase-tim-white-profile"]',
-      viewport: 'mobile',
-      publicExportPath: 'tim-white-profile-presave-phone.png',
-      fixedNow: '2026-04-15T12:00:00.000Z',
-    },
-    {
       id: 'tim-white-profile-live-desktop',
       title: 'Tim White Profile — Latest Release Desktop',
       route: '/demo/showcase/tim-white-profile?release=live',
@@ -271,6 +262,15 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
   ]),
   ...defineScenarios('marketing', ADMIN_MARKETING_AND_INVESTOR, [
     ...TIM_WHITE_PROFILE_MOBILE_VARIANTS.map(timWhiteProfileMobile),
+    {
+      id: 'tim-white-profile-presave-mobile',
+      title: 'Tim White Profile — Presave Countdown',
+      route: '/demo/showcase/tim-white-profile?release=presave',
+      waitFor: '[data-testid="demo-showcase-tim-white-profile"]',
+      viewport: 'mobile',
+      publicExportPath: 'tim-white-profile-presave-phone.png',
+      fixedNow: '2026-04-15T12:00:00.000Z',
+    },
     {
       id: 'release-presave-mobile',
       title: 'Release Presave Mobile',
@@ -355,7 +355,7 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
     {
       id: 'shell-v1-library-desktop',
       title: 'Shell v1 — Library',
-      route: '/exp/shell-v1?view=library&capture=marketing',
+      route: '/exp/shell-v1?view=library&capture=marketing&player=off',
       waitFor: '.shell-v1',
       interaction: 'open-shell-library',
       publicExportPath: 'shell-v1-library.png',

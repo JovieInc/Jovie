@@ -3,7 +3,7 @@
 import { getLinearPillClassName } from '@jovie/ui';
 import { ChevronDown } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { LogoVariant } from '@/components/atoms/Logo';
 import { LogoLink } from '@/components/atoms/LogoLink';
 import { AuthActions } from '@/components/molecules/AuthActions';
@@ -173,7 +173,10 @@ function MarketingGlassFlyout({
               className='marketing-glass-header__flyout-link focus-ring-themed'
               tabIndex={open ? undefined : -1}
             >
-              <span className='marketing-glass-header__flyout-number'>
+              <span
+                className='marketing-glass-header__flyout-number'
+                aria-hidden='true'
+              >
                 {(index + 1).toString().padStart(2, '0')}
               </span>
               <span className='min-w-0'>
@@ -268,11 +271,56 @@ export function HeaderNav({
   showContactLink = true,
 }: HeaderNavProps = {}) {
   const headerRef = useRef<HTMLElement | null>(null);
+  const closeFlyoutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
   const [openFlyoutId, setOpenFlyoutId] = useState<string | null>(null);
   const [isScrolled, setIsScrolled] = useState(false);
   const isMarketingGlass = presentation === 'marketing-glass';
   const isHomepagePresentation = presentation === 'homepage-embedded';
   const resolvedFlyoutMenus = isMarketingGlass ? (flyoutMenus ?? []) : [];
+
+  const clearFlyoutCloseTimer = useCallback(() => {
+    if (closeFlyoutTimerRef.current === null) {
+      return;
+    }
+
+    clearTimeout(closeFlyoutTimerRef.current);
+    closeFlyoutTimerRef.current = null;
+  }, []);
+
+  const openFlyout = useCallback(
+    (menuId: string) => {
+      clearFlyoutCloseTimer();
+      setOpenFlyoutId(menuId);
+    },
+    [clearFlyoutCloseTimer]
+  );
+
+  const closeFlyout = useCallback(
+    (restoreFocus = false) => {
+      clearFlyoutCloseTimer();
+
+      if (restoreFocus && openFlyoutId !== null) {
+        headerRef.current
+          ?.querySelector<HTMLElement>(
+            `[aria-controls="marketing-header-flyout-${openFlyoutId}"]`
+          )
+          ?.focus();
+      }
+
+      setOpenFlyoutId(null);
+    },
+    [clearFlyoutCloseTimer, openFlyoutId]
+  );
+
+  const scheduleFlyoutClose = useCallback(() => {
+    clearFlyoutCloseTimer();
+    closeFlyoutTimerRef.current = setTimeout(() => {
+      setOpenFlyoutId(null);
+      closeFlyoutTimerRef.current = null;
+    }, 170);
+  }, [clearFlyoutCloseTimer]);
 
   useEffect(() => {
     if (!isMarketingGlass) {
@@ -291,17 +339,6 @@ export function HeaderNav({
       return;
     }
 
-    const closeFlyout = (restoreFocus = false) => {
-      if (restoreFocus) {
-        headerRef.current
-          ?.querySelector<HTMLElement>(
-            `[aria-controls="marketing-header-flyout-${openFlyoutId}"]`
-          )
-          ?.focus();
-      }
-
-      setOpenFlyoutId(null);
-    };
     const closeIfOutside = (target: EventTarget | null) => {
       if (target instanceof Node && headerRef.current?.contains(target)) {
         return;
@@ -316,7 +353,7 @@ export function HeaderNav({
       ) {
         return;
       }
-      closeFlyout();
+      scheduleFlyoutClose();
     };
     const handleFocusIn = (event: FocusEvent) => {
       closeIfOutside(event.target);
@@ -337,7 +374,11 @@ export function HeaderNav({
       document.removeEventListener('focusin', handleFocusIn);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isMarketingGlass, openFlyoutId]);
+  }, [closeFlyout, isMarketingGlass, openFlyoutId, scheduleFlyoutClose]);
+
+  useEffect(() => {
+    return () => clearFlyoutCloseTimer();
+  }, [clearFlyoutCloseTimer]);
 
   const navLinkClass = cn(
     'focus-ring-themed',
@@ -370,8 +411,9 @@ export function HeaderNav({
                   )}
                   aria-expanded={open}
                   aria-controls={`marketing-header-flyout-${menu.id}`}
-                  onMouseEnter={() => setOpenFlyoutId(menu.id)}
-                  onFocus={() => setOpenFlyoutId(menu.id)}
+                  onMouseEnter={() => openFlyout(menu.id)}
+                  onPointerEnter={() => openFlyout(menu.id)}
+                  onFocus={() => openFlyout(menu.id)}
                 >
                   {menu.label}
                   <ChevronDown aria-hidden='true' size={13} strokeWidth={1.8} />

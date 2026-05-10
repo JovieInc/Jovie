@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Marketing homepage hero: Variant F chat composer demo.
+ * Marketing homepage AI section: Variant F chat composer demo.
  *
  * Self-contained — no live query hooks, no user auth.
  * Autoplay cycles: empty (2s) → typing (3s) → entity (4s) → loop.

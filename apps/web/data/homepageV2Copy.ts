@@ -151,7 +151,7 @@ export const HOMEPAGE_V2_COPY: HomepageV2Copy = {
     body: 'Real release behavior, not generic creator proof.',
   },
   pricing: {
-    headline: 'Simple Pricing.',
+    headline: 'Simple pricing',
     body: 'One plan. 14-day free trial.',
     supportLine: '14-day Pro trial. No credit card required.',
     ctaLabel: 'See Pricing',

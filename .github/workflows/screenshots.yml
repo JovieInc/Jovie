@@ -8,8 +8,15 @@ on:
     branches: [main]
     paths:
       - 'apps/web/app/(marketing)/**'
+      - 'apps/web/app/(home)/**'
+      - 'apps/web/app/(dynamic)/**'
       - 'apps/web/app/demo/**'
+      - 'apps/web/app/go/**'
+      - 'apps/web/app/r/**'
+      - 'apps/web/app/s/**'
       - 'apps/web/components/**'
+      - 'apps/web/data/artistProfilePageOrder.ts'
+      - 'apps/web/data/homepageLaunchCopy.ts'
       - 'apps/web/features/**'
       - 'apps/web/lib/screenshots/**'
       - 'apps/web/tests/product-screenshots/**'

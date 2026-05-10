@@ -167,3 +167,45 @@ export function DiscoWaxLogo({
     </span>
   );
 }
+
+export function BlancoYNegroLogo({
+  className,
+}: Readonly<{
+  readonly className?: string;
+}>) {
+  return (
+    <span
+      role='img'
+      aria-label='Blanco y Negro'
+      className={cn(
+        'inline-flex items-center justify-center select-none text-white/92',
+        className
+      )}
+    >
+      <span className='text-[1em] font-semibold tracking-[-0.04em]'>
+        Blanco y Negro
+      </span>
+    </span>
+  );
+}
+
+export function RecPlayLogo({
+  className,
+}: Readonly<{
+  readonly className?: string;
+}>) {
+  return (
+    <span
+      role='img'
+      aria-label='rec play'
+      className={cn(
+        'inline-flex items-center justify-center select-none text-white/92',
+        className
+      )}
+    >
+      <span className='text-[1em] font-semibold lowercase tracking-[-0.035em]'>
+        rec play
+      </span>
+    </span>
+  );
+}

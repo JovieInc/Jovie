@@ -32,7 +32,7 @@ test.describe('Homepage', () => {
     const hero = page.getByTestId('homepage-hero-shell');
 
     await expect(hero).toBeVisible();
-    await expect(hero.getByText('Release operating system')).toBeVisible();
+    await expect(hero.getByText('Release operating system')).toHaveCount(0);
     await expect(
       hero.getByRole('heading', { name: 'Release more music with less work' })
     ).toBeVisible();
@@ -75,6 +75,32 @@ test.describe('Homepage', () => {
     await expect(
       header.getByRole('link', { name: 'Start Free Trial' })
     ).toHaveAttribute('href', '/signup');
+  });
+
+  test('header flyouts stay open while moving into the panel', async ({
+    page,
+  }) => {
+    const header = page.getByTestId('header-nav');
+    const featuresTrigger = header.getByRole('button', { name: 'Features' });
+    const featuresFlyout = page.locator('#marketing-header-flyout-features');
+
+    await featuresTrigger.hover();
+    await expect(featuresTrigger).toHaveAttribute('aria-expanded', 'true');
+    await expect(featuresFlyout).toBeVisible();
+    await expect(
+      featuresFlyout.getByRole('link', { name: 'Automatic Fan Notifications' })
+    ).toBeVisible();
+    await expect(
+      featuresFlyout.getByRole('link', { name: 'Direct Fan Messaging' })
+    ).toHaveCount(0);
+
+    await featuresFlyout
+      .getByRole('link', { name: 'Capture Every Fan' })
+      .hover();
+    await expect(featuresFlyout).toBeVisible();
+
+    await page.keyboard.press('Escape');
+    await expect(featuresTrigger).toHaveAttribute('aria-expanded', 'false');
   });
 
   test('product carousel exposes desktop and mobile proof slides', async ({
@@ -155,7 +181,7 @@ test.describe('Homepage', () => {
     }
   });
 
-  test('trust, product statement, workspace, Friday, profile proof, pricing, FAQ, and final CTA render', async ({
+  test('trust, product statement, workspace, artist profiles, pricing, FAQ, and final CTA render', async ({
     page,
   }) => {
     await expect(page.getByTestId('homepage-trust')).toHaveAttribute(
@@ -181,13 +207,30 @@ test.describe('Homepage', () => {
     await expect(page.getByText('Meet Jovie')).toBeVisible();
     await expect(
       page.getByRole('heading', {
-        name: /A release operating system for serious artists\./,
+        name: /A new kind of operating system\s+Built for music artists/,
       })
     ).toBeVisible();
-    await expect(page.getByText('Go live. In 60 seconds.')).toBeVisible();
+    for (const outcome of [
+      'Import the drop',
+      'Generate the work',
+      'Keep the release moving',
+    ]) {
+      await expect(page.getByRole('heading', { name: outcome })).toBeVisible();
+    }
+    const aiComposer = page.getByTestId('homepage-ai-composer-demo');
+    await expect(aiComposer).toBeVisible();
+    await expect(
+      aiComposer.getByRole('heading', {
+        name: 'AI leverage for human artists',
+      })
+    ).toBeVisible();
+    await expect(page.getByTestId('homepage-go-live-section')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Go live in 60 seconds' })
+    ).toBeVisible();
     await expect(
       page.getByRole('heading', {
-        name: 'One workspace. For every release.',
+        name: 'One workspace For every release',
       })
     ).toBeVisible();
     await expect(
@@ -206,23 +249,104 @@ test.describe('Homepage', () => {
       0
     );
     await expect(page.getByTestId('homepage-workflow-strip')).toHaveCount(0);
-    await expect(page.getByTestId('friday-rhythm-section')).toBeVisible();
+    await expect(page.getByTestId('friday-rhythm-section')).toHaveCount(0);
     await expect(
       page.getByRole('heading', { name: 'Make Every Friday Count' })
-    ).toBeVisible();
-    await expect(page.getByTestId('homepage-profile-proof-band')).toBeVisible();
+    ).toHaveCount(0);
+    await expect(page.getByTestId('homepage-profile-proof-band')).toHaveCount(
+      0
+    );
+    const artistProfiles = page.getByTestId('homepage-artist-profiles-section');
+    await expect(artistProfiles).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'Artist profiles built to convert.' })
+      artistProfiles.getByRole('heading', {
+        name: 'Artist profiles Built to convert',
+      })
     ).toBeVisible();
-    await expect(page.getByTestId('homepage-v2-pricing')).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'Simple Pricing.' })
+      artistProfiles.getByText('Streams. Fans. Shows. Payments. Drops.')
     ).toBeVisible();
-    await expect(page.getByTestId('homepage-v2-pricing-free')).toHaveCount(0);
+    await expect(
+      artistProfiles.getByRole('link', { name: 'Claim your profile' })
+    ).toHaveAttribute('href', '/signup');
+    await expect(
+      artistProfiles.getByRole('link', { name: 'View example' })
+    ).toHaveAttribute('href', '/artist-profiles');
+    for (const outcome of [
+      'Get Paid',
+      'Drive Streams',
+      'Capture Fans',
+      'Sell Out',
+      'Drop Music',
+    ]) {
+      await expect(
+        artistProfiles.getByRole('heading', { name: outcome })
+      ).toBeVisible();
+    }
+    await page.waitForFunction(() => {
+      const section = document.querySelector(
+        '[data-testid="homepage-artist-profiles-section"]'
+      );
+      if (!section) return false;
+      return Array.from(
+        section.querySelectorAll<HTMLImageElement>('img')
+      ).every(img => img.complete && img.naturalWidth > 0);
+    });
+    const profileImageQuality = await artistProfiles
+      .locator('img')
+      .evaluateAll(images =>
+        images.map(img => {
+          const rect = img.getBoundingClientRect();
+          return {
+            alt: img.alt,
+            clientWidth: rect.width,
+            naturalWidth: img.naturalWidth,
+            requiredWidth: Math.ceil(rect.width * devicePixelRatio),
+          };
+        })
+      );
+
+    expect(profileImageQuality).toHaveLength(5);
+    for (const image of profileImageQuality) {
+      expect(
+        image.naturalWidth,
+        `${image.alt} should be loaded at device pixel ratio quality`
+      ).toBeGreaterThanOrEqual(image.requiredWidth);
+    }
+    const specWall = page.getByTestId('homepage-spec-wall-section');
+    await expect(specWall).toBeVisible();
+    await expect(
+      specWall.getByRole('heading', {
+        name: 'Everything else artists ask before switching',
+      })
+    ).toBeVisible();
+    for (const spec of [
+      'Presaves',
+      'Bot filtering',
+      'Album art',
+      'Power users',
+      'Customization',
+      'Fan notifications',
+    ]) {
+      await expect(specWall.getByRole('heading', { name: spec })).toBeVisible();
+    }
+    const pricing = page.getByTestId('homepage-v2-pricing');
+    await expect(pricing).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Simple pricing' })
+    ).toBeVisible();
+    const freePricingCard = page.getByTestId('homepage-v2-pricing-free');
+    await expect(freePricingCard).toBeVisible();
+    await expect(
+      freePricingCard.getByText('Free forever', { exact: true })
+    ).toBeVisible();
+    await expect(
+      pricing.getByText('Artist profiles are free forever.')
+    ).toBeVisible();
     await expect(page.getByTestId('homepage-v2-pricing-pro')).toBeVisible();
     await expect(page.getByTestId('homepage-faq')).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'Questions Artists Ask Before Launch' })
+      page.getByRole('heading', { name: 'Frequently Asked Questions' })
     ).toBeVisible();
 
     const finalCta = page.getByTestId('homepage-v2-final-cta');
