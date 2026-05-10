@@ -326,23 +326,7 @@ test.describe('Homepage', () => {
         `${image.alt} should be loaded at device pixel ratio quality`
       ).toBeGreaterThanOrEqual(image.requiredWidth);
     }
-    const specWall = page.getByTestId('homepage-spec-wall-section');
-    await expect(specWall).toBeVisible();
-    await expect(
-      specWall.getByRole('heading', {
-        name: 'Answers for every launch objection',
-      })
-    ).toBeVisible();
-    for (const spec of [
-      'Presaves',
-      'Bot protection',
-      'AI art direction',
-      'Fast catalogs',
-      'Custom routing',
-      'Fan notifications',
-    ]) {
-      await expect(specWall.getByRole('heading', { name: spec })).toBeVisible();
-    }
+    // Spec wall section removed — JOV-2073
     const pricing = page.getByTestId('homepage-v2-pricing');
     await expect(pricing).toBeVisible();
     await expect(
