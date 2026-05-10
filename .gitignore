@@ -116,3 +116,15 @@ ruvector.db
 
 # AgentOS run artifacts (binary outputs not source-controlled)
 agentos/runs/**/artifacts/
+.hermes/
+agentos/
+docs/leads/
+*.bak
+*.bak2
+*.backup
+apps/web/exp/
+apps/web/.final-shots/
+apps/web/.tmp-polish-baseline/
+apps/desktop/
+apps/extension/
+.agents/
