@@ -9,8 +9,12 @@ name: desktop-release
 # - Manual workflow_dispatch lets you target staging or re-run production.
 #
 # Signing & notarization:
-# - Requires GH secrets: APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID,
-#   MAC_CERTIFICATE_BASE64, MAC_CERTIFICATE_PASSWORD.
+# - Requires GH secrets: MAC_CERTIFICATE_BASE64, MAC_CERTIFICATE_PASSWORD,
+#   APPLE_TEAM_ID, APPLE_API_KEY (the .p8 contents), APPLE_API_KEY_ID,
+#   APPLE_API_ISSUER.
+# - Notarization uses the modern App Store Connect API key flow (no
+#   app-specific password). The cert still imports into a temp keychain
+#   for codesigning.
 # - When secrets are absent (e.g. a fork PR), the macOS build skips signing
 #   gracefully and produces an unsigned DMG. Auto-update will not work for
 #   unsigned builds; that's by design — they're for sanity checks only.
@@ -53,6 +57,7 @@ jobs:
     env:
       ENVIRONMENT: ${{ github.event.inputs.environment || 'production' }}
       HAS_MAC_SIGNING_CREDENTIALS: ${{ secrets.MAC_CERTIFICATE_BASE64 != '' && secrets.MAC_CERTIFICATE_PASSWORD != '' }}
+      HAS_APPLE_API_CREDENTIALS: ${{ secrets.APPLE_API_KEY != '' && secrets.APPLE_API_KEY_ID != '' && secrets.APPLE_API_ISSUER != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -113,15 +118,43 @@ jobs:
           rm -f "$CERT_PATH"
           echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
 
+      # Notarization uses App Store Connect API keys instead of an Apple ID +
+      # app-specific password. @electron/notarize (which electron-builder
+      # invokes) reads APPLE_API_KEY as a filesystem path to the .p8 file, so
+      # write the secret contents to a temp file and export the path.
+      # Accepts the secret either as raw PEM (-----BEGIN PRIVATE KEY-----) or
+      # base64-encoded; whichever Tim pasted works.
+      - name: Stage Apple API key (macOS)
+        if: env.HAS_APPLE_API_CREDENTIALS == 'true'
+        env:
+          APPLE_API_KEY_CONTENTS: ${{ secrets.APPLE_API_KEY }}
+        run: |
+          set -euo pipefail
+          KEY_PATH="$RUNNER_TEMP/apple-api-key.p8"
+          if printf '%s' "$APPLE_API_KEY_CONTENTS" | grep -q "BEGIN PRIVATE KEY"; then
+            printf '%s' "$APPLE_API_KEY_CONTENTS" > "$KEY_PATH"
+          else
+            printf '%s' "$APPLE_API_KEY_CONTENTS" | base64 --decode > "$KEY_PATH"
+          fi
+          chmod 600 "$KEY_PATH"
+          # Sanity-check the staged key without leaking contents.
+          head -1 "$KEY_PATH" | grep -q "BEGIN PRIVATE KEY" || {
+            echo "::error::Staged Apple API key is not a valid PEM .p8 file"
+            exit 1
+          }
+          echo "APPLE_API_KEY=$KEY_PATH" >> "$GITHUB_ENV"
+
       - name: Build desktop app
         env:
           ELECTRON_ENV: ${{ env.ENVIRONMENT }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Apple notarization (notarytool). All three required by
-          # electron-builder when notarize: true is set; if any are missing,
-          # electron-builder skips notarization with a warning.
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          # Apple notarization via App Store Connect API key. All three are
+          # required by @electron/notarize when notarize: true is set; if any
+          # are missing, electron-builder skips notarization with a warning.
+          # APPLE_API_KEY is the path written by "Stage Apple API key" above.
+          APPLE_API_KEY: ${{ env.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           # CSC_LINK is the alternative to MAC_CERTIFICATE_BASE64 when not
           # using a pre-imported keychain. Left unset; we use the keychain
@@ -133,3 +166,8 @@ jobs:
         if: always() && env.KEYCHAIN_PATH != ''
         run: |
           security delete-keychain "$KEYCHAIN_PATH" || true
+
+      - name: Clean up Apple API key
+        if: always() && env.APPLE_API_KEY != ''
+        run: |
+          rm -f "$APPLE_API_KEY"

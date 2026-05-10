@@ -1,8 +1,10 @@
 # Desktop App Signing & Auto-Update Setup
 
-> One-time setup. Once these 5 GitHub secrets are added, every push to `main`
-> that touches `apps/desktop/**` or `VERSION` will produce a signed, notarized
-> macOS DMG that the existing app can auto-update to.
+> One-time setup. Once these 6 GitHub secrets are added, every push to `main`
+> that bumps `VERSION` (or changes `desktop-release.yml`) will produce a
+> signed, notarized macOS DMG that the existing app can auto-update to.
+> Notarization uses the modern App Store Connect API key flow — no
+> app-specific passwords to rotate.
 
 ## What this fixes
 
@@ -46,18 +48,21 @@ to step 2.
 2. Right-click `Developer ID Application: …` → Export
 3. Save as `jovie-cert.p12`, choose a strong password (you'll need it in step 4)
 
-### 3. Generate an app-specific password for `notarytool`
+### 3. Create an App Store Connect API key for `notarytool`
 
-1. Sign in at <https://appleid.apple.com> with the Apple ID that owns the team
-2. Sign-In and Security → App-Specific Passwords → Generate
-3. Label it `jovie-notarytool` and copy the password (format: `abcd-efgh-ijkl-mnop`)
+1. Sign in at <https://appstoreconnect.apple.com/access/integrations/api>
+2. Click `+` → choose **Developer** access (sufficient for notarization)
+3. Name it `jovie-notarytool` and download the `.p8` file (one-time download —
+   save it; Apple won't show it again)
+4. Note the **Key ID** (10-char string in the row, e.g. `ABC123DEF4`) and the
+   **Issuer ID** (UUID at the top of the Keys page)
 
 ### 4. Get the Team ID
 
 1. Sign in at <https://developer.apple.com/account>
 2. Membership → Team ID is the 10-character string (e.g. `A1B2C3D4E5`)
 
-### 5. Add 5 GitHub secrets
+### 5. Add 6 GitHub secrets
 
 ```bash
 # 1. Base64-encode the .p12 cert
@@ -66,27 +71,30 @@ base64 -i jovie-cert.p12 | gh secret set MAC_CERTIFICATE_BASE64
 # 2. The .p12 export password (from step 2)
 gh secret set MAC_CERTIFICATE_PASSWORD
 
-# 3. Apple ID email (the account that owns the team)
-gh secret set APPLE_ID
-
-# 4. App-specific password from step 3
-gh secret set APPLE_APP_SPECIFIC_PASSWORD
-
-# 5. Team ID from step 4
+# 3. Team ID from step 4
 gh secret set APPLE_TEAM_ID
+
+# 4. The .p8 API key contents from step 3 (paste raw PEM, base64 also accepted)
+gh secret set APPLE_API_KEY < AuthKey_ABC123DEF4.p8
+
+# 5. The Key ID from step 3
+gh secret set APPLE_API_KEY_ID
+
+# 6. The Issuer ID (UUID) from step 3
+gh secret set APPLE_API_ISSUER
 ```
 
 `gh secret set` will prompt for each value. Verify with `gh secret list | grep -E 'MAC_|APPLE_'`.
 
-### 6. Securely dispose of the local `.p12`
+### 6. Securely dispose of the local `.p12` and `.p8`
 
 ```bash
-rm -P jovie-cert.p12  # macOS
+rm -P jovie-cert.p12 AuthKey_*.p8   # macOS
 # Linux alternative:
-shred -u jovie-cert.p12
+shred -u jovie-cert.p12 AuthKey_*.p8
 ```
 
-The cert lives in GH secrets now; don't keep a copy in a downloads folder.
+The cert and API key live in GH secrets now; don't keep copies in a downloads folder.
 
 ## Verifying the setup
 
@@ -133,7 +141,8 @@ auto-update they can apply with one click.
 | Build succeeds but DMG is unsigned | `MAC_CERTIFICATE_BASE64` secret missing or empty | Re-run step 5 |
 | `electron-builder` fails with `code signing identity not found` | `MAC_CERTIFICATE_PASSWORD` is wrong | Re-export `.p12` and re-set the secret |
 | Notarization times out | Apple's notary service is slow; usually 2-15 min | Re-run the workflow; if persistent, check <https://www.apple.com/support/systemstatus/> |
-| `notarytool` fails with `Invalid credentials` | App-specific password expired or `APPLE_ID` wrong | Generate a new app-specific password (step 3) and update the secret |
+| `notarytool` fails with `Invalid credentials` | API key revoked, wrong Key ID, or wrong Issuer ID | Re-create the App Store Connect API key (step 3) and update the three `APPLE_API_*` secrets |
+| `Staged Apple API key is not a valid PEM .p8 file` | `APPLE_API_KEY` secret is corrupt or wasn't the .p8 contents | Re-download the .p8 from App Store Connect and re-set the secret with `gh secret set APPLE_API_KEY < AuthKey_*.p8` |
 | App installs but won't update | First signed install — older unsigned binary can't transition | One-time manual download of the new signed DMG (renderer falls back to download URL automatically) |
 
 ## Related files
