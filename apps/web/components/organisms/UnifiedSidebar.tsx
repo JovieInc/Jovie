@@ -10,7 +10,6 @@ import {
   ArrowLeft,
   ChevronDown,
   Copy,
-  Download,
   RefreshCw,
   SquarePen,
 } from 'lucide-react';
@@ -47,16 +46,13 @@ import { SidebarInstallBanner } from '@/features/feedback/SidebarInstallBanner';
 import { SidebarUpgradeBanner } from '@/features/feedback/SidebarUpgradeBanner';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import { useProfileData } from '@/hooks/useProfileData';
-import { usePWAInstall } from '@/hooks/usePWAInstall';
 import { env } from '@/lib/env-client';
 import { useAppFlag } from '@/lib/flags/client';
-import { TOAST_MESSAGES } from '@/lib/hooks/useNotifications';
 import {
   useVersionMonitor,
   type VersionMismatchInfo,
 } from '@/lib/hooks/useVersionMonitor';
 import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
-import { usePlanGate } from '@/lib/queries/usePlanGate';
 import { cn } from '@/lib/utils';
 import { ProfileSwitcher } from './ProfileSwitcher';
 import { SidebarBottomNowPlayingBridge } from './SidebarBottomNowPlayingBridge';
@@ -338,10 +334,6 @@ function SidebarHeaderNav({
 
 function ShellSidebarInstallBanner() {
   const isPassiveRuntime = env.IS_TEST || env.IS_E2E;
-  const { isPro, isTrialing } = usePlanGate();
-  const isPaidPro = isPro && !isTrialing;
-  const pwaInstallEnabled = useAppFlag('PWA_INSTALL_BANNER');
-  const { canPrompt, isIOS, install, dismiss: dismissPwa } = usePWAInstall();
   const [versionUpdate, setVersionUpdate] =
     useState<VersionMismatchInfo | null>(null);
   const [showVersionBanner, setShowVersionBanner] = useState(false);
@@ -396,42 +388,24 @@ function ShellSidebarInstallBanner() {
     return null;
   }
 
-  if (showVersionBanner && versionUpdate) {
-    const title = versionUpdate.newVersion
-      ? `New Version Available (v${versionUpdate.newVersion})`
-      : 'New Version Available';
-
-    return (
-      <InstallBanner
-        open
-        icon={RefreshCw}
-        title={title}
-        description='An improved version of Jovie is available. Reload to update.'
-        ctaLabel='Reload'
-        ctaIcon={RefreshCw}
-        onCta={reload}
-        onDismiss={dismissVersionUpdate}
-        className='group-data-[collapsible=icon]:hidden'
-      />
-    );
+  if (!showVersionBanner || !versionUpdate) {
+    return null;
   }
 
-  if (!pwaInstallEnabled || !isPaidPro || !canPrompt) return null;
+  const title = versionUpdate.newVersion
+    ? `New Version Available (v${versionUpdate.newVersion})`
+    : 'New Version Available';
 
   return (
     <InstallBanner
       open
-      icon={Download}
-      title={TOAST_MESSAGES.PWA_INSTALL}
-      description={
-        isIOS
-          ? TOAST_MESSAGES.PWA_INSTALL_IOS
-          : TOAST_MESSAGES.PWA_INSTALL_DESCRIPTION
-      }
-      ctaLabel={isIOS ? 'Dismiss' : 'Install'}
-      ctaIcon={isIOS ? null : Download}
-      onCta={isIOS ? dismissPwa : install}
-      onDismiss={dismissPwa}
+      icon={RefreshCw}
+      title={title}
+      description='An improved version of Jovie is available. Reload to update.'
+      ctaLabel='Reload'
+      ctaIcon={RefreshCw}
+      onCta={reload}
+      onDismiss={dismissVersionUpdate}
       className='group-data-[collapsible=icon]:hidden'
     />
   );

@@ -1,22 +1,11 @@
 'use client';
 
-import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { Copyright } from '@/components/atoms/Copyright';
 import { FooterBranding } from '@/components/molecules/FooterBranding';
 import { FooterNavigation } from '@/components/molecules/FooterNavigation';
 import { APP_ROUTES } from '@/constants/routes';
-import { useAppFlag } from '@/lib/flags/client';
 import { cn } from '@/lib/utils';
-
-// Dynamic import to exclude ThemeToggle from bundle when not used
-const ThemeToggle = dynamic(
-  () =>
-    import('@/components/site/theme-toggle').then(mod => ({
-      default: mod.ThemeToggle,
-    })),
-  { ssr: false }
-);
 
 const FOOTER_COLUMNS = [
   {
@@ -73,15 +62,11 @@ import type { FooterProps } from './types';
 export function Footer({
   variant = 'marketing',
   artistHandle,
-  showThemeToggle = false,
-  themeShortcutKey,
   className = '',
   brandingMark = 'icon',
   containerSize = 'lg',
   links,
 }: FooterProps) {
-  const isLightModeEnabled = useAppFlag('ENABLE_LIGHT_MODE');
-  const effectiveShowThemeToggle = showThemeToggle && isLightModeEnabled;
   const maxWidthClass = CONTAINER_SIZES[containerSize];
 
   const variantConfigs = getVariantConfigs(maxWidthClass, containerSize);
@@ -265,24 +250,6 @@ export function Footer({
                     </Link>
                   ))}
                 </nav>
-              )}
-              {effectiveShowThemeToggle && (
-                <>
-                  <div className='flex items-center md:hidden'>
-                    <ThemeToggle
-                      appearance='icon'
-                      shortcutKey={themeShortcutKey}
-                      variant='linear'
-                    />
-                  </div>
-                  <div className='max-md:hidden md:flex items-center'>
-                    <ThemeToggle
-                      appearance={config.themeAppearance}
-                      shortcutKey={themeShortcutKey}
-                      variant='linear'
-                    />
-                  </div>
-                </>
               )}
             </div>
             <Copyright

@@ -77,12 +77,12 @@ import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 ```tsx
 import { useAppFlag } from '@/lib/flags/client';
 
-function ReleaseToolbar() {
-  const showExtras = useAppFlag('SHOW_RELEASE_TOOLBAR_EXTRAS');
+function UpgradeButton() {
+  const directUpgrade = useAppFlag('BILLING_UPGRADE_DIRECT');
 
-  if (!showExtras) return null;
+  if (!directUpgrade) return <PricingLink />;
 
-  return <ReleaseToolbarExtras />;
+  return <DirectCheckoutButton />;
 }
 ```
 

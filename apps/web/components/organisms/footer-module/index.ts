@@ -12,5 +12,4 @@ export type {
   FooterProps,
   FooterVariant,
   FooterVariantConfig,
-  ThemeAppearance,
 } from './types';

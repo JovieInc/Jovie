@@ -61,13 +61,6 @@ vi.mock('@jovie/ui', () => ({
 }));
 
 vi.mock(
-  '@/features/dashboard/organisms/release-provider-matrix/ReleaseTableDisplayMenu',
-  () => ({
-    ReleaseTableDisplayMenu: () => <button type='button'>Display</button>,
-  })
-);
-
-vi.mock(
   '@/features/dashboard/organisms/release-provider-matrix/ReleaseTableExportButton',
   () => ({
     ReleaseTableExportButton: () => <button type='button'>Export</button>,
@@ -150,7 +143,7 @@ describe('ReleaseTableSubheader', () => {
     );
   });
 
-  it('orders toolbar controls as search, filters, display, export, and preview', () => {
+  it('orders toolbar controls as search, filters, export, and preview', () => {
     render(
       <ReleaseTableSubheader
         releases={[] as ReleaseViewModel[]}
@@ -168,7 +161,6 @@ describe('ReleaseTableSubheader', () => {
     const controls = [
       screen.getByTestId('toolbar-search'),
       screen.getByRole('button', { name: 'Filters' }),
-      screen.getByRole('button', { name: /display/i }),
       screen.getByRole('button', { name: 'Export' }),
       screen.getByTestId('drawer-toggle-button'),
     ];

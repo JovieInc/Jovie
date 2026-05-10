@@ -2,13 +2,11 @@
 
 import { useQueryClient } from '@tanstack/react-query';
 import { Search } from 'lucide-react';
-import dynamic from 'next/dynamic';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
-import { Flagged } from '@/components/features/dev/Flagged';
 import { OPEN_COMMAND_PALETTE_EVENT } from '@/components/organisms/command-palette-events';
 import { usePendingShell } from '@/components/organisms/PendingShellContext';
 import {
@@ -18,7 +16,6 @@ import {
 } from '@/components/organisms/Sidebar';
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
-import { env } from '@/lib/env-client';
 import { useAppFlag } from '@/lib/flags/client';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import { usePlanGate } from '@/lib/queries';
@@ -33,18 +30,6 @@ import {
 import { NavMenuItem } from './NavMenuItem';
 import { ProfileMenuActions } from './ProfileMenuActions';
 import type { DashboardNavProps, NavItem } from './types';
-
-const RecentChats = dynamic(
-  () => import('./RecentChats').then(mod => ({ default: mod.RecentChats })),
-  {
-    ssr: false,
-    loading: () => (
-      <div className='px-2 py-1 text-sm text-secondary-token animate-pulse'>
-        Loading threads…
-      </div>
-    ),
-  }
-);
 
 const searchNavItem: NavItem = {
   name: 'Search',
@@ -97,7 +82,6 @@ export function DashboardNav(_: DashboardNavProps) {
   const pathname = usePathname();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const threadsEnabled = useAppFlag('THREADS_ENABLED');
   const shellChatV1Enabled = useAppFlag('DESIGN_V1');
   const shellChatLibraryEnabled = useAppFlag('SHELL_CHAT_V1');
   const {
@@ -392,14 +376,6 @@ export function DashboardNav(_: DashboardNavProps) {
             ))}
           </SidebarGroupContent>
         </SidebarGroup>
-      )}
-
-      {!isInSettings && threadsEnabled && !env.IS_E2E && (
-        <Flagged name='THREADS_ENABLED'>
-          <div className='mt-3.5'>
-            <RecentChats />
-          </div>
-        </Flagged>
       )}
 
       {isAdmin && !isInSettings && (

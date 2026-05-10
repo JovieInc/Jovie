@@ -31,7 +31,6 @@ export function getVariantConfigs(
       showBranding: false,
       layout: 'horizontal',
       showLinks: true,
-      themeAppearance: 'icon',
     },
     profile: {
       containerClass: 'relative pt-2',
@@ -40,7 +39,6 @@ export function getVariantConfigs(
       showBranding: true,
       layout: 'vertical',
       showLinks: true,
-      themeAppearance: 'icon',
     },
     minimal: {
       containerClass: 'border-t border-subtle bg-base',
@@ -52,7 +50,6 @@ export function getVariantConfigs(
       showBranding: false,
       layout: 'horizontal',
       showLinks: true,
-      themeAppearance: 'segmented',
     },
     regular: {
       containerClass: 'border-t border-subtle bg-base',
@@ -64,7 +61,6 @@ export function getVariantConfigs(
       showBranding: false,
       layout: 'horizontal',
       showLinks: false,
-      themeAppearance: 'segmented',
     },
   };
 }

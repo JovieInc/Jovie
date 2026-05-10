@@ -1,9 +1,7 @@
 export interface FooterProps {
   readonly variant?: 'marketing' | 'profile' | 'minimal' | 'regular';
   readonly artistHandle?: string;
-  readonly showThemeToggle?: boolean;
   readonly className?: string;
-  readonly themeShortcutKey?: string;
   readonly brandingMark?: 'wordmark' | 'icon';
   readonly containerSize?: 'sm' | 'md' | 'lg' | 'xl' | 'full' | 'homepage';
   readonly links?: Array<{
@@ -14,7 +12,6 @@ export interface FooterProps {
 
 export type FooterVariant = 'marketing' | 'profile' | 'minimal' | 'regular';
 export type ContainerSize = 'sm' | 'md' | 'lg' | 'xl' | 'full' | 'homepage';
-export type ThemeAppearance = 'icon' | 'segmented';
 export type FooterLayout = 'horizontal' | 'vertical';
 export type ColorVariant = 'light' | 'dark';
 
@@ -25,5 +22,4 @@ export interface FooterVariantConfig {
   showBranding: boolean;
   layout: FooterLayout;
   showLinks: boolean;
-  themeAppearance: ThemeAppearance;
 }
