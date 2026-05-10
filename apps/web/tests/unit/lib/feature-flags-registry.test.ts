@@ -4,10 +4,12 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import {
+  APP_FLAG_DEFAULTS,
   APP_FLAG_KEYS,
   APP_FLAG_TO_STATSIG_GATE,
   DESIGN_V1_ALIAS_FLAGS,
   LEGACY_STATSIG_GATE_KEYS,
+  LOCAL_DEFAULT_ONLY_FLAGS,
 } from '@/lib/flags/contracts';
 
 const SOURCE_DIRECTORIES = ['app', 'components', 'hooks', 'lib'];
@@ -115,17 +117,20 @@ describe('feature flag registry integrity', () => {
     expect([...chatFlagsInKeys, ...chatFlagsInValues]).toEqual([]);
   });
 
-  it('keeps new design surfaces backed by DESIGN_V1', () => {
-    expect(APP_FLAG_KEYS.DESIGN_V1).toBe(LEGACY_STATSIG_GATE_KEYS.DESIGN_V1);
-    expect(APP_FLAG_TO_STATSIG_GATE.DESIGN_V1).toBe(
-      LEGACY_STATSIG_GATE_KEYS.DESIGN_V1
-    );
+  it('keeps DESIGN_V1 and aliases permanently enabled (no Statsig gate, default true)', () => {
+    // DESIGN_V1 is the only design. It must NOT be backed by a Statsig gate
+    // (so a misconfigured gate cannot turn off the new design in production).
+    // All entries live in LOCAL_DEFAULT_ONLY_FLAGS with default=true.
+    const statsigBackedFlags = new Set(Object.keys(APP_FLAG_TO_STATSIG_GATE));
+
+    expect(statsigBackedFlags.has('DESIGN_V1')).toBe(false);
+    expect(LOCAL_DEFAULT_ONLY_FLAGS.has('DESIGN_V1')).toBe(true);
+    expect(APP_FLAG_DEFAULTS.DESIGN_V1).toBe(true);
 
     for (const aliasFlag of DESIGN_V1_ALIAS_FLAGS) {
-      expect(APP_FLAG_KEYS[aliasFlag]).toBe(LEGACY_STATSIG_GATE_KEYS.DESIGN_V1);
-      expect(APP_FLAG_TO_STATSIG_GATE[aliasFlag]).toBe(
-        LEGACY_STATSIG_GATE_KEYS.DESIGN_V1
-      );
+      expect(statsigBackedFlags.has(aliasFlag)).toBe(false);
+      expect(LOCAL_DEFAULT_ONLY_FLAGS.has(aliasFlag)).toBe(true);
+      expect(APP_FLAG_DEFAULTS[aliasFlag]).toBe(true);
     }
   });
 

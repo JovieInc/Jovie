@@ -120,15 +120,6 @@ export const APP_FLAG_TO_STATSIG_GATE = {
   STRIPE_CONNECT_ENABLED: LEGACY_STATSIG_GATE_KEYS.STRIPE_CONNECT_ENABLED,
   ENABLE_LIGHT_MODE: LEGACY_STATSIG_GATE_KEYS.ENABLE_LIGHT_MODE,
   CHAT_JANK_MONITOR: LEGACY_STATSIG_GATE_KEYS.CHAT_JANK_MONITOR,
-  DESIGN_V1: LEGACY_STATSIG_GATE_KEYS.DESIGN_V1,
-  SHELL_CHAT_V1: LEGACY_STATSIG_GATE_KEYS.DESIGN_V1,
-  DESIGN_V1_RELEASES: LEGACY_STATSIG_GATE_KEYS.DESIGN_V1,
-  DESIGN_V1_TASKS: LEGACY_STATSIG_GATE_KEYS.DESIGN_V1,
-  DESIGN_V1_CHAT_ENTITIES: LEGACY_STATSIG_GATE_KEYS.DESIGN_V1,
-  DESIGN_V1_LYRICS: LEGACY_STATSIG_GATE_KEYS.DESIGN_V1,
-  DESIGN_V1_LIBRARY: LEGACY_STATSIG_GATE_KEYS.DESIGN_V1,
-  DESIGN_V1_AUTH: LEGACY_STATSIG_GATE_KEYS.DESIGN_V1,
-  DESIGN_V1_ONBOARDING: LEGACY_STATSIG_GATE_KEYS.DESIGN_V1,
 } as const satisfies Partial<Record<AppFlagName, StatsigGateKey>>;
 
 export type StatsigBackedAppFlagName = keyof typeof APP_FLAG_TO_STATSIG_GATE;
@@ -189,4 +180,13 @@ export const LOCAL_DEFAULT_ONLY_FLAGS = new Set<AppFlagName>([
   'ALBUM_ART_GENERATION', // default-true feature; controlled by Statsig experiment separately in usage, not a gate
   'CHAT_JANK_MONITOR', // monitoring-only flag; was missing Statsig gate (bug fixed in #8271 — kept here for local-dev override support)
   'RELEASE_PLAN_DEMO', // YC wedge demo page; admin/internal only, not externally gated
+  'DESIGN_V1', // permanently enabled — new design is the only design
+  'SHELL_CHAT_V1', // alias of DESIGN_V1 — permanently enabled
+  'DESIGN_V1_RELEASES', // alias of DESIGN_V1 — permanently enabled
+  'DESIGN_V1_TASKS', // alias of DESIGN_V1 — permanently enabled
+  'DESIGN_V1_CHAT_ENTITIES', // alias of DESIGN_V1 — permanently enabled
+  'DESIGN_V1_LYRICS', // alias of DESIGN_V1 — permanently enabled
+  'DESIGN_V1_LIBRARY', // alias of DESIGN_V1 — permanently enabled
+  'DESIGN_V1_AUTH', // alias of DESIGN_V1 — permanently enabled
+  'DESIGN_V1_ONBOARDING', // alias of DESIGN_V1 — permanently enabled
 ]);
