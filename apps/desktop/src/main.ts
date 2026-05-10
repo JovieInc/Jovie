@@ -384,13 +384,15 @@ ipcMain.handle(
 ipcMain.handle(GO_BACK_CHANNEL, (event: IpcMainInvokeEvent) => {
   if (!isTrustedIpcSender(event)) return;
   const win = BrowserWindow.fromWebContents(event.sender);
-  if (win?.webContents.canGoBack()) win.webContents.goBack();
+  if (win && !win.isDestroyed() && win.webContents.canGoBack())
+    win.webContents.goBack();
 });
 
 ipcMain.handle(GO_FORWARD_CHANNEL, (event: IpcMainInvokeEvent) => {
   if (!isTrustedIpcSender(event)) return;
   const win = BrowserWindow.fromWebContents(event.sender);
-  if (win?.webContents.canGoForward()) win.webContents.goForward();
+  if (win && !win.isDestroyed() && win.webContents.canGoForward())
+    win.webContents.goForward();
 });
 
 app.whenReady().then(() => {
