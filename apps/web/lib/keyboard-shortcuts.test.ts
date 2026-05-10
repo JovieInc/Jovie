@@ -28,6 +28,7 @@ describe('keyboard-shortcuts definitions', () => {
       'general',
       'navigation',
       'actions',
+      'player',
     ];
     for (const shortcut of KEYBOARD_SHORTCUTS) {
       expect(validCategories).toContain(shortcut.category);
@@ -38,6 +39,22 @@ describe('keyboard-shortcuts definitions', () => {
     expect(SHORTCUT_CATEGORY_LABELS.general).toBe('General');
     expect(SHORTCUT_CATEGORY_LABELS.navigation).toBe('Navigation');
     expect(SHORTCUT_CATEGORY_LABELS.actions).toBe('Actions');
+    expect(SHORTCUT_CATEGORY_LABELS.player).toBe('Player');
+  });
+
+  it('every shortcut declares a decision', () => {
+    const valid = ['required', 'deferred', 'none'];
+    for (const s of KEYBOARD_SHORTCUTS) {
+      expect(valid, `${s.id} missing decision`).toContain(s.decision.status);
+    }
+  });
+
+  it('every required shortcut has a non-empty binding', () => {
+    for (const s of KEYBOARD_SHORTCUTS) {
+      if (s.decision.status === 'required') {
+        expect(s.decision.binding, `${s.id} must have a binding`).toBeTruthy();
+      }
+    }
   });
 
   describe('sequential shortcuts', () => {
@@ -184,25 +201,28 @@ describe('keyboard-shortcuts definitions', () => {
   });
 
   describe('chord conflict detection (JOV-1827)', () => {
-    it('has no duplicate `shortcutKey` chord (canonicalized)', () => {
-      // Canonicalize so semantically identical chords with different
-      // casing/modifier order can't slip through (e.g. "Alt+Shift+Q" vs
-      // "Shift+Alt+q").
-      const normalizeChord = (chord: string) => {
-        const parts = chord
-          .split('+')
-          .map(p => p.trim())
-          .filter(Boolean);
-        const key = (parts.pop() ?? '').toLowerCase();
-        const modifiers = parts
-          .map(m => `${m[0]?.toUpperCase() ?? ''}${m.slice(1).toLowerCase()}`)
-          .sort();
-        return [...modifiers, key].join('+');
-      };
-      const chords = KEYBOARD_SHORTCUTS.filter(s => s.shortcutKey).map(s =>
-        normalizeChord(s.shortcutKey!)
-      );
-      expect(new Set(chords).size).toBe(chords.length);
+    // Canonicalize so semantically identical chords with different
+    // casing/modifier order can't slip through (e.g. "Alt+Shift+Q" vs
+    // "Shift+Alt+q").
+    const normalizeChord = (chord: string) => {
+      const parts = chord
+        .split('+')
+        .map(p => p.trim())
+        .filter(Boolean);
+      const key = (parts.pop() ?? '').toLowerCase();
+      const modifiers = parts
+        .map(m => `${m[0]?.toUpperCase() ?? ''}${m.slice(1).toLowerCase()}`)
+        .sort();
+      return [...modifiers, key].join('+');
+    };
+
+    it('has no duplicate shortcutKey chord among global-scoped shortcuts (canonicalized)', () => {
+      // Player- and overlay-scoped shortcuts can share chords with global shortcuts
+      // because they only fire in their respective contexts.
+      const globalChords = KEYBOARD_SHORTCUTS.filter(
+        s => s.shortcutKey && s.scope !== 'player' && s.scope !== 'overlay'
+      ).map(s => normalizeChord(s.shortcutKey!));
+      expect(new Set(globalChords).size).toBe(globalChords.length);
     });
 
     it('does not advertise bare single-letter chords for action shortcuts', () => {
@@ -213,10 +233,14 @@ describe('keyboard-shortcuts definitions', () => {
       }
     });
 
-    it('sequential first keys do not collide with single-key chords', () => {
-      const chords = new Set(
+    it('sequential first keys do not collide with global single-key chords', () => {
+      const globalSingleKeyChords = new Set(
         KEYBOARD_SHORTCUTS.filter(
-          s => s.shortcutKey && !s.shortcutKey.includes('+')
+          s =>
+            s.shortcutKey &&
+            !s.shortcutKey.includes('+') &&
+            s.scope !== 'player' &&
+            s.scope !== 'overlay'
         ).map(s => s.shortcutKey!.toLowerCase())
       );
       const sequentialFirsts = new Set(
@@ -225,30 +249,31 @@ describe('keyboard-shortcuts definitions', () => {
         )
       );
       for (const f of sequentialFirsts) {
-        expect(chords.has(f)).toBe(false);
+        expect(globalSingleKeyChords.has(f)).toBe(false);
       }
     });
 
-    it('every overlay shortcut has a known wiring location', () => {
-      // Document handler ownership in code so removals fail this test.
-      const HANDLED: Record<string, string> = {
-        'command-menu': 'CommandPalette.tsx',
-        'keyboard-shortcuts': 'useSequentialShortcuts',
-        'toggle-sidebar': 'useSidebarKeyboardShortcut',
-        'toggle-theme': 'useGlobalShortcutActions',
-        'sign-out': 'useGlobalShortcutActions',
-        'nav-dashboard': 'useSequentialShortcuts',
-        'nav-profile': 'useSequentialShortcuts',
-        'nav-contacts': 'useSequentialShortcuts',
-        'nav-releases': 'useSequentialShortcuts',
-        'nav-tour-dates': 'useSequentialShortcuts',
-        'nav-audience': 'useSequentialShortcuts',
-        'nav-earnings': 'useSequentialShortcuts',
-        'nav-chat': 'useSequentialShortcuts',
-        'nav-settings': 'useSequentialShortcuts',
-      };
+    it('every required shortcut has a known handler (decision.binding)', () => {
+      // The decision field replaces the old HANDLED map. This test ensures
+      // the binding field is populated for every wired shortcut so removals
+      // without updating the registry are caught.
       for (const s of KEYBOARD_SHORTCUTS) {
-        expect(HANDLED[s.id]).toBeTruthy();
+        if (s.decision.status === 'required') {
+          expect(
+            s.decision.binding,
+            `${s.id} has status "required" but binding is empty`
+          ).toBeTruthy();
+        }
+      }
+    });
+  });
+
+  describe('shortcuts.ts shim', () => {
+    it('shim resolves all SHORTCUTS keys without throwing', async () => {
+      const { SHORTCUTS } = await import('./shortcuts');
+      for (const [key, hint] of Object.entries(SHORTCUTS)) {
+        expect(hint.keys, `${key} should have keys`).toBeTruthy();
+        expect(hint.description, `${key} should have description`).toBeTruthy();
       }
     });
   });
