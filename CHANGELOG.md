@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.232] - 2026-05-10
+
+> Sign In page was showing an empty box with no Google/Apple buttons after the previous auth hardening shipped. Fixed — the OAuth provider guard now reads its enablement flags correctly in the production build.
+
+### Fixed
+
+- **`lib/auth/oauth-providers.ts`**: `isOAuthProviderEnabled` was reading `process.env[dynamicKey]` via bracket notation, which Next.js / webpack DefinePlugin cannot statically inline. The lookup always returned `undefined` in the client bundle, hiding every OAuth button in production regardless of the `NEXT_PUBLIC_CLERK_OAUTH_*_ENABLED` env var values. Switched to a `switch` with statically-referenced `process.env.NEXT_PUBLIC_CLERK_OAUTH_<PROVIDER>_ENABLED` expressions so DefinePlugin inlines the values at build time.
+
 ## [26.4.231.0] - 2026-05-10
 
 > Hardens auth: Clerk proxy now fails closed on a missing or malformed publishable key, OAuth provider buttons are hidden unless explicitly enabled via env flag, and the sign-in/sign-up UI is unified under a single AuthShell component.
