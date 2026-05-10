@@ -1,7 +1,9 @@
 'use client';
 
 import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { useContext } from 'react';
 import { UpdateAvailablePill } from '@/components/atoms/UpdateAvailablePill';
+import { SidebarContext } from '@/components/organisms/sidebar/context';
 import {
   useDesktopNavigation,
   useIsElectronRuntime,
@@ -25,6 +27,9 @@ import { cn } from '@/lib/utils';
 export function DesktopTitlebar() {
   const isDesktop = useIsElectronRuntime();
   const { canGoBack, canGoForward, goBack, goForward } = useDesktopNavigation();
+  // useContext (not useSidebar) so this is safe outside SidebarProvider (e.g. demo shell)
+  const sidebarCtx = useContext(SidebarContext);
+  const sidebarOpen = sidebarCtx?.state === 'open';
 
   return (
     <div
@@ -80,12 +85,12 @@ export function DesktopTitlebar() {
             style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
           />
 
-          {/* Update pill — no-drag so clicks register */}
+          {/* Update pill — compact when sidebar is open, full pill when sidebar is closed */}
           <div
             className='flex items-center pr-3'
             style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           >
-            <UpdateAvailablePill />
+            <UpdateAvailablePill compact={sidebarOpen} />
           </div>
         </>
       ) : null}
