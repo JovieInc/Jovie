@@ -5,6 +5,16 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.229] - 2026-05-10
+
+> [internal] Added P0 smoke tests for the cookie banner and chat page, and extended the visual regression matrix to cover 7 canonical viewport widths.
+
+### Added
+
+- [internal] **Cookie banner smoke tests** (`cookies.spec.ts`): verifies the banner appears for EU visitors, the "Accept All" button is clickable with nonzero bounding box and dismisses the banner, and the "Customize" button opens the preferences modal with a "Save Preferences" action (JOV-2074).
+- [internal] **Chat page smoke tests** (`chat.spec.ts`): verifies authenticated chat loads without console errors, the composer accepts typed text, pressing bare T does not toggle the theme while the input is focused, and a slash command does not cause layout shift >50px (JOV-2074).
+- [internal] **7-viewport visual regression matrix** (`visual-regression.spec.ts`): extends screenshot coverage to 375, 768, 1024, 1280, 1440, 1728, and 2560px widths for the homepage, sign-up, and sign-in pages, with horizontal scroll guards and CTA-clip assertions at each breakpoint (JOV-2081).
+
 ## [26.4.228] - 2026-05-09
 
 > Refreshed the Mac download page copy: clearer hero, six-feature grid, an expanded FAQ, and a final download call-to-action at the bottom.
