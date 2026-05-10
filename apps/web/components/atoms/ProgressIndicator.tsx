@@ -1,6 +1,14 @@
 'use client';
 
+import { motion } from 'motion/react';
 import { useMemo } from 'react';
+
+const SPRING = {
+  type: 'spring',
+  damping: 10,
+  mass: 0.75,
+  stiffness: 100,
+} as const;
 
 interface ProgressStep {
   readonly id: string;
@@ -61,9 +69,11 @@ export function ProgressIndicator({
           )}
         </div>
         <div className='w-full bg-surface-2 rounded-full h-2 overflow-hidden'>
-          <div
-            className='bg-gradient-to-r from-info/55 to-accent/55 dark:from-info/45 dark:to-accent/45 h-full rounded-full transition-all duration-300 ease-out'
-            style={{ width: `${progressPercentage}%` }}
+          <motion.div
+            className='bg-gradient-to-r from-info/55 to-accent/55 dark:from-info/45 dark:to-accent/45 h-full rounded-full'
+            initial={{ width: 0 }}
+            animate={{ width: `${progressPercentage}%` }}
+            transition={SPRING}
           />
         </div>
       </div>
