@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { getAdminStripeOverviewMetrics } from '@/lib/admin/stripe-metrics';
 import { getHudMetrics } from '@/lib/hud/metrics';
 
 const mockGetHudDeployments = vi.hoisted(() => vi.fn());
@@ -184,5 +185,29 @@ describe('getHudMetrics', () => {
     expect(metrics.aiOps.availability).toBe('partial');
     expect(metrics.aiOps.dispatch.available).toBe(true);
     expect(metrics.aiOps.counts.blocked).toBe(1);
+  });
+
+  it('marks financial data unavailable when Stripe is down', async () => {
+    mockGetHudDeployments.mockResolvedValueOnce({
+      availability: 'not_configured',
+      current: null,
+      recent: [],
+    });
+    vi.mocked(getAdminStripeOverviewMetrics).mockResolvedValueOnce({
+      mrrUsd: 0,
+      activeSubscribers: 0,
+      mrrGrowth30dUsd: 0,
+      isConfigured: true,
+      isAvailable: false,
+    });
+
+    const metrics = await getHudMetrics('admin');
+
+    expect(metrics.overview.financialDataAvailable).toBe(false);
+    expect(metrics.overview.runwayMonths).toBeNull();
+    expect(metrics.overview.defaultStatus).toBe('unknown');
+    expect(metrics.overview.defaultStatusDetail).toContain(
+      'Stripe (unavailable)'
+    );
   });
 });

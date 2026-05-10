@@ -393,7 +393,9 @@ describe('ProfileCompactTemplate', () => {
       })
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: /more options/i })
+      within(screen.getByTestId('profile-top-chrome')).queryByRole('button', {
+        name: /more options/i,
+      })
     ).not.toBeInTheDocument();
   });
 
@@ -428,7 +430,7 @@ describe('ProfileCompactTemplate', () => {
     );
 
     const bottomNav = screen.getByTestId('profile-bottom-nav');
-    for (const label of ['Home', 'Music', 'Alerts', 'More']) {
+    for (const label of ['Home', 'Music', 'Alerts', 'More options']) {
       expect(
         within(bottomNav).getByRole('button', { name: label })
       ).toBeInTheDocument();
@@ -440,7 +442,9 @@ describe('ProfileCompactTemplate', () => {
       within(bottomNav).queryByRole('button', { name: 'Profile' })
     ).not.toBeInTheDocument();
 
-    fireEvent.click(within(bottomNav).getByRole('button', { name: 'More' }));
+    fireEvent.click(
+      within(bottomNav).getByRole('button', { name: 'More options' })
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId('mock-profile-unified-drawer')).toHaveAttribute(
@@ -946,7 +950,7 @@ describe('ProfileCompactTemplate', () => {
 
     pushStateSpy.mockClear();
 
-    fireEvent.click(screen.getByRole('button', { name: 'More' }));
+    fireEvent.click(screen.getByRole('button', { name: 'More options' }));
 
     expect(pushStateSpy).not.toHaveBeenCalled();
     expect(window.location.search).toBe('?mode=listen');

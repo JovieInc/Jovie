@@ -1,16 +1,6 @@
 'use client';
 
-import {
-  BadgeCheck,
-  Bell,
-  CalendarDays,
-  ChevronLeft,
-  type LucideIcon,
-  MapPin,
-  MoreHorizontal,
-  Music2,
-  UserRound,
-} from 'lucide-react';
+import { BadgeCheck, Bell, ChevronLeft, MapPin } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useCallback, useMemo, useRef, useState } from 'react';
@@ -25,6 +15,7 @@ import type {
   ProfileRenderMode,
   ProfileSurfacePresentation,
 } from '@/features/profile/contracts';
+import { BottomTabBar } from '@/features/profile/nav/BottomTabBar';
 import { ProfileHomeRail } from '@/features/profile/ProfileHomeRail';
 import type { ProfilePrimaryActionCardRelease } from '@/features/profile/ProfilePrimaryActionCard';
 import { ProfilePrimaryTabPanel } from '@/features/profile/ProfilePrimaryTabPanel';
@@ -68,17 +59,6 @@ const DEFAULT_CONTENT_PREFS: Record<NotificationContentType, boolean> = {
   merch: true,
   general: true,
 };
-
-const PRIMARY_TABS: ReadonlyArray<{
-  mode: ProfilePrimaryTab;
-  label: string;
-  icon: LucideIcon;
-}> = [
-  { mode: 'profile', label: 'Home', icon: UserRound },
-  { mode: 'listen', label: 'Music', icon: Music2 },
-  { mode: 'tour', label: 'Events', icon: CalendarDays },
-  { mode: 'subscribe', label: 'Alerts', icon: Bell },
-];
 
 interface ProfileCompactSurfaceProps {
   readonly renderMode?: ProfileRenderMode;
@@ -214,7 +194,7 @@ export function ProfileCompactSurface({
   previewNotificationsState = {
     kind: 'button',
     tone: 'quiet',
-    label: 'Turn on alerts',
+    label: 'Get alerts',
   },
   dataTestId,
   hideMoreMenu = false,
@@ -307,12 +287,6 @@ export function ProfileCompactSurface({
   );
   const hasTip = surfaceState.hasTip;
   const hasReleases = surfaceState.hasReleases;
-  const visiblePrimaryTabs = useMemo(
-    () => PRIMARY_TABS.filter(tab => tab.mode !== 'tour' || hasTourDates),
-    [hasTourDates]
-  );
-  const visiblePrimaryTabCount =
-    visiblePrimaryTabs.length + (hideMoreMenu ? 0 : 1);
   const { heroSubtitle } = surfaceState;
   const IdentityHeading = renderMode === 'preview' ? 'p' : 'h1';
   const isMenuActive =
@@ -594,7 +568,9 @@ export function ProfileCompactSurface({
                         )}
                       />
                     ) : (
-                      <span>{isSubscribed ? 'Manage' : 'Turn On'}</span>
+                      <span>
+                        {isSubscribed ? 'Manage alerts' : 'Get alerts'}
+                      </span>
                     )}
                   </span>
                 </button>
@@ -660,84 +636,14 @@ export function ProfileCompactSurface({
           </div>
 
           {showBottomNav ? (
-            <div className='-mx-4 shrink-0 border-t border-white/[0.075] bg-black/72 px-1 pb-[max(env(safe-area-inset-bottom),10px)] pt-1 backdrop-blur-2xl'>
-              <nav
-                className='px-0 py-1'
-                aria-label='Profile navigation'
-                data-testid='profile-bottom-nav'
-              >
-                <div
-                  className={cn('grid items-center gap-1')}
-                  style={{
-                    gridTemplateColumns: `repeat(${visiblePrimaryTabCount}, minmax(0, 1fr))`,
-                  }}
-                >
-                  {visiblePrimaryTabs.map(tab => {
-                    const Icon = tab.icon;
-                    const isActive =
-                      !isMenuActive && tab.mode === activeVisiblePrimaryTab;
-                    return (
-                      <button
-                        key={tab.mode}
-                        type='button'
-                        onClick={() => onModeSelect(tab.mode)}
-                        className={cn(
-                          'relative flex min-h-[52px] min-w-0 flex-col items-center justify-center gap-1 rounded-[22px] px-1.5 py-1.5 text-center transition-[background-color,color] duration-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
-                          isActive
-                            ? 'text-white'
-                            : 'text-white/40 hover:text-white/62'
-                        )}
-                        aria-current={isActive ? 'page' : undefined}
-                      >
-                        <Icon
-                          className={cn(
-                            'h-5 w-5 shrink-0',
-                            isActive ? 'text-white' : 'text-white/52'
-                          )}
-                        />
-                        <span
-                          className={cn(
-                            'truncate text-[11px] leading-none tracking-[-0.012em]',
-                            isActive ? 'font-semibold' : 'font-medium'
-                          )}
-                        >
-                          {tab.label}
-                        </span>
-                      </button>
-                    );
-                  })}
-                  {!hideMoreMenu ? (
-                    <button
-                      type='button'
-                      onClick={onOpenMenu}
-                      className={cn(
-                        'relative flex min-h-[52px] min-w-0 flex-col items-center justify-center gap-1 rounded-[22px] px-1.5 py-1.5 text-center transition-[background-color,color] duration-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
-                        isMenuActive
-                          ? 'text-white'
-                          : 'text-white/40 hover:text-white/62'
-                      )}
-                      aria-haspopup='dialog'
-                      aria-expanded={isMenuActive}
-                    >
-                      <MoreHorizontal
-                        className={cn(
-                          'h-5 w-5 shrink-0',
-                          isMenuActive ? 'text-white' : 'text-white/52'
-                        )}
-                      />
-                      <span
-                        className={cn(
-                          'truncate text-[11px] leading-none tracking-[-0.012em]',
-                          isMenuActive ? 'font-semibold' : 'font-medium'
-                        )}
-                      >
-                        More
-                      </span>
-                    </button>
-                  ) : null}
-                </div>
-              </nav>
-            </div>
+            <BottomTabBar
+              activeTab={activeVisiblePrimaryTab}
+              hasTourDates={hasTourDates}
+              hideMoreMenu={hideMoreMenu}
+              isMenuOpen={isMenuActive}
+              onTabSelect={onModeSelect}
+              onOpenMenu={onOpenMenu}
+            />
           ) : null}
         </div>
       </div>

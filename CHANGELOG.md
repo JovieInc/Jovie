@@ -5,6 +5,63 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.227] - 2026-05-09
+
+> [internal] Progress bars across the dashboard now animate in with a spring/bounce effect using Framer Motion.
+
+### Changed
+
+- **[internal] Spring animation on all progress bars**: replaced CSS `transition-all` with `motion.div` spring animation (`damping: 10, mass: 0.75, stiffness: 100`) in `ReleaseTaskProgressBar`, `ProfileCompletionCard`, `ImportProgressBanner`, and `ProgressIndicator`. Native `<progress>` elements replaced with accessible `role="progressbar"` div wrappers where needed for animation compatibility.
+
+## [26.4.226] - 2026-05-09
+
+> [internal] Canonical metadata builder for all public artist profile routes — adds a shared lib/profile/metadata.ts that every /[username] route's generateMetadata now delegates to. Redirect-sink sub-routes (listen, releases, subscribe, tip, tour, pay, contact, [...slug]) gain noindex metadata guards. The alerts button now says "Get alerts" everywhere on artist profiles — consistent label, consistent intent.
+
+### Added
+
+- **[internal] `lib/profile/metadata.ts`**: shared metadata factory for all public profile routes. Provides `buildPublicProfileMetadata` (full OG + Twitter Card + canonical URL + robots + genre keywords + geo.placename), `sanitizeMetadataText` (HTML-strip artist bio/name/location before embedding in meta tags), `truncateMetadataText` (word-boundary truncation for descriptions), `buildProfileCanonicalUrl` (normalized slug resolution), and static fallback constants `PROFILE_NOT_FOUND_METADATA` / `PROFILE_ERROR_METADATA` / `REDIRECT_SINK_METADATA`.
+- **[internal] 43 unit tests** for the metadata builder covering all edge cases: null/undefined inputs, HTML injection, XSS in display_name, canonical URL normalization, description priority order, genre keywords, verified badge, geo.placename sanitization, and noindex on all error/not-found/redirect states.
+- **[internal] `generateMetadata` on 9 redirect-sink routes**: `[...slug]`, `contact`, `listen`, `pay`, `releases`, `subscribe`, `tip`, `tour` — all return `REDIRECT_SINK_METADATA` (`robots: noindex, nofollow`) so crawlers don't independently index transient redirect paths.
+
+### Changed
+
+- **[internal] `app/[username]/page.tsx` `generateMetadata`**: delegates to `buildPublicProfileMetadata` from the shared builder. Removed the local `buildProfileMetadata` and `buildProfileDescription` duplicates; returns `PROFILE_ERROR_METADATA` (noindex) on fetch errors instead of an ad-hoc object.
+- **[internal] `app/[username]/notifications/page.tsx` `generateMetadata`**: now resolves the artist display name from the profile loader rather than using the raw URL segment; adds `metadataBase`, full OG tags, Twitter card, and `robots: noindex`; sanitizes the artist name with `sanitizeMetadataText`.
+
+### Fixed
+
+- [internal] Canonical `SubscribeForm` wrapper component locks the "Get alerts" CTA label across all profile surfaces (spec §4.1). Previously, nine call-sites used inconsistent labels ("Turn On Alerts", "Turn on alerts", "Turn On") that conflicted with the spec.
+- [internal] `source` analytics tag now correctly passes through the two-step (email → SMS) flow; previously dropped in `TwoStepNotificationsCTA`, causing attribution gaps in subscribe analytics.
+
+## [26.4.225] - 2026-05-09
+
+> Jovie now has a real download page for the Mac app at jov.ie/download — version, system requirements, FAQ, and a button that always serves the latest signed release.
+
+### Added
+
+- **Download page (`/download`)**: public marketing page for the Mac app with hero, features, system requirements, FAQ, and legal footer. Designed to match the rest of jov.ie.
+- **Auto-updating download link**: the download button always serves the latest signed DMG without manual page edits — the link resolves at click time against our public release feed.
+- [internal] `/api/desktop/download` route 302-redirects to the latest universal DMG asset on GitHub Releases via a server-only helper (`lib/desktop/github-releases.ts`).
+- [internal] `APP_ROUTES.DOWNLOAD` constant added; in-app `UserButton` "Download Desktop App" item now opens `/download` instead of the raw GitHub URL.
+
+## [26.4.224] - 2026-05-09
+
+> [internal] Extracts the bottom tab bar from ProfileCompactSurface into a canonical BottomTabBar component, adds safe-area nav constants, and removes 6 legacy V2 profile files and their tests.
+
+### Added
+
+- **[internal] `BottomTabBar` component** (`components/features/profile/nav/BottomTabBar.tsx`): canonical extracted bottom tab bar for the public profile compact surface — 4 primary tabs (Home/Music/Events/Alerts), conditional Events tab, optional More menu trigger, aria-current/aria-expanded/aria-haspopup, 44pt touch targets via `min-h-[52px]`, iOS safe-area padding, and responsive grid columns.
+- **[internal] `lib/profile/nav-constants.ts`**: `TAB_BAR_HEIGHT_REM`, `CONTENT_SAFE_AREA_BOTTOM_PADDING`, and `TAB_BAR_INTERNAL_SAFE_AREA_MIN_PX` — published surface contract for JOV-2023/JOV-2024 desktop work.
+- **[internal] 26 unit tests for `BottomTabBar`**: covers tab rendering (with/without tour dates), More button visibility and aria-expanded, active state aria-current, font-semibold/medium, onTabSelect/onOpenMenu handlers, grid column counts (3/4/4/5), touch target class, data-testid, and safe-area wrapper class.
+
+### Changed
+
+- **[internal] `ProfileCompactSurface`**: removes 80-line inline tab bar, now renders `<BottomTabBar>` via shell slot.
+
+### Removed
+
+- **[internal] Deleted 6 legacy V2 chain files**: `ProfileFeaturedCard.tsx`, `ProfileScrollBody.tsx`, `ProfileSkeleton.stories.tsx`, `ProfileViewportShell.tsx`, `ProgressiveArtistPage.tsx`, `PublicProfileTemplateV2.tsx` and their corresponding test files (1,358 lines removed).
+
 ## [26.4.223] - 2026-05-09
 
 > The homepage now leads with a sharper release command center, verified proof, and a product-led workspace story without leaking internal tools into marketing screenshots.

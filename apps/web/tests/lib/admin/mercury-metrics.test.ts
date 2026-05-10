@@ -31,6 +31,7 @@ describe('getAdminMercuryMetrics', () => {
       burnWindowDays: 30,
       isConfigured: false,
       isAvailable: false,
+      defaultStatus: 'unknown',
       errorMessage:
         'Mercury credentials not configured (set MERCURY_API_TOKEN or MERCURY_API_KEY and MERCURY_CHECKING_ACCOUNT_ID or MERCURY_ACCOUNT_ID)',
     });
@@ -67,6 +68,7 @@ describe('getAdminMercuryMetrics', () => {
     expect(metrics.burnWindowDays).toBe(30);
     expect(metrics.isConfigured).toBe(true);
     expect(metrics.isAvailable).toBe(true);
+    expect(metrics.defaultStatus).toBe('alive');
     expect(metrics.errorMessage).toBeUndefined();
   });
 
@@ -82,6 +84,7 @@ describe('getAdminMercuryMetrics', () => {
     expect(metrics.burnRateUsd).toBe(0);
     expect(metrics.isConfigured).toBe(true);
     expect(metrics.isAvailable).toBe(false);
+    expect(metrics.defaultStatus).toBe('unknown');
     expect(metrics.errorMessage).toContain('Mercury API error');
   });
 });

@@ -56,6 +56,7 @@ function PricingCard({
   title,
   body,
   price,
+  badge,
   ctaLabel,
   ctaHref,
   featured = false,
@@ -65,6 +66,7 @@ function PricingCard({
   title: string;
   body: string;
   price: string;
+  badge: string;
   ctaLabel: string;
   ctaHref: string;
   featured?: boolean;
@@ -84,7 +86,7 @@ function PricingCard({
           <p className='homepage-pricing-card__title'>{title}</p>
           <p className='homepage-pricing-card__body'>{body}</p>
         </div>
-        <span className='homepage-pricing-card__badge'>14-day trial</span>
+        <span className='homepage-pricing-card__badge'>{badge}</span>
       </div>
       <p className='homepage-pricing-card__price'>{price}</p>
       {features?.length ? (
@@ -102,6 +104,12 @@ function PricingCard({
 }
 
 export function HomepageV2Pricing() {
+  const freeFeatures = [
+    'Public artist profile page',
+    'Unlimited smart links',
+    'Release pages with listen links per DSP',
+    'Basic analytics (30 days)',
+  ] as const;
   const proMonthlyPrice = ENTITLEMENT_REGISTRY.pro.marketing.price?.monthly;
   const proFeatures = ENTITLEMENT_REGISTRY.pro.marketing.features
     .filter(feature => feature !== 'All Free features +')
@@ -119,14 +127,25 @@ export function HomepageV2Pricing() {
       <MarketingContainer width='page'>
         <div className='homepage-pricing-shell'>
           <HomepageStoryHeader
-            align='left'
-            body='Release notifications, presaves, and audience analytics in one workspace.'
+            align='center'
+            body='Artist profiles are free forever. Pro adds the release tools when you need them.'
             headline={HOMEPAGE_V2_COPY.pricing.headline}
             className='homepage-pricing-copy'
           />
 
           <div className='homepage-pricing-grid'>
             <PricingCard
+              badge='Free forever'
+              body={ENTITLEMENT_REGISTRY.free.marketing.tagline}
+              ctaHref={`${APP_ROUTES.SIGNUP}?plan=free`}
+              ctaLabel='Claim Your Profile'
+              features={freeFeatures}
+              price='$0'
+              testId='homepage-v2-pricing-free'
+              title={ENTITLEMENT_REGISTRY.free.marketing.displayName}
+            />
+            <PricingCard
+              badge='14-day trial'
               body={HOMEPAGE_V2_COPY.pricing.supportLine}
               ctaHref={`${APP_ROUTES.SIGNUP}?plan=pro`}
               ctaLabel='Start 14-Day Free Trial'
