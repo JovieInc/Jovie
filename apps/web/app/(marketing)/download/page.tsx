@@ -22,27 +22,32 @@ const DOWNLOAD_URL = '/api/desktop/download';
 const FAQ_ITEMS = [
   {
     question: 'Is the Mac app safe?',
-    answer: `Yes. Every release is code-signed with our Apple Developer ID and notarized by Apple before it's published. macOS Gatekeeper verifies both signatures the first time you launch the app.`,
+    answer: `Yes. Each release is signed with Jovie's Apple Developer ID and notarized by Apple before it is published. macOS verifies the app the first time you open it.`,
   },
   {
-    question: 'Will the app update itself?',
+    question: 'Does the app update itself?',
     answer:
-      'Yes. Once installed, Jovie checks for new versions on launch and downloads them in the background. You never have to come back to this page after the first install.',
+      'Yes. Jovie checks for updates automatically and installs the latest version when you quit the app.',
   },
   {
-    question: 'Why is there only a Mac version right now?',
+    question: 'Does it work on Apple Silicon and Intel Macs?',
     answer:
-      "Mac is where most of our early users work. Windows and Linux builds aren't ready yet — when they are, they'll show up on this page automatically.",
+      'Yes. Jovie for Mac is a universal app, so the same download works on both Apple Silicon and Intel Macs.',
   },
   {
-    question: 'Does the app work on Apple Silicon and Intel Macs?',
+    question: 'Do I need a Jovie account?',
     answer:
-      'Yes. We ship a single universal binary that runs natively on both Apple Silicon (M-series) and Intel Macs.',
+      'Yes. The Mac app connects to your existing Jovie workspace. You can sign in with the same account you use on jov.ie.',
+  },
+  {
+    question: 'Why is there only a Mac version?',
+    answer:
+      'Most early Jovie users work on Mac. Windows and Linux versions will come later when they are ready.',
   },
   {
     question: 'Where does the download come from?',
     answer:
-      'Releases are hosted on GitHub. The download button on this page redirects to the latest signed DMG attached to our public GitHub release.',
+      'The download button redirects to the latest signed Jovie release hosted on GitHub.',
   },
 ];
 
@@ -83,7 +88,7 @@ export default async function DownloadPage() {
   const sizeLabel = release?.mac?.sizeBytes
     ? formatBytes(release.mac.sizeBytes)
     : null;
-  const meta = [versionLabel, sizeLabel, 'Universal']
+  const meta = [versionLabel, sizeLabel, 'Apple Silicon + Intel']
     .filter((value): value is string => Boolean(value))
     .join(' · ');
 
@@ -97,8 +102,8 @@ export default async function DownloadPage() {
           Jovie for Mac.
         </h1>
         <p className='mt-6 max-w-[52ch] text-lg leading-relaxed text-secondary-token'>
-          A native desktop app for your release work. Signed by Apple,
-          notarized, and updates itself in the background.
+          Run your Jovie workspace from a native Mac app. Manage releases,
+          links, fan data, and campaigns without living in another browser tab.
         </p>
         <div className='mt-10 flex flex-col items-center gap-3'>
           <a
@@ -111,35 +116,48 @@ export default async function DownloadPage() {
             Download for Mac
           </a>
           {meta ? <p className='text-sm text-tertiary-token'>{meta}</p> : null}
+          <p className='text-xs text-tertiary-token'>
+            Developer ID signed · Apple notarized · Auto-updates included
+          </p>
         </div>
       </MarketingHero>
 
       <MarketingContainer width='prose' className='pb-20'>
         <section>
           <h2 className='marketing-h2-linear text-primary-token'>
-            What you get.
+            Everything in Jovie, built for your desktop.
           </h2>
           <MarketingFeatureGrid
             items={[
               {
-                title: 'Native macOS shell',
+                title: 'Native Mac experience',
                 description:
-                  'A real Mac window with proper menus, keyboard shortcuts, and Dock integration. The web app, faster.',
+                  'Open Jovie from your Dock, switch with keyboard shortcuts, and keep your release workflow separate from browser noise.',
               },
               {
-                title: 'Background updates',
+                title: 'Faster daily workflow',
                 description:
-                  'New versions install on quit. You launch and you have the latest build — no prompts, no manual reinstall.',
+                  'Launch directly into your workspace and move through releases, links, fans, and campaigns with less friction.',
               },
               {
-                title: 'Apple-signed and notarized',
+                title: 'Automatic updates',
                 description:
-                  'Each release is code-signed with our Developer ID and submitted to Apple for notarization. Gatekeeper trusts it on first launch.',
+                  'New versions install automatically when you quit the app, so you stay current without downloading the installer again.',
               },
               {
-                title: 'Universal binary',
+                title: 'Trusted Mac install',
                 description:
-                  'One download for both Apple Silicon and Intel. The right architecture is selected automatically.',
+                  'Each release is signed with our Apple Developer ID and notarized by Apple before it ships.',
+              },
+              {
+                title: 'One download for every Mac',
+                description:
+                  'The same installer works on Apple Silicon and Intel Macs.',
+              },
+              {
+                title: 'Connected to your Jovie account',
+                description:
+                  'Sign in once and keep working with the same workspace, data, and permissions you use on the web.',
               },
             ]}
           />
@@ -156,7 +174,7 @@ export default async function DownloadPage() {
               { label: 'Operating system', value: 'macOS 11 Big Sur or later' },
               {
                 label: 'Architecture',
-                value: 'Apple Silicon (M1/M2/M3/M4) or Intel — universal',
+                value: 'Apple Silicon or Intel Mac',
               },
               { label: 'Memory', value: '4 GB RAM minimum, 8 GB recommended' },
               { label: 'Disk space', value: '500 MB free' },
@@ -172,6 +190,27 @@ export default async function DownloadPage() {
       </MarketingContainer>
 
       <FaqSection items={FAQ_ITEMS} heading='Frequently asked questions' />
+
+      <MarketingContainer width='prose' className='pb-20'>
+        <section className='flex flex-col items-center text-center'>
+          <h2 className='marketing-h2-linear text-primary-token'>
+            Ready to work from your desktop?
+          </h2>
+          <p className='mt-6 max-w-[52ch] text-lg leading-relaxed text-secondary-token'>
+            Download Jovie for Mac and keep your release workflow one click
+            away.
+          </p>
+          <a
+            href={DOWNLOAD_URL}
+            className='mt-10 inline-flex items-center gap-3 rounded-full bg-white px-7 py-3.5 text-base font-medium text-black transition-colors hover:bg-white/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white'
+            data-analytics-event='download_mac_dmg'
+            data-analytics-source='download_page_footer'
+          >
+            <ArrowDownToLine className='size-5' aria-hidden='true' />
+            Download for Mac
+          </a>
+        </section>
+      </MarketingContainer>
 
       <MarketingContainer width='prose' className='pb-20 pt-4'>
         <p className='text-xs text-tertiary-token'>
