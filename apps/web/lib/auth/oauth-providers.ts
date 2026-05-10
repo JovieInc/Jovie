@@ -31,14 +31,33 @@ export type ClerkOAuthProvider =
  *
  * The flag is `NEXT_PUBLIC_` so it can be read in both server components and
  * client components without an extra round-trip.
+ *
+ * IMPORTANT: each provider must use a *statically-referenced* `process.env.X`
+ * expression. Next.js / webpack DefinePlugin only inlines `NEXT_PUBLIC_*` env
+ * vars when the key is referenced as a literal property access. Dynamic
+ * `process.env[envKey]` lookups always resolve to `undefined` in client
+ * bundles because `process.env` is replaced at build time, not at runtime.
  */
 export function isOAuthProviderEnabled(provider: ClerkOAuthProvider): boolean {
-  const envKey = `NEXT_PUBLIC_CLERK_OAUTH_${provider.toUpperCase()}_ENABLED`;
-  // Bracket access — NEXT_PUBLIC_ vars get DefinePlugin-inlined only for the
-  // exact keys statically referenced. Reading via bracket here means missing
-  // vars correctly become undefined at runtime.
-  const value = (process.env as Record<string, string | undefined>)[envKey];
-  return value === '1';
+  switch (provider) {
+    case 'apple':
+      return process.env.NEXT_PUBLIC_CLERK_OAUTH_APPLE_ENABLED === '1';
+    case 'google':
+      return process.env.NEXT_PUBLIC_CLERK_OAUTH_GOOGLE_ENABLED === '1';
+    case 'facebook':
+      return process.env.NEXT_PUBLIC_CLERK_OAUTH_FACEBOOK_ENABLED === '1';
+    case 'github':
+      return process.env.NEXT_PUBLIC_CLERK_OAUTH_GITHUB_ENABLED === '1';
+    case 'spotify':
+      return process.env.NEXT_PUBLIC_CLERK_OAUTH_SPOTIFY_ENABLED === '1';
+    case 'tiktok':
+      return process.env.NEXT_PUBLIC_CLERK_OAUTH_TIKTOK_ENABLED === '1';
+    default: {
+      const _exhaustive: never = provider;
+      void _exhaustive;
+      return false;
+    }
+  }
 }
 
 /**
