@@ -1,0 +1,114 @@
+# Source Registry Schema for Agent OS Competitive Intelligence Market Radar
+# Defines the structure for tracking competitor sources
+
+version: "1.0.0"
+schema: "source-registry"
+
+sources:
+  # Competitor changelogs and release notes
+  - id: "conductor-changelog"
+    name: "Conductor Changelog"
+    type: "changelog"
+    url: "https://conductor.so/changelog"
+    selector: ".changelog-entry"  # CSS selector for entry extraction
+    attributes:
+      - "title"
+      - "date"
+      - "content"
+      - "tags"
+    frequency: "daily"
+    enabled: true
+    
+  - id: "linear-changelog"
+    name: "Linear Changelog"
+    type: "changelog"
+    url: "https://linear.app/changelog"
+    selector: ".release-item"
+    attributes:
+      - "title"
+      - "date"
+      - "content"
+      - "url"
+    frequency: "daily"
+    enabled: true
+    
+  - id: "cursor-changelog"
+    name: "Cursor Changelog"
+    type: "changelog"
+    url: "https://cursor.sh/changelog"
+    selector: ".changelog-post"
+    attributes:
+      - "title"
+      - "date"
+      - "content"
+      - "version"
+    frequency: "daily"
+    enabled: true
+    
+  - id: "windsurf-changelog"
+    name: "Windsurf Changelog"
+    type: "changelog"
+    url: "https://codeium.com/windsurf/changelog"
+    selector: ".release-note"
+    attributes:
+      - "title"
+      - "date"
+      - "content"
+    frequency: "daily"
+    enabled: true
+    
+  - id: "codex-changelog"
+    name: "Codex Changelog"
+    type: "changelog"
+    url: "https://openai.com/index/codex/"
+    selector: ".blog-post"
+    attributes:
+      - "title"
+      - "date"
+      - "content"
+    frequency: "daily"
+    enabled: true
+    
+  - id: "claude-desktop-changelog"
+    name: "Claude Desktop Changelog"
+    type: "changelog"
+    url: "https://claude.ai/news"
+    selector: ".post-entry"
+    attributes:
+      - "title"
+      - "date"
+      - "content"
+    frequency: "daily"
+    enabled: true
+    
+  - id: "openclaw-changelog"
+    name: "OpenClaw Changelog"
+    type: "changelog"
+    url: "https://openclaw.dev/blog"
+    selector: ".article"
+    attributes:
+      - "title"
+      - "date"
+      - "content"
+    frequency: "daily"
+    enabled: true
+    
+  - id: "hortator-changelog"
+    name: "Hortator Changelog"
+    type: "changelog"
+    url: "https://hortator.so/releases"
+    selector: ".release-card"
+    attributes:
+      - "title"
+      - "date"
+      - "content"
+      - "version"
+    frequency: "daily"
+    enabled: true
+
+# Source metadata
+metadata:
+  created_at: "2026-05-08"
+  updated_at: "2026-05-08"
+  maintainer: "Agent OS Market Radar System"
+  description: "Registry of competitive intelligence sources for Agent OS market monitoring"

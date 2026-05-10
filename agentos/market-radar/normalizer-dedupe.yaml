@@ -1,0 +1,210 @@
+# Normalizer with Dedupe Fingerprinting for Agent OS Competitive Intelligence Market Radar
+# Defines the normalization and deduplication process for competitive signals
+
+version: "1.0.0"
+component: "normalizer"
+description: "Normalizes raw competitive intelligence signals and removes duplicates using content fingerprinting"
+
+inputs:
+  - raw_signals:
+      type: "jsonl"
+      path: "./data/raw/signals-*.jsonl.gz"
+      format: "jsonl"
+      compression: "gzip"
+    - source_registry:
+      type: "yaml"
+      path: "./source-registry-schema.yaml"
+      description: "Registry of sources for metadata enrichment"
+
+stages:
+  - name: "decompress-input"
+    type: "transform"
+    plugin: "gzip-decompressor"
+    config:
+      chunk_size: 65536  # 64KB
+    
+  - name: "parse-jsonl"
+    type: "transform"
+    plugin: "jsonl-parser"
+    config:
+      strict_parsing: false
+      skip_invalid_lines: true
+      invalid_line_handler: "log_and_skip"
+      
+  - name: "enrich-with-source-metadata"
+    type: "transform"
+    plugin: "metadata-enricher"
+    config:
+      registry_path: "${inputs.source_registry}"
+      enrich_fields: ["source_name", "source_type", "source_url"]
+      add_collection_timestamp: true
+      
+  - name: "normalize-text-content"
+    type: "transform"
+    plugin: "text-normalizer"
+    config:
+      lowercase: true
+      trim_whitespace: true
+      normalize_unicode: "NFC"
+      remove_extra_whitespace: true
+      remove_html_entities: true
+      expand_contractions: false  # Preserve original meaning for competitive intel
+      fields_to_normalize: ["title", "content"]
+      
+  - name: "extract-structured-data"
+    type: "transform"
+    plugin: "pattern-extractor"
+    config:
+      patterns:
+        - name: "version_numbers"
+          regex: "\\b(v?\\d+\\.\\d+\\.\\d+(?:-[\\w\\d]+)?)\\b"
+          field: "content"
+          output_field: "extracted_versions"
+        - name: "dates"
+          regex: "\\b\\d{4}-\\d{2}-\\d{2}\\b"
+          field: "content"
+          output_field: "mentioned_dates"
+        - name: "feature_keywords"
+          regex: "\\b(feature|update|release|launch|announce|beta|alpha|stable)\\b"
+          field: "content"
+          output_field: "feature_signals"
+          case_sensitive: false
+      
+  - name: "generate-content-fingerprint"
+    type: "transform"
+    plugin: "content-fingerprinter"
+    config:
+      algorithm: "sha256"
+      include_fields: ["normalized_title", "normalized_content", "source_id", "collection_date"]
+      normalize_whitespace: true
+      case_folding: true
+      output_field: "content_fingerprint"
+      
+  - name: "detect-duplicates"
+    type: "transform"
+    plugin: "duplicate-detector"
+    config:
+      fingerprint_field: "content_fingerprint"
+      time_window_hours: 48  # Look for duplicates in last 48 hours
+      storage_backend: "redis"
+      redis_key_prefix: "market-radar:dedupe:"
+      action: "mark_as_duplicate"  # or "remove"
+      similarity_threshold: 0.95  # For near-duplicate detection
+      
+  - name: "filter-duplicates"
+    type: "filter"
+    plugin: "conditional-filter"
+    config:
+      condition: "is_duplicate == false"
+      
+  - name: "enrich-with-tags"
+    type: "transform"
+    plugin: "tag-enricher"
+    config:
+      tag_sources:
+        - source_extracted_versions: true
+        - source_feature_signals: true
+        - source_mentioned_dates: true
+      auto_tag_rules:
+        - if: "extracted_versions.length > 0"
+          then: "has-version-info"
+        - if: "feature_signals.length > 0"
+          then: "contains-feature-news"
+        - if: "mentioned_dates.length > 0"
+          then: "references-dates"
+          
+  - name: "output-normalized-signals"
+    type: "emit"
+    plugin: "signal-emitter"
+    config:
+      output_format: "json"
+      output_path: "./data/normalized/signals-${DATE}.jsonl"
+      compress: true
+      compression: "gzip"
+      include_metadata: true
+
+outputs:
+  - normalized_signals:
+      type: "jsonl"
+      path: "./data/normalized/signals-${DATE}.jsonl.gz"
+      format: "jsonl"
+      compression: "gzip"
+      partitioning: "by_source_id"
+      
+  - duplicates_removed:
+      type: "counter"
+      metric_name: "normalizer_duplicates_removed"
+      description: "Count of duplicate signals removed"
+      
+  - processing_lag:
+      type: "gauge"
+      metric_name: "normalizer_processing_lag_seconds"
+      description: "Time between collection and normalization"
+
+monitoring:
+  metrics:
+    - name: "normalizer_input_count"
+      type: "counter"
+      description: "Number of raw signals input to normalizer"
+    - name: "normalizer_output_count"
+      type: "counter"
+      description: "Number of normalized signals output"
+    - name: "normalizer_duplicates_removed"
+      type: "counter"
+      description: "Number of duplicate signals removed"
+    - name: "normalizer_processing_latency"
+      type: "histogram"
+      description: "Time taken to normalize each signal"
+      buckets: [0.01, 0.05, 0.1, 0.5, 1, 2, 5]
+    - name: "normalizer_enrichment_fields_added"
+      type: "histogram"
+      description: "Number of enrichment fields added per signal"
+      buckets: [0, 1, 2, 3, 4, 5, 10]
+  logs:
+    level: "info"
+    format: "json"
+    fields:
+      - timestamp
+      - source_id
+      - stage
+      - status
+      - duration_ms
+      - fingerprint (if generated)
+      - is_duplicate (if applicable)
+      - error_message (if present)
+
+dependencies:
+  - name: "gzip-decompressor"
+    version: ">=1.0.0"
+  - name: "jsonl-parser"
+    version: ">=1.0.0"
+  - name: "metadata-enricher"
+    version: ">=1.0.0"
+  - name: "text-normalizer"
+    version: ">=1.0.0"
+  - name: "pattern-extractor"
+    version: ">=1.0.0"
+  - name: "content-fingerprinter"
+    version: ">=1.0.0"
+  - name: "duplicate-detector"
+    version: ">=1.0.0"
+  - name: "conditional-filter"
+    version: ">=1.0.0"
+  - name: "tag-enricher"
+    version: ">=1.0.0"
+  - name: "signal-emitter"
+    version: ">=1.0.0"
+
+environment:
+  - name: "NODE_ENV"
+    value: "production"
+  - name: "LOG_LEVEL"
+    value: "info"
+  - name: "REDIS_HOST"
+    value: "localhost"
+  - name: "REDIS_PORT"
+    value: "6379"
+  - name: "DEDUPLICATION_WINDOW_HOURS"
+    value: "48"
+  - name: "SIMILARITY_THRESHOLD"
+    value: "0.95"

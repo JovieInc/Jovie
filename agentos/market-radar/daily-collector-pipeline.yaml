@@ -1,0 +1,151 @@
+# Daily Collector Pipeline for Agent OS Competitive Intelligence Market Radar
+# Defines the pipeline for collecting data from competitive sources
+
+version: "1.0.0"
+pipeline: "daily-collector"
+description: "Collects competitive intelligence data from registered sources on a daily schedule"
+
+schedule:
+  cron: "0 6 * * *"  # 6:00 AM UTC daily
+  timezone: "UTC"
+
+inputs:
+  - source_registry: "./source-registry-schema.yaml"
+    type: "yaml"
+    description: "Registry of sources to collect from"
+
+stages:
+  - name: "source-discovery"
+    type: "discover"
+    plugin: "yaml-source-discovery"
+    config:
+      registry_path: "${inputs.source_registry}"
+      enabled_only: true
+    
+  - name: "fetch-content"
+    type: "fetch"
+    plugin: "http-fetcher"
+    config:
+      concurrent_requests: 5
+      timeout_seconds: 30
+      retry_attempts: 3
+      user_agent: "AgentOS-MarketRadar/1.0 (+https://agentos.ai)"
+      headers:
+        Accept: "text/html,application/json"
+        Accept-Language: "en-US,en;q=0.9"
+      
+  - name: "extract-content"
+    type: "extract"
+    plugin: "css-selector-extractor"
+    config:
+      respect_robots_txt: true
+      delay_between_requests: 1000  # milliseconds
+    
+  - name: "validate-content"
+    type: "validate"
+    plugin: "content-validator"
+    config:
+      min_content_length: 50
+      required_fields: ["title", "date", "content"]
+      date_format_validation: true
+      
+  - name: "preprocess-content"
+    type: "transform"
+    plugin: "html-to-text"
+    config:
+      preserve_links: false
+      clean_whitespace: true
+      remove_scripts: true
+      remove_styles: true
+      
+  - name: "fingerprint-content"
+    type: "transform"
+    plugin: "content-fingerprinter"
+    config:
+      algorithm: "sha256"
+      include_fields: ["title", "content", "date"]
+      normalize_whitespace: true
+      case_folding: true
+      
+  - name: "emit-raw-signals"
+    type: "emit"
+    plugin: "signal-emitter"
+    config:
+      output_format: "json"
+      output_path: "./data/raw/signals-${DATE}.jsonl"
+      compress: true
+      compression: "gzip"
+
+outputs:
+  - raw_signals_bucket: "s3://agentos-market-radar/raw/${DATE}/"
+    format: "jsonl"
+    compression: "gzip"
+    partitioning: "by_source_id"
+    
+  - processing_queue: "sqs://agentos-market-radar/processing-queue"
+    message_format: "json"
+    include_fingerprint: true
+
+error_handling:
+  retry_policy:
+    max_attempts: 3
+    backoff_strategy: "exponential"
+    base_delay_seconds: 5
+    max_delay_seconds: 300
+  dead_letter_queue:
+    url: "sqs://agentos-market-radar/dlq-collector-failures"
+    max_receive_count: 3
+  alerts:
+    - condition: "failure_rate > 0.1"  # >10% failure rate
+      severity: "warning"
+      notification: "slack://#market-radar-alerts"
+    - condition: "consecutive_failures > 5"
+      severity: "critical"
+      notification: "pagerduty://market-radar-collector"
+
+monitoring:
+  metrics:
+    - name: "collector_success_rate"
+      type: "gauge"
+      description: "Percentage of successful source collections"
+    - name: "collector_latency_seconds"
+      type: "histogram"
+      description: "Time taken to collect from each source"
+      buckets: [1, 5, 10, 30, 60, 120, 300]
+    - name: "collector_items_collected"
+      type: "counter"
+      description: "Number of items collected per source"
+  logs:
+    level: "info"
+    format: "json"
+    fields:
+      - timestamp
+      - source_id
+      - stage
+      - status
+      - duration_ms
+      - error_message (if present)
+
+dependencies:
+  - name: "http-fetcher"
+    version: ">=1.0.0"
+  - name: "css-selector-extractor"
+    version: ">=1.0.0"
+  - name: "content-validator"
+    version: ">=1.0.0"
+  - name: "html-to-text"
+    version: ">=1.0.0"
+  - name: "content-fingerprinter"
+    version: ">=1.0.0"
+  - name: "signal-emitter"
+    version: ">=1.0.0"
+
+environment:
+  - name: "NODE_ENV"
+    value: "production"
+  - name: "LOG_LEVEL"
+    value: "info"
+  - name: "MAX_CONCURRENT_REQUESTS"
+    value: "5"
+  - name: "REQUEST_TIMEOUT_MS"
+    value: "30000"
