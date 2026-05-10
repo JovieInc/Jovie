@@ -34,6 +34,7 @@ import { HeaderProfileProgress } from '@/features/dashboard/atoms/HeaderProfileP
 import { useAuthRouteConfig } from '@/hooks/useAuthRouteConfig';
 import { useDashboardShortcuts } from '@/hooks/useDashboardShortcuts';
 import { useGlobalShortcutActions } from '@/hooks/useGlobalShortcutActions';
+import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { useAppFlag } from '@/lib/flags/client';
 import { AuthShell } from './AuthShell';
 import { CommandPalette } from './CommandPalette';
@@ -101,6 +102,7 @@ function AuthShellWrapperInner({
   const config = useAuthRouteConfig();
   const headerActionsContext = useOptionalHeaderActions();
   const designV1Enabled = useAppFlag('DESIGN_V1');
+  const isElectron = useIsElectronRuntime();
   const [, startTransition] = useTransition();
   const [pendingShellRoute, setPendingShellRoute] =
     useState<PendingShellRoute>(null);
@@ -131,10 +133,15 @@ function AuthShellWrapperInner({
           <HeaderChatUsageIndicator />
         ) : null}
         <HeaderProfileProgress />
-        <UpdateAvailablePill />
+        {isElectron ? null : <UpdateAvailablePill />}
       </>
     ),
-    [config.isDemoRoute, config.showChatUsageIndicator, designV1Enabled]
+    [
+      config.isDemoRoute,
+      config.showChatUsageIndicator,
+      designV1Enabled,
+      isElectron,
+    ]
   );
   // Wrap page-injected header elements in ErrorBoundary so a throwing badge/action
   // degrades gracefully (renders nothing + toast) instead of crashing the shell.

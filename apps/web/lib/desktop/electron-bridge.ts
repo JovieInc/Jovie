@@ -23,6 +23,14 @@ export interface ElectronAPI {
     readonly ok: boolean;
     readonly reason?: string;
   }>;
+  /** Navigate back in the SPA history stack. */
+  readonly goBack: () => Promise<void>;
+  /** Navigate forward in the SPA history stack. */
+  readonly goForward: () => Promise<void>;
+  /** Subscribe to nav-state changes; returns unsubscribe. */
+  readonly onNavStateChanged: (
+    cb: (state: { canGoBack: boolean; canGoForward: boolean }) => void
+  ) => () => void;
 }
 
 type InstallUpdateResult = Awaited<
@@ -88,7 +96,10 @@ export function getElectronAPI(): ElectronAPI | undefined {
     typeof api.electronVersion === 'string' &&
     typeof api.onUpdateAvailable === 'function' &&
     typeof api.onUpdateDownloaded === 'function' &&
-    typeof api.installUpdateAndRestart === 'function'
+    typeof api.installUpdateAndRestart === 'function' &&
+    typeof api.goBack === 'function' &&
+    typeof api.goForward === 'function' &&
+    typeof api.onNavStateChanged === 'function'
   ) {
     return api as ElectronAPI;
   }
@@ -240,6 +251,44 @@ export function useDesktopUpdate(): DesktopUpdateState {
     available,
     downloaded,
     install: safeInstallUpdateAndRestart,
+  };
+}
+
+export interface DesktopNavState {
+  readonly canGoBack: boolean;
+  readonly canGoForward: boolean;
+  readonly goBack: () => void;
+  readonly goForward: () => void;
+}
+
+/**
+ * useDesktopNavigation — subscribes to Electron webContents nav-state IPC.
+ *
+ * Returns `canGoBack: false, canGoForward: false` in browser contexts or when
+ * the bridge is partial/stale. Never throws.
+ */
+export function useDesktopNavigation(): DesktopNavState {
+  const [canGoBack, setCanGoBack] = useState(false);
+  const [canGoForward, setCanGoForward] = useState(false);
+
+  useEffect(() => {
+    const api = getElectronAPI();
+    if (!api) return;
+    return api.onNavStateChanged(({ canGoBack: back, canGoForward: fwd }) => {
+      setCanGoBack(back);
+      setCanGoForward(fwd);
+    });
+  }, []);
+
+  return {
+    canGoBack,
+    canGoForward,
+    goBack: () => {
+      void getElectronAPI()?.goBack();
+    },
+    goForward: () => {
+      void getElectronAPI()?.goForward();
+    },
   };
 }
 
