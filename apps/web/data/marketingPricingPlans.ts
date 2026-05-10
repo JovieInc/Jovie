@@ -1,24 +1,17 @@
 import { APP_ROUTES } from '@/constants/routes';
+import { PLAN_PRICES } from '@/lib/config/plan-prices';
 
-export const MARKETING_PRICING_PLAN_IDS = [
-  'free',
-  'pro',
-  'team',
-  'enterprise',
-] as const;
+/**
+ * Canonical plan IDs for the marketing pricing page.
+ *
+ * These MUST match the canonical PlanId values in
+ * apps/web/lib/entitlements/registry.ts (free / pro / max).
+ * Do not add plan IDs here that don't exist in the entitlement registry.
+ */
+export const MARKETING_PRICING_PLAN_IDS = ['free', 'pro', 'max'] as const;
 
 export type MarketingPricingPlanId =
   (typeof MARKETING_PRICING_PLAN_IDS)[number];
-
-const activePlanIds = (process.env.NEXT_PUBLIC_MARKETING_ACTIVE_PLANS ?? 'free')
-  .split(',')
-  .map(plan => plan.trim())
-  .filter((plan): plan is MarketingPricingPlanId =>
-    (MARKETING_PRICING_PLAN_IDS as readonly string[]).includes(plan)
-  );
-const ACTIVE_PLAN_IDS = new Set<MarketingPricingPlanId>(
-  activePlanIds.length > 0 ? activePlanIds : ['free']
-);
 
 export interface MarketingPricingPlan {
   readonly id: MarketingPricingPlanId;
@@ -29,8 +22,8 @@ export interface MarketingPricingPlan {
   readonly body: string;
   readonly features: readonly string[];
   readonly accent: 'cyan' | 'blue' | 'pink' | 'violet';
-  readonly activeCtaLabel: string;
-  readonly waitlistCtaLabel: string;
+  readonly ctaLabel: string;
+  readonly ctaHref: string;
 }
 
 export const MARKETING_PRICING_PLANS: readonly MarketingPricingPlan[] = [
@@ -45,73 +38,61 @@ export const MARKETING_PRICING_PLANS: readonly MarketingPricingPlan[] = [
       'Smart release links',
       'Listen buttons by platform',
       'Basic audience signal',
+      'Up to 100 contacts',
+      'Manual release creation',
     ],
     accent: 'cyan',
-    activeCtaLabel: 'Claim your profile',
-    waitlistCtaLabel: 'Claim your profile',
+    ctaLabel: 'Claim your profile',
+    ctaHref: `${APP_ROUTES.SIGNUP}?plan=free`,
   },
   {
     id: 'pro',
     name: 'Pro',
-    price: '$39',
+    price: `$${PLAN_PRICES.pro.monthly}`,
     cadence: '/mo',
     badge: 'Recommended',
-    body: 'Fan notifications, presaves, release plans, and launch automation.',
+    body: 'Fan notifications, presaves, and deeper release analytics.',
     features: [
-      'Release plan generation',
-      'Presaves and countdowns',
-      'Automatic fan notifications',
-      'Deeper release analytics',
+      'Everything in Free',
+      'Release notifications to fans',
+      'Pre-save campaigns',
+      'Pre-release countdown pages',
+      'Extended analytics (180 days)',
+      'Unlimited contacts',
+      'Contact export',
+      'Tips & payments',
+      'Verified badge',
+      'AI assistant (100 msgs/day)',
     ],
     accent: 'blue',
-    activeCtaLabel: 'Start Free Trial',
-    waitlistCtaLabel: 'Request Access',
+    ctaLabel: 'Start Free Trial',
+    ctaHref: `${APP_ROUTES.SIGNUP}?plan=pro`,
   },
   {
-    id: 'team',
-    name: 'Team',
-    price: '$99',
+    id: 'max',
+    name: 'Max',
+    price: `$${PLAN_PRICES.max.monthly}`,
     cadence: '/mo',
-    badge: 'Teams',
-    body: 'A shared release workspace for managers, artists, and collaborators.',
+    badge: 'Full stack',
+    body: 'Your entire release operation, automated end to end.',
     features: [
-      'Shared team workspace',
-      'Assignments and approvals',
-      'Catalog release views',
-      'Role-aware collaboration',
-    ],
-    accent: 'pink',
-    activeCtaLabel: 'Start Team Trial',
-    waitlistCtaLabel: 'Request Access',
-  },
-  {
-    id: 'enterprise',
-    name: 'Enterprise',
-    price: 'Custom',
-    badge: 'Labels',
-    body: 'Team accounts, label workflows, onboarding, and priority support.',
-    features: [
-      'Team account setup',
-      'Label and management workflows',
-      'Priority onboarding',
-      'Custom launch support',
+      'Everything in Pro',
+      'Release plan generation',
+      'Metadata submission agent',
+      'Unlimited analytics',
+      'Email campaigns',
+      'Fan subscriptions',
+      'API access',
+      'Team management',
+      'White-label / custom domain',
+      'AI assistant (500 msgs/day)',
     ],
     accent: 'violet',
-    activeCtaLabel: 'Contact Sales',
-    waitlistCtaLabel: 'Contact Sales',
+    ctaLabel: 'Start Free Trial',
+    ctaHref: `${APP_ROUTES.SIGNUP}?plan=max`,
   },
 ] as const;
 
-export function isMarketingPlanActive(planId: MarketingPricingPlanId): boolean {
-  return ACTIVE_PLAN_IDS.has(planId);
-}
-
 export function getMarketingPlanHref(planId: MarketingPricingPlanId): string {
   return `${APP_ROUTES.SIGNUP}?plan=${planId}`;
-}
-
-export function getMarketingPlanCtaLabel(plan: MarketingPricingPlan): string {
-  return isMarketingPlanActive(plan.id)
-    ? plan.activeCtaLabel
-    : plan.waitlistCtaLabel;
 }

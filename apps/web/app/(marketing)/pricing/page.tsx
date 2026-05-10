@@ -4,7 +4,10 @@ import { MarketingPricingPlans } from '@/components/features/pricing/MarketingPr
 import { MarketingContainer, MarketingPageShell } from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
-import { MARKETING_PRICING_PLANS } from '@/data/marketingPricingPlans';
+import {
+  MARKETING_PRICING_PLANS,
+  type MarketingPricingPlan,
+} from '@/data/marketingPricingPlans';
 import { PricingComparisonChart } from '@/features/pricing/PricingComparisonChart';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 
@@ -46,6 +49,10 @@ const pricingSchemaValidUntil = new Date(
   .toISOString()
   .slice(0, 10);
 
+function getPriceValue(plan: MarketingPricingPlan): string {
+  return plan.price.replace('$', '');
+}
+
 const PRICING_SCHEMA = {
   '@context': 'https://schema.org',
   '@type': 'WebPage',
@@ -56,7 +63,7 @@ const PRICING_SCHEMA = {
   mainEntity: {
     '@type': 'ItemList',
     itemListElement: MARKETING_PRICING_PLANS.map((plan, index) => {
-      const price = plan.price === 'Custom' ? '0' : plan.price.replace('$', '');
+      const price = getPriceValue(plan);
 
       return {
         '@type': 'ListItem',
@@ -69,12 +76,11 @@ const PRICING_SCHEMA = {
             '@type': 'Offer',
             price,
             priceCurrency: 'USD',
-            ...(plan.price !== '$0' &&
-              plan.price !== 'Custom' && {
-                priceValidUntil: pricingSchemaValidUntil,
-                billingIncrement: 'P1M',
-              }),
-            availability: 'https://schema.org/PreOrder',
+            ...(plan.price !== '$0' && {
+              priceValidUntil: pricingSchemaValidUntil,
+              billingIncrement: 'P1M',
+            }),
+            availability: 'https://schema.org/InStock',
           },
         },
       };
@@ -137,10 +143,6 @@ export default function PricingPage() {
                 Artist profiles are free forever. Pro adds the release tools
                 when you need them.
               </p>
-              {/* copy-lint-allow: waitlist — intentional; describes the paid plan access flow */}
-              <p className='mt-6 text-[13px] font-medium tracking-[-0.01em] text-tertiary-token'>
-                Paid plans open from the waitlist with the plan request saved.
-              </p>
               <div className='mt-7 flex flex-wrap items-center gap-3'>
                 <Link
                   href={`${APP_ROUTES.SIGNUP}?plan=free`}
@@ -198,11 +200,11 @@ export default function PricingPage() {
         <MarketingContainer width='page'>
           <div className='text-center'>
             <h2 className='text-[clamp(2.1rem,3.6vw,3.25rem)] font-semibold tracking-[-0.04em] text-primary-token'>
-              Request Access
+              Get Started
             </h2>
             <p className='mx-auto mt-4 max-w-[30rem] text-[15px] leading-[1.7] text-secondary-token'>
-              Claim the profile first. Request Pro, Team, or Enterprise when you
-              want the release system turned on.
+              Your profile is free forever. Upgrade to Pro or Max when you want
+              the release system turned on.
             </p>
             <div className='mt-8 flex flex-wrap items-center justify-center gap-3'>
               <Link
@@ -213,11 +215,11 @@ export default function PricingPage() {
                 Claim your profile
               </Link>
               <Link
-                href={APP_ROUTES.ARTIST_PROFILES}
+                href={`${APP_ROUTES.SIGNUP}?plan=pro`}
                 prefetch={false}
                 className='public-action-secondary'
               >
-                Explore Artist Profiles
+                Start Pro trial
               </Link>
             </div>
           </div>
