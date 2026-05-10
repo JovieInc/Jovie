@@ -21,15 +21,23 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(searchParamsState.value),
 }));
 
-vi.mock('@/features/auth', () => ({
-  AuthLayout: ({ children }: { children: ReactNode }) => (
-    <div data-testid='auth-layout'>{children}</div>
-  ),
-  AuthRoutePrefetch: ({ href }: { href: string }) => {
-    routerPrefetchMock(href);
-    return null;
-  },
-}));
+vi.mock('@/features/auth', async () => {
+  const reactModule = await import('react');
+  return {
+    AuthLayout: ({ children }: { children: ReactNode }) =>
+      reactModule.createElement(
+        'div',
+        { 'data-testid': 'auth-layout' },
+        children
+      ),
+    AuthRoutePrefetch: ({ href }: { href: string }) => {
+      routerPrefetchMock(href);
+      return null;
+    },
+    // Import the real AuthShell so the Clerk wiring stays exercised end to end.
+    AuthShell: (await import('@/components/features/auth/AuthShell')).AuthShell,
+  };
+});
 
 import { APP_ROUTES } from '@/constants/routes';
 import SignInPage from '../../../app/(auth)/signin/page';

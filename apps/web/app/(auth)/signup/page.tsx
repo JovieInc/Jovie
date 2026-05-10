@@ -1,13 +1,11 @@
 'use client';
 
-import { SignUp } from '@clerk/nextjs';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { AuthFormSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { APP_ROUTES } from '@/constants/routes';
-import { AuthLayout, AuthRoutePrefetch } from '@/features/auth';
-import { useNormalizeClerkHomeLink } from '@/features/auth/useNormalizeClerkHomeLink';
+import { AuthLayout, AuthRoutePrefetch, AuthShell } from '@/features/auth';
 import { track } from '@/lib/analytics';
 import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
 import { setPlanIntent, validatePlan } from '@/lib/auth/plan-intent';
@@ -172,103 +170,29 @@ function SignUpOauthErrorBanner() {
   );
 }
 
-/**
- * Clerk appearance override for the signup page only.
- * Hides Clerk's built-in "Create your account" header because we render our
- * own "Request Access" heading. Also hides the Clerk footer sign-in link when
- * an OAuth error banner is present to satisfy the subtraction principle (one
- * error message, one action).
- */
-const SIGNUP_APPEARANCE_HIDE_HEADER = {
-  elements: {
-    headerTitle: 'hidden',
-    headerSubtitle: 'hidden',
-  },
-} as const;
-
-const SIGNUP_APPEARANCE_HIDE_HEADER_AND_FOOTER = {
-  elements: {
-    headerTitle: 'hidden',
-    headerSubtitle: 'hidden',
-    footer: 'hidden',
-  },
-} as const;
-
 function SignUpPageContent() {
-  const [isMounted, setIsMounted] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const searchParams = useSearchParams();
-  const signInUrl = buildAuthRouteUrl(APP_ROUTES.SIGNIN, searchParams);
-  const oauthError = searchParams.get('oauth_error');
-
-  useNormalizeClerkHomeLink(containerRef);
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  if (!isMounted) {
-    return <AuthFormSkeleton />;
-  }
-
-  // When oauth_error is present, hide Clerk's own footer sign-in link to avoid
-  // a redundant third prompt alongside our error banner + its action link.
-  const signUpAppearance = oauthError
-    ? SIGNUP_APPEARANCE_HIDE_HEADER_AND_FOOTER
-    : SIGNUP_APPEARANCE_HIDE_HEADER;
-
   return (
     <>
       <AuthRoutePrefetch href={APP_ROUTES.WAITLIST} />
-      {/* P0: heading first so it anchors the form visually */}
-      <div className='mb-4 text-center lg:text-left'>
-        <h1 className='text-[22px] font-semibold leading-7 text-white'>
-          Request Access
-        </h1>
-        <p className='mt-2 text-[13px] leading-5 text-white/58'>
-          Create an account to start your private launch request.
-        </p>
-      </div>
-      {/* P2: banner and error notice render below the heading */}
       <SignUpOauthErrorBanner />
       <SignUpClaimDataPersistence />
-      <div ref={containerRef}>
-        <SignUp
-          routing='hash'
-          oauthFlow='redirect'
-          signInUrl={signInUrl}
-          fallbackRedirectUrl={APP_ROUTES.WAITLIST}
-          appearance={signUpAppearance}
-        />
-      </div>
-      <p className='mt-4 text-center text-2xs leading-relaxed text-white/80'>
-        By signing up, you agree to our{' '}
-        <Link
-          href={APP_ROUTES.LEGAL_TERMS}
-          className='focus-ring-themed rounded-md py-1 text-white underline underline-offset-2 transition-colors hover:text-white'
-        >
-          Terms of Service
-        </Link>{' '}
-        and{' '}
-        <Link
-          href={APP_ROUTES.LEGAL_PRIVACY}
-          className='focus-ring-themed rounded-md py-1 text-white underline underline-offset-2 transition-colors hover:text-white'
-        >
-          Privacy Policy
-        </Link>
-        .
-      </p>
+      <AuthShell mode='sign-up' />
     </>
   );
 }
 
 /**
- * Sign-up page using Clerk's prebuilt components for reliability.
+ * Sign-up page using the canonical AuthShell (JOV-2064).
+ *
+ * The page and the intercepted modal route at `/@auth/(.)signup` render the
+ * same AuthShell, so copy, links, and provider list cannot drift. Provider
+ * buttons are gated by `lib/auth/oauth-providers.ts` — Apple stays hidden
+ * until its env flag is set (JOV-2062).
  */
 export default function SignUpPage() {
   return (
     <AuthLayout
-      formTitle='Request Access'
+      formTitle='Create your account'
       showFormTitle={false}
       showFooterPrompt={false}
       layoutVariant='split'
