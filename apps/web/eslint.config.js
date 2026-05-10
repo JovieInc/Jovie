@@ -13,6 +13,7 @@ const noHardcodedRoutesRule = require('./eslint-rules/no-hardcoded-routes');
 const requireQueryCacheConfigRule = require('./eslint-rules/require-query-cache-config');
 const requireAbortSignalRule = require('./eslint-rules/require-abort-signal');
 const noRawMotionValuesRule = require('./eslint-rules/no-raw-motion-values');
+const noDirectElectronBridgeRule = require('./eslint-rules/no-direct-electron-bridge');
 
 const [nextBase, nextTypescript, nextIgnores] = nextConfig;
 
@@ -34,6 +35,7 @@ const baseConfig = {
         'require-query-cache-config': requireQueryCacheConfigRule,
         'require-abort-signal': requireAbortSignalRule,
         'no-raw-motion-values': noRawMotionValuesRule,
+        'no-direct-electron-bridge': noDirectElectronBridgeRule,
       },
     },
   },
@@ -177,6 +179,9 @@ const baseConfig = {
     '@jovie/require-query-cache-config': 'error',
     '@jovie/require-abort-signal': 'error',
     '@jovie/no-raw-motion-values': 'warn',
+    // Prevent renderer code from reaching past the guarded electron-bridge
+    // wrapper — installed binaries may expose a partial bridge.
+    '@jovie/no-direct-electron-bridge': 'error',
   },
 };
 
