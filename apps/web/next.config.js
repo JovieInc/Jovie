@@ -57,6 +57,11 @@ const nextConfig = {
   // Note: cacheComponents disabled due to incompatibility with runtime='nodejs' in API routes
   // Using traditional caching (unstable_cache) instead
   images: {
+    localPatterns: [
+      {
+        pathname: '/**',
+      },
+    ],
     // Remote image patterns for Next.js image optimization.
     // Keep in sync with constants/platforms/cdn-domains.ts — verified by sync test.
     remotePatterns: [
@@ -121,7 +126,7 @@ const nextConfig = {
     ],
     formats: ['image/avif', 'image/webp'],
     qualities: [25, 50, 75, 85, 100],
-    deviceSizes: [640, 750, 828, 1080, 1200],
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2880],
     imageSizes: [64, 96, 128, 256, 384, 400, 1024],
     minimumCacheTTL: 60 * 60 * 24 * 365, // 1 year for better caching
     dangerouslyAllowSVG: true,

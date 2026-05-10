@@ -8,6 +8,7 @@ import {
 } from '@/components/organisms/HeaderNav';
 import { APP_ROUTES } from '@/constants/routes';
 import { MARKETING_NAV_LINKS } from '@/data/marketingNavigation';
+import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 
 export type MarketingHeaderVariant =
   | 'landing'
@@ -138,16 +139,26 @@ export function MarketingHeader({
   const presentation = isMinimal ? 'default' : 'marketing-glass';
   const useCustomNav = !isMinimal && navLinks !== undefined;
   const hasSimpleNav = isMinimal || useCustomNav;
-  const hideCenterNav = isMinimal || (isHomepage && !showHomepageCenterNav);
+  const centerNavDisabled =
+    !useCustomNav &&
+    (!FEATURE_FLAGS.SHOW_MARKETING_CENTER_NAV ||
+      (isHomepage && !showHomepageCenterNav));
+  const hideCenterNav = isMinimal || centerNavDisabled;
   const resolvedFlyoutMenus = hasSimpleNav
     ? undefined
-    : MARKETING_GLASS_FLYOUTS;
+    : centerNavDisabled
+      ? undefined
+      : MARKETING_GLASS_FLYOUTS;
   const resolvedMobileNavLinks = hasSimpleNav
     ? resolvedNavLinks
-    : MARKETING_GLASS_MOBILE_LINKS;
+    : centerNavDisabled
+      ? []
+      : MARKETING_GLASS_MOBILE_LINKS;
   const resolvedDesktopNavLinks = hasSimpleNav
     ? resolvedNavLinks
-    : MARKETING_GLASS_DESKTOP_LINKS;
+    : centerNavDisabled
+      ? []
+      : MARKETING_GLASS_DESKTOP_LINKS;
 
   return (
     <HeaderNav
@@ -163,7 +174,7 @@ export function MarketingHeader({
       presentation={presentation}
       flyoutMenus={resolvedFlyoutMenus}
       mobilePublicCtaHref={isHomepage ? APP_ROUTES.SIGNUP : undefined}
-      mobilePublicCtaLabel={isHomepage ? 'Start Free' : undefined}
+      mobilePublicCtaLabel={isHomepage ? 'Start Free Trial' : undefined}
       mobileNavLinks={resolvedMobileNavLinks}
       navLinks={resolvedDesktopNavLinks}
       showContactLink={!isHomepage}

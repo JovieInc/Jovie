@@ -930,37 +930,198 @@ body {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-height: var(--linear-button-height-sm);
-    border-radius: var(--linear-radius-sm);
-    background: var(--linear-btn-primary-bg);
-    color: var(--linear-btn-primary-fg);
-    padding: 0 20px;
-    font-size: var(--linear-body-sm-size);
-    font-weight: var(--linear-font-weight-medium);
+    min-height: 42px;
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    border-radius: 999px;
+    background: rgb(244, 246, 255);
+    color: rgb(6, 7, 10);
+    padding: 0 1.45rem;
+    font-size: 14px;
+    font-weight: 650;
+    letter-spacing: 0;
+    text-decoration: none;
     transition:
-      opacity 150ms var(--ease-interactive),
-      transform 150ms var(--ease-interactive);
+      background-color 150ms var(--ease-interactive),
+      border-color 150ms var(--ease-interactive),
+      opacity 150ms var(--ease-interactive);
   }
   .public-action-primary:hover {
-    opacity: 0.92;
+    background: #ffffff;
+    opacity: 0.94;
   }
   .public-action-secondary {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-height: var(--linear-button-height-sm);
-    border-radius: var(--linear-radius-sm);
-    background: var(--linear-bg-button);
+    min-height: 42px;
+    border: 1px solid
+      color-mix(in oklab, var(--linear-border-default) 72%, white 12%);
+    border-radius: 999px;
+    background: color-mix(
+      in oklab,
+      var(--linear-bg-surface-1) 82%,
+      transparent
+    );
     color: var(--linear-text-primary);
-    padding: 0 20px;
-    font-size: var(--linear-body-sm-size);
-    font-weight: var(--linear-font-weight-medium);
+    padding: 0 1.35rem;
+    font-size: 14px;
+    font-weight: 620;
+    letter-spacing: 0;
+    text-decoration: none;
     transition:
-      opacity 150ms var(--ease-interactive),
-      transform 150ms var(--ease-interactive);
+      background-color 150ms var(--ease-interactive),
+      border-color 150ms var(--ease-interactive),
+      opacity 150ms var(--ease-interactive);
   }
   .public-action-secondary:hover {
+    border-color: color-mix(
+      in oklab,
+      var(--linear-border-default) 52%,
+      white 32%
+    );
     opacity: 0.92;
+  }
+  .marketing-pricing-plans {
+    display: grid;
+    gap: clamp(0.85rem, 1.4vw, 1.1rem);
+  }
+  .marketing-pricing-plans--compact {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .marketing-pricing-plans--expanded {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .marketing-pricing-plan-card {
+    --marketing-plan-accent: #00c8ff;
+    position: relative;
+    display: flex;
+    min-height: 24rem;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 18px;
+    padding: clamp(1.2rem, 2vw, 1.55rem);
+    background:
+      radial-gradient(
+        92% 62% at 50% 0%,
+        color-mix(in oklab, var(--marketing-plan-accent) 15%, transparent),
+        transparent 62%
+      ),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 42%),
+      rgba(255, 255, 255, 0.02);
+    box-shadow:
+      0 28px 80px rgba(0, 0, 0, 0.24),
+      inset 0 1px 0 rgba(255, 255, 255, 0.055);
+  }
+  .marketing-pricing-plan-card--blue {
+    --marketing-plan-accent: #1463ff;
+  }
+  .marketing-pricing-plan-card--pink {
+    --marketing-plan-accent: #ff3b8a;
+  }
+  .marketing-pricing-plan-card--violet {
+    --marketing-plan-accent: #7b2cff;
+  }
+  .marketing-pricing-plan-card__topline {
+    position: absolute;
+    inset: 0 0 auto;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      color-mix(in oklab, var(--marketing-plan-accent) 68%, transparent),
+      rgba(255, 255, 255, 0.16),
+      transparent
+    );
+  }
+  .marketing-pricing-plan-card__header {
+    display: grid;
+    min-height: 6.6rem;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    gap: 0.8rem;
+  }
+  .marketing-pricing-plan-card__name {
+    margin: 0;
+    color: rgba(255, 255, 255, 0.94);
+    font-size: 1.05rem;
+    font-weight: 650;
+    line-height: 1.16;
+  }
+  .marketing-pricing-plan-card__body {
+    max-width: 20rem;
+    margin: 0.5rem 0 0;
+    color: rgba(255, 255, 255, 0.58);
+    font-size: 13.5px;
+    line-height: 1.48;
+  }
+  .marketing-pricing-plan-card__badge {
+    display: inline-flex;
+    width: fit-content;
+    min-height: 1.7rem;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 999px;
+    padding-inline: 0.68rem;
+    background: rgba(255, 255, 255, 0.035);
+    color: rgba(255, 255, 255, 0.64);
+    font-size: 11px;
+    font-weight: 620;
+    line-height: 1;
+  }
+  .marketing-pricing-plan-card__price {
+    margin: 1.35rem 0 0;
+    color: rgba(255, 255, 255, 0.95);
+    font-size: clamp(2.25rem, 3.2vw, 2.85rem);
+    font-weight: 650;
+    line-height: 0.96;
+    letter-spacing: -0.045em;
+  }
+  .marketing-pricing-plan-card__price span {
+    margin-left: 0.08em;
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 0.48em;
+    font-weight: 560;
+    letter-spacing: 0;
+  }
+  .marketing-pricing-plan-card__cta {
+    width: 100%;
+    margin-top: 1.15rem;
+  }
+  .marketing-pricing-plan-card__features {
+    display: grid;
+    gap: 0.7rem;
+    margin: 1.35rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .marketing-pricing-plan-card__features li {
+    display: grid;
+    grid-template-columns: 15px minmax(0, 1fr);
+    gap: 0.55rem;
+    align-items: start;
+    color: rgba(255, 255, 255, 0.64);
+    font-size: 13px;
+    line-height: 1.42;
+  }
+  .marketing-pricing-plan-card__features svg {
+    margin-top: 0.12rem;
+    color: color-mix(in oklab, var(--marketing-plan-accent) 70%, white 30%);
+  }
+  @media (max-width: 1180px) {
+    .marketing-pricing-plans--compact,
+    .marketing-pricing-plans--expanded {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (max-width: 700px) {
+    .marketing-pricing-plans--compact,
+    .marketing-pricing-plans--expanded {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .marketing-pricing-plan-card {
+      min-height: auto;
+    }
   }
   .public-action-inline {
     display: inline-flex;

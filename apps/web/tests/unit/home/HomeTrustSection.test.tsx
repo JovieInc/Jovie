@@ -46,5 +46,8 @@ describe('HomeTrustSection', () => {
     expect(
       container.querySelectorAll('.homepage-trust-logo-slot')
     ).toHaveLength(8);
+    expect(
+      container.querySelectorAll('[data-mobile-logo="secondary"]')
+    ).toHaveLength(4);
   });
 });

@@ -21,18 +21,18 @@ export type HomepageHeroCommandCenterImages = {
 function buildProductPanes(images: HomepageHeroCommandCenterImages) {
   return [
     {
-      image: images.releases,
-      alt: 'Jovie releases page with release status, assets, and launch progress',
-      sizes: '(min-width: 1280px) 68rem, (min-width: 768px) 76vw, 88vw',
-      className: 'homepage-product-pane--desktop',
-      priority: true,
-    },
-    {
       image: images.release,
       alt: 'The Deep End release page with fan action buttons',
       sizes: '(min-width: 1280px) 18rem, (min-width: 768px) 24vw, 34vw',
       className: 'homepage-product-pane--phone homepage-product-pane--release',
       priority: false,
+    },
+    {
+      image: images.releases,
+      alt: 'Jovie releases page with release status, assets, and launch progress',
+      sizes: '(min-width: 1280px) 68rem, (min-width: 768px) 76vw, 88vw',
+      className: 'homepage-product-pane--desktop',
+      priority: true,
     },
     {
       image: images.profile,
@@ -73,10 +73,10 @@ function ProductPane({
         width={image.width}
         height={image.height}
         loading={priority ? 'eager' : 'lazy'}
-        priority={priority}
         fetchPriority={priority ? 'high' : 'auto'}
         sizes={sizes}
         className='homepage-product-pane__image'
+        quality={100}
       />
     </figure>
   );

@@ -221,9 +221,15 @@ test.describe('Homepage', () => {
     await expect(aiComposer).toBeVisible();
     await expect(
       aiComposer.getByRole('heading', {
-        name: 'AI leverage for human artists',
+        name: 'A release plan Jovie can run',
       })
     ).toBeVisible();
+    const aiComposerBefore = await aiComposer.boundingBox();
+    await page.waitForTimeout(5600);
+    const aiComposerAfter = await aiComposer.boundingBox();
+    expect(
+      Math.abs((aiComposerAfter?.height ?? 0) - (aiComposerBefore?.height ?? 0))
+    ).toBeLessThanOrEqual(2);
     await expect(page.getByTestId('homepage-go-live-section')).toBeVisible();
     await expect(
       page.getByRole('heading', { name: 'Go live in 60 seconds' })
@@ -283,6 +289,13 @@ test.describe('Homepage', () => {
         artistProfiles.getByRole('heading', { name: outcome })
       ).toBeVisible();
     }
+    await artistProfiles.scrollIntoViewIfNeeded();
+    const profileCards = artistProfiles.locator(
+      '.homepage-artist-profile-card'
+    );
+    for (let index = 0; index < (await profileCards.count()); index += 1) {
+      await profileCards.nth(index).scrollIntoViewIfNeeded();
+    }
     await page.waitForFunction(() => {
       const section = document.querySelector(
         '[data-testid="homepage-artist-profiles-section"]'
@@ -317,15 +330,15 @@ test.describe('Homepage', () => {
     await expect(specWall).toBeVisible();
     await expect(
       specWall.getByRole('heading', {
-        name: 'Everything else artists ask before switching',
+        name: 'Answers for every launch objection',
       })
     ).toBeVisible();
     for (const spec of [
       'Presaves',
-      'Bot filtering',
-      'Album art',
-      'Power users',
-      'Customization',
+      'Bot protection',
+      'AI art direction',
+      'Fast catalogs',
+      'Custom routing',
       'Fan notifications',
     ]) {
       await expect(specWall.getByRole('heading', { name: spec })).toBeVisible();
@@ -335,7 +348,7 @@ test.describe('Homepage', () => {
     await expect(
       page.getByRole('heading', { name: 'Simple pricing' })
     ).toBeVisible();
-    const freePricingCard = page.getByTestId('homepage-v2-pricing-free');
+    const freePricingCard = page.getByTestId('marketing-pricing-plan-free');
     await expect(freePricingCard).toBeVisible();
     await expect(
       freePricingCard.getByText('Free forever', { exact: true })
@@ -343,7 +356,31 @@ test.describe('Homepage', () => {
     await expect(
       pricing.getByText('Artist profiles are free forever.')
     ).toBeVisible();
-    await expect(page.getByTestId('homepage-v2-pricing-pro')).toBeVisible();
+    await expect(page.getByTestId('marketing-pricing-plan-pro')).toBeVisible();
+    await expect(page.getByTestId('marketing-pricing-plan-team')).toBeVisible();
+    await expect(
+      page.getByTestId('marketing-pricing-plan-enterprise')
+    ).toBeVisible();
+    const pricingCtasOnGrid = await pricing
+      .locator('.marketing-pricing-plan-card')
+      .evaluateAll(cards =>
+        cards.map(card => {
+          const cta = card.querySelector<HTMLElement>(
+            '.marketing-pricing-plan-card__cta'
+          );
+          const cardRect = card.getBoundingClientRect();
+          const ctaRect = cta?.getBoundingClientRect();
+          if (!ctaRect) return false;
+          return (
+            Math.abs(
+              cardRect.left +
+                cardRect.width / 2 -
+                (ctaRect.left + ctaRect.width / 2)
+            ) <= 1 && ctaRect.right <= cardRect.right
+          );
+        })
+      );
+    expect(pricingCtasOnGrid).toEqual([true, true, true, true]);
     await expect(page.getByTestId('homepage-faq')).toBeVisible();
     await expect(
       page.getByRole('heading', { name: 'Frequently Asked Questions' })
@@ -417,7 +454,7 @@ test.describe('Homepage', () => {
       mobilePanel.getByRole('link', { name: 'Blog', exact: true })
     ).toBeVisible();
     await expect(
-      mobilePanel.getByRole('link', { name: 'Start Free', exact: true })
+      mobilePanel.getByRole('link', { name: 'Start Free Trial', exact: true })
     ).toHaveAttribute('href', '/signup');
   });
 

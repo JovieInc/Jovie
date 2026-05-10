@@ -163,6 +163,7 @@ export function HomeTrustSection({
             />
           </div>
           <div
+            data-mobile-logo='secondary'
             className={cn(
               'flex min-w-0 items-center justify-center',
               presentation === 'inline-strip' &&
@@ -179,7 +180,10 @@ export function HomeTrustSection({
           </div>
           {isInlineStrip ? (
             <>
-              <div className='flex min-w-0 items-center justify-center homepage-trust-logo-slot homepage-trust-logo-slot--disco-wax'>
+              <div
+                data-mobile-logo='secondary'
+                className='flex min-w-0 items-center justify-center homepage-trust-logo-slot homepage-trust-logo-slot--disco-wax'
+              >
                 <DiscoWaxLogo
                   className={cn(
                     'homepage-trust-logo homepage-trust-logo--disco-wax w-auto max-w-[36vw] select-none',
@@ -187,7 +191,10 @@ export function HomeTrustSection({
                   )}
                 />
               </div>
-              <div className='flex min-w-0 items-center justify-center homepage-trust-logo-slot homepage-trust-logo-slot--blanco'>
+              <div
+                data-mobile-logo='secondary'
+                className='flex min-w-0 items-center justify-center homepage-trust-logo-slot homepage-trust-logo-slot--blanco'
+              >
                 <BlancoYNegroLogo
                   className={cn(
                     'homepage-trust-logo homepage-trust-logo--blanco w-auto max-w-[42vw] select-none',
@@ -195,7 +202,10 @@ export function HomeTrustSection({
                   )}
                 />
               </div>
-              <div className='flex min-w-0 items-center justify-center homepage-trust-logo-slot homepage-trust-logo-slot--rec-play'>
+              <div
+                data-mobile-logo='secondary'
+                className='flex min-w-0 items-center justify-center homepage-trust-logo-slot homepage-trust-logo-slot--rec-play'
+              >
                 <RecPlayLogo
                   className={cn(
                     'homepage-trust-logo homepage-trust-logo--rec-play w-auto max-w-[34vw] select-none',

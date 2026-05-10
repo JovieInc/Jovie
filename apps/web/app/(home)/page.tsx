@@ -286,11 +286,11 @@ function HomepageProductStatement() {
           className='homepage-product-statement__ai'
           data-testid='homepage-ai-composer-demo'
         >
+          <HomeComposerHero />
           <div className='homepage-product-statement__ai-copy'>
             <h3>{aiCopy.headline}</h3>
             <p>{aiCopy.body}</p>
           </div>
-          <HomeComposerHero />
         </div>
       </div>
     </section>
@@ -333,6 +333,36 @@ const SPEC_WALL_ICONS = [
   MailPlus,
 ];
 
+function SpecWallGraphic({
+  index,
+}: Readonly<{
+  index: number;
+}>) {
+  const label = `spec-graphic-${index}`;
+
+  return (
+    <span
+      className='homepage-spec-wall-card__graphic'
+      data-graphic={label}
+      aria-hidden='true'
+    >
+      <svg viewBox='0 0 160 86' focusable='false'>
+        <title>Release feature signal</title>
+        <path
+          className='homepage-spec-wall-card__trace'
+          d='M12 64h34c10 0 10-14 20-14h28c10 0 10-18 20-18h34'
+        />
+        <circle className='homepage-spec-wall-card__pulse' r='5' />
+      </svg>
+      <span className='homepage-spec-wall-card__blocks'>
+        <span />
+        <span />
+        <span />
+      </span>
+    </span>
+  );
+}
+
 function HomepageSpecWall() {
   const copy = HOMEPAGE_LAUNCH_COPY.specWall;
 
@@ -359,6 +389,7 @@ function HomepageSpecWall() {
                 <span className='homepage-spec-wall-card__icon'>
                   <Icon aria-hidden='true' size={18} strokeWidth={1.8} />
                 </span>
+                <SpecWallGraphic index={index} />
                 <h3>{item.title}</h3>
                 <p>{item.body}</p>
               </article>
@@ -483,10 +514,40 @@ export default async function HomePage() {
           <div className='homepage-hero-inner relative z-[3] mx-auto flex w-full max-w-none min-w-0 flex-1 flex-col items-center justify-start'>
             <div className='homepage-hero-copy w-full min-w-0'>
               <h1
+                aria-label={HERO_COPY.headline}
                 id='home-hero-heading'
                 className='homepage-hero-headline self-center text-center text-white'
               >
-                {HERO_COPY.headline}
+                <span
+                  aria-hidden='true'
+                  className='homepage-hero-headline__desktop'
+                >
+                  Release more music
+                </span>
+                <span
+                  aria-hidden='true'
+                  className='homepage-hero-headline__desktop'
+                >
+                  with less work
+                </span>
+                <span
+                  aria-hidden='true'
+                  className='homepage-hero-headline__mobile'
+                >
+                  Release more
+                </span>
+                <span
+                  aria-hidden='true'
+                  className='homepage-hero-headline__mobile'
+                >
+                  music with
+                </span>
+                <span
+                  aria-hidden='true'
+                  className='homepage-hero-headline__mobile'
+                >
+                  less work
+                </span>
               </h1>
               <p className='homepage-hero-subhead self-center text-center text-white/68'>
                 {HERO_COPY.subhead}

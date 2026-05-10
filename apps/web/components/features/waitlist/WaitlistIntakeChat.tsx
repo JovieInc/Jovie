@@ -3,6 +3,7 @@
 import { ArrowRight, Loader2, SendHorizontal } from 'lucide-react';
 import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
+import { getPlanIntent } from '@/lib/auth/plan-intent';
 import { cn } from '@/lib/utils';
 import type { WaitlistAccessOutcome } from '@/lib/waitlist/access-request';
 import type { WaitlistDisplayOutcome } from './WaitlistOutcomeView';
@@ -191,7 +192,7 @@ export function WaitlistIntakeChat({
             spotifyUrl: nextAnswers.spotifyUrl || null,
             spotifyArtistName: nextAnswers.spotifyArtistName || null,
             heardAbout: 'onboarding_chat',
-            selectedPlan: null,
+            selectedPlan: getPlanIntent(),
           },
           transcript: nextTranscript,
           metadata: {

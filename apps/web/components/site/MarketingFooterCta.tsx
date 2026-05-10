@@ -86,14 +86,6 @@ export function MarketingFooterCta({
             opacity={1 - index * 0.05}
           />
         ))}
-        <rect
-          x='0'
-          y='538'
-          width='1200'
-          height='2'
-          fill='#0070f3'
-          opacity='0.3'
-        />
       </svg>
       <MarketingContainer width='page' className='relative z-10'>
         <div className='homepage-final-cta-copy mx-auto'>

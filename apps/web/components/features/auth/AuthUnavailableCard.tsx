@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
 
 interface AuthUnavailableCardProps {
@@ -25,7 +25,11 @@ export function AuthUnavailableCard({
   mode,
 }: AuthUnavailableCardProps = {}) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const resolvedMode = resolveMode(mode, pathname);
+  const oauthError = searchParams.get('oauth_error');
+  const showSignupLegal = resolvedMode === 'signup';
+  const showOauthError = showSignupLegal && Boolean(oauthError);
   const headline =
     resolvedMode === 'signup'
       ? 'Sign up is temporarily unavailable'
@@ -53,6 +57,15 @@ export function AuthUnavailableCard({
         <h1 className='max-w-[10.5ch] text-[clamp(2.9rem,6.2vw,4.45rem)] font-[590] leading-[0.92] tracking-[-0.06em] text-white text-balance lg:max-w-[11.5ch]'>
           {headline}
         </h1>
+        {showOauthError ? (
+          <p
+            role='alert'
+            className='rounded-[0.85rem] border border-white/10 bg-white/[0.045] px-3.5 py-3 text-[13px] font-medium leading-5 tracking-[-0.012em] text-white/76'
+          >
+            We could not finish that account connection. Please try again when
+            auth is available.
+          </p>
+        ) : null}
         <p className='mx-auto max-w-[26rem] text-[0.96rem] leading-[1.65] tracking-[-0.014em] text-white/60 text-pretty lg:mx-0'>
           {showResetAction
             ? "Something is off with this environment's auth. Try resetting your session — if it still fails, we've been notified."
@@ -81,6 +94,26 @@ export function AuthUnavailableCard({
       <p className='text-[12px] leading-[1.6] tracking-[-0.01em] text-white/40'>
         If it still does not work, give it a moment and try again.
       </p>
+
+      {showSignupLegal ? (
+        <p className='text-[12px] leading-[1.6] tracking-[-0.01em] text-white/50'>
+          By signing up, you agree to our{' '}
+          <Link
+            href={APP_ROUTES.LEGAL_TERMS}
+            className='rounded-md text-white/76 underline underline-offset-2 focus-ring-themed'
+          >
+            Terms of Service
+          </Link>{' '}
+          and{' '}
+          <Link
+            href={APP_ROUTES.LEGAL_PRIVACY}
+            className='rounded-md text-white/76 underline underline-offset-2 focus-ring-themed'
+          >
+            Privacy Policy
+          </Link>
+          .
+        </p>
+      ) : null}
     </section>
   );
 }

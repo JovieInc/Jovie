@@ -13,10 +13,11 @@
 
 import { Music2, Pause, Play, Send } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
-import { useEffect, useReducer, useRef, useState } from 'react';
+import { useEffect, useReducer, useRef } from 'react';
 
 import { TRANSITION_SURFACE } from '@/components/jovie/components/chat-motion';
 import {
+  DEMO_RELEASE_ACTIONS,
   DEMO_RELEASES,
   type DemoStat,
   MIDNIGHT_RUN_STATS,
@@ -67,7 +68,7 @@ function demoReducer(state: DemoState, action: DemoAction): DemoState {
       return { phase: 'empty', typedText: '', isPaused: false };
     case 'sync-reduced-motion':
       return {
-        phase: 'typing',
+        phase: 'entity',
         typedText: TYPEWRITER_QUERY,
         isPaused: true,
       };
@@ -82,13 +83,10 @@ function demoReducer(state: DemoState, action: DemoAction): DemoState {
 
 type SurfaceMode = 'empty' | 'typing' | 'entity';
 
-function geometryFor(mode: SurfaceMode, stacked: boolean) {
-  if (stacked) {
-    return { width: '100%', borderRadius: mode === 'empty' ? 999 : 18 };
-  }
-  if (mode === 'empty') return { width: 440, borderRadius: 999 };
-  if (mode === 'typing') return { width: 440, borderRadius: 24 };
-  return { width: 760, borderRadius: 20 };
+function geometryFor(mode: SurfaceMode) {
+  if (mode === 'empty') return { borderRadius: 999 };
+  if (mode === 'typing') return { borderRadius: 24 };
+  return { borderRadius: 20 };
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────
@@ -117,7 +115,7 @@ interface InputRowProps {
 
 function InputRow({
   value,
-  placeholder = 'Ask Jovie anything',
+  placeholder = 'Ask Jovie for a release plan',
 }: InputRowProps) {
   return (
     <div className='flex items-end gap-2 px-4 py-3'>
@@ -296,18 +294,33 @@ function PreviewPane({ artBg, eyebrow, title, stats }: PreviewPaneProps) {
   );
 }
 
+function ActionList() {
+  return (
+    <div className='home-composer-actions'>
+      {DEMO_RELEASE_ACTIONS.map(action => (
+        <div className='home-composer-action' key={action.key}>
+          <div>
+            <p>{action.label}</p>
+            <span>{action.body}</span>
+          </div>
+          <strong>{action.status}</strong>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────
 
 export function HomeComposerHero() {
   const prefersReducedMotion = useReducedMotion();
 
   const [state, dispatch] = useReducer(demoReducer, {
-    phase: 'empty',
-    typedText: '',
+    phase: 'entity',
+    typedText: TYPEWRITER_QUERY,
     isPaused: false,
   });
 
-  const [isStacked, setIsStacked] = useState(false);
   const reducedMotionRef = useRef<boolean | null>(null);
   const containerRef = useRef<HTMLElement>(null);
   const pauseControlRef = useRef<HTMLButtonElement>(null);
@@ -315,21 +328,17 @@ export function HomeComposerHero() {
 
   useEffect(() => {
     const reducedMotion = !!prefersReducedMotion;
+    if (reducedMotionRef.current === null) {
+      reducedMotionRef.current = reducedMotion;
+      if (reducedMotion) dispatch({ type: 'sync-reduced-motion' });
+      return;
+    }
     if (reducedMotionRef.current === reducedMotion) return;
     reducedMotionRef.current = reducedMotion;
     dispatch(
       reducedMotion ? { type: 'sync-reduced-motion' } : { type: 'reset' }
     );
   }, [prefersReducedMotion]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const mq = window.matchMedia('(max-width: 899px)');
-    const update = () => setIsStacked(mq.matches);
-    update();
-    mq.addEventListener('change', update);
-    return () => mq.removeEventListener('change', update);
-  }, []);
 
   // ── Autoplay sequence ──────────────────────────────────────────────────
 
@@ -438,9 +447,9 @@ export function HomeComposerHero() {
   // ── Derived geometry ───────────────────────────────────────────────────
 
   const mode: SurfaceMode = state.phase;
-  const geometry = geometryFor(mode, isStacked);
-  const isEntity = state.phase === 'entity' && !isStacked;
-  const dockClass = isEntity ? 'flex justify-end' : 'flex justify-center';
+  const geometry = geometryFor(mode);
+  const isEntity = state.phase === 'entity';
+  const dockClass = 'flex justify-center';
 
   const activeRelease = DEMO_RELEASES[0];
 
@@ -498,7 +507,6 @@ export function HomeComposerHero() {
             prefersReducedMotion
               ? undefined
               : {
-                  width: geometry.width,
                   borderRadius: geometry.borderRadius,
                 }
           }
@@ -506,10 +514,10 @@ export function HomeComposerHero() {
           style={{
             background: SURFACE_BG,
             borderRadius: geometry.borderRadius,
-            width: geometry.width,
-            maxWidth: '100%',
+            width: 'min(100%, 760px)',
           }}
           className={cn(
+            'home-composer-surface',
             'overflow-hidden border border-white/[0.07]',
             'shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_1px_0_rgba(0,0,0,0.18),0_8px_24px_-8px_rgba(0,0,0,0.3)]',
             isEntity ? 'flex' : 'flex flex-col'
@@ -517,9 +525,9 @@ export function HomeComposerHero() {
         >
           {isEntity ? (
             // ── Entity state: two-column layout ───────────────────────
-            <div className='flex w-full'>
+            <div className='home-composer-result flex w-full'>
               {/* Left rail: 264px */}
-              <aside className='flex w-[264px] shrink-0 flex-col border-r border-white/[0.055]'>
+              <aside className='home-composer-result__rail flex w-[264px] shrink-0 flex-col border-r border-white/[0.055]'>
                 <div className='px-3 pt-3 pb-2'>
                   <EntityPill label='Releases' />
                 </div>
@@ -532,7 +540,7 @@ export function HomeComposerHero() {
                       type={release.type}
                       year={release.year}
                       artBg={release.artBg}
-                      isActive={release.id === 'midnight-run'}
+                      isActive={release.id === 'deep-end'}
                     />
                   ))}
                 </div>
@@ -542,49 +550,21 @@ export function HomeComposerHero() {
               <div className='flex min-w-0 flex-1 flex-col'>
                 <PreviewPane
                   artBg={activeRelease.artBg}
-                  eyebrow='Release · Album'
-                  title='Midnight Run'
+                  eyebrow='Release · Single'
+                  title='The Deep End'
                   stats={MIDNIGHT_RUN_STATS}
                 />
+                <ActionList />
                 <div className='border-t border-white/[0.055]'>
                   <InputRow value={state.typedText} />
                 </div>
               </div>
             </div>
-          ) : isStacked && state.phase === 'entity' ? (
-            // ── Stacked entity: vertical layout ──────────────────────
-            <>
-              <div className='border-b border-white/[0.055]'>
-                <div className='px-3 pt-3 pb-2'>
-                  <EntityPill label='Releases' />
-                </div>
-                <TabBar activeTab='Releases' />
-                {DEMO_RELEASES.map(release => (
-                  <ReleaseRow
-                    key={release.id}
-                    label={release.label}
-                    type={release.type}
-                    year={release.year}
-                    artBg={release.artBg}
-                    isActive={release.id === 'midnight-run'}
-                  />
-                ))}
-              </div>
-              <PreviewPane
-                artBg={activeRelease.artBg}
-                eyebrow='Release · Album'
-                title='Midnight Run'
-                stats={MIDNIGHT_RUN_STATS}
-              />
-              <div className='border-t border-white/[0.055]'>
-                <InputRow value={state.typedText} />
-              </div>
-            </>
           ) : (
             // ── Empty / typing states ──────────────────────────────────
             <InputRow
               value={state.typedText}
-              placeholder='Ask Jovie anything'
+              placeholder='Ask Jovie for a release plan'
             />
           )}
         </motion.div>

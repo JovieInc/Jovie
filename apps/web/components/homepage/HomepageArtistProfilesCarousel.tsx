@@ -137,6 +137,7 @@ export function HomepageArtistProfilesCarousel({
                           width={card.image.width}
                           height={card.image.height}
                           loading='lazy'
+                          fetchPriority='low'
                           sizes='(min-width: 1280px) 224px, (min-width: 768px) 21vw, 66vw'
                           unoptimized
                         />

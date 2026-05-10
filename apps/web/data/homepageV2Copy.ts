@@ -152,15 +152,15 @@ export const HOMEPAGE_V2_COPY: HomepageV2Copy = {
   },
   pricing: {
     headline: 'Simple pricing',
-    body: 'One plan. 14-day free trial.',
-    supportLine: '14-day Pro trial. No credit card required.',
+    body: 'Artist profiles are free forever. Pro adds the release tools when you need them.',
+    supportLine: 'Profiles stay free. Paid plans open from the waitlist.',
     ctaLabel: 'See Pricing',
     href: APP_ROUTES.PRICING,
   },
   finalCta: {
     headline: 'Keep Your Music Moving.',
     body: 'Jovie handles the plan, assets, and follow-up from there.',
-    primaryCtaLabel: 'Claim My Workspace',
+    primaryCtaLabel: 'Start Free Trial',
     secondaryCtaLabel: 'See Pricing',
   },
   footerColumns: [

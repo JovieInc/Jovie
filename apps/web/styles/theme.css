@@ -355,8 +355,7 @@
   letter-spacing: -0.011em;
   transition:
     box-shadow 180ms var(--clerk-motion-ease),
-    background-color 180ms var(--clerk-motion-ease),
-    transform 180ms var(--clerk-motion-ease);
+    background-color 180ms var(--clerk-motion-ease);
 }
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-formButtonPrimary:hover {
@@ -364,7 +363,7 @@
 }
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-formButtonPrimary:active {
-  transform: scale(0.985);
+  opacity: 0.92;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -375,9 +374,6 @@
   :is(.cl-signIn-root, .cl-signUp-root) .cl-selectButton,
   :is(.cl-signIn-root, .cl-signUp-root) .cl-selectSearchInput {
     transition: none;
-  }
-  :is(.cl-signIn-root, .cl-signUp-root) .cl-formButtonPrimary:active {
-    transform: none;
   }
 }
 

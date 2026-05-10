@@ -346,6 +346,9 @@ export function HeaderNav({
 
       closeFlyout();
     };
+    const handlePointerEnter = () => {
+      clearFlyoutCloseTimer();
+    };
     const handlePointerLeave = (event: PointerEvent) => {
       if (
         event.relatedTarget instanceof Node &&
@@ -365,16 +368,35 @@ export function HeaderNav({
     };
 
     const header = headerRef.current;
+    const flyoutPanels = Array.from(
+      header?.querySelectorAll<HTMLElement>(
+        '.marketing-glass-header__flyout'
+      ) ?? []
+    );
+    header?.addEventListener('pointerenter', handlePointerEnter);
     header?.addEventListener('pointerleave', handlePointerLeave);
+    for (const panel of flyoutPanels) {
+      panel.addEventListener('pointerenter', handlePointerEnter);
+    }
     document.addEventListener('focusin', handleFocusIn);
     document.addEventListener('keydown', handleKeyDown);
 
     return () => {
+      header?.removeEventListener('pointerenter', handlePointerEnter);
       header?.removeEventListener('pointerleave', handlePointerLeave);
+      for (const panel of flyoutPanels) {
+        panel.removeEventListener('pointerenter', handlePointerEnter);
+      }
       document.removeEventListener('focusin', handleFocusIn);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [closeFlyout, isMarketingGlass, openFlyoutId, scheduleFlyoutClose]);
+  }, [
+    clearFlyoutCloseTimer,
+    closeFlyout,
+    isMarketingGlass,
+    openFlyoutId,
+    scheduleFlyoutClose,
+  ]);
 
   useEffect(() => {
     return () => clearFlyoutCloseTimer();

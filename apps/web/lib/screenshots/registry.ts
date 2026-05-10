@@ -1,5 +1,6 @@
 import { ARTIST_PROFILE_SECTION_SCREENSHOT_ORDER } from '@/data/artistProfilePageOrder';
 import { getCanonicalSurfaceForScreenshotId } from '@/lib/canonical-surfaces';
+import screenshotCatalogManifest from '../../screenshot-catalog/current/manifest.json';
 import type {
   ScreenshotConsumer,
   ScreenshotGroup,
@@ -494,6 +495,34 @@ export function getScreenshotScenario(id: string): ScreenshotScenario | null {
 
 const PUBLIC_EXPORT_URL_PREFIX = '/product-screenshots';
 
+const PUBLIC_EXPORT_VERSION_BY_ID = new Map(
+  (
+    screenshotCatalogManifest as readonly {
+      readonly capturedAt?: string;
+      readonly gitSha?: string | null;
+      readonly id?: string;
+      readonly publicExportPath?: string;
+    }[]
+  ).flatMap(entry => {
+    if (!entry.id || !entry.publicExportPath) return [];
+    const versionSource = entry.gitSha ?? entry.capturedAt;
+    if (!versionSource) return [];
+    const version = versionSource.replace(/[^a-zA-Z0-9]/g, '').slice(0, 32);
+    return version ? [[entry.id, version] as const] : [];
+  })
+);
+
+function getPublicExportUrl(scenario: ScreenshotScenario) {
+  if (!scenario.publicExportPath) {
+    throw new Error(
+      `Screenshot scenario ${scenario.id} has no publicExportPath`
+    );
+  }
+  const baseUrl = `${PUBLIC_EXPORT_URL_PREFIX}/${scenario.publicExportPath}`;
+  const version = PUBLIC_EXPORT_VERSION_BY_ID.get(scenario.id);
+  return version ? `${baseUrl}?v=${version}` : baseUrl;
+}
+
 /**
  * Actual PNG dimensions for every published export. Source of truth: the PNG
  * IHDR header on disk. Locator-captured scenarios have non-retina dimensions
@@ -576,7 +605,7 @@ export function getMarketingExportImage(id: string): MarketingExportImage {
   // captures are always 1440×900 or 390×844 at deviceScaleFactor 2).
   const viewport = SCREENSHOT_VIEWPORTS[scenario.viewport];
   return {
-    publicUrl: `${PUBLIC_EXPORT_URL_PREFIX}/${scenario.publicExportPath}`,
+    publicUrl: getPublicExportUrl(scenario),
     width: known?.width ?? viewport.width * 2,
     height: known?.height ?? viewport.height * 2,
     alt: scenario.title,
