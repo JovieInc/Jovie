@@ -288,7 +288,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   border-radius: 1.15rem;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent 42%),
-    rgba(13, 14, 17, 0.985);
+    #0d0e11;
   box-shadow:
     0 28px 74px rgba(0, 0, 0, 0.56),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
