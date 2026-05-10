@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HeaderNav } from '@/components/organisms/HeaderNav';
 
 // Mock Clerk (MobileNav uses useAuthSafe which wraps Clerk hooks)
@@ -20,6 +20,10 @@ vi.mock('@clerk/nextjs', () => ({
 }));
 
 describe('HeaderNav flyout interactions', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('renders primary navigation links', () => {
     render(<HeaderNav />);
 
@@ -72,5 +76,43 @@ describe('HeaderNav flyout interactions', () => {
 
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
     expect(trigger).toHaveFocus();
+  });
+
+  it('keeps marketing flyouts open while moving from trigger to panel', () => {
+    vi.useFakeTimers();
+    const { container } = render(
+      <HeaderNav
+        authMode='public-static'
+        presentation='marketing-glass'
+        flyoutMenus={[
+          {
+            id: 'features',
+            label: 'Features',
+            heading: 'Product',
+            links: [
+              {
+                href: '/artist-profiles',
+                label: 'Artist Profiles',
+                description: 'Artist profile pages',
+              },
+            ],
+          },
+        ]}
+      />
+    );
+
+    const trigger = screen.getByRole('button', { name: /Features/ });
+    const header = screen.getByTestId('header-nav');
+    const flyout = container.querySelector('#marketing-header-flyout-features');
+
+    fireEvent.pointerEnter(trigger);
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+
+    fireEvent.pointerLeave(header, { relatedTarget: null });
+    fireEvent.pointerEnter(flyout as Element);
+    vi.advanceTimersByTime(220);
+
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(flyout).toHaveAttribute('aria-hidden', 'false');
   });
 });

@@ -35,9 +35,12 @@ describe('getMarketingExportScenarios', () => {
 describe('getMarketingExportImage', () => {
   it('returns a public URL, retina dimensions, and alt text for a full-viewport desktop scenario', () => {
     const image = getMarketingExportImage('dashboard-releases-desktop');
-    expect(image.publicUrl).toBe(
+    expect(image.publicUrl).toMatch(
       '/product-screenshots/releases-dashboard-full.png'
     );
+    expect(
+      new URL(image.publicUrl, 'https://jov.ie').searchParams.get('v')
+    ).toMatch(/^[a-zA-Z0-9]+$/);
     expect(image.width).toBe(SCREENSHOT_VIEWPORTS.desktop.width * 2);
     expect(image.height).toBe(SCREENSHOT_VIEWPORTS.desktop.height * 2);
     expect(image.alt).toBe('Releases Dashboard');
@@ -45,7 +48,10 @@ describe('getMarketingExportImage', () => {
 
   it('uses mobile viewport dimensions for full-viewport mobile scenarios', () => {
     const image = getMarketingExportImage('public-profile-mobile');
-    expect(image.publicUrl).toBe('/product-screenshots/profile-phone.png');
+    expect(image.publicUrl).toMatch('/product-screenshots/profile-phone.png');
+    expect(
+      new URL(image.publicUrl, 'https://jov.ie').searchParams.get('v')
+    ).toMatch(/^[a-zA-Z0-9]+$/);
     expect(image.width).toBe(SCREENSHOT_VIEWPORTS.mobile.width * 2);
     expect(image.height).toBe(SCREENSHOT_VIEWPORTS.mobile.height * 2);
   });

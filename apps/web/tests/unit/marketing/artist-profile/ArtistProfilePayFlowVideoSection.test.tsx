@@ -40,9 +40,9 @@ describe('ArtistProfilePayFlowVideoSection', () => {
     );
     expect(video).toBeInTheDocument();
     expect(video).toHaveAttribute('src', VIDEO_URL);
-    expect(video).toHaveAttribute(
-      'poster',
-      '/product-screenshots/tim-white-profile-pay-phone.png'
+    const poster = video.getAttribute('poster');
+    expect(poster).toMatch(
+      /^\/product-screenshots\/tim-white-profile-pay-phone\.png\?v=/
     );
     expect(video).toHaveAttribute('loop');
     expect(video).toHaveAttribute('autoplay');

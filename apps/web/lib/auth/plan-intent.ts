@@ -12,9 +12,9 @@
 const PLAN_INTENT_KEY = 'jovie_plan_intent';
 const PLAN_INTENT_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
-const VALID_PLANS = new Set(['free', 'pro', 'max']);
+const VALID_PLANS = new Set(['free', 'pro', 'team', 'enterprise', 'max']);
 
-export type PlanIntentTier = 'free' | 'pro' | 'max';
+export type PlanIntentTier = 'free' | 'pro' | 'team' | 'enterprise' | 'max';
 
 function getSecureCookieAttribute(): string {
   try {

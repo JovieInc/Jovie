@@ -231,7 +231,7 @@ test.describe('/signup page', () => {
       await waitForClerkAuthUi(page);
 
       // The error banner should be visible
-      const banner = page.getByRole('alert');
+      const banner = page.getByRole('alert').filter({ hasText: /account/i });
       await expect(banner).toBeVisible({ timeout: VISIBILITY_TIMEOUT });
 
       const bannerText = await banner.textContent();

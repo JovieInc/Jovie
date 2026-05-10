@@ -140,7 +140,14 @@ export type WaitlistGoal = z.infer<typeof waitlistGoalSchema>;
 /**
  * Pricing plan enum values for waitlist submissions.
  */
-export const waitlistPlanValues = ['free', 'branding', 'pro', 'max'] as const;
+export const waitlistPlanValues = [
+  'free',
+  'branding',
+  'pro',
+  'team',
+  'enterprise',
+  'max',
+] as const;
 
 /**
  * Pricing plan validation schema.

@@ -261,7 +261,7 @@
     "viewport": "mobile",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-05-09T00:38:28.063Z",
+    "capturedAt": "2026-05-10T08:31:29.267Z",
     "gitSha": null,
     "imagePath": "tim-white-profile-live-mobile.png",
     "publicExportPath": "tim-white-profile-live-phone.png"
@@ -457,7 +457,7 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-05-09T23:49:54.208Z",
+    "capturedAt": "2026-05-10T08:31:37.333Z",
     "gitSha": null,
     "imagePath": "shell-v1-library-desktop.png",
     "publicExportPath": "shell-v1-library.png"
@@ -471,7 +471,7 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-05-09T07:22:14.213Z",
+    "capturedAt": "2026-05-10T08:31:41.471Z",
     "gitSha": null,
     "imagePath": "shell-v1-releases-desktop.png",
     "publicExportPath": "shell-v1-releases.png"

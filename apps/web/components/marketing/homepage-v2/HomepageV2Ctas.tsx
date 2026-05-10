@@ -1,8 +1,8 @@
 import Link from 'next/link';
+import { MarketingPricingPlans } from '@/components/features/pricing/MarketingPricingPlans';
 import { MarketingContainer } from '@/components/marketing';
 import { APP_ROUTES } from '@/constants/routes';
 import { HOMEPAGE_V2_COPY } from '@/data/homepageV2Copy';
-import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
 import { cn } from '@/lib/utils';
 
 export function HomepageStoryHeader({
@@ -52,73 +52,7 @@ export function HomepageStoryHeader({
   );
 }
 
-function PricingCard({
-  title,
-  body,
-  price,
-  badge,
-  ctaLabel,
-  ctaHref,
-  featured = false,
-  testId,
-  features,
-}: Readonly<{
-  title: string;
-  body: string;
-  price: string;
-  badge: string;
-  ctaLabel: string;
-  ctaHref: string;
-  featured?: boolean;
-  testId: string;
-  features?: readonly string[];
-}>) {
-  return (
-    <article
-      data-testid={testId}
-      className={cn(
-        'homepage-pricing-card',
-        featured && 'homepage-pricing-card--featured'
-      )}
-    >
-      <div className='homepage-pricing-card__header'>
-        <div>
-          <p className='homepage-pricing-card__title'>{title}</p>
-          <p className='homepage-pricing-card__body'>{body}</p>
-        </div>
-        <span className='homepage-pricing-card__badge'>{badge}</span>
-      </div>
-      <p className='homepage-pricing-card__price'>{price}</p>
-      {features?.length ? (
-        <ul className='homepage-pricing-feature-list'>
-          {features.map(feature => (
-            <li key={feature}>{feature}</li>
-          ))}
-        </ul>
-      ) : null}
-      <Link href={ctaHref} className='homepage-pricing-card__cta'>
-        {ctaLabel}
-      </Link>
-    </article>
-  );
-}
-
 export function HomepageV2Pricing() {
-  const freeFeatures = [
-    'Public artist profile page',
-    'Unlimited smart links',
-    'Release pages with listen links per DSP',
-    'Basic analytics (30 days)',
-  ] as const;
-  const proMonthlyPrice = ENTITLEMENT_REGISTRY.pro.marketing.price?.monthly;
-  const proFeatures = ENTITLEMENT_REGISTRY.pro.marketing.features
-    .filter(feature => feature !== 'All Free features +')
-    .slice(0, 4);
-  const proPriceDisplay =
-    typeof proMonthlyPrice === 'number'
-      ? `$${proMonthlyPrice}/mo`
-      : 'Contact Us';
-
   return (
     <section
       data-testid='homepage-v2-pricing'
@@ -133,29 +67,7 @@ export function HomepageV2Pricing() {
             className='homepage-pricing-copy'
           />
 
-          <div className='homepage-pricing-grid'>
-            <PricingCard
-              badge='Free forever'
-              body={ENTITLEMENT_REGISTRY.free.marketing.tagline}
-              ctaHref={`${APP_ROUTES.SIGNUP}?plan=free`}
-              ctaLabel='Claim Your Profile'
-              features={freeFeatures}
-              price='$0'
-              testId='homepage-v2-pricing-free'
-              title={ENTITLEMENT_REGISTRY.free.marketing.displayName}
-            />
-            <PricingCard
-              badge='14-day trial'
-              body={HOMEPAGE_V2_COPY.pricing.supportLine}
-              ctaHref={`${APP_ROUTES.SIGNUP}?plan=pro`}
-              ctaLabel='Start 14-Day Free Trial'
-              featured
-              features={proFeatures}
-              price={proPriceDisplay}
-              testId='homepage-v2-pricing-pro'
-              title={ENTITLEMENT_REGISTRY.pro.marketing.displayName}
-            />
-          </div>
+          <MarketingPricingPlans mode='compact' />
         </div>
       </MarketingContainer>
     </section>
@@ -240,14 +152,6 @@ export function HomepageV2FinalCta() {
             opacity={1 - index * 0.05}
           />
         ))}
-        <rect
-          x='0'
-          y='538'
-          width='1200'
-          height='2'
-          fill='#0070f3'
-          opacity='0.3'
-        />
       </svg>
       <MarketingContainer width='page' className='relative z-10'>
         <div className='homepage-final-cta-copy mx-auto'>
@@ -259,7 +163,7 @@ export function HomepageV2FinalCta() {
           </h2>
           <Link
             href={APP_ROUTES.SIGNUP}
-            className='homepage-final-cta-action inline-flex h-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.12] px-4 text-[12px] font-medium tracking-[-0.01em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur transition-colors hover:bg-white/[0.16] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
+            className='homepage-final-cta-action public-action-primary focus-ring-themed'
             data-testid='homepage-v2-final-cta-primary'
           >
             {HOMEPAGE_V2_COPY.finalCta.primaryCtaLabel}

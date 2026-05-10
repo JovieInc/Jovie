@@ -5,19 +5,19 @@
  * These are realistic placeholder values — not invented stats, not testimonials.
  */
 
-export const TYPEWRITER_QUERY = 'What did Midnight Run do in its first week?';
+export const TYPEWRITER_QUERY = 'Build the launch plan for The Deep End.';
 
 /** Delay between each typed character in the autoplay sequence (ms). */
 export const TYPEWRITER_CHAR_INTERVAL = 40;
 
 /** How long to hold the empty phase before typing starts (ms). */
-export const PHASE_EMPTY_DURATION = 2000;
+export const PHASE_EMPTY_DURATION = 700;
 
 /** How long to hold the typing phase total before advancing to entity (ms). */
 export const PHASE_TYPING_DURATION = 3000;
 
 /** How long to hold the entity phase before looping (ms). */
-export const PHASE_ENTITY_DURATION = 4000;
+export const PHASE_ENTITY_DURATION = 5200;
 
 /** How long to wait after mouseLeave before resuming autoplay (ms). */
 export const RESUME_DELAY_AFTER_HOVER = 1000;
@@ -33,25 +33,25 @@ export interface DemoRelease {
 
 export const DEMO_RELEASES: readonly DemoRelease[] = [
   {
-    id: 'midnight-run',
-    label: 'Midnight Run',
-    type: 'Album',
-    year: '2026',
-    artBg: '#1a1a2e',
-  },
-  {
-    id: 'static',
-    label: 'Static',
+    id: 'deep-end',
+    label: 'The Deep End',
     type: 'Single',
     year: '2026',
-    artBg: '#0d1b2a',
+    artBg: '#0b1118',
   },
   {
-    id: 'dawnward',
-    label: 'Dawnward',
-    type: 'EP',
-    year: '2025',
-    artBg: '#1a0a1e',
+    id: 'take-me-over',
+    label: 'Take Me Over',
+    type: 'Single',
+    year: '2026',
+    artBg: '#101626',
+  },
+  {
+    id: 'never-say',
+    label: 'Never Say',
+    type: 'Single',
+    year: '2026',
+    artBg: '#14101e',
   },
 ] as const;
 
@@ -63,12 +63,37 @@ export interface DemoStat {
 }
 
 export const MIDNIGHT_RUN_STATS: readonly DemoStat[] = [
-  { key: 'tracks', label: '9 tracks' },
-  { key: 'date', label: 'Mar 14, 2026' },
-  { key: 'duration', label: '42:17' },
-  { key: 'spotify', label: 'Spotify 71' },
-  { key: 'first-week', label: '142k 1st-week' },
-  { key: 'features', label: '2 features' },
+  { key: 'artist', label: 'Cosmic Gate & Tim White' },
+  { key: 'type', label: 'Single' },
+  { key: 'status', label: 'Live' },
+] as const;
+
+export interface DemoAction {
+  readonly key: string;
+  readonly label: string;
+  readonly body: string;
+  readonly status: string;
+}
+
+export const DEMO_RELEASE_ACTIONS: readonly DemoAction[] = [
+  {
+    key: 'fan-path',
+    label: 'Fan path',
+    body: 'Smart link, presave fallback, and profile update generated.',
+    status: 'Ready',
+  },
+  {
+    key: 'tasks',
+    label: 'Launch tasks',
+    body: 'Artwork, DSP checks, post copy, and UTM review assigned.',
+    status: '8 tasks',
+  },
+  {
+    key: 'notify',
+    label: 'Fan notification',
+    body: 'Opted-in listeners get the release when the link goes live.',
+    status: 'Queued',
+  },
 ] as const;
 
 export const DEMO_ARTIST = {

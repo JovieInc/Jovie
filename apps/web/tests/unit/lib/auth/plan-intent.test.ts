@@ -3,6 +3,7 @@ import {
   DEFAULT_UPSELL_PLAN,
   MAX_FOLLOWER_THRESHOLD,
   recommendPlan,
+  validatePlan,
 } from '@/lib/auth/plan-intent';
 
 describe('recommendPlan', () => {
@@ -40,5 +41,19 @@ describe('DEFAULT_UPSELL_PLAN', () => {
 describe('MAX_FOLLOWER_THRESHOLD', () => {
   it('is 10,000', () => {
     expect(MAX_FOLLOWER_THRESHOLD).toBe(10_000);
+  });
+});
+
+describe('validatePlan', () => {
+  it('accepts marketing waitlist plan intents', () => {
+    expect(validatePlan('free')).toBe('free');
+    expect(validatePlan('pro')).toBe('pro');
+    expect(validatePlan('team')).toBe('team');
+    expect(validatePlan('enterprise')).toBe('enterprise');
+  });
+
+  it('rejects unknown plan intents', () => {
+    expect(validatePlan('agency')).toBeNull();
+    expect(validatePlan(null)).toBeNull();
   });
 });
