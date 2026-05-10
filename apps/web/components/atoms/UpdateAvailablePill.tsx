@@ -1,24 +1,23 @@
 'use client';
 
-import { Loader2 } from 'lucide-react';
+import { Download, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { useDesktopUpdate } from '@/lib/desktop/electron-bridge';
+import { cn } from '@/lib/utils';
 import { useWebUpdate } from '@/lib/version/use-web-update';
 
-/**
- * UpdateAvailablePill — Codex titlebar-style update indicator.
- *
- * Renders only when an update is detected from either:
- *   - Electron auto-updater IPC (desktop)
- *   - /api/version build-hash drift (web)
- *
- * Visual spec (locked):
- *   - bg-white hover:bg-white/90 text-black (matches ActionPill canonical style)
- *   - text-[12px] font-medium rounded-full px-3 h-7
- *   - WebkitAppRegion: no-drag (so click works inside Electron titlebar)
- *   - Click: shows "Updating…" spinner, then triggers install/reload
- */
-export function UpdateAvailablePill() {
+interface UpdateAvailablePillProps {
+  /**
+   * Compact mode — collapses to an icon-only circle.
+   * Used in the Electron titlebar when the sidebar is open to conserve space.
+   * Transitions smoothly to the full text pill when false.
+   */
+  readonly compact?: boolean;
+}
+
+export function UpdateAvailablePill({
+  compact = false,
+}: UpdateAvailablePillProps) {
   const desktop = useDesktopUpdate();
   const web = useWebUpdate();
   const [updating, setUpdating] = useState(false);
@@ -46,18 +45,31 @@ export function UpdateAvailablePill() {
       onClick={handleClick}
       disabled={updating}
       aria-label='Update available — click to install'
-      // WebkitAppRegion no-drag so clicks register inside Electron's frameless titlebar
       style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-      className='inline-flex h-7 items-center gap-1.5 rounded-full bg-white px-3 text-[12px] font-medium text-black transition-colors duration-subtle hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-1 disabled:opacity-70'
+      className={cn(
+        'inline-flex h-7 min-w-[28px] items-center justify-center rounded-full bg-white text-black',
+        'overflow-hidden transition-[max-width,padding,gap] duration-subtle',
+        'hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-1 disabled:opacity-70',
+        compact ? 'max-w-[28px] gap-0 px-0' : 'max-w-[100px] gap-1.5 px-3'
+      )}
     >
       {updating ? (
-        <>
-          <Loader2 className='h-3 w-3 animate-spin' aria-hidden='true' />
-          <span>Updating…</span>
-        </>
+        <Loader2
+          className='h-3.5 w-3.5 shrink-0 animate-spin'
+          aria-hidden='true'
+        />
       ) : (
-        <span>Update</span>
+        <Download className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
       )}
+      <span
+        className={cn(
+          'whitespace-nowrap text-[12px] font-medium',
+          'transition-opacity duration-subtle',
+          compact ? 'opacity-0' : 'opacity-100'
+        )}
+      >
+        {updating ? 'Updating…' : 'Update'}
+      </span>
     </button>
   );
 }
