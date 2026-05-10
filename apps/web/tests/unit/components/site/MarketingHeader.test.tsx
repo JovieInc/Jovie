@@ -28,6 +28,15 @@ describe('MarketingHeader', () => {
       'aria-controls',
       'marketing-header-flyout-resources'
     );
+    expect(
+      screen.getByRole('link', {
+        name: /Automatic Fan Notifications/,
+        hidden: true,
+      })
+    ).toHaveAttribute('href', '/artist-notifications');
+    expect(
+      screen.queryByRole('link', { name: 'Direct Fan Messaging', hidden: true })
+    ).toBeNull();
     expect(screen.getByRole('link', { name: 'Pricing' })).toHaveAttribute(
       'href',
       '/pricing'

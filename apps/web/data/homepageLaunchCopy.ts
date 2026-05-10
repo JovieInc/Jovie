@@ -17,7 +17,6 @@ export const HOMEPAGE_LAUNCH_COPY = {
       'Jovie gives artists one workspace for profiles, releases, fan capture, and release momentum.',
   },
   hero: {
-    eyebrow: 'Release operating system',
     headline: 'Release more music with less work',
     subhead:
       'Plan the drop, route every fan, and keep the next release moving.',
@@ -36,9 +35,8 @@ export const HOMEPAGE_LAUNCH_COPY = {
     support: 'Free profile. 14-day Pro trial.',
   },
   workspace: {
-    kicker: 'Go live. In 60 seconds.',
-    headline: 'One workspace. For every release.',
-    headlineLines: ['One workspace.', 'For every release.'],
+    kicker: 'Go live in 60 seconds',
+    headline: 'One workspace\nFor every release',
     screenshotKey: 'shell-v1-releases-desktop',
     callouts: [
       {
@@ -63,8 +61,29 @@ export const HOMEPAGE_LAUNCH_COPY = {
   },
   productStatement: {
     eyebrow: 'Meet Jovie',
-    lead: 'A release operating system for serious artists.',
-    body: 'Import the drop. Generate the work. Keep the next release moving.',
+    lead: 'A new kind of operating system',
+    body: 'Built for music artists',
+    cards: [
+      {
+        number: '01',
+        title: 'Import the drop',
+        body: 'Jovie pulls artwork, credits, dates, links, and release status into one workspace automatically.',
+      },
+      {
+        number: '02',
+        title: 'Generate the work',
+        body: 'Turn each release into the plan, tasks, profile updates, fan paths, and launch timing it needs.',
+      },
+      {
+        number: '03',
+        title: 'Keep the release moving',
+        body: 'Let Jovie run the next action or assign it to your team with the release context attached.',
+      },
+    ],
+  },
+  aiComposer: {
+    headline: 'AI leverage for human artists',
+    body: 'Ask Jovie for the release plan, the fan path, or the next action while the workspace stays in view.',
   },
   intentBand: {
     eyebrow: 'Ask Jovie',
@@ -81,31 +100,112 @@ export const HOMEPAGE_LAUNCH_COPY = {
       'Analytics show what moved before the next Friday.',
     ],
   },
+  artistProfiles: {
+    headline: 'Artist profiles',
+    headlineAccent: 'Built to convert',
+    subhead: 'Streams. Fans. Shows. Payments. Drops.',
+    cards: [
+      {
+        id: 'get-paid',
+        title: 'Get Paid',
+        screenshotScenarioId: 'tim-white-profile-pay-mobile',
+        glow: 'cyan',
+      },
+      {
+        id: 'drive-streams',
+        title: 'Drive Streams',
+        screenshotScenarioId: 'tim-white-profile-listen-mobile',
+        glow: 'blue',
+      },
+      {
+        id: 'capture-fans',
+        title: 'Capture Fans',
+        screenshotScenarioId: 'tim-white-profile-subscribe-mobile',
+        glow: 'violet',
+      },
+      {
+        id: 'sell-out',
+        title: 'Sell Out',
+        screenshotScenarioId: 'tim-white-profile-tour-mobile',
+        glow: 'magenta',
+      },
+      {
+        id: 'drop-music',
+        title: 'Drop Music',
+        screenshotScenarioId: 'tim-white-profile-presave-mobile',
+        glow: 'aurora',
+      },
+    ],
+    primaryCta: {
+      label: 'Claim your profile',
+      href: APP_ROUTES.SIGNUP,
+    },
+    secondaryCta: {
+      label: 'View example',
+      href: APP_ROUTES.ARTIST_PROFILES,
+    },
+  },
+  specWall: {
+    headline: 'Everything else artists ask before switching',
+    body: 'Short answers for the release details that usually turn into another tool.',
+    items: [
+      {
+        title: 'Presaves',
+        body: 'Countdowns, pre-save CTAs, and release-day routing.',
+        accent: 'cyan',
+      },
+      {
+        title: 'Bot filtering',
+        body: 'Cleaner signal by removing bots, team clicks, and tests.',
+        accent: 'blue',
+      },
+      {
+        title: 'Album art',
+        body: 'Generate concepts from the release brief when you need them.',
+        accent: 'pink',
+      },
+      {
+        title: 'Power users',
+        body: 'Fast tables, keyboard-speed workflows, and bulk-friendly views.',
+        accent: 'violet',
+      },
+      {
+        title: 'Customization',
+        body: 'Campaign links, UTMs, QR codes, and profile modes.',
+        accent: 'teal',
+      },
+      {
+        title: 'Fan notifications',
+        body: 'Fans opt in once, then hear about the next drop.',
+        accent: 'magenta',
+      },
+    ],
+  },
   faq: [
     {
-      question: 'What does Jovie create for an artist?',
+      question: 'Are artist profiles free?',
       answer:
-        'Jovie creates a public artist profile, release pages, smart links, fan capture, and a workspace for the tasks around each drop.',
+        'Yes. Artist profiles are free forever. Pro adds the release tools when you need presaves, notifications, deeper analytics, and more launch automation.',
     },
     {
-      question: 'Do I need to replace my existing link in bio?',
+      question: 'What does Jovie generate for a release?',
       answer:
-        'No. You can use Jovie as the primary link or as a launch-specific page while you compare how it performs.',
+        'Jovie turns release metadata into a working plan: profile updates, release pages, smart links, fan capture, launch tasks, and the next actions around the drop.',
     },
     {
-      question: 'Can I edit the profile before it goes live?',
+      question: 'Can my team use the release plan?',
       answer:
-        'Yes. The signup flow captures your intent, then you can review and adjust the profile, release details, links, and calls to action.',
+        'Yes. Tasks can be assigned with the release context attached, so managers, collaborators, and artists work from the same source of truth.',
     },
     {
-      question: 'What happens after I publish?',
+      question: 'Do I need to replace my current link in bio?',
       answer:
-        'Jovie keeps the release context, fan actions, and analytics together so the next launch starts with what already worked.',
+        'No. You can use Jovie as the primary artist profile or as a launch-specific fan path while you compare how it performs.',
     },
     {
-      question: 'How much does it cost?',
+      question: 'Can I review everything before publishing?',
       answer:
-        'You can start with a free artist profile. Pro adds release notifications, presaves, fan CRM, extended analytics, and priority support.',
+        'Yes. You can review and adjust the profile, release details, smart links, fan actions, and task plan before anything becomes part of your public launch path.',
     },
   ],
 } as const;

@@ -1,7 +1,7 @@
 'use client';
 
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import Image, { type ImageLoader } from 'next/image';
+import Image from 'next/image';
 import { useLayoutEffect, useRef } from 'react';
 
 type HomepageMarketingImage = {
@@ -10,9 +10,6 @@ type HomepageMarketingImage = {
   readonly height: number;
   readonly alt: string;
 };
-
-const sourceScreenshotLoader: ImageLoader = ({ src, width }) =>
-  `${src}?w=${width}`;
 
 export type HomepageHeroCommandCenterImages = {
   readonly library: HomepageMarketingImage;
@@ -82,11 +79,10 @@ function ProductPane({
         alt={alt}
         width={image.width}
         height={image.height}
-        loader={sourceScreenshotLoader}
         loading={priority ? 'eager' : 'lazy'}
         fetchPriority={priority ? 'high' : 'auto'}
         sizes={sizes}
-        quality={85}
+        unoptimized
         className='homepage-product-pane__image'
       />
     </figure>

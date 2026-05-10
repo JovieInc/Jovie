@@ -3,6 +3,9 @@ import {
   ArmadaMusicLogo,
   AwalLogo,
   BlackHoleRecordingsLogo,
+  BlancoYNegroLogo,
+  DiscoWaxLogo,
+  RecPlayLogo,
   TheOrchardLogo,
   UniversalMusicGroupLogo,
 } from './label-logos';
@@ -174,6 +177,34 @@ export function HomeTrustSection({
               )}
             />
           </div>
+          {isInlineStrip ? (
+            <>
+              <div className='flex min-w-0 items-center justify-center homepage-trust-logo-slot homepage-trust-logo-slot--disco-wax'>
+                <DiscoWaxLogo
+                  className={cn(
+                    'homepage-trust-logo homepage-trust-logo--disco-wax w-auto max-w-[36vw] select-none',
+                    logoTone
+                  )}
+                />
+              </div>
+              <div className='flex min-w-0 items-center justify-center homepage-trust-logo-slot homepage-trust-logo-slot--blanco'>
+                <BlancoYNegroLogo
+                  className={cn(
+                    'homepage-trust-logo homepage-trust-logo--blanco w-auto max-w-[42vw] select-none',
+                    logoTone
+                  )}
+                />
+              </div>
+              <div className='flex min-w-0 items-center justify-center homepage-trust-logo-slot homepage-trust-logo-slot--rec-play'>
+                <RecPlayLogo
+                  className={cn(
+                    'homepage-trust-logo homepage-trust-logo--rec-play w-auto max-w-[34vw] select-none',
+                    logoTone
+                  )}
+                />
+              </div>
+            </>
+          ) : null}
         </div>
       </div>
     </section>

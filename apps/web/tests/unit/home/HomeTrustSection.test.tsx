@@ -39,10 +39,12 @@ describe('HomeTrustSection', () => {
     );
     expect(screen.getByText('Trusted by artists')).toBeInTheDocument();
     expect(screen.getByAltText('Black Hole Recordings')).toBeInTheDocument();
-    expect(screen.queryByLabelText('disco:wax')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('disco:wax')).toBeInTheDocument();
+    expect(screen.getByLabelText('Blanco y Negro')).toBeInTheDocument();
+    expect(screen.getByLabelText('rec play')).toBeInTheDocument();
     expect(container.querySelector('.homepage-trust-logo-grid')).toBeTruthy();
     expect(
       container.querySelectorAll('.homepage-trust-logo-slot')
-    ).toHaveLength(5);
+    ).toHaveLength(8);
   });
 });

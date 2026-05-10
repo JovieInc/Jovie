@@ -1721,6 +1721,8 @@ function ShellV1ExperimentContent() {
   const hideInternalTools =
     searchParams.get('capture') === 'marketing' ||
     searchParams.get('marketing') === '1';
+  const hideNowPlaying =
+    hideInternalTools && searchParams.get('player') === 'off';
   const initialReleaseId =
     initialView === 'releases' &&
     RELEASES.some(release => release.id === initialReleaseParam)
@@ -2128,6 +2130,14 @@ function ShellV1ExperimentContent() {
   const currentTrack: TrackInfo = playingRelease
     ? trackFromRelease(playingRelease)
     : trackFromRelease(RELEASES[0]);
+  const nowPlayingProps = hideNowPlaying
+    ? undefined
+    : {
+        track: currentTrack,
+        isPlaying,
+        barCollapsed,
+        onPlay: () => setIsPlaying(p => !p),
+      };
   const playingDurationSec = playingRelease?.durationSec ?? TRACK.duration;
 
   // Cinematic cold-start sequence. Three phases, total ~900ms:
@@ -2395,12 +2405,7 @@ function ShellV1ExperimentContent() {
             onThreadContextMenu={onThreadContextMenu}
             libraryAssetCount={libraryAllAssets.length}
             hideInternalTools={hideInternalTools}
-            nowPlaying={{
-              track: currentTrack,
-              isPlaying,
-              barCollapsed,
-              onPlay: () => setIsPlaying(p => !p),
-            }}
+            nowPlaying={nowPlayingProps}
             installBanner={{
               open: installBannerOpen,
               onDismiss: () => setInstallBannerOpen(false),
@@ -2446,12 +2451,7 @@ function ShellV1ExperimentContent() {
           onThreadContextMenu={onThreadContextMenu}
           libraryAssetCount={libraryAllAssets.length}
           hideInternalTools={hideInternalTools}
-          nowPlaying={{
-            track: currentTrack,
-            isPlaying,
-            barCollapsed,
-            onPlay: () => setIsPlaying(p => !p),
-          }}
+          nowPlaying={nowPlayingProps}
           installBanner={{
             open: installBannerOpen,
             onDismiss: () => setInstallBannerOpen(false),
@@ -2464,30 +2464,32 @@ function ShellV1ExperimentContent() {
           When the bar collapses, the COMPACT version takes over — it
           renders inside the sidebar bottom slot. The two never appear
           together. */}
-        <div
-          aria-hidden={barCollapsed}
-          // Sits inside the same 32px gutter the audio bar uses (px-8) so
-          // the album art aligns to a virtual grid as if the canvas's
-          // content area extended down past it.
-          className='hidden lg:block fixed bottom-[26px] z-30 w-[224px]'
-          style={{
-            left: sidebarMode === 'docked' ? 264 : 32,
-            opacity: barCollapsed ? 0 : 1,
-            transform: barCollapsed ? 'translateY(8px)' : 'translateY(0)',
-            pointerEvents: barCollapsed ? 'none' : 'auto',
-            transition: `opacity ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, transform ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, left ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
-          }}
-        >
-          <div className='px-1 pb-0'>
-            <SidebarNowPlaying
-              collapsed={false}
-              isPlaying={isPlaying}
-              onPlay={() => setIsPlaying(p => !p)}
-              playOverlayVisible={barCollapsed}
-              track={toNowPlayingTrack(currentTrack)}
-            />
+        {!hideNowPlaying ? (
+          <div
+            aria-hidden={barCollapsed}
+            // Sits inside the same 32px gutter the audio bar uses (px-8) so
+            // the album art aligns to a virtual grid as if the canvas's
+            // content area extended down past it.
+            className='hidden lg:block fixed bottom-[26px] z-30 w-[224px]'
+            style={{
+              left: sidebarMode === 'docked' ? 264 : 32,
+              opacity: barCollapsed ? 0 : 1,
+              transform: barCollapsed ? 'translateY(8px)' : 'translateY(0)',
+              pointerEvents: barCollapsed ? 'none' : 'auto',
+              transition: `opacity ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, transform ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, left ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
+            }}
+          >
+            <div className='px-1 pb-0'>
+              <SidebarNowPlaying
+                collapsed={false}
+                isPlaying={isPlaying}
+                onPlay={() => setIsPlaying(p => !p)}
+                playOverlayVisible={barCollapsed}
+                track={toNowPlayingTrack(currentTrack)}
+              />
+            </div>
           </div>
-        </div>
+        ) : null}
 
         <div
           className='flex min-h-0 min-w-0 flex-1 flex-col lg:gap-2'
@@ -2495,7 +2497,9 @@ function ShellV1ExperimentContent() {
             // Reserve room for the fixed-bottom AudioBar so canvas content
             // never sits hidden underneath. Falls to 0 when collapsed.
             paddingBottom:
-              barCollapsed || cinematic || onboardingActive ? 0 : 80,
+              hideNowPlaying || barCollapsed || cinematic || onboardingActive
+                ? 0
+                : 80,
             transition:
               cinematic || onboardingActive
                 ? `padding-bottom var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing)`
@@ -2797,12 +2801,23 @@ function ShellV1ExperimentContent() {
             canvas reflow. Earlier rendering inside the canvas column meant
             buttons shifted horizontally whenever the column width changed. */}
         <div
-          aria-hidden={barCollapsed || cinematic || onboardingActive}
+          aria-hidden={
+            hideNowPlaying || barCollapsed || cinematic || onboardingActive
+          }
           className='fixed inset-x-0 bottom-0 z-30 hidden lg:block overflow-hidden bg-(--linear-bg-page)'
           style={{
-            maxHeight: barCollapsed || cinematic || onboardingActive ? 0 : 80,
-            opacity: barCollapsed || cinematic || onboardingActive ? 0 : 1,
-            pointerEvents: cinematic || onboardingActive ? 'none' : undefined,
+            maxHeight:
+              hideNowPlaying || barCollapsed || cinematic || onboardingActive
+                ? 0
+                : 80,
+            opacity:
+              hideNowPlaying || barCollapsed || cinematic || onboardingActive
+                ? 0
+                : 1,
+            pointerEvents:
+              hideNowPlaying || cinematic || onboardingActive
+                ? 'none'
+                : undefined,
             transition:
               cinematic || onboardingActive
                 ? `max-height var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), opacity var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing)`
@@ -2836,15 +2851,22 @@ function ShellV1ExperimentContent() {
             Always mounted; fades + drops 6px on collapse so the bar retires
             instead of popping off. */}
         <div
-          aria-hidden={barCollapsed || cinematic || onboardingActive}
+          aria-hidden={
+            hideNowPlaying || barCollapsed || cinematic || onboardingActive
+          }
           style={{
-            opacity: barCollapsed || cinematic || onboardingActive ? 0 : 1,
+            opacity:
+              hideNowPlaying || barCollapsed || cinematic || onboardingActive
+                ? 0
+                : 1,
             transform:
-              barCollapsed || cinematic || onboardingActive
+              hideNowPlaying || barCollapsed || cinematic || onboardingActive
                 ? 'translateY(6px)'
                 : 'translateY(0)',
             pointerEvents:
-              barCollapsed || cinematic || onboardingActive ? 'none' : 'auto',
+              hideNowPlaying || barCollapsed || cinematic || onboardingActive
+                ? 'none'
+                : 'auto',
             transition: `opacity ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, transform ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
           }}
         >

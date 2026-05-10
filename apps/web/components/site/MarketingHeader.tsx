@@ -35,47 +35,37 @@ const MARKETING_GLASS_FLYOUTS: readonly HeaderFlyoutMenu[] = [
   {
     id: 'features',
     label: 'Features',
-    heading: 'Product',
+    heading: 'Release system',
     links: [
       {
         href: APP_ROUTES.ARTIST_PROFILES,
         label: 'Smart Release Links',
-        description: 'One link for every drop.',
-      },
-      {
-        href: APP_ROUTES.ARTIST_PROFILES,
-        label: 'Artist Profiles',
-        description: 'A live page that converts.',
+        description: 'One fan path for every drop.',
       },
       {
         href: APP_ROUTES.LAUNCH,
         label: 'Pre-saves & Countdowns',
-        description: 'Built into the same link.',
+        description: 'Before and after release day.',
       },
       {
-        href: APP_ROUTES.LAUNCH,
-        label: 'Tour & City Detection',
-        description: 'Show the next show first.',
-      },
-      {
-        href: APP_ROUTES.PAY,
-        label: 'Tip Jar & Instant Payout',
-        description: 'Get paid in the moment.',
+        href: APP_ROUTES.ARTIST_PROFILES,
+        label: 'Artist Profiles',
+        description: 'Built to convert, not decorate.',
       },
       {
         href: `${APP_ROUTES.ARTIST_PROFILES}#capture-every-fan`,
-        label: 'Fan Capture',
-        description: 'Listens, scans, opt-ins.',
+        label: 'Capture Every Fan',
+        description: 'Turn traffic into an audience.',
       },
       {
         href: APP_ROUTES.ARTIST_NOTIFICATIONS,
-        label: 'Named-Fan CRM',
-        description: 'Recognize who keeps showing up.',
+        label: 'Automatic Fan Notifications',
+        description: 'Fans opt in once and come back.',
       },
       {
-        href: APP_ROUTES.ARTIST_NOTIFICATIONS,
-        label: 'Direct Fan Messaging',
-        description: 'Write to fans who care.',
+        href: APP_ROUTES.LAUNCH,
+        label: 'Tour City Routing',
+        description: 'Show the right city first.',
       },
     ],
   },
@@ -91,8 +81,8 @@ const MARKETING_GLASS_FLYOUTS: readonly HeaderFlyoutMenu[] = [
       },
       {
         href: APP_ROUTES.COMPARE,
-        label: 'Customer Stories',
-        description: 'Artists running the loop.',
+        label: 'Compare',
+        description: 'See where Jovie fits.',
       },
       {
         href: APP_ROUTES.CHANGELOG,
@@ -103,11 +93,6 @@ const MARKETING_GLASS_FLYOUTS: readonly HeaderFlyoutMenu[] = [
         href: APP_ROUTES.SUPPORT,
         label: 'Help Center',
         description: 'Guides and answers.',
-      },
-      {
-        href: APP_ROUTES.COMPARE,
-        label: 'Compare',
-        description: 'See how Jovie fits against general-purpose tools.',
       },
       {
         href: 'https://status.jov.ie',
