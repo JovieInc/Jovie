@@ -5,6 +5,16 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.229] - 2026-05-10
+
+> [internal] Homepage signup CTAs now carry a stable test attribute, and the E2E suite has new tests verifying auth page content and CTA routing.
+
+### Added
+
+- [internal] Added `data-cta-sign-up="true"` attribute to all public homepage signup CTAs (hero, final CTA, pre-footer, artist profiles carousel, V2 final CTA) for stable Playwright targeting (JOV-2065).
+- [internal] New E2E tests in `auth.spec.ts`: verify `/signup` and `/signin` pages render Clerk auth UI with correct copy, cross-links between pages, and redirect URL preservation (JOV-2066).
+- [internal] New E2E tests in `homepage.spec.ts`: verify all `data-cta-sign-up` CTAs route to `/signup`, and that the trust logo bar contains visual logo elements (JOV-2065, JOV-2066).
+
 ## [26.4.228] - 2026-05-09
 
 > Refreshed the Mac download page copy: clearer hero, six-feature grid, an expanded FAQ, and a final download call-to-action at the bottom.
