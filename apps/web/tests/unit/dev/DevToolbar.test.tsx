@@ -26,7 +26,7 @@ vi.mock('@/lib/flags/contracts', () => ({
     CLAIM_HANDLE: 'code:CLAIM_HANDLE',
     HERO_SPOTIFY: 'code:HERO_SPOTIFY',
     BILLING_UPGRADE: 'code:BILLING_UPGRADE',
-    THREADS_ENABLED: 'code:THREADS_ENABLED',
+    SPOTIFY_OAUTH: 'code:SPOTIFY_OAUTH',
     DESIGN_V1: 'code:DESIGN_V1',
     SHELL_CHAT_V1: 'code:DESIGN_V1',
   },
@@ -34,7 +34,7 @@ vi.mock('@/lib/flags/contracts', () => ({
     CLAIM_HANDLE: false,
     HERO_SPOTIFY: false,
     BILLING_UPGRADE: false,
-    THREADS_ENABLED: false,
+    SPOTIFY_OAUTH: false,
     DESIGN_V1: false,
     SHELL_CHAT_V1: false,
   },
@@ -360,7 +360,7 @@ describe('DevToolbar', () => {
       renderToolbar();
 
       expect(screen.getByText('claim handle')).toBeInTheDocument();
-      expect(screen.getByText('threads enabled')).toBeInTheDocument();
+      expect(screen.getByText('spotify oauth')).toBeInTheDocument();
       expect(screen.getByText('design v1')).toBeInTheDocument();
       expect(screen.queryByText('shell chat v1')).not.toBeInTheDocument();
     });
@@ -520,7 +520,7 @@ describe('DevToolbar', () => {
     it('shows correct override count for multiple overrides', () => {
       setLocalOverrides({
         'code:CLAIM_HANDLE': true,
-        'code:THREADS_ENABLED': true,
+        'code:SPOTIFY_OAUTH': true,
       });
       localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
       renderToolbar();
@@ -606,7 +606,7 @@ describe('DevToolbar', () => {
     it('uses plural for multiple overrides', () => {
       setLocalOverrides({
         'code:CLAIM_HANDLE': true,
-        'code:THREADS_ENABLED': true,
+        'code:SPOTIFY_OAUTH': true,
       });
       renderToolbar();
 

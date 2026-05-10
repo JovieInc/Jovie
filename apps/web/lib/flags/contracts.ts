@@ -7,7 +7,6 @@ export const LEGACY_STATSIG_GATE_KEYS = {
   SPOTIFY_OAUTH: 'feature_spotify_oauth',
   STRIPE_CONNECT_ENABLED: 'stripe-connect-enabled',
   SHOW_EXAMPLE_PROFILES_CAROUSEL: 'show_example_profiles_carousel',
-  ENABLE_LIGHT_MODE: 'enable_light_mode',
   SHOW_SEE_IT_IN_ACTION: 'show_see_it_in_action',
   DESIGN_V1: 'design_v1',
   SHELL_CHAT_V1: 'feature_shell_chat_v1',
@@ -36,10 +35,6 @@ export const APP_FLAG_DEFAULTS = {
   IOS_APPLE_MUSIC_PRIORITY: false,
   SPOTIFY_OAUTH: false,
   STRIPE_CONNECT_ENABLED: false,
-  ENABLE_LIGHT_MODE: false,
-  THREADS_ENABLED: false,
-  PWA_INSTALL_BANNER: false,
-  SHOW_RELEASE_TOOLBAR_EXTRAS: false,
   PLAYLIST_ENGINE: false,
   ALBUM_ART_GENERATION: true,
   CHAT_JANK_MONITOR: false,
@@ -68,10 +63,6 @@ export const APP_FLAG_KEYS = {
   IOS_APPLE_MUSIC_PRIORITY: LEGACY_STATSIG_GATE_KEYS.IOS_APPLE_MUSIC_PRIORITY,
   SPOTIFY_OAUTH: LEGACY_STATSIG_GATE_KEYS.SPOTIFY_OAUTH,
   STRIPE_CONNECT_ENABLED: LEGACY_STATSIG_GATE_KEYS.STRIPE_CONNECT_ENABLED,
-  ENABLE_LIGHT_MODE: LEGACY_STATSIG_GATE_KEYS.ENABLE_LIGHT_MODE,
-  THREADS_ENABLED: 'threads_enabled',
-  PWA_INSTALL_BANNER: 'pwa_install_banner',
-  SHOW_RELEASE_TOOLBAR_EXTRAS: 'show_release_toolbar_extras',
   PLAYLIST_ENGINE: 'playlist_engine',
   ALBUM_ART_GENERATION: 'album_art_generation',
   CHAT_JANK_MONITOR: 'chat_jank_monitor',
@@ -93,10 +84,6 @@ export const APP_FLAG_OVERRIDE_KEYS = {
   IOS_APPLE_MUSIC_PRIORITY: 'code:IOS_APPLE_MUSIC_PRIORITY',
   SPOTIFY_OAUTH: 'code:SPOTIFY_OAUTH',
   STRIPE_CONNECT_ENABLED: 'code:STRIPE_CONNECT_ENABLED',
-  ENABLE_LIGHT_MODE: 'code:ENABLE_LIGHT_MODE',
-  THREADS_ENABLED: 'code:THREADS_ENABLED',
-  PWA_INSTALL_BANNER: 'code:PWA_INSTALL_BANNER',
-  SHOW_RELEASE_TOOLBAR_EXTRAS: 'code:SHOW_RELEASE_TOOLBAR_EXTRAS',
   PLAYLIST_ENGINE: 'code:PLAYLIST_ENGINE',
   ALBUM_ART_GENERATION: 'code:ALBUM_ART_GENERATION',
   CHAT_JANK_MONITOR: 'code:CHAT_JANK_MONITOR',
@@ -118,7 +105,6 @@ export const APP_FLAG_TO_STATSIG_GATE = {
   IOS_APPLE_MUSIC_PRIORITY: LEGACY_STATSIG_GATE_KEYS.IOS_APPLE_MUSIC_PRIORITY,
   SPOTIFY_OAUTH: LEGACY_STATSIG_GATE_KEYS.SPOTIFY_OAUTH,
   STRIPE_CONNECT_ENABLED: LEGACY_STATSIG_GATE_KEYS.STRIPE_CONNECT_ENABLED,
-  ENABLE_LIGHT_MODE: LEGACY_STATSIG_GATE_KEYS.ENABLE_LIGHT_MODE,
   CHAT_JANK_MONITOR: LEGACY_STATSIG_GATE_KEYS.CHAT_JANK_MONITOR,
 } as const satisfies Partial<Record<AppFlagName, StatsigGateKey>>;
 
@@ -130,10 +116,6 @@ export const APP_FLAG_DESCRIPTIONS = {
   IOS_APPLE_MUSIC_PRIORITY: 'Prefer Apple Music on iOS',
   SPOTIFY_OAUTH: 'Spotify OAuth login',
   STRIPE_CONNECT_ENABLED: 'Stripe Connect payouts',
-  ENABLE_LIGHT_MODE: 'Light mode theme option',
-  THREADS_ENABLED: 'Threads in sidebar chat history',
-  PWA_INSTALL_BANNER: 'PWA install banner in the sidebar',
-  SHOW_RELEASE_TOOLBAR_EXTRAS: 'Extra releases toolbar controls',
   PLAYLIST_ENGINE: 'Playlist engine surfaces',
   ALBUM_ART_GENERATION: 'AI-generated release artwork via chat',
   CHAT_JANK_MONITOR:
@@ -173,9 +155,6 @@ export type DesignV1AliasFlagName = (typeof DESIGN_V1_ALIAS_FLAGS)[number];
  * justification, or the flag-registration-guardrail test will fail.
  */
 export const LOCAL_DEFAULT_ONLY_FLAGS = new Set<AppFlagName>([
-  'THREADS_ENABLED', // dev-only / not yet productionized; no gate created
-  'PWA_INSTALL_BANNER', // kill-switch style; default-false means feature is off until explicitly wired
-  'SHOW_RELEASE_TOOLBAR_EXTRAS', // internal dev/staging visual toggle; not user-facing
   'PLAYLIST_ENGINE', // early prototype; not ready for remote control
   'ALBUM_ART_GENERATION', // default-true feature; controlled by Statsig experiment separately in usage, not a gate
   'CHAT_JANK_MONITOR', // monitoring-only flag; was missing Statsig gate (bug fixed in #8271 — kept here for local-dev override support)

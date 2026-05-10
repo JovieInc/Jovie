@@ -24,7 +24,6 @@ export const Minimal: Story = {
   name: 'Variant – Minimal',
   args: {
     variant: 'minimal',
-    showThemeToggle: true,
     links: [
       { href: '/legal/privacy', label: 'Privacy' },
       { href: '/legal/terms', label: 'Terms of Service' },
@@ -36,7 +35,6 @@ export const Regular: Story = {
   name: 'Variant – Regular (Clerk-style)',
   args: {
     variant: 'regular',
-    showThemeToggle: true,
     links: [
       { href: '/legal/privacy', label: 'Privacy' },
       { href: '/legal/terms', label: 'Terms of Service' },

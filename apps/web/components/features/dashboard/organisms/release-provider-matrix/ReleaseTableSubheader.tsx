@@ -16,7 +16,6 @@ import {
 import { DrawerToggleButton } from '@/features/dashboard/atoms/DrawerToggleButton';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import type { ReleaseType, ReleaseViewModel } from '@/lib/discography/types';
-import { useAppFlag } from '@/lib/flags/client';
 import { cn } from '@/lib/utils';
 import { useReleaseFilterCounts } from './hooks/useReleaseFilterCounts';
 import { RELEASE_VIEW_OPTIONS } from './ReleaseTable.types';
@@ -24,12 +23,6 @@ import { RELEASE_VIEW_OPTIONS } from './ReleaseTable.types';
 const ReleaseFilterDropdown = lazy(() =>
   import('./ReleaseFilterDropdown').then(m => ({
     default: m.ReleaseFilterDropdown,
-  }))
-);
-
-const ReleaseTableDisplayMenu = lazy(() =>
-  import('./ReleaseTableDisplayMenu').then(m => ({
-    default: m.ReleaseTableDisplayMenu,
   }))
 );
 
@@ -70,10 +63,6 @@ interface ReleaseTableSubheaderProps {
   readonly filters: ReleaseFilters;
   /** Callback when filters change */
   readonly onFiltersChange: (filters: ReleaseFilters) => void;
-  /** Whether to group releases by year */
-  readonly groupByYear?: boolean;
-  /** Callback when groupByYear changes */
-  readonly onGroupByYearChange?: (group: boolean) => void;
   /** Current release view filter */
   readonly releaseView?: ReleaseView;
   /** Callback when release view changes */
@@ -123,8 +112,6 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
   selectedIds,
   filters,
   onFiltersChange,
-  groupByYear,
-  onGroupByYearChange,
   releaseView = 'releases',
   onReleaseViewChange,
   searchQuery,
@@ -134,7 +121,6 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
 }: ReleaseTableSubheaderProps) {
   // Compute filter counts from all (unfiltered) releases so counts stay stable
   const counts = useReleaseFilterCounts(allReleases);
-  const showToolbarExtras = useAppFlag('SHOW_RELEASE_TOOLBAR_EXTRAS');
 
   return (
     <PageToolbar
@@ -196,39 +182,6 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
               iconOnly
             />
           </Suspense>
-          {showToolbarExtras && (
-            <Suspense
-              fallback={
-                <Button
-                  variant='ghost'
-                  size='sm'
-                  className={cn(
-                    PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
-                    PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS,
-                    'h-7 w-7 rounded-full px-0 [&_svg]:h-3 [&_svg]:w-3'
-                  )}
-                  aria-label='Display'
-                  disabled
-                >
-                  <Icon
-                    name='SlidersHorizontal'
-                    className={PAGE_TOOLBAR_ICON_CLASS}
-                    strokeWidth={PAGE_TOOLBAR_ICON_STROKE_WIDTH}
-                  />
-                  <span className='sr-only'>Display</span>
-                </Button>
-              }
-            >
-              <ReleaseTableDisplayMenu
-                groupByYear={groupByYear}
-                onGroupByYearChange={onGroupByYearChange}
-                releaseView={releaseView}
-                onReleaseViewChange={onReleaseViewChange}
-                triggerClassName={PAGE_TOOLBAR_ACTION_BUTTON_CLASS}
-                compact
-              />
-            </Suspense>
-          )}
           <Suspense
             fallback={
               <Button

@@ -9,8 +9,6 @@ interface SiteFooterProps
     readonly className?: string;
     readonly brandingMark?: 'wordmark' | 'icon';
     readonly containerSize?: 'sm' | 'md' | 'lg' | 'xl' | 'full' | 'homepage';
-    readonly themeShortcutKey?: string;
-    readonly showThemeToggle?: boolean;
   }> {}
 
 export function Footer({
@@ -18,8 +16,6 @@ export function Footer({
   className,
   brandingMark,
   containerSize,
-  themeShortcutKey,
-  showThemeToggle = true,
 }: SiteFooterProps) {
   const mappedVariant =
     version === 1 || version === 'minimal' ? 'minimal' : 'regular';
@@ -30,8 +26,6 @@ export function Footer({
       variant={mappedVariant}
       brandingMark={brandingMark}
       containerSize={containerSize}
-      showThemeToggle={showThemeToggle}
-      themeShortcutKey={themeShortcutKey}
       links={[
         { href: APP_ROUTES.LEGAL_PRIVACY, label: 'Privacy' },
         { href: APP_ROUTES.LEGAL_TERMS, label: 'Terms' },

@@ -21,7 +21,6 @@ experiments used by the web app.
 | `feature_ios_apple_music_priority` | `LEGACY_STATSIG_GATE_KEYS.IOS_APPLE_MUSIC_PRIORITY` | `false` | iOS Apple Music prioritization | Active |
 | `feature_spotify_oauth` | `LEGACY_STATSIG_GATE_KEYS.SPOTIFY_OAUTH` | `false` | Auth and onboarding login method selector | Active |
 | `stripe-connect-enabled` | `LEGACY_STATSIG_GATE_KEYS.STRIPE_CONNECT_ENABLED` | `false` | Stripe Connect payouts (settings + payment routes) | Active |
-| `enable_light_mode` | `LEGACY_STATSIG_GATE_KEYS.ENABLE_LIGHT_MODE` | `false` | Light mode theme toggle (footer) | Active |
 | `chat_jank_monitor` | `LEGACY_STATSIG_GATE_KEYS.CHAT_JANK_MONITOR` | `false` | Chat jank instrumentation (message continuity + streaming) | Active |
 | `design_v1` | `LEGACY_STATSIG_GATE_KEYS.DESIGN_V1` | `false` | Unified Design V1 rollout for shell, releases, tasks, chat entities, lyrics, library, auth, and onboarding app flags | Active |
 | `ai_chat_disabled` | `CHAT_KILL_SWITCH_GATES.DISABLED` | `false` | Emergency kill switch for `/api/chat` | Active |

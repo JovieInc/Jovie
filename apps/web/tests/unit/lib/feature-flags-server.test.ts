@@ -211,7 +211,7 @@ describe('Statsig server initialization', () => {
           name === 'jovie_app_flag_overrides'
             ? {
                 value: encodeURIComponent(
-                  JSON.stringify({ 'code:THREADS_ENABLED': true })
+                  JSON.stringify({ 'code:SPOTIFY_OAUTH': true })
                 ),
               }
             : undefined,
@@ -225,7 +225,7 @@ describe('Statsig server initialization', () => {
     const run = vi.fn().mockResolvedValue(false);
     vi.doMock('@/lib/flags/registry', () => ({
       APP_FLAG_REGISTRY: {
-        THREADS_ENABLED: { run },
+        SPOTIFY_OAUTH: { run },
       },
       SUBSCRIBE_CTA_VARIANT_FLAG: {
         run: vi.fn().mockResolvedValue('two_step'),
@@ -236,7 +236,7 @@ describe('Statsig server initialization', () => {
     }));
 
     const { getAppFlagValue } = await import('@/lib/flags/server');
-    await expect(getAppFlagValue('THREADS_ENABLED')).resolves.toBe(false);
+    await expect(getAppFlagValue('SPOTIFY_OAUTH')).resolves.toBe(false);
     expect(run).toHaveBeenCalledTimes(1);
   });
 });
