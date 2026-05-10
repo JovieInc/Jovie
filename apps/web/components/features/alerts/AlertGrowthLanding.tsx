@@ -99,6 +99,16 @@ function sanitizeSourceCode(raw: string | undefined): string | undefined {
   return cleaned || undefined;
 }
 
+function getInputValidationError(
+  isSms: boolean,
+  phoneE164: string | null,
+  email: string | null
+): string | null {
+  if (isSms && !phoneE164) return 'Please enter a valid US phone number.';
+  if (!isSms && !email) return 'Please enter a valid email address.';
+  return null;
+}
+
 export function AlertGrowthLanding({
   artist,
   sourceCode: sourceCodeProp,
@@ -147,18 +157,9 @@ export function AlertGrowthLanding({
         builtPhone !== null ? normalizeSubscriptionPhone(builtPhone) : null;
       const email = isSms ? null : normalizeSubscriptionEmail(emailInput);
 
-      if (isSms && !phoneE164) {
-        setSubmitState({
-          kind: 'error',
-          message: 'Please enter a valid US phone number.',
-        });
-        return;
-      }
-      if (!isSms && !email) {
-        setSubmitState({
-          kind: 'error',
-          message: 'Please enter a valid email address.',
-        });
+      const validationError = getInputValidationError(isSms, phoneE164, email);
+      if (validationError) {
+        setSubmitState({ kind: 'error', message: validationError });
         return;
       }
 

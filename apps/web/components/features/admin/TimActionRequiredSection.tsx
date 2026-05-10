@@ -146,12 +146,12 @@ export function TimActionRequiredSection() {
 
   useEffect(() => {
     const controller = new AbortController();
-    void fetchData(controller.signal);
+    fetchData(controller.signal).catch(() => {});
 
     // Poll every 5 minutes (STANDARD_CACHE staleTime)
     const intervalMs = STANDARD_CACHE.staleTime ?? 5 * 60 * 1000;
     const interval = setInterval(() => {
-      void fetchData(controller.signal);
+      fetchData(controller.signal).catch(() => {});
     }, intervalMs);
 
     return () => {
@@ -181,7 +181,7 @@ export function TimActionRequiredSection() {
 
       toast.success('Marked as done in Linear');
       // Refresh the list to get latest state
-      void fetchData();
+      fetchData().catch(() => {});
     } catch (error) {
       // Roll back the optimistic removal
       setOptimisticallyClosedIds(prev => {
