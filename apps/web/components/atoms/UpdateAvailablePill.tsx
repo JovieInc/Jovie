@@ -13,9 +13,8 @@ import { useWebUpdate } from '@/lib/version/use-web-update';
  *   - /api/version build-hash drift (web)
  *
  * Visual spec (locked):
- *   - bg-blue-600 (hover: bg-blue-700, color-change only — no motion)
- *   - text-sm font-semibold text-white
- *   - rounded-full px-3 h-7
+ *   - bg-white hover:bg-white/90 text-black (matches ActionPill canonical style)
+ *   - text-[12px] font-medium rounded-full px-3 h-7
  *   - WebkitAppRegion: no-drag (so click works inside Electron titlebar)
  *   - Click: shows "Updating…" spinner, then triggers install/reload
  */
@@ -49,7 +48,7 @@ export function UpdateAvailablePill() {
       aria-label='Update available — click to install'
       // WebkitAppRegion no-drag so clicks register inside Electron's frameless titlebar
       style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-      className='inline-flex h-7 items-center gap-1.5 rounded-full bg-blue-600 px-3 text-sm font-semibold text-white transition-colors duration-subtle hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 disabled:opacity-70'
+      className='inline-flex h-7 items-center gap-1.5 rounded-full bg-white px-3 text-[12px] font-medium text-black transition-colors duration-subtle hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-1 disabled:opacity-70'
     >
       {updating ? (
         <>

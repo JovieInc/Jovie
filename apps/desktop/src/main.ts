@@ -24,10 +24,18 @@ const ENABLE_DEVTOOLS = APP_ENV !== 'production' || !app.isPackaged;
 const UPDATE_AVAILABLE_CHANNEL = 'update-available';
 const UPDATE_DOWNLOADED_CHANNEL = 'update-downloaded';
 const QUIT_AND_INSTALL_CHANNEL = 'quit-and-install';
+const GO_BACK_CHANNEL = 'go-back';
+const GO_FORWARD_CHANNEL = 'go-forward';
+const NAV_STATE_CHANNEL = 'nav-state-changed';
 
 type UpdateChannel =
   | typeof UPDATE_AVAILABLE_CHANNEL
   | typeof UPDATE_DOWNLOADED_CHANNEL;
+
+interface NavState {
+  canGoBack: boolean;
+  canGoForward: boolean;
+}
 
 let updateReadyToInstall = false;
 
@@ -160,6 +168,8 @@ function createWindow(initialUrl = APP_URL): BrowserWindow {
     minWidth: 800,
     minHeight: 600,
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    trafficLightPosition:
+      process.platform === 'darwin' ? { x: 13, y: 11 } : undefined,
     webPreferences: {
       contextIsolation: true,
       devTools: ENABLE_DEVTOOLS,
@@ -230,6 +240,18 @@ function createWindow(initialUrl = APP_URL): BrowserWindow {
   win.on('close', () => {
     saveWindowState(win);
   });
+
+  function sendNavState(): void {
+    if (win.isDestroyed()) return;
+    const state: NavState = {
+      canGoBack: win.webContents.canGoBack(),
+      canGoForward: win.webContents.canGoForward(),
+    };
+    win.webContents.send(NAV_STATE_CHANNEL, state);
+  }
+
+  win.webContents.on('did-navigate-in-page', sendNavState);
+  win.webContents.on('did-navigate', sendNavState);
 
   return win;
 }
@@ -358,6 +380,20 @@ ipcMain.handle(
     return { ok: true };
   }
 );
+
+ipcMain.handle(GO_BACK_CHANNEL, (event: IpcMainInvokeEvent) => {
+  if (!isTrustedIpcSender(event)) return;
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win && !win.isDestroyed() && win.webContents.canGoBack())
+    win.webContents.goBack();
+});
+
+ipcMain.handle(GO_FORWARD_CHANNEL, (event: IpcMainInvokeEvent) => {
+  if (!isTrustedIpcSender(event)) return;
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win && !win.isDestroyed() && win.webContents.canGoForward())
+    win.webContents.goForward();
+});
 
 app.whenReady().then(() => {
   Menu.setApplicationMenu(buildApplicationMenu());

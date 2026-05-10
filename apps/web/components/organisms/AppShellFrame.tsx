@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { memo } from 'react';
 import { CanvasGrain } from '@/components/atoms/CanvasGrain';
+import { DesktopTitlebar } from '@/components/atoms/DesktopTitlebar';
 import { isEnabled } from '@/lib/feature-flags';
 import { cn } from '@/lib/utils';
 
@@ -59,11 +60,7 @@ export const AppShellFrame = memo(function AppShellFrame({
         containerClassName
       )}
     >
-      <div
-        aria-hidden='true'
-        data-electron-titlebar='true'
-        data-electron-drag-region='true'
-      />
+      <DesktopTitlebar />
       {sidebar}
 
       <main
