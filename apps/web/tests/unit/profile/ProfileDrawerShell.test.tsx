@@ -194,6 +194,23 @@ describe('ProfileDrawerShell', () => {
     );
   });
 
+  // Regression: tapping the overlay must dismiss the standalone (vaul) drawer.
+  // Mobile Safari does not reliably trigger Radix's onPointerDownOutside on
+  // single-finger taps, so the shell adds an explicit onClick on Drawer.Overlay.
+  it('closes the standalone drawer when the backdrop is tapped', () => {
+    const onOpenChange = vi.fn();
+
+    render(
+      <ProfileDrawerShell open onOpenChange={onOpenChange} title='Menu'>
+        <div>Drawer body</div>
+      </ProfileDrawerShell>
+    );
+
+    fireEvent.click(screen.getByTestId('profile-drawer-overlay'));
+
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
   it('anchors embedded drawers flush to the phone shell instead of floating them', () => {
     render(
       <ProfileDrawerShell
