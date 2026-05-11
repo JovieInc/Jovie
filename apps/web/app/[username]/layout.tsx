@@ -1,3 +1,4 @@
+import { ProfileWebVitalsReporter } from '@/components/features/profile/ProfileWebVitalsReporter';
 import { ClientProviders } from '@/components/providers/ClientProviders';
 import { publicEnv } from '@/lib/env-public';
 
@@ -26,6 +27,7 @@ export default function ProfileLayout({
       skipCoreProviders
     >
       {children}
+      <ProfileWebVitalsReporter />
     </ClientProviders>
   );
 }
