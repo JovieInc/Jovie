@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { getQrCodeUrl, QRCode } from '@/components/molecules/QRCode';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
+import { PROFILE_Z } from '@/lib/profile/z-index-constants';
 
 interface DesktopQrOverlayProps {
   readonly handle: string;
@@ -130,7 +131,7 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
               ? { duration: 0 }
               : { duration: 0.2, ease: 'easeOut' }
           }
-          className='group fixed bottom-4 right-4 z-50 flex flex-col items-center rounded-xl p-4 ring-1 ring-(--color-border-subtle) shadow-xl bg-surface-0 backdrop-blur-md overflow-hidden'
+          className={`group fixed bottom-4 right-4 ${PROFILE_Z.DRAWER_CONTENT} flex flex-col items-center rounded-xl p-4 ring-1 ring-(--color-border-subtle) shadow-xl bg-surface-0 backdrop-blur-md overflow-hidden`}
         >
           <div className='pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-slower group-hover:opacity-100'>
             <div className='absolute inset-0 bg-[radial-gradient(80%_60%_at_50%_0%,rgba(255,255,255,0.35),transparent_60%)]' />
@@ -162,7 +163,7 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
               ? { duration: 0 }
               : { duration: 0.2, ease: 'easeOut' }
           }
-          className='fixed bottom-4 right-4 z-50'
+          className={`fixed bottom-4 right-4 ${PROFILE_Z.DRAWER_CONTENT}`}
         >
           <CircleIconButton
             size='md'

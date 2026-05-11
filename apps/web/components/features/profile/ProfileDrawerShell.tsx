@@ -4,6 +4,7 @@ import { ChevronLeft, X } from 'lucide-react';
 import { useId } from 'react';
 import { Drawer } from 'vaul';
 import type { ProfileSurfacePresentation } from '@/features/profile/contracts';
+import { PROFILE_Z } from '@/lib/profile/z-index-constants';
 
 type ProfileDrawerNavigationLevel = 'root' | 'secondary';
 
@@ -152,11 +153,11 @@ export function ProfileDrawerShell({
         <button
           type='button'
           aria-label='Close drawer overlay'
-          className='fixed inset-0 z-10 bg-black/48 backdrop-blur-sm'
+          className={`fixed inset-0 ${PROFILE_Z.LOCAL_CONTENT} bg-black/48 backdrop-blur-sm`}
           onClick={() => onOpenChange(false)}
         />
         <dialog
-          className='absolute inset-x-0 bottom-0 z-20 m-0 max-w-none border-0 bg-transparent p-0'
+          className={`absolute inset-x-0 bottom-0 ${PROFILE_Z.STICKY_CHROME} m-0 max-w-none border-0 bg-transparent p-0`}
           data-testid={dataTestId}
           aria-describedby={accessibleDescriptionId}
           aria-labelledby={titleId}
@@ -183,7 +184,9 @@ export function ProfileDrawerShell({
     }
 
     return (
-      <div className='absolute inset-0 z-30 flex items-center justify-center bg-black/52 p-6 backdrop-blur-sm'>
+      <div
+        className={`absolute inset-0 ${PROFILE_Z.EMBEDDED_MODAL} flex items-center justify-center bg-black/52 p-6 backdrop-blur-sm`}
+      >
         <button
           type='button'
           aria-label='Close modal overlay'
@@ -215,8 +218,12 @@ export function ProfileDrawerShell({
   return (
     <Drawer.Root open={open} onOpenChange={onOpenChange}>
       <Drawer.Portal>
-        <Drawer.Overlay className='fixed inset-0 z-40 bg-black/60 backdrop-blur-sm' />
-        <div className='fixed inset-x-0 bottom-0 z-50 flex justify-center'>
+        <Drawer.Overlay
+          className={`fixed inset-0 ${PROFILE_Z.DRAWER_BACKDROP} bg-black/60 backdrop-blur-sm`}
+        />
+        <div
+          className={`fixed inset-x-0 bottom-0 ${PROFILE_Z.DRAWER_CONTENT} flex justify-center`}
+        >
           <Drawer.Content
             className={contentClasses}
             style={drawerHeightStyle}

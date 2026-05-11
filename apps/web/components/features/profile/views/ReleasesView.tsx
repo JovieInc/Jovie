@@ -182,7 +182,7 @@ export function ReleasesView({
                 onClick={() => setActiveFilter(filter.key)}
                 aria-pressed={isActive}
                 className={cn(
-                  'inline-flex h-8 shrink-0 items-center rounded-full border px-3 text-[12px] font-semibold transition-colors duration-200',
+                  'inline-flex h-8 shrink-0 items-center rounded-full border px-3 text-[12px] font-semibold transition-colors duration-subtle',
                   isActive
                     ? 'border-white bg-white text-black'
                     : 'border-white/10 bg-white/[0.035] text-white/58 hover:text-white'
@@ -198,7 +198,7 @@ export function ReleasesView({
       {visibleReleases[0]?.slug ? (
         <a
           href={`/${artistHandle}/${visibleReleases[0].slug}`}
-          className='group flex items-center gap-3 border-y border-white/[0.075] px-4 py-3.5 transition-colors duration-200 hover:bg-white/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+          className='group flex items-center gap-3 border-y border-white/[0.075] px-4 py-3.5 transition-colors duration-subtle hover:bg-white/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
           aria-label={getReleaseAriaLabel(visibleReleases[0])}
         >
           <div className='relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-[8px] bg-white/[0.04] shadow-[0_8px_20px_-10px_rgba(0,0,0,0.55)]'>
@@ -269,7 +269,7 @@ export function ReleasesView({
               <a
                 href={`/${artistHandle}/${release.slug}`}
                 className={cn(
-                  'group flex min-h-[60px] items-center gap-3 px-4 py-2.5 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent hover:bg-white/[0.03]',
+                  'group flex min-h-[60px] items-center gap-3 px-4 py-2.5 transition-colors duration-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent hover:bg-white/[0.03]',
                   index > 0 && 'border-t border-white/[0.075]'
                 )}
                 aria-label={ariaLabel}
@@ -290,7 +290,7 @@ export function ReleasesView({
                       {release.title}
                     </span>
                     {index === 0 ? (
-                      <span className='inline-flex h-[15px] items-center rounded-full border border-white/8 bg-white px-1.25 text-[8px] font-semibold uppercase tracking-[0.04em] text-[#15161a]'>
+                      <span className='inline-flex h-[15px] items-center rounded-full border border-white/8 bg-white px-1.25 text-[8px] font-semibold uppercase tracking-[0.04em] text-black'>
                         New
                       </span>
                     ) : null}
@@ -306,12 +306,12 @@ export function ReleasesView({
                 </div>
 
                 <div className='ml-1 flex shrink-0 items-center gap-3'>
-                  <span className='flex h-8 w-8 items-center justify-center rounded-full border border-white/8 bg-white/[0.02] text-white/78 transition-[border-color,background-color] duration-200 group-hover:border-white/14 group-hover:bg-white/[0.05]'>
+                  <span className='flex h-8 w-8 items-center justify-center rounded-full border border-white/8 bg-white/[0.02] text-white/78 transition-[border-color,background-color] duration-subtle group-hover:border-white/14 group-hover:bg-white/[0.05]'>
                     <Play className='ml-0.5 h-3 w-3 fill-current' />
                   </span>
                   <span
                     aria-hidden='true'
-                    className='flex items-center gap-[3px] text-white/24 transition-colors duration-200 group-hover:text-white/36'
+                    className='flex items-center gap-[3px] text-white/24 transition-colors duration-subtle group-hover:text-white/36'
                   >
                     <span className='h-[3px] w-[3px] rounded-full bg-current' />
                     <span className='h-[3px] w-[3px] rounded-full bg-current' />
