@@ -299,7 +299,7 @@ export function ShippingVelocityChart({
   // Fetch when range changes (but not on initial mount if initialData is provided)
   useEffect(() => {
     if (initialData && range === initialRange) return;
-    void fetchData(range);
+    fetchData(range).catch(() => {});
   }, [range, fetchData, initialData, initialRange]);
 
   function handleRangeChange(newRange: Range) {
@@ -403,7 +403,9 @@ export function ShippingVelocityChart({
           ) : null}
           <button
             type='button'
-            onClick={() => void fetchData(range)}
+            onClick={() => {
+              fetchData(range).catch(() => {});
+            }}
             className='mt-1 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-medium text-white/60 transition-colors hover:bg-white/10 hover:text-white/80'
           >
             Retry
