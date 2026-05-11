@@ -41,6 +41,7 @@ import {
 import { and, count, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { tryHandleAnonymousOnboardingChat } from '@/app/api/chat/onboarding-handler';
 import { buildArtistBioDraft } from '@/lib/ai/artist-bio-writer';
 import { createImportBioFromUrlTool } from '@/lib/ai/tools/import-bio-from-url';
 import { createProfileEditTool } from '@/lib/ai/tools/profile-edit';
@@ -1713,6 +1714,16 @@ export async function POST(req: Request) {
     Sentry.setTag('feature', 'ai-chat');
     Sentry.setExtra('request_id', requestId);
   });
+
+  // Anonymous onboarding mode (JOV-2132): clones the request to peek for
+  // `mode: 'onboarding'`. If present, runs cookie/turnstile/rate-limit gates
+  // and returns a response (501 stub in PR 1; LLM dispatch in PR 2). Returns
+  // null for normal authenticated traffic, falling through to the flow below.
+  const onboardingResponse = await tryHandleAnonymousOnboardingChat(
+    req,
+    requestId
+  );
+  if (onboardingResponse) return onboardingResponse;
 
   // Auth check - ensure user is authenticated
   const { userId } = await getOptionalAuth();
