@@ -10,6 +10,7 @@ import {
   CheckCircle,
   Copy,
   ExternalLink,
+  FileSignature,
   Mail,
   MailX,
   RefreshCw,
@@ -23,6 +24,8 @@ import { toast } from 'sonner';
 import type { ContextMenuItemType } from '@/components/organisms/table';
 import { BASE_URL } from '@/constants/domains';
 import { copyToClipboard } from '@/hooks/useClipboard';
+import { buildEmailSignature } from '@/lib/email-signature/build-signature';
+import { buildSignatureInputFromProfile } from '@/lib/email-signature/profile-input';
 import type { AdminCreatorProfileRow, IngestRefreshStatus } from '../types';
 
 export interface ContextMenuDependencies {
@@ -42,6 +45,7 @@ export interface ContextMenuDependencies {
   ) => Promise<{ success: boolean }>;
   openDeleteDialog: (profile: AdminCreatorProfileRow) => void;
   openInviteDialog: (profile: AdminCreatorProfileRow) => void;
+  openEmailSignatureDialog?: (profile: AdminCreatorProfileRow) => void;
 }
 
 export function useContextMenuItems({
@@ -52,6 +56,7 @@ export function useContextMenuItems({
   toggleMarketing,
   openDeleteDialog,
   openInviteDialog,
+  openEmailSignatureDialog,
 }: ContextMenuDependencies) {
   const getContextMenuItems = useCallback(
     (profile: AdminCreatorProfileRow): ContextMenuItemType[] => {
@@ -169,6 +174,55 @@ export function useContextMenuItems({
         }
       );
 
+      // Email signature — copy HTML directly, or open a preview modal
+      items.push(
+        { type: 'separator' as const },
+        {
+          id: 'copy-email-signature',
+          label: 'Copy email signature',
+          icon: <Copy className='h-3.5 w-3.5' />,
+          onClick: () => {
+            void (async () => {
+              const input = buildSignatureInputFromProfile({
+                profile: {
+                  username: profile.username,
+                  displayName: profile.displayName,
+                  avatarUrl: profile.avatarUrl,
+                  genres: profile.genres,
+                  location: profile.location,
+                },
+                socials: profile.socialLinks?.map(link => ({
+                  label: link.displayText ?? link.platform,
+                  url: link.url,
+                })),
+              });
+              if (!input) {
+                toast.error('Unable to build signature');
+                return;
+              }
+              const { html } = buildEmailSignature(input);
+              const ok = await copyToClipboard(html);
+              if (ok) {
+                toast.success('Email signature copied');
+              } else {
+                toast.error('Failed to copy email signature');
+              }
+            })();
+          },
+        }
+      );
+
+      if (openEmailSignatureDialog) {
+        items.push({
+          id: 'preview-email-signature',
+          label: 'Email signature…',
+          icon: <FileSignature className='h-3.5 w-3.5' />,
+          onClick: () => {
+            openEmailSignatureDialog(profile);
+          },
+        });
+      }
+
       // Copy claim link & Send invite (if unclaimed and has claim token)
       const claimToken = 'claimToken' in profile ? profile.claimToken : null;
       if (!profile.isClaimed && claimToken) {
@@ -224,6 +278,7 @@ export function useContextMenuItems({
       toggleMarketing,
       openDeleteDialog,
       openInviteDialog,
+      openEmailSignatureDialog,
     ]
   );
 
