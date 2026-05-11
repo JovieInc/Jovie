@@ -375,7 +375,7 @@ export function ClaimHandleForm({
             buttonRoundingClass,
             isDisabled
               ? 'cursor-not-allowed opacity-40'
-              : 'hover:brightness-110 active:scale-[0.98]'
+              : 'hover:brightness-110'
           )}
           style={buttonStyle}
         >

@@ -32,6 +32,11 @@ const buttonVariants = cva(
           'backdrop-blur-sm bg-surface-0/30 dark:bg-surface-1/10 hover:bg-surface-1/50 dark:hover:bg-surface-2/20 border border-subtle',
         'frosted-outline':
           'backdrop-blur-sm bg-transparent border border-subtle hover:bg-surface-1/20 dark:hover:bg-surface-2/10',
+        // Canonical white pill CTA — high-contrast hero/auth pill used across
+        // marketing headers and homepage sign-in. Calm color/opacity feedback
+        // only — no decorative scale/translate. See .claude/rules/ui.md.
+        whitePill:
+          'border border-white/88 bg-white text-black shadow-[0_8px_20px_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.72)] hover:bg-white/95 font-medium tracking-[-0.012em] sm:shadow-[0_10px_24px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.72)]',
       },
       size: {
         default: 'h-8 px-3 py-1.5',

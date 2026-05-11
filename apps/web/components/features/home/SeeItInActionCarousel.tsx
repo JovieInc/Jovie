@@ -206,7 +206,7 @@ function ReleaseCard({
                 onHoverEnd(release.id);
               }
             }}
-            className='group flex w-full flex-col rounded-xl p-6 text-left no-underline transition-all duration-[var(--linear-duration-normal)] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--linear-text-secondary)]'
+            className='group flex w-full flex-col rounded-xl p-6 text-left no-underline transition-colors duration-[var(--linear-duration-normal)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--linear-text-secondary)]'
             style={{
               backgroundColor: 'var(--linear-bg-surface-0)',
               border: '1px solid var(--linear-border-subtle)',
