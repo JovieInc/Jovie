@@ -292,7 +292,7 @@ export function ReleasesView({
                       {release.title}
                     </span>
                     {index === 0 ? (
-                      <span className='inline-flex h-[15px] items-center rounded-full border border-white/8 bg-white px-1.25 text-[8px] font-semibold uppercase tracking-[0.04em] text-[#15161a]'>
+                      <span className='inline-flex h-[15px] items-center rounded-full border border-white/8 bg-white px-1.25 text-[8px] font-semibold uppercase tracking-[0.04em] text-black'>
                         New
                       </span>
                     ) : null}
