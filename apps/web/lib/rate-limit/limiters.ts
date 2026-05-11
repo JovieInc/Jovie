@@ -69,6 +69,34 @@ export const onboardingLimiter = createRateLimiter(RATE_LIMITERS.onboarding);
 export const handleCheckLimiter = createRateLimiter(RATE_LIMITERS.handleCheck);
 
 // ============================================================================
+// Anonymous Onboarding Chat (JOV-2132)
+// ============================================================================
+
+/** Anonymous onboarding chat per-IP limiter: 20 msg/hour */
+export const anonymousOnboardingChatIpLimiter = createRateLimiter(
+  RATE_LIMITERS.anonymousOnboardingChatIp,
+  { requireRedis: true }
+);
+
+/** Anonymous onboarding chat per-ASN limiter: 60 msg/hour (residential-proxy defense) */
+export const anonymousOnboardingChatAsnLimiter = createRateLimiter(
+  RATE_LIMITERS.anonymousOnboardingChatAsn,
+  { requireRedis: true }
+);
+
+/** Anonymous onboarding chat per-session lifetime limiter: 20 turns over 7 days */
+export const anonymousOnboardingChatSessionLimiter = createRateLimiter(
+  RATE_LIMITERS.anonymousOnboardingChatSession,
+  { requireRedis: true }
+);
+
+export interface AnonymousChatLimitInput {
+  readonly ip: string;
+  readonly sessionId: string;
+  readonly asn?: string | null;
+}
+
+// ============================================================================
 // Dashboard Operations
 // ============================================================================
 
@@ -400,6 +428,40 @@ async function checkRateLimit(
     };
   }
   return result;
+}
+
+/**
+ * Check all three anonymous-onboarding-chat rate limits (JOV-2132).
+ * Returns the first failure or success if all pass.
+ *
+ * IP and session caps always apply; ASN cap only applies when an ASN was
+ * resolvable from the request (Vercel/Cloudflare both provide this header).
+ */
+export async function checkAnonymousChatRateLimit(
+  input: AnonymousChatLimitInput
+): Promise<RateLimitResult> {
+  const ipResult = await checkRateLimit(
+    anonymousOnboardingChatIpLimiter,
+    `ip:${input.ip}`,
+    'Too many anonymous chat requests from this IP. Please slow down or sign up to continue.'
+  );
+  if (!ipResult.success) return ipResult;
+
+  if (input.asn) {
+    const asnResult = await checkRateLimit(
+      anonymousOnboardingChatAsnLimiter,
+      `asn:${input.asn}`,
+      'Too many anonymous chat requests from this network. Please sign up to continue.'
+    );
+    if (!asnResult.success) return asnResult;
+  }
+
+  const sessionResult = await checkRateLimit(
+    anonymousOnboardingChatSessionLimiter,
+    `session:${input.sessionId}`,
+    'You have hit the conversation limit for this session. Sign up to keep going.'
+  );
+  return sessionResult;
 }
 
 /**
@@ -927,6 +989,9 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     api: apiLimiter,
     onboarding: onboardingLimiter,
     handleCheck: handleCheckLimiter,
+    anonymousOnboardingChatIp: anonymousOnboardingChatIpLimiter,
+    anonymousOnboardingChatAsn: anonymousOnboardingChatAsnLimiter,
+    anonymousOnboardingChatSession: anonymousOnboardingChatSessionLimiter,
     dashboardLinks: dashboardLinksLimiter,
     paymentIntent: paymentIntentLimiter,
     tipCheckout: tipCheckoutLimiter,

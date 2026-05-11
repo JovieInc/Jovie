@@ -309,6 +309,20 @@
       "when": 1778307491160,
       "tag": "0043_harden_waitlist_onboarding",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1778471395778,
+      "tag": "0044_wild_cassandra_nova",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1778471868960,
+      "tag": "0045_short_forgotten_one",
+      "breakpoints": true
     }
   ]
 }

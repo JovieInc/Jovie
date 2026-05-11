@@ -58,6 +58,10 @@ export const publicEnv = {
   get NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY() {
     return process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || undefined;
   },
+  // Cloudflare Turnstile site key for onboarding chat bot challenge (JOV-2132)
+  get NEXT_PUBLIC_TURNSTILE_SITE_KEY() {
+    return process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || undefined;
+  },
   // Feature flags
   get NEXT_PUBLIC_FEATURE_TIPS() {
     return process.env.NEXT_PUBLIC_FEATURE_TIPS || undefined;
