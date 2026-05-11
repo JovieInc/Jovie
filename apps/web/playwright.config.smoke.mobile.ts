@@ -1,22 +1,20 @@
 import { defineConfig, devices } from '@playwright/test';
-import { DESKTOP_SMOKE_SPECS } from './tests/e2e/smoke-manifest';
+import { MOBILE_SMOKE_SPECS } from './tests/e2e/smoke-manifest';
 
 /**
- * Smoke Test Playwright Configuration (Desktop)
+ * Smoke Test Playwright Configuration (Mobile)
  *
- * Focused config for the highest-signal smoke test files that gate production
- * deploys. Optimized for speed: higher parallelism, shorter timeouts, no
- * video recording.
+ * Mobile-viewport parity for the focused smoke lane. Runs the spec files
+ * declared in `tests/e2e/smoke-manifest.ts` → MOBILE_SMOKE_SPECS against an
+ * iPhone-class viewport so mobile overflow and viewport-stability regressions
+ * are caught before they reach production.
  *
- * The spec list lives in `tests/e2e/smoke-manifest.ts` so the package script,
- * the CI workflow, and this config stay in lockstep. See
- * `apps/web/tests/TESTING.md` → "Smoke Lanes" for the canonical policy.
+ * See `apps/web/tests/TESTING.md` → "Smoke Lanes" for the canonical policy.
  *
  * Usage:
- *   pnpm --filter=@jovie/web exec playwright test --config=playwright.config.smoke.ts
+ *   pnpm --filter=@jovie/web exec playwright test --config=playwright.config.smoke.mobile.ts
  */
 
-// Build extra HTTP headers for Vercel Deployment Protection bypass
 const extraHTTPHeaders: Record<string, string> = {};
 if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
   extraHTTPHeaders['x-vercel-protection-bypass'] =
@@ -34,16 +32,16 @@ const useTestAuthBypass = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
 
 export default defineConfig({
   testDir: './tests/e2e',
-  // Source of truth: tests/e2e/smoke-manifest.ts → DESKTOP_SMOKE_SPECS.
-  testMatch: [...DESKTOP_SMOKE_SPECS],
+  // Source of truth: tests/e2e/smoke-manifest.ts → MOBILE_SMOKE_SPECS.
+  testMatch: [...MOBILE_SMOKE_SPECS],
   fullyParallel: true,
   forbidOnly: true,
   retries: 2,
-  workers: 8,
+  workers: 4,
   reporter: [
     ['line'],
     ['html', { open: 'never' }],
-    ['json', { outputFile: 'test-results/results.json' }],
+    ['json', { outputFile: 'test-results/results-mobile.json' }],
   ],
 
   timeout: 90_000,
@@ -63,8 +61,8 @@ export default defineConfig({
 
   projects: [
     {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      name: 'mobile-chrome',
+      use: { ...devices['Pixel 5'] },
     },
   ],
 
@@ -94,7 +92,7 @@ export default defineConfig({
           },
           url: managedWebServerUrl.origin,
           reuseExistingServer: true,
-          timeout: 300000,
+          timeout: 300_000,
           stdout: 'pipe',
           stderr: 'pipe',
         },

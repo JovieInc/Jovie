@@ -83,6 +83,8 @@
     "test:web:changed": "doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run test -- --changed",
     "test:web:watch": "doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run test:watch",
     "test:web:smoke": "doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run e2e:smoke",
+    "test:web:smoke:mobile": "doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run e2e:smoke:mobile",
+    "test:web:smoke:tagged": "doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run e2e:smoke:tagged",
     "test:web:e2e": "doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run test:e2e",
     "test:mobile-overflow": "doppler run --project jovie-web --config dev -- env E2E_USE_TEST_AUTH_BYPASS=1 NEXT_PUBLIC_CLERK_MOCK=1 NEXT_PUBLIC_CLERK_PROXY_DISABLED=1 pnpm --filter @jovie/web exec playwright test tests/e2e/mobile-overflow.spec.ts --project=chromium --reporter=line",
     "test:ci": "node scripts/turbo-local.mjs test:ci",
