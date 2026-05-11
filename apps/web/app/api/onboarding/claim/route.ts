@@ -93,20 +93,44 @@ export async function POST(req: Request) {
     const otherIds = others.map(o => o.id);
 
     try {
-      // Ordering matters here. The partial unique index on (session_id) WHERE
-      // user_id IS NOT NULL means we cannot have multiple rows with the same
-      // sessionId AND user_id set. We satisfy the constraint by clearing the
-      // sessionId on superseded rows BEFORE we set user_id on the primary.
-      //
-      // Sequence (no db.transaction per .claude/rules/db.md):
-      //  1. Audit-log first — if this fails, no state mutation has happened.
-      //  2. Detach superseded rows from the session + mark superseded title
-      //     + assign them to the user. Once session_id is null, the partial
-      //     unique index no longer applies to these rows.
-      //  3. Claim the primary row last — by this point only one row with
-      //     this sessionId remains, so the unique index won't fire.
+      // Compare-and-swap on the primary row FIRST. The WHERE clause only
+      // matches a row that is still unclaimed (userId IS NULL) and still has
+      // this sessionId. .returning() lets us detect a concurrent claim from
+      // another request — if zero rows update, somebody else won the race.
+      // We don't use db.transaction() per .claude/rules/db.md, so this CAS
+      // is the linearization point that makes the whole sequence safe:
+      //   - audit insert is harmless if the CAS later succeeds
+      //   - sibling batch is gated on the CAS having claimed primary
+      //   - the partial unique index (session_id WHERE user_id IS NOT NULL)
+      //     is still the catch-all for the cross-user case
+      const claimedPrimary = await db
+        .update(chatConversations)
+        .set({ userId: userRow.id, updatedAt: new Date() })
+        .where(
+          and(
+            eq(chatConversations.id, primary.id),
+            eq(chatConversations.sessionId, sessionId),
+            isNull(chatConversations.userId)
+          )
+        )
+        .returning({ id: chatConversations.id });
 
-      // 1. Audit row first (safe to write; no FK from other tables depends on it).
+      if (claimedPrimary.length === 0) {
+        // Concurrent claim won — primary already has a userId set (likely
+        // a duplicate request from the same user retrying after a network
+        // blip). Treat as a soft success rather than a 409 because the same
+        // user winning twice should not error.
+        await clearOnboardingSessionCookie();
+        return NextResponse.json({
+          claimed: 0,
+          conversationId: primary.id,
+          alreadyClaimed: true,
+        });
+      }
+
+      // Audit row records the claim event. Failure here is acceptable —
+      // primary is already claimed, audit gap is a forensic loss but not a
+      // user-visible failure.
       await db.insert(chatAuditLog).values({
         userId: userRow.id,
         creatorProfileId: null,
@@ -124,10 +148,9 @@ export async function POST(req: Request) {
         userAgent,
       });
 
-      // 2. Detach superseded siblings (clear sessionId so the partial unique
-      //    index releases them) in a single batch update via inArray. We still
-      //    set userId so the user can browse the discarded transcripts in
-      //    their dashboard, and we suffix the title to mark them as superseded.
+      // Detach superseded siblings. Same CAS-style WHERE (still unclaimed
+      // with this sessionId) so we never overwrite a row that a concurrent
+      // claim already touched.
       if (otherIds.length > 0) {
         await db
           .update(chatConversations)
@@ -137,14 +160,14 @@ export async function POST(req: Request) {
             title: '(superseded — claimed alongside another transcript)',
             updatedAt: new Date(),
           })
-          .where(inArray(chatConversations.id, otherIds));
+          .where(
+            and(
+              inArray(chatConversations.id, otherIds),
+              eq(chatConversations.sessionId, sessionId),
+              isNull(chatConversations.userId)
+            )
+          );
       }
-
-      // 3. Claim the primary row last.
-      await db
-        .update(chatConversations)
-        .set({ userId: userRow.id, updatedAt: new Date() })
-        .where(eq(chatConversations.id, primary.id));
 
       await clearOnboardingSessionCookie();
 

@@ -18,6 +18,7 @@ import {
   isTurnstileConfigured,
   verifyTurnstileToken,
 } from '@/lib/turnstile/verify';
+import { extractClientIPFromRequest } from '@/lib/utils/ip-extraction';
 
 /**
  * Anonymous onboarding chat handler (JOV-2132 PR 1 — scaffolding).
@@ -69,16 +70,11 @@ async function peekOnboardingMode(req: Request): Promise<PeekedBody | null> {
 }
 
 function extractClientIp(req: Request): string {
-  const forwarded = req.headers.get('x-forwarded-for');
-  if (forwarded) {
-    const first = forwarded.split(',')[0]?.trim();
-    if (first) return first;
-  }
-  return (
-    req.headers.get('x-real-ip')?.trim() ||
-    req.headers.get('cf-connecting-ip')?.trim() ||
-    'unknown'
-  );
+  // Delegate to the canonical helper which validates the IP and uses the
+  // trusted-proxy priority order (cf-connecting-ip → x-real-ip → x-forwarded-for).
+  // The raw leftmost x-forwarded-for is client-controllable, so we never use it
+  // directly for abuse-control inputs.
+  return extractClientIPFromRequest(req) || 'unknown';
 }
 
 function extractAsn(req: Request): string | null {

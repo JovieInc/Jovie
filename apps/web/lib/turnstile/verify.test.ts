@@ -71,7 +71,10 @@ describe('verifyTurnstileToken', () => {
   });
 
   it('reports timeout when fetch aborts', async () => {
-    vi.spyOn(globalThis, 'fetch').mockImplementationOnce(((
+    // Use mockImplementation (not Once) — verifyTurnstileToken retries once on
+    // timeout, so both fetch attempts need the aborting mock or the second
+    // attempt would hit the real network.
+    vi.spyOn(globalThis, 'fetch').mockImplementation(((
       _url: unknown,
       init: { signal?: AbortSignal } | undefined
     ) => {
