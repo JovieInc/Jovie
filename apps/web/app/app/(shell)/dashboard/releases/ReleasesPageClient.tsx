@@ -102,6 +102,10 @@ export function ReleasesPageClient() {
         primaryProviders={primaryProviderKeys}
         artistName={spotifyArtistName}
         allowArtworkDownloads={allowArtworkDownloads}
+        spotifyConnected={spotifyConnected}
+        appleMusicConnected={appleMusicConnected}
+        initialImporting={spotifyImportStatus === 'importing'}
+        initialTotalCount={spotifyImportTotal}
       />
     );
   }

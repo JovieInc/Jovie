@@ -1,6 +1,13 @@
 'use client';
 
-import { ExternalLink, MoreHorizontal, Pause, Play } from 'lucide-react';
+import {
+  Clock,
+  ExternalLink,
+  Lock,
+  MoreHorizontal,
+  Pause,
+  Play,
+} from 'lucide-react';
 import Link from 'next/link';
 import { type KeyboardEvent, memo, useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
@@ -15,6 +22,8 @@ import type { ReleaseViewModel } from '@/lib/discography/types';
 import { dropDateMeta } from '@/lib/format-drop-date';
 import { cn } from '@/lib/utils';
 import { releaseStatusToShell, releaseToDspItems } from './release-adapters';
+
+export type ShellRowLockReason = 'scheduled' | 'cap' | null;
 
 /**
  * Linear-style release row for the DESIGN_V1 path. Replaces the legacy
@@ -31,11 +40,13 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
   isSelected,
   onSelect,
   actionMenuItems,
+  smartLinkLockReason = null,
 }: {
   readonly release: ReleaseViewModel;
   readonly isSelected: boolean;
   readonly onSelect: () => void;
   readonly actionMenuItems?: TableActionMenuItem[];
+  readonly smartLinkLockReason?: ShellRowLockReason;
 }) {
   const dspItems = useMemo(() => releaseToDspItems(release), [release]);
   const dropMeta = useMemo(
@@ -45,6 +56,7 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
   const status = releaseStatusToShell(release.status);
   const artistLabel = release.artistNames?.join(', ') ?? '';
   const smartLinkPath = release.smartLinkPath || `/${release.slug}`;
+  const isSmartLinkLocked = smartLinkLockReason !== null;
 
   const { playbackState, toggleTrack } = useTrackAudioPlayer();
   const previewUrl = release.previewUrl ?? null;
@@ -191,17 +203,42 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
         <DspAvatarStack dsps={dspItems} />
       </div>
 
-      <Link
-        href={smartLinkPath}
-        target='_blank'
-        rel='noreferrer'
-        onClick={e => e.stopPropagation()}
-        title={`Open smart link · ${smartLinkPath}`}
-        aria-label={`Open smart link for ${release.title}`}
-        className='shrink-0 h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-colors duration-subtle ease-out'
-      >
-        <ExternalLink className='h-3 w-3' strokeWidth={2.25} />
-      </Link>
+      {isSmartLinkLocked ? (
+        <span
+          role='img'
+          aria-label={
+            smartLinkLockReason === 'scheduled'
+              ? `Scheduled smart link (Pro) for ${release.title}`
+              : `Smart link locked (Pro) for ${release.title}`
+          }
+          title={
+            smartLinkLockReason === 'scheduled'
+              ? 'Pre-release smart link requires Pro'
+              : 'Smart link locked — upgrade for more'
+          }
+          data-shell-release-smart-link-locked='true'
+          data-shell-release-smart-link-lock-reason={smartLinkLockReason}
+          className='shrink-0 h-7 w-7 rounded-md grid place-items-center text-quaternary-token cursor-not-allowed'
+        >
+          {smartLinkLockReason === 'scheduled' ? (
+            <Clock className='h-3 w-3' strokeWidth={2.25} aria-hidden='true' />
+          ) : (
+            <Lock className='h-3 w-3' strokeWidth={2.25} aria-hidden='true' />
+          )}
+        </span>
+      ) : (
+        <Link
+          href={smartLinkPath}
+          target='_blank'
+          rel='noreferrer'
+          onClick={e => e.stopPropagation()}
+          title={`Open smart link · ${smartLinkPath}`}
+          aria-label={`Open smart link for ${release.title}`}
+          className='shrink-0 h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-colors duration-subtle ease-out'
+        >
+          <ExternalLink className='h-3 w-3' strokeWidth={2.25} />
+        </Link>
+      )}
 
       {actionMenuItems && actionMenuItems.length > 0 ? (
         <TableActionMenu items={actionMenuItems} trigger='custom' align='end'>

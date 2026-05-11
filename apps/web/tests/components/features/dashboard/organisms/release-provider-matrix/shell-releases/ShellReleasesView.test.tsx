@@ -1,11 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ShellReleasesView } from '@/components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView';
-import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurface';
 import {
   HeaderActionsProvider,
-  useHeaderActions,
+  useOptionalHeaderActions,
 } from '@/contexts/HeaderActionsContext';
 import {
   RightPanelProvider,
@@ -13,8 +12,174 @@ import {
 } from '@/contexts/RightPanelContext';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 
+const mockUsePlanGate = vi.fn(() => ({
+  isLoading: false,
+  isError: false,
+  smartLinksLimit: null as number | null,
+  isPro: true,
+  canCreateManualReleases: true,
+  canGenerateAlbumArt: false,
+  canGenerateReleasePlans: true,
+  canEditSmartLinks: true,
+  canAccessFutureReleases: true,
+}));
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    refresh: vi.fn(),
+    back: vi.fn(),
+    forward: vi.fn(),
+    prefetch: vi.fn(),
+  }),
+  useSearchParams: () => new URLSearchParams(),
+  usePathname: () => '/app/dashboard/releases',
+}));
+
+vi.mock('@/contexts/TableMetaContext', () => ({
+  useTableMeta: () => ({
+    tableMeta: { rowCount: null, toggle: null, rightPanelWidth: null },
+    setTableMeta: vi.fn(),
+  }),
+}));
+
+vi.mock('@/lib/feature-flags/client', () => ({
+  useCodeFlag: () => false,
+}));
+
 vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
   revertReleaseArtwork: vi.fn(),
+  connectAppleMusicArtist: vi.fn(() =>
+    Promise.resolve({ success: true, message: 'ok' })
+  ),
+  deleteRelease: vi.fn(() => Promise.resolve({ success: true })),
+}));
+
+vi.mock('@/app/app/(shell)/dashboard/releases/catalog-task-actions', () => ({
+  instantiateReleaseTasksFromCatalog: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock('@/app/app/(shell)/dashboard/releases/task-actions', () => ({
+  instantiateReleaseTasks: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock('@/lib/error-tracking', () => ({
+  captureError: vi.fn(),
+}));
+
+vi.mock('@/lib/chat/open-chat-with-prompt', () => ({
+  openChatWithPrompt: vi.fn(),
+}));
+
+vi.mock('sonner', () => ({
+  toast: Object.assign(vi.fn(), {
+    success: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    warning: vi.fn(),
+    dismiss: vi.fn(),
+  }),
+}));
+
+vi.mock(
+  '@/features/dashboard/organisms/release-provider-matrix/hooks/useImportPolling',
+  () => ({
+    useImportPolling: () => ({ importedCount: 0, totalCount: 0 }),
+  })
+);
+
+vi.mock(
+  '@/features/dashboard/organisms/release-provider-matrix/ImportProgressBanner',
+  () => ({
+    ImportProgressBanner: () => <div data-testid='import-progress-banner' />,
+  })
+);
+
+vi.mock(
+  '@/features/dashboard/organisms/release-provider-matrix/AppleMusicSyncBanner',
+  () => ({
+    AppleMusicSyncBanner: () => <div data-testid='apple-music-sync-banner' />,
+  })
+);
+
+vi.mock(
+  '@/features/dashboard/organisms/release-provider-matrix/SmartLinkGateBanner',
+  () => ({
+    SmartLinkGateBanner: ({ mode }: { mode: string }) => (
+      <div data-testid={`smart-link-gate-banner-${mode}`} />
+    ),
+  })
+);
+
+vi.mock(
+  '@/features/dashboard/organisms/release-provider-matrix/SpotifyConnectDialog',
+  () => ({
+    SpotifyConnectDialog: ({ open }: { open: boolean }) =>
+      open ? <div data-testid='spotify-connect-dialog' /> : null,
+  })
+);
+
+vi.mock(
+  '@/features/dashboard/organisms/release-provider-matrix/ReleasePlanWizard',
+  () => ({
+    ReleasePlanWizard: () => <div data-testid='release-plan-wizard' />,
+  })
+);
+
+vi.mock(
+  '@/features/dashboard/organisms/release-provider-matrix/AddReleaseSidebar',
+  () => ({
+    AddReleaseSidebar: ({ isOpen }: { isOpen: boolean }) =>
+      isOpen ? (
+        <aside data-testid='add-release-sidebar'>Add release</aside>
+      ) : null,
+  })
+);
+
+vi.mock(
+  '@/features/dashboard/organisms/release-provider-matrix/NewReleaseHeaderAction',
+  () => ({
+    NewReleaseHeaderAction: ({
+      canCreateManualReleases,
+      isSyncing,
+      onSyncSpotify,
+      onCreateManual,
+    }: {
+      canCreateManualReleases: boolean;
+      isSyncing: boolean;
+      onSyncSpotify: () => void;
+      onCreateManual: () => void;
+    }) => (
+      <div data-testid='new-release-header-action'>
+        <button
+          type='button'
+          data-testid='sync-spotify-action'
+          disabled={isSyncing}
+          onClick={onSyncSpotify}
+        >
+          {isSyncing ? 'Syncing' : 'Sync'}
+        </button>
+        {canCreateManualReleases ? (
+          <button
+            type='button'
+            data-testid='create-manual-action'
+            onClick={onCreateManual}
+          >
+            New release
+          </button>
+        ) : null}
+      </div>
+    ),
+  })
+);
+
+vi.mock('@/components/organisms/artist-search-palette', () => ({
+  ArtistSearchCommandPalette: () => null,
+}));
+
+vi.mock('@/components/organisms/DialogLoadingSkeleton', () => ({
+  DialogLoadingSkeleton: () => null,
 }));
 
 vi.mock('@/lib/queries', () => {
@@ -36,6 +201,7 @@ vi.mock('@/lib/queries', () => {
     useSaveReleaseMetadataMutation: () => mutation,
     useSaveReleaseTargetPlaylistsMutation: () => mutation,
     useSyncReleasesFromSpotifyMutation: () => mutation,
+    usePlanGate: () => mockUsePlanGate(),
   };
 });
 
@@ -137,19 +303,15 @@ function RightPanelProbe() {
   return <div data-testid='right-panel-probe'>{panel}</div>;
 }
 
-function HeaderAdapterProbe() {
-  const { headerSearchAdapter } = useHeaderActions();
-  return (
-    <div
-      data-testid='header-adapter-probe'
-      data-adapter-key={headerSearchAdapter?.key ?? ''}
-      data-visible-count={headerSearchAdapter?.visibleCount ?? ''}
-      data-total-count={headerSearchAdapter?.totalCount ?? ''}
-    />
-  );
+function HeaderActionsProbe() {
+  const state = useOptionalHeaderActions();
+  return <div data-testid='header-actions-probe'>{state?.headerActions}</div>;
 }
 
-function renderShell(releases: readonly ReleaseViewModel[]) {
+function renderShell(
+  releases: readonly ReleaseViewModel[],
+  extraProps: Partial<Parameters<typeof ShellReleasesView>[0]> = {}
+) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -161,23 +323,37 @@ function renderShell(releases: readonly ReleaseViewModel[]) {
     <QueryClientProvider client={queryClient}>
       <HeaderActionsProvider>
         <RightPanelProvider>
-          {/* Mimics the AuthShell breadcrumb slot so the route's registered
-              header-search adapter actually renders a closed/open trigger
-              we can inspect from tests. */}
-          <HeaderSearchSurfaceFromContext />
+          {/* Mimics the AuthShell header slot so the route's registered
+              header actions (search trigger + new-release affordance) render
+              in the DOM where tests can inspect them. */}
           <ShellReleasesView
             releases={releases}
             providerConfig={providerConfig}
             primaryProviders={primaryProviders}
             artistName='Bahamas'
+            {...extraProps}
           />
-          <HeaderAdapterProbe />
+          <HeaderActionsProbe />
           <RightPanelProbe />
         </RightPanelProvider>
       </HeaderActionsProvider>
     </QueryClientProvider>
   );
 }
+
+beforeEach(() => {
+  mockUsePlanGate.mockReturnValue({
+    isLoading: false,
+    isError: false,
+    smartLinksLimit: null,
+    isPro: true,
+    canCreateManualReleases: true,
+    canGenerateAlbumArt: false,
+    canGenerateReleasePlans: true,
+    canEditSmartLinks: true,
+    canAccessFutureReleases: true,
+  });
+});
 
 describe('ShellReleasesView', () => {
   it('renders one row per release with title + artist', () => {
@@ -195,8 +371,15 @@ describe('ShellReleasesView', () => {
     expect(screen.getByText('Other')).toBeInTheDocument();
   });
 
-  it('shows the empty state when there are no releases', () => {
+  it('shows the connect-Spotify empty state when not yet connected', () => {
     renderShell([]);
+    expect(
+      screen.getByText(/Connect Spotify to get started/)
+    ).toBeInTheDocument();
+  });
+
+  it('shows the connected empty state when connected with no releases', () => {
+    renderShell([], { spotifyConnected: true });
     expect(screen.getByText(/No releases yet/)).toBeInTheDocument();
   });
 
@@ -258,18 +441,167 @@ describe('ShellReleasesView', () => {
     });
   });
 
-  it('registers a header-search adapter exposing the release count', () => {
+  it('registers header actions exposing the release count in the search trigger', async () => {
     renderShell([
       fakeRelease({ id: '1', title: 'Alpha' }),
       fakeRelease({ id: '2', title: 'Beta' }),
     ]);
-    const probe = screen.getByTestId('header-adapter-probe');
-    expect(probe).toHaveAttribute('data-adapter-key', 'releases');
-    expect(probe).toHaveAttribute('data-total-count', '2');
-    expect(probe).toHaveAttribute('data-visible-count', '2');
-    // The shell's closed search trigger renders the same count + label.
-    expect(
-      screen.getByRole('button', { name: /Filter releases|Search Releases/ })
-    ).toHaveTextContent('2');
+    // The route registers headerActions (not a structured adapter) so the shell
+    // header slot renders an inline search trigger with the visible count.
+    // Use findByTestId so we wait for the effect that calls setHeaderActions to run.
+    const probe = await screen.findByTestId('header-actions-probe');
+    expect(probe).toBeInTheDocument();
+    // The closed search trigger has aria-label="Search releases" and renders the count.
+    const searchTrigger = await screen.findByRole('button', {
+      name: /search releases/i,
+    });
+    expect(searchTrigger).toHaveTextContent('2');
+  });
+
+  describe('entitlement gating', () => {
+    it('shows open smart-link affordance for fully entitled users', () => {
+      renderShell([
+        fakeRelease({
+          id: 'r1',
+          title: 'Open Track',
+          releaseDate: '2024-01-01',
+        }),
+      ]);
+
+      expect(
+        screen.getByLabelText('Open smart link for Open Track')
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByLabelText(/Smart link locked \(Pro\)/)
+      ).not.toBeInTheDocument();
+    });
+
+    it('locks scheduled releases for free users without canAccessFutureReleases', async () => {
+      mockUsePlanGate.mockReturnValue({
+        isLoading: false,
+        isError: false,
+        smartLinksLimit: null,
+        isPro: false,
+        canCreateManualReleases: true,
+        canGenerateAlbumArt: false,
+        canGenerateReleasePlans: false,
+        canEditSmartLinks: true,
+        canAccessFutureReleases: false,
+      });
+
+      const future = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        .toISOString()
+        .slice(0, 10);
+
+      renderShell([
+        fakeRelease({
+          id: 'future-1',
+          title: 'Upcoming Drop',
+          releaseDate: future,
+        }),
+      ]);
+
+      expect(
+        screen.getByLabelText('Scheduled smart link (Pro) for Upcoming Drop')
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByLabelText('Open smart link for Upcoming Drop')
+      ).not.toBeInTheDocument();
+      expect(
+        await screen.findByTestId('smart-link-gate-banner-unreleased')
+      ).toBeInTheDocument();
+    });
+
+    it('locks releases beyond smartLinksLimit with cap reason', () => {
+      mockUsePlanGate.mockReturnValue({
+        isLoading: false,
+        isError: false,
+        smartLinksLimit: 1,
+        isPro: false,
+        canCreateManualReleases: true,
+        canGenerateAlbumArt: false,
+        canGenerateReleasePlans: false,
+        canEditSmartLinks: true,
+        canAccessFutureReleases: true,
+      });
+
+      renderShell([
+        fakeRelease({
+          id: 'old',
+          title: 'Older Release',
+          releaseDate: '2020-01-01',
+        }),
+        fakeRelease({
+          id: 'new',
+          title: 'Newer Release',
+          releaseDate: '2024-01-01',
+        }),
+      ]);
+
+      // Cap allows oldest first up to limit — newer release is locked.
+      expect(
+        screen.getByLabelText('Smart link locked (Pro) for Newer Release')
+      ).toBeInTheDocument();
+      expect(
+        screen.getByLabelText('Open smart link for Older Release')
+      ).toBeInTheDocument();
+    });
+
+    it('gates the row action menu copy item when the smart link is locked', () => {
+      mockUsePlanGate.mockReturnValue({
+        isLoading: false,
+        isError: false,
+        smartLinksLimit: null,
+        isPro: false,
+        canCreateManualReleases: true,
+        canGenerateAlbumArt: false,
+        canGenerateReleasePlans: false,
+        canEditSmartLinks: true,
+        canAccessFutureReleases: false,
+      });
+
+      const future = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        .toISOString()
+        .slice(0, 10);
+
+      renderShell([
+        fakeRelease({
+          id: 'future-1',
+          title: 'Upcoming Drop',
+          releaseDate: future,
+        }),
+      ]);
+
+      // Row menu should expose the scheduled-lock label, not "Copy smart link".
+      expect(
+        screen.getByRole('button', { name: 'Scheduled smart link (Pro)' })
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Copy smart link' })
+      ).not.toBeInTheDocument();
+    });
+
+    it('hides the manual create affordance when canCreateManualReleases is false', () => {
+      mockUsePlanGate.mockReturnValue({
+        isLoading: false,
+        isError: false,
+        smartLinksLimit: null,
+        isPro: false,
+        canCreateManualReleases: false,
+        canGenerateAlbumArt: false,
+        canGenerateReleasePlans: false,
+        canEditSmartLinks: true,
+        canAccessFutureReleases: true,
+      });
+
+      renderShell([], { spotifyConnected: true });
+
+      expect(
+        screen.queryByTestId('create-manual-action')
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId('shell-releases-create-connected-empty')
+      ).not.toBeInTheDocument();
+    });
   });
 });
