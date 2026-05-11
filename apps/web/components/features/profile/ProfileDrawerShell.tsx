@@ -66,7 +66,7 @@ export function ProfileDrawerShell({
             <button
               type='button'
               onClick={onBack}
-              className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/[0.04] text-white/44 transition-colors duration-subtle hover:bg-white/[0.08] hover:text-white/74 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
+              className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[color:var(--color-bg-hover)] text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-interactive-active hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
               aria-label='Back'
               data-testid='profile-drawer-back-button'
             >
@@ -87,7 +87,7 @@ export function ProfileDrawerShell({
                 {subtitle ? (
                   <p
                     id={subtitleId}
-                    className='truncate text-3xs font-[440] leading-[1.1] tracking-[-0.01em] text-white/46'
+                    className='truncate text-3xs font-[440] leading-[1.1] tracking-[-0.01em] text-tertiary-token'
                   >
                     {subtitle}
                   </p>
@@ -104,7 +104,7 @@ export function ProfileDrawerShell({
             <button
               type='button'
               onClick={() => onOpenChange(false)}
-              className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/[0.04] text-white/44 transition-colors duration-subtle hover:bg-white/[0.08] hover:text-white/74 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
+              className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[color:var(--color-bg-hover)] text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-interactive-active hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
               aria-label='Close'
               data-testid='profile-drawer-close-button'
             >
@@ -126,7 +126,7 @@ export function ProfileDrawerShell({
               {subtitle ? (
                 <p
                   id={subtitleId}
-                  className='mt-1 truncate text-3xs font-[440] leading-[1.1] tracking-[-0.01em] text-white/46'
+                  className='mt-1 truncate text-3xs font-[440] leading-[1.1] tracking-[-0.01em] text-tertiary-token'
                 >
                   {subtitle}
                 </p>
@@ -136,7 +136,9 @@ export function ProfileDrawerShell({
         )}
       </div>
 
-      {isSecondaryHeader ? <div className='mx-5 h-px bg-white/[0.06]' /> : null}
+      {isSecondaryHeader ? (
+        <div className='mx-5 h-px bg-[color:var(--color-border-subtle)]' />
+      ) : null}
     </>
   );
 
