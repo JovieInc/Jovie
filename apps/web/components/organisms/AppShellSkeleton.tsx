@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { cn } from '@/lib/utils';
 import { AppShellFrame, type AppShellFrameVariant } from './AppShellFrame';
 
 const NAV_ITEMS = [
@@ -29,17 +30,39 @@ export function AppShellSkeleton({
    */
   readonly variant?: AppShellFrameVariant;
 } = {}) {
+  const isShellChatV1 = variant === 'shellChatV1';
+
   return (
     <AppShellFrame
       variant={variant}
       sidebar={
-        <div className='max-lg:hidden bg-sidebar lg:flex lg:w-[232px] lg:shrink-0 lg:flex-col'>
-          <div className='flex h-9 items-center gap-2 px-2 pt-2'>
+        <div
+          // Shell V1 mirrors the production sidebar token width (244px) and the
+          // compact header height so the post-resolve UnifiedSidebar slots in
+          // without a width/header reflow.
+          className={cn(
+            'max-lg:hidden bg-sidebar lg:flex lg:shrink-0 lg:flex-col',
+            isShellChatV1 ? 'lg:w-(--linear-app-sidebar-width)' : 'lg:w-[232px]'
+          )}
+        >
+          <div
+            className={cn(
+              'flex items-center gap-2 px-2.5',
+              isShellChatV1
+                ? 'h-(--linear-app-header-height-compact) py-0.5'
+                : 'h-9 pt-2'
+            )}
+          >
             <div className='skeleton h-6 w-6 rounded-md' />
             <div className='skeleton h-4 w-24 rounded' />
           </div>
 
-          <div className='flex-1 space-y-1 px-2 pt-4'>
+          <div
+            className={cn(
+              'flex-1 space-y-1',
+              isShellChatV1 ? 'px-2.5 pt-1.5' : 'px-2 pt-4'
+            )}
+          >
             {NAV_ITEMS.map(item => (
               <div
                 key={item.key}
@@ -71,14 +94,29 @@ export function AppShellSkeleton({
             ))}
           </div>
 
-          <div className='flex items-center gap-2 px-2 pb-2 pt-1'>
+          <div
+            className={cn(
+              'flex items-center gap-2 pb-2 pt-1',
+              isShellChatV1 ? 'px-2.5' : 'px-2'
+            )}
+          >
             <div className='skeleton h-7 w-7 shrink-0 rounded-full' />
             <div className='skeleton h-3 w-20 rounded' />
           </div>
         </div>
       }
       header={
-        <header className='flex h-12 shrink-0 items-center gap-2 border-b border-subtle px-4'>
+        <header
+          // Shell V1 header sits on the rounded content surface — no border-b,
+          // matches the compact header token used by DashboardHeader so the
+          // Suspense fallback doesn't shift the breadcrumb down a row.
+          className={cn(
+            'flex shrink-0 items-center gap-2',
+            isShellChatV1
+              ? 'h-(--linear-app-header-height-compact) bg-(--linear-app-content-surface) px-2.5'
+              : 'h-12 border-b border-subtle px-4'
+          )}
+        >
           <div className='skeleton h-4 w-20 rounded' />
           <div className='skeleton h-4 w-4 rounded opacity-30' />
           <div className='skeleton h-4 w-28 rounded' />

@@ -111,10 +111,10 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
   {
     id: 'toggle-sidebar',
     label: 'Toggle sidebar',
-    keys: `${GLYPH_CMD} B`,
+    keys: `[ · ${GLYPH_CMD} B`,
     category: 'general',
     icon: PanelLeft,
-    shortcutKey: 'Meta+b',
+    shortcutKey: '[',
     decision: { status: 'required', binding: 'useSidebarKeyboardShortcut' },
   },
 
