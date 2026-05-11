@@ -31,14 +31,36 @@ export type ClerkOAuthProvider =
  *
  * The flag is `NEXT_PUBLIC_` so it can be read in both server components and
  * client components without an extra round-trip.
+ *
+ * IMPORTANT: each provider must use a *statically-referenced* `process.env.X`
+ * expression. Next.js / webpack DefinePlugin only inlines `NEXT_PUBLIC_*` env
+ * vars when the key is referenced as a literal property access. Dynamic
+ * `process.env[envKey]` lookups always resolve to `undefined` in client
+ * bundles because `process.env` is replaced at build time, not at runtime.
  */
 export function isOAuthProviderEnabled(provider: ClerkOAuthProvider): boolean {
-  const envKey = `NEXT_PUBLIC_CLERK_OAUTH_${provider.toUpperCase()}_ENABLED`;
-  // Bracket access — NEXT_PUBLIC_ vars get DefinePlugin-inlined only for the
-  // exact keys statically referenced. Reading via bracket here means missing
-  // vars correctly become undefined at runtime.
-  const value = (process.env as Record<string, string | undefined>)[envKey];
-  return value === '1';
+  // Allowlist enabled providers explicitly. We tried env-var gating
+  // (NEXT_PUBLIC_CLERK_OAUTH_<PROVIDER>_ENABLED=1) and the values did not get
+  // inlined into the production build despite being set in Vercel — keeping
+  // the gate as code is the only reliable single chokepoint right now.
+  // JOV-2062 prevention: if a provider needs to be removed in prod, remove
+  // its line here (and the corresponding Clerk dashboard config); do not
+  // re-enable a provider here without verified credentials end-to-end.
+  switch (provider) {
+    case 'apple':
+    case 'google':
+      return true;
+    case 'facebook':
+    case 'github':
+    case 'spotify':
+    case 'tiktok':
+      return false;
+    default: {
+      const _exhaustive: never = provider;
+      void _exhaustive;
+      return false;
+    }
+  }
 }
 
 /**

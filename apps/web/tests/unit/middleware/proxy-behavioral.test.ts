@@ -913,6 +913,55 @@ describe('proxy.ts middleware', () => {
       }
     });
 
+    it('rewrites FAPI-relative Location headers to absolute proxy URLs (Apple OAuth form_post redirect)', async () => {
+      // Apple's OAuth form_post callback flow makes FAPI return a 302 to a
+      // *relative* path like `/v1/oauth_callback?code=...&state=...`.
+      // NextResponse.redirect requires an absolute URL; passing the relative
+      // path through threw "URL is malformed". The proxy must resolve the
+      // relative path against our /__clerk proxy origin.
+      const stagingFapiHost = 'clerk.staging.jov.ie';
+      const previousPublishableKey =
+        process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+
+      try {
+        process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = `pk_live_${Buffer.from('production-fapi.clerk.example$').toString('base64')}`;
+        mocks.resolveClerkKeys.mockReturnValue({
+          publishableKey: `pk_live_${Buffer.from(`${stagingFapiHost}$`).toString('base64')}`,
+          secretKey: 'sk_live_staging_example',
+          status: 'ok',
+        });
+
+        // FAPI returns a Location header with a relative path (no scheme).
+        mocks.fetch.mockResolvedValueOnce(
+          new Response(null, {
+            status: 302,
+            headers: {
+              location: '/v1/oauth_callback?code=abc123&state=def456',
+            },
+          })
+        );
+
+        const req = createUnauthenticatedRequest({
+          hostname: 'staging.jov.ie',
+          pathname: '/__clerk/v1/oauth_callback',
+          method: 'POST',
+        });
+        const res = await callMiddleware(req);
+
+        expect(res.status).toBe(302);
+        expect(res.headers.get('location')).toBe(
+          'https://staging.jov.ie/__clerk/v1/oauth_callback?code=abc123&state=def456'
+        );
+      } finally {
+        if (previousPublishableKey === undefined) {
+          delete process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+        } else {
+          process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY =
+            previousPublishableKey;
+        }
+      }
+    });
+
     it('passes through upstream non-redirect 3xx-adjacent responses (e.g. 304) without rewriting Location', async () => {
       // Sanity: 200 path still streams (covered above by /v1/client). This
       // covers the edge where upstream 3xx has no Location header — the proxy

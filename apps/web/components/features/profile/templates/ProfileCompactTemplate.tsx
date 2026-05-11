@@ -767,7 +767,7 @@ export function ProfileCompactTemplate({
               </div>
             ) : (
               <div
-                className='relative flex h-full w-full max-w-(--profile-shell-max-width) flex-col overflow-clip bg-[color:var(--profile-content-bg)] md:mx-auto md:h-[740px] md:overflow-hidden md:rounded-[var(--profile-shell-card-radius)] md:border md:border-[color:var(--profile-panel-border)] md:shadow-[var(--profile-panel-shadow)]'
+                className='relative flex h-full w-full max-w-(--profile-shell-max-width) flex-col overflow-hidden bg-[color:var(--profile-content-bg)] md:mx-auto md:h-[740px] md:rounded-[var(--profile-shell-card-radius)] md:border md:border-[color:var(--profile-panel-border)] md:shadow-[var(--profile-panel-shadow)]'
                 data-testid='profile-compact-shell'
               >
                 <ProfileCompactSurface
