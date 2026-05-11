@@ -135,7 +135,27 @@ export async function tryHandleAnonymousOnboardingChat(
     sessionId = existingSessionId;
   } else {
     sessionId = randomUUID();
-    mintedSessionCookie = encodeSessionCookie(sessionId);
+    // Sign the new sessionId. encodeSessionCookie throws if SESSION_SECRET is
+    // missing/short — surface that as a 503 (not 500) so observability can tell
+    // an ops-config gap from a true crash.
+    try {
+      mintedSessionCookie = encodeSessionCookie(sessionId);
+    } catch (error) {
+      Sentry.captureException(error, {
+        tags: { context: 'onboarding_handler_mint_cookie' },
+      });
+      return NextResponse.json(
+        {
+          error: 'Onboarding chat is temporarily unavailable',
+          errorCode: 'SESSION_SECRET_NOT_CONFIGURED',
+          requestId,
+        },
+        {
+          status: 503,
+          headers: { ...corsHeaders, 'x-request-id': requestId },
+        }
+      );
+    }
   }
 
   const ip = extractClientIp(req);
