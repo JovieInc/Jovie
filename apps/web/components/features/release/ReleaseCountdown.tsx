@@ -89,8 +89,14 @@ export function ReleaseCountdown({
     return () => clearInterval(timer);
   }, [releaseDate, router]);
 
-  // Don't render until mounted or if release has passed
-  if (!timeLeft || timeLeft.total <= 0) {
+  // Defensive synchronous expiry check: if an ISR-cached parent rendered us
+  // with a release date already in the past, render nothing immediately
+  // instead of waiting for the next interval tick. The `typeof window` guard
+  // preserves SSR-safe hydration (server matches the initial null state).
+  const isPastNow =
+    typeof window !== 'undefined' && releaseDate.getTime() <= Date.now();
+
+  if (!timeLeft || timeLeft.total <= 0 || isPastNow) {
     return null;
   }
 

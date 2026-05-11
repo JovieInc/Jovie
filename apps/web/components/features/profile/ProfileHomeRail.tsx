@@ -14,6 +14,7 @@ import {
   startOfProfileSurfaceLocalDay as startOfLocalDay,
   toProfileSurfaceDateValue as toDateValue,
 } from '@/features/profile/profile-surface-state';
+import { useReleaseAwareNow } from '@/hooks/useReleaseAwareNow';
 import { useTourDateProximity } from '@/hooks/useTourDateProximity';
 import type { UserLocation } from '@/hooks/useUserLocation';
 import { useUserLocation } from '@/hooks/useUserLocation';
@@ -357,13 +358,17 @@ export function ProfileHomeRail({
   viewerLocation,
   resolveNearbyTour = true,
 }: Readonly<ProfileHomeRailProps>) {
+  // Re-evaluate visibility at the release boundary so the rail's "Drops in"
+  // chrome transitions to "Out Now" when the release drops, even if the
+  // page was served from a stale ISR cache.
+  const now = useReleaseAwareNow(latestRelease?.releaseDate);
   const upcomingTourDates = useMemo(
-    () => getUpcomingTourDates(tourDates),
-    [tourDates]
+    () => getUpcomingTourDates(tourDates, now),
+    [now, tourDates]
   );
   const releaseVisibility = useMemo(
-    () => getProfileReleaseVisibility(latestRelease, profileSettings),
-    [latestRelease, profileSettings]
+    () => getProfileReleaseVisibility(latestRelease, profileSettings, now),
+    [latestRelease, now, profileSettings]
   );
   const shouldResolveGeo =
     resolveNearbyTour &&
@@ -388,6 +393,7 @@ export function ProfileHomeRail({
         nearbyTourDate,
         featuredPlaylistFallback,
         hasPlayableDestinations,
+        now,
       }),
     [
       artist.name,
@@ -396,6 +402,7 @@ export function ProfileHomeRail({
       latestRelease,
       nearbyTourDate,
       nextTourDate,
+      now,
       profileSettings,
     ]
   );
