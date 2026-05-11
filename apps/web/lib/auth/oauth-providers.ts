@@ -39,19 +39,22 @@ export type ClerkOAuthProvider =
  * bundles because `process.env` is replaced at build time, not at runtime.
  */
 export function isOAuthProviderEnabled(provider: ClerkOAuthProvider): boolean {
+  // Allowlist enabled providers explicitly. We tried env-var gating
+  // (NEXT_PUBLIC_CLERK_OAUTH_<PROVIDER>_ENABLED=1) and the values did not get
+  // inlined into the production build despite being set in Vercel — keeping
+  // the gate as code is the only reliable single chokepoint right now.
+  // JOV-2062 prevention: if a provider needs to be removed in prod, remove
+  // its line here (and the corresponding Clerk dashboard config); do not
+  // re-enable a provider here without verified credentials end-to-end.
   switch (provider) {
     case 'apple':
-      return process.env.NEXT_PUBLIC_CLERK_OAUTH_APPLE_ENABLED === '1';
     case 'google':
-      return process.env.NEXT_PUBLIC_CLERK_OAUTH_GOOGLE_ENABLED === '1';
+      return true;
     case 'facebook':
-      return process.env.NEXT_PUBLIC_CLERK_OAUTH_FACEBOOK_ENABLED === '1';
     case 'github':
-      return process.env.NEXT_PUBLIC_CLERK_OAUTH_GITHUB_ENABLED === '1';
     case 'spotify':
-      return process.env.NEXT_PUBLIC_CLERK_OAUTH_SPOTIFY_ENABLED === '1';
     case 'tiktok':
-      return process.env.NEXT_PUBLIC_CLERK_OAUTH_TIKTOK_ENABLED === '1';
+      return false;
     default: {
       const _exhaustive: never = provider;
       void _exhaustive;
