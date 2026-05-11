@@ -186,6 +186,8 @@ export { UnifiedTableSkeleton } from './organisms/UnifiedTableSkeleton';
 // Hooks
 // =============================================================================
 
+export type { UseAmbientListSelectionParams } from './hooks/useAmbientListSelection';
+export { useAmbientListSelection } from './hooks/useAmbientListSelection';
 export type {
   UseRowKeyboardOptions,
   UseRowKeyboardResult,
@@ -224,6 +226,7 @@ export type {
 export { createSelectionColumnFactory } from './utils/createSelectionColumnFactory';
 export {
   isFormElement,
+  isInteractiveOverlayTarget,
   resolveTableNavAction,
   type TableNavAction,
 } from './utils/tableKeyMap';

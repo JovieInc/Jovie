@@ -25,8 +25,14 @@ import {
   DrawerSurfaceCard,
 } from '@/components/molecules/drawer';
 import { DialogLoadingSkeleton } from '@/components/organisms/DialogLoadingSkeleton';
-import type { ReleaseSidebarProps } from '@/components/organisms/release-sidebar';
-import { convertContextMenuItems } from '@/components/organisms/table';
+import type {
+  ReleaseSidebarProps,
+  TrackSidebarData,
+} from '@/components/organisms/release-sidebar';
+import {
+  convertContextMenuItems,
+  useAmbientListSelection,
+} from '@/components/organisms/table';
 import { PillSearch } from '@/components/shell/PillSearch';
 import type {
   FilterField,
@@ -57,6 +63,12 @@ import { ShellReleaseRow } from './ShellReleaseRow';
 const ReleaseSidebar = lazy(() =>
   import('@/components/organisms/release-sidebar').then(m => ({
     default: m.ReleaseSidebar,
+  }))
+);
+
+const TrackSidebar = lazy(() =>
+  import('@/components/organisms/release-sidebar').then(m => ({
+    default: m.TrackSidebar,
   }))
 );
 
@@ -233,6 +245,9 @@ export function ShellReleasesView({
     null
   );
   const [isDeleting, setIsDeleting] = useState(false);
+  const [editingTrack, setEditingTrack] = useState<TrackSidebarData | null>(
+    null
+  );
 
   const releaseRows = useMemo(() => [...releases], [releases]);
   const {
@@ -365,6 +380,53 @@ export function ShellReleasesView({
       openEditor(release);
     },
     [openEditor]
+  );
+
+  const selectedReleaseIndex = useMemo(() => {
+    if (!editingRelease) return null;
+    const idx = visibleReleases.findIndex(r => r.id === editingRelease.id);
+    return idx === -1 ? null : idx;
+  }, [editingRelease, visibleReleases]);
+
+  const handleAmbientSelect = useCallback(
+    (index: number) => {
+      const target = visibleReleases[index];
+      if (target) openEditor(target);
+    },
+    [openEditor, visibleReleases]
+  );
+
+  useAmbientListSelection({
+    enabled: visibleReleases.length > 0,
+    count: visibleReleases.length,
+    selectedIndex: selectedReleaseIndex,
+    onSelect: handleAmbientSelect,
+  });
+
+  const openTrackDrawer = useCallback(
+    (trackData: TrackSidebarData) => {
+      closeEditor();
+      setAddReleaseOpen(false);
+      setEditingTrack(current =>
+        current?.id === trackData.id ? null : trackData
+      );
+    },
+    [closeEditor]
+  );
+
+  const closeTrackDrawer = useCallback(() => {
+    setEditingTrack(null);
+  }, []);
+
+  const handleBackToReleaseFromTrack = useCallback(
+    (releaseId: string) => {
+      const release = rows.find(r => r.id === releaseId);
+      if (release) {
+        setEditingTrack(null);
+        openEditor(release);
+      }
+    },
+    [openEditor, rows]
   );
 
   const handleArtworkUpload = uploadReleaseArtwork;
@@ -602,9 +664,34 @@ export function ShellReleasesView({
   );
 
   const isReleaseSidebarOpen = Boolean(editingRelease);
-  const isSidebarOpen = isReleaseSidebarOpen || addReleaseOpen;
+  const isTrackSidebarOpen = Boolean(editingTrack);
+  const isSidebarOpen =
+    isReleaseSidebarOpen || isTrackSidebarOpen || addReleaseOpen;
 
   const sidebarPanel = useMemo(() => {
+    if (isTrackSidebarOpen) {
+      return (
+        <Suspense
+          fallback={
+            <DrawerLoadingSkeleton
+              ariaLabel='Loading track details'
+              width={RELEASE_DETAIL_PANEL_WIDTH}
+              showTabs={false}
+              contentRows={5}
+            />
+          }
+        >
+          <TrackSidebar
+            track={editingTrack}
+            isOpen={isTrackSidebarOpen}
+            width={RELEASE_DETAIL_PANEL_WIDTH}
+            onClose={closeTrackDrawer}
+            onBackToRelease={handleBackToReleaseFromTrack}
+          />
+        </Suspense>
+      );
+    }
+
     if (!isReleaseSidebarOpen) {
       if (addReleaseOpen && canCreateManualReleases) {
         return (
@@ -665,6 +752,7 @@ export function ShellReleasesView({
       showCredits: true,
       designV1: true,
       onCanvasStatusUpdate: handleCanvasStatusUpdate,
+      onTrackClick: openTrackDrawer,
     };
 
     return (
@@ -689,11 +777,14 @@ export function ShellReleasesView({
     canEditSmartLinks,
     closeAddRelease,
     closeEditor,
+    closeTrackDrawer,
     editingRelease,
+    editingTrack,
     handleAddReleaseCreated,
     handleAddUrl,
     handleArtworkRevert,
     handleArtworkUpload,
+    handleBackToReleaseFromTrack,
     handleCanvasStatusUpdate,
     handleFormatLyrics,
     handleGenerateAlbumArt,
@@ -709,6 +800,8 @@ export function ShellReleasesView({
     isReleaseSidebarOpen,
     isRescanningIsrc,
     isSaving,
+    isTrackSidebarOpen,
+    openTrackDrawer,
     providerConfig,
     refreshingReleaseId,
     showGenerateAlbumArtAction,
@@ -799,7 +892,9 @@ export function ShellReleasesView({
 
   useEffect(() => {
     const toggle = () => {
-      if (editingRelease) {
+      if (editingTrack) {
+        closeTrackDrawer();
+      } else if (editingRelease) {
         closeEditor();
       } else if (rowsRef.current.length > 0) {
         openEditor(rowsRef.current[0]);
@@ -813,7 +908,9 @@ export function ShellReleasesView({
     });
   }, [
     closeEditor,
+    closeTrackDrawer,
     editingRelease,
+    editingTrack,
     isSidebarOpen,
     openEditor,
     rows.length,

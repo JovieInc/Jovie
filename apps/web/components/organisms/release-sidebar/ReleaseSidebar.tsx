@@ -559,6 +559,7 @@ export function ReleaseSidebar({
   showCredits = true,
   onCanvasStatusUpdate,
   designV1 = false,
+  onTrackClick,
 }: ReleaseSidebarProps) {
   const {
     isAddingLink,
@@ -935,6 +936,7 @@ export function ReleaseSidebar({
               <ReleaseTrackList
                 release={release}
                 tracksOverride={tracksOverride}
+                onTrackClick={onTrackClick}
               />
             </DrawerSection>
           ) : null}
