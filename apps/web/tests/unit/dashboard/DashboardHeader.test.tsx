@@ -1,4 +1,4 @@
-import { render, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { DashboardHeader } from '@/components/features/dashboard/organisms/DashboardHeader';
 
@@ -25,5 +25,48 @@ describe('DashboardHeader', () => {
       'p-1'
     );
     expect(actionWrapper).toHaveClass('flex', 'items-center', 'gap-1');
+  });
+
+  it('renders the breadcrumb alongside the closed search surface', () => {
+    const { container } = render(
+      <DashboardHeader
+        breadcrumbs={[{ label: 'Releases', href: '/app/dashboard/releases' }]}
+        searchSurface={<button type='button'>Search Releases</button>}
+        isSearchActive={false}
+      />
+    );
+
+    const desktopRow = container.querySelector(
+      '[data-search-active="false"]'
+    ) as HTMLElement | null;
+    expect(desktopRow).not.toBeNull();
+    // Breadcrumb label remains visible alongside the inline trigger.
+    expect(within(desktopRow!).getAllByText('Releases').length).toBeGreaterThan(
+      0
+    );
+    expect(
+      within(desktopRow!).getByRole('button', { name: 'Search Releases' })
+    ).toBeInTheDocument();
+  });
+
+  it('collapses the breadcrumb when the search surface takes over', () => {
+    const { container } = render(
+      <DashboardHeader
+        breadcrumbs={[{ label: 'Releases', href: '/app/dashboard/releases' }]}
+        searchSurface={
+          <input type='search' aria-label='Filter releases' defaultValue='' />
+        }
+        isSearchActive
+      />
+    );
+
+    const desktopRow = container.querySelector(
+      '[data-search-active="true"]'
+    ) as HTMLElement | null;
+    expect(desktopRow).not.toBeNull();
+    expect(within(desktopRow!).queryByText('Releases')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('searchbox', { name: 'Filter releases' })
+    ).toBeInTheDocument();
   });
 });
