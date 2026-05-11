@@ -15,7 +15,8 @@ export type AudienceSegment =
   | 'returning'
   | 'frequent'
   | 'recent24h'
-  | 'touringCity';
+  | 'touringCity'
+  | 'alertsOn';
 
 /** Filter state for audience table -- mirrors ReleaseFilters pattern */
 export interface AudienceFilters {

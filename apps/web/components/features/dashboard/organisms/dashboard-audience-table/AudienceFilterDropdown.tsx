@@ -12,13 +12,15 @@ type SegmentId =
   | 'returning'
   | 'frequent'
   | 'recent24h'
-  | 'touringCity';
+  | 'touringCity'
+  | 'alertsOn';
 
 const SEGMENT_OPTIONS: readonly {
   id: SegmentId;
   label: string;
   iconName: string;
 }[] = [
+  { id: 'alertsOn', label: 'Alerts On', iconName: 'Bell' },
   { id: 'highIntent', label: 'High Intent', iconName: 'Bolt' },
   { id: 'returning', label: 'Returning', iconName: 'RefreshCw' },
   { id: 'frequent', label: '3+ Visits', iconName: 'RefreshCw' },

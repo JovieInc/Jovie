@@ -58,10 +58,10 @@ import { AudienceTableSubheader } from './AudienceTableSubheader';
 import { buildAudienceActions } from './audience-actions';
 import {
   AudienceActionCell,
+  AudienceAlertsCell,
   AudienceEngagementBars,
   AudienceFanCell,
   AudienceLastCell,
-  AudienceSignalCell,
   AudienceStateCell,
   NowMsProvider,
 } from './cells';
@@ -122,7 +122,7 @@ function sanitizeQrFilename(value: string): string {
 
 /**
  * Compact 6-column layout per the redesigned mockup.
- * Layout: Select | Fan | State | Signal | Engagement | Last | Action
+ * Layout: Select | Fan | State | Alerts | Engagement | Last | Action
  */
 function buildMemberColumns(
   mode: 'members' | 'subscribers'
@@ -153,10 +153,10 @@ function buildMemberColumns(
       enableSorting: false,
     }),
     memberColumnHelper.display({
-      id: 'signal',
-      header: 'Signal',
-      cell: ({ row }) => <AudienceSignalCell member={row.original} />,
-      size: 80,
+      id: 'alerts',
+      header: 'Alerts',
+      cell: ({ row }) => <AudienceAlertsCell member={row.original} />,
+      size: 96,
       enableSorting: false,
     }),
     memberColumnHelper.accessor('engagementScore', {
@@ -205,19 +205,19 @@ function getAudienceTableLayout(width: number): AudienceTableLayout {
  * Progressive hiding is based on the measured desktop table container width,
  * not the window width, so the layout adapts correctly with the shell sidebar
  * and right drawer both open and closed. Hide order at narrow widths:
- * SIGNAL → ENGAGEMENT → STATE → LAST. (FAN + ACTION + select always render.)
+ * ALERTS → ENGAGEMENT → STATE → LAST. (FAN + ACTION + select always render.)
  */
 function getColumnVisibility(width: number): VisibilityState {
   switch (getAudienceTableLayout(width)) {
     case 'narrow':
       return {
-        signal: false,
+        alerts: false,
         engagement: false,
         state: false,
         last: false,
       };
     case 'medium':
-      return { signal: false, engagement: false };
+      return { alerts: false, engagement: false };
     case 'wide':
     default:
       return {};

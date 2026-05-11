@@ -10,6 +10,7 @@ import {
 import { webhookEvents } from '@/lib/db/schema/suppression';
 import { env } from '@/lib/env-server';
 import { captureCriticalError, captureError } from '@/lib/error-tracking';
+import { syncAudienceAlertState } from '@/lib/notifications/audience-alert-state';
 import {
   parseSecondaryExpiresAt,
   twilioAdapter,
@@ -371,6 +372,13 @@ async function confirmSubscriptionFromIntent(input: {
   if (consumeStatus.kind === 'not_found') {
     return { kind: 'join_not_found' };
   }
+
+  // JOV-1842: propagate the confirmed SMS subscription to audience_members.
+  // Runs outside the consume transaction so the webhook commits even if the
+  // propagation fails (helper captures its own errors).
+  await syncAudienceAlertState(consumeStatus.intent.creatorProfileId, {
+    phone: phoneNorm,
+  });
 
   return {
     kind: 'join_confirmed',

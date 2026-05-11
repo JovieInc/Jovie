@@ -309,6 +309,13 @@
       "when": 1778307491160,
       "tag": "0043_harden_waitlist_onboarding",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1778491020265,
+      "tag": "0044_chubby_ezekiel_stane",
+      "breakpoints": true
     }
   ]
 }
