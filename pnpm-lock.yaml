@@ -474,8 +474,8 @@ importers:
         specifier: ^6.7.7
         version: 6.7.7(@solana/web3.js@1.98.4(bufferutil@4.1.0)(encoding@0.1.13)(typescript@6.0.3)(utf-8-validate@6.0.6))(@types/react@19.2.14)(bs58@6.0.0)(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(immer@11.1.4)(react-dom@19.2.4(react@19.2.4))(react-native@0.83.1(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.4)(utf-8-validate@6.0.6))(react@19.2.4)(typescript@6.0.3)(use-sync-external-store@1.6.0(react@19.2.4))(utf-8-validate@6.0.6)(zod@4.3.6)
       '@clerk/testing':
-        specifier: ^2.0.24
-        version: 2.0.24(@playwright/test@1.58.2)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+        specifier: ^2.0.27
+        version: 2.0.27(@playwright/test@1.58.2)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@lhci/cli':
         specifier: ^0.15.1
         version: 0.15.1(bufferutil@4.1.0)(encoding@0.1.13)(utf-8-validate@6.0.6)
@@ -1320,8 +1320,8 @@ packages:
       react-dom:
         optional: true
 
-  '@clerk/testing@2.0.24':
-    resolution: {integrity: sha512-M0oafQaCenpkt9JiLzheE4nfv5Waota0bYV99HF6EpDcib1Y+Idn+C35A6bLjxMwVAbPK6JtelXWsci5ViG+mg==}
+  '@clerk/testing@2.0.27':
+    resolution: {integrity: sha512-U6wTIomyYxtiwbYc14Agid6KN5PNMQqSGTKGp+w1PilbZ0RqKNFwM08m+jO6eVi09wcpd3zAcVtmhVhxPSftMQ==}
     engines: {node: '>=20.9.0'}
     peerDependencies:
       '@playwright/test': ^1
@@ -15663,7 +15663,7 @@ snapshots:
       react: 19.2.4
       react-dom: 19.2.4(react@19.2.4)
 
-  '@clerk/testing@2.0.24(@playwright/test@1.58.2)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
+  '@clerk/testing@2.0.27(@playwright/test@1.58.2)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
     dependencies:
       '@clerk/backend': 3.4.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@clerk/shared': 4.8.5(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
