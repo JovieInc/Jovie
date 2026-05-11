@@ -8,10 +8,11 @@ Jovie uses a unified toast notification system that provides consistent user fee
 
 > **Note**: This notification system was designed to replace direct calls to external toast libraries and provide a consistent user experience throughout the application.
 
-## Server-delivered notifications (email/push/in-app)
+## Server-delivered notifications (email/sms/push/in-app)
 
 - Send cross-channel notifications through `lib/notifications/service.ts` to avoid duplicating provider logic.
 - Email delivery is handled by Resend (`RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `RESEND_REPLY_TO_EMAIL`). Defaults are `notifications@jov.ie` for system sender/reply-to; founder-personal mail uses `tim@jov.ie`.
+- SMS delivery is handled by Twilio (`providers/sms/twilio-sender.ts`) and gated by the global STOP suppression ledger (`notification_contacts.smsStatus`). Per-artist consent and unsubscribe are enforced upstream by the subscribe flow and release scheduler.
 - Preferences are resolved from creator profile settings (`settings.marketing_emails` + `marketingOptOut`) and channel toggles under `settings.notifications.channels`.
 - Provide a stable `id`/`dedupKey` so `dismissNotification` can stop the same message from fanning out across channels (e.g., when a user dismisses an in-app toast).
 - Example:
@@ -24,14 +25,29 @@ Jovie uses a unified toast notification system that provides consistent user fee
       category: 'product',
       subject: 'New feature available',
       text: 'Try the new dashboard filters.',
-      channels: ['email', 'in_app'],
+      channels: ['email', 'sms', 'in_app'],
     },
-    { creatorProfileId, email }
+    { creatorProfileId, email, phone }
   );
 
   // When user dismisses the in-app notification:
   await dismissNotification(`dashboard-alert-${userId}`, { creatorProfileId });
   ```
+
+### Channel type reference (`NotificationChannel` vs `NotificationDeliveryChannel`)
+
+Two channel types live in `apps/web/types/notifications.ts`. They look similar but mean different things — do not mix them.
+
+| Type | Values | Purpose | Where it lives |
+| --- | --- | --- | --- |
+| `NotificationChannel` | `'sms' \| 'email'` | Fan-facing subscription enum. What a fan picks on a public profile and what's persisted in the DB (`notification_subscriptions.channel`, `notification_contacts.*Status`). | Subscribe/unsubscribe API, fan preference UI, validation schemas |
+| `NotificationDeliveryChannel` | `'email' \| 'sms' \| 'push' \| 'in_app'` | App-wide outbound dispatch enum. The transports `sendNotification()` can target. Superset of `NotificationChannel`. | `service.ts`, notification preferences, dispatch results |
+
+Rules:
+
+- `sendNotification()` only accepts `NotificationDeliveryChannel`. SMS dispatch goes through it directly — there is no shadow type or bypass path.
+- DB-facing fan subscription code (subscribe API, fan UI) uses `NotificationChannel` because fans cannot pick `push` or `in_app`.
+- When converting between the two, the safe direction is `NotificationChannel → NotificationDeliveryChannel` (widening). Do not narrow `NotificationDeliveryChannel` to `NotificationChannel` without explicitly handling `push`/`in_app`.
 
 ## When to Use Toasts vs Console Logging
 
