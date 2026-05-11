@@ -168,6 +168,32 @@ describe('ProfileDrawerShell', () => {
     expect(onBack).toHaveBeenCalledTimes(1);
   });
 
+  // Regression: body must use definite height (not min-h) so overflow-y-auto
+  // activates when content exceeds the drawer envelope. min-h alone lets the
+  // body grow past the parent's max-h and get clipped (JOV-1993).
+  it('gives the drawer body a definite height plus overflow-y-auto for scroll', () => {
+    render(
+      <ProfileDrawerShell
+        open
+        onOpenChange={vi.fn()}
+        title='About'
+        dataTestId='scroll-drawer'
+      >
+        <div data-testid='drawer-body-content'>Body</div>
+      </ProfileDrawerShell>
+    );
+
+    const body = screen.getByTestId('drawer-body-content').parentElement;
+    expect(body).not.toBeNull();
+    expect(body?.className).toMatch(/\boverflow-y-auto\b/);
+    expect(body?.className).toMatch(
+      /\bh-\[calc\(var\(--profile-drawer-height-max\)/
+    );
+    expect(body?.className).not.toMatch(
+      /\bmin-h-\[calc\(var\(--profile-drawer-height-max\)/
+    );
+  });
+
   it('anchors embedded drawers flush to the phone shell instead of floating them', () => {
     render(
       <ProfileDrawerShell
