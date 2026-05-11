@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.233] - 2026-05-10
+
+> Sign In and Sign Up pages now show the Google and Apple buttons. The previous attempts to gate them by env var weren't taking effect in production, so the allowlist is now hardcoded.
+
+### Fixed
+
+- **`lib/auth/oauth-providers.ts`**: replaced the `NEXT_PUBLIC_CLERK_OAUTH_*_ENABLED` env-var gate with a hardcoded allowlist (apple + google). The env-var approach was unreliable — the values were set in Vercel but not inlined into the production build (likely a Turborepo cache + build-time env resolution interaction). Keeping the gate as code is the single reliable chokepoint: to remove a provider, delete its case line and Clerk dashboard entry; to add one, add a line here only after end-to-end credential verification.
+
 ## [26.4.232] - 2026-05-10
 
 > Sign In page was showing an empty box with no Google/Apple buttons after the previous auth hardening shipped. Fixed — the OAuth provider guard now reads its enablement flags correctly in the production build.
