@@ -270,7 +270,7 @@
     "@vitest/browser-playwright": "4.1.5",
     "@vitest/coverage-v8": "4.1.4",
     "autoprefixer": "^10.4.27",
-    "axe-core": "^4.11.1",
+    "axe-core": "^4.11.4",
     "babel-plugin-react-compiler": "19.1.0-rc.3",
     "danger": "^13.0.7",
     "drizzle-kit": "^0.31.10",
