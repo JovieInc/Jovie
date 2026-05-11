@@ -1,11 +1,20 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/error-tracking', () => ({
   captureError: vi.fn(),
 }));
 
 // Set secret BEFORE module import so `verifyTurnstileToken` sees it.
+const ORIGINAL_TURNSTILE_SECRET = process.env.TURNSTILE_SECRET_KEY;
 process.env.TURNSTILE_SECRET_KEY = 'test-secret-key';
+
+afterAll(() => {
+  if (ORIGINAL_TURNSTILE_SECRET === undefined) {
+    delete process.env.TURNSTILE_SECRET_KEY;
+  } else {
+    process.env.TURNSTILE_SECRET_KEY = ORIGINAL_TURNSTILE_SECRET;
+  }
+});
 
 import { isTurnstileConfigured, verifyTurnstileToken } from './verify';
 

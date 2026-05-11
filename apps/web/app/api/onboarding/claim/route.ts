@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
@@ -90,16 +90,23 @@ export async function POST(req: Request) {
     const [primary, ...others] = candidates;
     const ipAddress = extractClientIPFromRequest(req);
     const userAgent = req.headers.get('user-agent') ?? null;
+    const otherIds = others.map(o => o.id);
 
     try {
-      // Primary claim: associate the most recent conversation with the user.
-      await db
-        .update(chatConversations)
-        .set({ userId: userRow.id, updatedAt: new Date() })
-        .where(eq(chatConversations.id, primary.id));
+      // Ordering matters here. The partial unique index on (session_id) WHERE
+      // user_id IS NOT NULL means we cannot have multiple rows with the same
+      // sessionId AND user_id set. We satisfy the constraint by clearing the
+      // sessionId on superseded rows BEFORE we set user_id on the primary.
+      //
+      // Sequence (no db.transaction per .claude/rules/db.md):
+      //  1. Audit-log first — if this fails, no state mutation has happened.
+      //  2. Detach superseded rows from the session + mark superseded title
+      //     + assign them to the user. Once session_id is null, the partial
+      //     unique index no longer applies to these rows.
+      //  3. Claim the primary row last — by this point only one row with
+      //     this sessionId remains, so the unique index won't fire.
 
-      // Audit-log the claim for forensics and rollback. creatorProfileId is
-      // null here — the user has just signed up and hasn't claimed a profile.
+      // 1. Audit row first (safe to write; no FK from other tables depends on it).
       await db.insert(chatAuditLog).values({
         userId: userRow.id,
         creatorProfileId: null,
@@ -111,30 +118,33 @@ export async function POST(req: Request) {
         metadata: {
           sessionId,
           claimedConversationCount: candidates.length,
-          discardedConversationIds: others.map(o => o.id),
+          discardedConversationIds: otherIds,
         },
         ipAddress,
         userAgent,
       });
 
-      // Soft-discard any sibling conversations from the same session by
-      // suffixing their title (we keep the rows for audit, not delete).
-      // PR 3 will surface a UI for users to pick the right transcript when
-      // multiple exist (cross-device).
-      if (others.length > 0) {
-        await Promise.all(
-          others.map(other =>
-            db
-              .update(chatConversations)
-              .set({
-                userId: userRow.id,
-                title: '(superseded — claimed alongside another transcript)',
-                updatedAt: new Date(),
-              })
-              .where(eq(chatConversations.id, other.id))
-          )
-        );
+      // 2. Detach superseded siblings (clear sessionId so the partial unique
+      //    index releases them) in a single batch update via inArray. We still
+      //    set userId so the user can browse the discarded transcripts in
+      //    their dashboard, and we suffix the title to mark them as superseded.
+      if (otherIds.length > 0) {
+        await db
+          .update(chatConversations)
+          .set({
+            userId: userRow.id,
+            sessionId: null,
+            title: '(superseded — claimed alongside another transcript)',
+            updatedAt: new Date(),
+          })
+          .where(inArray(chatConversations.id, otherIds));
       }
+
+      // 3. Claim the primary row last.
+      await db
+        .update(chatConversations)
+        .set({ userId: userRow.id, updatedAt: new Date() })
+        .where(eq(chatConversations.id, primary.id));
 
       await clearOnboardingSessionCookie();
 

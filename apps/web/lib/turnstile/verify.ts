@@ -15,6 +15,8 @@ import { captureError } from '@/lib/error-tracking';
 
 const VERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
 const VERIFY_TIMEOUT_MS = 5_000;
+const MAX_ATTEMPTS = 2; // one retry on transient failure
+const RETRY_BACKOFF_MS = 250;
 
 export interface TurnstileVerifyResult {
   readonly success: boolean;
@@ -67,46 +69,73 @@ export async function verifyTurnstileToken(
     body.set('remoteip', remoteIp);
   }
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), VERIFY_TIMEOUT_MS);
+  // One bounded retry on transient failures (network errors, 5xx). Token
+  // can be re-submitted to siteverify within its short validity window;
+  // Cloudflare explicitly supports this for the same token.
+  let lastTransientReason: string | null = null;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), VERIFY_TIMEOUT_MS);
+    try {
+      const response = await fetch(VERIFY_URL, {
+        method: 'POST',
+        body,
+        signal: controller.signal,
+      });
 
-  try {
-    const response = await fetch(VERIFY_URL, {
-      method: 'POST',
-      body,
-      signal: controller.signal,
-    });
+      if (!response.ok) {
+        // 5xx is transient and worth retrying; 4xx is not.
+        if (response.status >= 500 && attempt < MAX_ATTEMPTS - 1) {
+          lastTransientReason = `siteverify_http_${response.status}`;
+          await sleep(RETRY_BACKOFF_MS);
+          continue;
+        }
+        return {
+          success: false,
+          reason: `siteverify_http_${response.status}`,
+        };
+      }
 
-    if (!response.ok) {
+      const data = (await response.json()) as SiteverifyResponse;
+      if (data.success) {
+        return { success: true };
+      }
+      // siteverify returned 200 but success=false — definitive failure, do not retry
       return {
         success: false,
-        reason: `siteverify_http_${response.status}`,
+        errorCodes: data['error-codes'] ?? [],
+        reason: 'siteverify_failed',
       };
+    } catch (error) {
+      const isAbort =
+        (error as { name?: string } | null)?.name === 'AbortError';
+      const reason = isAbort ? 'siteverify_timeout' : 'siteverify_error';
+      // Retry on timeout and network errors
+      if (attempt < MAX_ATTEMPTS - 1) {
+        lastTransientReason = reason;
+        await sleep(RETRY_BACKOFF_MS);
+        continue;
+      }
+      if (!isAbort) {
+        await captureError('Turnstile siteverify request failed', error, {
+          context: 'turnstile_verify',
+        });
+      }
+      return { success: false, reason };
+    } finally {
+      clearTimeout(timeoutId);
     }
-
-    const data = (await response.json()) as SiteverifyResponse;
-    if (data.success) {
-      return { success: true };
-    }
-    return {
-      success: false,
-      errorCodes: data['error-codes'] ?? [],
-      reason: 'siteverify_failed',
-    };
-  } catch (error) {
-    const isAbort = (error as { name?: string } | null)?.name === 'AbortError';
-    if (!isAbort) {
-      await captureError('Turnstile siteverify request failed', error, {
-        context: 'turnstile_verify',
-      });
-    }
-    return {
-      success: false,
-      reason: isAbort ? 'siteverify_timeout' : 'siteverify_error',
-    };
-  } finally {
-    clearTimeout(timeoutId);
   }
+
+  // Unreachable in practice (loop returns on every path), but tsc requires a return
+  return {
+    success: false,
+    reason: lastTransientReason ?? 'siteverify_exhausted_retries',
+  };
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 /**

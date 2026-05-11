@@ -1,8 +1,17 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 
 // SESSION_SECRET must be set BEFORE we import the module (server-only import
 // calls cookies() lazily, but signing reads the secret at function-call time).
+const ORIGINAL_SESSION_SECRET = process.env.SESSION_SECRET;
 process.env.SESSION_SECRET = 'test-session-secret-test-session-secret-padding';
+
+afterAll(() => {
+  if (ORIGINAL_SESSION_SECRET === undefined) {
+    delete process.env.SESSION_SECRET;
+  } else {
+    process.env.SESSION_SECRET = ORIGINAL_SESSION_SECRET;
+  }
+});
 
 // Mock next/headers so the cookie module doesn't crash when imported outside
 // a request scope. Only encode/verify are exercised in this test file.

@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import * as Sentry from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { isSecureEnv } from '@/lib/env-server';
+import { env, isSecureEnv } from '@/lib/env-server';
 import { createAuthenticatedCorsHeaders } from '@/lib/http/headers';
 import {
   encodeSessionCookie,
@@ -163,7 +163,31 @@ export async function tryHandleAnonymousOnboardingChat(
 
   // --- Turnstile gate: required for the first message of a fresh session ---
   if (!existingSessionId) {
-    if (isTurnstileConfigured()) {
+    if (!isTurnstileConfigured()) {
+      // Fail-closed in production/preview: if Turnstile keys aren't configured
+      // we must NOT silently let bot traffic through. A missing secret is an
+      // ops gap, not a feature flag — surface as 503 so it pages and gets
+      // fixed instead of opening the LLM spend to unauthenticated bots.
+      // Local dev (NODE_ENV === 'development') is the one exemption: contributors
+      // shouldn't need Cloudflare creds to run the dev server locally.
+      if (env.NODE_ENV !== 'development') {
+        Sentry.captureMessage(
+          'Turnstile not configured in non-dev env — onboarding chat returning 503',
+          { level: 'error' }
+        );
+        return NextResponse.json(
+          {
+            error: 'Onboarding chat is temporarily unavailable',
+            errorCode: 'TURNSTILE_NOT_CONFIGURED',
+            requestId,
+          },
+          {
+            status: 503,
+            headers: { ...corsHeaders, 'x-request-id': requestId },
+          }
+        );
+      }
+    } else {
       const verify = await verifyTurnstileToken(parsed.data.turnstileToken, ip);
       if (!verify.success) {
         return NextResponse.json(
@@ -183,13 +207,6 @@ export async function tryHandleAnonymousOnboardingChat(
         );
       }
     }
-    // First successful turn: stamp a verification flag so subsequent turns skip
-    // the gate even if the client forgets to send the token. (We intentionally
-    // don't persist this in Redis yet — the session-lifetime rate limiter
-    // already enforces a 20-turn cap per cookie, and the cookie itself carries
-    // signed trust forward. PR 2 may add a Redis flag when the LLM call goes
-    // live and we want a stricter "second turn requires not-yet-elapsed
-    // verification" rule.)
   }
 
   // --- Rate limits: IP + ASN + session ---
@@ -261,8 +278,14 @@ function parseCookieHeader(header: string): Map<string, string> {
     if (eq <= 0) continue;
     const name = part.slice(0, eq).trim();
     const value = part.slice(eq + 1).trim();
-    if (name) {
+    if (!name) continue;
+    // decodeURIComponent throws on malformed `%` escapes (e.g. `%zz`). The
+    // Cookie header is attacker-controlled, so wrap defensively: skip the bad
+    // cookie rather than crashing the whole handler.
+    try {
       map.set(name, decodeURIComponent(value));
+    } catch {
+      // Skip malformed cookie value; do not let it crash the handler.
     }
   }
   return map;
