@@ -41,6 +41,13 @@ export interface EntitySidebarShellProps {
    * elements (e.g., entity card + analytics) — they stack with space-y-2.
    */
   readonly entityHeader?: ReactNode;
+  /**
+   * Controls whether the minimal-mode entity header is wrapped in a card surface.
+   * Defaults to `card` to preserve legacy visuals. Pass `flat` when the caller
+   * already provides its own card chrome to avoid nested card-on-card stacking.
+   * Only applies when `headerMode='minimal'`.
+   */
+  readonly entityHeaderSurface?: 'card' | 'flat';
   /** When true, header actions render inside the entity header card instead of the title bar */
   readonly actionsInEntityHeader?: boolean;
   /** Tabs slot — SegmentControl rendered below entity header in standard mode */
@@ -104,6 +111,7 @@ export function EntitySidebarShell({
   headerMode = 'standard',
   hideMinimalHeaderBar = false,
   entityHeader,
+  entityHeaderSurface = 'card',
   actionsInEntityHeader = false,
   tabs,
   minimalTabsPlacement = 'card',
@@ -137,16 +145,27 @@ export function EntitySidebarShell({
   const titleBarActions = actionsInEntityHeader
     ? closeAction
     : (headerActions ?? closeAction);
-  const minimalEntityHeaderContent =
-    isMinimalHeader && !isEmpty && entityHeader ? (
-      <DrawerSurfaceCard
-        testId='entity-sidebar-entity-header'
-        variant='card'
-        className='overflow-hidden lg:mx-0 lg:mt-0'
-      >
-        {entityHeader}
-      </DrawerSurfaceCard>
-    ) : null;
+  let minimalEntityHeaderContent: ReactNode = null;
+  if (isMinimalHeader && !isEmpty && entityHeader) {
+    minimalEntityHeaderContent =
+      entityHeaderSurface === 'card' ? (
+        <DrawerSurfaceCard
+          testId='entity-sidebar-entity-header'
+          variant='card'
+          className='overflow-hidden lg:mx-0 lg:mt-0'
+        >
+          {entityHeader}
+        </DrawerSurfaceCard>
+      ) : (
+        <div
+          data-testid='entity-sidebar-entity-header'
+          data-surface-variant='flat'
+          className='lg:mx-0 lg:mt-0'
+        >
+          {entityHeader}
+        </div>
+      );
+  }
   let footerNode: ReactNode = null;
   if (footer) {
     footerNode =

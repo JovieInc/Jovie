@@ -1030,6 +1030,7 @@ export function ReleaseSidebar({
       data-testid='release-sidebar'
       headerMode='minimal'
       hideMinimalHeaderBar
+      entityHeaderSurface='flat'
       entityHeader={
         release ? (
           <ReleaseEntityHeader
