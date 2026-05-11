@@ -57,8 +57,7 @@ export function isOAuthProviderEnabled(provider: ClerkOAuthProvider): boolean {
       return false;
     default: {
       const _exhaustive: never = provider;
-      void _exhaustive;
-      return false;
+      return _exhaustive;
     }
   }
 }

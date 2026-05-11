@@ -31,7 +31,7 @@ export function UpdateAvailablePill({
     setUpdating(true);
 
     if (desktop.available) {
-      void desktop.install();
+      desktop.install();
     } else {
       web.reload();
     }
