@@ -1,6 +1,6 @@
 'use client';
 
-import { ExternalLink, MoreHorizontal } from 'lucide-react';
+import { Clock, ExternalLink, Lock, MoreHorizontal } from 'lucide-react';
 import Link from 'next/link';
 import { type KeyboardEvent, memo, useMemo } from 'react';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
@@ -13,6 +13,8 @@ import type { ReleaseViewModel } from '@/lib/discography/types';
 import { dropDateMeta } from '@/lib/format-drop-date';
 import { cn } from '@/lib/utils';
 import { releaseStatusToShell, releaseToDspItems } from './release-adapters';
+
+export type ShellRowLockReason = 'scheduled' | 'cap' | null;
 
 /**
  * Linear-style release row for the DESIGN_V1 path. Replaces the legacy
@@ -29,11 +31,13 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
   isSelected,
   onSelect,
   actionMenuItems,
+  smartLinkLockReason = null,
 }: {
   readonly release: ReleaseViewModel;
   readonly isSelected: boolean;
   readonly onSelect: () => void;
   readonly actionMenuItems?: TableActionMenuItem[];
+  readonly smartLinkLockReason?: ShellRowLockReason;
 }) {
   const dspItems = useMemo(() => releaseToDspItems(release), [release]);
   const dropMeta = useMemo(
@@ -43,6 +47,7 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
   const status = releaseStatusToShell(release.status);
   const artistLabel = release.artistNames?.join(', ') ?? '';
   const smartLinkPath = release.smartLinkPath || `/${release.slug}`;
+  const isSmartLinkLocked = smartLinkLockReason !== null;
 
   function handleKeyDown(e: KeyboardEvent<HTMLDivElement>) {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -61,7 +66,7 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
       data-shell-release-row
       data-release-id={release.id}
       className={cn(
-        'group/row relative flex items-center gap-3 px-3 h-14 rounded-md cursor-pointer transition-colors duration-150 ease-out outline-none focus-visible:ring-1 focus-visible:ring-cyan-400/50',
+        'group/row relative flex items-center gap-3 px-3 h-14 rounded-md cursor-pointer transition-colors duration-subtle ease-out outline-none focus-visible:ring-1 focus-visible:ring-cyan-400/50',
         isSelected
           ? 'bg-(--linear-bg-surface-1)/80'
           : 'hover:bg-(--linear-bg-surface-1)/50'
@@ -103,17 +108,42 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
         <DspAvatarStack dsps={dspItems} />
       </div>
 
-      <Link
-        href={smartLinkPath}
-        target='_blank'
-        rel='noreferrer'
-        onClick={e => e.stopPropagation()}
-        title={`Open smart link · ${smartLinkPath}`}
-        aria-label={`Open smart link for ${release.title}`}
-        className='shrink-0 h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-colors duration-150 ease-out'
-      >
-        <ExternalLink className='h-3 w-3' strokeWidth={2.25} />
-      </Link>
+      {isSmartLinkLocked ? (
+        <span
+          role='img'
+          aria-label={
+            smartLinkLockReason === 'scheduled'
+              ? `Scheduled smart link (Pro) for ${release.title}`
+              : `Smart link locked (Pro) for ${release.title}`
+          }
+          title={
+            smartLinkLockReason === 'scheduled'
+              ? 'Pre-release smart link requires Pro'
+              : 'Smart link locked — upgrade for more'
+          }
+          data-shell-release-smart-link-locked='true'
+          data-shell-release-smart-link-lock-reason={smartLinkLockReason}
+          className='shrink-0 h-7 w-7 rounded-md grid place-items-center text-quaternary-token cursor-not-allowed'
+        >
+          {smartLinkLockReason === 'scheduled' ? (
+            <Clock className='h-3 w-3' strokeWidth={2.25} aria-hidden='true' />
+          ) : (
+            <Lock className='h-3 w-3' strokeWidth={2.25} aria-hidden='true' />
+          )}
+        </span>
+      ) : (
+        <Link
+          href={smartLinkPath}
+          target='_blank'
+          rel='noreferrer'
+          onClick={e => e.stopPropagation()}
+          title={`Open smart link · ${smartLinkPath}`}
+          aria-label={`Open smart link for ${release.title}`}
+          className='shrink-0 h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-colors duration-subtle ease-out'
+        >
+          <ExternalLink className='h-3 w-3' strokeWidth={2.25} />
+        </Link>
+      )}
 
       {actionMenuItems && actionMenuItems.length > 0 ? (
         <TableActionMenu items={actionMenuItems} trigger='custom' align='end'>
@@ -123,7 +153,7 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
             onKeyDown={e => e.stopPropagation()}
             aria-label={`Release actions for ${release.title}`}
             className={cn(
-              'shrink-0 h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-[opacity,color,background-color] duration-150 ease-out',
+              'shrink-0 h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-[opacity,color,background-color] duration-subtle ease-out',
               'opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100',
               isSelected && 'opacity-100'
             )}
