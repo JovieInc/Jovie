@@ -102,6 +102,12 @@ export default defineConfig({
     ...changedSuiteStabilityConfig,
 
     // Coverage disabled by default for speed (enable with --coverage flag)
+    //
+    // Thresholds are part of the risk-based testing strategy. See
+    // docs/TEST_RISK_REGISTER.md for the surface taxonomy and target_coverage
+    // values. Phase 0 sets thresholds at current baselines (warnings via the
+    // heatmap, not vitest errors). Phase 2 ratchets per-glob thresholds to the
+    // register targets and lets vitest --coverage fail CI on regression.
     coverage: {
       enabled: false,
       provider: 'v8',
@@ -115,7 +121,29 @@ export default defineConfig({
         '**/coverage/**',
         '.next/**',
         'dist/**',
+        '**/__generated__/**',
+        '**/*.gen.ts',
+        'app/**/layout.tsx',
+        'app/**/loading.tsx',
+        'app/**/not-found.tsx',
       ],
+      // Global thresholds are intentionally low — the heatmap is the
+      // enforcement mechanism in Phase 0. Per-glob thresholds below track
+      // critical surfaces (raised in Phase 2).
+      thresholds: {
+        lines: 0,
+        branches: 0,
+        functions: 0,
+        statements: 0,
+        perFile: false,
+        // Critical surfaces — Phase 2 will raise these to the targets in
+        // docs/TEST_RISK_REGISTER.md (90, 95, 85, etc.).
+        'lib/entitlements/**/*.ts': { branches: 0, lines: 0 },
+        'app/api/stripe/webhooks/**/*.ts': { branches: 0, lines: 0 },
+        'app/api/webhooks/**/*.ts': { branches: 0, lines: 0 },
+        'app/api/dev/test-auth/**/*.ts': { branches: 0, lines: 0 },
+        'lib/auth/test-mode.ts': { branches: 0, lines: 0 },
+      },
     },
 
     // Reduce reporter overhead - basic was removed in vitest 4, use default with summary:false

@@ -6,7 +6,13 @@ export default {
   coverageAnalysis: 'perTest',
   disableTypeChecks: false,
   reporters: ['progress', 'clear-text', 'json'],
+  // Critical-surface targets driven by docs/TEST_RISK_REGISTER.md.
+  // Mutation testing is where coverage % stops lying about test strength —
+  // assertions that exercise but don't verify are exactly what mutation
+  // testing surfaces. Expand this list conservatively (one new surface per
+  // quarter per the strategy in docs/TESTING_GUIDELINES.md).
   mutate: [
+    // Validation + onboarding helpers (existing — pure functions, fast)
     'constants/platforms/utils.ts',
     'lib/validation/handle.ts',
     'lib/validation/username.ts',
@@ -20,10 +26,24 @@ export default {
     'lib/onboarding/reserved-handle.ts',
     'lib/onboarding/return-to.ts',
     'lib/onboarding/session-keys.ts',
+    // Entitlements (existing — critical gating)
     'lib/entitlements/**/*.ts',
+    // Billing helpers (existing)
     'lib/billing/verified-upgrade.ts',
     'lib/stripe/connect-readiness.ts',
     'lib/stripe/plan-change.ts',
+    // High-blast-radius additions per docs/TEST_RISK_REGISTER.md.
+    // The heatmap currently shows 82% line coverage on the webhook route
+    // but ~0% on negative paths (signature failures, replay, idempotency
+    // collisions). Mutation testing will surface assertions that don't
+    // exercise these branches.
+    'app/api/stripe/webhooks/route.ts',
+    // FAPI host decoding + Clerk env key resolution — broken auth here
+    // locks out every user across all three Clerk environments.
+    'lib/auth/decode-fapi-host.ts',
+    'lib/auth/staging-clerk-keys.ts',
+    'lib/auth/test-mode.ts',
+    // Standard exclusions
     '!**/*.test.ts',
     '!**/*.test.tsx',
     '!**/*.d.ts',

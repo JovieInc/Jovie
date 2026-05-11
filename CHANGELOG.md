@@ -5,6 +5,32 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.235] - 2026-05-10
+
+> [internal] Coverage heatmap and risk register infrastructure for autonomous-agent shipping. Nightly audit cron, generator script, and instrumentation fixes surfaced by an /autoplan adversarial review.
+
+### Added
+
+- [internal] **Test risk register** (`docs/TEST_RISK_REGISTER.md`): hand-curated taxonomy of 11 high-risk surfaces with blast-radius / reversibility / visibility scores. YAML front-matter is the machine-readable form; rendered table for humans.
+- [internal] **Coverage heatmap** (`docs/TEST_COVERAGE_HEATMAP.md`): auto-generated from the risk register joined with v8 coverage + Stryker mutation scores. Priority queue, stale-row detector, unmapped-churn detector, flake tracking, mutation-score warnings.
+- [internal] **Heatmap generator** (`scripts/audit-test-coverage.ts`, 900+ LOC): zero new npm deps. Modes: default, `--check-pr`, `--dry-run`. Reads v8 coverage, Stryker JSON, flake report, 90-day git churn; writes heatmap markdown + committed JSON snapshot baseline at `apps/web/reports/test-coverage-snapshot.json`.
+- [internal] **Nightly audit workflow** (`.github/workflows/test-coverage-audit.yml`): 06:00 UTC cron. Rebases before push to handle race conditions; opens a GitHub issue on failure.
+- [internal] **Proxy extraction plan** (`docs/PROXY_EXTRACTION_CANDIDATES.md`): risk-ordered plan to split the 1,412-line `apps/web/proxy.ts` into per-domain modules so per-region coverage becomes measurable.
+- [internal] `pnpm run test:coverage:report` and `pnpm run test:coverage:diff` root scripts.
+
+### Changed
+
+- [internal] **Stryker mutate[]** (`apps/web/stryker.config.mjs`): extended to include `app/api/stripe/webhooks/route.ts`, `lib/auth/decode-fapi-host.ts`, `lib/auth/staging-clerk-keys.ts`, `lib/auth/test-mode.ts`. Mutation testing now exercises the highest-blast-radius infra paths, not just validation helpers.
+- [internal] **Vitest config** (`apps/web/vitest.config.fast.mts`): added `coverage.thresholds` scaffolding for critical globs (set to 0 in this PR; raised to register targets in a future PR per JOV-2128).
+- [internal] **`.claude/rules/testing.md`**: added "Risk-Based Testing" section at the top with explicit links to the heatmap, register, and the decision rule for when agents must add tests. Closes the discoverability dead-end where agents could read CLAUDE.md → testing rules without finding the heatmap.
+
+### Fixed
+
+- [internal] **`--check-pr` no-op defect** surfaced by /autoplan eng subagent: snapshot lived at `.context/test-coverage-snapshot.json` (gitignored) and the cron didn't commit it, so any CI delta check found no baseline and exited 0 silently. Moved snapshot to `apps/web/reports/test-coverage-snapshot.json` (committed), updated the cron to commit it with `git pull --rebase --autostash` before push, and added `gh issue create` on cron failure.
+- [internal] **Per-region proxy.ts coverage hallucination**: three register rows (clerk-routing, investor-portal, audience-block) all globbed the same file and reported identical 68.2%. Collapsed into one `proxy` row; per-region tracking deferred until the extraction plan ships.
+- [internal] **CI Clerk secret scope**: workflow scoped unprefixed `CLERK_*` secrets (= production keypair per `.claude/rules/auth.md`) for the coverage step, even though unit tests are auth-mocked at the SDK boundary. Replaced with `pk_test_*` / `sk_test_*` dummies — no production credentials in scope for the coverage workflow.
+- [internal] **Hardcoded `assertion_ratio = 0.5` formula bias**: the stub inflated every risk score uniformly by ~+10 via its 20% weight. Removed from the formula; `coverage_score` now uses line + branch only (50/50). Status assignments unchanged (thresholds at 30/18).
+
 ## [26.4.234] - 2026-05-10
 
 > Apple Sign In was still failing the OAuth callback step. The Clerk proxy now correctly resolves relative redirect URLs that come back from Apple's "Hide My Email" flow.
