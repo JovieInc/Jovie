@@ -1,9 +1,18 @@
 import 'server-only';
 import { randomUUID } from 'node:crypto';
 import * as Sentry from '@sentry/nextjs';
+import type { UIMessage } from 'ai';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { executeChatTurn, isClientDisconnect } from '@/lib/chat/run';
+import {
+  buildOnboardingTools,
+  createOnboardingTurnState,
+} from '@/lib/chat/tools/onboarding-tool-impls';
+import type { ChatTelemetry } from '@/lib/chat/types';
+import { getEntitlements } from '@/lib/entitlements/registry';
 import { env, isSecureEnv } from '@/lib/env-server';
+import { checkGateForUser } from '@/lib/flags/server';
 import { createAuthenticatedCorsHeaders } from '@/lib/http/headers';
 import {
   encodeSessionCookie,
@@ -20,26 +29,42 @@ import {
 } from '@/lib/turnstile/verify';
 import { extractClientIPFromRequest } from '@/lib/utils/ip-extraction';
 
+/** Statsig kill-switch gate for the anonymous onboarding chat (JOV-2132). */
+const ONBOARDING_CHAT_GATE = 'onboarding_chat_v2';
+
+/** Maximum onboarding messages we accept in a single request payload. */
+const MAX_ONBOARDING_MESSAGES = 50;
+
+/** Maximum text length per onboarding message. */
+const MAX_ONBOARDING_MESSAGE_LENGTH = 4000;
+
 /**
- * Anonymous onboarding chat handler (JOV-2132 PR 1 — scaffolding).
+ * Anonymous onboarding chat handler (JOV-2132).
  *
- * Wires the request through the abuse-containment gates that PR 2's actual
- * LLM tools will run behind:
- *  1. Resolve or mint a signed onboarding session cookie.
- *  2. Resolve IP + ASN from request headers.
- *  3. Verify a Cloudflare Turnstile token on the first message of the session.
- *  4. Apply IP + ASN + session-lifetime rate limits.
- *  5. Return 501 Not Implemented (real LLM dispatch lands in PR 2).
+ * Gate chain (in order):
+ *  1. Statsig kill-switch `onboarding_chat_v2` — return 503 if disabled.
+ *  2. Resolve or mint a signed onboarding session cookie.
+ *  3. Resolve client IP (via trusted proxy header helper) + ASN.
+ *  4. Verify Cloudflare Turnstile token on the first message of a fresh
+ *     session. Fail-closed when unconfigured in non-dev envs.
+ *  5. Apply IP + ASN + session-lifetime rate limits.
+ *  6. Validate the UIMessage payload (length caps).
+ *  7. Dispatch `executeChatTurn` with `mode='onboarding'`, the onboarding
+ *     tool palette, and the Stanley-style system prompt. Stream the
+ *     UIMessage response back.
  *
  * Returns `null` when the request is not addressed to onboarding mode, so the
  * main `/api/chat` handler can fall through to the authenticated chat flow.
  */
 
-const TURNSTILE_VERIFIED_FLAG_PREFIX = 'anon_onb_chat_verified';
-
 const onboardingPayloadSchema = z.object({
   mode: z.literal('onboarding'),
   turnstileToken: z.string().max(2048).optional(),
+  /**
+   * UIMessage[] from the AI SDK client. Validated for shape elsewhere (message
+   * role + parts structure); we only enforce length caps here.
+   */
+  messages: z.array(z.unknown()).max(MAX_ONBOARDING_MESSAGES).optional(),
 });
 
 interface PeekedBody {
@@ -117,6 +142,27 @@ export async function tryHandleAnonymousOnboardingChat(
 
   Sentry.setTag('chat_mode', 'onboarding');
   Sentry.setTag('chat_anonymous', 'true');
+
+  // --- Statsig kill switch (onboarding_chat_v2) ---
+  // The whole onboarding surface is gated. When the gate evaluates to false
+  // (default OFF / kill-switch flipped) we return 503 so on-call sees a
+  // clean signal and we never quietly burn LLM spend during an incident.
+  // Anonymous → pass `null` userId; Statsig falls back to public conditions.
+  const onboardingEnabled = await checkGateForUser(
+    null,
+    ONBOARDING_CHAT_GATE,
+    false
+  );
+  if (!onboardingEnabled) {
+    return NextResponse.json(
+      {
+        error: 'Onboarding chat is temporarily unavailable',
+        errorCode: 'ONBOARDING_CHAT_DISABLED',
+        requestId,
+      },
+      { status: 503, headers: { ...corsHeaders, 'x-request-id': requestId } }
+    );
+  }
 
   // --- Session cookie: read existing or mint a new one ---
   const incomingCookieHeader = req.headers.get('cookie') || '';
@@ -226,44 +272,179 @@ export async function tryHandleAnonymousOnboardingChat(
     );
   }
 
-  // PR 1 scope ends here. PR 2 will replace this 501 with the actual
-  // executeChatTurn dispatch (Haiku-forced, onboarding tools wired in).
-  const response = NextResponse.json(
-    {
-      error: 'Onboarding chat not yet implemented',
-      message:
-        'Onboarding chat infrastructure landed in JOV-2132 PR 1; LLM tools land in PR 2.',
-      errorCode: 'NOT_IMPLEMENTED',
-      sessionId,
-      requestId,
-    },
-    {
-      status: 501,
-      headers: {
-        ...corsHeaders,
-        'x-request-id': requestId,
+  // --- Validate and shape the UIMessage payload ---
+  const rawMessages = (parsed.data.messages ?? []) as unknown[];
+  const messagesError = validateOnboardingMessages(rawMessages);
+  if (messagesError) {
+    return NextResponse.json(
+      {
+        error: messagesError,
+        errorCode: 'INVALID_MESSAGES',
+        requestId,
       },
-    }
-  );
-
-  if (mintedSessionCookie) {
-    response.cookies.set(ONBOARDING_SESSION_COOKIE_NAME, mintedSessionCookie, {
-      httpOnly: true,
-      secure: isSecureEnv(),
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 60 * 60 * 24 * 7,
-    });
+      { status: 400, headers: { ...corsHeaders, 'x-request-id': requestId } }
+    );
   }
+  const uiMessages = rawMessages as UIMessage[];
+  const turnCount = uiMessages.filter(m => m.role === 'user').length;
 
-  Sentry.addBreadcrumb({
-    category: 'onboarding-chat',
-    message: 'anonymous_request_handled',
-    level: 'info',
-    data: { sessionMinted: !existingSessionId, asnPresent: Boolean(asn) },
-  });
+  // --- Build the per-turn state accumulator and the onboarding tool palette ---
+  const onboardingState = createOnboardingTurnState({ sessionId, turnCount });
+  const tools = buildOnboardingTools(onboardingState);
 
-  return response;
+  // --- Telemetry hooks (mirror authenticated chat) ---
+  const telemetry: ChatTelemetry = {
+    setTags: tags => {
+      try {
+        Sentry.setTags(tags);
+      } catch {}
+    },
+    setExtra: (key, value) => {
+      try {
+        Sentry.setExtra(key, value);
+      } catch {}
+    },
+    captureException: (error, context) => {
+      try {
+        Sentry.captureException(error, context);
+      } catch {}
+    },
+  };
+
+  // --- Dispatch the LLM turn ---
+  // Anonymous: no userId, no creator profile, no artist context. The free-tier
+  // entitlements are passed so the planLimits flags (aiCanUseTools, etc.) line
+  // up with what the LLM expects. forceLightModel keeps onboarding on Haiku
+  // until we have signal a real artist is on the other end — flipped via
+  // confirmSpotifyArtist + recordInterviewSignal in a follow-up commit.
+  const freeTierLimits = getEntitlements('free');
+  try {
+    const turn = await executeChatTurn({
+      uiMessages,
+      artistContext: null,
+      releases: [],
+      resolvedProfileId: null,
+      resolvedConversationId: null,
+      userId: null,
+      userPlan: 'free',
+      planLimits: freeTierLimits,
+      insightsEnabled: false,
+      // Haiku-forced for anonymous traffic. PR follow-up: allow Sonnet once
+      // confirmSpotifyArtist has resolved a verified or 1k+-follower artist.
+      forceLightModel: true,
+      tools,
+      signal: req.signal,
+      requestId,
+      telemetry,
+      mode: 'onboarding',
+    });
+
+    Sentry.addBreadcrumb({
+      category: 'onboarding-chat',
+      message: 'anonymous_dispatch',
+      level: 'info',
+      data: {
+        sessionMinted: !existingSessionId,
+        asnPresent: Boolean(asn),
+        turnCount,
+        selectedModel: turn.selectedModel,
+        toolCount: turn.toolNames.length,
+      },
+    });
+
+    const responseHeaders: Record<string, string> = {
+      ...corsHeaders,
+      'x-request-id': requestId,
+      'x-chat-mode': 'onboarding',
+    };
+    if (mintedSessionCookie) {
+      responseHeaders['set-cookie'] =
+        buildSessionCookieHeader(mintedSessionCookie);
+    }
+
+    return turn.streamResult.toUIMessageStreamResponse({
+      headers: responseHeaders,
+    });
+  } catch (error) {
+    if (isClientDisconnect(error, req.signal)) {
+      return new NextResponse(null, {
+        status: 499,
+        headers: { ...corsHeaders, 'x-request-id': requestId },
+      });
+    }
+    Sentry.captureException(error, {
+      tags: { feature: 'ai-chat', chat_mode: 'onboarding' },
+      extra: { sessionId: sessionId.slice(0, 8), requestId, turnCount },
+    });
+    return NextResponse.json(
+      {
+        error: 'Onboarding chat failed',
+        errorCode: 'INTERNAL_ERROR',
+        requestId,
+      },
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'x-request-id': requestId },
+      }
+    );
+  }
+}
+
+/**
+ * Build the wire `set-cookie` header value for the onboarding session cookie.
+ * Used when `executeChatTurn`'s streaming response prevents us from using the
+ * `NextResponse.cookies.set` helper.
+ */
+function buildSessionCookieHeader(value: string): string {
+  const parts = [
+    `${ONBOARDING_SESSION_COOKIE_NAME}=${value}`,
+    'Path=/',
+    'HttpOnly',
+    'SameSite=Lax',
+    `Max-Age=${60 * 60 * 24 * 7}`,
+  ];
+  if (isSecureEnv()) parts.push('Secure');
+  return parts.join('; ');
+}
+
+/**
+ * Lightweight shape check for the UIMessage payload. We deliberately don't
+ * pull in the full `validateMessagesArray` from `/api/chat/route.ts` to keep
+ * this handler import-light — onboarding mode has stricter caps anyway.
+ */
+function validateOnboardingMessages(messages: unknown[]): string | null {
+  if (messages.length === 0) {
+    return 'messages array must be non-empty';
+  }
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i];
+    if (!msg || typeof msg !== 'object') {
+      return `messages[${i}] must be an object`;
+    }
+    const m = msg as { role?: unknown; parts?: unknown };
+    if (m.role !== 'user' && m.role !== 'assistant' && m.role !== 'system') {
+      return `messages[${i}].role must be user/assistant/system`;
+    }
+    if (!Array.isArray(m.parts)) {
+      return `messages[${i}].parts must be an array`;
+    }
+    for (const part of m.parts) {
+      if (
+        part &&
+        typeof part === 'object' &&
+        (part as { type?: unknown }).type === 'text'
+      ) {
+        const text = (part as { text?: unknown }).text;
+        if (
+          typeof text === 'string' &&
+          text.length > MAX_ONBOARDING_MESSAGE_LENGTH
+        ) {
+          return `messages[${i}] text part exceeds ${MAX_ONBOARDING_MESSAGE_LENGTH} chars`;
+        }
+      }
+    }
+  }
+  return null;
 }
 
 function parseCookieHeader(header: string): Map<string, string> {
@@ -286,6 +467,3 @@ function parseCookieHeader(header: string): Map<string, string> {
   }
   return map;
 }
-
-/** Exported for the Redis verification flag key prefix used in PR 2 follow-ups. */
-export { TURNSTILE_VERIFIED_FLAG_PREFIX };

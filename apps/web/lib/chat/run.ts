@@ -7,6 +7,7 @@ import {
   type UIMessage,
 } from 'ai';
 import { selectKnowledgeContext } from '@/lib/chat/knowledge/router';
+import { ONBOARDING_SYSTEM_PROMPT } from '@/lib/chat/prompts/onboarding';
 import { buildSystemPrompt } from '@/lib/chat/system-prompt';
 import type {
   ArtistContext,
@@ -98,24 +99,39 @@ export function selectKnowledgeContextForTurn(uiMessages: UIMessage[]): string {
 
 export interface ExecuteChatTurnInput {
   uiMessages: UIMessage[];
-  artistContext: ArtistContext;
+  /**
+   * Required for `mode='app'` (authenticated artist chat). Ignored when
+   * `mode='onboarding'` — the anonymous visitor has no creator profile yet.
+   */
+  artistContext: ArtistContext | null;
   releases: ReleaseContext[];
+  /** Internal creator-profile UUID. Null when anonymous (`mode='onboarding'`). */
   resolvedProfileId: string | null;
   resolvedConversationId: string | null;
-  userId: string;
+  /** Clerk user id. Null when anonymous (`mode='onboarding'`). */
+  userId: string | null;
   userPlan: string;
   planLimits: EntitlementsForPlan;
   insightsEnabled: boolean;
   forceLightModel: boolean;
   /**
    * Pre-built tools for the turn. The caller composes free + paid tool sets
-   * based on plan and feature flags before invoking.
+   * based on plan and feature flags before invoking. For `mode='onboarding'`,
+   * the caller passes the ONBOARDING_TOOLS palette.
    */
   tools: ToolSet;
   signal: AbortSignal;
   requestId: string;
   /** Telemetry hooks (Sentry in prod, no-op in eval/tests). */
   telemetry?: ChatTelemetry;
+  /**
+   * Mode discriminator (JOV-2132). `'app'` is the existing authenticated
+   * artist chat path; `'onboarding'` is the anonymous /start visitor flow
+   * that uses the Stanley-style ONBOARDING_SYSTEM_PROMPT, skips knowledge
+   * context, and never reads artistContext. Default `'app'` keeps existing
+   * callers behaviour-stable.
+   */
+  mode?: 'app' | 'onboarding';
 }
 
 export interface ExecuteChatTurnResult {
@@ -164,16 +180,23 @@ export async function executeChatTurn(
     requestId,
     resolvedProfileId,
     telemetry,
+    mode = 'app',
   } = input;
 
-  const knowledgeContext = selectKnowledgeContextForTurn(uiMessages);
-
-  const systemPrompt = buildSystemPrompt(artistContext, releases, {
-    aiCanUseTools: planLimits.booleans.aiCanUseTools,
-    aiDailyMessageLimit: planLimits.limits.aiDailyMessageLimit,
-    insightsEnabled,
-    knowledgeContext: knowledgeContext || undefined,
-  });
+  // Onboarding mode swaps in the Stanley-style prompt and skips the
+  // music-industry knowledge context (which is keyed on the artist's profile,
+  // not relevant pre-account). Authenticated `mode='app'` keeps the existing
+  // buildSystemPrompt path so this refactor is behaviour-stable for in-app chat.
+  const systemPrompt =
+    mode === 'onboarding'
+      ? ONBOARDING_SYSTEM_PROMPT
+      : buildSystemPrompt(artistContext as ArtistContext, releases, {
+          aiCanUseTools: planLimits.booleans.aiCanUseTools,
+          aiDailyMessageLimit: planLimits.limits.aiDailyMessageLimit,
+          insightsEnabled,
+          knowledgeContext:
+            selectKnowledgeContextForTurn(uiMessages) || undefined,
+        });
 
   const modelMessages = await convertToModelMessages(uiMessages);
 
