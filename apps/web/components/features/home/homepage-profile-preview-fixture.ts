@@ -213,7 +213,9 @@ export const HOMEPAGE_PROFILE_PREVIEW_SOCIAL_LINKS: readonly LegacySocialLink[] 
       id: 'homepage-preview-spotify',
       artist_id: HOMEPAGE_PROFILE_PREVIEW_ARTIST.id,
       platform: 'spotify',
-      url: HOMEPAGE_PROFILE_PREVIEW_ARTIST.spotify_url ?? 'https://spotify.com',
+      url:
+        HOMEPAGE_PROFILE_PREVIEW_ARTIST.spotify_url ??
+        TIM_WHITE_PROFILE.spotifyUrl,
       clicks: 1820,
       created_at: CREATED_AT,
       is_visible: true,
@@ -264,7 +266,7 @@ export const HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_SOCIAL_LINKS: readonly LegacySoc
       platform: 'spotify',
       url:
         HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_ARTIST.spotify_url ??
-        'https://open.spotify.com/artist/4u',
+        TIM_WHITE_PROFILE.spotifyUrl,
       clicks: 1820,
       created_at: CREATED_AT,
       is_visible: true,
