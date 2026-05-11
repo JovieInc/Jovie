@@ -12,13 +12,17 @@ vi.mock('@/components/molecules/drawer', async importOriginal => {
     EntitySidebarShell: ({
       children,
       entityHeader,
+      isEmpty,
+      emptyMessage,
     }: {
       children: ReactNode;
       entityHeader?: ReactNode;
+      isEmpty?: boolean;
+      emptyMessage?: string;
     }) => (
       <div>
-        {entityHeader}
-        {children}
+        {isEmpty ? <div>{emptyMessage}</div> : entityHeader}
+        {isEmpty ? null : children}
       </div>
     ),
   };
@@ -87,11 +91,14 @@ describe('AudienceMemberSidebar', () => {
     expect(screen.getByText('3 visits')).toBeInTheDocument();
   });
 
-  it('renders empty state when member is null', () => {
+  it('renders empty state message when member is null', () => {
     render(
       <AudienceMemberSidebar member={null} isOpen onClose={() => undefined} />
     );
 
     expect(screen.queryByText('Jordan Reyes')).not.toBeInTheDocument();
+    expect(
+      screen.getByText('Select a row in the table to view contact details.')
+    ).toBeInTheDocument();
   });
 });
