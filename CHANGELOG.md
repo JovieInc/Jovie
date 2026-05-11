@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.234] - 2026-05-10
+
+> Apple Sign In was still failing the OAuth callback step. The Clerk proxy now correctly resolves relative redirect URLs that come back from Apple's "Hide My Email" flow.
+
+### Fixed
+
+- **Clerk proxy** (`apps/web/proxy.ts`): when Clerk FAPI returned a 302 with a relative `Location` header (e.g. `/v1/oauth_callback?code=...&state=...` — which happens during Apple's `response_mode=form_post` callback chain), the proxy passed the relative path to `NextResponse.redirect`, which throws "URL is malformed — please use only absolute URLs". Now resolves FAPI-relative paths against the `/__clerk` proxy origin and absolute non-FAPI URLs pass through unchanged. Regression test in `tests/unit/middleware/proxy-behavioral.test.ts`.
+
 ## [26.4.233] - 2026-05-10
 
 > Sign In and Sign Up pages now show the Google and Apple buttons. The previous attempts to gate them by env var weren't taking effect in production, so the allowlist is now hardcoded.

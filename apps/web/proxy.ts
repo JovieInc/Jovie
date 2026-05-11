@@ -1202,12 +1202,26 @@ export default async function middleware(
 
       if (isRedirect && upstreamLocation) {
         const fapiOrigin = `https://${fapiHost}`;
-        const rewrittenLocation = upstreamLocation.startsWith(fapiOrigin)
-          ? upstreamLocation.replace(
-              fapiOrigin,
-              `${req.nextUrl.origin}/__clerk`
-            )
-          : upstreamLocation;
+        // NextResponse.redirect requires an absolute URL. Clerk FAPI can
+        // return three kinds of Location headers during OAuth:
+        //   1. Absolute FAPI URL (https://clerk.jov.ie/v1/...) — route through
+        //      our /__clerk proxy so cookies and CSP stay scoped to our origin.
+        //   2. FAPI-relative path (/v1/...) — Apple's intra-FAPI redirects do
+        //      this. Resolve it against our /__clerk proxy origin so the
+        //      browser follows it through the proxy.
+        //   3. Absolute non-FAPI URL (https://other.example/...) — third-party
+        //      OAuth provider redirects. Pass through unchanged.
+        let rewrittenLocation: string;
+        if (upstreamLocation.startsWith(fapiOrigin)) {
+          rewrittenLocation = upstreamLocation.replace(
+            fapiOrigin,
+            `${req.nextUrl.origin}/__clerk`
+          );
+        } else if (upstreamLocation.startsWith('/')) {
+          rewrittenLocation = `${req.nextUrl.origin}/__clerk${upstreamLocation}`;
+        } else {
+          rewrittenLocation = upstreamLocation;
+        }
 
         const redirectStatus = proxyRes.status as 301 | 302 | 303 | 307 | 308;
         const redirect = NextResponse.redirect(
