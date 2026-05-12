@@ -6,9 +6,9 @@
  * Background: the profile preview can render duplicate platform rows (e.g.
  * three YouTube rows on Tim's profile, JOV-2149) because legacy ingestion
  * paths can insert rows with the same (creator_profile_id, platform, url)
- * tuple. The render layer now dedupes defensively (ProfileLinkList.tsx),
- * and migration 0046 adds a partial unique index — but that migration will
- * fail if duplicates already exist. Run this script first.
+ * tuple. Migration 0046 is now self-healing (it soft-deletes duplicates
+ * within the migration itself), so this script is no longer required as
+ * a pre-step. It remains useful for ad-hoc dry-run inspection.
  *
  * Usage:
  *   doppler run --project jovie-web --config dev -- \

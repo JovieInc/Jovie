@@ -3,25 +3,29 @@
 -- duplicate (creator, platform, url) rows to land in the DB and render as
 -- "YouTube YouTube YouTube" in the profile preview (JOV-2149).
 --
--- Guard block: aborts with a descriptive RAISE if existing data would
--- violate the index. Run `pnpm tsx scripts/audit-duplicate-social-links.ts
--- --apply` first to soft-delete duplicates, then re-run this migration.
-DO $$
-DECLARE
-  dup_groups integer;
-BEGIN
-  SELECT count(*) INTO dup_groups FROM (
-    SELECT creator_profile_id, platform, lower(url) AS norm_url
-    FROM social_links
-    WHERE is_active = true AND state = 'active'
-    GROUP BY 1, 2, 3
-    HAVING count(*) > 1
-  ) t;
-  IF dup_groups > 0 THEN
-    RAISE EXCEPTION
-      'Migration aborted: % duplicate (creator_profile_id, platform, lower(url)) groups exist in social_links. Run apps/web/scripts/audit-duplicate-social-links.ts --apply first.',
-      dup_groups;
-  END IF;
-END $$;
+-- Self-healing: soft-deletes any existing duplicates within each
+-- (creator_profile_id, platform, lower(url)) group, keeping the most
+-- recently updated row active and marking the rest as
+-- is_active=false, state='inactive'. The originals are preserved for
+-- forensic review — no rows are hard-deleted. This makes the migration
+-- safe to run on databases that already hold duplicates.
+
+WITH ranked AS (
+  SELECT
+    id,
+    row_number() OVER (
+      PARTITION BY creator_profile_id, platform, lower(url)
+      ORDER BY updated_at DESC, created_at DESC, id
+    ) AS rn
+  FROM social_links
+  WHERE is_active = true AND state = 'active'
+)
+UPDATE social_links sl
+   SET is_active = false,
+       state     = 'inactive',
+       updated_at = now()
+  FROM ranked r
+ WHERE sl.id = r.id
+   AND r.rn > 1;
 
 CREATE UNIQUE INDEX IF NOT EXISTS "social_links_creator_platform_url_unique" ON "social_links" USING btree ("creator_profile_id","platform",lower("url")) WHERE is_active = true AND state = 'active';
