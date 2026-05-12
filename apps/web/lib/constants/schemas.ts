@@ -27,7 +27,7 @@ export const SCHEMA_FRAGMENTS = {
   },
   logo: {
     '@type': 'ImageObject' as const,
-    url: `${BASE_URL}/brand/Jovie-Logo-Icon.svg`,
+    url: `${BASE_URL}/brand/Jovie-Logo-Mark-Cream.svg`,
     width: 512,
     height: 512,
   },
@@ -37,7 +37,7 @@ export const SCHEMA_FRAGMENTS = {
     url: BASE_URL,
     logo: {
       '@type': 'ImageObject' as const,
-      url: `${BASE_URL}/brand/Jovie-Logo-Icon.svg`,
+      url: `${BASE_URL}/brand/Jovie-Logo-Mark-Cream.svg`,
       width: 512,
       height: 512,
     },

@@ -752,6 +752,25 @@ const MARKETING_PUBLIC_ROUTES = [
     resourceSizes: DEFAULT_PUBLIC_RESOURCE_BUDGETS,
     priority: 2,
   },
+  {
+    id: 'marketing-brand',
+    group: 'marketing-public',
+    surface: 'marketing',
+    path: APP_ROUTES.BRAND,
+    requiresAuth: false,
+    warmupStrategy: 'public-route',
+    measureMode: 'page-load',
+    readySelectors: { content: ['main', 'h1'] },
+    timings: [
+      { metric: 'first-contentful-paint', budget: 1800 },
+      { metric: 'largest-contentful-paint', budget: 2600 },
+      { metric: 'cumulative-layout-shift', budget: 0.1 },
+      { metric: 'first-input-delay', budget: 100 },
+      { metric: 'time-to-first-byte', budget: 1500 },
+    ],
+    resourceSizes: DEFAULT_PUBLIC_RESOURCE_BUDGETS,
+    priority: 2,
+  },
 ] as const satisfies readonly PerfRouteDefinition[];
 
 const LEGAL_PUBLIC_ROUTES = [
