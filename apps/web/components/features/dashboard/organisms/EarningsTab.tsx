@@ -24,6 +24,7 @@ import { useClipboard } from '@/hooks/useClipboard';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { type TipperRow, useEarningsQuery } from '@/lib/queries';
 import { downloadBlob, downloadString } from '@/lib/utils/download';
+import { formatAmount } from '@/lib/utils/format-number';
 import {
   generateQrCodeDataUrl,
   generateQrCodeSvg,
@@ -60,7 +61,7 @@ const tipperColumns = [
     meta: { align: 'right' },
     cell: ({ getValue }) => (
       <span className='text-right font-caption tabular-nums text-primary-token'>
-        {formatCents(getValue())}
+        {formatAmount(getValue())}
       </span>
     ),
   }),
@@ -79,10 +80,6 @@ const tipperColumns = [
 // =============================================================================
 // Helpers
 // =============================================================================
-
-function formatCents(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
-}
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', {
@@ -310,7 +307,7 @@ export function EarningsTab() {
         <dl className='grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2'>
           <StatCard
             label='Total revenue'
-            value={formatCents(stats?.totalRevenueCents ?? 0)}
+            value={formatAmount(stats?.totalRevenueCents ?? 0)}
             icon={DollarSign}
             iconBg='bg-surface-1 border border-subtle'
             iconColor='text-success'
@@ -324,7 +321,7 @@ export function EarningsTab() {
           />
           <StatCard
             label='Average tip'
-            value={formatCents(stats?.averageTipCents ?? 0)}
+            value={formatAmount(stats?.averageTipCents ?? 0)}
             icon={TrendingUp}
             iconBg='bg-surface-1 border border-subtle'
             iconColor='text-accent'
