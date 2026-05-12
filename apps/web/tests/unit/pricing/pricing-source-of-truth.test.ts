@@ -151,4 +151,28 @@ describe('MARKETING_PRICING_PLANS (data/marketingPricingPlans.ts) — contract (
     expect(planIds).not.toContain('team');
     expect(planIds).not.toContain('enterprise');
   });
+
+  it('has non-empty features list for every plan (no silent drift from canonical plans)', () => {
+    // MARKETING_PRICING_PLANS uses curated marketing copy (short, benefit-oriented)
+    // while CANONICAL_PLANS derives features from the entitlement registry (granular).
+    // They intentionally differ in wording and level of detail — that is by design.
+    // This test ensures the marketing feature list is never inadvertently emptied
+    // when canonical plan data is restructured.
+    for (const marketingPlan of MARKETING_PRICING_PLANS) {
+      const canonicalPlan = CANONICAL_PLANS.find(
+        p => p.id === marketingPlan.id
+      );
+      if (canonicalPlan === undefined) continue;
+
+      expect(
+        marketingPlan.features.length,
+        `Marketing plan "${marketingPlan.id}" feature list is empty — update marketingPricingPlans.ts when canonical features change`
+      ).toBeGreaterThan(0);
+
+      expect(
+        canonicalPlan.features.length,
+        `Canonical plan "${canonicalPlan.id}" feature list is empty — check entitlement registry`
+      ).toBeGreaterThan(0);
+    }
+  });
 });
