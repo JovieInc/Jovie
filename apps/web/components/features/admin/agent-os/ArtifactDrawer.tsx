@@ -23,6 +23,17 @@ function formatCost(artifact: AgentRunArtifact): string {
   });
 }
 
+function getPullRequestLabel(url: string | null): string {
+  if (!url) return 'Pull Request';
+  try {
+    const lastSegment = new URL(url).pathname.split('/').filter(Boolean).pop();
+    const num = lastSegment ? Number.parseInt(lastSegment, 10) : null;
+    return num !== null && !Number.isNaN(num) ? `#${num}` : 'Pull Request';
+  } catch {
+    return 'Pull Request';
+  }
+}
+
 function getSafeExternalHref(href: string | null): string | null {
   if (!href) return null;
 
@@ -129,8 +140,14 @@ export function ArtifactDrawer({ artifact }: ArtifactDrawerProps) {
       ) : null}
 
       <div className='mt-4 flex flex-wrap gap-3'>
-        <ArtifactLink href={artifact.linearIssueUrl} label='Linear' />
-        <ArtifactLink href={artifact.pullRequestUrl} label='Pull Request' />
+        <ArtifactLink
+          href={artifact.linearIssueUrl}
+          label={artifact.linearIssueId ?? 'Linear'}
+        />
+        <ArtifactLink
+          href={artifact.pullRequestUrl}
+          label={getPullRequestLabel(artifact.pullRequestUrl)}
+        />
       </div>
 
       <div className='mt-4'>
