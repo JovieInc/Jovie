@@ -180,3 +180,47 @@ export function extractHandleFromUrl(urlRaw: string): string | null {
     return null;
   }
 }
+
+/**
+ * Produce a stable key for deduping a link by `(platform, url)`.
+ *
+ * Two URLs that resolve to the same destination on the same platform
+ * (trailing slash, casing, `www.` prefix, query/fragment noise) must
+ * collapse to the same key. Invalid URLs fall back to the trimmed raw
+ * string so we don't drop rows we can't parse.
+ */
+function dedupeKey(platform: string, urlRaw: string): string {
+  const p = platform.trim().toLowerCase();
+  try {
+    const u = new URL(urlRaw);
+    const host = u.hostname.toLowerCase().replace(/^www\./, '');
+    const path = u.pathname.replace(/\/+$/, '').toLowerCase();
+    return `${p}|${host}${path}`;
+  } catch {
+    return `${p}|${urlRaw.trim().toLowerCase()}`;
+  }
+}
+
+/**
+ * Deduplicate a list of links by `(platform, normalized-url)`.
+ *
+ * - Preserves the first occurrence of each unique key (input order stable).
+ * - Multiple legitimate channels on the same platform with different URLs
+ *   (e.g. two distinct YouTube channels) are kept.
+ * - Identical or near-identical rows (trailing slash, casing, www prefix)
+ *   collapse to a single row.
+ * - Pure: never mutates input, never invents output.
+ */
+export function dedupeLinks<L extends { platform: string; url: string }>(
+  links: readonly L[]
+): L[] {
+  const seen = new Set<string>();
+  const out: L[] = [];
+  for (const link of links) {
+    const key = dedupeKey(link.platform, link.url);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(link);
+  }
+  return out;
+}
