@@ -50,6 +50,21 @@ export async function assertDomStable(
 ): Promise<void> {
   const duration = options.durationMs ?? 2000;
   const interval = options.intervalMs ?? 50;
+  // Fail fast on misconfiguration. A silently-passing stability check is
+  // worse than no check at all — it produces false confidence that the
+  // DOM was stable when the helper simply never observed anything.
+  // (CodeRabbit JOV-2149 review.)
+  if (duration <= 0) {
+    throw new Error('assertDomStable: durationMs must be > 0');
+  }
+  if (interval <= 0) {
+    throw new Error('assertDomStable: intervalMs must be > 0');
+  }
+  if (!options.selector && !options.absentSelector) {
+    throw new Error(
+      'assertDomStable: provide selector and/or absentSelector — nothing to observe'
+    );
+  }
   const violations: DomStabilityViolation[] = [];
   const start = Date.now();
 

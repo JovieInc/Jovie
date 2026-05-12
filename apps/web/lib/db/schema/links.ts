@@ -73,14 +73,17 @@ export const socialLinks = pgTable(
     // one row among active+visible links. The application layer already
     // dedupes for display (see ProfileLinkList.tsx), but legacy ingestion
     // paths can still create duplicate rows; this index closes the gap at
-    // the source. Allows multiple inactive/disabled rows. Migration is
-    // gated by a guard block that aborts if duplicates already exist —
-    // run scripts/audit-duplicate-social-links.ts first. See JOV-2149.
+    // the source. Allows multiple inactive/disabled rows.
+    //
+    // The migration self-cleans pre-existing duplicates inline before
+    // creating this index. Normalization mirrors the app's `dedupeKey`
+    // via the `normalize_social_url(text)` SQL function defined in
+    // 0046_social_links_active_url_unique.sql. See JOV-2149.
     activeUrlUnique: uniqueIndex('social_links_creator_platform_url_unique')
       .on(
         table.creatorProfileId,
         table.platform,
-        drizzleSql`lower(${table.url})`
+        drizzleSql`normalize_social_url(${table.url})`
       )
       .where(drizzleSql`is_active = true AND state = 'active'`),
   })

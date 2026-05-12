@@ -6,9 +6,14 @@
  * Background: the profile preview can render duplicate platform rows (e.g.
  * three YouTube rows on Tim's profile, JOV-2149) because legacy ingestion
  * paths can insert rows with the same (creator_profile_id, platform, url)
- * tuple. Migration 0046 is now self-healing (it soft-deletes duplicates
- * within the migration itself), so this script is no longer required as
- * a pre-step. It remains useful for ad-hoc dry-run inspection.
+ * tuple. The render layer now dedupes defensively (ProfileLinkList.tsx),
+ * and migration 0046 adds a partial unique index gated on
+ * `normalize_social_url(url)`.
+ *
+ * The migration is self-cleaning: it soft-deletes pre-existing duplicates
+ * inline before creating the unique index. This script is therefore
+ * OPTIONAL — useful for previewing what the migration would touch, or for
+ * forensic post-migration audits.
  *
  * Usage:
  *   doppler run --project jovie-web --config dev -- \
@@ -21,13 +26,15 @@
  *     # state='inactive'. Original rows are preserved for forensic review.
  *
  * Strategy:
- *  - Group active rows by (creator_profile_id, platform, lower(url)).
+ *  - Group active rows by (creator_profile_id, platform,
+ *    normalize_social_url(url)) — same expression as the unique index.
  *  - Within each group, keep the row with the most recent updated_at
  *    (ties broken by created_at, then id). Soft-delete the rest.
  */
 
-import { sql as drizzleSql } from 'drizzle-orm';
+import { and, asc, desc, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/db';
+import { socialLinks } from '@/lib/db/schema/links';
 
 const args = process.argv.slice(2);
 const APPLY = args.includes('--apply');
@@ -48,71 +55,82 @@ interface DuplicateGroup {
   readonly rows: DuplicateRow[];
 }
 
+/**
+ * Find duplicate active social_links rows using Drizzle query composition.
+ *
+ * Strategy: select all active rows with their normalized URL (using the
+ * `normalize_social_url()` DB function from migration 0046), then group
+ * client-side and discard groups of size 1. This avoids a CTE/HAVING
+ * pattern that Drizzle's builder doesn't express cleanly while keeping
+ * the column projection type-safe and aligned with the schema.
+ *
+ * The single `drizzleSql` fragment is the normalization expression — it
+ * must match the index in 0046 exactly (which itself mirrors
+ * `lib/utils/social-platform.ts` `dedupeKey`). Per coding guidelines, we
+ * minimize raw SQL to that single expression rather than hand-rolling
+ * the entire query as a template.
+ */
 async function findDuplicateGroups(): Promise<DuplicateGroup[]> {
-  const rows = await db.execute<{
-    creator_profile_id: string;
-    platform: string;
-    norm_url: string;
-    id: string;
-    url: string;
-    created_at: string;
-    updated_at: string;
-  }>(drizzleSql`
-    WITH dupes AS (
-      SELECT creator_profile_id, platform, lower(url) AS norm_url
-      FROM social_links
-      WHERE is_active = true AND state = 'active'
-      GROUP BY 1, 2, 3
-      HAVING count(*) > 1
-    )
-    SELECT
-      sl.id,
-      sl.creator_profile_id,
-      sl.platform,
-      lower(sl.url) AS norm_url,
-      sl.url,
-      sl.created_at,
-      sl.updated_at
-    FROM social_links sl
-    JOIN dupes d
-      ON d.creator_profile_id = sl.creator_profile_id
-     AND d.platform = sl.platform
-     AND d.norm_url = lower(sl.url)
-    WHERE sl.is_active = true AND sl.state = 'active'
-    ORDER BY sl.creator_profile_id, sl.platform, lower(sl.url),
-             sl.updated_at DESC, sl.created_at DESC, sl.id;
-  `);
+  const normUrl = drizzleSql<string>`normalize_social_url(${socialLinks.url})`;
+
+  const rows = await db
+    .select({
+      id: socialLinks.id,
+      creatorProfileId: socialLinks.creatorProfileId,
+      platform: socialLinks.platform,
+      normUrl,
+      url: socialLinks.url,
+      createdAt: socialLinks.createdAt,
+      updatedAt: socialLinks.updatedAt,
+    })
+    .from(socialLinks)
+    .where(and(eq(socialLinks.isActive, true), eq(socialLinks.state, 'active')))
+    .orderBy(
+      asc(socialLinks.creatorProfileId),
+      asc(socialLinks.platform),
+      asc(normUrl),
+      desc(socialLinks.updatedAt),
+      desc(socialLinks.createdAt),
+      asc(socialLinks.id)
+    );
 
   const groupKey = (r: {
-    creator_profile_id: string;
+    creatorProfileId: string;
     platform: string;
-    norm_url: string;
-  }) => `${r.creator_profile_id}|${r.platform}|${r.norm_url}`;
+    normUrl: string;
+  }) => `${r.creatorProfileId}|${r.platform}|${r.normUrl}`;
 
   const byKey = new Map<string, DuplicateGroup>();
-  for (const r of rows.rows) {
+  for (const r of rows) {
     const key = groupKey(r);
     const row: DuplicateRow = {
       id: r.id,
-      creatorProfileId: r.creator_profile_id,
+      creatorProfileId: r.creatorProfileId,
       platform: r.platform,
       url: r.url,
-      createdAt: r.created_at,
-      updatedAt: r.updated_at,
+      createdAt:
+        r.createdAt instanceof Date
+          ? r.createdAt.toISOString()
+          : String(r.createdAt),
+      updatedAt:
+        r.updatedAt instanceof Date
+          ? r.updatedAt.toISOString()
+          : String(r.updatedAt),
     };
     const group = byKey.get(key);
     if (group) {
       (group.rows as DuplicateRow[]).push(row);
     } else {
       byKey.set(key, {
-        creatorProfileId: r.creator_profile_id,
+        creatorProfileId: r.creatorProfileId,
         platform: r.platform,
-        normUrl: r.norm_url,
+        normUrl: r.normUrl,
         rows: [row],
       });
     }
   }
-  return Array.from(byKey.values());
+  // Only keep groups with more than one row (the actual duplicates).
+  return Array.from(byKey.values()).filter(g => g.rows.length > 1);
 }
 
 function pickIdsToSoftDelete(group: DuplicateGroup): string[] {
@@ -123,20 +141,26 @@ function pickIdsToSoftDelete(group: DuplicateGroup): string[] {
 
 async function softDelete(ids: string[]): Promise<void> {
   if (ids.length === 0) return;
-  await db.execute(drizzleSql`
-    UPDATE social_links
-       SET is_active = false,
-           state = 'inactive',
-           updated_at = now()
-     WHERE id = ANY(${ids}::uuid[])
-  `);
+  // Type-safe Drizzle update with inArray() — replaces the previous raw
+  // SQL `UPDATE ... WHERE id = ANY($ids::uuid[])` template per coding
+  // guidelines: prefer Drizzle ORM query composition over raw SQL.
+  await db
+    .update(socialLinks)
+    .set({
+      isActive: false,
+      state: 'inactive',
+      updatedAt: new Date(),
+    })
+    .where(inArray(socialLinks.id, ids));
 }
 
 async function main(): Promise<void> {
   const groups = await findDuplicateGroups();
 
   if (groups.length === 0) {
-    console.log('No duplicate (creator, platform, lower(url)) groups found.');
+    console.log(
+      'No duplicate (creator, platform, normalize_social_url(url)) groups found.'
+    );
     return;
   }
 

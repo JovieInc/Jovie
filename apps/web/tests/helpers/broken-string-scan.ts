@@ -40,6 +40,11 @@ function asText(input: string | { textContent: string | null }): string {
 /**
  * Return every broken-pattern match found in `input`. Each entry includes
  * the pattern source and a short excerpt so test failures are diagnosable.
+ *
+ * Iterates ALL matches for each pattern (CodeRabbit JOV-2149): the
+ * earlier implementation called `pattern.exec` once and missed repeated
+ * occurrences of the same broken token, despite the docstring promising
+ * every match.
  */
 export function scanForBrokenStrings(
   input: string | { textContent: string | null },
@@ -50,14 +55,21 @@ export function scanForBrokenStrings(
   const patterns = [...DEFAULT_BROKEN_PATTERNS, ...extraPatterns];
   const hits: BrokenStringMatch[] = [];
   for (const pattern of patterns) {
-    const match = pattern.exec(text);
-    if (!match) continue;
-    const start = Math.max(0, match.index - 20);
-    const end = Math.min(text.length, match.index + match[0].length + 20);
-    hits.push({
-      pattern: pattern.source,
-      excerpt: text.slice(start, end),
-    });
+    // Build a fresh `g`-flagged RegExp so `matchAll` works and so we
+    // don't mutate the caller's pattern's `lastIndex`.
+    const flags = pattern.flags.includes('g')
+      ? pattern.flags
+      : `${pattern.flags}g`;
+    const globalPattern = new RegExp(pattern.source, flags);
+    for (const match of text.matchAll(globalPattern)) {
+      const index = match.index ?? 0;
+      const start = Math.max(0, index - 20);
+      const end = Math.min(text.length, index + match[0].length + 20);
+      hits.push({
+        pattern: pattern.source,
+        excerpt: text.slice(start, end),
+      });
+    }
   }
   return hits;
 }
