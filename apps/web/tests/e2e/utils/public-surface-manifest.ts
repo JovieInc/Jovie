@@ -943,6 +943,23 @@ const EDGE_CASE_SURFACES = [
     perfGroups: [],
     interactions: GLOBAL_INTERACTIONS,
   },
+  {
+    // JOV-2145: dedicated probe route that calls notFound() so the closest
+    // boundary walking up is the root `app/not-found.tsx`. Existing 404
+    // surfaces only exercise nested boundaries inside `[username]/`, which
+    // is why the unstyled-megamenu regression on the root page was missed.
+    id: 'root-not-found',
+    family: 'not-found',
+    expectedState: 'not-found',
+    path: '/dev/root-not-found-probe',
+    resolvePath: () => '/dev/root-not-found-probe',
+    readySelectors: ['[data-testid="not-found"]'],
+    mainSelector: '[data-testid="not-found"]',
+    minMainTextLength: 20,
+    lighthouse: false,
+    perfGroups: [],
+    interactions: GLOBAL_INTERACTIONS,
+  },
 ] as const satisfies readonly PublicSurfaceSpec[];
 
 export const PUBLIC_SURFACE_MANIFEST = [
