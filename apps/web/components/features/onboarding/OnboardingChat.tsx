@@ -13,6 +13,14 @@ import {
   useState,
 } from 'react';
 import { cn } from '@/lib/utils';
+import {
+  ChatProposeCheckoutCard,
+  type CheckoutCardPayload,
+} from './ChatProposeCheckoutCard';
+import {
+  ChatProposeNextStepCard,
+  type NextStepCardPayload,
+} from './ChatProposeNextStepCard';
 
 /**
  * Anonymous onboarding chat client (JOV-2132 PR 3).
@@ -44,15 +52,58 @@ function getMessageText(message: UIMessage): string {
     .join('');
 }
 
-/** Surface visible tool-call markers as inline chips. */
-function getToolMarkers(message: UIMessage): readonly string[] {
-  return (message.parts ?? []).flatMap(part => {
-    if (part.type === 'dynamic-tool' || part.type?.startsWith('tool-')) {
-      const toolPart = part as { toolName?: string; type: string };
-      return [toolPart.toolName ?? toolPart.type];
-    }
-    return [];
-  });
+interface ToolPart {
+  readonly type: string;
+  readonly toolName?: string;
+  readonly toolCallId?: string;
+  readonly output?: unknown;
+  readonly state?: string;
+}
+
+function isToolPart(part: unknown): part is ToolPart {
+  if (!part || typeof part !== 'object') return false;
+  const type = (part as { type?: unknown }).type;
+  return (
+    type === 'dynamic-tool' ||
+    (typeof type === 'string' && type.startsWith('tool-'))
+  );
+}
+
+function getToolName(part: ToolPart): string {
+  if (part.toolName) return part.toolName;
+  // Convention: AI SDK emits parts of type `tool-<name>` when output is present.
+  return part.type.startsWith('tool-')
+    ? part.type.slice('tool-'.length)
+    : part.type;
+}
+
+/**
+ * Extract tool parts from a message. Returns the structured parts (not text)
+ * so the renderer can decide between rich cards (proposeNextStep,
+ * proposeCheckout) and the chip fallback for the rest.
+ */
+function getToolParts(message: UIMessage): readonly ToolPart[] {
+  return (message.parts ?? []).filter(isToolPart);
+}
+
+interface ToolOutputWithAction {
+  readonly action?: string;
+}
+
+function isNextStepPayload(output: unknown): output is NextStepCardPayload {
+  return (
+    typeof output === 'object' &&
+    output !== null &&
+    (output as ToolOutputWithAction).action === 'propose_next_step'
+  );
+}
+
+function isCheckoutPayload(output: unknown): output is CheckoutCardPayload {
+  return (
+    typeof output === 'object' &&
+    output !== null &&
+    (output as ToolOutputWithAction).action === 'propose_checkout'
+  );
 }
 
 export function OnboardingChat({ turnstileToken }: OnboardingChatProps) {
@@ -136,44 +187,73 @@ export function OnboardingChat({ turnstileToken }: OnboardingChatProps) {
 
         {messages.map(message => {
           const text = getMessageText(message);
-          const toolMarkers = getToolMarkers(message);
+          const toolParts = getToolParts(message);
           return (
             <div
               key={message.id}
               className={cn(
-                'flex',
-                message.role === 'user' ? 'justify-end' : 'justify-start'
+                'flex flex-col',
+                message.role === 'user' ? 'items-end' : 'items-start'
               )}
             >
-              <div
-                className={cn(
-                  'max-w-[80%] rounded-2xl px-3.5 py-2.5 text-[14px] leading-6',
-                  message.role === 'user'
-                    ? 'bg-white text-black'
-                    : 'border border-white/[0.08] bg-white/[0.035] text-white/82'
-                )}
-              >
-                {text || (
-                  <span className='text-white/40'>
-                    <Loader2
-                      className='inline h-3.5 w-3.5 animate-spin'
-                      aria-hidden
-                    />
+              {text || toolParts.length === 0 ? (
+                <div
+                  className={cn(
+                    'max-w-[80%] rounded-2xl px-3.5 py-2.5 text-[14px] leading-6',
+                    message.role === 'user'
+                      ? 'bg-white text-black'
+                      : 'border border-white/[0.08] bg-white/[0.035] text-white/82'
+                  )}
+                >
+                  {text || (
+                    <span className='text-white/40'>
+                      <Loader2
+                        className='inline h-3.5 w-3.5 animate-spin'
+                        aria-hidden
+                      />
+                    </span>
+                  )}
+                </div>
+              ) : null}
+
+              {toolParts.map((part, i) => {
+                const toolName = getToolName(part);
+                const key = part.toolCallId ?? `${message.id}-tool-${i}`;
+                const output = part.output;
+
+                if (
+                  toolName === 'proposeNextStep' &&
+                  isNextStepPayload(output)
+                ) {
+                  return (
+                    <div key={key} className='w-full max-w-[440px]'>
+                      <ChatProposeNextStepCard payload={output} />
+                    </div>
+                  );
+                }
+                if (
+                  toolName === 'proposeCheckout' &&
+                  isCheckoutPayload(output)
+                ) {
+                  return (
+                    <div key={key} className='w-full max-w-[440px]'>
+                      <ChatProposeCheckoutCard payload={output} />
+                    </div>
+                  );
+                }
+                // Fallback: small chip surfacing the tool name. The dedicated
+                // cards for searchSpotifyArtist / confirmSpotifyArtist /
+                // checkHandle / proposeSocialLink / recordInterviewSignal
+                // land in follow-up commits on this branch.
+                return (
+                  <span
+                    key={key}
+                    className='mt-1 inline-flex rounded-full border border-white/[0.12] bg-white/[0.04] px-2 py-0.5 text-[11px] text-white/60'
+                  >
+                    {toolName}
                   </span>
-                )}
-                {toolMarkers.length > 0 ? (
-                  <div className='mt-2 flex flex-wrap gap-1.5'>
-                    {toolMarkers.map((marker, i) => (
-                      <span
-                        key={`${message.id}-tool-${i}`}
-                        className='rounded-full border border-white/[0.12] bg-white/[0.04] px-2 py-0.5 text-[11px] text-white/60'
-                      >
-                        {marker}
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
+                );
+              })}
             </div>
           );
         })}
