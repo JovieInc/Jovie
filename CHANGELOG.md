@@ -5,6 +5,17 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.242] - 2026-05-12
+
+> [internal] Shell Releases view (design-v1) now matches production controls and entitlements — sync actions, smart-link gating, and dialogs all wired.
+
+### Changed
+
+- [internal] **Shell Releases controls parity** (JOV-1822): `ShellReleasesView` receives `spotifyConnected`, `appleMusicConnected`, `initialImporting`, and `initialTotalCount` from `ReleasesPageClient`, mirroring the production `ReleaseProviderMatrix`. New release toolbar (`NewReleaseHeaderAction`) is wired with Spotify sync and manual-add gates; manual create is hidden when `canCreateManualReleases` is false.
+- [internal] **Shell Releases dialogs**: `SpotifyConnectDialog`, `AddReleaseSidebar`, `ArtistSearchCommandPalette`, `ReleasePlanWizard`, and delete `ConfirmDialog` all render from the shell view without duplicating page chrome. `ImportProgressBanner`, `AppleMusicSyncBanner`, and `SmartLinkGateBanner` (soft-cap + unreleased modes) are surfaced inline.
+- [internal] **Smart-link gating per row**: lock state (scheduled vs. cap) is computed from plan entitlements and passed into `ShellReleaseRow` so the row CTA and context menu show a disabled "Scheduled / Smart link (Pro)" item instead of the open-link affordance.
+- [internal] **SonarCloud complexity reduction** (S3776 + S3358): extracted `useArtworkPlayback`, `ArtworkCell`, `SmartLinkCell`, `computeSmartLinkGating`, and `ReleasesListContent` to bring `ShellReleaseRow` and `ShellReleasesView` below the cognitive-complexity ceiling.
+
 ## [26.4.241] - 2026-05-12
 
 > [internal] AgentOS board now shows real run IDs on cards, lets you click lane counts to filter by status, and displays actual issue/PR identifiers in the detail drawer.
