@@ -175,6 +175,239 @@ function distinctValues(
   return [...seen];
 }
 
+// ── Smart-link gating ─────────────────────────────────────────────────────────
+
+interface SmartLinkGating {
+  readonly unlockedIds: Set<string> | null;
+  readonly lockReasons: Map<string, 'scheduled' | 'cap'>;
+  readonly releasedCount: number;
+  readonly unreleasedCount: number;
+}
+
+function computeSmartLinkGating(
+  rows: readonly ReleaseViewModel[],
+  smartLinksLimit: number | null | undefined,
+  canAccessFutureReleases: boolean
+): SmartLinkGating {
+  const now = Date.now();
+  const released: ReleaseViewModel[] = [];
+  const unreleased: ReleaseViewModel[] = [];
+  const reasons = new Map<string, 'scheduled' | 'cap'>();
+
+  for (const r of rows) {
+    const releaseTime = r.releaseDate ? new Date(r.releaseDate).getTime() : 0;
+    if (releaseTime > now) {
+      unreleased.push(r);
+      if (!canAccessFutureReleases) reasons.set(r.id, 'scheduled');
+    } else {
+      released.push(r);
+    }
+  }
+
+  if (!smartLinksLimit) {
+    return {
+      unlockedIds: canAccessFutureReleases
+        ? null
+        : new Set(released.map(r => r.id)),
+      lockReasons: reasons,
+      releasedCount: released.length,
+      unreleasedCount: unreleased.length,
+    };
+  }
+
+  const sorted = [...released].sort((a, b) => {
+    const dateA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
+    const dateB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
+    return dateA - dateB;
+  });
+  const ids = new Set(sorted.slice(0, smartLinksLimit).map(r => r.id));
+  for (const r of sorted.slice(smartLinksLimit)) reasons.set(r.id, 'cap');
+
+  return {
+    unlockedIds: ids,
+    lockReasons: reasons,
+    releasedCount: released.length,
+    unreleasedCount: unreleased.length,
+  };
+}
+
+// ── Empty / list content ───────────────────────────────────────────────────────
+
+interface ReleasesListContentProps {
+  readonly showEmptyState: boolean;
+  readonly showConnectedEmptyState: boolean;
+  readonly visibleReleases: readonly ReleaseViewModel[];
+  readonly selectedReleaseId: string | null;
+  readonly pills: readonly FilterPill[];
+  readonly canCreateManualReleases: boolean;
+  readonly isSyncing: boolean;
+  readonly actionMenusByReleaseId: Map<
+    string,
+    ReturnType<typeof convertContextMenuItems>
+  >;
+  readonly isSmartLinkLocked: (id: string) => boolean;
+  readonly getSmartLinkLockReason: (id: string) => 'scheduled' | 'cap' | null;
+  readonly onConnectSpotify: () => void;
+  readonly onNewRelease: () => void;
+  readonly onSync: () => void;
+  readonly onSelect: (release: ReleaseViewModel) => void;
+  readonly onClearFilters: () => void;
+}
+
+function ReleasesListContent({
+  showEmptyState,
+  showConnectedEmptyState,
+  visibleReleases,
+  selectedReleaseId,
+  pills,
+  canCreateManualReleases,
+  isSyncing,
+  actionMenusByReleaseId,
+  isSmartLinkLocked,
+  getSmartLinkLockReason,
+  onConnectSpotify,
+  onNewRelease,
+  onSync,
+  onSelect,
+  onClearFilters,
+}: ReleasesListContentProps) {
+  if (showEmptyState) {
+    return (
+      <div className='py-12 grid place-items-center text-center'>
+        <div className='max-w-sm'>
+          <div className='text-[13px] font-caption text-primary-token'>
+            Connect Spotify to get started
+          </div>
+          <p className='mt-1 text-[12px] text-tertiary-token leading-[1.5]'>
+            Sync your catalog from Spotify or add a release manually to start
+            generating smart links.
+          </p>
+          <div className='mt-3 flex flex-wrap items-center justify-center gap-2'>
+            <DrawerButton
+              tone='primary'
+              onClick={onConnectSpotify}
+              className='h-7 rounded-lg px-2.5 text-2xs inline-flex items-center gap-2'
+              data-testid='shell-releases-connect-spotify'
+            >
+              <Icon name='RefreshCw' className='h-4 w-4' aria-hidden='true' />
+              Connect Spotify
+            </DrawerButton>
+            {canCreateManualReleases && (
+              <DrawerButton
+                onClick={onNewRelease}
+                className='h-7 rounded-lg px-2.5 text-2xs inline-flex items-center gap-2'
+                data-testid='shell-releases-create-empty'
+              >
+                <Icon name='Plus' className='h-4 w-4' aria-hidden='true' />
+                Add manually
+              </DrawerButton>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (showConnectedEmptyState) {
+    return (
+      <div className='py-12 grid place-items-center text-center'>
+        <DrawerSurfaceCard
+          variant='card'
+          className='flex min-h-[212px] flex-col items-center justify-center px-5 py-9 text-center'
+          testId='shell-releases-empty-state-connected'
+        >
+          <div className='mb-2.5 flex h-9 w-9 items-center justify-center rounded-[10px] border border-subtle bg-surface-1'>
+            <Icon
+              name='Disc3'
+              className='h-4 w-4 text-tertiary-token'
+              aria-hidden='true'
+            />
+          </div>
+          <h3 className='text-app font-caption text-primary-token'>
+            No releases yet
+          </h3>
+          <p className='mt-0.5 max-w-sm text-xs leading-[17px] text-secondary-token'>
+            {canCreateManualReleases
+              ? 'Sync from Spotify or create one manually to start generating smart links.'
+              : 'Sync from Spotify to start generating smart links.'}
+          </p>
+          <div className='mt-3 flex flex-wrap items-center justify-center gap-2.5'>
+            <DrawerButton
+              tone='primary'
+              disabled={isSyncing}
+              onClick={onSync}
+              className='h-7 rounded-lg px-2.5 text-2xs inline-flex items-center gap-2'
+              data-testid='shell-releases-sync-empty-state'
+            >
+              <Icon
+                name={isSyncing ? 'Loader2' : 'RefreshCw'}
+                className={cn(
+                  'h-4 w-4',
+                  isSyncing && 'animate-spin motion-reduce:animate-none'
+                )}
+                aria-hidden='true'
+              />
+              {isSyncing ? 'Syncing...' : 'Sync from Spotify'}
+            </DrawerButton>
+            {canCreateManualReleases && (
+              <DrawerButton
+                onClick={onNewRelease}
+                className='h-7 rounded-lg px-2.5 text-2xs inline-flex items-center gap-2'
+                data-testid='shell-releases-create-connected-empty'
+              >
+                <Icon name='Plus' className='h-4 w-4' aria-hidden='true' />
+                Add manually
+              </DrawerButton>
+            )}
+          </div>
+        </DrawerSurfaceCard>
+      </div>
+    );
+  }
+
+  if (visibleReleases.length === 0) {
+    return (
+      <div className='py-12 grid place-items-center text-center'>
+        <div>
+          <div className='text-[13px] font-caption text-secondary-token'>
+            No releases match your filters
+          </div>
+          {pills.length > 0 ? (
+            <button
+              type='button'
+              onClick={onClearFilters}
+              className='mt-2 text-[11px] text-cyan-400 hover:text-cyan-300 transition-colors duration-subtle ease-out'
+            >
+              Clear filters
+            </button>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      role='listbox'
+      aria-label='Releases'
+      className='py-1.5 space-y-px px-2'
+    >
+      {visibleReleases.map(r => (
+        <ShellReleaseRow
+          key={r.id}
+          release={r}
+          isSelected={r.id === selectedReleaseId}
+          onSelect={() => onSelect(r)}
+          actionMenuItems={actionMenusByReleaseId.get(r.id)}
+          smartLinkLockReason={
+            isSmartLinkLocked(r.id) ? getSmartLinkLockReason(r.id) : null
+          }
+        />
+      ))}
+    </div>
+  );
+}
+
 export interface ShellReleasesViewProps {
   readonly releases: readonly ReleaseViewModel[];
   readonly providerConfig: Record<
@@ -281,57 +514,11 @@ export function ShellReleasesView({
     albumArtFlagEnabled && Boolean(canGenerateAlbumArt);
 
   // Smart-link gating: partition releases by released/scheduled + apply cap.
-  const { unlockedIds, lockReasons, releasedCount, unreleasedCount } =
-    useMemo(() => {
-      const now = Date.now();
-      const released: ReleaseViewModel[] = [];
-      const unreleased: ReleaseViewModel[] = [];
-      const reasons = new Map<string, 'scheduled' | 'cap'>();
-
-      for (const r of rows) {
-        const releaseTime = r.releaseDate
-          ? new Date(r.releaseDate).getTime()
-          : 0;
-        if (releaseTime > now) {
-          unreleased.push(r);
-          if (!canAccessFutureReleases) {
-            reasons.set(r.id, 'scheduled');
-          }
-        } else {
-          released.push(r);
-        }
-      }
-
-      if (!smartLinksLimit) {
-        return {
-          unlockedIds: canAccessFutureReleases
-            ? null
-            : new Set(released.map(r => r.id)),
-          lockReasons: reasons,
-          releasedCount: released.length,
-          unreleasedCount: unreleased.length,
-        };
-      }
-
-      const sorted = [...released].sort((a, b) => {
-        const dateA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
-        const dateB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
-        return dateA - dateB;
-      });
-      const allowed = sorted.slice(0, smartLinksLimit);
-      const ids = new Set(allowed.map(r => r.id));
-
-      for (const r of sorted.slice(smartLinksLimit)) {
-        reasons.set(r.id, 'cap');
-      }
-
-      return {
-        unlockedIds: ids,
-        lockReasons: reasons,
-        releasedCount: released.length,
-        unreleasedCount: unreleased.length,
-      };
-    }, [rows, smartLinksLimit, canAccessFutureReleases]);
+  const { unlockedIds, lockReasons, releasedCount, unreleasedCount } = useMemo(
+    () =>
+      computeSmartLinkGating(rows, smartLinksLimit, canAccessFutureReleases),
+    [rows, smartLinksLimit, canAccessFutureReleases]
+  );
 
   const isSmartLinkLocked = useCallback(
     (releaseId: string) => {
@@ -888,143 +1075,23 @@ export function ShellReleasesView({
           )}
 
         <div className='flex-1 min-h-0 overflow-y-auto'>
-          {showEmptyState ? (
-            <div className='py-12 grid place-items-center text-center'>
-              <div className='max-w-sm'>
-                <div className='text-[13px] font-caption text-primary-token'>
-                  Connect Spotify to get started
-                </div>
-                <p className='mt-1 text-[12px] text-tertiary-token leading-[1.5]'>
-                  Sync your catalog from Spotify or add a release manually to
-                  start generating smart links.
-                </p>
-                <div className='mt-3 flex flex-wrap items-center justify-center gap-2'>
-                  <DrawerButton
-                    tone='primary'
-                    onClick={() => setSpotifySearchOpen(true)}
-                    className='h-7 rounded-lg px-2.5 text-2xs inline-flex items-center gap-2'
-                    data-testid='shell-releases-connect-spotify'
-                  >
-                    <Icon
-                      name='RefreshCw'
-                      className='h-4 w-4'
-                      aria-hidden='true'
-                    />
-                    Connect Spotify
-                  </DrawerButton>
-                  {canCreateManualReleases && (
-                    <DrawerButton
-                      onClick={handleNewRelease}
-                      className='h-7 rounded-lg px-2.5 text-2xs inline-flex items-center gap-2'
-                      data-testid='shell-releases-create-empty'
-                    >
-                      <Icon
-                        name='Plus'
-                        className='h-4 w-4'
-                        aria-hidden='true'
-                      />
-                      Add manually
-                    </DrawerButton>
-                  )}
-                </div>
-              </div>
-            </div>
-          ) : showConnectedEmptyState ? (
-            <div className='py-12 grid place-items-center text-center'>
-              <DrawerSurfaceCard
-                variant='card'
-                className='flex min-h-[212px] flex-col items-center justify-center px-5 py-9 text-center'
-                testId='shell-releases-empty-state-connected'
-              >
-                <div className='mb-2.5 flex h-9 w-9 items-center justify-center rounded-[10px] border border-subtle bg-surface-1'>
-                  <Icon
-                    name='Disc3'
-                    className='h-4 w-4 text-tertiary-token'
-                    aria-hidden='true'
-                  />
-                </div>
-                <h3 className='text-app font-caption text-primary-token'>
-                  No releases yet
-                </h3>
-                <p className='mt-0.5 max-w-sm text-xs leading-[17px] text-secondary-token'>
-                  {canCreateManualReleases
-                    ? 'Sync from Spotify or create one manually to start generating smart links.'
-                    : 'Sync from Spotify to start generating smart links.'}
-                </p>
-                <div className='mt-3 flex flex-wrap items-center justify-center gap-2.5'>
-                  <DrawerButton
-                    tone='primary'
-                    disabled={isSyncing}
-                    onClick={handleSync}
-                    className='h-7 rounded-lg px-2.5 text-2xs inline-flex items-center gap-2'
-                    data-testid='shell-releases-sync-empty-state'
-                  >
-                    <Icon
-                      name={isSyncing ? 'Loader2' : 'RefreshCw'}
-                      className={cn(
-                        'h-4 w-4',
-                        isSyncing && 'animate-spin motion-reduce:animate-none'
-                      )}
-                      aria-hidden='true'
-                    />
-                    {isSyncing ? 'Syncing...' : 'Sync from Spotify'}
-                  </DrawerButton>
-                  {canCreateManualReleases && (
-                    <DrawerButton
-                      onClick={handleNewRelease}
-                      className='h-7 rounded-lg px-2.5 text-2xs inline-flex items-center gap-2'
-                      data-testid='shell-releases-create-connected-empty'
-                    >
-                      <Icon
-                        name='Plus'
-                        className='h-4 w-4'
-                        aria-hidden='true'
-                      />
-                      Add manually
-                    </DrawerButton>
-                  )}
-                </div>
-              </DrawerSurfaceCard>
-            </div>
-          ) : visibleReleases.length === 0 ? (
-            <div className='py-12 grid place-items-center text-center'>
-              <div>
-                <div className='text-[13px] font-caption text-secondary-token'>
-                  No releases match your filters
-                </div>
-                {pills.length > 0 ? (
-                  <button
-                    type='button'
-                    onClick={handleClearFilters}
-                    className='mt-2 text-[11px] text-cyan-400 hover:text-cyan-300 transition-colors duration-subtle ease-out'
-                  >
-                    Clear filters
-                  </button>
-                ) : null}
-              </div>
-            </div>
-          ) : (
-            <div
-              role='listbox'
-              aria-label='Releases'
-              className='py-1.5 space-y-px px-2'
-            >
-              {visibleReleases.map(r => (
-                <ShellReleaseRow
-                  key={r.id}
-                  release={r}
-                  isSelected={r.id === selectedReleaseId}
-                  onSelect={() => handleSelect(r)}
-                  actionMenuItems={actionMenusByReleaseId.get(r.id)}
-                  smartLinkLockReason={
-                    isSmartLinkLocked(r.id)
-                      ? getSmartLinkLockReason(r.id)
-                      : null
-                  }
-                />
-              ))}
-            </div>
-          )}
+          <ReleasesListContent
+            showEmptyState={showEmptyState}
+            showConnectedEmptyState={showConnectedEmptyState}
+            visibleReleases={visibleReleases}
+            selectedReleaseId={selectedReleaseId}
+            pills={pills}
+            canCreateManualReleases={canCreateManualReleases}
+            isSyncing={isSyncing}
+            actionMenusByReleaseId={actionMenusByReleaseId}
+            isSmartLinkLocked={isSmartLinkLocked}
+            getSmartLinkLockReason={getSmartLinkLockReason}
+            onConnectSpotify={() => setSpotifySearchOpen(true)}
+            onNewRelease={handleNewRelease}
+            onSync={handleSync}
+            onSelect={handleSelect}
+            onClearFilters={handleClearFilters}
+          />
         </div>
       </section>
 
