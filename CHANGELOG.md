@@ -15,6 +15,24 @@
 - [internal] **AgentOS lane counts**: status count badges are now `<button>` elements with `aria-pressed`. Clicking a lane count highlights that lane and dims all others. Clicking again clears the filter. The panel subtitle updates to show the filtered count.
 - [internal] **ArtifactDrawer links**: Linear and PR links now display actual identifiers (`JOV-1971`, `#8282`) instead of generic `"Linear"` / `"Pull Request"` labels.
 
+## [26.4.240] - 2026-05-12
+
+> Pricing pages now use a single source of truth for plan names, prices, and CTAs. "Request Access" and "Waitlist" copy is removed; all plans link directly to signup with the plan pre-selected.
+
+### Added
+
+- **Pricing source of truth** (`constants/plans.ts`): new `CANONICAL_PLANS` export — the single source of truth for plan display names, monthly/yearly prices, CTA labels, and signup URLs. Prices derive from `PLAN_PRICES`; feature lists derive from the entitlement registry. Marketing pages and onboarding import from here instead of duplicating values.
+- **Fixture invariant tests** (`tests/unit/seed/seed-fixture-invariants.test.ts`): enforces that demo persona seed data contains no known placeholder titles, correctly credits collaborators (no Tim White identity collision in Calvin demo), and has consistent Spotify ID + artwork pairing. (JOV-2077, JOV-2078)
+- **Screenshot player timestamp invariants** (`tests/unit/product-screenshots/screenshot-player-timestamps.test.ts`): enforces unique `playerTimestamp` values across all marketing screenshot scenarios that show a visible audio player, and validates the timestamp format (`M:SS` / `MM:SS`). (JOV-2087)
+- **Pricing contract tests** (`tests/unit/pricing/pricing-source-of-truth.test.ts`): 16 tests enforcing plan IDs, prices, CTA copy (no banned phrases), and signup href `?plan=` params all flow from canonical sources.
+- `playerTimestamp` field on `ScreenshotScenario` type; Tim White profile mobile variants (listen, pay, live, subscribe) now declare unique timestamps.
+
+### Changed
+
+- **Pricing pages** (`/pricing`, `/launch/pricing`): removed "Request Access", "Waitlist", and "Paid plans open from the waitlist" copy. CTAs updated to "Claim your profile" (free) and "Start Free Trial" (Pro/Max). Availability changed to `InStock` in JSON-LD structured data.
+- `MarketingPricingPlans` component: removed `isMarketingPlanActive`/`getMarketingPlanCtaLabel`/`getMarketingPlanHref` helpers; CTA labels and hrefs now come directly from the data layer.
+- `data/marketingPricingPlans.ts`: replaced `team`/`enterprise` plans with `max`; replaced `activeCtaLabel`/`waitlistCtaLabel` with single `ctaLabel`/`ctaHref`; prices now reference `PLAN_PRICES`.
+
 ## [26.4.239] - 2026-05-12
 
 > Artist profile cards no longer stretch too tall on large monitors, footer sections breathe a bit more, and the spec-wall animations on the homepage now stagger instead of firing all at once.
