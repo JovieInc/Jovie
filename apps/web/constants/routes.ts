@@ -114,6 +114,7 @@ export const APP_ROUTES = {
   ARTIST_PROFILES: '/artist-profiles',
   BLOG: '/blog',
   BLOG_THE_CONTACT_PROBLEM: '/blog/the-contact-problem',
+  BRAND: '/brand',
   BLOG_THE_MYSPACE_PROBLEM: '/blog/the-myspace-problem',
   COMPARE: '/compare',
   DEMO: '/demo',
