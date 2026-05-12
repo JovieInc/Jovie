@@ -26,14 +26,17 @@ function formatUpdatedAt(value: string): string {
   }).format(new Date(value));
 }
 
+const AGENT_OS_LINK_ALLOWED_HOSTS = new Set(['github.com', 'linear.app']);
+
 function getSafeExternalHref(href: string | null): string | null {
   if (!href) return null;
 
   try {
     const url = new URL(href);
-    return url.protocol === 'http:' || url.protocol === 'https:'
-      ? url.toString()
-      : null;
+    if (url.protocol !== 'https:') return null;
+    if (url.username || url.password) return null;
+    if (!AGENT_OS_LINK_ALLOWED_HOSTS.has(url.hostname)) return null;
+    return url.toString();
   } catch {
     return null;
   }
