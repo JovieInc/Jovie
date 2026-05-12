@@ -1,5 +1,6 @@
 'use client';
 
+import './HeaderNav.css';
 import { Button, getLinearPillClassName } from '@jovie/ui';
 import { ChevronDown } from 'lucide-react';
 import Link from 'next/link';
