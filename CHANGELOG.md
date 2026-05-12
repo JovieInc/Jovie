@@ -5,13 +5,21 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.237] - 2026-05-12
+
+> [internal] Analytics settings toggle now shows a compact state label instead of a verbose disclosure card.
+
+### Changed
+
+- [internal] **Analytics settings** (`SettingsAnalyticsSection`): replaced the verbose `ContentSurfaceCard` disclosure block with a single-line description label on the toggle row — "High quality only" when filtering is on, "All traffic" when off. Removes 17 lines of explanatory chrome that duplicated the toggle's own affordance.
+
 ## [26.4.236] - 2026-05-12
 
 > [internal] Fixed cookie consent banner buttons being unresponsive when the server action failed.
 
 ### Fixed
 
-- **[internal] Cookie banner buttons respond immediately**: Accept All, Reject, and Save Preferences now update the UI synchronously. Previously, if the server-side cookie write failed (network error, CSRF issue), the banner stayed stuck open. Consent is now persisted to localStorage first; the server action runs fire-and-forget in the background. Also raised banner z-index from z-40 to z-[60] to prevent overlay stacking issues.
+- **[internal] Cookie banner buttons respond immediately**: Accept All, Reject, and Save Preferences now update the UI synchronously. Previously, if the server-side cookie write failed (network error, CSRF issue), the banner stayed stuck open. Consent is now persisted to localStorage first; the server action runs fire-and-fight in the background. Also raised banner z-index from z-40 to z-[60] to prevent overlay stacking issues.
 
 ## [26.4.235] - 2026-05-10
 
