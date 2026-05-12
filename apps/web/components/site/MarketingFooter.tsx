@@ -94,10 +94,10 @@ export function MarketingFooter({
         className={cn(
           'mx-auto w-full max-w-[var(--linear-content-max)] px-[clamp(1.25rem,2.2vw,2rem)]',
           isMinimal
-            ? 'pt-[clamp(2.5rem,4.5vw,3.5rem)] pb-[clamp(2rem,3.5vw,2.75rem)]'
+            ? 'pt-[clamp(3rem,5vw,4.5rem)] pb-[clamp(2.5rem,4vw,3.5rem)]'
             : shouldShowCta
-              ? 'pt-0 pb-[clamp(2rem,3.5vw,2.75rem)]'
-              : 'pt-[clamp(3.5rem,5.5vw,5rem)] pb-[clamp(2rem,3.5vw,2.75rem)]'
+              ? 'pt-0 pb-[clamp(2.5rem,4vw,3.5rem)]'
+              : 'pt-[clamp(4rem,6.5vw,6rem)] pb-[clamp(2.5rem,4vw,3.5rem)]'
         )}
       >
         {shouldShowCta ? (
