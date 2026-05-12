@@ -119,9 +119,34 @@ export interface MarketingHeaderProps
     readonly variant?: MarketingHeaderVariant;
   }> {}
 
-/**
- * Marketing header with a static public auth shell.
- */
+interface ResolvedNavConfig {
+  readonly flyoutMenus: readonly HeaderFlyoutMenu[] | undefined;
+  readonly mobileNavLinks: readonly MarketingHeaderNavLink[];
+  readonly desktopNavLinks: readonly MarketingHeaderNavLink[];
+}
+
+function resolveNavConfig(
+  hasSimpleNav: boolean,
+  centerNavDisabled: boolean,
+  simpleNavLinks: readonly MarketingHeaderNavLink[]
+): ResolvedNavConfig {
+  if (hasSimpleNav) {
+    return {
+      flyoutMenus: undefined,
+      mobileNavLinks: simpleNavLinks,
+      desktopNavLinks: simpleNavLinks,
+    };
+  }
+  if (centerNavDisabled) {
+    return { flyoutMenus: undefined, mobileNavLinks: [], desktopNavLinks: [] };
+  }
+  return {
+    flyoutMenus: MARKETING_GLASS_FLYOUTS,
+    mobileNavLinks: MARKETING_GLASS_MOBILE_LINKS,
+    desktopNavLinks: MARKETING_GLASS_DESKTOP_LINKS,
+  };
+}
+
 export function MarketingHeader({
   logoSize = 'xs',
   logoVariant = 'word',
@@ -144,21 +169,11 @@ export function MarketingHeader({
     (!FEATURE_FLAGS.SHOW_MARKETING_CENTER_NAV ||
       (isHomepage && !showHomepageCenterNav));
   const hideCenterNav = isMinimal || centerNavDisabled;
-  const resolvedFlyoutMenus = hasSimpleNav
-    ? undefined
-    : centerNavDisabled
-      ? undefined
-      : MARKETING_GLASS_FLYOUTS;
-  const resolvedMobileNavLinks = hasSimpleNav
-    ? resolvedNavLinks
-    : centerNavDisabled
-      ? []
-      : MARKETING_GLASS_MOBILE_LINKS;
-  const resolvedDesktopNavLinks = hasSimpleNav
-    ? resolvedNavLinks
-    : centerNavDisabled
-      ? []
-      : MARKETING_GLASS_DESKTOP_LINKS;
+  const navConfig = resolveNavConfig(
+    hasSimpleNav,
+    centerNavDisabled,
+    resolvedNavLinks
+  );
 
   return (
     <HeaderNav
@@ -172,11 +187,11 @@ export function MarketingHeader({
       includePublicLoginInMobileNav
       containerSize='homepage'
       presentation={presentation}
-      flyoutMenus={resolvedFlyoutMenus}
+      flyoutMenus={navConfig.flyoutMenus}
       mobilePublicCtaHref={isHomepage ? APP_ROUTES.SIGNUP : undefined}
       mobilePublicCtaLabel={isHomepage ? 'Start Free Trial' : undefined}
-      mobileNavLinks={resolvedMobileNavLinks}
-      navLinks={resolvedDesktopNavLinks}
+      mobileNavLinks={navConfig.mobileNavLinks}
+      navLinks={navConfig.desktopNavLinks}
       showContactLink={!isHomepage}
     />
   );

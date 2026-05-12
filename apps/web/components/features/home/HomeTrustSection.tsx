@@ -41,6 +41,23 @@ function getLabelMarginClass(
   return 'mb-5 sm:mb-6';
 }
 
+function getSlotClass(isInlineStrip: boolean, slotName: string): string {
+  return cn(
+    'flex min-w-0 items-center justify-center',
+    isInlineStrip &&
+      `homepage-trust-logo-slot homepage-trust-logo-slot--${slotName}`
+  );
+}
+
+function getLogoClass(
+  isInlineStrip: boolean,
+  inlineClass: string,
+  cardClass: string,
+  tone: string
+): string {
+  return cn(isInlineStrip ? inlineClass : cardClass, tone);
+}
+
 export function HomeTrustSection({
   variant = 'default',
   className,
@@ -59,9 +76,6 @@ export function HomeTrustSection({
       data-testid='homepage-trust'
       data-presentation={presentation}
       className={cn(
-        // Bundle pattern: dim/monochrome wide-gap row on a soft proof strip.
-        // Card variant retains its bordered surface for artist-profile /
-        // notifications surfaces.
         isInlineStrip
           ? 'relative z-[1] mx-auto w-full overflow-hidden px-5 py-12 sm:px-6 sm:py-14 lg:px-0'
           : 'relative z-[1] mx-auto w-full px-5 sm:px-6 lg:px-0',
@@ -90,91 +104,64 @@ export function HomeTrustSection({
         </p>
         <div
           className={cn(
-            presentation === 'inline-strip'
+            isInlineStrip
               ? 'homepage-trust-logo-grid'
               : 'grid grid-cols-2 items-center justify-items-center gap-x-6 gap-y-6 sm:flex sm:flex-wrap sm:items-center sm:justify-center sm:gap-x-10 sm:gap-y-5 lg:flex-nowrap lg:justify-between',
             variant === 'compact' &&
-              presentation !== 'inline-strip' &&
+              !isInlineStrip &&
               'gap-x-5 gap-y-5 sm:gap-x-8'
           )}
         >
-          <div
-            className={cn(
-              'flex min-w-0 items-center justify-center',
-              presentation === 'inline-strip' &&
-                'homepage-trust-logo-slot homepage-trust-logo-slot--awal'
-            )}
-          >
+          <div className={getSlotClass(isInlineStrip, 'awal')}>
             <AwalLogo
-              className={cn(
-                isInlineStrip
-                  ? 'homepage-trust-logo homepage-trust-logo--awal w-auto max-w-[38vw] select-none'
-                  : 'h-[20px] w-auto max-w-[36vw] select-none sm:h-[22px]',
+              className={getLogoClass(
+                isInlineStrip,
+                'homepage-trust-logo homepage-trust-logo--awal w-auto max-w-[38vw] select-none',
+                'h-[20px] w-auto max-w-[36vw] select-none sm:h-[22px]',
                 logoTone
               )}
             />
           </div>
-          <div
-            className={cn(
-              'flex min-w-0 items-center justify-center',
-              presentation === 'inline-strip' &&
-                'homepage-trust-logo-slot homepage-trust-logo-slot--orchard'
-            )}
-          >
+          <div className={getSlotClass(isInlineStrip, 'orchard')}>
             <TheOrchardLogo
-              className={cn(
-                isInlineStrip
-                  ? 'homepage-trust-logo homepage-trust-logo--orchard w-auto max-w-[44vw] select-none'
-                  : 'h-[28px] w-auto max-w-[34vw] select-none sm:h-[31px]',
+              className={getLogoClass(
+                isInlineStrip,
+                'homepage-trust-logo homepage-trust-logo--orchard w-auto max-w-[44vw] select-none',
+                'h-[28px] w-auto max-w-[34vw] select-none sm:h-[31px]',
                 logoTone
               )}
             />
           </div>
-          <div
-            className={cn(
-              'flex min-w-0 items-center justify-center',
-              presentation === 'inline-strip' &&
-                'homepage-trust-logo-slot homepage-trust-logo-slot--umg'
-            )}
-          >
+          <div className={getSlotClass(isInlineStrip, 'umg')}>
             <UniversalMusicGroupLogo
-              className={cn(
-                isInlineStrip
-                  ? 'homepage-trust-logo homepage-trust-logo--umg h-auto max-w-[52vw] select-none'
-                  : 'h-[14px] w-auto max-w-[72vw] select-none sm:h-[16px]',
+              className={getLogoClass(
+                isInlineStrip,
+                'homepage-trust-logo homepage-trust-logo--umg h-auto max-w-[52vw] select-none',
+                'h-[14px] w-auto max-w-[72vw] select-none sm:h-[16px]',
                 logoTone
               )}
             />
           </div>
-          <div
-            className={cn(
-              'flex min-w-0 items-center justify-center',
-              presentation === 'inline-strip' &&
-                'homepage-trust-logo-slot homepage-trust-logo-slot--armada'
-            )}
-          >
+          <div className={getSlotClass(isInlineStrip, 'armada')}>
             <ArmadaMusicLogo
-              className={cn(
-                isInlineStrip
-                  ? 'homepage-trust-logo homepage-trust-logo--armada w-auto max-w-[44vw] select-none'
-                  : 'h-[22px] w-auto max-w-[38vw] select-none sm:h-[24px]',
+              className={getLogoClass(
+                isInlineStrip,
+                'homepage-trust-logo homepage-trust-logo--armada w-auto max-w-[44vw] select-none',
+                'h-[22px] w-auto max-w-[38vw] select-none sm:h-[24px]',
                 logoTone
               )}
             />
           </div>
           <div
             data-mobile-logo='secondary'
-            className={cn(
-              'flex min-w-0 items-center justify-center',
-              presentation === 'inline-strip' &&
-                'homepage-trust-logo-slot homepage-trust-logo-slot--black-hole'
-            )}
+            className={getSlotClass(isInlineStrip, 'black-hole')}
           >
             <BlackHoleRecordingsLogo
-              className={cn(
-                isInlineStrip
-                  ? 'homepage-trust-logo homepage-trust-logo--black-hole h-auto'
-                  : 'h-[16px] w-auto sm:h-[18px]'
+              className={getLogoClass(
+                isInlineStrip,
+                'homepage-trust-logo homepage-trust-logo--black-hole h-auto',
+                'h-[16px] w-auto sm:h-[18px]',
+                ''
               )}
             />
           </div>
