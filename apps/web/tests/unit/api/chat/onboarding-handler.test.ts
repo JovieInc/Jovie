@@ -136,6 +136,17 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     expect(body.errorCode).toBe('INVALID_MESSAGES');
   });
 
+  it('returns 400 when the messages array is empty', async () => {
+    const { tryHandleAnonymousOnboardingChat } = await import(
+      '@/app/api/chat/onboarding-handler'
+    );
+    const req = makeRequest({ mode: 'onboarding', messages: [] });
+    const result = await tryHandleAnonymousOnboardingChat(req, 'req-3b');
+    expect(result?.status).toBe(400);
+    const body = await result?.json();
+    expect(body.errorCode).toBe('INVALID_MESSAGES');
+  });
+
   it('returns 400 when a message is shaped wrong', async () => {
     const { tryHandleAnonymousOnboardingChat } = await import(
       '@/app/api/chat/onboarding-handler'

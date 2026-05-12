@@ -411,37 +411,52 @@ function buildSessionCookieHeader(value: string): string {
  * Lightweight shape check for the UIMessage payload. We deliberately don't
  * pull in the full `validateMessagesArray` from `/api/chat/route.ts` to keep
  * this handler import-light — onboarding mode has stricter caps anyway.
+ *
+ * Split into shape-and-parts helpers so SonarCloud's cognitive-complexity
+ * budget (15) is satisfied at each layer.
  */
 function validateOnboardingMessages(messages: unknown[]): string | null {
   if (messages.length === 0) {
     return 'messages array must be non-empty';
   }
   for (let i = 0; i < messages.length; i++) {
-    const msg = messages[i];
-    if (!msg || typeof msg !== 'object') {
-      return `messages[${i}] must be an object`;
-    }
-    const m = msg as { role?: unknown; parts?: unknown };
-    if (m.role !== 'user' && m.role !== 'assistant' && m.role !== 'system') {
-      return `messages[${i}].role must be user/assistant/system`;
-    }
-    if (!Array.isArray(m.parts)) {
-      return `messages[${i}].parts must be an array`;
-    }
-    for (const part of m.parts) {
-      if (
-        part &&
-        typeof part === 'object' &&
-        (part as { type?: unknown }).type === 'text'
-      ) {
-        const text = (part as { text?: unknown }).text;
-        if (
-          typeof text === 'string' &&
-          text.length > MAX_ONBOARDING_MESSAGE_LENGTH
-        ) {
-          return `messages[${i}] text part exceeds ${MAX_ONBOARDING_MESSAGE_LENGTH} chars`;
-        }
-      }
+    const shapeError = validateMessageShape(messages[i], i);
+    if (shapeError) return shapeError;
+    // shape check guarantees parts is an array
+    const parts = (messages[i] as { parts: unknown[] }).parts;
+    const partsError = validateTextPartLengths(parts, i);
+    if (partsError) return partsError;
+  }
+  return null;
+}
+
+function validateMessageShape(msg: unknown, index: number): string | null {
+  if (!msg || typeof msg !== 'object') {
+    return `messages[${index}] must be an object`;
+  }
+  const m = msg as { role?: unknown; parts?: unknown };
+  if (m.role !== 'user' && m.role !== 'assistant' && m.role !== 'system') {
+    return `messages[${index}].role must be user/assistant/system`;
+  }
+  if (!Array.isArray(m.parts)) {
+    return `messages[${index}].parts must be an array`;
+  }
+  return null;
+}
+
+function validateTextPartLengths(
+  parts: unknown[],
+  messageIndex: number
+): string | null {
+  for (const part of parts) {
+    if (!part || typeof part !== 'object') continue;
+    if ((part as { type?: unknown }).type !== 'text') continue;
+    const text = (part as { text?: unknown }).text;
+    if (
+      typeof text === 'string' &&
+      text.length > MAX_ONBOARDING_MESSAGE_LENGTH
+    ) {
+      return `messages[${messageIndex}] text part exceeds ${MAX_ONBOARDING_MESSAGE_LENGTH} chars`;
     }
   }
   return null;

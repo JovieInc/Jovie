@@ -187,16 +187,23 @@ export async function executeChatTurn(
   // music-industry knowledge context (which is keyed on the artist's profile,
   // not relevant pre-account). Authenticated `mode='app'` keeps the existing
   // buildSystemPrompt path so this refactor is behaviour-stable for in-app chat.
-  const systemPrompt =
-    mode === 'onboarding'
-      ? ONBOARDING_SYSTEM_PROMPT
-      : buildSystemPrompt(artistContext as ArtistContext, releases, {
-          aiCanUseTools: planLimits.booleans.aiCanUseTools,
-          aiDailyMessageLimit: planLimits.limits.aiDailyMessageLimit,
-          insightsEnabled,
-          knowledgeContext:
-            selectKnowledgeContextForTurn(uiMessages) || undefined,
-        });
+  let systemPrompt: string;
+  if (mode === 'onboarding') {
+    systemPrompt = ONBOARDING_SYSTEM_PROMPT;
+  } else {
+    // Runtime guard rather than a `as ArtistContext` cast — the type system
+    // can't express "non-null when mode='app'" without a discriminated union,
+    // and we'd rather fail fast at the entry than crash inside buildSystemPrompt.
+    if (!artistContext) {
+      throw new Error('artistContext is required when mode is "app"');
+    }
+    systemPrompt = buildSystemPrompt(artistContext, releases, {
+      aiCanUseTools: planLimits.booleans.aiCanUseTools,
+      aiDailyMessageLimit: planLimits.limits.aiDailyMessageLimit,
+      insightsEnabled,
+      knowledgeContext: selectKnowledgeContextForTurn(uiMessages) || undefined,
+    });
+  }
 
   const modelMessages = await convertToModelMessages(uiMessages);
 
