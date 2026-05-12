@@ -84,6 +84,66 @@ function isWaitlistInviteRedirect(redirectUrl: string | null): boolean {
   );
 }
 
+/**
+ * Paths the proxy must NOT rewrite based on user state. The page component
+ * handles its own auth/state logic.
+ *
+ *  - /api/* — API handlers do their own auth checks.
+ *  - /app, /app/* — app shell layout handles waitlist/onboarding gating.
+ *  - /start — anonymous onboarding (JOV-2132). For authenticated visitors
+ *    the page mounts OnboardingShell, which fires useOnboardingClaim once
+ *    Clerk reports the user is signed in and hands off to /onboarding/checkout.
+ *    Rewriting /start orphans the anonymous conversation; combined with
+ *    /waitlist's anonymous → /start redirect it produces a server-side
+ *    redirect loop (JOV-2161).
+ *  - /onboarding/checkout — has its own resolveUserState() gating and is the
+ *    handoff target for useOnboardingClaim. Rewriting it to /onboarding
+ *    breaks the post-claim flow.
+ */
+function isProxyRewriteExempt(pathname: string): boolean {
+  if (pathname.startsWith('/api/')) return true;
+  if (pathname === '/app' || pathname.startsWith('/app/')) return true;
+  if (pathname === APP_ROUTES.START) return true;
+  if (pathname === APP_ROUTES.ONBOARDING_CHECKOUT) return true;
+  return false;
+}
+
+/** Max consecutive state-based rewrites before the circuit breaker fires. */
+const PROXY_REWRITE_CIRCUIT_BREAKER_THRESHOLD = 3;
+const PROXY_REWRITE_COUNT_COOKIE = 'jovie_redirect_count';
+const PROXY_REWRITE_COUNT_TTL_SECONDS = 30;
+
+/**
+ * Apply a state-based rewrite with a shared redirect-loop circuit breaker.
+ * Returns the rewritten NextResponse, or null when the breaker fires (caller
+ * falls through with NextResponse.next() and a Sentry event).
+ *
+ * The counter is shared across all state-based rewrites (waitlist + onboarding)
+ * so any loop class trips the same breaker.
+ */
+function applyStateRewrite(
+  req: NextRequest,
+  requestHeaders: Headers,
+  target: string
+): NextResponse | null {
+  const redirectCount = Number(
+    req.cookies.get(PROXY_REWRITE_COUNT_COOKIE)?.value ?? '0'
+  );
+  if (redirectCount >= PROXY_REWRITE_CIRCUIT_BREAKER_THRESHOLD) {
+    return null;
+  }
+  const res = NextResponse.rewrite(new URL(target, req.url), {
+    request: { headers: requestHeaders },
+  });
+  res.cookies.set(PROXY_REWRITE_COUNT_COOKIE, String(redirectCount + 1), {
+    maxAge: PROXY_REWRITE_COUNT_TTL_SECONDS,
+    path: '/',
+    httpOnly: true,
+    sameSite: 'lax',
+  });
+  return res;
+}
+
 // ============================================================================
 // Public Profile Audience Block Check
 // ============================================================================
@@ -757,20 +817,36 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         userState.needsWaitlist &&
         pathname !== '/waitlist' &&
         !isInviteRedemptionPath &&
-        !pathname.startsWith('/api/') &&
-        pathname !== '/app' &&
-        !pathname.startsWith('/app/')
+        !isProxyRewriteExempt(pathname)
       ) {
-        res = NextResponse.rewrite(new URL('/waitlist', req.url), {
-          request: { headers: requestHeaders },
-        });
+        const waitlistRewrite = applyStateRewrite(
+          req,
+          requestHeaders,
+          '/waitlist'
+        );
+        if (waitlistRewrite === null) {
+          await captureError(
+            '[proxy] Redirect loop circuit breaker triggered',
+            new Error('Redirect loop detected'),
+            {
+              pathname,
+              target: '/waitlist',
+              redirectCount: Number(
+                req.cookies.get(PROXY_REWRITE_COUNT_COOKIE)?.value ?? '0'
+              ),
+              operation: 'proxy_circuit_breaker',
+            }
+          );
+          res = NextResponse.next({ request: { headers: requestHeaders } });
+          res.cookies.delete(PROXY_REWRITE_COUNT_COOKIE);
+        } else {
+          res = waitlistRewrite;
+        }
       } else if (
         userState.needsOnboarding &&
         pathname !== '/onboarding' &&
         !isInviteRedemptionPath &&
-        !pathname.startsWith('/api/') &&
-        pathname !== '/app' &&
-        !pathname.startsWith('/app/')
+        !isProxyRewriteExempt(pathname)
       ) {
         const onboardingJustCompleted =
           req.cookies.get('jovie_onboarding_complete')?.value === '1';
@@ -779,36 +855,28 @@ async function handleRequest(req: NextRequest, userId: string | null) {
           res = NextResponse.next({ request: { headers: requestHeaders } });
           res.cookies.delete('jovie_onboarding_complete');
         } else {
-          // Circuit breaker: detect redirect loops between /app and /onboarding.
-          // If we've redirected the same user more than 3 times in 30 seconds,
-          // break the loop and let the request through instead of looping forever.
-          const redirectCount = Number(
-            req.cookies.get('jovie_redirect_count')?.value ?? '0'
+          const rewriteRes = applyStateRewrite(
+            req,
+            requestHeaders,
+            '/onboarding'
           );
-
-          if (redirectCount >= 3) {
+          if (rewriteRes === null) {
             await captureError(
               '[proxy] Redirect loop circuit breaker triggered',
               new Error('Redirect loop detected'),
               {
                 pathname,
-                redirectCount,
+                target: '/onboarding',
+                redirectCount: Number(
+                  req.cookies.get(PROXY_REWRITE_COUNT_COOKIE)?.value ?? '0'
+                ),
                 operation: 'proxy_circuit_breaker',
               }
             );
-            // Let the request through — the page will handle the state
             res = NextResponse.next({ request: { headers: requestHeaders } });
-            res.cookies.delete('jovie_redirect_count');
+            res.cookies.delete(PROXY_REWRITE_COUNT_COOKIE);
           } else {
-            res = NextResponse.rewrite(new URL('/onboarding', req.url), {
-              request: { headers: requestHeaders },
-            });
-            res.cookies.set('jovie_redirect_count', String(redirectCount + 1), {
-              maxAge: 30, // 30 second TTL — auto-resets
-              path: '/',
-              httpOnly: true,
-              sameSite: 'lax',
-            });
+            res = rewriteRes;
           }
         }
       } else if (
