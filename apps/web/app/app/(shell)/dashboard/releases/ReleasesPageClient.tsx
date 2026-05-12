@@ -61,7 +61,7 @@ export function ReleasesPageClient() {
     designV1ReleasesEnabled: useAppFlag('DESIGN_V1'),
   });
 
-  const { data: releases, isLoading, isError } = useReleasesQuery(profileId);
+  const { data: releases, isError } = useReleasesQuery(profileId);
 
   const settings =
     (selectedProfile?.settings as Record<string, unknown> | null) ?? {};
@@ -81,10 +81,12 @@ export function ReleasesPageClient() {
       ? settings.spotifyImportTotal
       : 0;
 
-  // Only swap to skeleton on a true cold load. Once we have any data (even
-  // from placeholderData), keep the tree mounted so background refetches
-  // never tear down the drawer or remount the table.
-  if (!releases && isLoading) {
+  // Cold-load skeleton only. TanStack's `isLoading` can spike on certain
+  // refetch transitions (window focus, mutation invalidation) before
+  // `data` is repopulated, causing the skeleton to flash every refetch
+  // (JOV-2151). `data === undefined` is the only true "no cached data"
+  // signal; `placeholderData` keeps it defined across same-profile refetches.
+  if (releases === undefined) {
     return <ReleaseTableSkeleton showHeader={false} />;
   }
 
