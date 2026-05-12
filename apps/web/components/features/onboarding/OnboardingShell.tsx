@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { OnboardingChat } from './OnboardingChat';
 import { OnboardingTurnstile } from './OnboardingTurnstile';
+import { useOnboardingClaim } from './useOnboardingClaim';
 
 /**
  * Outer shell for the anonymous onboarding chat (JOV-2132 PR 3).
@@ -22,6 +23,14 @@ interface OnboardingShellProps {
 export function OnboardingShell({ sessionLabel }: OnboardingShellProps) {
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [turnstileError, setTurnstileError] = useState<string | null>(null);
+
+  // Auto-claim any anonymous transcript onto the user the moment Clerk
+  // reports they're authenticated. On success, this hook navigates away to
+  // /onboarding/checkout, so the rest of the shell never gets a chance to
+  // render a "now what?" state. Idle for unauthenticated visitors.
+  const claimStatus = useOnboardingClaim();
+  const isLinking =
+    claimStatus === 'pending' || claimStatus === 'retry-after-webhook';
 
   return (
     <div
@@ -53,6 +62,16 @@ export function OnboardingShell({ sessionLabel }: OnboardingShellProps) {
           role='alert'
         >
           {turnstileError}
+        </p>
+      ) : null}
+
+      {isLinking ? (
+        <p
+          className='fixed bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-white/[0.12] bg-white/[0.04] px-3 py-1 text-[12px] text-white/70'
+          role='status'
+          aria-live='polite'
+        >
+          linking your conversation…
         </p>
       ) : null}
     </div>
