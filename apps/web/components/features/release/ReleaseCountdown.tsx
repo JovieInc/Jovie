@@ -19,11 +19,19 @@ interface TimeLeft {
 }
 
 /**
- * Calculate time remaining until target date
+ * Calculate time remaining until target date.
+ * Returns zero-state for invalid or already-past dates.
  */
 function getTimeLeft(targetDate: Date): TimeLeft {
+  const targetMs = targetDate.getTime();
+  // Treat non-finite timestamps (NaN, ±Infinity) as expired to prevent NaN
+  // values propagating into the countdown digits.
+  if (!Number.isFinite(targetMs)) {
+    return { days: 0, hours: 0, minutes: 0, total: 0 };
+  }
+
   const now = new Date();
-  const total = targetDate.getTime() - now.getTime();
+  const total = targetMs - now.getTime();
 
   if (total <= 0) {
     return { days: 0, hours: 0, minutes: 0, total: 0 };

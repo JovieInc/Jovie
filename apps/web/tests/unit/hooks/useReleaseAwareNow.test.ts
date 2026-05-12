@@ -27,6 +27,22 @@ describe('useReleaseAwareNow', () => {
     expect(result.current).toBe(initial);
   });
 
+  it('does not update when rerendered with an equivalent past Date instance', () => {
+    const pastIso = '2026-05-10T00:00:00Z';
+    const { result, rerender } = renderHook(
+      ({ date }: { date: Date }) => useReleaseAwareNow(date),
+      { initialProps: { date: new Date(pastIso) } }
+    );
+    const initial = result.current;
+    // Simulate a caller that creates a new Date object on every render but
+    // with the same underlying timestamp — the hook must not re-render.
+    rerender({ date: new Date(pastIso) });
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(result.current).toBe(initial);
+  });
+
   it('re-renders with a fresh Date when the release boundary passes', () => {
     const future = new Date('2026-05-11T00:00:30Z'); // 30s in the future
     const { result } = renderHook(() => useReleaseAwareNow(future));
