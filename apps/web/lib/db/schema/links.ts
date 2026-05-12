@@ -1,3 +1,4 @@
+import { sql as drizzleSql } from 'drizzle-orm';
 import {
   boolean,
   index,
@@ -68,6 +69,20 @@ export const socialLinks = pgTable(
     creatorProfilePlatformIdx: index(
       'social_links_creator_profile_platform_idx'
     ).on(table.creatorProfileId, table.platform),
+    // Partial unique index: collapse (creator, platform, normalized url) to
+    // one row among active+visible links. The application layer already
+    // dedupes for display (see ProfileLinkList.tsx), but legacy ingestion
+    // paths can still create duplicate rows; this index closes the gap at
+    // the source. Allows multiple inactive/disabled rows. Migration is
+    // gated by a guard block that aborts if duplicates already exist —
+    // run scripts/audit-duplicate-social-links.ts first. See JOV-2149.
+    activeUrlUnique: uniqueIndex('social_links_creator_platform_url_unique')
+      .on(
+        table.creatorProfileId,
+        table.platform,
+        drizzleSql`lower(${table.url})`
+      )
+      .where(drizzleSql`is_active = true AND state = 'active'`),
   })
 );
 
