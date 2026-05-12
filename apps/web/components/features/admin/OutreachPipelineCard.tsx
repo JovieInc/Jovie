@@ -10,7 +10,7 @@ import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentMetricRow } from '@/components/molecules/ContentMetricRow';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { formatPercent } from '@/lib/admin/format';
+import { formatPercent, formatUsd } from '@/lib/admin/format';
 import type { AdminFunnelMetrics } from '@/lib/admin/types';
 
 interface OutreachPipelineCardProps {
@@ -19,7 +19,7 @@ interface OutreachPipelineCardProps {
 
 function formatDollarPerOutreach(value: number | null): string {
   if (value === null) return '--';
-  return `$${value.toFixed(2)}`;
+  return formatUsd(value);
 }
 
 interface ConversionMetricProps {
