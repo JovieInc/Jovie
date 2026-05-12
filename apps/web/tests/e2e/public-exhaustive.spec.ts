@@ -12,8 +12,6 @@ import {
   setupPageMonitoring,
 } from './utils/smoke-test-utils';
 
-test.use({ storageState: { cookies: [], origins: [] } });
-
 function createEmptyStorageState() {
   return { cookies: [], origins: [] } as const;
 }
@@ -173,6 +171,7 @@ async function assertNoClippedInteractiveElements(
 }
 
 test.describe('Public Exhaustive Surface QA', () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
   test.setTimeout(240_000);
 
   test('all public anonymous routes stay green under interaction sweep', async ({
