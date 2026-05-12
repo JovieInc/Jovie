@@ -172,8 +172,12 @@ function SectionEyebrow({
 }
 
 async function copyDeploymentId(run: HudDeploymentRun) {
-  await navigator.clipboard.writeText(String(run.id));
-  toast.success('Deployment ID copied');
+  try {
+    await navigator.clipboard.writeText(String(run.id));
+    toast.success('Deployment ID copied');
+  } catch {
+    toast.error('Failed to copy deployment ID');
+  }
 }
 
 function DeploymentActionsMenu({
@@ -211,7 +215,7 @@ function DeploymentActionsMenu({
             </a>
           </DropdownMenuItem>
         ) : null}
-        <DropdownMenuSeparator />
+        {(run.url ?? run.branch) ? <DropdownMenuSeparator /> : null}
         <DropdownMenuItem
           onClick={() => {
             void copyDeploymentId(run);
