@@ -85,7 +85,8 @@
         "electron",
         "electron-builder",
         "sharp",
-        "cross-env"
+        "cross-env",
+        "@electron/fuses"
       ]
     },
     "apps/should-i-make": {
