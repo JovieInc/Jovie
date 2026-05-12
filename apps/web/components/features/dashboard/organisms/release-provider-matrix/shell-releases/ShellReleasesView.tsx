@@ -1,23 +1,17 @@
 'use client';
 
-import { Search } from 'lucide-react';
-import {
-  lazy,
-  Suspense,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+import { lazy, Suspense, useCallback, useMemo, useState } from 'react';
 import { DrawerLoadingSkeleton } from '@/components/molecules/drawer';
 import type { ReleaseSidebarProps } from '@/components/organisms/release-sidebar';
 import { convertContextMenuItems } from '@/components/organisms/table';
-import { PillSearch } from '@/components/shell/PillSearch';
 import type {
   FilterField,
   FilterPill,
 } from '@/components/shell/pill-search.types';
-import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
+import {
+  type HeaderSearchAdapter,
+  useRegisterHeaderSearch,
+} from '@/contexts/HeaderActionsContext';
 import { buildReleaseActions } from '@/features/dashboard/organisms/releases/release-actions';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
@@ -137,8 +131,6 @@ export function ShellReleasesView({
   readonly artistName?: string | null;
   readonly allowArtworkDownloads?: boolean;
 }) {
-  const { setHeaderActions } = useSetHeaderActions();
-  const [searchOpen, setSearchOpen] = useState(false);
   const [pills, setPills] = useState<FilterPill[]>([]);
   const releaseRows = useMemo(() => [...releases], [releases]);
   const {
@@ -280,65 +272,41 @@ export function ShellReleasesView({
   useRegisterRightPanel(sidebarPanel);
 
   const selectedReleaseId = editingRelease?.id ?? null;
-  const releaseCountSuffix =
-    visibleReleases.length === rows.length ? '' : ` of ${rows.length}`;
 
   const handleClearFilters = useCallback(() => {
     setPills([]);
   }, []);
 
-  const headerSearch = useMemo(() => {
-    if (searchOpen) {
-      return (
-        <div className='w-[min(560px,calc(100vw-2rem))] rounded-lg border border-(--linear-app-shell-border) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] px-2 py-1 shadow-[0_10px_32px_rgba(0,0,0,0.16)] sm:w-[440px] lg:w-[520px]'>
-          <PillSearch
-            active={searchOpen}
-            pills={pills}
-            onPillsChange={setPills}
-            artistOptions={artistOptions}
-            titleOptions={titleOptions}
-            albumOptions={albumOptions}
-            ariaLabel='Filter releases'
-            placeholder='Filter releases — / for fields'
-            onClose={() => {
-              setSearchOpen(false);
-              setPills([]);
-            }}
-          />
-        </div>
-      );
-    }
+  // Expose the route's filter state to the shell header. Shell V1 takes the
+  // adapter and renders the morphing PillSearch surface in the breadcrumb
+  // area; the route stays focused on data + the row list. The adapter is
+  // ignored when SHELL_CHAT_V1 is off, so legacy DESIGN_V1-only renders
+  // simply show no header search (the page itself is gated on DESIGN_V1).
+  const headerSearchAdapter = useMemo<HeaderSearchAdapter>(
+    () => ({
+      key: 'releases',
+      pills,
+      onPillsChange: setPills,
+      artistOptions,
+      titleOptions,
+      albumOptions,
+      totalCount: rows.length,
+      visibleCount: visibleReleases.length,
+      triggerLabel: 'Search Releases',
+      ariaLabel: 'Filter releases',
+      placeholder: 'Filter releases — / for fields',
+    }),
+    [
+      albumOptions,
+      artistOptions,
+      pills,
+      rows.length,
+      titleOptions,
+      visibleReleases.length,
+    ]
+  );
 
-    return (
-      <button
-        type='button'
-        data-app-search-trigger='true'
-        onClick={() => setSearchOpen(true)}
-        className='inline-flex h-7 items-center gap-1.5 rounded-md border border-(--linear-app-shell-border) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_94%,transparent)] px-2 text-[12px] text-secondary-token transition-[background-color,border-color,color] duration-150 hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
-        aria-label='Search releases'
-      >
-        <Search className='h-3.5 w-3.5' aria-hidden='true' />
-        <span className='hidden sm:inline'>Search Releases</span>
-        <span className='tabular-nums text-tertiary-token'>
-          {visibleReleases.length}
-          {releaseCountSuffix}
-        </span>
-      </button>
-    );
-  }, [
-    albumOptions,
-    artistOptions,
-    pills,
-    releaseCountSuffix,
-    searchOpen,
-    titleOptions,
-    visibleReleases.length,
-  ]);
-
-  useEffect(() => {
-    setHeaderActions(headerSearch);
-    return () => setHeaderActions(null);
-  }, [headerSearch, setHeaderActions]);
+  useRegisterHeaderSearch(headerSearchAdapter);
 
   return (
     <section
@@ -360,7 +328,7 @@ export function ShellReleasesView({
                 <button
                   type='button'
                   onClick={handleClearFilters}
-                  className='mt-2 text-[11px] text-cyan-400 hover:text-cyan-300 transition-colors duration-150 ease-out'
+                  className='mt-2 text-[11px] text-cyan-400 hover:text-cyan-300 transition-colors duration-subtle ease-out'
                 >
                   Clear filters
                 </button>

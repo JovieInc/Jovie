@@ -12,6 +12,13 @@ export interface DashboardHeaderProps {
   readonly breadcrumbSuffix?: ReactNode;
   /** Content shown on right side */
   readonly action?: ReactNode;
+  /**
+   * Shell-owned search surface. When set, the closed trigger renders inline
+   * beside the breadcrumb; when `isSearchActive` is true, the breadcrumb
+   * collapses and the search takes over the leading area to avoid layout shift.
+   */
+  readonly searchSurface?: ReactNode;
+  readonly isSearchActive?: boolean;
   /** Profile button slot shown on the far right of the mobile header */
   readonly mobileProfileSlot?: ReactNode;
   readonly showDivider?: boolean;
@@ -24,6 +31,8 @@ export function DashboardHeader({
   sidebarTrigger,
   breadcrumbSuffix,
   action,
+  searchSurface,
+  isSearchActive = false,
   mobileProfileSlot,
   showDivider = false,
   className,
@@ -32,6 +41,8 @@ export function DashboardHeader({
   const rootLabel =
     breadcrumbs.length > 1 ? (breadcrumbs[0]?.label ?? 'Jovie') : 'Jovie';
   const usesSectionTitleLayout = breadcrumbs.length === 1 && !breadcrumbSuffix;
+  const showInlineSearch = Boolean(searchSurface);
+  const searchTakesOver = showInlineSearch && isSearchActive;
 
   return (
     <header
@@ -70,26 +81,40 @@ export function DashboardHeader({
           </div>
         ) : null}
         {/* Desktop: Simplified breadcrumb - just current page */}
-        <div className='flex min-w-0 flex-1 items-center gap-1 tracking-[-0.012em]'>
-          {usesSectionTitleLayout ? (
-            <span className='truncate text-xs font-semibold tracking-[-0.01em] text-primary-token'>
-              {currentLabel}
-            </span>
+        <div
+          className='flex min-w-0 flex-1 items-center gap-2 tracking-[-0.012em]'
+          data-search-active={searchTakesOver ? 'true' : 'false'}
+        >
+          {searchTakesOver ? (
+            <div className='min-w-0 flex-1 flex items-center'>
+              {searchSurface}
+            </div>
           ) : (
             <>
-              <span className='shrink-0 text-2xs font-caption tracking-[-0.01em] text-tertiary-token'>
-                {rootLabel}
-              </span>
-              <ChevronRight className='size-3 shrink-0 text-quaternary-token/85' />
-              {breadcrumbSuffix ? (
-                <div className='min-w-0 truncate text-xs tracking-[-0.01em] text-secondary-token'>
-                  {breadcrumbSuffix}
-                </div>
-              ) : (
+              {usesSectionTitleLayout ? (
                 <span className='truncate text-xs font-semibold tracking-[-0.01em] text-primary-token'>
                   {currentLabel}
                 </span>
+              ) : (
+                <>
+                  <span className='shrink-0 text-2xs font-caption tracking-[-0.01em] text-tertiary-token'>
+                    {rootLabel}
+                  </span>
+                  <ChevronRight className='size-3 shrink-0 text-quaternary-token/85' />
+                  {breadcrumbSuffix ? (
+                    <div className='min-w-0 truncate text-xs tracking-[-0.01em] text-secondary-token'>
+                      {breadcrumbSuffix}
+                    </div>
+                  ) : (
+                    <span className='truncate text-xs font-semibold tracking-[-0.01em] text-primary-token'>
+                      {currentLabel}
+                    </span>
+                  )}
+                </>
               )}
+              {showInlineSearch ? (
+                <div className='ml-2 flex items-center'>{searchSurface}</div>
+              ) : null}
             </>
           )}
         </div>

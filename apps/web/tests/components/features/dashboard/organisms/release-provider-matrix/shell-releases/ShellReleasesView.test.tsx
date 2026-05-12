@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ShellReleasesView } from '@/components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView';
+import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurface';
 import {
   HeaderActionsProvider,
   useHeaderActions,
@@ -136,9 +137,16 @@ function RightPanelProbe() {
   return <div data-testid='right-panel-probe'>{panel}</div>;
 }
 
-function HeaderActionsProbe() {
-  const { headerActions } = useHeaderActions();
-  return <div data-testid='header-actions-probe'>{headerActions}</div>;
+function HeaderAdapterProbe() {
+  const { headerSearchAdapter } = useHeaderActions();
+  return (
+    <div
+      data-testid='header-adapter-probe'
+      data-adapter-key={headerSearchAdapter?.key ?? ''}
+      data-visible-count={headerSearchAdapter?.visibleCount ?? ''}
+      data-total-count={headerSearchAdapter?.totalCount ?? ''}
+    />
+  );
 }
 
 function renderShell(releases: readonly ReleaseViewModel[]) {
@@ -153,13 +161,17 @@ function renderShell(releases: readonly ReleaseViewModel[]) {
     <QueryClientProvider client={queryClient}>
       <HeaderActionsProvider>
         <RightPanelProvider>
+          {/* Mimics the AuthShell breadcrumb slot so the route's registered
+              header-search adapter actually renders a closed/open trigger
+              we can inspect from tests. */}
+          <HeaderSearchSurfaceFromContext />
           <ShellReleasesView
             releases={releases}
             providerConfig={providerConfig}
             primaryProviders={primaryProviders}
             artistName='Bahamas'
           />
-          <HeaderActionsProbe />
+          <HeaderAdapterProbe />
           <RightPanelProbe />
         </RightPanelProvider>
       </HeaderActionsProvider>
@@ -246,11 +258,18 @@ describe('ShellReleasesView', () => {
     });
   });
 
-  it('shows a count when filtered down', () => {
+  it('registers a header-search adapter exposing the release count', () => {
     renderShell([
       fakeRelease({ id: '1', title: 'Alpha' }),
       fakeRelease({ id: '2', title: 'Beta' }),
     ]);
-    expect(screen.getByText('2')).toBeInTheDocument();
+    const probe = screen.getByTestId('header-adapter-probe');
+    expect(probe).toHaveAttribute('data-adapter-key', 'releases');
+    expect(probe).toHaveAttribute('data-total-count', '2');
+    expect(probe).toHaveAttribute('data-visible-count', '2');
+    // The shell's closed search trigger renders the same count + label.
+    expect(
+      screen.getByRole('button', { name: /Filter releases|Search Releases/ })
+    ).toHaveTextContent('2');
   });
 });
