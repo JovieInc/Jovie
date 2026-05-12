@@ -730,7 +730,24 @@ describe('proxy.ts middleware', () => {
       expect(cookies.jovie_redirect_count).toBe('1');
     });
 
-    it('breaks needsWaitlist rewrite loop at count >= 3 (JOV-2147 regression guard)', async () => {
+    it('treats a tampered jovie_redirect_count cookie (NaN) as 0 (defense in depth)', async () => {
+      mocks.getUserState.mockResolvedValue(USER_STATES.needsOnboarding);
+
+      const req = createAuthenticatedRequest('clerk_user_1', {
+        pathname: '/pricing',
+        cookies: { jovie_redirect_count: 'NaN' },
+      });
+      const res = await callMiddleware(req);
+
+      // Cookie was unparseable → treat as 0 and increment to 1, NOT NaN+1.
+      const rewriteUrl = res.headers.get('x-middleware-rewrite');
+      expect(rewriteUrl).toBeTruthy();
+      expect(new URL(rewriteUrl!).pathname).toBe('/onboarding');
+      const cookies = getResponseCookies(res);
+      expect(cookies.jovie_redirect_count).toBe('1');
+    });
+
+    it('breaks needsWaitlist rewrite loop at count >= 3 (JOV-2161 regression guard)', async () => {
       mocks.getUserState.mockResolvedValue(USER_STATES.needsWaitlist);
 
       const req = createAuthenticatedRequest('clerk_user_1', {

@@ -114,6 +114,17 @@ const PROXY_REWRITE_COUNT_COOKIE = 'jovie_redirect_count';
 const PROXY_REWRITE_COUNT_TTL_SECONDS = 30;
 
 /**
+ * Read the redirect-count cookie defensively. A tampered or malformed cookie
+ * value must NOT disable the circuit breaker — fall back to 0 on any
+ * non-finite or negative value.
+ */
+function readRedirectCount(req: NextRequest): number {
+  const raw = req.cookies.get(PROXY_REWRITE_COUNT_COOKIE)?.value;
+  const parsed = Number.parseInt(raw ?? '0', 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+}
+
+/**
  * Apply a state-based rewrite with a shared redirect-loop circuit breaker.
  * Returns the rewritten NextResponse, or null when the breaker fires (caller
  * falls through with NextResponse.next() and a Sentry event).
@@ -126,9 +137,7 @@ function applyStateRewrite(
   requestHeaders: Headers,
   target: string
 ): NextResponse | null {
-  const redirectCount = Number(
-    req.cookies.get(PROXY_REWRITE_COUNT_COOKIE)?.value ?? '0'
-  );
+  const redirectCount = readRedirectCount(req);
   if (redirectCount >= PROXY_REWRITE_CIRCUIT_BREAKER_THRESHOLD) {
     return null;
   }
@@ -831,9 +840,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
             {
               pathname,
               target: '/waitlist',
-              redirectCount: Number(
-                req.cookies.get(PROXY_REWRITE_COUNT_COOKIE)?.value ?? '0'
-              ),
+              redirectCount: readRedirectCount(req),
               operation: 'proxy_circuit_breaker',
             }
           );
@@ -867,9 +874,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
               {
                 pathname,
                 target: '/onboarding',
-                redirectCount: Number(
-                  req.cookies.get(PROXY_REWRITE_COUNT_COOKIE)?.value ?? '0'
-                ),
+                redirectCount: readRedirectCount(req),
                 operation: 'proxy_circuit_breaker',
               }
             );
