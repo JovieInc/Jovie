@@ -39,15 +39,16 @@ describe('HomeTrustSection', () => {
     );
     expect(screen.getByText('Trusted by artists')).toBeInTheDocument();
     expect(screen.getByAltText('Black Hole Recordings')).toBeInTheDocument();
-    expect(screen.getByLabelText('disco:wax')).toBeInTheDocument();
-    expect(screen.getByLabelText('Blanco y Negro')).toBeInTheDocument();
-    expect(screen.getByLabelText('rec play')).toBeInTheDocument();
+    // Text-only logos (BlancoYNegro, RecPlay, DiscoWax) removed — JOV-2075
+    expect(screen.queryByLabelText('disco:wax')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Blanco y Negro')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('rec play')).not.toBeInTheDocument();
     expect(container.querySelector('.homepage-trust-logo-grid')).toBeTruthy();
     expect(
       container.querySelectorAll('.homepage-trust-logo-slot')
-    ).toHaveLength(8);
+    ).toHaveLength(5);
     expect(
       container.querySelectorAll('[data-mobile-logo="secondary"]')
-    ).toHaveLength(4);
+    ).toHaveLength(1);
   });
 });
