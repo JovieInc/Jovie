@@ -58,10 +58,10 @@ describe('demo persona fixtures (JOV-2077)', () => {
   it('contains no known placeholder titles in release data', () => {
     const fixtureText = fixtureJson({
       releases: INTERNAL_DJ_DEMO_PERSONA.releases,
-    });
+    }).toLowerCase();
 
     for (const placeholder of KNOWN_PLACEHOLDER_TITLES) {
-      expect(fixtureText).not.toContain(placeholder);
+      expect(fixtureText).not.toContain(placeholder.toLowerCase());
     }
   });
 

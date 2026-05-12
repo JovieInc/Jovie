@@ -53,8 +53,8 @@ describe('screenshot player timestamp invariants (JOV-2087)', () => {
   });
 
   it('uses valid timestamp format for declared playerTimestamps', () => {
-    // Format: M:SS or MM:SS (e.g. "1:24", "12:07")
-    const TIMESTAMP_PATTERN = /^\d{1,2}:\d{2}$/;
+    // Format: M:SS or MM:SS (e.g. "1:24", "12:07") — seconds must be 00–59
+    const TIMESTAMP_PATTERN = /^\d{1,2}:[0-5]\d$/;
 
     const scenariosWithTimestamp = SCREENSHOT_SCENARIOS.filter(
       scenario => scenario.playerTimestamp !== undefined
