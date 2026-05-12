@@ -185,7 +185,7 @@ function ContactList({
                   <a
                     key={`${contact.id}-${channel.type}`}
                     href={channelHref}
-                    className='flex h-8 w-8 items-center justify-center rounded-full text-white/50 transition-colors duration-normal hover:bg-white/[0.08] hover:text-white/80'
+                    className='flex h-8 w-8 items-center justify-center rounded-full text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-interactive-active hover:text-primary-token'
                     aria-label={`${labels[channel.type] ?? 'Call'} ${contact.roleLabel}`}
                     onClick={() => trackAction(channel, contact)}
                   >
@@ -398,12 +398,12 @@ export function ProfileUnifiedDrawer({
                     checked={contentPrefs[pref.key]}
                     onCheckedChange={() => onTogglePref(pref.key)}
                     aria-label={pref.label}
-                    className='data-[state=checked]:bg-green-500 data-[state=checked]:hover:bg-green-600 data-[state=unchecked]:bg-white/[0.16] data-[state=unchecked]:hover:bg-white/[0.22]'
+                    className='data-[state=checked]:bg-success data-[state=checked]:hover:bg-success/90'
                   />
                 </div>
               ))}
 
-              <div className='mx-1 my-1 h-px bg-white/[0.06]' />
+              <div className='mx-1 my-1 h-px bg-[color:var(--color-border-subtle)]' />
 
               <button
                 type='button'
@@ -412,7 +412,7 @@ export function ProfileUnifiedDrawer({
                 onClick={onUnsubscribe}
                 disabled={isUnsubscribing}
               >
-                <BellOff className='size-4 text-red-400/50' />
+                <BellOff className='size-4 text-error/60' />
                 {isUnsubscribing
                   ? 'Turning off\u2026'
                   : 'Turn off notifications'}
@@ -501,11 +501,11 @@ export function ProfileUnifiedDrawer({
                   otherPaymentOptionsLabel='Other payment options'
                 />
               ) : (
-                <div className='rounded-[var(--profile-drawer-radius-mobile)] border border-white/8 bg-white/[0.035] px-4 py-5 text-center'>
-                  <p className='text-sm font-semibold text-white/88'>
+                <div className='rounded-[var(--profile-drawer-radius-mobile)] border border-subtle bg-[color:var(--color-interactive-hover)] px-4 py-5 text-center'>
+                  <p className='text-sm font-semibold text-primary-token'>
                     Payments not available yet
                   </p>
-                  <p className='mt-2 text-sm leading-6 text-white/54'>
+                  <p className='mt-2 text-sm leading-6 text-tertiary-token'>
                     This profile has not added a public Venmo link.
                   </p>
                 </div>
