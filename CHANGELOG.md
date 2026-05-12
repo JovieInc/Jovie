@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.243] - 2026-05-12
+
+> [internal] Ops admin deployment rows are now actionable — each row shows a context menu to open the GitHub Actions run, navigate to the branch, or copy the deployment ID.
+
+### Changed
+
+- **[internal] Ops HUD deployment rows: context menu actions**: Both the compact history list and the current-run detail view on the Ops admin screen now include a three-dot actions menu on each deployment row. Available actions: Open GitHub run (links to the Actions workflow run), Open branch (links to the branch on GitHub), and Copy deployment ID (clipboard with toast confirmation). Clipboard errors surface a toast instead of silently failing.
+
 ## [26.4.242] - 2026-05-12
 
 > [internal] Approval queue rows now show direct action links to open the related PR and Linear issue in a new tab.
