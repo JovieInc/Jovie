@@ -1,10 +1,12 @@
 import { ImageResponse } from 'next/og';
-import { JOVIE_PATH } from '@/lib/brand';
+import { JOVIE_PATH, JOVIE_VIEWBOX } from '@/lib/brand';
 
 export const runtime = 'edge';
 export const alt = 'Jovie · Brand';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
+
+const VIEWBOX = `0 0 ${JOVIE_VIEWBOX.width} ${JOVIE_VIEWBOX.height}`;
 
 export default function Image() {
   return new ImageResponse(
@@ -23,7 +25,7 @@ export default function Image() {
       <svg
         width='220'
         height='220'
-        viewBox='0 0 360 360'
+        viewBox={VIEWBOX}
         xmlns='http://www.w3.org/2000/svg'
         aria-hidden='true'
       >

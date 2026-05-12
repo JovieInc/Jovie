@@ -1,10 +1,6 @@
 import type { CSSProperties } from 'react';
 import { JOVIE_PATH, JOVIE_VIEWBOX, WORDMARK_TRACK } from '@/lib/brand/tokens';
-import {
-  LETTER_PAIRS,
-  LETTER_PATHS,
-  LETTER_SEQUENCE,
-} from '@/lib/brand/wordmark-letters';
+import { computeWordmarkLayout } from '@/lib/brand/wordmark-letters';
 
 /**
  * Server-renderable SVG primitives for the Jovie brand. No state, no hooks,
@@ -83,29 +79,7 @@ export function Wordmark({
   title,
   style,
 }: WordmarkProps) {
-  const placed = LETTER_SEQUENCE.reduce<
-    Array<{
-      letter: (typeof LETTER_SEQUENCE)[number];
-      x: number;
-      w: number;
-      d: string;
-      rule?: 'evenodd';
-    }>
-  >((acc, letter, i) => {
-    const prev = acc[i - 1];
-    const prevPair = i > 0 ? LETTER_PAIRS[i - 1] : undefined;
-    const prevAdvance = prev
-      ? prev.w + (prevPair ? WORDMARK_TRACK[prevPair] : 0)
-      : 0;
-    const x = (prev?.x ?? 0) + prevAdvance;
-    const p = LETTER_PATHS[letter];
-    acc.push({ letter, x, w: p.w, d: p.d, rule: p.rule });
-    return acc;
-  }, []);
-  const lastIndex = placed.length - 1;
-  const last = placed[lastIndex];
-  const lastPair = LETTER_PAIRS[lastIndex];
-  const totalW = last.x + last.w + (lastPair ? WORDMARK_TRACK[lastPair] : 0);
+  const { placed, totalWidth: totalW } = computeWordmarkLayout(WORDMARK_TRACK);
   const width = (totalW / 100) * height;
   const viewBox = `0 0 ${totalW} 100`;
   const mergedStyle = { display: 'block', color, ...style };
@@ -183,22 +157,25 @@ export function Lockup({
   gap,
   stacked = false,
   className,
-  title = 'Jovie',
+  title,
 }: LockupProps) {
   const g = gap ?? height * 0.34;
+  // Only opt into the role='img' announcement when the caller provides a
+  // title — otherwise the lockup is decorative chrome and screen readers
+  // shouldn't announce it (most consumers wrap it in a labeled link).
+  const labelProps = title
+    ? ({ role: 'img' as const, 'aria-label': title } as const)
+    : ({ 'aria-hidden': true as const } as const);
+  const baseClass = stacked
+    ? 'flex flex-col items-center'
+    : 'flex items-center';
+  const combinedClass = className ? `${baseClass} ${className}` : baseClass;
   if (stacked) {
     return (
       <div
-        className={className}
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: g * 0.55,
-          color,
-        }}
-        role='img'
-        aria-label={title}
+        className={combinedClass}
+        style={{ gap: g * 0.55, color }}
+        {...labelProps}
       >
         <Mark size={height * 1.5} color='currentColor' />
         <Wordmark height={height * 0.76} color='currentColor' />
@@ -206,17 +183,7 @@ export function Lockup({
     );
   }
   return (
-    <div
-      className={className}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: g,
-        color,
-      }}
-      role='img'
-      aria-label={title}
-    >
+    <div className={combinedClass} style={{ gap: g, color }} {...labelProps}>
       <Mark size={height} color='currentColor' />
       <Wordmark height={height * 0.74} color='currentColor' />
     </div>
@@ -227,10 +194,5 @@ export function Lockup({
  * Computed total wordmark width in cap-height units (100u). Exposed for tests
  * and asset generation that needs to know the canonical width.
  */
-export const WORDMARK_TOTAL_WIDTH_U = LETTER_SEQUENCE.reduce(
-  (acc, letter, i) => {
-    const pair = LETTER_PAIRS[i];
-    return acc + LETTER_PATHS[letter].w + (pair ? WORDMARK_TRACK[pair] : 0);
-  },
-  0
-);
+export const WORDMARK_TOTAL_WIDTH_U =
+  computeWordmarkLayout(WORDMARK_TRACK).totalWidth;

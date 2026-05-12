@@ -27,9 +27,8 @@ import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 import { JOVIE_PATH, JOVIE_VIEWBOX, WORDMARK_TRACK } from '../lib/brand/tokens';
 import {
-  LETTER_PAIRS,
-  LETTER_PATHS,
-  LETTER_SEQUENCE,
+  computeWordmarkLayout,
+  type PlacedLetter,
 } from '../lib/brand/wordmark-letters';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -40,91 +39,46 @@ const BRAND_DIR = resolve(PUBLIC, 'brand');
 const INK = '#08090a';
 const CREAM = '#F5F4F0';
 
+const VIEWBOX = `0 0 ${JOVIE_VIEWBOX.width} ${JOVIE_VIEWBOX.height}`;
+const LAYOUT = computeWordmarkLayout(WORDMARK_TRACK);
+const WORDMARK_WIDTH_U = LAYOUT.totalWidth;
+// Lockup ratios — mark height 100u, wordmark height 74u, gap 34u (0.34× mark).
+// All proportions derive from the canonical mark + wordmark; no hand-tuned
+// magic numbers that could drift from the React Lockup component.
+const LOCKUP_MARK_H = 100;
+const LOCKUP_WORDMARK_H = 74;
+const LOCKUP_GAP = 34;
+const LOCKUP_MARK_SCALE = LOCKUP_MARK_H / JOVIE_VIEWBOX.width;
+const LOCKUP_WORDMARK_SCALE = LOCKUP_WORDMARK_H / 100;
+const LOCKUP_WORDMARK_OFFSET_Y = (LOCKUP_MARK_H - LOCKUP_WORDMARK_H) / 2;
+const LOCKUP_TOTAL_W =
+  LOCKUP_MARK_H + LOCKUP_GAP + WORDMARK_WIDTH_U * LOCKUP_WORDMARK_SCALE;
+
 function markSvg(color: string): string {
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${JOVIE_VIEWBOX.width} ${JOVIE_VIEWBOX.height}" shape-rendering="geometricPrecision"><path fill="${color}" d="${JOVIE_PATH}"/></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${VIEWBOX}" shape-rendering="geometricPrecision"><path fill="${color}" d="${JOVIE_PATH}"/></svg>`;
+}
+
+function glyphsForLayout(
+  placed: readonly PlacedLetter[],
+  color: string
+): string {
+  return placed
+    .map(
+      p =>
+        `<path fill="${color}" fill-rule="${p.rule ?? 'nonzero'}" transform="translate(${p.x} 0)" d="${p.d}"/>`
+    )
+    .join('');
 }
 
 function wordmarkSvg(color: string): string {
-  // Same layout math as <Wordmark> in lib/brand/primitives.tsx — kept in lock
-  // step so the static SVG matches the React render byte-for-byte.
-  type Placed = {
-    letter: (typeof LETTER_SEQUENCE)[number];
-    x: number;
-    w: number;
-    d: string;
-    rule?: 'evenodd';
-  };
-  const placed: Placed[] = LETTER_SEQUENCE.reduce<Placed[]>(
-    (acc, letter, i) => {
-      const prev = acc[i - 1];
-      const prevPair = i > 0 ? LETTER_PAIRS[i - 1] : undefined;
-      const prevAdvance = prev
-        ? prev.w + (prevPair ? WORDMARK_TRACK[prevPair] : 0)
-        : 0;
-      const x = (prev?.x ?? 0) + prevAdvance;
-      const p = LETTER_PATHS[letter];
-      acc.push({ letter, x, w: p.w, d: p.d, rule: p.rule });
-      return acc;
-    },
-    []
-  );
-  const last = placed[placed.length - 1];
-  const lastPair = LETTER_PAIRS[placed.length - 1];
-  const totalW = last.x + last.w + (lastPair ? WORDMARK_TRACK[lastPair] : 0);
-  const glyphs = placed
-    .map(
-      p =>
-        `<path fill="${color}" fill-rule="${p.rule ?? 'nonzero'}" transform="translate(${p.x} 0)" d="${p.d}"/>`
-    )
-    .join('');
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${totalW} 100">${glyphs}</svg>`;
+  const glyphs = glyphsForLayout(LAYOUT.placed, color);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${WORDMARK_WIDTH_U} 100">${glyphs}</svg>`;
 }
 
 function lockupSvg(color: string): string {
-  // Horizontal lockup: mark at left, wordmark to the right with a gap of
-  // 0.34 × mark height. Mark sized 100, wordmark height 74 → gap 34.
-  // Mark sits on a 360×360 viewBox; scale to 100 → factor 100/360 = 0.2778.
-  // Wordmark total width is 374u, scaled to height 74 → width 74 * 374/100 = 276.76.
-  const markH = 100;
-  const wordmarkH = 74;
-  const gap = 34;
-  const wordmarkW = (wordmarkH * 374) / 100;
-  const totalW = markH + gap + wordmarkW;
-  const totalH = markH;
-  const yOffsetWordmark = (markH - wordmarkH) / 2;
-  // Inline both via group transforms to avoid <use> + defs complexity.
-  const markGroup = `<g transform="scale(${markH / 360})"><path fill="${color}" d="${JOVIE_PATH}"/></g>`;
-  // Inline wordmark glyphs at the wordmark's intrinsic 374×100 viewBox, then
-  // scale into the lockup coordinate space.
-  type Placed = {
-    x: number;
-    w: number;
-    d: string;
-    rule?: 'evenodd';
-  };
-  const placed: Placed[] = LETTER_SEQUENCE.reduce<Placed[]>(
-    (acc, letter, i) => {
-      const prev = acc[i - 1];
-      const prevPair = i > 0 ? LETTER_PAIRS[i - 1] : undefined;
-      const prevAdvance = prev
-        ? prev.w + (prevPair ? WORDMARK_TRACK[prevPair] : 0)
-        : 0;
-      const x = (prev?.x ?? 0) + prevAdvance;
-      const p = LETTER_PATHS[letter];
-      acc.push({ x, w: p.w, d: p.d, rule: p.rule });
-      return acc;
-    },
-    []
-  );
-  const wordmarkInner = placed
-    .map(
-      p =>
-        `<path fill="${color}" fill-rule="${p.rule ?? 'nonzero'}" transform="translate(${p.x} 0)" d="${p.d}"/>`
-    )
-    .join('');
-  const wordmarkScale = wordmarkH / 100;
-  const wordmarkGroup = `<g transform="translate(${markH + gap} ${yOffsetWordmark}) scale(${wordmarkScale})">${wordmarkInner}</g>`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${totalW} ${totalH}">${markGroup}${wordmarkGroup}</svg>`;
+  const markGroup = `<g transform="scale(${LOCKUP_MARK_SCALE})"><path fill="${color}" d="${JOVIE_PATH}"/></g>`;
+  const wordmarkGroup = `<g transform="translate(${LOCKUP_MARK_H + LOCKUP_GAP} ${LOCKUP_WORDMARK_OFFSET_Y}) scale(${LOCKUP_WORDMARK_SCALE})">${glyphsForLayout(LAYOUT.placed, color)}</g>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${LOCKUP_TOTAL_W} ${LOCKUP_MARK_H}">${markGroup}${wordmarkGroup}</svg>`;
 }
 
 async function writeSvg(file: string, content: string): Promise<void> {
@@ -201,7 +155,7 @@ async function main(): Promise<void> {
   );
 
   // 4. Favicon.svg — dual-mode via @media prefers-color-scheme
-  const dualModeFavicon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${JOVIE_VIEWBOX.width} ${JOVIE_VIEWBOX.height}" shape-rendering="geometricPrecision"><style>path{fill:${INK}}@media (prefers-color-scheme:dark){path{fill:${CREAM}}}</style><path d="${JOVIE_PATH}"/></svg>`;
+  const dualModeFavicon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${VIEWBOX}" shape-rendering="geometricPrecision"><style>path{fill:${INK}}@media (prefers-color-scheme:dark){path{fill:${CREAM}}}</style><path d="${JOVIE_PATH}"/></svg>`;
   await writeSvg(resolve(PUBLIC, 'favicon.svg'), dualModeFavicon);
 
   // 5. Favicons — cream mark on transparent (browser tabs auto-tint as needed,

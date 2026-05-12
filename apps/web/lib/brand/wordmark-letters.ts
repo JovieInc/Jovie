@@ -49,3 +49,48 @@ export const LETTER_PATHS: Readonly<
 
 export const LETTER_SEQUENCE = ['J', 'O', 'V', 'I', 'E'] as const;
 export const LETTER_PAIRS = ['JO', 'OV', 'VI', 'IE'] as const;
+
+export type WordmarkLetter = (typeof LETTER_SEQUENCE)[number];
+export type WordmarkPair = (typeof LETTER_PAIRS)[number];
+
+export interface PlacedLetter {
+  readonly letter: WordmarkLetter;
+  readonly x: number;
+  readonly w: number;
+  readonly d: string;
+  readonly rule?: 'evenodd';
+}
+
+export interface WordmarkLayout {
+  readonly placed: readonly PlacedLetter[];
+  readonly totalWidth: number;
+}
+
+/**
+ * Single source of truth for the geometric JOVIE wordmark layout. Returns
+ * each letter's placement on the 100u cap-height grid plus the total width
+ * after kerning. Consumed by both the React Wordmark primitive and the
+ * static SVG generation script — no math is duplicated.
+ */
+export function computeWordmarkLayout(
+  trackingMap: Readonly<Record<WordmarkPair, number>>
+): WordmarkLayout {
+  const placed: PlacedLetter[] = LETTER_SEQUENCE.reduce<PlacedLetter[]>(
+    (acc, letter, i) => {
+      const prev = acc[i - 1];
+      const prevPair = i > 0 ? LETTER_PAIRS[i - 1] : undefined;
+      const prevAdvance = prev
+        ? prev.w + (prevPair ? trackingMap[prevPair] : 0)
+        : 0;
+      const x = (prev?.x ?? 0) + prevAdvance;
+      const p = LETTER_PATHS[letter];
+      acc.push({ letter, x, w: p.w, d: p.d, rule: p.rule });
+      return acc;
+    },
+    []
+  );
+  const last = placed[placed.length - 1];
+  const lastPair = LETTER_PAIRS[placed.length - 1];
+  const totalWidth = last.x + last.w + (lastPair ? trackingMap[lastPair] : 0);
+  return { placed, totalWidth };
+}

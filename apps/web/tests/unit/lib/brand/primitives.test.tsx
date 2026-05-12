@@ -110,19 +110,29 @@ describe('Lockup', () => {
     // One Mark svg + one Wordmark svg = 2 top-level svgs.
     expect(svgs.length).toBe(2);
     const root = container.firstElementChild as HTMLElement;
-    expect(root.style.flexDirection).toBe('');
+    expect(root.className).toContain('flex');
+    expect(root.className).toContain('items-center');
+    expect(root.className).not.toContain('flex-col');
   });
 
   it('stacks the mark above the wordmark when stacked is true', () => {
     const { container } = render(<Lockup height={48} stacked />);
     const root = container.firstElementChild as HTMLElement;
-    expect(root.style.flexDirection).toBe('column');
+    expect(root.className).toContain('flex-col');
+    expect(root.className).toContain('items-center');
   });
 
-  it('exposes an accessible label', () => {
-    const { container } = render(<Lockup height={32} title='Jovie' />);
-    const root = container.firstElementChild as HTMLElement;
-    expect(root.getAttribute('role')).toBe('img');
-    expect(root.getAttribute('aria-label')).toBe('Jovie');
+  it('is decorative (aria-hidden) by default and labelled when title is set', () => {
+    const decorative = render(<Lockup height={32} />);
+    const decorativeRoot = decorative.container
+      .firstElementChild as HTMLElement;
+    expect(decorativeRoot.getAttribute('aria-hidden')).toBe('true');
+    expect(decorativeRoot.getAttribute('role')).toBeNull();
+
+    const labelled = render(<Lockup height={32} title='Jovie' />);
+    const labelledRoot = labelled.container.firstElementChild as HTMLElement;
+    expect(labelledRoot.getAttribute('role')).toBe('img');
+    expect(labelledRoot.getAttribute('aria-label')).toBe('Jovie');
+    expect(labelledRoot.getAttribute('aria-hidden')).toBeNull();
   });
 });
