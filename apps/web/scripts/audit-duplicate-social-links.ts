@@ -23,7 +23,10 @@
  *   doppler run --project jovie-web --config dev -- \
  *     pnpm tsx apps/web/scripts/audit-duplicate-social-links.ts --apply
  *     # marks all-but-one row per duplicate group as is_active=false,
- *     # state='inactive'. Original rows are preserved for forensic review.
+ *     # state='rejected'. Original rows are preserved for forensic review.
+ *     # ('rejected' matches the canonical soft-delete state used by
+ *     # `app/api/dashboard/social-links DELETE`; the social_link_state
+ *     # enum has no 'inactive' member.)
  *
  * Strategy:
  *  - Group active rows by (creator_profile_id, platform,
@@ -148,7 +151,10 @@ async function softDelete(ids: string[]): Promise<void> {
     .update(socialLinks)
     .set({
       isActive: false,
-      state: 'inactive',
+      // 'rejected' is the canonical soft-delete state (see
+      // app/api/dashboard/social-links DELETE). The social_link_state
+      // enum is ['active','suggested','rejected'] — no 'inactive' member.
+      state: 'rejected',
       updatedAt: new Date(),
     })
     .where(inArray(socialLinks.id, ids));

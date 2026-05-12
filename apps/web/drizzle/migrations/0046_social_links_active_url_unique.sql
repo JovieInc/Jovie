@@ -13,10 +13,13 @@
 -- Self-healing: the migration soft-deletes any existing duplicates within
 -- each (creator_profile_id, platform, normalize_social_url(url)) group,
 -- keeping the most recently updated row active and marking the rest as
--- is_active=false, state='inactive'. Originals are preserved for forensic
--- review — no rows are hard-deleted. This makes the migration safe to run
--- on databases that already hold duplicates (the audit script is retained
--- for ad-hoc dry-run inspection but is no longer a required preflight).
+-- is_active=false, state='rejected'. Originals are preserved for forensic
+-- review — no rows are hard-deleted. ('rejected' matches the canonical
+-- soft-delete state used by `app/api/dashboard/social-links DELETE`; the
+-- `social_link_state` enum has no 'inactive' member.) This makes the
+-- migration safe to run on databases that already hold duplicates (the
+-- audit script is retained for ad-hoc dry-run inspection but is no
+-- longer a required preflight).
 
 -- 1. Define a normalize_social_url() function that mirrors the app's
 --    dedupeKey for VALID URLs. Marked IMMUTABLE so it can be indexed.
@@ -77,8 +80,9 @@ $func$;
 
 -- 2. Inline self-clean: soft-delete duplicate active rows, keeping the
 --    most-recently-updated row per (creator, platform, normalized_url)
---    group. Original rows are preserved (is_active=false, state=inactive)
---    for forensic review.
+--    group. Original rows are preserved (is_active=false, state=rejected)
+--    for forensic review — the 'rejected' state matches the canonical
+--    soft-delete path used elsewhere in the app.
 WITH ranked AS (
   SELECT
     id,
@@ -91,7 +95,7 @@ WITH ranked AS (
 )
 UPDATE social_links sl
    SET is_active = false,
-       state = 'inactive',
+       state = 'rejected',
        updated_at = now()
   FROM ranked r
  WHERE sl.id = r.id
