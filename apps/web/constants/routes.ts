@@ -141,6 +141,8 @@ export const APP_ROUTES = {
   ONBOARDING: '/onboarding',
   ONBOARDING_CHECKOUT: '/onboarding/checkout',
   WAITLIST: '/waitlist',
+  /** Anonymous onboarding chat (JOV-2132). Replaces /waitlist as the front door. */
+  START: '/start',
 
   // Billing
   BILLING: '/billing',
