@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.244] - 2026-05-12
+
+> [internal] Touring settings page button polish: Bandsintown pill height normalized to sm scale, Copy Link button uses pill shape.
+
+### Fixed
+
+- **[internal] Touring page button sizing**: Bandsintown connection pill now matches the sm button height (h-7) and icon scale (h-3.5 w-3.5). Copy Link button replaced with the shared Button component (variant secondary, size sm) giving it the correct rounded-full pill shape. No layout shifts.
+
 ## [26.4.243] - 2026-05-12
 
 > [internal] Ops admin deployment rows are now actionable — each row shows a context menu to open the GitHub Actions run, navigate to the branch, or copy the deployment ID.
