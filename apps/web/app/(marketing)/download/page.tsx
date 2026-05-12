@@ -1,3 +1,4 @@
+import { Button } from '@jovie/ui';
 import { ArrowDownToLine } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -106,15 +107,20 @@ export default async function DownloadPage() {
           links, fan data, and campaigns without living in another browser tab.
         </p>
         <div className='mt-10 flex flex-col items-center gap-3'>
-          <a
-            href={DOWNLOAD_URL}
-            className='inline-flex items-center gap-3 rounded-full bg-white px-7 py-3.5 text-base font-medium text-black transition-colors hover:bg-white/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white'
-            data-analytics-event='download_mac_dmg'
-            data-analytics-source='download_page_hero'
+          <Button
+            asChild
+            variant='whitePill'
+            className='gap-3 px-7 py-3.5 text-base sm:text-base'
           >
-            <ArrowDownToLine className='size-5' aria-hidden='true' />
-            Download for Mac
-          </a>
+            <a
+              href={DOWNLOAD_URL}
+              data-analytics-event='download_mac_dmg'
+              data-analytics-source='download_page_hero'
+            >
+              <ArrowDownToLine className='size-5' aria-hidden='true' />
+              Download for Mac
+            </a>
+          </Button>
           {meta ? <p className='text-sm text-tertiary-token'>{meta}</p> : null}
           <p className='text-xs text-tertiary-token'>
             Developer ID signed · Apple notarized · Auto-updates included
@@ -200,15 +206,20 @@ export default async function DownloadPage() {
             Download Jovie for Mac and keep your release workflow one click
             away.
           </p>
-          <a
-            href={DOWNLOAD_URL}
-            className='mt-10 inline-flex items-center gap-3 rounded-full bg-white px-7 py-3.5 text-base font-medium text-black transition-colors hover:bg-white/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white'
-            data-analytics-event='download_mac_dmg'
-            data-analytics-source='download_page_footer'
+          <Button
+            asChild
+            variant='whitePill'
+            className='mt-10 gap-3 px-7 py-3.5 text-base sm:text-base'
           >
-            <ArrowDownToLine className='size-5' aria-hidden='true' />
-            Download for Mac
-          </a>
+            <a
+              href={DOWNLOAD_URL}
+              data-analytics-event='download_mac_dmg'
+              data-analytics-source='download_page_footer'
+            >
+              <ArrowDownToLine className='size-5' aria-hidden='true' />
+              Download for Mac
+            </a>
+          </Button>
         </section>
       </MarketingContainer>
 

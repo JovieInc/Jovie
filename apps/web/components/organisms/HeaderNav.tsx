@@ -1,6 +1,6 @@
 'use client';
 
-import { getLinearPillClassName } from '@jovie/ui';
+import { Button, getLinearPillClassName } from '@jovie/ui';
 import { ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -62,12 +62,13 @@ function PublicAuthActions({
   if (minimal) {
     if (minimalVariant === 'pill') {
       return (
-        <Link
-          href={APP_ROUTES.SIGNIN}
-          className='focus-ring-themed hidden h-[36px] items-center justify-center rounded-full border border-white/88 bg-white px-4 text-[13px] font-medium tracking-[-0.012em] text-black shadow-[0_8px_20px_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.72)] transition-colors duration-subtle hover:bg-white/95 sm:inline-flex sm:h-[40px] sm:px-5 sm:text-[14px] sm:shadow-[0_10px_24px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.72)]'
+        <Button
+          asChild
+          variant='whitePill'
+          className='focus-ring-themed hidden h-[36px] px-4 text-[13px] sm:inline-flex sm:h-[40px] sm:px-5 sm:text-[14px]'
         >
-          Sign in
-        </Link>
+          <Link href={APP_ROUTES.SIGNIN}>Sign in</Link>
+        </Button>
       );
     }
 

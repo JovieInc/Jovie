@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import dynamic from 'next/dynamic';
 import { useCallback, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -35,6 +36,24 @@ export function MarketingSignInLink({
     void loadModal();
   }, []);
 
+  if (variant === 'pill') {
+    return (
+      <>
+        <Button
+          variant='whitePill'
+          onClick={onOpen}
+          onMouseEnter={prefetch}
+          onFocus={prefetch}
+          onTouchStart={prefetch}
+          className='focus-ring-themed h-[36px] px-4 sm:h-[40px] sm:px-5 sm:text-[14px]'
+        >
+          Sign in
+        </Button>
+        {open ? <AuthModal onClose={onClose} defaultMode='signin' /> : null}
+      </>
+    );
+  }
+
   return (
     <>
       <button
@@ -45,9 +64,7 @@ export function MarketingSignInLink({
         onTouchStart={prefetch}
         className={cn(
           'focus-ring-themed transition-colors duration-subtle',
-          variant === 'pill'
-            ? 'inline-flex h-[36px] items-center justify-center rounded-full border border-white/88 bg-white px-4 text-[13px] font-medium tracking-[-0.012em] text-black shadow-[0_8px_20px_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.72)] hover:bg-white/95 sm:h-[40px] sm:px-5 sm:text-[14px] sm:shadow-[0_10px_24px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.72)]'
-            : 'text-[13px] text-white/60 hover:text-white/90'
+          'text-[13px] text-white/60 hover:text-white/90'
         )}
       >
         Sign in

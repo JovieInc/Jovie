@@ -49,8 +49,7 @@ export function shellCtaClassName({
 } = {}) {
   return cn(
     'inline-flex shrink-0 items-center justify-center rounded-full font-semibold tracking-[-0.011em]',
-    'transition-[background-color,border-color,box-shadow,transform] duration-150 ease-[cubic-bezier(0.25,0.46,0.45,0.94)]',
-    'active:scale-[0.985] motion-reduce:transition-none motion-reduce:active:scale-100',
+    'transition-[background-color,border-color,box-shadow,opacity] duration-150 ease-[cubic-bezier(0.25,0.46,0.45,0.94)]',
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--linear-border-focus)] focus-visible:ring-offset-2',
     RING_OFFSET[context],
     SHAPE[size],
