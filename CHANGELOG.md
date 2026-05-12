@@ -5,6 +5,18 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.242] - 2026-05-12
+
+> [internal] Approval queue rows now show direct action links to open the related PR and Linear issue in a new tab.
+
+### Added
+
+- **[internal] Open PR and Open Linear links on approval queue rows**: Each run row in the AgentOS admin approval queue now surfaces inline action links when a PR URL or Linear issue URL is present. Links are host-allowlisted to `github.com` and `linear.app` only.
+
+### Fixed
+
+- **[internal] Tighten external URL allowlist in AgentOS admin surface**: `getSafeExternalHref` in both `WorkflowRunRow` and `ArtifactDrawer` now validates that URLs are `https`-only, credential-free, and from the expected provider domains, preventing open-redirect risk from artifact-injected URLs.
+
 ## [26.4.241] - 2026-05-12
 
 > [internal] AgentOS board now shows real run IDs on cards, lets you click lane counts to filter by status, and displays actual issue/PR identifiers in the detail drawer.
