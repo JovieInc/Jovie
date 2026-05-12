@@ -5,6 +5,16 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.241] - 2026-05-12
+
+> [internal] AgentOS board now shows real run IDs on cards, lets you click lane counts to filter by status, and displays actual issue/PR identifiers in the detail drawer.
+
+### Changed
+
+- [internal] **AgentOS board cards**: `sourceRunId` is now displayed next to the source label (e.g., `vercel-workflow wrun_agentos_health_001`), giving operators a direct reference to the upstream run without opening the drawer.
+- [internal] **AgentOS lane counts**: status count badges are now `<button>` elements with `aria-pressed`. Clicking a lane count highlights that lane and dims all others. Clicking again clears the filter. The panel subtitle updates to show the filtered count.
+- [internal] **ArtifactDrawer links**: Linear and PR links now display actual identifiers (`JOV-1971`, `#8282`) instead of generic `"Linear"` / `"Pull Request"` labels.
+
 ## [26.4.239] - 2026-05-12
 
 > Artist profile cards no longer stretch too tall on large monitors, footer sections breathe a bit more, and the spec-wall animations on the homepage now stagger instead of firing all at once.
