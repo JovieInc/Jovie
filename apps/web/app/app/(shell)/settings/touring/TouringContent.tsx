@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { Calendar, Copy } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -70,14 +71,10 @@ function CalendarSubscribeRow({
           }
           action={
             isPublicProfile ? (
-              <button
-                type='button'
-                onClick={handleCopy}
-                className='inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface-1 px-2.5 py-1 text-2xs text-secondary-token hover:bg-surface-2'
-              >
+              <Button variant='secondary' size='sm' onClick={handleCopy}>
                 <Copy className='h-3.5 w-3.5' />
                 {copied ? 'Copied' : 'Copy Link'}
-              </button>
+              </Button>
             ) : undefined
           }
         />
