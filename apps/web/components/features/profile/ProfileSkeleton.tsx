@@ -23,7 +23,7 @@ export function ProfileSkeleton() {
         <div className='relative flex w-full flex-col overflow-hidden bg-white/[0.02] md:min-h-0 md:rounded-[var(--profile-shell-card-radius)] md:border md:border-white/[0.06]'>
           {/* Hero placeholder — matches ArtistHero height */}
           <div
-            className={`relative h-[48dvh] max-h-[620px] min-h-[420px] w-full overflow-hidden md:h-[56dvh] md:min-h-[520px] md:rounded-t-[var(--profile-shell-card-radius)] ${pulse}`}
+            className={`relative h-[48dvh] max-h-[620px] min-h-[420px] w-full overflow-hidden md:h-[56dvh] md:min-h-[520px] md:rounded-t-[var(--profile-shell-card-radius)] xl:max-h-[640px] 2xl:max-h-[680px] ${pulse}`}
           >
             {/* Gradient overlay: artistic dark hero fade — intentional profile-stage values */}
             <div className='absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.04)_0%,rgba(18,20,26,0.6)_50%,rgba(10,11,14,0.95)_100%)]' />
