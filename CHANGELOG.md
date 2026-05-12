@@ -12,8 +12,8 @@
 ### Changed
 
 - **Artist profile height cap**: at 1280px+ viewports the hero card no longer stretches past 640px (640px at xl, 680px at 2xl), keeping proportions tight on large monitors.
-- **Footer vertical padding**: all footer variants now use responsive padding — py-12 on mobile, py-16 on desktop, py-20 on ultrawide — giving each footer section more breathing room.
-- **Homepage spec-wall animation stagger**: spec-wall cards now animate in with staggered delays (0ms, −600ms, −1200ms … −4200ms) so the pulse effect ripples across cards instead of triggering all at once.
+- **Footer vertical padding**: all footer variants now use responsive vertical padding — the regular footer uses split pt/pb values (pt-12/pb-10 mobile, pt-16/pb-14 desktop, pt-20/pb-16 ultrawide) while the marketing footer and minimal variant use py-* clamp values — giving each footer section more breathing room.
+- **Homepage spec-wall animation stagger**: spec-wall cards now animate in with staggered delays (0ms, −600ms, −1200ms … −3675ms) so the pulse effect ripples across cards instead of triggering all at once.
 
 ## [26.4.238] - 2026-05-12
 
