@@ -11,12 +11,7 @@ import {
   useState,
 } from 'react';
 import { toast } from 'sonner';
-import {
-  connectAppleMusicArtist,
-  deleteRelease,
-} from '@/app/app/(shell)/dashboard/releases/actions';
-import { instantiateReleaseTasksFromCatalog } from '@/app/app/(shell)/dashboard/releases/catalog-task-actions';
-import { instantiateReleaseTasks } from '@/app/app/(shell)/dashboard/releases/task-actions';
+import { deleteRelease } from '@/app/app/(shell)/dashboard/releases/actions';
 import { Icon } from '@/components/atoms/Icon';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import {
@@ -38,7 +33,6 @@ import type {
   FilterField,
   FilterPill,
 } from '@/components/shell/pill-search.types';
-import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useTableMeta } from '@/contexts/TableMetaContext';
 import { buildReleaseActions } from '@/features/dashboard/organisms/releases/release-actions';
@@ -51,6 +45,10 @@ import { usePlanGate } from '@/lib/queries';
 import type { ReleaseContext } from '@/lib/release-tasks/applicability';
 import { cn } from '@/lib/utils';
 import { isFormElement } from '@/lib/utils/keyboard';
+import {
+  type AppleMusicArtistSelection,
+  connectSelectedAppleMusicArtist,
+} from '../apple-music-connection';
 import { useImportPolling } from '../hooks/useImportPolling';
 import { NewReleaseHeaderAction } from '../NewReleaseHeaderAction';
 import { ReleaseStateBanners } from '../ReleaseStateBanners';
@@ -58,6 +56,7 @@ import {
   restoreReleaseArtwork,
   uploadReleaseArtwork,
 } from '../release-artwork-actions';
+import { generateReleasePlanTasks } from '../release-plan-generation';
 import {
   computeSmartLinkGating,
   type SmartLinkLockReason,
@@ -171,6 +170,11 @@ function distinctValues(
     if (seen.size >= 200) break;
   }
   return [...seen];
+}
+
+function formatReleaseCountSuffix(visibleCount: number, totalCount: number) {
+  if (visibleCount === totalCount) return '';
+  return ` of ${totalCount}`;
 }
 
 // ── Empty / list content ───────────────────────────────────────────────────────
@@ -671,32 +675,10 @@ export function ShellReleasesView({
   });
 
   const handleAppleMusicConnect = useCallback(
-    async (artist: {
-      id: string;
-      name: string;
-      url: string;
-      imageUrl?: string;
-    }) => {
-      try {
-        const result = await connectAppleMusicArtist({
-          externalArtistId: artist.id,
-          externalArtistName: artist.name,
-          externalArtistUrl: artist.url,
-          externalArtistImageUrl: artist.imageUrl,
-        });
-        if (result.success) {
-          setIsAmConnected(true);
-          toast.success(result.message);
-        } else {
-          toast.error(result.message);
-        }
-      } catch (error) {
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : 'Failed to connect Apple Music'
-        );
-      }
+    async (artist: AppleMusicArtistSelection) => {
+      await connectSelectedAppleMusicArtist(artist, () =>
+        setIsAmConnected(true)
+      );
     },
     []
   );
@@ -745,14 +727,9 @@ export function ShellReleasesView({
 
       setIsGeneratingReleasePlan(true);
       try {
-        if (ctx) {
-          await instantiateReleaseTasksFromCatalog(postCreateRelease.id, ctx);
-        } else {
-          await instantiateReleaseTasks(postCreateRelease.id);
-        }
-        const releaseTasksPath = APP_ROUTES.DASHBOARD_RELEASE_TASKS.replace(
-          '[releaseId]',
-          postCreateRelease.id
+        const releaseTasksPath = await generateReleasePlanTasks(
+          postCreateRelease.id,
+          ctx
         );
         setIsPostCreatePlanModalOpen(false);
         setPostCreateRelease(null);
@@ -929,8 +906,10 @@ export function ShellReleasesView({
   // ── Header actions: NewReleaseHeaderAction + search trigger / PillSearch ──
 
   const selectedReleaseId = editingRelease?.id ?? null;
-  const releaseCountSuffix =
-    visibleReleases.length === rows.length ? '' : ` of ${rows.length}`;
+  const releaseCountSuffix = formatReleaseCountSuffix(
+    visibleReleases.length,
+    rows.length
+  );
 
   const handleClearFilters = useCallback(() => {
     setPills([]);

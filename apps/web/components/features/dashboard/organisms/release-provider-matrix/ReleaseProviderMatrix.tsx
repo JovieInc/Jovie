@@ -13,12 +13,7 @@ import {
   useState,
 } from 'react';
 import { toast } from 'sonner';
-import {
-  connectAppleMusicArtist,
-  deleteRelease,
-} from '@/app/app/(shell)/dashboard/releases/actions';
-import { instantiateReleaseTasksFromCatalog } from '@/app/app/(shell)/dashboard/releases/catalog-task-actions';
-import { instantiateReleaseTasks } from '@/app/app/(shell)/dashboard/releases/task-actions';
+import { deleteRelease } from '@/app/app/(shell)/dashboard/releases/actions';
 import { Icon } from '@/components/atoms/Icon';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import {
@@ -29,7 +24,6 @@ import {
 import { DialogLoadingSkeleton } from '@/components/organisms/DialogLoadingSkeleton';
 import { PageShell } from '@/components/organisms/PageShell';
 import type { TrackSidebarData } from '@/components/organisms/release-sidebar';
-import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useTableMeta } from '@/contexts/TableMetaContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
@@ -41,6 +35,10 @@ import { useAppFlag } from '@/lib/flags/client';
 import { QueryErrorBoundary, usePlanGate } from '@/lib/queries';
 import type { ReleaseContext } from '@/lib/release-tasks/applicability';
 import { cn } from '@/lib/utils';
+import {
+  type AppleMusicArtistSelection,
+  connectSelectedAppleMusicArtist,
+} from './apple-music-connection';
 import { useImportPolling } from './hooks/useImportPolling';
 import { useReleaseTablePreferences } from './hooks/useReleaseTablePreferences';
 import { NewReleaseHeaderAction } from './NewReleaseHeaderAction';
@@ -56,6 +54,7 @@ import {
   restoreReleaseArtwork,
   uploadReleaseArtwork,
 } from './release-artwork-actions';
+import { generateReleasePlanTasks } from './release-plan-generation';
 import { computeSmartLinkGating } from './smart-link-gating';
 import type { ReleaseProviderMatrixProps } from './types';
 import { useReleaseProviderMatrix } from './useReleaseProviderMatrix';
@@ -394,32 +393,10 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   });
 
   const handleAppleMusicConnect = useCallback(
-    async (artist: {
-      id: string;
-      name: string;
-      url: string;
-      imageUrl?: string;
-    }) => {
-      try {
-        const result = await connectAppleMusicArtist({
-          externalArtistId: artist.id,
-          externalArtistName: artist.name,
-          externalArtistUrl: artist.url,
-          externalArtistImageUrl: artist.imageUrl,
-        });
-        if (result.success) {
-          setIsAmConnected(true);
-          toast.success(result.message);
-        } else {
-          toast.error(result.message);
-        }
-      } catch (error) {
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : 'Failed to connect Apple Music'
-        );
-      }
+    async (artist: AppleMusicArtistSelection) => {
+      await connectSelectedAppleMusicArtist(artist, () =>
+        setIsAmConnected(true)
+      );
     },
     []
   );
@@ -472,16 +449,9 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
       setIsGeneratingReleasePlan(true);
       try {
-        if (ctx) {
-          await instantiateReleaseTasksFromCatalog(postCreateRelease.id, ctx);
-        } else {
-          // Fallback: legacy default-template path (used only if the wizard
-          // is bypassed).
-          await instantiateReleaseTasks(postCreateRelease.id);
-        }
-        const releaseTasksPath = APP_ROUTES.DASHBOARD_RELEASE_TASKS.replace(
-          '[releaseId]',
-          postCreateRelease.id
+        const releaseTasksPath = await generateReleasePlanTasks(
+          postCreateRelease.id,
+          ctx
         );
         setIsPostCreatePlanModalOpen(false);
         setPostCreateRelease(null);
