@@ -8,19 +8,37 @@ import { env } from '@/lib/env-client';
 import { publicEnv } from '@/lib/env-public';
 import { isMarketingAllowed } from '@/lib/tracking/consent';
 
-const DENIED_PREFIXES = [
-  '/app',
-  '/onboarding',
-  '/account',
-  '/artist-selection',
-  '/billing',
-  '/sso-callback',
+// Allowlist approach (fail-closed): the pixel only fires on explicit marketing
+// pages. Any route NOT in this list — including future auth-adjacent routes,
+// /signin, /signup, /sso-callback, /app/*, /onboarding, etc. — gets NO pixel
+// by default. This prevents pre-auth fingerprinting (audit finding #8, P0).
+//
+// Previous DENY-list omitted /signin and /signup, letting the pixel fire on
+// auth surfaces (live-capture: r2.leadsy.ai/tag.js, wvbknd.leadsy.ai POSTs).
+// An ALLOW-list is safer: new routes default to excluded; authors must
+// explicitly opt a page in rather than remembering to opt it out.
+const ALLOWED_PREFIXES = [
+  '/', // exact root only — home
+  '/about',
+  '/pricing',
+  '/blog',
+  '/changelog',
+  '/support',
+  '/download',
+  '/artist-profiles',
+  '/ai',
+  '/compare',
+  '/alternatives',
 ] as const;
 
-function isDeniedRoute(pathname: string | null): boolean {
+function isAllowedRoute(pathname: string | null): boolean {
   if (!pathname) return false;
-  return DENIED_PREFIXES.some(
-    prefix => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  return ALLOWED_PREFIXES.some(prefix =>
+    // For '/' allow exact match only to avoid matching everything.
+    // For all other prefixes allow exact + sub-paths.
+    prefix === '/'
+      ? pathname === '/'
+      : pathname === prefix || pathname.startsWith(`${prefix}/`)
   );
 }
 
@@ -28,9 +46,9 @@ export function InstantlyPixel() {
   const pathname = usePathname();
   const pixelId = publicEnv.NEXT_PUBLIC_INSTANTLY_PIXEL_ID;
   const isPassive = env.IS_TEST || env.IS_E2E;
-  const isDenied = isDeniedRoute(pathname);
+  const isAllowed = isAllowedRoute(pathname);
   const isDemo = isDemoRecordingClient();
-  const skip = !pixelId || isPassive || isDenied || isDemo;
+  const skip = !pixelId || isPassive || !isAllowed || isDemo;
 
   const [allowed, setAllowed] = useState(false);
 
