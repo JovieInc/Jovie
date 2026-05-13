@@ -64,6 +64,7 @@ import {
 import {
   isFormElement,
   resolveTableNavAction,
+  type TableNavAction,
 } from '@/components/organisms/table/utils/tableKeyMap';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
@@ -105,6 +106,22 @@ import {
 } from './task-presentation';
 
 const columnHelper = createColumnHelper<TaskView>();
+
+function shouldIgnoreTaskShortcut(event: KeyboardEvent): boolean {
+  return (
+    event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey
+  );
+}
+
+function isTaskSearchShortcut(event: KeyboardEvent): boolean {
+  return event.key === '/' && !event.shiftKey && !isFormElement(event.target);
+}
+
+function isTaskRowNavigationAction(
+  action: TableNavAction
+): action is 'next' | 'prev' {
+  return action === 'next' || action === 'prev';
+}
 
 const TASK_STATUS_OPTIONS = [
   ['backlog', 'Backlog'],
@@ -1555,13 +1572,54 @@ export function TasksPageClient() {
     updateTask,
   ]);
 
+  const handleCloseShortcut = useCallback(
+    (event: KeyboardEvent) => {
+      if (isFormElement(event.target)) return;
+
+      if (headerMode !== 'default') {
+        event.preventDefault();
+        setHeaderMode('default');
+        return;
+      }
+
+      if (selectedTask) {
+        event.preventDefault();
+        setSelectedTaskId(null);
+      }
+    },
+    [headerMode, selectedTask]
+  );
+
+  const handleRowNavigationShortcut = useCallback(
+    (action: 'next' | 'prev', event: KeyboardEvent) => {
+      event.preventDefault();
+
+      if (!selectedTask) {
+        selectTaskByIndex(action === 'next' ? 0 : visibleTasks.length - 1);
+        return;
+      }
+
+      if (action === 'next') {
+        selectNextTask();
+        return;
+      }
+
+      selectPreviousTask();
+    },
+    [
+      selectNextTask,
+      selectPreviousTask,
+      selectTaskByIndex,
+      selectedTask,
+      visibleTasks.length,
+    ]
+  );
+
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.defaultPrevented) return;
-      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (shouldIgnoreTaskShortcut(event)) return;
 
-      if (event.key === '/' && !event.shiftKey) {
-        if (isFormElement(event.target)) return;
+      if (isTaskSearchShortcut(event)) {
         event.preventDefault();
         setHeaderMode('search');
         return;
@@ -1569,33 +1627,12 @@ export function TasksPageClient() {
 
       const action = resolveTableNavAction(event.key, event.target);
       if (action === 'close') {
-        if (isFormElement(event.target)) return;
-        if (headerMode !== 'default') {
-          event.preventDefault();
-          setHeaderMode('default');
-          return;
-        }
-        if (selectedTask) {
-          event.preventDefault();
-          setSelectedTaskId(null);
-        }
+        handleCloseShortcut(event);
         return;
       }
 
-      if (action === 'next') {
-        event.preventDefault();
-        if (!selectedTask) {
-          selectTaskByIndex(0);
-          return;
-        }
-        selectNextTask();
-      } else if (action === 'prev') {
-        event.preventDefault();
-        if (!selectedTask) {
-          selectTaskByIndex(visibleTasks.length - 1);
-          return;
-        }
-        selectPreviousTask();
+      if (isTaskRowNavigationAction(action)) {
+        handleRowNavigationShortcut(action, event);
       }
     }
 
@@ -1603,14 +1640,7 @@ export function TasksPageClient() {
     return () => {
       globalThis.removeEventListener('keydown', handleKeyDown);
     };
-  }, [
-    headerMode,
-    selectNextTask,
-    selectPreviousTask,
-    selectTaskByIndex,
-    selectedTask,
-    visibleTasks.length,
-  ]);
+  }, [handleCloseShortcut, handleRowNavigationShortcut]);
 
   const sidebarPanel = selectedRelease ? (
     <ReleaseSidebar

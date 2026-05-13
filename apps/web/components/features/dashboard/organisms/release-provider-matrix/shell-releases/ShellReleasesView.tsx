@@ -53,10 +53,15 @@ import { cn } from '@/lib/utils';
 import { isFormElement } from '@/lib/utils/keyboard';
 import { useImportPolling } from '../hooks/useImportPolling';
 import { NewReleaseHeaderAction } from '../NewReleaseHeaderAction';
+import { ReleaseStateBanners } from '../ReleaseStateBanners';
 import {
   restoreReleaseArtwork,
   uploadReleaseArtwork,
 } from '../release-artwork-actions';
+import {
+  computeSmartLinkGating,
+  type SmartLinkLockReason,
+} from '../smart-link-gating';
 import { useReleaseProviderMatrix } from '../useReleaseProviderMatrix';
 import { releaseStatusToShell } from './release-adapters';
 import { ShellReleaseRow } from './ShellReleaseRow';
@@ -91,24 +96,6 @@ const ArtistSearchCommandPalette = lazy(() =>
   }))
 );
 
-const ImportProgressBanner = lazy(() =>
-  import('../ImportProgressBanner').then(m => ({
-    default: m.ImportProgressBanner,
-  }))
-);
-
-const AppleMusicSyncBanner = lazy(() =>
-  import('../AppleMusicSyncBanner').then(m => ({
-    default: m.AppleMusicSyncBanner,
-  }))
-);
-
-const SmartLinkGateBanner = lazy(() =>
-  import('../SmartLinkGateBanner').then(m => ({
-    default: m.SmartLinkGateBanner,
-  }))
-);
-
 const ReleasePlanWizard = lazy(() =>
   import('../ReleasePlanWizard').then(m => ({
     default: m.ReleasePlanWizard,
@@ -116,8 +103,6 @@ const ReleasePlanWizard = lazy(() =>
 );
 
 const RELEASE_DETAIL_PANEL_WIDTH = 388;
-/** Soft cap: show a "request higher limit" banner (not a hard lock) */
-const SMART_LINK_SOFT_CAP = 100;
 
 /**
  * Match a release against a single filter value. Field-level operator
@@ -188,62 +173,6 @@ function distinctValues(
   return [...seen];
 }
 
-// ── Smart-link gating ─────────────────────────────────────────────────────────
-
-interface SmartLinkGating {
-  readonly unlockedIds: Set<string> | null;
-  readonly lockReasons: Map<string, 'scheduled' | 'cap'>;
-  readonly releasedCount: number;
-  readonly unreleasedCount: number;
-}
-
-function computeSmartLinkGating(
-  rows: readonly ReleaseViewModel[],
-  smartLinksLimit: number | null | undefined,
-  canAccessFutureReleases: boolean
-): SmartLinkGating {
-  const now = Date.now();
-  const released: ReleaseViewModel[] = [];
-  const unreleased: ReleaseViewModel[] = [];
-  const reasons = new Map<string, 'scheduled' | 'cap'>();
-
-  for (const r of rows) {
-    const releaseTime = r.releaseDate ? new Date(r.releaseDate).getTime() : 0;
-    if (releaseTime > now) {
-      unreleased.push(r);
-      if (!canAccessFutureReleases) reasons.set(r.id, 'scheduled');
-    } else {
-      released.push(r);
-    }
-  }
-
-  if (!smartLinksLimit) {
-    return {
-      unlockedIds: canAccessFutureReleases
-        ? null
-        : new Set(released.map(r => r.id)),
-      lockReasons: reasons,
-      releasedCount: released.length,
-      unreleasedCount: unreleased.length,
-    };
-  }
-
-  const sorted = [...released].sort((a, b) => {
-    const dateA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
-    const dateB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
-    return dateA - dateB;
-  });
-  const ids = new Set(sorted.slice(0, smartLinksLimit).map(r => r.id));
-  for (const r of sorted.slice(smartLinksLimit)) reasons.set(r.id, 'cap');
-
-  return {
-    unlockedIds: ids,
-    lockReasons: reasons,
-    releasedCount: released.length,
-    unreleasedCount: unreleased.length,
-  };
-}
-
 // ── Empty / list content ───────────────────────────────────────────────────────
 
 interface ReleasesListContentProps {
@@ -259,7 +188,7 @@ interface ReleasesListContentProps {
     ReturnType<typeof convertContextMenuItems>
   >;
   readonly isSmartLinkLocked: (id: string) => boolean;
-  readonly getSmartLinkLockReason: (id: string) => 'scheduled' | 'cap' | null;
+  readonly getSmartLinkLockReason: (id: string) => SmartLinkLockReason | null;
   readonly onConnectSpotify: () => void;
   readonly onNewRelease: () => void;
   readonly onSync: () => void;
@@ -545,7 +474,7 @@ export function ShellReleasesView({
   );
 
   const getSmartLinkLockReason = useCallback(
-    (releaseId: string): 'scheduled' | 'cap' | null => {
+    (releaseId: string): SmartLinkLockReason | null => {
       return lockReasons.get(releaseId) ?? null;
     },
     [lockReasons]
@@ -1148,57 +1077,22 @@ export function ShellReleasesView({
         data-design-v1-releases='true'
         data-testid='shell-releases-view'
       >
-        {showImportProgress && (
-          <div className='mx-3 lg:mx-4 mt-3'>
-            <Suspense fallback={null}>
-              <ImportProgressBanner
-                artistName={artistName}
-                importedCount={importedCount}
-                totalCount={totalCount}
-                visible={showImportProgress}
-              />
-            </Suspense>
-          </div>
-        )}
-
-        {rows.length > 0 &&
-          rows[0]?.profileId &&
-          !isAmConnected &&
-          !isImporting && (
-            <Suspense fallback={null}>
-              <AppleMusicSyncBanner
-                profileId={rows[0].profileId}
-                spotifyConnected={isConnected}
-                releases={rows}
-                onMatchStatusChange={handleMatchStatusChange}
-                className='mx-3 lg:mx-4 mt-3'
-              />
-            </Suspense>
-          )}
-
-        {rows.length > 0 && !isPro && releasedCount > SMART_LINK_SOFT_CAP && (
-          <Suspense fallback={null}>
-            <SmartLinkGateBanner
-              mode='soft-cap'
-              releasedCount={releasedCount}
-              softCap={SMART_LINK_SOFT_CAP}
-              className='mx-3 lg:mx-4 mt-3'
-            />
-          </Suspense>
-        )}
-
-        {rows.length > 0 &&
-          !isPro &&
-          !canAccessFutureReleases &&
-          unreleasedCount > 0 && (
-            <Suspense fallback={null}>
-              <SmartLinkGateBanner
-                mode='unreleased'
-                unreleasedCount={unreleasedCount}
-                className='mx-3 lg:mx-4 mt-3'
-              />
-            </Suspense>
-          )}
+        <ReleaseStateBanners
+          rows={rows}
+          showImportProgress={showImportProgress}
+          showReleasesTable={rows.length > 0}
+          artistName={artistName}
+          importedCount={importedCount}
+          totalCount={totalCount}
+          isAppleMusicConnected={isAmConnected}
+          isImporting={isImporting}
+          isSpotifyConnected={isConnected}
+          isPro={isPro}
+          canAccessFutureReleases={canAccessFutureReleases}
+          releasedCount={releasedCount}
+          unreleasedCount={unreleasedCount}
+          onAppleMusicMatchStatusChange={handleMatchStatusChange}
+        />
 
         <div className='flex-1 min-h-0 overflow-y-auto'>
           <ReleasesListContent
