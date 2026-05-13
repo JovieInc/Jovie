@@ -333,8 +333,8 @@ function HomepageFaq() {
 function HomepageUnlockedSections() {
   return (
     <>
-      <HomepageGoLiveStepsSection />
       <HomepageProductStatement />
+      <HomepageGoLiveStepsSection />
       <HomepageWorkspaceSection screenshot={WORKSPACE_SCREENSHOT} />
       <HomepageArtistProfilesCarousel cards={ARTIST_PROFILE_CARDS} />
       {FEATURE_FLAGS.SHOW_HOMEPAGE_FRIDAY_RHYTHM ? (

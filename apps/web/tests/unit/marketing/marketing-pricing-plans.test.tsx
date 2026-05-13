@@ -3,14 +3,18 @@ import { describe, expect, it } from 'vitest';
 import { MarketingPricingPlans } from '@/components/features/pricing/MarketingPricingPlans';
 
 describe('MarketingPricingPlans', () => {
-  it('renders all public plans while paid plans stay waitlisted by default', () => {
+  it('renders only Free and Pro by default while Pro stays waitlisted', () => {
     render(<MarketingPricingPlans mode='compact' />);
 
-    for (const plan of ['free', 'pro', 'team', 'enterprise']) {
+    for (const plan of ['free', 'pro']) {
       expect(
         screen.getByTestId(`marketing-pricing-plan-${plan}`)
       ).toBeInTheDocument();
     }
+    expect(screen.queryByTestId('marketing-pricing-plan-team')).toBeNull();
+    expect(
+      screen.queryByTestId('marketing-pricing-plan-enterprise')
+    ).toBeNull();
 
     expect(screen.getByTestId('marketing-pricing-plan-free')).toHaveAttribute(
       'data-plan-active',
@@ -20,13 +24,6 @@ describe('MarketingPricingPlans', () => {
       'data-plan-active',
       'false'
     );
-    expect(screen.getByTestId('marketing-pricing-plan-team')).toHaveAttribute(
-      'data-plan-active',
-      'false'
-    );
-    expect(
-      screen.getByTestId('marketing-pricing-plan-enterprise')
-    ).toHaveAttribute('data-plan-active', 'false');
   });
 
   it('stores requested paid plan ids in signup links', () => {
@@ -38,12 +35,14 @@ describe('MarketingPricingPlans', () => {
     expect(requestLinks.map(link => link.getAttribute('href'))).toContain(
       '/signup?plan=pro'
     );
-    expect(requestLinks.map(link => link.getAttribute('href'))).toContain(
+    expect(requestLinks.map(link => link.getAttribute('href'))).not.toContain(
       '/signup?plan=team'
     );
-    expect(screen.getByRole('link', { name: 'Contact Sales' })).toHaveAttribute(
-      'href',
+    expect(requestLinks.map(link => link.getAttribute('href'))).not.toContain(
       '/signup?plan=enterprise'
     );
+    expect(
+      screen.queryByRole('link', { name: 'Contact Sales' })
+    ).not.toBeInTheDocument();
   });
 });

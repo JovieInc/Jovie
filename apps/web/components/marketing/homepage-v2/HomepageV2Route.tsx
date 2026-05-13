@@ -49,7 +49,9 @@ export function HomepageV2BelowHero() {
       <HomepageV2SystemOverview />
       <HomepageV2Spotlight />
       <HomepageV2CaptureReactivate />
-      <HomepageV2PowerGrid />
+      {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_POWER_GRID ? (
+        <HomepageV2PowerGrid />
+      ) : null}
       {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_SOCIAL_PROOF ? (
         <HomepageV2SocialProof />
       ) : null}

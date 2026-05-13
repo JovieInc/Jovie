@@ -56,6 +56,14 @@ else
   echo "  Skipped archive cleanup (set CODEX_ARCHIVE_ON_STOP=1 to enable)"
 fi
 
+if [[ -f "$REPO_ROOT/scripts/codex-gbrain-sync.sh" ]]; then
+  bash "$REPO_ROOT/scripts/codex-gbrain-sync.sh" stop || {
+    echo "  GBrain auto-sync failed; continuing Codex cleanup" >&2
+  }
+else
+  echo "  GBrain auto-sync script missing; skipped"
+fi
+
 echo "Codex cleanup complete."
 
 if [[ "$CODEX_HOOK" == "1" ]]; then
