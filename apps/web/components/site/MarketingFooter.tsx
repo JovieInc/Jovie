@@ -51,7 +51,7 @@ const markLinkClassName =
 const footerLinkClassName =
   'mf-link inline-flex w-fit rounded-[5px] text-[15px] leading-[1.45] tracking-[-0.005em] text-white/[0.72] transition-colors duration-subtle hover:text-white focus-visible:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
 const footerLegalLinkClassName =
-  'mf-legal-link inline-flex w-fit rounded-[5px] text-[12px] leading-5 tracking-[-0.01em] text-white/[0.34] transition-colors duration-subtle hover:text-white/70 focus-visible:text-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
+  'mf-legal-link inline-flex w-fit rounded-[5px] text-[12px] leading-5 tracking-[-0.01em] text-white/[0.5] transition-colors duration-subtle hover:text-white/70 focus-visible:text-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
 
 function FooterLink({ link }: Readonly<{ link: MarketingFooterLink }>) {
   return (
@@ -163,7 +163,7 @@ export function MarketingFooter({
           )}
           style={isMinimal ? { marginTop: '1.75rem' } : undefined}
         >
-          <span className='text-[12px] leading-[1.45] tracking-[-0.005em] text-white/[0.36]'>
+          <span className='text-[12px] leading-[1.45] tracking-[-0.005em] text-white/[0.5]'>
             © {new Date().getFullYear()} Jovie Technology Inc.
           </span>
           <nav aria-label='Legal' className='flex flex-wrap items-center gap-6'>
