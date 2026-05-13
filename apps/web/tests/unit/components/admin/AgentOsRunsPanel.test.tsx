@@ -52,6 +52,10 @@ describe('AgentOsRunsPanel', () => {
     expect(drawer).toHaveTextContent('WDK health dry run');
     expect(drawer).toHaveTextContent('Verification Gates');
 
+    // Drawer should show real IDs, not generic labels
+    expect(drawer).toHaveTextContent('JOV-1971');
+    expect(drawer).toHaveTextContent('#8282');
+
     await userEvent.click(
       within(
         screen.getByTestId(
@@ -84,6 +88,31 @@ describe('AgentOsRunsPanel', () => {
     expect(screen.getByTestId('agent-os-artifact-drawer')).toHaveTextContent(
       'Main post-merge verification'
     );
+  });
+
+  it('filters lanes by clicking a status count button', async () => {
+    render(<AgentOsRunsPanel artifacts={AGENT_OS_ADMIN_FIXTURE_ARTIFACTS} />);
+
+    const queuedFilterBtn = screen.getByRole('button', {
+      name: /Filter by Queued/i,
+    });
+    expect(queuedFilterBtn).toHaveAttribute('aria-pressed', 'false');
+
+    await userEvent.click(queuedFilterBtn);
+    expect(queuedFilterBtn).toHaveAttribute('aria-pressed', 'true');
+
+    // Clicking again deactivates the filter
+    await userEvent.click(queuedFilterBtn);
+    expect(queuedFilterBtn).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('shows run source IDs on board cards', () => {
+    render(<AgentOsRunsPanel artifacts={AGENT_OS_ADMIN_FIXTURE_ARTIFACTS} />);
+
+    // The first fixture has sourceRunId 'wrun_agentos_health_001'
+    expect(
+      screen.getByTestId('agent-os-board-card-agentos-run-queued-wdk-health')
+    ).toHaveTextContent('wrun_agentos_health_001');
   });
 
   it('renders an empty table and empty approval queue', () => {

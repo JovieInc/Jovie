@@ -224,6 +224,11 @@ function AgentOsBoardCard({
           <div className='mt-2 grid gap-1 text-[11.5px] leading-4 text-tertiary-token'>
             <p className='truncate font-[520] text-secondary-token'>
               {artifact.source}
+              {artifact.sourceRunId ? (
+                <span className='ml-1.5 font-[480] text-tertiary-token'>
+                  {artifact.sourceRunId}
+                </span>
+              ) : null}
             </p>
             <p className='truncate tabular-nums'>
               {formatGateProgressLabel(artifact)}
@@ -243,10 +248,14 @@ function AgentOsBoard({
   rows,
   selectedId,
   onSelect,
+  statusFilter,
+  onStatusFilterChange,
 }: Readonly<{
   readonly rows: readonly AgentRunArtifact[];
   readonly selectedId: string | null;
   readonly onSelect: (artifact: AgentRunArtifact) => void;
+  readonly statusFilter: AgentRunStatus | null;
+  readonly onStatusFilterChange: (status: AgentRunStatus | null) => void;
 }>) {
   if (rows.length === 0) {
     return (
@@ -263,18 +272,36 @@ function AgentOsBoard({
       {BOARD_STATUSES.map(status => {
         const laneRows = rows.filter(artifact => artifact.status === status);
 
+        const isDimmed = statusFilter !== null && statusFilter !== status;
+
         return (
           <section
             key={status}
-            className='grid min-h-[150px] content-start gap-2 border-subtle border-t pt-2'
+            className={cn(
+              'grid min-h-[150px] content-start gap-2 border-subtle border-t pt-2 transition-opacity',
+              isDimmed && 'opacity-40'
+            )}
           >
             <div className='flex items-center justify-between gap-2 px-1'>
               <p className='text-[12px] font-[560] text-primary-token'>
                 {RUN_STATUS_LABEL[status]}
               </p>
-              <span className='text-[11px] tabular-nums text-tertiary-token'>
+              <button
+                type='button'
+                onClick={() =>
+                  onStatusFilterChange(statusFilter === status ? null : status)
+                }
+                aria-pressed={statusFilter === status}
+                aria-label={`Filter by ${RUN_STATUS_LABEL[status]} (${laneRows.length})`}
+                className={cn(
+                  'rounded px-1 text-[11px] tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
+                  statusFilter === status
+                    ? 'bg-surface-0 font-[560] text-primary-token'
+                    : 'text-tertiary-token hover:bg-surface-0 hover:text-secondary-token'
+                )}
+              >
                 {laneRows.length}
-              </span>
+              </button>
             </div>
             {laneRows.length > 0 ? (
               laneRows.map(artifact => (
@@ -442,6 +469,7 @@ export function AgentOsRunsPanel({
     artifacts[0]?.id ?? null
   );
   const [viewMode, setViewMode] = useState<AgentOsViewMode>('board');
+  const [statusFilter, setStatusFilter] = useState<AgentRunStatus | null>(null);
   const columns = useMemo<ColumnDef<AgentRunArtifact, unknown>[]>(
     () => AGENT_OS_COLUMNS,
     []
@@ -473,7 +501,9 @@ export function AgentOsRunsPanel({
         title='AgentOS Runs'
         subtitle={
           summary ??
-          `${rows.length.toLocaleString('en-US')} artifact${rows.length === 1 ? '' : 's'}`
+          (statusFilter
+            ? `${RUN_STATUS_LABEL[statusFilter]} — ${rows.filter(a => a.status === statusFilter).length} of ${rows.length.toLocaleString('en-US')}`
+            : `${rows.length.toLocaleString('en-US')} artifact${rows.length === 1 ? '' : 's'}`)
         }
         actions={
           <div className='flex w-full flex-wrap items-center justify-between gap-2 sm:w-auto sm:justify-end'>
@@ -520,6 +550,8 @@ export function AgentOsRunsPanel({
               rows={rows}
               selectedId={selectedArtifact?.id ?? null}
               onSelect={artifact => setSelectedId(artifact.id)}
+              statusFilter={statusFilter}
+              onStatusFilterChange={setStatusFilter}
             />
           ) : (
             <div className='min-w-0 rounded-lg border border-subtle bg-(--linear-app-content-surface)'>

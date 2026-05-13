@@ -713,6 +713,109 @@ describe('proxy.ts middleware', () => {
 
       expect(res.status).toBeLessThan(300);
     });
+
+    it('rewrites needsWaitlist user from /pricing to /waitlist and increments count', async () => {
+      mocks.getUserState.mockResolvedValue(USER_STATES.needsWaitlist);
+
+      const req = createAuthenticatedRequest('clerk_user_1', {
+        pathname: '/pricing',
+      });
+      const res = await callMiddleware(req);
+
+      const rewriteUrl = res.headers.get('x-middleware-rewrite');
+      expect(rewriteUrl).toBeTruthy();
+      expect(new URL(rewriteUrl!).pathname).toBe('/waitlist');
+
+      const cookies = getResponseCookies(res);
+      expect(cookies.jovie_redirect_count).toBe('1');
+    });
+
+    it('treats a tampered jovie_redirect_count cookie (NaN) as 0 (defense in depth)', async () => {
+      mocks.getUserState.mockResolvedValue(USER_STATES.needsOnboarding);
+
+      const req = createAuthenticatedRequest('clerk_user_1', {
+        pathname: '/pricing',
+        cookies: { jovie_redirect_count: 'NaN' },
+      });
+      const res = await callMiddleware(req);
+
+      // Cookie was unparseable → treat as 0 and increment to 1, NOT NaN+1.
+      const rewriteUrl = res.headers.get('x-middleware-rewrite');
+      expect(rewriteUrl).toBeTruthy();
+      expect(new URL(rewriteUrl!).pathname).toBe('/onboarding');
+      const cookies = getResponseCookies(res);
+      expect(cookies.jovie_redirect_count).toBe('1');
+    });
+
+    it('breaks needsWaitlist rewrite loop at count >= 3 (JOV-2161 regression guard)', async () => {
+      mocks.getUserState.mockResolvedValue(USER_STATES.needsWaitlist);
+
+      const req = createAuthenticatedRequest('clerk_user_1', {
+        pathname: '/pricing',
+        cookies: { jovie_redirect_count: '3' },
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBeLessThan(300);
+      expect(mocks.captureError).toHaveBeenCalledWith(
+        expect.stringContaining('circuit breaker'),
+        expect.any(Error),
+        expect.objectContaining({ target: '/waitlist', redirectCount: 3 })
+      );
+    });
+  });
+
+  // ==========================================================================
+  // Rewrite-Exempt Paths (JOV-2147)
+  // ==========================================================================
+  describe('rewrite-exempt paths', () => {
+    it('does NOT rewrite /start for a needsWaitlist user (lets OnboardingShell mount)', async () => {
+      mocks.getUserState.mockResolvedValue(USER_STATES.needsWaitlist);
+
+      const req = createAuthenticatedRequest('clerk_user_1', {
+        pathname: '/start',
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.headers.get('x-middleware-rewrite')).toBeNull();
+      expect(res.status).toBeLessThan(300);
+    });
+
+    it('does NOT rewrite /start for a needsOnboarding user', async () => {
+      mocks.getUserState.mockResolvedValue(USER_STATES.needsOnboarding);
+
+      const req = createAuthenticatedRequest('clerk_user_1', {
+        pathname: '/start',
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.headers.get('x-middleware-rewrite')).toBeNull();
+      expect(res.status).toBeLessThan(300);
+    });
+
+    it('does NOT rewrite /onboarding/checkout for a needsWaitlist user', async () => {
+      mocks.getUserState.mockResolvedValue(USER_STATES.needsWaitlist);
+
+      const req = createAuthenticatedRequest('clerk_user_1', {
+        pathname: '/onboarding/checkout',
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.headers.get('x-middleware-rewrite')).toBeNull();
+      expect(res.status).toBeLessThan(300);
+    });
+
+    it('does NOT rewrite /onboarding/checkout for a needsOnboarding user', async () => {
+      mocks.getUserState.mockResolvedValue(USER_STATES.needsOnboarding);
+
+      const req = createAuthenticatedRequest('clerk_user_1', {
+        pathname: '/onboarding/checkout',
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.headers.get('x-middleware-rewrite')).toBeNull();
+      expect(res.status).toBeLessThan(300);
+    });
   });
 
   // ==========================================================================

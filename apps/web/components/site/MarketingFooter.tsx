@@ -51,7 +51,7 @@ const markLinkClassName =
 const footerLinkClassName =
   'mf-link inline-flex w-fit rounded-[5px] text-[15px] leading-[1.45] tracking-[-0.005em] text-white/[0.72] transition-colors duration-subtle hover:text-white focus-visible:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
 const footerLegalLinkClassName =
-  'mf-legal-link inline-flex w-fit rounded-[5px] text-[12px] leading-5 tracking-[-0.01em] text-white/[0.34] transition-colors duration-subtle hover:text-white/70 focus-visible:text-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
+  'mf-legal-link inline-flex w-fit rounded-[5px] text-[12px] leading-5 tracking-[-0.01em] text-white/[0.5] transition-colors duration-subtle hover:text-white/70 focus-visible:text-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
 
 function FooterLink({ link }: Readonly<{ link: MarketingFooterLink }>) {
   return (
@@ -94,10 +94,10 @@ export function MarketingFooter({
         className={cn(
           'mx-auto w-full max-w-[var(--linear-content-max)] px-[clamp(1.25rem,2.2vw,2rem)]',
           isMinimal
-            ? 'pt-[clamp(2.5rem,4.5vw,3.5rem)] pb-[clamp(2rem,3.5vw,2.75rem)]'
+            ? 'pt-[clamp(3rem,5vw,4.5rem)] pb-[clamp(2.5rem,4vw,3.5rem)]'
             : shouldShowCta
-              ? 'pt-0 pb-[clamp(2rem,3.5vw,2.75rem)]'
-              : 'pt-[clamp(3.5rem,5.5vw,5rem)] pb-[clamp(2rem,3.5vw,2.75rem)]'
+              ? 'pt-0 pb-[clamp(2.5rem,4vw,3.5rem)]'
+              : 'pt-[clamp(4rem,6.5vw,6rem)] pb-[clamp(2.5rem,4vw,3.5rem)]'
         )}
       >
         {shouldShowCta ? (
@@ -163,7 +163,7 @@ export function MarketingFooter({
           )}
           style={isMinimal ? { marginTop: '1.75rem' } : undefined}
         >
-          <span className='text-[12px] leading-[1.45] tracking-[-0.005em] text-white/[0.36]'>
+          <span className='text-[12px] leading-[1.45] tracking-[-0.005em] text-white/[0.5]'>
             © {new Date().getFullYear()} Jovie Technology Inc.
           </span>
           <nav aria-label='Legal' className='flex flex-wrap items-center gap-6'>

@@ -1,13 +1,4 @@
-import {
-  ArrowRight,
-  Bot,
-  ImageIcon,
-  MailPlus,
-  ShieldCheck,
-  SlidersHorizontal,
-  Timer,
-  Zap,
-} from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import type { Metadata } from 'next';
 import dynamic from 'next/dynamic';
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
@@ -324,83 +315,6 @@ function HomepageGoLiveStepsSection() {
   );
 }
 
-const SPEC_WALL_ICONS = [
-  Timer,
-  Bot,
-  ImageIcon,
-  Zap,
-  SlidersHorizontal,
-  MailPlus,
-];
-
-function SpecWallGraphic({
-  index,
-}: Readonly<{
-  index: number;
-}>) {
-  const label = `spec-graphic-${index}`;
-
-  return (
-    <span
-      className='homepage-spec-wall-card__graphic'
-      data-graphic={label}
-      aria-hidden='true'
-    >
-      <svg viewBox='0 0 160 86' focusable='false'>
-        <title>Release feature signal</title>
-        <path
-          className='homepage-spec-wall-card__trace'
-          d='M12 64h34c10 0 10-14 20-14h28c10 0 10-18 20-18h34'
-        />
-        <circle className='homepage-spec-wall-card__pulse' r='5' />
-      </svg>
-      <span className='homepage-spec-wall-card__blocks'>
-        <span />
-        <span />
-        <span />
-      </span>
-    </span>
-  );
-}
-
-function HomepageSpecWall() {
-  const copy = HOMEPAGE_LAUNCH_COPY.specWall;
-
-  return (
-    <section
-      className='homepage-spec-wall-section'
-      aria-labelledby='homepage-spec-wall-heading'
-      data-testid='homepage-spec-wall-section'
-    >
-      <div className='homepage-spec-wall-section__inner'>
-        <div className='homepage-spec-wall-section__header'>
-          <h2 id='homepage-spec-wall-heading'>{copy.headline}</h2>
-          <p>{copy.body}</p>
-        </div>
-        <div className='homepage-spec-wall-grid'>
-          {copy.items.map((item, index) => {
-            const Icon = SPEC_WALL_ICONS[index] ?? ShieldCheck;
-
-            return (
-              <article
-                className={`homepage-spec-wall-card homepage-spec-wall-card--${item.accent}`}
-                key={item.title}
-              >
-                <span className='homepage-spec-wall-card__icon'>
-                  <Icon aria-hidden='true' size={18} strokeWidth={1.8} />
-                </span>
-                <SpecWallGraphic index={index} />
-                <h3>{item.title}</h3>
-                <p>{item.body}</p>
-              </article>
-            );
-          })}
-        </div>
-      </div>
-    </section>
-  );
-}
-
 function HomepageFaq() {
   return (
     <div id='faq' className='homepage-faq-section' data-testid='homepage-faq'>
@@ -419,17 +333,16 @@ function HomepageFaq() {
 function HomepageUnlockedSections() {
   return (
     <>
+      <HomepageGoLiveStepsSection />
       <HomepageProductStatement />
       <HomepageWorkspaceSection screenshot={WORKSPACE_SCREENSHOT} />
-      <HomepageGoLiveStepsSection />
+      <HomepageArtistProfilesCarousel cards={ARTIST_PROFILE_CARDS} />
       {FEATURE_FLAGS.SHOW_HOMEPAGE_FRIDAY_RHYTHM ? (
         <FridayRhythmSection />
       ) : null}
-      <HomepageArtistProfilesCarousel cards={ARTIST_PROFILE_CARDS} />
       {FEATURE_FLAGS.SHOW_HOME_REFRESH_2026 ? <HomeBentoPairs /> : null}
       {FEATURE_FLAGS.SHOW_HOME_REFRESH_2026 ? <HomeLoopDiagramSection /> : null}
       {FEATURE_FLAGS.SHOW_HOME_REFRESH_2026 ? <HomeStatQuoteSection /> : null}
-      <HomepageSpecWall />
       {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_PRICING ? <HomepageV2Pricing /> : null}
       <HomepageFaq />
     </>

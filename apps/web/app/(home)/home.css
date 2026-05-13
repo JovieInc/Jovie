@@ -3178,6 +3178,39 @@ body:has(.home-viewport)::-webkit-scrollbar {
   }
 }
 
+/* Stagger animation delays so cards don't all fire simultaneously */
+.homepage-spec-wall-card:nth-child(1) .homepage-spec-wall-card__pulse {
+  animation-delay: 0ms;
+}
+
+.homepage-spec-wall-card:nth-child(2) .homepage-spec-wall-card__pulse {
+  animation-delay: -600ms;
+}
+
+.homepage-spec-wall-card:nth-child(3) .homepage-spec-wall-card__pulse {
+  animation-delay: -1200ms;
+}
+
+.homepage-spec-wall-card:nth-child(4) .homepage-spec-wall-card__pulse {
+  animation-delay: -1800ms;
+}
+
+.homepage-spec-wall-card:nth-child(5) .homepage-spec-wall-card__pulse {
+  animation-delay: -2400ms;
+}
+
+.homepage-spec-wall-card:nth-child(6) .homepage-spec-wall-card__pulse {
+  animation-delay: -3000ms;
+}
+
+.homepage-spec-wall-card:nth-child(7) .homepage-spec-wall-card__pulse {
+  animation-delay: -3600ms;
+}
+
+.homepage-spec-wall-card:nth-child(8) .homepage-spec-wall-card__pulse {
+  animation-delay: -3675ms;
+}
+
 .homepage-spec-wall-card h3 {
   position: relative;
   z-index: 2;
@@ -4676,7 +4709,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .marketing-footer-premium {
   --mf-text: rgba(255, 255, 255, 0.92);
   --mf-text-secondary: rgba(255, 255, 255, 0.6);
-  --mf-text-tertiary: rgba(255, 255, 255, 0.36);
+  --mf-text-tertiary: rgba(255, 255, 255, 0.48);
   --mf-text-muted: rgba(255, 255, 255, 0.22);
   --mf-hairline: rgba(255, 255, 255, 0.07);
   --mf-hairline-strong: rgba(255, 255, 255, 0.12);

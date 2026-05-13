@@ -5,6 +5,59 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.243] - 2026-05-12
+
+> [internal] Ops admin deployment rows are now actionable — each row shows a context menu to open the GitHub Actions run, navigate to the branch, or copy the deployment ID.
+
+### Changed
+
+- **[internal] Ops HUD deployment rows: context menu actions**: Both the compact history list and the current-run detail view on the Ops admin screen now include a three-dot actions menu on each deployment row. Available actions: Open GitHub run (links to the Actions workflow run), Open branch (links to the branch on GitHub), and Copy deployment ID (clipboard with toast confirmation). Clipboard errors surface a toast instead of silently failing.
+
+## [26.4.242] - 2026-05-12
+
+> [internal] Approval queue rows now show direct action links to open the related PR and Linear issue in a new tab.
+
+### Added
+
+- **[internal] Open PR and Open Linear links on approval queue rows**: Each run row in the AgentOS admin approval queue now surfaces inline action links when a PR URL or Linear issue URL is present. Links are host-allowlisted to `github.com` and `linear.app` only.
+
+### Fixed
+
+- **[internal] Tighten external URL allowlist in AgentOS admin surface**: `getSafeExternalHref` in both `WorkflowRunRow` and `ArtifactDrawer` now validates that URLs are `https`-only, credential-free, and from the expected provider domains, preventing open-redirect risk from artifact-injected URLs.
+
+## [26.4.241] - 2026-05-12
+
+> [internal] AgentOS board now shows real run IDs on cards, lets you click lane counts to filter by status, and displays actual issue/PR identifiers in the detail drawer.
+
+### Changed
+
+- [internal] **AgentOS board cards**: `sourceRunId` is now displayed next to the source label (e.g., `vercel-workflow wrun_agentos_health_001`), giving operators a direct reference to the upstream run without opening the drawer.
+- [internal] **AgentOS lane counts**: status count badges are now `<button>` elements with `aria-pressed`. Clicking a lane count highlights that lane and dims all others. Clicking again clears the filter. The panel subtitle updates to show the filtered count.
+- [internal] **ArtifactDrawer links**: Linear and PR links now display actual identifiers (`JOV-1971`, `#8282`) instead of generic `"Linear"` / `"Pull Request"` labels.
+
+## [26.4.239] - 2026-05-12
+
+> Artist profile cards no longer stretch too tall on large monitors, footer sections breathe a bit more, and the spec-wall animations on the homepage now stagger instead of firing all at once.
+
+### Changed
+
+- **Artist profile height cap**: at 1280px+ viewports the hero card no longer stretches past 640px (640px at xl, 680px at 2xl), keeping proportions tight on large monitors.
+- **Footer vertical padding**: all footer variants now use responsive vertical padding — the regular footer uses split pt/pb values (pt-12/pb-10 mobile, pt-16/pb-14 desktop, pt-20/pb-16 ultrawide) while the marketing footer and minimal variant use py-* clamp values — giving each footer section more breathing room.
+- **Homepage spec-wall animation stagger**: spec-wall cards now animate in with staggered delays (0ms, −600ms, −1200ms … −3675ms) so the pulse effect ripples across cards instead of triggering all at once.
+
+## [26.4.238] - 2026-05-12
+
+> [internal] Homepage content cleanup: removed the spec-wall section with internal sales language, dropped three text-only placeholder logos from the trust bar, and reordered sections so "Go live in 60 seconds" appears directly below the hero.
+
+### Removed
+
+- **[internal] Spec-wall section removed**: the "Answers for every launch objection" section used internal sales language ("objection") that read poorly to customers. Section and its unused icon imports removed from the homepage. (JOV-2073)
+- **[internal] Text-only logo placeholders removed**: Blanco y Negro, RecPlay, and disco:wax were rendered as plain `<span>` text rather than real SVG or image assets. Removed from the HomeTrustSection inline-strip; only logos with real assets remain (UMG, AWAL, The Orchard, Armada Music, Black Hole Recordings). (JOV-2075)
+
+### Changed
+
+- **[internal] Homepage section order updated**: sections reordered to "Go live in 60 seconds" → product statement (AI release plan) → workspace → artist profiles carousel, putting the immediate proof beat directly after the hero. (JOV-2076)
+
 ## [26.4.237] - 2026-05-12
 
 > [internal] Analytics settings toggle now shows a compact state label instead of a verbose disclosure card.
