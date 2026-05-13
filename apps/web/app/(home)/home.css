@@ -4709,7 +4709,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .marketing-footer-premium {
   --mf-text: rgba(255, 255, 255, 0.92);
   --mf-text-secondary: rgba(255, 255, 255, 0.6);
-  --mf-text-tertiary: rgba(255, 255, 255, 0.36);
+  --mf-text-tertiary: rgba(255, 255, 255, 0.48);
   --mf-text-muted: rgba(255, 255, 255, 0.22);
   --mf-hairline: rgba(255, 255, 255, 0.07);
   --mf-hairline-strong: rgba(255, 255, 255, 0.12);
