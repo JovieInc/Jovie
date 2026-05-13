@@ -2,6 +2,7 @@ import { currentUser } from '@clerk/nextjs/server';
 import { headers } from 'next/headers';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
 import {
   enforceOnboardingRateLimit,
@@ -96,7 +97,7 @@ export default async function WaitlistInvitePage({
   });
 
   if (result.outcome === 'approved') {
-    redirect('/onboarding?fresh_signup=true');
+    redirect(`${APP_ROUTES.START}?fresh_signup=true`);
   }
 
   if (result.outcome === 'signed_up') {

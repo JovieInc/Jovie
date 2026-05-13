@@ -5,13 +5,11 @@ import { getAppFlagsSnapshot } from '@/lib/flags/server';
 
 export const dynamic = 'force-dynamic';
 
-// Legacy onboarding URLs redirect to /start; checkout remains under this route
-// group and handles its own auth gating.
 export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default async function OnboardingLayout({
+export default async function StartLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;

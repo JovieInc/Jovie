@@ -50,7 +50,7 @@ export function normalizeOnboardingReturnTo(raw: unknown): string {
 
   const trimmed = raw.trim();
 
-  // Allow onboarding resume URLs
+  // Allow onboarding resume URLs and normalize legacy form links to chat.
   if (trimmed.startsWith(APP_ROUTES.ONBOARDING)) {
     const parsed = new URL(trimmed, 'https://jovie.invalid');
     if (parsed.pathname !== APP_ROUTES.ONBOARDING) {
@@ -62,7 +62,21 @@ export function normalizeOnboardingReturnTo(raw: unknown): string {
       return DEFAULT_ONBOARDING_RETURN_TO;
     }
 
-    return `${APP_ROUTES.ONBOARDING}?resume=${resume}`;
+    return `${APP_ROUTES.START}?resume=${resume}`;
+  }
+
+  if (trimmed.startsWith(APP_ROUTES.START)) {
+    const parsed = new URL(trimmed, 'https://jovie.invalid');
+    if (parsed.pathname !== APP_ROUTES.START) {
+      return DEFAULT_ONBOARDING_RETURN_TO;
+    }
+
+    const resume = parsed.searchParams.get('resume');
+    if (!resume || !ALLOWED_ONBOARDING_RESUME_TARGETS.has(resume)) {
+      return DEFAULT_ONBOARDING_RETURN_TO;
+    }
+
+    return `${APP_ROUTES.START}?resume=${resume}`;
   }
 
   // Allow post-checkout destinations (e.g. /app/chat?from=onboarding)

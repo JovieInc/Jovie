@@ -145,12 +145,12 @@ export async function loadDspPresence(): Promise<DspPresenceData> {
   const data = await getDashboardData();
 
   if (data.needsOnboarding && !data.dashboardLoadError) {
-    redirect(APP_ROUTES.ONBOARDING);
+    redirect(APP_ROUTES.START);
   }
 
   const profile = data.selectedProfile;
   if (!profile) {
-    redirect(APP_ROUTES.ONBOARDING);
+    redirect(APP_ROUTES.START);
   }
 
   return loadDspPresenceForProfile(profile.id);
@@ -192,12 +192,12 @@ export async function addManualDspMatch(input: {
   const data = await getDashboardData();
 
   if (data.needsOnboarding && !data.dashboardLoadError) {
-    redirect(APP_ROUTES.ONBOARDING);
+    redirect(APP_ROUTES.START);
   }
 
   const profile = data.selectedProfile;
   if (!profile) {
-    redirect(APP_ROUTES.ONBOARDING);
+    redirect(APP_ROUTES.START);
   }
 
   // Normalize inputs

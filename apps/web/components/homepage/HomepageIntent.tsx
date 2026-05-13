@@ -42,7 +42,7 @@ function isDesktopViewport(): boolean {
 }
 
 function buildAuthUrl(intentId: string): string {
-  const destination = `${APP_ROUTES.ONBOARDING}?intent_id=${encodeURIComponent(intentId)}`;
+  const destination = `${APP_ROUTES.START}?intent_id=${encodeURIComponent(intentId)}`;
   return buildAuthRouteUrl(
     APP_ROUTES.SIGNUP,
     new URLSearchParams({ redirect_url: destination })

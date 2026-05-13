@@ -73,12 +73,12 @@ function buildAuthStartPath(params: {
   });
 
   if (params.isSignedIn) {
-    return `${APP_ROUTES.ONBOARDING}?${onboardingParams.toString()}`;
+    return `${APP_ROUTES.START}?${onboardingParams.toString()}`;
   }
 
   const signUpParams = new URLSearchParams({
     handle: params.username,
-    redirect_url: `${APP_ROUTES.ONBOARDING}?${onboardingParams.toString()}`,
+    redirect_url: `${APP_ROUTES.START}?${onboardingParams.toString()}`,
   });
 
   if (params.spotifyUrl) {
