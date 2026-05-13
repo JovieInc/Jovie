@@ -26,7 +26,7 @@ import { buildReleaseActions } from '@/features/dashboard/organisms/releases/rel
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { openChatWithPrompt } from '@/lib/chat/open-chat-with-prompt';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
-import { useCodeFlag } from '@/lib/feature-flags/client';
+import { useAppFlag } from '@/lib/flags/client';
 import { usePlanGate } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { isFormElement } from '@/lib/utils/keyboard';
@@ -359,7 +359,7 @@ export function ShellReleasesView({
     captureContext: 'shell-releases-view',
   });
   const { setHeaderActions } = useSetHeaderActions();
-  const albumArtFlagEnabled = useCodeFlag('ALBUM_ART_GENERATION');
+  const albumArtFlagEnabled = useAppFlag('ALBUM_ART_GENERATION');
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [pills, setPills] = useState<FilterPill[]>([]);

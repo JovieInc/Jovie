@@ -84,14 +84,14 @@ export function ReleasesPageClient() {
   // Cold-load skeleton only. TanStack's `isLoading` can spike on refetch
   // transitions before data is repopulated, which flashes the skeleton.
   // `data === undefined` is the only true no-cache signal here.
-  if (releases === undefined) {
-    return <ReleaseTableSkeleton showHeader={false} />;
-  }
-
   if (isError) {
     return (
       <PageErrorState message='Failed to load releases data. Please refresh the page.' />
     );
+  }
+
+  if (releases === undefined) {
+    return <ReleaseTableSkeleton showHeader={false} />;
   }
 
   if (releasesViewMode === 'designV1ShellReleases') {
