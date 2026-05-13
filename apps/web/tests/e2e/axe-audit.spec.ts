@@ -138,7 +138,7 @@ test.describe('Axe WCAG 2.1 Compliance', () => {
   test.setTimeout(120_000);
 
   test('public surface manifests load successfully', () => {
-    expect(surfaceManifestLoadError).toBeUndefined();
+    expect(surfaceManifestLoadError).toBeNull();
   });
 
   for (const surface of publicSurfaces) {
