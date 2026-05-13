@@ -99,7 +99,7 @@ function GlassAuthActions({
   showContactLink = true,
 }: Readonly<{ showContactLink?: boolean }>) {
   return (
-    <div className='hidden items-center gap-1 md:flex'>
+    <div className='flex items-center gap-1'>
       {showContactLink ? (
         <Link
           href={APP_ROUTES.SUPPORT}
@@ -541,10 +541,12 @@ export function HeaderNav({
             />
           ) : null}
 
-          {/* Auth actions - visible on all sizes (Linear shows Log in + Sign up on mobile) */}
+          {/* Auth actions */}
           <div
             className={cn(
-              'flex items-center gap-1',
+              isMarketingGlass && hasMobileNavLinks
+                ? 'hidden items-center gap-1 md:flex'
+                : 'flex items-center gap-1',
               isHomepagePresentation && 'homepage-header-auth'
             )}
           >

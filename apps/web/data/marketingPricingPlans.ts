@@ -19,6 +19,17 @@ const activePlanIds = (process.env.NEXT_PUBLIC_MARKETING_ACTIVE_PLANS ?? 'free')
 const ACTIVE_PLAN_IDS = new Set<MarketingPricingPlanId>(
   activePlanIds.length > 0 ? activePlanIds : ['free']
 );
+const visiblePlanIds = (
+  process.env.NEXT_PUBLIC_MARKETING_VISIBLE_PLANS ?? 'free,pro'
+)
+  .split(',')
+  .map(plan => plan.trim())
+  .filter((plan): plan is MarketingPricingPlanId =>
+    (MARKETING_PRICING_PLAN_IDS as readonly string[]).includes(plan)
+  );
+const VISIBLE_PLAN_IDS = new Set<MarketingPricingPlanId>(
+  visiblePlanIds.length > 0 ? visiblePlanIds : ['free', 'pro']
+);
 
 export interface MarketingPricingPlan {
   readonly id: MarketingPricingPlanId;
@@ -104,6 +115,18 @@ export const MARKETING_PRICING_PLANS: readonly MarketingPricingPlan[] = [
 
 export function isMarketingPlanActive(planId: MarketingPricingPlanId): boolean {
   return ACTIVE_PLAN_IDS.has(planId);
+}
+
+export function isMarketingPlanVisible(
+  planId: MarketingPricingPlanId
+): boolean {
+  return VISIBLE_PLAN_IDS.has(planId);
+}
+
+export function getVisibleMarketingPricingPlans(): readonly MarketingPricingPlan[] {
+  return MARKETING_PRICING_PLANS.filter(plan =>
+    isMarketingPlanVisible(plan.id)
+  );
 }
 
 export function getMarketingPlanHref(planId: MarketingPricingPlanId): string {

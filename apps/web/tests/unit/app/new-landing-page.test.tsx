@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import Link from 'next/link';
 import { describe, expect, it, vi } from 'vitest';
 import NewLandingPage from '@/app/(marketing)/new/page';
@@ -43,23 +43,16 @@ vi.mock('next/navigation', () => ({
 }));
 
 describe('NewLandingPage', () => {
-  it('renders the staged homepage v2 content and glass product nav', () => {
+  it('renders the staged homepage v2 content with YC-tightened nav', () => {
     render(<MarketingHeader />);
 
-    const featuresTrigger = screen.getByRole('button', { name: /Features/ });
-    fireEvent.focus(featuresTrigger);
-
+    expect(screen.queryByRole('button', { name: /Features/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Resources/ })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Pricing' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Contact' })).toBeNull();
     expect(
-      screen.getByRole('link', { name: /Artist Profiles/ })
-    ).toHaveAttribute('href', '/artist-profiles');
-    expect(screen.getByRole('link', { name: 'Pricing' })).toHaveAttribute(
-      'href',
-      '/pricing'
-    );
-    expect(screen.getByRole('link', { name: 'Contact' })).toHaveAttribute(
-      'href',
-      '/support'
-    );
+      screen.getByRole('link', { name: 'Start Free Trial' })
+    ).toHaveAttribute('href', '/signup');
 
     render(<NewLandingPage />);
 

@@ -162,12 +162,12 @@ export function MarketingHeader({
   const isMinimal = variant === 'minimal';
   const isHomepage = variant === 'homepage';
   const presentation = isMinimal ? 'default' : 'marketing-glass';
-  const useCustomNav = !isMinimal && navLinks !== undefined;
+  const centerNavEnabled =
+    FEATURE_FLAGS.SHOW_MARKETING_CENTER_NAV &&
+    (!isHomepage || showHomepageCenterNav);
+  const useCustomNav = !isMinimal && navLinks !== undefined && centerNavEnabled;
   const hasSimpleNav = isMinimal || useCustomNav;
-  const centerNavDisabled =
-    !useCustomNav &&
-    (!FEATURE_FLAGS.SHOW_MARKETING_CENTER_NAV ||
-      (isHomepage && !showHomepageCenterNav));
+  const centerNavDisabled = !centerNavEnabled;
   const hideCenterNav = isMinimal || centerNavDisabled;
   const navConfig = resolveNavConfig(
     hasSimpleNav,
@@ -192,7 +192,7 @@ export function MarketingHeader({
       mobilePublicCtaLabel={isHomepage ? 'Start Free Trial' : undefined}
       mobileNavLinks={navConfig.mobileNavLinks}
       navLinks={navConfig.desktopNavLinks}
-      showContactLink={!isHomepage}
+      showContactLink={centerNavEnabled && !isHomepage}
     />
   );
 }
