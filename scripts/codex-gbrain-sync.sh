@@ -125,26 +125,29 @@ try {
   if (config.engine !== "pglite" || !config.database_path) process.exit(0);
 
   const db = new PGlite(config.database_path);
-  const result = await db.query(
-    "SELECT holder_pid FROM gbrain_cycle_locks WHERE id = $1",
-    ["gbrain-sync"],
-  );
-  const pid = result.rows?.[0]?.holder_pid;
-  if (Number.isInteger(pid)) {
-    let alive = true;
-    try {
-      process.kill(pid, 0);
-    } catch {
-      alive = false;
+  try {
+    const result = await db.query(
+      "SELECT holder_pid FROM gbrain_cycle_locks WHERE id = $1",
+      ["gbrain-sync"],
+    );
+    const pid = result.rows?.[0]?.holder_pid;
+    if (Number.isInteger(pid)) {
+      let alive = true;
+      try {
+        process.kill(pid, 0);
+      } catch {
+        alive = false;
+      }
+      if (!alive) {
+        await db.query(
+          "DELETE FROM gbrain_cycle_locks WHERE id = $1 AND holder_pid = $2",
+          ["gbrain-sync", pid],
+        );
+      }
     }
-    if (!alive) {
-      await db.query(
-        "DELETE FROM gbrain_cycle_locks WHERE id = $1 AND holder_pid = $2",
-        ["gbrain-sync", pid],
-      );
-    }
+  } finally {
+    await db.close();
   }
-  await db.close();
 } catch {}
 '"'"'
 ' bash "$gbrain_repo" "$config_file" || true
