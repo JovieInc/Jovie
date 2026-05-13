@@ -117,6 +117,20 @@ describe('InstantlyPixel', () => {
     expect(hasScript(container)).toBe(false);
   });
 
+  // --- Allowlist: routes that should NOT fire the pixel ---
+
+  it('returns null on /signin (auth surface — audit finding #8)', () => {
+    _pathname = '/signin';
+    const { container } = render(<InstantlyPixel />);
+    expect(hasScript(container)).toBe(false);
+  });
+
+  it('returns null on /signup (auth surface — audit finding #8)', () => {
+    _pathname = '/signup';
+    const { container } = render(<InstantlyPixel />);
+    expect(hasScript(container)).toBe(false);
+  });
+
   it('returns null on /app/dashboard route', () => {
     _pathname = '/app/dashboard';
     const { container } = render(<InstantlyPixel />);
@@ -133,6 +147,57 @@ describe('InstantlyPixel', () => {
     _pathname = '/billing/success';
     const { container } = render(<InstantlyPixel />);
     expect(hasScript(container)).toBe(false);
+  });
+
+  it('returns null on /sso-callback (not in allowlist)', () => {
+    _pathname = '/sso-callback';
+    const { container } = render(<InstantlyPixel />);
+    expect(hasScript(container)).toBe(false);
+  });
+
+  it('returns null on an unknown future route (fail-closed default)', () => {
+    _pathname = '/some-new-auth-route';
+    const { container } = render(<InstantlyPixel />);
+    expect(hasScript(container)).toBe(false);
+  });
+
+  it('does not treat /about-us as matching /about prefix', () => {
+    // /about-us is NOT in the allowlist; only /about and /about/* are allowed
+    _pathname = '/about-us';
+    const { container } = render(<InstantlyPixel />);
+    expect(hasScript(container)).toBe(false);
+  });
+
+  // --- Allowlist: routes that SHOULD fire the pixel ---
+
+  it('renders on / (home — exact match)', () => {
+    _pathname = '/';
+    const { container } = render(<InstantlyPixel />);
+    expect(hasScript(container)).toBe(true);
+  });
+
+  it('renders on /about', () => {
+    _pathname = '/about';
+    const { container } = render(<InstantlyPixel />);
+    expect(hasScript(container)).toBe(true);
+  });
+
+  it('renders on /blog/some-post (sub-path of allowed prefix)', () => {
+    _pathname = '/blog/some-post';
+    const { container } = render(<InstantlyPixel />);
+    expect(hasScript(container)).toBe(true);
+  });
+
+  it('renders on /changelog', () => {
+    _pathname = '/changelog';
+    const { container } = render(<InstantlyPixel />);
+    expect(hasScript(container)).toBe(true);
+  });
+
+  it('renders on /artist-profiles', () => {
+    _pathname = '/artist-profiles';
+    const { container } = render(<InstantlyPixel />);
+    expect(hasScript(container)).toBe(true);
   });
 
   it('returns null in test runtime', () => {
