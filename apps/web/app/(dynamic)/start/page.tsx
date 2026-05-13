@@ -1,5 +1,8 @@
 import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
 import { OnboardingShell } from '@/components/features/onboarding/OnboardingShell';
+import { APP_ROUTES } from '@/constants/routes';
+import { captureError } from '@/lib/error-tracking';
 import { getOrMintOnboardingSessionId } from '@/lib/onboarding/session';
 
 /**
@@ -31,7 +34,22 @@ export default async function StartPage() {
   // Mint or read the signed onboarding session cookie. The /api/chat handler
   // will read this cookie on the first message; persisting it here means the
   // first POST already has a stable session id and Turnstile gate behavior.
-  const { sessionId } = await getOrMintOnboardingSessionId();
+  //
+  // Guard: if session minting fails (e.g. SESSION_SECRET not yet provisioned
+  // on a new environment), redirect to /signup instead of rendering a 500.
+  // The root cause is almost always a missing SESSION_SECRET env var.
+  let sessionId: string;
+  try {
+    const result = await getOrMintOnboardingSessionId();
+    sessionId = result.sessionId;
+  } catch (err) {
+    await captureError(
+      '[/start] getOrMintOnboardingSessionId threw — redirecting to /signup. Check SESSION_SECRET is provisioned.',
+      err,
+      { route: '/start' }
+    );
+    return redirect(APP_ROUTES.SIGNUP);
+  }
 
   // We expose only the leading 8 chars of the session id to the client for
   // debugging breadcrumbs — the full signed cookie value is httpOnly, the
