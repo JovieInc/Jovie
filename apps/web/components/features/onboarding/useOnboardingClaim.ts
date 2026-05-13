@@ -1,16 +1,16 @@
 'use client';
 
-import { useAuth } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
+import { useAuthSafe } from '@/hooks/useClerkSafe';
 
 /**
  * Auto-claim the anonymous onboarding conversation when the visitor
  * authenticates mid-flow (JOV-2132 PR 4).
  *
- * Fires once, on mount or as soon as Clerk reports the user is signed in.
- * Calls POST /api/onboarding/claim — the server reads the signed
+ * Fires on mount and after completed chat turns while Clerk reports the user
+ * is signed in. Calls POST /api/onboarding/claim — the server reads the signed
  * `jovie_onboarding_session` cookie and attaches matching anonymous
  * conversations to the freshly created user.
  *
@@ -23,7 +23,7 @@ import { APP_ROUTES } from '@/constants/routes';
  * On success (claimed >= 1) the hook navigates to `/onboarding/checkout`
  * so the existing post-claim path takes over. If the claim returned
  * `claimed: 0` (no anonymous conversation for this session), we stay put
- * and let the chat continue.
+ * and retry after later chat activity.
  */
 
 type ClaimStatus =
@@ -45,18 +45,22 @@ interface ClaimResponse {
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1_500;
 
-export function useOnboardingClaim(): ClaimStatus {
-  const { isLoaded, isSignedIn } = useAuth();
+export function useOnboardingClaim(claimTrigger = 0): ClaimStatus {
+  const { isLoaded, isSignedIn } = useAuthSafe();
   const router = useRouter();
   const [status, setStatus] = useState<ClaimStatus>('idle');
-  const firedRef = useRef(false);
+  const completedTriggersRef = useRef<Set<number>>(new Set());
+  const claimedRef = useRef(false);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
-    if (firedRef.current) return;
-    firedRef.current = true;
+    if (claimedRef.current) return;
+    if (completedTriggersRef.current.has(claimTrigger)) return;
 
     let cancelled = false;
+    const markTriggerCompleted = () => {
+      completedTriggersRef.current.add(claimTrigger);
+    };
 
     const attemptClaim = async (attempt: number): Promise<void> => {
       setStatus('pending');
@@ -68,7 +72,10 @@ export function useOnboardingClaim(): ClaimStatus {
           body: '{}',
         });
       } catch {
-        if (!cancelled) setStatus('error');
+        if (!cancelled) {
+          markTriggerCompleted();
+          setStatus('error');
+        }
         return;
       }
       if (cancelled) return;
@@ -77,13 +84,17 @@ export function useOnboardingClaim(): ClaimStatus {
       try {
         body = (await response.json()) as ClaimResponse;
       } catch {
-        if (!cancelled) setStatus('error');
+        if (!cancelled) {
+          markTriggerCompleted();
+          setStatus('error');
+        }
         return;
       }
       if (cancelled) return;
 
       if (response.status === 401) {
         // Clerk session expired between mount and request — bail silently.
+        markTriggerCompleted();
         setStatus('error');
         return;
       }
@@ -97,6 +108,8 @@ export function useOnboardingClaim(): ClaimStatus {
       }
 
       if (body.claimed && body.claimed > 0) {
+        markTriggerCompleted();
+        claimedRef.current = true;
         setStatus('claimed');
         // Hand off to the existing /onboarding/checkout flow.
         router.replace(APP_ROUTES.ONBOARDING_CHECKOUT);
@@ -105,6 +118,8 @@ export function useOnboardingClaim(): ClaimStatus {
 
       if (body.alreadyClaimed) {
         // Same user already claimed this transcript (typical retry case).
+        markTriggerCompleted();
+        claimedRef.current = true;
         setStatus('claimed');
         router.replace(APP_ROUTES.ONBOARDING_CHECKOUT);
         return;
@@ -112,6 +127,7 @@ export function useOnboardingClaim(): ClaimStatus {
 
       // claimed:0 → no anonymous transcript for this session. User signed
       // up but no conversation to claim. Continue on /start.
+      markTriggerCompleted();
       setStatus('no-op');
     };
 
@@ -120,7 +136,7 @@ export function useOnboardingClaim(): ClaimStatus {
     return () => {
       cancelled = true;
     };
-  }, [isLoaded, isSignedIn, router]);
+  }, [claimTrigger, isLoaded, isSignedIn, router]);
 
   return status;
 }

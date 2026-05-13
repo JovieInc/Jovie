@@ -96,7 +96,7 @@ export function SidebarThreadsSection({
             <div
               key={t.id}
               className={cn(
-                'group/thread relative flex items-center rounded-md transition-colors duration-150 ease-out',
+                'group/thread relative flex items-center rounded-md transition-colors duration-subtle ease-out',
                 tight ? 'h-6' : 'h-7',
                 active
                   ? 'bg-surface-1 text-primary-token'
@@ -136,17 +136,19 @@ export function SidebarThreadsSection({
                   {t.title}
                 </span>
               </button>
-              <button
-                type='button'
-                onClick={e => onThreadContextMenu?.(e, t)}
-                aria-label='Thread actions'
-                className={cn(
-                  'absolute right-1 top-1/2 -translate-y-1/2 h-5 w-5 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-opacity duration-150 ease-out',
-                  'opacity-0 group-hover/thread:opacity-100 focus-visible:opacity-100'
-                )}
-              >
-                <MoreHorizontal className='h-3 w-3' strokeWidth={2.25} />
-              </button>
+              {onThreadContextMenu ? (
+                <button
+                  type='button'
+                  onClick={e => onThreadContextMenu(e, t)}
+                  aria-label='Thread actions'
+                  className={cn(
+                    'absolute right-1 top-1/2 -translate-y-1/2 h-5 w-5 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-opacity duration-subtle ease-out',
+                    'opacity-0 group-hover/thread:opacity-100 focus-visible:opacity-100'
+                  )}
+                >
+                  <MoreHorizontal className='h-3 w-3' strokeWidth={2.25} />
+                </button>
+              ) : null}
             </div>
           );
         })}
@@ -156,7 +158,7 @@ export function SidebarThreadsSection({
         <button
           type='button'
           onClick={() => setExpanded(v => !v)}
-          className='w-full text-left px-3 py-1 text-[10.5px] uppercase tracking-[0.06em] text-quaternary-token hover:text-secondary-token transition-colors duration-150 ease-out'
+          className='w-full text-left px-3 py-1 text-[10.5px] uppercase tracking-[0.06em] text-quaternary-token hover:text-secondary-token transition-colors duration-subtle ease-out'
         >
           {expanded ? 'Show less' : 'View all'}
         </button>

@@ -100,6 +100,19 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     decision: { status: 'required', binding: 'CommandPalette.tsx' },
   },
   {
+    id: 'current-view-search',
+    label: 'Search current view',
+    keys: '/ in view',
+    description: 'Open the active page search or filter surface',
+    category: 'general',
+    icon: Search,
+    shortcutKey: '/',
+    decision: {
+      status: 'required',
+      binding: 'ShellReleasesView, TasksPageClient, LibrarySurface',
+    },
+  },
+  {
     id: 'keyboard-shortcuts',
     label: 'View keyboard shortcuts',
     keys: `${GLYPH_CMD} / · ?`,

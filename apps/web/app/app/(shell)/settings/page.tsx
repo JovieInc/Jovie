@@ -19,7 +19,7 @@ export default async function SettingsPage() {
     const dashboardData = await getDashboardData();
 
     if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
-      redirect('/onboarding');
+      redirect(APP_ROUTES.START);
     }
 
     return <DashboardSettings />;
