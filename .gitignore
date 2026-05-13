@@ -83,7 +83,8 @@ doppler.yaml
 # Local git worktrees (should never be committed)
 .worktrees/
 /.issues/
-.gbrain-source
+# GBrain per-worktree source state
+/.gbrain-source
 
 # Screenshot pipeline artifacts
 ideation/screenshots/

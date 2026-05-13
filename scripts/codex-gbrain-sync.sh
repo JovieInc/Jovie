@@ -58,8 +58,6 @@ run_capture() {
     local now
     now="$(date +%s)"
     if (( now - started_at >= timeout_seconds )); then
-      kill_process_tree "$pid" TERM
-      sleep 1
       kill_process_tree "$pid" KILL
       wait "$pid" >/dev/null 2>&1 || true
       return 124
@@ -90,7 +88,14 @@ clear_dead_gbrain_sync_lock() {
   lock_pid="$(node -e '
 const fs = require("node:fs");
 try {
-  const pid = JSON.parse(fs.readFileSync(process.argv[1], "utf8"))?.pid;
+  const raw = fs.readFileSync(process.argv[1], "utf8").trim();
+  let pid;
+  try {
+    const parsed = JSON.parse(raw);
+    pid = typeof parsed === "number" ? parsed : parsed?.pid;
+  } catch {
+    if (/^[0-9]+$/.test(raw)) pid = Number(raw);
+  }
   if (Number.isInteger(pid)) process.stdout.write(String(pid));
 } catch {}
 ' "$lock_file" 2>/dev/null)"
@@ -98,6 +103,52 @@ try {
   if [[ -n "$lock_pid" ]] && ! kill -0 "$lock_pid" >/dev/null 2>&1; then
     rm -f "$lock_file"
   fi
+}
+
+clear_dead_gbrain_db_sync_lock() {
+  local config_file="$HOME/.gbrain/config.json"
+  local gbrain_repo="$HOME/.gbrain/gbrain"
+  [[ -f "$config_file" ]] || return 0
+  [[ -d "$gbrain_repo/node_modules/@electric-sql/pglite" ]] || return 0
+  command -v bun >/dev/null 2>&1 || return 0
+
+  local output_file
+  output_file="$(mktemp "${TMPDIR:-/tmp}/codex-gbrain-db-lock.XXXXXX")"
+  run_capture 5 "$output_file" bash -lc '
+cd "$1" || exit 0
+GBRAIN_CONFIG_FILE="$2" bun --eval '"'"'
+import { readFileSync } from "node:fs";
+import { PGlite } from "@electric-sql/pglite";
+
+try {
+  const config = JSON.parse(readFileSync(process.env.GBRAIN_CONFIG_FILE, "utf8"));
+  if (config.engine !== "pglite" || !config.database_path) process.exit(0);
+
+  const db = new PGlite(config.database_path);
+  const result = await db.query(
+    "SELECT holder_pid FROM gbrain_cycle_locks WHERE id = $1",
+    ["gbrain-sync"],
+  );
+  const pid = result.rows?.[0]?.holder_pid;
+  if (Number.isInteger(pid)) {
+    let alive = true;
+    try {
+      process.kill(pid, 0);
+    } catch {
+      alive = false;
+    }
+    if (!alive) {
+      await db.query(
+        "DELETE FROM gbrain_cycle_locks WHERE id = $1 AND holder_pid = $2",
+        ["gbrain-sync", pid],
+      );
+    }
+  }
+  await db.close();
+} catch {}
+'"'"'
+' bash "$gbrain_repo" "$config_file" || true
+  rm -f "$output_file"
 }
 
 failure_summary() {
@@ -144,6 +195,28 @@ try {
 ' "$state_file" 2>/dev/null
 }
 
+gbrain_source_registry_available() {
+  local output_file
+  output_file="$(mktemp "${TMPDIR:-/tmp}/codex-gbrain-sources.XXXXXX")"
+  run_capture 5 "$output_file" gbrain sources list --json
+  local status=$?
+
+  if [[ "$status" -eq 0 ]]; then
+    rm -f "$output_file"
+    return 0
+  fi
+
+  local last_line
+  last_line="$(failure_summary "$output_file")"
+  rm -f "$output_file"
+  if [[ "$status" -eq 124 ]]; then
+    echo "GBrain: source registry probe timed out; skipped auto-sync for ${PHASE}."
+  else
+    echo "GBrain: source registry unavailable; skipped auto-sync for ${PHASE}. ${last_line}"
+  fi
+  return 1
+}
+
 if ! command -v gbrain >/dev/null 2>&1; then
   echo "GBrain: unavailable; gbrain CLI is not on PATH. Run /setup-gbrain to enable Codex auto-sync."
   exit 0
@@ -175,8 +248,18 @@ health_score="$(json_field "$doctor_output" health_score)"
 status="$(json_field "$doctor_output" status)"
 rm -f "$doctor_output"
 
-if [[ "$health_score" =~ ^[0-9]+$ ]] && (( health_score < 70 )); then
+if [[ "$status" == "error" ]]; then
+  echo "GBrain: doctor status is '${status}'; skipped auto-sync for ${PHASE}."
+  exit 0
+fi
+
+if [[ "$health_score" =~ ^[0-9]+$ ]] && (( 10#$health_score < 70 )); then
   echo "GBrain: health=${health_score}, status=${status:-unknown}; skipped auto-sync for ${PHASE}."
+  exit 0
+fi
+
+if [[ ! "$health_score" =~ ^[0-9]+$ ]] && [[ "$status" != "ok" && "$status" != "warnings" ]]; then
+  echo "GBrain: doctor status is '${status:-unknown}' and no numeric health score was reported; skipped auto-sync for ${PHASE}."
   exit 0
 fi
 
@@ -193,11 +276,17 @@ fi
 
 sync_output="$(mktemp "${TMPDIR:-/tmp}/codex-gbrain-sync.XXXXXX")"
 clear_dead_gbrain_sync_lock
+clear_dead_gbrain_db_sync_lock
+if ! gbrain_source_registry_available; then
+  rm -f "$sync_output"
+  exit 0
+fi
 run_capture "$GBRAIN_SYNC_TIMEOUT_SECONDS" "$sync_output" bun "$sync_script" --incremental --quiet --no-memory
 sync_status=$?
 
 if [[ "$sync_status" -eq 124 ]]; then
   clear_dead_gbrain_sync_lock
+  clear_dead_gbrain_db_sync_lock
   rm -f "$sync_output"
   echo "GBrain: sync timed out after ${GBRAIN_SYNC_TIMEOUT_SECONDS}s during ${PHASE}; it will retry on the next Codex hook."
   exit 0
