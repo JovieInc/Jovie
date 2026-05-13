@@ -42,19 +42,19 @@ export const HOMEPAGE_LAUNCH_COPY = {
       {
         key: 'import',
         number: '01',
-        title: 'Import the release',
+        title: 'Import the drop automatically',
         body: 'Jovie pulls artwork, credits, links, dates, and status into the workspace automatically.',
       },
       {
         key: 'publish',
         number: '02',
-        title: 'Generate the plan',
+        title: 'Generate the launch plan',
         body: 'Turn the release into tasks for profile updates, DSP links, fan capture, and launch timing.',
       },
       {
         key: 'review',
         number: '03',
-        title: 'Run the tasks',
+        title: 'Run the next action',
         body: 'Let Jovie handle the next action or assign it to your team with the context attached.',
       },
     ],
@@ -66,24 +66,24 @@ export const HOMEPAGE_LAUNCH_COPY = {
     cards: [
       {
         number: '01',
-        title: 'Import the drop',
+        title: 'Import the drop automatically',
         body: 'Jovie pulls artwork, credits, dates, links, and release status into one workspace automatically.',
       },
       {
         number: '02',
-        title: 'Generate the work',
+        title: 'Generate the launch plan',
         body: 'Turn each release into the plan, tasks, profile updates, fan paths, and launch timing it needs.',
       },
       {
         number: '03',
-        title: 'Keep the release moving',
+        title: 'Run the next action',
         body: 'Let Jovie run the next action or assign it to your team with the release context attached.',
       },
     ],
   },
   aiComposer: {
-    headline: 'A release plan Jovie can run',
-    body: 'Ask for the launch plan. Jovie drafts the fan path, creates the task list, and assigns the next actions with release context attached.',
+    headline: 'Ask once. Get the launch plan',
+    body: 'Jovie turns a release into the fan path, launch tasks, and next actions your team can run.',
   },
   intentBand: {
     eyebrow: 'Ask Jovie',

@@ -1,5 +1,6 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { HeaderNav } from '@/components/organisms/HeaderNav';
 import { MarketingHeader } from '@/components/site/MarketingHeader';
 
 const mockUsePathname = vi.fn<string | null, []>(() => '/about');
@@ -17,39 +18,24 @@ describe('MarketingHeader', () => {
     mockUsePathname.mockReturnValue('/about');
   });
 
-  it('renders the shared glass marketing navigation on standard routes', () => {
+  it('renders only logo and auth actions by default on standard routes', () => {
     render(<MarketingHeader />);
 
-    expect(screen.getByRole('button', { name: /Features/ })).toHaveAttribute(
-      'aria-controls',
-      'marketing-header-flyout-features'
-    );
-    expect(screen.getByRole('button', { name: /Resources/ })).toHaveAttribute(
-      'aria-controls',
-      'marketing-header-flyout-resources'
+    expect(screen.queryByRole('button', { name: /Features/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Resources/ })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Pricing' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Contact' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute(
+      'href',
+      '/signin'
     );
     expect(
-      screen.getByRole('link', {
-        name: /Automatic Fan Notifications/,
-        hidden: true,
-      })
-    ).toHaveAttribute('href', '/artist-notifications');
-    expect(
-      screen.queryByRole('link', { name: 'Direct Fan Messaging', hidden: true })
-    ).toBeNull();
-    expect(screen.getByRole('link', { name: 'Pricing' })).toHaveAttribute(
-      'href',
-      '/pricing'
-    );
-    expect(screen.getByRole('link', { name: 'Contact' })).toHaveAttribute(
-      'href',
-      '/support'
-    );
+      screen.getByRole('link', { name: 'Start Free Trial' })
+    ).toHaveAttribute('href', '/signup');
   });
 
-  it('removes hidden flyout links from the tab order until opened', () => {
+  it('does not mount flyout menus when center navigation is disabled', () => {
     const { container } = render(<MarketingHeader />);
-    const featuresTrigger = screen.getByRole('button', { name: /Features/ });
     const featuresFlyout = container.querySelector(
       '#marketing-header-flyout-features'
     );
@@ -57,20 +43,11 @@ describe('MarketingHeader', () => {
       '#marketing-header-flyout-resources'
     );
 
-    expect(featuresFlyout).toHaveAttribute('aria-hidden', 'true');
-    expect(featuresFlyout).toHaveAttribute('inert');
-    expect(resourcesFlyout).toHaveAttribute('aria-hidden', 'true');
-    expect(resourcesFlyout).toHaveAttribute('inert');
-
-    fireEvent.mouseEnter(featuresTrigger);
-
-    expect(featuresFlyout).toHaveAttribute('aria-hidden', 'false');
-    expect(featuresFlyout).not.toHaveAttribute('inert');
-    expect(resourcesFlyout).toHaveAttribute('aria-hidden', 'true');
-    expect(resourcesFlyout).toHaveAttribute('inert');
+    expect(featuresFlyout).toBeNull();
+    expect(resourcesFlyout).toBeNull();
   });
 
-  it('renders explicit custom nav links consistently as simple glass links', () => {
+  it('keeps explicit custom nav links hidden until the shared nav flag is enabled', () => {
     render(
       <MarketingHeader
         navLinks={[
@@ -81,9 +58,25 @@ describe('MarketingHeader', () => {
     );
 
     expect(screen.queryByRole('button', { name: /Features/ })).toBeNull();
-    expect(screen.getByRole('link', { name: 'Product' })).toHaveAttribute(
-      'href',
-      '/artist-profiles'
+    expect(screen.queryByRole('link', { name: 'Product' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Pricing' })).toBeNull();
+  });
+
+  it('hides inline glass auth on mobile when a mobile nav is present', () => {
+    render(
+      <HeaderNav
+        authMode='public-static'
+        flyoutMenus={[]}
+        hideDesktopNav={false}
+        mobileNavLinks={[{ href: '/pricing', label: 'Pricing' }]}
+        navLinks={[{ href: '/pricing', label: 'Pricing' }]}
+        presentation='marketing-glass'
+      />
     );
+
+    expect(screen.getByRole('button', { name: 'Open menu' })).toBeVisible();
+    expect(
+      screen.getByRole('link', { name: 'Sign in' }).parentElement?.parentElement
+    ).toHaveClass('hidden', 'md:flex');
   });
 });
