@@ -13,6 +13,9 @@ import { APP_FLAG_DEFAULTS, type AppFlagSnapshot } from '@/lib/flags/contracts';
 
 export const mockUsePathname = vi.fn<() => string>(() => APP_ROUTES.CHAT);
 export const mockUseTaskStatsQuery = vi.fn(() => ({ data: undefined }));
+export const mockUseChatConversationsQuery = vi.fn(() => ({
+  data: undefined,
+}));
 export const mockUsePlanGate = vi.fn(() => ({
   canAccessTasksWorkspace: true,
   isLoading: false,
@@ -41,7 +44,8 @@ vi.mock('sonner', () => ({
 }));
 
 vi.mock('@/lib/queries/useChatConversationsQuery', () => ({
-  useChatConversationsQuery: () => ({ data: undefined }),
+  useChatConversationsQuery: (...args: unknown[]) =>
+    mockUseChatConversationsQuery(...args),
 }));
 
 vi.mock('@/lib/queries/useChatMutations', () => ({
@@ -150,6 +154,8 @@ export function resetDashboardNavTestMocks() {
   mockUsePathname.mockReturnValue(APP_ROUTES.CHAT);
   mockUseTaskStatsQuery.mockReset();
   mockUseTaskStatsQuery.mockReturnValue({ data: undefined });
+  mockUseChatConversationsQuery.mockReset();
+  mockUseChatConversationsQuery.mockReturnValue({ data: undefined });
   mockUsePlanGate.mockReset();
   mockUsePlanGate.mockReturnValue({
     canAccessTasksWorkspace: true,
