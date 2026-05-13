@@ -9,6 +9,7 @@ import {
   MARKETING_LEGAL_LINKS,
   type MarketingFooterLink,
 } from '@/data/marketingNavigation';
+import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { cn } from '@/lib/utils';
 import { MarketingFooterCta } from './MarketingFooterCta';
 
@@ -74,8 +75,15 @@ export function MarketingFooter({
 }: Readonly<MarketingFooterProps>) {
   const pathname = usePathname();
   const isMinimalPath = pathname && MINIMAL_FOOTER_PATHS.has(pathname);
-  const autoVariant = isMinimalPath ? 'minimal' : 'expanded';
-  const resolvedVariant = variant === 'auto' ? autoVariant : variant;
+  const autoVariant =
+    FEATURE_FLAGS.SHOW_MARKETING_FULL_FOOTER && !isMinimalPath
+      ? 'expanded'
+      : 'minimal';
+  const requestedVariant = variant === 'auto' ? autoVariant : variant;
+  const resolvedVariant =
+    requestedVariant === 'expanded' && !FEATURE_FLAGS.SHOW_MARKETING_FULL_FOOTER
+      ? 'minimal'
+      : requestedVariant;
   const isMinimal = resolvedVariant === 'minimal';
   const pageOwnsFinalCta =
     typeof pathname === 'string' && PAGE_OWNS_FINAL_CTA_PATHS.has(pathname);
