@@ -1,25 +1,13 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import {
-  lazy,
-  Suspense,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
-import { toast } from 'sonner';
-import { deleteRelease } from '@/app/app/(shell)/dashboard/releases/actions';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
-import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import {
   DrawerButton,
   DrawerLoadingSkeleton,
   DrawerSurfaceCard,
 } from '@/components/molecules/drawer';
-import { DialogLoadingSkeleton } from '@/components/organisms/DialogLoadingSkeleton';
 import type {
   ReleaseSidebarProps,
   TrackSidebarData,
@@ -34,15 +22,12 @@ import type {
   FilterPill,
 } from '@/components/shell/pill-search.types';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
-import { useTableMeta } from '@/contexts/TableMetaContext';
 import { buildReleaseActions } from '@/features/dashboard/organisms/releases/release-actions';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { openChatWithPrompt } from '@/lib/chat/open-chat-with-prompt';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
-import { captureError } from '@/lib/error-tracking';
 import { useCodeFlag } from '@/lib/feature-flags/client';
 import { usePlanGate } from '@/lib/queries';
-import type { ReleaseContext } from '@/lib/release-tasks/applicability';
 import { cn } from '@/lib/utils';
 import { isFormElement } from '@/lib/utils/keyboard';
 import {
@@ -52,56 +37,29 @@ import {
 import { useImportPolling } from '../hooks/useImportPolling';
 import { NewReleaseHeaderAction } from '../NewReleaseHeaderAction';
 import { ReleaseStateBanners } from '../ReleaseStateBanners';
+import { ReleaseWorkflowOverlays } from '../ReleaseWorkflowOverlays';
 import {
   restoreReleaseArtwork,
   uploadReleaseArtwork,
 } from '../release-artwork-actions';
-import { generateReleasePlanTasks } from '../release-plan-generation';
+import { useReleaseDeletion } from '../release-deletion';
+import {
+  AddReleaseSidebar,
+  ReleaseSidebar,
+  TrackSidebar,
+} from '../release-lazy-components';
+import { usePostCreateReleasePlan } from '../release-plan-generation';
 import {
   computeSmartLinkGating,
   type SmartLinkLockReason,
 } from '../smart-link-gating';
 import { useReleaseProviderMatrix } from '../useReleaseProviderMatrix';
+import {
+  RELEASE_DETAIL_PANEL_WIDTH,
+  useReleaseRightPanelTableMeta,
+} from '../useReleaseRightPanelTableMeta';
 import { releaseStatusToShell } from './release-adapters';
 import { ShellReleaseRow } from './ShellReleaseRow';
-
-const ReleaseSidebar = lazy(() =>
-  import('@/components/organisms/release-sidebar').then(m => ({
-    default: m.ReleaseSidebar,
-  }))
-);
-
-const TrackSidebar = lazy(() =>
-  import('@/components/organisms/release-sidebar').then(m => ({
-    default: m.TrackSidebar,
-  }))
-);
-
-const AddReleaseSidebar = lazy(() =>
-  import('../AddReleaseSidebar').then(m => ({
-    default: m.AddReleaseSidebar,
-  }))
-);
-
-const SpotifyConnectDialog = lazy(() =>
-  import('../SpotifyConnectDialog').then(m => ({
-    default: m.SpotifyConnectDialog,
-  }))
-);
-
-const ArtistSearchCommandPalette = lazy(() =>
-  import('@/components/organisms/artist-search-palette').then(m => ({
-    default: m.ArtistSearchCommandPalette,
-  }))
-);
-
-const ReleasePlanWizard = lazy(() =>
-  import('../ReleasePlanWizard').then(m => ({
-    default: m.ReleasePlanWizard,
-  }))
-);
-
-const RELEASE_DETAIL_PANEL_WIDTH = 388;
 
 /**
  * Match a release against a single filter value. Field-level operator
@@ -389,6 +347,17 @@ export function ShellReleasesView({
   initialTotalCount = 0,
 }: ShellReleasesViewProps) {
   const router = useRouter();
+  const {
+    postCreateRelease,
+    isPostCreatePlanModalOpen,
+    isGeneratingReleasePlan,
+    openPostCreatePlanModal,
+    closePostCreatePlanModal,
+    handleGenerateReleasePlan,
+  } = usePostCreateReleasePlan({
+    router,
+    captureContext: 'shell-releases-view',
+  });
   const { setHeaderActions } = useSetHeaderActions();
   const albumArtFlagEnabled = useCodeFlag('ALBUM_ART_GENERATION');
 
@@ -403,15 +372,6 @@ export function ShellReleasesView({
   const [addReleaseOpen, setAddReleaseOpen] = useState(false);
   const [isAmConnected, setIsAmConnected] = useState(appleMusicConnected);
   const [amPaletteOpen, setAmPaletteOpen] = useState(false);
-  const [postCreateRelease, setPostCreateRelease] =
-    useState<ReleaseViewModel | null>(null);
-  const [isPostCreatePlanModalOpen, setIsPostCreatePlanModalOpen] =
-    useState(false);
-  const [isGeneratingReleasePlan, setIsGeneratingReleasePlan] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<ReleaseViewModel | null>(
-    null
-  );
-  const [isDeleting, setIsDeleting] = useState(false);
   const [editingTrack, setEditingTrack] = useState<TrackSidebarData | null>(
     null
   );
@@ -447,6 +407,13 @@ export function ShellReleasesView({
     providerConfig,
     primaryProviders,
   });
+  const {
+    deleteTarget,
+    isDeleting,
+    requestReleaseDelete: handleDeleteRequest,
+    closeDeleteDialog,
+    confirmReleaseDelete: handleDeleteConfirm,
+  } = useReleaseDeletion({ rows, setRows });
 
   const planGate = usePlanGate();
   const {
@@ -569,43 +536,6 @@ export function ShellReleasesView({
     [router]
   );
 
-  const isDistributed = useCallback((release: ReleaseViewModel) => {
-    return (
-      !!release.primaryIsrc &&
-      !!release.releaseDate &&
-      new Date(release.releaseDate) <= new Date()
-    );
-  }, []);
-
-  const handleDeleteRequest = useCallback(
-    (releaseId: string) => {
-      const release = rows.find(r => r.id === releaseId);
-      if (release) {
-        setDeleteTarget(release);
-      }
-    },
-    [rows]
-  );
-
-  const handleDeleteConfirm = useCallback(async () => {
-    if (!deleteTarget) return;
-    setIsDeleting(true);
-    try {
-      const result = await deleteRelease({ releaseId: deleteTarget.id });
-      if (result.success) {
-        setRows(prev => prev.filter(r => r.id !== deleteTarget.id));
-        toast.success(`"${deleteTarget.title}" deleted.`);
-      } else {
-        toast.error(result.message ?? 'Failed to delete release.');
-      }
-    } catch {
-      toast.error('Failed to delete release.');
-    } finally {
-      setIsDeleting(false);
-      setDeleteTarget(null);
-    }
-  }, [deleteTarget, setRows]);
-
   const actionMenusByReleaseId = useMemo(() => {
     return new Map(
       visibleReleases.map(release => [
@@ -704,48 +634,9 @@ export function ShellReleasesView({
       handleReleaseCreated(createdRelease, { openEditor: false });
       setAddReleaseOpen(false);
       closeEditor();
-      setPostCreateRelease(createdRelease);
-      setIsPostCreatePlanModalOpen(true);
+      openPostCreatePlanModal(createdRelease);
     },
-    [closeEditor, handleReleaseCreated]
-  );
-
-  const closePostCreatePlanModal = useCallback(() => {
-    if (isGeneratingReleasePlan) {
-      return;
-    }
-
-    setIsPostCreatePlanModalOpen(false);
-    setPostCreateRelease(null);
-  }, [isGeneratingReleasePlan]);
-
-  const handleGenerateReleasePlan = useCallback(
-    async (ctx?: ReleaseContext) => {
-      if (!postCreateRelease || isGeneratingReleasePlan) {
-        return;
-      }
-
-      setIsGeneratingReleasePlan(true);
-      try {
-        const releaseTasksPath = await generateReleasePlanTasks(
-          postCreateRelease.id,
-          ctx
-        );
-        setIsPostCreatePlanModalOpen(false);
-        setPostCreateRelease(null);
-        router.push(releaseTasksPath);
-      } catch (error) {
-        captureError('Failed to generate release plan', error, {
-          context: 'shell-releases-view',
-          releaseId: postCreateRelease.id,
-          action: 'generate-release-plan',
-        });
-        toast.error('Failed to generate the release plan. Try again.');
-      } finally {
-        setIsGeneratingReleasePlan(false);
-      }
-    },
-    [isGeneratingReleasePlan, postCreateRelease, router]
+    [closeEditor, handleReleaseCreated, openPostCreatePlanModal]
   );
 
   // ── Sidebar / right-panel registration ──
@@ -1008,38 +899,15 @@ export function ShellReleasesView({
     return () => globalThis.removeEventListener('keydown', onKeyDown);
   }, [searchOpen]);
 
-  // ── Drawer toggle integration with table chrome (parity with production) ──
-
-  const { setTableMeta } = useTableMeta();
-  const rowsRef = useRef(rows);
-  rowsRef.current = rows;
-
-  useEffect(() => {
-    const toggle = () => {
-      if (editingTrack) {
-        closeTrackDrawer();
-      } else if (editingRelease) {
-        closeEditor();
-      } else if (rowsRef.current.length > 0) {
-        openEditor(rowsRef.current[0]);
-      }
-    };
-
-    setTableMeta({
-      rowCount: rows.length,
-      toggle: rows.length > 0 ? toggle : null,
-      rightPanelWidth: isSidebarOpen ? RELEASE_DETAIL_PANEL_WIDTH : 0,
-    });
-  }, [
-    closeEditor,
-    closeTrackDrawer,
+  useReleaseRightPanelTableMeta({
+    rows,
+    isSidebarOpen,
     editingRelease,
     editingTrack,
-    isSidebarOpen,
+    closeEditor,
+    closeTrackDrawer,
     openEditor,
-    rows.length,
-    setTableMeta,
-  ]);
+  });
 
   // ── Conditional state surfaces ──
 
@@ -1094,99 +962,26 @@ export function ShellReleasesView({
         </div>
       </section>
 
-      <Suspense
-        fallback={
-          amPaletteOpen ? (
-            <DialogLoadingSkeleton
-              open={amPaletteOpen}
-              onClose={() => setAmPaletteOpen(false)}
-              size='lg'
-              rows={3}
-            />
-          ) : null
-        }
-      >
-        {amPaletteOpen ? (
-          <ArtistSearchCommandPalette
-            open={amPaletteOpen}
-            onOpenChange={setAmPaletteOpen}
-            provider='apple_music'
-            onArtistSelect={handleAppleMusicConnect}
-          />
-        ) : null}
-      </Suspense>
-
-      <Suspense
-        fallback={
-          spotifySearchOpen ? (
-            <DialogLoadingSkeleton
-              open={spotifySearchOpen}
-              onClose={() => setSpotifySearchOpen(false)}
-              size='lg'
-              rows={3}
-            />
-          ) : null
-        }
-      >
-        <SpotifyConnectDialog
-          open={spotifySearchOpen}
-          onOpenChange={setSpotifySearchOpen}
-          onConnected={handleArtistConnected}
-          onImportStart={handleImportStart}
-        />
-      </Suspense>
-
-      <Suspense
-        fallback={
-          isPostCreatePlanModalOpen && postCreateRelease !== null ? (
-            <DialogLoadingSkeleton
-              open
-              onClose={closePostCreatePlanModal}
-              size='sm'
-              rows={3}
-            />
-          ) : null
-        }
-      >
-        {isPostCreatePlanModalOpen && postCreateRelease !== null ? (
-          <ReleasePlanWizard
-            open
-            releaseTitle={postCreateRelease.title}
-            isGateLoading={isReleasePlanGateLoading}
-            canGenerateReleasePlans={canGenerateReleasePlans}
-            isGeneratingReleasePlan={isGeneratingReleasePlan}
-            onClose={closePostCreatePlanModal}
-            onSubmit={handleGenerateReleasePlan}
-          />
-        ) : null}
-      </Suspense>
-
-      {deleteTarget && (
-        <ConfirmDialog
-          open
-          onOpenChange={open => {
-            if (!open) setDeleteTarget(null);
-          }}
-          title={
-            isDistributed(deleteTarget)
-              ? 'Release is distributed'
-              : `Delete "${deleteTarget.title}"?`
-          }
-          description={
-            isDistributed(deleteTarget)
-              ? 'Remove this release from distribution before deleting it.'
-              : 'This will remove the release from your dashboard and public profile.'
-          }
-          confirmLabel={isDistributed(deleteTarget) ? 'OK' : 'Delete'}
-          variant={isDistributed(deleteTarget) ? 'default' : 'destructive'}
-          isLoading={isDeleting}
-          onConfirm={
-            isDistributed(deleteTarget)
-              ? () => setDeleteTarget(null)
-              : handleDeleteConfirm
-          }
-        />
-      )}
+      <ReleaseWorkflowOverlays
+        amPaletteOpen={amPaletteOpen}
+        setAmPaletteOpen={setAmPaletteOpen}
+        spotifySearchOpen={spotifySearchOpen}
+        setSpotifySearchOpen={setSpotifySearchOpen}
+        onAppleMusicConnect={handleAppleMusicConnect}
+        onSpotifyConnected={handleArtistConnected}
+        onSpotifyImportStart={handleImportStart}
+        postCreateRelease={postCreateRelease}
+        isPostCreatePlanModalOpen={isPostCreatePlanModalOpen}
+        isReleasePlanGateLoading={isReleasePlanGateLoading}
+        canGenerateReleasePlans={canGenerateReleasePlans}
+        isGeneratingReleasePlan={isGeneratingReleasePlan}
+        closePostCreatePlanModal={closePostCreatePlanModal}
+        onGenerateReleasePlan={handleGenerateReleasePlan}
+        deleteTarget={deleteTarget}
+        isDeleting={isDeleting}
+        closeDeleteDialog={closeDeleteDialog}
+        onDeleteConfirm={handleDeleteConfirm}
+      />
     </>
   );
 }
