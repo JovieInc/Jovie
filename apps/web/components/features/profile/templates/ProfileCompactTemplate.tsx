@@ -689,9 +689,12 @@ export function ProfileCompactTemplate({
       <AnonCookieBootstrap onVariantResolved={setResolvedAlertOptInVariant} />
       <div
         className={cn(
-          'profile-viewport relative h-[100dvh] overflow-hidden bg-[color:var(--profile-stage-bg)] text-primary-token'
+          'profile-viewport relative overflow-hidden bg-[color:var(--profile-stage-bg)] text-primary-token'
         )}
-        style={profileAccentStyle}
+        style={{
+          ...profileAccentStyle,
+          height: 'calc(100dvh - var(--cookie-banner-h, 0px))',
+        }}
       >
         <div className='absolute inset-0' aria-hidden='true'>
           <div className='absolute inset-[-10%]'>
