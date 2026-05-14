@@ -118,7 +118,7 @@ export const APP_ROUTES = {
   BLOG_THE_MYSPACE_PROBLEM: '/blog/the-myspace-problem',
   COMPARE: '/compare',
   DEMO: '/demo',
-  DEMO_VIDEO: '/demo/video',
+  DEMO_VIDEO: '/demovideo',
   ENGAGEMENT_ENGINE: '/engagement-engine',
   INVESTORS: '/investors',
   LANDING_NEW: '/new',

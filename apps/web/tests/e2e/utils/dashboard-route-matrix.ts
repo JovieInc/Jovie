@@ -566,6 +566,7 @@ export const EXCLUDED_ROUTES: Record<string, string> = {
   '/demo/onboarding': 'Internal demo',
   '/demo/showcase/:surface': 'Internal demo',
   '/demo/video': 'Internal demo (marketing)',
+  '/demovideo': 'Internal demo video',
   '/error/user-creation-failed': 'Error page (covered by error.tsx)',
   '/artist-selection': 'Internal flow',
   '/artists': 'Internal listing',

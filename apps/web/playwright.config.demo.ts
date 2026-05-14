@@ -23,6 +23,7 @@ export default defineConfig({
   ...baseConfig,
   testDir: './tests/e2e',
   testMatch: /yc-demo\.spec\.ts/,
+  grep: /yc demo - zero to release-ready in one cascade/,
   workers: 1,
   timeout: 300_000,
   retries: 0,
