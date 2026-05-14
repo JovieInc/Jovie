@@ -20,12 +20,16 @@ import { discogReleases } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { tasks } from '@/lib/db/schema/tasks';
 import { requireTasksWorkspaceAccess } from '@/lib/entitlements/tasks-gate';
+import { isTaskStatus, TASK_BOARD_STATUSES } from '@/lib/tasks/task-board';
 import type {
   CreateTaskInput,
+  MoveTaskInput,
+  TaskBoardResult,
   TaskCursor,
   TaskFilters,
   TaskListResult,
   TaskStats,
+  TaskStatus,
   TaskView,
   UpdateTaskInput,
 } from '@/lib/tasks/types';
@@ -33,6 +37,7 @@ import { requireProfileId } from '../requireProfileId';
 
 const DEFAULT_TASK_LIMIT = 50;
 const MAX_TASK_LIMIT = 100;
+const TASK_POSITION_STEP = 1024;
 
 function clampLimit(limit?: number): number {
   if (!limit) return DEFAULT_TASK_LIMIT;
@@ -300,6 +305,128 @@ async function getOwnedTaskOrThrow(
   return task;
 }
 
+function getNextCursor(
+  rows: Array<Pick<TaskView, 'id' | 'position'>>,
+  limit: number
+): TaskCursor | null {
+  const hasNextPage = rows.length > limit;
+  if (!hasNextPage) {
+    return null;
+  }
+
+  const pageRows = rows.slice(0, limit);
+  const nextCursorRow = pageRows.at(-1);
+  return nextCursorRow
+    ? {
+        position: nextCursorRow.position,
+        id: nextCursorRow.id,
+      }
+    : null;
+}
+
+function getPageRows<T>(rows: T[], limit: number): T[] {
+  return rows.length > limit ? rows.slice(0, limit) : rows;
+}
+
+function assertMoveTaskInput(
+  input: MoveTaskInput
+): asserts input is MoveTaskInput {
+  if (!input.taskId || typeof input.taskId !== 'string') {
+    throw new Error('Task not found or access denied');
+  }
+
+  if (!isTaskStatus(input.toStatus)) {
+    throw new Error('Invalid task status');
+  }
+
+  const adjacentIds = [input.beforeTaskId, input.afterTaskId].filter(Boolean);
+  if (adjacentIds.includes(input.taskId)) {
+    throw new Error('Task cannot be moved next to itself');
+  }
+}
+
+function resolveInsertIndex(
+  destinationRows: Array<typeof tasks.$inferSelect>,
+  input: MoveTaskInput
+): number {
+  if (input.beforeTaskId) {
+    const beforeIndex = destinationRows.findIndex(
+      row => row.id === input.beforeTaskId
+    );
+    if (beforeIndex === -1) {
+      throw new Error('Task order changed. Reload and try again.');
+    }
+    return beforeIndex;
+  }
+
+  if (input.afterTaskId) {
+    const afterIndex = destinationRows.findIndex(
+      row => row.id === input.afterTaskId
+    );
+    if (afterIndex === -1) {
+      throw new Error('Task order changed. Reload and try again.');
+    }
+    return afterIndex + 1;
+  }
+
+  return destinationRows.length;
+}
+
+function getTaskMoveUpdates({
+  rows,
+  movingTask,
+  input,
+}: Readonly<{
+  rows: Array<typeof tasks.$inferSelect>;
+  movingTask: typeof tasks.$inferSelect;
+  input: MoveTaskInput;
+}>): Array<{
+  readonly id: string;
+  readonly status: TaskStatus;
+  readonly position: number;
+}> {
+  const statuses = new Set<TaskStatus>([movingTask.status, input.toStatus]);
+  const groups = new Map<TaskStatus, Array<typeof tasks.$inferSelect>>();
+
+  for (const status of statuses) {
+    groups.set(
+      status,
+      rows
+        .filter(row => row.status === status && row.id !== movingTask.id)
+        .sort(
+          (left, right) =>
+            left.position - right.position || left.id.localeCompare(right.id)
+        )
+    );
+  }
+
+  const destinationRows = groups.get(input.toStatus) ?? [];
+  const insertIndex = resolveInsertIndex(destinationRows, input);
+  destinationRows.splice(insertIndex, 0, {
+    ...movingTask,
+    status: input.toStatus,
+  });
+  groups.set(input.toStatus, destinationRows);
+
+  const updates: Array<{
+    readonly id: string;
+    readonly status: TaskStatus;
+    readonly position: number;
+  }> = [];
+
+  for (const [status, groupRows] of groups) {
+    groupRows.forEach((row, index) => {
+      updates.push({
+        id: row.id,
+        status,
+        position: (index + 1) * TASK_POSITION_STEP,
+      });
+    });
+  }
+
+  return updates;
+}
+
 export async function getTasks(filters?: TaskFilters): Promise<TaskListResult> {
   await requireTasksWorkspaceAccess();
   const profileId = await requireProfileId();
@@ -341,18 +468,81 @@ export async function getTasks(filters?: TaskFilters): Promise<TaskListResult> {
     .orderBy(asc(tasks.position), asc(tasks.id))
     .limit(limit + 1);
 
-  const hasNextPage = rows.length > limit;
-  const pageRows = hasNextPage ? rows.slice(0, limit) : rows;
-  const nextCursorRow = hasNextPage ? pageRows[pageRows.length - 1] : null;
+  const pageRows = getPageRows(rows, limit);
 
   return {
     tasks: pageRows.map(mapTaskRow),
-    nextCursor: nextCursorRow
-      ? ({
-          position: nextCursorRow.position,
-          id: nextCursorRow.id,
-        } satisfies TaskCursor)
-      : null,
+    nextCursor: getNextCursor(rows, limit),
+  };
+}
+
+export async function getTaskBoard(
+  filters?: Omit<TaskFilters, 'status'>
+): Promise<TaskBoardResult> {
+  await requireTasksWorkspaceAccess();
+  const profileId = await requireProfileId();
+  const limit = clampLimit(filters?.limit);
+
+  const columns = await Promise.all(
+    TASK_BOARD_STATUSES.map(async status => {
+      const boardFilters = {
+        ...filters,
+        status,
+      } satisfies TaskFilters;
+
+      const [totalRow] = await db
+        .select({ totalCount: count() })
+        .from(tasks)
+        .where(getTaskListWhereClause(profileId, boardFilters));
+
+      const rows = await db
+        .select({
+          id: tasks.id,
+          taskNumber: tasks.taskNumber,
+          creatorProfileId: tasks.creatorProfileId,
+          title: tasks.title,
+          description: tasks.description,
+          status: tasks.status,
+          priority: tasks.priority,
+          assigneeKind: tasks.assigneeKind,
+          assigneeUserId: tasks.assigneeUserId,
+          agentType: tasks.agentType,
+          agentStatus: tasks.agentStatus,
+          agentInput: tasks.agentInput,
+          agentOutput: tasks.agentOutput,
+          agentError: tasks.agentError,
+          releaseId: tasks.releaseId,
+          releaseTitle: discogReleases.title,
+          parentTaskId: tasks.parentTaskId,
+          category: tasks.category,
+          dueAt: tasks.dueAt,
+          scheduledFor: tasks.scheduledFor,
+          startedAt: tasks.startedAt,
+          completedAt: tasks.completedAt,
+          position: tasks.position,
+          sourceTemplateId: tasks.sourceTemplateId,
+          metadata: tasks.metadata,
+          createdAt: tasks.createdAt,
+          updatedAt: tasks.updatedAt,
+        })
+        .from(tasks)
+        .leftJoin(discogReleases, eq(tasks.releaseId, discogReleases.id))
+        .where(getTaskListWhereClause(profileId, boardFilters))
+        .orderBy(asc(tasks.position), asc(tasks.id))
+        .limit(limit + 1);
+
+      return {
+        status,
+        tasks: getPageRows(rows, limit).map(mapTaskRow),
+        totalCount: Number(totalRow?.totalCount ?? 0),
+        nextCursor: getNextCursor(rows, limit),
+      };
+    })
+  );
+
+  return {
+    columns,
+    totalCount: columns.reduce((total, column) => total + column.totalCount, 0),
   };
 }
 
@@ -506,6 +696,118 @@ export async function updateTask(
   revalidatePath(APP_ROUTES.DASHBOARD_RELEASES);
 
   return mapTaskRow(updated);
+}
+
+export async function moveTask(
+  input: MoveTaskInput
+): Promise<{ readonly success: true }> {
+  await requireTasksWorkspaceAccess();
+  assertMoveTaskInput(input);
+
+  const profileId = await requireProfileId();
+  const movingTask = await getOwnedTaskOrThrow(profileId, input.taskId);
+  const adjacentIds = [input.beforeTaskId, input.afterTaskId].filter(
+    (id): id is string => Boolean(id)
+  );
+
+  if (adjacentIds.length > 0) {
+    const adjacentRows = await db
+      .select({
+        id: tasks.id,
+        status: tasks.status,
+      })
+      .from(tasks)
+      .where(
+        and(
+          eq(tasks.creatorProfileId, profileId),
+          isNull(tasks.deletedAt),
+          inArray(tasks.id, adjacentIds)
+        )
+      );
+
+    if (
+      adjacentRows.length !== adjacentIds.length ||
+      adjacentRows.some(row => row.status !== input.toStatus)
+    ) {
+      throw new Error('Task order changed. Reload and try again.');
+    }
+  }
+
+  const affectedStatuses = Array.from(
+    new Set<TaskStatus>([movingTask.status, input.toStatus])
+  );
+  const affectedRows = await db
+    .select()
+    .from(tasks)
+    .where(
+      and(
+        eq(tasks.creatorProfileId, profileId),
+        isNull(tasks.deletedAt),
+        inArray(tasks.status, affectedStatuses)
+      )
+    )
+    .orderBy(asc(tasks.position), asc(tasks.id));
+
+  const updates = getTaskMoveUpdates({
+    rows: affectedRows,
+    movingTask,
+    input,
+  });
+
+  if (updates.length === 0) {
+    return { success: true };
+  }
+
+  const statusCase = drizzleSql<typeof tasks.status>`case ${drizzleSql.join(
+    updates.map(
+      update =>
+        drizzleSql`when ${tasks.id} = ${update.id} then ${update.status}::release_task_status`
+    ),
+    drizzleSql` `
+  )} else ${tasks.status} end`;
+  const positionCase = drizzleSql<number>`case ${drizzleSql.join(
+    updates.map(
+      update =>
+        drizzleSql`when ${tasks.id} = ${update.id} then ${update.position}`
+    ),
+    drizzleSql` `
+  )} else ${tasks.position} end`;
+  const nextCompletedAt =
+    input.toStatus === 'done'
+      ? (movingTask.completedAt ?? new Date())
+      : input.toStatus !== movingTask.status
+        ? null
+        : movingTask.completedAt;
+  const completedAtCase = drizzleSql<Date | null>`case when ${tasks.id} = ${input.taskId} then ${nextCompletedAt} else ${tasks.completedAt} end`;
+
+  const updated = await db
+    .update(tasks)
+    .set({
+      status: statusCase,
+      position: positionCase,
+      completedAt: completedAtCase,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(tasks.creatorProfileId, profileId),
+        isNull(tasks.deletedAt),
+        inArray(
+          tasks.id,
+          updates.map(update => update.id)
+        )
+      )
+    )
+    .returning({ id: tasks.id });
+
+  if (updated.length !== updates.length) {
+    throw new Error('Task order changed. Reload and try again.');
+  }
+
+  revalidatePath(APP_ROUTES.TASKS);
+  revalidatePath(APP_ROUTES.DASHBOARD_RELEASES);
+
+  return { success: true };
 }
 
 export async function deleteTask(

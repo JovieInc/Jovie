@@ -5,10 +5,14 @@ import {
   bulkUpdateTasks,
   createTask,
   deleteTask,
+  moveTask,
   updateTask,
 } from '@/app/app/(shell)/dashboard/tasks/task-actions';
+import { applyTaskBoardMove, applyTaskListMove } from '@/lib/tasks/task-board';
 import type {
   CreateTaskInput,
+  MoveTaskInput,
+  TaskBoardResult,
   TaskListResult,
   TaskStats,
   TaskView,
@@ -21,11 +25,16 @@ type TaskListCacheEntry = readonly [
   readonly unknown[],
   TaskListResult | undefined,
 ];
+type TaskBoardCacheEntry = readonly [
+  readonly unknown[],
+  TaskBoardResult | undefined,
+];
 type TaskDetailCacheEntry = readonly [readonly unknown[], TaskView | undefined];
 type TaskStatsCacheEntry = readonly [readonly unknown[], TaskStats | undefined];
 
 interface TaskCacheSnapshot {
   readonly previousLists: TaskListCacheEntry[];
+  readonly previousBoards: TaskBoardCacheEntry[];
   readonly previousDetails: TaskDetailCacheEntry[];
   readonly previousStatsEntries: TaskStatsCacheEntry[];
 }
@@ -51,8 +60,29 @@ function updateTaskInList(
   };
 }
 
+function updateTaskInBoard(
+  board: TaskBoardResult | undefined,
+  taskId: string,
+  patch: Partial<TaskView>
+): TaskBoardResult | undefined {
+  if (!board) {
+    return board;
+  }
+
+  return {
+    ...board,
+    columns: board.columns.map(column => ({
+      ...column,
+      tasks: column.tasks.map(task =>
+        task.id === taskId ? { ...task, ...patch } : task
+      ),
+    })),
+  };
+}
+
 function getCachedTask(
   previousLists: ReadonlyArray<TaskListCacheEntry>,
+  previousBoards: ReadonlyArray<TaskBoardCacheEntry>,
   previousDetails: ReadonlyArray<TaskDetailCacheEntry>,
   taskId: string
 ): TaskView | undefined {
@@ -69,6 +99,15 @@ function getCachedTask(
     }
   }
 
+  for (const [, board] of previousBoards) {
+    for (const column of board?.columns ?? []) {
+      const task = column.tasks.find(candidate => candidate.id === taskId);
+      if (task) {
+        return task;
+      }
+    }
+  }
+
   return undefined;
 }
 
@@ -79,6 +118,9 @@ function getTaskCacheSnapshot(
   return {
     previousLists: queryClient.getQueriesData<TaskListResult>({
       queryKey: queryKeys.tasks.list(),
+    }),
+    previousBoards: queryClient.getQueriesData<TaskBoardResult>({
+      queryKey: queryKeys.tasks.board(),
     }),
     previousDetails: queryClient.getQueriesData<TaskView>({
       queryKey: queryKeys.tasks.detail(taskId),
@@ -95,6 +137,10 @@ function restoreTaskCacheSnapshot(
 ) {
   for (const [queryKey, list] of snapshot.previousLists) {
     queryClient.setQueryData(queryKey, list);
+  }
+
+  for (const [queryKey, board] of snapshot.previousBoards) {
+    queryClient.setQueryData(queryKey, board);
   }
 
   for (const [queryKey, detail] of snapshot.previousDetails) {
@@ -215,6 +261,7 @@ export function useUpdateTaskMutation() {
       const snapshot = getTaskCacheSnapshot(queryClient, taskId);
       const previousTask = getCachedTask(
         snapshot.previousLists,
+        snapshot.previousBoards,
         snapshot.previousDetails,
         taskId
       );
@@ -230,6 +277,18 @@ export function useUpdateTaskMutation() {
             ...data,
             completedAt: optimisticCompletedAt,
           })
+        );
+      }
+
+      for (const [queryKey, board] of snapshot.previousBoards) {
+        queryClient.setQueryData(
+          queryKey,
+          data.status
+            ? applyTaskBoardMove(board, {
+                taskId,
+                toStatus: data.status,
+              })
+            : updateTaskInBoard(board, taskId, data)
         );
       }
 
@@ -297,6 +356,81 @@ export function useBulkUpdateTasksMutation() {
   });
 }
 
+export function useMoveTaskMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: MoveTaskInput) => moveTask(input),
+    onMutate: async input => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.tasks.all });
+
+      const snapshot = getTaskCacheSnapshot(queryClient, input.taskId);
+      const previousTask = getCachedTask(
+        snapshot.previousLists,
+        snapshot.previousBoards,
+        snapshot.previousDetails,
+        input.taskId
+      );
+
+      for (const [queryKey, board] of snapshot.previousBoards) {
+        queryClient.setQueryData(queryKey, applyTaskBoardMove(board, input));
+      }
+
+      for (const [queryKey, list] of snapshot.previousLists) {
+        queryClient.setQueryData(queryKey, applyTaskListMove(list, input));
+      }
+
+      for (const [queryKey, detail] of snapshot.previousDetails) {
+        if (!detail) {
+          continue;
+        }
+
+        queryClient.setQueryData(queryKey, {
+          ...detail,
+          status: input.toStatus,
+          completedAt:
+            input.toStatus === 'done'
+              ? (detail.completedAt ?? new Date())
+              : input.toStatus !== detail.status
+                ? null
+                : detail.completedAt,
+        });
+      }
+
+      if (previousTask && previousTask.status !== input.toStatus) {
+        for (const [queryKey, stats] of snapshot.previousStatsEntries) {
+          if (!stats) {
+            continue;
+          }
+
+          queryClient.setQueryData(
+            queryKey,
+            updateTaskStatsForStatusChange(
+              stats,
+              previousTask.status,
+              input.toStatus
+            )
+          );
+        }
+      }
+
+      return snapshot;
+    },
+    onError: (_error, _input, context) => {
+      if (!context) {
+        return;
+      }
+
+      restoreTaskCacheSnapshot(queryClient, context);
+    },
+    onSettled: async () => {
+      await invalidateTaskQueries(queryClient, {
+        includeStats: true,
+      });
+    },
+  });
+}
+
 export function useDeleteTaskMutation() {
   const queryClient = useQueryClient();
 
@@ -308,6 +442,7 @@ export function useDeleteTaskMutation() {
       const snapshot = getTaskCacheSnapshot(queryClient, taskId);
       const previousTask = getCachedTask(
         snapshot.previousLists,
+        snapshot.previousBoards,
         snapshot.previousDetails,
         taskId
       );
@@ -320,6 +455,27 @@ export function useDeleteTaskMutation() {
         queryClient.setQueryData(queryKey, {
           ...list,
           tasks: list.tasks.filter(task => task.id !== taskId),
+        });
+      }
+
+      for (const [queryKey, board] of snapshot.previousBoards) {
+        if (!board) {
+          continue;
+        }
+
+        queryClient.setQueryData(queryKey, {
+          ...board,
+          columns: board.columns.map(column => {
+            const removed = column.tasks.some(task => task.id === taskId);
+            return {
+              ...column,
+              tasks: column.tasks.filter(task => task.id !== taskId),
+              totalCount: removed
+                ? Math.max(0, column.totalCount - 1)
+                : column.totalCount,
+            };
+          }),
+          totalCount: Math.max(0, board.totalCount - 1),
         });
       }
 

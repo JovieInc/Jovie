@@ -58,6 +58,23 @@ vi.mock('@/components/organisms/table', () => ({
   ),
 }));
 
+vi.mock('@/components/organisms/table/molecules/DisplayMenuDropdown', () => ({
+  DisplayMenuDropdown: ({
+    trigger,
+    onViewModeChange,
+  }: {
+    readonly trigger: ReactNode;
+    readonly onViewModeChange?: (viewMode: 'board' | 'list') => void;
+  }) => (
+    <div>
+      {trigger}
+      <button type='button' onClick={() => onViewModeChange?.('list')}>
+        List view
+      </button>
+    </div>
+  ),
+}));
+
 function createBaseProps() {
   return {
     search: '',
@@ -81,6 +98,10 @@ function createBaseProps() {
     createPending: false,
     filterCategories: [],
     onClearFilters: vi.fn(),
+    viewMode: 'board',
+    onViewModeChange: vi.fn(),
+    showCancelledColumn: false,
+    onShowCancelledColumnChange: vi.fn(),
     showTaskNavigation: false,
     canSelectPrevious: false,
     canSelectNext: false,
@@ -109,6 +130,9 @@ describe('TaskWorkspaceHeaderBar', () => {
       screen.getByRole('button', { name: 'Search tasks' })
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Filters' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Display options' })
+    ).toBeInTheDocument();
   });
 
   it('emits subview changes from the compact tab strip', () => {
@@ -119,6 +143,16 @@ describe('TaskWorkspaceHeaderBar', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Assigned To Jovie 1' }));
 
     expect(props.onSubviewChange).toHaveBeenCalledWith('jovie');
+  });
+
+  it('emits display mode changes from the display menu trigger', () => {
+    const props = createBaseProps();
+
+    render(<TaskWorkspaceHeaderBar {...props} mode='default' />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'List view' }));
+
+    expect(props.onViewModeChange).toHaveBeenCalledWith('list');
   });
 
   it('renders search mode controls without reintroducing the divider', () => {

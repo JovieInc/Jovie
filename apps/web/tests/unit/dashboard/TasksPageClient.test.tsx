@@ -2,7 +2,7 @@ import { TooltipProvider } from '@jovie/ui';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { TaskView } from '@/lib/tasks/types';
+import type { TaskBoardResult, TaskStatus, TaskView } from '@/lib/tasks/types';
 
 const { mockRegisterRightPanel, mockUseAppFlag } = vi.hoisted(() => ({
   mockRegisterRightPanel: vi.fn(),
@@ -107,12 +107,12 @@ const mockTask = {
   category: null,
   scheduledFor: null,
   startedAt: null,
-  completedAt: '2026-04-01T00:00:00.000Z',
+  completedAt: new Date('2026-04-01T00:00:00.000Z'),
   position: 0,
   sourceTemplateId: null,
   metadata: null,
-  createdAt: '2026-04-01T00:00:00.000Z',
-  updatedAt: '2026-04-01T00:00:00.000Z',
+  createdAt: new Date('2026-04-01T00:00:00.000Z'),
+  updatedAt: new Date('2026-04-01T00:00:00.000Z'),
 } as const;
 
 const mockTaskTwo = {
@@ -177,13 +177,43 @@ const mockHelperTask = {
 const mockCreateTask = vi.fn();
 const mockDeleteTask = vi.fn();
 const mockUpdateTask = vi.fn();
+const mockMoveTask = vi.fn();
 const mockSetHeaderActions = vi.fn();
 let setHeaderActionsHost: ((actions: React.ReactNode) => void) | null = null;
 let mockIsXlUp = true;
 let mockIs2xlUp = true;
 let mockTasksData = [mockTask, mockTaskTwo];
+let mockViewMode: 'board' | 'list' = 'list';
 let mockCanShowTaskDocumentAlongsideReleaseSidebar = true;
 const mockUnifiedTable = vi.fn();
+const mockSetViewMode = vi.fn((viewMode: 'board' | 'list') => {
+  mockViewMode = viewMode;
+});
+
+function createMockTaskBoardResult(
+  tasks: ReadonlyArray<TaskView>
+): TaskBoardResult {
+  const statuses: TaskStatus[] = [
+    'backlog',
+    'todo',
+    'in_progress',
+    'done',
+    'cancelled',
+  ];
+
+  return {
+    columns: statuses.map(status => {
+      const columnTasks = tasks.filter(task => task.status === status);
+      return {
+        status,
+        tasks: columnTasks,
+        totalCount: columnTasks.length,
+        nextCursor: null,
+      };
+    }),
+    totalCount: tasks.length,
+  };
+}
 
 function setHeaderActionsForTest(actions: React.ReactNode) {
   mockSetHeaderActions(actions);
@@ -238,6 +268,15 @@ vi.mock('@/hooks/useMediaQuery', () => ({
   useMediaQuery: () => mockCanShowTaskDocumentAlongsideReleaseSidebar,
 }));
 
+vi.mock('@/components/organisms/table/utils/useViewMode', () => ({
+  useViewMode: () => ({
+    viewMode: mockViewMode,
+    setViewMode: mockSetViewMode,
+    availableModes: ['board', 'list'],
+    isHydrated: true,
+  }),
+}));
+
 vi.mock('@/lib/queries/useReleasesQuery', () => ({
   useReleasesQuery: () => ({
     data: [{ id: 'release-1', title: 'QA Release' }],
@@ -247,6 +286,12 @@ vi.mock('@/lib/queries/useReleasesQuery', () => ({
 vi.mock('@/lib/queries/useTasksQuery', () => ({
   useTasksQuery: () => ({
     data: { tasks: mockTasksData },
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
+  useTaskBoardQuery: () => ({
+    data: createMockTaskBoardResult(mockTasksData as TaskView[]),
     isLoading: false,
     isError: false,
     refetch: vi.fn(),
@@ -270,6 +315,46 @@ vi.mock('@/lib/queries/useTaskMutations', () => ({
     mutate: mockUpdateTask,
     isPending: false,
   }),
+  useMoveTaskMutation: () => ({
+    mutate: mockMoveTask,
+    isPending: false,
+  }),
+}));
+
+vi.mock('@/components/features/dashboard/tasks/TaskBoard', () => ({
+  TaskBoard: ({
+    board,
+    onOpenTask,
+    onMoveTask,
+  }: {
+    readonly board?: TaskBoardResult;
+    readonly onOpenTask: (task: TaskView) => void;
+    readonly onMoveTask: (input: {
+      readonly taskId: string;
+      readonly toStatus: TaskStatus;
+    }) => void;
+  }) => (
+    <div data-testid='tasks-board'>
+      {board?.columns.flatMap(column =>
+        column.tasks.map(task => (
+          <button
+            key={task.id}
+            type='button'
+            data-testid={`mock-board-card-${task.id}`}
+            onClick={() => onOpenTask(task)}
+          >
+            {task.title}
+          </button>
+        ))
+      )}
+      <button
+        type='button'
+        onClick={() => onMoveTask({ taskId: 'task-2', toStatus: 'done' })}
+      >
+        Move board task
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock(
@@ -430,6 +515,8 @@ describe('TasksPageClient', () => {
     mockCreateTask.mockReset();
     mockDeleteTask.mockReset();
     mockUpdateTask.mockReset();
+    mockMoveTask.mockReset();
+    mockSetViewMode.mockClear();
     mockSetHeaderActions.mockReset();
     mockRegisterRightPanel.mockReset();
     mockUseAppFlag.mockReturnValue(false);
@@ -437,6 +524,7 @@ describe('TasksPageClient', () => {
     mockIsXlUp = true;
     mockIs2xlUp = true;
     mockTasksData = [mockTask, mockTaskTwo];
+    mockViewMode = 'list';
     mockCanShowTaskDocumentAlongsideReleaseSidebar = true;
   });
 
@@ -452,6 +540,37 @@ describe('TasksPageClient', () => {
     expect(screen.queryByText('All Statuses')).not.toBeInTheDocument();
     expect(screen.queryByText('All Priorities')).not.toBeInTheDocument();
     expect(screen.queryByText('All Assignees')).not.toBeInTheDocument();
+  });
+
+  it('renders the board workspace when board mode is active', () => {
+    mockViewMode = 'board';
+
+    renderPage();
+
+    expect(screen.getByTestId('tasks-board')).toBeInTheDocument();
+    expect(screen.queryByTestId('tasks-table')).not.toBeInTheDocument();
+    expect(screen.getByTestId('task-document-pane')).toHaveClass('hidden');
+
+    fireEvent.click(screen.getByTestId('mock-board-card-task-2'));
+
+    expect(mockRegisterRightPanel).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        type: expect.any(Function),
+      })
+    );
+  });
+
+  it('submits board moves through the move mutation', () => {
+    mockViewMode = 'board';
+
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Move board task' }));
+
+    expect(mockMoveTask).toHaveBeenCalledWith(
+      { taskId: 'task-2', toStatus: 'done' },
+      expect.objectContaining({ onError: expect.any(Function) })
+    );
   });
 
   it('filters desktop tasks through the assignee subview tabs', () => {
@@ -525,8 +644,8 @@ describe('TasksPageClient', () => {
     renderPage();
 
     expect(getLatestTableProps()?.data?.map(task => task.id)).toEqual([
-      'task-2',
       'task-jovie',
+      'task-2',
       'task-1',
     ]);
 
@@ -543,8 +662,8 @@ describe('TasksPageClient', () => {
 
     fireEvent.click(screen.getByRole('tab', { name: 'All 3' }));
     expect(getLatestTableProps()?.data?.map(task => task.id)).toEqual([
-      'task-2',
       'task-jovie',
+      'task-2',
       'task-1',
     ]);
   });
