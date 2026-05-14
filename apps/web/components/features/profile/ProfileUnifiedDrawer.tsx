@@ -309,14 +309,15 @@ export function ProfileUnifiedDrawer({
     visibleReleases.length,
   ]);
 
-  useEffect(() => {
-    if (view === 'releases' && !canOpenReleasesDrawer) {
-      onViewChange('menu');
-    }
-    if (view === 'tour' && !canOpenTourDrawer) {
-      onViewChange('menu');
-    }
-  }, [canOpenReleasesDrawer, canOpenTourDrawer, onViewChange, view]);
+  // Intentionally do NOT mutate `view` when capability flips false.
+  // `resolveRenderedView` already returns 'menu' for that case (line 124),
+  // and `resolveViewMeta` falls back to the menu title (line 104). Mutating
+  // here causes the drawer to flicker whenever the releases query refetches
+  // and transiently returns empty data — the effect would snap view back to
+  // 'menu', the data would resolve, and the user would see a blink as the
+  // drawer re-rendered releases content. The view stays as 'releases' in
+  // parent state; rendering is the source of truth for what the user sees.
+  // See JOV-2150.
 
   const venmoLink =
     socialLinks.find(link => link.platform === 'venmo')?.url ?? null;

@@ -15,12 +15,11 @@ import {
   DrawerLinkSection,
   SidebarLinkRow,
 } from '@/components/molecules/drawer';
-import { PLATFORM_METADATA_MAP } from '@/constants/platforms';
 import { PROVIDER_LABELS } from '@/features/dashboard/atoms/DspProviderIcon';
 import type { LinkSection } from '@/features/dashboard/organisms/links/utils/link-categorization';
 import { getPlatformCategory } from '@/features/dashboard/organisms/links/utils/platform-category';
 import { cn } from '@/lib/utils';
-import { extractHandleFromUrl } from '@/lib/utils/social-platform';
+import { dedupeLinks, extractHandleFromUrl } from '@/lib/utils/social-platform';
 import { SuggestedDspMatches } from './SuggestedDspMatches';
 
 export type CategoryOption = LinkSection | 'all';
@@ -116,12 +115,7 @@ function LinkItem({ link, onRemove }: LinkItemProps) {
   return (
     <SidebarLinkRow
       icon={<SocialIcon platform={link.platform} className='h-4 w-4' />}
-      label={
-        handle
-          ? `@${handle}`
-          : (PLATFORM_METADATA_MAP[link.platform]?.name ??
-            formatDisplayHost(link.url))
-      }
+      label={handle ? `@${handle}` : formatDisplayHost(link.url)}
       url={link.url}
       deepLinkPlatform={link.platform}
       isVisible={link.isVisible}
@@ -197,6 +191,12 @@ export function ProfileLinkList({
   surface = 'card',
   profileId,
 }: ProfileLinkListProps) {
+  // Dedupe defensively — even if the DB or seed/import paths produce
+  // duplicate (platform, url) rows, we render each unique link once.
+  // Without this guard, malformed YouTube rows have rendered as
+  // "YouTube YouTube YouTube" in production. See JOV-2149.
+  const uniqueLinks = useMemo(() => dedupeLinks(links), [links]);
+
   // Group links by category
   const groupedLinks = useMemo(() => {
     const groups: Record<LinkSection, PreviewPanelLink[]> = {
@@ -206,21 +206,21 @@ export function ProfileLinkList({
       custom: [],
     };
 
-    for (const link of links) {
+    for (const link of uniqueLinks) {
       const section = getLinkSection(link);
       groups[section].push(link);
     }
 
     return groups;
-  }, [links]);
+  }, [uniqueLinks]);
 
   // Get filtered links based on selected category
   const filteredLinks = useMemo(() => {
     if (selectedCategory === 'all') {
-      return links;
+      return uniqueLinks;
     }
     return groupedLinks[selectedCategory] ?? [];
-  }, [selectedCategory, groupedLinks, links]);
+  }, [selectedCategory, groupedLinks, uniqueLinks]);
 
   // When viewing a specific category, render links directly (no section header —
   // the tab already labels the category, and the + button is inline with tabs)
@@ -306,19 +306,22 @@ export function ProfileLinkList({
   );
 }
 
-// Export helper for getting category counts
+// Export helper for getting category counts.
+// Dedupes by (platform, url) so the tab badge matches the rendered row count.
+// Gotcha class #6: count/badge mismatch — see JOV-2148.
 export function getCategoryCounts(
   links: PreviewPanelLink[]
 ): Record<CategoryOption, number> {
+  const unique = dedupeLinks(links);
   const counts: Record<CategoryOption, number> = {
-    all: links.length,
+    all: unique.length,
     social: 0,
     dsp: 0,
     earnings: 0,
     custom: 0,
   };
 
-  for (const link of links) {
+  for (const link of unique) {
     const section = getLinkSection(link);
     counts[section]++;
   }
