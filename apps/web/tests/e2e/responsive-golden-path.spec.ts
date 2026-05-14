@@ -96,11 +96,10 @@ async function assertTouchTargets(
 
   // Allow up to 3 small targets (nav icons, close buttons may be intentionally smaller)
   // This is a soft assertion — log but don't hard fail for minor violations
-  if (smallTargets.length > 5) {
-    console.error(
-      `[responsive] Too many small touch targets: ${smallTargets.length}`
-    );
-  }
+  expect(
+    smallTargets.length,
+    `Too many small touch targets (< ${minSize}px): ${smallTargets.slice(0, 5).join(', ')}`
+  ).toBeLessThanOrEqual(5);
 }
 
 /**
@@ -180,9 +179,10 @@ async function assertFocusOrder(page: import('@playwright/test').Page) {
     return jumps;
   });
 
-  if (focusJumps.length > 0) {
-    console.warn('[responsive] Focus order jumps:', focusJumps);
-  }
+  expect(
+    focusJumps.length,
+    `Focus order has backward jumps: ${focusJumps.slice(0, 5).join('; ')}`
+  ).toBeLessThanOrEqual(3);
 }
 
 test.describe('Responsive Golden Path', () => {

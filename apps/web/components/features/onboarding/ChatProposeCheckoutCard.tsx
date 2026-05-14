@@ -28,7 +28,7 @@ interface ChatProposeCheckoutCardProps {
 }
 
 const PLAN_LABELS: Record<NonNullable<CheckoutCardPayload['plan']>, string> = {
-  free: 'free tier',
+  free: 'Free tier',
   pro: 'Pro — $39/mo',
   max: 'Max — $149/mo',
 };
@@ -36,7 +36,7 @@ const PLAN_LABELS: Record<NonNullable<CheckoutCardPayload['plan']>, string> = {
 export function ChatProposeCheckoutCard({
   payload,
 }: ChatProposeCheckoutCardProps) {
-  const planLabel = payload.plan ? PLAN_LABELS[payload.plan] : 'pick a plan';
+  const planLabel = payload.plan ? PLAN_LABELS[payload.plan] : 'Pick a plan';
   // Trust the handoffUrl from the server if present, but bound it to the
   // canonical onboarding checkout route family so a future tool-result tweak
   // can't redirect us to an unrelated path.
@@ -46,10 +46,10 @@ export function ChatProposeCheckoutCard({
       : APP_ROUTES.ONBOARDING_CHECKOUT;
 
   return (
-    <div className='mt-2 flex items-center justify-between gap-3 rounded-2xl border border-white/[0.12] bg-white/[0.06] px-4 py-3'>
+    <div className='flex items-center justify-between gap-3 rounded-xl border border-subtle bg-surface-1 px-4 py-3'>
       <div className='min-w-0'>
-        <p className='text-[13px] text-white/60'>continue to checkout</p>
-        <p className='truncate text-[15px] font-semibold text-white'>
+        <p className='text-[13px] text-secondary-token'>Continue to checkout</p>
+        <p className='truncate text-[15px] font-semibold text-primary-token'>
           {planLabel}
         </p>
       </div>

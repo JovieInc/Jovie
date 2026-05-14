@@ -15,7 +15,7 @@ export default async function SettingsDeleteAccountPage() {
 
   const dashboardData = await getDashboardData();
   if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
-    redirect('/onboarding');
+    redirect(APP_ROUTES.START);
   }
 
   return <DashboardSettings focusSection='data-privacy' />;

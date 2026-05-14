@@ -1,4 +1,8 @@
 import { test as base } from '@playwright/test';
+import {
+  assertNoHydrationMismatches,
+  isHydrationMismatch,
+} from '../helpers/hydration-guard';
 import { isExpectedError, isExpectedWarning } from './utils/smoke-test-utils';
 
 declare global {
@@ -20,11 +24,16 @@ export const test = base.extend({
     // Array to collect console errors
     const consoleErrors: string[] = [];
     const consoleWarnings: string[] = [];
+    const hydrationMismatches: string[] = [];
 
     // Listen for console errors and warnings
     page.on('console', msg => {
       if (msg.type() === 'error') {
         const errorText = msg.text();
+        // Check for hydration mismatches first (before other filters)
+        if (isHydrationMismatch(errorText)) {
+          hydrationMismatches.push(errorText);
+        }
         // Skip expected test-related errors
         if (
           !isExpectedError(errorText) &&
@@ -38,6 +47,10 @@ export const test = base.extend({
       }
       if (msg.type() === 'warning') {
         const warningText = msg.text();
+        // Check for hydration mismatches in warnings too (React prod builds may warn)
+        if (isHydrationMismatch(warningText)) {
+          hydrationMismatches.push(warningText);
+        }
         // Skip expected warnings
         if (!isExpectedWarning(warningText)) {
           consoleWarnings.push(warningText);
@@ -59,6 +72,9 @@ export const test = base.extend({
 
     // Use the page
     await runPage(page);
+
+    // Fail fast on any detected hydration mismatches
+    assertNoHydrationMismatches(hydrationMismatches);
 
     // After test completion, log console errors and warnings
     if (consoleErrors.length > 0) {

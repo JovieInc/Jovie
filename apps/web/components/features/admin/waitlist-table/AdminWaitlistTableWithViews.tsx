@@ -38,6 +38,7 @@ import {
   useApproveWaitlistMutation,
   useDisapproveWaitlistMutation,
 } from '@/lib/queries';
+import { logger } from '@/lib/utils/logger';
 import { AdminWaitlistTableUnified } from './AdminWaitlistTableUnified';
 import {
   persistGroupingPreference,
@@ -267,7 +268,10 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
           toast.error('Unsupported waitlist status update.');
         }
       } catch (error) {
-        console.error('Failed to update waitlist status:', error);
+        logger.error(
+          '[admin/waitlist] Failed to update waitlist status:',
+          error
+        );
         toast.error('Failed to update status', {
           description:
             error instanceof Error ? error.message : 'Please try again',

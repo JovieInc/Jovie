@@ -61,46 +61,28 @@ test.describe('Homepage', () => {
       'marketing-glass'
     );
     await expect(header.locator('a[href="/"]').first()).toBeVisible();
-    await expect(
-      header.getByRole('button', { name: 'Features' })
-    ).toBeVisible();
-    await expect(
-      header.getByRole('button', { name: 'Resources' })
-    ).toBeVisible();
-    await expect(header.getByRole('link', { name: 'Pricing' })).toHaveAttribute(
-      'href',
-      '/pricing'
+    await expect(header.getByRole('button', { name: 'Features' })).toHaveCount(
+      0
     );
+    await expect(header.getByRole('button', { name: 'Resources' })).toHaveCount(
+      0
+    );
+    await expect(header.getByRole('link', { name: 'Pricing' })).toHaveCount(0);
+    await expect(header.getByRole('link', { name: 'Contact' })).toHaveCount(0);
     await expect(header.getByRole('link', { name: 'Sign in' })).toHaveCount(1);
     await expect(
       header.getByRole('link', { name: 'Start Free Trial' })
     ).toHaveAttribute('href', '/signup');
   });
 
-  test('header flyouts stay open while moving into the panel', async ({
-    page,
-  }) => {
+  test('header flyouts are not mounted by default', async ({ page }) => {
     const header = page.getByTestId('header-nav');
-    const featuresTrigger = header.getByRole('button', { name: 'Features' });
     const featuresFlyout = page.locator('#marketing-header-flyout-features');
 
-    await featuresTrigger.hover();
-    await expect(featuresTrigger).toHaveAttribute('aria-expanded', 'true');
-    await expect(featuresFlyout).toBeVisible();
-    await expect(
-      featuresFlyout.getByRole('link', { name: 'Automatic Fan Notifications' })
-    ).toBeVisible();
-    await expect(
-      featuresFlyout.getByRole('link', { name: 'Direct Fan Messaging' })
-    ).toHaveCount(0);
-
-    await featuresFlyout
-      .getByRole('link', { name: 'Capture Every Fan' })
-      .hover();
-    await expect(featuresFlyout).toBeVisible();
-
-    await page.keyboard.press('Escape');
-    await expect(featuresTrigger).toHaveAttribute('aria-expanded', 'false');
+    await expect(header.getByRole('button', { name: 'Features' })).toHaveCount(
+      0
+    );
+    await expect(featuresFlyout).toHaveCount(0);
   });
 
   test('product carousel exposes desktop and mobile proof slides', async ({
@@ -210,18 +192,11 @@ test.describe('Homepage', () => {
         name: /A new kind of operating system\s+Built for music artists/,
       })
     ).toBeVisible();
-    for (const outcome of [
-      'Import the drop',
-      'Generate the work',
-      'Keep the release moving',
-    ]) {
-      await expect(page.getByRole('heading', { name: outcome })).toBeVisible();
-    }
     const aiComposer = page.getByTestId('homepage-ai-composer-demo');
     await expect(aiComposer).toBeVisible();
     await expect(
       aiComposer.getByRole('heading', {
-        name: 'A release plan Jovie can run',
+        name: 'Ask once. Get the launch plan',
       })
     ).toBeVisible();
     const aiComposerBefore = await aiComposer.boundingBox();
@@ -234,6 +209,38 @@ test.describe('Homepage', () => {
     await expect(
       page.getByRole('heading', { name: 'Go live in 60 seconds' })
     ).toBeVisible();
+    const productStatement = page.getByTestId('homepage-product-statement');
+    const goLiveSection = page.getByTestId('homepage-go-live-section');
+    const workspaceSection = page.getByTestId('homepage-workspace-section');
+    for (const outcome of [
+      'Import the drop automatically',
+      'Generate the launch plan',
+      'Run the next action',
+    ]) {
+      await expect(
+        goLiveSection.getByRole('heading', { name: outcome })
+      ).toBeVisible();
+    }
+    const sectionOrder = await page.evaluate(() => {
+      const product = document.querySelector(
+        '[data-testid="homepage-product-statement"]'
+      );
+      const goLive = document.querySelector(
+        '[data-testid="homepage-go-live-section"]'
+      );
+      const workspace = document.querySelector(
+        '[data-testid="homepage-workspace-section"]'
+      );
+      if (!product || !goLive || !workspace) return [];
+      return [
+        product.compareDocumentPosition(goLive),
+        goLive.compareDocumentPosition(workspace),
+      ];
+    });
+    expect(sectionOrder).toEqual([4, 4]);
+    await expect(productStatement).toBeVisible();
+    await expect(goLiveSection).toBeVisible();
+    await expect(workspaceSection).toBeVisible();
     await expect(
       page.getByRole('heading', {
         name: 'One workspace For every release',
@@ -243,13 +250,17 @@ test.describe('Homepage', () => {
       page.getByTestId('homepage-workspace-screenshot').locator('img')
     ).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'Import the release' })
+      workspaceSection.getByRole('heading', {
+        name: 'Import the drop automatically',
+      })
     ).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'Generate the plan' })
+      workspaceSection.getByRole('heading', {
+        name: 'Generate the launch plan',
+      })
     ).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'Run the tasks' })
+      workspaceSection.getByRole('heading', { name: 'Run the next action' })
     ).toBeVisible();
     await expect(page.getByTestId('homepage-product-depth-band')).toHaveCount(
       0
@@ -326,23 +337,7 @@ test.describe('Homepage', () => {
         `${image.alt} should be loaded at device pixel ratio quality`
       ).toBeGreaterThanOrEqual(image.requiredWidth);
     }
-    const specWall = page.getByTestId('homepage-spec-wall-section');
-    await expect(specWall).toBeVisible();
-    await expect(
-      specWall.getByRole('heading', {
-        name: 'Answers for every launch objection',
-      })
-    ).toBeVisible();
-    for (const spec of [
-      'Presaves',
-      'Bot protection',
-      'AI art direction',
-      'Fast catalogs',
-      'Custom routing',
-      'Fan notifications',
-    ]) {
-      await expect(specWall.getByRole('heading', { name: spec })).toBeVisible();
-    }
+    // Spec wall section removed — JOV-2073
     const pricing = page.getByTestId('homepage-v2-pricing');
     await expect(pricing).toBeVisible();
     await expect(
@@ -357,10 +352,17 @@ test.describe('Homepage', () => {
       pricing.getByText('Artist profiles are free forever.')
     ).toBeVisible();
     await expect(page.getByTestId('marketing-pricing-plan-pro')).toBeVisible();
-    await expect(page.getByTestId('marketing-pricing-plan-team')).toBeVisible();
     await expect(
       page.getByTestId('marketing-pricing-plan-enterprise')
-    ).toBeVisible();
+    ).toHaveCount(0);
+    await expect(page.getByTestId('marketing-pricing-plan-team')).toHaveCount(
+      0
+    );
+    await expect(
+      page
+        .getByTestId('marketing-pricing-plan-pro')
+        .getByRole('link', { name: 'Request Access' })
+    ).toHaveAttribute('href', '/signup?plan=pro');
     const pricingCtasOnGrid = await pricing
       .locator('.marketing-pricing-plan-card')
       .evaluateAll(cards =>
@@ -380,7 +382,7 @@ test.describe('Homepage', () => {
           );
         })
       );
-    expect(pricingCtasOnGrid).toEqual([true, true, true, true]);
+    expect(pricingCtasOnGrid).toEqual([true, true]);
     await expect(page.getByTestId('homepage-faq')).toBeVisible();
     await expect(
       page.getByRole('heading', { name: 'Frequently Asked Questions' })
@@ -398,9 +400,23 @@ test.describe('Homepage', () => {
     await expect(
       page.getByTestId('homepage-v2-final-cta-secondary')
     ).toHaveCount(0);
+    const footer = page.getByTestId('marketing-footer');
+    await expect(footer).toBeVisible();
+    await expect(footer.getByRole('link', { name: 'Privacy' })).toHaveAttribute(
+      'href',
+      '/legal/privacy'
+    );
+    await expect(footer.getByRole('link', { name: 'Terms' })).toHaveAttribute(
+      'href',
+      '/legal/terms'
+    );
+    await expect(footer.getByRole('link', { name: 'Pricing' })).toHaveCount(0);
+    await expect(footer.getByRole('link', { name: 'Investors' })).toHaveCount(
+      0
+    );
   });
 
-  test('mobile keeps hero and carousel inside the viewport and uses signup in drawer', async ({
+  test('mobile keeps hero and carousel inside the viewport with direct auth CTAs', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
@@ -430,32 +446,16 @@ test.describe('Homepage', () => {
       closeDevTools?.click();
     });
 
-    const openMenu = page.getByRole('button', { name: 'Open menu' });
-    await openMenu.click();
-    const mobilePanel = page.locator('#mobile-nav-panel');
-
-    await expect(mobilePanel).toBeVisible();
+    const header = page.getByTestId('header-nav');
+    await expect(page.getByRole('button', { name: 'Open menu' })).toHaveCount(
+      0
+    );
     await expect(
-      page.getByRole('button', { name: 'Close menu' })
-    ).toBeVisible();
-    await expect(
-      mobilePanel.getByRole('link', { name: 'Artist Profiles', exact: true })
-    ).toBeVisible();
-    await expect(
-      mobilePanel.getByRole('link', {
-        name: 'Smart Release Links',
-        exact: true,
-      })
-    ).toBeVisible();
-    await expect(
-      mobilePanel.getByRole('link', { name: 'Pricing', exact: true })
-    ).toBeVisible();
-    await expect(
-      mobilePanel.getByRole('link', { name: 'Blog', exact: true })
-    ).toBeVisible();
-    await expect(
-      mobilePanel.getByRole('link', { name: 'Start Free Trial', exact: true })
+      header.getByRole('link', { name: 'Start Free Trial', exact: true })
     ).toHaveAttribute('href', '/signup');
+    await expect(
+      header.getByRole('link', { name: 'Sign in', exact: true })
+    ).toHaveAttribute('href', '/signin');
   });
 
   test('has no horizontal overflow across common viewports', async ({
@@ -497,5 +497,66 @@ test.describe('Homepage', () => {
     await waitForHydration(page);
 
     expect(errors).toEqual([]);
+  });
+
+  /**
+   * JOV-2065: Public CTAs with data-cta-sign-up="true" must route to /signup.
+   *
+   * Finds every element marked with data-cta-sign-up="true" and verifies it
+   * has an href starting with /signup, or opens a dialog with
+   * data-auth-mode="sign-up".
+   */
+  test('all data-cta-sign-up elements navigate to /signup (JOV-2065)', async ({
+    page,
+  }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await waitForHydration(page);
+
+    const ctaLinks = page.locator('[data-cta-sign-up="true"]');
+    const count = await ctaLinks.count();
+
+    // Must have at least one CTA on the homepage
+    expect(
+      count,
+      'Homepage must have at least one data-cta-sign-up CTA'
+    ).toBeGreaterThan(0);
+
+    // Every anchor CTA must point to /signup (or /signup?...)
+    for (let i = 0; i < count; i += 1) {
+      const cta = ctaLinks.nth(i);
+      const tagName = await cta.evaluate(el => el.tagName.toLowerCase());
+
+      if (tagName === 'a') {
+        const href = await cta.getAttribute('href');
+        const isSignupRoute = href?.startsWith('/signup') ?? false;
+        expect(
+          isSignupRoute,
+          `CTA at index ${i} (href="${href}") must route to /signup`
+        ).toBe(true);
+      }
+    }
+  });
+
+  /**
+   * JOV-2066: Trust logo bar contains SVG or img elements (not text-only logos)
+   */
+  test('trust logo bar contains visual logo elements (SVG or img)', async ({
+    page,
+  }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await waitForHydration(page);
+
+    const trustSection = page.getByTestId('homepage-trust');
+    await expect(trustSection).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
+
+    const svgCount = await trustSection.locator('svg').count();
+    const imgCount = await trustSection.locator('img').count();
+
+    expect(
+      svgCount + imgCount,
+      'Trust logo bar must contain SVG or img logo elements'
+    ).toBeGreaterThan(0);
   });
 });

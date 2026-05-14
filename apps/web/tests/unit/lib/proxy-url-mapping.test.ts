@@ -50,7 +50,8 @@ describe('proxy routing helpers', () => {
       );
       expect(categorizePath('/billing').isProtectedPath).toBe(true);
       expect(categorizePath('/waitlist').isProtectedPath).toBe(true);
-      expect(categorizePath('/onboarding/profile').isProtectedPath).toBe(true);
+      expect(categorizePath('/onboarding').isProtectedPath).toBe(false);
+      expect(categorizePath('/onboarding/checkout').isProtectedPath).toBe(true);
     });
 
     it('keeps public routes public', () => {

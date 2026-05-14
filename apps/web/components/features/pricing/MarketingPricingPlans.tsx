@@ -3,8 +3,8 @@ import Link from 'next/link';
 import {
   getMarketingPlanCtaLabel,
   getMarketingPlanHref,
+  getVisibleMarketingPricingPlans,
   isMarketingPlanActive,
-  MARKETING_PRICING_PLANS,
   type MarketingPricingPlan,
 } from '@/data/marketingPricingPlans';
 import { cn } from '@/lib/utils';
@@ -19,7 +19,6 @@ function MarketingPricingPlanCard({
   plan: MarketingPricingPlan;
 }>) {
   const active = isMarketingPlanActive(plan.id);
-  const isFree = plan.id === 'free';
 
   return (
     <article
@@ -40,9 +39,7 @@ function MarketingPricingPlanCard({
           <p className='marketing-pricing-plan-card__name'>{plan.name}</p>
           <p className='marketing-pricing-plan-card__body'>{plan.body}</p>
         </div>
-        <span className='marketing-pricing-plan-card__badge'>
-          {active || isFree ? plan.badge : 'Waitlist'}
-        </span>
+        <span className='marketing-pricing-plan-card__badge'>{plan.badge}</span>
       </div>
 
       <p className='marketing-pricing-plan-card__price'>
@@ -77,6 +74,8 @@ export function MarketingPricingPlans({
   mode?: MarketingPricingMode;
   className?: string;
 }>) {
+  const visiblePlans = getVisibleMarketingPricingPlans();
+
   return (
     <div
       className={cn(
@@ -85,7 +84,7 @@ export function MarketingPricingPlans({
         className
       )}
     >
-      {MARKETING_PRICING_PLANS.map(plan => (
+      {visiblePlans.map(plan => (
         <MarketingPricingPlanCard key={plan.id} mode={mode} plan={plan} />
       ))}
     </div>

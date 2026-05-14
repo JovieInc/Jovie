@@ -1,8 +1,9 @@
 'use client';
 
-import { SignUp, useAuth } from '@clerk/nextjs';
+import { SignUp } from '@clerk/nextjs';
 import { useMemo } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
+import { useAuthSafe, useCanRenderClerkUi } from '@/hooks/useClerkSafe';
 
 /**
  * Renders the `proposeNextStep` tool result inside the onboarding chat
@@ -39,7 +40,8 @@ interface ChatProposeNextStepCardProps {
 export function ChatProposeNextStepCard({
   payload,
 }: ChatProposeNextStepCardProps) {
-  const { isSignedIn } = useAuth();
+  const { isSignedIn } = useAuthSafe();
+  const canRenderClerkUi = useCanRenderClerkUi();
   const kind = payload.decision.kind;
 
   // Memoise the Clerk appearance so the inline form looks at home on the
@@ -49,18 +51,18 @@ export function ChatProposeNextStepCard({
       elements: {
         rootBox: 'w-full',
         card: 'bg-transparent shadow-none border-0 p-0',
-        headerTitle: 'text-white text-[18px] font-semibold',
-        headerSubtitle: 'text-white/60 text-[13px]',
+        headerTitle: 'text-primary-token text-[18px] font-semibold',
+        headerSubtitle: 'text-secondary-token text-[13px]',
         formButtonPrimary:
-          'bg-white text-black hover:bg-white/90 normal-case font-semibold',
+          'bg-white text-black hover:bg-white/90 font-semibold',
         socialButtonsBlockButton:
-          'bg-white/[0.04] border-white/[0.09] text-white hover:bg-white/[0.08]',
+          'bg-surface-1 border-subtle text-primary-token hover:bg-surface-2',
         formFieldInput:
-          'bg-white/[0.04] border-white/[0.09] text-white focus:border-white/24',
-        formFieldLabel: 'text-white/70',
+          'bg-surface-0 border-subtle text-primary-token focus:border-primary-token/30',
+        formFieldLabel: 'text-secondary-token',
         footer: 'hidden',
-        dividerLine: 'bg-white/[0.07]',
-        dividerText: 'text-white/40',
+        dividerLine: 'bg-(--linear-border-subtle)',
+        dividerText: 'text-tertiary-token',
       },
       variables: {
         colorBackground: 'transparent',
@@ -82,9 +84,9 @@ export function ChatProposeNextStepCard({
 
   if (kind === 'waitlist') {
     return (
-      <div className='mt-2 rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 py-3'>
-        <p className='text-[14px] leading-6 text-white/82'>
-          {`you're on the list. I'll email you when you're up — we can pick up right here.`}
+      <div className='rounded-xl border border-subtle bg-surface-1 px-4 py-3'>
+        <p className='text-[15px] leading-7 text-primary-token'>
+          {`You're on the list. I'll email you when you're up — we can pick up right here.`}
         </p>
       </div>
     );
@@ -96,18 +98,28 @@ export function ChatProposeNextStepCard({
     // had a Clerk session already). Skip the form; the claim hook on the
     // shell will fire and bounce them to checkout.
     return (
-      <div className='mt-2 rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 py-3'>
-        <p className='text-[14px] leading-6 text-white/82'>
-          {`you're already signed in. one sec — linking this conversation to your account…`}
+      <div className='rounded-xl border border-subtle bg-surface-1 px-4 py-3'>
+        <p className='text-[15px] leading-7 text-primary-token'>
+          {`You're already signed in. Linking this conversation to your account…`}
+        </p>
+      </div>
+    );
+  }
+
+  if (!canRenderClerkUi) {
+    return (
+      <div className='rounded-xl border border-subtle bg-surface-1 px-4 py-3'>
+        <p className='text-[15px] leading-7 text-primary-token'>
+          {`You're in. Use the dev toolbar to continue as a local test user — I'll keep this conversation ready to link.`}
         </p>
       </div>
     );
   }
 
   return (
-    <div className='mt-2 rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 py-4'>
-      <p className='mb-3 text-[14px] leading-6 text-white/82'>
-        {`you're in. drop an email to keep going — I'll save this conversation to your account so we don't lose it.`}
+    <div className='rounded-xl border border-subtle bg-surface-1 px-4 py-4'>
+      <p className='mb-3 text-[15px] leading-7 text-primary-token'>
+        {`You're in. Add an email to keep going — I'll save this conversation to your account so we don't lose it.`}
       </p>
       <SignUp
         routing='hash'

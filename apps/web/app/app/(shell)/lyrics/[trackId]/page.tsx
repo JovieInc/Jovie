@@ -44,7 +44,7 @@ export default async function LyricsPage({ params }: Props) {
   }
 
   if (dashboardData.needsOnboarding) {
-    redirect(APP_ROUTES.ONBOARDING);
+    redirect(APP_ROUTES.START);
   }
 
   const selectedProfile = dashboardData.selectedProfile;

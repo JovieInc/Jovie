@@ -86,6 +86,11 @@ function userMessage(text: string) {
 
 describe('tryHandleAnonymousOnboardingChat', () => {
   beforeEach(() => {
+    vi.resetModules();
+    vi.doMock('@/lib/env-server', () => ({
+      env: { NODE_ENV: 'development' },
+      isSecureEnv: () => false,
+    }));
     vi.clearAllMocks();
     hoisted.checkGateForUserMock.mockResolvedValue(true);
     hoisted.checkAnonymousChatRateLimitMock.mockResolvedValue({
@@ -108,6 +113,11 @@ describe('tryHandleAnonymousOnboardingChat', () => {
   });
 
   it('returns 503 when the Statsig kill-switch is disabled', async () => {
+    vi.resetModules();
+    vi.doMock('@/lib/env-server', () => ({
+      env: { NODE_ENV: 'production' },
+      isSecureEnv: () => true,
+    }));
     hoisted.checkGateForUserMock.mockResolvedValue(false);
     const { tryHandleAnonymousOnboardingChat } = await import(
       '@/app/api/chat/onboarding-handler'

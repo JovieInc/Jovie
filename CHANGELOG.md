@@ -5,6 +5,116 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.246] - 2026-05-13
+
+> [internal] Hardened DashboardAudienceTable unit tests against CI shard timing (JOV-2138).
+
+### Fixed
+
+- **[internal] Flaky unit test shards 2/6, 3/6, 5/6 resolved**: `DashboardAudienceTable` tests used a synchronous ResizeObserver mock that triggered `setDesktopTableWidth` inside `useEffect`, but React 18 batches the resulting re-render asynchronously. Under forked-worker memory pressure in CI, the default 1 000 ms `waitFor` window closed before the re-render landed. Fixed by flushing React's scheduler with `await act(async () => {})` immediately after render, wrapping `fireDesktopTableResize` calls in `act()`, and extending `waitFor` timeout to 5 000 ms as a buffer. All 11 tests pass; three previously-failing shards now pass cleanly.
+
+## [26.4.245] - 2026-05-13
+
+> [internal] CI: Guardrails (proxy) job no longer requires pnpm install, unblocking dependabot PRs.
+
+### Fixed
+
+- **[internal] Guardrails (proxy) CI unblocked on dependabot PRs**: The `ci-guardrails` job was running the full `setup-node-pnpm` composite action (which calls `pnpm install --offline --frozen-lockfile`) before executing the proxy guard script. Dependabot PRs that bump `package.json` without regenerating `pnpm-lock.yaml` triggered `ERR_PNPM_OUTDATED_LOCKFILE`, failing the Guardrails job and cascading to `ci-fast` and PR Ready. Since `next-proxy-guard.mjs` only uses Node.js built-ins (`fs`, `path`), the job now runs `actions/setup-node` and invokes the script directly with `node`, eliminating the lockfile dependency and reducing job time from ~60s to ~8s.
+
+## [26.4.244] - 2026-05-12
+
+> [internal] Touring settings page button polish: Bandsintown pill height normalized to sm scale, Copy Link button uses pill shape.
+
+### Fixed
+
+- **[internal] Touring page button sizing**: Bandsintown connection pill now matches the sm button height (h-7) and icon scale (h-3.5 w-3.5). Copy Link button replaced with the shared Button component (variant secondary, size sm) giving it the correct rounded-full pill shape. No layout shifts.
+
+> Public marketing is tightened for YC: the homepage keeps the strong product story visible, hides broad navigation and feature-grid sprawl, and limits pricing to Free plus waitlisted Pro by default.
+
+### Changed
+
+- **YC homepage flow tightened**: The public homepage now keeps the hero, proof logos, Meet Jovie AI plan demo, Go live in 60 seconds, Workspace, Artist Profiles, Free/Pro pricing, FAQ, and final CTA visible while keeping Friday Rhythm and feature/spec-grid content hidden by default.
+- **Minimal marketing chrome by default**: Marketing headers render logo plus Sign in and Start Free Trial unless the shared center-nav flag is explicitly enabled. Marketing footers render only legal links unless the full-footer flag is explicitly enabled.
+- **Free + Pro pricing defaults**: Marketing pricing cards and pricing-page JSON-LD now use the visible plan set, defaulting to Free and waitlisted Pro. Pricing copy follows the visible paid plan set so future plan exposure does not leave Pro-only copy around Team or Enterprise cards.
+
+### Fixed
+
+- **AI demo layout stability**: The homepage AI composer reserves enough space across states so the typing animation does not shift the surrounding section.
+- **Mobile center-nav fallback**: If center navigation is re-enabled, the glass header hides inline mobile auth actions when the hamburger nav is active, avoiding duplicate auth controls and header crowding.
+
+## [26.4.243] - 2026-05-12
+
+> [internal] Ops admin deployment rows are now actionable — each row shows a context menu to open the GitHub Actions run, navigate to the branch, or copy the deployment ID.
+
+### Changed
+
+- **[internal] Ops HUD deployment rows: context menu actions**: Both the compact history list and the current-run detail view on the Ops admin screen now include a three-dot actions menu on each deployment row. Available actions: Open GitHub run (links to the Actions workflow run), Open branch (links to the branch on GitHub), and Copy deployment ID (clipboard with toast confirmation). Clipboard errors surface a toast instead of silently failing.
+
+## [26.4.242] - 2026-05-12
+
+> [internal] Approval queue rows now show direct action links to open the related PR and Linear issue in a new tab.
+
+### Added
+
+- **[internal] Open PR and Open Linear links on approval queue rows**: Each run row in the AgentOS admin approval queue now surfaces inline action links when a PR URL or Linear issue URL is present. Links are host-allowlisted to `github.com` and `linear.app` only.
+- [internal] **Shell Releases controls parity** (JOV-1822): the design-v1 shell releases view mirrors production release controls with Spotify sync/manual-add gates, inline import/Apple Music/smart-link banners, release plan generation, delete confirmation, and smart-link row gating from plan entitlements.
+- [internal] **Shell Releases complexity split**: extracted artwork playback, smart-link gating, and list-content helpers so `ShellReleaseRow` and `ShellReleasesView` stay below SonarCloud cognitive-complexity limits while preserving parity behavior.
+
+### Fixed
+
+- **[internal] Tighten external URL allowlist in AgentOS admin surface**: `getSafeExternalHref` in both `WorkflowRunRow` and `ArtifactDrawer` now validates that URLs are `https`-only, credential-free, and from the expected provider domains, preventing open-redirect risk from artifact-injected URLs.
+
+## [26.4.241] - 2026-05-12
+
+> [internal] AgentOS board now shows real run IDs on cards, lets you click lane counts to filter by status, and displays actual issue/PR identifiers in the detail drawer.
+
+### Changed
+
+- [internal] **AgentOS board cards**: `sourceRunId` is now displayed next to the source label (e.g., `vercel-workflow wrun_agentos_health_001`), giving operators a direct reference to the upstream run without opening the drawer.
+- [internal] **AgentOS lane counts**: status count badges are now `<button>` elements with `aria-pressed`. Clicking a lane count highlights that lane and dims all others. Clicking again clears the filter. The panel subtitle updates to show the filtered count.
+- [internal] **ArtifactDrawer links**: Linear and PR links now display actual identifiers (`JOV-1971`, `#8282`) instead of generic `"Linear"` / `"Pull Request"` labels.
+
+## [26.4.240] - 2026-05-12
+
+> Pricing pages now use a single source of truth for plan names, prices, and CTAs. "Request Access" and "Waitlist" copy is removed; all plans link directly to signup with the plan pre-selected.
+
+### Added
+
+- **Pricing source of truth** (`constants/plans.ts`): new `CANONICAL_PLANS` export — the single source of truth for plan display names, monthly/yearly prices, CTA labels, and signup URLs. Prices derive from `PLAN_PRICES`; feature lists derive from the entitlement registry. Marketing pages and onboarding import from here instead of duplicating values.
+- **Fixture invariant tests** (`tests/unit/seed/seed-fixture-invariants.test.ts`): enforces that demo persona seed data contains no known placeholder titles, correctly credits collaborators (no Tim White identity collision in Calvin demo), and has consistent Spotify ID + artwork pairing. (JOV-2077, JOV-2078)
+- **Screenshot player timestamp invariants** (`tests/unit/product-screenshots/screenshot-player-timestamps.test.ts`): enforces unique `playerTimestamp` values across all marketing screenshot scenarios that show a visible audio player, and validates the timestamp format (`M:SS` / `MM:SS`). (JOV-2087)
+- **Pricing contract tests** (`tests/unit/pricing/pricing-source-of-truth.test.ts`): 16 tests enforcing plan IDs, prices, CTA copy (no banned phrases), and signup href `?plan=` params all flow from canonical sources.
+- `playerTimestamp` field on `ScreenshotScenario` type; Tim White profile mobile variants (listen, pay, live, subscribe) now declare unique timestamps.
+
+### Changed
+
+- **Pricing pages** (`/pricing`, `/launch/pricing`): removed "Request Access", "Waitlist", and "Paid plans open from the waitlist" copy. CTAs updated to "Claim your profile" (free) and "Start Free Trial" (Pro/Max). Availability changed to `InStock` in JSON-LD structured data.
+- `MarketingPricingPlans` component: removed `isMarketingPlanActive`/`getMarketingPlanCtaLabel`/`getMarketingPlanHref` helpers; CTA labels and hrefs now come directly from the data layer.
+- `data/marketingPricingPlans.ts`: replaced `team`/`enterprise` plans with `max`; replaced `activeCtaLabel`/`waitlistCtaLabel` with single `ctaLabel`/`ctaHref`; prices now reference `PLAN_PRICES`.
+
+## [26.4.239] - 2026-05-12
+
+> Artist profile cards no longer stretch too tall on large monitors, footer sections breathe a bit more, and the spec-wall animations on the homepage now stagger instead of firing all at once.
+
+### Changed
+
+- **Artist profile height cap**: at 1280px+ viewports the hero card no longer stretches past 640px (640px at xl, 680px at 2xl), keeping proportions tight on large monitors.
+- **Footer vertical padding**: all footer variants now use responsive vertical padding — the regular footer uses split pt/pb values (pt-12/pb-10 mobile, pt-16/pb-14 desktop, pt-20/pb-16 ultrawide) while the marketing footer and minimal variant use py-* clamp values — giving each footer section more breathing room.
+- **Homepage spec-wall animation stagger**: spec-wall cards now animate in with staggered delays (0ms, −600ms, −1200ms … −3675ms) so the pulse effect ripples across cards instead of triggering all at once.
+
+## [26.4.238] - 2026-05-12
+
+> [internal] Homepage content cleanup: removed the spec-wall section with internal sales language, dropped three text-only placeholder logos from the trust bar, and reordered sections so "Go live in 60 seconds" appears directly below the hero.
+
+### Removed
+
+- **[internal] Spec-wall section removed**: the "Answers for every launch objection" section used internal sales language ("objection") that read poorly to customers. Section and its unused icon imports removed from the homepage. (JOV-2073)
+- **[internal] Text-only logo placeholders removed**: Blanco y Negro, RecPlay, and disco:wax were rendered as plain `<span>` text rather than real SVG or image assets. Removed from the HomeTrustSection inline-strip; only logos with real assets remain (UMG, AWAL, The Orchard, Armada Music, Black Hole Recordings). (JOV-2075)
+
+### Changed
+
+- **[internal] Homepage section order updated**: sections reordered to "Go live in 60 seconds" → product statement (AI release plan) → workspace → artist profiles carousel, putting the immediate proof beat directly after the hero. (JOV-2076)
+
 ## [26.4.237] - 2026-05-12
 
 > [internal] Analytics settings toggle now shows a compact state label instead of a verbose disclosure card.
@@ -108,6 +218,9 @@
 - [internal] **Cookie banner smoke tests** (`cookies.spec.ts`): verifies the banner appears for EU visitors, the "Accept All" button is clickable with nonzero bounding box and dismisses the banner, and the "Customize" button opens the preferences modal with a "Save Preferences" action (JOV-2074).
 - [internal] **Chat page smoke tests** (`chat.spec.ts`): verifies authenticated chat loads without console errors, the composer accepts typed text, pressing bare T does not toggle the theme while the input is focused, and a slash command does not cause layout shift >50px (JOV-2074).
 - [internal] **7-viewport visual regression matrix** (`visual-regression.spec.ts`): extends screenshot coverage to 375, 768, 1024, 1280, 1440, 1728, and 2560px widths for the homepage, sign-up, and sign-in pages, with horizontal scroll guards and CTA-clip assertions at each breakpoint (JOV-2081).
+- [internal] Added `data-cta-sign-up="true"` to public homepage signup CTAs for stable Playwright targeting (JOV-2065).
+- [internal] Added auth E2E coverage for sign-in/sign-up page content and `/signup` modal CTA routing (JOV-2065).
+- [internal] Added homepage E2E coverage that verifies signup CTAs route to `/signup` and the trust logo bar renders visual logo elements (JOV-2065, JOV-2066).
 
 ## [26.4.228] - 2026-05-09
 
