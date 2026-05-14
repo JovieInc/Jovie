@@ -415,6 +415,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       <form
         onSubmit={handleFormSubmit}
         aria-label='Compose a message — type / for skills and references'
+        className='focus-within:outline-none'
       >
         <div className={dockClass}>
           {/* ROOT inline picker: rendered above the surface via absolute
@@ -464,6 +465,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
               'overflow-hidden border border-white/[0.07] shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_1px_0_rgba(0,0,0,0.18)]',
               isExpanded &&
                 'border-white/[0.10] shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_1px_0_rgba(0,0,0,0.22),0_12px_32px_-16px_rgba(0,0,0,0.45)]',
+              'outline-none focus-within:border-white/[0.16] focus-within:shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_0_0_3px_rgba(255,255,255,0.035)] focus-within:outline-none',
               isOverLimit && 'border-error',
               showEntitySurface && !isStacked ? 'flex' : 'flex flex-col'
             )}
@@ -838,7 +840,7 @@ function InputRow({
             // the suppress intentional for both mouse and keyboard paths since
             // the surface-level glow IS the keyboard focus indicator for this
             // compound widget.
-            'focus:outline-none focus-visible:outline-none',
+            'focus:outline-none focus-visible:outline-none focus-visible:ring-0',
             isPillMode
               ? 'overflow-hidden whitespace-nowrap py-[7px] px-1'
               : 'py-2 px-1',
@@ -849,8 +851,12 @@ function InputRow({
               ? {
                   height: isPillMode ? undefined : measuredHeight,
                   overflow: isAtMaxHeight ? 'auto' : 'hidden',
+                  boxShadow: 'none',
                 }
-              : { overflow: isAtMaxHeight ? 'auto' : 'hidden' }
+              : {
+                  overflow: isAtMaxHeight ? 'auto' : 'hidden',
+                  boxShadow: 'none',
+                }
           }
           onKeyDown={handleKeyDown}
           onPaste={onPaste}

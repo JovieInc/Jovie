@@ -32,6 +32,11 @@ interface ChatMessageProps {
   readonly profileId?: string;
   /** Skip entrance animation for messages loaded from persistence. */
   readonly skipEntrance?: boolean;
+  /**
+   * Render generic app tool cards/status rows. Callers with surface-specific
+   * tool cards can opt out and render their own tool UI beside the message.
+   */
+  readonly renderTools?: boolean;
 }
 
 export function ChatMessage({
@@ -43,6 +48,7 @@ export function ChatMessage({
   avatarUrl,
   profileId,
   skipEntrance,
+  renderTools = true,
 }: ChatMessageProps) {
   const isUser = role === 'user';
   const { copy, isSuccess } = useClipboard();
@@ -109,96 +115,79 @@ export function ChatMessage({
           )}
         </div>
       ) : (
-        <div className='flex max-w-[78%] flex-col'>
-          {/* Thinking indicator — bouncing dots inside the virtualizer */}
-          {isThinking && (
-            <div className='space-y-2'>
-              <div className='flex items-center gap-2 pl-0.5'>
-                <span
-                  data-testid='chat-loading-avatar'
-                  className='flex h-5.5 w-5.5 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token'
-                >
-                  <BrandLogo size={10} tone='auto' rounded={false} />
-                </span>
-                <span className='text-2xs font-semibold tracking-[-0.01em] text-secondary-token'>
-                  Jovie
-                </span>
-                <span className='text-2xs text-tertiary-token'>
-                  Writing reply…
-                </span>
-              </div>
+        <div className='grid w-full max-w-full grid-cols-[24px_minmax(0,1fr)] gap-3'>
+          <span
+            data-testid={isThinking ? 'chat-loading-avatar' : undefined}
+            className='mt-0.5 flex h-6 w-6 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token'
+          >
+            <BrandLogo size={11} tone='auto' rounded={false} />
+          </span>
+          <div className='min-w-0'>
+            {isThinking ? (
               <div
-                data-testid='chat-loading-bubble'
-                className='rounded-[18px] border border-subtle bg-surface-1 px-4 py-3.5 shadow-card'
+                data-testid='chat-loading-indicator'
+                className='flex min-h-7 items-center gap-2 text-[15px] leading-7 text-secondary-token'
+                role='status'
+                aria-live='polite'
               >
-                <div className='flex items-center gap-1.5'>
-                  <span className='flex items-center gap-1' aria-hidden='true'>
-                    <span className='h-1.5 w-1.5 rounded-full bg-tertiary-token animate-bounce [animation-delay:-0.3s] motion-reduce:animate-none' />
-                    <span className='h-1.5 w-1.5 rounded-full bg-tertiary-token animate-bounce [animation-delay:-0.15s] motion-reduce:animate-none' />
-                    <span className='h-1.5 w-1.5 rounded-full bg-tertiary-token animate-bounce motion-reduce:animate-none' />
-                  </span>
-                </div>
+                <span>Thinking</span>
+                <span className='flex items-center gap-1' aria-hidden='true'>
+                  <span className='h-1.5 w-1.5 animate-bounce rounded-full bg-tertiary-token [animation-delay:-0.3s] motion-reduce:animate-none' />
+                  <span className='h-1.5 w-1.5 animate-bounce rounded-full bg-tertiary-token [animation-delay:-0.15s] motion-reduce:animate-none' />
+                  <span className='h-1.5 w-1.5 animate-bounce rounded-full bg-tertiary-token motion-reduce:animate-none' />
+                </span>
+                <span className='sr-only'>Jovie is thinking</span>
               </div>
-              <span className='sr-only' aria-live='polite'>
-                Jovie is writing a reply
-              </span>
-            </div>
-          )}
+            ) : null}
 
-          {!isThinking && hasAssistantContent && (
-            <div className='space-y-1.5'>
-              <div className='flex items-center gap-2 pl-0.5'>
-                <span className='flex h-5.5 w-5.5 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token'>
-                  <BrandLogo size={10} tone='auto' rounded={false} />
-                </span>
-                <span className='text-2xs font-semibold tracking-[-0.01em] text-secondary-token'>
-                  Jovie
-                </span>
-                <span className='text-2xs text-tertiary-token'>
-                  {isStreaming ? 'Writing reply…' : 'Reply'}
-                </span>
-              </div>
-              {messageText ? (
-                <div
-                  data-testid='chat-message-reply-bubble'
-                  className='rounded-[18px] border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_70%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,var(--linear-surface))] px-4 py-3.5 text-primary-token shadow-none'
-                >
-                  <ChatMarkdown
-                    content={messageText}
-                    isStreaming={Boolean(isStreaming)}
+            {!isThinking && hasAssistantContent ? (
+              <div className='space-y-3'>
+                {messageText ? (
+                  <div
+                    data-testid='chat-message-reply'
+                    className='text-[15px] leading-7 text-primary-token tracking-[-0.008em] sm:text-[15.5px]'
+                  >
+                    <ChatMarkdown
+                      content={messageText}
+                      isStreaming={Boolean(isStreaming)}
+                    />
+                  </div>
+                ) : null}
+
+                {renderTools ? (
+                  <ToolPartsRenderer
+                    parts={parts}
+                    profileId={profileId}
+                    variant='chat'
+                    hasMessageText={Boolean(messageText)}
                   />
-                </div>
-              ) : null}
-            </div>
-          )}
+                ) : null}
+              </div>
+            ) : null}
 
-          <ToolPartsRenderer
-            parts={parts}
-            profileId={profileId}
-            variant='chat'
-            hasMessageText={Boolean(messageText)}
-          />
-
-          {!isStreaming && messageText && (
-            <div className='mt-1.5 flex items-center justify-end pr-0.5'>
-              <SimpleTooltip content={isSuccess ? 'Copied!' : 'Copy response'}>
-                <button
-                  type='button'
-                  onClick={() => copy(messageText)}
-                  className='inline-flex h-7 w-7 items-center justify-center rounded-full border border-transparent bg-transparent text-tertiary-token shadow-none transition-colors duration-150 hover:bg-surface-1 hover:text-secondary-token focus-visible:bg-surface-1 focus-visible:outline-none'
-                  aria-label={
-                    isSuccess ? 'Copied to clipboard' : 'Copy message'
-                  }
+            {!isThinking && !isStreaming && messageText ? (
+              <div className='mt-1.5 flex items-center justify-start'>
+                <SimpleTooltip
+                  content={isSuccess ? 'Copied!' : 'Copy response'}
                 >
-                  {isSuccess ? (
-                    <Check className='h-3.5 w-3.5' />
-                  ) : (
-                    <Copy className='h-3.5 w-3.5' />
-                  )}
-                </button>
-              </SimpleTooltip>
-            </div>
-          )}
+                  <button
+                    type='button'
+                    onClick={() => copy(messageText)}
+                    className='inline-flex h-7 w-7 items-center justify-center rounded-full border border-transparent bg-transparent text-tertiary-token shadow-none transition-colors duration-subtle hover:bg-surface-1 hover:text-secondary-token focus-visible:bg-surface-1 focus-visible:outline-none'
+                    aria-label={
+                      isSuccess ? 'Copied to clipboard' : 'Copy message'
+                    }
+                  >
+                    {isSuccess ? (
+                      <Check className='h-3.5 w-3.5' />
+                    ) : (
+                      <Copy className='h-3.5 w-3.5' />
+                    )}
+                  </button>
+                </SimpleTooltip>
+              </div>
+            ) : null}
+          </div>
         </div>
       )}
     </motion.div>

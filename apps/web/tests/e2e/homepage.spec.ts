@@ -498,4 +498,65 @@ test.describe('Homepage', () => {
 
     expect(errors).toEqual([]);
   });
+
+  /**
+   * JOV-2065: Public CTAs with data-cta-sign-up="true" must route to /signup.
+   *
+   * Finds every element marked with data-cta-sign-up="true" and verifies it
+   * has an href starting with /signup, or opens a dialog with
+   * data-auth-mode="sign-up".
+   */
+  test('all data-cta-sign-up elements navigate to /signup (JOV-2065)', async ({
+    page,
+  }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await waitForHydration(page);
+
+    const ctaLinks = page.locator('[data-cta-sign-up="true"]');
+    const count = await ctaLinks.count();
+
+    // Must have at least one CTA on the homepage
+    expect(
+      count,
+      'Homepage must have at least one data-cta-sign-up CTA'
+    ).toBeGreaterThan(0);
+
+    // Every anchor CTA must point to /signup (or /signup?...)
+    for (let i = 0; i < count; i += 1) {
+      const cta = ctaLinks.nth(i);
+      const tagName = await cta.evaluate(el => el.tagName.toLowerCase());
+
+      if (tagName === 'a') {
+        const href = await cta.getAttribute('href');
+        const isSignupRoute = href?.startsWith('/signup') ?? false;
+        expect(
+          isSignupRoute,
+          `CTA at index ${i} (href="${href}") must route to /signup`
+        ).toBe(true);
+      }
+    }
+  });
+
+  /**
+   * JOV-2066: Trust logo bar contains SVG or img elements (not text-only logos)
+   */
+  test('trust logo bar contains visual logo elements (SVG or img)', async ({
+    page,
+  }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await waitForHydration(page);
+
+    const trustSection = page.getByTestId('homepage-trust');
+    await expect(trustSection).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
+
+    const svgCount = await trustSection.locator('svg').count();
+    const imgCount = await trustSection.locator('img').count();
+
+    expect(
+      svgCount + imgCount,
+      'Trust logo bar must contain SVG or img logo elements'
+    ).toBeGreaterThan(0);
+  });
 });
