@@ -24,6 +24,23 @@ type LatestReleaseCardProps = {
   readonly enableDynamicEngagement?: boolean;
 };
 
+function isValidDate(d: Date | null): d is Date {
+  return d !== null && !Number.isNaN(d.getTime());
+}
+
+function formatReleaseType(type: string): string {
+  if (type === 'ep') return 'EP';
+  return type.charAt(0).toUpperCase() + type.slice(1);
+}
+
+function buildActionLabel(isFuture: boolean): string {
+  return isFuture ? 'Notify me' : 'Listen Now';
+}
+
+function buildActionIcon(isFuture: boolean): 'Bell' | 'Play' {
+  return isFuture ? 'Bell' : 'Play';
+}
+
 export function LatestReleaseCard({
   release,
   artistHandle,
@@ -37,24 +54,18 @@ export function LatestReleaseCard({
   const releaseDate = release.releaseDate
     ? new Date(release.releaseDate)
     : null;
-  // Re-evaluate at the release boundary so an ISR-cached page transitions
-  // from "Drops in"/"Notify me" to "Out Now"/"Listen Now" the moment the
-  // release drops.
   const now = useReleaseAwareNow(releaseDate);
-  const releaseYear =
-    releaseDate && !Number.isNaN(releaseDate.getTime())
-      ? releaseDate.getUTCFullYear()
-      : null;
-  const isFutureRelease =
-    releaseDate !== null &&
-    !Number.isNaN(releaseDate.getTime()) &&
-    releaseDate.getTime() > now.getTime();
-  const releaseTypeLabel =
-    release.releaseType === 'ep'
-      ? 'EP'
-      : release.releaseType.charAt(0).toUpperCase() +
-        release.releaseType.slice(1);
+  const validDate = isValidDate(releaseDate);
+  const releaseYear = validDate ? releaseDate.getUTCFullYear() : null;
+  const isFutureRelease = validDate && releaseDate.getTime() > now.getTime();
+  const releaseTypeLabel = formatReleaseType(release.releaseType);
   const showDrawer = isMobile && artist && dsps && dsps.length > 0;
+  const label = buildActionLabel(isFutureRelease);
+  const icon = buildActionIcon(isFutureRelease);
+
+  const action = showDrawer
+    ? { label, onClick: () => setDrawerOpen(true), icon }
+    : { label, href: `/${artistHandle}/${release.slug}`, icon };
 
   return (
     <>
@@ -73,19 +84,7 @@ export function LatestReleaseCard({
             : null
         }
         status={isFutureRelease ? null : { label: 'Out Now', tone: 'green' }}
-        action={
-          showDrawer
-            ? {
-                label: isFutureRelease ? 'Notify me' : 'Listen Now',
-                onClick: () => setDrawerOpen(true),
-                icon: isFutureRelease ? 'Bell' : 'Play',
-              }
-            : {
-                label: isFutureRelease ? 'Notify me' : 'Listen Now',
-                href: `/${artistHandle}/${release.slug}`,
-                icon: isFutureRelease ? 'Bell' : 'Play',
-              }
-        }
+        action={action}
         dataTestId='latest-release-card'
       />
       {showDrawer ? (

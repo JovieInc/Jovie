@@ -100,7 +100,7 @@ export async function DashboardShellContent({
   const sidebarDefaultOpen = sidebarCookie?.value !== 'false';
 
   const shellContents = (
-    <div className='animate-shell-in h-full'>
+    <div className='h-full'>
       {/* ENG-004: Show environment issues to admins in non-production */}
       <OperatorBanner isAdmin={dashboardData.isAdmin} />
       <ImpersonationBannerWrapper />

@@ -4,6 +4,7 @@ import {
   hasClerkOriginMismatchSignal,
   isClerkHandshakeUrl,
   isClerkOriginMismatchMessage,
+  resolveBypassSessionUrls,
 } from './clerk-auth';
 
 describe('clerk-auth helpers', () => {
@@ -50,9 +51,20 @@ describe('clerk-auth helpers', () => {
     ).toBe(false);
   });
 
-  it('only allows creator persona fallback for bypass auth', () => {
+  it('allows explicit user fallback for any bypass persona', () => {
     expect(canFallbackToBypassUserId('creator')).toBe(true);
-    expect(canFallbackToBypassUserId('admin')).toBe(false);
+    expect(canFallbackToBypassUserId('creator-ready')).toBe(true);
+    expect(canFallbackToBypassUserId('admin')).toBe(true);
     expect(canFallbackToBypassUserId(null)).toBe(false);
+  });
+
+  it('resolves localhost bypass session urls with an IPv4 fallback', () => {
+    expect(resolveBypassSessionUrls('http://localhost:3100')).toEqual([
+      'http://localhost:3100/api/dev/test-auth/session',
+      'http://127.0.0.1:3100/api/dev/test-auth/session',
+    ]);
+    expect(resolveBypassSessionUrls('http://127.0.0.1:3100')).toEqual([
+      'http://127.0.0.1:3100/api/dev/test-auth/session',
+    ]);
   });
 });

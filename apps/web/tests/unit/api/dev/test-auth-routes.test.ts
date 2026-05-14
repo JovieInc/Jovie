@@ -6,6 +6,7 @@ const {
   mockEnsureDevTestAuthActor,
   mockGetCachedDevTestAuthSession,
   mockGetDevTestAuthAvailability,
+  mockIsTrustedTestBypassRequest,
   mockParseDevTestAuthPersona,
   mockRevalidatePath,
   mockSanitizeDevTestAuthRedirectPath,
@@ -14,6 +15,7 @@ const {
   mockEnsureDevTestAuthActor: vi.fn(),
   mockGetCachedDevTestAuthSession: vi.fn(),
   mockGetDevTestAuthAvailability: vi.fn(),
+  mockIsTrustedTestBypassRequest: vi.fn(),
   mockParseDevTestAuthPersona: vi.fn(),
   mockRevalidatePath: vi.fn(),
   mockSanitizeDevTestAuthRedirectPath: vi.fn(),
@@ -33,6 +35,10 @@ vi.mock('@/lib/auth/dev-test-auth.server', () => ({
   sanitizeDevTestAuthRedirectPath: mockSanitizeDevTestAuthRedirectPath,
 }));
 
+vi.mock('@/lib/auth/test-mode', () => ({
+  isTrustedTestBypassRequest: mockIsTrustedTestBypassRequest,
+}));
+
 vi.mock('next/cache', () => ({
   revalidatePath: mockRevalidatePath,
 }));
@@ -47,6 +53,7 @@ describe('dev test-auth routes', () => {
       trustedHost: true,
       reason: null,
     });
+    mockIsTrustedTestBypassRequest.mockReturnValue(false);
     mockParseDevTestAuthPersona.mockImplementation(value =>
       value === 'admin' || value === 'creator' || value === 'creator-ready'
         ? value
@@ -170,6 +177,100 @@ describe('dev test-auth routes', () => {
     expect(response.headers.get('set-cookie')).toContain('__e2e_test_mode');
     expect(response.headers.get('set-cookie')).toContain('__e2e_test_user_id');
     expect(response.headers.get('set-cookie')).toContain('__e2e_test_persona');
+  });
+
+  it('accepts POST /session when the URL host is the server bind address but the request host is loopback', async () => {
+    mockGetDevTestAuthAvailability.mockReturnValueOnce({
+      enabled: true,
+      trustedHost: false,
+      reason: 'Only available on loopback and private dev hosts',
+    });
+    mockIsTrustedTestBypassRequest.mockReturnValueOnce(true);
+    mockEnsureDevTestAuthActor.mockResolvedValueOnce({
+      persona: 'creator-ready',
+      clerkUserId: 'user_creator_ready',
+      email: 'browse-ready+clerk_test@jov.ie',
+      username: 'browse-ready-user',
+      fullName: 'Browse Ready User',
+      isAdmin: false,
+      profilePath: '/browse-ready-user',
+    });
+
+    const { POST } = await import('@/app/api/dev/test-auth/session/route');
+    const response = await POST(
+      new NextRequest('http://0.0.0.0:3100/api/dev/test-auth/session', {
+        method: 'POST',
+        body: JSON.stringify({ persona: 'creator-ready' }),
+        headers: {
+          'Content-Type': 'application/json',
+          Host: '127.0.0.1:3100',
+        },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      success: true,
+      persona: 'creator-ready',
+      userId: 'user_creator_ready',
+      email: 'browse-ready+clerk_test@jov.ie',
+      profilePath: '/browse-ready-user',
+    });
+    expect(mockIsTrustedTestBypassRequest).toHaveBeenCalled();
+  });
+
+  it('accepts GET /session when the URL host is the server bind address but the request host is loopback', async () => {
+    mockGetDevTestAuthAvailability.mockReturnValueOnce({
+      enabled: true,
+      trustedHost: false,
+      reason: 'Only available on loopback and private dev hosts',
+    });
+    mockIsTrustedTestBypassRequest.mockReturnValueOnce(true);
+
+    const { GET } = await import('@/app/api/dev/test-auth/session/route');
+    const response = await GET(
+      new NextRequest('http://0.0.0.0:3100/api/dev/test-auth/session', {
+        headers: {
+          Host: '127.0.0.1:3100',
+        },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      enabled: true,
+      trustedHost: true,
+      active: false,
+      persona: null,
+      userId: null,
+      email: null,
+      profilePath: null,
+      reason: null,
+    });
+    expect(mockIsTrustedTestBypassRequest).toHaveBeenCalled();
+  });
+
+  it('accepts DELETE /session when the URL host is the server bind address but the request host is loopback', async () => {
+    mockGetDevTestAuthAvailability.mockReturnValueOnce({
+      enabled: true,
+      trustedHost: false,
+      reason: 'Only available on loopback and private dev hosts',
+    });
+    mockIsTrustedTestBypassRequest.mockReturnValueOnce(true);
+
+    const { DELETE } = await import('@/app/api/dev/test-auth/session/route');
+    const response = await DELETE(
+      new NextRequest('http://0.0.0.0:3100/api/dev/test-auth/session', {
+        method: 'DELETE',
+        headers: {
+          Host: '127.0.0.1:3100',
+        },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('set-cookie')).toContain('__e2e_test_persona=');
+    expect(mockIsTrustedTestBypassRequest).toHaveBeenCalled();
   });
 
   it('accepts creator-ready on POST /session', async () => {

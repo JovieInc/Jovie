@@ -642,6 +642,28 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       return NextResponse.redirect(targetUrl, 308);
     }
 
+    // `/start` is the canonical onboarding front door. Redirect legacy
+    // `/onboarding` before React renders so users never see the old shell or a
+    // streamed meta-refresh fallback. `/onboarding/checkout` remains unchanged.
+    if (isNavigationMethod && pathname === APP_ROUTES.ONBOARDING) {
+      const targetUrl = req.nextUrl.clone();
+      targetUrl.pathname = APP_ROUTES.START;
+      return NextResponse.redirect(targetUrl, 308);
+    }
+
+    // Authenticated legacy earnings deep links should land directly on the
+    // canonical artist profile pay section. Keeping this in proxy avoids an
+    // app-shell render/streamed redirect for smoke tests and real users.
+    if (
+      isNavigationMethod &&
+      userId &&
+      pathname === APP_ROUTES.DASHBOARD_EARNINGS
+    ) {
+      return NextResponse.redirect(
+        new URL(`${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn#pay`, req.url)
+      );
+    }
+
     // ========================================================================
     // Audience block check for public profile routes
     //
@@ -688,6 +710,12 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         const url = req.nextUrl.clone();
         url.pathname = '/signup';
         return NextResponse.redirect(url);
+      }
+
+      // Anonymous waitlist visitors now start in chat onboarding. Keep this in
+      // middleware so local/dev auth outages do not expose a 503 or legacy view.
+      if (isNavigationMethod && pathname === APP_ROUTES.WAITLIST) {
+        return NextResponse.redirect(new URL(APP_ROUTES.START, req.url));
       }
 
       // Check if path requires authentication
@@ -1337,6 +1365,11 @@ export default async function middleware(
   }
 
   const pathInfo = categorizePath(pathname);
+  const isNavigationMethod = req.method === 'GET' || req.method === 'HEAD';
+  const canProceedWithoutClerk =
+    pathInfo.isAuthPath ||
+    (!pathInfo.isProtectedPath && !isClerkRequiredPath(pathname, pathInfo)) ||
+    (isNavigationMethod && pathname === APP_ROUTES.WAITLIST);
 
   // Check if Clerk config is missing or mocked (staging-aware)
   const clerkConfigMissing = isMockOrMissingClerkConfig(hostname);
@@ -1354,10 +1387,7 @@ export default async function middleware(
     // Authenticated API routes (e.g. /api/chat) must NOT fall through here —
     // their route handlers call auth() and would throw "Clerk can't detect
     // usage of clerkMiddleware()" (JOV-1795) if Clerk context wasn't set up.
-    if (
-      pathInfo.isAuthPath ||
-      (!pathInfo.isProtectedPath && !isClerkRequiredPath(pathname, pathInfo))
-    ) {
+    if (canProceedWithoutClerk) {
       return handleRequest(req, null);
     }
 
@@ -1417,10 +1447,7 @@ export default async function middleware(
     : clerkProductionMiddleware;
 
   if (!selectedMiddleware) {
-    if (
-      pathInfo.isAuthPath ||
-      (!pathInfo.isProtectedPath && !isClerkRequiredPath(pathname, pathInfo))
-    ) {
+    if (canProceedWithoutClerk) {
       return handleRequest(req, null);
     }
 
@@ -1455,10 +1482,7 @@ export default async function middleware(
       // /app) must not silently fall back to null userId — that causes a redirect
       // loop where the user completes Google OAuth but lands back at
       // /signin?redirect_url=%2Fonboarding instead of /onboarding (JOV-1902).
-      if (
-        pathInfo.isAuthPath ||
-        (!pathInfo.isProtectedPath && !isClerkRequiredPath(pathname, pathInfo))
-      ) {
+      if (canProceedWithoutClerk) {
         return handleRequest(req, null);
       }
       return new NextResponse(
