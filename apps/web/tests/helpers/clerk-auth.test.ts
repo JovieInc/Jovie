@@ -51,9 +51,10 @@ describe('clerk-auth helpers', () => {
     ).toBe(false);
   });
 
-  it('only allows creator persona fallback for bypass auth', () => {
+  it('allows explicit user fallback for any bypass persona', () => {
     expect(canFallbackToBypassUserId('creator')).toBe(true);
-    expect(canFallbackToBypassUserId('admin')).toBe(false);
+    expect(canFallbackToBypassUserId('creator-ready')).toBe(true);
+    expect(canFallbackToBypassUserId('admin')).toBe(true);
     expect(canFallbackToBypassUserId(null)).toBe(false);
   });
 
