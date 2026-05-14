@@ -1952,7 +1952,7 @@ export function TasksPageClient() {
   return (
     <>
       <PageShell
-        className='overflow-hidden'
+        className='absolute inset-0 overflow-hidden'
         data-testid='tasks-workspace'
         data-design-v1-tasks={designV1TasksEnabled ? 'true' : undefined}
         toolbar={

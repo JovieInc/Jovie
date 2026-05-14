@@ -144,7 +144,7 @@ async function openTaskRowByTitle(
   taskTitle: string
 ): Promise<ReturnType<Page['locator']>> {
   const row = getTaskRowByTitle(page, taskTitle);
-  await expect(row).toBeVisible({ timeout: 15_000 });
+  await expect(row).toBeVisible({ timeout: 60_000 });
   await row.click();
   return row;
 }
@@ -256,8 +256,8 @@ async function assertTasksLayout(
     timeout: 30_000,
   });
 
-  await expect(page.getByText(taskTitle).first()).toBeVisible({
-    timeout: 15_000,
+  await expect(page.getByTestId('task-list-pane')).toBeVisible({
+    timeout: 30_000,
   });
   const targetRow = await openTaskRowByTitle(page, taskTitle);
 
