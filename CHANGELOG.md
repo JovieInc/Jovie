@@ -182,6 +182,9 @@
 - [internal] **Cookie banner smoke tests** (`cookies.spec.ts`): verifies the banner appears for EU visitors, the "Accept All" button is clickable with nonzero bounding box and dismisses the banner, and the "Customize" button opens the preferences modal with a "Save Preferences" action (JOV-2074).
 - [internal] **Chat page smoke tests** (`chat.spec.ts`): verifies authenticated chat loads without console errors, the composer accepts typed text, pressing bare T does not toggle the theme while the input is focused, and a slash command does not cause layout shift >50px (JOV-2074).
 - [internal] **7-viewport visual regression matrix** (`visual-regression.spec.ts`): extends screenshot coverage to 375, 768, 1024, 1280, 1440, 1728, and 2560px widths for the homepage, sign-up, and sign-in pages, with horizontal scroll guards and CTA-clip assertions at each breakpoint (JOV-2081).
+- [internal] Added `data-cta-sign-up="true"` to public homepage signup CTAs for stable Playwright targeting (JOV-2065).
+- [internal] Added auth E2E coverage for sign-in/sign-up page content and `/signup` modal CTA routing (JOV-2065).
+- [internal] Added homepage E2E coverage that verifies signup CTAs route to `/signup` and the trust logo bar renders visual logo elements (JOV-2065, JOV-2066).
 
 ## [26.4.228] - 2026-05-09
 
