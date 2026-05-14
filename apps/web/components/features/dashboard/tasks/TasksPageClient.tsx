@@ -1383,9 +1383,8 @@ export function TasksPageClient() {
     setAssigneeFilter('all');
     setMobileScope('all');
   }, []);
-  const showTaskWorkbenchEmptyState = isBoardMode
-    ? !isActiveBoardLoading && visibleBoardTaskCount === 0
-    : !isActiveListLoading && tasks.length === 0;
+  const showTaskWorkbenchEmptyState =
+    !isBoardMode && !isActiveListLoading && tasks.length === 0;
   const selectedTaskIndex = effectiveSelectedTaskId
     ? visibleTasks.findIndex(task => task.id === effectiveSelectedTaskId)
     : -1;
