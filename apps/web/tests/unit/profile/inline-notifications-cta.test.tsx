@@ -288,4 +288,128 @@ describe('ProfileInlineNotificationsCTA flow', () => {
 
     expect(container).toBeEmptyDOMElement();
   });
+
+  // JOV-1986: alert mode consistency across all three entry points.
+  // The preference labels in ProfileMobileNotificationsFlow map as:
+  //   newMusic → 'New Music', tourDates → 'Shows', merch → 'Merch'
+  describe('alert mode consistency (JOV-1986)', () => {
+    it('initializes alertPrefs from server contentPreferences when already subscribed (overlay entry)', async () => {
+      // Subscriber has tourDates disabled on the server (rendered as 'Shows' label)
+      mockUseProfileNotifications.mockReturnValue(
+        buildProfileNotifications({
+          contentPreferences: {
+            newMusic: true,
+            tourDates: false,
+            merch: true,
+            general: true,
+          },
+        })
+      );
+      mockUseSubscriptionForm.mockReturnValue(
+        buildFormState({
+          notificationsState: 'success',
+          subscribedChannels: { email: true },
+        })
+      );
+
+      render(<ProfileInlineNotificationsCTA artist={makeArtist()} />);
+
+      fireEvent.click(screen.getByRole('button', { name: /manage alerts/i }));
+
+      // Preferences step must show the saved server value, not the all-true default
+      await waitFor(() => {
+        expect(screen.getByRole('switch', { name: 'Shows' })).not.toBeChecked();
+      });
+      // Other preferences remain as saved
+      expect(screen.getByRole('switch', { name: 'New Music' })).toBeChecked();
+    });
+
+    it('seeds alertPrefs from context at mount when already subscribed (inline entry)', async () => {
+      // Subscriber has merch disabled on the server
+      mockUseProfileNotifications.mockReturnValue(
+        buildProfileNotifications({
+          contentPreferences: {
+            newMusic: true,
+            tourDates: true,
+            merch: false,
+            general: true,
+          },
+        })
+      );
+      mockUseSubscriptionForm.mockReturnValue(
+        buildFormState({
+          notificationsState: 'success',
+          subscribedChannels: { email: true },
+        })
+      );
+
+      render(
+        <ProfileInlineNotificationsCTA
+          artist={makeArtist()}
+          presentation='inline'
+        />
+      );
+
+      // Inline flows go directly to preferences for subscribed users
+      await waitFor(() => {
+        expect(screen.getByRole('switch', { name: 'Merch' })).not.toBeChecked();
+      });
+      expect(screen.getByRole('switch', { name: 'New Music' })).toBeChecked();
+    });
+
+    it('syncs alertPrefs from server when hydration resolves to subscribed mid-flow (subscribe-drawer entry)', async () => {
+      // Start as unsubscribed (hydration pending)
+      mockUseProfileNotifications.mockReturnValue(
+        buildProfileNotifications({
+          contentPreferences: {
+            newMusic: true,
+            tourDates: false,
+            merch: true,
+            general: true,
+          },
+        })
+      );
+      mockUseSubscriptionForm.mockReturnValue(
+        buildFormState({
+          notificationsState: 'idle',
+          subscribedChannels: {},
+        })
+      );
+
+      const { rerender } = render(
+        <ProfileInlineNotificationsCTA
+          artist={makeArtist()}
+          presentation='inline'
+          autoOpen
+        />
+      );
+
+      // Initially shows email step for unsubscribed user
+      await waitFor(() => {
+        expect(screen.getByTestId('mobile-email-input')).toBeInTheDocument();
+      });
+
+      // Hydration completes: user is now subscribed
+      mockUseSubscriptionForm.mockReturnValue(
+        buildFormState({
+          notificationsState: 'success',
+          subscribedChannels: { email: true },
+        })
+      );
+
+      rerender(
+        <ProfileInlineNotificationsCTA
+          artist={makeArtist()}
+          presentation='inline'
+          autoOpen
+        />
+      );
+
+      // Must transition to preferences with saved server prefs (tourDates/Shows = off)
+      await waitFor(() => {
+        expect(screen.getByRole('switch', { name: 'Shows' })).not.toBeChecked();
+      });
+      expect(screen.getByRole('switch', { name: 'New Music' })).toBeChecked();
+    });
+  });
 });
