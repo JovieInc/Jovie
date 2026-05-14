@@ -61,11 +61,6 @@ export const PROFILE_PRIMARY_TAB_KEYS = [
 
 export type ProfilePrimaryTab = (typeof PROFILE_PRIMARY_TAB_KEYS)[number];
 
-export interface ProfileRailCard {
-  readonly id: string;
-  readonly kind: 'release' | 'tour' | 'alerts' | 'playlist' | 'listen';
-}
-
 export type ProfileShowcaseStateId =
   | 'mock-home'
   | 'streams-latest'

@@ -10,6 +10,7 @@ import {
   ArrowLeft,
   ChevronDown,
   Copy,
+  PanelLeftClose,
   RefreshCw,
   SquarePen,
 } from 'lucide-react';
@@ -28,6 +29,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from '@/components/organisms/Sidebar';
 import { UserButton } from '@/components/organisms/user-button';
 import { InstallBanner } from '@/components/shell/InstallBanner';
@@ -46,6 +48,7 @@ import { SidebarInstallBanner } from '@/features/feedback/SidebarInstallBanner';
 import { SidebarUpgradeBanner } from '@/features/feedback/SidebarUpgradeBanner';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import { useProfileData } from '@/hooks/useProfileData';
+import { SIDEBAR_KEYBOARD_SHORTCUT_BARE } from '@/hooks/useSidebarKeyboardShortcut';
 import { env } from '@/lib/env-client';
 import { useAppFlag } from '@/lib/flags/client';
 import {
@@ -205,6 +208,35 @@ function SettingsNavigation({
   );
 }
 
+/**
+ * Visible dock/pin affordance for the New Design sidebar. Opens/closes the
+ * sidebar in a way users can discover without keyboard knowledge; the same
+ * state is persisted by the existing sidebar:state cookie via the SidebarContext.
+ */
+function SidebarDockButton() {
+  const { toggleSidebar } = useSidebar();
+  return (
+    <Tooltip
+      label='Collapse sidebar'
+      side='bottom'
+      shortcut={{
+        keys: SIDEBAR_KEYBOARD_SHORTCUT_BARE,
+        description: 'Toggle sidebar',
+      }}
+      className='ml-auto group-data-[collapsible=icon]:hidden'
+    >
+      <button
+        type='button'
+        aria-label='Collapse sidebar'
+        onClick={toggleSidebar}
+        className='flex size-7 shrink-0 items-center justify-center rounded-[10px] bg-transparent text-sidebar-item-icon transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/60 hover:text-sidebar-item-foreground focus-visible:outline-none focus-visible:bg-sidebar-accent/60 focus-visible:text-sidebar-item-foreground'
+      >
+        <PanelLeftClose className='size-3' />
+      </button>
+    </Tooltip>
+  );
+}
+
 /** Workspace button (logo + name) or back button for settings */
 function SidebarHeaderNav({
   isInSettings,
@@ -318,13 +350,12 @@ function SidebarHeaderNav({
       {!isInSettings &&
         isDashboardOrAdmin &&
         (shellChatV1Enabled ? (
-          <Tooltip
-            label='New thread'
-            side='bottom'
-            className='ml-auto group-data-[collapsible=icon]:hidden'
-          >
-            {newThreadLink}
-          </Tooltip>
+          <div className='ml-auto flex items-center gap-0.5 group-data-[collapsible=icon]:hidden'>
+            <Tooltip label='New thread' side='bottom'>
+              {newThreadLink}
+            </Tooltip>
+            <SidebarDockButton />
+          </div>
         ) : (
           newThreadLink
         ))}

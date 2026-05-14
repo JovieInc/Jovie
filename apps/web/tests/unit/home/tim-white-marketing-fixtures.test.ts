@@ -27,6 +27,14 @@ describe('Tim White marketing fixtures', () => {
     }
   });
 
+  it('does not expose the deleted Tim White draft release in profile preview fixtures', () => {
+    for (const path of FIXTURE_PATHS) {
+      const source = readFixture(path);
+      expect(source).not.toContain("Don't Look Down");
+      expect(source).not.toContain('dont-look-down');
+    }
+  });
+
   it('uses /tim for visible marketing shortlinks instead of /timwhite', () => {
     const sandboxSource = readFixture(
       'components/features/home/HomeSandboxCard.tsx'

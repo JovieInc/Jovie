@@ -14,6 +14,16 @@ These are local Codex automations for agent workflow hygiene. They are not produ
 
 Before adding another Codex workspace automation, inspect existing Codex automations and repo schedules. Combine with this retro only when the job is about converting review feedback into durable agent hardening; keep product or production scheduling in the Vercel cron registry below.
 
+## GitHub Actions Schedule
+
+Scheduled workflows in `.github/workflows/`. Not Vercel crons — these run on GitHub-hosted runners.
+
+| Workflow | Schedule | Purpose | Source |
+|----------|----------|---------|--------|
+| `Nightly Tests` | `0 2 * * *` PT | Full unit + E2E suite, Knip dead-code audit. Alerts on failure. | `.github/workflows/nightly-tests.yml` |
+| `Test Coverage Audit` | `0 6 * * *` UTC | Regenerates [`docs/TEST_COVERAGE_HEATMAP.md`](TEST_COVERAGE_HEATMAP.md) from [`TEST_RISK_REGISTER.md`](TEST_RISK_REGISTER.md) + v8 coverage. Commits if changed. | `.github/workflows/test-coverage-audit.yml` |
+| `Neon Ephemeral Branch Cleanup` | (see workflow) | Reaps Neon branches created by per-PR ephemeral DB tests. | `.github/workflows/neon-ephemeral-branch-cleanup.yml` |
+
 ## Production Schedule
 
 Source of truth: `vercel.json` (repo root — Vercel reads this file; `apps/web/vercel.json` has been deleted per JOV-1901 / AUTOMATION_AUDIT.md)

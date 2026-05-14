@@ -600,13 +600,6 @@ describe('ProfileCompactTemplate', () => {
         artist={mockArtist}
         socialLinks={[]}
         contacts={[]}
-        latestRelease={{
-          title: "Don't Look Down",
-          slug: 'dont-look-down',
-          artworkUrl: 'https://example.com/release.jpg',
-          releaseDate: '2026-04-01T00:00:00.000Z',
-          releaseType: 'single',
-        }}
         tourDates={[
           {
             id: 'tour-1',

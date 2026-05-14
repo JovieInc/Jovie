@@ -196,6 +196,59 @@ export async function assertPublicSurfaceHealthy(
   }
 }
 
+/**
+ * JOV-2145: assert that the marketing-glass-header flyouts ("Features",
+ * "Resources" megamenus) start fully hidden on any surface that mounts
+ * MarketingHeader. The flyout's visibility is CSS-only — without the
+ * stylesheet, the DOM renders the menu content fully expanded as
+ * unstyled text. Existing health checks (status, text length, overflow,
+ * console errors, keyboard reach) all pass against that broken state,
+ * which is why CI missed the regression.
+ *
+ * No-op on surfaces that don't mount the marketing header. Asserts all
+ * three CSS props (visibility, opacity, pointer-events) so the assertion
+ * can't false-pass mid-transition (the flyout uses a 130ms ease).
+ */
+export async function assertMarketingHeaderFlyoutsHidden(
+  page: Page,
+  surface: ResolvedPublicSurfaceSpec
+) {
+  const headerCount = await page.locator('.marketing-glass-header').count();
+  if (headerCount === 0) {
+    return;
+  }
+
+  const flyouts = page.locator('.marketing-glass-header__flyout');
+  const flyoutCount = await flyouts.count();
+  if (flyoutCount === 0) {
+    return;
+  }
+
+  for (let i = 0; i < flyoutCount; i += 1) {
+    const computed = await flyouts.nth(i).evaluate(el => {
+      const style = getComputedStyle(el);
+      return {
+        visibility: style.visibility,
+        opacity: style.opacity,
+        pointerEvents: style.pointerEvents,
+      };
+    });
+
+    expect(
+      computed.visibility,
+      `${surface.id} flyout ${i} visibility (CSS missing? see JOV-2145)`
+    ).toBe('hidden');
+    expect(
+      Number.parseFloat(computed.opacity),
+      `${surface.id} flyout ${i} opacity`
+    ).toBe(0);
+    expect(
+      computed.pointerEvents,
+      `${surface.id} flyout ${i} pointer-events`
+    ).toBe('none');
+  }
+}
+
 async function visibleLocators(page: Page, selectors: readonly string[]) {
   const matches: Locator[] = [];
 

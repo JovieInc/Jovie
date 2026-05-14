@@ -26,7 +26,7 @@ vi.mock('@/lib/auth/gate', () => ({
 }));
 
 describe('WaitlistPage', () => {
-  test('server-side redirects onboarding-ready users to /onboarding', async () => {
+  test('server-side redirects onboarding-ready users to /start', async () => {
     mockResolveUserState.mockResolvedValue({
       state: 'NEEDS_ONBOARDING',
       context: { email: 'artist@example.com' },
@@ -35,6 +35,6 @@ describe('WaitlistPage', () => {
     const { default: WaitlistPage } = await import('../../app/waitlist/page');
 
     await expect(WaitlistPage()).rejects.toThrow('NEXT_REDIRECT');
-    expect(mockRedirect).toHaveBeenCalledWith('/onboarding');
+    expect(mockRedirect).toHaveBeenCalledWith('/start');
   });
 });

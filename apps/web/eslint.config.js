@@ -16,6 +16,7 @@ const noRawMotionValuesRule = require('./eslint-rules/no-raw-motion-values');
 const noDirectElectronBridgeRule = require('./eslint-rules/no-direct-electron-bridge');
 const noBannedMarketingCopyRule = require('./eslint-rules/no-banned-marketing-copy');
 const noRawFocusRingRule = require('./eslint-rules/no-raw-focus-ring');
+const noAdHocCurrencyRule = require('./eslint-rules/no-ad-hoc-currency');
 
 const [nextBase, nextTypescript, nextIgnores] = nextConfig;
 
@@ -40,6 +41,7 @@ const baseConfig = {
         'no-direct-electron-bridge': noDirectElectronBridgeRule,
         'no-banned-marketing-copy': noBannedMarketingCopyRule,
         'no-raw-focus-ring': noRawFocusRingRule,
+        'no-ad-hoc-currency': noAdHocCurrencyRule,
       },
     },
   },
@@ -192,6 +194,7 @@ const baseConfig = {
     // Design-system focus ring enforcement — interactive elements must use
     // canonical focus-ring-themed or focus-visible:* utilities
     '@jovie/no-raw-focus-ring': 'warn',
+    '@jovie/no-ad-hoc-currency': 'error',
   },
 };
 
@@ -385,6 +388,20 @@ module.exports = [
           ],
         },
       ],
+    },
+  },
+  // JOV-2168: Deferred no-ad-hoc-currency violations — each suppressed here pending
+  // migration to the canonical formatter (see linked issue for per-file rationale).
+  {
+    files: [
+      'lib/chat/system-prompt.ts',
+      'components/organisms/billing/PlanComparisonSection.tsx',
+      'components/molecules/PaySelector.tsx',
+      'app/investor-portal/_components/FundraiseProgress.tsx',
+      'app/onboarding/checkout/OnboardingCheckoutClient.tsx',
+    ],
+    rules: {
+      '@jovie/no-ad-hoc-currency': 'off',
     },
   },
 ];

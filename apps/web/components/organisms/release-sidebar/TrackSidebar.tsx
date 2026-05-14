@@ -309,6 +309,7 @@ export function TrackSidebar({
       hideMinimalHeaderBar={Boolean(track)}
       isEmpty={!track}
       emptyMessage='Select a track to view its details.'
+      entityHeaderSurface='flat'
       entityHeader={
         track ? (
           <div className='space-y-2.5'>
@@ -420,7 +421,7 @@ export function TrackSidebar({
                       onClick={handleTogglePlayback}
                       aria-label={isPlaying ? 'Pause preview' : 'Play preview'}
                       aria-pressed={isPlaying}
-                      className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token transition-[background-color,color,border-color] duration-150 hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+                      className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token transition-[background-color,color,border-color] duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
                     >
                       {isPlaying ? (
                         <Pause className='h-4 w-4' />

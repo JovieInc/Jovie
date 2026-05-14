@@ -337,7 +337,7 @@ async function handleMissingDbUser(
       clerkUserId,
       dbUserId: null,
       profileId: null,
-      redirectTo: '/onboarding?fresh_signup=true',
+      redirectTo: '/start?fresh_signup=true',
       context: { ...baseContext, email },
     };
   }

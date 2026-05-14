@@ -1,10 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import type {
-  ProfileRailCard,
-  ProfileRenderMode,
-} from '@/features/profile/contracts';
+import type { ProfileRenderMode } from '@/features/profile/contracts';
 import { ProfileMediaCard } from '@/features/profile/ProfileMediaCard';
 import {
   type ProfilePrimaryActionCardRelease,
@@ -14,13 +11,13 @@ import {
   startOfProfileSurfaceLocalDay as startOfLocalDay,
   toProfileSurfaceDateValue as toDateValue,
 } from '@/features/profile/profile-surface-state';
+import { useReleaseAwareNow } from '@/hooks/useReleaseAwareNow';
 import { useTourDateProximity } from '@/hooks/useTourDateProximity';
 import type { UserLocation } from '@/hooks/useUserLocation';
 import { useUserLocation } from '@/hooks/useUserLocation';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import { getProfileReleaseVisibility } from '@/lib/profile/release-visibility';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
-import { cn } from '@/lib/utils';
 import { isDefaultAvatarUrl } from '@/lib/utils/dsp-images';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
 import type { Artist } from '@/types/db';
@@ -41,15 +38,6 @@ interface ProfileHomeRailProps {
   readonly resolveNearbyTour?: boolean;
 }
 
-type FeaturedRailKind =
-  | 'release_countdown'
-  | 'release_live'
-  | 'tour_nearby'
-  | 'tour_next'
-  | 'playlist_fallback'
-  | 'listen_fallback'
-  | 'none';
-
 function getUpcomingTourDates(
   tourDates: readonly TourDateViewModel[],
   now = new Date()
@@ -68,63 +56,6 @@ function getUpcomingTourDates(
         (toDateValue(left.startDate)?.getTime() ?? 0) -
         (toDateValue(right.startDate)?.getTime() ?? 0)
     );
-}
-
-function getFeaturedRailCardKind(kind: FeaturedRailKind) {
-  switch (kind) {
-    case 'release_countdown':
-    case 'release_live':
-      return 'release';
-    case 'tour_nearby':
-    case 'tour_next':
-      return 'tour';
-    case 'playlist_fallback':
-      return 'playlist';
-    case 'listen_fallback':
-      return 'listen';
-    default:
-      return null;
-  }
-}
-
-export function buildProfileRailCards(params: {
-  latestReleaseVisible: boolean;
-  hasUpcomingTourDates: boolean;
-  hasPlaylistFallback: boolean;
-  hasListenFallback: boolean;
-  featuredKind: FeaturedRailKind;
-}): ProfileRailCard[] {
-  const cards: ProfileRailCard[] = [];
-  const usedKinds = new Set<ProfileRailCard['kind']>();
-
-  const pushCard = (kind: ProfileRailCard['kind']) => {
-    if (usedKinds.has(kind) || cards.length >= 3) {
-      return;
-    }
-
-    usedKinds.add(kind);
-    cards.push({ id: `profile-rail-${kind}`, kind });
-  };
-
-  const featuredRailKind = getFeaturedRailCardKind(params.featuredKind);
-  if (featuredRailKind) {
-    pushCard(featuredRailKind);
-  }
-
-  if (params.latestReleaseVisible) {
-    pushCard('release');
-  }
-  if (params.hasUpcomingTourDates) {
-    pushCard('tour');
-  }
-  if (params.hasPlaylistFallback) {
-    pushCard('playlist');
-  }
-  if (params.hasListenFallback) {
-    pushCard('listen');
-  }
-
-  return cards;
 }
 
 function formatMonthLabel(value: string | null | undefined) {
@@ -234,12 +165,12 @@ function LatestReleaseFeature({
       }
       priority
       dataTestId='profile-home-latest-card'
-      className='rounded-[18px] [&>div:first-child]:aspect-[3/1] [@media(max-height:880px)]:[&>div:last-child]:px-2.5 [@media(max-height:880px)]:[&>div:last-child]:py-2'
+      className='rounded-[18px] [@media(max-height:880px)]:[&>div:first-child]:min-h-[132px] [@media(max-height:880px)]:[&>div:last-child]:px-2.5 [@media(max-height:880px)]:[&>div:last-child]:py-2.5'
     />
   );
 }
 
-function TourUpNextCard({
+function TourFeatureCard({
   artist,
   tourDate,
   isNearYou,
@@ -263,7 +194,7 @@ function TourUpNextCard({
       imageAlt={`${artist.name} show`}
       fallbackVariant='avatar'
       accent={isNearYou ? 'blue' : 'orange'}
-      ratio='compact'
+      ratio='landscape'
       datePill={{
         month: formatMonthLabel(tourDate.startDate),
         day: formatDayLabel(tourDate.startDate),
@@ -283,13 +214,14 @@ function TourUpNextCard({
         showChevron: canBuyTickets,
         disabled: tourDate.ticketStatus === 'cancelled',
       }}
+      priority
       dataTestId='profile-home-rail-tour'
-      className='[@media(max-height:880px)]:[&>div:first-child]:aspect-[1.35/1] [@media(max-height:880px)]:[&>div:last-child]:p-1'
+      className='rounded-[18px] [@media(max-height:880px)]:[&>div:first-child]:min-h-[132px] [@media(max-height:880px)]:[&>div:last-child]:px-2.5 [@media(max-height:880px)]:[&>div:last-child]:py-2.5'
     />
   );
 }
 
-function PlaylistUpNextCard({
+function PlaylistFeatureCard({
   playlist,
 }: Readonly<{ playlist: ConfirmedFeaturedPlaylistFallback }>) {
   return (
@@ -301,7 +233,7 @@ function PlaylistUpNextCard({
       imageAlt={playlist.title}
       fallbackVariant='release'
       accent='green'
-      ratio='compact'
+      ratio='landscape'
       action={{
         label: 'Listen',
         ariaLabel: `Open ${playlist.title}`,
@@ -309,13 +241,14 @@ function PlaylistUpNextCard({
         icon: 'Play',
         showChevron: true,
       }}
+      priority
       dataTestId='profile-home-rail-playlist'
-      className='[@media(max-height:880px)]:[&>div:first-child]:aspect-[1.35/1] [@media(max-height:880px)]:[&>div:last-child]:p-1'
+      className='rounded-[18px] [@media(max-height:880px)]:[&>div:first-child]:min-h-[132px] [@media(max-height:880px)]:[&>div:last-child]:px-2.5 [@media(max-height:880px)]:[&>div:last-child]:py-2.5'
     />
   );
 }
 
-function ListenUpNextCard({
+function ListenFeatureCard({
   artist,
   onPlayClick,
 }: Readonly<{
@@ -331,7 +264,7 @@ function ListenUpNextCard({
       imageAlt={artist.name}
       fallbackVariant='avatar'
       accent='purple'
-      ratio='compact'
+      ratio='landscape'
       action={{
         label: 'Listen',
         ariaLabel: `Listen to ${artist.name}`,
@@ -339,8 +272,9 @@ function ListenUpNextCard({
         onClick: onPlayClick,
         icon: 'Play',
       }}
+      priority
       dataTestId='profile-home-rail-listen'
-      className='[@media(max-height:880px)]:[&>div:first-child]:aspect-[1.35/1] [@media(max-height:880px)]:[&>div:last-child]:p-1'
+      className='rounded-[18px] [@media(max-height:880px)]:[&>div:first-child]:min-h-[132px] [@media(max-height:880px)]:[&>div:last-child]:px-2.5 [@media(max-height:880px)]:[&>div:last-child]:py-2.5'
     />
   );
 }
@@ -357,13 +291,17 @@ export function ProfileHomeRail({
   viewerLocation,
   resolveNearbyTour = true,
 }: Readonly<ProfileHomeRailProps>) {
+  // Re-evaluate visibility at the release boundary so the rail's "Drops in"
+  // chrome transitions to "Out Now" when the release drops, even if the
+  // page was served from a stale ISR cache.
+  const now = useReleaseAwareNow(latestRelease?.releaseDate);
   const upcomingTourDates = useMemo(
-    () => getUpcomingTourDates(tourDates),
-    [tourDates]
+    () => getUpcomingTourDates(tourDates, now),
+    [now, tourDates]
   );
   const releaseVisibility = useMemo(
-    () => getProfileReleaseVisibility(latestRelease, profileSettings),
-    [latestRelease, profileSettings]
+    () => getProfileReleaseVisibility(latestRelease, profileSettings, now),
+    [latestRelease, now, profileSettings]
   );
   const shouldResolveGeo =
     resolveNearbyTour &&
@@ -388,6 +326,7 @@ export function ProfileHomeRail({
         nearbyTourDate,
         featuredPlaylistFallback,
         hasPlayableDestinations,
+        now,
       }),
     [
       artist.name,
@@ -396,134 +335,51 @@ export function ProfileHomeRail({
       latestRelease,
       nearbyTourDate,
       nextTourDate,
+      now,
       profileSettings,
     ]
   );
-  const cards = useMemo(
-    () =>
-      buildProfileRailCards({
-        latestReleaseVisible: Boolean(releaseVisibility?.show && latestRelease),
-        hasUpcomingTourDates: upcomingTourDates.length > 0,
-        hasPlaylistFallback: Boolean(featuredPlaylistFallback),
-        hasListenFallback: hasPlayableDestinations,
-        featuredKind: featuredState.kind,
-      }),
-    [
-      featuredPlaylistFallback,
-      featuredState.kind,
-      hasPlayableDestinations,
-      latestRelease,
-      releaseVisibility?.show,
-      upcomingTourDates.length,
-    ]
-  );
 
-  if (cards.length === 0) {
+  const isCountdown = featuredState.kind === 'release_countdown';
+  const showLatest = Boolean(releaseVisibility?.show && latestRelease);
+  const visibleTourDate = nearbyTourDate ?? nextTourDate;
+
+  let featureCard: React.ReactNode = null;
+  if (showLatest && latestRelease) {
+    featureCard = (
+      <LatestReleaseFeature
+        artist={artist}
+        latestRelease={latestRelease}
+        isCountdown={isCountdown}
+        onPlayClick={onPlayClick}
+        renderMode={renderMode}
+      />
+    );
+  } else if (
+    visibleTourDate &&
+    (featuredState.kind === 'tour_nearby' || featuredState.kind === 'tour_next')
+  ) {
+    featureCard = (
+      <TourFeatureCard
+        artist={artist}
+        tourDate={visibleTourDate}
+        isNearYou={Boolean(nearbyTourDate && resolveNearbyTour)}
+      />
+    );
+  } else if (
+    featuredState.kind === 'playlist_fallback' &&
+    featuredPlaylistFallback
+  ) {
+    featureCard = <PlaylistFeatureCard playlist={featuredPlaylistFallback} />;
+  } else if (featuredState.kind === 'listen_fallback') {
+    featureCard = (
+      <ListenFeatureCard artist={artist} onPlayClick={onPlayClick} />
+    );
+  }
+
+  if (!featureCard) {
     return null;
   }
 
-  const showLatest = Boolean(releaseVisibility?.show && latestRelease);
-  const upNextCards = cards.filter(
-    card => !(showLatest && card.kind === 'release')
-  );
-  const visibleTourDate = nearbyTourDate ?? nextTourDate;
-  const isCountdown = featuredState.kind === 'release_countdown';
-  const releaseEyebrow = isCountdown ? 'New Single' : 'New Release';
-  const releaseCountdown =
-    isCountdown && latestRelease?.releaseDate
-      ? { targetDate: latestRelease.releaseDate, label: 'Drops in' as const }
-      : null;
-  const releaseActionLabel = isCountdown ? 'Notify me' : 'Listen';
-  const releaseActionIcon = isCountdown ? 'Bell' : 'Play';
-
-  return (
-    <div
-      className='space-y-2 [@media(max-height:820px)]:space-y-1.5'
-      data-testid='profile-home-rail'
-    >
-      {showLatest && latestRelease ? (
-        <>
-          <p className='text-[11px] font-[680] uppercase tracking-[0.16em] text-white/72 [@media(max-height:760px)]:text-[9px]'>
-            Latest
-          </p>
-          <LatestReleaseFeature
-            artist={artist}
-            latestRelease={latestRelease}
-            isCountdown={isCountdown}
-            onPlayClick={onPlayClick}
-            renderMode={renderMode}
-          />
-          <div className='flex items-center justify-center gap-1.5 pt-0.5 [@media(max-height:820px)]:hidden'>
-            {[0, 1, 2, 3, 4].map(index => (
-              <span
-                key={`latest-dot-${index}`}
-                className={cn(
-                  'h-1.5 rounded-full',
-                  index === 0 ? 'w-4 bg-white/82' : 'w-1.5 bg-white/16'
-                )}
-              />
-            ))}
-          </div>
-        </>
-      ) : null}
-
-      {upNextCards.length > 0 ? (
-        <div className='space-y-2 pt-0.5 [@media(max-height:820px)]:space-y-1'>
-          <p className='text-[18px] font-[680] leading-none tracking-[-0.018em] text-white [@media(max-height:820px)]:text-[15px]'>
-            Up Next
-          </p>
-          <div className='-mx-4 flex snap-x snap-mandatory gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [@media(max-height:820px)]:gap-1.5 [&::-webkit-scrollbar]:hidden'>
-            {upNextCards.map(card => (
-              <div
-                key={card.id}
-                className='w-[108px] shrink-0 snap-start [@media(max-height:820px)]:w-[92px] [@media(max-height:760px)]:w-[88px]'
-                data-rail-card-index={card.id}
-              >
-                {card.kind === 'release' && latestRelease ? (
-                  <ProfileMediaCard
-                    eyebrow={releaseEyebrow}
-                    title={latestRelease.title}
-                    subtitle={getReleaseCardMeta(latestRelease)}
-                    imageUrl={resolveImageUrl(
-                      latestRelease.artworkUrl,
-                      'release'
-                    )}
-                    imageAlt={`${latestRelease.title} artwork`}
-                    fallbackVariant='release'
-                    accent='purple'
-                    ratio='compact'
-                    countdown={releaseCountdown}
-                    action={{
-                      label: releaseActionLabel,
-                      ariaLabel: `Open ${latestRelease.title}`,
-                      href: `/${artist.handle}/${latestRelease.slug}`,
-                      icon: releaseActionIcon,
-                    }}
-                    dataTestId='profile-home-rail-release'
-                    className='[@media(max-height:880px)]:[&>div:first-child]:aspect-[1.35/1] [@media(max-height:880px)]:[&>div:last-child]:p-1'
-                  />
-                ) : null}
-
-                {card.kind === 'tour' && visibleTourDate ? (
-                  <TourUpNextCard
-                    artist={artist}
-                    tourDate={visibleTourDate}
-                    isNearYou={Boolean(nearbyTourDate && resolveNearbyTour)}
-                  />
-                ) : null}
-
-                {card.kind === 'playlist' && featuredPlaylistFallback ? (
-                  <PlaylistUpNextCard playlist={featuredPlaylistFallback} />
-                ) : null}
-
-                {card.kind === 'listen' ? (
-                  <ListenUpNextCard artist={artist} onPlayClick={onPlayClick} />
-                ) : null}
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : null}
-    </div>
-  );
+  return <div data-testid='profile-home-rail'>{featureCard}</div>;
 }

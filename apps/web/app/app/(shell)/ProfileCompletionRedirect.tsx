@@ -35,13 +35,13 @@ export function ProfileCompletionRedirect() {
     }
 
     if (!selectedProfile) {
-      router.replace(APP_ROUTES.ONBOARDING);
+      router.replace(APP_ROUTES.START);
       return;
     }
 
     // Canonical completeness check (username, displayName, isPublic, onboarding).
     if (!isProfileComplete(selectedProfile)) {
-      router.replace(APP_ROUTES.ONBOARDING);
+      router.replace(APP_ROUTES.START);
     }
   }, [dashboardLoadError, isAdmin, router, selectedProfile]);
 

@@ -94,14 +94,14 @@ const ACTION_ICONS: Record<ProfileMediaCardIcon, LucideIcon> = {
 const RATIO_CLASS_NAMES: Record<ProfileMediaCardRatio, string> = {
   square: 'aspect-square',
   portrait: 'aspect-[4/5]',
-  landscape: 'aspect-[5/3]',
+  landscape: 'aspect-[5/3] min-h-[142px]',
   compact: 'aspect-[3/4]',
 };
 
 const CONTENT_CLASS_NAMES: Record<ProfileMediaCardRatio, string> = {
   square: 'p-4',
   portrait: 'p-4',
-  landscape: 'max-w-[63%] justify-end p-4',
+  landscape: 'max-w-[66%] justify-center px-4 py-5',
   compact: 'p-2',
 };
 
@@ -443,9 +443,9 @@ export function ProfileMediaCard({
         <div
           className={cn(
             'absolute inset-0 z-10 flex flex-col',
-            'justify-end',
             CONTENT_CLASS_NAMES[ratio]
           )}
+          data-testid={dataTestId ? `${dataTestId}-content` : undefined}
         >
           <div className={cn('space-y-1.5', compact && 'space-y-1')}>
             <p
@@ -465,9 +465,10 @@ export function ProfileMediaCard({
                 compact
                   ? 'line-clamp-2 text-[12px]'
                   : landscape
-                    ? 'text-[26px]'
+                    ? 'line-clamp-2 text-[clamp(20px,6.1vw,25px)] [@media(max-height:760px)]:text-[20px]'
                     : 'line-clamp-2 text-[26px]'
               )}
+              data-testid={dataTestId ? `${dataTestId}-title` : undefined}
             >
               {title}
             </h3>

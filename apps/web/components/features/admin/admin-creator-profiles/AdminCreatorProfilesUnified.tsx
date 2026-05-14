@@ -31,6 +31,7 @@ import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
 import { useAdminTableKeyboardNavigation } from '@/features/admin/table/useAdminTableKeyboardNavigation';
 import { useCreatorActions } from '@/features/admin/useCreatorActions';
 import { useCreatorVerification } from '@/features/admin/useCreatorVerification';
+import { EmailSignatureDialog } from '@/features/dashboard/molecules/EmailSignatureDialog';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import {
   CREATORS_CSV_FILENAME_PREFIX,
@@ -38,6 +39,7 @@ import {
 } from '@/lib/admin/csv-configs/creators';
 import type { AdminCreatorProfileRow } from '@/lib/admin/types';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
+import { buildSignatureInputFromProfile } from '@/lib/email-signature/profile-input';
 import { useAdminCreatorsInfiniteQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { AdminProfileSidebar } from './AdminProfileSidebar';
@@ -110,6 +112,34 @@ export function AdminCreatorProfilesUnified({
     clearDeleteProfile,
     clearInviteProfile,
   } = useDialogState();
+
+  const [signatureProfile, setSignatureProfile] =
+    useState<AdminCreatorProfileRow | null>(null);
+  const openEmailSignatureDialog = useCallback(
+    (profile: AdminCreatorProfileRow) => {
+      setSignatureProfile(profile);
+    },
+    []
+  );
+  const signatureInput = useMemo(
+    () =>
+      signatureProfile
+        ? buildSignatureInputFromProfile({
+            profile: {
+              username: signatureProfile.username,
+              displayName: signatureProfile.displayName,
+              avatarUrl: signatureProfile.avatarUrl,
+              genres: signatureProfile.genres,
+              location: signatureProfile.location,
+            },
+            socials: signatureProfile.socialLinks?.map(link => ({
+              label: link.displayText ?? link.platform,
+              url: link.url,
+            })),
+          })
+        : null,
+    [signatureProfile]
+  );
 
   // Load all data without server-side search — filter client-side instead
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
@@ -205,6 +235,7 @@ export function AdminCreatorProfilesUnified({
     toggleMarketing,
     openDeleteDialog,
     openInviteDialog,
+    openEmailSignatureDialog,
   });
 
   const {
@@ -556,6 +587,11 @@ export function AdminCreatorProfilesUnified({
         onSuccess={() => {
           clearInviteProfile();
         }}
+      />
+      <EmailSignatureDialog
+        open={signatureProfile !== null}
+        onClose={() => setSignatureProfile(null)}
+        input={signatureInput}
       />
     </>
   );

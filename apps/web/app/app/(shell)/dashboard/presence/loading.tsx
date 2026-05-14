@@ -7,6 +7,7 @@ export default function PresenceLoading() {
     <div
       className='flex h-full min-h-0 flex-col bg-[color-mix(in_oklab,var(--linear-bg-page)_72%,var(--linear-bg-surface-1))]'
       aria-busy='true'
+      data-testid='presence-loading-skeleton'
     >
       {/* Summary bar skeleton */}
       <div className='shrink-0 border-b border-(--linear-app-frame-seam) px-3 py-2.5 lg:px-4'>

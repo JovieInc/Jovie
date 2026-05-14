@@ -73,6 +73,56 @@ function buildEmptyBuckets(days: number): Map<string, DailyBucket> {
   return buckets;
 }
 
+function buildPrQuery(
+  owner: string,
+  repo: string,
+  cursor: string | null
+): string {
+  const afterClause = cursor ? `, after: "${cursor}"` : '';
+  return `query {
+    repository(owner: "${owner}", name: "${repo}") {
+      pullRequests(
+        states: [MERGED, CLOSED, OPEN]
+        first: 100
+        orderBy: { field: CREATED_AT, direction: DESC }
+        ${afterClause}
+      ) {
+        nodes { state merged createdAt mergedAt closedAt }
+        pageInfo { hasNextPage endCursor }
+      }
+    }
+  }`;
+}
+
+async function fetchGraphQLPage(
+  token: string,
+  query: string
+): Promise<GraphQLResponse> {
+  const response = await fetch('https://api.github.com/graphql', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      'User-Agent': 'Jovie-HUD/1.0',
+    },
+    body: JSON.stringify({ query }),
+    signal: AbortSignal.timeout(15000),
+  });
+
+  if (!response.ok) {
+    throw new Error(`GitHub GraphQL API error: ${response.status}`);
+  }
+
+  const payload = (await response.json()) as GraphQLResponse;
+  if (payload.errors?.length) {
+    throw new Error(
+      `GitHub GraphQL errors: ${payload.errors[0]?.message ?? 'unknown'}`
+    );
+  }
+
+  return payload;
+}
+
 async function fetchPullRequestsFromGitHub(
   token: string,
   owner: string,
@@ -81,79 +131,21 @@ async function fetchPullRequestsFromGitHub(
 ): Promise<GitHubPrNode[]> {
   const nodes: GitHubPrNode[] = [];
   let cursor: string | null = null;
-  let hasNextPage = true;
 
-  while (hasNextPage) {
-    const afterClause = cursor ? `, after: "${cursor}"` : '';
-    const query = `
-      query {
-        repository(owner: "${owner}", name: "${repo}") {
-          pullRequests(
-            states: [MERGED, CLOSED, OPEN]
-            first: 100
-            orderBy: { field: CREATED_AT, direction: DESC }
-            ${afterClause}
-          ) {
-            nodes {
-              state
-              merged
-              createdAt
-              mergedAt
-              closedAt
-            }
-            pageInfo {
-              hasNextPage
-              endCursor
-            }
-          }
-        }
-      }
-    `;
-
-    const response = await fetch('https://api.github.com/graphql', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'User-Agent': 'Jovie-HUD/1.0',
-      },
-      body: JSON.stringify({ query }),
-      signal: AbortSignal.timeout(15000),
-    });
-
-    if (!response.ok) {
-      throw new Error(`GitHub GraphQL API error: ${response.status}`);
-    }
-
-    const payload = (await response.json()) as GraphQLResponse;
-
-    if (payload.errors && payload.errors.length > 0) {
-      throw new Error(
-        `GitHub GraphQL errors: ${payload.errors[0]?.message ?? 'unknown'}`
-      );
-    }
+  for (;;) {
+    const query = buildPrQuery(owner, repo, cursor);
+    const payload = await fetchGraphQLPage(token, query);
 
     const prs = payload.data?.repository?.pullRequests;
-    if (!prs) {
-      break;
-    }
+    if (!prs) break;
 
-    // PRs are ordered newest-first; stop when we go past the since date
-    let reachedEnd = false;
     for (const node of prs.nodes) {
-      if (node.createdAt < sinceIso) {
-        reachedEnd = true;
-        break;
-      }
+      if (node.createdAt < sinceIso) return nodes;
       nodes.push(node);
     }
 
-    if (reachedEnd || !prs.pageInfo.hasNextPage) {
-      hasNextPage = false;
-    } else {
-      cursor = prs.pageInfo.endCursor;
-      hasNextPage = true;
-    }
+    if (!prs.pageInfo.hasNextPage) break;
+    cursor = prs.pageInfo.endCursor;
   }
 
   return nodes;
