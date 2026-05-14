@@ -12,6 +12,7 @@ import {
   interviewSignalSchema,
 } from '@/lib/chat/tools/onboarding-signals';
 import { buildSpotifyArtistUrl, getSpotifyArtist } from '@/lib/spotify';
+import { logger } from '@/lib/utils/logger';
 
 /**
  * Onboarding tool execute closures.
@@ -121,7 +122,16 @@ export function buildOnboardingTools(state: OnboardingTurnState): ToolSet {
       inputSchema: TOOL_SCHEMAS.confirmSpotifyArtist.inputSchema,
       execute: async ({ spotifyArtistId }) => {
         state.spotifyArtistId = spotifyArtistId;
-        const artist = await getSpotifyArtist(spotifyArtistId);
+        let artist: Awaited<ReturnType<typeof getSpotifyArtist>> = null;
+
+        try {
+          artist = await getSpotifyArtist(spotifyArtistId);
+        } catch (error) {
+          logger.warn('Onboarding Spotify artist enrichment failed', {
+            error,
+            spotifyArtistId,
+          });
+        }
 
         if (artist) {
           state.spotifyArtistName = artist.name;

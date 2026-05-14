@@ -81,7 +81,7 @@ function isTestAuthBypassEnabled(): boolean {
 
 function hasDashboardAuthConfiguration(): boolean {
   if (isTestAuthBypassEnabled()) {
-    return Boolean(process.env.E2E_CLERK_USER_ID?.trim());
+    return true;
   }
 
   return hasClerkCredentials();

@@ -123,7 +123,7 @@ export function resolveBypassSessionUrls(baseUrl: string): readonly string[] {
 }
 
 async function resolveBypassUserIdFromLocalProvisioning(
-  fallbackUserId: string,
+  fallbackUserId: string | null,
   persona: DevTestAuthPersona | null
 ): Promise<string | null> {
   if (!persona || !isTestAuthBypassEnabled()) {
@@ -147,10 +147,16 @@ async function resolveBypassUserIdFromLocalProvisioning(
 
 async function resolveBypassUserId(
   baseUrl: string,
-  fallbackUserId: string,
+  fallbackUserId: string | null,
   persona: DevTestAuthPersona | null
 ): Promise<string> {
   if (!persona) {
+    if (!fallbackUserId) {
+      throw new ClerkTestError(
+        'E2E_CLERK_USER_ID is required when test auth bypass has no persona.',
+        'MISSING_CREDENTIALS'
+      );
+    }
     return fallbackUserId;
   }
 
@@ -176,7 +182,11 @@ async function resolveBypassUserId(
         }
 
         const payload = (await response.json()) as { userId?: string | null };
-        return payload.userId?.trim() || fallbackUserId;
+        const resolvedUserId = payload.userId?.trim() || fallbackUserId;
+        if (resolvedUserId) {
+          return resolvedUserId;
+        }
+        lastResolveError = `${sessionUrl} returned no userId for ${persona}.`;
       } catch (error) {
         lastResolveError = `${sessionUrl} failed: ${
           error instanceof Error ? error.message : String(error)
@@ -195,7 +205,7 @@ async function resolveBypassUserId(
         return locallyProvisionedUserId;
       }
 
-      if (canFallbackToBypassUserId(persona)) {
+      if (fallbackUserId && canFallbackToBypassUserId(persona)) {
         console.warn(
           `[clerk-auth] Falling back to configured bypass user for ${persona} persona after session bootstrap failed: ${lastResolveError}`
         );
@@ -211,6 +221,12 @@ async function resolveBypassUserId(
     await sleep(500 * attempt);
   }
 
+  if (!fallbackUserId) {
+    throw new ClerkTestError(
+      `Failed to resolve ${persona} test auth persona: ${lastResolveError}`,
+      'CLERK_SETUP_FAILED'
+    );
+  }
   return fallbackUserId;
 }
 
@@ -236,9 +252,9 @@ async function enableTestAuthBypass(page: Page): Promise<void> {
       ? existingPersona
       : null) ?? requestedPersona;
 
-  if (!userId) {
+  if (!(userId || persona)) {
     throw new ClerkTestError(
-      'E2E_CLERK_USER_ID is required when test auth bypass is enabled.',
+      'E2E_CLERK_USER_ID or E2E_TEST_AUTH_PERSONA is required when test auth bypass is enabled.',
       'MISSING_CREDENTIALS'
     );
   }
@@ -280,9 +296,9 @@ export async function setTestAuthBypassSession(
   overrideUserId?: string | null
 ): Promise<void> {
   const userId = overrideUserId?.trim() || getTestAuthBypassUserId();
-  if (!userId) {
+  if (!(userId || persona)) {
     throw new ClerkTestError(
-      'E2E_CLERK_USER_ID is required when test auth bypass is enabled.',
+      'E2E_CLERK_USER_ID is required when test auth bypass has no persona.',
       'MISSING_CREDENTIALS'
     );
   }

@@ -493,7 +493,7 @@ export function OnboardingHandleCheckCard({
   const handle = output?.handle?.replace(/^@/, '').toLowerCase() ?? null;
   const availability = useHandleAvailabilityQuery({
     handle,
-    enabled: state === 'output-available',
+    enabled: Boolean(handle) && !isRunning(state) && !isFailed(state),
   });
 
   if (isFailed(state)) {

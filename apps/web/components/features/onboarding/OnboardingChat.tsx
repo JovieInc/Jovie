@@ -78,6 +78,17 @@ type ToolPart = MessagePart & {
   readonly state?: string;
 };
 
+type OnboardingToolRendererArgs = {
+  readonly part: ToolPart;
+  readonly key: string;
+  readonly isBusy: boolean;
+  readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
+};
+
+type OnboardingToolRenderer = (
+  args: OnboardingToolRendererArgs
+) => ReactNode | null;
+
 function isToolPart(part: unknown): part is ToolPart {
   if (!part || typeof part !== 'object') return false;
   const type = (part as { type?: unknown }).type;
@@ -173,6 +184,109 @@ function getOnboardingErrorMessage(message: string): string {
   return message;
 }
 
+const renderSearchSpotifyArtist: OnboardingToolRenderer = ({
+  part,
+  key,
+  isBusy,
+  onSelectArtist,
+}) => {
+  const output = part.output;
+  if (!(isArtistPickerOutput(output) || output === undefined)) {
+    return null;
+  }
+
+  return (
+    <OnboardingSpotifyArtistPickerCard
+      key={key}
+      state={part.state}
+      output={isArtistPickerOutput(output) ? output : null}
+      inputQuery={getInputQuery(part)}
+      disabled={isBusy}
+      onSelectArtist={onSelectArtist}
+    />
+  );
+};
+
+const renderConfirmSpotifyArtist: OnboardingToolRenderer = ({ part, key }) => {
+  const output = part.output;
+  if (!(isArtistConfirmedOutput(output) || output === undefined)) {
+    return null;
+  }
+
+  return (
+    <OnboardingArtistConfirmedCard
+      key={key}
+      state={part.state}
+      output={isArtistConfirmedOutput(output) ? output : null}
+    />
+  );
+};
+
+const renderCheckHandle: OnboardingToolRenderer = ({ part, key }) => {
+  const output = part.output;
+  if (!(isHandleCheckOutput(output) || output === undefined)) {
+    return null;
+  }
+
+  return (
+    <OnboardingHandleCheckCard
+      key={key}
+      state={part.state}
+      output={isHandleCheckOutput(output) ? output : null}
+    />
+  );
+};
+
+const renderProposeSocialLink: OnboardingToolRenderer = ({ part, key }) => {
+  const output = part.output;
+  if (!(isSocialLinkOutput(output) || output === undefined)) {
+    return null;
+  }
+
+  return (
+    <OnboardingSocialLinkCard
+      key={key}
+      state={part.state}
+      output={isSocialLinkOutput(output) ? output : null}
+    />
+  );
+};
+
+const renderProposeNextStep: OnboardingToolRenderer = ({ part, key }) => {
+  if (!isNextStepPayload(part.output)) {
+    return null;
+  }
+
+  return (
+    <div key={key} className='w-full max-w-[440px]'>
+      <ChatProposeNextStepCard payload={part.output} />
+    </div>
+  );
+};
+
+const renderProposeCheckout: OnboardingToolRenderer = ({ part, key }) => {
+  if (!isCheckoutPayload(part.output)) {
+    return null;
+  }
+
+  return (
+    <div key={key} className='w-full max-w-[440px]'>
+      <ChatProposeCheckoutCard payload={part.output} />
+    </div>
+  );
+};
+
+const onboardingToolRenderers: Readonly<
+  Record<string, OnboardingToolRenderer>
+> = {
+  checkHandle: renderCheckHandle,
+  confirmSpotifyArtist: renderConfirmSpotifyArtist,
+  proposeCheckout: renderProposeCheckout,
+  proposeNextStep: renderProposeNextStep,
+  proposeSocialLink: renderProposeSocialLink,
+  searchSpotifyArtist: renderSearchSpotifyArtist,
+};
+
 function renderOnboardingTools({
   messageId,
   toolParts,
@@ -192,87 +306,19 @@ function renderOnboardingTools({
   toolParts.forEach((part, i) => {
     const toolName = getToolName(part);
     const key = part.toolCallId ?? `${messageId}-tool-${i}`;
-    const output = part.output;
 
     if (toolName === 'recordInterviewSignal') {
       return;
     }
 
-    if (
-      toolName === 'searchSpotifyArtist' &&
-      (isArtistPickerOutput(output) || output === undefined)
-    ) {
-      cards.push(
-        <OnboardingSpotifyArtistPickerCard
-          key={key}
-          state={part.state}
-          output={isArtistPickerOutput(output) ? output : null}
-          inputQuery={getInputQuery(part)}
-          disabled={isBusy}
-          onSelectArtist={onSelectArtist}
-        />
-      );
-      return;
-    }
-
-    if (
-      toolName === 'confirmSpotifyArtist' &&
-      (isArtistConfirmedOutput(output) || output === undefined)
-    ) {
-      cards.push(
-        <OnboardingArtistConfirmedCard
-          key={key}
-          state={part.state}
-          output={isArtistConfirmedOutput(output) ? output : null}
-        />
-      );
-      return;
-    }
-
-    if (
-      toolName === 'checkHandle' &&
-      (isHandleCheckOutput(output) || output === undefined)
-    ) {
-      cards.push(
-        <OnboardingHandleCheckCard
-          key={key}
-          state={part.state}
-          output={isHandleCheckOutput(output) ? output : null}
-        />
-      );
-      return;
-    }
-
-    if (
-      toolName === 'proposeSocialLink' &&
-      (isSocialLinkOutput(output) || output === undefined)
-    ) {
-      cards.push(
-        <OnboardingSocialLinkCard
-          key={key}
-          state={part.state}
-          output={isSocialLinkOutput(output) ? output : null}
-        />
-      );
-      return;
-    }
-
-    if (toolName === 'proposeNextStep' && isNextStepPayload(output)) {
-      const card = (
-        <div key={key} className='w-full max-w-[440px]'>
-          <ChatProposeNextStepCard payload={output} />
-        </div>
-      );
+    const card = onboardingToolRenderers[toolName]?.({
+      part,
+      key,
+      isBusy,
+      onSelectArtist,
+    });
+    if (card) {
       cards.push(card);
-      return;
-    }
-
-    if (toolName === 'proposeCheckout' && isCheckoutPayload(output)) {
-      cards.push(
-        <div key={key} className='w-full max-w-[440px]'>
-          <ChatProposeCheckoutCard payload={output} />
-        </div>
-      );
       return;
     }
 
