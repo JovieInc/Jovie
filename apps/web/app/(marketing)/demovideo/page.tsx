@@ -10,6 +10,6 @@ export const metadata: Metadata = {
   robots: NOINDEX_ROBOTS,
 };
 
-export default function ProductDemoPage() {
+export default function ProductDemoVideoPage() {
   return <DemoVideoPage />;
 }
