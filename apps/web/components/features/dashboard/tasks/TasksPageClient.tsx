@@ -1203,7 +1203,9 @@ export function TasksPageClient() {
   const designV1TasksEnabled = useAppFlag('DESIGN_V1');
   const { selectedProfile } = useDashboardData();
   const { setHeaderActions } = useSetHeaderActions();
-  const isXlUp = useBreakpoint('xl');
+  const isDesktopTaskLayout = useBreakpoint('lg');
+  const [hasResolvedResponsiveLayout, setHasResolvedResponsiveLayout] =
+    useState(false);
   const canShowTaskDocumentAlongsideReleaseSidebar = useMediaQuery(
     '(min-width: 1720px)'
   );
@@ -1237,8 +1239,13 @@ export function TasksPageClient() {
     defaultMode: 'board',
     availableModes: TASK_VIEW_MODES,
   });
-  const isBoardMode = isXlUp && viewMode === 'board';
+  const isBoardMode = isDesktopTaskLayout && viewMode === 'board';
   const profileId = selectedProfile?.id;
+
+  useEffect(() => {
+    setHasResolvedResponsiveLayout(true);
+  }, []);
+
   const createTaskMutation = useCreateTaskMutation();
   const deleteTaskMutation = useDeleteTaskMutation();
   const updateTaskMutation = useUpdateTaskMutation();
@@ -1274,10 +1281,17 @@ export function TasksPageClient() {
       }),
     [showCancelledColumn, statusFilter]
   );
+  const shouldFetchBoard =
+    hasResolvedResponsiveLayout && isBoardMode && Boolean(profileId);
+  const shouldFetchList =
+    hasResolvedResponsiveLayout && !isBoardMode && Boolean(profileId);
 
   const { data, isLoading, isError, refetch } = useTasksQuery(
     profileId,
-    listFilters
+    listFilters,
+    {
+      enabled: shouldFetchList,
+    }
   );
   const {
     data: boardData,
@@ -1285,7 +1299,7 @@ export function TasksPageClient() {
     isError: isBoardError,
     refetch: refetchBoard,
   } = useTaskBoardQuery(profileId, boardFilters, {
-    enabled: Boolean(profileId),
+    enabled: shouldFetchBoard,
   });
 
   const taskSubviewBaseTasks = useMemo(() => {
@@ -1330,7 +1344,7 @@ export function TasksPageClient() {
     () => getMobileScopedTasks(tasks, mobileScope),
     [mobileScope, tasks]
   );
-  const visibleTasks = isXlUp ? tasks : mobileScopedTasks;
+  const visibleTasks = isDesktopTaskLayout ? tasks : mobileScopedTasks;
   const boardTasks = useMemo(
     () => boardData?.columns.flatMap(column => column.tasks) ?? [],
     [boardData?.columns]
@@ -1344,7 +1358,7 @@ export function TasksPageClient() {
   );
   const effectiveSelectedTaskId =
     selectedTaskId ??
-    (isXlUp && !isBoardMode && !designV1TasksEnabled
+    (isDesktopTaskLayout && !isBoardMode && !designV1TasksEnabled
       ? (visibleTasks[0]?.id ?? null)
       : null);
   const { data: selectedTaskData } = useTaskQuery(
@@ -1367,14 +1381,17 @@ export function TasksPageClient() {
     statusFilter !== 'all' ||
     priorityFilter !== 'all' ||
     assigneeFilter !== 'all';
-  const isResolvingProfile = !profileId;
+  const isResolvingProfile = !profileId || !hasResolvedResponsiveLayout;
   const isActiveBoardLoading = isResolvingProfile || isBoardLoading;
   const isActiveListLoading = isResolvingProfile || isLoading;
   const showTaskListPane =
-    isBoardMode || isXlUp || !selectedTask || shouldPrioritizeRightPanel;
+    isBoardMode ||
+    isDesktopTaskLayout ||
+    !selectedTask ||
+    shouldPrioritizeRightPanel;
   const showTaskDocumentPane =
-    !isBoardMode &&
-    (isXlUp || Boolean(selectedTask)) &&
+    ((isBoardMode && isDesktopTaskLayout && Boolean(selectedTask)) ||
+      (!isBoardMode && (isDesktopTaskLayout || Boolean(selectedTask)))) &&
     !shouldPrioritizeRightPanel;
   const clearFilters = useCallback(() => {
     setSearch('');
@@ -1524,6 +1541,10 @@ export function TasksPageClient() {
   }, [canShowTaskDocumentAlongsideReleaseSidebar, selectedReleaseId]);
 
   useEffect(() => {
+    if (isBoardMode) {
+      return;
+    }
+
     if (isLoading) {
       return;
     }
@@ -1535,15 +1556,11 @@ export function TasksPageClient() {
       return;
     }
 
-    if (isBoardMode) {
-      return;
-    }
-
     const hasVisibleSelection = visibleTasks.some(
       task => task.id === selectedTaskId
     );
     if (!hasVisibleSelection) {
-      if (!isXlUp && selectedTaskId === null) {
+      if (!isDesktopTaskLayout && selectedTaskId === null) {
         return;
       }
 
@@ -1555,7 +1572,7 @@ export function TasksPageClient() {
     designV1TasksEnabled,
     isBoardMode,
     isLoading,
-    isXlUp,
+    isDesktopTaskLayout,
     selectedTaskId,
     tasks,
     visibleTasks,
@@ -1724,30 +1741,7 @@ export function TasksPageClient() {
       onClose={() => setSelectedReleaseId(null)}
     />
   ) : null;
-  const boardTaskPanel =
-    isBoardMode && selectedTask ? (
-      <TaskDocumentPanel
-        task={selectedTask}
-        title={editorTitle}
-        description={editorDescription}
-        onTitleChange={setEditorTitle}
-        onDescriptionChange={setEditorDescription}
-        onClose={() => setSelectedTaskId(null)}
-        onOpenRelease={openReleaseSidebar}
-        onUpdateStatus={(taskId, status) => updateTaskField(taskId, { status })}
-        onUpdatePriority={(taskId, priority) =>
-          updateTaskField(taskId, { priority })
-        }
-        onUpdateAssignee={(taskId, assigneeKind) =>
-          updateTaskField(taskId, { assigneeKind })
-        }
-        artistName={artistName}
-        isDesktopLayout={isXlUp}
-        designV1={designV1TasksEnabled}
-      />
-    ) : null;
-
-  useRegisterRightPanel(sidebarPanel ?? boardTaskPanel);
+  useRegisterRightPanel(sidebarPanel);
 
   const headerActions = useMemo(
     () => (
@@ -1867,7 +1861,7 @@ export function TasksPageClient() {
         getTaskContextMenuItems={getTaskContextMenuItems}
       />
     );
-  } else if (isXlUp) {
+  } else if (isDesktopTaskLayout) {
     desktopTaskPane = (
       <UnifiedTable
         data={visibleTasks}
@@ -1955,7 +1949,7 @@ export function TasksPageClient() {
         data-testid='tasks-workspace'
         data-design-v1-tasks={designV1TasksEnabled ? 'true' : undefined}
         toolbar={
-          isXlUp || headerMode !== 'default' ? (
+          isDesktopTaskLayout || headerMode !== 'default' ? (
             <TaskWorkspaceHeaderBar
               mode={headerMode}
               search={search}
@@ -1988,7 +1982,7 @@ export function TasksPageClient() {
               showCancelledColumn={showCancelledColumn}
               onShowCancelledColumnChange={setShowCancelledColumn}
               showTaskNavigation={
-                !isBoardMode && isXlUp && Boolean(selectedTask)
+                !isBoardMode && isDesktopTaskLayout && Boolean(selectedTask)
               }
               canSelectPrevious={canSelectPrevious}
               canSelectNext={canSelectNext}
@@ -2030,11 +2024,11 @@ export function TasksPageClient() {
                 className={cn(
                   'min-h-0 min-w-0',
                   TASK_WORKSPACE_PANE_CLASSNAME,
-                  selectedTask && showTaskDocumentPane
-                    ? 'xl:flex-none xl:basis-[32rem] xl:min-w-[28rem] xl:max-w-[36rem] xl:border-r xl:border-[color-mix(in_oklab,var(--linear-app-shell-border)_74%,transparent)]'
+                  selectedTask && showTaskDocumentPane && !isBoardMode
+                    ? 'lg:flex-none lg:basis-[32rem] lg:min-w-[28rem] lg:max-w-[36rem] lg:border-r lg:border-[color-mix(in_oklab,var(--linear-app-shell-border)_74%,transparent)]'
                     : 'flex-1',
                   showTaskListPane ? 'block' : 'hidden',
-                  !selectedTask && 'xl:max-w-none'
+                  !selectedTask && 'lg:max-w-none'
                 )}
               >
                 {desktopTaskPane ?? (
@@ -2080,7 +2074,10 @@ export function TasksPageClient() {
               </div>
               <div
                 className={cn(
-                  'min-h-0 min-w-0 flex-1 overflow-hidden',
+                  'min-h-0 min-w-0 overflow-hidden',
+                  isBoardMode
+                    ? 'lg:flex-none lg:w-[min(34rem,42vw)] lg:border-l lg:border-[color-mix(in_oklab,var(--linear-app-shell-border)_74%,transparent)]'
+                    : 'flex-1',
                   TASK_WORKSPACE_PANE_CLASSNAME,
                   showTaskDocumentPane ? 'flex' : 'hidden'
                 )}
@@ -2105,7 +2102,7 @@ export function TasksPageClient() {
                       updateTaskField(taskId, { assigneeKind })
                     }
                     artistName={artistName}
-                    isDesktopLayout={isXlUp}
+                    isDesktopLayout={isDesktopTaskLayout}
                     designV1={designV1TasksEnabled}
                   />
                 ) : (
@@ -2121,7 +2118,7 @@ export function TasksPageClient() {
                     onUpdatePriority={NOOP_TASK_PRIORITY_UPDATE}
                     onUpdateAssignee={NOOP_TASK_ASSIGNEE_UPDATE}
                     artistName={artistName}
-                    isDesktopLayout={isXlUp}
+                    isDesktopLayout={isDesktopTaskLayout}
                     designV1={designV1TasksEnabled}
                   />
                 )}
