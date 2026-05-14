@@ -292,11 +292,17 @@ describe('proxy.ts middleware', () => {
       expect(isRedirectTo(res, '/signin')).toBe(true);
     });
 
-    it('lets unauthenticated GET /onboarding reach the /start shim', async () => {
-      const req = createUnauthenticatedRequest({ pathname: '/onboarding' });
+    it('redirects unauthenticated GET /onboarding to /start before rendering', async () => {
+      const req = createUnauthenticatedRequest({
+        pathname: '/onboarding',
+        searchParams: { resume: 'spotify' },
+      });
       const res = await callMiddleware(req);
 
-      expect(res.status).toBeLessThan(300);
+      expect(res.status).toBeGreaterThanOrEqual(300);
+      expect(res.status).toBeLessThan(400);
+      expect(isRedirectTo(res, '/start')).toBe(true);
+      expect(res.headers.get('location')).toContain('resume=spotify');
     });
 
     it('redirects unauthenticated GET /waitlist to /start', async () => {
@@ -636,15 +642,19 @@ describe('proxy.ts middleware', () => {
       expect(isRedirectTo(res, '/app')).toBe(true);
     });
 
-    it('lets /onboarding reach the redirect shim for active users', async () => {
+    it('redirects active users from legacy /onboarding to /start', async () => {
       mocks.getUserState.mockResolvedValue(USER_STATES.active);
 
       const req = createAuthenticatedRequest('clerk_user_1', {
         pathname: '/onboarding',
+        searchParams: { handle: 'artist' },
       });
       const res = await callMiddleware(req);
 
-      expect(res.status).toBeLessThan(300);
+      expect(res.status).toBeGreaterThanOrEqual(300);
+      expect(res.status).toBeLessThan(400);
+      expect(isRedirectTo(res, '/start')).toBe(true);
+      expect(res.headers.get('location')).toContain('handle=artist');
     });
   });
 

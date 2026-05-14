@@ -1,17 +1,15 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { BrandLogo } from '@/components/atoms/BrandLogo';
+import { AppShellFrame } from '@/components/organisms/AppShellFrame';
+import { SidebarProvider } from '@/components/organisms/Sidebar';
+import { cn } from '@/lib/utils';
 import { OnboardingChat } from './OnboardingChat';
 import { OnboardingTurnstile } from './OnboardingTurnstile';
 import { useOnboardingClaim } from './useOnboardingClaim';
 
 /**
- * Outer shell for the anonymous onboarding chat (JOV-2132 PR 3).
- *
- * v1 is a calm, dark canvas with the chat as the only thing on the page.
- * Cinematic reveal choreography (per the plan's 6-stage state machine)
- * lands incrementally after real-artist watch sessions inform the timing.
+ * App-shell frame for the anonymous onboarding chat.
  *
  * Holds the Turnstile token until the chat client wires its first request.
  */
@@ -48,54 +46,67 @@ export function OnboardingShell({ sessionLabel }: OnboardingShellProps) {
     claimStatus === 'pending' || claimStatus === 'retry-after-webhook';
 
   return (
-    <div
-      className='flex min-h-dvh w-full flex-col bg-(--linear-app-content-surface) text-primary-token [color-scheme:dark]'
-      data-onboarding-session={sessionLabel}
-    >
-      <header className='flex h-12 items-center justify-between px-4 sm:px-6'>
-        <div className='inline-flex items-center gap-2'>
-          <BrandLogo size={20} tone='auto' aria-hidden />
-          <span className='text-[15px] font-semibold text-primary-token'>
-            Jovie
-          </span>
-        </div>
-      </header>
+    <SidebarProvider defaultOpen={false}>
+      <AppShellFrame
+        variant='shellChatV1'
+        sidebar={null}
+        containerClassName='[color-scheme:dark]'
+        contentClassName='!overflow-hidden'
+        main={
+          <div
+            className='relative flex min-h-0 flex-1'
+            data-onboarding-session={sessionLabel}
+          >
+            <OnboardingChat
+              onConversationActivity={handleConversationActivity}
+              turnstileToken={turnstileToken}
+            />
 
-      <main className='flex min-h-0 flex-1 overflow-hidden px-3 pb-14 sm:px-6 sm:pb-6'>
-        <section
-          className='mx-auto flex min-h-0 w-full max-w-[56rem] flex-1 overflow-hidden rounded-[20px] border border-subtle bg-surface-1 shadow-card'
-          aria-label='Jovie onboarding chat'
-        >
-          <OnboardingChat
-            onConversationActivity={handleConversationActivity}
-            turnstileToken={turnstileToken}
-          />
-        </section>
-      </main>
+            <OnboardingShellStatus
+              kind='error'
+              message={turnstileError}
+              visible={Boolean(turnstileError)}
+            />
+            <OnboardingShellStatus
+              kind='status'
+              message='Linking your conversation...'
+              visible={isLinking}
+            />
+          </div>
+        }
+      />
 
       <OnboardingTurnstile
         onToken={handleTurnstileToken}
         onError={handleTurnstileError}
       />
+    </SidebarProvider>
+  );
+}
 
-      {turnstileError ? (
-        <p
-          className='fixed bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-red-500/20 bg-error-subtle px-3 py-1 text-[12px] text-error'
-          role='alert'
-        >
-          {turnstileError}
-        </p>
-      ) : null}
+function OnboardingShellStatus({
+  kind,
+  message,
+  visible,
+}: Readonly<{
+  kind: 'error' | 'status';
+  message: string | null;
+  visible: boolean;
+}>) {
+  if (!visible || !message) return null;
 
-      {isLinking ? (
-        <p
-          className='fixed bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-subtle bg-surface-1 px-3 py-1 text-[12px] text-secondary-token'
-          role='status'
-          aria-live='polite'
-        >
-          Linking your conversation…
-        </p>
-      ) : null}
-    </div>
+  return (
+    <p
+      className={cn(
+        'pointer-events-none absolute right-3 top-3 z-40 max-w-[min(28rem,calc(100%-1.5rem))] rounded-full border bg-surface-0 px-3 py-1.5 text-[12px] leading-5 shadow-card sm:right-4 sm:top-4',
+        kind === 'error'
+          ? 'border-red-500/20 text-error'
+          : 'border-subtle text-secondary-token'
+      )}
+      role={kind === 'error' ? 'alert' : 'status'}
+      aria-live={kind === 'error' ? 'assertive' : 'polite'}
+    >
+      {message}
+    </p>
   );
 }

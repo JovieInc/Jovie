@@ -18,14 +18,40 @@
  * @smoke
  */
 
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
+import { APP_FLAG_OVERRIDE_KEYS } from '@/lib/flags/contracts';
+import {
+  APP_FLAG_OVERRIDES_COOKIE,
+  FF_OVERRIDES_KEY,
+} from '@/lib/flags/overrides';
+import { setTestAuthBypassSession } from '../helpers/clerk-auth';
 
-const BYPASS_URL =
-  '/api/dev/test-auth/enter?persona=creator&redirect=/app/chat';
+async function forceChatJankMonitor(page: Page) {
+  const overrides = JSON.stringify({
+    [APP_FLAG_OVERRIDE_KEYS.CHAT_JANK_MONITOR]: true,
+    [APP_FLAG_OVERRIDE_KEYS.DESIGN_V1]: true,
+  });
+
+  await page.addInitScript(
+    ({ cookieName, key, value }) => {
+      localStorage.setItem(key, value);
+      document.cookie = `${cookieName}=${encodeURIComponent(value)}; path=/; SameSite=Lax`;
+    },
+    {
+      cookieName: APP_FLAG_OVERRIDES_COOKIE,
+      key: FF_OVERRIDES_KEY,
+      value: overrides,
+    }
+  );
+}
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
 test('chat page renders with jank monitor flag forced on', async ({ page }) => {
+  test.skip(
+    process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
+    'Requires E2E_USE_TEST_AUTH_BYPASS=1'
+  );
   test.setTimeout(120_000);
 
   const consoleErrors: string[] = [];
@@ -34,21 +60,21 @@ test('chat page renders with jank monitor flag forced on', async ({ page }) => {
     if (msg.type() === 'error') consoleErrors.push(msg.text());
   });
 
-  // Bypass auth + navigate to /app/chat
-  await page.goto(BYPASS_URL, { waitUntil: 'domcontentloaded' });
-  // The bypass responds with a 303 and the browser follows to /app/chat
+  await forceChatJankMonitor(page);
+  await setTestAuthBypassSession(page, 'creator-ready', 'e2e-chat-jank-user');
+  await page.goto('/app/chat', { waitUntil: 'domcontentloaded' });
   await page.waitForURL(/\/app\/chat/, { timeout: 60_000 });
 
-  // Flip the jank-monitor flag on via the dev localStorage override, then reload
-  await page.evaluate(() => {
-    globalThis.localStorage.setItem('code:CHAT_JANK_MONITOR', 'true');
-  });
-  await page.reload({ waitUntil: 'domcontentloaded' });
-
   // Chat content root (see data-testid='chat-content' in JovieChat.tsx)
+  await expect(
+    page.locator(
+      '[data-app-shell-frame="true"][data-shell-design="shellChatV1"]'
+    )
+  ).toBeVisible({ timeout: 30_000 });
   await expect(page.locator('[data-testid="chat-content"]')).toBeVisible({
     timeout: 30_000,
   });
+  await expect(page.locator('[data-testid="onboarding-chat"]')).toHaveCount(0);
 
   // Composer should be interactive
   const composer = page
@@ -68,6 +94,7 @@ test('chat page renders with jank monitor flag forced on', async ({ page }) => {
     /favicon/i,
     /non-passive event listener/i,
     /ResizeObserver loop/i,
+    /eval\(\) is not supported.*React requires eval/i,
   ];
   const relevant = consoleErrors.filter(e => !ignorable.some(rx => rx.test(e)));
   expect(relevant, `Unexpected console errors: ${relevant.join('\n')}`).toEqual(

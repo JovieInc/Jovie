@@ -1,5 +1,6 @@
 'use client';
 
+import { X } from 'lucide-react';
 import Image from 'next/image';
 import { useMemo } from 'react';
 import { useOptionalChatEntityPanel } from '@/app/app/(shell)/chat/ChatEntityPanelContext';
@@ -19,6 +20,8 @@ interface EntityChipProps {
   readonly variant?: 'input' | 'transcript';
   /** Marks chip atomic for contenteditable: sets contentEditable="false" + data attributes so input handlers can detect it. */
   readonly isInputChip?: boolean;
+  readonly onRemove?: () => void;
+  readonly removeLabel?: string;
 }
 
 const KIND_PREFIX: Record<EntityKind, string> = {
@@ -32,6 +35,8 @@ export function EntityChip({
   data,
   variant = 'input',
   isInputChip = false,
+  onRemove,
+  removeLabel,
 }: EntityChipProps) {
   const prefix = KIND_PREFIX[data.kind];
   const designV1ChatEntitiesEnabled = useAppFlag('DESIGN_V1');
@@ -80,6 +85,19 @@ export function EntityChip({
         />
       )}
       <span className='max-w-[180px] truncate'>{data.label}</span>
+      {onRemove ? (
+        <button
+          type='button'
+          aria-label={removeLabel ?? `Remove ${data.label}`}
+          onMouseDown={event => {
+            event.preventDefault();
+            onRemove();
+          }}
+          className='-mr-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-sm text-tertiary-token transition-colors duration-fast hover:bg-surface-1 hover:text-primary-token focus:outline-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30'
+        >
+          <X className='h-3 w-3' />
+        </button>
+      ) : null}
     </>
   );
 
@@ -102,6 +120,18 @@ export function EntityChip({
       >
         {contents}
       </button>
+    );
+  }
+
+  if (onRemove) {
+    return (
+      <span
+        {...inputChipAttributes}
+        className={commonClassName}
+        title={`${prefix}: ${data.label}`}
+      >
+        {contents}
+      </span>
     );
   }
 

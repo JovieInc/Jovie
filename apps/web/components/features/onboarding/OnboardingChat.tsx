@@ -2,12 +2,14 @@
 
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, type UIMessage } from 'ai';
+import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ChatInput,
   ChatMessage,
   ErrorDisplay,
 } from '@/components/jovie/components';
+import { useChatJankMonitor, useStickToBottom } from '@/components/jovie/hooks';
 import { ToolPartsRenderer } from '@/components/jovie/tool-ui';
 import type { ChatError, MessagePart } from '@/components/jovie/types';
 import {
@@ -15,6 +17,7 @@ import {
   getErrorType,
   getPreferredErrorMessage,
 } from '@/components/jovie/utils';
+import { useAppFlag } from '@/lib/flags/client';
 import { cn } from '@/lib/utils';
 import {
   ChatProposeCheckoutCard,
@@ -24,6 +27,18 @@ import {
   ChatProposeNextStepCard,
   type NextStepCardPayload,
 } from './ChatProposeNextStepCard';
+import {
+  type ArtistConfirmedOutput,
+  type ArtistPickerOutput,
+  type HandleCheckOutput,
+  OnboardingArtistConfirmedCard,
+  type OnboardingArtistSelection,
+  OnboardingHandleCheckCard,
+  OnboardingSocialLinkCard,
+  OnboardingSpotifyArtistPickerCard,
+  type SocialLinkOutput,
+  useArtistSelectionMessage,
+} from './OnboardingToolArtifacts';
 
 /**
  * Anonymous onboarding chat client (JOV-2132 PR 3).
@@ -42,7 +57,7 @@ interface OnboardingChatProps {
 }
 
 /** Pull the user-visible text out of a UIMessage's parts. */
-const THINKING_PLACEHOLDER_ID = 'onboarding-thinking-placeholder';
+const THINKING_PLACEHOLDER_ID = 'thinking-placeholder';
 
 function getMessageText(message: UIMessage): string {
   return (message.parts ?? [])
@@ -58,6 +73,7 @@ type ToolPart = MessagePart & {
   readonly type: string;
   readonly toolName?: string;
   readonly toolCallId?: string;
+  readonly input?: unknown;
   readonly output?: unknown;
   readonly state?: string;
 };
@@ -108,6 +124,35 @@ function isCheckoutPayload(output: unknown): output is CheckoutCardPayload {
   );
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function isArtistPickerOutput(output: unknown): output is ArtistPickerOutput {
+  return asRecord(output)?.action === 'open_artist_picker';
+}
+
+function isArtistConfirmedOutput(
+  output: unknown
+): output is ArtistConfirmedOutput {
+  return asRecord(output)?.action === 'spotify_artist_confirmed';
+}
+
+function isHandleCheckOutput(output: unknown): output is HandleCheckOutput {
+  return asRecord(output)?.action === 'check_handle';
+}
+
+function isSocialLinkOutput(output: unknown): output is SocialLinkOutput {
+  return asRecord(output)?.action === 'propose_social_link';
+}
+
+function getInputQuery(part: ToolPart): string | null {
+  const input = asRecord(part.input);
+  return typeof input?.query === 'string' ? input.query : null;
+}
+
 function findLastAssistantMessageId(messages: readonly UIMessage[]) {
   for (let i = messages.length - 1; i >= 0; i--) {
     const message = messages[i];
@@ -121,42 +166,120 @@ function findLastAssistantMessageId(messages: readonly UIMessage[]) {
   return null;
 }
 
+function getOnboardingErrorMessage(message: string): string {
+  if (/authentication service is initializing/i.test(message)) {
+    return 'Jovie is still connecting. Try again in a moment.';
+  }
+  return message;
+}
+
 function renderOnboardingTools({
   messageId,
   toolParts,
   hasMessageText,
+  isBusy,
+  onSelectArtist,
 }: {
   readonly messageId: string;
   readonly toolParts: readonly ToolPart[];
   readonly hasMessageText: boolean;
+  readonly isBusy: boolean;
+  readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
 }) {
   const genericParts: ToolPart[] = [];
-  const cards = toolParts.map((part, i) => {
+  const cards: ReactNode[] = [];
+
+  toolParts.forEach((part, i) => {
     const toolName = getToolName(part);
     const key = part.toolCallId ?? `${messageId}-tool-${i}`;
     const output = part.output;
 
+    if (toolName === 'recordInterviewSignal') {
+      return;
+    }
+
+    if (
+      toolName === 'searchSpotifyArtist' &&
+      (isArtistPickerOutput(output) || output === undefined)
+    ) {
+      cards.push(
+        <OnboardingSpotifyArtistPickerCard
+          key={key}
+          state={part.state}
+          output={isArtistPickerOutput(output) ? output : null}
+          inputQuery={getInputQuery(part)}
+          disabled={isBusy}
+          onSelectArtist={onSelectArtist}
+        />
+      );
+      return;
+    }
+
+    if (
+      toolName === 'confirmSpotifyArtist' &&
+      (isArtistConfirmedOutput(output) || output === undefined)
+    ) {
+      cards.push(
+        <OnboardingArtistConfirmedCard
+          key={key}
+          state={part.state}
+          output={isArtistConfirmedOutput(output) ? output : null}
+        />
+      );
+      return;
+    }
+
+    if (
+      toolName === 'checkHandle' &&
+      (isHandleCheckOutput(output) || output === undefined)
+    ) {
+      cards.push(
+        <OnboardingHandleCheckCard
+          key={key}
+          state={part.state}
+          output={isHandleCheckOutput(output) ? output : null}
+        />
+      );
+      return;
+    }
+
+    if (
+      toolName === 'proposeSocialLink' &&
+      (isSocialLinkOutput(output) || output === undefined)
+    ) {
+      cards.push(
+        <OnboardingSocialLinkCard
+          key={key}
+          state={part.state}
+          output={isSocialLinkOutput(output) ? output : null}
+        />
+      );
+      return;
+    }
+
     if (toolName === 'proposeNextStep' && isNextStepPayload(output)) {
-      return (
+      const card = (
         <div key={key} className='w-full max-w-[440px]'>
           <ChatProposeNextStepCard payload={output} />
         </div>
       );
+      cards.push(card);
+      return;
     }
 
     if (toolName === 'proposeCheckout' && isCheckoutPayload(output)) {
-      return (
+      cards.push(
         <div key={key} className='w-full max-w-[440px]'>
           <ChatProposeCheckoutCard payload={output} />
         </div>
       );
+      return;
     }
 
     genericParts.push(part);
-    return null;
   });
 
-  if (toolParts.length === 0) {
+  if (cards.length === 0 && genericParts.length === 0) {
     return null;
   }
 
@@ -174,6 +297,58 @@ function renderOnboardingTools({
   );
 }
 
+function OnboardingMessageList({
+  displayMessages,
+  isStreaming,
+  lastAssistantMessageId,
+  isBusy,
+  onSelectArtist,
+}: {
+  readonly displayMessages: readonly UIMessage[];
+  readonly isStreaming: boolean;
+  readonly lastAssistantMessageId: string | null;
+  readonly isBusy: boolean;
+  readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
+}) {
+  return (
+    <div className='flex flex-col pb-4'>
+      {displayMessages.map(message => {
+        const text = getMessageText(message);
+        const toolParts = getToolParts(message);
+        const isThinking = message.id === THINKING_PLACEHOLDER_ID;
+        const shouldRenderMessage =
+          isThinking || Boolean(text) || toolParts.length === 0;
+
+        return (
+          <div key={message.id} className='pb-5'>
+            {shouldRenderMessage ? (
+              <ChatMessage
+                id={message.id}
+                role={message.role}
+                parts={(message.parts ?? []) as MessagePart[]}
+                isThinking={isThinking}
+                isStreaming={
+                  isStreaming && message.id === lastAssistantMessageId
+                }
+                renderTools={false}
+              />
+            ) : null}
+            {!isThinking
+              ? renderOnboardingTools({
+                  messageId: message.id,
+                  toolParts,
+                  hasMessageText: Boolean(text),
+                  isBusy,
+                  onSelectArtist,
+                })
+              : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function OnboardingChat({
   onConversationActivity,
   turnstileToken,
@@ -181,9 +356,10 @@ export function OnboardingChat({
   const [input, setInput] = useState('');
   const [hasSentFirst, setHasSentFirst] = useState(false);
   const [chatError, setChatError] = useState<ChatError | null>(null);
-  const messagesRef = useRef<HTMLDivElement | null>(null);
+  const [composerPickerOpen, setComposerPickerOpen] = useState(false);
   const completedUserTurnsRef = useRef(0);
   const lastAttemptedMessageRef = useRef<string | null>(null);
+  const formatArtistSelectionMessage = useArtistSelectionMessage();
 
   const transport = useMemo(
     () =>
@@ -209,9 +385,10 @@ export function OnboardingChat({
     onError: error => {
       const type = getErrorType(error);
       const metadata = extractErrorMetadata(error);
+      const message = getPreferredErrorMessage(error, type, metadata);
       setChatError({
         type,
-        message: getPreferredErrorMessage(error, type, metadata),
+        message: getOnboardingErrorMessage(message),
         retryAfter: metadata.retryAfter,
         errorCode: metadata.errorCode,
         requestId: metadata.requestId,
@@ -242,6 +419,17 @@ export function OnboardingChat({
       ]
     : messages;
   const lastAssistantMessageId = findLastAssistantMessageId(displayMessages);
+  const { isStuckToBottom, onScroll, totalSizeRef, scrollContainerRef } =
+    useStickToBottom({ messageCount: displayMessages.length });
+  const jankMonitorEnabled = useAppFlag('CHAT_JANK_MONITOR');
+  const { onSend: notifyJankSend } = useChatJankMonitor({
+    conversationId: 'onboarding',
+    messages,
+    status,
+    isStuckToBottom,
+    scrollContainerRef,
+    enabled: jankMonitorEnabled,
+  });
 
   const submitText = useCallback(
     (rawText: string) => {
@@ -254,11 +442,12 @@ export function OnboardingChat({
       }
       lastAttemptedMessageRef.current = text;
       setChatError(null);
+      notifyJankSend();
       sendMessage({ text });
       setHasSentFirst(true);
       setInput('');
     },
-    [isAwaitingFirstToken, isBusy, sendMessage]
+    [isAwaitingFirstToken, isBusy, notifyJankSend, sendMessage]
   );
 
   const handleSubmit = useCallback(
@@ -275,12 +464,12 @@ export function OnboardingChat({
     submitText(failedMessage);
   }, [chatError?.failedMessage, submitText]);
 
-  // Auto-scroll on new content
-  useEffect(() => {
-    const node = messagesRef.current;
-    if (!node) return;
-    node.scrollTop = node.scrollHeight;
-  }, [displayMessages.length, isBusy]);
+  const handleArtistSelect = useCallback(
+    (artist: OnboardingArtistSelection) => {
+      submitText(formatArtistSelectionMessage(artist));
+    },
+    [formatArtistSelectionMessage, submitText]
+  );
 
   useEffect(() => {
     if (status !== 'ready') return;
@@ -293,70 +482,61 @@ export function OnboardingChat({
   }, [messages, onConversationActivity, status]);
 
   return (
-    <div className='flex flex-1 flex-col overflow-hidden'>
+    <section
+      className='relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-(--linear-app-content-surface)'
+      aria-label='Jovie onboarding chat'
+      data-testid='onboarding-chat'
+      data-picker-open={composerPickerOpen ? 'true' : undefined}
+    >
+      {chatError && !composerPickerOpen ? (
+        <div className='pointer-events-none absolute right-3 top-3 z-30 w-[min(27rem,calc(100%-1.5rem))] sm:right-4 sm:top-4'>
+          <div className='pointer-events-auto'>
+            <ErrorDisplay
+              chatError={chatError}
+              onRetry={handleRetry}
+              isLoading={isBusy}
+              isSubmitting={isSubmitted}
+            />
+          </div>
+        </div>
+      ) : null}
+
       <div
-        ref={messagesRef}
-        className='relative flex-1 overflow-y-auto px-4 py-5 sm:px-5'
+        ref={scrollContainerRef}
+        onScroll={onScroll}
+        className='relative flex-1 overflow-y-auto px-4 py-5 sm:px-6 lg:px-8'
         aria-live='polite'
       >
-        <div className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col'>
+        <div
+          ref={totalSizeRef}
+          className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col'
+        >
           {messages.length === 0 ? (
             <div className='flex flex-1 items-center justify-center py-12'>
-              <h1 className='text-balance text-center text-[2.25rem] font-semibold leading-[1.08] tracking-[-0.035em] text-primary-token sm:text-[3rem]'>
+              <h1
+                className={cn(
+                  'text-balance text-center text-[2.25rem] font-semibold leading-[1.08] tracking-[-0.035em] text-primary-token transition-opacity duration-fast sm:text-[3rem]',
+                  composerPickerOpen && 'opacity-0'
+                )}
+                aria-hidden={composerPickerOpen}
+              >
                 What are you working on?
               </h1>
             </div>
           ) : (
-            <div className='flex flex-col pb-4'>
-              {displayMessages.map(message => {
-                const text = getMessageText(message);
-                const toolParts = getToolParts(message);
-                const isThinking = message.id === THINKING_PLACEHOLDER_ID;
-                const shouldRenderMessage =
-                  isThinking || Boolean(text) || toolParts.length === 0;
-
-                return (
-                  <div key={message.id} className='pb-5'>
-                    {shouldRenderMessage ? (
-                      <ChatMessage
-                        id={message.id}
-                        role={message.role}
-                        parts={(message.parts ?? []) as MessagePart[]}
-                        isThinking={isThinking}
-                        isStreaming={
-                          isStreaming && message.id === lastAssistantMessageId
-                        }
-                        renderTools={false}
-                      />
-                    ) : null}
-                    {!isThinking
-                      ? renderOnboardingTools({
-                          messageId: message.id,
-                          toolParts,
-                          hasMessageText: Boolean(text),
-                        })
-                      : null}
-                  </div>
-                );
-              })}
-            </div>
+            <OnboardingMessageList
+              displayMessages={displayMessages}
+              isStreaming={isStreaming}
+              lastAssistantMessageId={lastAssistantMessageId}
+              isBusy={isBusy}
+              onSelectArtist={handleArtistSelect}
+            />
           )}
         </div>
       </div>
 
-      <div className='shrink-0 bg-surface-1 px-4 pb-4 pt-2 sm:px-5 sm:pb-5 sm:pt-2.5'>
+      <div className='shrink-0 bg-(--linear-app-content-surface) px-4 pb-4 pt-2 sm:px-6 sm:pb-5 sm:pt-2.5 lg:px-8'>
         <div className='mx-auto w-full max-w-[34rem]'>
-          {chatError ? (
-            <div className='mb-2'>
-              <ErrorDisplay
-                chatError={chatError}
-                onRetry={handleRetry}
-                isLoading={isBusy}
-                isSubmitting={isSubmitted}
-              />
-            </div>
-          ) : null}
-
           {isAwaitingFirstToken ? (
             <p
               className='mb-1.5 text-center text-xs text-tertiary-token'
@@ -378,10 +558,11 @@ export function OnboardingChat({
             placeholder={
               isAwaitingFirstToken ? 'Securing chat...' : 'Ask Jovie...'
             }
+            onPickerOpenChange={setComposerPickerOpen}
             shellChatV1
           />
         </div>
       </div>
-    </div>
+    </section>
   );
 }

@@ -41,20 +41,13 @@ export function ChipTray({ chips, onRemoveAt }: ChipTrayProps) {
           );
         }
         return (
-          <span key={chip.uid} className='relative'>
-            <EntityChip data={chip} variant='input' />
-            <button
-              type='button'
-              aria-label={`Remove ${chip.label}`}
-              onMouseDown={e => {
-                e.preventDefault();
-                onRemoveAt(i);
-              }}
-              className='absolute -right-1 -top-1 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-surface-2 text-tertiary-token shadow-[0_1px_2px_rgba(0,0,0,0.1)] hover:bg-surface-1 hover:text-primary-token focus:outline-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30'
-            >
-              <X className='h-2.5 w-2.5' />
-            </button>
-          </span>
+          <EntityChip
+            key={chip.uid}
+            data={chip}
+            variant='input'
+            onRemove={() => onRemoveAt(i)}
+            removeLabel={`Remove ${chip.label}`}
+          />
         );
       })}
     </div>

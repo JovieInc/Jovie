@@ -54,21 +54,21 @@ export function ErrorDisplay({
       role='alert'
       aria-live='assertive'
       aria-atomic='true'
-      className='rounded-[12px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-4'
+      className='rounded-[14px] border border-(--linear-app-frame-seam) bg-surface-0 p-3.5 shadow-[0_16px_40px_-28px_rgba(0,0,0,0.75)]'
     >
       <div className='flex items-start gap-3'>
-        <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-error/20 bg-error-subtle text-error'>
+        <div className='mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-error/25 bg-transparent text-error'>
           <ErrorIcon className='h-4.5 w-4.5' />
         </div>
-        <div className='min-w-0 flex-1 space-y-3'>
-          <div className='space-y-1'>
-            <p className='text-2xs font-semibold uppercase tracking-[0.16em] text-error'>
-              Chat interrupted
+        <div className='min-w-0 flex-1 space-y-2.5'>
+          <div className='space-y-0.5'>
+            <p className='text-[13px] font-medium leading-5 text-primary-token'>
+              Message paused
             </p>
-            <p className='text-sm font-medium text-primary-token'>
+            <p className='text-[12.5px] leading-5 text-secondary-token'>
               {chatError.message}
             </p>
-            <p className='text-xs text-secondary-token'>
+            <p className='text-[12px] leading-5 text-tertiary-token'>
               {getNextStepMessage(chatError.type)}
             </p>
           </div>
@@ -102,7 +102,7 @@ export function ErrorDisplay({
               size='sm'
               onClick={onRetry}
               disabled={isLoading || isSubmitting}
-              className='h-9 gap-2 rounded-[10px] px-4 text-2xs font-medium tracking-[-0.01em]'
+              className='h-8 gap-2 rounded-[10px] px-3 text-2xs font-medium tracking-[-0.01em]'
             >
               <RefreshCw className='h-3.5 w-3.5' />
               Retry message
