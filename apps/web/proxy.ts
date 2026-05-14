@@ -648,7 +648,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     if (isNavigationMethod && pathname === APP_ROUTES.ONBOARDING) {
       const targetUrl = req.nextUrl.clone();
       targetUrl.pathname = APP_ROUTES.START;
-      return NextResponse.redirect(targetUrl);
+      return NextResponse.redirect(targetUrl, 308);
     }
 
     // Authenticated legacy earnings deep links should land directly on the

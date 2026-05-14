@@ -58,7 +58,7 @@ export function ErrorDisplay({
     >
       <div className='flex items-start gap-3'>
         <div className='mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-error/25 bg-transparent text-error'>
-          <ErrorIcon className='h-4.5 w-4.5' />
+          <ErrorIcon className='size-4.5' />
         </div>
         <div className='min-w-0 flex-1 space-y-2.5'>
           <div className='space-y-0.5'>
@@ -89,7 +89,7 @@ export function ErrorDisplay({
                 className='ml-auto h-7 gap-1 rounded-[8px] px-2.5 text-2xs font-medium tracking-[-0.01em]'
                 aria-label='Copy support reference'
               >
-                <Copy className='h-3 w-3' />
+                <Copy className='size-3' />
                 {copied ? 'Copied' : 'Copy'}
               </Button>
             </div>
@@ -104,7 +104,7 @@ export function ErrorDisplay({
               disabled={isLoading || isSubmitting}
               className='h-8 gap-2 rounded-[10px] px-3 text-2xs font-medium tracking-[-0.01em]'
             >
-              <RefreshCw className='h-3.5 w-3.5' />
+              <RefreshCw className='size-3.5' />
               Retry message
             </Button>
           )}

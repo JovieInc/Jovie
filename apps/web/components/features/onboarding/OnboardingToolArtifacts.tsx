@@ -25,7 +25,7 @@ type ToolState =
   | 'output-denied'
   | 'approval-requested'
   | 'approval-responded'
-  | string
+  | (string & {})
   | undefined;
 
 interface ToolArtifactProps {
@@ -290,7 +290,20 @@ export function OnboardingSpotifyArtistPickerCard({
           </div>
         ) : null}
 
-        {!isSearching && hasQuery && results.length === 0 ? (
+        {!isSearching && artistSearch.error ? (
+          <div
+            className='flex items-start gap-2 rounded-lg border border-red-500/20 px-2.5 py-2.5 text-[12.5px] leading-5 text-secondary-token'
+            role='alert'
+          >
+            <AlertCircle className='mt-0.5 h-3.5 w-3.5 shrink-0 text-error' />
+            <span>{artistSearch.error}</span>
+          </div>
+        ) : null}
+
+        {!isSearching &&
+        !artistSearch.error &&
+        hasQuery &&
+        results.length === 0 ? (
           <div className='px-2 py-3 text-[12.5px] leading-5 text-secondary-token'>
             No exact match yet. Try the artist name from Spotify.
           </div>

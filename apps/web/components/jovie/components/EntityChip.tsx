@@ -91,6 +91,9 @@ export function EntityChip({
           aria-label={removeLabel ?? `Remove ${data.label}`}
           onMouseDown={event => {
             event.preventDefault();
+          }}
+          onClick={event => {
+            event.preventDefault();
             onRemove();
           }}
           className='-mr-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-sm text-tertiary-token transition-colors duration-fast hover:bg-surface-1 hover:text-primary-token focus:outline-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30'
@@ -101,7 +104,7 @@ export function EntityChip({
     </>
   );
 
-  if (canOpenEntityPanel) {
+  if (canOpenEntityPanel && !onRemove) {
     return (
       <button
         type='button'

@@ -306,7 +306,20 @@ test.describe('canonical /start onboarding chat', () => {
     await textarea.fill('/');
     const slashMenu = page.locator('[data-testid="slash-command-menu"]');
     await expect(slashMenu).toBeVisible();
-    await expect(alert).toBeHidden();
+    await expect(alert).toBeVisible();
+
+    const alertBox = await alert.boundingBox();
+    const slashMenuBox = await slashMenu.boundingBox();
+    expect(alertBox).not.toBeNull();
+    expect(slashMenuBox).not.toBeNull();
+    if (alertBox && slashMenuBox) {
+      const overlaps =
+        alertBox.x < slashMenuBox.x + slashMenuBox.width &&
+        alertBox.x + alertBox.width > slashMenuBox.x &&
+        alertBox.y < slashMenuBox.y + slashMenuBox.height &&
+        alertBox.y + alertBox.height > slashMenuBox.y;
+      expect(overlaps).toBe(false);
+    }
 
     await expect(page).toHaveScreenshot('start-error-picker.png', {
       maxDiffPixelRatio: 0.04,

@@ -481,6 +481,19 @@ export function OnboardingChat({
     onConversationActivity?.();
   }, [messages, onConversationActivity, status]);
 
+  const composerStatusBanner =
+    chatError && composerPickerOpen ? (
+      <div
+        role='alert'
+        aria-live='assertive'
+        aria-atomic='true'
+        className='px-3 py-2.5 text-[12.5px] leading-5'
+      >
+        <p className='font-medium text-primary-token'>Message paused</p>
+        <p className='mt-0.5 text-secondary-token'>{chatError.message}</p>
+      </div>
+    ) : null;
+
   return (
     <section
       className='relative flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-(--linear-app-content-surface)'
@@ -560,6 +573,7 @@ export function OnboardingChat({
             }
             onPickerOpenChange={setComposerPickerOpen}
             shellChatV1
+            statusBanner={composerStatusBanner}
           />
         </div>
       </div>

@@ -3,6 +3,7 @@
 import { motion, useReducedMotion } from 'motion/react';
 import {
   forwardRef,
+  type ReactNode,
   useCallback,
   useEffect,
   useId,
@@ -92,6 +93,8 @@ export interface ChatInputProps {
   readonly profileId?: string;
   /** Enables the Shell + Chat V1 composer geometry behind DESIGN_V1. */
   readonly shellChatV1?: boolean;
+  /** Optional compact status content rendered inside the composer surface. */
+  readonly statusBanner?: ReactNode;
 }
 
 type SurfaceMode = 'empty' | 'typing' | 'root' | 'entity';
@@ -158,6 +161,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       onPickerOpenChange,
       profileId,
       shellChatV1 = false,
+      statusBanner,
     },
     ref
   ) {
@@ -502,6 +506,11 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                       {pickerKindNoun(picker.state.kind)} to preview.
                     </div>
                   )}
+                  {statusBanner ? (
+                    <div className='border-t border-white/[0.055]'>
+                      {statusBanner}
+                    </div>
+                  ) : null}
                   <div className='border-t border-white/[0.055]'>
                     <InputRow
                       containerRef={containerRef}
@@ -570,6 +579,12 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                         <EntityPreviewPane entity={activeEntity} />
                       </div>
                     ) : null}
+                  </div>
+                ) : null}
+
+                {statusBanner ? (
+                  <div className='border-b border-white/[0.055]'>
+                    {statusBanner}
                   </div>
                 ) : null}
 

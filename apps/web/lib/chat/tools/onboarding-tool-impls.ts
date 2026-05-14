@@ -58,7 +58,6 @@ export interface OnboardingTurnState {
   spotifyImageUrl: string | null;
   spotifyGenres: string[];
   spotifyPopularity: number | null;
-  spotifyVerified: boolean;
   spotifyFollowers: number | null;
   /** Append-only log of recordInterviewSignal calls within this turn. */
   signals: InterviewSignal[];
@@ -77,7 +76,6 @@ export function createOnboardingTurnState(input: {
     spotifyImageUrl: null,
     spotifyGenres: [],
     spotifyPopularity: null,
-    spotifyVerified: false,
     spotifyFollowers: null,
     signals: [],
     turnCount: input.turnCount,
@@ -210,7 +208,6 @@ export function buildOnboardingTools(state: OnboardingTurnState): ToolSet {
             }))
           ),
           spotifyFollowers: state.spotifyFollowers,
-          spotifyVerified: state.spotifyVerified,
           turnCount: state.turnCount,
         });
         const payload: NextStepCardPayload = {

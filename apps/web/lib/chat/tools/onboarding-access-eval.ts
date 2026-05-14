@@ -4,7 +4,7 @@
  * This is NOT an LLM tool. It is a server function called by the
  * `proposeNextStep` tool to decide whether the visitor should:
  *
- *   - `instant_access` — Spotify-verified or has solid signal, route to checkout
+ *   - `instant_access` — Spotify/social audience has solid signal, route to checkout
  *   - `waitlist`       — qualifying signal too weak, defer with waitlist confirmation
  *   - `needs_more_info` — interview not complete enough to decide either way
  *
@@ -30,8 +30,6 @@ export interface AccessDecisionInput {
   readonly signal: InterviewSignal;
   /** Spotify follower count from confirmSpotifyArtist (if resolved). */
   readonly spotifyFollowers: number | null;
-  /** Whether the picked Spotify artist is verified on Spotify. */
-  readonly spotifyVerified: boolean;
   /** Number of LLM turns observed so far. Used to break stuck loops. */
   readonly turnCount: number;
 }
@@ -73,7 +71,7 @@ const releaseStageRank: Record<ReleaseStage, number> = {
  * Pure function, deterministic, no I/O. Safe to call repeatedly across turns.
  *
  * Decision rules (top match wins):
- *  1. Spotify verified artist OR followers >= 1k → instant_access
+ *  1. Spotify followers >= 1k → instant_access
  *  2. Audience band 5k+ → instant_access
  *  3. Audience band 500-5k AND active release stage → instant_access
  *  4. Hit MAX_INTERVIEW_TURNS_BEFORE_FORCE without instant-access signal → waitlist
@@ -82,16 +80,9 @@ const releaseStageRank: Record<ReleaseStage, number> = {
 export function evaluateAccessSignal(
   input: AccessDecisionInput
 ): AccessDecision {
-  const { signal, spotifyFollowers, spotifyVerified, turnCount } = input;
+  const { signal, spotifyFollowers, turnCount } = input;
 
   // 1. Strong Spotify signal — instant access.
-  if (spotifyVerified) {
-    return {
-      kind: 'instant_access',
-      rationale: 'spotify_verified',
-      score: 95,
-    };
-  }
   if (
     spotifyFollowers !== null &&
     spotifyFollowers >= INSTANT_ACCESS_FOLLOWER_THRESHOLD

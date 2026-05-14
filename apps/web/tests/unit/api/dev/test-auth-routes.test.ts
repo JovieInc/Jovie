@@ -219,6 +219,60 @@ describe('dev test-auth routes', () => {
     expect(mockIsTrustedTestBypassRequest).toHaveBeenCalled();
   });
 
+  it('accepts GET /session when the URL host is the server bind address but the request host is loopback', async () => {
+    mockGetDevTestAuthAvailability.mockReturnValueOnce({
+      enabled: true,
+      trustedHost: false,
+      reason: 'Only available on loopback and private dev hosts',
+    });
+    mockIsTrustedTestBypassRequest.mockReturnValueOnce(true);
+
+    const { GET } = await import('@/app/api/dev/test-auth/session/route');
+    const response = await GET(
+      new NextRequest('http://0.0.0.0:3100/api/dev/test-auth/session', {
+        headers: {
+          Host: '127.0.0.1:3100',
+        },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      enabled: true,
+      trustedHost: true,
+      active: false,
+      persona: null,
+      userId: null,
+      email: null,
+      profilePath: null,
+      reason: null,
+    });
+    expect(mockIsTrustedTestBypassRequest).toHaveBeenCalled();
+  });
+
+  it('accepts DELETE /session when the URL host is the server bind address but the request host is loopback', async () => {
+    mockGetDevTestAuthAvailability.mockReturnValueOnce({
+      enabled: true,
+      trustedHost: false,
+      reason: 'Only available on loopback and private dev hosts',
+    });
+    mockIsTrustedTestBypassRequest.mockReturnValueOnce(true);
+
+    const { DELETE } = await import('@/app/api/dev/test-auth/session/route');
+    const response = await DELETE(
+      new NextRequest('http://0.0.0.0:3100/api/dev/test-auth/session', {
+        method: 'DELETE',
+        headers: {
+          Host: '127.0.0.1:3100',
+        },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('set-cookie')).toContain('__e2e_test_persona=');
+    expect(mockIsTrustedTestBypassRequest).toHaveBeenCalled();
+  });
+
   it('accepts creator-ready on POST /session', async () => {
     mockEnsureDevTestAuthActor.mockResolvedValueOnce({
       persona: 'creator-ready',
