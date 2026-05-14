@@ -7,7 +7,7 @@ import {
   MarketingPageShell,
 } from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
-import { APP_ROUTES } from '@/constants/routes';
+import { CANONICAL_PLANS, getCanonicalPlan } from '@/constants/plans';
 import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
 import { publicEnv } from '@/lib/env-public';
 
@@ -39,6 +39,11 @@ const maxPlanEnabled = publicEnv.NEXT_PUBLIC_FEATURE_MAX_PLAN === 'true';
 const free = ENTITLEMENT_REGISTRY.free;
 const pro = ENTITLEMENT_REGISTRY.pro;
 const max = ENTITLEMENT_REGISTRY.max;
+
+// Canonical CTAs — sourced from constants/plans.ts to prevent copy/URL drift
+const freePlan = getCanonicalPlan('free') ?? CANONICAL_PLANS[0];
+const proPlan = getCanonicalPlan('pro') ?? CANONICAL_PLANS[1];
+const maxPlan = getCanonicalPlan('max') ?? CANONICAL_PLANS[2];
 
 interface FeatureListProps {
   readonly features: readonly string[];
@@ -92,10 +97,10 @@ export default function PricingPage() {
               <FeatureList features={free.marketing.features} />
             </div>
             <Link
-              href={APP_ROUTES.SIGNUP}
+              href={freePlan.signupHref}
               className='focus-ring inline-block mt-7 px-5 py-2.5 rounded-md font-medium text-sm transition-colors border border-subtle hover:bg-white/[0.04]'
             >
-              Request Access
+              {freePlan.ctaLabel}
             </Link>
           </div>
 
@@ -120,10 +125,10 @@ export default function PricingPage() {
               <FeatureList features={pro.marketing.features} />
             </div>
             <Link
-              href={`${APP_ROUTES.SIGNUP}?plan=pro`}
+              href={proPlan.signupHref}
               className='public-action-primary focus-ring mt-7'
             >
-              Request Access
+              {proPlan.ctaLabel}
             </Link>
           </div>
 
@@ -148,10 +153,10 @@ export default function PricingPage() {
                 <FeatureList features={max.marketing.features} />
               </div>
               <Link
-                href={`${APP_ROUTES.SIGNUP}?plan=max`}
+                href={maxPlan.signupHref}
                 className='focus-ring inline-block mt-7 px-5 py-2.5 rounded-md font-medium text-sm transition-colors border border-subtle hover:bg-white/[0.04]'
               >
-                Request Access
+                {maxPlan.ctaLabel}
               </Link>
             </div>
           )}

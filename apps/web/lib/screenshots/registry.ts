@@ -110,11 +110,14 @@ interface TimWhiteProfileMobileVariant {
  * Build a tim-white-profile mobile scenario seed. The mode/release variants
  * all share the same waitFor selector + mobile viewport — only the slug
  * (driving id, title, URL query, and exported phone screenshot path) differs.
+ *
+ * Variants that render a visible audio player declare a unique `playerTimestamp`
+ * so the invariant test can enforce that no two player screenshots look identical.
  */
 function timWhiteProfileMobile(
-  variant: TimWhiteProfileMobileVariant
+  variant: TimWhiteProfileMobileVariantWithTimestamp
 ): ScreenshotScenarioSeed {
-  const { slug, title, queryKey } = variant;
+  const { slug, title, queryKey, playerTimestamp } = variant;
   return {
     id: `tim-white-profile-${slug}-mobile`,
     title: `Tim White Profile — ${title}`,
@@ -122,16 +125,44 @@ function timWhiteProfileMobile(
     waitFor: TIM_WHITE_PROFILE_MOBILE_WAIT_FOR,
     viewport: 'mobile',
     publicExportPath: `tim-white-profile-${slug}-phone.png`,
+    ...(playerTimestamp !== undefined && { playerTimestamp }),
   };
 }
 
-const TIM_WHITE_PROFILE_MOBILE_VARIANTS: readonly TimWhiteProfileMobileVariant[] =
+/**
+ * Extended variant with an optional player timestamp.
+ *
+ * Any mode that renders a visible audio player must declare a unique timestamp
+ * so the invariant test can verify no two player screenshots look identical.
+ * Format: "M:SS" matching the Jovie player display.
+ */
+interface TimWhiteProfileMobileVariantWithTimestamp
+  extends TimWhiteProfileMobileVariant {
+  readonly playerTimestamp?: string;
+}
+
+const TIM_WHITE_PROFILE_MOBILE_VARIANTS: readonly TimWhiteProfileMobileVariantWithTimestamp[] =
   [
-    { slug: 'listen', title: 'Listen', queryKey: 'mode' },
+    {
+      slug: 'listen',
+      title: 'Listen',
+      queryKey: 'mode',
+      playerTimestamp: '1:24',
+    },
     { slug: 'tour', title: 'Tour', queryKey: 'mode' },
-    { slug: 'pay', title: 'Pay', queryKey: 'mode' },
-    { slug: 'live', title: 'Latest Release', queryKey: 'release' },
-    { slug: 'subscribe', title: 'Subscribe', queryKey: 'mode' },
+    { slug: 'pay', title: 'Pay', queryKey: 'mode', playerTimestamp: '2:47' },
+    {
+      slug: 'live',
+      title: 'Latest Release',
+      queryKey: 'release',
+      playerTimestamp: '0:38',
+    },
+    {
+      slug: 'subscribe',
+      title: 'Subscribe',
+      queryKey: 'mode',
+      playerTimestamp: '3:12',
+    },
     { slug: 'contact', title: 'Contact', queryKey: 'mode' },
   ];
 
