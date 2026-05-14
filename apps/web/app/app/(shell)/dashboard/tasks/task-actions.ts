@@ -339,6 +339,10 @@ function assertMoveTaskInput(
     throw new Error('Invalid task status');
   }
 
+  if (input.beforeTaskId && input.afterTaskId) {
+    throw new Error('Provide only one task order anchor');
+  }
+
   const adjacentIds = [input.beforeTaskId, input.afterTaskId].filter(Boolean);
   if (adjacentIds.includes(input.taskId)) {
     throw new Error('Task cannot be moved next to itself');
@@ -758,6 +762,33 @@ export async function moveTask(
     return { success: true };
   }
 
+  const originalUpdatedAtByTaskId = new Map(
+    affectedRows.map(row => [row.id, row.updatedAt] as const)
+  );
+  const updatePreconditions: SQL<unknown>[] = [];
+
+  for (const update of updates) {
+    const originalUpdatedAt = originalUpdatedAtByTaskId.get(update.id);
+    const precondition =
+      originalUpdatedAt &&
+      and(eq(tasks.id, update.id), eq(tasks.updatedAt, originalUpdatedAt));
+
+    if (!precondition) {
+      throw new Error('Task order changed. Reload and try again.');
+    }
+
+    updatePreconditions.push(precondition);
+  }
+
+  const guardedUpdateCondition =
+    updatePreconditions.length === 1
+      ? updatePreconditions[0]
+      : or(...updatePreconditions);
+
+  if (!guardedUpdateCondition) {
+    throw new Error('Task order changed. Reload and try again.');
+  }
+
   const statusCase = drizzleSql<typeof tasks.status>`case ${drizzleSql.join(
     updates.map(
       update =>
@@ -792,10 +823,7 @@ export async function moveTask(
       and(
         eq(tasks.creatorProfileId, profileId),
         isNull(tasks.deletedAt),
-        inArray(
-          tasks.id,
-          updates.map(update => update.id)
-        )
+        guardedUpdateCondition
       )
     )
     .returning({ id: tasks.id });

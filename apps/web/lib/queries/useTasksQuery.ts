@@ -15,7 +15,11 @@ const TASK_STATS_CACHE = {
   gcTime: 5 * 60 * 1000,
 };
 
-export function useTasksQuery(profileId?: string, filters?: TaskFilters) {
+export function useTasksQuery(
+  profileId?: string,
+  filters?: TaskFilters,
+  options?: { readonly enabled?: boolean }
+) {
   const queryFilters = filters ? { ...filters } : undefined;
 
   return useQuery({
@@ -24,7 +28,7 @@ export function useTasksQuery(profileId?: string, filters?: TaskFilters) {
     queryFn: () => getTasks(filters),
     ...STANDARD_CACHE,
     placeholderData: keepPreviousData,
-    enabled: Boolean(profileId),
+    enabled: Boolean(profileId) && (options?.enabled ?? true),
   });
 }
 

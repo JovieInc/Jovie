@@ -101,6 +101,30 @@ function findTaskStatus(
   );
 }
 
+function resolveDropInsertIndex({
+  overTaskIndex,
+  destinationLength,
+  isSameColumn,
+  sourceIndex,
+  overIndex,
+}: Readonly<{
+  overTaskIndex: number;
+  destinationLength: number;
+  isSameColumn: boolean;
+  sourceIndex: number;
+  overIndex: number;
+}>): number {
+  if (overTaskIndex === -1) {
+    return destinationLength;
+  }
+
+  if (isSameColumn && sourceIndex < overIndex) {
+    return overTaskIndex + 1;
+  }
+
+  return overTaskIndex;
+}
+
 function resolveTaskBoardMoveInput({
   activeTaskId,
   overId,
@@ -141,12 +165,13 @@ function resolveTaskBoardMoveInput({
     sourceColumn?.tasks.findIndex(task => task.id === activeTaskId) ?? -1;
   const overIndex =
     destinationColumn.tasks.findIndex(task => task.id === overId) ?? -1;
-  const insertIndex =
-    overTaskIndex === -1
-      ? destinationTasksWithoutActive.length
-      : activeTask.status === overColumnStatus && sourceIndex < overIndex
-        ? overTaskIndex + 1
-        : overTaskIndex;
+  const insertIndex = resolveDropInsertIndex({
+    overTaskIndex,
+    destinationLength: destinationTasksWithoutActive.length,
+    isSameColumn: activeTask.status === overColumnStatus,
+    sourceIndex,
+    overIndex,
+  });
   const beforeTaskId = destinationTasksWithoutActive[insertIndex]?.id ?? null;
   const afterTaskId =
     destinationTasksWithoutActive[insertIndex - 1]?.id ?? null;
@@ -282,7 +307,6 @@ export function TaskBoard({
             artistName={artistName}
             selected={false}
             draggingOverlay
-            onOpenTask={onOpenTask}
           />
         ) : null}
       </DragOverlay>
@@ -414,19 +438,25 @@ function SortableTaskBoardCard({
         transform: CSS.Transform.toString(transform),
         transition,
       }}
-      {...attributes}
-      {...listeners}
       className={cn(
         'group/task-board-card-shell relative',
         isDragging && 'opacity-45'
       )}
     >
-      <TaskBoardCard
-        task={task}
-        artistName={artistName}
-        selected={selected}
-        onOpenTask={onOpenTask}
-      />
+      <button
+        type='button'
+        {...attributes}
+        {...listeners}
+        data-testid={`task-board-card-${task.id}`}
+        onClick={() => onOpenTask(task)}
+        className='block w-full text-left focus-visible:outline-none'
+      >
+        <TaskBoardCard
+          task={task}
+          artistName={artistName}
+          selected={selected}
+        />
+      </button>
       <div className='absolute right-2 top-2'>
         <TableActionMenu
           items={convertContextMenuItems(getTaskContextMenuItems(task))}
@@ -452,13 +482,11 @@ function TaskBoardCard({
   artistName,
   selected,
   draggingOverlay = false,
-  onOpenTask,
 }: Readonly<{
   task: TaskView;
   artistName?: string | null;
   selected: boolean;
   draggingOverlay?: boolean;
-  onOpenTask: (task: TaskView) => void;
 }>) {
   const stage = getTaskStageVisual(task.status, task.agentStatus);
   const stageAccent = getAccentCssVars(stage.accent);
@@ -469,10 +497,7 @@ function TaskBoardCard({
   const StageIcon = stage.icon;
 
   return (
-    <button
-      type='button'
-      data-testid={`task-board-card-${task.id}`}
-      onClick={() => onOpenTask(task)}
+    <div
       className={cn(
         'group/task-board-card min-h-[7.25rem] w-full cursor-default rounded-lg border border-[color-mix(in_oklab,var(--linear-app-shell-border)_68%,transparent)] bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_38%,var(--linear-app-content-surface))] px-3 py-2.5 text-left shadow-[0_1px_0_rgba(255,255,255,0.025)] transition-[background-color,border-color,box-shadow,opacity]',
         'hover:border-[color-mix(in_oklab,var(--linear-app-shell-border)_90%,transparent)] hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_42%,var(--linear-app-content-surface))]',
@@ -546,7 +571,7 @@ function TaskBoardCard({
           />
         ) : null}
       </div>
-    </button>
+    </div>
   );
 }
 
