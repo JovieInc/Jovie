@@ -11,7 +11,11 @@ import type {
   ReleaseSidebarAnalytics,
   ReleaseSidebarTrack,
 } from '@/components/organisms/release-sidebar/types';
-import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
+import {
+  type DemoPersona,
+  FOUNDER_DEMO_PERSONA,
+  INTERNAL_DJ_DEMO_PERSONA,
+} from '@/lib/demo-personas';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import type { AudienceMember } from '@/types';
 
@@ -43,7 +47,8 @@ export const DEMO_PROVIDER_CONFIG: Record<
 
 // Helper to create provider links
 function makeProviders(
-  release: (typeof INTERNAL_DJ_DEMO_PERSONA.releases)[number]
+  release: DemoPersona['releases'][number],
+  persona: DemoPersona
 ): ReleaseViewModel['providers'] {
   const entries = Object.entries(release.providerUrls) as Array<
     [ProviderKey, string]
@@ -55,16 +60,19 @@ function makeProviders(
     source: 'ingested' as const,
     updatedAt: '2026-02-01T00:00:00Z',
     label: DEMO_PROVIDER_CONFIG[key].label,
-    path: `/${INTERNAL_DJ_DEMO_PERSONA.profile.handle}/${release.slug}`,
+    path: `/${persona.profile.handle}/${release.slug}`,
     isPrimary: i < 3,
   }));
 }
 
 // ── Release view models ─────────────────────────────────────────────────────
 
-export const DEMO_RELEASE_VIEW_MODELS: ReleaseViewModel[] =
-  INTERNAL_DJ_DEMO_PERSONA.releases.map(release => ({
-    profileId: 'demo-profile',
+function makeReleaseViewModels(
+  persona: DemoPersona,
+  profileId: string
+): ReleaseViewModel[] {
+  return persona.releases.map(release => ({
+    profileId,
     id: release.id,
     title: release.title,
     artistNames: [...release.artistNames],
@@ -72,7 +80,7 @@ export const DEMO_RELEASE_VIEW_MODELS: ReleaseViewModel[] =
     status: 'released' as const,
     artworkUrl: release.artworkUrl,
     slug: release.slug,
-    smartLinkPath: `/${INTERNAL_DJ_DEMO_PERSONA.profile.handle}/${release.slug}`,
+    smartLinkPath: `/${persona.profile.handle}/${release.slug}`,
     spotifyPopularity: release.spotifyPopularity,
     releaseType: release.releaseType,
     isExplicit: Boolean(release.tracks?.some(track => track.isExplicit)),
@@ -86,16 +94,22 @@ export const DEMO_RELEASE_VIEW_MODELS: ReleaseViewModel[] =
     label: release.label ?? null,
     primaryIsrc: release.primaryIsrc,
     genres: [...release.genres],
-    providers: makeProviders(release),
+    providers: makeProviders(release, persona),
   }));
+}
+
+export const DEMO_RELEASE_VIEW_MODELS: ReleaseViewModel[] =
+  makeReleaseViewModels(INTERNAL_DJ_DEMO_PERSONA, 'demo-profile');
+
+export const FOUNDER_DEMO_RELEASE_VIEW_MODELS: ReleaseViewModel[] =
+  makeReleaseViewModels(FOUNDER_DEMO_PERSONA, 'demo-founder-profile');
 
 function makeDemoTracks(
   release: ReleaseViewModel,
+  persona: DemoPersona,
   count = Math.min(Math.max(release.totalTracks, 1), 6)
 ): ReleaseSidebarTrack[] {
-  const personaRelease = INTERNAL_DJ_DEMO_PERSONA.releases.find(
-    item => item.id === release.id
-  );
+  const personaRelease = persona.releases.find(item => item.id === release.id);
   if (personaRelease?.tracks?.length) {
     return personaRelease.tracks.slice(0, count).map(track => ({
       id: `${release.id}-track-${track.trackNumber}`,
@@ -169,7 +183,17 @@ export const DEMO_RELEASE_SIDEBAR_FIXTURES = Object.fromEntries(
     release.id,
     {
       analytics: makeDemoAnalytics(release, index),
-      tracks: makeDemoTracks(release),
+      tracks: makeDemoTracks(release, INTERNAL_DJ_DEMO_PERSONA),
+    },
+  ])
+);
+
+export const FOUNDER_DEMO_RELEASE_SIDEBAR_FIXTURES = Object.fromEntries(
+  FOUNDER_DEMO_RELEASE_VIEW_MODELS.map((release, index) => [
+    release.id,
+    {
+      analytics: makeDemoAnalytics(release, index),
+      tracks: makeDemoTracks(release, FOUNDER_DEMO_PERSONA),
     },
   ])
 );
