@@ -31,6 +31,7 @@ type TaskBoardCacheEntry = readonly [
 ];
 type TaskDetailCacheEntry = readonly [readonly unknown[], TaskView | undefined];
 type TaskStatsCacheEntry = readonly [readonly unknown[], TaskStats | undefined];
+type TaskQueryClient = ReturnType<typeof useQueryClient>;
 
 interface TaskCacheSnapshot {
   readonly previousLists: TaskListCacheEntry[];
@@ -112,7 +113,7 @@ function getCachedTask(
 }
 
 function getTaskCacheSnapshot(
-  queryClient: ReturnType<typeof useQueryClient>,
+  queryClient: TaskQueryClient,
   taskId: string
 ): TaskCacheSnapshot {
   return {
@@ -132,7 +133,7 @@ function getTaskCacheSnapshot(
 }
 
 function restoreTaskCacheSnapshot(
-  queryClient: ReturnType<typeof useQueryClient>,
+  queryClient: TaskQueryClient,
   snapshot: TaskCacheSnapshot
 ) {
   for (const [queryKey, list] of snapshot.previousLists) {
@@ -157,7 +158,7 @@ function restoreTaskCacheSnapshot(
 }
 
 async function invalidateTaskQueries(
-  queryClient: ReturnType<typeof useQueryClient>,
+  queryClient: TaskQueryClient,
   options: Readonly<{ includeStats?: boolean }> = {}
 ) {
   await queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
@@ -231,6 +232,77 @@ function updateTaskStatsForDeletion(
         ? previousStatusCount
         : stats.inProgress),
   };
+}
+
+function patchMovedTaskBoards(
+  queryClient: TaskQueryClient,
+  previousBoards: ReadonlyArray<TaskBoardCacheEntry>,
+  input: MoveTaskInput
+) {
+  for (const [queryKey, board] of previousBoards) {
+    queryClient.setQueryData(queryKey, applyTaskBoardMove(board, input));
+  }
+}
+
+function patchMovedTaskLists(
+  queryClient: TaskQueryClient,
+  previousLists: ReadonlyArray<TaskListCacheEntry>,
+  input: MoveTaskInput
+) {
+  for (const [queryKey, list] of previousLists) {
+    queryClient.setQueryData(queryKey, applyTaskListMove(list, input));
+  }
+}
+
+function getOptimisticMoveCompletedAt(
+  detail: TaskView,
+  nextStatus: TaskView['status']
+): Date | null {
+  if (nextStatus === 'done') {
+    return detail.completedAt ?? new Date();
+  }
+
+  return nextStatus !== detail.status ? null : detail.completedAt;
+}
+
+function patchMovedTaskDetails(
+  queryClient: TaskQueryClient,
+  previousDetails: ReadonlyArray<TaskDetailCacheEntry>,
+  input: MoveTaskInput
+) {
+  for (const [queryKey, detail] of previousDetails) {
+    if (!detail) {
+      continue;
+    }
+
+    queryClient.setQueryData(queryKey, {
+      ...detail,
+      status: input.toStatus,
+      completedAt: getOptimisticMoveCompletedAt(detail, input.toStatus),
+    });
+  }
+}
+
+function patchMovedTaskStatsIfNeeded(
+  queryClient: TaskQueryClient,
+  previousStatsEntries: ReadonlyArray<TaskStatsCacheEntry>,
+  previousTask: TaskView | undefined,
+  nextStatus: TaskView['status']
+) {
+  if (!previousTask || previousTask.status === nextStatus) {
+    return;
+  }
+
+  for (const [queryKey, stats] of previousStatsEntries) {
+    if (!stats) {
+      continue;
+    }
+
+    queryClient.setQueryData(
+      queryKey,
+      updateTaskStatsForStatusChange(stats, previousTask.status, nextStatus)
+    );
+  }
 }
 
 export function useCreateTaskMutation() {
@@ -372,47 +444,15 @@ export function useMoveTaskMutation() {
         input.taskId
       );
 
-      for (const [queryKey, board] of snapshot.previousBoards) {
-        queryClient.setQueryData(queryKey, applyTaskBoardMove(board, input));
-      }
-
-      for (const [queryKey, list] of snapshot.previousLists) {
-        queryClient.setQueryData(queryKey, applyTaskListMove(list, input));
-      }
-
-      for (const [queryKey, detail] of snapshot.previousDetails) {
-        if (!detail) {
-          continue;
-        }
-
-        queryClient.setQueryData(queryKey, {
-          ...detail,
-          status: input.toStatus,
-          completedAt:
-            input.toStatus === 'done'
-              ? (detail.completedAt ?? new Date())
-              : input.toStatus !== detail.status
-                ? null
-                : detail.completedAt,
-        });
-      }
-
-      if (previousTask && previousTask.status !== input.toStatus) {
-        for (const [queryKey, stats] of snapshot.previousStatsEntries) {
-          if (!stats) {
-            continue;
-          }
-
-          queryClient.setQueryData(
-            queryKey,
-            updateTaskStatsForStatusChange(
-              stats,
-              previousTask.status,
-              input.toStatus
-            )
-          );
-        }
-      }
+      patchMovedTaskBoards(queryClient, snapshot.previousBoards, input);
+      patchMovedTaskLists(queryClient, snapshot.previousLists, input);
+      patchMovedTaskDetails(queryClient, snapshot.previousDetails, input);
+      patchMovedTaskStatsIfNeeded(
+        queryClient,
+        snapshot.previousStatsEntries,
+        previousTask,
+        input.toStatus
+      );
 
       return snapshot;
     },
@@ -463,6 +503,10 @@ export function useDeleteTaskMutation() {
           continue;
         }
 
+        const removedFromBoard = board.columns.some(column =>
+          column.tasks.some(task => task.id === taskId)
+        );
+
         queryClient.setQueryData(queryKey, {
           ...board,
           columns: board.columns.map(column => {
@@ -475,7 +519,9 @@ export function useDeleteTaskMutation() {
                 : column.totalCount,
             };
           }),
-          totalCount: Math.max(0, board.totalCount - 1),
+          totalCount: removedFromBoard
+            ? Math.max(0, board.totalCount - 1)
+            : board.totalCount,
         });
       }
 

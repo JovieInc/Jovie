@@ -256,7 +256,7 @@ vi.mock('@/hooks/useBreakpoint', () => ({
       return mockIs2xlUp;
     }
 
-    if (breakpoint === 'xl') {
+    if (breakpoint === 'lg' || breakpoint === 'xl') {
       return mockIsXlUp;
     }
 
@@ -553,11 +553,7 @@ describe('TasksPageClient', () => {
 
     fireEvent.click(screen.getByTestId('mock-board-card-task-2'));
 
-    expect(mockRegisterRightPanel).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        type: expect.any(Function),
-      })
-    );
+    expect(screen.getByLabelText('Task title')).toHaveValue(mockTaskTwo.title);
   });
 
   it('submits board moves through the move mutation', () => {
