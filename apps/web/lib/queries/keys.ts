@@ -371,6 +371,13 @@ export const queryKeys = {
         ...(profileId === undefined ? [] : [profileId]),
         ...(filters === undefined ? [] : [filters]),
       ] as const,
+    board: (profileId?: string, filters?: Record<string, unknown>) =>
+      [
+        ...queryKeys.tasks.all,
+        'board',
+        ...(profileId === undefined ? [] : [profileId]),
+        ...(filters === undefined ? [] : [filters]),
+      ] as const,
     detail: (taskId: string, profileId?: string) =>
       [
         ...queryKeys.tasks.all,

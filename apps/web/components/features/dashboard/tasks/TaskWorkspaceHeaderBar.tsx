@@ -1,7 +1,7 @@
 'use client';
 
 import { Button, Input } from '@jovie/ui';
-import { ArrowDown, ArrowUp, Search, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Search, Settings2, X } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { AppSearchField } from '@/components/molecules/AppSearchField';
 import {
@@ -9,6 +9,10 @@ import {
   type TableFilterDropdownCategory,
 } from '@/components/molecules/filters';
 import { PageToolbarActionButton } from '@/components/organisms/table';
+import {
+  DisplayMenuDropdown,
+  type ViewMode,
+} from '@/components/organisms/table/molecules/DisplayMenuDropdown';
 import { cn } from '@/lib/utils';
 
 export type TaskSubviewId = 'all' | 'mine' | 'jovie';
@@ -36,6 +40,10 @@ export interface TaskWorkspaceHeaderBarProps {
   readonly createPending: boolean;
   readonly filterCategories: ReadonlyArray<TableFilterDropdownCategory>;
   readonly onClearFilters: () => void;
+  readonly viewMode: ViewMode;
+  readonly onViewModeChange: (viewMode: ViewMode) => void;
+  readonly showCancelledColumn: boolean;
+  readonly onShowCancelledColumnChange: (showCancelledColumn: boolean) => void;
   readonly showTaskNavigation?: boolean;
   readonly canSelectPrevious?: boolean;
   readonly canSelectNext?: boolean;
@@ -57,6 +65,10 @@ export function TaskWorkspaceHeaderBar({
   createPending,
   filterCategories,
   onClearFilters,
+  viewMode,
+  onViewModeChange,
+  showCancelledColumn,
+  onShowCancelledColumnChange,
   showTaskNavigation = false,
   canSelectPrevious = false,
   canSelectNext = false,
@@ -166,6 +178,27 @@ export function TaskWorkspaceHeaderBar({
                 shortcutHint='S'
               />
             </div>
+            <DisplayMenuDropdown
+              viewMode={viewMode}
+              availableViewModes={['board', 'list']}
+              onViewModeChange={onViewModeChange}
+              availableColumns={[{ id: 'cancelled', label: 'Cancelled' }]}
+              columnVisibility={{ cancelled: showCancelledColumn }}
+              onColumnVisibilityChange={(columnId, visible) => {
+                if (columnId === 'cancelled') {
+                  onShowCancelledColumnChange(visible);
+                }
+              }}
+              trigger={
+                <PageToolbarActionButton
+                  ariaLabel='Display options'
+                  label='Display options'
+                  tooltipLabel='Display'
+                  iconOnly
+                  icon={<Settings2 className='h-3.5 w-3.5' />}
+                />
+              }
+            />
             {showTaskNavigation ? (
               <div className='flex items-center gap-0.5'>
                 <PageToolbarActionButton
