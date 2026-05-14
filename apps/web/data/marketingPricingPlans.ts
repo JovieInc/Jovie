@@ -13,6 +13,16 @@ export const MARKETING_PRICING_PLAN_IDS = ['free', 'pro', 'max'] as const;
 export type MarketingPricingPlanId =
   (typeof MARKETING_PRICING_PLAN_IDS)[number];
 
+const visiblePlanIds = (process.env.NEXT_PUBLIC_MARKETING_VISIBLE_PLANS ?? '')
+  .split(',')
+  .map(plan => plan.trim())
+  .filter((plan): plan is MarketingPricingPlanId =>
+    (MARKETING_PRICING_PLAN_IDS as readonly string[]).includes(plan)
+  );
+const VISIBLE_PLAN_IDS = new Set<MarketingPricingPlanId>(
+  visiblePlanIds.length > 0 ? visiblePlanIds : MARKETING_PRICING_PLAN_IDS
+);
+
 export interface MarketingPricingPlan {
   readonly id: MarketingPricingPlanId;
   readonly name: string;
@@ -95,4 +105,26 @@ export const MARKETING_PRICING_PLANS: readonly MarketingPricingPlan[] = [
 
 export function getMarketingPlanHref(planId: MarketingPricingPlanId): string {
   return `${APP_ROUTES.SIGNUP}?plan=${planId}`;
+}
+
+export function isMarketingPlanActive(
+  _planId: MarketingPricingPlanId
+): boolean {
+  return true;
+}
+
+export function isMarketingPlanVisible(
+  planId: MarketingPricingPlanId
+): boolean {
+  return VISIBLE_PLAN_IDS.has(planId);
+}
+
+export function getVisibleMarketingPricingPlans(): readonly MarketingPricingPlan[] {
+  return MARKETING_PRICING_PLANS.filter(plan =>
+    isMarketingPlanVisible(plan.id)
+  );
+}
+
+export function getMarketingPlanCtaLabel(plan: MarketingPricingPlan): string {
+  return plan.ctaLabel;
 }

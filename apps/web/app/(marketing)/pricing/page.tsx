@@ -5,13 +5,26 @@ import { MarketingContainer, MarketingPageShell } from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import {
-  MARKETING_PRICING_PLANS,
+  getVisibleMarketingPricingPlans,
   type MarketingPricingPlan,
 } from '@/data/marketingPricingPlans';
 import { PricingComparisonChart } from '@/features/pricing/PricingComparisonChart';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 
 export const revalidate = false;
+
+const VISIBLE_PRICING_PLANS = getVisibleMarketingPricingPlans();
+const VISIBLE_PAID_PLANS = VISIBLE_PRICING_PLANS.filter(
+  plan => plan.id !== 'free'
+);
+const primaryPaidPlanName =
+  VISIBLE_PAID_PLANS.length === 1 ? VISIBLE_PAID_PLANS[0]?.name : null;
+const accessCopy = primaryPaidPlanName
+  ? `${primaryPaidPlanName} is ready when you want the release system turned on.`
+  : 'Pro and Max are ready when you want the release system turned on.';
+const requestAccessCopy = primaryPaidPlanName
+  ? `Claim the profile first. Choose ${primaryPaidPlanName} when you want the release system turned on.`
+  : 'Claim the profile first. Choose a paid plan when you want the release system turned on.';
 
 export const metadata: Metadata = {
   title: 'Pricing',
@@ -62,7 +75,7 @@ const PRICING_SCHEMA = {
   url: `${BASE_URL}/pricing`,
   mainEntity: {
     '@type': 'ItemList',
-    itemListElement: MARKETING_PRICING_PLANS.map((plan, index) => {
+    itemListElement: VISIBLE_PRICING_PLANS.map((plan, index) => {
       const price = getPriceValue(plan);
 
       return {
@@ -143,6 +156,9 @@ export default function PricingPage() {
                 Artist profiles are free forever. Pro adds the release tools
                 when you need them.
               </p>
+              <p className='mt-6 text-[13px] font-medium tracking-[-0.01em] text-tertiary-token'>
+                {accessCopy}
+              </p>
               <div className='mt-7 flex flex-wrap items-center gap-3'>
                 <Link
                   href={`${APP_ROUTES.SIGNUP}?plan=free`}
@@ -203,8 +219,7 @@ export default function PricingPage() {
               Get Started
             </h2>
             <p className='mx-auto mt-4 max-w-[30rem] text-[15px] leading-[1.7] text-secondary-token'>
-              Your profile is free forever. Upgrade to Pro or Max when you want
-              the release system turned on.
+              {requestAccessCopy}
             </p>
             <div className='mt-8 flex flex-wrap items-center justify-center gap-3'>
               <Link

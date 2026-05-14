@@ -76,7 +76,7 @@ export function AuthClientProviders({
       signInUrl={APP_ROUTES.SIGNIN}
       signUpUrl={APP_ROUTES.SIGNUP}
       signInFallbackRedirectUrl={APP_ROUTES.DASHBOARD}
-      signUpFallbackRedirectUrl={APP_ROUTES.WAITLIST}
+      signUpFallbackRedirectUrl={APP_ROUTES.START}
     >
       <ClerkSafeValuesProvider>
         {wrapChildren(children)}

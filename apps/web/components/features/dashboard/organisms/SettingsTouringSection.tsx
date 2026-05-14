@@ -217,7 +217,7 @@ function BandsintownConnectionPill({
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
             className={cn(
-              'inline-flex cursor-pointer items-center gap-1.5 rounded-full border py-1 pl-2.5 pr-3 text-app font-caption transition-colors',
+              'inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-full border px-2.5 text-xs transition-colors',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2'
             )}
             style={
@@ -229,7 +229,10 @@ function BandsintownConnectionPill({
             }
             aria-label={`Bandsintown connection: ${artistName || 'Connected'}`}
           >
-            <Calendar className='h-4 w-4 shrink-0' style={{ color: accent }} />
+            <Calendar
+              className='h-3.5 w-3.5 shrink-0'
+              style={{ color: accent }}
+            />
             <span className='max-w-[160px] truncate text-secondary-token'>
               {artistName || 'Connected'}
             </span>
@@ -243,12 +246,12 @@ function BandsintownConnectionPill({
             )}
             {hovered || menuOpen ? (
               <MoreHorizontal
-                className='h-4 w-4 shrink-0'
+                className='h-3.5 w-3.5 shrink-0'
                 style={{ color: accent }}
               />
             ) : (
               <CheckCircle2
-                className='h-4 w-4 shrink-0'
+                className='h-3.5 w-3.5 shrink-0'
                 style={{ color: accent }}
               />
             )}
@@ -276,7 +279,7 @@ function BandsintownConnectionPill({
       type='button'
       onClick={onConnect}
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-full border border-subtle bg-surface-1 py-1 pl-2.5 pr-3 text-app font-caption text-secondary-token transition-colors',
+        'inline-flex h-7 items-center gap-1.5 rounded-full border border-subtle bg-surface-1 px-2.5 text-xs text-secondary-token transition-colors',
         'hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2'
       )}
       style={
@@ -286,9 +289,9 @@ function BandsintownConnectionPill({
       }
       aria-label='Connect Bandsintown'
     >
-      <Calendar className='h-4 w-4 shrink-0' style={{ color: accent }} />
+      <Calendar className='h-3.5 w-3.5 shrink-0' style={{ color: accent }} />
       <span>Bandsintown</span>
-      <Plus className='h-4 w-4 shrink-0' />
+      <Plus className='h-3.5 w-3.5 shrink-0' />
     </button>
   );
 }

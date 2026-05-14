@@ -1,7 +1,10 @@
 import { Check } from 'lucide-react';
 import Link from 'next/link';
 import {
-  MARKETING_PRICING_PLANS,
+  getMarketingPlanCtaLabel,
+  getMarketingPlanHref,
+  getVisibleMarketingPricingPlans,
+  isMarketingPlanActive,
   type MarketingPricingPlan,
 } from '@/data/marketingPricingPlans';
 import { cn } from '@/lib/utils';
@@ -15,9 +18,12 @@ function MarketingPricingPlanCard({
   mode: MarketingPricingMode;
   plan: MarketingPricingPlan;
 }>) {
+  const active = isMarketingPlanActive(plan.id);
+
   return (
     <article
       data-testid={`marketing-pricing-plan-${plan.id}`}
+      data-plan-active={active ? 'true' : 'false'}
       className={cn(
         'marketing-pricing-plan-card',
         `marketing-pricing-plan-card--${plan.accent}`,
@@ -42,11 +48,11 @@ function MarketingPricingPlanCard({
       </p>
 
       <Link
-        href={plan.ctaHref}
+        href={getMarketingPlanHref(plan.id)}
         prefetch={false}
         className='marketing-pricing-plan-card__cta public-action-primary focus-ring-themed'
       >
-        {plan.ctaLabel}
+        {getMarketingPlanCtaLabel(plan)}
       </Link>
 
       <ul className='marketing-pricing-plan-card__features'>
@@ -68,6 +74,8 @@ export function MarketingPricingPlans({
   mode?: MarketingPricingMode;
   className?: string;
 }>) {
+  const visiblePlans = getVisibleMarketingPricingPlans();
+
   return (
     <div
       className={cn(
@@ -76,7 +84,7 @@ export function MarketingPricingPlans({
         className
       )}
     >
-      {MARKETING_PRICING_PLANS.map(plan => (
+      {visiblePlans.map(plan => (
         <MarketingPricingPlanCard key={plan.id} mode={mode} plan={plan} />
       ))}
     </div>

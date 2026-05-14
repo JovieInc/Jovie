@@ -58,12 +58,12 @@ async function requireProfile(): Promise<{
   const data = await getDashboardData();
 
   if (data.needsOnboarding && !data.dashboardLoadError) {
-    redirect('/onboarding');
+    redirect(APP_ROUTES.START);
   }
 
   // Redirect to onboarding if no profile exists (new users, mid-onboarding, or load errors)
   if (!data.selectedProfile) {
-    redirect('/onboarding');
+    redirect(APP_ROUTES.START);
   }
 
   // Use bandsintown fields directly from selectedProfile (already fetched by getDashboardData)

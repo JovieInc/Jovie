@@ -194,7 +194,7 @@ export function ClaimHandleForm({
   useEffect(() => {
     if (available === true && handle) {
       router.prefetch(
-        `/onboarding?handle=${encodeURIComponent(handle.toLowerCase())}`
+        `${APP_ROUTES.START}?handle=${encodeURIComponent(handle.toLowerCase())}`
       );
     }
   }, [available, handle, router]);
@@ -225,7 +225,7 @@ export function ClaimHandleForm({
         });
       }
 
-      const target = `/onboarding?handle=${encodeURIComponent(normalizedHandle)}`;
+      const target = `${APP_ROUTES.START}?handle=${encodeURIComponent(normalizedHandle)}`;
 
       setNavigating(true);
 

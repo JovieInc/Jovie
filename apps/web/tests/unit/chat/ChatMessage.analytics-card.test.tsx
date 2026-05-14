@@ -44,7 +44,7 @@ describe('ChatMessage analytics cards', () => {
     };
     fastRender(<ChatMessage {...messageProps} />);
 
-    expect(screen.getByTestId('chat-message-reply-bubble')).toBeTruthy();
+    expect(screen.getByTestId('chat-message-reply')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Copy message' })).toBeTruthy();
     expect(screen.queryByText('Copy')).toBeNull();
   });

@@ -61,7 +61,11 @@ import {
   convertContextMenuItems,
   UnifiedTable,
 } from '@/components/organisms/table';
-import { resolveTableNavAction } from '@/components/organisms/table/utils/tableKeyMap';
+import {
+  isFormElement,
+  resolveTableNavAction,
+  type TableNavAction,
+} from '@/components/organisms/table/utils/tableKeyMap';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
@@ -102,6 +106,22 @@ import {
 } from './task-presentation';
 
 const columnHelper = createColumnHelper<TaskView>();
+
+function shouldIgnoreTaskShortcut(event: KeyboardEvent): boolean {
+  return (
+    event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey
+  );
+}
+
+function isTaskSearchShortcut(event: KeyboardEvent): boolean {
+  return event.key === '/' && !event.shiftKey && !isFormElement(event.target);
+}
+
+function isTaskRowNavigationAction(
+  action: TableNavAction
+): action is 'next' | 'prev' {
+  return action === 'next' || action === 'prev';
+}
 
 const TASK_STATUS_OPTIONS = [
   ['backlog', 'Backlog'],
@@ -377,7 +397,7 @@ const TaskMetaTrigger = forwardRef<
       type='button'
       aria-label={ariaLabel}
       className={cn(
-        '-mx-1 inline-flex min-w-0 items-center rounded-full px-1.5 py-1 text-secondary-token transition-[background-color,color] duration-150 hover:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_70%,transparent)] hover:text-primary-token data-[state=open]:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,transparent)] data-[state=open]:text-primary-token',
+        '-mx-1 inline-flex min-w-0 items-center rounded-full px-1.5 py-1 text-secondary-token transition-[background-color,color] duration-subtle hover:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_70%,transparent)] hover:text-primary-token data-[state=open]:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,transparent)] data-[state=open]:text-primary-token',
         className
       )}
       {...props}
@@ -882,7 +902,7 @@ function MobileTaskScopeTabs({
               onClick={() => onChange(value)}
               aria-pressed={isActive}
               className={cn(
-                'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-2xs font-semibold transition-[background-color,color] duration-150',
+                'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-2xs font-semibold transition-[background-color,color] duration-subtle',
                 isActive
                   ? 'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,transparent)] text-primary-token shadow-[0_0_0_1px_color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)]'
                   : 'text-secondary-token hover:text-primary-token'
@@ -967,7 +987,7 @@ function MobileTaskListItem({
       onClick={() => onOpenTask(task)}
       data-testid='mobile-task-row'
       className={cn(
-        'flex w-full items-start gap-3 border-b border-[color-mix(in_oklab,var(--linear-app-shell-border)_58%,transparent)] px-4 py-3 text-left transition-[background-color,color] duration-150 last:border-b-0',
+        'flex w-full items-start gap-3 border-b border-[color-mix(in_oklab,var(--linear-app-shell-border)_58%,transparent)] px-4 py-3 text-left transition-[background-color,color] duration-subtle last:border-b-0',
         isSelected
           ? 'bg-[color-mix(in_oklab,var(--linear-row-hover)_68%,var(--linear-app-content-surface))]'
           : 'bg-transparent hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_56%,transparent)]'
@@ -1552,26 +1572,67 @@ export function TasksPageClient() {
     updateTask,
   ]);
 
+  const handleCloseShortcut = useCallback(
+    (event: KeyboardEvent) => {
+      if (isFormElement(event.target)) return;
+
+      if (headerMode !== 'default') {
+        event.preventDefault();
+        setHeaderMode('default');
+        return;
+      }
+
+      if (selectedTask) {
+        event.preventDefault();
+        setSelectedTaskId(null);
+      }
+    },
+    [headerMode, selectedTask]
+  );
+
+  const handleRowNavigationShortcut = useCallback(
+    (action: 'next' | 'prev', event: KeyboardEvent) => {
+      event.preventDefault();
+
+      if (!selectedTask) {
+        selectTaskByIndex(action === 'next' ? 0 : visibleTasks.length - 1);
+        return;
+      }
+
+      if (action === 'next') {
+        selectNextTask();
+        return;
+      }
+
+      selectPreviousTask();
+    },
+    [
+      selectNextTask,
+      selectPreviousTask,
+      selectTaskByIndex,
+      selectedTask,
+      visibleTasks.length,
+    ]
+  );
+
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.defaultPrevented) return;
-      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (shouldIgnoreTaskShortcut(event)) return;
+
+      if (isTaskSearchShortcut(event)) {
+        event.preventDefault();
+        setHeaderMode('search');
+        return;
+      }
 
       const action = resolveTableNavAction(event.key, event.target);
-      if (action === 'next') {
-        event.preventDefault();
-        if (!selectedTask) {
-          selectTaskByIndex(0);
-          return;
-        }
-        selectNextTask();
-      } else if (action === 'prev') {
-        event.preventDefault();
-        if (!selectedTask) {
-          selectTaskByIndex(visibleTasks.length - 1);
-          return;
-        }
-        selectPreviousTask();
+      if (action === 'close') {
+        handleCloseShortcut(event);
+        return;
+      }
+
+      if (isTaskRowNavigationAction(action)) {
+        handleRowNavigationShortcut(action, event);
       }
     }
 
@@ -1579,13 +1640,7 @@ export function TasksPageClient() {
     return () => {
       globalThis.removeEventListener('keydown', handleKeyDown);
     };
-  }, [
-    selectNextTask,
-    selectPreviousTask,
-    selectTaskByIndex,
-    selectedTask,
-    visibleTasks.length,
-  ]);
+  }, [handleCloseShortcut, handleRowNavigationShortcut]);
 
   const sidebarPanel = selectedRelease ? (
     <ReleaseSidebar
@@ -1643,7 +1698,7 @@ export function TasksPageClient() {
               type='button'
               onClick={event => event.stopPropagation()}
               aria-label='Open task actions'
-              className='inline-flex h-7 w-7 items-center justify-center rounded-full bg-transparent text-tertiary-token transition-[background-color,color] duration-150 hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_56%,transparent)] hover:text-primary-token focus-visible:outline-none focus-visible:bg-[color-mix(in_oklab,var(--linear-row-hover)_60%,transparent)] focus-visible:text-primary-token'
+              className='inline-flex h-7 w-7 items-center justify-center rounded-full bg-transparent text-tertiary-token transition-[background-color,color] duration-subtle hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_56%,transparent)] hover:text-primary-token focus-visible:outline-none focus-visible:bg-[color-mix(in_oklab,var(--linear-row-hover)_60%,transparent)] focus-visible:text-primary-token'
             >
               <MoreVertical className='h-3.5 w-3.5' />
             </button>
@@ -1884,7 +1939,7 @@ export function TasksPageClient() {
                           )
                         }
                         aria-label='Search tasks'
-                        className='inline-flex h-10 w-10 items-center justify-center rounded-full bg-surface-1 text-secondary-token transition-[background-color,color] duration-150 hover:bg-surface-0 hover:text-primary-token'
+                        className='inline-flex h-10 w-10 items-center justify-center rounded-full bg-surface-1 text-secondary-token transition-[background-color,color] duration-subtle hover:bg-surface-0 hover:text-primary-token'
                       >
                         <Search className='h-4 w-4' />
                       </button>

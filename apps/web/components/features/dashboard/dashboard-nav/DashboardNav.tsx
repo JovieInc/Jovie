@@ -15,10 +15,15 @@ import {
   SidebarMenu,
 } from '@/components/organisms/Sidebar';
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
+import {
+  type SidebarThread,
+  SidebarThreadsSection,
+} from '@/components/shell/SidebarThreadsSection';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { useAppFlag } from '@/lib/flags/client';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import { usePlanGate } from '@/lib/queries';
+import { useChatConversationsQuery } from '@/lib/queries/useChatConversationsQuery';
 import { useTaskStatsQuery } from '@/lib/queries/useTasksQuery';
 import {
   adminNavigationSections,
@@ -111,6 +116,10 @@ export function DashboardNav(_: DashboardNavProps) {
     usePlanGate();
   const { data: taskStats } = useTaskStatsQuery(profileId, {
     enabled: !isDemo && canAccessTasksWorkspace,
+  });
+  const { data: conversations } = useChatConversationsQuery({
+    limit: 10,
+    enabled: shellChatV1Enabled && !isDemo,
   });
   const isInSettings = pathname.startsWith(APP_ROUTES.SETTINGS);
 
@@ -272,6 +281,31 @@ export function DashboardNav(_: DashboardNavProps) {
     globalThis.dispatchEvent(new Event(OPEN_COMMAND_PALETTE_EVENT));
   }, []);
 
+  const sidebarThreads = useMemo<SidebarThread[]>(
+    () =>
+      (conversations ?? []).map(conversation => ({
+        id: conversation.id,
+        title: conversation.title?.trim() || 'Untitled thread',
+        status: 'complete',
+        updatedAt: conversation.updatedAt,
+      })),
+    [conversations]
+  );
+
+  const activeThreadId = useMemo(() => {
+    const chatPrefix = `${APP_ROUTES.CHAT}/`;
+    if (!pathname.startsWith(chatPrefix)) return null;
+    const [id] = pathname.slice(chatPrefix.length).split('/');
+    return id ? decodeURIComponent(id) : null;
+  }, [pathname]);
+
+  const handleThreadSelect = useCallback(
+    (id: string) => {
+      router.push(`${APP_ROUTES.CHAT}/${encodeURIComponent(id)}`);
+    },
+    [router]
+  );
+
   // Memoize renderNavItem to prevent creating new functions on every render
   const renderNavItem = useCallback(
     (item: NavItem, _index: number) => {
@@ -377,6 +411,18 @@ export function DashboardNav(_: DashboardNavProps) {
           </SidebarGroupContent>
         </SidebarGroup>
       )}
+
+      {shellChatV1Enabled && !isInSettings ? (
+        <div className='mt-1.5'>
+          <SidebarThreadsSection
+            threads={sidebarThreads}
+            activeThreadId={activeThreadId}
+            onSelect={handleThreadSelect}
+            tight
+            collapsed={false}
+          />
+        </div>
+      ) : null}
 
       {isAdmin && !isInSettings && (
         <div data-testid='admin-nav-section' className='mt-3'>

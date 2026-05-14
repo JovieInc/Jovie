@@ -2,16 +2,19 @@
 
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, type UIMessage } from 'ai';
-import { ArrowUp, Loader2 } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  type FormEvent,
-  type KeyboardEvent,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+  ChatInput,
+  ChatMessage,
+  ErrorDisplay,
+} from '@/components/jovie/components';
+import { ToolPartsRenderer } from '@/components/jovie/tool-ui';
+import type { ChatError, MessagePart } from '@/components/jovie/types';
+import {
+  extractErrorMetadata,
+  getErrorType,
+  getPreferredErrorMessage,
+} from '@/components/jovie/utils';
 import { cn } from '@/lib/utils';
 import {
   ChatProposeCheckoutCard,
@@ -29,19 +32,18 @@ import {
  * carries the Cloudflare Turnstile token; subsequent requests in the same
  * session do not (the signed cookie + session-lifetime rate limit carry
  * trust forward).
- *
- * v1 visual: a single column of message bubbles with a composer at the
- * bottom. Tool-call previews are rendered as small inline chips so the LLM's
- * tool use is visible while we iterate on the dedicated tool cards in a
- * follow-up commit on this branch.
  */
 
 interface OnboardingChatProps {
   /** Turnstile token from the widget. Required on first message. */
   readonly turnstileToken: string | null;
+  /** Fires after a submitted user turn reaches the ready state. */
+  readonly onConversationActivity?: () => void;
 }
 
 /** Pull the user-visible text out of a UIMessage's parts. */
+const THINKING_PLACEHOLDER_ID = 'onboarding-thinking-placeholder';
+
 function getMessageText(message: UIMessage): string {
   return (message.parts ?? [])
     .filter(
@@ -52,13 +54,13 @@ function getMessageText(message: UIMessage): string {
     .join('');
 }
 
-interface ToolPart {
+type ToolPart = MessagePart & {
   readonly type: string;
   readonly toolName?: string;
   readonly toolCallId?: string;
   readonly output?: unknown;
   readonly state?: string;
-}
+};
 
 function isToolPart(part: unknown): part is ToolPart {
   if (!part || typeof part !== 'object') return false;
@@ -83,7 +85,7 @@ function getToolName(part: ToolPart): string {
  * proposeCheckout) and the chip fallback for the rest.
  */
 function getToolParts(message: UIMessage): readonly ToolPart[] {
-  return (message.parts ?? []).filter(isToolPart);
+  return ((message.parts ?? []) as readonly MessagePart[]).filter(isToolPart);
 }
 
 interface ToolOutputWithAction {
@@ -106,10 +108,82 @@ function isCheckoutPayload(output: unknown): output is CheckoutCardPayload {
   );
 }
 
-export function OnboardingChat({ turnstileToken }: OnboardingChatProps) {
+function findLastAssistantMessageId(messages: readonly UIMessage[]) {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i];
+    if (
+      message.role === 'assistant' &&
+      message.id !== THINKING_PLACEHOLDER_ID
+    ) {
+      return message.id;
+    }
+  }
+  return null;
+}
+
+function renderOnboardingTools({
+  messageId,
+  toolParts,
+  hasMessageText,
+}: {
+  readonly messageId: string;
+  readonly toolParts: readonly ToolPart[];
+  readonly hasMessageText: boolean;
+}) {
+  const genericParts: ToolPart[] = [];
+  const cards = toolParts.map((part, i) => {
+    const toolName = getToolName(part);
+    const key = part.toolCallId ?? `${messageId}-tool-${i}`;
+    const output = part.output;
+
+    if (toolName === 'proposeNextStep' && isNextStepPayload(output)) {
+      return (
+        <div key={key} className='w-full max-w-[440px]'>
+          <ChatProposeNextStepCard payload={output} />
+        </div>
+      );
+    }
+
+    if (toolName === 'proposeCheckout' && isCheckoutPayload(output)) {
+      return (
+        <div key={key} className='w-full max-w-[440px]'>
+          <ChatProposeCheckoutCard payload={output} />
+        </div>
+      );
+    }
+
+    genericParts.push(part);
+    return null;
+  });
+
+  if (toolParts.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className={cn('space-y-3 pl-9', hasMessageText && 'mt-3')}>
+      {cards}
+      {genericParts.length > 0 ? (
+        <ToolPartsRenderer
+          parts={genericParts}
+          variant='chat'
+          hasMessageText={false}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+export function OnboardingChat({
+  onConversationActivity,
+  turnstileToken,
+}: OnboardingChatProps) {
   const [input, setInput] = useState('');
   const [hasSentFirst, setHasSentFirst] = useState(false);
+  const [chatError, setChatError] = useState<ChatError | null>(null);
   const messagesRef = useRef<HTMLDivElement | null>(null);
+  const completedUserTurnsRef = useRef(0);
+  const lastAttemptedMessageRef = useRef<string | null>(null);
 
   const transport = useMemo(
     () =>
@@ -122,170 +196,192 @@ export function OnboardingChat({ turnstileToken }: OnboardingChatProps) {
             ...body,
             mode: 'onboarding' as const,
             messages,
-            ...(hasSentFirst ? {} : { turnstileToken }),
+            ...(turnstileToken ? { turnstileToken } : {}),
           },
         }),
       }),
-    [hasSentFirst, turnstileToken]
+    [turnstileToken]
   );
 
-  const { messages, sendMessage, status } = useChat({
+  const { messages, sendMessage, status, stop } = useChat({
     id: 'onboarding',
     transport,
+    onError: error => {
+      const type = getErrorType(error);
+      const metadata = extractErrorMetadata(error);
+      setChatError({
+        type,
+        message: getPreferredErrorMessage(error, type, metadata),
+        retryAfter: metadata.retryAfter,
+        errorCode: metadata.errorCode,
+        requestId: metadata.requestId,
+        failedMessage: lastAttemptedMessageRef.current ?? undefined,
+      });
+      if (lastAttemptedMessageRef.current) {
+        setInput(lastAttemptedMessageRef.current);
+      }
+    },
   });
 
-  const isStreaming = status === 'streaming' || status === 'submitted';
+  const isSubmitted = status === 'submitted';
+  const isStreaming = status === 'streaming';
+  const isBusy = isSubmitted || isStreaming;
+  const requiresTurnstile = process.env.NODE_ENV !== 'development';
+  const isAwaitingFirstToken =
+    requiresTurnstile && !hasSentFirst && !turnstileToken;
+  const lastMessage = messages[messages.length - 1];
+  const shouldShowThinking = isBusy && lastMessage?.role === 'user';
+  const displayMessages: readonly UIMessage[] = shouldShowThinking
+    ? [
+        ...messages,
+        {
+          id: THINKING_PLACEHOLDER_ID,
+          role: 'assistant',
+          parts: [],
+        },
+      ]
+    : messages;
+  const lastAssistantMessageId = findLastAssistantMessageId(displayMessages);
 
-  const handleSubmit = useCallback(
-    (event?: FormEvent<HTMLFormElement>) => {
-      event?.preventDefault();
-      const text = input.trim();
-      if (!text || isStreaming) return;
-      if (!hasSentFirst && !turnstileToken) {
+  const submitText = useCallback(
+    (rawText: string) => {
+      const text = rawText.trim();
+      if (!text || isBusy) return;
+      if (isAwaitingFirstToken) {
         // Turnstile hasn't issued a token yet; the widget normally resolves
         // within ~500ms. Silently no-op so the user can retry.
         return;
       }
+      lastAttemptedMessageRef.current = text;
+      setChatError(null);
       sendMessage({ text });
       setHasSentFirst(true);
       setInput('');
     },
-    [hasSentFirst, input, isStreaming, sendMessage, turnstileToken]
+    [isAwaitingFirstToken, isBusy, sendMessage]
   );
 
-  const handleKeyDown = useCallback(
-    (event: KeyboardEvent<HTMLTextAreaElement>) => {
-      if (event.key === 'Enter' && !event.shiftKey) {
-        event.preventDefault();
-        handleSubmit();
-      }
+  const handleSubmit = useCallback(
+    (event?: React.FormEvent) => {
+      event?.preventDefault();
+      submitText(input);
     },
-    [handleSubmit]
+    [input, submitText]
   );
+
+  const handleRetry = useCallback(() => {
+    const failedMessage = chatError?.failedMessage;
+    if (!failedMessage) return;
+    submitText(failedMessage);
+  }, [chatError?.failedMessage, submitText]);
 
   // Auto-scroll on new content
   useEffect(() => {
     const node = messagesRef.current;
     if (!node) return;
     node.scrollTop = node.scrollHeight;
-  }, [messages.length, isStreaming]);
+  }, [displayMessages.length, isBusy]);
 
-  const composerDisabled = isStreaming || (!hasSentFirst && !turnstileToken);
+  useEffect(() => {
+    if (status !== 'ready') return;
+    const completedUserTurns = messages.filter(
+      message => message.role === 'user'
+    ).length;
+    if (completedUserTurns <= completedUserTurnsRef.current) return;
+    completedUserTurnsRef.current = completedUserTurns;
+    onConversationActivity?.();
+  }, [messages, onConversationActivity, status]);
 
   return (
-    <div className='flex flex-1 flex-col'>
+    <div className='flex flex-1 flex-col overflow-hidden'>
       <div
         ref={messagesRef}
-        className='flex-1 space-y-3 overflow-y-auto px-1 py-6'
+        className='relative flex-1 overflow-y-auto px-4 py-5 sm:px-5'
         aria-live='polite'
       >
-        {messages.length === 0 ? (
-          <p className='text-center text-[13px] text-white/40'>
-            {`heads up — I'll remember this chat so you can pick up where we left off when you sign up. what are you working on?`}
-          </p>
-        ) : null}
+        <div className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col'>
+          {messages.length === 0 ? (
+            <div className='flex flex-1 items-center justify-center py-12'>
+              <h1 className='text-balance text-center text-[2.25rem] font-semibold leading-[1.08] tracking-[-0.035em] text-primary-token sm:text-[3rem]'>
+                What are you working on?
+              </h1>
+            </div>
+          ) : (
+            <div className='flex flex-col pb-4'>
+              {displayMessages.map(message => {
+                const text = getMessageText(message);
+                const toolParts = getToolParts(message);
+                const isThinking = message.id === THINKING_PLACEHOLDER_ID;
+                const shouldRenderMessage =
+                  isThinking || Boolean(text) || toolParts.length === 0;
 
-        {messages.map(message => {
-          const text = getMessageText(message);
-          const toolParts = getToolParts(message);
-          return (
-            <div
-              key={message.id}
-              className={cn(
-                'flex flex-col',
-                message.role === 'user' ? 'items-end' : 'items-start'
-              )}
-            >
-              {text || toolParts.length === 0 ? (
-                <div
-                  className={cn(
-                    'max-w-[80%] rounded-2xl px-3.5 py-2.5 text-[14px] leading-6',
-                    message.role === 'user'
-                      ? 'bg-white text-black'
-                      : 'border border-white/[0.08] bg-white/[0.035] text-white/82'
-                  )}
-                >
-                  {text || (
-                    <span className='text-white/40'>
-                      <Loader2
-                        className='inline h-3.5 w-3.5 animate-spin'
-                        aria-hidden
-                      />
-                    </span>
-                  )}
-                </div>
-              ) : null}
-
-              {toolParts.map((part, i) => {
-                const toolName = getToolName(part);
-                const key = part.toolCallId ?? `${message.id}-tool-${i}`;
-                const output = part.output;
-
-                if (
-                  toolName === 'proposeNextStep' &&
-                  isNextStepPayload(output)
-                ) {
-                  return (
-                    <div key={key} className='w-full max-w-[440px]'>
-                      <ChatProposeNextStepCard payload={output} />
-                    </div>
-                  );
-                }
-                if (
-                  toolName === 'proposeCheckout' &&
-                  isCheckoutPayload(output)
-                ) {
-                  return (
-                    <div key={key} className='w-full max-w-[440px]'>
-                      <ChatProposeCheckoutCard payload={output} />
-                    </div>
-                  );
-                }
-                // Fallback: small chip surfacing the tool name. The dedicated
-                // cards for searchSpotifyArtist / confirmSpotifyArtist /
-                // checkHandle / proposeSocialLink / recordInterviewSignal
-                // land in follow-up commits on this branch.
                 return (
-                  <span
-                    key={key}
-                    className='mt-1 inline-flex rounded-full border border-white/[0.12] bg-white/[0.04] px-2 py-0.5 text-[11px] text-white/60'
-                  >
-                    {toolName}
-                  </span>
+                  <div key={message.id} className='pb-5'>
+                    {shouldRenderMessage ? (
+                      <ChatMessage
+                        id={message.id}
+                        role={message.role}
+                        parts={(message.parts ?? []) as MessagePart[]}
+                        isThinking={isThinking}
+                        isStreaming={
+                          isStreaming && message.id === lastAssistantMessageId
+                        }
+                        renderTools={false}
+                      />
+                    ) : null}
+                    {!isThinking
+                      ? renderOnboardingTools({
+                          messageId: message.id,
+                          toolParts,
+                          hasMessageText: Boolean(text),
+                        })
+                      : null}
+                  </div>
                 );
               })}
             </div>
-          );
-        })}
+          )}
+        </div>
       </div>
 
-      <form
-        onSubmit={handleSubmit}
-        className='sticky bottom-0 flex items-end gap-2 border-t border-white/[0.07] bg-[#06070a]/90 pb-3 pt-3 backdrop-blur'
-      >
-        <textarea
-          value={input}
-          onChange={event => setInput(event.target.value)}
-          onKeyDown={handleKeyDown}
-          rows={1}
-          placeholder={
-            !hasSentFirst && !turnstileToken
-              ? 'just a sec…'
-              : 'tell me what you are working on'
-          }
-          disabled={composerDisabled}
-          className='min-h-[44px] max-h-[160px] flex-1 resize-none rounded-2xl border border-white/[0.09] bg-white/[0.04] px-4 py-2.5 text-[14px] text-white outline-none placeholder:text-white/32 focus:border-white/24 disabled:cursor-not-allowed disabled:opacity-50'
-          aria-label='Type a message to Jovie'
-        />
-        <button
-          type='submit'
-          disabled={composerDisabled || input.trim().length === 0}
-          className='inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-black transition-colors hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40 focus-ring-themed'
-          aria-label='Send message'
-        >
-          <ArrowUp className='h-4 w-4' aria-hidden />
-        </button>
-      </form>
+      <div className='shrink-0 bg-surface-1 px-4 pb-4 pt-2 sm:px-5 sm:pb-5 sm:pt-2.5'>
+        <div className='mx-auto w-full max-w-[34rem]'>
+          {chatError ? (
+            <div className='mb-2'>
+              <ErrorDisplay
+                chatError={chatError}
+                onRetry={handleRetry}
+                isLoading={isBusy}
+                isSubmitting={isSubmitted}
+              />
+            </div>
+          ) : null}
+
+          {isAwaitingFirstToken ? (
+            <p
+              className='mb-1.5 text-center text-xs text-tertiary-token'
+              role='status'
+              aria-live='polite'
+            >
+              Securing chat...
+            </p>
+          ) : null}
+
+          <ChatInput
+            value={input}
+            onChange={setInput}
+            onSubmit={handleSubmit}
+            isLoading={isBusy}
+            isSubmitting={isSubmitted || isAwaitingFirstToken}
+            isStreaming={isStreaming}
+            onStop={stop}
+            placeholder={
+              isAwaitingFirstToken ? 'Securing chat...' : 'Ask Jovie...'
+            }
+            shellChatV1
+          />
+        </div>
+      </div>
     </div>
   );
 }

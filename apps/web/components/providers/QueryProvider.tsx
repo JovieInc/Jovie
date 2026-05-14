@@ -140,7 +140,9 @@ export function QueryProvider({ children }: QueryProviderProps) {
     }
     window.__JOVIE_E2E_INVALIDATE_QUERIES__ = (queryKeyPrefix: string[]) => {
       console.info('[E2E] invalidating', queryKeyPrefix);
-      void queryClient.invalidateQueries({ queryKey: queryKeyPrefix });
+      queryClient
+        .invalidateQueries({ queryKey: queryKeyPrefix })
+        .catch(() => {});
     };
     return () => {
       delete window.__JOVIE_E2E_INVALIDATE_QUERIES__;

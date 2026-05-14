@@ -148,11 +148,10 @@ export async function tryHandleAnonymousOnboardingChat(
   // (default OFF / kill-switch flipped) we return 503 so on-call sees a
   // clean signal and we never quietly burn LLM spend during an incident.
   // Anonymous → pass `null` userId; Statsig falls back to public conditions.
-  const onboardingEnabled = await checkGateForUser(
-    null,
-    ONBOARDING_CHAT_GATE,
-    false
-  );
+  const onboardingEnabled =
+    env.NODE_ENV === 'development'
+      ? true
+      : await checkGateForUser(null, ONBOARDING_CHAT_GATE, false);
   if (!onboardingEnabled) {
     return NextResponse.json(
       {
@@ -205,31 +204,31 @@ export async function tryHandleAnonymousOnboardingChat(
 
   // --- Turnstile gate: required for the first message of a fresh session ---
   if (!existingSessionId) {
-    if (!isTurnstileConfigured()) {
+    if (env.NODE_ENV !== 'development' && !isTurnstileConfigured()) {
       // Fail-closed in production/preview: if Turnstile keys aren't configured
       // we must NOT silently let bot traffic through. A missing secret is an
       // ops gap, not a feature flag — surface as 503 so it pages and gets
-      // fixed instead of opening the LLM spend to unauthenticated bots.
-      // Local dev (NODE_ENV === 'development') is the one exemption: contributors
-      // shouldn't need Cloudflare creds to run the dev server locally.
-      if (env.NODE_ENV !== 'development') {
-        Sentry.captureMessage(
-          'Turnstile not configured in non-dev env — onboarding chat returning 503',
-          { level: 'error' }
-        );
-        return NextResponse.json(
-          {
-            error: 'Onboarding chat is temporarily unavailable',
-            errorCode: 'TURNSTILE_NOT_CONFIGURED',
-            requestId,
-          },
-          {
-            status: 503,
-            headers: { ...corsHeaders, 'x-request-id': requestId },
-          }
-        );
-      }
-    } else {
+      // fixed instead of opening the LLM spend to unauthenticated bots. Local
+      // dev is the one exemption above: contributors shouldn't need Cloudflare
+      // creds or a live challenge iframe to run the dev server locally.
+      Sentry.captureMessage(
+        'Turnstile not configured in non-dev env — onboarding chat returning 503',
+        { level: 'error' }
+      );
+      return NextResponse.json(
+        {
+          error: 'Onboarding chat is temporarily unavailable',
+          errorCode: 'TURNSTILE_NOT_CONFIGURED',
+          requestId,
+        },
+        {
+          status: 503,
+          headers: { ...corsHeaders, 'x-request-id': requestId },
+        }
+      );
+    }
+
+    if (env.NODE_ENV !== 'development') {
       const verify = await verifyTurnstileToken(parsed.data.turnstileToken, ip);
       if (!verify.success) {
         return NextResponse.json(

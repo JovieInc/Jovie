@@ -341,7 +341,7 @@ describe('@critical releases/actions.ts — create/sync operations', () => {
       );
 
       await expect(loadReleaseMatrix()).rejects.toThrow('NEXT_REDIRECT');
-      expect(mockRedirect).toHaveBeenCalledWith('/onboarding');
+      expect(mockRedirect).toHaveBeenCalledWith('/start');
     });
 
     it('filters provider links to only those with URLs', async () => {
