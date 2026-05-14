@@ -63,7 +63,7 @@ export function PreFooterCTA() {
               variant='primary'
               className='text-lg px-8 py-4 transition-shadow duration-slower hover:shadow-lg hover:shadow-indigo-500/25 dark:hover:shadow-indigo-400/25'
             >
-              <Link href='/onboarding'>Create Your Profile</Link>
+              <Link href='/start'>Create Your Profile</Link>
             </Button>
 
             {/* Secondary info with better visual hierarchy */}

@@ -81,19 +81,17 @@ export function ReleasesPageClient() {
       ? settings.spotifyImportTotal
       : 0;
 
-  // Cold-load skeleton only. TanStack's `isLoading` can spike on certain
-  // refetch transitions (window focus, mutation invalidation) before
-  // `data` is repopulated, causing the skeleton to flash every refetch
-  // (JOV-2151). `data === undefined` is the only true "no cached data"
-  // signal; `placeholderData` keeps it defined across same-profile refetches.
-  if (releases === undefined) {
-    return <ReleaseTableSkeleton showHeader={false} />;
-  }
-
+  // Cold-load skeleton only. TanStack's `isLoading` can spike on refetch
+  // transitions before data is repopulated, which flashes the skeleton.
+  // `data === undefined` is the only true no-cache signal here.
   if (isError) {
     return (
       <PageErrorState message='Failed to load releases data. Please refresh the page.' />
     );
+  }
+
+  if (releases === undefined) {
+    return <ReleaseTableSkeleton showHeader={false} />;
   }
 
   if (releasesViewMode === 'designV1ShellReleases') {
@@ -104,6 +102,10 @@ export function ReleasesPageClient() {
         primaryProviders={primaryProviderKeys}
         artistName={spotifyArtistName}
         allowArtworkDownloads={allowArtworkDownloads}
+        spotifyConnected={spotifyConnected}
+        appleMusicConnected={appleMusicConnected}
+        initialImporting={spotifyImportStatus === 'importing'}
+        initialTotalCount={spotifyImportTotal}
       />
     );
   }

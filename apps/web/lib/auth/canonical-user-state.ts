@@ -148,10 +148,10 @@ export function resolveCanonicalState(
 
 const STATE_REDIRECT_MAP: Record<CanonicalUserState, string | null> = {
   [CanonicalUserState.UNAUTHENTICATED]: '/signin',
-  [CanonicalUserState.NEEDS_DB_USER]: '/onboarding?fresh_signup=true',
+  [CanonicalUserState.NEEDS_DB_USER]: '/start?fresh_signup=true',
   [CanonicalUserState.NEEDS_WAITLIST_SUBMISSION]: '/waitlist',
   [CanonicalUserState.WAITLIST_PENDING]: '/waitlist',
-  [CanonicalUserState.NEEDS_ONBOARDING]: '/onboarding?fresh_signup=true',
+  [CanonicalUserState.NEEDS_ONBOARDING]: '/start?fresh_signup=true',
   [CanonicalUserState.BANNED]: '/unavailable',
   [CanonicalUserState.USER_CREATION_FAILED]: '/error/user-creation-failed',
   [CanonicalUserState.ACTIVE]: null,

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { OnboardingChat } from './OnboardingChat';
 import { OnboardingTurnstile } from './OnboardingTurnstile';
@@ -23,12 +23,27 @@ interface OnboardingShellProps {
 export function OnboardingShell({ sessionLabel }: OnboardingShellProps) {
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [turnstileError, setTurnstileError] = useState<string | null>(null);
+  const [claimTrigger, setClaimTrigger] = useState(0);
+
+  const handleConversationActivity = useCallback(() => {
+    setClaimTrigger(current => current + 1);
+  }, []);
+
+  const handleTurnstileToken = useCallback((token: string) => {
+    setTurnstileToken(token);
+    setTurnstileError(null);
+  }, []);
+
+  const handleTurnstileError = useCallback((message: string) => {
+    setTurnstileError(message);
+  }, []);
 
   // Auto-claim any anonymous transcript onto the user the moment Clerk
-  // reports they're authenticated. On success, this hook navigates away to
+  // reports they're authenticated, then retry after completed chat turns.
+  // On success, this hook navigates away to
   // /onboarding/checkout, so the rest of the shell never gets a chance to
   // render a "now what?" state. Idle for unauthenticated visitors.
-  const claimStatus = useOnboardingClaim();
+  const claimStatus = useOnboardingClaim(claimTrigger);
   const isLinking =
     claimStatus === 'pending' || claimStatus === 'retry-after-webhook';
 
@@ -45,15 +60,15 @@ export function OnboardingShell({ sessionLabel }: OnboardingShellProps) {
       </header>
 
       <main className='mx-auto flex w-full max-w-[680px] flex-1 flex-col px-4 pb-4 sm:px-6'>
-        <OnboardingChat turnstileToken={turnstileToken} />
+        <OnboardingChat
+          onConversationActivity={handleConversationActivity}
+          turnstileToken={turnstileToken}
+        />
       </main>
 
       <OnboardingTurnstile
-        onToken={token => {
-          setTurnstileToken(token);
-          setTurnstileError(null);
-        }}
-        onError={message => setTurnstileError(message)}
+        onToken={handleTurnstileToken}
+        onError={handleTurnstileError}
       />
 
       {turnstileError ? (

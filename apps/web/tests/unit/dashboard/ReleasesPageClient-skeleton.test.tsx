@@ -1,41 +1,19 @@
-/**
- * Skeleton-flash regression test for ReleasesPageClient (JOV-2151).
- *
- * Pre-fix: `if (!releases && isLoading)` showed the skeleton on every
- * background refetch — TanStack's `isLoading` can spike briefly when a
- * mutation invalidates or window-focus refetch fires.
- *
- * Post-fix: `if (releases === undefined)` shows the skeleton only on
- * a true cold cache. Background refetches keep `data` defined via
- * `placeholderData`, so the skeleton never flashes.
- *
- * This test mocks the hooks the page consumes and asserts the
- * skeleton appears only when data is `undefined`.
- */
 import { cleanup, render, screen } from '@testing-library/react';
-import React from 'react';
+import type { FC } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const useReleasesQueryMock = vi.fn();
 const useDashboardDataMock = vi.fn();
 const useAppFlagMock = vi.fn();
 
-// Mock next/dynamic to bypass async imports; return components directly so
-// the page renders the chosen view (not the dynamic loading skeleton).
 vi.mock('next/dynamic', () => ({
   default: (
     _loader: () => Promise<unknown>,
     opts?: { loading?: () => unknown }
   ) => {
-    // For this test we always exercise the page's terminal render paths,
-    // so return a stub that renders one of the mocked view testids based
-    // on the eventual import shape. The page uses two dynamic imports
-    // (ReleasesExperience and ShellReleasesView); the file mocks below
-    // intercept those module paths, but next/dynamic still wraps them.
-    // Simplest: synchronously render a passthrough component.
     void opts;
-    const Stub: React.FC<Record<string, unknown>> = props => (
-      <div data-testid='dynamic-stub' {...(props as Record<string, never>)} />
+    const Stub: FC<Record<string, unknown>> = () => (
+      <div data-testid='dynamic-stub' />
     );
     return Stub;
   },
@@ -76,7 +54,7 @@ vi.mock('@/features/feedback/PageErrorState', () => ({
   PageErrorState: () => <div data-testid='page-error-state' />,
 }));
 
-describe('ReleasesPageClient — skeleton-flash invariant (JOV-2151)', () => {
+describe('ReleasesPageClient skeleton behavior', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useDashboardDataMock.mockReturnValue({
@@ -94,35 +72,38 @@ describe('ReleasesPageClient — skeleton-flash invariant (JOV-2151)', () => {
     return render(<ReleasesPageClient />);
   }
 
-  it('renders the skeleton when data is undefined (cold cache)', async () => {
+  it('renders the skeleton when data is undefined', async () => {
     useReleasesQueryMock.mockReturnValue({
       data: undefined,
       isError: false,
     });
+
     await renderPage();
+
     expect(screen.getByTestId('release-table-skeleton')).toBeDefined();
     expect(screen.queryByTestId('dynamic-stub')).toBeNull();
   });
 
-  it('does NOT render the skeleton when data is an empty array', async () => {
-    // The pre-fix code would have rendered the skeleton here if
-    // isLoading spiked during a refetch. The post-fix code does not.
+  it('keeps the releases view mounted when data is an empty array', async () => {
     useReleasesQueryMock.mockReturnValue({
       data: [],
       isError: false,
     });
+
     await renderPage();
+
     expect(screen.queryByTestId('release-table-skeleton')).toBeNull();
-    // Falls through to one of the populated views (now a next/dynamic stub).
     expect(screen.getByTestId('dynamic-stub')).toBeDefined();
   });
 
-  it('does NOT render the skeleton when populated data is present (refetch)', async () => {
+  it('keeps the releases view mounted when populated data is present', async () => {
     useReleasesQueryMock.mockReturnValue({
       data: [{ id: 'r1' }, { id: 'r2' }],
       isError: false,
     });
+
     await renderPage();
+
     expect(screen.queryByTestId('release-table-skeleton')).toBeNull();
     expect(screen.getByTestId('dynamic-stub')).toBeDefined();
   });
@@ -132,7 +113,9 @@ describe('ReleasesPageClient — skeleton-flash invariant (JOV-2151)', () => {
       data: [],
       isError: true,
     });
+
     await renderPage();
+
     expect(screen.getByTestId('page-error-state')).toBeDefined();
     expect(screen.queryByTestId('release-table-skeleton')).toBeNull();
   });

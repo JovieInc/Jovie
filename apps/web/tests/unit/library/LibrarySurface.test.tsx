@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { LibrarySurface } from '@/app/app/(shell)/library/LibrarySurface';
@@ -64,6 +64,9 @@ describe('LibrarySurface', () => {
     render(<LibrarySurface assets={[buildAsset()]} />);
 
     expect(screen.getByTestId('library-surface')).toBeDefined();
+    expect(
+      screen.getByRole('searchbox', { name: 'Search library assets' })
+    ).toBeDefined();
     expect(screen.getByRole('heading', { name: 'Take Me Over' })).toBeDefined();
     expect(screen.getByText('Tim White')).toBeDefined();
     expect(screen.getByText('Apr 28, 2026')).toBeDefined();
@@ -83,5 +86,50 @@ describe('LibrarySurface', () => {
       'href',
       'https://cdn.example.com/preview.mp3'
     );
+  });
+
+  it('filters release assets with library search and focuses it from /', () => {
+    render(
+      <LibrarySurface
+        assets={[
+          buildAsset(),
+          buildAsset({
+            id: 'release-2',
+            title: 'Never Say A Word',
+            artist: 'Other Artist',
+            providers: [
+              {
+                key: 'apple',
+                label: 'Apple Music',
+                url: 'https://music.apple.com/album/never-say-a-word',
+              },
+            ],
+          }),
+        ]}
+      />
+    );
+
+    const search = screen.getByRole('searchbox', {
+      name: 'Search library assets',
+    });
+
+    fireEvent.keyDown(window, { key: '/' });
+    expect(search).toHaveFocus();
+
+    fireEvent.change(search, { target: { value: 'apple' } });
+
+    expect(
+      screen.getByRole('heading', { name: 'Never Say A Word' })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Take Me Over' })
+    ).not.toBeInTheDocument();
+
+    fireEvent.keyDown(search, { key: 'Escape' });
+
+    expect(search).toHaveValue('');
+    expect(
+      screen.getByRole('heading', { name: 'Take Me Over' })
+    ).toBeInTheDocument();
   });
 });

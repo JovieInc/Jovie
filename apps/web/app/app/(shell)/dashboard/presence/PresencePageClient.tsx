@@ -23,9 +23,8 @@ export function PresencePageClient() {
 
   const { data: presenceData, isError } = useDspPresenceQuery(profileId);
 
-  // Cold-load skeleton only. `data === undefined` is the only true "no
-  // cached data" signal; `isLoading` can spike on refetch transitions
-  // and flash the skeleton every window focus. See JOV-2151.
+  // Cold-load skeleton only. Keep the mounted view stable across background
+  // refetches where data stays defined.
   if (presenceData === undefined) {
     return <PresenceLoading />;
   }

@@ -1,22 +1,17 @@
 import type { Metadata } from 'next';
-import { redirect } from 'next/navigation';
 import { OnboardingShell } from '@/components/features/onboarding/OnboardingShell';
-import { APP_ROUTES } from '@/constants/routes';
-import { captureError } from '@/lib/error-tracking';
-import { getOrMintOnboardingSessionId } from '@/lib/onboarding/session';
 
 /**
- * Anonymous onboarding chat entry point (JOV-2132 PR 3).
+ * Canonical onboarding chat entry point.
  *
- * Pre-account musicians land here. The server component ensures an
- * `jovie_onboarding_session` cookie is minted (signed; PR 1 helper) before
- * the client OnboardingChat opens its first POST to /api/chat in
- * `mode='onboarding'`.
+ * The page is intentionally read-only. `/api/chat` mints the signed
+ * `jovie_onboarding_session` cookie on the visitor's first onboarding
+ * message, because cookies can only be modified from a route handler or
+ * server action.
  *
  * Placed under `app/(dynamic)/` so the marketing-static rule does not apply
- * — this route mints session cookies per request and dispatches a streaming
- * LLM response. CSP nonce and middleware behavior follow the existing
- * dynamic-group conventions.
+ * — this route dispatches a streaming LLM response through `/api/chat`. CSP
+ * nonce and middleware behavior follow the existing dynamic-group conventions.
  *
  * The visual shell here is intentionally minimal for v1. Cinematic reveal
  * choreography (per the JOV-2132 plan + Stanley refs) lands incrementally
@@ -31,31 +26,5 @@ export const metadata: Metadata = {
 };
 
 export default async function StartPage() {
-  // Mint or read the signed onboarding session cookie. The /api/chat handler
-  // will read this cookie on the first message; persisting it here means the
-  // first POST already has a stable session id and Turnstile gate behavior.
-  //
-  // Guard: if session minting fails (e.g. SESSION_SECRET not yet provisioned
-  // on a new environment), redirect to /signup instead of rendering a 500.
-  // The root cause is almost always a missing SESSION_SECRET env var.
-  let sessionId: string;
-  try {
-    const result = await getOrMintOnboardingSessionId();
-    sessionId = result.sessionId;
-  } catch (err) {
-    await captureError(
-      '[/start] getOrMintOnboardingSessionId threw — redirecting to /signup. Check SESSION_SECRET is provisioned.',
-      err,
-      { route: '/start' }
-    );
-    return redirect(APP_ROUTES.SIGNUP);
-  }
-
-  // We expose only the leading 8 chars of the session id to the client for
-  // debugging breadcrumbs — the full signed cookie value is httpOnly, the
-  // client never needs the full id, and we keep it scrubbed in any Sentry
-  // crumbs that mention it.
-  const sessionLabel = sessionId.slice(0, 8);
-
-  return <OnboardingShell sessionLabel={sessionLabel} />;
+  return <OnboardingShell sessionLabel='pending' />;
 }
