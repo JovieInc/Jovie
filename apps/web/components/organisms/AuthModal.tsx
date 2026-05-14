@@ -213,7 +213,7 @@ function AuthModalInner({ defaultMode, onClose }: Readonly<AuthModalProps>) {
       proxyUrl={getClerkProxyUrl(globalThis.location)}
       signInUrl={APP_ROUTES.SIGNIN}
       signUpUrl={APP_ROUTES.SIGNUP}
-      signInFallbackRedirectUrl={APP_ROUTES.ONBOARDING}
+      signInFallbackRedirectUrl={APP_ROUTES.START}
     >
       <div
         role='dialog'
@@ -259,14 +259,14 @@ function AuthModalInner({ defaultMode, onClose }: Readonly<AuthModalProps>) {
                 appearance={clerkDarkCompact}
                 routing='hash'
                 signUpUrl={APP_ROUTES.SIGNUP}
-                fallbackRedirectUrl={APP_ROUTES.ONBOARDING}
+                fallbackRedirectUrl={APP_ROUTES.START}
               />
             ) : (
               <SignUp
                 appearance={clerkDarkCompact}
                 routing='hash'
                 signInUrl={APP_ROUTES.SIGNIN}
-                fallbackRedirectUrl={APP_ROUTES.WAITLIST}
+                fallbackRedirectUrl={APP_ROUTES.START}
               />
             )}
 

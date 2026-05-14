@@ -292,22 +292,20 @@ describe('proxy.ts middleware', () => {
       expect(isRedirectTo(res, '/signin')).toBe(true);
     });
 
-    it('redirects unauthenticated GET /onboarding to /signin', async () => {
+    it('lets unauthenticated GET /onboarding reach the /start shim', async () => {
       const req = createUnauthenticatedRequest({ pathname: '/onboarding' });
       const res = await callMiddleware(req);
 
-      expect(res.status).toBeGreaterThanOrEqual(300);
-      expect(res.status).toBeLessThan(400);
-      expect(isRedirectTo(res, '/signin')).toBe(true);
+      expect(res.status).toBeLessThan(300);
     });
 
-    it('redirects unauthenticated GET /waitlist to /signup', async () => {
+    it('redirects unauthenticated GET /waitlist to /start', async () => {
       const req = createUnauthenticatedRequest({ pathname: '/waitlist' });
       const res = await callMiddleware(req);
 
       expect(res.status).toBeGreaterThanOrEqual(300);
       expect(res.status).toBeLessThan(400);
-      expect(isRedirectTo(res, '/signup')).toBe(true);
+      expect(isRedirectTo(res, '/start')).toBe(true);
     });
 
     it('allows unauthenticated access to public paths', async () => {
@@ -450,11 +448,11 @@ describe('proxy.ts middleware', () => {
 
       const req = createUnauthenticatedRequest({
         hostname: 'staging.jov.ie',
-        pathname: '/onboarding',
+        pathname: '/onboarding/checkout',
       });
       const res = await callMiddleware(req);
 
-      // Must return 503, NOT redirect to /signin?redirect_url=%2Fonboarding
+      // Must return 503, NOT redirect to /signin?redirect_url=%2Fonboarding%2Fcheckout
       expect(res.status).toBe(503);
       expect(isRedirectTo(res, '/signin')).toBe(false);
     });
@@ -568,7 +566,7 @@ describe('proxy.ts middleware', () => {
       expect(isRedirectTo(res, '/waitlist')).toBe(true);
     });
 
-    it('redirects authenticated user with needsOnboarding on /signin to /onboarding', async () => {
+    it('redirects authenticated user with needsOnboarding on /signin to /start', async () => {
       mocks.getUserState.mockResolvedValue(USER_STATES.needsOnboarding);
 
       const req = createAuthenticatedRequest('clerk_user_1', {
@@ -577,7 +575,7 @@ describe('proxy.ts middleware', () => {
       const res = await callMiddleware(req);
 
       expect(res.status).toBeGreaterThanOrEqual(300);
-      expect(isRedirectTo(res, '/onboarding')).toBe(true);
+      expect(isRedirectTo(res, '/start')).toBe(true);
     });
 
     it('returns approved invite recipients from /signin to the invite redemption page', async () => {
@@ -638,7 +636,7 @@ describe('proxy.ts middleware', () => {
       expect(isRedirectTo(res, '/app')).toBe(true);
     });
 
-    it('redirects active user away from /onboarding to /app', async () => {
+    it('lets /onboarding reach the redirect shim for active users', async () => {
       mocks.getUserState.mockResolvedValue(USER_STATES.active);
 
       const req = createAuthenticatedRequest('clerk_user_1', {
@@ -646,8 +644,7 @@ describe('proxy.ts middleware', () => {
       });
       const res = await callMiddleware(req);
 
-      expect(res.status).toBeGreaterThanOrEqual(300);
-      expect(isRedirectTo(res, '/app')).toBe(true);
+      expect(res.status).toBeLessThan(300);
     });
   });
 
@@ -655,7 +652,7 @@ describe('proxy.ts middleware', () => {
   // Circuit Breaker
   // ==========================================================================
   describe('circuit breaker (redirect loop prevention)', () => {
-    it('rewrites to /onboarding and increments redirect count', async () => {
+    it('rewrites to /start and increments redirect count', async () => {
       mocks.getUserState.mockResolvedValue(USER_STATES.needsOnboarding);
 
       const req = createAuthenticatedRequest('clerk_user_1', {
@@ -663,10 +660,10 @@ describe('proxy.ts middleware', () => {
       });
       const res = await callMiddleware(req);
 
-      // Verify the rewrite destination is /onboarding
+      // Verify the rewrite destination is /start
       const rewriteUrl = res.headers.get('x-middleware-rewrite');
       expect(rewriteUrl).toBeTruthy();
-      expect(new URL(rewriteUrl!).pathname).toBe('/onboarding');
+      expect(new URL(rewriteUrl!).pathname).toBe('/start');
 
       const cookies = getResponseCookies(res);
       expect(cookies.jovie_redirect_count).toBe('1');
@@ -742,7 +739,7 @@ describe('proxy.ts middleware', () => {
       // Cookie was unparseable → treat as 0 and increment to 1, NOT NaN+1.
       const rewriteUrl = res.headers.get('x-middleware-rewrite');
       expect(rewriteUrl).toBeTruthy();
-      expect(new URL(rewriteUrl!).pathname).toBe('/onboarding');
+      expect(new URL(rewriteUrl!).pathname).toBe('/start');
       const cookies = getResponseCookies(res);
       expect(cookies.jovie_redirect_count).toBe('1');
     });

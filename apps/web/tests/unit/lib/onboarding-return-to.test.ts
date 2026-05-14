@@ -16,11 +16,14 @@ describe('normalizeOnboardingReturnTo', () => {
 
   it('preserves allowed onboarding resume targets', () => {
     expect(normalizeOnboardingReturnTo('/onboarding?resume=spotify')).toBe(
-      '/onboarding?resume=spotify'
+      '/start?resume=spotify'
+    );
+    expect(normalizeOnboardingReturnTo('/start?resume=spotify')).toBe(
+      '/start?resume=spotify'
     );
     expect(
       normalizeOnboardingReturnTo('/onboarding?resume=profile-ready')
-    ).toBe('/onboarding?resume=profile-ready');
+    ).toBe('/start?resume=profile-ready');
   });
 
   it('rejects invalid and external return targets', () => {

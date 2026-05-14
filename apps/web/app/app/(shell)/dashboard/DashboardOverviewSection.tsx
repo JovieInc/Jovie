@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { APP_ROUTES } from '@/constants/routes';
 import { DashboardOverview } from '@/features/dashboard/organisms/DashboardOverview';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { convertDrizzleCreatorProfileToArtist } from '@/types/db';
@@ -12,7 +13,7 @@ export async function DashboardOverviewSection() {
   ]);
 
   if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
-    redirect('/onboarding');
+    redirect(APP_ROUTES.START);
   }
 
   const artist = dashboardData.selectedProfile

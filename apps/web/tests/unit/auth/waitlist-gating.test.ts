@@ -298,7 +298,7 @@ describe('resolveProfileState', () => {
   it('returns NEEDS_ONBOARDING when profile is null', () => {
     const result = resolveProfileState(null);
     expect(result.state).toBe(CanonicalUserState.NEEDS_ONBOARDING);
-    expect(result.redirectTo).toContain('/onboarding');
+    expect(result.redirectTo).toContain('/start');
   });
 
   it('returns NEEDS_ONBOARDING when profile has no username', () => {
@@ -653,9 +653,9 @@ describe('gate.ts utility functions', () => {
       );
     });
 
-    it('returns /onboarding for onboarding states', () => {
+    it('returns /start for onboarding states', () => {
       const redirect = getRedirectForState(CanonicalUserState.NEEDS_ONBOARDING);
-      expect(redirect).toContain('/onboarding');
+      expect(redirect).toContain('/start');
     });
 
     it('returns /unavailable for BANNED state', () => {
@@ -694,7 +694,6 @@ describe('proxy.ts path categorization', () => {
       '/app/admin',
       '/app/billing',
       '/app/account',
-      '/onboarding',
       '/waitlist',
     ];
 
@@ -704,7 +703,7 @@ describe('proxy.ts path categorization', () => {
       expect(protectedPaths).toContain('/app/profile');
       expect(protectedPaths).toContain('/app/settings');
       expect(protectedPaths).toContain('/waitlist');
-      expect(protectedPaths).toContain('/onboarding');
+      expect(protectedPaths).not.toContain('/onboarding');
     });
   });
 

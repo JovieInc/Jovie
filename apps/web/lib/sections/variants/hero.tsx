@@ -18,7 +18,7 @@ function HeroDemoContent() {
       </p>
       <div className='mt-8 flex flex-wrap items-center justify-center gap-3'>
         <Link
-          href='/onboarding'
+          href='/start'
           className='inline-flex h-10 items-center rounded-full bg-white px-5 text-sm font-semibold text-black transition-colors hover:bg-white/90'
         >
           Claim my workspace
@@ -50,7 +50,7 @@ function SplitDemoContent() {
         </p>
         <div className='mt-7'>
           <Link
-            href='/onboarding'
+            href='/start'
             className='inline-flex h-10 items-center rounded-full bg-primary-token px-5 text-sm font-semibold text-on-primary'
           >
             Claim your handle
