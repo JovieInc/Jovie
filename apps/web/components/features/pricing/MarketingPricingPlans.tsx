@@ -19,7 +19,6 @@ function MarketingPricingPlanCard({
   plan: MarketingPricingPlan;
 }>) {
   const active = isMarketingPlanActive(plan.id);
-  const isFree = plan.id === 'free';
 
   return (
     <article
@@ -40,9 +39,7 @@ function MarketingPricingPlanCard({
           <p className='marketing-pricing-plan-card__name'>{plan.name}</p>
           <p className='marketing-pricing-plan-card__body'>{plan.body}</p>
         </div>
-        <span className='marketing-pricing-plan-card__badge'>
-          {active || isFree ? plan.badge : 'Waitlist'}
-        </span>
+        <span className='marketing-pricing-plan-card__badge'>{plan.badge}</span>
       </div>
 
       <p className='marketing-pricing-plan-card__price'>
