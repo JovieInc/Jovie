@@ -1,6 +1,7 @@
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
+  act,
   fireEvent,
   type RenderOptions,
   render,
@@ -219,6 +220,12 @@ const defaultProps = {
   subscriberCount: 0,
 };
 
+/**
+ * Fire a resize event through the mocked ResizeObserver and flush React state
+ * updates synchronously. Must be called inside `act()` when invoked from test
+ * bodies (outside of React's own event system) to ensure React processes the
+ * resulting `setDesktopTableWidth` call before assertions run.
+ */
 function fireDesktopTableResize(width: number) {
   mockDesktopTableWidth = width;
   if (!resizeObserverCallback || !resizeObserverTarget) {
@@ -332,15 +339,23 @@ describe('DashboardAudienceTable', () => {
       />
     );
 
-    await waitFor(() => {
-      expect(capturedColumnVisibility).toEqual({
-        signal: false,
-        engagement: false,
-        state: false,
-        last: false,
-      });
-      expect(capturedMinWidth).toBe('480px');
-    });
+    // Flush all pending React effects and state updates (including the
+    // synchronous ResizeObserver callback fired during useEffect) so assertions
+    // do not depend on waitFor's polling window under CI memory pressure.
+    await act(async () => {});
+
+    await waitFor(
+      () => {
+        expect(capturedColumnVisibility).toEqual({
+          signal: false,
+          engagement: false,
+          state: false,
+          last: false,
+        });
+        expect(capturedMinWidth).toBe('480px');
+      },
+      { timeout: 5000 }
+    );
   });
 
   it('keeps engagement and recency visible at medium desktop widths', async () => {
@@ -354,13 +369,18 @@ describe('DashboardAudienceTable', () => {
       />
     );
 
-    await waitFor(() => {
-      expect(capturedColumnVisibility).toEqual({
-        signal: false,
-        engagement: false,
-      });
-      expect(capturedMinWidth).toBe('640px');
-    });
+    await act(async () => {});
+
+    await waitFor(
+      () => {
+        expect(capturedColumnVisibility).toEqual({
+          signal: false,
+          engagement: false,
+        });
+        expect(capturedMinWidth).toBe('640px');
+      },
+      { timeout: 5000 }
+    );
   });
 
   it('shows all desktop columns at wide widths', async () => {
@@ -372,10 +392,15 @@ describe('DashboardAudienceTable', () => {
       />
     );
 
-    await waitFor(() => {
-      expect(capturedColumnVisibility).toEqual({});
-      expect(capturedMinWidth).toBe('800px');
-    });
+    await act(async () => {});
+
+    await waitFor(
+      () => {
+        expect(capturedColumnVisibility).toEqual({});
+        expect(capturedMinWidth).toBe('800px');
+      },
+      { timeout: 5000 }
+    );
   });
 
   it('updates the desktop layout when the table width changes after mount', async () => {
@@ -387,22 +412,34 @@ describe('DashboardAudienceTable', () => {
       />
     );
 
-    await waitFor(() => {
-      expect(capturedColumnVisibility).toEqual({});
-      expect(capturedMinWidth).toBe('800px');
+    await act(async () => {});
+
+    await waitFor(
+      () => {
+        expect(capturedColumnVisibility).toEqual({});
+        expect(capturedMinWidth).toBe('800px');
+      },
+      { timeout: 5000 }
+    );
+
+    // Wrap the external resize trigger in act() so React processes the
+    // resulting setDesktopTableWidth state update before assertions run.
+    await act(async () => {
+      fireDesktopTableResize(700);
     });
 
-    fireDesktopTableResize(700);
-
-    await waitFor(() => {
-      expect(capturedColumnVisibility).toEqual({
-        signal: false,
-        engagement: false,
-        state: false,
-        last: false,
-      });
-      expect(capturedMinWidth).toBe('480px');
-    });
+    await waitFor(
+      () => {
+        expect(capturedColumnVisibility).toEqual({
+          signal: false,
+          engagement: false,
+          state: false,
+          last: false,
+        });
+        expect(capturedMinWidth).toBe('480px');
+      },
+      { timeout: 5000 }
+    );
   });
 
   it('renders a mobile load more control and forwards clicks', () => {
