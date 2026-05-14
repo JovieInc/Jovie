@@ -292,6 +292,20 @@ describe('proxy.ts middleware', () => {
       expect(isRedirectTo(res, '/signin')).toBe(true);
     });
 
+    it('keeps unauthenticated legacy earnings deep links behind signin', async () => {
+      const req = createUnauthenticatedRequest({
+        pathname: '/app/dashboard/earnings',
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBeGreaterThanOrEqual(300);
+      expect(res.status).toBeLessThan(400);
+      expect(isRedirectTo(res, '/signin')).toBe(true);
+      expect(res.headers.get('location')).toContain(
+        'redirect_url=%2Fapp%2Fdashboard%2Fearnings'
+      );
+    });
+
     it('redirects unauthenticated GET /onboarding to /start before rendering', async () => {
       const req = createUnauthenticatedRequest({
         pathname: '/onboarding',
@@ -655,6 +669,25 @@ describe('proxy.ts middleware', () => {
       expect(res.status).toBeLessThan(400);
       expect(isRedirectTo(res, '/start')).toBe(true);
       expect(res.headers.get('location')).toContain('handle=artist');
+    });
+
+    it('redirects authenticated legacy earnings deep links to artist profile pay', async () => {
+      mocks.getUserState.mockResolvedValue(USER_STATES.active);
+
+      const req = createAuthenticatedRequest('clerk_user_1', {
+        pathname: '/app/dashboard/earnings',
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBeGreaterThanOrEqual(300);
+      expect(res.status).toBeLessThan(400);
+      const location = res.headers.get('location');
+      expect(location).toBeTruthy();
+      const locationUrl = new URL(location ?? '', 'https://localhost');
+      expect(locationUrl.pathname).toBe('/app/settings/artist-profile');
+      expect(locationUrl.searchParams.get('tab')).toBe('earn');
+      expect(locationUrl.hash).toBe('#pay');
+      expect(mocks.getUserState).not.toHaveBeenCalled();
     });
   });
 

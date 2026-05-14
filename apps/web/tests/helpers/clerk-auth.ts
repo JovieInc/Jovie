@@ -104,6 +104,24 @@ export function canFallbackToBypassUserId(
   return persona === 'creator';
 }
 
+export function resolveBypassSessionUrls(baseUrl: string): readonly string[] {
+  const urls = [new URL('/api/dev/test-auth/session', baseUrl).toString()];
+
+  try {
+    const parsedBaseUrl = new URL(baseUrl);
+    if (parsedBaseUrl.hostname === 'localhost') {
+      parsedBaseUrl.hostname = '127.0.0.1';
+      urls.push(
+        new URL('/api/dev/test-auth/session', parsedBaseUrl).toString()
+      );
+    }
+  } catch {
+    // The primary URL constructor above will surface invalid base URLs.
+  }
+
+  return Array.from(new Set(urls));
+}
+
 async function resolveBypassUserIdFromLocalProvisioning(
   fallbackUserId: string,
   persona: DevTestAuthPersona | null
@@ -136,53 +154,61 @@ async function resolveBypassUserId(
     return fallbackUserId;
   }
 
+  const sessionUrls = resolveBypassSessionUrls(baseUrl);
+  let lastResolveError = `No session bootstrap attempts ran for ${persona}.`;
+
   for (let attempt = 1; attempt <= 3; attempt += 1) {
-    try {
-      const response = await fetch(
-        new URL('/api/dev/test-auth/session', baseUrl),
-        {
+    for (const sessionUrl of sessionUrls) {
+      try {
+        const response = await fetch(sessionUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ persona }),
-        }
-      );
+        });
 
-      if (!response.ok) {
-        throw new Error(`Failed to resolve ${persona} test auth persona.`);
+        if (!response.ok) {
+          const responseText = await response.text().catch(() => '');
+          const bodySnippet = responseText.trim().slice(0, 240);
+          lastResolveError = `${sessionUrl} returned ${response.status}${
+            bodySnippet ? `: ${bodySnippet}` : ''
+          }`;
+          continue;
+        }
+
+        const payload = (await response.json()) as { userId?: string | null };
+        return payload.userId?.trim() || fallbackUserId;
+      } catch (error) {
+        lastResolveError = `${sessionUrl} failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`;
       }
-
-      const payload = (await response.json()) as { userId?: string | null };
-      return payload.userId?.trim() || fallbackUserId;
-    } catch {
-      if (attempt === 3) {
-        const locallyProvisionedUserId =
-          await resolveBypassUserIdFromLocalProvisioning(
-            fallbackUserId,
-            persona
-          );
-
-        if (locallyProvisionedUserId) {
-          console.warn(
-            `[clerk-auth] Falling back to local provisioning for ${persona} persona after session bootstrap failed`
-          );
-          return locallyProvisionedUserId;
-        }
-
-        if (canFallbackToBypassUserId(persona)) {
-          console.warn(
-            `[clerk-auth] Falling back to configured bypass user for ${persona} persona after session bootstrap failed`
-          );
-          return fallbackUserId;
-        }
-
-        throw new ClerkTestError(
-          `Failed to resolve ${persona} test auth persona.`,
-          'CLERK_SETUP_FAILED'
-        );
-      }
-
-      await sleep(500 * attempt);
     }
+
+    if (attempt === 3) {
+      const locallyProvisionedUserId =
+        await resolveBypassUserIdFromLocalProvisioning(fallbackUserId, persona);
+
+      if (locallyProvisionedUserId) {
+        console.warn(
+          `[clerk-auth] Falling back to local provisioning for ${persona} persona after session bootstrap failed: ${lastResolveError}`
+        );
+        return locallyProvisionedUserId;
+      }
+
+      if (canFallbackToBypassUserId(persona)) {
+        console.warn(
+          `[clerk-auth] Falling back to configured bypass user for ${persona} persona after session bootstrap failed: ${lastResolveError}`
+        );
+        return fallbackUserId;
+      }
+
+      throw new ClerkTestError(
+        `Failed to resolve ${persona} test auth persona: ${lastResolveError}`,
+        'CLERK_SETUP_FAILED'
+      );
+    }
+
+    await sleep(500 * attempt);
   }
 
   return fallbackUserId;
