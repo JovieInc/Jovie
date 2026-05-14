@@ -57,6 +57,8 @@
 ### Added
 
 - **[internal] Open PR and Open Linear links on approval queue rows**: Each run row in the AgentOS admin approval queue now surfaces inline action links when a PR URL or Linear issue URL is present. Links are host-allowlisted to `github.com` and `linear.app` only.
+- [internal] **Shell Releases controls parity** (JOV-1822): the design-v1 shell releases view mirrors production release controls with Spotify sync/manual-add gates, inline import/Apple Music/smart-link banners, release plan generation, delete confirmation, and smart-link row gating from plan entitlements.
+- [internal] **Shell Releases complexity split**: extracted artwork playback, smart-link gating, and list-content helpers so `ShellReleaseRow` and `ShellReleasesView` stay below SonarCloud cognitive-complexity limits while preserving parity behavior.
 
 ### Fixed
 
