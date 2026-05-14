@@ -101,7 +101,7 @@ async function parseJsonSafely<T>(response: APIResponse): Promise<T | null> {
 export function canFallbackToBypassUserId(
   persona: DevTestAuthPersona | null
 ): boolean {
-  return persona === 'creator';
+  return Boolean(persona);
 }
 
 export function resolveBypassSessionUrls(baseUrl: string): readonly string[] {
