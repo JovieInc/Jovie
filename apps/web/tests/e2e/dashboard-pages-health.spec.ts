@@ -1,4 +1,3 @@
-import { neon } from '@neondatabase/serverless';
 import {
   expect,
   type Locator,
@@ -7,6 +6,7 @@ import {
   test,
 } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
+import type { DevTestAuthPersona } from '@/lib/auth/dev-test-auth-types';
 import {
   ensureSignedInUser,
   getAdminCredentials,
@@ -14,6 +14,7 @@ import {
   isProductionTarget,
   setTestAuthBypassSession,
   signInUser,
+  waitForAuthenticatedHealth,
 } from '../helpers/clerk-auth';
 import {
   DASHBOARD_ROUTE_MATRIX,
@@ -67,21 +68,45 @@ const HEALTH_NAVIGATION_TIMEOUT = FAST_ITERATION
   ? 90_000
   : SMOKE_TIMEOUTS.NAVIGATION;
 const DASHBOARD_ROUTING_TIMEOUT = FAST_ITERATION ? 180_000 : 300_000;
+const CREATOR_DASHBOARD_PERSONA = 'creator-ready' satisfies DevTestAuthPersona;
 
-async function resolveSeededCreatorClerkId(): Promise<string | null> {
-  const databaseUrl = process.env.DATABASE_URL?.trim();
-  if (!databaseUrl) return null;
+type ClerkCredentials = {
+  readonly username?: string;
+  readonly password?: string;
+};
 
-  const sql = neon(databaseUrl);
-  const rows = await sql<Array<{ clerk_id: string | null }>>`
-    select u.clerk_id
-    from users u
-    inner join creator_profiles p on p.user_id = u.id
-    where p.username = 'e2e-test-user'
-    limit 1
-  `;
+function isTestAuthBypassEnabled(): boolean {
+  return process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
+}
 
-  return rows[0]?.clerk_id?.trim() || null;
+function hasDashboardAuthConfiguration(): boolean {
+  if (isTestAuthBypassEnabled()) {
+    return Boolean(process.env.E2E_CLERK_USER_ID?.trim());
+  }
+
+  return hasClerkCredentials();
+}
+
+async function prepareDashboardAuthSession(
+  page: Page,
+  options: {
+    readonly persona?: DevTestAuthPersona | null;
+    readonly userId?: string | null;
+    readonly credentials?: ClerkCredentials;
+  } = {}
+): Promise<void> {
+  if (isTestAuthBypassEnabled()) {
+    const expectedUserId = options.persona ? null : (options.userId ?? null);
+    await setTestAuthBypassSession(
+      page,
+      options.persona ?? null,
+      options.userId ?? null
+    );
+    await waitForAuthenticatedHealth(page, expectedUserId);
+    return;
+  }
+
+  await ensureSignedInUser(page, options.credentials);
 }
 
 function getComparableUrlValue(urlString: string): string {
@@ -274,10 +299,9 @@ async function runRouteCheck(
   route: DashboardRouteDescriptor,
   testInfo: TestInfo,
   options?: {
-    readonly credentials?: {
-      readonly username: string;
-      readonly password: string;
-    };
+    readonly authPersona?: DevTestAuthPersona | null;
+    readonly authUserId?: string | null;
+    readonly credentials?: ClerkCredentials;
   }
 ): Promise<PageHealthResult> {
   const resolvedPath = await resolveRoutePath(page, route);
@@ -317,7 +341,15 @@ async function runRouteCheck(
         currentUrl.includes('/signin') || currentUrl.includes('/sign-in');
 
       if (isAuthRedirect && attempt === 0) {
-        await signInUser(page, options?.credentials);
+        if (isTestAuthBypassEnabled()) {
+          await prepareDashboardAuthSession(page, {
+            persona: options?.authPersona ?? CREATOR_DASHBOARD_PERSONA,
+            userId: options?.authUserId ?? null,
+            credentials: options?.credentials,
+          });
+        } else {
+          await signInUser(page, options?.credentials);
+        }
         continue;
       }
 
@@ -538,10 +570,10 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
       return;
     }
 
-    if (!hasClerkCredentials()) {
+    if (!hasDashboardAuthConfiguration()) {
       test.skip(
         true,
-        'Dashboard health tests require authenticated Clerk credentials'
+        'Dashboard health tests require Clerk credentials or test auth bypass user id'
       );
       return;
     }
@@ -549,11 +581,9 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
     await stubPassiveTracking(page);
 
     try {
-      if (process.env.E2E_USE_TEST_AUTH_BYPASS === '1') {
-        const creatorClerkId = await resolveSeededCreatorClerkId();
-        await setTestAuthBypassSession(page, null, creatorClerkId);
-      }
-      await ensureSignedInUser(page);
+      await prepareDashboardAuthSession(page, {
+        persona: CREATOR_DASHBOARD_PERSONA,
+      });
     } catch (error) {
       console.error('Failed to sign in test user:', error);
       test.skip();
@@ -607,10 +637,10 @@ test.describe('Admin Pages Health Check @smoke', () => {
       return;
     }
 
-    if (!hasClerkCredentials()) {
+    if (!hasDashboardAuthConfiguration()) {
       test.skip(
         true,
-        'Admin health tests require authenticated Clerk credentials'
+        'Admin health tests require Clerk credentials or test auth bypass user id'
       );
       return;
     }
@@ -618,10 +648,10 @@ test.describe('Admin Pages Health Check @smoke', () => {
     await stubPassiveTracking(page);
 
     try {
-      if (process.env.E2E_USE_TEST_AUTH_BYPASS === '1') {
-        await setTestAuthBypassSession(page, 'admin');
-      }
-      await ensureSignedInUser(page, getAdminCredentials());
+      await prepareDashboardAuthSession(page, {
+        persona: 'admin',
+        credentials: getAdminCredentials(),
+      });
     } catch (error) {
       console.error('Failed to sign in admin or fallback user:', error);
       test.skip();
@@ -638,6 +668,7 @@ test.describe('Admin Pages Health Check @smoke', () => {
 
     for (const route of ACTIVE_ADMIN_PAGES) {
       const result = await runRouteCheck(page, route, testInfo, {
+        authPersona: 'admin',
         credentials,
       });
       console.log(
@@ -668,15 +699,20 @@ test.describe('Dashboard Routing', () => {
   test.setTimeout(DASHBOARD_ROUTING_TIMEOUT);
 
   test.beforeEach(async ({ page }) => {
-    if (!hasClerkCredentials()) {
-      test.skip(true, 'Routing checks require authenticated Clerk credentials');
+    if (!hasDashboardAuthConfiguration()) {
+      test.skip(
+        true,
+        'Routing checks require Clerk credentials or test auth bypass user id'
+      );
       return;
     }
 
     await stubPassiveTracking(page);
 
     try {
-      await ensureSignedInUser(page);
+      await prepareDashboardAuthSession(page, {
+        persona: CREATOR_DASHBOARD_PERSONA,
+      });
     } catch {
       test.skip();
     }
