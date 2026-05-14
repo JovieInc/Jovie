@@ -44,67 +44,76 @@ function findDangerousElementEnd(
   return closingEnd === -1 ? lowerHtml.length : closingEnd + 1;
 }
 
+const WHITESPACE = new Set([' ', '\t', '\n', '\r']);
+const TOKEN_BREAK = new Set([' ', '\t', '\n', '\r', '=', '>', '/']);
+
+function skipWhitespace(str: string, from: number): number {
+  let i = from;
+  while (WHITESPACE.has(str[i] as string)) i += 1;
+  return i;
+}
+
+function readAttributeName(
+  rawTag: string,
+  from: number
+): { end: number; name: string } {
+  let index = from;
+  while (index < rawTag.length) {
+    const char = rawTag[index];
+    if (!char || TOKEN_BREAK.has(char)) break;
+    index += 1;
+  }
+  return { end: index, name: rawTag.slice(from, index) };
+}
+
+function readQuotedValue(
+  rawTag: string,
+  quote: string,
+  from: number
+): { endIndex: number; value: string } {
+  const valueEnd = rawTag.indexOf(quote, from);
+  if (valueEnd === -1) {
+    return { endIndex: rawTag.length, value: rawTag.slice(from) };
+  }
+  return { endIndex: valueEnd + 1, value: rawTag.slice(from, valueEnd) };
+}
+
+function readUnquotedValue(
+  rawTag: string,
+  from: number
+): { endIndex: number; value: string } {
+  let index = from;
+  while (index < rawTag.length) {
+    const char = rawTag[index];
+    if (!char || WHITESPACE.has(char) || char === '>' || char === '/') break;
+    index += 1;
+  }
+  return { endIndex: index, value: rawTag.slice(from, index) };
+}
+
 function readAttribute(
   rawTag: string,
   startIndex: number
 ): { endIndex: number; name: string; value: string | null } {
-  let index = startIndex;
-  while (rawTag[index] === ' ' || rawTag[index] === '\n') index += 1;
-  while (rawTag[index] === '\t' || rawTag[index] === '\r') index += 1;
+  let index = skipWhitespace(rawTag, startIndex);
 
-  const nameStart = index;
-  while (index < rawTag.length) {
-    const char = rawTag[index];
-    if (!char || char === '=' || char === '>' || char === '/') break;
-    if (char === ' ' || char === '\t' || char === '\n' || char === '\r') break;
-    index += 1;
-  }
-
-  const name = rawTag.slice(nameStart, index);
-  while (rawTag[index] === ' ' || rawTag[index] === '\n') index += 1;
-  while (rawTag[index] === '\t' || rawTag[index] === '\r') index += 1;
+  const { end: nameEnd, name } = readAttributeName(rawTag, index);
+  index = skipWhitespace(rawTag, nameEnd);
 
   if (rawTag[index] !== '=') {
     return { endIndex: index, name, value: null };
   }
 
-  index += 1;
-  while (rawTag[index] === ' ' || rawTag[index] === '\n') index += 1;
-  while (rawTag[index] === '\t' || rawTag[index] === '\r') index += 1;
+  index = skipWhitespace(rawTag, index + 1);
 
   const quote = rawTag[index];
   if (quote === '"' || quote === "'") {
-    index += 1;
-    const valueStart = index;
-    const valueEnd = rawTag.indexOf(quote, index);
-    if (valueEnd === -1) {
-      return {
-        endIndex: rawTag.length,
-        name,
-        value: rawTag.slice(valueStart),
-      };
-    }
-
-    return {
-      endIndex: valueEnd + 1,
-      name,
-      value: rawTag.slice(valueStart, valueEnd),
-    };
+    const quoted = readQuotedValue(rawTag, quote, index + 1);
+    return { endIndex: quoted.endIndex, name, value: quoted.value };
   }
 
-  const valueStart = index;
-  while (index < rawTag.length) {
-    const char = rawTag[index];
-    if (!char || char === ' ' || char === '\t' || char === '\n') break;
-    if (char === '\r' || char === '>' || char === '/') break;
-    index += 1;
-  }
-
-  return {
-    endIndex: index,
-    name,
-    value: rawTag.slice(valueStart, index),
-  };
+  const unquoted = readUnquotedValue(rawTag, index);
+  return { endIndex: unquoted.endIndex, name, value: unquoted.value };
 }
 
 function isSafeAttribute(name: string, value: string | null): boolean {

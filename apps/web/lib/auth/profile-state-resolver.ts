@@ -47,7 +47,7 @@ export function resolveProfileState(
     return {
       state: CanonicalUserState.NEEDS_ONBOARDING,
       profileId: null,
-      redirectTo: '/onboarding?fresh_signup=true',
+      redirectTo: '/start?fresh_signup=true',
     };
   }
 
@@ -56,7 +56,7 @@ export function resolveProfileState(
     return {
       state: CanonicalUserState.NEEDS_ONBOARDING,
       profileId: profile.id,
-      redirectTo: '/onboarding?fresh_signup=true',
+      redirectTo: '/start?fresh_signup=true',
     };
   }
 

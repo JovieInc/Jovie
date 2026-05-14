@@ -4,11 +4,23 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 
 const toggleTrack = vi.fn().mockResolvedValue(undefined);
-let playbackState = { activeTrackId: null as string | null, isPlaying: false };
+let playbackState: {
+  activeTrackId: string | null;
+  isPlaying: boolean;
+  playbackStatus: 'idle' | 'loading' | 'playing' | 'paused' | 'error';
+} = {
+  activeTrackId: null,
+  isPlaying: false,
+  playbackStatus: 'idle',
+};
 
 beforeEach(() => {
   toggleTrack.mockClear();
-  playbackState = { activeTrackId: null, isPlaying: false };
+  playbackState = {
+    activeTrackId: null,
+    isPlaying: false,
+    playbackStatus: 'idle',
+  };
 });
 
 vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
@@ -17,7 +29,7 @@ vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
     toggleTrack,
     seek: vi.fn(),
     stop: vi.fn(),
-    onError: vi.fn(),
+    onError: vi.fn(() => () => undefined),
   }),
 }));
 
@@ -26,121 +38,175 @@ const { ShellReleaseRow } = await import(
 );
 
 function fakeRelease(
-  partial: Partial<ReleaseViewModel> = {}
+  partial: Partial<ReleaseViewModel> & { id: string; title: string }
 ): ReleaseViewModel {
   return {
-    profileId: 'profile-1',
-    id: 'release-1',
-    title: 'Skyline Dreams',
-    slug: 'skyline-dreams',
-    smartLinkPath: '/smart/release-1',
-    artistNames: ['Jovie Artist'],
+    profileId: 'p',
+    artistNames: ['Bahamas'],
     status: 'released',
+    artworkUrl: 'https://x.invalid/a.jpg',
+    slug: partial.title.toLowerCase().replace(/\s+/g, '-'),
+    smartLinkPath: `/${partial.title.toLowerCase().replace(/\s+/g, '-')}`,
+    providers: [],
     releaseType: 'single',
     isExplicit: false,
     totalTracks: 1,
-    providers: [],
-    previewUrl: 'https://cdn.example.com/preview.mp3',
-    primaryIsrc: 'USX9P2400001',
-    artworkUrl: 'https://cdn.example.com/art.jpg',
-    lyrics: '',
     ...partial,
   } as ReleaseViewModel;
 }
 
-describe('ShellReleaseRow audio parity', () => {
-  it('omits the play overlay when the release has no production preview', () => {
+describe('ShellReleaseRow audio affordance', () => {
+  it('omits the play overlay when the release has no preview URL', () => {
     render(
       <ShellReleaseRow
-        release={fakeRelease({ previewUrl: null })}
+        release={fakeRelease({
+          id: 'r1',
+          title: 'No Preview',
+          previewUrl: null,
+        })}
         isSelected={false}
-        onSelect={vi.fn()}
+        onSelect={() => undefined}
       />
     );
 
     expect(
-      screen.queryByRole('button', { name: /Play|Pause/ })
+      screen.queryByRole('button', { name: 'Play No Preview' })
     ).not.toBeInTheDocument();
   });
 
-  it('passes the full production track payload to toggleTrack on first click', async () => {
+  it('renders a production-backed play overlay when previewUrl exists', () => {
+    render(
+      <ShellReleaseRow
+        release={fakeRelease({
+          id: 'r1',
+          title: 'Lost in the Light',
+          previewUrl: 'https://cdn.example.com/preview.mp3',
+        })}
+        isSelected={false}
+        onSelect={() => undefined}
+      />
+    );
+
+    const playButton = screen.getByRole('button', {
+      name: 'Play Lost in the Light',
+    });
+    expect(playButton).toBeInTheDocument();
+    expect(playButton).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('toggles playback via the shared audio player without selecting the row', async () => {
     const user = userEvent.setup();
     const onSelect = vi.fn();
 
     render(
       <ShellReleaseRow
-        release={fakeRelease({ lyrics: 'first line\nsecond line' })}
+        release={fakeRelease({
+          id: 'r1',
+          title: 'Lost in the Light',
+          previewUrl: 'https://cdn.example.com/preview.mp3',
+          primaryIsrc: 'USX9P2400001',
+          lyrics: 'la la la',
+        })}
         isSelected={false}
         onSelect={onSelect}
       />
     );
 
-    await user.click(screen.getByRole('button', { name: 'Play' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Play Lost in the Light' })
+    );
 
     expect(toggleTrack).toHaveBeenCalledWith({
-      id: 'release-1',
-      title: 'Skyline Dreams',
+      id: 'r1',
+      title: 'Lost in the Light',
       audioUrl: 'https://cdn.example.com/preview.mp3',
       isrc: 'USX9P2400001',
-      releaseTitle: 'Skyline Dreams',
-      artistName: 'Jovie Artist',
-      artworkUrl: 'https://cdn.example.com/art.jpg',
+      releaseTitle: 'Lost in the Light',
+      artistName: 'Bahamas',
+      artworkUrl: 'https://x.invalid/a.jpg',
       hasLyrics: true,
     });
-    // Click on the overlay must not also fire the row's onSelect.
     expect(onSelect).not.toHaveBeenCalled();
   });
 
-  it('omits audioUrl when toggling the same track that is already active (resume path)', async () => {
+  it('forwards a resume request without re-loading the audio source', async () => {
     const user = userEvent.setup();
-    playbackState = { activeTrackId: 'release-1', isPlaying: false };
+    playbackState = {
+      activeTrackId: 'r1',
+      isPlaying: false,
+      playbackStatus: 'paused',
+    };
 
     render(
       <ShellReleaseRow
-        release={fakeRelease()}
+        release={fakeRelease({
+          id: 'r1',
+          title: 'Lost in the Light',
+          previewUrl: 'https://cdn.example.com/preview.mp3',
+        })}
         isSelected={false}
-        onSelect={vi.fn()}
+        onSelect={() => undefined}
       />
     );
 
-    await user.click(screen.getByRole('button', { name: 'Play' }));
-
-    expect(toggleTrack).toHaveBeenCalledWith(
-      expect.objectContaining({
-        id: 'release-1',
-        audioUrl: undefined,
-      })
+    await user.click(
+      screen.getByRole('button', { name: 'Play Lost in the Light' })
     );
+
+    expect(toggleTrack).toHaveBeenCalledWith({
+      id: 'r1',
+      title: 'Lost in the Light',
+    });
+    const call = toggleTrack.mock.calls[0]?.[0] ?? {};
+    expect(call).not.toHaveProperty('audioUrl');
   });
 
-  it('marks the row as the active audio source while playing', () => {
-    playbackState = { activeTrackId: 'release-1', isPlaying: true };
+  it('reflects the active track in aria-pressed and data attributes', () => {
+    playbackState = {
+      activeTrackId: 'r1',
+      isPlaying: true,
+      playbackStatus: 'playing',
+    };
 
     const { container } = render(
       <ShellReleaseRow
-        release={fakeRelease()}
+        release={fakeRelease({
+          id: 'r1',
+          title: 'Lost in the Light',
+          previewUrl: 'https://cdn.example.com/preview.mp3',
+        })}
         isSelected={false}
-        onSelect={vi.fn()}
+        onSelect={() => undefined}
       />
     );
 
+    const pauseButton = screen.getByRole('button', {
+      name: 'Pause Lost in the Light',
+    });
+    expect(pauseButton).toHaveAttribute('aria-pressed', 'true');
+    expect(pauseButton.className).toContain('opacity-100');
+
     const row = container.querySelector('[data-shell-release-row]');
     expect(row).toHaveAttribute('data-release-active', 'true');
-    expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
   });
 
-  it('reports hasLyrics=false when release.lyrics is empty whitespace', async () => {
+  it('flags lyrics availability when the release has lyrics text', async () => {
     const user = userEvent.setup();
 
     render(
       <ShellReleaseRow
-        release={fakeRelease({ lyrics: '   \n  ' })}
+        release={fakeRelease({
+          id: 'r1',
+          title: 'No Lyrics',
+          previewUrl: 'https://cdn.example.com/preview.mp3',
+          lyrics: '',
+        })}
         isSelected={false}
-        onSelect={vi.fn()}
+        onSelect={() => undefined}
       />
     );
 
-    await user.click(screen.getByRole('button', { name: 'Play' }));
+    await user.click(screen.getByRole('button', { name: 'Play No Lyrics' }));
 
     expect(toggleTrack).toHaveBeenCalledWith(
       expect.objectContaining({ hasLyrics: false })

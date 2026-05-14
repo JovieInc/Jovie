@@ -18,7 +18,7 @@ export function PreFooterCTA() {
         <div className='mx-auto max-w-4xl text-center'>
           {/* Badge with glass morphism effect */}
           <div className='mb-8'>
-            <div className='inline-flex items-center gap-2 px-4 py-2 rounded-full bg-surface-1/80 border border-subtle backdrop-blur-sm text-sm font-medium text-secondary-token transition-all duration-slower hover:bg-surface-2/80 hover:scale-105'>
+            <div className='inline-flex items-center gap-2 px-4 py-2 rounded-full bg-surface-1/80 border border-subtle backdrop-blur-sm text-sm font-medium text-secondary-token transition-colors duration-slower'>
               <svg
                 className='w-4 h-4 text-blue-600 dark:text-blue-400'
                 fill='none'
@@ -61,9 +61,9 @@ export function PreFooterCTA() {
               asChild
               size='lg'
               variant='primary'
-              className='text-lg px-8 py-4 transition-all duration-slower hover:scale-105 hover:shadow-lg hover:shadow-indigo-500/25 dark:hover:shadow-indigo-400/25'
+              className='text-lg px-8 py-4 transition-shadow duration-slower hover:shadow-lg hover:shadow-indigo-500/25 dark:hover:shadow-indigo-400/25'
             >
-              <Link href='/onboarding'>Create Your Profile</Link>
+              <Link href='/start'>Create Your Profile</Link>
             </Button>
 
             {/* Secondary info with better visual hierarchy */}
@@ -87,7 +87,7 @@ export function PreFooterCTA() {
           </div>
 
           {/* Social proof with enhanced styling */}
-          <div className='mt-10 p-4 rounded-2xl bg-surface-1/50 backdrop-blur-sm border border-subtle transition-all duration-slower'>
+          <div className='mt-10 p-4 rounded-2xl bg-surface-1/50 backdrop-blur-sm border border-subtle'>
             <p className='text-sm text-tertiary-token font-medium'>
               Join{' '}
               <span className='text-blue-600 dark:text-blue-400 font-semibold'>

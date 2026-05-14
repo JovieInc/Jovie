@@ -3,6 +3,12 @@ import localFont from 'next/font/local';
 import React from 'react';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import './globals.css';
+// JOV-2145: HeaderNav.css is imported here so that the marketing-glass-header
+// visibility rules load on EVERY route, not just pages inside the (home) and
+// (marketing) route groups. The component-side import in HeaderNav.tsx is the
+// canonical declaration; Next.js's not-found.tsx CSS extraction doesn't always
+// traverse client-component CSS imports, so we ground the bundle here too.
+import '@/components/organisms/HeaderNav.css';
 import { CookieBannerMount } from '@/components/organisms/CookieBannerMount';
 import { InstantlyPixel } from '@/components/providers/InstantlyPixel';
 import { getRootLayoutChromeState } from '@/lib/demo-recording';

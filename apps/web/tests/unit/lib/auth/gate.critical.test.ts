@@ -257,7 +257,7 @@ describe('@critical gate.ts', () => {
     mockResolveProfileState.mockReturnValue({
       state: CanonicalUserState.NEEDS_ONBOARDING,
       profileId: null,
-      redirectTo: '/onboarding?fresh_signup=true',
+      redirectTo: '/start?fresh_signup=true',
     });
   });
 
@@ -318,13 +318,13 @@ describe('@critical gate.ts', () => {
       mockResolveProfileState.mockReturnValue({
         state: CanonicalUserState.NEEDS_ONBOARDING,
         profileId: null,
-        redirectTo: '/onboarding?fresh_signup=true',
+        redirectTo: '/start?fresh_signup=true',
       });
 
       const result = await resolveUserState();
 
       expect(result.state).toBe(CanonicalUserState.NEEDS_ONBOARDING);
-      expect(result.redirectTo).toBe('/onboarding?fresh_signup=true');
+      expect(result.redirectTo).toBe('/start?fresh_signup=true');
     });
 
     it('returns BANNED when user status is banned', async () => {
@@ -376,7 +376,7 @@ describe('@critical gate.ts', () => {
 
       expect(result.state).toBe(CanonicalUserState.NEEDS_DB_USER);
       expect(result.dbUserId).toBeNull();
-      expect(result.redirectTo).toBe('/onboarding?fresh_signup=true');
+      expect(result.redirectTo).toBe('/start?fresh_signup=true');
     });
 
     it('routes missing DB users to waitlist intake when no access request exists', async () => {
@@ -483,7 +483,7 @@ describe('@critical gate.ts', () => {
       mockResolveProfileState.mockReturnValue({
         state: CanonicalUserState.NEEDS_ONBOARDING,
         profileId: null,
-        redirectTo: '/onboarding?fresh_signup=true',
+        redirectTo: '/start?fresh_signup=true',
       });
 
       const result = await resolveUserState();
@@ -651,7 +651,7 @@ describe('@critical gate.ts', () => {
       mockResolveProfileState.mockReturnValue({
         state: CanonicalUserState.NEEDS_ONBOARDING,
         profileId: null,
-        redirectTo: '/onboarding?fresh_signup=true',
+        redirectTo: '/start?fresh_signup=true',
       });
 
       const result = await resolveUserState();
@@ -754,7 +754,7 @@ describe('@critical gate.ts', () => {
       mockResolveProfileState.mockReturnValue({
         state: CanonicalUserState.NEEDS_ONBOARDING,
         profileId: null,
-        redirectTo: '/onboarding?fresh_signup=true',
+        redirectTo: '/start?fresh_signup=true',
       });
 
       const result = await resolveUserState();
@@ -882,9 +882,9 @@ describe('@critical gate.ts', () => {
       );
     });
 
-    it('returns /onboarding?fresh_signup=true for NEEDS_DB_USER', () => {
+    it('returns /start?fresh_signup=true for NEEDS_DB_USER', () => {
       expect(getRedirectForState(CanonicalUserState.NEEDS_DB_USER)).toBe(
-        '/onboarding?fresh_signup=true'
+        '/start?fresh_signup=true'
       );
     });
 
@@ -900,9 +900,9 @@ describe('@critical gate.ts', () => {
       );
     });
 
-    it('returns /onboarding?fresh_signup=true for NEEDS_ONBOARDING', () => {
+    it('returns /start?fresh_signup=true for NEEDS_ONBOARDING', () => {
       expect(getRedirectForState(CanonicalUserState.NEEDS_ONBOARDING)).toBe(
-        '/onboarding?fresh_signup=true'
+        '/start?fresh_signup=true'
       );
     });
 

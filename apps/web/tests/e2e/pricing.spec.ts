@@ -57,12 +57,15 @@ test.describe('Pricing Page', () => {
     await expect(page.getByTestId('marketing-pricing-plan-pro')).toContainText(
       'Pro'
     );
-    await expect(page.getByTestId('marketing-pricing-plan-team')).toContainText(
-      'Team'
+    await expect(page.getByTestId('marketing-pricing-plan-pro')).toContainText(
+      'Waitlist'
     );
     await expect(
       page.getByTestId('marketing-pricing-plan-enterprise')
-    ).toContainText('Enterprise');
+    ).toHaveCount(0);
+    await expect(page.getByTestId('marketing-pricing-plan-team')).toHaveCount(
+      0
+    );
   });
 
   test('has working call-to-action buttons', async ({ page }) => {
@@ -95,7 +98,7 @@ test.describe('Pricing Page', () => {
           );
         })
       );
-    expect(requestAccessButtonsOnGrid).toEqual([true, true, true, true]);
+    expect(requestAccessButtonsOnGrid).toEqual([true, true]);
     await expect(
       page.getByRole('link', { name: 'Explore Artist Profiles' }).first()
     ).toBeVisible();

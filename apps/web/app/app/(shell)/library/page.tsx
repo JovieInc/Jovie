@@ -34,7 +34,7 @@ export default async function LibraryPage() {
   }
 
   if (dashboardData.needsOnboarding) {
-    redirect(APP_ROUTES.ONBOARDING);
+    redirect(APP_ROUTES.START);
   }
 
   const profileId = dashboardData.selectedProfile?.id;

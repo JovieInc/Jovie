@@ -92,7 +92,7 @@ export async function DashboardShellContent({
     dashboardData.needsOnboarding &&
     !dashboardData.dashboardLoadError
   ) {
-    redirect(APP_ROUTES.ONBOARDING);
+    redirect(APP_ROUTES.START);
   }
 
   // Read sidebar cookie server-side so SSR matches client state (no flash)

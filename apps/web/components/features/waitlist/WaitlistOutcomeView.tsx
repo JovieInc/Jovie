@@ -32,14 +32,14 @@ const OUTCOME_COPY: Record<
     body: 'We saved your release context. Continue setup to finish your profile and open Jovie.',
     icon: CheckCircle2,
     actionLabel: 'Continue Setup',
-    actionHref: APP_ROUTES.ONBOARDING,
+    actionHref: APP_ROUTES.START,
   },
   already_accepted: {
     title: 'You Have Access',
     body: 'Your request has already been approved. Continue setup to finish your profile.',
     icon: CheckCircle2,
     actionLabel: 'Continue Setup',
-    actionHref: APP_ROUTES.ONBOARDING,
+    actionHref: APP_ROUTES.START,
   },
   waitlisted_gate_on: {
     title: 'Request Saved',

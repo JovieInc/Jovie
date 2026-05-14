@@ -1,6 +1,13 @@
 'use client';
 
-import { ExternalLink, MoreHorizontal } from 'lucide-react';
+import {
+  Clock,
+  ExternalLink,
+  Lock,
+  MoreHorizontal,
+  Pause,
+  Play,
+} from 'lucide-react';
 import Link from 'next/link';
 import {
   type KeyboardEvent,
@@ -13,7 +20,6 @@ import { toast } from 'sonner';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import type { TableActionMenuItem } from '@/components/atoms/table-action-menu/types';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
-import { ArtworkPlayOverlay } from '@/components/shell/ArtworkPlayOverlay';
 import { ArtworkThumb } from '@/components/shell/ArtworkThumb';
 import { DropDateChip } from '@/components/shell/DropDateChip';
 import { DspAvatarStack } from '@/components/shell/DspAvatarStack';
@@ -23,55 +29,34 @@ import { dropDateMeta } from '@/lib/format-drop-date';
 import { cn } from '@/lib/utils';
 import { releaseStatusToShell, releaseToDspItems } from './release-adapters';
 
-/**
- * Linear-style release row for the DESIGN_V1 path. Replaces the legacy
- * provider-matrix cells with: artwork + title + artists + status + drop date
- * + DSP avatar stack + smart link + more menu.
- *
- * The outer `<li>` is the click + keyboard target (parent `<ul role="listbox">`
- * means `<li role="option">` with `tabIndex={0}` is the right semantic).
- * Inner interactive elements (smart link, more-menu) stop propagation so
- * they don't double-fire selection — the standard pattern across shell-v1.
- */
-export const ShellReleaseRow = memo(function ShellReleaseRow({
-  release,
-  isSelected,
-  onSelect,
-  actionMenuItems,
-}: {
-  readonly release: ReleaseViewModel;
-  readonly isSelected: boolean;
-  readonly onSelect: () => void;
-  readonly actionMenuItems?: TableActionMenuItem[];
-}) {
-  const dspItems = useMemo(() => releaseToDspItems(release), [release]);
-  const dropMeta = useMemo(
-    () => (release.releaseDate ? dropDateMeta(release.releaseDate) : null),
-    [release.releaseDate]
-  );
-  const status = releaseStatusToShell(release.status);
-  const artistLabel = release.artistNames?.join(', ') ?? '';
-  const smartLinkPath = release.smartLinkPath || `/${release.slug}`;
+export type ShellRowLockReason = 'scheduled' | 'cap' | null;
 
+// ── Subcomponents ─────────────────────────────────────────────────────────────
+
+function useArtworkPlayback(release: ReleaseViewModel) {
   const { playbackState, toggleTrack } = useTrackAudioPlayer();
-  const hasPreview = Boolean(release.previewUrl);
+  const previewUrl = release.previewUrl ?? null;
   const isActiveTrack = playbackState.activeTrackId === release.id;
-  const isPlaying = isActiveTrack && playbackState.isPlaying;
+  const isTrackPlaying = isActiveTrack && playbackState.isPlaying;
   const primaryArtist = release.artistNames?.[0];
 
-  // Accepts the synthetic event when bound to a real onClick handler so we
-  // can stop propagation; safe to invoke without an argument when the
-  // host primitive (`ArtworkPlayOverlay`) ignores the event signature.
-  const handleTogglePreview = useCallback(
-    (e?: MouseEvent<HTMLButtonElement>) => {
-      e?.stopPropagation();
-      if (!release.previewUrl) return;
+  const handleTogglePlayback = useCallback(
+    (e: MouseEvent<HTMLButtonElement> | KeyboardEvent<HTMLButtonElement>) => {
+      e.stopPropagation();
+
+      if (isActiveTrack) {
+        toggleTrack({ id: release.id, title: release.title }).catch(() => {
+          toast.error('Unable to control playback right now');
+        });
+        return;
+      }
+
+      if (!previewUrl) return;
+
       toggleTrack({
         id: release.id,
         title: release.title,
-        // Same-track toggles must omit `audioUrl` so the player resumes
-        // without re-loading; new-track plays pass the production source.
-        audioUrl: isActiveTrack ? undefined : release.previewUrl,
+        audioUrl: previewUrl,
         isrc: release.primaryIsrc ?? null,
         releaseTitle: release.title,
         artistName: primaryArtist,
@@ -83,16 +68,158 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
     },
     [
       isActiveTrack,
+      previewUrl,
       primaryArtist,
       release.artworkUrl,
       release.id,
       release.lyrics,
-      release.previewUrl,
       release.primaryIsrc,
       release.title,
       toggleTrack,
     ]
   );
+
+  return { previewUrl, isActiveTrack, isTrackPlaying, handleTogglePlayback };
+}
+
+function ArtworkCell({ release }: { readonly release: ReleaseViewModel }) {
+  const { previewUrl, isTrackPlaying, handleTogglePlayback } =
+    useArtworkPlayback(release);
+  const hasPreview = Boolean(previewUrl);
+
+  return (
+    <div className='relative shrink-0'>
+      <ArtworkThumb
+        src={release.artworkUrl ?? ''}
+        title={release.title}
+        size={40}
+      />
+      {hasPreview ? (
+        <button
+          type='button'
+          onClick={handleTogglePlayback}
+          onKeyDown={e => e.stopPropagation()}
+          aria-label={
+            isTrackPlaying ? `Pause ${release.title}` : `Play ${release.title}`
+          }
+          aria-pressed={isTrackPlaying}
+          data-testid={`shell-release-play-${release.id}`}
+          className={cn(
+            'absolute inset-0 grid place-items-center rounded-sm bg-black/50 text-white transition-opacity duration-subtle ease-out focus-visible:outline-none focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
+            isTrackPlaying
+              ? 'opacity-100'
+              : 'opacity-0 group-hover/row:opacity-100'
+          )}
+        >
+          {isTrackPlaying ? (
+            <Pause
+              className='h-3.5 w-3.5'
+              strokeWidth={2.5}
+              fill='currentColor'
+              aria-hidden='true'
+            />
+          ) : (
+            <Play
+              className='h-3.5 w-3.5 translate-x-px'
+              strokeWidth={2.5}
+              fill='currentColor'
+              aria-hidden='true'
+            />
+          )}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function SmartLinkCell({
+  release,
+  smartLinkLockReason,
+  smartLinkPath,
+}: {
+  readonly release: ReleaseViewModel;
+  readonly smartLinkLockReason: ShellRowLockReason;
+  readonly smartLinkPath: string;
+}) {
+  const isLocked = smartLinkLockReason !== null;
+  const isScheduled = smartLinkLockReason === 'scheduled';
+
+  if (isLocked) {
+    return (
+      <span
+        role='img'
+        aria-label={
+          isScheduled
+            ? `Scheduled smart link (Pro) for ${release.title}`
+            : `Smart link locked (Pro) for ${release.title}`
+        }
+        title={
+          isScheduled
+            ? 'Pre-release smart link requires Pro'
+            : 'Smart link locked — upgrade for more'
+        }
+        data-shell-release-smart-link-locked='true'
+        data-shell-release-smart-link-lock-reason={smartLinkLockReason}
+        className='shrink-0 h-7 w-7 rounded-md grid place-items-center text-quaternary-token cursor-not-allowed'
+      >
+        {isScheduled ? (
+          <Clock className='h-3 w-3' strokeWidth={2.25} aria-hidden='true' />
+        ) : (
+          <Lock className='h-3 w-3' strokeWidth={2.25} aria-hidden='true' />
+        )}
+      </span>
+    );
+  }
+
+  return (
+    <Link
+      href={smartLinkPath}
+      target='_blank'
+      rel='noreferrer'
+      onClick={e => e.stopPropagation()}
+      title={`Open smart link · ${smartLinkPath}`}
+      aria-label={`Open smart link for ${release.title}`}
+      className='shrink-0 h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-colors duration-subtle ease-out'
+    >
+      <ExternalLink className='h-3 w-3' strokeWidth={2.25} />
+    </Link>
+  );
+}
+
+// ── Main row component ─────────────────────────────────────────────────────────
+
+/**
+ * Linear-style release row for the DESIGN_V1 path. Replaces the legacy
+ * provider-matrix cells with: artwork + title + artists + status + drop date
+ * + DSP avatar stack + smart link + more menu.
+ *
+ * The outer `<div>` is the click + keyboard target (parent `<div role="listbox">`)
+ * Inner interactive elements (smart link, more-menu) stop propagation so
+ * they don't double-fire selection — the standard pattern across shell-v1.
+ */
+export const ShellReleaseRow = memo(function ShellReleaseRow({
+  release,
+  isSelected,
+  onSelect,
+  actionMenuItems,
+  smartLinkLockReason = null,
+}: {
+  readonly release: ReleaseViewModel;
+  readonly isSelected: boolean;
+  readonly onSelect: () => void;
+  readonly actionMenuItems?: TableActionMenuItem[];
+  readonly smartLinkLockReason?: ShellRowLockReason;
+}) {
+  const dspItems = useMemo(() => releaseToDspItems(release), [release]);
+  const dropMeta = useMemo(
+    () => (release.releaseDate ? dropDateMeta(release.releaseDate) : null),
+    [release.releaseDate]
+  );
+  const status = releaseStatusToShell(release.status);
+  const artistLabel = release.artistNames?.join(', ') ?? '';
+  const smartLinkPath = release.smartLinkPath || `/${release.slug}`;
+  const { playbackState } = useTrackAudioPlayer();
+  const isActiveTrack = playbackState.activeTrackId === release.id;
 
   function handleKeyDown(e: KeyboardEvent<HTMLDivElement>) {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -125,21 +252,7 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
         />
       ) : null}
 
-      <div className='relative h-10 w-10 shrink-0 rounded-sm overflow-hidden'>
-        <ArtworkThumb
-          src={release.artworkUrl ?? ''}
-          title={release.title}
-          size={40}
-        />
-        {hasPreview ? (
-          <ArtworkPlayOverlay
-            isPlaying={isPlaying}
-            onPlay={handleTogglePreview}
-            visible={isActiveTrack}
-            className='group-hover/row:opacity-100 focus-visible:opacity-100'
-          />
-        ) : null}
-      </div>
+      <ArtworkCell release={release} />
 
       <div className='min-w-0 flex-1'>
         <div className='truncate text-[13px] font-caption text-primary-token leading-[1.2]'>
@@ -164,17 +277,11 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
         <DspAvatarStack dsps={dspItems} />
       </div>
 
-      <Link
-        href={smartLinkPath}
-        target='_blank'
-        rel='noreferrer'
-        onClick={e => e.stopPropagation()}
-        title={`Open smart link · ${smartLinkPath}`}
-        aria-label={`Open smart link for ${release.title}`}
-        className='shrink-0 h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-colors duration-subtle ease-out'
-      >
-        <ExternalLink className='h-3 w-3' strokeWidth={2.25} />
-      </Link>
+      <SmartLinkCell
+        release={release}
+        smartLinkLockReason={smartLinkLockReason}
+        smartLinkPath={smartLinkPath}
+      />
 
       {actionMenuItems && actionMenuItems.length > 0 ? (
         <TableActionMenu items={actionMenuItems} trigger='custom' align='end'>

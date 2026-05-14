@@ -50,6 +50,10 @@ export function categorizePath(pathname: string): PathCategory {
   const isAccountPath = matchesRoute(pathname, '/account');
   const isBillingPath = matchesRoute(pathname, '/billing');
   const isOnboardingPath = matchesRoute(pathname, '/onboarding');
+  const isOnboardingCheckoutPath = matchesRoute(
+    pathname,
+    '/onboarding/checkout'
+  );
   const isWaitlistPath = matchesRoute(pathname, '/waitlist');
 
   const isProtectedPath =
@@ -57,7 +61,7 @@ export function categorizePath(pathname: string): PathCategory {
     isAccountPath ||
     isBillingPath ||
     isWaitlistPath ||
-    isOnboardingPath;
+    isOnboardingCheckoutPath;
 
   const needsNonce =
     pathname.startsWith('/api/') ||
