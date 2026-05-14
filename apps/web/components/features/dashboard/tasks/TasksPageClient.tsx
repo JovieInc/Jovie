@@ -1367,6 +1367,9 @@ export function TasksPageClient() {
     statusFilter !== 'all' ||
     priorityFilter !== 'all' ||
     assigneeFilter !== 'all';
+  const isResolvingProfile = !profileId;
+  const isActiveBoardLoading = isResolvingProfile || isBoardLoading;
+  const isActiveListLoading = isResolvingProfile || isLoading;
   const showTaskListPane =
     isBoardMode || isXlUp || !selectedTask || shouldPrioritizeRightPanel;
   const showTaskDocumentPane =
@@ -1381,8 +1384,8 @@ export function TasksPageClient() {
     setMobileScope('all');
   }, []);
   const showTaskWorkbenchEmptyState = isBoardMode
-    ? !isBoardLoading && visibleBoardTaskCount === 0
-    : !isLoading && tasks.length === 0;
+    ? !isActiveBoardLoading && visibleBoardTaskCount === 0
+    : !isActiveListLoading && tasks.length === 0;
   const selectedTaskIndex = effectiveSelectedTaskId
     ? visibleTasks.findIndex(task => task.id === effectiveSelectedTaskId)
     : -1;
@@ -1856,7 +1859,7 @@ export function TasksPageClient() {
       <TaskBoard
         board={boardData}
         visibleStatuses={visibleBoardStatuses}
-        isLoading={isBoardLoading}
+        isLoading={isActiveBoardLoading}
         artistName={artistName}
         selectedTaskId={effectiveSelectedTaskId}
         onOpenTask={openTaskDocument}
