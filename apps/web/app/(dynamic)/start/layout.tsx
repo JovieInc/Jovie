@@ -17,7 +17,7 @@ export default async function StartLayout({
   const initialFlags = await getAppFlagsSnapshot();
 
   return (
-    <ResolvedClientProviders>
+    <ResolvedClientProviders skipCoreProviders>
       <AppFlagProvider initialFlags={initialFlags}>{children}</AppFlagProvider>
     </ResolvedClientProviders>
   );

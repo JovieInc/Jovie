@@ -34,6 +34,7 @@ export const audienceSegmentValues = [
   'returning',
   'frequent',
   'recent24h',
+  'alertsOn',
 ] as const;
 
 /**

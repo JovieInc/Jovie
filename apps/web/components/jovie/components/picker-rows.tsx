@@ -65,6 +65,7 @@ export type PickerItem = PickerSkillItem | PickerEntityItem | PickerNavItem;
 function entityKindLabel(kind: EntityKind): string {
   if (kind === 'release') return 'Release';
   if (kind === 'artist') return 'Artist';
+  if (kind === 'event') return 'Event';
   return 'Track';
 }
 
@@ -151,6 +152,13 @@ export function RowVisual({ item }: { readonly item: PickerItem }) {
   if (item.entity.kind === 'release')
     return <ReleaseArt entity={item.entity} />;
   if (item.entity.kind === 'artist') return <ArtistArt entity={item.entity} />;
+  if (item.entity.kind === 'event') {
+    return (
+      <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-surface-2 text-secondary-token shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.05)]'>
+        <Calendar className='h-[14px] w-[14px]' strokeWidth={1.5} />
+      </div>
+    );
+  }
   return (
     <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-surface-2 text-secondary-token shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.05)]'>
       <Music2 className='h-[14px] w-[14px]' strokeWidth={1.5} />

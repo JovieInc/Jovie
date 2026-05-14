@@ -21,6 +21,12 @@ interface ImageWithFallbackProps extends Omit<ImageProps, 'onError' | 'src'> {
   readonly fallbackVariant?: FallbackVariant;
   /** Additional classes for the fallback container */
   readonly fallbackClassName?: string;
+  /**
+   * Called when the image fails to load (404, CDN error, etc.).
+   * Useful when a parent component needs to react to image failure
+   * independently of this component's built-in fallback rendering.
+   */
+  readonly onLoadError?: () => void;
 }
 
 /** SVG disc icon for release artwork fallback */
@@ -95,6 +101,10 @@ const FALLBACK_ICONS: Record<
  * When the image source fails (404, CORS, expired CDN URL, etc.), instead of
  * rendering a broken image, it shows a styled placeholder with a contextual SVG icon.
  *
+ * When used with the `fill` prop the fallback container uses `absolute inset-0`
+ * instead of `h-full w-full` so it correctly fills an absolutely-positioned parent
+ * whose intrinsic height is 0 (matching how Next.js `<Image fill>` behaves).
+ *
  * Usage:
  * ```tsx
  * <ImageWithFallback
@@ -111,6 +121,7 @@ export function ImageWithFallback({
   fallbackVariant = 'generic',
   fallbackClassName,
   className,
+  onLoadError,
   ...rest
 }: ImageWithFallbackProps) {
   const [hasError, setHasError] = useState(false);
@@ -128,10 +139,15 @@ export function ImageWithFallback({
 
   if (!src || hasError) {
     const FallbackIcon = FALLBACK_ICONS[fallbackVariant];
+    // When `fill` is used, Next.js Image renders as `position: absolute; inset: 0`.
+    // The fallback must match that behaviour so it fills the positioned parent even
+    // when the parent has no explicit height in normal flow.
+    const isFill = Boolean(rest.fill);
     return (
       <div
         className={cn(
-          'flex h-full w-full items-center justify-center',
+          'flex items-center justify-center',
+          isFill ? 'absolute inset-0' : 'h-full w-full',
           fallbackClassName
         )}
         role='img'
@@ -147,7 +163,10 @@ export function ImageWithFallback({
       src={src}
       alt={alt}
       className={className}
-      onError={() => setHasError(true)}
+      onError={() => {
+        setHasError(true);
+        onLoadError?.();
+      }}
       unoptimized={shouldBypassImageOptimization(sourceUrl)}
       {...rest}
     />

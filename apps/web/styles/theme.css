@@ -201,6 +201,7 @@
 }
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-socialButtonsBlockButton {
+  position: relative;
   width: 100%;
   height: 2.5rem;
   min-height: 2.5rem;
@@ -212,10 +213,45 @@
   border-radius: var(--clerk-radius-pill);
   background: rgba(255, 255, 255, 0.045);
   color: var(--clerk-color-foreground);
+  overflow: visible;
   transition:
     box-shadow 180ms var(--clerk-motion-ease),
     border-color 180ms var(--clerk-motion-ease),
     background-color 180ms var(--clerk-motion-ease);
+}
+
+/* "Last used" badge: Clerk's overlay mode renders this with
+   position:absolute + insetInlineEnd:-1 + top:-1 + transform which shifts
+   the pill outside the button boundary and onto the hit area. We re-anchor
+   it to the interior right edge of the button so it is adjacent to (not
+   overlapping) the button label. The button gets enough padding-inline-end
+   to keep the centered label from running under the badge. */
+:is(.cl-signIn-root, .cl-signUp-root) .cl-lastAuthenticationStrategyBadge {
+  position: absolute !important;
+  inset-inline-end: 0.75rem !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  inset-inline-start: auto !important;
+  pointer-events: none;
+  font-size: 0.6875rem;
+  font-weight: 510;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  padding: 0.1875rem 0.4375rem;
+  border-radius: 9999px;
+  border: 1px solid var(--clerk-color-border);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--clerk-color-muted-foreground);
+  white-space: nowrap;
+  /* Keep badge visually on the button surface, never outside it */
+  box-shadow: none;
+}
+
+/* Reserve space on the right so the centered button label
+   never overlaps the inline "Last used" badge */
+:is(.cl-signIn-root, .cl-signUp-root)
+  .cl-socialButtonsBlockButton:has(.cl-lastAuthenticationStrategyBadge) {
+  padding-inline-end: 4.5rem;
 }
 
 :is(.cl-signIn-root, .cl-signUp-root) .cl-socialButtonsBlockButton__google {
