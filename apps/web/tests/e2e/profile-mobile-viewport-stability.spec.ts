@@ -561,8 +561,8 @@ async function collectMockHomeReleaseCardLayout(
   page: Page
 ): Promise<ReleaseCardLayout> {
   return page.evaluate(() => {
-    const title = Array.from(document.querySelectorAll<HTMLElement>('h3')).find(
-      heading => heading.textContent?.trim() === "Don't Look Down"
+    const title = document.querySelector<HTMLElement>(
+      '[data-testid="profile-home-latest-card-title"]'
     );
     const card = title?.closest<HTMLElement>('article');
     const media = card?.querySelector<HTMLElement>(':scope > div:first-child');

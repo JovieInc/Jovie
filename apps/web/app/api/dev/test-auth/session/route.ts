@@ -9,6 +9,7 @@ import {
   getDevTestAuthAvailability,
   parseDevTestAuthPersona,
 } from '@/lib/auth/dev-test-auth.server';
+import { isTrustedTestBypassRequest } from '@/lib/auth/test-mode';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
 export const runtime = 'nodejs';
@@ -54,8 +55,25 @@ function applyDevTestAuthCookies(
   }
 }
 
-export async function GET(request: NextRequest) {
+function getRequestDevTestAuthAvailability(request: NextRequest) {
   const availability = getDevTestAuthAvailability(request.nextUrl.hostname);
+  if (
+    availability.trustedHost ||
+    !availability.enabled ||
+    !isTrustedTestBypassRequest(request.headers)
+  ) {
+    return availability;
+  }
+
+  return {
+    enabled: true,
+    trustedHost: true,
+    reason: null,
+  };
+}
+
+export async function GET(request: NextRequest) {
+  const availability = getRequestDevTestAuthAvailability(request);
 
   if (!availability.enabled || !availability.trustedHost) {
     return NextResponse.json(
@@ -91,7 +109,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const availability = getDevTestAuthAvailability(request.nextUrl.hostname);
+  const availability = getRequestDevTestAuthAvailability(request);
 
   if (!availability.enabled || !availability.trustedHost) {
     return NextResponse.json(
@@ -141,7 +159,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const availability = getDevTestAuthAvailability(request.nextUrl.hostname);
+  const availability = getRequestDevTestAuthAvailability(request);
 
   if (!availability.enabled || !availability.trustedHost) {
     return NextResponse.json(

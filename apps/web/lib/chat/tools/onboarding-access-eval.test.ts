@@ -7,22 +7,10 @@ import {
 const EMPTY_SIGNAL = {};
 
 describe('evaluateAccessSignal', () => {
-  it('grants instant access when the Spotify artist is verified', () => {
-    const result = evaluateAccessSignal({
-      signal: EMPTY_SIGNAL,
-      spotifyFollowers: 47,
-      spotifyVerified: true,
-      turnCount: 1,
-    });
-    expect(result.kind).toBe('instant_access');
-    expect(result.rationale).toBe('spotify_verified');
-  });
-
-  it('grants instant access at >= 1000 followers even if not verified', () => {
+  it('grants instant access at >= 1000 Spotify followers', () => {
     const result = evaluateAccessSignal({
       signal: EMPTY_SIGNAL,
       spotifyFollowers: 1500,
-      spotifyVerified: false,
       turnCount: 1,
     });
     expect(result.kind).toBe('instant_access');
@@ -33,7 +21,6 @@ describe('evaluateAccessSignal', () => {
     const result = evaluateAccessSignal({
       signal: { audienceBand: '5k_to_50k' },
       spotifyFollowers: 200, // below threshold
-      spotifyVerified: false,
       turnCount: 1,
     });
     expect(result.kind).toBe('instant_access');
@@ -47,7 +34,6 @@ describe('evaluateAccessSignal', () => {
         releaseStage: 'announced_unreleased',
       },
       spotifyFollowers: null,
-      spotifyVerified: false,
       turnCount: 1,
     });
     expect(result.kind).toBe('instant_access');
@@ -58,7 +44,6 @@ describe('evaluateAccessSignal', () => {
     const result = evaluateAccessSignal({
       signal: { audienceBand: 'under_500' },
       spotifyFollowers: null,
-      spotifyVerified: false,
       turnCount: 1,
     });
     expect(result.kind).toBe('needs_more_info');
@@ -69,7 +54,6 @@ describe('evaluateAccessSignal', () => {
     const result = evaluateAccessSignal({
       signal: { audienceBand: 'under_500' },
       spotifyFollowers: null,
-      spotifyVerified: false,
       turnCount: MAX_INTERVIEW_TURNS_BEFORE_FORCE,
     });
     expect(result.kind).toBe('waitlist');
@@ -80,7 +64,6 @@ describe('evaluateAccessSignal', () => {
     const result = evaluateAccessSignal({
       signal: EMPTY_SIGNAL,
       spotifyFollowers: 10_000,
-      spotifyVerified: false,
       turnCount: MAX_INTERVIEW_TURNS_BEFORE_FORCE + 5,
     });
     expect(result.kind).toBe('instant_access');
@@ -93,7 +76,6 @@ describe('evaluateAccessSignal', () => {
         releaseStage: 'between_releases',
       },
       spotifyFollowers: null,
-      spotifyVerified: false,
       turnCount: 1,
     });
     expect(result.kind).toBe('needs_more_info');
@@ -103,7 +85,6 @@ describe('evaluateAccessSignal', () => {
     const result = evaluateAccessSignal({
       signal: { audienceBand: '50k_to_500k' },
       spotifyFollowers: null,
-      spotifyVerified: false,
       turnCount: 0,
     });
     expect(result.kind).toBe('instant_access');

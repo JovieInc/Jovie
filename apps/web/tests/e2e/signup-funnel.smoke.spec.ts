@@ -52,7 +52,7 @@ test.describe('Signup Funnel Smoke @smoke', () => {
     );
   });
 
-  test('unauthenticated onboarding deep links redirect to signin with the onboarding target intact', async ({
+  test('unauthenticated onboarding deep links land on the canonical chat front door', async ({
     page,
   }) => {
     const response = await smokeNavigateWithRetry(
@@ -72,14 +72,13 @@ test.describe('Signup Funnel Smoke @smoke', () => {
       );
       return;
     }
-    await expect(page).toHaveURL(/\/sign-?in/, {
+    await expect(page).toHaveURL(/\/start\?/, {
       timeout: SMOKE_TIMEOUTS.URL_STABLE,
     });
 
     const finalUrl = new URL(page.url());
-    expect(finalUrl.searchParams.get('redirect_url') ?? '').toContain(
-      '/onboarding'
-    );
+    expect(finalUrl.pathname).toBe('/start');
+    expect(finalUrl.searchParams.get('handle')).toBe('smokeartist');
   });
 
   test('authenticated creator shell and welcome chat bootstrap stay healthy under auth bypass', async ({
@@ -90,7 +89,11 @@ test.describe('Signup Funnel Smoke @smoke', () => {
       return;
     }
 
-    await setTestAuthBypassSession(page, 'creator-ready');
+    await setTestAuthBypassSession(
+      page,
+      'creator-ready',
+      'e2e-signup-funnel-smoke-user'
+    );
 
     const appResponse = await smokeNavigateWithRetry(page, '/app/chat', {
       timeout: 120_000,

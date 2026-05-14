@@ -42,15 +42,7 @@ async function gotoChatRoute(page: Page) {
   }
 }
 
-test('chat route renders the Shell V1 app frame when forced on', async ({
-  page,
-}) => {
-  test.skip(
-    process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
-    'Requires E2E_USE_TEST_AUTH_BYPASS=1'
-  );
-  test.setTimeout(180_000);
-
+async function forceDesignV1(page: Page) {
   const overrides = JSON.stringify({
     [APP_FLAG_OVERRIDE_KEYS.DESIGN_V1]: true,
   });
@@ -66,8 +58,20 @@ test('chat route renders the Shell V1 app frame when forced on', async ({
       value: overrides,
     }
   );
+}
 
-  await setTestAuthBypassSession(page, 'creator-ready');
+test('chat route renders the Shell V1 app frame when forced on', async ({
+  page,
+}) => {
+  test.skip(
+    process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
+    'Requires E2E_USE_TEST_AUTH_BYPASS=1'
+  );
+  test.setTimeout(180_000);
+
+  await forceDesignV1(page);
+
+  await setTestAuthBypassSession(page, 'creator-ready', 'e2e-shell-chat-user');
   await gotoChatRoute(page);
   await page.waitForURL(/\/app\/chat/, { timeout: 60_000 });
 
@@ -81,4 +85,52 @@ test('chat route renders the Shell V1 app frame when forced on', async ({
     'border-radius',
     /999px|18px|20px|24px/
   );
+  await expect(page.locator('.animate-shell-in')).toHaveCount(0);
+});
+
+test('chat route picker opens without moving the shell or composer', async ({
+  page,
+}) => {
+  test.skip(
+    process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
+    'Requires E2E_USE_TEST_AUTH_BYPASS=1'
+  );
+  test.setTimeout(180_000);
+
+  await forceDesignV1(page);
+  await setTestAuthBypassSession(
+    page,
+    'creator-ready',
+    'e2e-shell-chat-picker-user'
+  );
+  await gotoChatRoute(page);
+  await page.waitForURL(/\/app\/chat/, { timeout: 60_000 });
+
+  const shellScroll = page.locator('[data-testid="app-shell-scroll"]');
+  const composer = page.locator('[data-testid="chat-composer-surface"]');
+  const input = page.locator('[aria-label="Chat message input"]');
+  await expect(composer).toBeVisible({ timeout: 30_000 });
+
+  const beforeBox = await composer.boundingBox();
+  const beforeScrollTop = await shellScroll.evaluate(
+    element => element.scrollTop
+  );
+
+  await input.fill('/');
+  await expect(composer).toHaveAttribute('data-surface-mode', 'root');
+  await expect(page.locator('[data-testid="slash-command-menu"]')).toBeVisible({
+    timeout: 10_000,
+  });
+
+  const afterBox = await composer.boundingBox();
+  const afterScrollTop = await shellScroll.evaluate(
+    element => element.scrollTop
+  );
+
+  expect(beforeBox).not.toBeNull();
+  expect(afterBox).not.toBeNull();
+  if (beforeBox && afterBox) {
+    expect(Math.abs(afterBox.y - beforeBox.y)).toBeLessThanOrEqual(1);
+  }
+  expect(afterScrollTop).toBe(beforeScrollTop);
 });

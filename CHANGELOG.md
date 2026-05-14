@@ -5,6 +5,20 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.248] - 2026-05-14
+
+> Onboarding now opens in the canonical app-shell chat front door with hardened tool artifacts, picker stability, and performance gates.
+
+### Changed
+
+- **Canonical onboarding chat front door**: `/onboarding` and waitlist entry now route into `/start`, preserving onboarding query params while leaving `/onboarding/checkout` as the checkout handoff.
+- **App-shell onboarding experience**: `/start` now renders inside the Shell V1 app frame with the sidebar collapsed, shared chat composer primitives, polished onboarding tool artifacts, and stable slash-picker geometry across desktop and mobile.
+
+### Fixed
+
+- **Chat layout stability and visible implementation leakage**: Removed the app-shell entrance animation that caused screen flashes, replaced generic tool rows with purpose-built onboarding cards, hid raw tool internals from the transcript, and hardened error, loading, thinking, retry, and artist-pick states.
+- **Onboarding QA and perf coverage**: Added `/start` Playwright visual/flow coverage, onboarding transcript evals, canonical redirect assertions, Lighthouse `/start` coverage, and stricter onboarding/chat CLS budgets.
+
 ## [26.4.247] - 2026-05-14
 
 > Artist profiles now display the background atmosphere correctly even when the hero image fails to load — instead of a blank screen, the page falls back to a subtle gradient.
