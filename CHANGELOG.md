@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.247] - 2026-05-13
+
+> Fixed cookie consent banner overlapping the bottom tab navigation on mobile artist profiles.
+
+### Fixed
+
+- **Mobile profile: cookie banner no longer covers bottom nav**: On mobile, the fixed cookie consent banner was sitting on top of the profile shell's bottom tab bar, making navigation items unreachable while the banner was visible. The banner now publishes its height as a `--cookie-banner-h` CSS custom property on `:root` via a `ResizeObserver`. The profile viewport uses `calc(100dvh - var(--cookie-banner-h, 0px))` to shrink by exactly that height, pushing the tab bar above the banner. Zero layout impact when the banner is absent — the fallback resolves to `100dvh` (JOV-1982).
+
 ## [26.4.246] - 2026-05-13
 
 > [internal] Hardened DashboardAudienceTable unit tests against CI shard timing (JOV-2138).
