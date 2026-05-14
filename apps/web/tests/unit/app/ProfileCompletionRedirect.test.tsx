@@ -72,7 +72,7 @@ describe('ProfileCompletionRedirect', () => {
     mockReplace.mockClear();
     renderGuard({ ...baseDashboardData, selectedProfile: null });
 
-    expect(mockReplace).toHaveBeenCalledWith('/onboarding');
+    expect(mockReplace).toHaveBeenCalledWith('/start');
   });
 
   it('redirects when username is blank', () => {
@@ -85,7 +85,7 @@ describe('ProfileCompletionRedirect', () => {
       },
     });
 
-    expect(mockReplace).toHaveBeenCalledWith('/onboarding');
+    expect(mockReplace).toHaveBeenCalledWith('/start');
   });
 
   it('redirects when display name is blank', () => {
@@ -98,7 +98,7 @@ describe('ProfileCompletionRedirect', () => {
       },
     });
 
-    expect(mockReplace).toHaveBeenCalledWith('/onboarding');
+    expect(mockReplace).toHaveBeenCalledWith('/start');
   });
 
   it('does NOT redirect when avatar URL is blank (avatar is soft requirement)', () => {
@@ -154,7 +154,7 @@ describe('ProfileCompletionRedirect', () => {
       dashboardLoadError: undefined,
     });
 
-    expect(mockReplace).toHaveBeenCalledWith('/onboarding');
+    expect(mockReplace).toHaveBeenCalledWith('/start');
   });
 
   it('does NOT redirect admins when their profile is incomplete', () => {

@@ -248,7 +248,7 @@ export function ChatPageClient({
 
   useEffect(() => {
     if (needsOnboarding && !selectedProfile && !dashboardLoadError) {
-      router.replace(APP_ROUTES.ONBOARDING);
+      router.replace(APP_ROUTES.START);
     }
   }, [dashboardLoadError, needsOnboarding, router, selectedProfile]);
 

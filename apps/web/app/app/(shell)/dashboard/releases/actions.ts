@@ -193,7 +193,7 @@ async function requireProfile(profileId?: string): Promise<{
   const data = await getDashboardData();
 
   if (data.needsOnboarding && !data.dashboardLoadError) {
-    redirect('/onboarding');
+    redirect(APP_ROUTES.START);
   }
 
   let profile = data.selectedProfile;
@@ -205,7 +205,7 @@ async function requireProfile(profileId?: string): Promise<{
 
   // Redirect to onboarding if no profile exists (new users, mid-onboarding, or load errors)
   if (!profile) {
-    redirect('/onboarding');
+    redirect(APP_ROUTES.START);
   }
 
   return {

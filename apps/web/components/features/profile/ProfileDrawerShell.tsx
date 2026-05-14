@@ -4,6 +4,7 @@ import { ChevronLeft, X } from 'lucide-react';
 import { useId } from 'react';
 import { Drawer } from 'vaul';
 import type { ProfileSurfacePresentation } from '@/features/profile/contracts';
+import { PROFILE_Z } from '@/lib/profile/z-index-constants';
 
 type ProfileDrawerNavigationLevel = 'root' | 'secondary';
 
@@ -50,7 +51,9 @@ export function ProfileDrawerShell({
     ['--profile-drawer-header' as string]: '72px',
   } as React.CSSProperties;
   const contentClasses = `relative flex max-h-[var(--profile-drawer-height-max)] w-full flex-col overflow-hidden rounded-t-[var(--profile-drawer-radius-mobile)] border-t border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_-8px_40px_rgba(0,0,0,0.4)] backdrop-blur-2xl md:max-w-(--profile-shell-max-width) md:rounded-t-[var(--profile-drawer-radius-desktop)] before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-24 before:bg-[linear-gradient(to_bottom,rgba(255,255,255,0.04),transparent)] ${contentClassName ?? ''}`;
-  const bodyClasses = `relative z-10 min-h-[calc(var(--profile-drawer-height-max)_-_var(--profile-drawer-header))] overflow-y-auto overscroll-contain px-5 pb-[calc(1.25rem_+_env(safe-area-inset-bottom))] pt-3 ${bodyClassName ?? ''}`;
+  // Fixed height (not min-h) so overflow-y-auto activates on overflow; min-h
+  // lets the body grow past the parent's max-h and get clipped by overflow-hidden.
+  const bodyClasses = `relative z-10 h-[calc(var(--profile-drawer-height-max)_-_var(--profile-drawer-header))] overflow-y-auto overscroll-contain px-5 pb-[calc(1.25rem_+_env(safe-area-inset-bottom))] pt-3 ${bodyClassName ?? ''}`;
 
   const header = (
     <>
@@ -66,7 +69,7 @@ export function ProfileDrawerShell({
             <button
               type='button'
               onClick={onBack}
-              className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/[0.04] text-white/44 transition-colors duration-subtle hover:bg-white/[0.08] hover:text-white/74 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
+              className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[color:var(--color-bg-hover)] text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-interactive-active hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
               aria-label='Back'
               data-testid='profile-drawer-back-button'
             >
@@ -87,7 +90,7 @@ export function ProfileDrawerShell({
                 {subtitle ? (
                   <p
                     id={subtitleId}
-                    className='truncate text-3xs font-[440] leading-[1.1] tracking-[-0.01em] text-white/46'
+                    className='truncate text-3xs font-[440] leading-[1.1] tracking-[-0.01em] text-tertiary-token'
                   >
                     {subtitle}
                   </p>
@@ -104,7 +107,7 @@ export function ProfileDrawerShell({
             <button
               type='button'
               onClick={() => onOpenChange(false)}
-              className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/[0.04] text-white/44 transition-colors duration-subtle hover:bg-white/[0.08] hover:text-white/74 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
+              className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[color:var(--color-bg-hover)] text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-interactive-active hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
               aria-label='Close'
               data-testid='profile-drawer-close-button'
             >
@@ -126,7 +129,7 @@ export function ProfileDrawerShell({
               {subtitle ? (
                 <p
                   id={subtitleId}
-                  className='mt-1 truncate text-3xs font-[440] leading-[1.1] tracking-[-0.01em] text-white/46'
+                  className='mt-1 truncate text-3xs font-[440] leading-[1.1] tracking-[-0.01em] text-tertiary-token'
                 >
                   {subtitle}
                 </p>
@@ -136,7 +139,9 @@ export function ProfileDrawerShell({
         )}
       </div>
 
-      {isSecondaryHeader ? <div className='mx-5 h-px bg-white/[0.06]' /> : null}
+      {isSecondaryHeader ? (
+        <div className='mx-5 h-px bg-[color:var(--color-border-subtle)]' />
+      ) : null}
     </>
   );
 
@@ -152,11 +157,11 @@ export function ProfileDrawerShell({
         <button
           type='button'
           aria-label='Close drawer overlay'
-          className='fixed inset-0 z-10 bg-black/48 backdrop-blur-sm'
+          className={`fixed inset-0 ${PROFILE_Z.LOCAL_CONTENT} bg-black/48 backdrop-blur-sm`}
           onClick={() => onOpenChange(false)}
         />
         <dialog
-          className='absolute inset-x-0 bottom-0 z-20 m-0 max-w-none border-0 bg-transparent p-0'
+          className={`absolute inset-x-0 bottom-0 ${PROFILE_Z.STICKY_CHROME} m-0 max-w-none border-0 bg-transparent p-0`}
           data-testid={dataTestId}
           aria-describedby={accessibleDescriptionId}
           aria-labelledby={titleId}
@@ -183,7 +188,9 @@ export function ProfileDrawerShell({
     }
 
     return (
-      <div className='absolute inset-0 z-30 flex items-center justify-center bg-black/52 p-6 backdrop-blur-sm'>
+      <div
+        className={`absolute inset-0 ${PROFILE_Z.EMBEDDED_MODAL} flex items-center justify-center bg-black/52 p-6 backdrop-blur-sm`}
+      >
         <button
           type='button'
           aria-label='Close modal overlay'
@@ -215,8 +222,14 @@ export function ProfileDrawerShell({
   return (
     <Drawer.Root open={open} onOpenChange={onOpenChange}>
       <Drawer.Portal>
-        <Drawer.Overlay className='fixed inset-0 z-40 bg-black/60 backdrop-blur-sm' />
-        <div className='fixed inset-x-0 bottom-0 z-50 flex justify-center'>
+        <Drawer.Overlay
+          className={`fixed inset-0 ${PROFILE_Z.DRAWER_BACKDROP} bg-black/60 backdrop-blur-sm`}
+          onClick={() => onOpenChange(false)}
+          data-testid='profile-drawer-overlay'
+        />
+        <div
+          className={`fixed inset-x-0 bottom-0 ${PROFILE_Z.DRAWER_CONTENT} flex justify-center`}
+        >
           <Drawer.Content
             className={contentClasses}
             style={drawerHeightStyle}

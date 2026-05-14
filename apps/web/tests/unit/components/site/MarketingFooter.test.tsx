@@ -17,21 +17,25 @@ describe('MarketingFooter', () => {
     mockUsePathname.mockReturnValue('/about');
   });
 
-  it('renders the footer CTA on pages that do not own a final CTA', () => {
+  it('renders a legal-only footer by default on marketing pages', () => {
     render(<MarketingFooter />);
 
-    expect(screen.getByTestId('marketing-footer-cta')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Investors' })).toHaveAttribute(
+    expect(
+      screen.queryByTestId('marketing-footer-cta')
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Privacy' })).toHaveAttribute(
       'href',
-      '/investors'
+      '/legal/privacy'
     );
-    expect(screen.getByRole('link', { name: 'Status' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Terms' })).toHaveAttribute(
       'href',
-      'https://status.jov.ie'
+      '/legal/terms'
     );
+    expect(screen.queryByRole('link', { name: 'Investors' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Status' })).toBeNull();
   });
 
-  it('hides the footer CTA on homepage-owned CTA routes', () => {
+  it('keeps homepage footer legal-only', () => {
     mockUsePathname.mockReturnValue('/');
 
     render(<MarketingFooter />);
@@ -40,23 +44,19 @@ describe('MarketingFooter', () => {
       screen.queryByTestId('marketing-footer-cta')
     ).not.toBeInTheDocument();
     expect(
-      screen.getByText('Built for artists. By artists.')
-    ).toBeInTheDocument();
+      screen.queryByText('Built for artists. By artists.')
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('heading', { name: 'Connect' })
     ).not.toBeInTheDocument();
   });
 
-  it('uses the minimal footer on pricing', () => {
-    mockUsePathname.mockReturnValue('/pricing');
+  it('does not expand the footer unless the full-footer flag is enabled', () => {
+    render(<MarketingFooter variant='expanded' />);
 
-    render(<MarketingFooter />);
-
-    expect(
-      screen.queryByRole('heading', { name: 'Product' })
-    ).not.toBeInTheDocument();
     expect(
       screen.queryByTestId('marketing-footer-cta')
     ).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Product' })).toBeNull();
   });
 });

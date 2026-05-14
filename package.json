@@ -1,6 +1,6 @@
 {
   "name": "jovie-monorepo",
-  "version": "26.4.231.0",
+  "version": "26.4.244",
   "private": true,
   "config": {
     "commitizen": {
@@ -83,6 +83,8 @@
     "test:web:changed": "doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run test -- --changed",
     "test:web:watch": "doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run test:watch",
     "test:web:smoke": "doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run e2e:smoke",
+    "test:web:smoke:mobile": "doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run e2e:smoke:mobile",
+    "test:web:smoke:tagged": "doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run e2e:smoke:tagged",
     "test:web:e2e": "doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run test:e2e",
     "test:mobile-overflow": "doppler run --project jovie-web --config dev -- env E2E_USE_TEST_AUTH_BYPASS=1 NEXT_PUBLIC_CLERK_MOCK=1 NEXT_PUBLIC_CLERK_PROXY_DISABLED=1 pnpm --filter @jovie/web exec playwright test tests/e2e/mobile-overflow.spec.ts --project=chromium --reporter=line",
     "test:ci": "node scripts/turbo-local.mjs test:ci",
@@ -91,6 +93,8 @@
     "test:guard": "pnpm --filter=@jovie/web run test:guard",
     "test:profile": "pnpm --filter=@jovie/web run test:profile",
     "test:flaky": "pnpm --filter=@jovie/web run test:flaky",
+    "test:coverage:report": "tsx scripts/audit-test-coverage.ts",
+    "test:coverage:diff": "tsx scripts/audit-test-coverage.ts --check-pr",
     "admin:green": "doppler run --project jovie-web --config dev -- pnpm --filter=@jovie/web run admin:green",
     "admin:green:record": "doppler run --project jovie-web --config dev -- pnpm --filter=@jovie/web run admin:green:record",
     "admin:green:watch": "doppler run --project jovie-web --config dev -- pnpm --filter=@jovie/web run admin:green:watch",
@@ -126,8 +130,8 @@
     "cz-conventional-changelog": "^3.3.0",
     "husky": "^9.1.7",
     "knip": "^6.0.4",
-    "lint-staged": "^16.4.0",
-    "playwright": "1.58.2",
+    "lint-staged": "^17.0.4",
+    "playwright": "1.60.0",
     "tsx": "^4.21.0",
     "turbo": "^2.9.8",
     "typescript": "^6.0.3",

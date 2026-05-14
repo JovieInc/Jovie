@@ -11,6 +11,7 @@ import {
   mockShowPendingShell,
   mockToastInfo,
   mockTogglePreviewPanel,
+  mockUseChatConversationsQuery,
   mockUsePathname,
   renderDashboardNav,
   resetDashboardNavTestMocks,
@@ -157,6 +158,44 @@ describe('DashboardNav interactions', () => {
       'href',
       APP_ROUTES.DASHBOARD_AUDIENCE
     );
+  });
+
+  it('renders recent threads in the Design V1 sidebar and opens a selected thread', async () => {
+    const user = userEvent.setup();
+    mockUseChatConversationsQuery.mockReturnValueOnce({
+      data: [
+        {
+          id: 'thread-older',
+          title: 'Release rollout',
+          createdAt: '2026-05-01T00:00:00.000Z',
+          updatedAt: '2026-05-10T00:00:00.000Z',
+        },
+        {
+          id: 'thread-newer',
+          title: 'Pitch tasks',
+          createdAt: '2026-05-02T00:00:00.000Z',
+          updatedAt: '2026-05-12T00:00:00.000Z',
+        },
+      ],
+    });
+
+    renderDashboardNav({
+      renderFn: render,
+      appFlags: { DESIGN_V1: true },
+    });
+
+    expect(screen.getByText('Threads')).toBeInTheDocument();
+    expect(mockUseChatConversationsQuery).toHaveBeenCalledWith({
+      limit: 10,
+      enabled: true,
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Pitch tasks' }));
+
+    expect(mockRouterPush).toHaveBeenCalledWith('/app/chat/thread-newer');
+    expect(
+      screen.queryByRole('button', { name: 'Thread actions' })
+    ).not.toBeInTheDocument();
   });
 
   it('profile button navigates to chat before opening the drawer off chat routes', async () => {

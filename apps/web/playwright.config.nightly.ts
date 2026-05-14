@@ -103,9 +103,12 @@ export default defineConfig({
     ? {}
     : {
         webServer: {
+          // Pin Doppler scope explicitly so worktrees never inherit whichever
+          // scope happens to be active in the parent shell.
+          // See .claude/rules/environment.md.
           command: process.env.DATABASE_URL
             ? 'pnpm run dev:local'
-            : 'doppler run -- pnpm run dev:local',
+            : 'doppler run --project jovie-web --config dev -- pnpm run dev:local',
           env: {
             ...process.env,
             NODE_ENV: 'test',

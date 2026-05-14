@@ -15,7 +15,7 @@ export default async function SettingsProfilePage() {
 
   const dashboardData = await getDashboardData();
   if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
-    redirect('/onboarding');
+    redirect(APP_ROUTES.START);
   }
 
   redirect(APP_ROUTES.SETTINGS_ARTIST_PROFILE);

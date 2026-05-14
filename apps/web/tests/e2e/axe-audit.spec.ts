@@ -11,8 +11,6 @@ import {
   resolvePublicSurfaceManifestSync,
 } from './utils/public-surface-manifest';
 
-test.use({ storageState: { cookies: [], origins: [] } });
-
 function createEmptyStorageState() {
   return { cookies: [], origins: [] } as const;
 }
@@ -136,12 +134,11 @@ const {
 } = loadSurfaceManifests();
 
 test.describe('Axe WCAG 2.1 Compliance', () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
   test.setTimeout(120_000);
 
   test('public surface manifests load successfully', () => {
-    if (surfaceManifestLoadError) {
-      throw surfaceManifestLoadError;
-    }
+    expect(surfaceManifestLoadError).toBeNull();
   });
 
   for (const surface of publicSurfaces) {

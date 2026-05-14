@@ -121,7 +121,7 @@ export function DashboardOverview({
         }}
         secondaryAction={{
           label: 'Restart onboarding',
-          href: APP_ROUTES.ONBOARDING,
+          href: APP_ROUTES.START,
         }}
         testId='dashboard-missing-profile'
       />

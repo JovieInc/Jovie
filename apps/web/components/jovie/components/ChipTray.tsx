@@ -33,7 +33,7 @@ export function ChipTray({ chips, onRemoveAt }: ChipTrayProps) {
                   e.preventDefault();
                   onRemoveAt(i);
                 }}
-                className='inline-flex h-3.5 w-3.5 items-center justify-center rounded-sm text-tertiary-token hover:bg-surface-1 hover:text-primary-token'
+                className='inline-flex h-3.5 w-3.5 items-center justify-center rounded-sm text-tertiary-token hover:bg-surface-1 hover:text-primary-token focus:outline-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30'
               >
                 <X className='h-3 w-3' />
               </button>
@@ -50,7 +50,7 @@ export function ChipTray({ chips, onRemoveAt }: ChipTrayProps) {
                 e.preventDefault();
                 onRemoveAt(i);
               }}
-              className='absolute -right-1 -top-1 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-surface-2 text-tertiary-token shadow-[0_1px_2px_rgba(0,0,0,0.1)] hover:bg-surface-1 hover:text-primary-token'
+              className='absolute -right-1 -top-1 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-surface-2 text-tertiary-token shadow-[0_1px_2px_rgba(0,0,0,0.1)] hover:bg-surface-1 hover:text-primary-token focus:outline-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30'
             >
               <X className='h-2.5 w-2.5' />
             </button>

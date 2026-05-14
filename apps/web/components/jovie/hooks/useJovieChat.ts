@@ -708,12 +708,16 @@ export function useJovieChat({
     [rateLimitedSubmitter]
   );
 
+  // Consume a pending prompt set before the chat component mounted
+  // (e.g. via "open-chat-with-prompt"). This is programmatic/automated, not
+  // a repeated user action, so it bypasses the client-side rate limiter to
+  // avoid consuming the first-message slot and blocking the user's first send.
   useEffect(() => {
     const pendingPrompt = consumePendingChatPrompt();
     if (!pendingPrompt) return;
 
-    rateLimitedSubmitter.maybeExecute({ text: pendingPrompt });
-  }, [rateLimitedSubmitter]);
+    doSubmit(pendingPrompt);
+  }, [doSubmit]);
 
   useEffect(() => {
     const handlePromptEvent = (event: Event) => {

@@ -529,6 +529,7 @@ export function ProfileDesktopSurface({
                         fill
                         sizes='56px'
                         className='object-cover'
+                        fallbackVariant='release'
                       />
                     </div>
                     <div className='min-w-0'>
@@ -693,6 +694,7 @@ export function ProfileDesktopSurface({
                   fill
                   sizes='320px'
                   className='object-cover'
+                  fallbackVariant='release'
                 />
               </div>
               <div>

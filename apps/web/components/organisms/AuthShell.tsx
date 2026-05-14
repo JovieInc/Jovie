@@ -22,6 +22,9 @@ export interface AuthShellProps {
   readonly breadcrumbs: DashboardBreadcrumbItem[];
   readonly headerBadge?: ReactNode;
   readonly headerAction?: ReactNode;
+  /** Shell-owned search surface (Shell V1). Replaces the breadcrumb when active. */
+  readonly headerSearchSurface?: ReactNode;
+  readonly isHeaderSearchActive?: boolean;
   readonly showMobileTabs?: boolean;
   readonly isTableRoute?: boolean;
   readonly onSidebarOpenChange?: (open: boolean) => void;
@@ -39,6 +42,8 @@ function AuthShellInner({
   breadcrumbs,
   headerBadge,
   headerAction,
+  headerSearchSurface,
+  isHeaderSearchActive = false,
   showMobileTabs = false,
   isTableRoute = false,
   children,
@@ -81,6 +86,8 @@ function AuthShellInner({
             sidebarTrigger={sidebarTrigger}
             breadcrumbSuffix={headerBadge}
             action={headerAction}
+            searchSurface={headerSearchSurface}
+            isSearchActive={isHeaderSearchActive}
             mobileProfileSlot={
               <MobileProfileDrawer onOpen={previewPanelState.toggle} />
             }

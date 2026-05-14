@@ -23,14 +23,28 @@ function formatCost(artifact: AgentRunArtifact): string {
   });
 }
 
+const AGENT_OS_LINK_ALLOWED_HOSTS = new Set(['github.com', 'linear.app']);
+
+function getPullRequestLabel(url: string | null): string {
+  if (!url) return 'Pull Request';
+  try {
+    const lastSegment = new URL(url).pathname.split('/').filter(Boolean).pop();
+    const num = lastSegment ? Number.parseInt(lastSegment, 10) : null;
+    return num !== null && !Number.isNaN(num) ? `#${num}` : 'Pull Request';
+  } catch {
+    return 'Pull Request';
+  }
+}
+
 function getSafeExternalHref(href: string | null): string | null {
   if (!href) return null;
 
   try {
     const url = new URL(href);
-    return url.protocol === 'http:' || url.protocol === 'https:'
-      ? url.toString()
-      : null;
+    if (url.protocol !== 'https:') return null;
+    if (url.username || url.password) return null;
+    if (!AGENT_OS_LINK_ALLOWED_HOSTS.has(url.hostname)) return null;
+    return url.toString();
   } catch {
     return null;
   }
@@ -129,8 +143,14 @@ export function ArtifactDrawer({ artifact }: ArtifactDrawerProps) {
       ) : null}
 
       <div className='mt-4 flex flex-wrap gap-3'>
-        <ArtifactLink href={artifact.linearIssueUrl} label='Linear' />
-        <ArtifactLink href={artifact.pullRequestUrl} label='Pull Request' />
+        <ArtifactLink
+          href={artifact.linearIssueUrl}
+          label={artifact.linearIssueId ?? 'Linear'}
+        />
+        <ArtifactLink
+          href={artifact.pullRequestUrl}
+          label={getPullRequestLabel(artifact.pullRequestUrl)}
+        />
       </div>
 
       <div className='mt-4'>

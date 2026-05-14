@@ -194,7 +194,7 @@ export function ClaimHandleForm({
   useEffect(() => {
     if (available === true && handle) {
       router.prefetch(
-        `/onboarding?handle=${encodeURIComponent(handle.toLowerCase())}`
+        `${APP_ROUTES.START}?handle=${encodeURIComponent(handle.toLowerCase())}`
       );
     }
   }, [available, handle, router]);
@@ -225,7 +225,7 @@ export function ClaimHandleForm({
         });
       }
 
-      const target = `/onboarding?handle=${encodeURIComponent(normalizedHandle)}`;
+      const target = `${APP_ROUTES.START}?handle=${encodeURIComponent(normalizedHandle)}`;
 
       setNavigating(true);
 
@@ -375,7 +375,7 @@ export function ClaimHandleForm({
             buttonRoundingClass,
             isDisabled
               ? 'cursor-not-allowed opacity-40'
-              : 'hover:brightness-110 active:scale-[0.98]'
+              : 'hover:brightness-110'
           )}
           style={buttonStyle}
         >

@@ -125,6 +125,39 @@ export const RATE_LIMITERS = {
   } satisfies RateLimitConfig,
 
   // ---------------------------------------------------------------------------
+  // Anonymous Onboarding Chat (JOV-2132)
+  // Token-burn DoS defense for /api/chat in mode='onboarding'. IP+ASN+session
+  // limits stack with hard turn caps and Haiku-force to bound the worst case.
+  // ---------------------------------------------------------------------------
+
+  /** Anonymous onboarding chat: 20 messages per hour per IP */
+  anonymousOnboardingChatIp: {
+    name: 'Anonymous Onboarding Chat (IP)',
+    limit: 20,
+    window: '1 h',
+    prefix: 'anon_onb_chat_ip',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** Anonymous onboarding chat: 60 messages per hour per ASN (defeats residential proxy IP rotation) */
+  anonymousOnboardingChatAsn: {
+    name: 'Anonymous Onboarding Chat (ASN)',
+    limit: 60,
+    window: '1 h',
+    prefix: 'anon_onb_chat_asn',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** Anonymous onboarding chat: 20 total turns per session lifetime (7 days) */
+  anonymousOnboardingChatSession: {
+    name: 'Anonymous Onboarding Chat (Session)',
+    limit: 20,
+    window: '7 d',
+    prefix: 'anon_onb_chat_session',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  // ---------------------------------------------------------------------------
   // Dashboard Operations
   // ---------------------------------------------------------------------------
 
