@@ -117,9 +117,6 @@ function geometryFor(mode: SurfaceMode, stacked: boolean): SurfaceGeometry {
   return { width: 760, maxWidth: '100%', borderRadius: 20 };
 }
 
-const SURFACE_BG =
-  'linear-gradient(180deg, rgba(255,255,255,0.018) 0%, transparent 40%), #16161a';
-
 function pickerKindNoun(kind: import('@/lib/chat/tokens').EntityKind): string {
   if (kind === 'release') return 'release';
   if (kind === 'artist') return 'artist';
@@ -464,19 +461,15 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             }
             transition={reducedMotion ? undefined : TRANSITION_SURFACE}
             style={{
-              background: SURFACE_BG,
               borderRadius: geometry.borderRadius,
               width: geometry.width,
               maxWidth: geometry.maxWidth,
             }}
             className={cn(
-              // Shell-v1 composer: deep bg (set via SURFACE_BG) + subtle
-              // hairline border, no floating drop shadow. The pill recedes
-              // into the canvas instead of stacking above it.
-              'overflow-hidden border border-white/[0.07] shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_1px_0_rgba(0,0,0,0.18)]',
+              'overflow-hidden border border-black/6 bg-white shadow-[0_2px_8px_rgba(0,0,0,0.08)] dark:border-white/[0.07] dark:bg-[linear-gradient(180deg,rgba(255,255,255,0.018)_0%,transparent_40%),#16161a] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_1px_0_rgba(0,0,0,0.18)]',
               isExpanded &&
-                'border-white/[0.10] shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_1px_0_rgba(0,0,0,0.22),0_12px_32px_-16px_rgba(0,0,0,0.45)]',
-              'outline-none focus-within:border-white/[0.16] focus-within:shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_0_0_3px_rgba(255,255,255,0.035)] focus-within:outline-none',
+                'border-black/10 shadow-[0_4px_14px_rgba(0,0,0,0.10)] dark:border-white/[0.10] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_1px_0_rgba(0,0,0,0.22),0_12px_32px_-16px_rgba(0,0,0,0.45)]',
+              'outline-none focus-within:border-black/16 focus-within:shadow-[0_0_0_3px_rgba(0,0,0,0.035)] focus-within:outline-none dark:focus-within:border-white/[0.16] dark:focus-within:shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_0_0_3px_rgba(255,255,255,0.035)]',
               isOverLimit && 'border-error',
               showEntitySurface && !isStacked ? 'flex' : 'flex flex-col'
             )}
