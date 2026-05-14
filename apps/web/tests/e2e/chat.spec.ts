@@ -25,7 +25,7 @@ import {
 } from './utils/smoke-test-utils';
 
 const USE_TEST_AUTH_BYPASS = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
-const BYPASS_PERSONA = 'creator';
+const BYPASS_PERSONA = 'creator-ready';
 
 /** Authenticate via the fastest available path */
 async function authenticateAndGoToChat(

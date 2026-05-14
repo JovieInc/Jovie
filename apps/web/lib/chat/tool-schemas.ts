@@ -92,7 +92,7 @@ export const TOOL_SCHEMAS = {
 
   confirmSpotifyArtist: {
     description:
-      'Lock in the Spotify artist the visitor picked. This pulls full enrichment (avatar, name, monthly listeners, latest release, genres) and is the trigger for the profile-preview reveal stage. Call this ONLY after the user has explicitly selected a candidate from searchSpotifyArtist results.',
+      'Lock in the Spotify artist the visitor picked. This pulls Spotify enrichment (avatar, name, followers, popularity, genres) and is the trigger for the profile-preview reveal stage. Call this ONLY after the user has explicitly selected a candidate from searchSpotifyArtist results.',
     inputSchema: z.object({
       spotifyArtistId: z
         .string()

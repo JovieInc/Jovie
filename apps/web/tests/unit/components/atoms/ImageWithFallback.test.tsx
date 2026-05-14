@@ -131,4 +131,56 @@ describe('ImageWithFallback', () => {
     const fallback = screen.getByRole('img', { name: 'Some image' });
     expect(fallback).toBeInTheDocument();
   });
+
+  it('uses absolute inset-0 layout for fallback when fill prop is set', () => {
+    render(
+      <ImageWithFallback
+        src={null as unknown as string}
+        alt='Fill image'
+        fill
+        fallbackVariant='release'
+      />
+    );
+
+    const fallback = screen.getByRole('img', { name: 'Fill image' });
+    expect(fallback).toHaveClass('absolute');
+    expect(fallback).toHaveClass('inset-0');
+    // Should NOT have h-full w-full when fill is used
+    expect(fallback).not.toHaveClass('h-full');
+    expect(fallback).not.toHaveClass('w-full');
+  });
+
+  it('calls onLoadError when image fails to load', () => {
+    const onLoadError = vi.fn();
+    render(
+      <ImageWithFallback
+        src='https://i.scdn.co/image/broken.jpg'
+        alt='Broken'
+        width={64}
+        height={64}
+        onLoadError={onLoadError}
+      />
+    );
+
+    fireEvent.error(screen.getByTestId('next-image'));
+
+    expect(onLoadError).toHaveBeenCalledOnce();
+  });
+
+  it('does not call onLoadError when src is null (no image attempted)', () => {
+    const onLoadError = vi.fn();
+    render(
+      <ImageWithFallback
+        src={null as unknown as string}
+        alt='Null src'
+        width={64}
+        height={64}
+        onLoadError={onLoadError}
+      />
+    );
+
+    // Fallback renders immediately, no image load attempted
+    expect(screen.queryByTestId('next-image')).not.toBeInTheDocument();
+    expect(onLoadError).not.toHaveBeenCalled();
+  });
 });
