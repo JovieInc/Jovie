@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.246] - 2026-05-13
+
+> [internal] Hardened DashboardAudienceTable unit tests against CI shard timing (JOV-2138).
+
+### Fixed
+
+- **[internal] Flaky unit test shards 2/6, 3/6, 5/6 resolved**: `DashboardAudienceTable` tests used a synchronous ResizeObserver mock that triggered `setDesktopTableWidth` inside `useEffect`, but React 18 batches the resulting re-render asynchronously. Under forked-worker memory pressure in CI, the default 1 000 ms `waitFor` window closed before the re-render landed. Fixed by flushing React's scheduler with `await act(async () => {})` immediately after render, wrapping `fireDesktopTableResize` calls in `act()`, and extending `waitFor` timeout to 5 000 ms as a buffer. All 11 tests pass; three previously-failing shards now pass cleanly.
+
 ## [26.4.245] - 2026-05-13
 
 > [internal] CI: Guardrails (proxy) job no longer requires pnpm install, unblocking dependabot PRs.
