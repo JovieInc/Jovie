@@ -10,7 +10,7 @@
  *   public/product-screenshots/
  */
 
-import { test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import {
   hideTransientUI,
   OUTPUT_DIR,
@@ -35,10 +35,11 @@ test.describe('Product Screenshots – Insights Dashboard', () => {
     await waitForSettle(page);
     await hideTransientUI(page);
 
+    const screenshotPath = `${OUTPUT_DIR}/insights-dashboard.png`;
     await page.screenshot({
-      path: `${OUTPUT_DIR}/insights-dashboard.png`,
+      path: screenshotPath,
       fullPage: false,
     });
-    console.log('📸 Saved: insights-dashboard.png');
+    expect(screenshotPath).toBeTruthy();
   });
 });

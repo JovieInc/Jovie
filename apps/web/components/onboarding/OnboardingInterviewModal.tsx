@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -214,14 +215,14 @@ export function OnboardingInterviewModal({
         >
           Skip
         </button>
-        <button
-          type='button'
+        <Button
+          variant='whitePill'
           onClick={() => advance(false)}
           disabled={!canSubmit || entry.answer.trim().length === 0}
-          className='rounded-full bg-white px-4 py-2 text-sm font-medium text-black transition-opacity hover:opacity-90 disabled:opacity-40'
+          className='px-4 py-2 text-sm'
         >
           {submitLabel}
-        </button>
+        </Button>
       </div>
     </dialog>
   );

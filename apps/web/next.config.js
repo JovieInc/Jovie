@@ -406,6 +406,18 @@ const nextConfig = {
         destination: '/artist-notifications',
         permanent: true,
       },
+      // Press / brand aliases — journalists searching "Jovie press kit"
+      // land on the brand kit's Downloads section.
+      {
+        source: '/press',
+        destination: '/brand#downloads',
+        permanent: false,
+      },
+      {
+        source: '/press-kit',
+        destination: '/brand#downloads',
+        permanent: false,
+      },
       // VIP username redirects
       ...vipUsernameRedirects,
     ];

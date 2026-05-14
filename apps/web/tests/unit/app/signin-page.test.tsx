@@ -60,7 +60,8 @@ describe('signin page', () => {
     expect(routerPrefetchMock).toHaveBeenCalledWith(APP_ROUTES.SIGNUP);
     expect(clerkSignInMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        routing: 'hash',
+        routing: 'path',
+        path: '/signin',
         oauthFlow: 'redirect',
         signUpUrl: APP_ROUTES.SIGNUP,
         fallbackRedirectUrl: APP_ROUTES.DASHBOARD,

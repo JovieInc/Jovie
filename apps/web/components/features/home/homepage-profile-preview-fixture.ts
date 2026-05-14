@@ -14,10 +14,6 @@ import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
 
 const CREATED_AT = '2026-01-10T00:00:00.000Z';
-const MOCK_HOME_HERO_IMAGE_URL =
-  '/images/mock-profile/tim-white-dont-look-down-hero.jpg';
-const MOCK_HOME_CARD_IMAGE_URL =
-  '/images/mock-profile/tim-white-dont-look-down-card.jpg';
 
 type HomepageContactInput = {
   readonly id: string;
@@ -192,8 +188,8 @@ export const HOMEPAGE_PROFILE_PREVIEW_ARTIST: Artist = {
 export const HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_ARTIST: Artist = {
   ...HOMEPAGE_PROFILE_PREVIEW_ARTIST,
   id: 'homepage-preview-artist-mock-home',
-  image_url: MOCK_HOME_HERO_IMAGE_URL,
-  tagline: "Don't Look Down",
+  image_url: TIM_WHITE_PROFILE.avatarSrc,
+  tagline: HOMEPAGE_PROFILE_PREVIEW_ARTIST.tagline,
   settings: {
     ...(HOMEPAGE_PROFILE_PREVIEW_ARTIST.settings ?? {}),
     heroRoleLabel: 'DJ / Producer',
@@ -201,8 +197,8 @@ export const HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_ARTIST: Artist = {
   theme: {
     profileAccent: {
       version: 1,
-      primaryHex: '#ed9962',
-      sourceUrl: MOCK_HOME_HERO_IMAGE_URL,
+      primaryHex: '#d3834e',
+      sourceUrl: TIM_WHITE_PROFILE.avatarSrc,
     },
   },
 };
@@ -213,7 +209,9 @@ export const HOMEPAGE_PROFILE_PREVIEW_SOCIAL_LINKS: readonly LegacySocialLink[] 
       id: 'homepage-preview-spotify',
       artist_id: HOMEPAGE_PROFILE_PREVIEW_ARTIST.id,
       platform: 'spotify',
-      url: HOMEPAGE_PROFILE_PREVIEW_ARTIST.spotify_url ?? 'https://spotify.com',
+      url:
+        HOMEPAGE_PROFILE_PREVIEW_ARTIST.spotify_url ??
+        TIM_WHITE_PROFILE.spotifyUrl,
       clicks: 1820,
       created_at: CREATED_AT,
       is_visible: true,
@@ -264,7 +262,7 @@ export const HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_SOCIAL_LINKS: readonly LegacySoc
       platform: 'spotify',
       url:
         HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_ARTIST.spotify_url ??
-        'https://open.spotify.com/artist/4u',
+        TIM_WHITE_PROFILE.spotifyUrl,
       clicks: 1820,
       created_at: CREATED_AT,
       is_visible: true,
@@ -524,7 +522,7 @@ export const HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_TOUR_DATES: readonly TourDateVie
       eventType: 'tour',
       confirmationStatus: 'confirmed',
       reviewedAt: CREATED_AT,
-      title: "Don't Look Down Tour",
+      title: 'The Deep End Tour',
       startDate: '2026-06-21',
       startTime: '20:00',
       timezone: 'America/Los_Angeles',
@@ -567,26 +565,19 @@ export const HOMEPAGE_PROFILE_PREVIEW_RELEASES = {
 } as const;
 
 export const HOMEPAGE_PROFILE_PREVIEW_MOCK_HOME_RELEASE = {
-  title: "Don't Look Down",
-  slug: 'dont-look-down',
-  artworkUrl: MOCK_HOME_CARD_IMAGE_URL,
-  releaseDate: '2025-10-01T07:00:00.000Z',
-  releaseType: 'single',
-  metadata: {
-    artistNames: ['Tim White'],
-  },
+  ...HOMEPAGE_PROFILE_PREVIEW_RELEASES.live,
 } as const;
 
 export const HOMEPAGE_PROFILE_PREVIEW_DRAWER_RELEASES: readonly PublicRelease[] =
   [
     {
       id: 'drawer-release-1',
-      title: "Don't Look Down",
-      slug: 'dont-look-down',
+      title: HOMEPAGE_PROFILE_PREVIEW_RELEASES.live.title,
+      slug: HOMEPAGE_PROFILE_PREVIEW_RELEASES.live.slug,
       releaseType: 'single',
-      releaseDate: '2024-11-01T07:00:00.000Z',
-      artworkUrl: '/images/mock-profile/tim-white-dont-look-down-card.jpg',
-      artistNames: ['Tim White'],
+      releaseDate: HOMEPAGE_PROFILE_PREVIEW_RELEASES.live.releaseDate,
+      artworkUrl: HOMEPAGE_PROFILE_PREVIEW_RELEASES.live.artworkUrl,
+      artistNames: ['Cosmic Gate', 'Tim White'],
     },
     {
       id: 'drawer-release-2',

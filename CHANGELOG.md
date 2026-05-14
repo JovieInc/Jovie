@@ -5,6 +5,116 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.244] - 2026-05-12
+
+> Public marketing is tightened for YC: the homepage keeps the strong product story visible, hides broad navigation and feature-grid sprawl, and limits pricing to Free plus waitlisted Pro by default.
+
+### Changed
+
+- **YC homepage flow tightened**: The public homepage now keeps the hero, proof logos, Meet Jovie AI plan demo, Go live in 60 seconds, Workspace, Artist Profiles, Free/Pro pricing, FAQ, and final CTA visible while keeping Friday Rhythm and feature/spec-grid content hidden by default.
+- **Minimal marketing chrome by default**: Marketing headers render logo plus Sign in and Start Free Trial unless the shared center-nav flag is explicitly enabled. Marketing footers render only legal links unless the full-footer flag is explicitly enabled.
+- **Free + Pro pricing defaults**: Marketing pricing cards and pricing-page JSON-LD now use the visible plan set, defaulting to Free and waitlisted Pro. Pricing copy follows the visible paid plan set so future plan exposure does not leave Pro-only copy around Team or Enterprise cards.
+
+### Fixed
+
+- **AI demo layout stability**: The homepage AI composer reserves enough space across states so the typing animation does not shift the surrounding section.
+- **Mobile center-nav fallback**: If center navigation is re-enabled, the glass header hides inline mobile auth actions when the hamburger nav is active, avoiding duplicate auth controls and header crowding.
+
+## [26.4.243] - 2026-05-12
+
+> [internal] Ops admin deployment rows are now actionable — each row shows a context menu to open the GitHub Actions run, navigate to the branch, or copy the deployment ID.
+
+### Changed
+
+- **[internal] Ops HUD deployment rows: context menu actions**: Both the compact history list and the current-run detail view on the Ops admin screen now include a three-dot actions menu on each deployment row. Available actions: Open GitHub run (links to the Actions workflow run), Open branch (links to the branch on GitHub), and Copy deployment ID (clipboard with toast confirmation). Clipboard errors surface a toast instead of silently failing.
+
+## [26.4.242] - 2026-05-12
+
+> [internal] Approval queue rows now show direct action links to open the related PR and Linear issue in a new tab.
+
+### Added
+
+- **[internal] Open PR and Open Linear links on approval queue rows**: Each run row in the AgentOS admin approval queue now surfaces inline action links when a PR URL or Linear issue URL is present. Links are host-allowlisted to `github.com` and `linear.app` only.
+
+### Fixed
+
+- **[internal] Tighten external URL allowlist in AgentOS admin surface**: `getSafeExternalHref` in both `WorkflowRunRow` and `ArtifactDrawer` now validates that URLs are `https`-only, credential-free, and from the expected provider domains, preventing open-redirect risk from artifact-injected URLs.
+
+## [26.4.241] - 2026-05-12
+
+> [internal] AgentOS board now shows real run IDs on cards, lets you click lane counts to filter by status, and displays actual issue/PR identifiers in the detail drawer.
+
+### Changed
+
+- [internal] **AgentOS board cards**: `sourceRunId` is now displayed next to the source label (e.g., `vercel-workflow wrun_agentos_health_001`), giving operators a direct reference to the upstream run without opening the drawer.
+- [internal] **AgentOS lane counts**: status count badges are now `<button>` elements with `aria-pressed`. Clicking a lane count highlights that lane and dims all others. Clicking again clears the filter. The panel subtitle updates to show the filtered count.
+- [internal] **ArtifactDrawer links**: Linear and PR links now display actual identifiers (`JOV-1971`, `#8282`) instead of generic `"Linear"` / `"Pull Request"` labels.
+
+## [26.4.239] - 2026-05-12
+
+> Artist profile cards no longer stretch too tall on large monitors, footer sections breathe a bit more, and the spec-wall animations on the homepage now stagger instead of firing all at once.
+
+### Changed
+
+- **Artist profile height cap**: at 1280px+ viewports the hero card no longer stretches past 640px (640px at xl, 680px at 2xl), keeping proportions tight on large monitors.
+- **Footer vertical padding**: all footer variants now use responsive vertical padding — the regular footer uses split pt/pb values (pt-12/pb-10 mobile, pt-16/pb-14 desktop, pt-20/pb-16 ultrawide) while the marketing footer and minimal variant use py-* clamp values — giving each footer section more breathing room.
+- **Homepage spec-wall animation stagger**: spec-wall cards now animate in with staggered delays (0ms, −600ms, −1200ms … −3675ms) so the pulse effect ripples across cards instead of triggering all at once.
+
+## [26.4.238] - 2026-05-12
+
+> [internal] Homepage content cleanup: removed the spec-wall section with internal sales language, dropped three text-only placeholder logos from the trust bar, and reordered sections so "Go live in 60 seconds" appears directly below the hero.
+
+### Removed
+
+- **[internal] Spec-wall section removed**: the "Answers for every launch objection" section used internal sales language ("objection") that read poorly to customers. Section and its unused icon imports removed from the homepage. (JOV-2073)
+- **[internal] Text-only logo placeholders removed**: Blanco y Negro, RecPlay, and disco:wax were rendered as plain `<span>` text rather than real SVG or image assets. Removed from the HomeTrustSection inline-strip; only logos with real assets remain (UMG, AWAL, The Orchard, Armada Music, Black Hole Recordings). (JOV-2075)
+
+### Changed
+
+- **[internal] Homepage section order updated**: sections reordered to "Go live in 60 seconds" → product statement (AI release plan) → workspace → artist profiles carousel, putting the immediate proof beat directly after the hero. (JOV-2076)
+
+## [26.4.237] - 2026-05-12
+
+> [internal] Analytics settings toggle now shows a compact state label instead of a verbose disclosure card.
+
+### Changed
+
+- [internal] **Analytics settings** (`SettingsAnalyticsSection`): replaced the verbose `ContentSurfaceCard` disclosure block with a single-line description label on the toggle row — "High quality only" when filtering is on, "All traffic" when off. Removes 17 lines of explanatory chrome that duplicated the toggle's own affordance.
+
+## [26.4.236] - 2026-05-12
+
+> [internal] Fixed cookie consent banner buttons being unresponsive when the server action failed.
+
+### Fixed
+
+- **[internal] Cookie banner buttons respond immediately**: Accept All, Reject, and Save Preferences now update the UI synchronously. Previously, if the server-side cookie write failed (network error, CSRF issue), the banner stayed stuck open. Consent is now persisted to localStorage first; the server action runs fire-and-fight in the background. Also raised banner z-index from z-40 to z-[60] to prevent overlay stacking issues.
+
+## [26.4.235] - 2026-05-10
+
+> [internal] Coverage heatmap and risk register infrastructure for autonomous-agent shipping. Nightly audit cron, generator script, and instrumentation fixes surfaced by an /autoplan adversarial review.
+
+### Added
+
+- [internal] **Test risk register** (`docs/TEST_RISK_REGISTER.md`): hand-curated taxonomy of 11 high-risk surfaces with blast-radius / reversibility / visibility scores. YAML front-matter is the machine-readable form; rendered table for humans.
+- [internal] **Coverage heatmap** (`docs/TEST_COVERAGE_HEATMAP.md`): auto-generated from the risk register joined with v8 coverage + Stryker mutation scores. Priority queue, stale-row detector, unmapped-churn detector, flake tracking, mutation-score warnings.
+- [internal] **Heatmap generator** (`scripts/audit-test-coverage.ts`, 900+ LOC): zero new npm deps. Modes: default, `--check-pr`, `--dry-run`. Reads v8 coverage, Stryker JSON, flake report, 90-day git churn; writes heatmap markdown + committed JSON snapshot baseline at `apps/web/reports/test-coverage-snapshot.json`.
+- [internal] **Nightly audit workflow** (`.github/workflows/test-coverage-audit.yml`): 06:00 UTC cron. Rebases before push to handle race conditions; opens a GitHub issue on failure.
+- [internal] **Proxy extraction plan** (`docs/PROXY_EXTRACTION_CANDIDATES.md`): risk-ordered plan to split the 1,412-line `apps/web/proxy.ts` into per-domain modules so per-region coverage becomes measurable.
+- [internal] `pnpm run test:coverage:report` and `pnpm run test:coverage:diff` root scripts.
+
+### Changed
+
+- [internal] **Stryker mutate[]** (`apps/web/stryker.config.mjs`): extended to include `app/api/stripe/webhooks/route.ts`, `lib/auth/decode-fapi-host.ts`, `lib/auth/staging-clerk-keys.ts`, `lib/auth/test-mode.ts`. Mutation testing now exercises the highest-blast-radius infra paths, not just validation helpers.
+- [internal] **Vitest config** (`apps/web/vitest.config.fast.mts`): added `coverage.thresholds` scaffolding for critical globs (set to 0 in this PR; raised to register targets in a future PR per JOV-2128).
+- [internal] **`.claude/rules/testing.md`**: added "Risk-Based Testing" section at the top with explicit links to the heatmap, register, and the decision rule for when agents must add tests. Closes the discoverability dead-end where agents could read CLAUDE.md → testing rules without finding the heatmap.
+
+### Fixed
+
+- [internal] **`--check-pr` no-op defect** surfaced by /autoplan eng subagent: snapshot lived at `.context/test-coverage-snapshot.json` (gitignored) and the cron didn't commit it, so any CI delta check found no baseline and exited 0 silently. Moved snapshot to `apps/web/reports/test-coverage-snapshot.json` (committed), updated the cron to commit it with `git pull --rebase --autostash` before push, and added `gh issue create` on cron failure.
+- [internal] **Per-region proxy.ts coverage hallucination**: three register rows (clerk-routing, investor-portal, audience-block) all globbed the same file and reported identical 68.2%. Collapsed into one `proxy` row; per-region tracking deferred until the extraction plan ships.
+- [internal] **CI Clerk secret scope**: workflow scoped unprefixed `CLERK_*` secrets (= production keypair per `.claude/rules/auth.md`) for the coverage step, even though unit tests are auth-mocked at the SDK boundary. Replaced with `pk_test_*` / `sk_test_*` dummies — no production credentials in scope for the coverage workflow.
+- [internal] **Hardcoded `assertion_ratio = 0.5` formula bias**: the stub inflated every risk score uniformly by ~+10 via its 20% weight. Removed from the formula; `coverage_score` now uses line + branch only (50/50). Status assignments unchanged (thresholds at 30/18).
+
 ## [26.4.234] - 2026-05-10
 
 > Apple Sign In was still failing the OAuth callback step. The Clerk proxy now correctly resolves relative redirect URLs that come back from Apple's "Hide My Email" flow.

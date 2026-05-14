@@ -1,5 +1,6 @@
 import { expect, test } from './setup';
 import {
+  assertMarketingHeaderFlyoutsHidden,
   assertPublicSurfaceHealthy,
   installPublicRouteMocks,
   runDeclaredPublicInteractions,
@@ -206,6 +207,7 @@ test.describe('Public Exhaustive Surface QA', () => {
           });
           await waitForPublicSurfaceReady(surfacePage, surface);
           await assertPublicSurfaceHealthy(surfacePage, surface);
+          await assertMarketingHeaderFlyoutsHidden(surfacePage, surface);
           await runDeclaredPublicInteractions(
             surfacePage,
             surface,

@@ -121,7 +121,21 @@
       "env": ["NODE_ENV", "CI", "PLAYWRIGHT_*", "BASE_URL"]
     },
     "e2e:smoke": {
-      "description": "Runs Playwright @smoke tests for quick production validation",
+      "description": "Runs the canonical focused smoke Playwright lane (playwright.config.smoke.ts)",
+      "dependsOn": ["build"],
+      "inputs": ["$TURBO_DEFAULT$", "playwright.config.*", "tests/e2e/**"],
+      "outputs": ["playwright-report/**", "test-results/**"],
+      "env": ["NODE_ENV", "CI", "SMOKE_ONLY", "BASE_URL", "PLAYWRIGHT_*"]
+    },
+    "e2e:smoke:mobile": {
+      "description": "Runs the mobile parity smoke lane (playwright.config.smoke.mobile.ts)",
+      "dependsOn": ["build"],
+      "inputs": ["$TURBO_DEFAULT$", "playwright.config.*", "tests/e2e/**"],
+      "outputs": ["playwright-report/**", "test-results/**"],
+      "env": ["NODE_ENV", "CI", "SMOKE_ONLY", "BASE_URL", "PLAYWRIGHT_*"]
+    },
+    "e2e:smoke:tagged": {
+      "description": "Runs every -g @smoke tagged Playwright test across the default config (broader sharded lane)",
       "dependsOn": ["build"],
       "inputs": ["$TURBO_DEFAULT$", "playwright.config.*", "tests/e2e/**"],
       "outputs": ["playwright-report/**", "test-results/**"],

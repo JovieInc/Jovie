@@ -11,13 +11,11 @@
 import { MapPin } from 'lucide-react';
 import { useState } from 'react';
 import {
-  DrawerSurfaceCard,
   DrawerTabbedCard,
   DrawerTabs,
-  EntityHeaderCard,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
-import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
+import { DrawerHero } from '@/components/shell/DrawerHero';
 import { AudienceMemberActivityFeed } from './AudienceMemberActivityFeed';
 import { AudienceMemberDetails } from './AudienceMemberDetails';
 import { AudienceMemberReferrers } from './AudienceMemberReferrers';
@@ -31,67 +29,6 @@ const AUDIENCE_TAB_OPTIONS = [
   { value: 'sources' as const, label: 'Sources' },
 ];
 
-function AudienceMemberEntityHeader({
-  member,
-  onClose,
-  contextMenuItems,
-}: Readonly<{
-  member: NonNullable<AudienceMemberSidebarProps['member']>;
-  onClose: () => void;
-  contextMenuItems?: AudienceMemberSidebarProps['contextMenuItems'];
-}>) {
-  const primaryLabel =
-    member.displayName?.trim() ||
-    member.email ||
-    member.phone ||
-    'Audience member';
-  const secondaryLabel =
-    member.displayName?.trim() && (member.email || member.phone)
-      ? member.email || member.phone
-      : null;
-
-  return (
-    <DrawerSurfaceCard
-      variant='flat'
-      className='overflow-hidden'
-      testId='audience-member-header-card'
-    >
-      <div className='relative border-b border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] px-3 py-2.5'>
-        <div className='absolute right-2.5 top-2.5'>
-          <DrawerHeaderActions
-            primaryActions={[]}
-            menuItems={contextMenuItems}
-            onClose={onClose}
-          />
-        </div>
-        <EntityHeaderCard
-          title={primaryLabel}
-          subtitle={secondaryLabel}
-          meta={
-            <div className='mt-1 flex flex-wrap items-center gap-2 text-2xs text-tertiary-token'>
-              {member.locationLabel ? (
-                <span className='inline-flex items-center gap-1'>
-                  <MapPin className='h-3 w-3' />
-                  {member.locationLabel}
-                </span>
-              ) : null}
-              <span>
-                {member.visits} visit{member.visits === 1 ? '' : 's'}
-              </span>
-            </div>
-          }
-          image={
-            <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] border border-subtle bg-surface-0 text-sm font-semibold text-secondary-token'>
-              {primaryLabel.charAt(0).toUpperCase()}
-            </div>
-          }
-          className='pr-8'
-        />
-      </div>
-    </DrawerSurfaceCard>
-  );
-}
-
 export function AudienceMemberSidebar({
   member,
   isOpen,
@@ -99,6 +36,17 @@ export function AudienceMemberSidebar({
   contextMenuItems,
 }: AudienceMemberSidebarProps) {
   const [activeTab, setActiveTab] = useState<AudienceTab>('details');
+
+  const primaryLabel =
+    member?.displayName?.trim() ||
+    member?.email ||
+    member?.phone ||
+    'Audience member';
+
+  const secondaryLabel =
+    member?.displayName?.trim() && (member.email || member.phone)
+      ? (member.email ?? member.phone ?? undefined)
+      : undefined;
 
   return (
     <EntitySidebarShell
@@ -108,13 +56,31 @@ export function AudienceMemberSidebar({
       data-testid='audience-member-sidebar'
       onClose={onClose}
       headerMode='minimal'
-      hideMinimalHeaderBar
       entityHeader={
         member ? (
-          <AudienceMemberEntityHeader
-            member={member}
-            onClose={onClose}
-            contextMenuItems={contextMenuItems}
+          <DrawerHero
+            title={primaryLabel}
+            subtitle={secondaryLabel}
+            artwork={
+              <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] border border-subtle bg-surface-0 text-sm font-semibold text-secondary-token'>
+                {primaryLabel.charAt(0).toUpperCase()}
+              </div>
+            }
+            meta={
+              member.locationLabel || member.visits > 0 ? (
+                <div className='flex flex-wrap items-center gap-2 text-2xs text-tertiary-token'>
+                  {member.locationLabel ? (
+                    <span className='inline-flex items-center gap-1'>
+                      <MapPin className='h-3 w-3' />
+                      {member.locationLabel}
+                    </span>
+                  ) : null}
+                  <span>
+                    {member.visits} visit{member.visits === 1 ? '' : 's'}
+                  </span>
+                </div>
+              ) : undefined
+            }
           />
         ) : undefined
       }

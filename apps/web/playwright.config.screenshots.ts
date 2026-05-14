@@ -18,9 +18,11 @@ if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
   extraHTTPHeaders['x-vercel-set-bypass-cookie'] = 'samesitenone';
 }
 
+// Pin Doppler scope explicitly so worktrees never inherit whichever scope
+// happens to be active in the parent shell. See .claude/rules/environment.md.
 const webServerCommand = process.env.DATABASE_URL
   ? 'pnpm run dev:local'
-  : 'doppler run -- pnpm run dev:local';
+  : 'doppler run --project jovie-web --config dev -- pnpm run dev:local';
 const baseURL = process.env.BASE_URL || 'http://localhost:3100';
 const managedWebServerUrl = new URL(baseURL);
 if (!managedWebServerUrl.port) {

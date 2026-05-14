@@ -4,9 +4,38 @@
 
 | Tier | Tests | When | Time Target |
 |------|-------|------|-------------|
-| **Smoke** | Homepage, auth pages, protected routes, 404 | Every PR | < 10 min |
+| **Smoke (focused)** | Spec files in `tests/e2e/smoke-manifest.ts` → `DESKTOP_SMOKE_SPECS` | Every PR | < 10 min |
+| **Smoke (mobile parity)** | Spec files in `tests/e2e/smoke-manifest.ts` → `MOBILE_SMOKE_SPECS` (Pixel 5 viewport) | Manual / opt-in CI | < 10 min |
+| **Smoke (tagged)** | Every `-g @smoke` tagged test across the suite (sharded) | PR with `testing` label | < 15 min |
 | **Full E2E** | All E2E specs including billing and golden-path flows | Main branch, `testing` label | 20-30 min |
 | **Nightly** | Extended accessibility and synthetic golden path checks | Scheduled | Unlimited |
+
+## Smoke Lanes (Canonical Policy)
+
+There is **one canonical smoke manifest**: [`apps/web/tests/e2e/smoke-manifest.ts`](e2e/smoke-manifest.ts). It exports two arrays (`DESKTOP_SMOKE_SPECS`, `MOBILE_SMOKE_SPECS`) consumed by every smoke entry point.
+
+| Lane | Entry point | Playwright config | What runs |
+|------|-------------|-------------------|-----------|
+| Desktop focused | `pnpm run test:web:smoke` / `pnpm e2e:smoke` | `playwright.config.smoke.ts` | `DESKTOP_SMOKE_SPECS` on Desktop Chrome |
+| Mobile parity | `pnpm run test:web:smoke:mobile` / `pnpm e2e:smoke:mobile` | `playwright.config.smoke.mobile.ts` | `MOBILE_SMOKE_SPECS` on Pixel 5 |
+| Tagged (broader) | `pnpm e2e:smoke:tagged` | `playwright.config.ts` (default) | Every `-g @smoke` tagged test |
+| Auth-only | `pnpm e2e:auth-smoke` | `playwright.config.ts` (default) | `smoke-auth.spec.ts` only |
+
+Rules of thumb:
+
+- Adding a spec to `DESKTOP_SMOKE_SPECS` or `MOBILE_SMOKE_SPECS` makes it a deploy-gating signal — keep both lists short and high-signal.
+- Adding `@smoke` to a `test.describe` opts a test into the broader tagged lane (`e2e:smoke:tagged`), used for PRs labelled `testing`.
+- CI: the `ci-e2e-smoke` job runs the focused desktop lane; the `e2e-suite-* / E2E Smoke (PR to Preview)` step runs the tagged lane sharded.
+- Mobile parity is currently opt-in (no CI job by default). Run it locally when changing shell layout, mobile bottom nav, or any responsive code that has shipped with mobile regressions.
+
+### Flag-on / Flag-off parity
+
+Shell routes that depend on `DESIGN_V1`/`SHELL_CHAT_V1` overrides require **both** a flag-on smoke and a flag-off smoke so we never ship a change that only works under one flag value:
+
+- `shell-chat-v1.spec.ts` — proves the New Design shell mounts when the override forces it on.
+- `shell-chat-v1-flag-off.spec.ts` — proves the legacy shell still mounts when the override forces it off.
+
+Marketing/product screenshots (`playwright.config.screenshots.ts` + `tests/product-screenshots/catalog.spec.ts`) continue to force the New Design via the production default; the flag-off parity coverage lives in the smoke lanes above.
 
 ## Running Tests
 
@@ -41,6 +70,40 @@ doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run tes
 doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run test:e2e:ui
 ```
 
+## Smoke Lanes
+
+There are three smoke lanes, each with a clearly named script and Playwright
+config. The spec list for the focused lanes lives in
+[`tests/e2e/smoke-manifest.ts`](./e2e/smoke-manifest.ts) — that file is the
+single source of truth shared by `playwright.config.smoke.ts`,
+`playwright.config.smoke.mobile.ts`, and the CI workflow.
+
+| Lane | Script | Config | Use |
+|------|--------|--------|-----|
+| **Focused desktop** (PR gate) | `pnpm --filter @jovie/web run e2e:smoke` | `playwright.config.smoke.ts` | Highest-signal deploy-gating specs. Runs on every PR via `ci-e2e-smoke`. |
+| **Focused mobile parity** | `pnpm --filter @jovie/web run e2e:smoke:mobile` | `playwright.config.smoke.mobile.ts` | iPhone-class viewport coverage for mobile overflow and viewport stability. Available locally; opt in via the `testing` label for preview QA. |
+| **Tagged / discovery** | `pnpm --filter @jovie/web run e2e:smoke:tagged` | default `playwright.config.ts` | Broader sharded sweep of every `-g @smoke` test. Runs on main and on PRs tagged `testing`. |
+
+The flag-gated shell is covered by **both** the flag-on path
+(`shell-chat-v1.spec.ts`) and a flag-off parity path
+(`shell-chat-v1-flag-off.spec.ts`). Both are in the focused desktop manifest so
+the PR gate catches regressions in either direction. They require
+`E2E_USE_TEST_AUTH_BYPASS=1`; in environments without it they skip cleanly.
+
+The marketing/product screenshot catalog (`pnpm --filter @jovie/web screenshots`)
+forces `DESIGN_V1` (the `SHELL_CHAT_V1` override slot) on explicitly before
+every scenario navigates, so the catalog cannot silently flip back to the
+legacy shell if defaults change.
+
+### Adding a spec to a focused lane
+
+1. Add the filename to either `DESKTOP_SMOKE_SPECS` or `MOBILE_SMOKE_SPECS` in
+   `apps/web/tests/e2e/smoke-manifest.ts`.
+2. Confirm the test runs in under 30 seconds and meets the "When to add to
+   smoke" bar below.
+3. Run `pnpm --filter @jovie/web run e2e:smoke` (or `:mobile`) locally to
+   confirm the new lane stays green and well under the 10 minute target.
+
 ## Smoke Test Files
 
 Smoke tests are designed for **fast PR feedback** (< 10 min target):
@@ -60,6 +123,12 @@ Smoke tests are designed for **fast PR feedback** (< 10 min target):
   - Protected route redirects
   - Dashboard navigation after Clerk test-mode sign-in
   - Quick auth-page availability checks
+
+- `shell-chat-v1.spec.ts` - New Design shell renders when `SHELL_CHAT_V1`
+  override is forced on (requires `E2E_USE_TEST_AUTH_BYPASS=1`).
+
+- `shell-chat-v1-flag-off.spec.ts` - Legacy shell still renders when
+  `SHELL_CHAT_V1` override is forced off — flag-off parity guard.
 
 ## Full Suite Files
 

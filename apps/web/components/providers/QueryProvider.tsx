@@ -7,8 +7,14 @@ import {
   QueryClientProvider,
 } from '@tanstack/react-query';
 import dynamic from 'next/dynamic';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { isDevChromeDisabledClient } from '@/lib/demo-recording';
+
+declare global {
+  interface Window {
+    __JOVIE_E2E_INVALIDATE_QUERIES__?: (queryKeyPrefix: string[]) => void;
+  }
+}
 
 // Lazy load devtools only in development to avoid production bundle bloat
 const ReactQueryDevtools = dynamic(
@@ -120,6 +126,28 @@ interface QueryProviderProps {
 export function QueryProvider({ children }: QueryProviderProps) {
   // Use useState to ensure client gets the singleton on hydration
   const [queryClient] = useState(getQueryClient);
+
+  // Gated E2E-only hook: exposes window.__JOVIE_E2E_INVALIDATE_QUERIES__ so
+  // Playwright specs can trigger a TanStack Query invalidation and assert the
+  // UI stays stable during async churn. Never active in production.
+  // Gating mirrors the DevToolsLoader pattern above.
+  useEffect(() => {
+    if (
+      process.env.NEXT_PUBLIC_E2E_MODE !== '1' ||
+      process.env.NODE_ENV === 'production'
+    ) {
+      return;
+    }
+    window.__JOVIE_E2E_INVALIDATE_QUERIES__ = (queryKeyPrefix: string[]) => {
+      console.info('[E2E] invalidating', queryKeyPrefix);
+      queryClient
+        .invalidateQueries({ queryKey: queryKeyPrefix })
+        .catch(() => {});
+    };
+    return () => {
+      delete window.__JOVIE_E2E_INVALIDATE_QUERIES__;
+    };
+  }, [queryClient]);
 
   return (
     <QueryClientProvider client={queryClient}>

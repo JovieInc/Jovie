@@ -21,14 +21,11 @@ export function PresencePageClient() {
   const { selectedProfile } = useDashboardData();
   const profileId = selectedProfile?.id ?? '';
 
-  const {
-    data: presenceData,
-    isLoading,
-    isError,
-  } = useDspPresenceQuery(profileId);
+  const { data: presenceData, isError } = useDspPresenceQuery(profileId);
 
-  // Only show skeleton on cold load (no cached data at all)
-  if (isLoading && !presenceData) {
+  // Cold-load skeleton only. Keep the mounted view stable across background
+  // refetches where data stays defined.
+  if (presenceData === undefined) {
     return <PresenceLoading />;
   }
 

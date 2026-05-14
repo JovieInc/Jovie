@@ -87,7 +87,7 @@ export function PublicPageErrorFallback({
         <p style={styles.description}>Try refreshing the page.</p>
         <button
           type='button'
-          className='mt-6 inline-flex h-9 cursor-pointer items-center justify-center rounded-full bg-[#e6e6e6] px-4 text-sm font-medium text-[#06070a] transition-[background] duration-150 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7170ff] active:scale-[0.97]'
+          className='mt-6 inline-flex h-9 cursor-pointer items-center justify-center rounded-full bg-[#e6e6e6] px-4 text-sm font-medium text-[#06070a] transition-[background] duration-subtle hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7170ff]'
           onClick={onRefresh}
         >
           Refresh

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { ProfileMediaCard } from '@/features/profile/ProfileMediaCard';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
+import { useReleaseAwareNow } from '@/hooks/useReleaseAwareNow';
 import type { AvailableDSP } from '@/lib/dsp';
 import type { Artist } from '@/types/db';
 import { ListenDrawer } from './ListenDrawer';
@@ -36,6 +37,10 @@ export function LatestReleaseCard({
   const releaseDate = release.releaseDate
     ? new Date(release.releaseDate)
     : null;
+  // Re-evaluate at the release boundary so an ISR-cached page transitions
+  // from "Drops in"/"Notify me" to "Out Now"/"Listen Now" the moment the
+  // release drops.
+  const now = useReleaseAwareNow(releaseDate);
   const releaseYear =
     releaseDate && !Number.isNaN(releaseDate.getTime())
       ? releaseDate.getUTCFullYear()
@@ -43,7 +48,7 @@ export function LatestReleaseCard({
   const isFutureRelease =
     releaseDate !== null &&
     !Number.isNaN(releaseDate.getTime()) &&
-    releaseDate.getTime() > Date.now();
+    releaseDate.getTime() > now.getTime();
   const releaseTypeLabel =
     release.releaseType === 'ep'
       ? 'EP'

@@ -1,7 +1,8 @@
 import { act, renderHook } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   SIDEBAR_KEYBOARD_SHORTCUT,
+  SIDEBAR_KEYBOARD_SHORTCUT_BARE,
   useSidebarKeyboardShortcut,
 } from '@/hooks/useSidebarKeyboardShortcut';
 
@@ -12,16 +13,27 @@ describe('useSidebarKeyboardShortcut', () => {
     onToggle = vi.fn();
   });
 
+  afterEach(() => {
+    document.body.replaceChildren();
+  });
+
   function dispatchKeyDown(
-    opts: Partial<KeyboardEventInit> & { key?: string | undefined }
+    opts: Partial<KeyboardEventInit> & {
+      key?: string | undefined;
+      target?: EventTarget | null;
+    }
   ) {
+    const { target, ...init } = opts;
     const event = new KeyboardEvent('keydown', {
       bubbles: true,
-      ...opts,
+      ...init,
     });
     // For events with undefined key, override the property
     if (opts.key === undefined && 'key' in opts) {
       Object.defineProperty(event, 'key', { value: undefined });
+    }
+    if (target) {
+      Object.defineProperty(event, 'target', { value: target });
     }
     globalThis.dispatchEvent(event);
     return event;
@@ -87,5 +99,44 @@ describe('useSidebarKeyboardShortcut', () => {
     });
 
     expect(onToggle).toHaveBeenCalledOnce();
+  });
+
+  it('fires handler on bare `[`', () => {
+    renderHook(() => useSidebarKeyboardShortcut(onToggle));
+
+    act(() => {
+      dispatchKeyDown({ key: SIDEBAR_KEYBOARD_SHORTCUT_BARE });
+    });
+
+    expect(onToggle).toHaveBeenCalledOnce();
+  });
+
+  it('does not fire bare `[` while focus is in a form element', () => {
+    const input = document.createElement('input');
+    document.body.append(input);
+
+    renderHook(() => useSidebarKeyboardShortcut(onToggle));
+
+    act(() => {
+      dispatchKeyDown({
+        key: SIDEBAR_KEYBOARD_SHORTCUT_BARE,
+        target: input,
+      });
+    });
+
+    expect(onToggle).not.toHaveBeenCalled();
+  });
+
+  it('does not fire bare `[` when combined with a modifier', () => {
+    renderHook(() => useSidebarKeyboardShortcut(onToggle));
+
+    act(() => {
+      dispatchKeyDown({
+        key: SIDEBAR_KEYBOARD_SHORTCUT_BARE,
+        metaKey: true,
+      });
+    });
+
+    expect(onToggle).not.toHaveBeenCalled();
   });
 });

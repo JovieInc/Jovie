@@ -1,4 +1,6 @@
-import { Clock3 } from 'lucide-react';
+'use client';
+
+import { Clock3, ExternalLink } from 'lucide-react';
 import type { AgentRunArtifact } from '@/lib/agent-os/artifact';
 import { cn } from '@/lib/utils';
 import { WorkflowStatusPill } from './WorkflowStatusPill';
@@ -24,6 +26,46 @@ function formatUpdatedAt(value: string): string {
   }).format(new Date(value));
 }
 
+const AGENT_OS_LINK_ALLOWED_HOSTS = new Set(['github.com', 'linear.app']);
+
+function getSafeExternalHref(href: string | null): string | null {
+  if (!href) return null;
+
+  try {
+    const url = new URL(href);
+    if (url.protocol !== 'https:') return null;
+    if (url.username || url.password) return null;
+    if (!AGENT_OS_LINK_ALLOWED_HOSTS.has(url.hostname)) return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+interface RowActionLinkProps {
+  readonly href: string | null;
+  readonly label: string;
+}
+
+function RowActionLink({ href, label }: RowActionLinkProps) {
+  const safeHref = getSafeExternalHref(href);
+  if (!safeHref) return null;
+
+  return (
+    <a
+      href={safeHref}
+      target='_blank'
+      rel='noopener noreferrer'
+      aria-label={`${label} (opens in a new tab)`}
+      onClick={e => e.stopPropagation()}
+      className='inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-[520] text-tertiary-token transition-colors hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+    >
+      {label}
+      <ExternalLink className='size-3' aria-hidden='true' />
+    </a>
+  );
+}
+
 interface WorkflowRunRowProps {
   readonly artifact: AgentRunArtifact;
   readonly isSelected?: boolean;
@@ -35,11 +77,17 @@ export function WorkflowRunRow({
   isSelected = false,
   onSelect,
 }: WorkflowRunRowProps) {
-  const className = cn(
-    'grid w-full gap-2 rounded-lg border border-subtle bg-surface-1 px-3 py-2.5 text-left transition-colors hover:bg-surface-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
-    isSelected && 'border-(--linear-border-focus) bg-surface-0'
+  const containerClassName = cn(
+    'grid w-full gap-2 rounded-lg border border-subtle bg-surface-1 px-3 py-2.5 text-left transition-colors',
+    isSelected && 'border-(--linear-border-focus) bg-surface-0',
+    onSelect && !isSelected && 'hover:bg-surface-0'
   );
-  const content = (
+
+  const hasPr = getSafeExternalHref(artifact.pullRequestUrl) !== null;
+  const hasLinear = getSafeExternalHref(artifact.linearIssueUrl) !== null;
+  const hasActions = hasPr || hasLinear;
+
+  const mainContent = (
     <>
       <div className='flex min-w-0 items-start justify-between gap-3'>
         <div className='min-w-0'>
@@ -71,17 +119,35 @@ export function WorkflowRunRow({
   );
 
   if (!onSelect) {
-    return <div className={className}>{content}</div>;
+    return (
+      <div className={containerClassName}>
+        {mainContent}
+        {hasActions ? (
+          <div className='flex items-center gap-1 border-t border-subtle pt-2'>
+            <RowActionLink href={artifact.pullRequestUrl} label='Open PR' />
+            <RowActionLink href={artifact.linearIssueUrl} label='Open Linear' />
+          </div>
+        ) : null}
+      </div>
+    );
   }
 
   return (
-    <button
-      type='button'
-      onClick={() => onSelect(artifact)}
-      className={className}
-      aria-pressed={isSelected}
-    >
-      {content}
-    </button>
+    <div className={containerClassName}>
+      <button
+        type='button'
+        onClick={() => onSelect(artifact)}
+        className='grid gap-2 text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus) focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface)'
+        aria-pressed={isSelected}
+      >
+        {mainContent}
+      </button>
+      {hasActions ? (
+        <div className='flex items-center gap-1 border-t border-subtle pt-2'>
+          <RowActionLink href={artifact.pullRequestUrl} label='Open PR' />
+          <RowActionLink href={artifact.linearIssueUrl} label='Open Linear' />
+        </div>
+      ) : null}
+    </div>
   );
 }
