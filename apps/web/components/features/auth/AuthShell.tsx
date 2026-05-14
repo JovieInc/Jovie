@@ -131,7 +131,8 @@ export function AuthShell({
 
       {isSignUp ? (
         <SignUp
-          routing='hash'
+          routing='path'
+          path='/signup'
           oauthFlow='redirect'
           signInUrl={crossLinkUrl}
           fallbackRedirectUrl={resolvedRedirect}
@@ -139,7 +140,8 @@ export function AuthShell({
         />
       ) : (
         <SignIn
-          routing='hash'
+          routing='path'
+          path='/signin'
           oauthFlow='redirect'
           signUpUrl={crossLinkUrl}
           fallbackRedirectUrl={resolvedRedirect}

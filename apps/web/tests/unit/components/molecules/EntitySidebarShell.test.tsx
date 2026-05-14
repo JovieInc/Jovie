@@ -69,6 +69,44 @@ describe('EntitySidebarShell', () => {
     expect(screen.getByText('Drawer tabs')).toBeInTheDocument();
   });
 
+  it('wraps the minimal-mode entity header in a card surface by default', () => {
+    render(
+      <EntitySidebarShell
+        isOpen
+        ariaLabel='Release details'
+        headerMode='minimal'
+        hideMinimalHeaderBar
+        entityHeader={<div>Entity header content</div>}
+      >
+        <div>Body content</div>
+      </EntitySidebarShell>
+    );
+
+    const headerSurface = screen.getByTestId('entity-sidebar-entity-header');
+    expect(headerSurface).toHaveAttribute('data-surface-variant', 'card');
+    expect(headerSurface).toHaveAttribute('data-variant', 'card');
+  });
+
+  it('renders the minimal-mode entity header without an outer card surface when entityHeaderSurface is flat', () => {
+    render(
+      <EntitySidebarShell
+        isOpen
+        ariaLabel='Release details'
+        headerMode='minimal'
+        hideMinimalHeaderBar
+        entityHeaderSurface='flat'
+        entityHeader={<div>Entity header content</div>}
+      >
+        <div>Body content</div>
+      </EntitySidebarShell>
+    );
+
+    const headerSurface = screen.getByTestId('entity-sidebar-entity-header');
+    expect(headerSurface).toHaveAttribute('data-surface-variant', 'flat');
+    expect(headerSurface).not.toHaveAttribute('data-variant', 'card');
+    expect(headerSurface).toHaveTextContent('Entity header content');
+  });
+
   it('can promote minimal-mode tabs into the full-width sticky header and hide the empty utility bar', () => {
     render(
       <EntitySidebarShell

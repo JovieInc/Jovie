@@ -817,6 +817,22 @@ describe('TasksPageClient', () => {
     ).toBeInTheDocument();
   });
 
+  it('opens task search with / unless focus is in a text editor', () => {
+    renderPage();
+
+    fireEvent.keyDown(screen.getByLabelText('Task title'), { key: '/' });
+
+    expect(
+      screen.queryByRole('searchbox', { name: 'Search tasks' })
+    ).not.toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: '/' });
+
+    expect(
+      screen.getByRole('searchbox', { name: 'Search tasks' })
+    ).toBeInTheDocument();
+  });
+
   it('promotes the header into create mode when new task is triggered', () => {
     renderPage();
 
@@ -949,6 +965,24 @@ describe('TasksPageClient', () => {
     fireEvent.keyDown(window, { key: 'j' });
 
     expect(screen.getByLabelText('Task title')).toHaveValue(mockTaskTwo.title);
+  });
+
+  it('closes the DESIGN_V1 task detail with Escape from the ambient task surface', () => {
+    enableDesignV1Tasks();
+
+    renderPage();
+
+    act(() => {
+      getLatestTableProps()?.onRowClick?.(mockTaskTwo);
+    });
+    expect(screen.getByLabelText('Task title')).toHaveValue(mockTaskTwo.title);
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+
+    expect(screen.queryByLabelText('Task title')).not.toBeInTheDocument();
+    expect(
+      screen.getByText('Pick a task from the list to see what it needs.')
+    ).toBeInTheDocument();
   });
 
   it('keeps task keyboard navigation out of text editors', () => {

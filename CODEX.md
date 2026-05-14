@@ -15,6 +15,8 @@ Codex project config lives in `.codex/`:
 
 Codex hooks are currently a Codex lifecycle feature and may not run on every platform. If hooks are unavailable, run the same scripts manually.
 
+The setup and cleanup wrappers also run `scripts/codex-gbrain-sync.sh`. That script performs a bounded `gbrain doctor --fast --json` check and, when local GBrain is healthy, runs the incremental GBrain sync path so Codex refreshes the repo/code index and curated gstack artifacts at session start and task stop. The hook is best effort: a missing, unhealthy, locked, or slow GBrain setup is reported but does not block Codex setup or cleanup.
+
 ## Manual Setup
 
 Run this from the repository root on every fresh worktree:

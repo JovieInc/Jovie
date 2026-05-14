@@ -20,6 +20,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { OtpInput } from '@/features/auth/atoms/otp-input';
+import { PROFILE_Z } from '@/lib/profile/z-index-constants';
 import { cn } from '@/lib/utils';
 import type { NotificationContentType } from '@/types/notifications';
 
@@ -504,7 +505,7 @@ export function ProfileMobileNotificationsFlow({
           footer={
             <div className='space-y-3'>
               {error ? (
-                <p className='text-sm text-[#ff8b8b]' role='alert'>
+                <p className='text-sm text-red-400' role='alert'>
                   {error}
                 </p>
               ) : null}
@@ -543,7 +544,7 @@ export function ProfileMobileNotificationsFlow({
           footer={
             <div className='space-y-3'>
               {error ? (
-                <p className='text-sm text-[#ff8b8b]' role='alert'>
+                <p className='text-sm text-red-400' role='alert'>
                   {error}
                 </p>
               ) : null}
@@ -836,8 +837,8 @@ export function ProfileMobileNotificationsFlow({
 
   const overlayRootClassName =
     portalContainer === undefined
-      ? 'pointer-events-auto fixed inset-0 z-[140]'
-      : 'pointer-events-auto absolute inset-0 z-[140]';
+      ? `pointer-events-auto fixed inset-0 ${PROFILE_Z.FULLSCREEN_FLOW}`
+      : `pointer-events-auto absolute inset-0 ${PROFILE_Z.FULLSCREEN_FLOW}`;
   const contentStyle = {
     '--mobile-flow-accent': accentHex,
   } as CSSProperties;

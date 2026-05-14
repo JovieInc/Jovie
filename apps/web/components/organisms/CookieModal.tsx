@@ -142,15 +142,16 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
     setSettings(prev => ({ ...prev, [key]: checked }));
   };
 
-  const save = async () => {
-    try {
-      await saveConsent(settings);
-      onSave?.(settings);
-      onClose();
-    } catch {
-      // saveConsent writes a cookie — failure is extremely unlikely
-      // but if it happens, don't close the modal so the user can retry
-    }
+  const save = () => {
+    // Invoke the parent's onSave callback first so the banner hides and
+    // localStorage is updated synchronously, regardless of whether the
+    // server-side cookie write succeeds. The server action is best-effort.
+    onSave?.(settings);
+    onClose();
+    // Best-effort server-side persistence (httpOnly cookie). Errors are
+    // suppressed — the client-side localStorage write is the source of truth
+    // for subsequent page loads.
+    saveConsent(settings).catch(() => undefined);
   };
 
   if (isMobile) {

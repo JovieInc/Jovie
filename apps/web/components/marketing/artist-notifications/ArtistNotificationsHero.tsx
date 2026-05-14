@@ -1,3 +1,4 @@
+import { Button } from '@jovie/ui';
 import Link from 'next/link';
 import { MarketingContainer } from '@/components/marketing';
 import { ArtistNotificationFloatingCardView } from '@/components/marketing/MarketingStoryPrimitives';
@@ -52,12 +53,13 @@ export function ArtistNotificationsHero({
             ) : null}
 
             <div className='mt-8'>
-              <Link
-                href={hero.primaryCtaHref}
-                className='inline-flex h-11 items-center justify-center rounded-full bg-white px-5 text-[14px] font-medium text-black transition-colors hover:bg-white/90'
+              <Button
+                asChild
+                variant='whitePill'
+                className='h-11 px-5 sm:text-[14px]'
               >
-                {hero.primaryCtaLabel}
-              </Link>
+                <Link href={hero.primaryCtaHref}>{hero.primaryCtaLabel}</Link>
+              </Button>
             </div>
           </div>
 

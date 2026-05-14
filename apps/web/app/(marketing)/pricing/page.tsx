@@ -4,11 +4,24 @@ import { MarketingPricingPlans } from '@/components/features/pricing/MarketingPr
 import { MarketingContainer, MarketingPageShell } from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
-import { MARKETING_PRICING_PLANS } from '@/data/marketingPricingPlans';
+import { getVisibleMarketingPricingPlans } from '@/data/marketingPricingPlans';
 import { PricingComparisonChart } from '@/features/pricing/PricingComparisonChart';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 
 export const revalidate = false;
+
+const VISIBLE_PRICING_PLANS = getVisibleMarketingPricingPlans();
+const VISIBLE_PAID_PLANS = VISIBLE_PRICING_PLANS.filter(
+  plan => plan.id !== 'free'
+);
+const primaryPaidPlanName =
+  VISIBLE_PAID_PLANS.length === 1 ? VISIBLE_PAID_PLANS[0]?.name : null;
+const accessCopy = primaryPaidPlanName
+  ? `${primaryPaidPlanName} opens from the waitlist with the plan request saved.` // copy-lint-allow: waitlist
+  : 'Paid plans open from the waitlist with the plan request saved.'; // copy-lint-allow: waitlist
+const requestAccessCopy = primaryPaidPlanName
+  ? `Claim the profile first. Request ${primaryPaidPlanName} when you want the release system turned on.`
+  : 'Claim the profile first. Request a paid plan when you want the release system turned on.';
 
 export const metadata: Metadata = {
   title: 'Pricing',
@@ -55,7 +68,7 @@ const PRICING_SCHEMA = {
   url: `${BASE_URL}/pricing`,
   mainEntity: {
     '@type': 'ItemList',
-    itemListElement: MARKETING_PRICING_PLANS.map((plan, index) => {
+    itemListElement: VISIBLE_PRICING_PLANS.map((plan, index) => {
       const price = plan.price === 'Custom' ? '0' : plan.price.replace('$', '');
 
       return {
@@ -139,7 +152,7 @@ export default function PricingPage() {
               </p>
               {/* copy-lint-allow: waitlist — intentional; describes the paid plan access flow */}
               <p className='mt-6 text-[13px] font-medium tracking-[-0.01em] text-tertiary-token'>
-                Paid plans open from the waitlist with the plan request saved.
+                {accessCopy}
               </p>
               <div className='mt-7 flex flex-wrap items-center gap-3'>
                 <Link
@@ -201,8 +214,7 @@ export default function PricingPage() {
               Request Access
             </h2>
             <p className='mx-auto mt-4 max-w-[30rem] text-[15px] leading-[1.7] text-secondary-token'>
-              Claim the profile first. Request Pro, Team, or Enterprise when you
-              want the release system turned on.
+              {requestAccessCopy}
             </p>
             <div className='mt-8 flex flex-wrap items-center justify-center gap-3'>
               <Link

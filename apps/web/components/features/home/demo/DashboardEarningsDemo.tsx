@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { formatAmount } from '@/lib/utils/format-number';
 import { EARNINGS_SUMMARY, MONTHLY_EARNINGS, RECENT_TIPS } from './mock-data';
 
 /**
@@ -25,8 +26,6 @@ export function DashboardEarningsDemo() {
 
   const maxEarning = Math.max(...MONTHLY_EARNINGS.map(m => m.amount));
 
-  const formatCents = (cents: number) => `$${(cents / 100).toFixed(2)}`;
-
   return (
     <div ref={containerRef} className='space-y-4'>
       {/* Summary cards */}
@@ -34,11 +33,11 @@ export function DashboardEarningsDemo() {
         {[
           {
             label: 'Total Earned',
-            value: formatCents(EARNINGS_SUMMARY.totalReceivedCents),
+            value: formatAmount(EARNINGS_SUMMARY.totalReceivedCents),
           },
           {
             label: 'This Month',
-            value: formatCents(EARNINGS_SUMMARY.monthReceivedCents),
+            value: formatAmount(EARNINGS_SUMMARY.monthReceivedCents),
           },
           {
             label: 'Tips Received',

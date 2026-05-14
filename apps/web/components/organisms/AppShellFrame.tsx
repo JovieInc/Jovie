@@ -51,51 +51,58 @@ export const AppShellFrame = memo(function AppShellFrame({
       data-app-shell-frame='true'
       data-shell-design={variant}
       className={cn(
-        'relative flex h-full w-full overflow-hidden',
+        'relative flex h-full w-full flex-col overflow-hidden',
         isShellChatV1 ? 'bg-(--linear-bg-page)' : 'bg-base',
         /* PWA safe area: pad top for notch/Dynamic Island in standalone mode (mobile only) */
         'max-lg:pt-[env(safe-area-inset-top)]',
-        isShellChatV1 &&
-          'lg:gap-[var(--linear-app-shell-gap)] lg:p-[var(--linear-app-shell-gap)]',
         containerClassName
       )}
     >
       <DesktopTitlebar />
-      {sidebar}
-
-      <main
-        id='main-content'
+      <div
+        data-app-shell-body='true'
         className={cn(
-          'relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-0',
-          isShellChatV1
-            ? 'lg:rounded-[var(--linear-app-shell-radius)] lg:border-t lg:border-r lg:border-b lg:border-(--linear-app-shell-border) lg:bg-(--linear-app-content-surface) lg:shadow-[var(--linear-app-shell-shadow)] lg:pt-px'
-            : 'lg:border-l lg:border-subtle'
+          'flex min-h-0 min-w-0 flex-1 overflow-hidden',
+          isShellChatV1 &&
+            'lg:gap-[var(--linear-app-shell-gap)] lg:p-[var(--linear-app-shell-gap)]'
         )}
       >
-        {isEnabled('CANVAS_GRAIN') && <CanvasGrain />}
-        {header}
-        <div
+        {sidebar}
+
+        <main
+          id='main-content'
           className={cn(
-            'flex flex-1 min-h-0 min-w-0 overflow-hidden',
-            isShellChatV1 && 'lg:gap-[var(--linear-app-shell-gap)]'
+            'relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-0',
+            isShellChatV1
+              ? 'lg:rounded-[var(--linear-app-shell-radius)] lg:border-t lg:border-r lg:border-b lg:border-(--linear-app-shell-border) lg:bg-(--linear-app-content-surface) lg:shadow-[var(--linear-app-shell-shadow)] lg:pt-px'
+              : 'lg:border-l lg:border-subtle'
           )}
         >
+          {isEnabled('CANVAS_GRAIN') && <CanvasGrain />}
+          {header}
           <div
-            data-testid='app-shell-scroll'
             className={cn(
-              'flex flex-1 min-h-0 min-w-0 flex-col pb-[var(--dev-toolbar-height,0px)]',
-              isTableRoute
-                ? 'overflow-hidden overflow-x-auto overscroll-contain'
-                : 'overflow-y-auto overflow-x-hidden overscroll-contain',
-              contentClassName
+              'flex flex-1 min-h-0 min-w-0 overflow-hidden',
+              isShellChatV1 && 'lg:gap-[var(--linear-app-shell-gap)]'
             )}
           >
-            {main}
+            <div
+              data-testid='app-shell-scroll'
+              className={cn(
+                'flex flex-1 min-h-0 min-w-0 flex-col pb-[var(--dev-toolbar-height,0px)]',
+                isTableRoute
+                  ? 'overflow-hidden overflow-x-auto overscroll-contain'
+                  : 'overflow-y-auto overflow-x-hidden overscroll-contain',
+                contentClassName
+              )}
+            >
+              {main}
+            </div>
+            {rightPanel}
           </div>
-          {rightPanel}
-        </div>
-        {audioPlayer}
-      </main>
+          {audioPlayer}
+        </main>
+      </div>
 
       {mobileBottomNav}
     </div>

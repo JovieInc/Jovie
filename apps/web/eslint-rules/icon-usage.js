@@ -16,7 +16,16 @@ const { SOCIAL_PLATFORMS } = require('../constants/platforms.cjs');
 const APPROVED_CUSTOM_SVGS = [
   '/brand/jovie-logo.svg',
   '/brand/Jovie-Logo-Icon.svg',
-  // Add more approved custom SVGs here
+  '/brand/Jovie-Logo-Icon-Black.svg',
+  '/brand/Jovie-Logo-Icon-White.svg',
+  '/brand/Jovie-Logo-Mark-Black.svg',
+  '/brand/Jovie-Logo-Mark-Cream.svg',
+  '/brand/Jovie-Wordmark-Black.svg',
+  '/brand/Jovie-Wordmark-Cream.svg',
+  '/brand/Jovie-Lockup-Black.svg',
+  '/brand/Jovie-Lockup-Cream.svg',
+  '/brand/Jovie-Logo-Wordmark-Alt-Black.svg',
+  '/brand/Jovie-Logo-Wordmark-Alt-White.svg',
 ];
 
 // Common UI icons that should use Lucide React
@@ -209,6 +218,7 @@ module.exports = {
               'footer.ts',
               'email-template.ts',
               'dsp-registry.ts',
+              'generate-brand-assets.ts',
             ];
             if (allowedServerFiles.some(file => filename.includes(file))) {
               return;

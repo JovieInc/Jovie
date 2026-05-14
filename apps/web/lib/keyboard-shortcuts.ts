@@ -100,6 +100,19 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     decision: { status: 'required', binding: 'CommandPalette.tsx' },
   },
   {
+    id: 'current-view-search',
+    label: 'Search current view',
+    keys: '/ in view',
+    description: 'Open the active page search or filter surface',
+    category: 'general',
+    icon: Search,
+    shortcutKey: '/',
+    decision: {
+      status: 'required',
+      binding: 'ShellReleasesView, TasksPageClient, LibrarySurface',
+    },
+  },
+  {
     id: 'keyboard-shortcuts',
     label: 'View keyboard shortcuts',
     keys: `${GLYPH_CMD} / · ?`,
@@ -111,10 +124,10 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
   {
     id: 'toggle-sidebar',
     label: 'Toggle sidebar',
-    keys: `${GLYPH_CMD} B`,
+    keys: `[ · ${GLYPH_CMD} B`,
     category: 'general',
     icon: PanelLeft,
-    shortcutKey: 'Meta+b',
+    shortcutKey: '[',
     decision: { status: 'required', binding: 'useSidebarKeyboardShortcut' },
   },
 

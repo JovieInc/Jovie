@@ -40,7 +40,7 @@ describe('ProblemSolutionSection', () => {
       name: /Request Early Access/i,
     });
     expect(ctaButton).toBeInTheDocument();
-    expect(ctaButton).toHaveAttribute('href', '/onboarding');
+    expect(ctaButton).toHaveAttribute('href', '/start');
   });
 
   it('tracks analytics when CTA button is clicked', () => {

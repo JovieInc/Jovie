@@ -1,3 +1,4 @@
+import { Button } from '@jovie/ui';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { APP_ROUTES } from '@/constants/routes';
@@ -42,12 +43,13 @@ export default function ProductDemoPage() {
             Download Demo
           </a>
         )}
-        <Link
-          href={APP_ROUTES.SIGNUP}
-          className='inline-flex h-12 items-center rounded-full bg-white px-8 text-sm font-semibold text-black transition-opacity hover:opacity-90'
+        <Button
+          asChild
+          variant='whitePill'
+          className='h-12 px-8 text-sm font-semibold'
         >
-          Try it free
-        </Link>
+          <Link href={APP_ROUTES.SIGNUP}>Try it free</Link>
+        </Button>
       </div>
     </section>
   );

@@ -96,30 +96,37 @@ export function CookieBannerSection() {
     return () => globalThis.removeEventListener('jv:cookie:open', handleOpen);
   }, []);
 
-  const acceptAll = async () => {
+  const acceptAll = () => {
     const consent = { essential: true, analytics: true, marketing: true };
-    await saveConsent(consent);
+    // Persist client-side immediately so the banner hides regardless of
+    // whether the server action succeeds (network/CSRF failures must not
+    // leave the banner stuck open).
     setConsentState('accepted');
     try {
       localStorage.setItem('jv_cc', JSON.stringify(consent));
     } catch {
-      // ignore
+      // ignore — restricted browsing context
     }
     globalThis.JVConsent?._emit(consent);
     setVisible(false);
+    // Best-effort server-side persistence (httpOnly cookie). Fire-and-forget
+    // — UI has already updated above.
+    saveConsent(consent).catch(() => undefined);
   };
 
-  const reject = async () => {
+  const reject = () => {
     const consent = { essential: true, analytics: false, marketing: false };
-    await saveConsent(consent);
+    // Persist client-side immediately — see acceptAll comment above.
     setConsentState('rejected');
     try {
       localStorage.setItem('jv_cc', JSON.stringify(consent));
     } catch {
-      // ignore
+      // ignore — restricted browsing context
     }
     globalThis.JVConsent?._emit(consent);
     setVisible(false);
+    // Best-effort server-side persistence.
+    saveConsent(consent).catch(() => undefined);
   };
 
   return (
@@ -128,7 +135,7 @@ export function CookieBannerSection() {
         <aside
           aria-label='Cookie consent'
           data-testid='cookie-banner'
-          className='fixed inset-x-0 bottom-0 z-40 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-md sm:px-6 md:flex md:items-center md:justify-between md:gap-4'
+          className='fixed inset-x-0 bottom-0 z-[60] px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-md sm:px-6 md:flex md:items-center md:justify-between md:gap-4'
           style={{
             backgroundColor: 'var(--linear-bg-surface-1)',
             borderTop: '1px solid var(--linear-border-default)',

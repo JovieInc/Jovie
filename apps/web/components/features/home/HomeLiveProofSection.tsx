@@ -46,7 +46,7 @@ function ProofCard({
               ? '(max-width: 767px) 100vw, 900px'
               : '(max-width: 767px) 100vw, 420px'
           }
-          className='object-cover transition-transform duration-300 ease-out group-hover:scale-[1.02]'
+          className='object-cover'
         />
       </div>
       <div className='absolute inset-0 bg-[linear-gradient(180deg,rgba(5,7,12,0.12),rgba(5,7,12,0.3)_35%,rgba(5,7,12,0.82)_100%)]' />
