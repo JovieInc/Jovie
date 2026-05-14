@@ -22,6 +22,7 @@ import type {
 
 export type {
   AudienceAction,
+  AudienceAlertChannel,
   AudienceIntentLevel,
   AudienceMember,
   AudienceMemberType,

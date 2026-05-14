@@ -50,6 +50,8 @@ const segmentToCondition = (segment: AudienceSegment) => {
         audienceMembers.lastSeenAt,
         drizzleSql`NOW() - INTERVAL '24 hours'`
       );
+    case 'alertsOn':
+      return eq(audienceMembers.hasActiveAlerts, true);
   }
 };
 
@@ -253,6 +255,9 @@ export async function GET(request: NextRequest) {
           tags: audienceMembers.tags,
           lastSeenAt: audienceMembers.lastSeenAt,
           createdAt: audienceMembers.firstSeenAt,
+          hasActiveAlerts: audienceMembers.hasActiveAlerts,
+          activeAlertChannels: audienceMembers.activeAlertChannels,
+          lastAlertConfirmedAt: audienceMembers.lastAlertConfirmedAt,
         })
         .from(audienceMembers)
         .leftJoin(
@@ -320,6 +325,14 @@ export async function GET(request: NextRequest) {
         tags: Array.isArray(member.tags) ? member.tags : [],
         lastSeenAt: serializeDate(member.lastSeenAt),
         createdAt: serializeDate(member.createdAt),
+        hasActiveAlerts: Boolean(member.hasActiveAlerts),
+        activeAlertChannels: Array.isArray(member.activeAlertChannels)
+          ? member.activeAlertChannels.filter(
+              (c): c is 'sms' | 'email' | 'push' =>
+                c === 'sms' || c === 'email' || c === 'push'
+            )
+          : [],
+        lastAlertConfirmedAt: serializeDate(member.lastAlertConfirmedAt),
       }));
 
       // total is null — clients use hasMore / nextCursor for pagination control.
