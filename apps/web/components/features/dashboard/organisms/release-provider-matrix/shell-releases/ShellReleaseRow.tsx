@@ -9,7 +9,13 @@ import {
   Play,
 } from 'lucide-react';
 import Link from 'next/link';
-import { type KeyboardEvent, memo, useCallback, useMemo } from 'react';
+import {
+  type KeyboardEvent,
+  type MouseEvent,
+  memo,
+  useCallback,
+  useMemo,
+} from 'react';
 import { toast } from 'sonner';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import type { TableActionMenuItem } from '@/components/atoms/table-action-menu/types';
@@ -35,7 +41,7 @@ function useArtworkPlayback(release: ReleaseViewModel) {
   const primaryArtist = release.artistNames?.[0];
 
   const handleTogglePlayback = useCallback(
-    (e: React.MouseEvent | React.KeyboardEvent) => {
+    (e: MouseEvent<HTMLButtonElement> | KeyboardEvent<HTMLButtonElement>) => {
       e.stopPropagation();
 
       if (isActiveTrack) {
@@ -51,6 +57,7 @@ function useArtworkPlayback(release: ReleaseViewModel) {
         id: release.id,
         title: release.title,
         audioUrl: previewUrl,
+        isrc: release.primaryIsrc ?? null,
         releaseTitle: release.title,
         artistName: primaryArtist,
         artworkUrl: release.artworkUrl,
@@ -66,6 +73,7 @@ function useArtworkPlayback(release: ReleaseViewModel) {
       release.artworkUrl,
       release.id,
       release.lyrics,
+      release.primaryIsrc,
       release.title,
       toggleTrack,
     ]

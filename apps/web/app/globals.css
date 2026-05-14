@@ -51,16 +51,15 @@ html[data-desktop-runtime="electron"] body {
 
 html[data-desktop-runtime="electron"] [data-app-shell-frame="true"] {
   box-sizing: border-box;
-  padding-top: var(--electron-titlebar-height);
 }
 
 html[data-desktop-runtime="electron"] [data-electron-titlebar="true"] {
   -webkit-app-region: drag;
-  position: absolute;
-  inset: 0 0 auto;
   z-index: 60;
-  display: flex;
+  display: grid;
+  grid-template-columns: var(--linear-app-sidebar-width) minmax(0, 1fr);
   align-items: center;
+  flex-shrink: 0;
   height: var(--electron-titlebar-height);
   user-select: none;
   background: rgb(var(--sidebar-background));
@@ -88,10 +87,6 @@ html[data-desktop-runtime="electron"]
 }
 
 html[data-desktop-runtime="electron"] [data-electron-update-pill="true"] {
-  position: fixed;
-  top: 7px;
-  right: 12px;
-  z-index: 80;
   height: 26px;
   padding-inline: 12px;
   border-radius: 999px;

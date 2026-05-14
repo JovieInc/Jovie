@@ -44,7 +44,7 @@ export default async function ReleasesPage() {
   }
 
   if (dashboardData.needsOnboarding) {
-    redirect(APP_ROUTES.ONBOARDING);
+    redirect(APP_ROUTES.START);
   }
 
   const profileId = dashboardData.selectedProfile?.id;

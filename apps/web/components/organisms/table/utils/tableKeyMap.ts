@@ -56,3 +56,35 @@ export function resolveTableNavAction(
       return null;
   }
 }
+
+/**
+ * True when the event target is inside an overlay surface that owns its own
+ * keyboard navigation — Radix dropdown menu, popover, dialog, alert dialog,
+ * combobox listbox, etc. Ambient list-level J/K/Arrow handlers should bail
+ * out when this returns true so they don't steal keys from the overlay.
+ *
+ * Form elements are intentionally NOT included here; callers can compose
+ * with `isFormElement` if they need to suppress for inputs as well.
+ */
+export function isInteractiveOverlayTarget(
+  target: EventTarget | null
+): boolean {
+  if (!(target instanceof Element)) return false;
+  return Boolean(
+    target.closest(
+      [
+        '[role="dialog"]',
+        '[role="alertdialog"]',
+        '[role="menu"]',
+        '[role="menuitem"]',
+        '[role="menubar"]',
+        '[role="combobox"][aria-expanded="true"]',
+        '[data-radix-popper-content-wrapper]',
+        '[data-radix-menu-content]',
+        '[data-radix-popover-content]',
+        '[data-radix-dialog-content]',
+        '[data-radix-alert-dialog-content]',
+      ].join(', ')
+    )
+  );
+}

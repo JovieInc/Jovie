@@ -31,7 +31,7 @@ export function HeroClaimHandle({
 }: Readonly<HeroClaimHandleProps>) {
   return (
     <form action={APP_ROUTES.SIGNUP} className='w-full' method='get'>
-      <input name='redirect_url' type='hidden' value={APP_ROUTES.ONBOARDING} />
+      <input name='redirect_url' type='hidden' value={APP_ROUTES.START} />
       <div
         className='relative flex w-full items-center gap-2 rounded-[1rem] p-[0.35rem]'
         style={FALLBACK_ROW_STYLE}

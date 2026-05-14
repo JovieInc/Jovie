@@ -2804,29 +2804,12 @@ body:has(.home-viewport)::-webkit-scrollbar {
   justify-items: center;
   gap: clamp(1.2rem, 2.5vw, 2rem);
   min-height: clamp(34rem, 46vw, 43rem);
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.075);
-  border-radius: clamp(1.2rem, 2.5vw, 2rem);
-  background:
-    radial-gradient(
-      70% 100% at 80% 35%,
-      rgba(0, 163, 255, 0.11),
-      transparent 56%
-    ),
-    radial-gradient(
-      58% 88% at 18% 75%,
-      rgba(255, 59, 138, 0.07),
-      transparent 62%
-    ),
-    rgba(255, 255, 255, 0.022);
-  box-shadow:
-    0 34px 100px rgba(0, 0, 0, 0.32),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  overflow: visible;
 }
 
 .homepage-product-statement__ai-copy {
   max-width: 44rem;
-  padding: 0 clamp(1.35rem, 3vw, 2.5rem) clamp(1.35rem, 3vw, 2.25rem);
+  padding: 0 clamp(1rem, 2vw, 1.4rem);
   text-align: center;
 }
 
@@ -2857,7 +2840,12 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .home-composer-surface {
-  min-height: 54px;
+  min-height: clamp(21rem, 30vw, 24rem);
+}
+
+.home-composer-surface[data-surface-mode="empty"],
+.home-composer-surface[data-surface-mode="typing"] {
+  justify-content: flex-end;
 }
 
 .home-composer-result {
@@ -3459,10 +3447,11 @@ body:has(.home-viewport)::-webkit-scrollbar {
   .homepage-product-statement__ai {
     grid-template-columns: minmax(0, 1fr);
     gap: 0.8rem;
+    min-height: clamp(34rem, 132vw, 42rem);
   }
 
   .homepage-product-statement__ai-copy {
-    padding: 0 1.35rem 1.35rem;
+    padding: 0;
     text-align: left;
   }
 
@@ -3481,6 +3470,10 @@ body:has(.home-viewport)::-webkit-scrollbar {
   .home-composer-result {
     min-height: 0;
     flex-direction: column;
+  }
+
+  .home-composer-surface {
+    min-height: clamp(25rem, 104vw, 31rem);
   }
 
   .home-composer-result__rail {
@@ -4709,7 +4702,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .marketing-footer-premium {
   --mf-text: rgba(255, 255, 255, 0.92);
   --mf-text-secondary: rgba(255, 255, 255, 0.6);
-  --mf-text-tertiary: rgba(255, 255, 255, 0.36);
+  --mf-text-tertiary: rgba(255, 255, 255, 0.48);
   --mf-text-muted: rgba(255, 255, 255, 0.22);
   --mf-hairline: rgba(255, 255, 255, 0.07);
   --mf-hairline-strong: rgba(255, 255, 255, 0.12);

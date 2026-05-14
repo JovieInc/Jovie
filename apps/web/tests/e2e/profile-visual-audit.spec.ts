@@ -437,6 +437,7 @@ test.describe('Public profile visual audit @smoke', () => {
               fullPage: false,
             });
 
+            expect(outputPath).toBeTruthy();
             copyFileSync(outputPath, path.join(cycleDir, filename));
             await testInfo.attach('profile-visual-case', {
               body: JSON.stringify(
