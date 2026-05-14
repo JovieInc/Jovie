@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.245] - 2026-05-13
+
+> [internal] CI: Guardrails (proxy) job no longer requires pnpm install, unblocking dependabot PRs.
+
+### Fixed
+
+- **[internal] Guardrails (proxy) CI unblocked on dependabot PRs**: The `ci-guardrails` job was running the full `setup-node-pnpm` composite action (which calls `pnpm install --offline --frozen-lockfile`) before executing the proxy guard script. Dependabot PRs that bump `package.json` without regenerating `pnpm-lock.yaml` triggered `ERR_PNPM_OUTDATED_LOCKFILE`, failing the Guardrails job and cascading to `ci-fast` and PR Ready. Since `next-proxy-guard.mjs` only uses Node.js built-ins (`fs`, `path`), the job now runs `actions/setup-node` and invokes the script directly with `node`, eliminating the lockfile dependency and reducing job time from ~60s to ~8s.
+
 ## [26.4.244] - 2026-05-12
 
 > [internal] Touring settings page button polish: Bandsintown pill height normalized to sm scale, Copy Link button uses pill shape.
