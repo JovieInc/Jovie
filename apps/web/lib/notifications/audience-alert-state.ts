@@ -73,7 +73,9 @@ export async function syncAudienceAlertState(
         lastConfirmedAt = row.confirmedAt;
       }
     }
-    const channels = [...channelSet].sort();
+    const channels = [...channelSet].sort((left, right) =>
+      left.localeCompare(right)
+    );
     const hasActive = channels.length > 0;
 
     const audienceMatchClauses = [];
