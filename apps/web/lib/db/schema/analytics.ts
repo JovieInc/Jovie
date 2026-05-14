@@ -61,6 +61,17 @@ export const audienceMembers = pgTable(
     phone: text('phone'),
     spotifyConnected: boolean('spotify_connected').default(false).notNull(),
     purchaseCount: integer('purchase_count').default(0).notNull(),
+    // Denormalized alert state from notification_subscriptions (JOV-1842).
+    // True when at least one confirmed, non-unsubscribed subscription exists
+    // for this audience member's email or phone on the same creator profile.
+    hasActiveAlerts: boolean('has_active_alerts').default(false).notNull(),
+    // Channels with confirmed active alerts: subset of notification_channel enum.
+    activeAlertChannels: jsonb('active_alert_channels')
+      .$type<Array<'sms' | 'email' | 'push'>>()
+      .default([])
+      .notNull(),
+    // Most recent confirmed_at across all active subscriptions for this member.
+    lastAlertConfirmedAt: timestamp('last_alert_confirmed_at'),
     tags: jsonb('tags').$type<string[]>().default([]),
     utmParams: jsonb('utm_params')
       .$type<{
@@ -101,6 +112,11 @@ export const audienceMembers = pgTable(
     emailLookupIdx: index('idx_audience_members_email')
       .on(table.creatorProfileId, table.email)
       .where(drizzleSql`email IS NOT NULL`),
+    // Active-alerts filter index (JOV-1842) — supports the "alerts on" segment
+    // filter on the audience table.
+    activeAlertsIdx: index('idx_audience_members_active_alerts')
+      .on(table.creatorProfileId, table.lastSeenAt)
+      .where(drizzleSql`has_active_alerts = true`),
   })
 );
 

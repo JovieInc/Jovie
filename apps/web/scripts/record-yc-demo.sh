@@ -11,13 +11,11 @@ RAW_VIDEO="$RESULT_ROOT/yc-demo.webm"
 MP4_VIDEO="$RESULT_ROOT/yc-demo.mp4"
 OUTPUT_WEBM="$OUTPUT_ROOT/yc-demo.webm"
 OUTPUT_MP4="$OUTPUT_ROOT/yc-demo.mp4"
+PUBLIC_MP4="$WEB_ROOT/public/demo/jovie-demo.mp4"
 CONTACT_SHEET="$OUTPUT_ROOT/yc-demo-contact-sheet.jpg"
 SERVER_LOG="$OUTPUT_ROOT/yc-demo-server.log"
-
-if [[ -z "${DEMO_CLERK_USER_ID:-}" ]]; then
-  echo "DEMO_CLERK_USER_ID is required." >&2
-  exit 1
-fi
+TRIM_START_SECONDS="${DEMO_VIDEO_TRIM_START_SECONDS:-2}"
+TRANSITION_MASK_FILTER="drawbox=x=0:y=0:w=iw:h=ih:color=0x080a10@1:t=fill:enable='between(t,2.2,6.8)+between(t,128,138.5)'"
 
 for cmd in curl doppler ffmpeg ffprobe; do
   if ! command -v "$cmd" >/dev/null 2>&1; then
@@ -26,7 +24,12 @@ for cmd in curl doppler ffmpeg ffprobe; do
   fi
 done
 
-mkdir -p "$OUTPUT_ROOT" "$RESULT_ROOT"
+if [[ -z "${DEMO_CLERK_USER_ID:-}" ]] && ! doppler run -- printenv DEMO_CLERK_USER_ID >/dev/null 2>&1; then
+  echo "DEMO_CLERK_USER_ID is required in the shell or Doppler config." >&2
+  exit 1
+fi
+
+mkdir -p "$OUTPUT_ROOT" "$RESULT_ROOT" "$(dirname "$PUBLIC_MP4")"
 rm -rf "$FRAMES_ROOT"
 mkdir -p "$FRAMES_ROOT"
 
@@ -91,7 +94,7 @@ if [[ "$RAW_SIZE" != "1280x720" ]]; then
 fi
 
 echo "[yc-demo] Transcoding MP4..."
-ffmpeg -y -i "$RAW_VIDEO" -c:v libx264 -pix_fmt yuv420p -movflags +faststart -crf 20 -preset medium "$MP4_VIDEO" >/dev/null 2>&1
+ffmpeg -y -ss "$TRIM_START_SECONDS" -i "$RAW_VIDEO" -vf "$TRANSITION_MASK_FILTER" -c:v libx264 -pix_fmt yuv420p -movflags +faststart -crf 20 -preset medium "$MP4_VIDEO" >/dev/null 2>&1
 
 MP4_SIZE="$(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0:s=x "$MP4_VIDEO")"
 if [[ "$MP4_SIZE" != "1280x720" ]]; then
@@ -101,6 +104,7 @@ fi
 
 cp "$RAW_VIDEO" "$OUTPUT_WEBM"
 cp "$MP4_VIDEO" "$OUTPUT_MP4"
+cp "$MP4_VIDEO" "$PUBLIC_MP4"
 
 echo "[yc-demo] Extracting review frames..."
 SAMPLE_TIMES=(1 6 10 14 22 26 30 34)
@@ -116,4 +120,5 @@ ffmpeg -y -framerate 1 -i "$FRAMES_ROOT/frame-%03d.jpg" -vf "tile=2x4:padding=12
 echo "[yc-demo] Outputs ready:"
 echo "  $OUTPUT_WEBM"
 echo "  $OUTPUT_MP4"
+echo "  $PUBLIC_MP4"
 echo "  $CONTACT_SHEET"

@@ -1,4 +1,4 @@
-import { type AvailableDSP, DSP_CONFIGS } from '@/lib/dsp';
+import { type AvailableDSP, DSP_CONFIGS, isValidDspUrl } from '@/lib/dsp';
 import { PLATFORM_TO_DSP_MAPPINGS } from '@/lib/dsp-registry';
 
 interface ProfileDspSource {
@@ -37,6 +37,7 @@ function addDsp(
   url: string | null
 ) {
   if (!url || dsps.has(key)) return;
+  if (!isValidDspUrl(key, url)) return;
   const config = DSP_CONFIGS[key];
   if (!config) return;
 

@@ -179,8 +179,20 @@ export function ProfileInlineNotificationsCTA({
   const [nameInput, setNameInput] = useState('');
   const [birthdayInput, setBirthdayInput] = useState('');
   const [birthdayHintShown, setBirthdayHintShown] = useState(false);
-  const [alertPrefs, setAlertPrefs] = useState(DEFAULT_ALERT_PREFS);
-  const [artistEmailOptIn, setArtistEmailOptIn] = useState(false);
+  const [alertPrefs, setAlertPrefs] = useState<
+    Record<NotificationContentType, boolean>
+  >(() => {
+    // Seed from server preferences when the user is already subscribed at mount,
+    // so all three entry points (inline CTA, notifications drawer, subscribe
+    // drawer) start from the same canonical state rather than DEFAULT_ALERT_PREFS.
+    if (isSubscribed && contentPreferences) {
+      return { ...DEFAULT_ALERT_PREFS, ...contentPreferences };
+    }
+    return DEFAULT_ALERT_PREFS;
+  });
+  const [artistEmailOptIn, setArtistEmailOptIn] = useState(() =>
+    isSubscribed ? (artistEmail?.optedIn ?? false) : false
+  );
   const [canEditPreferences, setCanEditPreferences] = useState(isSubscribed);
   const subscribedEmailRef = useRef('');
   const hasAutoOpenedRef = useRef(false);
@@ -308,10 +320,21 @@ export function ProfileInlineNotificationsCTA({
       return;
     }
 
+    // Sync server preferences before transitioning to manage mode so that the
+    // preferences step shows the actual saved values, not DEFAULT_ALERT_PREFS.
+    syncPreferencesFromStatus();
     setFlowOrigin('manage');
     setCanEditPreferences(true);
     setStep('preferences');
-  }, [autoOpen, flowOrigin, isFlowOpen, isInline, isSubscribed, step]);
+  }, [
+    autoOpen,
+    flowOrigin,
+    isFlowOpen,
+    isInline,
+    isSubscribed,
+    step,
+    syncPreferencesFromStatus,
+  ]);
 
   const activeEmail = useMemo(
     () =>
