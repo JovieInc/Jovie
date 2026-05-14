@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.247] - 2026-05-14
+
+> Artist profiles now display the background atmosphere correctly even when the hero image fails to load — instead of a blank screen, the page falls back to a subtle gradient.
+
+### Fixed
+
+- **Profile hero background no longer goes blank on image failure**: When a hero image URL is invalid or the CDN returns an error, `ProfileCompactTemplate` now degrades gracefully to the gradient placeholder background instead of rendering blank. Root cause: `ImageWithFallback`'s fallback container used `h-full w-full` (normal flow) but `<Image fill>` generates `position: absolute; inset: 0`, so the fallback had zero height in the ambient background context. Fixed by using `absolute inset-0` for fill-layout fallbacks, and tracking image failure state in `ProfileCompactTemplate` to render the gradient instead of a centred avatar icon.
+
 ## [26.4.246] - 2026-05-13
 
 > [internal] Hardened DashboardAudienceTable unit tests against CI shard timing (JOV-2138).
