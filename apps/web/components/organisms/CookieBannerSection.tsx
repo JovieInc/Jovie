@@ -88,6 +88,44 @@ export function CookieBannerSection() {
     }
   }, [visible]);
 
+  // Publish banner height as a CSS custom property on :root so that layout
+  // regions with overflow-hidden (e.g. the profile compact shell) can shrink
+  // themselves to avoid the fixed banner covering their bottom chrome.
+  // Cleared when the banner is hidden so there is zero layout impact once
+  // the visitor consents.
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+
+    const root = document.documentElement;
+
+    if (!visible || isDashboard) {
+      root.style.removeProperty('--cookie-banner-h');
+      return;
+    }
+
+    const banner = document.querySelector<HTMLElement>(
+      '[data-testid="cookie-banner"]'
+    );
+    if (!banner) return;
+
+    const update = () => {
+      root.style.setProperty(
+        '--cookie-banner-h',
+        `${banner.getBoundingClientRect().height}px`
+      );
+    };
+
+    update();
+
+    const ro = new ResizeObserver(update);
+    ro.observe(banner);
+
+    return () => {
+      ro.disconnect();
+      root.style.removeProperty('--cookie-banner-h');
+    };
+  }, [visible, isDashboard]);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
