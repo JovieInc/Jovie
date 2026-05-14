@@ -104,6 +104,7 @@ function isProxyRewriteExempt(pathname: string): boolean {
   if (pathname.startsWith('/api/')) return true;
   if (pathname === '/app' || pathname.startsWith('/app/')) return true;
   if (pathname === APP_ROUTES.START) return true;
+  if (pathname === APP_ROUTES.ONBOARDING) return true;
   if (pathname === APP_ROUTES.ONBOARDING_CHECKOUT) return true;
   return false;
 }
@@ -693,6 +694,9 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       const needsAuth = pathInfo.isProtectedPath;
 
       if (needsAuth) {
+        if (pathname === APP_ROUTES.WAITLIST) {
+          return NextResponse.redirect(new URL(APP_ROUTES.START, req.url));
+        }
         const authPage = pathname === '/waitlist' ? '/signup' : '/signin';
         const authUrl = new URL(
           buildProtectedAuthRedirectUrl(
@@ -735,9 +739,6 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     const isRSCPrefetch =
       req.headers.get('Next-Router-Prefetch') === '1' ||
       req.nextUrl.searchParams.has('_rsc');
-    const hasOnboardingContinuationSignal =
-      req.nextUrl.searchParams.has('handle') ||
-      req.nextUrl.searchParams.has('resume');
 
     // Authenticated users on homepage → redirect to dashboard at the edge.
     // Skips the client-side AuthRedirectHandler overlay (black flash) entirely.
@@ -790,7 +791,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         return NextResponse.redirect(new URL('/waitlist', req.url));
       }
       if (userState.needsOnboarding) {
-        return NextResponse.redirect(new URL('/onboarding', req.url));
+        return NextResponse.redirect(new URL(APP_ROUTES.START, req.url));
       }
       if (redirectUrl) {
         return NextResponse.redirect(new URL(redirectUrl, req.url));
@@ -851,7 +852,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         }
       } else if (
         userState.needsOnboarding &&
-        pathname !== '/onboarding' &&
+        pathname !== APP_ROUTES.START &&
         !isInviteRedemptionPath &&
         !isProxyRewriteExempt(pathname)
       ) {
@@ -865,7 +866,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
           const rewriteRes = applyStateRewrite(
             req,
             requestHeaders,
-            '/onboarding'
+            APP_ROUTES.START
           );
           if (rewriteRes === null) {
             await captureError(
@@ -873,7 +874,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
               new Error('Redirect loop detected'),
               {
                 pathname,
-                target: '/onboarding',
+                target: APP_ROUTES.START,
                 redirectCount: readRedirectCount(req),
                 operation: 'proxy_circuit_breaker',
               }
@@ -889,14 +890,6 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         pathname === '/waitlist' &&
         isNavigationMethod &&
         !isRSCPrefetch
-      ) {
-        return NextResponse.redirect(new URL(DASHBOARD_URL, req.url));
-      } else if (
-        !userState.needsOnboarding &&
-        pathname === '/onboarding' &&
-        isNavigationMethod &&
-        !isRSCPrefetch &&
-        !hasOnboardingContinuationSignal
       ) {
         return NextResponse.redirect(new URL(DASHBOARD_URL, req.url));
       } else if (pathInfo.isAuthPath && isNavigationMethod && !isRSCPrefetch) {

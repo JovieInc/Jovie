@@ -13,8 +13,8 @@ import { publicEnv } from '@/lib/env-public';
  * messages within the same session rely on the signed session cookie + the
  * session-lifetime rate limiter and do NOT re-verify.
  *
- * If the site key isn't configured (local dev without Doppler creds), the
- * widget short-circuits and the chat handler's dev-mode skip kicks in.
+ * In local development, the widget short-circuits and the chat handler's
+ * dev-mode skip kicks in.
  */
 
 declare global {
@@ -43,6 +43,8 @@ interface OnboardingTurnstileProps {
   readonly onError: (message: string) => void;
 }
 
+const LOCAL_DEV_BYPASS_TOKEN = 'local-dev-turnstile-bypass';
+
 export function OnboardingTurnstile({
   onToken,
   onError,
@@ -51,9 +53,10 @@ export function OnboardingTurnstile({
   const widgetIdRef = useRef<string | null>(null);
   const widgetDomId = useId();
   const siteKey = publicEnv.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+  const shouldBypassTurnstile = process.env.NODE_ENV === 'development';
 
   const render = useCallback(() => {
-    if (!siteKey) return; // dev-only fallback handled server-side
+    if (shouldBypassTurnstile || !siteKey) return; // local fallback handled server-side
     if (!containerRef.current || !window.turnstile) return;
     if (widgetIdRef.current) return; // already rendered
     try {
@@ -73,12 +76,19 @@ export function OnboardingTurnstile({
       });
     } catch (err) {
       onError('turnstile failed to load');
-      // biome-ignore lint/suspicious/noConsole: dev-time diagnostic
       console.error('[onboarding] turnstile render error', err);
     }
-  }, [onToken, onError, siteKey]);
+  }, [onToken, onError, shouldBypassTurnstile, siteKey]);
 
   useEffect(() => {
+    if (shouldBypassTurnstile) {
+      onToken(LOCAL_DEV_BYPASS_TOKEN);
+      return;
+    }
+    if (!siteKey) {
+      onError('turnstile is not configured');
+      return;
+    }
     if (window.turnstile) {
       render();
     }
@@ -92,10 +102,11 @@ export function OnboardingTurnstile({
         }
       }
     };
-  }, [render]);
+  }, [onError, onToken, render, shouldBypassTurnstile, siteKey]);
 
-  if (!siteKey) {
-    // No site key in dev — handler's dev-mode skip lets the chat proceed.
+  if (shouldBypassTurnstile || !siteKey) {
+    // No Turnstile UI in dev, and no challenge UI can be rendered without a
+    // site key. The server remains fail-closed outside local development.
     return null;
   }
 

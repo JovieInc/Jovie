@@ -25,7 +25,7 @@ export default async function WaitlistPage() {
     redirect(APP_ROUTES.DASHBOARD);
   }
   if (authResult.state === CanonicalUserState.NEEDS_ONBOARDING) {
-    redirect(APP_ROUTES.ONBOARDING);
+    redirect(APP_ROUTES.START);
   }
 
   // Anonymous visitors get the new front-door chat.

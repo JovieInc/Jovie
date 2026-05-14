@@ -39,6 +39,8 @@ import {
 interface OnboardingChatProps {
   /** Turnstile token from the widget. Required on first message. */
   readonly turnstileToken: string | null;
+  /** Fires after a submitted user turn reaches the ready state. */
+  readonly onConversationActivity?: () => void;
 }
 
 /** Pull the user-visible text out of a UIMessage's parts. */
@@ -106,10 +108,14 @@ function isCheckoutPayload(output: unknown): output is CheckoutCardPayload {
   );
 }
 
-export function OnboardingChat({ turnstileToken }: OnboardingChatProps) {
+export function OnboardingChat({
+  onConversationActivity,
+  turnstileToken,
+}: OnboardingChatProps) {
   const [input, setInput] = useState('');
   const [hasSentFirst, setHasSentFirst] = useState(false);
   const messagesRef = useRef<HTMLDivElement | null>(null);
+  const completedUserTurnsRef = useRef(0);
 
   const transport = useMemo(
     () =>
@@ -122,11 +128,11 @@ export function OnboardingChat({ turnstileToken }: OnboardingChatProps) {
             ...body,
             mode: 'onboarding' as const,
             messages,
-            ...(hasSentFirst ? {} : { turnstileToken }),
+            ...(turnstileToken ? { turnstileToken } : {}),
           },
         }),
       }),
-    [hasSentFirst, turnstileToken]
+    [turnstileToken]
   );
 
   const { messages, sendMessage, status } = useChat({
@@ -169,6 +175,16 @@ export function OnboardingChat({ turnstileToken }: OnboardingChatProps) {
     if (!node) return;
     node.scrollTop = node.scrollHeight;
   }, [messages.length, isStreaming]);
+
+  useEffect(() => {
+    if (status !== 'ready') return;
+    const completedUserTurns = messages.filter(
+      message => message.role === 'user'
+    ).length;
+    if (completedUserTurns <= completedUserTurnsRef.current) return;
+    completedUserTurnsRef.current = completedUserTurns;
+    onConversationActivity?.();
+  }, [messages, onConversationActivity, status]);
 
   const composerDisabled = isStreaming || (!hasSentFirst && !turnstileToken);
 

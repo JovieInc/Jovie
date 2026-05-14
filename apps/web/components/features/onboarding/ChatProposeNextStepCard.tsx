@@ -1,8 +1,9 @@
 'use client';
 
-import { SignUp, useAuth } from '@clerk/nextjs';
+import { SignUp } from '@clerk/nextjs';
 import { useMemo } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
+import { useAuthSafe, useCanRenderClerkUi } from '@/hooks/useClerkSafe';
 
 /**
  * Renders the `proposeNextStep` tool result inside the onboarding chat
@@ -39,7 +40,8 @@ interface ChatProposeNextStepCardProps {
 export function ChatProposeNextStepCard({
   payload,
 }: ChatProposeNextStepCardProps) {
-  const { isSignedIn } = useAuth();
+  const { isSignedIn } = useAuthSafe();
+  const canRenderClerkUi = useCanRenderClerkUi();
   const kind = payload.decision.kind;
 
   // Memoise the Clerk appearance so the inline form looks at home on the
@@ -99,6 +101,16 @@ export function ChatProposeNextStepCard({
       <div className='mt-2 rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 py-3'>
         <p className='text-[14px] leading-6 text-white/82'>
           {`you're already signed in. one sec — linking this conversation to your account…`}
+        </p>
+      </div>
+    );
+  }
+
+  if (!canRenderClerkUi) {
+    return (
+      <div className='mt-2 rounded-2xl border border-white/[0.08] bg-white/[0.035] px-4 py-3'>
+        <p className='text-[14px] leading-6 text-white/82'>
+          {`you're in. use the dev toolbar to continue as a local test user — I'll keep this conversation ready to link.`}
         </p>
       </div>
     );

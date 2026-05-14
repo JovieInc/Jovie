@@ -81,7 +81,7 @@ async function AudienceContent({
     // needsOnboarding is true. Checking user first would incorrectly redirect
     // authenticated-but-not-yet-provisioned users to signin.
     if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
-      redirect(APP_ROUTES.ONBOARDING);
+      redirect(APP_ROUTES.START);
     }
 
     if (!dashboardData.user?.id) {
