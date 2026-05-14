@@ -153,6 +153,13 @@ async function setTaskViewMode(
   page: Page,
   viewMode: 'board' | 'list'
 ): Promise<void> {
+  await page.context().addInitScript(
+    ({ key, value }) => {
+      window.localStorage.setItem(key, value);
+    },
+    { key: TASK_VIEW_MODE_STORAGE_KEY, value: viewMode }
+  );
+
   await page
     .evaluate(
       ({ key, value }) => {
@@ -168,6 +175,20 @@ async function setTaskViewMode(
     },
     { key: TASK_VIEW_MODE_STORAGE_KEY, value: viewMode }
   );
+}
+
+async function ensureBoardViewMode(page: Page): Promise<void> {
+  const board = page.getByTestId('tasks-board');
+  const boardRendered = await board
+    .isVisible({ timeout: 5_000 })
+    .catch(() => false);
+
+  if (boardRendered) {
+    return;
+  }
+
+  await page.getByRole('button', { name: 'Display options' }).click();
+  await page.getByRole('button', { name: 'Board view' }).click();
 }
 
 async function assertTasksBoardLayout(
@@ -190,6 +211,7 @@ async function assertTasksBoardLayout(
   await expect(page.getByTestId('tasks-workspace')).toBeVisible({
     timeout: 30_000,
   });
+  await ensureBoardViewMode(page);
   await expect(page.getByTestId('tasks-board')).toBeVisible({
     timeout: 60_000,
   });
