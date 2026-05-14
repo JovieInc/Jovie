@@ -347,7 +347,7 @@ describe('DashboardAudienceTable', () => {
     await waitFor(
       () => {
         expect(capturedColumnVisibility).toEqual({
-          signal: false,
+          alerts: false,
           engagement: false,
           state: false,
           last: false,
@@ -374,7 +374,7 @@ describe('DashboardAudienceTable', () => {
     await waitFor(
       () => {
         expect(capturedColumnVisibility).toEqual({
-          signal: false,
+          alerts: false,
           engagement: false,
         });
         expect(capturedMinWidth).toBe('640px');
@@ -431,7 +431,7 @@ describe('DashboardAudienceTable', () => {
     await waitFor(
       () => {
         expect(capturedColumnVisibility).toEqual({
-          signal: false,
+          alerts: false,
           engagement: false,
           state: false,
           last: false,

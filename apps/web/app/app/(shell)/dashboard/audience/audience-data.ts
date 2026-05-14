@@ -157,6 +157,9 @@ function transformMemberRow(member: {
   ltvTicketSalesCents: number | null;
   tags: string[] | null;
   lastSeenAt: Date;
+  hasActiveAlerts: boolean | null;
+  activeAlertChannels: unknown;
+  lastAlertConfirmedAt: Date | null;
 }): AudienceServerRow {
   return {
     id: member.id,
@@ -189,7 +192,22 @@ function transformMemberRow(member: {
     tags: Array.isArray(member.tags) ? member.tags : [],
     deviceType: member.deviceType,
     lastSeenAt: toISOStringOrNull(member.lastSeenAt),
+    hasActiveAlerts: Boolean(member.hasActiveAlerts),
+    activeAlertChannels: normalizeAlertChannels(member.activeAlertChannels),
+    lastAlertConfirmedAt: toISOStringOrNull(member.lastAlertConfirmedAt),
   };
+}
+
+const ALERT_CHANNEL_VALUES = new Set(['sms', 'email', 'push']);
+
+function normalizeAlertChannels(
+  value: unknown
+): Array<'sms' | 'email' | 'push'> {
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (c): c is 'sms' | 'email' | 'push' =>
+      typeof c === 'string' && ALERT_CHANNEL_VALUES.has(c)
+  );
 }
 
 function normalizeLocationLabel(
@@ -346,6 +364,9 @@ function buildMemberSelectFields(
     ltvTicketSalesCents: drizzleSql<number>`0`.as('ltv_ticket_sales_cents'),
     tags: audienceMembers.tags,
     lastSeenAt: audienceMembers.lastSeenAt,
+    hasActiveAlerts: audienceMembers.hasActiveAlerts,
+    activeAlertChannels: audienceMembers.activeAlertChannels,
+    lastAlertConfirmedAt: audienceMembers.lastAlertConfirmedAt,
   };
 }
 
@@ -365,6 +386,8 @@ function segmentToCondition(segment: string) {
         audienceMembers.lastSeenAt,
         drizzleSql`NOW() - INTERVAL '24 hours'`
       );
+    case 'alertsOn':
+      return eq(audienceMembers.hasActiveAlerts, true);
     default:
       return null;
   }

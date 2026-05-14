@@ -58,4 +58,16 @@ describe('performance route manifest', () => {
       'creator-releases',
     ]);
   });
+
+  it('measures canonical chat onboarding at /start, not the legacy form shim', () => {
+    const onboarding = getEndUserPerfRouteManifest().find(
+      route => route.id === 'onboarding'
+    );
+
+    expect(onboarding?.path).toBe('/start');
+    expect(onboarding?.requiresAuth).toBe(false);
+    expect(onboarding?.readySelectors.content).toContain(
+      '[data-testid="onboarding-chat"]'
+    );
+  });
 });

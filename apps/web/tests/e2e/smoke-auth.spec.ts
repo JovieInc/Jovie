@@ -174,10 +174,7 @@ test.describe('Dashboard Navigation @smoke', () => {
     const page = await context.newPage();
 
     try {
-      for (const route of [
-        APP_ROUTES.LEGACY_DASHBOARD,
-        APP_ROUTES.ONBOARDING,
-      ]) {
+      for (const route of [APP_ROUTES.LEGACY_DASHBOARD]) {
         await smokeNavigateWithRetry(page, route, {
           timeout: SMOKE_TIMEOUTS.NAVIGATION,
           retries: 2,

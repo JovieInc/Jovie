@@ -147,7 +147,7 @@ test.describe('Auth and onboarding Design V1 mobile QA', () => {
     }
   });
 
-  test('flagged onboarding handle and resume shells preserve mobile layout', async ({
+  test('canonical onboarding chat preserves mobile layout for handle and resume links', async ({
     page,
     request,
   }) => {
@@ -162,22 +162,15 @@ test.describe('Auth and onboarding Design V1 mobile QA', () => {
       timeout: 120_000,
     });
 
-    const shell = page.getByTestId('onboarding-experience-shell');
-    await expect(shell).toHaveAttribute(
-      'data-onboarding-visual-variant',
-      'v1',
-      {
-        timeout: 30_000,
-      }
-    );
+    const shell = page.locator('[data-app-shell-frame="true"]');
+    const chat = page.getByTestId('onboarding-chat');
+    await expect(shell).toBeVisible({ timeout: 30_000 });
+    await expect(chat).toBeVisible({ timeout: 30_000 });
     await expect(page).toHaveURL(
-      new RegExp(`/onboarding\\?handle=${ONBOARDING_QA_HANDLE}`)
+      new RegExp(`/start\\?handle=${ONBOARDING_QA_HANDLE}`)
     );
     await assertNoHorizontalOverflow(page);
-    await assertNoCriticalA11yViolations(
-      page,
-      '[data-testid="onboarding-experience-shell"]'
-    );
+    await assertNoCriticalA11yViolations(page, '[data-app-shell-frame="true"]');
 
     await page.goto(
       `${APP_ROUTES.ONBOARDING}?handle=${ONBOARDING_QA_HANDLE}&resume=dsp`,
@@ -187,14 +180,9 @@ test.describe('Auth and onboarding Design V1 mobile QA', () => {
       }
     );
 
-    await expect(shell).toHaveAttribute(
-      'data-onboarding-visual-variant',
-      'v1',
-      {
-        timeout: 30_000,
-      }
-    );
-    await expect(page).toHaveURL(/\/onboarding\?.*resume=/);
+    await expect(shell).toBeVisible({ timeout: 30_000 });
+    await expect(chat).toBeVisible({ timeout: 30_000 });
+    await expect(page).toHaveURL(/\/start\?.*resume=/);
     await assertNoHorizontalOverflow(page);
   });
 });

@@ -47,6 +47,24 @@ interface MarketingFooterProps {
   readonly showCta?: boolean;
 }
 
+type ResolvedVariant = 'expanded' | 'minimal';
+
+function resolveFooterVariant(
+  variant: 'auto' | 'expanded' | 'minimal',
+  pathname: string | null
+): ResolvedVariant {
+  const isMinimalPath = pathname ? MINIMAL_FOOTER_PATHS.has(pathname) : false;
+  const autoVariant: ResolvedVariant =
+    FEATURE_FLAGS.SHOW_MARKETING_FULL_FOOTER && !isMinimalPath
+      ? 'expanded'
+      : 'minimal';
+  const requested = variant === 'auto' ? autoVariant : variant;
+  if (requested === 'expanded' && !FEATURE_FLAGS.SHOW_MARKETING_FULL_FOOTER) {
+    return 'minimal';
+  }
+  return requested;
+}
+
 const markLinkClassName =
   '-m-1.5 inline-flex rounded-full p-1.5 text-white/[0.92] transition-opacity duration-subtle hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-black';
 const footerLinkClassName =
@@ -74,16 +92,7 @@ export function MarketingFooter({
   showCta = true,
 }: Readonly<MarketingFooterProps>) {
   const pathname = usePathname();
-  const isMinimalPath = pathname && MINIMAL_FOOTER_PATHS.has(pathname);
-  const autoVariant =
-    FEATURE_FLAGS.SHOW_MARKETING_FULL_FOOTER && !isMinimalPath
-      ? 'expanded'
-      : 'minimal';
-  const requestedVariant = variant === 'auto' ? autoVariant : variant;
-  const resolvedVariant =
-    requestedVariant === 'expanded' && !FEATURE_FLAGS.SHOW_MARKETING_FULL_FOOTER
-      ? 'minimal'
-      : requestedVariant;
+  const resolvedVariant = resolveFooterVariant(variant, pathname);
   const isMinimal = resolvedVariant === 'minimal';
   const pageOwnsFinalCta =
     typeof pathname === 'string' && PAGE_OWNS_FINAL_CTA_PATHS.has(pathname);

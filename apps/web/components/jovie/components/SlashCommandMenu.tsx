@@ -362,7 +362,16 @@ export function SlashCommandMenu({
         e.preventDefault();
         onMoveSelected(-1, items.length);
       } else if (e.key === 'Enter') {
-        const selectedIdx = state.status === 'closed' ? 0 : state.selectedIndex;
+        const selectedIdx =
+          items.length === 0
+            ? -1
+            : Math.max(
+                0,
+                Math.min(
+                  items.length - 1,
+                  state.status === 'closed' ? 0 : state.selectedIndex
+                )
+              );
         const item = items[selectedIdx];
         if (!item) return;
         e.preventDefault();

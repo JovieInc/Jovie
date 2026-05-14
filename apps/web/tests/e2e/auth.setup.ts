@@ -10,9 +10,13 @@ setup.setTimeout(360_000); // 6min to absorb local cold-start compilation plus C
 setup('authenticate', async ({ page }) => {
   const username = process.env.E2E_CLERK_USER_USERNAME;
   const password = process.env.E2E_CLERK_USER_PASSWORD;
+  const useTestAuthBypass = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
 
   // Guard: write empty auth state if prerequisites missing
-  if (!username || process.env.CLERK_TESTING_SETUP_SUCCESS !== 'true') {
+  if (
+    !useTestAuthBypass &&
+    (!username || process.env.CLERK_TESTING_SETUP_SUCCESS !== 'true')
+  ) {
     console.log('  Auth prerequisites not met, writing empty auth state');
     await page.context().storageState({ path: AUTH_FILE });
     return;

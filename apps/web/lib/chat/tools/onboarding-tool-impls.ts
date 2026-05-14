@@ -11,12 +11,14 @@ import {
   type InterviewSignal,
   interviewSignalSchema,
 } from '@/lib/chat/tools/onboarding-signals';
+import { buildSpotifyArtistUrl, getSpotifyArtist } from '@/lib/spotify';
+import { logger } from '@/lib/utils/logger';
 
 /**
- * Onboarding tool execute closures (JOV-2132 PR 2).
+ * Onboarding tool execute closures.
  *
  * These are server-side closures the LLM calls during the onboarding chat.
- * They return structured payloads the UI cards (landing in PR 3) will render.
+ * They return structured payloads the onboarding UI cards render.
  *
  * Implementation strategy by tool type:
  *
@@ -31,11 +33,10 @@ import {
  *                                signals "show the picker, optionally pre-filled")
  *     - checkHandle            → ditto for /api/handle/check
  *
- *   UI-coordination markers (real implementations land in PR 3):
+ *   UI-coordination markers:
  *     - confirmSpotifyArtist   → records the picked artist id on the
- *                                accumulator; PR 3 will fetch full enrichment
- *     - proposeCheckout        → emits the route-handoff marker; PR 4 swaps
- *                                in the Stripe-Embedded experiment
+ *                                accumulator and fetches Spotify enrichment
+ *     - proposeCheckout        → emits the route-handoff marker
  *
  *   Reused from authenticated chat:
  *     - proposeSocialLink      → same tool as in-app chat
@@ -46,15 +47,18 @@ import {
  * and threads it through the tool closures so they can share state (e.g.
  * recordInterviewSignal writes; proposeNextStep reads).
  *
- * Persistence (chat_messages + chat_conversations.metadata) lands in a
- * follow-up commit so the handler diff stays focused on the dispatch path.
+ * Keep this state request-local; durable onboarding session state is handled
+ * outside the per-turn tool accumulator.
  */
 export interface OnboardingTurnState {
   sessionId: string;
   /** Set when confirmSpotifyArtist is called. */
   spotifyArtistId: string | null;
-  /** Set after confirmSpotifyArtist enrichment (PR 3 will populate). */
-  spotifyVerified: boolean;
+  /** Set after confirmSpotifyArtist enrichment. */
+  spotifyArtistName: string | null;
+  spotifyImageUrl: string | null;
+  spotifyGenres: string[];
+  spotifyPopularity: number | null;
   spotifyFollowers: number | null;
   /** Append-only log of recordInterviewSignal calls within this turn. */
   signals: InterviewSignal[];
@@ -69,7 +73,10 @@ export function createOnboardingTurnState(input: {
   return {
     sessionId: input.sessionId,
     spotifyArtistId: null,
-    spotifyVerified: false,
+    spotifyArtistName: null,
+    spotifyImageUrl: null,
+    spotifyGenres: [],
+    spotifyPopularity: null,
     spotifyFollowers: null,
     signals: [],
     turnCount: input.turnCount,
@@ -84,7 +91,7 @@ export interface NextStepCardPayload {
 export interface CheckoutCardPayload {
   readonly action: 'propose_checkout';
   readonly plan: 'free' | 'pro' | 'max' | null;
-  /** Route to send the visitor to. PR 4 may swap in Embedded Checkout. */
+  /** Route to send the visitor to after chat onboarding. */
   readonly handoffUrl: string;
 }
 
@@ -105,6 +112,7 @@ export function buildOnboardingTools(state: OnboardingTurnState): ToolSet {
         return {
           action: 'open_artist_picker' as const,
           query: query ?? null,
+          summary: 'Pick the matching Spotify artist.',
         };
       },
     }),
@@ -114,14 +122,47 @@ export function buildOnboardingTools(state: OnboardingTurnState): ToolSet {
       inputSchema: TOOL_SCHEMAS.confirmSpotifyArtist.inputSchema,
       execute: async ({ spotifyArtistId }) => {
         state.spotifyArtistId = spotifyArtistId;
-        // PR 3 will fetch full enrichment server-side here (avatar, followers,
-        // latest release, verified flag, genres) and persist it onto the
-        // conversation. For now we mark the pick; the LLM proceeds knowing the
-        // artist has been identified, and proposeNextStep will see whatever
-        // signal accumulates by the time it fires.
+        state.spotifyArtistName = null;
+        state.spotifyImageUrl = null;
+        state.spotifyGenres = [];
+        state.spotifyPopularity = null;
+        state.spotifyFollowers = null;
+        let artist: Awaited<ReturnType<typeof getSpotifyArtist>> = null;
+
+        try {
+          artist = await getSpotifyArtist(spotifyArtistId);
+        } catch (error) {
+          logger.warn('Onboarding Spotify artist enrichment failed', {
+            error,
+            spotifyArtistId,
+          });
+        }
+
+        if (artist) {
+          state.spotifyArtistName = artist.name;
+          state.spotifyImageUrl = artist.images?.[0]?.url ?? null;
+          state.spotifyGenres = artist.genres ?? [];
+          state.spotifyPopularity = artist.popularity ?? null;
+          state.spotifyFollowers = artist.followers?.total ?? null;
+        }
+
         return {
           action: 'spotify_artist_confirmed' as const,
           spotifyArtistId,
+          artist: artist
+            ? {
+                id: artist.id,
+                name: artist.name,
+                url: buildSpotifyArtistUrl(artist.id),
+                imageUrl: artist.images?.[0]?.url ?? null,
+                followers: artist.followers?.total ?? null,
+                popularity: artist.popularity ?? null,
+                genres: artist.genres?.slice(0, 3) ?? [],
+              }
+            : null,
+          summary: artist
+            ? `${artist.name} matched on Spotify.`
+            : 'Spotify artist selected.',
         };
       },
     }),
@@ -136,6 +177,7 @@ export function buildOnboardingTools(state: OnboardingTurnState): ToolSet {
         return {
           action: 'check_handle' as const,
           handle: handle.toLowerCase(),
+          summary: `Checking @${handle.toLowerCase()}.`,
         };
       },
     }),
@@ -144,13 +186,12 @@ export function buildOnboardingTools(state: OnboardingTurnState): ToolSet {
       description: TOOL_SCHEMAS.proposeSocialLink.description,
       inputSchema: TOOL_SCHEMAS.proposeSocialLink.inputSchema,
       execute: async ({ url }) => {
-        // PR 3 will wire this through the same SocialLink confirmation card
-        // the authenticated chat uses (detectPlatform + preview). For PR 2 we
-        // just emit the URL — the LLM treats this as "I've offered to attach
-        // this link" and the UI will render the card.
+        // Preserve the exact URL so the UI can render a review state before
+        // any commitment.
         return {
           action: 'propose_social_link' as const,
           url,
+          summary: 'Social link ready to review.',
         };
       },
     }),
@@ -160,12 +201,12 @@ export function buildOnboardingTools(state: OnboardingTurnState): ToolSet {
       inputSchema: TOOL_SCHEMAS.recordInterviewSignal.inputSchema,
       execute: async (signal: z.infer<typeof interviewSignalSchema>) => {
         state.signals.push(signal);
-        // Persistence to chat_conversations.metadata.interviewSignals lands
-        // in the follow-up commit. The accumulator above is sufficient to
-        // feed proposeNextStep within the same turn.
+        // Keep this silent in the UI; the accumulator feeds proposeNextStep
+        // within the same turn.
         return {
           action: 'signal_recorded' as const,
           signalCount: state.signals.length,
+          summary: 'Signal noted.',
         };
       },
     }),
@@ -182,14 +223,16 @@ export function buildOnboardingTools(state: OnboardingTurnState): ToolSet {
             }))
           ),
           spotifyFollowers: state.spotifyFollowers,
-          spotifyVerified: state.spotifyVerified,
           turnCount: state.turnCount,
         });
         const payload: NextStepCardPayload = {
           action: 'propose_next_step',
           decision,
         };
-        return payload;
+        return {
+          ...payload,
+          summary: `Next step: ${decision.kind.replaceAll('_', ' ')}.`,
+        };
       },
     }),
 
@@ -205,7 +248,7 @@ export function buildOnboardingTools(state: OnboardingTurnState): ToolSet {
           plan: plan ?? null,
           handoffUrl,
         };
-        return payload;
+        return { ...payload, summary: 'Checkout handoff ready.' };
       },
     }),
   } satisfies ToolSet;
