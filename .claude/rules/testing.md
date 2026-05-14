@@ -2,6 +2,17 @@
 
 E2E patterns, test performance, coverage philosophy, verify-before-done.
 
+## Risk-Based Testing (Source of Truth)
+
+Before adding a new test, check the heatmap to see which surface needs it most:
+
+- [`docs/TEST_COVERAGE_HEATMAP.md`](../../docs/TEST_COVERAGE_HEATMAP.md) — auto-generated dashboard. The **Priority Queue** at the top names the surface with the biggest risk × coverage_gap and the exact file:line range to target.
+- [`docs/TEST_RISK_REGISTER.md`](../../docs/TEST_RISK_REGISTER.md) — hand-curated risk taxonomy (blast radius, reversibility, target coverage per surface).
+- `pnpm run test:coverage:report` — regenerate the heatmap locally from current v8 coverage.
+- `pnpm run test:coverage:diff` — check whether your PR drops any RED surface ≥3pp.
+
+**When to add a test (decision rule):** add a test if (a) the file matches a critical glob in the register, OR (b) the change introduces a new branch / new API route / new server action / new entitlement, OR (c) the change is a bugfix (regression test mandatory). Otherwise no test required — but say so explicitly in the PR description.
+
 ## Stack
 
 - Unit tests: Vitest with jsdom

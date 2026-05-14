@@ -147,7 +147,7 @@ describe('ClaimHandleForm', () => {
       handle: 'releasefanclub',
     });
     expect(mockPush).toHaveBeenCalledWith(
-      '/signup?redirect_url=%2Fonboarding%3Fhandle%3Dreleasefanclub'
+      '/signup?redirect_url=%2Fstart%3Fhandle%3Dreleasefanclub'
     );
   });
 
@@ -164,7 +164,7 @@ describe('ClaimHandleForm', () => {
 
     expect(mockTrack).not.toHaveBeenCalled();
     expect(mockPush).toHaveBeenCalledWith(
-      '/signup?redirect_url=%2Fonboarding%3Fhandle%3Dreleasefanclub'
+      '/signup?redirect_url=%2Fstart%3Fhandle%3Dreleasefanclub'
     );
   });
 });

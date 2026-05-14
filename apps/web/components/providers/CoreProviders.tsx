@@ -4,8 +4,8 @@ import { TooltipProvider } from '@jovie/ui';
 import { PacerProvider } from '@tanstack/react-pacer';
 import dynamic, { type DynamicOptionsLoadingProps } from 'next/dynamic';
 import { usePathname } from 'next/navigation';
-import { ThemeProvider, useTheme } from 'next-themes';
-import React, { useEffect, useMemo, useRef } from 'react';
+import { ThemeProvider } from 'next-themes';
+import React, { useEffect, useMemo } from 'react';
 import { env } from '@/lib/env-client';
 import { useChunkErrorHandler } from '@/lib/hooks/useChunkErrorHandler';
 import { PACER_TIMING } from '@/lib/pacer/hooks';
@@ -26,51 +26,10 @@ function LazyProvidersSkeleton(props: DynamicOptionsLoadingProps) {
 
 // Deferral delay shared by the keyboard-shortcut listeners and the monitoring
 // chunk imports. 300ms gives the first-paint burst of work room to finish
-// before we schedule optional side effects. Users do not press `t` or `/`,
+// before we schedule optional side effects. Users do not press `/`,
 // nor do monitoring chunks need to arrive, within this window of boot.
 const BOOT_DEFERRED_WORK_DELAY_MS = 300;
 const KEYBOARD_SHORTCUT_ATTACH_DELAY_MS = BOOT_DEFERRED_WORK_DELAY_MS;
-
-function ThemeKeyboardShortcut({ isEnabled }: { isEnabled: boolean }) {
-  const { resolvedTheme, setTheme } = useTheme();
-
-  // Keep the listener referentially stable — reading the current theme +
-  // setter from a ref — so the useEffect below does not re-run and
-  // re-defer the listener attachment every time resolvedTheme changes.
-  // Without the ref, pressing `t` within 300ms of a theme toggle would
-  // do nothing while the new setTimeout was pending.
-  const themeRef = useRef({ resolvedTheme, setTheme });
-  useEffect(() => {
-    themeRef.current = { resolvedTheme, setTheme };
-  }, [resolvedTheme, setTheme]);
-
-  useEffect(() => {
-    if (!isEnabled) return;
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.defaultPrevented) return;
-      if (event.metaKey || event.ctrlKey || event.altKey) return;
-      if (event.key?.toLowerCase() !== 't') return;
-      if (isFormElement(event.target)) return;
-
-      event.preventDefault();
-      const { resolvedTheme: currentTheme, setTheme: setCurrentTheme } =
-        themeRef.current;
-      setCurrentTheme(currentTheme === 'dark' ? 'light' : 'dark');
-    }
-
-    const attachHandle = setTimeout(() => {
-      globalThis.addEventListener('keydown', handleKeyDown);
-    }, KEYBOARD_SHORTCUT_ATTACH_DELAY_MS);
-
-    return () => {
-      clearTimeout(attachHandle);
-      globalThis.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isEnabled]);
-
-  return null;
-}
 
 function SearchKeyboardShortcut() {
   useEffect(() => {
@@ -246,7 +205,6 @@ function CoreProvidersInner({
       storageKey='jovie-theme'
     >
       <SearchKeyboardShortcut />
-      <ThemeKeyboardShortcut isEnabled={themeEnabled} />
       <TooltipProvider delayDuration={1200}>
         <LazyProviders enableAnalytics={enableAnalytics}>
           {children}

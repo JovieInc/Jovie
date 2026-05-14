@@ -17,6 +17,16 @@ const path = require('path');
 const APPROVED_CUSTOM_SVGS = [
   '/brand/jovie-logo.svg',
   '/brand/Jovie-Logo-Icon.svg',
+  '/brand/Jovie-Logo-Icon-Black.svg',
+  '/brand/Jovie-Logo-Icon-White.svg',
+  '/brand/Jovie-Logo-Mark-Black.svg',
+  '/brand/Jovie-Logo-Mark-Cream.svg',
+  '/brand/Jovie-Wordmark-Black.svg',
+  '/brand/Jovie-Wordmark-Cream.svg',
+  '/brand/Jovie-Lockup-Black.svg',
+  '/brand/Jovie-Lockup-Cream.svg',
+  '/brand/Jovie-Logo-Wordmark-Alt-Black.svg',
+  '/brand/Jovie-Logo-Wordmark-Alt-White.svg',
 ];
 
 const ALLOWED_DIRECT_SVG_FILES = [

@@ -1,9 +1,25 @@
 'use client';
 
-import { Loader2, Rocket, X } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@jovie/ui';
+import {
+  Copy,
+  ExternalLink,
+  GitBranch,
+  Loader2,
+  MoreHorizontal,
+  Rocket,
+  X,
+} from 'lucide-react';
 import Image from 'next/image';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { AgentOsRunsPanel } from '@/components/features/admin/agent-os';
 import type { DailyBucket } from '@/components/features/admin/ShippingVelocityChart';
 import { ShippingVelocityChart } from '@/components/features/admin/ShippingVelocityChart';
@@ -20,7 +36,11 @@ import {
   type HudTone,
 } from '@/lib/hud/tone-determination';
 import type { HermesCliRuntime, HermesDispatchRequest } from '@/types/ai-ops';
-import type { HudDeploymentState, HudMetrics } from '@/types/hud';
+import type {
+  HudDeploymentRun,
+  HudDeploymentState,
+  HudMetrics,
+} from '@/types/hud';
 import { HudClockClient } from './HudClockClient';
 import { HudStatusPill } from './HudStatusPill';
 import { useHudMetricsQuery } from './useHudMetricsQuery';
@@ -151,6 +171,64 @@ function SectionEyebrow({
   );
 }
 
+async function copyDeploymentId(run: HudDeploymentRun) {
+  try {
+    await navigator.clipboard.writeText(String(run.id));
+    toast.success('Deployment ID copied');
+  } catch {
+    toast.error('Failed to copy deployment ID');
+  }
+}
+
+function DeploymentActionsMenu({
+  run,
+}: Readonly<{ readonly run: HudDeploymentRun }>) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type='button'
+          aria-label='Deployment actions'
+          className='flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-tertiary-token hover:bg-surface-1 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/25'
+        >
+          <MoreHorizontal className='h-3.5 w-3.5' aria-hidden='true' />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align='end' sideOffset={6}>
+        {run.url ? (
+          <DropdownMenuItem asChild>
+            <a href={run.url} target='_blank' rel='noopener noreferrer'>
+              <ExternalLink className='h-3.5 w-3.5' />
+              Open GitHub run
+            </a>
+          </DropdownMenuItem>
+        ) : null}
+        {run.branch ? (
+          <DropdownMenuItem asChild>
+            <a
+              href={`https://github.com/JovieInc/Jovie/tree/${encodeURIComponent(run.branch)}`}
+              target='_blank'
+              rel='noopener noreferrer'
+            >
+              <GitBranch className='h-3.5 w-3.5' />
+              Open branch
+            </a>
+          </DropdownMenuItem>
+        ) : null}
+        {(run.url ?? run.branch) ? <DropdownMenuSeparator /> : null}
+        <DropdownMenuItem
+          onClick={() => {
+            void copyDeploymentId(run);
+          }}
+        >
+          <Copy className='h-3.5 w-3.5' />
+          Copy deployment ID
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 function CompactDeploymentRow({
   run,
 }: Readonly<{
@@ -168,9 +246,12 @@ function CompactDeploymentRow({
             {DEPLOYMENT_STATE_LABELS[run.status]}
           </p>
         </div>
-        <p className='shrink-0 text-[12px] font-[560] tabular-nums text-primary-token'>
-          #{run.runNumber}
-        </p>
+        <div className='flex shrink-0 items-center gap-1.5'>
+          <p className='text-[12px] font-[560] tabular-nums text-primary-token'>
+            #{run.runNumber}
+          </p>
+          <DeploymentActionsMenu run={run} />
+        </div>
       </div>
       <p
         className='truncate text-[12px] leading-4 text-secondary-token'
@@ -200,13 +281,16 @@ function DeploymentRow({
           </span>
         </p>
       </div>
-      <div className='shrink-0 text-right'>
-        <p className='text-[11px] text-tertiary-token'>
-          {formatDeploymentTime(run.createdAtIso)}
-        </p>
-        <p className='mt-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-secondary-token'>
-          {run.status}
-        </p>
+      <div className='flex shrink-0 items-center gap-2'>
+        <div className='text-right'>
+          <p className='text-[11px] text-tertiary-token'>
+            {formatDeploymentTime(run.createdAtIso)}
+          </p>
+          <p className='mt-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-secondary-token'>
+            {run.status}
+          </p>
+        </div>
+        <DeploymentActionsMenu run={run} />
       </div>
     </div>
   );

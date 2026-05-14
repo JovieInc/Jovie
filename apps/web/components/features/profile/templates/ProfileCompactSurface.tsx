@@ -28,6 +28,7 @@ import type { UserLocation } from '@/hooks/useUserLocation';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
+import { CONTENT_SAFE_AREA_BOTTOM_PADDING } from '@/lib/profile/nav-constants';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import { buildProfileShareContext } from '@/lib/share/context';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
@@ -296,7 +297,7 @@ export function ProfileCompactSurface({
   const socialIconClassName =
     'inline-flex h-8 w-8 items-center justify-center text-white/68 transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
   const heroHeightClassName = isHomeMode
-    ? 'h-[34svh] min-h-[232px] max-h-[250px] [@media(min-height:761px)_and_(max-height:880px)]:max-h-[190px] [@media(min-height:761px)_and_(max-height:880px)]:min-h-[190px] [@media(max-height:760px)]:h-[156px] [@media(max-height:760px)]:min-h-[156px]'
+    ? 'h-[36svh] min-h-[248px] max-h-[276px] [@media(min-height:761px)_and_(max-height:880px)]:max-h-[218px] [@media(min-height:761px)_and_(max-height:880px)]:min-h-[214px] [@media(max-height:760px)]:h-[178px] [@media(max-height:760px)]:min-h-[178px]'
     : 'h-14 border-b border-white/[0.075]';
   const locationLabel = artist.location?.trim() || artist.hometown?.trim();
   const registerNotificationsReveal = useCallback(
@@ -365,7 +366,7 @@ export function ProfileCompactSurface({
                     fill
                     priority
                     sizes='(max-width: 767px) 100vw, 430px'
-                    className='object-cover object-center'
+                    className='object-cover object-[50%_34%]'
                     fallbackVariant='avatar'
                     fallbackClassName='bg-surface-2'
                   />
@@ -377,8 +378,8 @@ export function ProfileCompactSurface({
                 )}
               </div>
 
-              <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(2,3,4,0.08)_0%,rgba(2,3,4,0.12)_26%,rgba(3,4,6,0.34)_58%,rgba(5,6,8,0.9)_84%,var(--profile-stage-bg)_100%)]' />
-              <div className='pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-[linear-gradient(180deg,transparent,var(--profile-stage-bg)_92%)]' />
+              <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(2,3,4,0.1)_0%,rgba(2,3,4,0.18)_30%,rgba(3,4,6,0.48)_64%,rgba(5,6,8,0.94)_88%,var(--profile-stage-bg)_100%)]' />
+              <div className='pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-[linear-gradient(180deg,transparent,var(--profile-stage-bg)_90%)]' />
             </>
           ) : (
             <div className='absolute inset-0 bg-black/94 backdrop-blur-2xl' />
@@ -432,9 +433,9 @@ export function ProfileCompactSurface({
           </div>
 
           {isHomeMode ? (
-            <div className='absolute inset-x-0 bottom-0 z-10 px-4 pb-4 [@media(max-height:820px)]:pb-3'>
+            <div className='absolute inset-x-0 bottom-0 z-10 px-4 pb-5 [@media(max-height:820px)]:pb-4 [@media(max-height:760px)]:pb-3'>
               <div
-                className='min-w-0 space-y-1'
+                className='min-w-0 rounded-[18px] bg-black/18 px-3 py-2.5 shadow-[0_16px_38px_-24px_rgba(0,0,0,0.72)] backdrop-blur-[2px] [@media(max-height:820px)]:px-2.5 [@media(max-height:820px)]:py-2'
                 data-testid='profile-hero-identity-block'
               >
                 <IdentityHeading
@@ -447,7 +448,7 @@ export function ProfileCompactSurface({
                     data-testid='profile-identity-link'
                     href={profileHref}
                     aria-label={`Go to ${artist.name}'s profile`}
-                    className='inline-flex max-w-full min-w-0 items-center gap-1.5 rounded-md text-[36px] font-semibold leading-[0.98] tracking-[-0.026em] text-white drop-shadow-[0_2px_14px_rgba(0,0,0,0.42)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent [@media(max-height:820px)]:text-[32px] [@media(max-height:760px)]:text-[31px]'
+                    className='inline-flex max-w-full min-w-0 items-center gap-1.5 rounded-md text-[34px] font-semibold leading-[0.98] tracking-[-0.026em] text-white drop-shadow-[0_2px_14px_rgba(0,0,0,0.42)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent [@media(max-height:820px)]:text-[30px] [@media(max-height:760px)]:text-[28px]'
                   >
                     <span className='truncate'>{artist.name}</span>
                     {artist.is_verified ? (
@@ -462,7 +463,7 @@ export function ProfileCompactSurface({
                   </Link>
                 </IdentityHeading>
 
-                <p className='line-clamp-1 text-[13px] font-medium leading-5 tracking-[-0.012em] text-white/76 [@media(max-height:820px)]:text-[12px]'>
+                <p className='mt-1 line-clamp-1 text-[13px] font-medium leading-5 tracking-[-0.012em] text-white/76 [@media(max-height:820px)]:text-[12px]'>
                   {heroSubtitle}
                 </p>
 
@@ -586,10 +587,10 @@ export function ProfileCompactSurface({
 
           <div
             className={cn(
-              'min-h-0 flex-1',
-              showBottomNav ? 'pb-4' : 'pb-0',
+              'min-h-0 flex-1 overflow-y-auto overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+              showBottomNav ? CONTENT_SAFE_AREA_BOTTOM_PADDING : 'pb-0',
               !isHomeMode &&
-                'overflow-y-auto overscroll-contain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70'
             )}
             tabIndex={isHomeMode ? undefined : 0}
           >

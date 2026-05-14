@@ -39,7 +39,7 @@ async function TasksContent({ releaseId }: Readonly<{ releaseId: string }>) {
   const profileId = profile?.id;
 
   if (!profileId || !profile.onboardingCompletedAt) {
-    redirect(APP_ROUTES.ONBOARDING);
+    redirect(APP_ROUTES.START);
   }
 
   const [release] = await db

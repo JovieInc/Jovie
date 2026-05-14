@@ -154,6 +154,10 @@ export const ServerEnvSchema = z.object({
   UPSTASH_REDIS_REST_URL: z.string().url().optional(),
   UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
 
+  // Onboarding chat (anonymous session signing + bot challenge — JOV-2132)
+  SESSION_SECRET: z.string().min(32).optional(),
+  TURNSTILE_SECRET_KEY: z.string().optional(),
+
   // Analytics
   ANALYTICS_RETENTION_DAYS: z.string().optional(),
   TRACKING_TOKEN_SECRET: z.string().optional(),
@@ -313,6 +317,8 @@ export const ENV_KEYS = [
   'MERCURY_ACCOUNT_ID',
   'UPSTASH_REDIS_REST_URL',
   'UPSTASH_REDIS_REST_TOKEN',
+  'SESSION_SECRET',
+  'TURNSTILE_SECRET_KEY',
   'ANALYTICS_RETENTION_DAYS',
   'TRACKING_TOKEN_SECRET',
   'TRACKING_RATE_LIMIT_CLICKS_PER_HOUR',

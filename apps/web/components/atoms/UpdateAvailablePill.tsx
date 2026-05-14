@@ -31,7 +31,7 @@ export function UpdateAvailablePill({
     setUpdating(true);
 
     if (desktop.available) {
-      void desktop.install();
+      desktop.install();
     } else {
       web.reload();
     }
@@ -42,6 +42,7 @@ export function UpdateAvailablePill({
       type='button'
       data-electron-update-pill='true'
       data-electron-no-drag='true'
+      data-testid='update-available-pill'
       onClick={handleClick}
       disabled={updating}
       aria-label='Update available — click to install'

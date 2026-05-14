@@ -31,7 +31,7 @@ export function HeroClaimHandle({
 }: Readonly<HeroClaimHandleProps>) {
   return (
     <form action={APP_ROUTES.SIGNUP} className='w-full' method='get'>
-      <input name='redirect_url' type='hidden' value={APP_ROUTES.ONBOARDING} />
+      <input name='redirect_url' type='hidden' value={APP_ROUTES.START} />
       <div
         className='relative flex w-full items-center gap-2 rounded-[1rem] p-[0.35rem]'
         style={FALLBACK_ROW_STYLE}
@@ -76,7 +76,7 @@ export function HeroClaimHandle({
         </div>
 
         <button
-          className='group inline-flex shrink-0 items-center justify-center gap-1.5 rounded-[0.8rem] px-4 transition-all duration-slow hover:brightness-110 active:scale-[0.98] focus-ring-themed'
+          className='group inline-flex shrink-0 items-center justify-center gap-1.5 rounded-[0.8rem] px-4 transition-[background-color,color,box-shadow,filter,opacity] duration-slow hover:brightness-110 focus-ring-themed'
           data-testid={submitButtonTestId}
           style={FALLBACK_BUTTON_STYLE}
           type='submit'

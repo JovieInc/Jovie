@@ -11,6 +11,7 @@ import {
   startOfProfileSurfaceLocalDay as startOfLocalDay,
   toProfileSurfaceDateValue as toDateValue,
 } from '@/features/profile/profile-surface-state';
+import { useReleaseAwareNow } from '@/hooks/useReleaseAwareNow';
 import { useTourDateProximity } from '@/hooks/useTourDateProximity';
 import type { UserLocation } from '@/hooks/useUserLocation';
 import { useUserLocation } from '@/hooks/useUserLocation';
@@ -609,14 +610,20 @@ export function ProfilePrimaryActionCard({
   size = 'compact',
   now,
 }: Readonly<ProfilePrimaryActionCardProps>) {
+  // Re-evaluate visibility at the release boundary so the countdown card
+  // chrome transitions to "live" the moment the release drops (even if the
+  // surrounding page is served from a stale ISR cache).
+  const releaseAwareNow = useReleaseAwareNow(latestRelease?.releaseDate);
+  const effectiveNow = now ?? releaseAwareNow;
   const upcomingTourDates = useMemo(
-    () => getUpcomingTourDates(tourDates, now),
-    [now, tourDates]
+    () => getUpcomingTourDates(tourDates, effectiveNow),
+    [effectiveNow, tourDates]
   );
   const nextTourDate = upcomingTourDates[0] ?? null;
   const releaseVisibility = useMemo(
-    () => getProfileReleaseVisibility(latestRelease, profileSettings, now),
-    [latestRelease, now, profileSettings]
+    () =>
+      getProfileReleaseVisibility(latestRelease, profileSettings, effectiveNow),
+    [latestRelease, effectiveNow, profileSettings]
   );
   const shouldResolveGeo =
     resolveNearbyTour &&
@@ -642,16 +649,16 @@ export function ProfilePrimaryActionCard({
         nearbyTourDate,
         featuredPlaylistFallback,
         hasPlayableDestinations,
-        now,
+        now: effectiveNow,
       }),
     [
       artist.name,
+      effectiveNow,
       featuredPlaylistFallback,
       hasPlayableDestinations,
       latestRelease,
       nearbyTourDate,
       nextTourDate,
-      now,
       profileSettings,
     ]
   );

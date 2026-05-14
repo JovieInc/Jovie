@@ -513,6 +513,136 @@ async function focusAndAssertNoShift(
   expectNoFocusShift(before, after, label);
 }
 
+const MOCK_HOME_RELEASE_CARD_VIEWPORTS = [
+  {
+    id: 'iphone-se-2-3',
+    label: 'iPhone SE 2/3',
+    width: 375,
+    height: 667,
+    deviceScaleFactor: 2,
+    devices: ['iPhone SE 2', 'iPhone SE 3'],
+  },
+  {
+    id: 'iphone-13-14',
+    label: 'iPhone 13/14',
+    width: 390,
+    height: 844,
+    deviceScaleFactor: 3,
+    devices: ['iPhone 13', 'iPhone 13 Pro', 'iPhone 14'],
+  },
+] as const satisfies readonly MobileProfileViewport[];
+
+type ReleaseCardLayout = {
+  readonly card: {
+    readonly top: number;
+    readonly bottom: number;
+    readonly left: number;
+    readonly right: number;
+  };
+  readonly media: {
+    readonly top: number;
+    readonly bottom: number;
+    readonly left: number;
+    readonly right: number;
+  };
+  readonly title: {
+    readonly top: number;
+    readonly bottom: number;
+    readonly left: number;
+    readonly right: number;
+  };
+  readonly hero: {
+    readonly top: number;
+    readonly bottom: number;
+  } | null;
+};
+
+async function collectMockHomeReleaseCardLayout(
+  page: Page
+): Promise<ReleaseCardLayout> {
+  return page.evaluate(() => {
+    const title = Array.from(document.querySelectorAll<HTMLElement>('h3')).find(
+      heading => heading.textContent?.trim() === "Don't Look Down"
+    );
+    const card = title?.closest<HTMLElement>('article');
+    const media = card?.querySelector<HTMLElement>(':scope > div:first-child');
+    const hero = document.querySelector<HTMLElement>(
+      '[data-testid="profile-hero-identity-block"]'
+    );
+
+    if (!card || !media || !title) {
+      throw new Error('Mock-home release card layout target missing');
+    }
+
+    const rect = (element: Element) => {
+      const box = element.getBoundingClientRect();
+      return {
+        top: box.top,
+        bottom: box.bottom,
+        left: box.left,
+        right: box.right,
+      };
+    };
+
+    return {
+      card: rect(card),
+      media: rect(media),
+      title: rect(title),
+      hero: hero ? rect(hero) : null,
+    };
+  });
+}
+
+test.describe('Public Profile Mock Home Release Card Layout @smoke @critical', () => {
+  for (const viewport of MOCK_HOME_RELEASE_CARD_VIEWPORTS) {
+    test(`${viewport.label} keeps release title inside the card`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({
+        width: viewport.width,
+        height: viewport.height,
+      });
+      await installProfileMocks(page);
+
+      await smokeNavigate(
+        page,
+        '/demo/showcase/tim-white-profile?state=mock-home',
+        { timeout: 120_000 }
+      );
+      await waitForHydration(page);
+      await waitForAnyVisible(page, [
+        '[data-testid="profile-home-latest-card"]',
+      ]);
+      await settleLayout(page);
+
+      const snapshot = await collectViewportSnapshot(
+        page,
+        '[data-testid="profile-compact-surface"]'
+      );
+      expect(
+        snapshot.horizontalOverflow,
+        `${viewport.label} mock-home profile should not overflow horizontally`
+      ).toBeLessThanOrEqual(2);
+
+      const layout = await collectMockHomeReleaseCardLayout(page);
+      expect(
+        layout.title.top,
+        `${viewport.label} release title should not clip above media`
+      ).toBeGreaterThanOrEqual(layout.media.top + 6);
+      expect(
+        layout.title.bottom,
+        `${viewport.label} release title should fit inside media`
+      ).toBeLessThanOrEqual(layout.media.bottom - 6);
+      if (layout.hero) {
+        expect(
+          layout.card.top,
+          `${viewport.label} release card should sit below hero identity`
+        ).toBeGreaterThanOrEqual(layout.hero.bottom + 4);
+      }
+    });
+  }
+});
+
 test.describe('Public Profile Mobile Viewport Stability @smoke @critical', () => {
   test.setTimeout(120_000);
 

@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { APP_ROUTES } from '@/constants/routes';
 import { useArtistSearchQuery } from '@/lib/queries';
 import type {
   ComboboxOption,
@@ -100,7 +101,7 @@ export function useArtistSelectionForm(): UseArtistSelectionFormReturn {
         sessionStorage.removeItem('pendingClaim');
 
         // Redirect to onboarding
-        router.push('/onboarding');
+        router.push(APP_ROUTES.START);
       } catch {
         setState(prev => ({
           ...prev,
@@ -116,7 +117,7 @@ export function useArtistSelectionForm(): UseArtistSelectionFormReturn {
     // Clear any pending claims and redirect to onboarding
     sessionStorage.removeItem('pendingClaim');
     sessionStorage.removeItem('selectedArtist');
-    router.push('/onboarding');
+    router.push(APP_ROUTES.START);
   }, [router]);
 
   const retryOperation = useCallback(() => {

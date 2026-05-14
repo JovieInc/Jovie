@@ -381,8 +381,8 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const showEntitySurface = picker.state.status === 'entity';
     const dockClass =
       surfaceMode === 'entity' && !isStacked
-        ? 'flex justify-end'
-        : 'flex justify-center';
+        ? 'relative flex justify-end'
+        : 'relative flex justify-center';
 
     const hasQuickActions =
       Boolean(onQuickActionSelect) && (quickActions?.length ?? 0) > 0;
@@ -417,6 +417,26 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         aria-label='Compose a message — type / for skills and references'
       >
         <div className={dockClass}>
+          {/* ROOT inline picker: rendered above the surface via absolute
+              positioning so it does not alter the surface height and cause
+              layout shift when it opens. `bottom-full` places it just above
+              the top edge of the surface; `mb-1` adds a small gap. */}
+          {showInlinePicker ? (
+            <div className='absolute bottom-full left-0 right-0 mb-1 flex justify-center'>
+              <SlashCommandMenu
+                profileId={pickerProfileId}
+                state={picker.state}
+                onSelectSkill={handleSelectSkill}
+                onSelectEntity={handleSelectEntity}
+                onSetSelected={picker.setSelected}
+                onMoveSelected={picker.moveSelected}
+                onClose={picker.close}
+                variant='inline'
+                listIdProp={pickerListId}
+                onActiveRowChange={setPickerActiveRowId}
+              />
+            </div>
+          ) : null}
           <motion.div
             data-testid='chat-composer-surface'
             data-surface-mode={surfaceMode}
@@ -544,23 +564,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   </div>
                 ) : null}
 
-                {/* ROOT inline picker (above input) */}
-                {showInlinePicker ? (
-                  <SlashCommandMenu
-                    profileId={pickerProfileId}
-                    state={picker.state}
-                    onSelectSkill={handleSelectSkill}
-                    onSelectEntity={handleSelectEntity}
-                    onSetSelected={picker.setSelected}
-                    onMoveSelected={picker.moveSelected}
-                    onClose={picker.close}
-                    variant='inline'
-                    listIdProp={pickerListId}
-                    onActiveRowChange={setPickerActiveRowId}
-                  />
-                ) : null}
-
-                {/* STACKED root picker (also stacks above input) */}
+                {/* STACKED root picker (stacks above input inside the surface) */}
                 {picker.state.status === 'root' && isStacked ? (
                   <div className='border-b border-white/[0.055]'>
                     <SlashCommandMenu
@@ -613,7 +617,15 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   chips={chips}
                   onRemoveChipAt={onRemoveChipAt}
                   isPillMode={surfaceMode === 'empty'}
-                  hasBorderTop={picker.state.status !== 'closed'}
+                  hasBorderTop={
+                    // Add a top separator only when there is surface content
+                    // *inside* the surface above the InputRow (entity mode or
+                    // stacked root picker). The inline root picker is now
+                    // absolutely positioned outside the surface, so it no
+                    // longer needs a separator border below it.
+                    showEntitySurface ||
+                    (picker.state.status === 'root' && isStacked)
+                  }
                   isPickerOpen={isPickerOpen}
                   pickerListId={pickerListId}
                   pickerActiveRowId={pickerActiveRowId}
@@ -820,7 +832,13 @@ function InputRow({
           className={cn(
             'min-w-0 flex-1 resize-none bg-transparent',
             'text-[14.5px] leading-[1.55] tracking-[-0.006em] text-primary-token placeholder:text-quaternary-token',
-            'focus:outline-none',
+            // Remove the browser's default focus outline. The surrounding
+            // surface provides the focus affordance (border glow via
+            // isFocused→isExpanded). Using focus-visible:outline-none keeps
+            // the suppress intentional for both mouse and keyboard paths since
+            // the surface-level glow IS the keyboard focus indicator for this
+            // compound widget.
+            'focus:outline-none focus-visible:outline-none',
             isPillMode
               ? 'overflow-hidden whitespace-nowrap py-[7px] px-1'
               : 'py-2 px-1',

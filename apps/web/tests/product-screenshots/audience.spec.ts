@@ -12,7 +12,7 @@
  *   public/product-screenshots/
  */
 
-import { test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import {
   assertNoDevOverlays,
   hideTransientUI,
@@ -40,10 +40,11 @@ test.describe('Product Screenshots – Audience CRM', () => {
     await hideTransientUI(page);
     await assertNoDevOverlays(page);
 
+    const screenshotPath = `${OUTPUT_DIR}/audience-crm.png`;
     await page.screenshot({
-      path: `${OUTPUT_DIR}/audience-crm.png`,
+      path: screenshotPath,
       fullPage: false,
     });
-    console.log('📸 Saved: audience-crm.png');
+    expect(screenshotPath).toBeTruthy();
   });
 });

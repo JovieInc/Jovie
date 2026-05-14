@@ -35,15 +35,24 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(searchParamsState.value),
 }));
 
-vi.mock('@/features/auth', () => ({
-  AuthLayout: ({ children }: { children: ReactNode }) => (
-    <div data-testid='auth-layout'>{children}</div>
-  ),
-  AuthRoutePrefetch: ({ href }: { href: string }) => {
-    routerPrefetchMock(href);
-    return null;
-  },
-}));
+vi.mock('@/features/auth', async () => {
+  const reactModule = await import('react');
+  return {
+    AuthLayout: ({ children }: { children: ReactNode }) =>
+      reactModule.createElement(
+        'div',
+        { 'data-testid': 'auth-layout' },
+        children
+      ),
+    AuthRoutePrefetch: ({ href }: { href: string }) => {
+      routerPrefetchMock(href);
+      return null;
+    },
+    // Import the real AuthShell so its Clerk wiring is exercised in this
+    // test. Provider gating is verified separately in oauth-providers.test.ts.
+    AuthShell: (await import('@/components/features/auth/AuthShell')).AuthShell,
+  };
+});
 
 vi.mock('@/lib/analytics', () => ({
   track: trackMock,
@@ -97,7 +106,8 @@ describe('signup page', () => {
     expect(routerPrefetchMock).toHaveBeenCalledWith(APP_ROUTES.WAITLIST);
     expect(clerkSignUpMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        routing: 'hash',
+        routing: 'path',
+        path: '/signup',
         oauthFlow: 'redirect',
         signInUrl: APP_ROUTES.SIGNIN,
         fallbackRedirectUrl: APP_ROUTES.WAITLIST,

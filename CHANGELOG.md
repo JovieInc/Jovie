@@ -5,15 +5,186 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.4.229] - 2026-05-10
+## [26.4.244] - 2026-05-12
 
-> [internal] Homepage signup CTAs now carry a stable test attribute, and the E2E suite has new tests verifying auth page content and CTA routing.
+> [internal] Touring settings page button polish: Bandsintown pill height normalized to sm scale, Copy Link button uses pill shape.
+
+### Fixed
+
+- **[internal] Touring page button sizing**: Bandsintown connection pill now matches the sm button height (h-7) and icon scale (h-3.5 w-3.5). Copy Link button replaced with the shared Button component (variant secondary, size sm) giving it the correct rounded-full pill shape. No layout shifts.
+
+> Public marketing is tightened for YC: the homepage keeps the strong product story visible, hides broad navigation and feature-grid sprawl, and limits pricing to Free plus waitlisted Pro by default.
+
+### Changed
+
+- **YC homepage flow tightened**: The public homepage now keeps the hero, proof logos, Meet Jovie AI plan demo, Go live in 60 seconds, Workspace, Artist Profiles, Free/Pro pricing, FAQ, and final CTA visible while keeping Friday Rhythm and feature/spec-grid content hidden by default.
+- **Minimal marketing chrome by default**: Marketing headers render logo plus Sign in and Start Free Trial unless the shared center-nav flag is explicitly enabled. Marketing footers render only legal links unless the full-footer flag is explicitly enabled.
+- **Free + Pro pricing defaults**: Marketing pricing cards and pricing-page JSON-LD now use the visible plan set, defaulting to Free and waitlisted Pro. Pricing copy follows the visible paid plan set so future plan exposure does not leave Pro-only copy around Team or Enterprise cards.
+
+### Fixed
+
+- **AI demo layout stability**: The homepage AI composer reserves enough space across states so the typing animation does not shift the surrounding section.
+- **Mobile center-nav fallback**: If center navigation is re-enabled, the glass header hides inline mobile auth actions when the hamburger nav is active, avoiding duplicate auth controls and header crowding.
+
+## [26.4.243] - 2026-05-12
+
+> [internal] Ops admin deployment rows are now actionable — each row shows a context menu to open the GitHub Actions run, navigate to the branch, or copy the deployment ID.
+
+### Changed
+
+- **[internal] Ops HUD deployment rows: context menu actions**: Both the compact history list and the current-run detail view on the Ops admin screen now include a three-dot actions menu on each deployment row. Available actions: Open GitHub run (links to the Actions workflow run), Open branch (links to the branch on GitHub), and Copy deployment ID (clipboard with toast confirmation). Clipboard errors surface a toast instead of silently failing.
+
+## [26.4.242] - 2026-05-12
+
+> [internal] Approval queue rows now show direct action links to open the related PR and Linear issue in a new tab.
 
 ### Added
 
-- [internal] Added `data-cta-sign-up="true"` attribute to all public homepage signup CTAs (hero, final CTA, pre-footer, artist profiles carousel, V2 final CTA) for stable Playwright targeting (JOV-2065).
-- [internal] New E2E tests in `auth.spec.ts`: verify `/signup` and `/signin` pages render Clerk auth UI with correct copy, cross-links between pages, and redirect URL preservation (JOV-2066).
-- [internal] New E2E tests in `homepage.spec.ts`: verify all `data-cta-sign-up` CTAs route to `/signup`, and that the trust logo bar contains visual logo elements (JOV-2065, JOV-2066).
+- **[internal] Open PR and Open Linear links on approval queue rows**: Each run row in the AgentOS admin approval queue now surfaces inline action links when a PR URL or Linear issue URL is present. Links are host-allowlisted to `github.com` and `linear.app` only.
+
+### Fixed
+
+- **[internal] Tighten external URL allowlist in AgentOS admin surface**: `getSafeExternalHref` in both `WorkflowRunRow` and `ArtifactDrawer` now validates that URLs are `https`-only, credential-free, and from the expected provider domains, preventing open-redirect risk from artifact-injected URLs.
+
+## [26.4.241] - 2026-05-12
+
+> [internal] AgentOS board now shows real run IDs on cards, lets you click lane counts to filter by status, and displays actual issue/PR identifiers in the detail drawer.
+
+### Changed
+
+- [internal] **AgentOS board cards**: `sourceRunId` is now displayed next to the source label (e.g., `vercel-workflow wrun_agentos_health_001`), giving operators a direct reference to the upstream run without opening the drawer.
+- [internal] **AgentOS lane counts**: status count badges are now `<button>` elements with `aria-pressed`. Clicking a lane count highlights that lane and dims all others. Clicking again clears the filter. The panel subtitle updates to show the filtered count.
+- [internal] **ArtifactDrawer links**: Linear and PR links now display actual identifiers (`JOV-1971`, `#8282`) instead of generic `"Linear"` / `"Pull Request"` labels.
+
+## [26.4.239] - 2026-05-12
+
+> Artist profile cards no longer stretch too tall on large monitors, footer sections breathe a bit more, and the spec-wall animations on the homepage now stagger instead of firing all at once.
+
+### Changed
+
+- **Artist profile height cap**: at 1280px+ viewports the hero card no longer stretches past 640px (640px at xl, 680px at 2xl), keeping proportions tight on large monitors.
+- **Footer vertical padding**: all footer variants now use responsive vertical padding — the regular footer uses split pt/pb values (pt-12/pb-10 mobile, pt-16/pb-14 desktop, pt-20/pb-16 ultrawide) while the marketing footer and minimal variant use py-* clamp values — giving each footer section more breathing room.
+- **Homepage spec-wall animation stagger**: spec-wall cards now animate in with staggered delays (0ms, −600ms, −1200ms … −3675ms) so the pulse effect ripples across cards instead of triggering all at once.
+
+## [26.4.238] - 2026-05-12
+
+> [internal] Homepage content cleanup: removed the spec-wall section with internal sales language, dropped three text-only placeholder logos from the trust bar, and reordered sections so "Go live in 60 seconds" appears directly below the hero.
+
+### Removed
+
+- **[internal] Spec-wall section removed**: the "Answers for every launch objection" section used internal sales language ("objection") that read poorly to customers. Section and its unused icon imports removed from the homepage. (JOV-2073)
+- **[internal] Text-only logo placeholders removed**: Blanco y Negro, RecPlay, and disco:wax were rendered as plain `<span>` text rather than real SVG or image assets. Removed from the HomeTrustSection inline-strip; only logos with real assets remain (UMG, AWAL, The Orchard, Armada Music, Black Hole Recordings). (JOV-2075)
+
+### Changed
+
+- **[internal] Homepage section order updated**: sections reordered to "Go live in 60 seconds" → product statement (AI release plan) → workspace → artist profiles carousel, putting the immediate proof beat directly after the hero. (JOV-2076)
+
+## [26.4.237] - 2026-05-12
+
+> [internal] Analytics settings toggle now shows a compact state label instead of a verbose disclosure card.
+
+### Changed
+
+- [internal] **Analytics settings** (`SettingsAnalyticsSection`): replaced the verbose `ContentSurfaceCard` disclosure block with a single-line description label on the toggle row — "High quality only" when filtering is on, "All traffic" when off. Removes 17 lines of explanatory chrome that duplicated the toggle's own affordance.
+
+## [26.4.236] - 2026-05-12
+
+> [internal] Fixed cookie consent banner buttons being unresponsive when the server action failed.
+
+### Fixed
+
+- **[internal] Cookie banner buttons respond immediately**: Accept All, Reject, and Save Preferences now update the UI synchronously. Previously, if the server-side cookie write failed (network error, CSRF issue), the banner stayed stuck open. Consent is now persisted to localStorage first; the server action runs fire-and-fight in the background. Also raised banner z-index from z-40 to z-[60] to prevent overlay stacking issues.
+
+## [26.4.235] - 2026-05-10
+
+> [internal] Coverage heatmap and risk register infrastructure for autonomous-agent shipping. Nightly audit cron, generator script, and instrumentation fixes surfaced by an /autoplan adversarial review.
+
+### Added
+
+- [internal] **Test risk register** (`docs/TEST_RISK_REGISTER.md`): hand-curated taxonomy of 11 high-risk surfaces with blast-radius / reversibility / visibility scores. YAML front-matter is the machine-readable form; rendered table for humans.
+- [internal] **Coverage heatmap** (`docs/TEST_COVERAGE_HEATMAP.md`): auto-generated from the risk register joined with v8 coverage + Stryker mutation scores. Priority queue, stale-row detector, unmapped-churn detector, flake tracking, mutation-score warnings.
+- [internal] **Heatmap generator** (`scripts/audit-test-coverage.ts`, 900+ LOC): zero new npm deps. Modes: default, `--check-pr`, `--dry-run`. Reads v8 coverage, Stryker JSON, flake report, 90-day git churn; writes heatmap markdown + committed JSON snapshot baseline at `apps/web/reports/test-coverage-snapshot.json`.
+- [internal] **Nightly audit workflow** (`.github/workflows/test-coverage-audit.yml`): 06:00 UTC cron. Rebases before push to handle race conditions; opens a GitHub issue on failure.
+- [internal] **Proxy extraction plan** (`docs/PROXY_EXTRACTION_CANDIDATES.md`): risk-ordered plan to split the 1,412-line `apps/web/proxy.ts` into per-domain modules so per-region coverage becomes measurable.
+- [internal] `pnpm run test:coverage:report` and `pnpm run test:coverage:diff` root scripts.
+
+### Changed
+
+- [internal] **Stryker mutate[]** (`apps/web/stryker.config.mjs`): extended to include `app/api/stripe/webhooks/route.ts`, `lib/auth/decode-fapi-host.ts`, `lib/auth/staging-clerk-keys.ts`, `lib/auth/test-mode.ts`. Mutation testing now exercises the highest-blast-radius infra paths, not just validation helpers.
+- [internal] **Vitest config** (`apps/web/vitest.config.fast.mts`): added `coverage.thresholds` scaffolding for critical globs (set to 0 in this PR; raised to register targets in a future PR per JOV-2128).
+- [internal] **`.claude/rules/testing.md`**: added "Risk-Based Testing" section at the top with explicit links to the heatmap, register, and the decision rule for when agents must add tests. Closes the discoverability dead-end where agents could read CLAUDE.md → testing rules without finding the heatmap.
+
+### Fixed
+
+- [internal] **`--check-pr` no-op defect** surfaced by /autoplan eng subagent: snapshot lived at `.context/test-coverage-snapshot.json` (gitignored) and the cron didn't commit it, so any CI delta check found no baseline and exited 0 silently. Moved snapshot to `apps/web/reports/test-coverage-snapshot.json` (committed), updated the cron to commit it with `git pull --rebase --autostash` before push, and added `gh issue create` on cron failure.
+- [internal] **Per-region proxy.ts coverage hallucination**: three register rows (clerk-routing, investor-portal, audience-block) all globbed the same file and reported identical 68.2%. Collapsed into one `proxy` row; per-region tracking deferred until the extraction plan ships.
+- [internal] **CI Clerk secret scope**: workflow scoped unprefixed `CLERK_*` secrets (= production keypair per `.claude/rules/auth.md`) for the coverage step, even though unit tests are auth-mocked at the SDK boundary. Replaced with `pk_test_*` / `sk_test_*` dummies — no production credentials in scope for the coverage workflow.
+- [internal] **Hardcoded `assertion_ratio = 0.5` formula bias**: the stub inflated every risk score uniformly by ~+10 via its 20% weight. Removed from the formula; `coverage_score` now uses line + branch only (50/50). Status assignments unchanged (thresholds at 30/18).
+
+## [26.4.234] - 2026-05-10
+
+> Apple Sign In was still failing the OAuth callback step. The Clerk proxy now correctly resolves relative redirect URLs that come back from Apple's "Hide My Email" flow.
+
+### Fixed
+
+- **Clerk proxy** (`apps/web/proxy.ts`): when Clerk FAPI returned a 302 with a relative `Location` header (e.g. `/v1/oauth_callback?code=...&state=...` — which happens during Apple's `response_mode=form_post` callback chain), the proxy passed the relative path to `NextResponse.redirect`, which throws "URL is malformed — please use only absolute URLs". Now resolves FAPI-relative paths against the `/__clerk` proxy origin and absolute non-FAPI URLs pass through unchanged. Regression test in `tests/unit/middleware/proxy-behavioral.test.ts`.
+
+## [26.4.233] - 2026-05-10
+
+> Sign In and Sign Up pages now show the Google and Apple buttons. The previous attempts to gate them by env var weren't taking effect in production, so the allowlist is now hardcoded.
+
+### Fixed
+
+- **`lib/auth/oauth-providers.ts`**: replaced the `NEXT_PUBLIC_CLERK_OAUTH_*_ENABLED` env-var gate with a hardcoded allowlist (apple + google). The env-var approach was unreliable — the values were set in Vercel but not inlined into the production build (likely a Turborepo cache + build-time env resolution interaction). Keeping the gate as code is the single reliable chokepoint: to remove a provider, delete its case line and Clerk dashboard entry; to add one, add a line here only after end-to-end credential verification.
+
+## [26.4.232] - 2026-05-10
+
+> Sign In page was showing an empty box with no Google/Apple buttons after the previous auth hardening shipped. Fixed — the OAuth provider guard now reads its enablement flags correctly in the production build.
+
+### Fixed
+
+- **`lib/auth/oauth-providers.ts`**: `isOAuthProviderEnabled` was reading `process.env[dynamicKey]` via bracket notation, which Next.js / webpack DefinePlugin cannot statically inline. The lookup always returned `undefined` in the client bundle, hiding every OAuth button in production regardless of the `NEXT_PUBLIC_CLERK_OAUTH_*_ENABLED` env var values. Switched to a `switch` with statically-referenced `process.env.NEXT_PUBLIC_CLERK_OAUTH_<PROVIDER>_ENABLED` expressions so DefinePlugin inlines the values at build time.
+
+## [26.4.231.0] - 2026-05-10
+
+> Hardens auth: Clerk proxy now fails closed on a missing or malformed publishable key, OAuth provider buttons are hidden unless explicitly enabled via env flag, and the sign-in/sign-up UI is unified under a single AuthShell component.
+
+### Added
+
+- **`lib/auth/decode-fapi-host.ts`**: canonical helper that decodes the Clerk FAPI host from a publishable key. Returns `null` on any malformed input so callers always fail closed (JOV-2062).
+- **`lib/auth/oauth-providers.ts`**: fail-closed OAuth provider guard. A provider button only appears when `NEXT_PUBLIC_CLERK_OAUTH_<PROVIDER>_ENABLED=1` is set — any other value keeps it hidden. Prevents Apple "invalid client" errors from leaking into production (JOV-2062).
+- **`AuthShell` component**: unified auth surface shared by the full-page sign-in/sign-up routes and the intercepted modal. Provider guard and appearance config are applied in one place so disabled OAuth buttons cannot re-appear (JOV-2064).
+
+### Changed
+
+- **Clerk proxy** (`proxy.ts`): replaced inline FAPI host decoding with `decodeFapiHostFromPublishableKey()` and upgraded proxy errors from `console.error` to `captureError` with structured error fields for Sentry tracking.
+- **Sign-in page** and **sign-up page**: refactored to delegate rendering to `AuthShell`; each page retains only its URL-parameter extraction and toast logic.
+
+### Added (tests)
+
+- [internal] Unit tests for `decode-fapi-host.ts` and `oauth-providers.ts` (45 + 103 cases).
+- [internal] Extended `signin-page` and `signup-page` unit tests to cover `AuthShell` delegation paths.
+
+## [26.4.230] - 2026-05-10
+
+> Apple Sign In now works on jov.ie. The login flow was returning an error for everyone trying to sign in with Apple — including Hide My Email — while Google login worked. Fixed.
+
+### Fixed
+
+- **Apple Sign In production callback**: removed manual `host` and `content-length` headers from the Clerk FAPI proxy in `apps/web/proxy.ts`. Edge fetch (undici) rejects manual override of these on POST bodies, which is why Apple's `response_mode=form_post` callback to `/__clerk/v1/oauth_callback` 502'd while Google's GET-based callback worked. Also scoped Referer forwarding to OAuth callback paths only and added structured error capture so the next proxy failure surfaces its actual exception name + message.
+
+## [26.4.229] - 2026-05-10
+
+> [internal] Added P0 smoke tests for the cookie banner and chat page, and extended the visual regression matrix to cover 7 canonical viewport widths.
+
+### Added
+
+- [internal] **Cookie banner smoke tests** (`cookies.spec.ts`): verifies the banner appears for EU visitors, the "Accept All" button is clickable with nonzero bounding box and dismisses the banner, and the "Customize" button opens the preferences modal with a "Save Preferences" action (JOV-2074).
+- [internal] **Chat page smoke tests** (`chat.spec.ts`): verifies authenticated chat loads without console errors, the composer accepts typed text, pressing bare T does not toggle the theme while the input is focused, and a slash command does not cause layout shift >50px (JOV-2074).
+- [internal] **7-viewport visual regression matrix** (`visual-regression.spec.ts`): extends screenshot coverage to 375, 768, 1024, 1280, 1440, 1728, and 2560px widths for the homepage, sign-up, and sign-in pages, with horizontal scroll guards and CTA-clip assertions at each breakpoint (JOV-2081).
+- [internal] Added `data-cta-sign-up="true"` to public homepage signup CTAs for stable Playwright targeting (JOV-2065).
+- [internal] Added auth E2E coverage for sign-in/sign-up page content and `/signup` modal CTA routing (JOV-2065).
+- [internal] Added homepage E2E coverage that verifies signup CTAs route to `/signup` and the trust logo bar renders visual logo elements (JOV-2065, JOV-2066).
 
 ## [26.4.228] - 2026-05-09
 

@@ -128,7 +128,7 @@ export function Footer({
             containerSize === 'homepage'
               ? 'px-5 sm:px-6 lg:px-0'
               : 'mx-auto px-6 lg:px-8',
-            'pt-16 pb-14',
+            'pt-12 pb-10 md:pt-16 md:pb-14 2xl:pt-20 2xl:pb-16',
             maxWidthClass
           )}
         >
@@ -227,7 +227,7 @@ export function Footer({
           containerSize === 'homepage'
             ? 'px-5 sm:px-6 lg:px-0'
             : 'mx-auto px-6 lg:px-8',
-          'flex flex-col md:flex-row items-center justify-between gap-4 py-8 md:py-10',
+          'flex flex-col md:flex-row items-center justify-between gap-4 py-12 md:py-16 2xl:py-20',
           CONTAINER_SIZES[containerSize]
         )}
       >

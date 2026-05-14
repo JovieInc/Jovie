@@ -292,22 +292,20 @@ describe('proxy.ts middleware', () => {
       expect(isRedirectTo(res, '/signin')).toBe(true);
     });
 
-    it('redirects unauthenticated GET /onboarding to /signin', async () => {
+    it('lets unauthenticated GET /onboarding reach the /start shim', async () => {
       const req = createUnauthenticatedRequest({ pathname: '/onboarding' });
       const res = await callMiddleware(req);
 
-      expect(res.status).toBeGreaterThanOrEqual(300);
-      expect(res.status).toBeLessThan(400);
-      expect(isRedirectTo(res, '/signin')).toBe(true);
+      expect(res.status).toBeLessThan(300);
     });
 
-    it('redirects unauthenticated GET /waitlist to /signup', async () => {
+    it('redirects unauthenticated GET /waitlist to /start', async () => {
       const req = createUnauthenticatedRequest({ pathname: '/waitlist' });
       const res = await callMiddleware(req);
 
       expect(res.status).toBeGreaterThanOrEqual(300);
       expect(res.status).toBeLessThan(400);
-      expect(isRedirectTo(res, '/signup')).toBe(true);
+      expect(isRedirectTo(res, '/start')).toBe(true);
     });
 
     it('allows unauthenticated access to public paths', async () => {
@@ -450,11 +448,11 @@ describe('proxy.ts middleware', () => {
 
       const req = createUnauthenticatedRequest({
         hostname: 'staging.jov.ie',
-        pathname: '/onboarding',
+        pathname: '/onboarding/checkout',
       });
       const res = await callMiddleware(req);
 
-      // Must return 503, NOT redirect to /signin?redirect_url=%2Fonboarding
+      // Must return 503, NOT redirect to /signin?redirect_url=%2Fonboarding%2Fcheckout
       expect(res.status).toBe(503);
       expect(isRedirectTo(res, '/signin')).toBe(false);
     });
@@ -568,7 +566,7 @@ describe('proxy.ts middleware', () => {
       expect(isRedirectTo(res, '/waitlist')).toBe(true);
     });
 
-    it('redirects authenticated user with needsOnboarding on /signin to /onboarding', async () => {
+    it('redirects authenticated user with needsOnboarding on /signin to /start', async () => {
       mocks.getUserState.mockResolvedValue(USER_STATES.needsOnboarding);
 
       const req = createAuthenticatedRequest('clerk_user_1', {
@@ -577,7 +575,7 @@ describe('proxy.ts middleware', () => {
       const res = await callMiddleware(req);
 
       expect(res.status).toBeGreaterThanOrEqual(300);
-      expect(isRedirectTo(res, '/onboarding')).toBe(true);
+      expect(isRedirectTo(res, '/start')).toBe(true);
     });
 
     it('returns approved invite recipients from /signin to the invite redemption page', async () => {
@@ -638,7 +636,7 @@ describe('proxy.ts middleware', () => {
       expect(isRedirectTo(res, '/app')).toBe(true);
     });
 
-    it('redirects active user away from /onboarding to /app', async () => {
+    it('lets /onboarding reach the redirect shim for active users', async () => {
       mocks.getUserState.mockResolvedValue(USER_STATES.active);
 
       const req = createAuthenticatedRequest('clerk_user_1', {
@@ -646,8 +644,7 @@ describe('proxy.ts middleware', () => {
       });
       const res = await callMiddleware(req);
 
-      expect(res.status).toBeGreaterThanOrEqual(300);
-      expect(isRedirectTo(res, '/app')).toBe(true);
+      expect(res.status).toBeLessThan(300);
     });
   });
 
@@ -655,7 +652,7 @@ describe('proxy.ts middleware', () => {
   // Circuit Breaker
   // ==========================================================================
   describe('circuit breaker (redirect loop prevention)', () => {
-    it('rewrites to /onboarding and increments redirect count', async () => {
+    it('rewrites to /start and increments redirect count', async () => {
       mocks.getUserState.mockResolvedValue(USER_STATES.needsOnboarding);
 
       const req = createAuthenticatedRequest('clerk_user_1', {
@@ -663,10 +660,10 @@ describe('proxy.ts middleware', () => {
       });
       const res = await callMiddleware(req);
 
-      // Verify the rewrite destination is /onboarding
+      // Verify the rewrite destination is /start
       const rewriteUrl = res.headers.get('x-middleware-rewrite');
       expect(rewriteUrl).toBeTruthy();
-      expect(new URL(rewriteUrl!).pathname).toBe('/onboarding');
+      expect(new URL(rewriteUrl!).pathname).toBe('/start');
 
       const cookies = getResponseCookies(res);
       expect(cookies.jovie_redirect_count).toBe('1');
@@ -711,6 +708,109 @@ describe('proxy.ts middleware', () => {
       });
       const res = await callMiddleware(req);
 
+      expect(res.status).toBeLessThan(300);
+    });
+
+    it('rewrites needsWaitlist user from /pricing to /waitlist and increments count', async () => {
+      mocks.getUserState.mockResolvedValue(USER_STATES.needsWaitlist);
+
+      const req = createAuthenticatedRequest('clerk_user_1', {
+        pathname: '/pricing',
+      });
+      const res = await callMiddleware(req);
+
+      const rewriteUrl = res.headers.get('x-middleware-rewrite');
+      expect(rewriteUrl).toBeTruthy();
+      expect(new URL(rewriteUrl!).pathname).toBe('/waitlist');
+
+      const cookies = getResponseCookies(res);
+      expect(cookies.jovie_redirect_count).toBe('1');
+    });
+
+    it('treats a tampered jovie_redirect_count cookie (NaN) as 0 (defense in depth)', async () => {
+      mocks.getUserState.mockResolvedValue(USER_STATES.needsOnboarding);
+
+      const req = createAuthenticatedRequest('clerk_user_1', {
+        pathname: '/pricing',
+        cookies: { jovie_redirect_count: 'NaN' },
+      });
+      const res = await callMiddleware(req);
+
+      // Cookie was unparseable → treat as 0 and increment to 1, NOT NaN+1.
+      const rewriteUrl = res.headers.get('x-middleware-rewrite');
+      expect(rewriteUrl).toBeTruthy();
+      expect(new URL(rewriteUrl!).pathname).toBe('/start');
+      const cookies = getResponseCookies(res);
+      expect(cookies.jovie_redirect_count).toBe('1');
+    });
+
+    it('breaks needsWaitlist rewrite loop at count >= 3 (JOV-2161 regression guard)', async () => {
+      mocks.getUserState.mockResolvedValue(USER_STATES.needsWaitlist);
+
+      const req = createAuthenticatedRequest('clerk_user_1', {
+        pathname: '/pricing',
+        cookies: { jovie_redirect_count: '3' },
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBeLessThan(300);
+      expect(mocks.captureError).toHaveBeenCalledWith(
+        expect.stringContaining('circuit breaker'),
+        expect.any(Error),
+        expect.objectContaining({ target: '/waitlist', redirectCount: 3 })
+      );
+    });
+  });
+
+  // ==========================================================================
+  // Rewrite-Exempt Paths (JOV-2147)
+  // ==========================================================================
+  describe('rewrite-exempt paths', () => {
+    it('does NOT rewrite /start for a needsWaitlist user (lets OnboardingShell mount)', async () => {
+      mocks.getUserState.mockResolvedValue(USER_STATES.needsWaitlist);
+
+      const req = createAuthenticatedRequest('clerk_user_1', {
+        pathname: '/start',
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.headers.get('x-middleware-rewrite')).toBeNull();
+      expect(res.status).toBeLessThan(300);
+    });
+
+    it('does NOT rewrite /start for a needsOnboarding user', async () => {
+      mocks.getUserState.mockResolvedValue(USER_STATES.needsOnboarding);
+
+      const req = createAuthenticatedRequest('clerk_user_1', {
+        pathname: '/start',
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.headers.get('x-middleware-rewrite')).toBeNull();
+      expect(res.status).toBeLessThan(300);
+    });
+
+    it('does NOT rewrite /onboarding/checkout for a needsWaitlist user', async () => {
+      mocks.getUserState.mockResolvedValue(USER_STATES.needsWaitlist);
+
+      const req = createAuthenticatedRequest('clerk_user_1', {
+        pathname: '/onboarding/checkout',
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.headers.get('x-middleware-rewrite')).toBeNull();
+      expect(res.status).toBeLessThan(300);
+    });
+
+    it('does NOT rewrite /onboarding/checkout for a needsOnboarding user', async () => {
+      mocks.getUserState.mockResolvedValue(USER_STATES.needsOnboarding);
+
+      const req = createAuthenticatedRequest('clerk_user_1', {
+        pathname: '/onboarding/checkout',
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.headers.get('x-middleware-rewrite')).toBeNull();
       expect(res.status).toBeLessThan(300);
     });
   });
@@ -840,7 +940,10 @@ describe('proxy.ts middleware', () => {
         expect(init.method).toBe('GET');
         expect(init.redirect).toBe('manual');
         const headers = init.headers as Headers;
-        expect(headers.get('host')).toBe(stagingFapiHost);
+        // Host is intentionally NOT forwarded — fetch() sets it from the
+        // target URL, and manual override breaks Edge fetch on POST bodies
+        // (root cause of Apple OAuth form_post 502s).
+        expect(headers.get('host')).toBeNull();
         expect(headers.get('origin')).toBe(`https://${stagingFapiHost}`);
       } finally {
         if (previousPublishableKey === undefined) {
@@ -900,6 +1003,55 @@ describe('proxy.ts middleware', () => {
           res.headers.get('set-cookie')?.split(/,(?=[^;]+=)/) ??
           [];
         expect(setCookies.join('\n')).toContain('__cf_bm=abc123');
+      } finally {
+        if (previousPublishableKey === undefined) {
+          delete process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+        } else {
+          process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY =
+            previousPublishableKey;
+        }
+      }
+    });
+
+    it('rewrites FAPI-relative Location headers to absolute proxy URLs (Apple OAuth form_post redirect)', async () => {
+      // Apple's OAuth form_post callback flow makes FAPI return a 302 to a
+      // *relative* path like `/v1/oauth_callback?code=...&state=...`.
+      // NextResponse.redirect requires an absolute URL; passing the relative
+      // path through threw "URL is malformed". The proxy must resolve the
+      // relative path against our /__clerk proxy origin.
+      const stagingFapiHost = 'clerk.staging.jov.ie';
+      const previousPublishableKey =
+        process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+
+      try {
+        process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = `pk_live_${Buffer.from('production-fapi.clerk.example$').toString('base64')}`;
+        mocks.resolveClerkKeys.mockReturnValue({
+          publishableKey: `pk_live_${Buffer.from(`${stagingFapiHost}$`).toString('base64')}`,
+          secretKey: 'sk_live_staging_example',
+          status: 'ok',
+        });
+
+        // FAPI returns a Location header with a relative path (no scheme).
+        mocks.fetch.mockResolvedValueOnce(
+          new Response(null, {
+            status: 302,
+            headers: {
+              location: '/v1/oauth_callback?code=abc123&state=def456',
+            },
+          })
+        );
+
+        const req = createUnauthenticatedRequest({
+          hostname: 'staging.jov.ie',
+          pathname: '/__clerk/v1/oauth_callback',
+          method: 'POST',
+        });
+        const res = await callMiddleware(req);
+
+        expect(res.status).toBe(302);
+        expect(res.headers.get('location')).toBe(
+          'https://staging.jov.ie/__clerk/v1/oauth_callback?code=abc123&state=def456'
+        );
       } finally {
         if (previousPublishableKey === undefined) {
           delete process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;

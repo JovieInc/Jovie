@@ -2781,8 +2781,11 @@ jobs:
             echo "No non-quarantined E2E specs to run."
             exit 0
           fi
-          # Chrome-only for PRs - faster feedback, Firefox runs on main only
-          cd apps/web && pnpm e2e:smoke --trace=retain-on-failure --project=chromium --shard=${SHARD_INDEX}/${SHARD_TOTAL} ${{ steps.quarantine.outputs.allowed_specs }}
+          # Chrome-only for PRs - faster feedback, Firefox runs on main only.
+          # `e2e:smoke:tagged` runs every `-g @smoke` test across the suite,
+          # sharded and quarantine-filtered. The focused PR-fast lane lives in
+          # the separate `ci-e2e-smoke` job (playwright.config.smoke.ts).
+          cd apps/web && pnpm e2e:smoke:tagged --trace=retain-on-failure --project=chromium --shard=${SHARD_INDEX}/${SHARD_TOTAL} ${{ steps.quarantine.outputs.allowed_specs }}
 
       - name: E2E Auth Smoke (PR Gate)
         if: ${{ matrix.shard == 1 && github.event_name == 'pull_request' && github.ref != 'refs/heads/production' && hashFiles('apps/web/tests/e2e/smoke-auth.spec.ts') != '' }}

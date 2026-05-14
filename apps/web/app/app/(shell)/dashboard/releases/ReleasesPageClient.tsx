@@ -61,7 +61,7 @@ export function ReleasesPageClient() {
     designV1ReleasesEnabled: useAppFlag('DESIGN_V1'),
   });
 
-  const { data: releases, isLoading, isError } = useReleasesQuery(profileId);
+  const { data: releases, isError } = useReleasesQuery(profileId);
 
   const settings =
     (selectedProfile?.settings as Record<string, unknown> | null) ?? {};
@@ -81,17 +81,17 @@ export function ReleasesPageClient() {
       ? settings.spotifyImportTotal
       : 0;
 
-  // Only swap to skeleton on a true cold load. Once we have any data (even
-  // from placeholderData), keep the tree mounted so background refetches
-  // never tear down the drawer or remount the table.
-  if (!releases && isLoading) {
-    return <ReleaseTableSkeleton showHeader={false} />;
-  }
-
+  // Cold-load skeleton only. TanStack's `isLoading` can spike on refetch
+  // transitions before data is repopulated, which flashes the skeleton.
+  // `data === undefined` is the only true no-cache signal here.
   if (isError) {
     return (
       <PageErrorState message='Failed to load releases data. Please refresh the page.' />
     );
+  }
+
+  if (releases === undefined) {
+    return <ReleaseTableSkeleton showHeader={false} />;
   }
 
   if (releasesViewMode === 'designV1ShellReleases') {
@@ -102,6 +102,10 @@ export function ReleasesPageClient() {
         primaryProviders={primaryProviderKeys}
         artistName={spotifyArtistName}
         allowArtworkDownloads={allowArtworkDownloads}
+        spotifyConnected={spotifyConnected}
+        appleMusicConnected={appleMusicConnected}
+        initialImporting={spotifyImportStatus === 'importing'}
+        initialTotalCount={spotifyImportTotal}
       />
     );
   }

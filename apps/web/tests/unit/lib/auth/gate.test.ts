@@ -265,7 +265,7 @@ describe('gate.ts', () => {
       const result = await resolveUserState();
 
       expect(result.state).toBe(CanonicalUserState.NEEDS_ONBOARDING);
-      expect(result.redirectTo).toBe('/onboarding?fresh_signup=true');
+      expect(result.redirectTo).toBe('/start?fresh_signup=true');
       expect(result.dbUserId).toBe('a1b2c3d4-e5f6-7890-abcd-ef1234567890');
     });
 
@@ -406,7 +406,7 @@ describe('gate.ts', () => {
       const result = await resolveUserState({ createDbUserIfMissing: false });
 
       expect(result.state).toBe(CanonicalUserState.NEEDS_DB_USER);
-      expect(result.redirectTo).toBe('/onboarding?fresh_signup=true');
+      expect(result.redirectTo).toBe('/start?fresh_signup=true');
     });
   });
 
@@ -416,7 +416,7 @@ describe('gate.ts', () => {
         '/signin'
       );
       expect(getRedirectForState(CanonicalUserState.NEEDS_DB_USER)).toBe(
-        '/onboarding?fresh_signup=true'
+        '/start?fresh_signup=true'
       );
       expect(
         getRedirectForState(CanonicalUserState.NEEDS_WAITLIST_SUBMISSION)
@@ -425,7 +425,7 @@ describe('gate.ts', () => {
         '/waitlist'
       );
       expect(getRedirectForState(CanonicalUserState.NEEDS_ONBOARDING)).toBe(
-        '/onboarding?fresh_signup=true'
+        '/start?fresh_signup=true'
       );
       expect(getRedirectForState(CanonicalUserState.BANNED)).toBe(
         '/unavailable'

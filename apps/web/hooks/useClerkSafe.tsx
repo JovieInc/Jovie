@@ -212,6 +212,7 @@ interface ClerkSafeContextValue {
   user: UseUserReturn;
   auth: UseAuthReturn;
   session: UseSessionReturn;
+  canRenderClerkUi: boolean;
 }
 
 const ClerkSafeContext = createContext<ClerkSafeContextValue | null>(null);
@@ -224,7 +225,10 @@ export function ClerkSafeValuesProvider({ children }: { children: ReactNode }) {
   const user = useUserOriginal();
   const auth = useAuthOriginal();
   const session = useSessionOriginal();
-  const value = useMemo(() => ({ user, auth, session }), [user, auth, session]);
+  const value = useMemo(
+    () => ({ user, auth, session, canRenderClerkUi: true }),
+    [user, auth, session]
+  );
 
   return (
     <ClerkSafeContext.Provider value={value}>
@@ -247,6 +251,7 @@ export function ClerkSafeDefaultsProvider({
         user: DEFAULT_USER_RETURN,
         auth: DEFAULT_AUTH_RETURN,
         session: DEFAULT_SESSION_RETURN,
+        canRenderClerkUi: false,
       }}
     >
       {children}
@@ -266,6 +271,7 @@ export function ClerkSafeBootstrapProvider({
       user: createBootstrapUserReturn(bootstrap),
       auth: createBootstrapAuthReturn(bootstrap),
       session: createBootstrapSessionReturn(bootstrap),
+      canRenderClerkUi: false,
     }),
     [bootstrap]
   );
@@ -325,6 +331,11 @@ export function useSessionSafe(): UseSessionReturn {
     return DEFAULT_SESSION_RETURN;
   }
   return context.session;
+}
+
+export function useCanRenderClerkUi(): boolean {
+  const context = useContext(ClerkSafeContext);
+  return context?.canRenderClerkUi ?? false;
 }
 
 // Re-export types for convenience

@@ -1,7 +1,7 @@
 'use client';
 
 import { Calendar, Download, Home, MapPin } from 'lucide-react';
-import Image from 'next/image';
+import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { hexToRgba, lightenHex } from '@/lib/utils/color';
 import type { Artist } from '@/types/db';
 import type { PressPhoto } from '@/types/press-photos';
@@ -165,17 +165,18 @@ export function AboutSection({
             {pressPhotos.map((photo, index) => (
               <div key={photo.id} className='overflow-hidden rounded-xl'>
                 <div className='relative aspect-[4/5]'>
-                  <Image
-                    src={
-                      photo.mediumUrl ?? photo.smallUrl ?? photo.blobUrl ?? ''
-                    }
+                  <ImageWithFallback
+                    src={photo.mediumUrl ?? photo.smallUrl ?? photo.blobUrl}
                     alt={
                       photo.originalFilename ??
                       `${artist.name} press photo ${index + 1}`
                     }
                     fill
                     sizes='(max-width: 640px) 50vw, 33vw'
+                    loading={index < 2 ? 'eager' : 'lazy'}
                     className='object-cover'
+                    fallbackVariant='avatar'
+                    fallbackClassName='bg-surface-2'
                   />
                   {/* Download button — flat icon, circle on hover */}
                   <button

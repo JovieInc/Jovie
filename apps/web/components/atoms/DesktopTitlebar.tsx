@@ -11,15 +11,12 @@ import {
 import { cn } from '@/lib/utils';
 
 /**
- * DesktopTitlebar — Electron-only titlebar with traffic-light spacer,
- * back/forward arrows, and the update pill.
+ * DesktopTitlebar — Electron-only titlebar grid with traffic-light spacer,
+ * update pill, and back/forward arrows.
  *
- * Layout (left → right):
- *   [72px traffic-light spacer, drag]
- *   [← → nav buttons, no-drag]
- *   [flex-1 center spacer, drag]
- *   [UpdateAvailablePill, no-drag]
- *   [12px right padding, drag]
+ * Layout:
+ *   [sidebar-width: traffic-light spacer, update pill]
+ *   [main: back/forward nav, drag region]
  *
  * Renders as a zero-height invisible element in the browser; CSS on
  * [data-electron-titlebar="true"] makes it visible only inside Electron.
@@ -34,17 +31,29 @@ export function DesktopTitlebar() {
   return (
     <div
       data-electron-titlebar='true'
+      data-testid='electron-titlebar-row'
       data-electron-drag-region='true'
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
     >
       {isDesktop ? (
         <>
-          {/* Traffic-light clearance — macOS hiddenInset reserves ~72px on the left */}
-          <div className='w-[72px] shrink-0' />
-
-          {/* Back / Forward navigation arrows */}
           <div
-            className='flex items-center gap-0.5'
+            data-testid='electron-titlebar-sidebar-cell'
+            className='flex min-w-0 items-center gap-2 px-2.5'
+          >
+            {/* Traffic-light clearance — macOS hiddenInset reserves ~72px on the left */}
+            <div className='w-[72px] shrink-0' aria-hidden='true' />
+            <div
+              className='min-w-0 shrink-0'
+              style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+            >
+              <UpdateAvailablePill compact={sidebarOpen} />
+            </div>
+          </div>
+
+          <div
+            data-testid='electron-titlebar-main-cell'
+            className='flex min-w-0 items-center gap-1 border-l border-(--linear-app-shell-sidebar-seam) px-2.5'
             style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           >
             <button
@@ -52,8 +61,9 @@ export function DesktopTitlebar() {
               onClick={goBack}
               disabled={!canGoBack}
               aria-label='Go back'
+              data-testid='electron-nav-back'
               className={cn(
-                'flex h-6 w-6 items-center justify-center rounded text-secondary-token',
+                'flex h-7 w-7 items-center justify-center rounded-[10px] text-secondary-token',
                 'transition-colors duration-subtle',
                 'hover:bg-white/[0.06] hover:text-primary-token',
                 'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30',
@@ -67,8 +77,9 @@ export function DesktopTitlebar() {
               onClick={goForward}
               disabled={!canGoForward}
               aria-label='Go forward'
+              data-testid='electron-nav-forward'
               className={cn(
-                'flex h-6 w-6 items-center justify-center rounded text-secondary-token',
+                'flex h-7 w-7 items-center justify-center rounded-[10px] text-secondary-token',
                 'transition-colors duration-subtle',
                 'hover:bg-white/[0.06] hover:text-primary-token',
                 'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30',
@@ -77,20 +88,10 @@ export function DesktopTitlebar() {
             >
               <ArrowRight className='h-3.5 w-3.5' strokeWidth={2} />
             </button>
-          </div>
-
-          {/* Center drag region */}
-          <div
-            className='flex-1'
-            style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
-          />
-
-          {/* Update pill — compact when sidebar is open, full pill when sidebar is closed */}
-          <div
-            className='flex items-center pr-3'
-            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-          >
-            <UpdateAvailablePill compact={sidebarOpen} />
+            <div
+              className='min-w-0 flex-1 self-stretch'
+              style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+            />
           </div>
         </>
       ) : null}

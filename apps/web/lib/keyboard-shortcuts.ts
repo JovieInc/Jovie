@@ -1,19 +1,28 @@
 import type { LucideIcon } from 'lucide-react';
 import {
+  AudioLines,
   Banknote,
   CalendarDays,
+  ChevronRight,
+  Columns2,
   Command,
   Home,
   IdCard,
   Keyboard,
   LogOut,
   MessageCircle,
+  Mic2,
   Music,
   PanelLeft,
+  Play,
+  Radio,
+  Search,
   Settings,
   Sun,
+  Type,
   UserCircle,
   Users,
+  X,
 } from 'lucide-react';
 import { APP_ROUTES } from '@/constants/routes';
 // Unicode glyphs via String.fromCodePoint so they survive encoding-unaware
@@ -22,6 +31,25 @@ export const GLYPH_CMD = String.fromCodePoint(0x2318);
 export const GLYPH_OPT = String.fromCodePoint(0x2325);
 export const GLYPH_SHIFT = String.fromCodePoint(0x21e7);
 export const GLYPH_ARROW_RIGHT = String.fromCodePoint(0x2192);
+
+/**
+ * Shipping gate — every shortcut must declare its status before merge.
+ * `required` means the shortcut is wired and tested; `binding` names the handler.
+ * `deferred` means intentionally not wired globally yet (e.g. desktop-only, needs conflict testing).
+ * `none` means no shortcut was the deliberate product decision.
+ */
+export type ShortcutDecision =
+  | { status: 'required'; binding: string }
+  | { status: 'deferred'; reason: string }
+  | { status: 'none'; reason: string };
+
+/**
+ * Where the shortcut fires.
+ * `global` = fires from anywhere in the shell.
+ * `player` = fires only when the audio player surface owns focus.
+ * `overlay` = fires only when a modal/overlay is active.
+ */
+export type ShortcutScope = 'global' | 'player' | 'overlay';
 
 /**
  * Keyboard shortcut definition
@@ -49,9 +77,13 @@ export interface KeyboardShortcut {
   secondKey?: string;
   /** Single key with modifiers (e.g., 'Meta+/') for non-sequential shortcuts */
   shortcutKey?: string;
+  /** Shipping gate: every shortcut must declare required | deferred | none */
+  decision: ShortcutDecision;
+  /** Where this shortcut fires; omit for 'global' (the default) */
+  scope?: ShortcutScope;
 }
 
-export type ShortcutCategory = 'general' | 'navigation' | 'actions';
+export type ShortcutCategory = 'general' | 'navigation' | 'actions' | 'player';
 
 /**
  * All keyboard shortcuts organized by category
@@ -65,6 +97,20 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     category: 'general',
     icon: Command,
     shortcutKey: 'Meta+k',
+    decision: { status: 'required', binding: 'CommandPalette.tsx' },
+  },
+  {
+    id: 'current-view-search',
+    label: 'Search current view',
+    keys: '/ in view',
+    description: 'Open the active page search or filter surface',
+    category: 'general',
+    icon: Search,
+    shortcutKey: '/',
+    decision: {
+      status: 'required',
+      binding: 'ShellReleasesView, TasksPageClient, LibrarySurface',
+    },
   },
   {
     id: 'keyboard-shortcuts',
@@ -73,14 +119,16 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     category: 'general',
     icon: Keyboard,
     shortcutKey: 'Meta+/',
+    decision: { status: 'required', binding: 'useSequentialShortcuts' },
   },
   {
     id: 'toggle-sidebar',
     label: 'Toggle sidebar',
-    keys: `${GLYPH_CMD} B`,
+    keys: `[ · ${GLYPH_CMD} B`,
     category: 'general',
     icon: PanelLeft,
-    shortcutKey: 'Meta+b',
+    shortcutKey: '[',
+    decision: { status: 'required', binding: 'useSidebarKeyboardShortcut' },
   },
 
   // Navigation shortcuts (G then letter)
@@ -94,6 +142,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     isSequential: true,
     firstKey: 'g',
     secondKey: 'd',
+    decision: { status: 'required', binding: 'useSequentialShortcuts' },
   },
   {
     id: 'nav-profile',
@@ -105,6 +154,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     isSequential: true,
     firstKey: 'g',
     secondKey: 'p',
+    decision: { status: 'required', binding: 'useSequentialShortcuts' },
   },
   {
     id: 'nav-contacts',
@@ -116,6 +166,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     isSequential: true,
     firstKey: 'g',
     secondKey: 'c',
+    decision: { status: 'required', binding: 'useSequentialShortcuts' },
   },
   {
     id: 'nav-releases',
@@ -127,6 +178,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     isSequential: true,
     firstKey: 'g',
     secondKey: 'r',
+    decision: { status: 'required', binding: 'useSequentialShortcuts' },
   },
   {
     id: 'nav-tour-dates',
@@ -138,6 +190,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     isSequential: true,
     firstKey: 'g',
     secondKey: 'o',
+    decision: { status: 'required', binding: 'useSequentialShortcuts' },
   },
   {
     id: 'nav-audience',
@@ -149,6 +202,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     isSequential: true,
     firstKey: 'g',
     secondKey: 'a',
+    decision: { status: 'required', binding: 'useSequentialShortcuts' },
   },
   {
     id: 'nav-earnings',
@@ -160,6 +214,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     isSequential: true,
     firstKey: 'g',
     secondKey: 'e',
+    decision: { status: 'required', binding: 'useSequentialShortcuts' },
   },
   {
     id: 'nav-chat',
@@ -171,6 +226,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     isSequential: true,
     firstKey: 'g',
     secondKey: 't',
+    decision: { status: 'required', binding: 'useSequentialShortcuts' },
   },
   {
     id: 'nav-settings',
@@ -182,6 +238,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     isSequential: true,
     firstKey: 'g',
     secondKey: 's',
+    decision: { status: 'required', binding: 'useSequentialShortcuts' },
   },
 
   // Action shortcuts
@@ -192,6 +249,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     category: 'actions',
     icon: Sun,
     shortcutKey: 'Alt+t',
+    decision: { status: 'required', binding: 'useGlobalShortcutActions' },
   },
   {
     id: 'sign-out',
@@ -200,6 +258,106 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     category: 'actions',
     icon: LogOut,
     shortcutKey: 'Alt+Shift+Q',
+    decision: { status: 'required', binding: 'useGlobalShortcutActions' },
+  },
+
+  // Player shortcuts — scope: 'player' means only fires when audio player has focus.
+  // Bare single-key shortcuts here are intentional and safe in that scoped context.
+  {
+    id: 'player-play-pause',
+    label: 'Play / Pause',
+    keys: 'Space',
+    category: 'player',
+    icon: Play,
+    scope: 'player',
+    decision: { status: 'required', binding: 'AudioBar' },
+  },
+  {
+    id: 'player-toggle-waveform',
+    label: 'Toggle waveform',
+    keys: 'W',
+    category: 'player',
+    icon: AudioLines,
+    scope: 'player',
+    decision: { status: 'required', binding: 'AudioBar' },
+  },
+  {
+    id: 'player-toggle-lyrics',
+    label: 'Toggle lyrics',
+    keys: 'L',
+    category: 'player',
+    icon: Type,
+    scope: 'player',
+    decision: { status: 'required', binding: 'AudioBar' },
+  },
+  {
+    id: 'player-toggle-bar',
+    label: 'Toggle audio bar',
+    keys: '`',
+    category: 'player',
+    icon: Radio,
+    shortcutKey: '`',
+    scope: 'global',
+    decision: { status: 'required', binding: 'AudioBar' },
+  },
+  {
+    id: 'player-toggle-bar-alt',
+    label: 'Toggle audio bar (alt)',
+    keys: `${GLYPH_CMD} \\`,
+    category: 'player',
+    icon: Radio,
+    shortcutKey: 'Meta+\\',
+    scope: 'global',
+    decision: { status: 'required', binding: 'AudioBar' },
+  },
+  {
+    id: 'player-search-slash',
+    label: 'Search (player)',
+    keys: '/',
+    category: 'player',
+    icon: Search,
+    scope: 'player',
+    decision: { status: 'required', binding: 'AudioBar' },
+  },
+  {
+    id: 'player-toggle-sidebar',
+    label: 'Toggle sidebar dock',
+    keys: '[',
+    category: 'player',
+    icon: Columns2,
+    scope: 'player',
+    decision: { status: 'required', binding: 'AudioBar' },
+  },
+  {
+    id: 'player-toggle-sidebar-tab',
+    label: 'Cycle sidebar tab',
+    keys: 'Tab',
+    category: 'player',
+    icon: ChevronRight,
+    scope: 'player',
+    decision: { status: 'required', binding: 'AudioBar' },
+  },
+  {
+    id: 'player-dictate',
+    label: 'Push-to-talk to Jovie',
+    keys: `Hold ${GLYPH_CMD} J`,
+    category: 'player',
+    icon: Mic2,
+    scope: 'global',
+    decision: {
+      status: 'deferred',
+      reason:
+        'Desktop-first; browser conflict testing pending before global default',
+    },
+  },
+  {
+    id: 'player-close-overlay',
+    label: 'Close overlay',
+    keys: 'Esc',
+    category: 'player',
+    icon: X,
+    scope: 'overlay',
+    decision: { status: 'required', binding: 'ContextMenuOverlay' },
   },
 ];
 
@@ -225,4 +383,5 @@ export const SHORTCUT_CATEGORY_LABELS: Record<ShortcutCategory, string> = {
   general: 'General',
   navigation: 'Navigation',
   actions: 'Actions',
+  player: 'Player',
 };

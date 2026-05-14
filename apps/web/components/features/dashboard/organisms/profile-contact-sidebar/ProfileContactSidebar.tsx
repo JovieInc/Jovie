@@ -25,8 +25,10 @@ import { useProfileHeaderParts } from '@/components/organisms/profile-sidebar/Pr
 import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
 import { ProfilePaySurface } from '@/features/dashboard/molecules/ProfilePaySurface';
+import { useEmailSignatureMenuAction } from '@/features/dashboard/molecules/useEmailSignatureMenuAction';
 import { getPlatformCategory } from '@/features/dashboard/organisms/links/utils/platform-category';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
+import { buildSignatureInputFromProfile } from '@/lib/email-signature/profile-input';
 import {
   useDeletePressPhotoMutation,
   useDspMatchesQuery,
@@ -632,12 +634,38 @@ export function ProfileContactSidebar() {
   );
 
   // Header parts hook needs to be called unconditionally
-  const { overflowActions } = useProfileHeaderParts({
+  const { overflowActions: baseOverflowActions } = useProfileHeaderParts({
     username: previewData?.username ?? '',
     displayName: previewData?.displayName ?? '',
     profilePath: previewData?.profilePath ?? '',
     onClose: close,
   });
+
+  const emailSignatureInput = useMemo(
+    () =>
+      previewData?.username
+        ? buildSignatureInputFromProfile({
+            profile: {
+              username: previewData.username,
+              displayName: previewData.displayName,
+              avatarUrl: previewData.avatarUrl,
+              genres: previewData.genres,
+              location: previewData.location,
+            },
+            socials: previewData.links.map(link => ({
+              label: link.title,
+              url: link.url,
+            })),
+          })
+        : null,
+    [previewData]
+  );
+  const { action: emailSignatureAction, modal: emailSignatureModal } =
+    useEmailSignatureMenuAction(emailSignatureInput);
+  const overflowActions = useMemo(
+    () => [...baseOverflowActions, emailSignatureAction],
+    [baseOverflowActions, emailSignatureAction]
+  );
 
   // Show skeleton sidebar until preview data loads (prevents CLS)
   if (!previewData) {
@@ -648,6 +676,7 @@ export function ProfileContactSidebar() {
         headerMode='minimal'
         hideMinimalHeaderBar
       >
+        {emailSignatureModal}
         <div className='space-y-2.5 pt-0.5'>
           <div className='space-y-2.5 p-3'>
             <div className='grid grid-cols-2 gap-3'>
@@ -718,6 +747,7 @@ export function ProfileContactSidebar() {
         />
       }
     >
+      {emailSignatureModal}
       <DrawerTabbedCard
         testId='profile-contact-tabbed-card'
         className='mt-2.5'

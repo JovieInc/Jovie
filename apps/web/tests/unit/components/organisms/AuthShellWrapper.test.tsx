@@ -39,6 +39,23 @@ vi.mock('@/contexts/KeyboardShortcutsContext', () => ({
 vi.mock('@/contexts/HeaderActionsContext', () => ({
   HeaderActionsProvider: ({ children }: { children: ReactNode }) => children,
   useOptionalHeaderActions: () => null,
+  useHeaderActions: () => ({
+    headerActions: null,
+    headerBadge: null,
+    headerSearchAdapter: null,
+    isSearchOpen: false,
+    setHeaderActions: vi.fn(),
+    setHeaderBadge: vi.fn(),
+    setHeaderSearchAdapter: vi.fn(),
+    openSearch: vi.fn(),
+    closeSearch: vi.fn(),
+  }),
+  useRegisterHeaderSearch: vi.fn(),
+}));
+
+vi.mock('@/components/shell/HeaderSearchSurface', () => ({
+  HeaderSearchSurface: () => null,
+  HeaderSearchSurfaceFromContext: () => null,
 }));
 
 vi.mock('@/contexts/RightPanelContext', () => ({
