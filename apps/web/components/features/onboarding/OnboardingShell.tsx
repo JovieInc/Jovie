@@ -49,21 +49,28 @@ export function OnboardingShell({ sessionLabel }: OnboardingShellProps) {
 
   return (
     <div
-      className='flex min-h-dvh w-full flex-col bg-[#06070a] text-white [color-scheme:dark]'
+      className='flex min-h-dvh w-full flex-col bg-(--linear-app-content-surface) text-primary-token [color-scheme:dark]'
       data-onboarding-session={sessionLabel}
     >
       <header className='flex h-12 items-center justify-between px-4 sm:px-6'>
         <div className='inline-flex items-center gap-2'>
-          <BrandLogo size={20} tone='white' aria-hidden />
-          <span className='text-[15px] font-semibold text-white'>Jovie</span>
+          <BrandLogo size={20} tone='auto' aria-hidden />
+          <span className='text-[15px] font-semibold text-primary-token'>
+            Jovie
+          </span>
         </div>
       </header>
 
-      <main className='mx-auto flex w-full max-w-[680px] flex-1 flex-col px-4 pb-4 sm:px-6'>
-        <OnboardingChat
-          onConversationActivity={handleConversationActivity}
-          turnstileToken={turnstileToken}
-        />
+      <main className='flex min-h-0 flex-1 overflow-hidden px-3 pb-14 sm:px-6 sm:pb-6'>
+        <section
+          className='mx-auto flex min-h-0 w-full max-w-[56rem] flex-1 overflow-hidden rounded-[20px] border border-subtle bg-surface-1 shadow-card'
+          aria-label='Jovie onboarding chat'
+        >
+          <OnboardingChat
+            onConversationActivity={handleConversationActivity}
+            turnstileToken={turnstileToken}
+          />
+        </section>
       </main>
 
       <OnboardingTurnstile
@@ -73,7 +80,7 @@ export function OnboardingShell({ sessionLabel }: OnboardingShellProps) {
 
       {turnstileError ? (
         <p
-          className='fixed bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-red-500/15 px-3 py-1 text-[12px] text-red-300'
+          className='fixed bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-red-500/20 bg-error-subtle px-3 py-1 text-[12px] text-error'
           role='alert'
         >
           {turnstileError}
@@ -82,11 +89,11 @@ export function OnboardingShell({ sessionLabel }: OnboardingShellProps) {
 
       {isLinking ? (
         <p
-          className='fixed bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-white/[0.12] bg-white/[0.04] px-3 py-1 text-[12px] text-white/70'
+          className='fixed bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-subtle bg-surface-1 px-3 py-1 text-[12px] text-secondary-token'
           role='status'
           aria-live='polite'
         >
-          linking your conversation…
+          Linking your conversation…
         </p>
       ) : null}
     </div>
