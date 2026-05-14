@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.247] - 2026-05-13
+
+> [internal] DSP URL validation: broken or cross-contaminated listen links no longer show as broken buttons on artist profiles (JOV-1985).
+
+### Fixed
+
+- **[internal] Invalid DSP listen links now silently hidden**: `isValidDspUrl()` is now enforced inside both `addDSP()` (artist profile DSPs) and the `addDsp()` helper in `profile-dsps.ts` (canonical profile DSPs + social links import path). URLs that don't parse as valid http/https or whose hostname doesn't match the canonical domain registry for that DSP are silently skipped, so artists never see a broken "Open in Spotify" button pointing at an Apple Music URL or a corrupted link.
+
 ## [26.4.246] - 2026-05-13
 
 > [internal] Hardened DashboardAudienceTable unit tests against CI shard timing (JOV-2138).
