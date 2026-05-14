@@ -221,13 +221,10 @@ async function resolveBypassUserId(
     await sleep(500 * attempt);
   }
 
-  if (!fallbackUserId) {
-    throw new ClerkTestError(
-      `Failed to resolve ${persona} test auth persona: ${lastResolveError}`,
-      'CLERK_SETUP_FAILED'
-    );
-  }
-  return fallbackUserId;
+  throw new ClerkTestError(
+    `Unexpected state while resolving ${persona} test auth persona: ${lastResolveError}`,
+    'CLERK_SETUP_FAILED'
+  );
 }
 
 async function enableTestAuthBypass(page: Page): Promise<void> {

@@ -122,6 +122,11 @@ export function buildOnboardingTools(state: OnboardingTurnState): ToolSet {
       inputSchema: TOOL_SCHEMAS.confirmSpotifyArtist.inputSchema,
       execute: async ({ spotifyArtistId }) => {
         state.spotifyArtistId = spotifyArtistId;
+        state.spotifyArtistName = null;
+        state.spotifyImageUrl = null;
+        state.spotifyGenres = [];
+        state.spotifyPopularity = null;
+        state.spotifyFollowers = null;
         let artist: Awaited<ReturnType<typeof getSpotifyArtist>> = null;
 
         try {
