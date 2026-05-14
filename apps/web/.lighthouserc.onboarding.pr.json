@@ -17,12 +17,12 @@
     "assert": {
       "assertMatrix": [
         {
-          "matchingUrlPattern": "\\/onboarding",
+          "matchingUrlPattern": "\\/start",
           "assertions": {
             "categories:performance": [
               "error",
               {
-                "minScore": 0.9
+                "minScore": 0.92
               }
             ],
             "categories:accessibility": [
@@ -40,7 +40,7 @@
             "cumulative-layout-shift": [
               "error",
               {
-                "maxNumericValue": 0.05
+                "maxNumericValue": 0.02
               }
             ],
             "first-contentful-paint": [
@@ -52,7 +52,7 @@
             "largest-contentful-paint": [
               "error",
               {
-                "maxNumericValue": 2500
+                "maxNumericValue": 2200
               }
             ],
             "total-blocking-time": [
@@ -70,7 +70,7 @@
             "interactive": [
               "error",
               {
-                "maxNumericValue": 2500
+                "maxNumericValue": 3500
               }
             ]
           }

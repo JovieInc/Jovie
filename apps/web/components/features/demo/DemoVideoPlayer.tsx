@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { BrowserFrame } from './BrowserFrame';
 import { ProductDemoCarousel } from './ProductDemoCarousel';
 
@@ -8,9 +8,18 @@ type VideoState = 'loading' | 'playing' | 'error';
 
 export function DemoVideoPlayer({
   videoUrl,
+  captionsUrl = '/demo/jovie-demo.vtt',
+  posterUrl,
+  controls = false,
+  label = 'Jovie demo video',
 }: {
   readonly videoUrl: string | undefined;
+  readonly captionsUrl?: string;
+  readonly posterUrl?: string;
+  readonly controls?: boolean;
+  readonly label?: string;
 }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
   const [state, setState] = useState<VideoState>(
     videoUrl ? 'loading' : 'error'
   );
@@ -21,6 +30,37 @@ export function DemoVideoPlayer({
   const handleError = useCallback(() => {
     setState('error');
   }, []);
+
+  useEffect(() => {
+    setState(videoUrl ? 'loading' : 'error');
+  }, [videoUrl]);
+
+  useEffect(() => {
+    if (!(videoUrl && state === 'loading')) {
+      return;
+    }
+
+    const video = videoRef.current;
+    if (!video) {
+      return;
+    }
+
+    if (video.readyState >= HTMLMediaElement.HAVE_METADATA) {
+      setState('playing');
+      return;
+    }
+
+    const pollId = window.setInterval(() => {
+      if (video.readyState >= HTMLMediaElement.HAVE_METADATA) {
+        setState('playing');
+        window.clearInterval(pollId);
+      }
+    }, 250);
+
+    return () => {
+      window.clearInterval(pollId);
+    };
+  }, [state, videoUrl]);
 
   // No video URL configured — show carousel directly
   if (!videoUrl) {
@@ -42,20 +82,26 @@ export function DemoVideoPlayer({
       {/* Video player */}
       {state !== 'error' && (
         <video
+          ref={videoRef}
+          aria-label={label}
           className={`aspect-[1280/720] w-full bg-black object-contain ${
             state === 'loading' ? 'hidden' : ''
           }`}
           src={videoUrl}
-          autoPlay
+          poster={posterUrl}
+          controls={controls}
           muted
           loop
           playsInline
+          preload='auto'
+          onLoadedMetadata={handleLoadedData}
           onLoadedData={handleLoadedData}
+          onCanPlay={handleLoadedData}
           onError={handleError}
         >
           <track
             kind='captions'
-            src='/demo/yc-demo.vtt'
+            src={captionsUrl}
             srcLang='en'
             label='English'
             default

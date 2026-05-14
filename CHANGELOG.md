@@ -5,6 +5,28 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.248] - 2026-05-14
+
+> Onboarding now opens in the canonical app-shell chat front door with hardened tool artifacts, picker stability, and performance gates.
+
+### Changed
+
+- **Canonical onboarding chat front door**: `/onboarding` and waitlist entry now route into `/start`, preserving onboarding query params while leaving `/onboarding/checkout` as the checkout handoff.
+- **App-shell onboarding experience**: `/start` now renders inside the Shell V1 app frame with the sidebar collapsed, shared chat composer primitives, polished onboarding tool artifacts, and stable slash-picker geometry across desktop and mobile.
+
+### Fixed
+
+- **Chat layout stability and visible implementation leakage**: Removed the app-shell entrance animation that caused screen flashes, replaced generic tool rows with purpose-built onboarding cards, hid raw tool internals from the transcript, and hardened error, loading, thinking, retry, and artist-pick states.
+- **Onboarding QA and perf coverage**: Added `/start` Playwright visual/flow coverage, onboarding transcript evals, canonical redirect assertions, Lighthouse `/start` coverage, and stricter onboarding/chat CLS budgets.
+
+## [26.4.247] - 2026-05-14
+
+> Artist profiles now display the background atmosphere correctly even when the hero image fails to load — instead of a blank screen, the page falls back to a subtle gradient.
+
+### Fixed
+
+- **Profile hero background no longer goes blank on image failure**: When a hero image URL is invalid or the CDN returns an error, `ProfileCompactTemplate` now degrades gracefully to the gradient placeholder background instead of rendering blank. Root cause: `ImageWithFallback`'s fallback container used `h-full w-full` (normal flow) but `<Image fill>` generates `position: absolute; inset: 0`, so the fallback had zero height in the ambient background context. Fixed by using `absolute inset-0` for fill-layout fallbacks, and tracking image failure state in `ProfileCompactTemplate` to render the gradient instead of a centred avatar icon.
+
 ## [26.4.246] - 2026-05-13
 
 > [internal] Hardened DashboardAudienceTable unit tests against CI shard timing (JOV-2138).
@@ -57,6 +79,8 @@
 ### Added
 
 - **[internal] Open PR and Open Linear links on approval queue rows**: Each run row in the AgentOS admin approval queue now surfaces inline action links when a PR URL or Linear issue URL is present. Links are host-allowlisted to `github.com` and `linear.app` only.
+- [internal] **Shell Releases controls parity** (JOV-1822): the design-v1 shell releases view mirrors production release controls with Spotify sync/manual-add gates, inline import/Apple Music/smart-link banners, release plan generation, delete confirmation, and smart-link row gating from plan entitlements.
+- [internal] **Shell Releases complexity split**: extracted artwork playback, smart-link gating, and list-content helpers so `ShellReleaseRow` and `ShellReleasesView` stay below SonarCloud cognitive-complexity limits while preserving parity behavior.
 
 ### Fixed
 

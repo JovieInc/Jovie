@@ -1,6 +1,6 @@
 {
-  "id": "a2774959-83bc-4ad8-bea6-e1084b8a49fd",
-  "prevId": "b1d75723-b053-4b21-b106-d8138d949e0f",
+  "id": "cb5eeb2f-a920-4c91-9992-6a8bab7f2ad6",
+  "prevId": "13c6dd3f-4ab8-4662-bd47-2ead612b8ad5",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1511,26 +1511,6 @@
           "notNull": true,
           "default": 0
         },
-        "has_active_alerts": {
-          "name": "has_active_alerts",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "active_alert_channels": {
-          "name": "active_alert_channels",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'[]'::jsonb"
-        },
-        "last_alert_confirmed_at": {
-          "name": "last_alert_confirmed_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
         "tags": {
           "name": "tags",
           "type": "jsonb",
@@ -1719,28 +1699,6 @@
           ],
           "isUnique": false,
           "where": "email IS NOT NULL",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_audience_members_active_alerts": {
-          "name": "idx_audience_members_active_alerts",
-          "columns": [
-            {
-              "expression": "creator_profile_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "last_seen_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "has_active_alerts = true",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -2735,7 +2693,7 @@
           "name": "creator_profile_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "conversation_id": {
           "name": "conversation_id",
@@ -2967,13 +2925,19 @@
           "name": "user_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "creator_profile_id": {
           "name": "creator_profile_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
+        },
+        "session_id": {
+          "name": "session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "title": {
           "name": "title",
@@ -3041,6 +3005,37 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "idx_chat_conversations_session_id": {
+          "name": "idx_chat_conversations_session_id",
+          "columns": [
+            {
+              "expression": "session_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_chat_conversations_session_id_claimed_unique": {
+          "name": "idx_chat_conversations_session_id_claimed_unique",
+          "columns": [
+            {
+              "expression": "session_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"chat_conversations\".\"user_id\" IS NOT NULL AND \"chat_conversations\".\"session_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -3074,7 +3069,12 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "chat_conversations_identity_check": {
+          "name": "chat_conversations_identity_check",
+          "value": "\"chat_conversations\".\"user_id\" IS NOT NULL OR \"chat_conversations\".\"session_id\" IS NOT NULL"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.chat_messages": {
@@ -16957,6 +16957,34 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "social_links_creator_platform_url_unique": {
+          "name": "social_links_creator_platform_url_unique",
+          "columns": [
+            {
+              "expression": "creator_profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "platform",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "normalize_social_url(\"url\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "is_active = true AND state = 'active'",
           "concurrently": false,
           "method": "btree",
           "with": {}

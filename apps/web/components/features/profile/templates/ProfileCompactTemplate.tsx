@@ -327,6 +327,16 @@ export function ProfileCompactTemplate({
     );
     return isDefaultAvatarUrl(imageUrl) ? null : imageUrl;
   }, [artist.image_url, photoDownloadSizes]);
+
+  // Track hero image load failure so the ambient background degrades to the
+  // gradient placeholder instead of rendering a blank or icon-filled container.
+  const [heroImageError, setHeroImageError] = useState(false);
+
+  // Reset on hero URL change (e.g. artist data refresh or profile switch)
+  useEffect(() => {
+    setHeroImageError(false);
+  }, [heroImageUrl]);
+
   const profileAccentStyle = useMemo(
     () =>
       buildProfileAccentCssVars(
@@ -695,7 +705,7 @@ export function ProfileCompactTemplate({
       >
         <div className='absolute inset-0' aria-hidden='true'>
           <div className='absolute inset-[-10%]'>
-            {heroImageUrl ? (
+            {heroImageUrl && !heroImageError ? (
               <ImageWithFallback
                 src={heroImageUrl}
                 alt={`${artist.name} background`}
@@ -704,6 +714,7 @@ export function ProfileCompactTemplate({
                 className='scale-[1.05] object-cover opacity-28 blur-[84px] saturate-[0.88]'
                 fallbackVariant='avatar'
                 fallbackClassName='bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_48%)]'
+                onLoadError={() => setHeroImageError(true)}
               />
             ) : (
               <div className='h-full w-full bg-[radial-gradient(circle_at_top,var(--profile-stage-glow-a),transparent_44%)] opacity-50' />

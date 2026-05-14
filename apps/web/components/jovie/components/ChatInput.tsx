@@ -3,6 +3,7 @@
 import { motion, useReducedMotion } from 'motion/react';
 import {
   forwardRef,
+  type ReactNode,
   useCallback,
   useEffect,
   useId,
@@ -92,6 +93,8 @@ export interface ChatInputProps {
   readonly profileId?: string;
   /** Enables the Shell + Chat V1 composer geometry behind DESIGN_V1. */
   readonly shellChatV1?: boolean;
+  /** Optional compact status content rendered inside the composer surface. */
+  readonly statusBanner?: ReactNode;
 }
 
 type SurfaceMode = 'empty' | 'typing' | 'root' | 'entity';
@@ -158,6 +161,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       onPickerOpenChange,
       profileId,
       shellChatV1 = false,
+      statusBanner,
     },
     ref
   ) {
@@ -377,7 +381,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       surfaceMode = 'typing';
 
     const geometry = geometryFor(surfaceMode, isStacked);
-    const showInlinePicker = picker.state.status === 'root' && !isStacked;
+    const showInlinePicker = picker.state.status === 'root';
     const showEntitySurface = picker.state.status === 'entity';
     const dockClass =
       surfaceMode === 'entity' && !isStacked
@@ -415,7 +419,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       <form
         onSubmit={handleFormSubmit}
         aria-label='Compose a message — type / for skills and references'
-        className='focus-within:outline-none'
+        className='relative z-10 focus-within:outline-none'
       >
         <div className={dockClass}>
           {/* ROOT inline picker: rendered above the surface via absolute
@@ -423,19 +427,26 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
               layout shift when it opens. `bottom-full` places it just above
               the top edge of the surface; `mb-1` adds a small gap. */}
           {showInlinePicker ? (
-            <div className='absolute bottom-full left-0 right-0 mb-1 flex justify-center'>
-              <SlashCommandMenu
-                profileId={pickerProfileId}
-                state={picker.state}
-                onSelectSkill={handleSelectSkill}
-                onSelectEntity={handleSelectEntity}
-                onSetSelected={picker.setSelected}
-                onMoveSelected={picker.moveSelected}
-                onClose={picker.close}
-                variant='inline'
-                listIdProp={pickerListId}
-                onActiveRowChange={setPickerActiveRowId}
-              />
+            <div className='absolute bottom-full left-0 right-0 z-50 mb-1 flex justify-center'>
+              <div
+                style={{
+                  width: geometry.width,
+                  maxWidth: geometry.maxWidth,
+                }}
+              >
+                <SlashCommandMenu
+                  profileId={pickerProfileId}
+                  state={picker.state}
+                  onSelectSkill={handleSelectSkill}
+                  onSelectEntity={handleSelectEntity}
+                  onSetSelected={picker.setSelected}
+                  onMoveSelected={picker.moveSelected}
+                  onClose={picker.close}
+                  variant='inline'
+                  listIdProp={pickerListId}
+                  onActiveRowChange={setPickerActiveRowId}
+                />
+              </div>
             </div>
           ) : null}
           <motion.div
@@ -495,6 +506,11 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                       {pickerKindNoun(picker.state.kind)} to preview.
                     </div>
                   )}
+                  {statusBanner ? (
+                    <div className='border-t border-white/[0.055]'>
+                      {statusBanner}
+                    </div>
+                  ) : null}
                   <div className='border-t border-white/[0.055]'>
                     <InputRow
                       containerRef={containerRef}
@@ -566,21 +582,9 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   </div>
                 ) : null}
 
-                {/* STACKED root picker (stacks above input inside the surface) */}
-                {picker.state.status === 'root' && isStacked ? (
+                {statusBanner ? (
                   <div className='border-b border-white/[0.055]'>
-                    <SlashCommandMenu
-                      profileId={pickerProfileId}
-                      state={picker.state}
-                      onSelectSkill={handleSelectSkill}
-                      onSelectEntity={handleSelectEntity}
-                      onSetSelected={picker.setSelected}
-                      onMoveSelected={picker.moveSelected}
-                      onClose={picker.close}
-                      variant='rail'
-                      listIdProp={pickerListId}
-                      onActiveRowChange={setPickerActiveRowId}
-                    />
+                    {statusBanner}
                   </div>
                 ) : null}
 
@@ -621,12 +625,11 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   isPillMode={surfaceMode === 'empty'}
                   hasBorderTop={
                     // Add a top separator only when there is surface content
-                    // *inside* the surface above the InputRow (entity mode or
-                    // stacked root picker). The inline root picker is now
-                    // absolutely positioned outside the surface, so it no
-                    // longer needs a separator border below it.
-                    showEntitySurface ||
-                    (picker.state.status === 'root' && isStacked)
+                    // *inside* the surface above the InputRow (entity mode).
+                    // The root picker is absolutely positioned outside the
+                    // surface, so it does not need a separator or shift the
+                    // composer vertically.
+                    showEntitySurface
                   }
                   isPickerOpen={isPickerOpen}
                   pickerListId={pickerListId}
@@ -800,7 +803,7 @@ function InputRow({
       <div
         ref={containerRef}
         className={cn(
-          'relative flex gap-1',
+          'relative flex min-h-[58px] gap-1',
           isPillMode
             ? 'items-center px-[7px] py-[7px] pl-4'
             : 'items-end px-2 py-[10px] pl-[18px]'
@@ -841,22 +844,14 @@ function InputRow({
             // the surface-level glow IS the keyboard focus indicator for this
             // compound widget.
             'focus:outline-none focus-visible:outline-none focus-visible:ring-0',
-            isPillMode
-              ? 'overflow-hidden whitespace-nowrap py-[7px] px-1'
-              : 'py-2 px-1',
-            isAtMaxHeight && 'overflow-y-auto'
+            'shadow-none',
+            isPillMode ? 'whitespace-nowrap py-[7px] px-1' : 'py-2 px-1',
+            isAtMaxHeight ? 'overflow-y-auto' : 'overflow-hidden'
           )}
           style={
-            reducedMotion
-              ? {
-                  height: isPillMode ? undefined : measuredHeight,
-                  overflow: isAtMaxHeight ? 'auto' : 'hidden',
-                  boxShadow: 'none',
-                }
-              : {
-                  overflow: isAtMaxHeight ? 'auto' : 'hidden',
-                  boxShadow: 'none',
-                }
+            reducedMotion && !isPillMode
+              ? { height: measuredHeight }
+              : undefined
           }
           onKeyDown={handleKeyDown}
           onPaste={onPaste}
@@ -870,7 +865,7 @@ function InputRow({
           // on the textarea; selection is communicated via
           // aria-activedescendant pointing to the row id.
           role={isPickerOpen ? 'combobox' : undefined}
-          aria-expanded={isPickerOpen ? 'true' : 'false'}
+          aria-expanded={isPickerOpen ? 'true' : undefined}
           aria-controls={isPickerOpen ? pickerListId : undefined}
           aria-activedescendant={
             isPickerOpen && pickerActiveRowId ? pickerActiveRowId : undefined

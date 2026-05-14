@@ -6,6 +6,10 @@ const ROOT = process.cwd();
 const APP_ROOT = join(ROOT, 'app');
 const DEMO_APP_ROOT = join(APP_ROOT, 'demo');
 const DEMO_FEATURE_ROOT = join(ROOT, 'components/features/demo');
+const ALLOWED_MARKETING_DEMO_UI_ROUTES = new Set([
+  join('(marketing)', 'demo', 'video', 'page.tsx'),
+  join('(marketing)', 'demovideo', 'page.tsx'),
+]);
 
 function getFilesRecursively(directory: string): string[] {
   const files: string[] = [];
@@ -32,7 +36,7 @@ describe('demo surface boundaries', () => {
     const offenders = getFilesRecursively(APP_ROOT)
       .filter(file => !file.startsWith(DEMO_APP_ROOT))
       .filter(
-        file => !file.endsWith(join('(marketing)', 'demo', 'video', 'page.tsx'))
+        file => !ALLOWED_MARKETING_DEMO_UI_ROUTES.has(relative(APP_ROOT, file))
       )
       .filter(file => readFileSync(file, 'utf8').includes('@/features/demo/'))
       .map(file => relative(ROOT, file));

@@ -16,8 +16,8 @@ import { ChatInput } from '@/components/jovie/components/ChatInput';
  *   - aria-controls={pickerListId}
  *   - aria-activedescendant={activeRowId}
  *   - aria-autocomplete='list'
- * When closed, only aria-expanded='false' (and the existing aria-label)
- * remain.
+ * When closed, only the existing aria-label remains. `aria-expanded` is
+ * omitted because it is invalid on a plain textarea without combobox role.
  */
 
 vi.mock('@/lib/queries/useReleasesQuery', () => ({
@@ -128,10 +128,10 @@ function getTextarea(): HTMLTextAreaElement {
 }
 
 describe('ChatInput combobox ARIA wiring', () => {
-  it('starts with aria-expanded=false and no combobox role when picker closed', () => {
+  it('starts with no combobox-only attrs when picker closed', () => {
     render(withProviders(<Harness />));
     const textarea = getTextarea();
-    expect(textarea).toHaveAttribute('aria-expanded', 'false');
+    expect(textarea).not.toHaveAttribute('aria-expanded');
     expect(textarea).not.toHaveAttribute('role', 'combobox');
     expect(textarea).not.toHaveAttribute('aria-controls');
     expect(textarea).not.toHaveAttribute('aria-activedescendant');
@@ -174,7 +174,7 @@ describe('ChatInput combobox ARIA wiring', () => {
     // Wait one microtask for the picker close + 0ms timeout focus restore.
     await new Promise(resolve => setTimeout(resolve, 10));
 
-    expect(textarea).toHaveAttribute('aria-expanded', 'false');
+    expect(textarea).not.toHaveAttribute('aria-expanded');
     expect(textarea).not.toHaveAttribute('role', 'combobox');
     expect(textarea).not.toHaveAttribute('aria-controls');
     expect(textarea).not.toHaveAttribute('aria-activedescendant');
