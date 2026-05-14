@@ -7,6 +7,12 @@
 
 ## [26.4.244] - 2026-05-12
 
+> [internal] Touring settings page button polish: Bandsintown pill height normalized to sm scale, Copy Link button uses pill shape.
+
+### Fixed
+
+- **[internal] Touring page button sizing**: Bandsintown connection pill now matches the sm button height (h-7) and icon scale (h-3.5 w-3.5). Copy Link button replaced with the shared Button component (variant secondary, size sm) giving it the correct rounded-full pill shape. No layout shifts.
+
 > Public marketing is tightened for YC: the homepage keeps the strong product story visible, hides broad navigation and feature-grid sprawl, and limits pricing to Free plus waitlisted Pro by default.
 
 ### Changed
