@@ -20,7 +20,7 @@ export function DemoVideoPage() {
       data-testid='demo-video-page'
     >
       <h1
-        className='max-w-3xl text-center text-4xl font-bold leading-tight tracking-tight text-white sm:text-5xl'
+        className='max-w-3xl text-center text-4xl font-bold leading-tight text-white sm:text-5xl'
         style={{ fontFeatureSettings: 'var(--font-features)' }}
       >
         Jovie turns artist signals into execution

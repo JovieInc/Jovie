@@ -81,6 +81,7 @@ export function useProfileVisitTracking(
     if (typeof window === 'undefined') return;
     if (!artistId) return;
     if (process.env.NEXT_PUBLIC_CI === 'true') return;
+    if (process.env.NEXT_PUBLIC_DEMO_RECORDING === '1') return;
     let cancelled = false;
     const profileId = artistId;
 
