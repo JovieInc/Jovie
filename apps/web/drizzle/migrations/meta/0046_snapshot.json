@@ -16977,7 +16977,7 @@
               "nulls": "last"
             },
             {
-              "expression": "lower(\"url\")",
+              "expression": "normalize_social_url(\"url\")",
               "asc": true,
               "isExpression": true,
               "nulls": "last"

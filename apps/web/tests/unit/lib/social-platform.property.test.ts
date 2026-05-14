@@ -111,6 +111,43 @@ describe('dedupeLinks (property)', () => {
       )
     );
   });
+
+  it('preserves distinct query strings — ?id=1 and ?id=2 stay separate', () => {
+    // Regression for CodeRabbit JOV-2149: the prior dedupe key dropped
+    // u.search, so Facebook profile URLs like profile.php?id=1 and ?id=2
+    // collapsed to one row even though they are different destinations.
+    const links = [
+      {
+        id: 'a',
+        platform: 'facebook',
+        url: 'https://facebook.com/profile.php?id=1',
+      },
+      {
+        id: 'b',
+        platform: 'facebook',
+        url: 'https://facebook.com/profile.php?id=2',
+      },
+    ];
+    expect(dedupeLinks(links)).toHaveLength(2);
+  });
+
+  it('collapses query-string casing variants of the same destination', () => {
+    // The query string is lowercased in the dedupe key, so ?ID=1 and
+    // ?id=1 are the same destination.
+    const links = [
+      {
+        id: 'a',
+        platform: 'facebook',
+        url: 'https://facebook.com/profile.php?ID=1',
+      },
+      {
+        id: 'b',
+        platform: 'facebook',
+        url: 'https://facebook.com/profile.php?id=1',
+      },
+    ];
+    expect(dedupeLinks(links)).toHaveLength(1);
+  });
 });
 
 describe('extractHandleFromUrl (property)', () => {

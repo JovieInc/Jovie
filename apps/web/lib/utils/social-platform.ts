@@ -182,20 +182,48 @@ export function extractHandleFromUrl(urlRaw: string): string | null {
 }
 
 /**
+ * Strip trailing forward slashes from a path without using regex.
+ *
+ * Avoids the regex-DoS analyzer false-positive on `/\/+$/` and is
+ * faster: a tight loop with index math instead of regex backtracking
+ * machinery. Bounded by string length, never re-enters.
+ */
+function stripTrailingSlashes(path: string): string {
+  let end = path.length;
+  while (end > 0 && path.charCodeAt(end - 1) === 47 /* '/' */) end -= 1;
+  return end === path.length ? path : path.slice(0, end);
+}
+
+/**
+ * Strip a leading `www.` host prefix without using regex.
+ *
+ * Mirrors `stripTrailingSlashes`: index check + slice, no backtracking.
+ */
+function stripLeadingWww(host: string): string {
+  return host.startsWith('www.') ? host.slice(4) : host;
+}
+
+/**
  * Produce a stable key for deduping a link by `(platform, url)`.
  *
  * Two URLs that resolve to the same destination on the same platform
- * (trailing slash, casing, `www.` prefix, query/fragment noise) must
- * collapse to the same key. Invalid URLs fall back to the trimmed raw
- * string so we don't drop rows we can't parse.
+ * (trailing slash, casing, `www.` prefix, fragment noise) must collapse
+ * to the same key. The query string is preserved (lowercased): URLs
+ * like `facebook.com/profile.php?id=1` and `…?id=2` are distinct
+ * destinations and must NOT collapse (CodeRabbit JOV-2149 review).
+ *
+ * Invalid URLs fall back to the trimmed raw string so we don't drop
+ * rows we can't parse.
  */
 function dedupeKey(platform: string, urlRaw: string): string {
   const p = platform.trim().toLowerCase();
   try {
     const u = new URL(urlRaw);
-    const host = u.hostname.toLowerCase().replace(/^www\./, '');
-    const path = u.pathname.replace(/\/+$/, '').toLowerCase();
-    return `${p}|${host}${path}`;
+    const host = stripLeadingWww(u.hostname.toLowerCase());
+    const path = stripTrailingSlashes(u.pathname).toLowerCase();
+    // Preserve query components — `?id=1` vs `?id=2` are distinct.
+    const search = u.search.toLowerCase();
+    return `${p}|${host}${path}${search}`;
   } catch {
     return `${p}|${urlRaw.trim().toLowerCase()}`;
   }
