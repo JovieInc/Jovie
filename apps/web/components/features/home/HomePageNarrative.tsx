@@ -49,6 +49,7 @@ export function FinalCallToAction({
             <Link
               href={APP_ROUTES.SIGNUP}
               data-testid='final-cta-action'
+              data-cta-sign-up='true'
               className='homepage-pill-primary focus-ring-themed'
             >
               {content.primaryCtaLabel}

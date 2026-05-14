@@ -27,7 +27,9 @@ export function NewPreFooterCTA() {
 
             <div className='mt-8 flex flex-col sm:flex-row items-center justify-center gap-3'>
               <Button asChild size='lg' variant='primary'>
-                <Link href={APP_ROUTES.SIGNUP}>Request Access</Link>
+                <Link href={APP_ROUTES.SIGNUP} data-cta-sign-up='true'>
+                  Request Access
+                </Link>
               </Button>
               <Button asChild size='lg' variant='secondary'>
                 <Link href='#how-it-works'>See how it works</Link>

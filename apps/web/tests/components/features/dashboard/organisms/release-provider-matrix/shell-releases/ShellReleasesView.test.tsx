@@ -627,4 +627,151 @@ describe('ShellReleasesView', () => {
       ).not.toBeInTheDocument();
     });
   });
+
+  describe('entitlement gating', () => {
+    it('shows open smart-link affordance for fully entitled users', () => {
+      renderShell([
+        fakeRelease({
+          id: 'r1',
+          title: 'Open Track',
+          releaseDate: '2024-01-01',
+        }),
+      ]);
+
+      expect(
+        screen.getByLabelText('Open smart link for Open Track')
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByLabelText(/Smart link locked \(Pro\)/)
+      ).not.toBeInTheDocument();
+    });
+
+    it('locks scheduled releases for free users without canAccessFutureReleases', async () => {
+      mockUsePlanGate.mockReturnValue({
+        isLoading: false,
+        isError: false,
+        smartLinksLimit: null,
+        isPro: false,
+        canCreateManualReleases: true,
+        canGenerateAlbumArt: false,
+        canGenerateReleasePlans: false,
+        canEditSmartLinks: true,
+        canAccessFutureReleases: false,
+      });
+
+      const future = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        .toISOString()
+        .slice(0, 10);
+
+      renderShell([
+        fakeRelease({
+          id: 'future-1',
+          title: 'Upcoming Drop',
+          releaseDate: future,
+        }),
+      ]);
+
+      expect(
+        screen.getByLabelText('Scheduled smart link (Pro) for Upcoming Drop')
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByLabelText('Open smart link for Upcoming Drop')
+      ).not.toBeInTheDocument();
+      expect(
+        await screen.findByTestId('smart-link-gate-banner-unreleased')
+      ).toBeInTheDocument();
+    });
+
+    it('locks releases beyond smartLinksLimit with cap reason', () => {
+      mockUsePlanGate.mockReturnValue({
+        isLoading: false,
+        isError: false,
+        smartLinksLimit: 1,
+        isPro: false,
+        canCreateManualReleases: true,
+        canGenerateAlbumArt: false,
+        canGenerateReleasePlans: false,
+        canEditSmartLinks: true,
+        canAccessFutureReleases: true,
+      });
+
+      renderShell([
+        fakeRelease({
+          id: 'old',
+          title: 'Older Release',
+          releaseDate: '2020-01-01',
+        }),
+        fakeRelease({
+          id: 'new',
+          title: 'Newer Release',
+          releaseDate: '2024-01-01',
+        }),
+      ]);
+
+      // Cap allows oldest first up to limit — newer release is locked.
+      expect(
+        screen.getByLabelText('Smart link locked (Pro) for Newer Release')
+      ).toBeInTheDocument();
+      expect(
+        screen.getByLabelText('Open smart link for Older Release')
+      ).toBeInTheDocument();
+    });
+
+    it('gates the row action menu copy item when the smart link is locked', () => {
+      mockUsePlanGate.mockReturnValue({
+        isLoading: false,
+        isError: false,
+        smartLinksLimit: null,
+        isPro: false,
+        canCreateManualReleases: true,
+        canGenerateAlbumArt: false,
+        canGenerateReleasePlans: false,
+        canEditSmartLinks: true,
+        canAccessFutureReleases: false,
+      });
+
+      const future = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        .toISOString()
+        .slice(0, 10);
+
+      renderShell([
+        fakeRelease({
+          id: 'future-1',
+          title: 'Upcoming Drop',
+          releaseDate: future,
+        }),
+      ]);
+
+      // Row menu should expose the scheduled-lock label, not "Copy smart link".
+      expect(
+        screen.getByRole('button', { name: 'Scheduled smart link (Pro)' })
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Copy smart link' })
+      ).not.toBeInTheDocument();
+    });
+
+    it('hides the manual create affordance when canCreateManualReleases is false', () => {
+      mockUsePlanGate.mockReturnValue({
+        isLoading: false,
+        isError: false,
+        smartLinksLimit: null,
+        isPro: false,
+        canCreateManualReleases: false,
+        canGenerateAlbumArt: false,
+        canGenerateReleasePlans: false,
+        canEditSmartLinks: true,
+        canAccessFutureReleases: true,
+      });
+
+      renderShell([], { spotifyConnected: true });
+
+      expect(
+        screen.queryByTestId('create-manual-action')
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId('shell-releases-create-connected-empty')
+      ).not.toBeInTheDocument();
+    });
+  });
 });
