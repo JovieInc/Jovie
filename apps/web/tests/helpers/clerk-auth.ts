@@ -101,11 +101,29 @@ async function parseJsonSafely<T>(response: APIResponse): Promise<T | null> {
 export function canFallbackToBypassUserId(
   persona: DevTestAuthPersona | null
 ): boolean {
-  return persona === 'creator';
+  return Boolean(persona);
+}
+
+export function resolveBypassSessionUrls(baseUrl: string): readonly string[] {
+  const urls = [new URL('/api/dev/test-auth/session', baseUrl).toString()];
+
+  try {
+    const parsedBaseUrl = new URL(baseUrl);
+    if (parsedBaseUrl.hostname === 'localhost') {
+      parsedBaseUrl.hostname = '127.0.0.1';
+      urls.push(
+        new URL('/api/dev/test-auth/session', parsedBaseUrl).toString()
+      );
+    }
+  } catch {
+    // The primary URL constructor above will surface invalid base URLs.
+  }
+
+  return Array.from(new Set(urls));
 }
 
 async function resolveBypassUserIdFromLocalProvisioning(
-  fallbackUserId: string,
+  fallbackUserId: string | null,
   persona: DevTestAuthPersona | null
 ): Promise<string | null> {
   if (!persona || !isTestAuthBypassEnabled()) {
@@ -129,63 +147,84 @@ async function resolveBypassUserIdFromLocalProvisioning(
 
 async function resolveBypassUserId(
   baseUrl: string,
-  fallbackUserId: string,
+  fallbackUserId: string | null,
   persona: DevTestAuthPersona | null
 ): Promise<string> {
   if (!persona) {
+    if (!fallbackUserId) {
+      throw new ClerkTestError(
+        'E2E_CLERK_USER_ID is required when test auth bypass has no persona.',
+        'MISSING_CREDENTIALS'
+      );
+    }
     return fallbackUserId;
   }
 
+  const sessionUrls = resolveBypassSessionUrls(baseUrl);
+  let lastResolveError = `No session bootstrap attempts ran for ${persona}.`;
+
   for (let attempt = 1; attempt <= 3; attempt += 1) {
-    try {
-      const response = await fetch(
-        new URL('/api/dev/test-auth/session', baseUrl),
-        {
+    for (const sessionUrl of sessionUrls) {
+      try {
+        const response = await fetch(sessionUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ persona }),
-        }
-      );
+        });
 
-      if (!response.ok) {
-        throw new Error(`Failed to resolve ${persona} test auth persona.`);
+        if (!response.ok) {
+          const responseText = await response.text().catch(() => '');
+          const bodySnippet = responseText.trim().slice(0, 240);
+          lastResolveError = `${sessionUrl} returned ${response.status}${
+            bodySnippet ? `: ${bodySnippet}` : ''
+          }`;
+          continue;
+        }
+
+        const payload = (await response.json()) as { userId?: string | null };
+        const resolvedUserId = payload.userId?.trim() || fallbackUserId;
+        if (resolvedUserId) {
+          return resolvedUserId;
+        }
+        lastResolveError = `${sessionUrl} returned no userId for ${persona}.`;
+      } catch (error) {
+        lastResolveError = `${sessionUrl} failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`;
       }
-
-      const payload = (await response.json()) as { userId?: string | null };
-      return payload.userId?.trim() || fallbackUserId;
-    } catch {
-      if (attempt === 3) {
-        const locallyProvisionedUserId =
-          await resolveBypassUserIdFromLocalProvisioning(
-            fallbackUserId,
-            persona
-          );
-
-        if (locallyProvisionedUserId) {
-          console.warn(
-            `[clerk-auth] Falling back to local provisioning for ${persona} persona after session bootstrap failed`
-          );
-          return locallyProvisionedUserId;
-        }
-
-        if (canFallbackToBypassUserId(persona)) {
-          console.warn(
-            `[clerk-auth] Falling back to configured bypass user for ${persona} persona after session bootstrap failed`
-          );
-          return fallbackUserId;
-        }
-
-        throw new ClerkTestError(
-          `Failed to resolve ${persona} test auth persona.`,
-          'CLERK_SETUP_FAILED'
-        );
-      }
-
-      await sleep(500 * attempt);
     }
+
+    if (attempt === 3) {
+      const locallyProvisionedUserId =
+        await resolveBypassUserIdFromLocalProvisioning(fallbackUserId, persona);
+
+      if (locallyProvisionedUserId) {
+        console.warn(
+          `[clerk-auth] Falling back to local provisioning for ${persona} persona after session bootstrap failed: ${lastResolveError}`
+        );
+        return locallyProvisionedUserId;
+      }
+
+      if (fallbackUserId && canFallbackToBypassUserId(persona)) {
+        console.warn(
+          `[clerk-auth] Falling back to configured bypass user for ${persona} persona after session bootstrap failed: ${lastResolveError}`
+        );
+        return fallbackUserId;
+      }
+
+      throw new ClerkTestError(
+        `Failed to resolve ${persona} test auth persona: ${lastResolveError}`,
+        'CLERK_SETUP_FAILED'
+      );
+    }
+
+    await sleep(500 * attempt);
   }
 
-  return fallbackUserId;
+  throw new ClerkTestError(
+    `Unexpected state while resolving ${persona} test auth persona: ${lastResolveError}`,
+    'CLERK_SETUP_FAILED'
+  );
 }
 
 async function enableTestAuthBypass(page: Page): Promise<void> {
@@ -210,9 +249,9 @@ async function enableTestAuthBypass(page: Page): Promise<void> {
       ? existingPersona
       : null) ?? requestedPersona;
 
-  if (!userId) {
+  if (!(userId || persona)) {
     throw new ClerkTestError(
-      'E2E_CLERK_USER_ID is required when test auth bypass is enabled.',
+      'E2E_CLERK_USER_ID or E2E_TEST_AUTH_PERSONA is required when test auth bypass is enabled.',
       'MISSING_CREDENTIALS'
     );
   }
@@ -254,9 +293,9 @@ export async function setTestAuthBypassSession(
   overrideUserId?: string | null
 ): Promise<void> {
   const userId = overrideUserId?.trim() || getTestAuthBypassUserId();
-  if (!userId) {
+  if (!(userId || persona)) {
     throw new ClerkTestError(
-      'E2E_CLERK_USER_ID is required when test auth bypass is enabled.',
+      'E2E_CLERK_USER_ID is required when test auth bypass has no persona.',
       'MISSING_CREDENTIALS'
     );
   }

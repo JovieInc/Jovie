@@ -43,6 +43,11 @@ export default {
     'lib/auth/decode-fapi-host.ts',
     'lib/auth/staging-clerk-keys.ts',
     'lib/auth/test-mode.ts',
+    // Social-link dedupe + handle parser. Mutating these surfaces the
+    // assertions in tests/unit/lib/social-platform.property.test.ts;
+    // a passing-but-mutation-survives suite means duplicate rows or
+    // "YouTube YouTube" labels could ship again (JOV-2149).
+    'lib/utils/social-platform.ts',
     // Standard exclusions
     '!**/*.test.ts',
     '!**/*.test.tsx',
@@ -55,6 +60,7 @@ export default {
     'tests/unit/actions/onboarding/**/*.test.ts',
     'tests/unit/lib/entitlements.server.test.ts',
     'tests/unit/lib/queries/useBillingMutations.test.tsx',
+    'tests/unit/lib/social-platform.property.test.ts',
   ],
   ignorePatterns: [
     '.next',

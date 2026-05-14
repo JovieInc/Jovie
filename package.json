@@ -1,6 +1,6 @@
 {
   "name": "jovie-monorepo",
-  "version": "26.4.244",
+  "version": "26.4.247",
   "private": true,
   "config": {
     "commitizen": {
@@ -57,7 +57,10 @@
       "tar": "7.5.13",
       "@tootallnate/once": "3.0.1",
       "smol-toml": "1.6.1",
-      "srvx": "0.11.13"
+      "srvx": "0.11.13",
+      "@playwright/test": "1.60.0",
+      "playwright": "1.60.0",
+      "playwright-core": "1.60.0"
     },
     "patchedDependencies": {
       "eslint-plugin-react@7.37.5": "patches/eslint-plugin-react@7.37.5.patch"
@@ -124,7 +127,7 @@
     "@biomejs/biome": "^2.4.8",
     "@commitlint/cli": "^20.5.0",
     "@commitlint/config-conventional": "^20.5.0",
-    "@playwright/test": "1.58.2",
+    "@playwright/test": "1.60.0",
     "commitizen": "^4.3.1",
     "csv-parse": "^6.2.1",
     "cz-conventional-changelog": "^3.3.0",

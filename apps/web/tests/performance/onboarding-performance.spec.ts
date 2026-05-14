@@ -108,10 +108,12 @@ test.describe('Onboarding Performance', () => {
   });
 
   test('handle validation debouncing works efficiently', async ({ page }) => {
-    await page.goto('/onboarding', { waitUntil: 'domcontentloaded' });
+    await page.goto('/start', { waitUntil: 'domcontentloaded' });
 
-    // Find handle input (if accessible without auth)
-    const handleInput = page.locator('input[type="text"]').first();
+    // Find chat composer (canonical onboarding is now chat-first).
+    const handleInput = page
+      .locator('[aria-label="Chat message input"]')
+      .first();
 
     if (await handleInput.isVisible()) {
       const startTime = Date.now();
@@ -135,7 +137,7 @@ test.describe('Onboarding Performance', () => {
   test('onboarding page renders efficiently', async ({ page }) => {
     const startTime = Date.now();
 
-    await page.goto('/onboarding', {
+    await page.goto('/start', {
       waitUntil: 'domcontentloaded',
       timeout: 5000,
     });
@@ -143,11 +145,11 @@ test.describe('Onboarding Performance', () => {
     const endTime = Date.now();
     const loadTime = endTime - startTime;
 
-    // Onboarding page should load quickly
+    // Onboarding chat shell should load quickly
     expect(loadTime).toBeLessThan(2000);
 
     // Check for basic content
-    await expect(page.locator('h1, h2')).toBeVisible();
+    await expect(page.locator('[data-testid="onboarding-chat"]')).toBeVisible();
   });
 
   test('API endpoints have proper caching headers', async ({ page }) => {
@@ -181,7 +183,7 @@ test.describe('Onboarding Performance', () => {
     // Navigate through onboarding flow multiple times
     for (let i = 0; i < 5; i++) {
       await page.goto('/', { waitUntil: 'domcontentloaded' });
-      await page.goto('/onboarding', { waitUntil: 'domcontentloaded' });
+      await page.goto('/start', { waitUntil: 'domcontentloaded' });
       await page.goto('/', { waitUntil: 'domcontentloaded' });
     }
 
