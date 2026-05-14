@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { geoAwarePopularityIndex } from '@/constants/app';
-import { DSP_CONFIGS, getAvailableDSPs, sortDSPsForDevice } from '@/lib/dsp';
+import {
+  DSP_CONFIGS,
+  getAvailableDSPs,
+  isValidDspUrl,
+  sortDSPsForDevice,
+} from '@/lib/dsp';
 import { Artist } from '@/types/db';
 
 describe('DSP Utils', () => {
@@ -257,6 +262,159 @@ describe('DSP Utils', () => {
         textColor: 'white',
         logoSvg: expect.stringContaining('<svg'),
       });
+    });
+  });
+
+  describe('isValidDspUrl', () => {
+    it('accepts a canonical Spotify URL', () => {
+      expect(
+        isValidDspUrl('spotify', 'https://open.spotify.com/artist/abc123')
+      ).toBe(true);
+    });
+
+    it('accepts a Spotify short-link domain', () => {
+      expect(isValidDspUrl('spotify', 'https://spotify.link/xyz')).toBe(true);
+    });
+
+    it('accepts an Apple Music URL', () => {
+      expect(
+        isValidDspUrl('apple_music', 'https://music.apple.com/us/artist/abc')
+      ).toBe(true);
+    });
+
+    it('accepts an iTunes URL for apple_music (legacy subdomain)', () => {
+      expect(
+        isValidDspUrl(
+          'apple_music',
+          'https://itunes.apple.com/us/artist/abc/id123'
+        )
+      ).toBe(true);
+    });
+
+    it('accepts a YouTube Music URL', () => {
+      expect(
+        isValidDspUrl(
+          'youtube_music',
+          'https://music.youtube.com/channel/UCabc'
+        )
+      ).toBe(true);
+    });
+
+    it('accepts an Amazon Music URL', () => {
+      expect(
+        isValidDspUrl('amazon_music', 'https://music.amazon.com/artists/abc')
+      ).toBe(true);
+    });
+
+    it('rejects a URL with wrong domain for Spotify', () => {
+      expect(isValidDspUrl('spotify', 'https://www.apple.com/music')).toBe(
+        false
+      );
+    });
+
+    it('rejects a URL that points to a completely different site', () => {
+      expect(
+        isValidDspUrl('apple_music', 'https://open.spotify.com/artist/abc')
+      ).toBe(false);
+    });
+
+    it('rejects an empty string', () => {
+      expect(isValidDspUrl('spotify', '')).toBe(false);
+    });
+
+    it('rejects null', () => {
+      expect(isValidDspUrl('spotify', null)).toBe(false);
+    });
+
+    it('rejects undefined', () => {
+      expect(isValidDspUrl('spotify', undefined)).toBe(false);
+    });
+
+    it('rejects a non-URL string', () => {
+      expect(isValidDspUrl('spotify', 'not-a-url')).toBe(false);
+    });
+
+    it('rejects a URL with an unsupported scheme', () => {
+      expect(
+        isValidDspUrl('spotify', 'ftp://open.spotify.com/artist/abc')
+      ).toBe(false);
+    });
+
+    it('rejects a www-prefixed URL when the domain is wrong', () => {
+      expect(
+        isValidDspUrl('spotify', 'https://www.deezer.com/artist/abc')
+      ).toBe(false);
+    });
+
+    it('normalises www prefix — accepts www.deezer.com for deezer key', () => {
+      expect(isValidDspUrl('deezer', 'https://www.deezer.com/artist/abc')).toBe(
+        true
+      );
+    });
+
+    it('accepts deezer.com without www', () => {
+      expect(isValidDspUrl('deezer', 'https://deezer.com/artist/abc')).toBe(
+        true
+      );
+    });
+  });
+
+  describe('getAvailableDSPs with invalid URLs', () => {
+    const baseArtist: Artist = {
+      id: '1',
+      owner_user_id: '1',
+      handle: 'testartist',
+      spotify_id: 'spotify123',
+      name: 'Test Artist',
+      spotify_url: 'https://open.spotify.com/artist/spotify123',
+      apple_music_url: 'https://music.apple.com/artist/apple123',
+      youtube_url: 'https://youtube.com/channel/youtube123',
+      published: true,
+      is_verified: false,
+      is_featured: false,
+      marketing_opt_out: false,
+      created_at: '2024-01-01T00:00:00Z',
+    };
+
+    it('excludes a DSP whose URL is a non-URL string (corrupted data)', () => {
+      const result = getAvailableDSPs({
+        ...baseArtist,
+        apple_music_url: 'not-a-valid-url',
+      });
+      expect(result.map(d => d.key)).not.toContain('apple_music');
+    });
+
+    it('excludes a DSP whose URL points to the wrong domain', () => {
+      const result = getAvailableDSPs({
+        ...baseArtist,
+        apple_music_url: 'https://open.spotify.com/artist/crosscontaminated',
+        youtube_url: undefined,
+        spotify_url: undefined,
+        spotify_id: '',
+      });
+      // apple_music_url resolves to a Spotify domain — should be hidden
+      expect(result).toHaveLength(0);
+    });
+
+    it('excludes a DSP whose URL uses a non-http scheme', () => {
+      const result = getAvailableDSPs({
+        ...baseArtist,
+        apple_music_url: 'ftp://music.apple.com/artist/abc',
+        youtube_url: undefined,
+        spotify_url: undefined,
+        spotify_id: '',
+      });
+      expect(result).toHaveLength(0);
+    });
+
+    it('still renders valid DSPs when only one is invalid', () => {
+      const result = getAvailableDSPs({
+        ...baseArtist,
+        apple_music_url: 'not-a-valid-url',
+        youtube_url: undefined,
+      });
+      expect(result).toHaveLength(1);
+      expect(result[0].key).toBe('spotify');
     });
   });
 });
