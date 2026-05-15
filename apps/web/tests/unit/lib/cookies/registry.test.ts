@@ -37,15 +37,11 @@ describe('cookie registry', () => {
       new Set(['jv_city', 'jv_region', 'jv_aid', 'jv_identified'])
     );
 
-    for (const entry of COOKIE_REGISTRY) {
-      if (
-        blocked.has(
-          entry.name as (typeof NONESSENTIAL_PROXY_COOKIE_NAMES)[number]
-        )
-      ) {
-        expect(entry.preConsent).toBe(false);
-        expect(entry.category).toBe('analytics');
-      }
+    for (const cookieName of blocked) {
+      const entry = COOKIE_REGISTRY.find(item => item.name === cookieName);
+      expect(entry).toBeDefined();
+      expect(entry?.preConsent).toBe(false);
+      expect(entry?.category).toBe('analytics');
     }
   });
 
