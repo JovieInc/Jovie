@@ -70,7 +70,7 @@ export function PublicProfileLayoutShell({
             <h1 className='sr-only'>{artistName}</h1>
           ) : null}
           {isDesktopLayout ? (
-            <div className='min-w-0 w-full' data-testid='profile-compact-shell'>
+            <div className='min-w-0 w-full' data-testid='profile-desktop-shell'>
               {desktopSurface}
             </div>
           ) : (

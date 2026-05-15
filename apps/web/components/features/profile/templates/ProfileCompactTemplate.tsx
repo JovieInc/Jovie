@@ -149,8 +149,11 @@ function unwrapNextImageUrl(url: string | null | undefined): string | null {
 
 const DRAWER_CLOSE_RESET_DELAY_MS = 200;
 
-function getInitialModeFromLocation(fallbackMode: ProfileMode): ProfileMode {
-  if (globalThis.window === undefined) {
+function getInitialModeFromLocation(
+  fallbackMode: ProfileMode,
+  readWindowLocation = false
+): ProfileMode {
+  if (!readWindowLocation || globalThis.window === undefined) {
     return fallbackMode;
   }
 
@@ -481,7 +484,7 @@ export function ProfileCompactTemplate({
 
   const syncRequestedModeFromLocation = useCallback(() => {
     setRequestedMode(currentMode => {
-      const nextMode = getInitialModeFromLocation(mode);
+      const nextMode = getInitialModeFromLocation(mode, true);
       if (currentMode !== nextMode) {
         suppressNextHistorySyncRef.current = true;
         initialLocationModeAlignedRef.current = false;

@@ -241,13 +241,6 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       viewport: 'mobile',
     },
     {
-      id: 'tim-white-profile-tour-nearby-mobile',
-      title: 'Tim White Profile — Nearby Tour',
-      route: '/demo/showcase/tim-white-profile?state=tour-nearby',
-      waitFor: '[data-testid="demo-showcase-tim-white-profile-state"]',
-      viewport: 'mobile',
-    },
-    {
       id: 'tim-white-profile-live-desktop',
       title: 'Tim White Profile — Latest Release Desktop',
       route: '/demo/showcase/tim-white-profile?release=live',
@@ -291,12 +284,24 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       waitFor: '[data-testid="demo-showcase-tim-white-profile-state"]',
       viewport: 'mobile',
     },
+  ]),
+  ...defineScenarios('marketing', ADMIN_MARKETING_AND_INVESTOR, [
+    ...TIM_WHITE_PROFILE_MOBILE_VARIANTS.map(timWhiteProfileMobile),
+    {
+      id: 'tim-white-profile-tour-nearby-mobile',
+      title: 'Tim White Profile — Nearby Tour',
+      route: '/demo/showcase/tim-white-profile?state=tour-nearby',
+      waitFor: '[data-testid="demo-showcase-tim-white-profile-state"]',
+      viewport: 'mobile',
+      publicExportPath: 'tim-white-profile-tour-nearby-phone.png',
+    },
     {
       id: 'tim-white-profile-alerts-fallback-mobile',
       title: 'Tim White Profile — Alerts Fallback',
       route: '/demo/showcase/tim-white-profile?state=alerts-fallback',
       waitFor: '[data-testid="profile-home-alerts-fallback-card"]',
       viewport: 'mobile',
+      publicExportPath: 'tim-white-profile-alerts-fallback-phone.png',
     },
     {
       id: 'tim-white-profile-events-empty-mobile',
@@ -304,6 +309,7 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       route: '/demo/showcase/tim-white-profile?state=events-empty',
       waitFor: '[data-testid="tour-drawer-content"]',
       viewport: 'mobile',
+      publicExportPath: 'tim-white-profile-events-empty-phone.png',
     },
     {
       id: 'tim-white-profile-more-menu-mobile',
@@ -311,10 +317,8 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       route: '/demo/showcase/tim-white-profile?state=more-menu',
       waitFor: '[data-testid="profile-menu-drawer"]',
       viewport: 'mobile',
+      publicExportPath: 'tim-white-profile-more-menu-phone.png',
     },
-  ]),
-  ...defineScenarios('marketing', ADMIN_MARKETING_AND_INVESTOR, [
-    ...TIM_WHITE_PROFILE_MOBILE_VARIANTS.map(timWhiteProfileMobile),
     {
       id: 'tim-white-profile-presave-mobile',
       title: 'Tim White Profile — Presave Countdown',

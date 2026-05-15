@@ -3,7 +3,7 @@
 import { BadgeCheck, Bell, ChevronLeft, MapPin } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
@@ -315,6 +315,11 @@ export function ProfileCompactSurface({
   const handleSubscriptionActivated = useCallback(() => {
     setShowRecentActivationRow(true);
   }, []);
+  useEffect(() => {
+    if (!isSubscribed) {
+      setShowRecentActivationRow(false);
+    }
+  }, [isSubscribed]);
   const returnToProfileAfterNotifications = useCallback(() => {
     onModeSelect('profile');
   }, [onModeSelect]);

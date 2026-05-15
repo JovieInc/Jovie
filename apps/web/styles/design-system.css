@@ -47,7 +47,7 @@
   --section-gap: clamp(16px, 3vw, 28px);
   --card-pad: clamp(14px, 3vw, 24px);
   --avatar-size: clamp(88px, 22vw, 144px);
-  --cover-height: clamp(320px, 112vw, 500px);
+  --cover-height: clamp(320px, min(112vw, 56svh), 500px);
   --content-max: 720px;
   --profile-bottom-nav-height: calc(
     3.5rem +
@@ -86,7 +86,7 @@
   --section-gap: clamp(16px, 3vw, 28px);
   --card-pad: clamp(14px, 3vw, 24px);
   --avatar-size: clamp(88px, 22vw, 144px);
-  --cover-height: clamp(320px, 112vw, 500px);
+  --cover-height: clamp(320px, min(112vw, 56svh), 500px);
   --content-max: 720px;
 }
 

@@ -92,10 +92,10 @@ test.describe('Profile Notifications Hosts', () => {
       await waitForHydration(page);
 
       await expect(
-        page.getByTestId('profile-mobile-notifications-flow')
+        page.getByTestId('profile-mobile-notifications-flow').first()
       ).toBeVisible();
       await expect(
-        page.getByTestId('profile-mobile-notifications-step-email')
+        page.getByTestId('profile-mobile-notifications-step-email').first()
       ).toBeVisible();
     });
 
@@ -167,13 +167,15 @@ test.describe('Profile Notifications Hosts', () => {
       await waitForHydration(page);
 
       await expect(
-        page.getByTestId('profile-mobile-notifications-flow')
+        page.getByTestId('profile-mobile-notifications-flow').first()
       ).toBeVisible();
       await expect(
-        page.getByTestId('profile-mobile-notifications-step-preferences')
+        page
+          .getByTestId('profile-mobile-notifications-step-preferences')
+          .first()
       ).toBeVisible();
       await expect(
-        page.getByTestId('profile-mobile-notifications-sent-from')
+        page.getByTestId('profile-mobile-notifications-sent-from').first()
       ).toBeVisible();
     });
   }

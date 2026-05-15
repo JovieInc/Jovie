@@ -545,7 +545,7 @@ export const HOMEPAGE_PROFILE_PREVIEW_RELEASES = {
     title: HOME_RELEASE_DESTINATION_PRESAVE_MOCK.title,
     slug: 'the-deep-end',
     artworkUrl: '/img/releases/the-deep-end.jpg',
-    releaseDate: '2026-05-01T07:00:00.000Z',
+    releaseDate: '2027-07-01T07:00:00.000Z',
     revealDate: '2026-04-18T07:00:00.000Z',
     releaseType: 'single',
     metadata: {

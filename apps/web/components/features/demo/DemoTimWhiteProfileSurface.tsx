@@ -460,7 +460,7 @@ function renderAlertsFallbackPreview(dataTestId: string) {
         profileSettings={SHOWCASE_PROFILE_SETTINGS}
         featuredPlaylistFallback={null}
         tourDates={[]}
-        hasPlayableDestinations
+        hasPlayableDestinations={false}
         renderMode='preview'
         isSubscribed={false}
         resolveNearbyTour={false}

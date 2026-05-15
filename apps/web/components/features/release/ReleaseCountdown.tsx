@@ -18,6 +18,11 @@ interface TimeLeft {
   total: number;
 }
 
+type CompactCountdownSegment = {
+  readonly value: number;
+  readonly label: 'YR' | 'YRS' | 'D' | 'H' | 'M';
+};
+
 /**
  * Calculate time remaining until target date.
  * Returns zero-state for invalid or already-past dates.
@@ -53,6 +58,29 @@ interface ReleaseCountdownProps {
 }
 
 const UPDATE_INTERVAL_MS = 60_000;
+const DAYS_PER_YEAR = 365;
+
+export function getCompactCountdownSegments(
+  timeLeft: Pick<TimeLeft, 'days' | 'hours' | 'minutes'>
+): readonly CompactCountdownSegment[] {
+  if (timeLeft.days >= DAYS_PER_YEAR) {
+    const years = Math.max(1, Math.floor(timeLeft.days / DAYS_PER_YEAR));
+    return [
+      {
+        value: years,
+        label: years === 1 ? 'YR' : 'YRS',
+      },
+    ];
+  }
+
+  return [
+    ...(timeLeft.days > 0
+      ? [{ value: timeLeft.days, label: 'D' as const }]
+      : []),
+    { value: timeLeft.hours, label: 'H' },
+    { value: timeLeft.minutes, label: 'M' },
+  ];
+}
 
 export function ReleaseCountdown({
   releaseDate,
@@ -109,34 +137,20 @@ export function ReleaseCountdown({
   }
 
   if (compact) {
+    const segments = getCompactCountdownSegments(timeLeft);
+
     return (
-      <div className='flex items-baseline gap-3 tabular-nums'>
-        {timeLeft.days > 0 && (
-          <span>
+      <div className='flex items-baseline gap-2.5 tabular-nums'>
+        {segments.map(segment => (
+          <span key={segment.label}>
             <span className='text-[22px] font-[680] tracking-[-0.03em] text-white'>
-              {timeLeft.days}
+              {segment.value}
             </span>
             <span className='ml-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-white/35'>
-              D
+              {segment.label}
             </span>
           </span>
-        )}
-        <span>
-          <span className='text-[22px] font-[680] tracking-[-0.03em] text-white'>
-            {timeLeft.hours}
-          </span>
-          <span className='ml-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-white/35'>
-            H
-          </span>
-        </span>
-        <span>
-          <span className='text-[22px] font-[680] tracking-[-0.03em] text-white'>
-            {timeLeft.minutes}
-          </span>
-          <span className='ml-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-white/35'>
-            M
-          </span>
-        </span>
+        ))}
       </div>
     );
   }

@@ -19,6 +19,7 @@ import { useUserLocation } from '@/hooks/useUserLocation';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import { getProfileReleaseVisibility } from '@/lib/profile/release-visibility';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
+import { cn } from '@/lib/utils';
 import type { Artist } from '@/types/db';
 
 interface ProfileHomeRailProps {
@@ -80,33 +81,31 @@ function HomeAlertsCard({
   const sharedProps = {
     className:
       variant === 'bento'
-        ? 'group grid min-h-[104px] w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-4 rounded-[18px] border border-white/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.07),rgba(255,255,255,0.025))] px-4 py-4 text-left text-white shadow-[0_18px_44px_-26px_rgba(0,0,0,0.72),inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-2xl transition-[background-color,border-color,opacity] duration-subtle hover:bg-white/[0.07] active:opacity-[0.9]'
-        : 'group flex min-h-11 w-full min-w-0 items-center gap-3 rounded-[14px] border border-white/10 bg-white/[0.035] px-3 text-left text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_14px_28px_-18px_rgba(0,0,0,0.55)] backdrop-blur-2xl transition-[background-color,border-color,opacity] duration-subtle hover:bg-white/[0.055] active:opacity-[0.9]',
-    role: 'switch',
-    'aria-checked': isSubscribed,
-    'aria-label': isSubscribed
-      ? `Manage alerts for ${artist.name}`
-      : `Get alerts for ${artist.name}`,
+        ? 'group flex min-h-[78px] w-full min-w-0 items-center gap-3 rounded-[16px] border border-white/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.025))] px-3.5 py-3 text-left text-white shadow-[0_16px_34px_-24px_rgba(0,0,0,0.7),inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-2xl transition-[background-color,border-color,opacity] duration-subtle hover:bg-white/[0.06] active:opacity-[0.9]'
+        : 'group flex min-h-12 w-full min-w-0 items-center gap-2.5 rounded-[14px] border border-white/10 bg-white/[0.035] px-3 text-left text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_14px_28px_-18px_rgba(0,0,0,0.55)] backdrop-blur-2xl transition-[background-color,border-color,opacity] duration-subtle hover:bg-white/[0.055] active:opacity-[0.9]',
     'data-testid':
       variant === 'bento'
         ? 'profile-home-alerts-fallback-card'
         : 'profile-home-alerts-row',
   } as const;
+  const ariaLabel = isSubscribed
+    ? `Manage alerts for ${artist.name}`
+    : `Get alerts for ${artist.name}`;
   const iconClassName =
     variant === 'bento'
-      ? 'flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] border border-white/8 bg-white/[0.06] text-white'
-      : 'flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-white/8 bg-white/[0.045] text-white';
+      ? 'flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border border-white/8 bg-white/[0.055] text-white/88'
+      : 'flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-white/8 bg-white/[0.045] text-white/86';
   const content = (
     <>
       <span className={iconClassName} aria-hidden='true'>
-        <Bell className={variant === 'bento' ? 'h-5 w-5' : 'h-4 w-4'} />
+        <Bell className={variant === 'bento' ? 'h-4 w-4' : 'h-3.5 w-3.5'} />
       </span>
       <span className='min-w-0 flex-1'>
         <span
           className={
             variant === 'bento'
-              ? 'block text-[16px] font-[650] leading-5 tracking-[-0.025em] [overflow-wrap:anywhere]'
-              : 'block text-[13px] font-semibold leading-5 tracking-[-0.01em] [overflow-wrap:anywhere]'
+              ? 'block text-[14px] font-[650] leading-[1.15] tracking-[-0.015em] [overflow-wrap:anywhere]'
+              : 'block text-[12.5px] font-semibold leading-4 tracking-[-0.005em] [overflow-wrap:anywhere]'
           }
         >
           {title}
@@ -114,8 +113,8 @@ function HomeAlertsCard({
         <span
           className={
             variant === 'bento'
-              ? 'mt-1 block max-w-[26ch] text-[12.5px] leading-5 text-white/56 [overflow-wrap:anywhere]'
-              : 'block text-[11.5px] leading-4 text-white/52 [overflow-wrap:anywhere]'
+              ? 'mt-1 block max-w-[25ch] text-[11.5px] leading-4 text-white/54 [overflow-wrap:anywhere]'
+              : 'mt-0.5 block text-[11px] leading-3.5 text-white/50 [overflow-wrap:anywhere]'
           }
         >
           {description}
@@ -124,16 +123,22 @@ function HomeAlertsCard({
       <span
         className={
           isSubscribed
-            ? 'relative h-[26px] w-[42px] shrink-0 rounded-full border border-white/42 bg-white p-0.5 transition-colors duration-subtle'
-            : 'relative h-[26px] w-[42px] shrink-0 rounded-full border border-white/16 bg-white/10 p-0.5 transition-colors duration-subtle'
+            ? cn(
+                'relative h-6 w-10 shrink-0 rounded-full border border-white/42 bg-white p-0.5 transition-colors duration-subtle',
+                variant === 'bento' && 'self-center'
+              )
+            : cn(
+                'relative h-6 w-10 shrink-0 rounded-full border border-white/16 bg-white/10 p-0.5 transition-colors duration-subtle',
+                variant === 'bento' && 'self-center'
+              )
         }
         aria-hidden='true'
       >
         <span
           className={
             isSubscribed
-              ? 'block h-[22px] w-[22px] translate-x-4 rounded-full bg-black shadow-[0_4px_10px_rgba(0,0,0,0.22)] transition-transform duration-subtle'
-              : 'block h-[22px] w-[22px] translate-x-0 rounded-full bg-white shadow-[0_4px_10px_rgba(0,0,0,0.22)] transition-transform duration-subtle'
+              ? 'block h-5 w-5 translate-x-4 rounded-full bg-black shadow-[0_4px_10px_rgba(0,0,0,0.22)] transition-transform duration-subtle'
+              : 'block h-5 w-5 translate-x-0 rounded-full bg-white shadow-[0_4px_10px_rgba(0,0,0,0.22)] transition-transform duration-subtle'
           }
         />
       </span>
@@ -142,7 +147,14 @@ function HomeAlertsCard({
 
   if (isInteractive) {
     return (
-      <button type='button' onClick={onAlertsClick} {...sharedProps}>
+      <button
+        type='button'
+        onClick={onAlertsClick}
+        role='switch'
+        aria-checked={isSubscribed}
+        aria-label={ariaLabel}
+        {...sharedProps}
+      >
         {content}
       </button>
     );
