@@ -115,7 +115,7 @@ describe('POST /api/max-access-request', () => {
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({
-      error: 'You already have the Max plan',
+      error: 'You already have Max access',
     });
     expect(hoisted.getCurrentUserEntitlementsMock).toHaveBeenCalledOnce();
     expect(hoisted.updateSetMock).not.toHaveBeenCalled();

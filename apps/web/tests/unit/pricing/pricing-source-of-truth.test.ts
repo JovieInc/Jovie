@@ -1,5 +1,5 @@
 /**
- * Pricing source of truth contract tests (JOV-2079)
+ * Pricing source of truth contract tests (JOV-2178)
  *
  * Enforces:
  * - CANONICAL_PLANS in constants/plans.ts matches the entitlement registry plan IDs
@@ -62,7 +62,7 @@ const MAX_ONLY_MARKETING_FEATURES = [
   },
 ] as const;
 
-describe('CANONICAL_PLANS (constants/plans.ts) — source of truth (JOV-2079)', () => {
+describe('CANONICAL_PLANS (constants/plans.ts) — source of truth (JOV-2178)', () => {
   it('contains exactly the three billing plan tiers: free, pro, max', () => {
     expect(CANONICAL_PLAN_IDS).toEqual(['free', 'pro', 'max']);
   });
@@ -141,7 +141,7 @@ describe('CANONICAL_PLANS (constants/plans.ts) — source of truth (JOV-2079)', 
   });
 });
 
-describe('MARKETING_PRICING_PLANS (data/marketingPricingPlans.ts) — contract (JOV-2079)', () => {
+describe('MARKETING_PRICING_PLANS (data/marketingPricingPlans.ts) — contract (JOV-2178)', () => {
   it('only contains plan IDs that exist in the entitlement registry', () => {
     const validPlanIds = new Set<string>(Object.keys(ENTITLEMENT_REGISTRY));
     for (const plan of MARKETING_PRICING_PLANS) {

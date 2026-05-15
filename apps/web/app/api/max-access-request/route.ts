@@ -66,7 +66,7 @@ export async function POST(request: Request) {
     // Check if already on Max-level entitlements.
     if (entitlements.hasAdvancedFeatures) {
       return NextResponse.json(
-        { error: 'You already have the Max plan' },
+        { error: 'You already have Max access' },
         { status: 400, headers: NO_STORE_HEADERS }
       );
     }
