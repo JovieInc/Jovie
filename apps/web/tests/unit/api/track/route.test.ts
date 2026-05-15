@@ -161,6 +161,51 @@ describe('POST /api/track', () => {
     );
   });
 
+  it.each([
+    ['absent consent cookie', 'jv_cc_required=1'],
+    ['invalid consent cookie', 'jv_cc_required=1; jv_cc=not-json'],
+  ])('anonymizes clicks and skips audience members for consent-required visitors with %s', async (_label, cookieHeader) => {
+    const insertMock = vi.fn();
+    const valuesMock = vi.fn().mockReturnValue({
+      returning: vi.fn().mockResolvedValue([{ id: 'click_event_123' }]),
+    });
+
+    insertMock.mockReturnValue({
+      values: valuesMock,
+    });
+
+    hoisted.withSystemIngestionSession.mockImplementationOnce(async callback =>
+      callback({
+        insert: insertMock,
+      })
+    );
+
+    const request = new NextRequest('http://localhost/api/track', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: cookieHeader,
+      },
+      body: JSON.stringify({
+        handle: 'artist123',
+        linkType: 'other',
+        target: 'https://example.com',
+      }),
+    });
+
+    const response = await POST(request as unknown as NextRequest);
+
+    expect(response.status).toBe(200);
+    expect(insertMock).toHaveBeenCalledTimes(1);
+    expect(valuesMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ipAddress: '203.0.113.0',
+        audienceMemberId: null,
+      })
+    );
+    expect(recordAudienceEvent).not.toHaveBeenCalled();
+  });
+
   it('records a human-readable source label for tracked audience events', async () => {
     hoisted.withSystemIngestionSession.mockImplementationOnce(async callback =>
       callback({

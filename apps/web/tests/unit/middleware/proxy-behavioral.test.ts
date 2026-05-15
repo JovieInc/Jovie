@@ -113,9 +113,11 @@ vi.mock('@clerk/nextjs/server', () => ({
 vi.mock('@/constants/app', () => ({
   AUDIENCE_ANON_COOKIE: 'audience_anon',
   AUDIENCE_IDENTIFIED_COOKIE: 'audience_identified',
+  AUDIENCE_SPOTIFY_PREFERRED_COOKIE: 'audience_spotify_preferred',
   COUNTRY_CODE_COOKIE: 'country_code',
   HOMEPAGE_CITY_COOKIE: 'homepage_city',
   HOMEPAGE_REGION_COOKIE: 'homepage_region',
+  LISTEN_COOKIE: 'listen_cookie',
 }));
 vi.mock('@/constants/domains', () => ({
   BASE_URL: 'https://jov.ie',
@@ -288,6 +290,63 @@ describe('proxy.ts middleware', () => {
       expect(cookies.homepage_city).toBe('Berlin');
       expect(cookies.homepage_region).toBe('BE');
       expect(cookies.audience_anon).toBeDefined();
+    });
+
+    it('does not set analytics-classified cookies for marketing-only consent', async () => {
+      mocks.isCookieBannerRequired.mockReturnValue(true);
+
+      const req = createUnauthenticatedRequest({
+        pathname: '/',
+        headers: {
+          'x-vercel-ip-country': 'DE',
+          'x-vercel-ip-city': 'Berlin',
+          'x-vercel-ip-country-region': 'BE',
+        },
+        cookies: {
+          jv_cc: JSON.stringify({
+            essential: true,
+            analytics: false,
+            marketing: true,
+          }),
+        },
+      });
+      const res = await callMiddleware(req);
+
+      const cookies = getResponseCookies(res);
+      expect(cookies.homepage_city).toBeUndefined();
+      expect(cookies.homepage_region).toBeUndefined();
+      expect(cookies.audience_anon).toBeUndefined();
+    });
+
+    it('deletes analytics-classified cookies for marketing-only consent', async () => {
+      mocks.isCookieBannerRequired.mockReturnValue(true);
+
+      const req = createUnauthenticatedRequest({
+        pathname: '/',
+        headers: {
+          'x-vercel-ip-country': 'DE',
+          'x-vercel-ip-city': 'Berlin',
+          'x-vercel-ip-country-region': 'BE',
+        },
+        cookies: {
+          jv_cc: JSON.stringify({
+            essential: true,
+            analytics: false,
+            marketing: true,
+          }),
+          audience_anon: 'anon-1',
+          audience_identified: '1',
+          homepage_city: 'Munich',
+          homepage_region: 'BY',
+        },
+      });
+      const res = await callMiddleware(req);
+
+      const cookies = getResponseCookies(res);
+      expect(cookies.audience_anon).toBe('');
+      expect(cookies.audience_identified).toBe('');
+      expect(cookies.homepage_city).toBe('');
+      expect(cookies.homepage_region).toBe('');
     });
 
     it('sets jv_cc_required=1 for US California (CCPA)', async () => {

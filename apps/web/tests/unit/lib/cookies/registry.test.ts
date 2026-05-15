@@ -20,6 +20,17 @@ describe('cookie registry', () => {
     expect(isRegisteredCookieName('unknown_cookie')).toBe(false);
   });
 
+  it('registers active first-party cookie writers', () => {
+    expect(COOKIE_REGISTRY.map(entry => entry.name)).toEqual(
+      expect.arrayContaining([
+        'jv_tracking_consent',
+        'jovie_dsp',
+        'jv_pref_spotify',
+        'jovie_lead_attribution',
+      ])
+    );
+  });
+
   it('marks only nonessential proxy cookies as blocked before consent', () => {
     const blocked = new Set(NONESSENTIAL_PROXY_COOKIE_NAMES);
     expect(blocked).toEqual(

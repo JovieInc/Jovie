@@ -1,14 +1,20 @@
 import {
   AUDIENCE_ANON_COOKIE,
   AUDIENCE_IDENTIFIED_COOKIE,
+  AUDIENCE_SPOTIFY_PREFERRED_COOKIE,
   COUNTRY_CODE_COOKIE,
   HOMEPAGE_CITY_COOKIE,
   HOMEPAGE_REGION_COOKIE,
+  LISTEN_COOKIE,
 } from '@/constants/app';
 import { COOKIE_BANNER_REQUIRED_COOKIE } from '@/lib/cookies/consent-regions';
 import { CONSENT_COOKIE_NAME } from '@/lib/cookies/consent-state';
 
-export type CookieCategory = 'essential' | 'analytics' | 'marketing';
+export type CookieCategory =
+  | 'essential'
+  | 'preferences'
+  | 'analytics'
+  | 'marketing';
 export type CookieMatch = 'exact' | 'prefix';
 
 export type CookieRegistryEntry = {
@@ -133,6 +139,34 @@ export const COOKIE_REGISTRY = [
     preConsent: true,
   },
   {
+    name: 'jv_tracking_consent',
+    match: 'exact',
+    category: 'essential',
+    purpose: 'Stores legacy tracking consent preferences.',
+    duration: '1 year',
+    ttlSeconds: 60 * 60 * 24 * 365,
+    preConsent: true,
+  },
+  {
+    name: LISTEN_COOKIE,
+    match: 'exact',
+    category: 'preferences',
+    purpose: 'Stores your preferred music service for profile listen links.',
+    duration: '1 year',
+    ttlSeconds: 60 * 60 * 24 * 365,
+    preConsent: true,
+  },
+  {
+    name: AUDIENCE_SPOTIFY_PREFERRED_COOKIE,
+    match: 'exact',
+    category: 'preferences',
+    purpose:
+      'Stores whether Spotify was selected as the preferred music service.',
+    duration: '1 year',
+    ttlSeconds: 60 * 60 * 24 * 365,
+    preConsent: true,
+  },
+  {
     name: HOMEPAGE_CITY_COOKIE,
     match: 'exact',
     category: 'analytics',
@@ -170,6 +204,16 @@ export const COOKIE_REGISTRY = [
       'Records that a browser has been associated with a signed-in Jovie account for audience de-duplication.',
     duration: '1 year',
     ttlSeconds: 60 * 60 * 24 * 365,
+    preConsent: false,
+  },
+  {
+    name: 'jovie_lead_attribution',
+    match: 'exact',
+    category: 'marketing',
+    purpose:
+      'Stores claim-invite attribution for signup and campaign conversion measurement.',
+    duration: '30 days',
+    ttlSeconds: 60 * 60 * 24 * 30,
     preConsent: false,
   },
 ] as const satisfies readonly CookieRegistryEntry[];

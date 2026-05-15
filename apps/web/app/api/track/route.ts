@@ -7,6 +7,7 @@ import {
   resolveAudienceClickVerb,
 } from '@/lib/audience/click-event-helpers';
 import { recordAudienceEvent } from '@/lib/audience/record-audience-event';
+import { COOKIE_BANNER_REQUIRED_COOKIE } from '@/lib/cookies/consent-regions';
 import {
   CONSENT_COOKIE_NAME,
   parseConsentCookieValue,
@@ -380,13 +381,16 @@ export async function POST(request: NextRequest) {
     const audienceDeviceType = inferAudienceDeviceType(userAgent);
 
     // Determine marketing consent from jv_cc cookie.
-    // When the cookie banner is not shown (non-regulated jurisdictions),
-    // jv_cc is absent — treat absent cookie as consent given (default-allow).
-    // Only explicit marketing=false (user rejected) blocks audience tracking.
+    // Non-regulated jurisdictions remain default-allow when no banner was
+    // required, but consent-required visitors need a valid marketing opt-in.
+    const requiresCookieConsent =
+      request.cookies?.get(COOKIE_BANNER_REQUIRED_COOKIE)?.value === '1';
     const consent = parseConsentCookieValue(
       request.cookies?.get(CONSENT_COOKIE_NAME)?.value
     );
-    const hasMarketingConsent = consent === null || consent.marketing === true;
+    const hasMarketingConsent =
+      consent?.marketing === true ||
+      (consent === null && !requiresCookieConsent);
 
     // Without marketing consent: anonymize IP and use generic fingerprint.
     // With consent: full behavior (store real IP, create audience members).

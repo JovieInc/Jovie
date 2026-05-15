@@ -27,3 +27,8 @@ export function hasAnalyticsOrMarketingConsent(
   const consent = parseConsentCookieValue(cookieValue);
   return consent?.analytics === true || consent?.marketing === true;
 }
+
+export function hasAnalyticsConsent(cookieValue: string | undefined): boolean {
+  const consent = parseConsentCookieValue(cookieValue);
+  return consent?.analytics === true;
+}

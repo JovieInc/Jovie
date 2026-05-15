@@ -2,7 +2,10 @@
  * Tests for server-side consent cookie parsing used by /api/track.
  */
 import { describe, expect, it } from 'vitest';
-import { parseConsentCookieValue as parseConsentCookie } from '@/lib/cookies/consent-state';
+import {
+  hasAnalyticsConsent,
+  parseConsentCookieValue as parseConsentCookie,
+} from '@/lib/cookies/consent-state';
 
 describe('parseConsentCookie', () => {
   it('returns null for undefined cookie value', () => {
@@ -57,5 +60,19 @@ describe('parseConsentCookie', () => {
 
   it('returns null for array', () => {
     expect(parseConsentCookie('[1,2,3]')).toBe(null);
+  });
+
+  it('requires analytics=true for analytics consent', () => {
+    expect(
+      hasAnalyticsConsent(
+        '{"essential":true,"analytics":true,"marketing":false}'
+      )
+    ).toBe(true);
+    expect(
+      hasAnalyticsConsent(
+        '{"essential":true,"analytics":false,"marketing":true}'
+      )
+    ).toBe(false);
+    expect(hasAnalyticsConsent('not-json')).toBe(false);
   });
 });

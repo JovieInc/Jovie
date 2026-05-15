@@ -40,7 +40,7 @@ import {
 } from '@/lib/cookies/consent-regions';
 import {
   CONSENT_COOKIE_NAME,
-  hasAnalyticsOrMarketingConsent,
+  hasAnalyticsConsent,
 } from '@/lib/cookies/consent-state';
 import { NONESSENTIAL_PROXY_COOKIE_NAMES } from '@/lib/cookies/registry';
 import { captureError } from '@/lib/error-tracking';
@@ -1028,9 +1028,9 @@ function buildFinalResponse(
   const currentCountryCode =
     req.cookies.get(COUNTRY_CODE_COOKIE)?.value ?? null;
   const nextCookieRequirement = requiresCookieConsent ? '1' : '0';
-  const canSetNonessentialProxyCookies =
+  const canSetAnalyticsProxyCookies =
     !requiresCookieConsent ||
-    hasAnalyticsOrMarketingConsent(req.cookies.get(CONSENT_COOKIE_NAME)?.value);
+    hasAnalyticsConsent(req.cookies.get(CONSENT_COOKIE_NAME)?.value);
 
   if (normalizedCountryCode && currentCountryCode !== normalizedCountryCode) {
     res.cookies.set(COUNTRY_CODE_COOKIE, normalizedCountryCode, {
@@ -1055,7 +1055,7 @@ function buildFinalResponse(
     });
   }
 
-  if (requiresCookieConsent && !canSetNonessentialProxyCookies) {
+  if (requiresCookieConsent && !canSetAnalyticsProxyCookies) {
     for (const cookieName of NONESSENTIAL_PROXY_COOKIE_NAMES) {
       if (req.cookies.get(cookieName)?.value) {
         res.cookies.set(cookieName, '', {
@@ -1068,7 +1068,7 @@ function buildFinalResponse(
     }
   }
 
-  if (canSetNonessentialProxyCookies) {
+  if (canSetAnalyticsProxyCookies) {
     if (geo.city && req.cookies.get(HOMEPAGE_CITY_COOKIE)?.value !== geo.city) {
       res.cookies.set(HOMEPAGE_CITY_COOKIE, geo.city, {
         httpOnly: false,
