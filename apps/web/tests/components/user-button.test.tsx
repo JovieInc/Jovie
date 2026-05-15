@@ -378,6 +378,19 @@ describe('UserButton billing actions', () => {
     expect(toast.error).not.toHaveBeenCalled();
   });
 
+  it('does not show the passive billing-status toast while the pathname is unavailable', () => {
+    mockUsePathname.mockReturnValue(null);
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: null,
+      isLoading: false,
+      error: new Error('Billing unavailable'),
+    } as any);
+
+    render(<UserButton showUserInfo />);
+
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
   it('shows the passive billing-status toast on billing surfaces', () => {
     mockUsePathname.mockReturnValue('/billing');
     mockUseBillingStatusQuery.mockReturnValue({
@@ -441,6 +454,59 @@ describe('UserButton billing actions', () => {
     render(<UserButton showUserInfo />);
 
     expect(toast.error).toHaveBeenCalledTimes(2);
+  });
+
+  it('waits for the loaded user before showing the passive billing-status toast', () => {
+    mockUsePathname.mockReturnValue('/billing');
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: null,
+      isLoading: false,
+      error: new Error('Billing unavailable'),
+    } as any);
+    mockUseUserSafe.mockReturnValue({
+      isLoaded: false,
+      isSignedIn: false,
+      user: null,
+    } as any);
+
+    const { rerender } = render(<UserButton showUserInfo />);
+
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(mockUseBillingStatusQuery).toHaveBeenLastCalledWith({
+      enabled: false,
+    });
+
+    mockUseUserSafe.mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+      user: {
+        id: 'user_123',
+        imageUrl: null,
+        fullName: 'Adele Adkins',
+        firstName: 'Adele',
+        emailAddresses: [{ emailAddress: 'adele@example.com' }],
+        primaryEmailAddress: { emailAddress: 'adele@example.com' },
+      } as any,
+    });
+
+    rerender(<UserButton showUserInfo />);
+
+    expect(toast.error).toHaveBeenCalledTimes(1);
+    expect(mockUseBillingStatusQuery).toHaveBeenLastCalledWith({
+      enabled: true,
+    });
+    expect(
+      window.sessionStorage.getItem('jovie:billing-status-error-toast-shown')
+    ).toBeNull();
+    expect(
+      window.sessionStorage.getItem(
+        'jovie:billing-status-error-toast-shown:user_123'
+      )
+    ).toBe('true');
+
+    rerender(<UserButton showUserInfo />);
+
+    expect(toast.error).toHaveBeenCalledTimes(1);
   });
 
   it('renders a custom trigger while user data is still loading', () => {

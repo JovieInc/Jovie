@@ -43,7 +43,10 @@ export interface UseUserButtonReturn {
 }
 
 function isRoutePath(pathname: string | null | undefined, route: string) {
-  return pathname === route || pathname?.startsWith(`${route}/`);
+  return (
+    typeof pathname === 'string' &&
+    (pathname === route || pathname.startsWith(`${route}/`))
+  );
 }
 
 function isBillingOwnedSurface(pathname: string | null | undefined) {
@@ -95,8 +98,9 @@ export function useUserButton({
   const isDemoRoute = isDemoRoutePath(pathname);
   const billingStatusErrorToastSessionKey =
     getBillingStatusErrorToastSessionKey(user?.id);
+  const hasLoadedUser = isLoaded && Boolean(user?.id);
   const { data, isLoading, error } = useBillingStatusQuery({
-    enabled: !isPassiveRuntime && !isDemoRoute,
+    enabled: hasLoadedUser && !isPassiveRuntime && !isDemoRoute,
   });
   const shouldSurfaceBillingStatusError = isBillingOwnedSurface(pathname);
 
@@ -132,6 +136,7 @@ export function useUserButton({
 
   useEffect(() => {
     if (
+      hasLoadedUser &&
       billingStatus.error &&
       shouldSurfaceBillingStatusError &&
       !hasNotifiedBillingErrorThisSession(billingStatusErrorToastSessionKey)
@@ -145,6 +150,7 @@ export function useUserButton({
   }, [
     billingStatus.error,
     billingStatusErrorToastSessionKey,
+    hasLoadedUser,
     shouldSurfaceBillingStatusError,
   ]);
 
