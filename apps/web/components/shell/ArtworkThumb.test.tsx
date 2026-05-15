@@ -3,23 +3,25 @@ import { describe, expect, it } from 'vitest';
 import { ArtworkThumb } from './ArtworkThumb';
 
 describe('ArtworkThumb', () => {
-  it('renders the first-letter fallback while the image loads', () => {
+  it('renders abstract fallback art while the image loads', () => {
     render(
       <ArtworkThumb src='https://x.invalid/a.jpg' title='Lost' size={40} />
     );
-    expect(screen.getByText('L')).toBeInTheDocument();
+    expect(
+      document.querySelector('[data-artwork-fallback="true"]')
+    ).toBeInTheDocument();
+    expect(screen.queryByText('L')).not.toBeInTheDocument();
   });
 
-  it('uppercases the fallback letter from the trimmed title', () => {
-    render(
-      <ArtworkThumb src='https://x.invalid/a.jpg' title='  echo' size={40} />
+  it('uses fallback art for an empty artwork source', () => {
+    const { container } = render(
+      <ArtworkThumb src='' title='Echo' size={40} />
     );
-    expect(screen.getByText('E')).toBeInTheDocument();
-  });
-
-  it('uses a middle-dot when the title is empty', () => {
-    render(<ArtworkThumb src='https://x.invalid/a.jpg' title='' size={40} />);
-    expect(screen.getByText('·')).toBeInTheDocument();
+    const tile = container.firstElementChild as HTMLElement;
+    expect(tile).toHaveAttribute('data-artwork-state', 'fallback');
+    expect(
+      document.querySelector('[data-artwork-fallback="true"]')
+    ).toBeInTheDocument();
   });
 
   it('applies the size as inline width and height', () => {
