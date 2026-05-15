@@ -8,6 +8,9 @@ import { saveConsent } from '@/lib/cookies/consent';
 import { COOKIE_BANNER_REQUIRED_COOKIE } from '@/lib/cookies/consent-regions';
 import { setConsentState } from '@/lib/tracking/consent';
 
+const CONSENT_SAVE_ERROR =
+  'We could not save preferences. Check your connection and try again.';
+
 declare global {
   var JVConsent:
     | {
@@ -40,6 +43,8 @@ export function CookieBannerSection() {
   const [visible, setVisible] = useState(false);
   const [customize, setCustomize] = useState(false);
   const [isMobileExpanded, setIsMobileExpanded] = useState(false);
+  const [isSavingConsent, setIsSavingConsent] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isDashboard || isDemo) {
@@ -134,37 +139,58 @@ export function CookieBannerSection() {
     return () => globalThis.removeEventListener('jv:cookie:open', handleOpen);
   }, []);
 
-  const acceptAll = () => {
-    const consent = { essential: true, analytics: true, marketing: true };
-    // Persist client-side immediately so the banner hides regardless of
-    // whether the server action succeeds (network/CSRF failures must not
-    // leave the banner stuck open).
-    setConsentState('accepted');
+  const applyConsentLocally = (consent: {
+    essential: boolean;
+    analytics: boolean;
+    marketing: boolean;
+  }) => {
+    setConsentState(
+      consent.analytics || consent.marketing ? 'accepted' : 'rejected'
+    );
     try {
       localStorage.setItem('jv_cc', JSON.stringify(consent));
     } catch {
       // ignore — restricted browsing context
     }
     globalThis.JVConsent?._emit(consent);
-    setVisible(false);
-    // Best-effort server-side persistence (httpOnly cookie). Fire-and-forget
-    // — UI has already updated above.
-    saveConsent(consent).catch(() => undefined);
+  };
+
+  const persistConsent = async (consent: {
+    essential: boolean;
+    analytics: boolean;
+    marketing: boolean;
+  }) => {
+    setIsSavingConsent(true);
+    setSaveError(null);
+    try {
+      await saveConsent(consent);
+      applyConsentLocally(consent);
+      setVisible(false);
+    } catch {
+      setSaveError(CONSENT_SAVE_ERROR);
+    } finally {
+      setIsSavingConsent(false);
+    }
+  };
+
+  const acceptAll = () => {
+    const consent = { essential: true, analytics: true, marketing: true };
+    void persistConsent(consent);
   };
 
   const reject = () => {
     const consent = { essential: true, analytics: false, marketing: false };
-    // Persist client-side immediately — see acceptAll comment above.
-    setConsentState('rejected');
-    try {
-      localStorage.setItem('jv_cc', JSON.stringify(consent));
-    } catch {
-      // ignore — restricted browsing context
-    }
-    globalThis.JVConsent?._emit(consent);
+    void persistConsent(consent);
+  };
+
+  const saveCustomPreferences = (consent: {
+    essential: boolean;
+    analytics: boolean;
+    marketing: boolean;
+  }) => {
+    applyConsentLocally(consent);
     setVisible(false);
-    // Best-effort server-side persistence.
-    saveConsent(consent).catch(() => undefined);
+    setSaveError(null);
   };
 
   return (
@@ -219,7 +245,16 @@ export function CookieBannerSection() {
               onAcceptAll={acceptAll}
               onReject={reject}
               onCustomize={() => setCustomize(true)}
+              disabled={isSavingConsent}
             />
+            {saveError ? (
+              <p
+                role='alert'
+                className='mt-2 text-center text-[11px] leading-snug text-secondary-token'
+              >
+                {saveError}
+              </p>
+            ) : null}
           </div>
         </aside>
       ) : null}
@@ -228,18 +263,7 @@ export function CookieBannerSection() {
         <CookieModal
           open={customize}
           onClose={() => setCustomize(false)}
-          onSave={c => {
-            setConsentState(
-              c.analytics || c.marketing ? 'accepted' : 'rejected'
-            );
-            try {
-              localStorage.setItem('jv_cc', JSON.stringify(c));
-            } catch {
-              // ignore
-            }
-            globalThis.JVConsent?._emit(c);
-            setVisible(false);
-          }}
+          onSave={saveCustomPreferences}
         />
       ) : null}
     </>
