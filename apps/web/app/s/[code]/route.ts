@@ -6,7 +6,10 @@ import {
 } from '@/app/api/audience/lib/audience-utils';
 import { recordAudienceEvent } from '@/lib/audience/record-audience-event';
 import { appendSourceUtmParams } from '@/lib/audience/source-links';
-import { COOKIE_BANNER_REQUIRED_COOKIE } from '@/lib/cookies/consent-regions';
+import {
+  COOKIE_BANNER_REQUIRED_COOKIE,
+  isCookieBannerRequired,
+} from '@/lib/cookies/consent-regions';
 import {
   CONSENT_COOKIE_NAME,
   parseConsentCookieValue,
@@ -189,8 +192,14 @@ export async function GET(
 
     const userAgent = request.headers.get('user-agent');
     const botDetection = detectBot(request, '/s/[code]');
+    const geoCity = request.headers.get('x-vercel-ip-city');
+    const geoCountry =
+      request.headers.get('x-vercel-ip-country') ??
+      request.headers.get('cf-ipcountry');
+    const geoRegion = request.headers.get('x-vercel-ip-country-region');
     const requiresCookieConsent =
-      request.cookies?.get(COOKIE_BANNER_REQUIRED_COOKIE)?.value === '1';
+      request.cookies?.get(COOKIE_BANNER_REQUIRED_COOKIE)?.value === '1' ||
+      isCookieBannerRequired(geoCountry, geoRegion);
     const consent = parseConsentCookieValue(
       request.cookies?.get(CONSENT_COOKIE_NAME)?.value
     );
@@ -199,10 +208,6 @@ export async function GET(
     const hasMarketingConsent =
       consent?.marketing === true ||
       (consent === null && !requiresCookieConsent);
-    const geoCity = request.headers.get('x-vercel-ip-city');
-    const geoCountry =
-      request.headers.get('x-vercel-ip-country') ??
-      request.headers.get('cf-ipcountry');
 
     try {
       await withSystemIngestionSession(async tx => {

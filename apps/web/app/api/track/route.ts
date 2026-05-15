@@ -7,7 +7,10 @@ import {
   resolveAudienceClickVerb,
 } from '@/lib/audience/click-event-helpers';
 import { recordAudienceEvent } from '@/lib/audience/record-audience-event';
-import { COOKIE_BANNER_REQUIRED_COOKIE } from '@/lib/cookies/consent-regions';
+import {
+  COOKIE_BANNER_REQUIRED_COOKIE,
+  isCookieBannerRequired,
+} from '@/lib/cookies/consent-regions';
 import {
   CONSENT_COOKIE_NAME,
   parseConsentCookieValue,
@@ -378,13 +381,16 @@ export async function POST(request: NextRequest) {
       request.headers.get('x-vercel-ip-country') ??
       request.headers.get('cf-ipcountry') ??
       undefined;
+    const geoRegion =
+      request.headers.get('x-vercel-ip-country-region') ?? undefined;
     const audienceDeviceType = inferAudienceDeviceType(userAgent);
 
     // Determine marketing consent from jv_cc cookie.
     // Non-regulated jurisdictions remain default-allow when no banner was
     // required, but consent-required visitors need a valid marketing opt-in.
     const requiresCookieConsent =
-      request.cookies?.get(COOKIE_BANNER_REQUIRED_COOKIE)?.value === '1';
+      request.cookies?.get(COOKIE_BANNER_REQUIRED_COOKIE)?.value === '1' ||
+      isCookieBannerRequired(geoCountry ?? null, geoRegion ?? null);
     const consent = parseConsentCookieValue(
       request.cookies?.get(CONSENT_COOKIE_NAME)?.value
     );

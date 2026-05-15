@@ -182,4 +182,24 @@ describe('GET /s/[code]', () => {
     expect(mocks.txInsertMock).not.toHaveBeenCalled();
     expect(recordAudienceEvent).not.toHaveBeenCalled();
   });
+
+  it('uses server geo headers when the consent-required cookie is tampered off', async () => {
+    const request = new NextRequest('http://localhost/s/abc123', {
+      headers: {
+        Cookie: 'jv_cc_required=0',
+        'x-vercel-ip-country': 'DE',
+      },
+    });
+
+    const response = await GET(request, {
+      params: Promise.resolve({ code: 'abc123' }),
+    });
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get('location')).toBe(
+      'https://example.com/profile'
+    );
+    expect(mocks.txInsertMock).not.toHaveBeenCalled();
+    expect(recordAudienceEvent).not.toHaveBeenCalled();
+  });
 });
