@@ -140,10 +140,13 @@ function HeroSection() {
     <section id='hero' className='px-6 pt-24 pb-8 md:px-8 md:pt-28 md:pb-10'>
       <div className='mx-auto grid min-h-[62svh] w-full max-w-[1180px] grid-cols-1 content-center gap-12 md:grid-cols-[minmax(0,1fr)_280px] md:gap-16'>
         <div className='max-w-[760px]'>
-          <p className='font-body text-[15px] leading-6 text-white/54'>
-            Brand kit v2.0, 2026.
-          </p>
-          <h1 className='mt-7 max-w-[720px] text-balance font-display text-5xl font-bold leading-[0.96] text-[#F5F4F0] md:text-7xl lg:text-8xl'>
+          <h1
+            className='max-w-[720px] text-balance text-5xl font-bold leading-[0.96] text-[#F5F4F0] md:text-7xl lg:text-8xl'
+            style={{
+              fontFamily:
+                '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+            }}
+          >
             One loop. Every release.
           </h1>
           <div className='mt-8 max-w-[620px] space-y-4'>

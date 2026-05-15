@@ -79,12 +79,18 @@ describe('performance route manifest', () => {
     expect(brand?.path).toBe('/brand');
     expect(brand?.requiresAuth).toBe(false);
     expect(brand?.measureMode).toBe('interactive-shell');
-    expect(brand?.readySelectors.shell).toContain('[data-testid="header-nav"]');
-    expect(getPrimaryTimingMetricName(brand!)).toBe('interactive-shell-ready');
+    expect(brand?.readySelectors.shell).toContain('main h1');
+    expect(brand?.readySelectors.content).toContain('main h1');
+    expect(getPrimaryTimingMetricName(brand!)).toBe('first-contentful-paint');
     expect(
       getRouteTimingBudgets(brand!).find(
-        timing => timing.metric === 'interactive-shell-ready'
+        timing => timing.metric === 'first-contentful-paint'
       )?.budget
     ).toBe(100);
+    expect(
+      getRouteResourceBudgets(brand!).find(
+        resource => resource.resourceType === 'font'
+      )?.budget
+    ).toBe(75);
   });
 });

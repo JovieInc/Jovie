@@ -16,23 +16,23 @@ import { getRootLayoutChromeState } from '@/lib/demo-recording';
 import { publicEnv } from '@/lib/env-public';
 
 const inter = localFont({
-  src: '../public/fonts/Inter-Variable.woff2',
+  src: '../public/fonts/Inter-Latin.woff2',
   variable: '--font-inter',
-  display: 'swap',
+  display: 'optional',
   weight: '100 900',
 });
 
 const satoshi = localFont({
-  src: '../public/fonts/Satoshi-Variable.woff2',
+  src: '../public/fonts/Satoshi-Latin.woff2',
   variable: '--font-satoshi',
-  display: 'swap',
+  display: 'optional',
   weight: '300 900',
 });
 
 const dmSans = localFont({
-  src: '../public/fonts/DMSans-Variable.woff2',
+  src: '../public/fonts/DMSans-Latin.woff2',
   variable: '--font-dm-sans',
-  display: 'swap',
+  display: 'optional',
   weight: '100 1000',
 });
 

@@ -1,13 +1,19 @@
 import { ImageResponse } from 'next/og';
 import { JOVIE_PATH } from '@/lib/brand';
+import { loadDMSansFont, loadSatoshiFont } from '@/lib/share/image-utils';
 
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 export const revalidate = false;
 export const alt = 'Jovie Brand';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
-export default function Image() {
+export default async function Image() {
+  const [satoshiFont, dmSansFont] = await Promise.all([
+    loadSatoshiFont(),
+    loadDMSansFont(),
+  ]);
+
   return new ImageResponse(
     <div
       style={{
@@ -18,7 +24,7 @@ export default function Image() {
         alignItems: 'center',
         justifyContent: 'center',
         background: '#08090a',
-        fontFamily: 'Inter, system-ui, sans-serif',
+        fontFamily: 'Satoshi, sans-serif',
       }}
     >
       <svg
@@ -34,7 +40,7 @@ export default function Image() {
         style={{
           marginTop: 56,
           fontSize: 84,
-          fontWeight: 800,
+          fontWeight: 700,
           color: '#F5F4F0',
           letterSpacing: 0,
         }}
@@ -44,6 +50,7 @@ export default function Image() {
       <div
         style={{
           marginTop: 16,
+          fontFamily: 'DM Sans, sans-serif',
           fontSize: 26,
           color: 'rgba(245,244,240,0.6)',
           letterSpacing: 0,
@@ -52,6 +59,22 @@ export default function Image() {
         One loop. Every release.
       </div>
     </div>,
-    { ...size }
+    {
+      ...size,
+      fonts: [
+        {
+          name: 'Satoshi',
+          data: satoshiFont,
+          weight: 700,
+          style: 'normal',
+        },
+        {
+          name: 'DM Sans',
+          data: dmSansFont,
+          weight: 400,
+          style: 'normal',
+        },
+      ],
+    }
   );
 }

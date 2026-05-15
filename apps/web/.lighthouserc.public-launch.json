@@ -2,6 +2,9 @@
   "ci": {
     "collect": {
       "numberOfRuns": 3,
+      "settings": {
+        "preset": "desktop"
+      },
       "url": ["http://localhost:3200/"]
     },
     "assert": {

@@ -8,30 +8,9 @@
   --mf-text-muted: rgba(255, 255, 255, 0.22);
   --mf-hairline: rgba(255, 255, 255, 0.07);
   --mf-hairline-strong: rgba(255, 255, 255, 0.12);
-  position: relative;
-  isolation: isolate;
   background: #06070a;
   color: var(--mf-text);
   border-top: 1px solid var(--mf-hairline);
-}
-
-.marketing-footer-premium::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 220px;
-  pointer-events: none;
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.025) 0%,
-    rgba(255, 255, 255, 0) 100%
-  );
-  z-index: 0;
-}
-
-.marketing-footer-premium > * {
-  position: relative;
-  z-index: 1;
 }
 
 .marketing-footer-premium .mf-eyebrow {
