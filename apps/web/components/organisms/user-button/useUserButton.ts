@@ -53,27 +53,29 @@ function isBillingOwnedSurface(pathname: string | null | undefined) {
   );
 }
 
-function hasNotifiedBillingErrorThisSession() {
+function getBillingStatusErrorToastSessionKey(
+  userId: string | null | undefined
+) {
+  return userId
+    ? `${BILLING_STATUS_ERROR_TOAST_SESSION_KEY}:${userId}`
+    : BILLING_STATUS_ERROR_TOAST_SESSION_KEY;
+}
+
+function hasNotifiedBillingErrorThisSession(storageKey: string) {
   if (typeof window === 'undefined') return true;
 
   try {
-    return (
-      window.sessionStorage.getItem(BILLING_STATUS_ERROR_TOAST_SESSION_KEY) ===
-      'true'
-    );
+    return window.sessionStorage.getItem(storageKey) === 'true';
   } catch {
     return false;
   }
 }
 
-function markBillingErrorNotifiedThisSession() {
+function markBillingErrorNotifiedThisSession(storageKey: string) {
   if (typeof window === 'undefined') return;
 
   try {
-    window.sessionStorage.setItem(
-      BILLING_STATUS_ERROR_TOAST_SESSION_KEY,
-      'true'
-    );
+    window.sessionStorage.setItem(storageKey, 'true');
   } catch {
     // Storage can be unavailable in private browsing or constrained test envs.
   }
@@ -91,6 +93,8 @@ export function useUserButton({
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const isPassiveRuntime = env.IS_E2E;
   const isDemoRoute = isDemoRoutePath(pathname);
+  const billingStatusErrorToastSessionKey =
+    getBillingStatusErrorToastSessionKey(user?.id);
   const { data, isLoading, error } = useBillingStatusQuery({
     enabled: !isPassiveRuntime && !isDemoRoute,
   });
@@ -130,15 +134,19 @@ export function useUserButton({
     if (
       billingStatus.error &&
       shouldSurfaceBillingStatusError &&
-      !hasNotifiedBillingErrorThisSession()
+      !hasNotifiedBillingErrorThisSession(billingStatusErrorToastSessionKey)
     ) {
       toast.error(
         "Couldn't confirm your plan. Billing actions may be unavailable.",
         { duration: 6000, id: 'billing-status-error' }
       );
-      markBillingErrorNotifiedThisSession();
+      markBillingErrorNotifiedThisSession(billingStatusErrorToastSessionKey);
     }
-  }, [billingStatus.error, shouldSurfaceBillingStatusError]);
+  }, [
+    billingStatus.error,
+    billingStatusErrorToastSessionKey,
+    shouldSurfaceBillingStatusError,
+  ]);
 
   // User display info - upgrade OAuth avatar to high resolution
   const userImageUrl = useMemo(

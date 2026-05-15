@@ -134,6 +134,7 @@ describe('UserButton billing actions', () => {
       isLoaded: true,
       isSignedIn: true,
       user: {
+        id: 'user_123',
         imageUrl: null,
         fullName: 'Adele Adkins',
         firstName: 'Adele',
@@ -409,6 +410,37 @@ describe('UserButton billing actions', () => {
     render(<UserButton showUserInfo />);
 
     expect(toast.error).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not suppress the passive billing-status toast for a different user in the same browser session', () => {
+    mockUsePathname.mockReturnValue('/app/settings/billing');
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: null,
+      isLoading: false,
+      error: new Error('Billing unavailable'),
+    } as any);
+
+    const firstRender = render(<UserButton showUserInfo />);
+
+    expect(toast.error).toHaveBeenCalledTimes(1);
+
+    firstRender.unmount();
+    mockUseUserSafe.mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+      user: {
+        id: 'user_456',
+        imageUrl: null,
+        fullName: 'Beyonce Knowles',
+        firstName: 'Beyonce',
+        emailAddresses: [{ emailAddress: 'beyonce@example.com' }],
+        primaryEmailAddress: { emailAddress: 'beyonce@example.com' },
+      } as any,
+    });
+
+    render(<UserButton showUserInfo />);
+
+    expect(toast.error).toHaveBeenCalledTimes(2);
   });
 
   it('renders a custom trigger while user data is still loading', () => {
