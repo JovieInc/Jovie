@@ -774,6 +774,7 @@ export function ProfileCompactTemplate({
               viewerCountryCode={viewerCountryCode}
               hideJovieBranding={hideJovieBranding}
               hideMoreMenu={hideMoreMenu}
+              renderSemanticHeading={!isDesktopLayout}
               drawerOpen={drawerOpen}
               drawerView={drawerView}
               activeMode={requestedMode}
