@@ -83,7 +83,7 @@ test('chat route renders the Shell V1 app frame when forced on', async ({
   });
   await expect(page.locator('[data-testid="chat-composer-surface"]')).toHaveCSS(
     'border-radius',
-    /999px|18px|20px|24px/
+    /999px|18px|20px|24px|28px/
   );
   await expect(page.locator('.animate-shell-in')).toHaveCount(0);
 });

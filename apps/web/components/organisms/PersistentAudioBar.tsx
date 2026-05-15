@@ -23,6 +23,9 @@ interface PersistentAudioBarProps {
   readonly variant?: PersistentAudioBarVariant;
 }
 
+const SHELL_AUDIO_BAR_TRANSITION =
+  'max-height var(--duration-cinematic) var(--ease-cinematic), opacity var(--duration-cinematic) var(--ease-cinematic), transform var(--duration-cinematic) var(--ease-cinematic)';
+
 export function PersistentAudioBar({
   variant = 'legacy',
 }: Readonly<PersistentAudioBarProps>) {
@@ -160,7 +163,7 @@ export function PersistentAudioBar({
     <section
       aria-label='Audio player'
       className={cn(
-        'animate-in fade-in slide-in-from-bottom-2 duration-200 shrink-0 border-t border-subtle bg-(--linear-app-content-surface) backdrop-blur-xl px-3 py-2 max-lg:mb-[calc(3.5rem+env(safe-area-inset-bottom))]',
+        'animate-in fade-in slide-in-from-bottom-2 duration-cinematic shrink-0 border-t border-subtle bg-(--linear-app-content-surface) backdrop-blur-xl px-3 py-2 max-lg:mb-[calc(3.5rem+env(safe-area-inset-bottom))]',
         className
       )}
     >
@@ -229,7 +232,7 @@ export function PersistentAudioBar({
           type='button'
           onClick={handleToggle}
           disabled={isLoading}
-          className='relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token transition-[background-color,color,border-color] duration-150 hover:border-default hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus) disabled:opacity-50 before:absolute before:-inset-2 before:content-[""]'
+          className='relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token transition-[background-color,color,border-color] duration-subtle hover:border-default hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus) disabled:opacity-50 before:absolute before:-inset-2 before:content-[""]'
           aria-label={playButtonLabel}
         >
           {playButtonIcon}
@@ -239,7 +242,7 @@ export function PersistentAudioBar({
         <button
           type='button'
           onClick={stop}
-          className='relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-quaternary-token transition-colors duration-150 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus) before:absolute before:-inset-2.5 before:content-[""]'
+          className='relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-quaternary-token transition-colors duration-subtle hover:text-secondary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus) before:absolute before:-inset-2.5 before:content-[""]'
           aria-label='Dismiss player'
         >
           <X className='h-3.5 w-3.5' />
@@ -271,10 +274,13 @@ export function PersistentAudioBar({
         aria-hidden={barCollapsed}
         className='hidden shrink-0 overflow-hidden border-t border-(--linear-app-shell-border) bg-(--linear-bg-page) lg:block'
         style={{
-          maxHeight: barCollapsed ? 0 : 120,
+          maxHeight: barCollapsed
+            ? 0
+            : 'var(--linear-app-audio-bar-max-height)',
           opacity: barCollapsed ? 0 : 1,
+          transform: barCollapsed ? 'translateY(10px)' : 'translateY(0)',
           pointerEvents: barCollapsed ? 'none' : 'auto',
-          transition: 'max-height 150ms ease-out, opacity 150ms ease-out',
+          transition: SHELL_AUDIO_BAR_TRANSITION,
         }}
       >
         <div className='px-8 pt-2'>
@@ -307,10 +313,13 @@ export function PersistentAudioBar({
         aria-hidden={!barCollapsed}
         className='hidden shrink-0 overflow-hidden border-t border-(--linear-app-shell-border) bg-(--linear-app-content-surface) px-3 lg:block'
         style={{
-          maxHeight: barCollapsed ? 64 : 0,
+          maxHeight: barCollapsed
+            ? 'var(--linear-app-audio-compact-height)'
+            : 0,
           opacity: barCollapsed ? 1 : 0,
+          transform: barCollapsed ? 'translateY(0)' : 'translateY(8px)',
           pointerEvents: barCollapsed ? 'auto' : 'none',
-          transition: 'max-height 150ms ease-out, opacity 150ms ease-out',
+          transition: SHELL_AUDIO_BAR_TRANSITION,
         }}
       >
         <SidebarBottomNowPlaying

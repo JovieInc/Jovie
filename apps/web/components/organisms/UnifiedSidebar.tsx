@@ -462,7 +462,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
       className={cn(
         'bg-base',
         '[--sidebar-width:var(--linear-app-sidebar-width)]',
-        'transition-[width,transform] duration-normal ease-interactive'
+        'transition-[width,transform] duration-cinematic ease-cinematic'
       )}
     >
       <SidebarHeader
