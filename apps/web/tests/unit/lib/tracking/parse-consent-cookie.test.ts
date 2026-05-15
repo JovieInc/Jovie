@@ -2,26 +2,7 @@
  * Tests for server-side consent cookie parsing used by /api/track.
  */
 import { describe, expect, it } from 'vitest';
-
-interface ConsentPreferences {
-  essential: boolean;
-  analytics: boolean;
-  marketing: boolean;
-}
-
-// Reimplemented from track/route.ts for unit testing
-function parseConsentCookie(
-  cookieValue: string | undefined
-): ConsentPreferences | null {
-  try {
-    if (!cookieValue) return null;
-    const parsed = JSON.parse(cookieValue) as ConsentPreferences;
-    if (typeof parsed?.marketing !== 'boolean') return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
+import { parseConsentCookieValue as parseConsentCookie } from '@/lib/cookies/consent-state';
 
 describe('parseConsentCookie', () => {
   it('returns null for undefined cookie value', () => {

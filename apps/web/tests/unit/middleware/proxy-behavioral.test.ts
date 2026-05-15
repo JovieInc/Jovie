@@ -217,6 +217,79 @@ describe('proxy.ts middleware', () => {
       expect(cookies.jv_cc_required).toBe('1');
     });
 
+    it('keeps only pre-consent cookies for consent-required visitors without consent', async () => {
+      mocks.isCookieBannerRequired.mockReturnValue(true);
+
+      const req = createUnauthenticatedRequest({
+        pathname: '/',
+        headers: {
+          'x-vercel-ip-country': 'DE',
+          'x-vercel-ip-city': 'Berlin',
+          'x-vercel-ip-country-region': 'BE',
+        },
+      });
+      const res = await callMiddleware(req);
+
+      const cookies = getResponseCookies(res);
+      expect(cookies.jv_cc_required).toBe('1');
+      expect(cookies.country_code).toBe('DE');
+      expect(cookies.homepage_city).toBeUndefined();
+      expect(cookies.homepage_region).toBeUndefined();
+      expect(cookies.audience_anon).toBeUndefined();
+    });
+
+    it('deletes existing nonessential proxy cookies when consent is missing', async () => {
+      mocks.isCookieBannerRequired.mockReturnValue(true);
+
+      const req = createUnauthenticatedRequest({
+        pathname: '/',
+        headers: {
+          'x-vercel-ip-country': 'DE',
+          'x-vercel-ip-city': 'Berlin',
+          'x-vercel-ip-country-region': 'BE',
+        },
+        cookies: {
+          audience_anon: 'anon-1',
+          audience_identified: '1',
+          homepage_city: 'Munich',
+          homepage_region: 'BY',
+        },
+      });
+      const res = await callMiddleware(req);
+
+      const cookies = getResponseCookies(res);
+      expect(cookies.audience_anon).toBe('');
+      expect(cookies.audience_identified).toBe('');
+      expect(cookies.homepage_city).toBe('');
+      expect(cookies.homepage_region).toBe('');
+    });
+
+    it('sets nonessential proxy cookies after analytics consent is granted', async () => {
+      mocks.isCookieBannerRequired.mockReturnValue(true);
+
+      const req = createUnauthenticatedRequest({
+        pathname: '/',
+        headers: {
+          'x-vercel-ip-country': 'DE',
+          'x-vercel-ip-city': 'Berlin',
+          'x-vercel-ip-country-region': 'BE',
+        },
+        cookies: {
+          jv_cc: JSON.stringify({
+            essential: true,
+            analytics: true,
+            marketing: false,
+          }),
+        },
+      });
+      const res = await callMiddleware(req);
+
+      const cookies = getResponseCookies(res);
+      expect(cookies.homepage_city).toBe('Berlin');
+      expect(cookies.homepage_region).toBe('BE');
+      expect(cookies.audience_anon).toBeDefined();
+    });
+
     it('sets jv_cc_required=1 for US California (CCPA)', async () => {
       mocks.isCookieBannerRequired.mockReturnValue(true);
 

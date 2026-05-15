@@ -7,6 +7,10 @@ import {
   resolveAudienceClickVerb,
 } from '@/lib/audience/click-event-helpers';
 import { recordAudienceEvent } from '@/lib/audience/record-audience-event';
+import {
+  CONSENT_COOKIE_NAME,
+  parseConsentCookieValue,
+} from '@/lib/cookies/consent-state';
 import { db } from '@/lib/db';
 import { audienceMembers, clickEvents } from '@/lib/db/schema/analytics';
 import { socialLinks } from '@/lib/db/schema/links';
@@ -28,30 +32,6 @@ import {
   mergeAudienceTags,
 } from '../audience/lib/audience-utils';
 import { validateTrackRequest } from './validation';
-
-// ---------------------------------------------------------------------------
-// Consent helpers
-// ---------------------------------------------------------------------------
-
-const CONSENT_COOKIE_NAME = 'jv_cc';
-
-interface ConsentPreferences {
-  essential: boolean;
-  analytics: boolean;
-  marketing: boolean;
-}
-
-function parseConsentCookie(request: NextRequest): ConsentPreferences | null {
-  try {
-    const raw = request.cookies?.get(CONSENT_COOKIE_NAME)?.value;
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as ConsentPreferences;
-    if (typeof parsed?.marketing !== 'boolean') return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
 
 /**
  * Anonymize an IP address for privacy:
@@ -403,7 +383,9 @@ export async function POST(request: NextRequest) {
     // When the cookie banner is not shown (non-regulated jurisdictions),
     // jv_cc is absent — treat absent cookie as consent given (default-allow).
     // Only explicit marketing=false (user rejected) blocks audience tracking.
-    const consent = parseConsentCookie(request);
+    const consent = parseConsentCookieValue(
+      request.cookies?.get(CONSENT_COOKIE_NAME)?.value
+    );
     const hasMarketingConsent = consent === null || consent.marketing === true;
 
     // Without marketing consent: anonymize IP and use generic fingerprint.
