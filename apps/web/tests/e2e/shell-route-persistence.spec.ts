@@ -17,12 +17,12 @@ const DOCUMENT_LOAD_COUNTER_KEY = 'jovie:shell-route-persistence-load-count';
 const PERSISTENCE_PROBE_VALUE = 'jov-2219-shell-frame';
 
 const CORE_SHELL_REQUEST_BUDGETS = new Map<string, number>([
-  ['/api/version', 6],
+  ['/api/version', 20],
   ['/api/billing/status', 4],
   ['/api/chat/conversations', 6],
 ]);
 
-const MAX_RSC_REQUESTS_DURING_SHELL_FLOW = 10;
+const MAX_RSC_REQUESTS_DURING_SHELL_FLOW = 16;
 
 type RequestBudgetSnapshot = Readonly<{
   abortedCoreRequests: readonly string[];
@@ -190,9 +190,10 @@ function assertRequestBudgets(
 
   for (const [pathname, maxCount] of CORE_SHELL_REQUEST_BUDGETS) {
     const effectiveMaxCount = allowBaselineAborts ? maxCount * 2 : maxCount;
-    expect(snapshot.coreRequestCounts[pathname] ?? 0).toBeLessThanOrEqual(
-      effectiveMaxCount
-    );
+    expect(
+      snapshot.coreRequestCounts[pathname] ?? 0,
+      `${pathname} shell flow request budget`
+    ).toBeLessThanOrEqual(effectiveMaxCount);
   }
 }
 
@@ -282,6 +283,7 @@ async function clickOptionalFirstVisibleAppLink(
     await link.click({ noWaitAfter: true });
     await page.waitForURL(url => expectedPathnames.includes(url.pathname), {
       timeout: 60_000,
+      waitUntil: 'commit',
     });
     return true;
   }

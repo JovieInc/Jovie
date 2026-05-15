@@ -57,7 +57,7 @@ export const Sidebar = React.forwardRef<
             className='w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden'
             style={
               {
-                '--sidebar-width': '244px',
+                '--sidebar-width': 'var(--linear-app-sidebar-width)',
               } as React.CSSProperties
             }
             side={side}
@@ -80,7 +80,7 @@ export const Sidebar = React.forwardRef<
           >
             <div
               className={cn(
-                'duration-normal relative h-full w-(--sidebar-width) overflow-hidden transition-[width,transform,opacity] ease-interactive motion-reduce:transition-none',
+                'duration-cinematic relative h-full w-(--sidebar-width) overflow-hidden transition-[width,transform,opacity] ease-cinematic motion-reduce:transition-none',
                 'group-data-[collapsible=offcanvas]:w-0',
                 state === 'closed' &&
                   collapsible === 'offcanvas' &&
