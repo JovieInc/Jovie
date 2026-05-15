@@ -2627,11 +2627,11 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 .homepage-trust-logo-grid {
   display: grid;
+  /* 5 logos: awal, orchard, umg (widest), armada, black-hole.
+     Prior 8-track layout was leftover from JOV-2075 logo removal. */
   grid-template-columns:
-    minmax(7rem, 0.95fr) minmax(7.5rem, 1fr)
-    minmax(11rem, 1.38fr) minmax(7.75rem, 1fr)
-    minmax(8rem, 1fr) minmax(6.75rem, 0.8fr)
-    minmax(7.5rem, 0.9fr) minmax(6.25rem, 0.72fr);
+    minmax(7rem, 0.95fr) minmax(7.5rem, 1fr) minmax(11rem, 1.38fr)
+    minmax(7.75rem, 1fr) minmax(7.5rem, 0.9fr);
   align-items: center;
   gap: clamp(1rem, 2.4vw, 3.1rem);
   transform-origin: center top;
@@ -2700,8 +2700,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
   }
 
   .homepage-trust-logo-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 1.45rem 2rem;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 1.45rem 1.5rem;
   }
 
   .homepage-trust-logo-slot {
@@ -2709,7 +2709,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   }
 
   .homepage-trust-logo-slot--umg {
-    grid-column: span 2;
+    grid-column: auto;
   }
 
   .homepage-spec-wall-grid {
@@ -2974,12 +2974,16 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-go-live-card h3 {
-  margin: 1.2rem 0 0;
+  margin: 0;
   color: rgba(255, 255, 255, 0.95);
   font-size: clamp(1.05rem, 1.45vw, 1.24rem);
   font-weight: 650;
   line-height: 1.12;
   letter-spacing: 0;
+}
+
+.homepage-go-live-card span + h3 {
+  margin-top: 1.2rem;
 }
 
 .homepage-go-live-card p {

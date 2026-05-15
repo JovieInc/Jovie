@@ -42,8 +42,21 @@ export const FEATURE_FLAGS = {
   SHOW_HOMEPAGE_V2_SPOTLIGHT: true,
   SHOW_HOMEPAGE_V2_CAPTURE_REACTIVATE: true,
   SHOW_HOMEPAGE_V2_POWER_GRID: false,
-  SHOW_HOMEPAGE_V2_PRICING: true,
+  SHOW_HOMEPAGE_V2_PRICING: false,
   SHOW_HOMEPAGE_V2_FINAL_CTA: true,
+  // "What Jovie finds" 3-card section. Off for prelaunch until the
+  // opportunity-type cards land harder.
+  SHOW_HOMEPAGE_GO_LIVE_SECTION: false,
+  // FAQ section. Off for prelaunch — answers will firm up post-waitlist
+  // when we know what people actually ask.
+  SHOW_HOMEPAGE_FAQ: false,
+  // Prelaunch waitlist gate. When true, public-front-door CTAs on the
+  // marketing homepage render as "Request access" (waitlisting everyone who
+  // comes in). When false, they revert to "Claim your free profile". The
+  // server-side waitlist gate (`isWaitlistGateEnabled`) handles routing once
+  // a user hits /signup; this flag only controls marketing copy. Flip to
+  // false to open the doors.
+  WAITLIST_ENABLED: true,
   SHOW_HOMEPAGE_V2_FOOTER_LINKS: false,
   SHOW_ARTIST_PROFILE_PAY_FLOW_VIDEO: true,
   SHOW_FORGEUI_MARKETING_UPDATES,
