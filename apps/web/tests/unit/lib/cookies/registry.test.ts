@@ -54,10 +54,14 @@ describe('cookie registry', () => {
       join(process.cwd(), 'content/legal/cookies.md'),
       'utf8'
     );
+    const policyRows = policy.split('\n').filter(line => line.startsWith('|'));
 
     for (const entry of COOKIE_REGISTRY) {
-      expect(policy).toContain(`\`${entry.name}\``);
-      expect(policy).toContain(entry.duration);
+      const row = policyRows.find(line =>
+        line.includes(`| \`${entry.name}\` |`)
+      );
+      expect(row).toBeDefined();
+      expect(row ?? '').toContain(`| ${entry.duration} |`);
     }
   });
 
