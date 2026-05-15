@@ -4102,7 +4102,7 @@ function DashboardHome() {
           for the morphing pill surface, slash picker, and chip tray.
           Backend wiring (useJovieChat / streaming / images) stays stubbed
           for the design pass — those wires land at flip-time. */}
-      <div className='shrink-0 mt-4 max-w-[560px] w-full mx-auto'>
+      <div className='shrink-0 mt-4 max-w-[45rem] w-full mx-auto'>
         <ChatInput
           value={composerValue}
           onChange={setComposerValue}
@@ -4602,7 +4602,7 @@ function OnboardingCanvas({ onComplete }: { onComplete: () => void }) {
           it doesn't lose focus mid-animation. Bottom padding animates
           from a tall spacer (centered) to chat-pinned. */}
       <footer className='shrink-0 px-8 pt-2'>
-        <div className='max-w-2xl mx-auto'>
+        <div className='mx-auto max-w-[45rem]'>
           <ChatInput
             value={draft}
             onChange={setDraft}

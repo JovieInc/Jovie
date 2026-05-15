@@ -1,6 +1,6 @@
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ComponentProps, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -147,5 +147,127 @@ describe('ChatInput', () => {
     expect(
       screen.getByRole('button', { name: 'Summarize this thread' })
     ).toBeInTheDocument();
+  });
+
+  it('renders the hardened dark composer geometry', () => {
+    fastRender(
+      withProviders(
+        <ChatInput {...baseProps} value='' onImageAttach={vi.fn()} />
+      )
+    );
+
+    const surface = screen.getByTestId('chat-composer-surface');
+    expect(surface.className).toContain('#16171b');
+    expect(surface.className).toContain('border-white');
+
+    const textarea = screen.getByRole('textbox', {
+      name: /chat message input/i,
+    });
+    expect(textarea.className).toContain('text-[16px]');
+    expect(textarea.className).toContain('leading-6');
+    expect(textarea.className).toContain('text-white/92');
+    expect(textarea.className).toContain('focus-visible:shadow-none!');
+    expect(textarea).toHaveStyle({
+      boxShadow: 'none',
+      outline: 'none',
+    });
+
+    for (const buttonName of [/attachment options/i, /send message/i]) {
+      expect(
+        screen.getByRole('button', { name: buttonName }).className
+      ).toMatch(/h-9 w-9/);
+    }
+  });
+
+  it('keeps structured chips inline with the editable text field', () => {
+    fastRender(
+      withProviders(
+        <ChatInput
+          {...baseProps}
+          value=''
+          chips={[
+            {
+              type: 'entity',
+              kind: 'release',
+              id: 'rel_1',
+              label: 'Performance Budget',
+              uid: 'chip-release-1',
+            },
+          ]}
+          onRemoveChipAt={vi.fn()}
+        />
+      )
+    );
+
+    const inlineField = screen.getByTestId('chat-input-inline-field');
+    expect(
+      within(inlineField).getByText('Performance Budget')
+    ).toBeInTheDocument();
+    expect(screen.getByTitle('Release: Performance Budget')).toHaveStyle({
+      '--jovie-entity-accent': 'var(--geist-purple-solid)',
+    });
+    expect(inlineField).toContainElement(
+      screen.getByRole('textbox', { name: /chat message input/i })
+    );
+    expect(screen.getByTestId('chat-input-chip-tray')).toHaveClass('contents');
+  });
+
+  it('lets keyboard users remove skill chips', async () => {
+    const user = userEvent.setup();
+    const onRemoveChipAt = vi.fn();
+
+    fastRender(
+      withProviders(
+        <ChatInput
+          {...baseProps}
+          value=''
+          chips={[
+            {
+              type: 'skill',
+              id: 'generateAlbumArt',
+              uid: 'chip-skill-1',
+            },
+          ]}
+          onRemoveChipAt={onRemoveChipAt}
+        />
+      )
+    );
+
+    screen
+      .getByRole('button', { name: /remove generate album art skill/i })
+      .focus();
+    await user.keyboard('{Enter}');
+
+    expect(onRemoveChipAt).toHaveBeenCalledWith(0);
+  });
+
+  it('keeps empty submit disabled until content or attachments are present', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    fastRender(
+      withProviders(<ChatInput {...baseProps} value='' onSubmit={onSubmit} />)
+    );
+
+    const sendButton = screen.getByRole('button', { name: /send message/i });
+    expect(sendButton).toBeDisabled();
+    await user.click(sendButton);
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('shows the stop action while streaming even when the draft is empty', async () => {
+    const user = userEvent.setup();
+    const onStop = vi.fn();
+    fastRender(
+      withProviders(
+        <ChatInput {...baseProps} value='' isStreaming onStop={onStop} />
+      )
+    );
+
+    const stopButton = screen.getByRole('button', {
+      name: /stop generating/i,
+    });
+    expect(stopButton).toBeEnabled();
+    await user.click(stopButton);
+    expect(onStop).toHaveBeenCalledTimes(1);
   });
 });

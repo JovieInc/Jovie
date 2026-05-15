@@ -5,7 +5,6 @@ import { Check, Copy } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
-import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { useClipboard } from '@/hooks/useClipboard';
 import { cn } from '@/lib/utils';
 import { getRenderableToolEvents, ToolPartsRenderer } from '../tool-ui';
@@ -45,7 +44,6 @@ export function ChatMessage({
   parts,
   isStreaming,
   isThinking,
-  avatarUrl,
   profileId,
   skipEntrance,
   renderTools = true,
@@ -76,7 +74,7 @@ export function ChatMessage({
       transition={{ duration: 0.2, ease: 'easeOut' }}
     >
       {isUser ? (
-        <div className='max-w-[78%] rounded-[18px] border border-(--linear-app-frame-seam) bg-surface-2 px-4 py-3.5 text-primary-token shadow-none'>
+        <div className='max-w-[78%] rounded-[18px] border border-white/80 bg-white px-4 py-3.5 text-[#111216] shadow-[0_12px_38px_-28px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.9)]'>
           {fileParts.length > 0 && (
             <div className={cn('flex flex-wrap gap-2', messageText && 'mb-2')}>
               {(() => {
@@ -109,85 +107,74 @@ export function ChatMessage({
             </div>
           )}
           {messageText && (
-            <div className='text-mid leading-6 tracking-[-0.01em]'>
+            <div className='text-[15px] leading-6 tracking-normal'>
               <TokenizedText content={messageText} />
             </div>
           )}
         </div>
       ) : (
-        <div className='grid w-full max-w-full grid-cols-[24px_minmax(0,1fr)] gap-3'>
-          <span
-            data-testid={isThinking ? 'chat-loading-avatar' : undefined}
-            className='mt-0.5 flex h-6 w-6 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token'
-          >
-            <BrandLogo size={11} tone='auto' rounded={false} />
-          </span>
-          <div className='min-w-0'>
-            {isThinking ? (
-              <div
-                data-testid='chat-loading-indicator'
-                className='flex min-h-7 items-center gap-2 text-[15px] leading-7 text-secondary-token'
-                role='status'
-                aria-live='polite'
-              >
-                <span>Thinking</span>
-                <span className='flex items-center gap-1' aria-hidden='true'>
-                  <span className='h-1.5 w-1.5 animate-bounce rounded-full bg-tertiary-token [animation-delay:-0.3s] motion-reduce:animate-none' />
-                  <span className='h-1.5 w-1.5 animate-bounce rounded-full bg-tertiary-token [animation-delay:-0.15s] motion-reduce:animate-none' />
-                  <span className='h-1.5 w-1.5 animate-bounce rounded-full bg-tertiary-token motion-reduce:animate-none' />
-                </span>
-                <span className='sr-only'>Jovie is thinking</span>
-              </div>
-            ) : null}
+        <div className='w-full min-w-0 max-w-full'>
+          {isThinking ? (
+            <div
+              data-testid='chat-loading-indicator'
+              className='flex min-h-7 items-center gap-2 text-[15px] leading-7 text-secondary-token'
+              role='status'
+              aria-live='polite'
+            >
+              <span>Jovie is thinking</span>
+              <span className='flex items-center gap-1' aria-hidden='true'>
+                <span className='h-1.5 w-1.5 animate-bounce rounded-full bg-tertiary-token [animation-delay:-0.3s] motion-reduce:animate-none' />
+                <span className='h-1.5 w-1.5 animate-bounce rounded-full bg-tertiary-token [animation-delay:-0.15s] motion-reduce:animate-none' />
+                <span className='h-1.5 w-1.5 animate-bounce rounded-full bg-tertiary-token motion-reduce:animate-none' />
+              </span>
+            </div>
+          ) : null}
 
-            {!isThinking && hasAssistantContent ? (
-              <div className='space-y-3'>
-                {messageText ? (
-                  <div
-                    data-testid='chat-message-reply'
-                    className='text-[15px] leading-7 text-primary-token tracking-[-0.008em] sm:text-[15.5px]'
-                  >
-                    <ChatMarkdown
-                      content={messageText}
-                      isStreaming={Boolean(isStreaming)}
-                    />
-                  </div>
-                ) : null}
-
-                {renderTools ? (
-                  <ToolPartsRenderer
-                    parts={parts}
-                    profileId={profileId}
-                    variant='chat'
-                    hasMessageText={Boolean(messageText)}
-                  />
-                ) : null}
-              </div>
-            ) : null}
-
-            {!isThinking && !isStreaming && messageText ? (
-              <div className='mt-1.5 flex items-center justify-start'>
-                <SimpleTooltip
-                  content={isSuccess ? 'Copied!' : 'Copy response'}
+          {!isThinking && hasAssistantContent ? (
+            <div className='space-y-3'>
+              {messageText ? (
+                <div
+                  data-testid='chat-message-reply'
+                  className='text-[15px] leading-7 text-primary-token tracking-[-0.008em] sm:text-[15.5px]'
                 >
-                  <button
-                    type='button'
-                    onClick={() => copy(messageText)}
-                    className='inline-flex h-7 w-7 items-center justify-center rounded-full border border-transparent bg-transparent text-tertiary-token shadow-none transition-colors duration-subtle hover:bg-surface-1 hover:text-secondary-token focus-visible:bg-surface-1 focus-visible:outline-none'
-                    aria-label={
-                      isSuccess ? 'Copied to clipboard' : 'Copy message'
-                    }
-                  >
-                    {isSuccess ? (
-                      <Check className='h-3.5 w-3.5' />
-                    ) : (
-                      <Copy className='h-3.5 w-3.5' />
-                    )}
-                  </button>
-                </SimpleTooltip>
-              </div>
-            ) : null}
-          </div>
+                  <ChatMarkdown
+                    content={messageText}
+                    isStreaming={Boolean(isStreaming)}
+                  />
+                </div>
+              ) : null}
+
+              {renderTools ? (
+                <ToolPartsRenderer
+                  parts={parts}
+                  profileId={profileId}
+                  variant='chat'
+                  hasMessageText={Boolean(messageText)}
+                />
+              ) : null}
+            </div>
+          ) : null}
+
+          {!isThinking && !isStreaming && messageText ? (
+            <div className='mt-1.5 flex items-center justify-start'>
+              <SimpleTooltip content={isSuccess ? 'Copied!' : 'Copy response'}>
+                <button
+                  type='button'
+                  onClick={() => copy(messageText)}
+                  className='inline-flex h-7 w-7 items-center justify-center rounded-full border border-transparent bg-transparent text-tertiary-token shadow-none transition-colors duration-subtle hover:bg-surface-1 hover:text-secondary-token focus-visible:bg-surface-1 focus-visible:outline-none'
+                  aria-label={
+                    isSuccess ? 'Copied to clipboard' : 'Copy message'
+                  }
+                >
+                  {isSuccess ? (
+                    <Check className='h-3.5 w-3.5' />
+                  ) : (
+                    <Copy className='h-3.5 w-3.5' />
+                  )}
+                </button>
+              </SimpleTooltip>
+            </div>
+          ) : null}
         </div>
       )}
     </motion.div>

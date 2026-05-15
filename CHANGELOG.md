@@ -5,6 +5,22 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.0] - 2026-05-15
+
+> Chat now uses the dark app-native composer across shell surfaces, with hardened focus, picker, attachment, and typed-entity states.
+
+### Changed
+
+- **Chat composer surface and controls**: Replaced the white command-style composer with a dark System B surface, two-zone text/toolbar layout, stable 36px controls, corrected focus affordances, bounded multiline autosize, inline structured chips, and Geist-accented entity chips.
+- **App shell chat chrome**: Aligned the Electron titlebar controls with the Codex-style back/forward layout, moved New thread into the sidebar navigation, tightened chat message presentation, and removed assistant avatars from the chat transcript.
+- **Attachment and picker polish**: Hardened the attachment menu, slash picker, entity picker, and dropzone layering so menus float without clipping and composer layout remains stable across empty, typing, mobile, and compact states.
+
+### Fixed
+
+- **Textarea focus-ring leakage**: Suppressed raw textarea focus outlines in chat and task document fields while preserving compound-widget focus states at the containing surface.
+- **Chat shell loading and thinking states**: Added a dark conversation-loading skeleton, smoother pending/thinking placeholders, verbose dev-only tool state output, and stable drag cursors for Kanban/task cards.
+- **Composer regression coverage**: Expanded unit and Playwright coverage for focus preservation, button states, chip layout, text contrast, picker ARIA paths, attachment clipping, and mobile composer geometry.
+
 ## [26.4.248] - 2026-05-14
 
 > Onboarding now opens in the canonical app-shell chat front door with hardened tool artifacts, picker stability, and performance gates.
