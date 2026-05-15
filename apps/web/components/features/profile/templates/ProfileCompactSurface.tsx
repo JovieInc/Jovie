@@ -297,7 +297,7 @@ export function ProfileCompactSurface({
   const socialIconClassName =
     'inline-flex h-8 w-8 items-center justify-center text-white/68 transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
   const heroHeightClassName = isHomeMode
-    ? 'h-[36svh] min-h-[248px] max-h-[276px] [@media(min-height:761px)_and_(max-height:880px)]:max-h-[218px] [@media(min-height:761px)_and_(max-height:880px)]:min-h-[214px] [@media(max-height:760px)]:h-[178px] [@media(max-height:760px)]:min-h-[178px]'
+    ? 'aspect-[16/9] min-h-[214px] max-h-[276px]'
     : 'h-[calc(3.5rem+max(env(safe-area-inset-top),0px))] border-b border-white/[0.075]';
   const locationLabel = artist.location?.trim() || artist.hometown?.trim();
   const registerNotificationsReveal = useCallback(
