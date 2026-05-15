@@ -3,6 +3,7 @@
  * @critical — Revenue-facing countdown timer, previously had zero tests
  */
 import { describe, expect, it } from 'vitest';
+import { getCompactCountdownSegments } from '@/components/features/release/ReleaseCountdown';
 
 // Test the pure getTimeLeft logic extracted inline (the component is too heavy
 // to render in the fork pool due to OOM in the worker). We test the algorithm
@@ -83,6 +84,21 @@ describe('@critical ReleaseCountdown — getTimeLeft logic', () => {
 });
 
 describe('@critical ReleaseCountdown — UI behavior contracts', () => {
+  it('compact mode collapses year-scale countdowns to one year token', () => {
+    expect(
+      getCompactCountdownSegments({ days: 400, hours: 12, minutes: 30 })
+    ).toEqual([{ value: 1, label: 'YR' }]);
+  });
+
+  it('compact mode keeps days hidden when less than a day remains', () => {
+    expect(
+      getCompactCountdownSegments({ days: 0, hours: 12, minutes: 30 })
+    ).toEqual([
+      { value: 12, label: 'H' },
+      { value: 30, label: 'M' },
+    ]);
+  });
+
   it('days segment hidden when days === 0 (compact: D not shown)', () => {
     const result = getTimeLeft(
       new Date('2025-06-01T03:45:00.000Z'),

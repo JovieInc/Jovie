@@ -1,9 +1,10 @@
 'use client';
 
+import { Bell } from 'lucide-react';
 import { useMemo } from 'react';
 import type { ProfileRenderMode } from '@/features/profile/contracts';
-import { ProfileMediaCard } from '@/features/profile/ProfileMediaCard';
 import {
+  ProfilePrimaryActionCard,
   type ProfilePrimaryActionCardRelease,
   resolveProfilePrimaryActionCardState,
 } from '@/features/profile/ProfilePrimaryActionCard';
@@ -18,8 +19,7 @@ import { useUserLocation } from '@/hooks/useUserLocation';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import { getProfileReleaseVisibility } from '@/lib/profile/release-visibility';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
-import { isDefaultAvatarUrl } from '@/lib/utils/dsp-images';
-import { capitalizeFirst } from '@/lib/utils/string-utils';
+import { cn } from '@/lib/utils';
 import type { Artist } from '@/types/db';
 
 interface ProfileHomeRailProps {
@@ -34,6 +34,8 @@ interface ProfileHomeRailProps {
   readonly renderMode?: ProfileRenderMode;
   readonly previewActionLabel?: string;
   readonly onPlayClick?: () => void;
+  readonly onAlertsClick?: () => void;
+  readonly isSubscribed?: boolean;
   readonly viewerLocation?: UserLocation | null;
   readonly resolveNearbyTour?: boolean;
 }
@@ -58,225 +60,107 @@ function getUpcomingTourDates(
     );
 }
 
-function formatMonthLabel(value: string | null | undefined) {
-  const date = toDateValue(value);
-  if (!date) return 'Soon';
+function HomeAlertsCard({
+  artist,
+  isSubscribed,
+  onAlertsClick,
+  renderMode,
+  variant,
+}: Readonly<{
+  artist: Artist;
+  isSubscribed: boolean;
+  onAlertsClick?: () => void;
+  renderMode: ProfileRenderMode;
+  variant: 'row' | 'bento';
+}>) {
+  const title = isSubscribed ? 'Alerts On' : `Get ${artist.name} alerts`;
+  const description = isSubscribed
+    ? 'New music, shows, and merch updates are ready.'
+    : 'New music, shows, and merch in one tap.';
+  const isInteractive = renderMode === 'interactive' && onAlertsClick;
+  const sharedProps = {
+    className:
+      variant === 'bento'
+        ? 'group flex min-h-[78px] w-full min-w-0 items-center gap-3 rounded-[16px] border border-white/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.025))] px-3.5 py-3 text-left text-white shadow-[0_16px_34px_-24px_rgba(0,0,0,0.7),inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-2xl transition-[background-color,border-color,opacity] duration-subtle hover:bg-white/[0.06] active:opacity-[0.9]'
+        : 'group flex min-h-12 w-full min-w-0 items-center gap-2.5 rounded-[14px] border border-white/10 bg-white/[0.035] px-3 text-left text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_14px_28px_-18px_rgba(0,0,0,0.55)] backdrop-blur-2xl transition-[background-color,border-color,opacity] duration-subtle hover:bg-white/[0.055] active:opacity-[0.9]',
+    'data-testid':
+      variant === 'bento'
+        ? 'profile-home-alerts-fallback-card'
+        : 'profile-home-alerts-row',
+  } as const;
+  const ariaLabel = isSubscribed
+    ? `Manage alerts for ${artist.name}`
+    : `Get alerts for ${artist.name}`;
+  const iconClassName =
+    variant === 'bento'
+      ? 'flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border border-white/8 bg-white/[0.055] text-white/88'
+      : 'flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-white/8 bg-white/[0.045] text-white/86';
+  const content = (
+    <>
+      <span className={iconClassName} aria-hidden='true'>
+        <Bell className={variant === 'bento' ? 'h-4 w-4' : 'h-3.5 w-3.5'} />
+      </span>
+      <span className='min-w-0 flex-1'>
+        <span
+          className={
+            variant === 'bento'
+              ? 'block text-[14px] font-[650] leading-[1.15] tracking-[-0.015em] [overflow-wrap:anywhere]'
+              : 'block text-[12.5px] font-semibold leading-4 tracking-[-0.005em] [overflow-wrap:anywhere]'
+          }
+        >
+          {title}
+        </span>
+        <span
+          className={
+            variant === 'bento'
+              ? 'mt-1 block max-w-[25ch] text-[11.5px] leading-4 text-white/54 [overflow-wrap:anywhere]'
+              : 'mt-0.5 block text-[11px] leading-3.5 text-white/50 [overflow-wrap:anywhere]'
+          }
+        >
+          {description}
+        </span>
+      </span>
+      <span
+        className={
+          isSubscribed
+            ? cn(
+                'relative h-6 w-10 shrink-0 rounded-full border border-white/42 bg-white p-0.5 transition-colors duration-subtle',
+                variant === 'bento' && 'self-center'
+              )
+            : cn(
+                'relative h-6 w-10 shrink-0 rounded-full border border-white/16 bg-white/10 p-0.5 transition-colors duration-subtle',
+                variant === 'bento' && 'self-center'
+              )
+        }
+        aria-hidden='true'
+      >
+        <span
+          className={
+            isSubscribed
+              ? 'block h-5 w-5 translate-x-4 rounded-full bg-black shadow-[0_4px_10px_rgba(0,0,0,0.22)] transition-transform duration-subtle'
+              : 'block h-5 w-5 translate-x-0 rounded-full bg-white shadow-[0_4px_10px_rgba(0,0,0,0.22)] transition-transform duration-subtle'
+          }
+        />
+      </span>
+    </>
+  );
 
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    timeZone: 'UTC',
-  }).format(date);
-}
-
-function formatDayLabel(value: string | null | undefined) {
-  const date = toDateValue(value);
-  if (!date) return '--';
-
-  return new Intl.DateTimeFormat('en-US', {
-    day: '2-digit',
-    timeZone: 'UTC',
-  }).format(date);
-}
-
-function formatWeekdayTimeLabel(tourDate: TourDateViewModel) {
-  const date = toDateValue(tourDate.startDate);
-  const weekday = date
-    ? new Intl.DateTimeFormat('en-US', {
-        weekday: 'short',
-        timeZone: 'UTC',
-      }).format(date)
-    : null;
-
-  return [weekday, tourDate.startTime].filter(Boolean).join(' · ');
-}
-
-function formatTourLocation(tourDate: TourDateViewModel) {
-  return [tourDate.city, tourDate.region].filter(Boolean).join(', ');
-}
-
-function formatReleaseType(value: string | null | undefined) {
-  if (!value) return 'Release';
-  return capitalizeFirst(value.replaceAll('_', ' '));
-}
-
-function resolveImageUrl(
-  imageUrl: string | null | undefined,
-  fallbackVariant: 'release' | 'avatar'
-) {
-  if (fallbackVariant === 'avatar' && isDefaultAvatarUrl(imageUrl)) {
-    return null;
+  if (isInteractive) {
+    return (
+      <button
+        type='button'
+        onClick={onAlertsClick}
+        role='switch'
+        aria-checked={isSubscribed}
+        aria-label={ariaLabel}
+        {...sharedProps}
+      >
+        {content}
+      </button>
+    );
   }
 
-  return imageUrl ?? null;
-}
-
-function getReleaseCardMeta(release: ProfilePrimaryActionCardRelease) {
-  const type = formatReleaseType(release.releaseType);
-  return release.releaseType === 'ep' ? 'EP' : type;
-}
-
-function LatestReleaseFeature({
-  artist,
-  latestRelease,
-  isCountdown,
-  onPlayClick,
-  renderMode,
-}: Readonly<{
-  artist: Artist;
-  latestRelease: ProfilePrimaryActionCardRelease;
-  isCountdown: boolean;
-  onPlayClick?: () => void;
-  renderMode: ProfileRenderMode;
-}>) {
-  const releaseDate = toDateValue(latestRelease.releaseDate);
-  const liveAction =
-    renderMode === 'interactive' && onPlayClick
-      ? { label: 'Listen Now', onClick: onPlayClick, icon: 'Play' as const }
-      : {
-          label: 'Listen Now',
-          href: `/${artist.handle}/${latestRelease.slug}`,
-          icon: 'Play' as const,
-        };
-
-  return (
-    <ProfileMediaCard
-      eyebrow={isCountdown ? 'New Single' : 'New Release'}
-      title={latestRelease.title}
-      subtitle={getReleaseCardMeta(latestRelease)}
-      imageUrl={resolveImageUrl(latestRelease.artworkUrl, 'release')}
-      imageAlt={`${latestRelease.title} artwork`}
-      fallbackVariant='release'
-      accent='purple'
-      ratio='landscape'
-      countdown={
-        isCountdown && releaseDate
-          ? { targetDate: releaseDate, label: 'Drops in' }
-          : null
-      }
-      status={isCountdown ? null : { label: 'Out Now', tone: 'green' }}
-      action={
-        isCountdown
-          ? {
-              label: 'Notify me',
-              href: `/${artist.handle}/${latestRelease.slug}`,
-              icon: 'Bell',
-            }
-          : liveAction
-      }
-      priority
-      dataTestId='profile-home-latest-card'
-      className='rounded-[18px] [@media(max-height:880px)]:[&>div:first-child]:min-h-[132px] [@media(max-height:880px)]:[&>div:last-child]:px-2.5 [@media(max-height:880px)]:[&>div:last-child]:py-2.5'
-    />
-  );
-}
-
-function TourFeatureCard({
-  artist,
-  tourDate,
-  isNearYou,
-}: Readonly<{
-  artist: Artist;
-  tourDate: TourDateViewModel;
-  isNearYou: boolean;
-}>) {
-  const canBuyTickets =
-    Boolean(tourDate.ticketUrl) &&
-    tourDate.ticketStatus !== 'cancelled' &&
-    tourDate.ticketStatus !== 'sold_out';
-
-  return (
-    <ProfileMediaCard
-      eyebrow={isNearYou ? 'Near You' : 'Next Show'}
-      title={tourDate.title ?? `${artist.name} Live`}
-      subtitle={tourDate.venueName}
-      locationLabel={formatTourLocation(tourDate)}
-      imageUrl={resolveImageUrl(artist.image_url, 'avatar')}
-      imageAlt={`${artist.name} show`}
-      fallbackVariant='avatar'
-      accent={isNearYou ? 'blue' : 'orange'}
-      ratio='landscape'
-      datePill={{
-        month: formatMonthLabel(tourDate.startDate),
-        day: formatDayLabel(tourDate.startDate),
-        meta: formatWeekdayTimeLabel(tourDate),
-      }}
-      action={{
-        label:
-          tourDate.ticketStatus === 'sold_out'
-            ? 'Sold out'
-            : tourDate.ticketStatus === 'cancelled'
-              ? 'Cancelled'
-              : canBuyTickets
-                ? 'Get tickets'
-                : 'Details',
-        href: canBuyTickets ? tourDate.ticketUrl : `/${artist.handle}/tour`,
-        icon: 'Ticket',
-        showChevron: canBuyTickets,
-        disabled: tourDate.ticketStatus === 'cancelled',
-      }}
-      priority
-      dataTestId='profile-home-rail-tour'
-      className='rounded-[18px] [@media(max-height:880px)]:[&>div:first-child]:min-h-[132px] [@media(max-height:880px)]:[&>div:last-child]:px-2.5 [@media(max-height:880px)]:[&>div:last-child]:py-2.5'
-    />
-  );
-}
-
-function PlaylistFeatureCard({
-  playlist,
-}: Readonly<{ playlist: ConfirmedFeaturedPlaylistFallback }>) {
-  return (
-    <ProfileMediaCard
-      eyebrow='Featured Playlist'
-      title={playlist.title}
-      subtitle='Open playlist'
-      imageUrl={playlist.imageUrl}
-      imageAlt={playlist.title}
-      fallbackVariant='release'
-      accent='green'
-      ratio='landscape'
-      action={{
-        label: 'Listen',
-        ariaLabel: `Open ${playlist.title}`,
-        href: playlist.url,
-        icon: 'Play',
-        showChevron: true,
-      }}
-      priority
-      dataTestId='profile-home-rail-playlist'
-      className='rounded-[18px] [@media(max-height:880px)]:[&>div:first-child]:min-h-[132px] [@media(max-height:880px)]:[&>div:last-child]:px-2.5 [@media(max-height:880px)]:[&>div:last-child]:py-2.5'
-    />
-  );
-}
-
-function ListenFeatureCard({
-  artist,
-  onPlayClick,
-}: Readonly<{
-  artist: Artist;
-  onPlayClick?: () => void;
-}>) {
-  return (
-    <ProfileMediaCard
-      eyebrow='Music'
-      title={artist.name}
-      subtitle='Choose a platform'
-      imageUrl={resolveImageUrl(artist.image_url, 'avatar')}
-      imageAlt={artist.name}
-      fallbackVariant='avatar'
-      accent='purple'
-      ratio='landscape'
-      action={{
-        label: 'Listen',
-        ariaLabel: `Listen to ${artist.name}`,
-        href: onPlayClick ? null : `/${artist.handle}?mode=listen`,
-        onClick: onPlayClick,
-        icon: 'Play',
-      }}
-      priority
-      dataTestId='profile-home-rail-listen'
-      className='rounded-[18px] [@media(max-height:880px)]:[&>div:first-child]:min-h-[132px] [@media(max-height:880px)]:[&>div:last-child]:px-2.5 [@media(max-height:880px)]:[&>div:last-child]:py-2.5'
-    />
-  );
+  return <div {...sharedProps}>{content}</div>;
 }
 
 export function ProfileHomeRail({
@@ -287,7 +171,10 @@ export function ProfileHomeRail({
   tourDates = [],
   hasPlayableDestinations,
   renderMode = 'interactive',
+  previewActionLabel = 'Listen',
   onPlayClick,
+  onAlertsClick,
+  isSubscribed = false,
   viewerLocation,
   resolveNearbyTour = true,
 }: Readonly<ProfileHomeRailProps>) {
@@ -340,46 +227,55 @@ export function ProfileHomeRail({
     ]
   );
 
-  const isCountdown = featuredState.kind === 'release_countdown';
-  const showLatest = Boolean(releaseVisibility?.show && latestRelease);
-  const visibleTourDate = nearbyTourDate ?? nextTourDate;
+  const hasPrimaryFeature =
+    featuredState.kind === 'release_countdown' ||
+    featuredState.kind === 'release_live' ||
+    featuredState.kind === 'tour_nearby' ||
+    featuredState.kind === 'tour_next' ||
+    featuredState.kind === 'playlist_fallback';
 
-  let featureCard: React.ReactNode = null;
-  if (showLatest && latestRelease) {
-    featureCard = (
-      <LatestReleaseFeature
-        artist={artist}
-        latestRelease={latestRelease}
-        isCountdown={isCountdown}
-        onPlayClick={onPlayClick}
-        renderMode={renderMode}
-      />
-    );
-  } else if (
-    visibleTourDate &&
-    (featuredState.kind === 'tour_nearby' || featuredState.kind === 'tour_next')
-  ) {
-    featureCard = (
-      <TourFeatureCard
-        artist={artist}
-        tourDate={visibleTourDate}
-        isNearYou={Boolean(nearbyTourDate && resolveNearbyTour)}
-      />
-    );
-  } else if (
-    featuredState.kind === 'playlist_fallback' &&
-    featuredPlaylistFallback
-  ) {
-    featureCard = <PlaylistFeatureCard playlist={featuredPlaylistFallback} />;
-  } else if (featuredState.kind === 'listen_fallback') {
-    featureCard = (
-      <ListenFeatureCard artist={artist} onPlayClick={onPlayClick} />
-    );
-  }
+  const alertsCard = (
+    <HomeAlertsCard
+      artist={artist}
+      isSubscribed={isSubscribed}
+      onAlertsClick={onAlertsClick}
+      renderMode={renderMode}
+      variant={hasPrimaryFeature ? 'row' : 'bento'}
+    />
+  );
 
-  if (!featureCard) {
-    return null;
-  }
+  const featureCard = hasPrimaryFeature ? (
+    <ProfilePrimaryActionCard
+      artist={artist}
+      latestRelease={latestRelease}
+      profileSettings={profileSettings}
+      featuredPlaylistFallback={featuredPlaylistFallback}
+      tourDates={tourDates}
+      hasPlayableDestinations={hasPlayableDestinations}
+      renderMode={renderMode}
+      previewActionLabel={previewActionLabel}
+      onPlayClick={onPlayClick}
+      viewerLocation={viewerLocation}
+      resolveNearbyTour={resolveNearbyTour}
+      size='showcase'
+      dataTestId='profile-home-primary-action-card'
+      className='w-full'
+      now={now}
+    />
+  ) : null;
 
-  return <div data-testid='profile-home-rail'>{featureCard}</div>;
+  return (
+    <div
+      className='min-w-0 space-y-2 md:mx-auto md:w-full md:max-w-[320px]'
+      data-testid='profile-home-rail'
+      data-feature-state={featuredState.kind}
+    >
+      {alertsCard}
+      {featureCard ? (
+        <div className='min-w-0' data-testid='profile-home-feature-card'>
+          {featureCard}
+        </div>
+      ) : null}
+    </div>
+  );
 }

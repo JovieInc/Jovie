@@ -539,18 +539,6 @@ type ReleaseCardLayout = {
     readonly left: number;
     readonly right: number;
   };
-  readonly media: {
-    readonly top: number;
-    readonly bottom: number;
-    readonly left: number;
-    readonly right: number;
-  };
-  readonly title: {
-    readonly top: number;
-    readonly bottom: number;
-    readonly left: number;
-    readonly right: number;
-  };
   readonly hero: {
     readonly top: number;
     readonly bottom: number;
@@ -561,16 +549,14 @@ async function collectMockHomeReleaseCardLayout(
   page: Page
 ): Promise<ReleaseCardLayout> {
   return page.evaluate(() => {
-    const title = document.querySelector<HTMLElement>(
-      '[data-testid="profile-home-latest-card-title"]'
+    const card = document.querySelector<HTMLElement>(
+      '[data-testid="profile-home-primary-action-card"]'
     );
-    const card = title?.closest<HTMLElement>('article');
-    const media = card?.querySelector<HTMLElement>(':scope > div:first-child');
     const hero = document.querySelector<HTMLElement>(
       '[data-testid="profile-hero-identity-block"]'
     );
 
-    if (!card || !media || !title) {
+    if (!card) {
       throw new Error('Mock-home release card layout target missing');
     }
 
@@ -586,8 +572,6 @@ async function collectMockHomeReleaseCardLayout(
 
     return {
       card: rect(card),
-      media: rect(media),
-      title: rect(title),
       hero: hero ? rect(hero) : null,
     };
   });
@@ -611,7 +595,7 @@ test.describe('Public Profile Mock Home Release Card Layout @smoke @critical', (
       );
       await waitForHydration(page);
       await waitForAnyVisible(page, [
-        '[data-testid="profile-home-latest-card"]',
+        '[data-testid="profile-home-primary-action-card"]',
       ]);
       await settleLayout(page);
 
@@ -625,14 +609,6 @@ test.describe('Public Profile Mock Home Release Card Layout @smoke @critical', (
       ).toBeLessThanOrEqual(2);
 
       const layout = await collectMockHomeReleaseCardLayout(page);
-      expect(
-        layout.title.top,
-        `${viewport.label} release title should not clip above media`
-      ).toBeGreaterThanOrEqual(layout.media.top + 6);
-      expect(
-        layout.title.bottom,
-        `${viewport.label} release title should fit inside media`
-      ).toBeLessThanOrEqual(layout.media.bottom - 6);
       if (layout.hero) {
         expect(
           layout.card.top,

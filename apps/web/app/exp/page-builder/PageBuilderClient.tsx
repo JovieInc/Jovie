@@ -439,6 +439,7 @@ function ProductComponentStudio() {
     DESIGN_STUDIO_ITEMS.filter(item => item.category !== 'sections')
   );
   const categoryOrder: readonly DesignStudioCategory[] = [
+    'public-profile',
     'music-ai',
     'shell-views',
     'components',

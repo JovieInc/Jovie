@@ -43,6 +43,17 @@
   --profile-drawer-radius-mobile: 24px;
   --profile-drawer-radius-desktop: 20px;
   --profile-action-radius: 14px;
+  --page-pad: clamp(16px, 4vw, 32px);
+  --section-gap: clamp(16px, 3vw, 28px);
+  --card-pad: clamp(14px, 3vw, 24px);
+  --avatar-size: clamp(88px, 22vw, 144px);
+  --cover-height: clamp(320px, min(112vw, 56svh), 500px);
+  --content-max: 720px;
+  --profile-bottom-nav-height: calc(
+    3.5rem +
+    max(12px, env(safe-area-inset-bottom)) +
+    24px
+  );
 
   /* DS_FOUNDATION_V1: canonical semantic aliases (do not redefine downstream) */
   --ds-public-content-max: 1298px; /* canonical public/marketing width */
@@ -68,6 +79,42 @@
   /* Derived base lightness for light mode */
   --theme-base-l: 99%;
   /* Near white for light mode */
+}
+
+.profile-viewport {
+  --page-pad: clamp(16px, 4vw, 32px);
+  --section-gap: clamp(16px, 3vw, 28px);
+  --card-pad: clamp(14px, 3vw, 24px);
+  --avatar-size: clamp(88px, 22vw, 144px);
+  --cover-height: clamp(320px, min(112vw, 56svh), 500px);
+  --content-max: 720px;
+}
+
+.public-profile-layout-frame {
+  height: 100%;
+  max-width: min(100%, var(--content-max));
+  padding-left: max(var(--page-pad), env(safe-area-inset-left));
+  padding-right: max(var(--page-pad), env(safe-area-inset-right));
+}
+
+.public-profile-layout-frame--desktop {
+  max-width: 1540px;
+  padding-block: clamp(16px, 2vw, 24px);
+}
+
+.public-profile-layout-frame--compact {
+  max-width: min(100%, calc(var(--content-max) + (var(--page-pad) * 2)));
+}
+
+.public-profile-compact-shell {
+  max-width: min(var(--profile-shell-max-width), 100%);
+}
+
+@media (min-width: 768px) {
+  .public-profile-compact-shell {
+    --cover-height: 340px;
+    height: min(740px, calc(100dvh - (var(--page-pad) * 2)));
+  }
 }
 
 :root.dark {

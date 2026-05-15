@@ -18,6 +18,7 @@ import { ThreadImageCard } from '@/components/shell/ThreadImageCard';
 import { ThreadVideoCard } from '@/components/shell/ThreadVideoCard';
 import { TypeBadge } from '@/components/shell/TypeBadge';
 import { MOCK_LYRICS } from '@/data/mock-lyrics';
+import { HomeProfileShowcase } from '@/features/home/HomeProfileShowcase';
 import { SCREENSHOT_SCENARIOS } from '@/lib/screenshots/registry';
 import { SECTION_REGISTRY, type SectionVariant } from '@/lib/sections/registry';
 import { cn } from '@/lib/utils';
@@ -26,6 +27,7 @@ export type DesignStudioCategory =
   | 'pages'
   | 'sections'
   | 'music-ai'
+  | 'public-profile'
   | 'shell-views'
   | 'components'
   | 'screenshots';
@@ -49,6 +51,7 @@ export const DESIGN_STUDIO_CATEGORY_LABELS: Record<
   pages: 'Pages',
   sections: 'Sections',
   'music-ai': 'Music AI',
+  'public-profile': 'Public Profile',
   'shell-views': 'Shell Views',
   components: 'Components',
   screenshots: 'Screenshots',
@@ -129,6 +132,71 @@ function MockArtwork({
     >
       <Music2 className='h-6 w-6 text-white/70' />
     </div>
+  );
+}
+
+function PublicProfileIphonePreview() {
+  const states = [
+    { id: 'streams-presave', label: 'Countdown' },
+    { id: 'streams-latest', label: 'Live release' },
+    { id: 'tour-nearby', label: 'Tour date' },
+    { id: 'alerts-fallback', label: 'Alerts fallback' },
+    { id: 'events-empty', label: 'Events empty' },
+    { id: 'more-menu', label: 'More menu' },
+  ] as const;
+
+  return (
+    <StudioFrame className='bg-[#050608] p-4'>
+      <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-3'>
+        {states.map(state => (
+          <div key={state.id} className='min-w-0'>
+            <div className='mb-2 flex items-center justify-between gap-2'>
+              <p className='truncate text-[11px] font-semibold text-white/62'>
+                {state.label}
+              </p>
+              <span className='rounded-md bg-white/[0.06] px-2 py-1 text-[10px] text-white/45'>
+                iPhone
+              </span>
+            </div>
+            <HomeProfileShowcase
+              stateId={state.id}
+              presentation='full-phone'
+              compact
+              hideJovieBranding
+              hideMoreMenu={state.id !== 'more-menu'}
+              phoneClassName='max-w-[13.5rem]'
+            />
+          </div>
+        ))}
+      </div>
+    </StudioFrame>
+  );
+}
+
+function PublicProfileMerchFixturePreview() {
+  return (
+    <StudioFrame className='flex items-center justify-center bg-[#050608] p-6'>
+      <div className='w-full max-w-[390px] rounded-[28px] border border-white/10 bg-black p-4'>
+        <div className='relative overflow-hidden rounded-[22px] border border-white/10 bg-white/[0.035]'>
+          <div className='grid min-h-[112px] grid-cols-[88px_minmax(0,1fr)] gap-3 p-3'>
+            <div className='aspect-square overflow-hidden rounded-[16px] bg-[linear-gradient(135deg,rgba(255,255,255,0.22),rgba(255,255,255,0.04))]'>
+              <div className='h-full w-full bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.38),transparent_28%),linear-gradient(145deg,#20242c_0%,#11141a_52%,#050608_100%)]' />
+            </div>
+            <div className='min-w-0 py-1'>
+              <p className='text-[11px] font-semibold text-white/45'>
+                Merch Drop
+              </p>
+              <p className='mt-1 text-[16px] font-[650] leading-5 tracking-[-0.03em] text-white [overflow-wrap:anywhere]'>
+                Tour Tee
+              </p>
+              <p className='mt-1 text-[12px] leading-5 text-white/55'>
+                Studio-only fixture. Production needs real product data first.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </StudioFrame>
   );
 }
 
@@ -433,6 +501,44 @@ function sectionPrompt(variant: SectionVariant): string {
 }
 
 const PRODUCT_SHOWCASE_ITEMS: readonly DesignStudioItem[] = [
+  {
+    id: 'public-profile-iphone-states',
+    label: 'Public Profile iPhone States',
+    category: 'public-profile',
+    description:
+      'The real compact public profile surface across Home, Events, Alerts fallback, and menu states.',
+    preview: PublicProfileIphonePreview,
+    demoRoute: '/demo/showcase/tim-white-profile?state=alerts-fallback',
+    componentPaths: [
+      'apps/web/components/features/profile/templates/ProfileCompactSurface.tsx',
+      'apps/web/components/features/profile/ProfileHomeRail.tsx',
+      'apps/web/components/features/profile/ProfilePrimaryTabPanel.tsx',
+      'apps/web/components/features/profile/TourModePanel.tsx',
+    ],
+    screenshotScenarioIds: [
+      'tim-white-profile-presave-mobile',
+      'tim-white-profile-live-mobile',
+      'tim-white-profile-tour-nearby-mobile',
+      'tim-white-profile-alerts-fallback-mobile',
+      'tim-white-profile-events-empty-mobile',
+      'tim-white-profile-more-menu-mobile',
+    ],
+    marketingPrompt:
+      'Use these public profile iPhone states to review the real artist-facing profile shell: portrait hero, compact action card, alerts fallback, events, and menu.',
+  },
+  {
+    id: 'public-profile-merch-fixture',
+    label: 'Public Profile Merch Fixture',
+    category: 'public-profile',
+    description:
+      'Studio-only compact merch-card direction for when real latest-product data exists.',
+    preview: PublicProfileMerchFixturePreview,
+    demoRoute: '/exp/page-builder?mode=product',
+    componentPaths: ['apps/web/lib/design-studio/registry.tsx'],
+    screenshotScenarioIds: [],
+    marketingPrompt:
+      'Use this only as a visual fixture for future merch-product data. Do not imply production currently has latest merch item data.',
+  },
   {
     id: 'music-ai-command-surface',
     label: 'Music AI Command Surface',
