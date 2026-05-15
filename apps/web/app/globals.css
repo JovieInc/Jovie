@@ -58,12 +58,13 @@ html[data-desktop-runtime="electron"] [data-electron-titlebar="true"] {
   z-index: 60;
   display: grid;
   grid-template-columns: var(--linear-app-sidebar-width) minmax(0, 1fr);
+  column-gap: var(--linear-app-shell-gap);
   align-items: center;
+  padding-right: var(--linear-app-shell-gap);
   flex-shrink: 0;
   height: var(--electron-titlebar-height);
   user-select: none;
   background: rgb(var(--sidebar-background));
-  border-bottom: 1px solid rgb(var(--sidebar-border));
 }
 
 html[data-desktop-runtime="electron"] [data-electron-drag-region="true"] {

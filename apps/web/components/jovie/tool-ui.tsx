@@ -12,6 +12,7 @@ import {
   type PersistedToolEvent,
 } from '@/lib/chat/tool-events';
 import { getToolUiConfig } from '@/lib/chat/tool-ui-registry';
+import { env } from '@/lib/env-client';
 import { addBreadcrumb } from '@/lib/sentry/client-lite';
 import { cn } from '@/lib/utils';
 import { ChatAlbumArtCard } from './components/ChatAlbumArtCard';
@@ -102,6 +103,25 @@ const TOOL_STATUS_ICONS: Record<PersistedToolEvent['state'], typeof Loader2> = {
   'needs-approval': CheckCircle2,
 };
 
+function isVerboseToolModeEnabled(): boolean {
+  if (env.IS_DEV) return true;
+  if (typeof globalThis.window === 'undefined') return false;
+
+  const browserWindow = globalThis.window;
+  const isVerboseQueryEnabled =
+    new URLSearchParams(browserWindow.location.search).get('chatVerbose') ===
+    '1';
+
+  try {
+    return (
+      isVerboseQueryEnabled ||
+      browserWindow.localStorage.getItem('jovie:chat-verbose') === '1'
+    );
+  } catch {
+    return isVerboseQueryEnabled;
+  }
+}
+
 function ToolStatusRow({
   event,
   variant,
@@ -114,6 +134,7 @@ function ToolStatusRow({
   const isError = event.state === 'failed' || event.state === 'denied';
   const isRunning = event.state === 'running';
   const Icon = TOOL_STATUS_ICONS[event.state];
+  const showVerboseDetails = isVerboseToolModeEnabled();
 
   return (
     <div
@@ -122,11 +143,11 @@ function ToolStatusRow({
       data-tool-state={event.state}
       role={isError ? 'alert' : 'status'}
       className={cn(
-        'w-full rounded-xl border bg-surface-1 text-primary-token',
+        'w-full rounded-xl border bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.018)),#17181d] text-primary-token shadow-[inset_0_1px_0_rgba(255,255,255,0.045)]',
         isInline ? 'px-3 py-2.5' : 'max-w-[420px] px-3.5 py-3',
         isError
           ? 'border-red-500/20 bg-[color-mix(in_oklab,var(--color-error)_8%,var(--linear-app-content-surface))]'
-          : 'border-subtle'
+          : 'border-white/[0.085]'
       )}
     >
       <div className='flex items-start gap-2.5'>
@@ -159,6 +180,26 @@ function ToolStatusRow({
             >
               {body}
             </div>
+          ) : null}
+          {showVerboseDetails ? (
+            <details
+              data-testid='chat-tool-verbose'
+              className='mt-2 rounded-lg border border-white/[0.07] bg-black/20 px-2 py-1.5 text-[10.5px] leading-4 text-tertiary-token'
+            >
+              <summary className='cursor-pointer select-none text-secondary-token'>
+                Verbose tool details
+              </summary>
+              <dl className='mt-1.5 grid grid-cols-[72px_minmax(0,1fr)] gap-x-2 gap-y-1'>
+                <dt>Tool</dt>
+                <dd className='min-w-0 truncate font-mono'>{event.toolName}</dd>
+                <dt>State</dt>
+                <dd className='font-mono'>{event.state}</dd>
+                <dt>Call</dt>
+                <dd className='min-w-0 truncate font-mono'>
+                  {event.toolCallId}
+                </dd>
+              </dl>
+            </details>
           ) : null}
         </div>
       </div>

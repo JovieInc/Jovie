@@ -100,21 +100,17 @@ export interface ChatInputProps {
 type SurfaceMode = 'empty' | 'typing' | 'root' | 'entity';
 
 interface SurfaceGeometry {
-  readonly width: number | string;
-  readonly maxWidth: number | string;
+  readonly width: string;
+  readonly maxWidth: string;
   readonly borderRadius: number;
 }
 
 function geometryFor(mode: SurfaceMode, stacked: boolean): SurfaceGeometry {
-  if (stacked) {
-    if (mode === 'empty')
-      return { width: '100%', maxWidth: '100%', borderRadius: 999 };
-    return { width: '100%', maxWidth: '100%', borderRadius: 18 };
-  }
-  if (mode === 'empty') return { width: 440, maxWidth: 440, borderRadius: 999 };
-  if (mode === 'typing') return { width: 440, maxWidth: 440, borderRadius: 24 };
-  if (mode === 'root') return { width: 520, maxWidth: 520, borderRadius: 20 };
-  return { width: 760, maxWidth: '100%', borderRadius: 20 };
+  const width = '100%';
+  const maxWidth = 'min(calc(100vw - 32px), 720px)';
+  if (stacked) return { width, maxWidth, borderRadius: 28 };
+  if (mode === 'entity') return { width, maxWidth, borderRadius: 24 };
+  return { width, maxWidth, borderRadius: 28 };
 }
 
 function pickerKindNoun(kind: import('@/lib/chat/tokens').EntityKind): string {
@@ -193,8 +189,8 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
 
     const isCompact = variant === 'compact';
     const isStacked = isCompact || isViewportNarrow;
-    const maxHeight = isCompact ? 128 : 192;
-    const minHeight = 28;
+    const maxHeight = 168;
+    const minHeight = 24;
 
     const internalTextareaRef = useRef<HTMLTextAreaElement>(null);
     useImperativeHandle(ref, () => internalTextareaRef.current!, []);
@@ -430,6 +426,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   width: geometry.width,
                   maxWidth: geometry.maxWidth,
                 }}
+                className='overflow-hidden rounded-[24px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.035)_0%,rgba(255,255,255,0.012)_42%,transparent_100%),#16171b] shadow-[0_18px_56px_-28px_rgba(0,0,0,0.9),inset_0_1px_0_rgba(255,255,255,0.055)]'
               >
                 <SlashCommandMenu
                   profileId={pickerProfileId}
@@ -464,19 +461,20 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
               borderRadius: geometry.borderRadius,
               width: geometry.width,
               maxWidth: geometry.maxWidth,
+              maxHeight: 'min(42vh, 280px)',
             }}
             className={cn(
-              'overflow-hidden border border-black/6 bg-white shadow-[0_2px_8px_rgba(0,0,0,0.08)] dark:border-white/[0.07] dark:bg-[linear-gradient(180deg,rgba(255,255,255,0.018)_0%,transparent_40%),#16161a] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_1px_0_rgba(0,0,0,0.18)]',
+              'overflow-hidden border border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.035)_0%,rgba(255,255,255,0.014)_45%,transparent_100%),#16171b] text-primary-token shadow-[0_18px_56px_-30px_rgba(0,0,0,0.86),inset_0_1px_0_rgba(255,255,255,0.055)]',
               isExpanded &&
-                'border-black/10 shadow-[0_4px_14px_rgba(0,0,0,0.10)] dark:border-white/[0.10] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_1px_0_rgba(0,0,0,0.22),0_12px_32px_-16px_rgba(0,0,0,0.45)]',
-              'outline-none focus-within:border-black/16 focus-within:shadow-[0_0_0_3px_rgba(0,0,0,0.035)] focus-within:outline-none dark:focus-within:border-white/[0.16] dark:focus-within:shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_0_0_3px_rgba(255,255,255,0.035)]',
+                'border-white/[0.12] shadow-[0_24px_68px_-32px_rgba(0,0,0,0.95),inset_0_1px_0_rgba(255,255,255,0.07)]',
+              'outline-none focus-within:border-white/[0.18] focus-within:shadow-[0_0_0_3px_rgba(255,255,255,0.05),0_24px_68px_-32px_rgba(0,0,0,0.95),inset_0_1px_0_rgba(255,255,255,0.07)] focus-within:outline-none',
               isOverLimit && 'border-error',
               showEntitySurface && !isStacked ? 'flex' : 'flex flex-col'
             )}
           >
             {showEntitySurface && !isStacked ? (
               <div className='flex w-full'>
-                <aside className='flex w-[264px] shrink-0 flex-col border-r border-white/[0.055]'>
+                <aside className='flex w-[264px] shrink-0 flex-col border-r border-white/[0.065]'>
                   <SlashCommandMenu
                     profileId={pickerProfileId}
                     state={picker.state}
@@ -500,11 +498,11 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                     </div>
                   )}
                   {statusBanner ? (
-                    <div className='border-t border-white/[0.055]'>
+                    <div className='border-t border-white/[0.065]'>
                       {statusBanner}
                     </div>
                   ) : null}
-                  <div className='border-t border-white/[0.055]'>
+                  <div className='border-t border-white/[0.065]'>
                     <InputRow
                       containerRef={containerRef}
                       hiddenDivRef={hiddenDivRef}
@@ -531,7 +529,6 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                       handleMicToggle={handleMicToggle}
                       canSend={canSend}
                       isStreaming={isStreaming}
-                      isCompact={isCompact}
                       onStop={onStop}
                       setIsFocused={setIsFocused}
                       hasPendingImages={hasPendingImages}
@@ -539,7 +536,6 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                       onRemoveImage={onRemoveImage}
                       chips={chips}
                       onRemoveChipAt={onRemoveChipAt}
-                      isPillMode={false}
                       isPickerOpen={isPickerOpen}
                       pickerListId={pickerListId}
                       pickerActiveRowId={pickerActiveRowId}
@@ -553,7 +549,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                 {/* STACKED entity mode: rail (full width) above optional preview, above input */}
                 {showEntitySurface && isStacked ? (
                   <div className='flex flex-col'>
-                    <div className='border-b border-white/[0.055]'>
+                    <div className='border-b border-white/[0.065]'>
                       <SlashCommandMenu
                         profileId={pickerProfileId}
                         state={picker.state}
@@ -568,7 +564,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                       />
                     </div>
                     {activeEntity ? (
-                      <div className='border-b border-white/[0.055]'>
+                      <div className='border-b border-white/[0.065]'>
                         <EntityPreviewPane entity={activeEntity} />
                       </div>
                     ) : null}
@@ -576,7 +572,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                 ) : null}
 
                 {statusBanner ? (
-                  <div className='border-b border-white/[0.055]'>
+                  <div className='border-b border-white/[0.065]'>
                     {statusBanner}
                   </div>
                 ) : null}
@@ -607,7 +603,6 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   handleMicToggle={handleMicToggle}
                   canSend={canSend}
                   isStreaming={isStreaming}
-                  isCompact={isCompact}
                   onStop={onStop}
                   setIsFocused={setIsFocused}
                   hasPendingImages={hasPendingImages}
@@ -615,7 +610,6 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   onRemoveImage={onRemoveImage}
                   chips={chips}
                   onRemoveChipAt={onRemoveChipAt}
-                  isPillMode={surfaceMode === 'empty'}
                   hasBorderTop={
                     // Add a top separator only when there is surface content
                     // *inside* the surface above the InputRow (entity mode).
@@ -713,7 +707,6 @@ interface InputRowProps {
   readonly handleMicToggle: () => void;
   readonly canSend: boolean;
   readonly isStreaming: boolean;
-  readonly isCompact: boolean;
   readonly onStop?: () => void;
   readonly setIsFocused: (focused: boolean) => void;
   readonly hasPendingImages: boolean;
@@ -721,8 +714,6 @@ interface InputRowProps {
   readonly onRemoveImage?: (id: string) => void;
   readonly chips?: readonly import('../hooks/useChipTray').TrayChip[];
   readonly onRemoveChipAt?: (index: number) => void;
-  /** Empty state: pill-shape, single-line clipped, vertical-center icons. */
-  readonly isPillMode?: boolean;
   /** Add hairline divider above the input (when picker sits above it). */
   readonly hasBorderTop?: boolean;
   /** True while slash picker is open — drives textarea combobox ARIA. */
@@ -761,7 +752,6 @@ function InputRow({
   handleMicToggle,
   canSend,
   isStreaming,
-  isCompact,
   onStop,
   setIsFocused,
   hasPendingImages,
@@ -769,7 +759,6 @@ function InputRow({
   onRemoveImage,
   chips,
   onRemoveChipAt,
-  isPillMode = false,
   hasBorderTop = false,
   isPickerOpen,
   pickerListId,
@@ -777,9 +766,9 @@ function InputRow({
   attachDisabledForPicker,
 }: InputRowProps) {
   return (
-    <div className={cn(hasBorderTop && 'border-t border-white/[0.055]')}>
+    <div className={cn(hasBorderTop && 'border-t border-white/[0.065]')}>
       {hasPendingImages && onRemoveImage ? (
-        <div className='px-4 pt-3'>
+        <div className='px-3 pt-3'>
           <ImagePreviewStrip
             images={pendingImages ?? []}
             onRemove={onRemoveImage}
@@ -787,106 +776,106 @@ function InputRow({
         </div>
       ) : null}
 
-      {chips && chips.length > 0 && onRemoveChipAt ? (
-        <div className='px-4 pt-3'>
-          <ChipTray chips={chips} onRemoveAt={onRemoveChipAt} />
-        </div>
-      ) : null}
-
       <div
         ref={containerRef}
         className={cn(
-          'relative flex min-h-[58px] gap-1',
-          isPillMode
-            ? 'items-center px-[7px] py-[7px] pl-4'
-            : 'items-end px-2 py-[10px] pl-[18px]'
+          'relative grid min-h-[88px] grid-rows-[minmax(24px,auto)_40px] gap-2 px-3 py-2.5'
         )}
       >
         <div ref={hiddenDivRef} style={HIDDEN_DIV_STYLES} aria-hidden />
-        {hasAttachButton && onImageAttach ? (
-          <ComposerAttachButton
-            isCompact={isCompact}
-            isImageProcessing={isImageProcessing}
-            isLoading={isLoading}
-            isSubmitting={isSubmitting}
-            disabled={attachDisabledForPicker}
-            plusMenuOpen={plusMenuOpen}
-            onOpenChange={setPlusMenuOpen}
-            onMouseDown={handlePreserveFocus}
-            onImageAttach={onImageAttach}
+        <div
+          data-testid='chat-input-inline-field'
+          className='flex min-h-7 w-full min-w-0 flex-wrap items-start gap-x-1.5 gap-y-1.5 px-1 pt-0.5'
+        >
+          {chips && chips.length > 0 && onRemoveChipAt ? (
+            <ChipTray chips={chips} onRemoveAt={onRemoveChipAt} />
+          ) : null}
+
+          <motion.textarea
+            ref={internalTextareaRef}
+            value={value}
+            onChange={e => onChange(e.target.value)}
+            placeholder={placeholder}
+            rows={1}
+            animate={reducedMotion ? undefined : { height: measuredHeight }}
+            transition={reducedMotion ? undefined : SPRING_HEIGHT}
+            className={cn(
+              'min-h-6 min-w-[min(13rem,100%)] flex-[1_1_13rem] resize-none bg-transparent',
+              'px-1 py-[1px] text-[16px] leading-6 text-white/92 placeholder:text-quaternary-token',
+              // Remove the browser's default focus outline. The surrounding
+              // surface provides the focus affordance (border glow via
+              // isFocused→isExpanded). Using focus-visible:outline-none keeps
+              // the suppress intentional for both mouse and keyboard paths since
+              // the surface-level glow IS the keyboard focus indicator for this
+              // compound widget.
+              'focus:outline-none! focus-visible:outline-none! focus:ring-0! focus-visible:ring-0!',
+              'focus:shadow-none! focus-visible:shadow-none! shadow-none [outline:none]',
+              isAtMaxHeight ? 'overflow-y-auto' : 'overflow-hidden'
+            )}
+            style={{
+              ...(reducedMotion ? { height: measuredHeight } : null),
+              boxShadow: 'none',
+              outline: 'none',
+            }}
+            onKeyDown={handleKeyDown}
+            onPaste={onPaste}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            maxLength={MAX_MESSAGE_LENGTH + 100}
+            aria-label='Chat message input'
+            aria-describedby={isNearLimit ? 'char-limit-status' : undefined}
+            // WAI-ARIA combobox pattern: the textarea is the input that
+            // controls the listbox rendered by SlashCommandMenu. Focus stays
+            // on the textarea; selection is communicated via
+            // aria-activedescendant pointing to the row id.
+            role={isPickerOpen ? 'combobox' : undefined}
+            aria-expanded={isPickerOpen ? 'true' : undefined}
+            aria-controls={isPickerOpen ? pickerListId : undefined}
+            aria-activedescendant={
+              isPickerOpen && pickerActiveRowId ? pickerActiveRowId : undefined
+            }
+            aria-autocomplete={isPickerOpen ? 'list' : undefined}
           />
-        ) : null}
+        </div>
 
-        <motion.textarea
-          ref={internalTextareaRef}
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          placeholder={placeholder}
-          rows={1}
-          animate={
-            reducedMotion || isPillMode ? undefined : { height: measuredHeight }
-          }
-          transition={reducedMotion ? undefined : SPRING_HEIGHT}
-          className={cn(
-            'min-w-0 flex-1 resize-none bg-transparent',
-            'text-[14.5px] leading-[1.55] tracking-[-0.006em] text-primary-token placeholder:text-quaternary-token',
-            // Remove the browser's default focus outline. The surrounding
-            // surface provides the focus affordance (border glow via
-            // isFocused→isExpanded). Using focus-visible:outline-none keeps
-            // the suppress intentional for both mouse and keyboard paths since
-            // the surface-level glow IS the keyboard focus indicator for this
-            // compound widget.
-            'focus:outline-none focus-visible:outline-none focus-visible:ring-0',
-            'shadow-none',
-            isPillMode ? 'whitespace-nowrap py-[7px] px-1' : 'py-2 px-1',
-            isAtMaxHeight ? 'overflow-y-auto' : 'overflow-hidden'
-          )}
-          style={
-            reducedMotion && !isPillMode
-              ? { height: measuredHeight }
-              : undefined
-          }
-          onKeyDown={handleKeyDown}
-          onPaste={onPaste}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
-          maxLength={MAX_MESSAGE_LENGTH + 100}
-          aria-label='Chat message input'
-          aria-describedby={isNearLimit ? 'char-limit-status' : undefined}
-          // WAI-ARIA combobox pattern: the textarea is the input that
-          // controls the listbox rendered by SlashCommandMenu. Focus stays
-          // on the textarea; selection is communicated via
-          // aria-activedescendant pointing to the row id.
-          role={isPickerOpen ? 'combobox' : undefined}
-          aria-expanded={isPickerOpen ? 'true' : undefined}
-          aria-controls={isPickerOpen ? pickerListId : undefined}
-          aria-activedescendant={
-            isPickerOpen && pickerActiveRowId ? pickerActiveRowId : undefined
-          }
-          aria-autocomplete={isPickerOpen ? 'list' : undefined}
-        />
+        <div className='flex min-h-10 items-center justify-between gap-2'>
+          <div className='flex min-w-0 items-center gap-2'>
+            {hasAttachButton && onImageAttach ? (
+              <ComposerAttachButton
+                isImageProcessing={isImageProcessing}
+                isLoading={isLoading}
+                isSubmitting={isSubmitting}
+                disabled={attachDisabledForPicker}
+                plusMenuOpen={plusMenuOpen}
+                onOpenChange={setPlusMenuOpen}
+                onMouseDown={handlePreserveFocus}
+                onImageAttach={onImageAttach}
+              />
+            ) : null}
+          </div>
 
-        {hasDictation ? (
-          <ComposerMicButton
-            isCompact={isCompact}
-            isListening={isListening}
-            isLoading={isLoading}
-            isSubmitting={isSubmitting}
-            onMouseDown={handlePreserveFocus}
-            onToggle={handleMicToggle}
-          />
-        ) : null}
+          <div className='flex shrink-0 items-center gap-2'>
+            {hasDictation ? (
+              <ComposerMicButton
+                isListening={isListening}
+                isLoading={isLoading}
+                isSubmitting={isSubmitting}
+                onMouseDown={handlePreserveFocus}
+                onToggle={handleMicToggle}
+              />
+            ) : null}
 
-        <ComposerSendButton
-          canSend={canSend}
-          isStreaming={isStreaming}
-          isLoading={isLoading}
-          isSubmitting={isSubmitting}
-          isCompact={isCompact}
-          reducedMotion={reducedMotion}
-          onMouseDown={handlePreserveFocus}
-          onStop={onStop}
-        />
+            <ComposerSendButton
+              canSend={canSend}
+              isStreaming={isStreaming}
+              isLoading={isLoading}
+              isSubmitting={isSubmitting}
+              reducedMotion={reducedMotion}
+              onMouseDown={handlePreserveFocus}
+              onStop={onStop}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );

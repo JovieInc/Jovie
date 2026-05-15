@@ -1,6 +1,6 @@
 {
   "name": "@jovie/web",
-  "version": "26.4.238",
+  "version": "26.5.0",
   "private": true,
   "sideEffects": false,
   "engines": {

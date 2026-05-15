@@ -449,7 +449,7 @@ function SortableTaskBoardCard({
         {...listeners}
         data-testid={`task-board-card-${task.id}`}
         onClick={() => onOpenTask(task)}
-        className='block w-full text-left focus-visible:outline-none'
+        className='block w-full cursor-grab text-left active:cursor-grabbing focus-visible:outline-none'
       >
         <TaskBoardCard
           task={task}
@@ -499,7 +499,8 @@ function TaskBoardCard({
   return (
     <div
       className={cn(
-        'group/task-board-card min-h-[7.25rem] w-full cursor-default rounded-lg border border-[color-mix(in_oklab,var(--linear-app-shell-border)_68%,transparent)] bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_38%,var(--linear-app-content-surface))] px-3 py-2.5 text-left shadow-[0_1px_0_rgba(255,255,255,0.025)] transition-[background-color,border-color,box-shadow,opacity]',
+        'group/task-board-card min-h-[7.25rem] w-full rounded-lg border border-[color-mix(in_oklab,var(--linear-app-shell-border)_68%,transparent)] bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_38%,var(--linear-app-content-surface))] px-3 py-2.5 text-left shadow-[0_1px_0_rgba(255,255,255,0.025)] transition-[background-color,border-color,box-shadow,opacity]',
+        draggingOverlay ? 'cursor-grabbing' : 'cursor-grab',
         'hover:border-[color-mix(in_oklab,var(--linear-app-shell-border)_90%,transparent)] hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_42%,var(--linear-app-content-surface))]',
         'focus-visible:outline-none focus-visible:border-[color-mix(in_oklab,var(--linear-border-focus)_74%,transparent)] focus-visible:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]',
         selected &&

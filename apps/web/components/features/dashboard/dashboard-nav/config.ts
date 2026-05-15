@@ -47,6 +47,14 @@ export const dashboardHome: NavItem = {
   description: 'Start a new thread',
 };
 
+export const newThreadNavItem: NavItem = {
+  name: 'New thread',
+  href: APP_ROUTES.CHAT,
+  id: 'chat',
+  icon: SquarePen,
+  description: 'Start a new thread',
+};
+
 export const profileNavItem: NavItem = {
   name: 'Profile',
   href: APP_ROUTES.CHAT,

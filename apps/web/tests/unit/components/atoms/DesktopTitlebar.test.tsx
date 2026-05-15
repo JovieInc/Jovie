@@ -47,16 +47,22 @@ describe('DesktopTitlebar', () => {
     expect(
       screen.getByTestId('electron-titlebar-sidebar-cell')
     ).toContainElement(screen.getByTestId('update-available-pill'));
+    expect(
+      screen.getByTestId('electron-titlebar-sidebar-cell')
+    ).toContainElement(screen.getByTestId('electron-sidebar-toggle'));
+    expect(
+      screen.getByTestId('electron-titlebar-sidebar-cell')
+    ).toContainElement(screen.getByTestId('electron-nav-back'));
+    expect(
+      screen.getByTestId('electron-titlebar-sidebar-cell')
+    ).toContainElement(screen.getByTestId('electron-nav-forward'));
     expect(screen.getByTestId('update-available-pill')).toHaveAttribute(
       'data-compact',
       'true'
     );
-    expect(screen.getByTestId('electron-titlebar-main-cell')).toContainElement(
-      screen.getByTestId('electron-nav-back')
-    );
-    expect(screen.getByTestId('electron-titlebar-main-cell')).toContainElement(
-      screen.getByTestId('electron-nav-forward')
-    );
+    expect(
+      screen.getByRole('button', { name: 'Collapse sidebar' })
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Go back' })).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Go forward' })

@@ -670,6 +670,12 @@ describe('TasksPageClient', () => {
     const titleEditor = screen.getByLabelText('Task title');
     expect(titleEditor.tagName).toBe('TEXTAREA');
     expect(titleEditor).toHaveValue(mockTaskTwo.title);
+    expect(titleEditor.className).toContain('focus-visible:bg-');
+    expect(titleEditor).toHaveStyle({ boxShadow: 'none' });
+
+    const descriptionEditor = screen.getByLabelText('Task description');
+    expect(descriptionEditor.className).toContain('focus-visible:bg-');
+    expect(descriptionEditor).toHaveStyle({ boxShadow: 'none' });
   });
 
   it('keeps the tasks subheader at the same compact header height as the page header', () => {

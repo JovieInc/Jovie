@@ -131,6 +131,7 @@ export function JovieChat({
   // Append a placeholder when waiting for the AI to start responding.
   // This is a displayMessages array, NOT a modification to the real messages.
   const lastMessage = messages[messages.length - 1];
+  const showPendingBootstrap = messages.length === 0 && isSubmitting;
   const displayMessages =
     isLoading && lastMessage?.role === 'user'
       ? [
@@ -142,7 +143,16 @@ export function JovieChat({
             createdAt: new Date(),
           },
         ]
-      : messages;
+      : showPendingBootstrap
+        ? [
+            {
+              id: THINKING_PLACEHOLDER_ID,
+              role: 'assistant' as const,
+              parts: [] as MessagePart[],
+              createdAt: new Date(),
+            },
+          ]
+        : messages;
 
   // ─── Sticky scroll via ResizeObserver ────────────────────────────
   const {
@@ -310,12 +320,32 @@ export function JovieChat({
   const lastAssistantIndex = findLastAssistantIndex(displayMessages);
 
   const isStreaming = status === 'streaming';
+  const showThreadView = hasMessages || showPendingBootstrap;
 
   // Show skeleton while fetching existing conversation
   if (isLoadingConversation) {
     return (
-      <div className='flex h-full flex-col'>
-        <ChatMessageSkeleton />
+      <div
+        className='flex h-full flex-col bg-(--linear-app-content-surface)'
+        data-testid='chat-loading-conversation-skeleton'
+      >
+        <div className='flex-1 overflow-hidden px-4 py-5 sm:px-5'>
+          <ChatMessageSkeleton />
+        </div>
+        <div className='shrink-0 px-4 pb-4 pt-2 sm:px-5 sm:pb-5 sm:pt-2.5'>
+          <div className='mx-auto h-[88px] w-full max-w-[45rem] rounded-[28px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.035)_0%,rgba(255,255,255,0.014)_45%,transparent_100%),#16171b] shadow-[0_18px_56px_-30px_rgba(0,0,0,0.86),inset_0_1px_0_rgba(255,255,255,0.055)]'>
+            <div className='grid h-full grid-rows-[minmax(24px,auto)_40px] gap-2 px-3 py-2.5'>
+              <div className='mx-1 mt-1 h-5 w-44 rounded-full bg-white/[0.055]' />
+              <div className='flex items-center justify-between'>
+                <div className='h-9 w-9 rounded-full bg-white/[0.045]' />
+                <div className='flex items-center gap-2'>
+                  <div className='h-9 w-9 rounded-full bg-white/[0.045]' />
+                  <div className='h-9 w-9 rounded-full bg-white/[0.08]' />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -381,21 +411,31 @@ export function JovieChat({
       <AnimatePresence>
         {isDragOver && (
           <motion.div
-            className='absolute inset-0 z-50 flex items-center justify-center rounded-xl border-2 border-dashed border-accent/50 bg-accent/5 backdrop-blur-sm'
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
+            data-testid='chat-attachment-dropzone'
+            className='absolute inset-0 z-50 flex items-center justify-center rounded-[var(--linear-app-shell-radius)] border border-dashed border-white/22 bg-black/58 p-6 backdrop-blur-md'
+            initial={{ opacity: 0, scale: 0.995 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.995 }}
+            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
           >
-            <div className='flex flex-col items-center gap-2 text-accent'>
-              <ImagePlus className='h-6 w-6' />
-              <span className='text-sm font-medium'>Drop images here</span>
+            <div className='flex min-h-40 w-full max-w-sm flex-col items-center justify-center gap-3 rounded-2xl border border-white/[0.1] bg-[linear-gradient(180deg,rgba(255,255,255,0.07),rgba(255,255,255,0.03)),#17181d] px-6 py-8 text-center shadow-[0_24px_80px_-32px_rgba(0,0,0,0.95)]'>
+              <span className='flex h-11 w-11 items-center justify-center rounded-full bg-white text-black shadow-[0_8px_24px_-12px_rgba(0,0,0,0.9)]'>
+                <ImagePlus className='h-5 w-5' />
+              </span>
+              <div>
+                <p className='text-sm font-semibold tracking-[-0.01em] text-primary-token'>
+                  Drop images to attach
+                </p>
+                <p className='mt-1 text-xs leading-5 text-secondary-token'>
+                  Up to 4 images, 10 MB each.
+                </p>
+              </div>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {hasMessages ? (
+      {showThreadView ? (
         <div className='flex flex-1 flex-col overflow-hidden'>
           {/* Messages area */}
           <div
@@ -503,7 +543,7 @@ export function JovieChat({
             unmounted entirely when empty.
           */}
           <div className='shrink-0 bg-(--linear-app-content-surface) px-4 pb-4 pt-2 sm:px-5 sm:pb-5 sm:pt-2.5'>
-            <div className='mx-auto w-full max-w-[44rem]'>
+            <div className='mx-auto w-full max-w-[45rem]'>
               {/* Transient alerts stack above the input. Each contributes its
                   own bottom margin only when rendered, so toggling them does
                   not leave residual padding behind. */}
@@ -609,7 +649,7 @@ export function JovieChat({
           </div>
 
           <div className='shrink-0 bg-(--linear-app-content-surface) px-4 pb-4 pt-2 sm:px-5 sm:pb-5 sm:pt-2.5'>
-            <div className='mx-auto w-full max-w-[34rem]'>
+            <div className='mx-auto w-full max-w-[45rem]'>
               <ChatUsageAlert />
 
               {isRateLimited && (

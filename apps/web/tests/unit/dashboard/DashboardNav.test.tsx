@@ -47,6 +47,19 @@ describe('DashboardNav', () => {
     expect(activeLink.getAttribute('aria-current')).toBe('page');
   });
 
+  it('only marks New thread active on the chat root', () => {
+    mockUsePathname.mockReturnValueOnce(`${APP_ROUTES.CHAT}/thread-123`);
+
+    const { getByRole } = renderDashboardNav({
+      renderFn: fastRender,
+      appFlags: { SHELL_CHAT_V1: true },
+    });
+
+    expect(
+      getByRole('link', { name: 'New thread' }).getAttribute('aria-current')
+    ).toBeNull();
+  });
+
   it('handles collapsed state', () => {
     const { container } = renderDashboardNav({
       renderFn: fastRender,

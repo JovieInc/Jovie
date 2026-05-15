@@ -29,6 +29,7 @@ import {
   adminNavigationSections,
   artistSettingsNavigation,
   libraryNavItem,
+  newThreadNavItem,
   primaryNavigation,
   userSettingsNavigation,
 } from './config';
@@ -72,6 +73,10 @@ function isItemActive(pathname: string, item: NavItem): boolean {
   }
 
   return normalizedPathname.startsWith(`${item.href}/`);
+}
+
+function normalizeTrailingSlash(pathname: string): string {
+  return pathname === '/' ? pathname : pathname.replace(/\/$/, '');
 }
 
 function formatTaskBadge(
@@ -165,6 +170,7 @@ export function DashboardNav(_: DashboardNavProps) {
         {
           key: 'user-work',
           items: [
+            newThreadNavItem,
             searchNavItem,
             ...(tasksItem ? [decorateItem(tasksItem)] : []),
             ...(shellChatLibraryEnabled ? [libraryNavItem] : []),
@@ -312,9 +318,16 @@ export function DashboardNav(_: DashboardNavProps) {
       const isProfileItem = item.id === 'profile';
       const isReleasesItem = item.id === 'releases';
       const isSearchItem = item.id === 'search';
-      const isActive = isProfileItem
-        ? isPreviewOpen && pathname.startsWith(APP_ROUTES.CHAT)
-        : isItemActive(pathname, item);
+      const isNewThreadItem =
+        item.id === 'chat' && item.href === APP_ROUTES.CHAT;
+      let isActive = false;
+      if (isProfileItem) {
+        isActive = isPreviewOpen && pathname.startsWith(APP_ROUTES.CHAT);
+      } else if (isNewThreadItem) {
+        isActive = normalizeTrailingSlash(pathname) === APP_ROUTES.CHAT;
+      } else if (!isSearchItem) {
+        isActive = isItemActive(pathname, item);
+      }
       const shortcut = NAV_SHORTCUTS[item.id];
 
       // In demo mode, only Releases has real content — intercept all other nav clicks

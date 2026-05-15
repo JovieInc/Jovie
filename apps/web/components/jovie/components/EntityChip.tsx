@@ -2,7 +2,7 @@
 
 import { X } from 'lucide-react';
 import Image from 'next/image';
-import { useMemo } from 'react';
+import { type CSSProperties, useMemo } from 'react';
 import { useOptionalChatEntityPanel } from '@/app/app/(shell)/chat/ChatEntityPanelContext';
 import type { EntityKind } from '@/lib/chat/tokens';
 import { useAppFlag } from '@/lib/flags/client';
@@ -31,6 +31,13 @@ const KIND_PREFIX: Record<EntityKind, string> = {
   event: 'Event',
 };
 
+const KIND_ACCENT_VAR: Record<EntityKind, string> = {
+  release: '--geist-purple-solid',
+  artist: '--geist-blue-solid',
+  track: '--geist-pink-solid',
+  event: '--geist-green-solid',
+};
+
 export function EntityChip({
   data,
   variant = 'input',
@@ -55,11 +62,14 @@ export function EntityChip({
         'data-entity-label': data.label,
       }
     : {};
+  const accentStyle = {
+    '--jovie-entity-accent': `var(${KIND_ACCENT_VAR[data.kind]})`,
+  } as CSSProperties;
   const commonClassName = cn(
-    'inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface-0 px-1.5 py-0.5 align-baseline text-app leading-5 text-primary-token',
-    'select-none',
-    variant === 'input' &&
-      'mx-0.5 cursor-default shadow-[0_1px_1px_rgba(0,0,0,0.04)]',
+    'inline-flex items-center gap-1.5 align-baseline text-primary-token select-none',
+    variant === 'input'
+      ? 'h-7 max-w-[220px] shrink-0 cursor-default rounded-[9px] border border-[color:color-mix(in_srgb,var(--jovie-entity-accent)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--jovie-entity-accent)_13%,transparent)] px-2 text-[13px] font-medium leading-none text-[color:color-mix(in_srgb,var(--jovie-entity-accent)_72%,white_28%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.045)]'
+      : 'rounded-md border border-subtle bg-surface-0 px-1.5 py-0.5 text-app leading-5',
     canOpenEntityPanel &&
       'cursor-pointer transition-colors hover:border-[color-mix(in_oklab,var(--linear-border-focus)_58%,transparent)] hover:bg-surface-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[color-mix(in_oklab,var(--linear-border-focus)_72%,transparent)]'
   );
@@ -81,10 +91,10 @@ export function EntityChip({
       ) : (
         <span
           aria-hidden
-          className='inline-block h-1.5 w-1.5 rounded-full bg-tertiary-token'
+          className='inline-block h-1.5 w-1.5 rounded-full bg-[var(--jovie-entity-accent)] shadow-[0_0_0_3px_color-mix(in_srgb,var(--jovie-entity-accent)_12%,transparent)]'
         />
       )}
-      <span className='max-w-[180px] truncate'>{data.label}</span>
+      <span className='min-w-0 truncate'>{data.label}</span>
       {onRemove ? (
         <button
           type='button'
@@ -96,7 +106,7 @@ export function EntityChip({
             event.preventDefault();
             onRemove();
           }}
-          className='-mr-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-sm text-tertiary-token transition-colors duration-fast hover:bg-surface-1 hover:text-primary-token focus:outline-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30'
+          className='-mr-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-sm text-tertiary-token transition-colors duration-fast hover:bg-white/[0.07] hover:text-primary-token focus:outline-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30'
         >
           <X className='h-3 w-3' />
         </button>
@@ -109,6 +119,7 @@ export function EntityChip({
       <button
         type='button'
         className={commonClassName}
+        style={accentStyle}
         aria-label={`Open ${prefix}: ${data.label}`}
         title={`${prefix}: ${data.label}`}
         onClick={() =>
@@ -131,6 +142,7 @@ export function EntityChip({
       <span
         {...inputChipAttributes}
         className={commonClassName}
+        style={accentStyle}
         title={`${prefix}: ${data.label}`}
       >
         {contents}
@@ -142,6 +154,7 @@ export function EntityChip({
     <span
       {...inputChipAttributes}
       className={commonClassName}
+      style={accentStyle}
       role='img'
       aria-label={`${prefix}: ${data.label}`}
       title={`${prefix}: ${data.label}`}

@@ -4,6 +4,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
   SimpleTooltip,
 } from '@jovie/ui';
@@ -27,30 +29,21 @@ import { TRANSITION_FAST } from './chat-motion';
 function getButtonIcon(
   showStop: boolean,
   isLoading: boolean,
-  isSubmitting: boolean,
-  isCompact: boolean
+  isSubmitting: boolean
 ): { key: string; icon: React.ReactNode } {
-  const iconSize = isCompact ? 'h-3.5 w-3.5' : 'h-4 w-4';
   if (showStop) {
     return {
       key: 'stop',
-      icon: (
-        <span
-          className={cn(
-            'block rounded-[2px] bg-current',
-            isCompact ? 'h-2.5 w-2.5' : 'h-3 w-3'
-          )}
-        />
-      ),
+      icon: <span className='block h-3 w-3 rounded-[2px] bg-current' />,
     };
   }
   if (isLoading || isSubmitting) {
     return {
       key: 'loading',
-      icon: <Loader2 className={cn('animate-spin', iconSize)} />,
+      icon: <Loader2 className='h-4 w-4 animate-spin' />,
     };
   }
-  return { key: 'send', icon: <ArrowUp className={iconSize} /> };
+  return { key: 'send', icon: <ArrowUp className='h-4 w-4' /> };
 }
 
 export interface ComposerSendButtonProps {
@@ -58,7 +51,6 @@ export interface ComposerSendButtonProps {
   readonly isStreaming: boolean;
   readonly isLoading: boolean;
   readonly isSubmitting: boolean;
-  readonly isCompact: boolean;
   readonly reducedMotion: boolean | null;
   readonly onMouseDown: (event: React.MouseEvent<HTMLButtonElement>) => void;
   readonly onStop?: () => void;
@@ -69,18 +61,12 @@ export function ComposerSendButton({
   isStreaming,
   isLoading,
   isSubmitting,
-  isCompact,
   reducedMotion,
   onMouseDown,
   onStop,
 }: ComposerSendButtonProps) {
   const showStop = isStreaming && Boolean(onStop);
-  const { key, icon } = getButtonIcon(
-    showStop,
-    isLoading,
-    isSubmitting,
-    isCompact
-  );
+  const { key, icon } = getButtonIcon(showStop, isLoading, isSubmitting);
   const motionInit = reducedMotion ? undefined : { scale: 0.5, opacity: 0 };
   const isInteractive = showStop || canSend;
 
@@ -92,11 +78,10 @@ export function ComposerSendButton({
         onClick={showStop ? onStop : undefined}
         disabled={!showStop && !canSend}
         className={cn(
-          'flex shrink-0 items-center justify-center rounded-full transition-[background-color,color,box-shadow] duration-fast',
+          'flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-[background-color,color,box-shadow] duration-fast',
           isInteractive
-            ? 'bg-gradient-to-b from-white to-[#e8e8eb] text-black shadow-[inset_0_0.5px_0_rgba(255,255,255,0.6),inset_0_-0.5px_0_rgba(0,0,0,0.08),0_1px_2px_rgba(0,0,0,0.4)] hover:shadow-[inset_0_0.5px_0_rgba(255,255,255,0.7),inset_0_-0.5px_0_rgba(0,0,0,0.1),0_4px_12px_-2px_rgba(0,0,0,0.5)]'
-            : 'cursor-not-allowed bg-white/[0.04] text-quaternary-token shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.04)]',
-          'h-8 w-8'
+            ? 'bg-gradient-to-b from-white to-[#e8e8eb] text-black shadow-[inset_0_0.5px_0_rgba(255,255,255,0.68),inset_0_-0.5px_0_rgba(0,0,0,0.1),0_1px_3px_rgba(0,0,0,0.42)] hover:shadow-[inset_0_0.5px_0_rgba(255,255,255,0.78),inset_0_-0.5px_0_rgba(0,0,0,0.12),0_4px_14px_-4px_rgba(0,0,0,0.62)]'
+            : 'cursor-not-allowed bg-white/[0.045] text-quaternary-token shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.045)]'
         )}
         aria-label={showStop ? 'Stop generating' : 'Send message'}
       >
@@ -118,7 +103,6 @@ export function ComposerSendButton({
 }
 
 export interface ComposerAttachButtonProps {
-  readonly isCompact: boolean;
   readonly isImageProcessing: boolean;
   readonly isLoading: boolean;
   readonly isSubmitting: boolean;
@@ -135,7 +119,6 @@ export interface ComposerAttachButtonProps {
 }
 
 export function ComposerAttachButton({
-  isCompact,
   isImageProcessing,
   isLoading,
   isSubmitting,
@@ -145,7 +128,6 @@ export function ComposerAttachButton({
   onMouseDown,
   onImageAttach,
 }: ComposerAttachButtonProps) {
-  const iconSize = isCompact ? 'h-4 w-4' : 'h-[15px] w-[15px]';
   return (
     <DropdownMenu open={plusMenuOpen} onOpenChange={onOpenChange}>
       <DropdownMenuTrigger asChild>
@@ -154,36 +136,49 @@ export function ComposerAttachButton({
           onMouseDown={onMouseDown}
           disabled={isImageProcessing || isLoading || isSubmitting || disabled}
           className={cn(
-            'flex shrink-0 items-center justify-center rounded-full text-tertiary-token transition-[background-color,color] duration-fast',
-            'hover:bg-white/[0.04] hover:text-primary-token',
-            'disabled:cursor-not-allowed disabled:opacity-50',
-            'h-8 w-8'
+            'flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-tertiary-token transition-[background-color,color,box-shadow] duration-fast',
+            'hover:bg-white/[0.055] hover:text-primary-token hover:shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.055)]',
+            'disabled:cursor-not-allowed disabled:opacity-50'
           )}
           aria-label='Attachment options'
         >
           {isImageProcessing ? (
-            <Loader2 className={cn('animate-spin', iconSize)} />
+            <Loader2 className='h-4 w-4 animate-spin' />
           ) : (
-            <Plus className={iconSize} strokeWidth={1.6} />
+            <Plus className='h-4 w-4' strokeWidth={1.6} />
           )}
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align='start' side='top' sideOffset={8}>
+      <DropdownMenuContent
+        align='start'
+        side='top'
+        sideOffset={8}
+        alignOffset={-4}
+        collisionPadding={16}
+        className='w-52 rounded-xl p-1'
+      >
+        <DropdownMenuLabel className='px-2.5 py-1.5 text-[11px] font-medium leading-4 text-tertiary-token'>
+          Attachments
+        </DropdownMenuLabel>
         <DropdownMenuItem
+          className='min-h-9 gap-2 px-2.5 py-2'
           onSelect={() => {
             onImageAttach();
           }}
         >
-          <ImagePlus className='mr-2 h-4 w-4' />
+          <ImagePlus className='h-4 w-4' />
           Attach image
         </DropdownMenuItem>
+        <DropdownMenuSeparator className='my-1' />
+        <div className='px-2.5 pb-1.5 pt-0.5 text-[11px] leading-4 text-tertiary-token'>
+          Drop images anywhere in chat.
+        </div>
       </DropdownMenuContent>
     </DropdownMenu>
   );
 }
 
 export interface ComposerMicButtonProps {
-  readonly isCompact: boolean;
   readonly isListening: boolean;
   readonly isLoading: boolean;
   readonly isSubmitting: boolean;
@@ -192,14 +187,12 @@ export interface ComposerMicButtonProps {
 }
 
 export function ComposerMicButton({
-  isCompact,
   isListening,
   isLoading,
   isSubmitting,
   onMouseDown,
   onToggle,
 }: ComposerMicButtonProps) {
-  const iconSize = isCompact ? 'h-3.5 w-3.5' : 'h-4 w-4';
   return (
     <SimpleTooltip content={isListening ? 'Stop dictation' : 'Dictate message'}>
       <button
@@ -208,20 +201,19 @@ export function ComposerMicButton({
         onClick={onToggle}
         disabled={isLoading || isSubmitting}
         className={cn(
-          'flex shrink-0 items-center justify-center rounded-full transition-[background-color,color] duration-fast',
+          'flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-[background-color,color,box-shadow] duration-fast',
           isListening
             ? 'bg-red-500/15 text-red-400 hover:bg-red-500/20'
-            : 'text-tertiary-token hover:bg-white/[0.04] hover:text-primary-token',
-          'disabled:cursor-not-allowed disabled:opacity-50',
-          'h-8 w-8'
+            : 'text-tertiary-token hover:bg-white/[0.055] hover:text-primary-token hover:shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.055)]',
+          'disabled:cursor-not-allowed disabled:opacity-50'
         )}
         aria-label={isListening ? 'Stop dictation' : 'Dictate message'}
         aria-pressed={isListening}
       >
         {isListening ? (
-          <MicOff className={iconSize} />
+          <MicOff className='h-4 w-4' />
         ) : (
-          <Mic className={iconSize} />
+          <Mic className='h-4 w-4' />
         )}
       </button>
     </SimpleTooltip>

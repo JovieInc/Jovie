@@ -238,7 +238,7 @@ function KanbanColumn<TData>({
                       className={cn(
                         'absolute top-0 left-0 w-full pb-2.5',
                         onItemMove &&
-                          'cursor-move transition-opacity hover:opacity-80'
+                          'cursor-grab transition-opacity hover:opacity-80 active:cursor-grabbing'
                       )}
                       style={{
                         transform: `translateY(${virtualRow.start}px)`,
@@ -271,7 +271,7 @@ function KanbanColumn<TData>({
                   }}
                   className={cn(
                     onItemMove &&
-                      'cursor-move transition-opacity hover:opacity-80'
+                      'cursor-grab transition-opacity hover:opacity-80 active:cursor-grabbing'
                   )}
                 >
                   {renderCard(item, index)}
