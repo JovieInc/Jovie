@@ -291,6 +291,27 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       waitFor: '[data-testid="demo-showcase-tim-white-profile-state"]',
       viewport: 'mobile',
     },
+    {
+      id: 'tim-white-profile-alerts-fallback-mobile',
+      title: 'Tim White Profile — Alerts Fallback',
+      route: '/demo/showcase/tim-white-profile?state=alerts-fallback',
+      waitFor: '[data-testid="profile-home-alerts-fallback-card"]',
+      viewport: 'mobile',
+    },
+    {
+      id: 'tim-white-profile-events-empty-mobile',
+      title: 'Tim White Profile — Events Empty',
+      route: '/demo/showcase/tim-white-profile?state=events-empty',
+      waitFor: '[data-testid="tour-drawer-content"]',
+      viewport: 'mobile',
+    },
+    {
+      id: 'tim-white-profile-more-menu-mobile',
+      title: 'Tim White Profile — More Menu',
+      route: '/demo/showcase/tim-white-profile?state=more-menu',
+      waitFor: '[data-testid="profile-menu-drawer"]',
+      viewport: 'mobile',
+    },
   ]),
   ...defineScenarios('marketing', ADMIN_MARKETING_AND_INVESTOR, [
     ...TIM_WHITE_PROFILE_MOBILE_VARIANTS.map(timWhiteProfileMobile),

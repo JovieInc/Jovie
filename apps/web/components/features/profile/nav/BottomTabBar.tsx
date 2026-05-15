@@ -103,8 +103,8 @@ export interface BottomTabBarProps {
 /**
  * Bottom tab bar for the public profile compact surface.
  *
- * Safe-area padding is applied inside the bar (`pb-[max(env(safe-area-inset-bottom),10px)]`).
- * Content rendered above this bar must apply `pb-[calc(3.5rem+env(safe-area-inset-bottom))]`
+ * Safe-area padding is applied inside the bar (`pb-[max(env(safe-area-inset-bottom),12px)]`).
+ * Content rendered above this bar must reserve `--profile-bottom-nav-height`
  * — see `CONTENT_SAFE_AREA_BOTTOM_PADDING` in `lib/profile/nav-constants.ts`.
  *
  * Touch targets meet the 44×44pt minimum via `min-h-[52px]` on each button
@@ -129,7 +129,7 @@ export function BottomTabBar({
   return (
     <div
       className={cn(
-        '-mx-4 shrink-0 border-t border-white/[0.075] bg-black/72 px-1 pb-[max(env(safe-area-inset-bottom),10px)] pt-1 backdrop-blur-2xl',
+        '-mx-[var(--page-pad)] shrink-0 border-t border-white/[0.075] bg-black/72 px-1 pb-[max(env(safe-area-inset-bottom),12px)] pt-1 backdrop-blur-2xl',
         className
       )}
       data-testid='profile-tab-bar'

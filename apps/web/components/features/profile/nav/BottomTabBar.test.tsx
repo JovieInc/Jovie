@@ -280,11 +280,11 @@ describe('BottomTabBar — grid layout', () => {
 // ---------------------------------------------------------------------------
 
 describe('BottomTabBar — safe area classes', () => {
-  it('applies pb-[max(env(safe-area-inset-bottom),10px)] inside the bar wrapper', () => {
+  it('applies pb-[max(env(safe-area-inset-bottom),12px)] inside the bar wrapper', () => {
     const { container } = render(<BottomTabBar {...makeProps()} />);
     const wrapper = container.querySelector('[data-testid="profile-tab-bar"]');
     expect(wrapper?.className).toContain(
-      'pb-[max(env(safe-area-inset-bottom),10px)]'
+      'pb-[max(env(safe-area-inset-bottom),12px)]'
     );
   });
 });

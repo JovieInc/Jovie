@@ -56,7 +56,10 @@ test.describe('Profile Notifications Hosts', () => {
         return;
       }
 
-      const trigger = page.getByTestId('profile-hero-alerts-row');
+      const trigger = page
+        .getByTestId('profile-home-alerts-row')
+        .or(page.getByTestId('profile-home-alerts-fallback-card'))
+        .first();
       await expect(trigger).toBeVisible();
 
       if (breakpoint.name === 'tablet') {

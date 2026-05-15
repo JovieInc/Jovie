@@ -297,7 +297,7 @@ export function ProfileCompactSurface({
   const socialIconClassName =
     'inline-flex h-8 w-8 items-center justify-center text-white/68 transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
   const heroHeightClassName = isHomeMode
-    ? 'aspect-[16/9] min-h-[214px] max-h-[276px]'
+    ? 'h-[var(--cover-height)] min-h-[320px] max-h-[500px]'
     : 'h-[calc(3.5rem+max(env(safe-area-inset-top),0px))] border-b border-white/[0.075]';
   const locationLabel = artist.location?.trim() || artist.hometown?.trim();
   const registerNotificationsReveal = useCallback(
@@ -328,7 +328,7 @@ export function ProfileCompactSurface({
     onModeSelect('subscribe');
     onRevealNotifications?.();
   }, [onModeSelect, onRevealNotifications]);
-  const showHeroAlertsRow = !isSubscribed || showRecentActivationRow;
+  const homeAlertsSubscribed = isSubscribed || showRecentActivationRow;
 
   return (
     <div
@@ -355,6 +355,7 @@ export function ProfileCompactSurface({
             'relative shrink-0 overflow-hidden',
             heroHeightClassName
           )}
+          data-testid='profile-cover'
         >
           {isHomeMode ? (
             <>
@@ -378,8 +379,8 @@ export function ProfileCompactSurface({
                 )}
               </div>
 
-              <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(2,3,4,0.1)_0%,rgba(2,3,4,0.18)_30%,rgba(3,4,6,0.48)_64%,rgba(5,6,8,0.94)_88%,var(--profile-stage-bg)_100%)]' />
-              <div className='pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-[linear-gradient(180deg,transparent,var(--profile-stage-bg)_90%)]' />
+              <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(2,3,4,0.04)_0%,rgba(2,3,4,0.12)_36%,rgba(3,4,6,0.38)_68%,rgba(5,6,8,0.9)_92%,var(--profile-stage-bg)_100%)]' />
+              <div className='pointer-events-none absolute inset-x-0 bottom-0 h-[48%] bg-[linear-gradient(180deg,transparent_0%,rgba(0,0,0,0.48)_38%,rgba(0,0,0,0.84)_74%,var(--profile-stage-bg)_100%)]' />
             </>
           ) : (
             <div className='absolute inset-0 bg-black/94 backdrop-blur-2xl' />
@@ -433,9 +434,9 @@ export function ProfileCompactSurface({
           </div>
 
           {isHomeMode ? (
-            <div className='absolute inset-x-0 bottom-0 z-10 px-4 pb-5 [@media(max-height:820px)]:pb-4 [@media(max-height:760px)]:pb-3'>
+            <div className='absolute inset-x-0 bottom-0 z-10 px-[var(--page-pad)] pb-5'>
               <div
-                className='min-w-0 rounded-[18px] bg-black/18 px-3 py-2.5 shadow-[0_16px_38px_-24px_rgba(0,0,0,0.72)] backdrop-blur-[2px] [@media(max-height:820px)]:px-2.5 [@media(max-height:820px)]:py-2'
+                className='min-w-0 px-0 py-0 [overflow-wrap:anywhere]'
                 data-testid='profile-hero-identity-block'
               >
                 <IdentityHeading
@@ -448,9 +449,11 @@ export function ProfileCompactSurface({
                     data-testid='profile-identity-link'
                     href={profileHref}
                     aria-label={`Go to ${artist.name}'s profile`}
-                    className='inline-flex max-w-full min-w-0 items-center gap-1.5 rounded-md text-[34px] font-semibold leading-[0.98] tracking-[-0.026em] text-white drop-shadow-[0_2px_14px_rgba(0,0,0,0.42)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent [@media(max-height:820px)]:text-[30px] [@media(max-height:760px)]:text-[28px]'
+                    className='inline-flex max-w-full min-w-0 flex-wrap items-center gap-1.5 rounded-md text-[clamp(28px,8vw,34px)] font-semibold leading-[0.98] tracking-[-0.026em] text-white drop-shadow-[0_2px_14px_rgba(0,0,0,0.42)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent [@media(max-height:820px)]:text-[30px] [@media(max-height:760px)]:text-[28px]'
                   >
-                    <span className='truncate'>{artist.name}</span>
+                    <span className='min-w-0 max-w-full [overflow-wrap:anywhere]'>
+                      {artist.name}
+                    </span>
                     {artist.is_verified ? (
                       <BadgeCheck
                         className='h-5 w-5 shrink-0 [@media(max-height:820px)]:h-4 [@media(max-height:820px)]:w-4'
@@ -463,15 +466,17 @@ export function ProfileCompactSurface({
                   </Link>
                 </IdentityHeading>
 
-                <p className='mt-1 line-clamp-1 text-[13px] font-medium leading-5 tracking-[-0.012em] text-white/76 [@media(max-height:820px)]:text-[12px]'>
+                <p className='mt-1 line-clamp-2 min-w-0 text-[13px] font-medium leading-5 tracking-[-0.012em] text-white/76 [overflow-wrap:anywhere] [@media(max-height:820px)]:text-[12px]'>
                   {heroSubtitle}
                 </p>
 
                 <div className='flex min-w-0 items-center justify-between gap-3 pt-1 [@media(max-height:820px)]:pt-0'>
                   {locationLabel ? (
-                    <p className='inline-flex min-w-0 items-center gap-1.5 text-[13px] font-medium text-white/78 [@media(max-height:820px)]:text-[12px]'>
+                    <p className='inline-flex min-w-0 items-center gap-1.5 text-[13px] font-medium text-white/78 [overflow-wrap:anywhere] [@media(max-height:820px)]:text-[12px]'>
                       <MapPin className='h-3.5 w-3.5 shrink-0' />
-                      <span className='truncate'>{locationLabel}</span>
+                      <span className='min-w-0 [overflow-wrap:anywhere]'>
+                        {locationLabel}
+                      </span>
                     </p>
                   ) : (
                     <span />
@@ -509,7 +514,7 @@ export function ProfileCompactSurface({
 
         <div
           className={cn(
-            'relative z-10 flex min-h-0 flex-1 flex-col px-4',
+            'relative z-10 flex min-h-0 flex-1 flex-col px-[var(--page-pad)]',
             isHomeMode ? 'pt-0' : 'pt-2'
           )}
         >
@@ -528,61 +533,7 @@ export function ProfileCompactSurface({
             />
           ) : null}
 
-          {isHomeMode ? (
-            <div className='shrink-0 space-y-2 pb-2'>
-              {showHeroAlertsRow ? (
-                <button
-                  type='button'
-                  onClick={openNotifications}
-                  disabled={renderMode !== 'interactive'}
-                  className='flex min-h-11 w-full items-center gap-3 rounded-[14px] border border-white/10 bg-white/[0.035] px-3 text-left text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_14px_28px_-18px_rgba(0,0,0,0.55)] backdrop-blur-2xl transition-[background-color,border-color] duration-subtle hover:bg-white/[0.055] disabled:cursor-default disabled:hover:bg-white/[0.035] [@media(max-height:820px)]:hidden'
-                  data-testid='profile-hero-alerts-row'
-                >
-                  <span
-                    className='flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-white/8 bg-white/[0.045] text-white'
-                    aria-hidden='true'
-                  >
-                    <Bell className='h-4 w-4' />
-                  </span>
-                  <span className='min-w-0 flex-1'>
-                    <span className='block truncate text-[13px] font-semibold leading-5 tracking-[-0.01em]'>
-                      {isSubscribed ? 'Alerts On' : 'Alerts Off'}
-                    </span>
-                    <span className='block truncate text-[11.5px] leading-4 text-white/52'>
-                      New music, events and merch.
-                    </span>
-                  </span>
-                  <span
-                    className={cn(
-                      alertOptInVariant === 'toggle'
-                        ? 'relative h-[26px] w-[42px] shrink-0 rounded-full border p-0.5 transition-colors duration-subtle'
-                        : 'inline-flex h-8 shrink-0 items-center rounded-full bg-white px-3 text-[12px] font-semibold text-black transition-colors duration-subtle',
-                      alertOptInVariant === 'toggle' &&
-                        (isSubscribed
-                          ? 'border-white/42 bg-white'
-                          : 'border-white/16 bg-white/10')
-                    )}
-                    aria-hidden='true'
-                  >
-                    {alertOptInVariant === 'toggle' ? (
-                      <span
-                        className={cn(
-                          'block h-[22px] w-[22px] rounded-full shadow-[0_4px_10px_rgba(0,0,0,0.22)] transition-transform duration-subtle',
-                          isSubscribed
-                            ? 'translate-x-4 bg-black'
-                            : 'translate-x-0 bg-white'
-                        )}
-                      />
-                    ) : (
-                      <span>
-                        {isSubscribed ? 'Manage alerts' : 'Get alerts'}
-                      </span>
-                    )}
-                  </span>
-                </button>
-              ) : null}
-            </div>
-          ) : null}
+          {isHomeMode ? <div className='shrink-0 pb-2' /> : null}
 
           {showSubscriptionConfirmedBanner ? (
             <div className='shrink-0 pb-3'>
@@ -597,6 +548,7 @@ export function ProfileCompactSurface({
               !isHomeMode &&
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70'
             )}
+            data-testid='profile-content-scroll'
             tabIndex={isHomeMode ? undefined : 0}
           >
             {isHomeMode ? (
@@ -609,6 +561,8 @@ export function ProfileCompactSurface({
                 hasPlayableDestinations={mergedDSPs.length > 0}
                 renderMode={renderMode}
                 onPlayClick={onPlayClick}
+                onAlertsClick={openNotifications}
+                isSubscribed={homeAlertsSubscribed}
                 viewerLocation={viewerLocation}
                 resolveNearbyTour={resolveNearbyTour}
               />

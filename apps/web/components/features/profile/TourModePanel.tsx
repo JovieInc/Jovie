@@ -1,6 +1,6 @@
 'use client';
 
-import { MapPin } from 'lucide-react';
+import { Bell, MapPin } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useMemo } from 'react';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
@@ -115,7 +115,7 @@ function TourDateRow({
   return (
     <div
       className={cn(
-        'grid grid-cols-[44px_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3.5 transition-colors duration-200 hover:bg-white/[0.03]',
+        'grid min-w-0 grid-cols-[44px_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 transition-colors duration-subtle hover:bg-white/[0.03]',
         'border-t border-white/[0.075] first:border-t-0',
         item.date.ticketStatus === 'cancelled' && 'opacity-50'
       )}
@@ -130,10 +130,10 @@ function TourDateRow({
           </div>
         ) : null}
 
-        <p className='truncate text-[15px] font-medium tracking-[-0.03em] text-white'>
+        <p className='min-w-0 truncate text-[15px] font-medium tracking-[-0.03em] text-white'>
           {item.date.venueName}
         </p>
-        <p className='mt-0.5 truncate text-[12px] font-medium tracking-[-0.01em] text-white/52'>
+        <p className='mt-0.5 min-w-0 truncate text-[12px] font-medium tracking-[-0.01em] text-white/52'>
           {location}
         </p>
       </div>
@@ -145,7 +145,7 @@ function TourDateRow({
           target='_blank'
           rel='noopener noreferrer'
           className={cn(
-            'inline-flex h-8 shrink-0 items-center rounded-full border px-3 text-[12px] font-semibold tracking-[-0.01em] transition-[border-color,background-color,opacity] duration-200 hover:opacity-90',
+            'inline-flex min-h-11 shrink-0 items-center rounded-[14px] border px-3 text-[12px] font-semibold tracking-[-0.01em] transition-[border-color,background-color,opacity] duration-subtle hover:opacity-90',
             getTicketStatusClassName(item.date.ticketStatus, canBuyTickets)
           )}
         >
@@ -154,7 +154,7 @@ function TourDateRow({
       ) : (
         <span
           className={cn(
-            'inline-flex h-8 shrink-0 items-center rounded-full border px-3 text-[12px] font-semibold tracking-[-0.01em]',
+            'inline-flex min-h-11 shrink-0 items-center rounded-[14px] border px-3 text-[12px] font-semibold tracking-[-0.01em]',
             getTicketStatusClassName(item.date.ticketStatus, canBuyTickets)
           )}
         >
@@ -176,21 +176,30 @@ function TourDatesContent({
 }>) {
   if (allDates.length === 0) {
     return (
-      <div className='space-y-4'>
-        <div className='space-y-1.5'>
-          <p className='text-[16px] font-medium tracking-[-0.03em] text-white'>
-            No upcoming events.
-          </p>
-          <p className='max-w-[30ch] text-[13px] leading-5 text-white/52'>
-            Turn on alerts to hear when new shows are announced.
-          </p>
+      <div className='px-4 py-3'>
+        <div className='rounded-[18px] border border-white/[0.075] bg-white/[0.035] p-4'>
+          <div className='flex items-start gap-3'>
+            <span className='flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] border border-white/8 bg-white/[0.05] text-white/72'>
+              <Bell className='h-4 w-4' />
+            </span>
+            <div className='min-w-0 flex-1'>
+              <p className='text-[16px] font-medium tracking-[-0.03em] text-white'>
+                No upcoming events.
+              </p>
+              <p className='mt-1 max-w-[30ch] text-[13px] leading-5 text-white/52'>
+                Turn on alerts to hear when new shows are announced.
+              </p>
+            </div>
+          </div>
+          <div className='mt-4'>
+            <ArtistNotificationsCTA
+              artist={artist}
+              hideListenFallback
+              source='tour_drawer'
+              presentation='overlay'
+            />
+          </div>
         </div>
-        <ArtistNotificationsCTA
-          artist={artist}
-          hideListenFallback
-          source='tour_drawer'
-          presentation='overlay'
-        />
       </div>
     );
   }

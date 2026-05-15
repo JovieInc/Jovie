@@ -17,6 +17,7 @@ import {
   type ProfileMode,
   type ProfileShowcaseStateId,
 } from '@/features/profile/contracts';
+import { ProfileHomeRail } from '@/features/profile/ProfileHomeRail';
 import {
   ProfilePrimaryActionCard,
   type ProfilePrimaryActionCardRelease,
@@ -100,6 +101,9 @@ const DEMO_TIM_WHITE_SHOWCASE_STATE_IDS = [
   'tour-nearby',
   'playlist-fallback',
   'listen-fallback',
+  'alerts-fallback',
+  'events-empty',
+  'more-menu',
   'fans-opt-in',
   'fans-confirmed',
   'fans-song-alert',
@@ -447,6 +451,24 @@ function renderActionCardPreview({
   );
 }
 
+function renderAlertsFallbackPreview(dataTestId: string) {
+  return (
+    <div className='w-full' data-testid={dataTestId}>
+      <ProfileHomeRail
+        artist={HOMEPAGE_PROFILE_PREVIEW_ARTIST}
+        latestRelease={null}
+        profileSettings={SHOWCASE_PROFILE_SETTINGS}
+        featuredPlaylistFallback={null}
+        tourDates={[]}
+        hasPlayableDestinations
+        renderMode='preview'
+        isSubscribed={false}
+        resolveNearbyTour={false}
+      />
+    </div>
+  );
+}
+
 function formatSubscribeStateLabel(
   stateId: (typeof SUBSCRIBE_SHOWCASE_STATE_IDS)[number]
 ) {
@@ -525,16 +547,11 @@ function ActionCardShowcaseBoard() {
       }),
     },
     {
-      id: 'listen-fallback',
-      label: 'Listen fallback',
+      id: 'alerts-fallback',
+      label: 'Alerts fallback',
       description:
-        'Clean listen CTA when the profile still has DSP destinations.',
-      card: renderActionCardPreview({
-        dataTestId: 'tim-white-cards-listen-fallback',
-        tourDates: [],
-        hasPlayableDestinations: true,
-        previewActionLabel: 'Listen',
-      }),
+        'Useful fallback when no release, tour date, playlist, or merch item can lead.',
+      card: renderAlertsFallbackPreview('tim-white-cards-alerts-fallback'),
     },
   ] as const;
 

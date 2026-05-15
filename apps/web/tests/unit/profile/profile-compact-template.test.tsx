@@ -625,18 +625,18 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    expect(screen.getByTestId('profile-hero-alerts-row')).toHaveTextContent(
-      'Alerts Off'
+    expect(screen.getByTestId('profile-home-alerts-row')).toHaveTextContent(
+      'Get Test Artist alerts'
     );
-    expect(screen.getByTestId('profile-home-rail-tour')).toHaveTextContent(
-      'Get tickets'
-    );
+    expect(
+      screen.getByTestId('profile-home-primary-action-card')
+    ).toHaveTextContent('Tickets');
     expect(
       screen.queryByTestId('profile-hero-status-pill')
     ).not.toBeInTheDocument();
   });
 
-  it('falls back to the listen CTA without rendering release metadata in the hero', async () => {
+  it('renders the compact latest release card without release metadata in the hero', async () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -653,12 +653,12 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    expect(screen.getByTestId('profile-hero-alerts-row')).toHaveTextContent(
-      'Alerts Off'
+    expect(screen.getByTestId('profile-home-alerts-row')).toHaveTextContent(
+      'Get Test Artist alerts'
     );
-    expect(screen.getByTestId('profile-home-latest-card')).toHaveTextContent(
-      'Listen Now'
-    );
+    expect(
+      screen.getByTestId('profile-home-primary-action-card')
+    ).toHaveTextContent('Listen');
     expect(
       screen.queryByTestId('profile-hero-status-pill')
     ).not.toBeInTheDocument();
@@ -674,8 +674,8 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    const alertsRow = screen.getByTestId('profile-hero-alerts-row');
-    expect(alertsRow).toHaveTextContent('Alerts Off');
+    const alertsRow = screen.getByTestId('profile-home-alerts-fallback-card');
+    expect(alertsRow).toHaveTextContent('Get Test Artist alerts');
     expect(alertsRow).not.toHaveTextContent('New music and shows');
 
     fireEvent.click(alertsRow);
@@ -717,7 +717,7 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    fireEvent.click(screen.getByTestId('profile-hero-alerts-row'));
+    fireEvent.click(screen.getByTestId('profile-home-alerts-fallback-card'));
 
     expect(revealNotifications).toHaveBeenCalledTimes(1);
     expect(
@@ -725,7 +725,7 @@ describe('ProfileCompactTemplate', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('hides the compact hero alerts row for returning subscribers', async () => {
+  it('shows the alerts fallback as on for returning subscribers', async () => {
     mockUseProfileShell.mockImplementation(() => ({
       notificationsContextValue: {
         subscribedChannels: { email: true },
@@ -749,8 +749,8 @@ describe('ProfileCompactTemplate', () => {
     );
 
     expect(
-      screen.queryByTestId('profile-hero-alerts-row')
-    ).not.toBeInTheDocument();
+      screen.getByTestId('profile-home-alerts-fallback-card')
+    ).toHaveTextContent('Alerts On');
   });
 
   it('keeps the compact hero alerts row on after activation in the current session', async () => {
@@ -794,9 +794,9 @@ describe('ProfileCompactTemplate', () => {
 
     view.rerender(renderProfile());
 
-    expect(screen.getByTestId('profile-hero-alerts-row')).toHaveTextContent(
-      'Alerts On'
-    );
+    expect(
+      screen.getByTestId('profile-home-alerts-fallback-card')
+    ).toHaveTextContent('Alerts On');
   });
 
   it('falls back to the mode prop when the URL has no mode param', async () => {
@@ -980,7 +980,7 @@ describe('ProfileCompactTemplate', () => {
       'href',
       'https://open.spotify.com/playlist/37i9dQZF1DZ06evO2SKVTu'
     );
-    expect(screen.getByText('Featured Playlist')).toBeInTheDocument();
+    expect(screen.getByText('Open playlist')).toBeInTheDocument();
   });
 
   it('keeps optional hero role metadata out of the mobile hero chrome', async () => {
@@ -1044,7 +1044,9 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    expect(screen.getByTestId('profile-home-rail-tour')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('profile-home-primary-action-card')
+    ).toHaveAttribute('data-state', 'tour_next');
     expect(
       screen.queryByRole('link', {
         name: `Open This Is playlist for ${mockArtist.name}`,

@@ -173,12 +173,14 @@ function DesktopSurfaceCard({
   onAction,
   children,
   className,
+  testId,
 }: Readonly<{
   title: string;
   actionLabel?: string;
   onAction?: () => void;
   children: React.ReactNode;
   className?: string;
+  testId?: string;
 }>) {
   return (
     <section
@@ -186,6 +188,7 @@ function DesktopSurfaceCard({
         'rounded-[18px] border border-white/6 bg-white/[0.025] p-5',
         className
       )}
+      data-testid={testId}
     >
       <div className='mb-4 flex items-center justify-between gap-4'>
         <h2 className='text-[16px] font-semibold tracking-[-0.02em] text-white'>
@@ -376,9 +379,12 @@ export function ProfileDesktopSurface({
   }
 
   const homeOverview = (
-    <div className='grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.9fr)]'>
-      <div className='grid min-h-0 gap-3.5'>
-        <section className='relative min-h-[548px] overflow-hidden rounded-[26px] bg-[color:var(--profile-stage-bg)]'>
+    <div className='grid min-h-0 min-w-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.9fr)]'>
+      <div className='grid min-h-0 min-w-0 gap-3.5'>
+        <section
+          className='relative aspect-[4/5] h-[min(620px,calc(100dvh-180px))] min-h-[420px] min-w-0 max-w-[520px] overflow-hidden rounded-[26px] bg-[color:var(--profile-stage-bg)]'
+          data-testid='profile-desktop-cover'
+        >
           <div className='absolute inset-0'>
             {heroImageUrl ? (
               <ImageWithFallback
@@ -458,7 +464,10 @@ export function ProfileDesktopSurface({
           </div>
         </section>
 
-        <div className='grid gap-3.5 xl:grid-cols-[minmax(0,1.12fr)_minmax(320px,0.88fr)]'>
+        <div
+          className='grid gap-3.5 xl:grid-cols-[minmax(0,1.12fr)_minmax(320px,0.88fr)]'
+          data-testid='profile-desktop-secondary-grid'
+        >
           <DesktopSurfaceCard
             title='All Shows'
             actionLabel='View all shows'
@@ -561,8 +570,8 @@ export function ProfileDesktopSurface({
         </div>
       </div>
 
-      <div className='grid min-h-0 gap-3.5'>
-        <DesktopSurfaceCard title='Alerts'>
+      <div className='grid min-h-0 min-w-0 gap-3.5'>
+        <DesktopSurfaceCard title='Alerts' testId='profile-desktop-alerts-card'>
           <div className='space-y-4'>
             {!isSubscribed ? (
               <button

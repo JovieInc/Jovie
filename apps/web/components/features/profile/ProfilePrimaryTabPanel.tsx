@@ -291,6 +291,8 @@ function AlertsSettingsRow({
       type='button'
       onClick={onClick}
       disabled={disabled}
+      role='switch'
+      aria-checked={checked}
       className='flex min-h-[62px] w-full items-center gap-3 border-t border-white/[0.075] px-4 py-3 text-left transition-colors duration-subtle first:border-t-0 hover:bg-white/[0.03] disabled:cursor-default disabled:hover:bg-transparent'
     >
       <div className='min-w-0 flex-1'>

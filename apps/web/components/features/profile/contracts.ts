@@ -70,6 +70,9 @@ export type ProfileShowcaseStateId =
   | 'tour-nearby'
   | 'playlist-fallback'
   | 'listen-fallback'
+  | 'alerts-fallback'
+  | 'events-empty'
+  | 'more-menu'
   | 'fans-opt-in'
   | 'fans-confirmed'
   | 'fans-song-alert'
@@ -94,6 +97,7 @@ export type ProfileShowcaseDrawerView =
   | 'tour'
   | 'pay'
   | 'contact'
+  | 'menu'
   | null;
 
 export interface ProfilePreviewNotificationsState {
