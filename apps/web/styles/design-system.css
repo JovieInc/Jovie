@@ -1261,9 +1261,12 @@
 [data-theme="linear"],
 .linear-marketing {
   /* Marketing typography: Satoshi (display/buttons) + DM Sans (body) */
-  font-family: var(--font-body);
-  --marketing-font-display: var(--font-display);
-  --marketing-font-body: var(--font-body);
+  font-family:
+    var(--font-dm-sans), "DM Sans", -apple-system, "system-ui", sans-serif;
+  --marketing-font-display:
+    var(--font-satoshi), "Satoshi", -apple-system, "system-ui", sans-serif;
+  --marketing-font-body:
+    var(--font-dm-sans), "DM Sans", -apple-system, "system-ui", sans-serif;
 
   /* Map Linear text colors to design system */
   --color-text-primary-token: var(--linear-text-primary);

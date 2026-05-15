@@ -56,6 +56,8 @@ const BRAND_SCHEMA = {
 
 const sectionShell =
   'mx-auto grid w-full max-w-[1180px] grid-cols-1 gap-12 px-6 py-20 md:grid-cols-[minmax(0,0.82fr)_minmax(0,1fr)] md:gap-16 md:px-8 md:py-28 lg:py-32';
+const firstSectionShell =
+  'mx-auto grid w-full max-w-[1180px] grid-cols-1 gap-12 px-6 pt-14 pb-20 md:grid-cols-[minmax(0,0.82fr)_minmax(0,1fr)] md:gap-16 md:px-8 md:pt-16 md:pb-28 lg:pb-32';
 const sectionHeading =
   'font-display text-3xl font-bold leading-[1.05] text-[#F5F4F0] md:text-5xl';
 const prose =
@@ -135,13 +137,13 @@ export default function BrandPage() {
 
 function HeroSection() {
   return (
-    <section id='hero' className='px-6 pt-28 pb-20 md:px-8 md:pt-36 md:pb-28'>
-      <div className='mx-auto grid min-h-[calc(100svh-8rem)] w-full max-w-[1180px] grid-cols-1 content-center gap-12 md:grid-cols-[minmax(0,1fr)_280px] md:gap-16'>
+    <section id='hero' className='px-6 pt-24 pb-8 md:px-8 md:pt-28 md:pb-10'>
+      <div className='mx-auto grid min-h-[62svh] w-full max-w-[1180px] grid-cols-1 content-center gap-12 md:grid-cols-[minmax(0,1fr)_280px] md:gap-16'>
         <div className='max-w-[760px]'>
           <p className='font-body text-[15px] leading-6 text-white/54'>
             Brand kit v2.0, 2026.
           </p>
-          <h1 className='mt-7 max-w-[720px] text-balance font-display text-6xl font-bold leading-[0.94] text-[#F5F4F0] md:text-8xl lg:text-9xl'>
+          <h1 className='mt-7 max-w-[720px] text-balance font-display text-5xl font-bold leading-[0.96] text-[#F5F4F0] md:text-7xl lg:text-8xl'>
             One loop. Every release.
           </h1>
           <div className='mt-8 max-w-[620px] space-y-4'>
@@ -184,7 +186,7 @@ function HeroSection() {
 
 function ThesisSection() {
   return (
-    <section id='thesis' className={sectionShell}>
+    <section id='thesis' className={firstSectionShell}>
       <div>
         <h2 className={sectionHeading}>The artist is the company.</h2>
       </div>
