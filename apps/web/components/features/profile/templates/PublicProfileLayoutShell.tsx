@@ -69,13 +69,23 @@ export function PublicProfileLayoutShell({
           {shouldRenderHeading ? (
             <h1 className='sr-only'>{artistName}</h1>
           ) : null}
-          {isDesktopLayout ? (
-            <div className='min-w-0 w-full' data-testid='profile-desktop-shell'>
-              {desktopSurface}
-            </div>
-          ) : (
-            compactSurface
-          )}
+          <div
+            aria-hidden={isDesktopLayout ? undefined : true}
+            className='public-profile-layout-desktop-shell'
+            data-testid='profile-desktop-shell'
+          >
+            {isDesktopLayout ? (
+              desktopSurface
+            ) : (
+              <div
+                className='h-[min(940px,calc(100dvh-48px))] w-full overflow-hidden rounded-[28px] bg-[rgba(8,10,14,0.76)]'
+                data-testid='profile-desktop-surface-reserved'
+              />
+            )}
+          </div>
+          <div className='public-profile-layout-compact-slot'>
+            {compactSurface}
+          </div>
         </main>
       </div>
     </div>

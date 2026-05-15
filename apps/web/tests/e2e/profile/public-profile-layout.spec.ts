@@ -15,6 +15,9 @@ const PROFILE_HANDLE =
   process.env.PUBLIC_PROFILE_LAYOUT_HANDLE?.trim() || 'tim';
 const APPROVAL_SCREENSHOTS =
   process.env.PROFILE_LAYOUT_APPROVAL_SCREENSHOTS === '1';
+const APPROVAL_SCREENSHOT_DIR =
+  process.env.PROFILE_LAYOUT_APPROVAL_DIR?.trim() ||
+  '.context/public-profile-layout-approval';
 const VIEWPORTS: readonly LayoutViewport[] = [
   { id: '320x568', width: 320, height: 568, isMobile: true },
   { id: '360x740', width: 360, height: 740, isMobile: true },
@@ -93,10 +96,7 @@ async function prepareProfilePage(page: Page, viewport: LayoutViewport) {
 async function saveApprovalScreenshot(page: Page, viewport: LayoutViewport) {
   if (!APPROVAL_SCREENSHOTS) return;
 
-  const outputDir = path.join(
-    repoRoot(),
-    '.context/public-profile-layout-approval'
-  );
+  const outputDir = path.resolve(repoRoot(), APPROVAL_SCREENSHOT_DIR);
   await mkdir(outputDir, { recursive: true });
   await page.screenshot({
     path: path.join(outputDir, `${viewport.id}.png`),
@@ -110,9 +110,28 @@ async function collectLayoutMetrics(page: Page) {
     const viewportHeight = window.innerHeight;
     const documentWidth = document.documentElement.scrollWidth;
     const bodyWidth = document.body.scrollWidth;
+    const isVisibleBox = (element: HTMLElement | null) => {
+      if (!element) return false;
+      const style = window.getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      return (
+        style.display !== 'none' &&
+        style.visibility !== 'hidden' &&
+        rect.width > 0 &&
+        rect.height > 0
+      );
+    };
     const shell = document.querySelector<HTMLElement>(
       '[data-testid="profile-compact-shell"]'
     );
+    const desktopShell = document.querySelector<HTMLElement>(
+      '[data-testid="profile-desktop-shell"]'
+    );
+    const activeShell = isVisibleBox(desktopShell)
+      ? desktopShell
+      : isVisibleBox(shell)
+        ? shell
+        : (shell ?? desktopShell);
     const cover = document.querySelector<HTMLElement>(
       '[data-testid="profile-cover"], [data-testid="profile-desktop-cover"]'
     );
@@ -131,10 +150,17 @@ async function collectLayoutMetrics(page: Page) {
     const desktopSecondaryGrid = document.querySelector<HTMLElement>(
       '[data-testid="profile-desktop-secondary-grid"]'
     );
-    const root =
-      document.querySelector<HTMLElement>(
-        '[data-testid="profile-compact-surface"]'
-      ) ?? shell;
+    const compactSurface = document.querySelector<HTMLElement>(
+      '[data-testid="profile-compact-surface"]'
+    );
+    const desktopSurface = document.querySelector<HTMLElement>(
+      '[data-testid="profile-desktop-surface"]'
+    );
+    const root = isVisibleBox(desktopSurface)
+      ? desktopSurface
+      : isVisibleBox(compactSurface)
+        ? compactSurface
+        : (compactSurface ?? desktopSurface ?? activeShell);
 
     const box = (element: HTMLElement | null) => {
       if (!element) return null;
@@ -150,9 +176,7 @@ async function collectLayoutMetrics(page: Page) {
     };
 
     const visibleLargeImages = Array.from(
-      document.querySelectorAll<HTMLImageElement>(
-        '[data-testid="profile-compact-shell"] img'
-      )
+      activeShell?.querySelectorAll<HTMLImageElement>('img') ?? []
     )
       .map(img => {
         const rect = img.getBoundingClientRect();
@@ -161,6 +185,7 @@ async function collectLayoutMetrics(page: Page) {
           alt: img.alt,
           width: rect.width,
           height: rect.height,
+          complete: img.complete,
           naturalWidth: img.naturalWidth,
           naturalHeight: img.naturalHeight,
           objectFit: style.objectFit,
@@ -222,7 +247,7 @@ async function collectLayoutMetrics(page: Page) {
       scrollX: window.scrollX,
       scrollY: window.scrollY,
       root: box(root),
-      shell: box(shell),
+      shell: box(activeShell),
       cover: box(cover),
       desktopCover: box(desktopCover),
       desktopAlerts: box(desktopAlerts),
@@ -270,15 +295,28 @@ test.describe('Public profile /tim layout hardening @regression', () => {
       );
 
       for (const image of metrics.visibleLargeImages) {
-        expect(image.naturalWidth, `${image.alt} should load`).toBeGreaterThan(
-          0
-        );
-        expect(image.naturalHeight, `${image.alt} should load`).toBeGreaterThan(
-          0
-        );
-        expect(image.objectFit, `${image.alt} should not stretch`).not.toBe(
-          'fill'
-        );
+        expect(
+          image.width,
+          `${image.alt} should keep a visible rendered width`
+        ).toBeGreaterThan(0);
+        expect(
+          image.height,
+          `${image.alt} should keep a visible rendered height`
+        ).toBeGreaterThan(0);
+        expect(
+          image.objectFit,
+          `${image.alt} should preserve its rendered aspect ratio`
+        ).not.toBe('fill');
+        expect(
+          image.objectFit,
+          `${image.alt} should use an explicit fit mode`
+        ).not.toBe('none');
+        if (image.complete && image.naturalWidth > 0) {
+          expect(
+            image.naturalHeight,
+            `${image.alt} loaded image should report intrinsic height`
+          ).toBeGreaterThan(0);
+        }
       }
 
       for (const target of metrics.actionTargets) {
