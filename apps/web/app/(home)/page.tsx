@@ -242,18 +242,20 @@ function HomepageHeroActions() {
       >
         {HERO_COPY.primaryCta.label}
       </HomepageTrackedLink>
-      <HomepageTrackedLink
-        href={HERO_COPY.secondaryCta.href}
-        className='homepage-hero-secondary-link focus-ring-themed'
-        eventName='homepage_hero_cta_clicked'
-        eventProperties={{
-          cta: 'secondary',
-          label: HERO_COPY.secondaryCta.label,
-        }}
-      >
-        {HERO_COPY.secondaryCta.label}
-        <ArrowRight aria-hidden='true' size={15} strokeWidth={1.9} />
-      </HomepageTrackedLink>
+      {FEATURE_FLAGS.WAITLIST_ENABLED ? null : (
+        <HomepageTrackedLink
+          href={HERO_COPY.secondaryCta.href}
+          className='homepage-hero-secondary-link focus-ring-themed'
+          eventName='homepage_hero_cta_clicked'
+          eventProperties={{
+            cta: 'secondary',
+            label: HERO_COPY.secondaryCta.label,
+          }}
+        >
+          {HERO_COPY.secondaryCta.label}
+          <ArrowRight aria-hidden='true' size={15} strokeWidth={1.9} />
+        </HomepageTrackedLink>
+      )}
     </div>
   );
 }
@@ -269,21 +271,25 @@ function HomepageProductStatement() {
       data-testid='homepage-product-statement'
     >
       <div className='homepage-product-statement__inner'>
-        <p className='homepage-section-eyebrow'>{copy.eyebrow}</p>
+        {copy.eyebrow ? (
+          <p className='homepage-section-eyebrow'>{copy.eyebrow}</p>
+        ) : null}
         <h2 id='homepage-product-statement-heading'>
-          <span className='homepage-product-statement__lead'>{copy.lead}</span>
+          <span className='homepage-product-statement__lead'>{copy.lead}</span>{' '}
           <span className='homepage-product-statement__body'>{copy.body}</span>
         </h2>
-        <div
-          className='homepage-product-statement__ai'
-          data-testid='homepage-ai-composer-demo'
-        >
-          <HomeComposerHero />
-          <div className='homepage-product-statement__ai-copy'>
-            <h3>{aiCopy.headline}</h3>
-            <p>{aiCopy.body}</p>
+        {FEATURE_FLAGS.SHOW_HOMEPAGE_AI_COMPOSER_SECTION ? (
+          <div
+            className='homepage-product-statement__ai'
+            data-testid='homepage-ai-composer-demo'
+          >
+            <HomeComposerHero />
+            <div className='homepage-product-statement__ai-copy'>
+              <h3>{aiCopy.headline}</h3>
+              <p>{aiCopy.body}</p>
+            </div>
           </div>
-        </div>
+        ) : null}
       </div>
     </section>
   );
@@ -302,15 +308,15 @@ function HomepageGoLiveStepsSection() {
         <h2 id='homepage-go-live-heading'>
           {HOMEPAGE_LAUNCH_COPY.workspace.kicker}
         </h2>
-        <ol className='homepage-go-live-section__cards'>
+        <ul className='homepage-go-live-section__cards'>
           {copy.cards.map(card => (
             <li className='homepage-go-live-card' key={card.title}>
-              <span>{card.number}</span>
+              {card.number ? <span>{card.number}</span> : null}
               <h3>{card.title}</h3>
               <p>{card.body}</p>
             </li>
           ))}
-        </ol>
+        </ul>
       </div>
     </section>
   );
@@ -335,7 +341,9 @@ function HomepageUnlockedSections() {
   return (
     <>
       <HomepageProductStatement />
-      <HomepageGoLiveStepsSection />
+      {FEATURE_FLAGS.SHOW_HOMEPAGE_GO_LIVE_SECTION ? (
+        <HomepageGoLiveStepsSection />
+      ) : null}
       <HomepageWorkspaceSection screenshot={WORKSPACE_SCREENSHOT} />
       <HomepageArtistProfilesCarousel cards={ARTIST_PROFILE_CARDS} />
       {FEATURE_FLAGS.SHOW_HOMEPAGE_FRIDAY_RHYTHM ? (
@@ -345,7 +353,7 @@ function HomepageUnlockedSections() {
       {FEATURE_FLAGS.SHOW_HOME_REFRESH_2026 ? <HomeLoopDiagramSection /> : null}
       {FEATURE_FLAGS.SHOW_HOME_REFRESH_2026 ? <HomeStatQuoteSection /> : null}
       {FEATURE_FLAGS.SHOW_HOMEPAGE_V2_PRICING ? <HomepageV2Pricing /> : null}
-      <HomepageFaq />
+      {FEATURE_FLAGS.SHOW_HOMEPAGE_FAQ ? <HomepageFaq /> : null}
     </>
   );
 }
@@ -376,7 +384,8 @@ function HomePageShell({ children }: { readonly children: React.ReactNode }) {
       <script type='application/ld+json'>{WEBSITE_SCHEMA}</script>
       <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
       <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
-      {FEATURE_FLAGS.SHOW_HOMEPAGE_UNLOCKED_SECTIONS ? (
+      {FEATURE_FLAGS.SHOW_HOMEPAGE_UNLOCKED_SECTIONS &&
+      FEATURE_FLAGS.SHOW_HOMEPAGE_FAQ ? (
         <script type='application/ld+json'>{FAQ_SCHEMA}</script>
       ) : null}
       {children}
@@ -428,40 +437,10 @@ export default async function HomePage() {
           <div className='homepage-hero-inner relative z-[3] mx-auto flex w-full max-w-none min-w-0 flex-1 flex-col items-center justify-start'>
             <div className='homepage-hero-copy w-full min-w-0'>
               <h1
-                aria-label={HERO_COPY.headline}
                 id='home-hero-heading'
-                className='homepage-hero-headline self-center text-center text-white'
+                className='homepage-hero-headline self-center text-center text-white text-balance'
               >
-                <span
-                  aria-hidden='true'
-                  className='homepage-hero-headline__desktop'
-                >
-                  Release more music
-                </span>
-                <span
-                  aria-hidden='true'
-                  className='homepage-hero-headline__desktop'
-                >
-                  with less work
-                </span>
-                <span
-                  aria-hidden='true'
-                  className='homepage-hero-headline__mobile'
-                >
-                  Release more
-                </span>
-                <span
-                  aria-hidden='true'
-                  className='homepage-hero-headline__mobile'
-                >
-                  music with
-                </span>
-                <span
-                  aria-hidden='true'
-                  className='homepage-hero-headline__mobile'
-                >
-                  less work
-                </span>
+                {HERO_COPY.headline}
               </h1>
               <p className='homepage-hero-subhead self-center text-center text-white/68'>
                 {HERO_COPY.subhead}
@@ -474,7 +453,7 @@ export default async function HomePage() {
       </section>
       <div className='homepage-trust-section'>
         <HomeTrustSection
-          label='Trusted by artists and teams releasing on'
+          label='Used by artists and teams with releases distributed through'
           presentation='inline-strip'
         />
       </div>

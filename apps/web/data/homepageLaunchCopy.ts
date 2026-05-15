@@ -1,4 +1,14 @@
 import { APP_ROUTES } from '@/constants/routes';
+import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
+
+// Prelaunch front-door label. Server-side waitlist gate handles the
+// post-/signup routing; this controls only the marketing copy.
+export const FRONT_DOOR_CTA_LABEL = FEATURE_FLAGS.WAITLIST_ENABLED
+  ? 'Request access'
+  : 'Claim your free profile';
+const FALLBACK_CTA_SUPPORT = FEATURE_FLAGS.WAITLIST_ENABLED
+  ? 'Limited prelaunch access. We will email when you are in.'
+  : 'Free forever. No credit card.';
 
 export interface HomepageHeroCarouselSlide {
   readonly id: string;
@@ -12,78 +22,78 @@ export interface HomepageHeroCarouselSlide {
 
 export const HOMEPAGE_LAUNCH_COPY = {
   seo: {
-    title: 'Jovie | Release more music with less work',
+    title: 'Jovie | Monetize your music catalog with AI',
     description:
-      'Jovie gives artists one workspace for profiles, releases, fan capture, and release momentum.',
+      'Jovie is the AI artist workspace that surfaces opportunities in your catalog — fan paths, presaves, pitches — and helps you ship the next one.',
   },
   hero: {
-    headline: 'Release more music with less work',
+    headline: 'Monetize your music catalog with AI',
     subhead:
-      'Plan the drop, route every fan, and keep the next release moving.',
+      'Jovie surfaces the opportunities hiding in your releases — and turns each one into a fan path, presave, or pitch you can ship today.',
     primaryCta: {
-      label: 'Start Free Trial',
+      label: FRONT_DOOR_CTA_LABEL,
       href: APP_ROUTES.SIGNUP,
     },
     secondaryCta: {
-      label: 'Explore Profiles',
+      label: 'See a live profile',
       href: APP_ROUTES.ARTIST_PROFILES,
     },
   },
   fallbackCta: {
-    label: 'Start Free',
+    label: FRONT_DOOR_CTA_LABEL,
     href: APP_ROUTES.SIGNUP,
-    support: 'Free profile. 14-day Pro trial.',
+    support: FALLBACK_CTA_SUPPORT,
   },
   workspace: {
-    kicker: 'Go live in 60 seconds',
-    headline: 'One workspace\nFor every release',
+    kicker: 'What Jovie finds.',
+    headline: 'All your music.\nWorking while you sleep.',
     screenshotKey: 'shell-v1-releases-desktop',
     callouts: [
       {
         key: 'import',
         number: '01',
-        title: 'Import the drop automatically',
-        body: 'Jovie pulls artwork, credits, links, dates, and status into the workspace automatically.',
+        title: 'Your catalog, in one place',
+        body: 'Releases, assets, links, dates, fans, and stream history come together automatically.',
       },
       {
         key: 'publish',
         number: '02',
-        title: 'Generate the launch plan',
-        body: 'Turn the release into tasks for profile updates, DSP links, fan capture, and launch timing.',
+        title: 'Opportunities surfaced',
+        body: 'Jovie scans the whole catalog for underexposed releases, missing fan paths, and presave gaps.',
       },
       {
         key: 'review',
         number: '03',
-        title: 'Run the next action',
-        body: 'Let Jovie handle the next action or assign it to your team with the context attached.',
+        title: 'Launch the next one',
+        body: 'Generate the presave page, fan path, or pitch and send it live to your audience.',
       },
     ],
   },
   productStatement: {
-    eyebrow: 'Meet Jovie',
-    lead: 'A new kind of operating system',
-    body: 'Built for music artists',
+    eyebrow: '',
+    lead: 'Meet Jovie',
+    body: 'Your always-on AI artist manager.',
     cards: [
       {
-        number: '01',
-        title: 'Import the drop automatically',
-        body: 'Jovie pulls artwork, credits, dates, links, and release status into one workspace automatically.',
+        number: '',
+        title: 'Underexposed releases.',
+        body: 'Songs gaining momentum that have no presave page or fan capture set up.',
       },
       {
-        number: '02',
-        title: 'Generate the launch plan',
-        body: 'Turn each release into the plan, tasks, profile updates, fan paths, and launch timing it needs.',
+        number: '',
+        title: 'Missing fan paths.',
+        body: 'Streams that arrive without a way for listeners to follow, subscribe, or save the next drop.',
       },
       {
-        number: '03',
-        title: 'Run the next action',
-        body: 'Let Jovie run the next action or assign it to your team with the release context attached.',
+        number: '',
+        title: 'Playlist openings.',
+        body: 'Editorial and curator playlists adding artists with your sound.',
       },
     ],
   },
   aiComposer: {
-    headline: 'Ask once. Get the launch plan',
-    body: 'Jovie turns a release into the fan path, launch tasks, and next actions your team can run.',
+    headline: 'Ask once. Surface the next opportunity.',
+    body: 'Jovie turns a release into the fan path, presave, or pitch your team can ship.',
   },
   intentBand: {
     eyebrow: 'Ask Jovie',
@@ -137,7 +147,7 @@ export const HOMEPAGE_LAUNCH_COPY = {
       },
     ],
     primaryCta: {
-      label: 'Claim your profile',
+      label: FRONT_DOOR_CTA_LABEL,
       href: APP_ROUTES.SIGNUP,
     },
     secondaryCta: {
@@ -183,29 +193,29 @@ export const HOMEPAGE_LAUNCH_COPY = {
   },
   faq: [
     {
-      question: 'Are artist profiles free?',
+      question: 'What does Jovie actually do?',
       answer:
-        'Yes. Artist profiles are free forever. Pro adds the release tools when you need presaves, notifications, deeper analytics, and more launch automation.',
+        'Connect your music. Jovie watches your catalog, fans, and stream movement, then surfaces specific opportunities. A release worth a presave. A playlist that fits your sound. A fan moment to capture.',
     },
     {
-      question: 'What does Jovie generate for a release?',
+      question: 'Where does my catalog data come from?',
       answer:
-        'Jovie turns release metadata into a working plan: profile updates, release pages, smart links, fan capture, launch tasks, and the next actions around the drop.',
+        'Spotify, Apple Music, and your DSPs. Connect once. Jovie keeps every release, asset, and fan path in one place.',
     },
     {
-      question: 'Can my team use the release plan?',
+      question: 'Does Jovie post or pitch on my behalf?',
       answer:
-        'Yes. Tasks can be assigned with the release context attached, so managers, collaborators, and artists work from the same source of truth.',
+        'Only when you say so. Jovie surfaces and drafts. You decide what goes live.',
     },
     {
-      question: 'Do I need to replace my current link in bio?',
+      question: 'How does Jovie know what is worth surfacing?',
       answer:
-        'No. You can use Jovie as the primary artist profile or as a launch-specific fan path while you compare how it performs.',
+        'It watches every track in your catalog every day. Streams, fan moments, playlist movement, and editorial activity all feed the model.',
     },
     {
-      question: 'Can I review everything before publishing?',
+      question: 'Who is Jovie for?',
       answer:
-        'Yes. You can review and adjust the profile, release details, smart links, fan actions, and task plan before anything becomes part of your public launch path.',
+        'Artists with a catalog already out and the team around them. Built for the work between drops, not just launch week.',
     },
   ],
 } as const;

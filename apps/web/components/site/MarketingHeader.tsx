@@ -7,6 +7,7 @@ import {
   HeaderNav,
 } from '@/components/organisms/HeaderNav';
 import { APP_ROUTES } from '@/constants/routes';
+import { FRONT_DOOR_CTA_LABEL } from '@/data/homepageLaunchCopy';
 import { MARKETING_NAV_LINKS } from '@/data/marketingNavigation';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 
@@ -109,6 +110,9 @@ const MARKETING_GLASS_MOBILE_LINKS: readonly MarketingHeaderNavLink[] = [
   ),
   ...MARKETING_GLASS_DESKTOP_LINKS,
 ] as const;
+const HOMEPAGE_PUBLIC_CTA_LABEL = FEATURE_FLAGS.WAITLIST_ENABLED
+  ? 'Request access'
+  : FRONT_DOOR_CTA_LABEL;
 
 export interface MarketingHeaderProps
   extends Readonly<{
@@ -189,9 +193,10 @@ export function MarketingHeader({
       presentation={presentation}
       flyoutMenus={navConfig.flyoutMenus}
       mobilePublicCtaHref={isHomepage ? APP_ROUTES.SIGNUP : undefined}
-      mobilePublicCtaLabel={isHomepage ? 'Start Free Trial' : undefined}
+      mobilePublicCtaLabel={isHomepage ? HOMEPAGE_PUBLIC_CTA_LABEL : undefined}
       mobileNavLinks={navConfig.mobileNavLinks}
       navLinks={navConfig.desktopNavLinks}
+      publicCtaLabel={isHomepage ? HOMEPAGE_PUBLIC_CTA_LABEL : undefined}
       showContactLink={centerNavEnabled && !isHomepage}
     />
   );
