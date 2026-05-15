@@ -1251,7 +1251,7 @@ export function TasksPageClient() {
   const updateTaskMutation = useUpdateTaskMutation();
   const moveTaskMutation = useMoveTaskMutation();
   const { mutateAsync: deleteTaskAsync } = deleteTaskMutation;
-  const { mutate: updateTask, isPending: isUpdatingTask } = updateTaskMutation;
+  const { mutate: updateTask } = updateTaskMutation;
   const { mutate: moveTask } = moveTaskMutation;
   const { data: releases = [] } = useReleasesQuery(profileId ?? '');
   const searchFilter = deferredSearch.trim();
@@ -1479,17 +1479,24 @@ export function TasksPageClient() {
     ],
     [artistName, assigneeFilter, priorityFilter, statusFilter]
   );
+  const selectedTaskEditorId = selectedTask?.id ?? null;
+  const selectedTaskEditorTitle = selectedTask?.title ?? '';
+  const selectedTaskEditorDescription = selectedTask?.description ?? '';
 
   useEffect(() => {
-    if (!selectedTask) {
+    if (!selectedTaskEditorId) {
       setEditorTitle('');
       setEditorDescription('');
       return;
     }
 
-    setEditorTitle(selectedTask.title);
-    setEditorDescription(selectedTask.description ?? '');
-  }, [selectedTask]);
+    setEditorTitle(selectedTaskEditorTitle);
+    setEditorDescription(selectedTaskEditorDescription);
+  }, [
+    selectedTaskEditorDescription,
+    selectedTaskEditorId,
+    selectedTaskEditorTitle,
+  ]);
 
   const openReleaseSidebar = useCallback((task: TaskView) => {
     if (task.releaseId) {
@@ -1607,26 +1614,26 @@ export function TasksPageClient() {
   }, [canSelectNext, selectTaskByIndex, selectedTaskIndex]);
 
   useEffect(() => {
-    latestSelectedTaskIdRef.current = selectedTask?.id ?? null;
-  }, [selectedTask]);
+    latestSelectedTaskIdRef.current = selectedTaskEditorId;
+  }, [selectedTaskEditorId]);
 
   useEffect(() => {
-    if (!selectedTask || isUpdatingTask) {
+    if (!selectedTaskEditorId) {
       return;
     }
 
     const nextTitle = editorTitle.trim();
     const nextDescription = editorDescription.trim();
-    const currentDescription = selectedTask.description ?? '';
+    const currentDescription = selectedTaskEditorDescription;
     const hasChanges =
-      nextTitle !== selectedTask.title ||
+      nextTitle !== selectedTaskEditorTitle ||
       nextDescription !== currentDescription;
 
     if (!hasChanges || !nextTitle) {
       return;
     }
 
-    const selectedTaskIdAtSchedule = selectedTask.id;
+    const selectedTaskIdAtSchedule = selectedTaskEditorId;
 
     const timeoutId = globalThis.setTimeout(() => {
       if (selectedTaskIdAtSchedule !== latestSelectedTaskIdRef.current) {
@@ -1655,8 +1662,9 @@ export function TasksPageClient() {
   }, [
     editorDescription,
     editorTitle,
-    isUpdatingTask,
-    selectedTask,
+    selectedTaskEditorDescription,
+    selectedTaskEditorId,
+    selectedTaskEditorTitle,
     updateTask,
   ]);
 

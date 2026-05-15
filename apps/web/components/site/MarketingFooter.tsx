@@ -1,5 +1,6 @@
 'use client';
 
+import './MarketingFooter.css';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
@@ -36,6 +37,7 @@ const MINIMAL_FOOTER_PATHS = new Set<string>([
 ]);
 const PAGE_OWNS_FINAL_CTA_PATHS = new Set<string>([
   APP_ROUTES.HOME,
+  APP_ROUTES.BRAND,
   APP_ROUTES.ARTIST_PROFILES,
   APP_ROUTES.ARTIST_NOTIFICATIONS,
   APP_ROUTES.LAUNCH,

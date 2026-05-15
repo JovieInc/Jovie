@@ -1,7 +1,7 @@
 import { SkipToContent } from '@/components/atoms/SkipToContent';
 import { HomeLegalFooter } from '@/components/homepage/HomeLegalFooter';
-import { HomepageV2FinalCta } from '@/components/marketing/homepage-v2/HomepageV2Ctas';
 import { MarketingHeader } from '@/components/site/MarketingHeader';
+import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 
 export const revalidate = false;
 
@@ -11,13 +11,17 @@ export default function BrandLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className='dark flex min-h-[100svh] flex-col overflow-x-clip bg-[var(--color-bg-base)] text-primary-token'>
+    <div className='linear-marketing dark flex min-h-[100svh] flex-col overflow-x-clip bg-black text-primary-token'>
       <SkipToContent />
-      <MarketingHeader logoSize='sm' logoVariant='icon' variant='homepage' />
-      <main id='main-content' className='flex flex-1 flex-col'>
+      <MarketingHeader
+        logoSize='sm'
+        logoVariant='icon'
+        showHomepageCenterNav={FEATURE_FLAGS.SHOW_HOMEPAGE_CENTER_NAV}
+        variant='homepage'
+      />
+      <main id='main-content' className='flex min-h-[100svh] flex-1 flex-col'>
         {children}
       </main>
-      <HomepageV2FinalCta />
       <HomeLegalFooter />
     </div>
   );

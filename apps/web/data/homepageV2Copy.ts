@@ -5,6 +5,14 @@ import {
   ARTIST_PROFILE_SPEC_TILES,
   type ArtistProfileFeatureTile,
 } from '@/data/artistProfileFeatures';
+import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
+
+// Footer CTA label tracks the prelaunch waitlist gate. Mirrors the hero
+// front-door pattern: "Request access" while we're waitlisting, then
+// "Start free trial" once the doors open.
+const FOOTER_CTA_LABEL = FEATURE_FLAGS.WAITLIST_ENABLED
+  ? 'Request access'
+  : 'Start free trial';
 
 function requireTile<T extends { readonly id: string }>(
   tiles: readonly T[],
@@ -158,9 +166,9 @@ export const HOMEPAGE_V2_COPY: HomepageV2Copy = {
     href: APP_ROUTES.PRICING,
   },
   finalCta: {
-    headline: 'Keep Your Music Moving.',
+    headline: 'Keep your music moving.',
     body: 'Jovie handles the plan, assets, and follow-up from there.',
-    primaryCtaLabel: 'Start Free Trial',
+    primaryCtaLabel: FOOTER_CTA_LABEL,
     secondaryCtaLabel: 'See Pricing',
   },
   footerColumns: [

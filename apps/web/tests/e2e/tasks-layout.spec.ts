@@ -1,10 +1,15 @@
 import { neon } from '@neondatabase/serverless';
 import { expect, type Page, type TestInfo, test } from '@playwright/test';
-import { and, asc, desc, eq, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull, or } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/neon-http';
 import { APP_ROUTES } from '@/constants/routes';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { tasks } from '@/lib/db/schema/tasks';
+import type {
+  TaskAssigneeKind,
+  TaskPriority,
+  TaskStatus,
+} from '@/lib/tasks/types';
 import { ensureSignedInUser, hasClerkCredentials } from '../helpers/clerk-auth';
 
 const LAYOUT_TASK_TITLE = 'Layout QA task fixture';
@@ -21,6 +26,17 @@ const VIEWPORTS = [
   { name: 'desktop-1280', width: 1280, height: 900 },
   { name: 'desktop-1440', width: 1440, height: 960 },
 ] as const;
+interface LayoutTaskFixture {
+  readonly id: string;
+  readonly title: string;
+}
+
+interface SeededTaskState {
+  readonly title: string;
+  readonly status: TaskStatus;
+  readonly priority: TaskPriority;
+  readonly assigneeKind: TaskAssigneeKind;
+}
 
 function resolveLayoutProfileUsername(): string {
   const persona = process.env.E2E_TEST_AUTH_PERSONA?.trim();
@@ -47,7 +63,7 @@ async function stubPassiveTracking(page: Page): Promise<void> {
   );
 }
 
-async function ensureTaskExists(): Promise<string> {
+async function ensureTaskExists(): Promise<LayoutTaskFixture> {
   const databaseUrl = process.env.DATABASE_URL?.trim();
   if (!databaseUrl) {
     throw new Error('DATABASE_URL is required for tasks layout seeding.');
@@ -73,7 +89,10 @@ async function ensureTaskExists(): Promise<string> {
     .where(
       and(
         eq(tasks.creatorProfileId, profile.id),
-        eq(tasks.title, LAYOUT_TASK_TITLE),
+        or(
+          eq(tasks.title, LAYOUT_TASK_TITLE),
+          eq(tasks.description, 'Used by the Playwright tasks layout spec.')
+        ),
         isNull(tasks.deletedAt)
       )
     )
@@ -95,22 +114,33 @@ async function ensureTaskExists(): Promise<string> {
       .orderBy(desc(tasks.taskNumber))
       .limit(1);
 
-    await db.insert(tasks).values({
-      creatorProfileId: profile.id,
-      taskNumber: (lastTaskNumber?.taskNumber ?? 0) + 1,
-      title: LAYOUT_TASK_TITLE,
-      description: 'Used by the Playwright tasks layout spec.',
-      status: 'backlog',
-      priority: 'high',
-      assigneeKind: 'human',
-      agentStatus: 'approved',
-      position: fixturePosition,
-      metadata: {},
-    });
+    const [insertedTask] = await db
+      .insert(tasks)
+      .values({
+        creatorProfileId: profile.id,
+        taskNumber: (lastTaskNumber?.taskNumber ?? 0) + 1,
+        title: LAYOUT_TASK_TITLE,
+        description: 'Used by the Playwright tasks layout spec.',
+        status: 'backlog',
+        priority: 'high',
+        assigneeKind: 'human',
+        agentStatus: 'approved',
+        position: fixturePosition,
+        metadata: {},
+      })
+      .returning({ id: tasks.id });
+
+    if (!insertedTask) {
+      throw new Error('Failed to seed the tasks layout fixture.');
+    }
+
+    return { id: insertedTask.id, title: LAYOUT_TASK_TITLE };
   } else {
     await db
       .update(tasks)
       .set({
+        title: LAYOUT_TASK_TITLE,
+        description: 'Used by the Playwright tasks layout spec.',
         status: 'backlog',
         priority: 'high',
         assigneeKind: 'human',
@@ -119,9 +149,34 @@ async function ensureTaskExists(): Promise<string> {
         deletedAt: null,
       })
       .where(eq(tasks.id, existingTask.id));
+
+    return { id: existingTask.id, title: LAYOUT_TASK_TITLE };
+  }
+}
+
+async function getSeededTaskState(
+  taskId: string
+): Promise<SeededTaskState | null> {
+  const databaseUrl = process.env.DATABASE_URL?.trim();
+  if (!databaseUrl) {
+    throw new Error('DATABASE_URL is required for tasks layout assertions.');
   }
 
-  return LAYOUT_TASK_TITLE;
+  const db = drizzle(neon(databaseUrl), {
+    schema: { tasks },
+  });
+  const [task] = await db
+    .select({
+      title: tasks.title,
+      status: tasks.status,
+      priority: tasks.priority,
+      assigneeKind: tasks.assigneeKind,
+    })
+    .from(tasks)
+    .where(and(eq(tasks.id, taskId), isNull(tasks.deletedAt)))
+    .limit(1);
+
+  return task ?? null;
 }
 
 function getVisibleTaskTitleEditor(page: Page) {
@@ -191,12 +246,21 @@ async function ensureBoardViewMode(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Board view' }).click();
 }
 
+async function selectTaskMetaOption(
+  page: Page,
+  triggerName: string,
+  optionName: string
+): Promise<void> {
+  await page.getByLabel(triggerName).click();
+  await page.getByRole('menuitem', { name: optionName }).click();
+}
+
 async function assertTasksBoardLayout(
   page: Page,
   testInfo: TestInfo,
   viewport: (typeof VIEWPORTS)[number]
 ): Promise<void> {
-  const taskTitle = await ensureTaskExists();
+  const { title: taskTitle } = await ensureTaskExists();
 
   await setTaskViewMode(page, 'board');
   await page.setViewportSize({
@@ -262,7 +326,7 @@ async function assertTasksLayout(
   testInfo: TestInfo,
   viewport: (typeof VIEWPORTS)[number]
 ): Promise<void> {
-  const taskTitle = await ensureTaskExists();
+  const { title: taskTitle } = await ensureTaskExists();
 
   await setTaskViewMode(page, 'list');
   await page.setViewportSize({
@@ -349,4 +413,67 @@ test.describe('Tasks layout', () => {
       await assertTasksLayout(page, testInfo, viewport);
     });
   }
+
+  test('persists board item edits after rapid title and metadata changes', async ({
+    page,
+  }, testInfo) => {
+    const { id: taskId, title: taskTitle } = await ensureTaskExists();
+    const editedTitle = `${LAYOUT_TASK_TITLE} ${Date.now()}`;
+
+    await setTaskViewMode(page, 'board');
+    await page.setViewportSize({ width: 1440, height: 960 });
+
+    await page.goto(APP_ROUTES.DASHBOARD_TASKS, {
+      waitUntil: 'domcontentloaded',
+      timeout: 120_000,
+    });
+    await expect(page.getByTestId('tasks-workspace')).toBeVisible({
+      timeout: 30_000,
+    });
+    await ensureBoardViewMode(page);
+
+    const boardCard = getTaskBoardCardByTitle(page, taskTitle);
+    await expect(boardCard).toBeVisible({ timeout: 30_000 });
+    await boardCard.click();
+
+    const titleEditor = getVisibleTaskTitleEditor(page);
+    await expect(titleEditor).toHaveValue(taskTitle, { timeout: 15_000 });
+    await titleEditor.fill(editedTitle);
+
+    await selectTaskMetaOption(page, 'Change task priority', 'Urgent');
+    await selectTaskMetaOption(page, 'Change task assignee', 'Jovie');
+    await selectTaskMetaOption(page, 'Change task status', 'In Progress');
+
+    await expect
+      .poll(() => getSeededTaskState(taskId), {
+        timeout: 30_000,
+        message: 'task item edits should persist to the database',
+      })
+      .toMatchObject({
+        title: editedTitle,
+        status: 'in_progress',
+        priority: 'urgent',
+        assigneeKind: 'jovie',
+      });
+
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('tasks-workspace')).toBeVisible({
+      timeout: 30_000,
+    });
+    await ensureBoardViewMode(page);
+
+    const movedCard = page
+      .getByTestId('tasks-board-column-in_progress')
+      .locator(TASK_BOARD_CARD_SELECTOR)
+      .filter({ hasText: editedTitle })
+      .first();
+    await expect(movedCard).toBeVisible({ timeout: 30_000 });
+    await expect(movedCard).toContainText('Urgent');
+    await expect(movedCard).toContainText('Jovie');
+
+    await testInfo.attach('tasks-board-persisted-item-edit', {
+      body: await page.getByTestId('tasks-workspace').screenshot(),
+      contentType: 'image/png',
+    });
+  });
 });
