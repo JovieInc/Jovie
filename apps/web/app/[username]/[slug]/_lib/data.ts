@@ -287,6 +287,8 @@ const fetchCreatorByUsername = async (usernameNormalized: string) => {
     .where(eq(creatorProfiles.usernameNormalized, usernameNormalized))
     .limit(1);
 
+  // Schema-rollout fallback only: this is not canonical profile state.
+  // Revisit once creator_profiles.is_claimed exists in every environment.
   return creator ? { ...creator, isClaimed: true } : null;
 };
 
