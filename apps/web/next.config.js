@@ -252,22 +252,17 @@ const nextConfig = {
       { source: '/app/profile', destination: '/app/chat?panel=profile' },
       { source: '/app/contacts', destination: '/app/settings/contacts' },
       {
-        source: '/app/earnings',
-        destination: '/app/settings/artist-profile?tab=earn#pay',
-      },
-      {
         source: '/app/tipping',
         destination: '/app/settings/artist-profile?tab=earn#pay',
       },
       { source: '/app/tour-dates', destination: '/app/settings/touring' },
       { source: '/app/dashboard', destination: '/app' },
       { source: '/app/dashboard/overview', destination: '/app' },
-      // NOTE: /app/dashboard/earnings intentionally omitted here.
-      // The earnings page.tsx handles auth-aware redirection: unauthenticated
-      // users are sent to /signin?redirect_url=/app/dashboard/earnings so they
-      // return to this deep-link after sign-in, not to the settings page.
-      // Putting a static redirect here bypasses Clerk middleware and sends
-      // unauthenticated users to /app/settings/artist-profile instead of /signin.
+      // NOTE: /app/earnings and /app/dashboard/earnings are intentionally
+      // omitted here. proxy.ts handles auth-aware redirection: unauthenticated
+      // users are sent to /signin?redirect_url=<requested earnings path>, while
+      // authenticated users go to the canonical artist profile pay section.
+      // Static redirects bypass Clerk middleware and lose the original deep link.
       {
         source: '/app/dashboard/links',
         destination: '/app/chat?panel=profile',

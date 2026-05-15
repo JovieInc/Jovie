@@ -652,12 +652,13 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     }
 
     // Authenticated legacy earnings deep links should land directly on the
-    // canonical artist profile pay section. Keeping this in proxy avoids an
-    // app-shell render/streamed redirect for smoke tests and real users.
+    // canonical artist profile pay section. Keeping this in proxy preserves
+    // auth-aware handling for anonymous users instead of using static redirects.
     if (
       isNavigationMethod &&
       userId &&
-      pathname === APP_ROUTES.DASHBOARD_EARNINGS
+      (pathname === APP_ROUTES.DASHBOARD_EARNINGS ||
+        pathname === APP_ROUTES.EARNINGS)
     ) {
       return NextResponse.redirect(
         new URL(`${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn#pay`, req.url)

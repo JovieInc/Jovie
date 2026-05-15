@@ -15,6 +15,7 @@
  */
 import { NextResponse } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { APP_ROUTES } from '@/constants/routes';
 import type { ProxyUserState } from '@/lib/auth/proxy-state';
 
 // ============================================================================
@@ -294,7 +295,7 @@ describe('proxy.ts middleware', () => {
 
     it('keeps unauthenticated legacy earnings deep links behind signin', async () => {
       const req = createUnauthenticatedRequest({
-        pathname: '/app/dashboard/earnings',
+        pathname: APP_ROUTES.DASHBOARD_EARNINGS,
       });
       const res = await callMiddleware(req);
 
@@ -303,6 +304,20 @@ describe('proxy.ts middleware', () => {
       expect(isRedirectTo(res, '/signin')).toBe(true);
       expect(res.headers.get('location')).toContain(
         'redirect_url=%2Fapp%2Fdashboard%2Fearnings'
+      );
+    });
+
+    it('keeps unauthenticated app earnings aliases behind signin', async () => {
+      const req = createUnauthenticatedRequest({
+        pathname: APP_ROUTES.EARNINGS,
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBeGreaterThanOrEqual(300);
+      expect(res.status).toBeLessThan(400);
+      expect(isRedirectTo(res, APP_ROUTES.SIGNIN)).toBe(true);
+      expect(res.headers.get('location')).toContain(
+        'redirect_url=%2Fapp%2Fearnings'
       );
     });
 
@@ -675,7 +690,7 @@ describe('proxy.ts middleware', () => {
       mocks.getUserState.mockResolvedValue(USER_STATES.active);
 
       const req = createAuthenticatedRequest('clerk_user_1', {
-        pathname: '/app/dashboard/earnings',
+        pathname: APP_ROUTES.DASHBOARD_EARNINGS,
       });
       const res = await callMiddleware(req);
 
@@ -685,6 +700,25 @@ describe('proxy.ts middleware', () => {
       expect(location).toBeTruthy();
       const locationUrl = new URL(location ?? '', 'https://localhost');
       expect(locationUrl.pathname).toBe('/app/settings/artist-profile');
+      expect(locationUrl.searchParams.get('tab')).toBe('earn');
+      expect(locationUrl.hash).toBe('#pay');
+      expect(mocks.getUserState).not.toHaveBeenCalled();
+    });
+
+    it('redirects authenticated app earnings aliases to artist profile pay', async () => {
+      mocks.getUserState.mockResolvedValue(USER_STATES.active);
+
+      const req = createAuthenticatedRequest('clerk_user_1', {
+        pathname: APP_ROUTES.EARNINGS,
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBeGreaterThanOrEqual(300);
+      expect(res.status).toBeLessThan(400);
+      const location = res.headers.get('location');
+      expect(location).toBeTruthy();
+      const locationUrl = new URL(location ?? '', 'https://localhost');
+      expect(locationUrl.pathname).toBe(APP_ROUTES.SETTINGS_ARTIST_PROFILE);
       expect(locationUrl.searchParams.get('tab')).toBe('earn');
       expect(locationUrl.hash).toBe('#pay');
       expect(mocks.getUserState).not.toHaveBeenCalled();
