@@ -60,6 +60,20 @@ async function forceDesignV1(page: Page) {
   );
 }
 
+function shellChatFrameLocators(page: Page) {
+  const shellFrame = page.locator('[data-shell-design="shellChatV1"]').filter({
+    has: page.locator(
+      '[data-testid="app-shell-scroll"] [data-testid="chat-content"]'
+    ),
+  });
+  const shellScroll = shellFrame.locator('[data-testid="app-shell-scroll"]');
+  const chatContent = shellScroll.locator('[data-testid="chat-content"]');
+  const composer = chatContent.locator('[data-testid="chat-composer-surface"]');
+  const input = composer.locator('[aria-label="Chat message input"]');
+
+  return { chatContent, composer, input, shellFrame, shellScroll };
+}
+
 test('chat route renders the Shell V1 app frame when forced on', async ({
   page,
 }) => {
@@ -75,15 +89,15 @@ test('chat route renders the Shell V1 app frame when forced on', async ({
   await gotoChatRoute(page);
   await page.waitForURL(/\/app\/chat/, { timeout: 60_000 });
 
-  await expect(page.locator('[data-shell-design="shellChatV1"]')).toBeVisible({
+  const { chatContent, composer, shellFrame } = shellChatFrameLocators(page);
+
+  await expect(shellFrame).toBeVisible({
     timeout: 30_000,
   });
-  await expect(page.locator('[data-testid="chat-content"]')).toBeVisible({
-    timeout: 30_000,
-  });
-  await expect(page.locator('[data-testid="chat-composer-surface"]')).toHaveCSS(
+  await expect(chatContent).toBeVisible({ timeout: 30_000 });
+  await expect(composer).toHaveCSS(
     'border-radius',
-    /999px|18px|20px|24px|28px/
+    /^(?:999px|18px|20px|24px|28px)$/
   );
   await expect(page.locator('.animate-shell-in')).toHaveCount(0);
 });
@@ -106,9 +120,7 @@ test('chat route picker opens without moving the shell or composer', async ({
   await gotoChatRoute(page);
   await page.waitForURL(/\/app\/chat/, { timeout: 60_000 });
 
-  const shellScroll = page.locator('[data-testid="app-shell-scroll"]');
-  const composer = page.locator('[data-testid="chat-composer-surface"]');
-  const input = page.locator('[aria-label="Chat message input"]');
+  const { composer, input, shellScroll } = shellChatFrameLocators(page);
   await expect(composer).toBeVisible({ timeout: 30_000 });
 
   const beforeBox = await composer.boundingBox();
