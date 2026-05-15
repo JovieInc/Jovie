@@ -9,23 +9,31 @@ import './globals.css';
 // canonical declaration; Next.js's not-found.tsx CSS extraction doesn't always
 // traverse client-component CSS imports, so we ground the bundle here too.
 import '@/components/organisms/HeaderNav.css';
+import '@/components/site/MarketingFooter.css';
 import { CookieBannerMount } from '@/components/organisms/CookieBannerMount';
 import { InstantlyPixel } from '@/components/providers/InstantlyPixel';
 import { getRootLayoutChromeState } from '@/lib/demo-recording';
 import { publicEnv } from '@/lib/env-public';
 
 const inter = localFont({
-  src: '../public/fonts/Inter-Variable.woff2',
+  src: '../public/fonts/Inter-Latin.woff2',
   variable: '--font-inter',
-  display: 'swap',
+  display: 'optional',
   weight: '100 900',
 });
 
 const satoshi = localFont({
-  src: '../public/fonts/Satoshi-Variable.woff2',
+  src: '../public/fonts/Satoshi-Latin.woff2',
   variable: '--font-satoshi',
-  display: 'swap',
+  display: 'optional',
   weight: '300 900',
+});
+
+const dmSans = localFont({
+  src: '../public/fonts/DMSans-Latin.woff2',
+  variable: '--font-dm-sans',
+  display: 'optional',
+  weight: '100 1000',
 });
 
 export const metadata: Metadata = {
@@ -192,7 +200,7 @@ export default async function RootLayout({
     );
   }
 
-  const bodyClassName = `${inter.variable} ${satoshi.variable} font-sans antialiased bg-base text-primary-token`;
+  const bodyClassName = `${inter.variable} ${satoshi.variable} ${dmSans.variable} font-sans antialiased bg-base text-primary-token`;
 
   const content = (
     <>

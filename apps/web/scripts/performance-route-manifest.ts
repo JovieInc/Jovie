@@ -140,6 +140,14 @@ const DEFAULT_PUBLIC_RESOURCE_BUDGETS = [
   { resourceType: 'total', budget: 1200 },
 ] as const satisfies readonly PerfResourceBudget[];
 
+const BRAND_RESOURCE_BUDGETS = [
+  { resourceType: 'script', budget: 700 },
+  { resourceType: 'image', budget: 10 },
+  { resourceType: 'font', budget: 75 },
+  { resourceType: 'stylesheet', budget: 130 },
+  { resourceType: 'total', budget: 900 },
+] as const satisfies readonly PerfResourceBudget[];
+
 const AUTH_RESOURCE_BUDGETS = [
   { resourceType: 'script', budget: 1450 },
   { resourceType: 'image', budget: 250 },
@@ -759,16 +767,19 @@ const MARKETING_PUBLIC_ROUTES = [
     path: APP_ROUTES.BRAND,
     requiresAuth: false,
     warmupStrategy: 'public-route',
-    measureMode: 'page-load',
-    readySelectors: { content: ['main', 'h1'] },
+    measureMode: 'interactive-shell',
+    readySelectors: {
+      shell: ['main h1'],
+      content: ['main h1'],
+    },
     timings: [
-      { metric: 'first-contentful-paint', budget: 1800 },
-      { metric: 'largest-contentful-paint', budget: 2600 },
-      { metric: 'cumulative-layout-shift', budget: 0.1 },
+      { metric: 'first-contentful-paint', budget: 100 },
+      { metric: 'largest-contentful-paint', budget: 300 },
+      { metric: 'cumulative-layout-shift', budget: 0.05 },
       { metric: 'first-input-delay', budget: 100 },
-      { metric: 'time-to-first-byte', budget: 1500 },
+      { metric: 'time-to-first-byte', budget: 50 },
     ],
-    resourceSizes: DEFAULT_PUBLIC_RESOURCE_BUDGETS,
+    resourceSizes: BRAND_RESOURCE_BUDGETS,
     priority: 2,
   },
 ] as const satisfies readonly PerfRouteDefinition[];
