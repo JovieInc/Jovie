@@ -120,6 +120,14 @@
   width: 100%;
 }
 
+.public-profile-layout-desktop-placeholder {
+  height: min(940px, calc(100dvh - 48px));
+  width: 100%;
+  overflow: hidden;
+  border-radius: 28px;
+  background: rgba(8, 10, 14, 0.76);
+}
+
 .public-profile-compact-shell {
   max-width: min(var(--profile-shell-max-width), 100%);
 }

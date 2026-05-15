@@ -78,7 +78,7 @@ export function PublicProfileLayoutShell({
               desktopSurface
             ) : (
               <div
-                className='h-[min(940px,calc(100dvh-48px))] w-full overflow-hidden rounded-[28px] bg-[rgba(8,10,14,0.76)]'
+                className='public-profile-layout-desktop-placeholder'
                 data-testid='profile-desktop-surface-reserved'
               />
             )}
