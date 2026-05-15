@@ -8,7 +8,11 @@ import {
   moveTask,
   updateTask,
 } from '@/app/app/(shell)/dashboard/tasks/task-actions';
-import { applyTaskBoardMove, applyTaskListMove } from '@/lib/tasks/task-board';
+import {
+  applyTaskBoardMove,
+  applyTaskListMove,
+  compareTasksByBoardOrder,
+} from '@/lib/tasks/task-board';
 import type {
   CreateTaskInput,
   MoveTaskInput,
@@ -47,17 +51,20 @@ function toTaskStatsStatusKey(status: TaskView['status']): TaskStatsStatusKey {
 function updateTaskInList(
   list: TaskListResult | undefined,
   taskId: string,
-  patch: Partial<TaskView>
+  patch: Partial<TaskView>,
+  options: Readonly<{ sort?: boolean }> = {}
 ): TaskListResult | undefined {
   if (!list) {
     return list;
   }
 
+  const tasks = list.tasks.map(task =>
+    task.id === taskId ? { ...task, ...patch } : task
+  );
+
   return {
     ...list,
-    tasks: list.tasks.map(task =>
-      task.id === taskId ? { ...task, ...patch } : task
-    ),
+    tasks: options.sort ? tasks.sort(compareTasksByBoardOrder) : tasks,
   };
 }
 
@@ -337,30 +344,37 @@ export function useUpdateTaskMutation() {
         snapshot.previousDetails,
         taskId
       );
-      const optimisticCompletedAt = getOptimisticCompletedAt(
-        previousTask,
-        data.status
-      );
+      const optimisticCompletedAt =
+        data.completedAt === undefined
+          ? getOptimisticCompletedAt(previousTask, data.status)
+          : data.completedAt;
+      const optimisticPatch: Partial<TaskView> = {
+        ...data,
+        ...(optimisticCompletedAt === undefined
+          ? {}
+          : { completedAt: optimisticCompletedAt }),
+      };
 
       for (const [queryKey, list] of snapshot.previousLists) {
         queryClient.setQueryData(
           queryKey,
-          updateTaskInList(list, taskId, {
-            ...data,
-            completedAt: optimisticCompletedAt,
+          updateTaskInList(list, taskId, optimisticPatch, {
+            sort: data.status !== undefined,
           })
         );
       }
 
       for (const [queryKey, board] of snapshot.previousBoards) {
+        const boardWithStatusUpdate = data.status
+          ? applyTaskBoardMove(board, {
+              taskId,
+              toStatus: data.status,
+            })
+          : board;
+
         queryClient.setQueryData(
           queryKey,
-          data.status
-            ? applyTaskBoardMove(board, {
-                taskId,
-                toStatus: data.status,
-              })
-            : updateTaskInBoard(board, taskId, data)
+          updateTaskInBoard(boardWithStatusUpdate, taskId, optimisticPatch)
         );
       }
 
@@ -371,11 +385,7 @@ export function useUpdateTaskMutation() {
 
         queryClient.setQueryData(queryKey, {
           ...detail,
-          ...data,
-          completedAt:
-            data.status === undefined
-              ? detail.completedAt
-              : optimisticCompletedAt,
+          ...optimisticPatch,
         });
       }
 

@@ -182,7 +182,7 @@ const mockSetHeaderActions = vi.fn();
 let setHeaderActionsHost: ((actions: React.ReactNode) => void) | null = null;
 let mockIsXlUp = true;
 let mockIs2xlUp = true;
-let mockTasksData = [mockTask, mockTaskTwo];
+let mockTasksData: TaskView[] = [mockTask, mockTaskTwo];
 let mockViewMode: 'board' | 'list' = 'list';
 let mockCanShowTaskDocumentAlongsideReleaseSidebar = true;
 const mockUnifiedTable = vi.fn();
@@ -756,6 +756,52 @@ describe('TasksPageClient', () => {
         taskId: 'task-2',
         data: {
           title: 'Updated release handoff title',
+          description: mockTaskTwo.description,
+        },
+      },
+      expect.objectContaining({
+        onError: expect.any(Function),
+      })
+    );
+  });
+
+  it('does not reset unsaved title text when task metadata refreshes', () => {
+    const view = renderPage();
+
+    const titleEditor = screen.getByLabelText('Task title');
+    fireEvent.change(titleEditor, {
+      target: { value: 'Unsaved metadata-safe title' },
+    });
+
+    mockTasksData = [
+      {
+        ...mockTaskTwo,
+        priority: 'urgent',
+        assigneeKind: 'jovie',
+      },
+      mockTask,
+    ];
+
+    view.rerender(
+      <TooltipProvider>
+        <HeaderActionsHost />
+        <TasksPageClient />
+      </TooltipProvider>
+    );
+
+    expect(screen.getByLabelText('Task title')).toHaveValue(
+      'Unsaved metadata-safe title'
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    expect(mockUpdateTask).toHaveBeenCalledWith(
+      {
+        taskId: 'task-2',
+        data: {
+          title: 'Unsaved metadata-safe title',
           description: mockTaskTwo.description,
         },
       },
