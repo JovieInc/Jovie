@@ -539,10 +539,6 @@ describe('POST /api/audience/visit', () => {
           return false;
         }
 
-        if (tableName === 'audience_actions' && columnName === 'event_type') {
-          return false;
-        }
-
         return true;
       }
     );
@@ -560,6 +556,7 @@ describe('POST /api/audience/visit', () => {
     });
 
     const insertedValues: Record<string, unknown>[] = [];
+    const updatedValues: Record<string, unknown>[] = [];
     mockWithSystemIngestionSession.mockImplementation(async callback => {
       const mockInsert = vi.fn().mockReturnValue({
         values: vi.fn().mockImplementation((value: Record<string, unknown>) => {
@@ -569,6 +566,14 @@ describe('POST /api/audience/visit', () => {
               returning: vi.fn().mockResolvedValue([{ id: 'inserted_member' }]),
             }),
             onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
+          };
+        }),
+      });
+      const mockUpdate = vi.fn().mockReturnValue({
+        set: vi.fn().mockImplementation((value: Record<string, unknown>) => {
+          updatedValues.push(value);
+          return {
+            where: vi.fn().mockResolvedValue(undefined),
           };
         }),
       });
@@ -582,6 +587,7 @@ describe('POST /api/audience/visit', () => {
           }),
         }),
         insert: mockInsert,
+        update: mockUpdate,
       });
     });
 
@@ -612,6 +618,9 @@ describe('POST /api/audience/visit', () => {
       })
     );
     expect(audienceMemberInsert).not.toHaveProperty('latestReferrerUrl');
+    expect(updatedValues).toHaveLength(1);
+    expect(updatedValues[0]).toHaveProperty('latestActions');
+    expect(updatedValues[0]).not.toHaveProperty('latestActionLabel');
     expect(mockCaptureError).not.toHaveBeenCalled();
   });
 
