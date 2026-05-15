@@ -9,6 +9,7 @@ import './globals.css';
 // canonical declaration; Next.js's not-found.tsx CSS extraction doesn't always
 // traverse client-component CSS imports, so we ground the bundle here too.
 import '@/components/organisms/HeaderNav.css';
+import '@/components/site/MarketingFooter.css';
 import { CookieBannerMount } from '@/components/organisms/CookieBannerMount';
 import { InstantlyPixel } from '@/components/providers/InstantlyPixel';
 import { getRootLayoutChromeState } from '@/lib/demo-recording';
@@ -26,6 +27,13 @@ const satoshi = localFont({
   variable: '--font-satoshi',
   display: 'swap',
   weight: '300 900',
+});
+
+const dmSans = localFont({
+  src: '../public/fonts/DMSans-Variable.woff2',
+  variable: '--font-dm-sans',
+  display: 'swap',
+  weight: '100 1000',
 });
 
 export const metadata: Metadata = {
@@ -192,7 +200,7 @@ export default async function RootLayout({
     );
   }
 
-  const bodyClassName = `${inter.variable} ${satoshi.variable} font-sans antialiased bg-base text-primary-token`;
+  const bodyClassName = `${inter.variable} ${satoshi.variable} ${dmSans.variable} font-sans antialiased bg-base text-primary-token`;
 
   const content = (
     <>

@@ -70,4 +70,21 @@ describe('performance route manifest', () => {
       '[data-testid="onboarding-chat"]'
     );
   });
+
+  it('holds the brand page to the perceived-latency budget', () => {
+    const brand = getEndUserPerfRouteManifest().find(
+      route => route.id === 'marketing-brand'
+    );
+
+    expect(brand?.path).toBe('/brand');
+    expect(brand?.requiresAuth).toBe(false);
+    expect(brand?.measureMode).toBe('interactive-shell');
+    expect(brand?.readySelectors.shell).toContain('[data-testid="header-nav"]');
+    expect(getPrimaryTimingMetricName(brand!)).toBe('interactive-shell-ready');
+    expect(
+      getRouteTimingBudgets(brand!).find(
+        timing => timing.metric === 'interactive-shell-ready'
+      )?.budget
+    ).toBe(100);
+  });
 });

@@ -297,6 +297,18 @@ const MARKETING_SURFACES = [
     interactions: GLOBAL_INTERACTIONS,
   },
   {
+    id: 'marketing-brand',
+    family: 'marketing',
+    expectedState: 'ok',
+    path: APP_ROUTES.BRAND,
+    readySelectors: ['h1', 'main', '[data-testid="header-nav"]'],
+    mainSelector: 'main',
+    minMainTextLength: 300,
+    lighthouse: true,
+    perfGroups: ['marketing-public'],
+    interactions: GLOBAL_INTERACTIONS,
+  },
+  {
     id: 'marketing-pay',
     family: 'marketing',
     expectedState: 'ok',

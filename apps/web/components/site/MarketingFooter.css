@@ -1,0 +1,105 @@
+/* Shared public footer skin. Kept with the site footer so root-level pages such
+   as /brand do not depend on app/(home)/home.css side effects. */
+
+.marketing-footer-premium {
+  --mf-text: rgba(255, 255, 255, 0.92);
+  --mf-text-secondary: rgba(255, 255, 255, 0.6);
+  --mf-text-tertiary: rgba(255, 255, 255, 0.48);
+  --mf-text-muted: rgba(255, 255, 255, 0.22);
+  --mf-hairline: rgba(255, 255, 255, 0.07);
+  --mf-hairline-strong: rgba(255, 255, 255, 0.12);
+  position: relative;
+  isolation: isolate;
+  background: #06070a;
+  color: var(--mf-text);
+  border-top: 1px solid var(--mf-hairline);
+}
+
+.marketing-footer-premium::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 220px;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.025) 0%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  z-index: 0;
+}
+
+.marketing-footer-premium > * {
+  position: relative;
+  z-index: 1;
+}
+
+.marketing-footer-premium .mf-eyebrow {
+  display: block;
+  font-size: 0.6875rem;
+  color: var(--mf-text-tertiary);
+  line-height: 1;
+  margin-bottom: 1.25rem;
+}
+
+.marketing-footer-premium .mf-eyebrow--caps {
+  text-transform: uppercase;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+}
+
+.marketing-footer-premium .mf-link {
+  display: inline-flex;
+  width: fit-content;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  letter-spacing: 0;
+  color: var(--mf-text-secondary);
+  transition: color 150ms ease;
+  border-radius: 4px;
+}
+
+.marketing-footer-premium .mf-link:hover,
+.marketing-footer-premium .mf-link:focus-visible {
+  color: var(--mf-text);
+}
+
+.marketing-footer-premium .mf-link:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.25);
+  outline-offset: 2px;
+}
+
+.marketing-footer-premium .mf-baseband {
+  border-top: 1px solid var(--mf-hairline);
+  margin-top: clamp(3rem, 5.5vw, 4.5rem);
+  padding-top: clamp(1.5rem, 2.5vw, 2rem);
+}
+
+.marketing-footer-premium .mf-legal-link {
+  display: inline-flex;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  letter-spacing: 0;
+  color: var(--mf-text-tertiary);
+  transition: color 150ms ease;
+  border-radius: 4px;
+}
+
+.marketing-footer-premium .mf-legal-link:hover,
+.marketing-footer-premium .mf-legal-link:focus-visible {
+  color: var(--mf-text);
+}
+
+.marketing-footer-premium .mf-legal-link:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.25);
+  outline-offset: 2px;
+}
+
+.marketing-footer-premium .mf-mark-tagline {
+  font-size: 0.75rem;
+  line-height: 1.5;
+  letter-spacing: 0;
+  color: var(--mf-text-tertiary);
+  max-width: 16rem;
+  margin-top: 1.25rem;
+}

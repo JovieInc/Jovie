@@ -8,7 +8,7 @@ describe('app/brand/page', () => {
     expect(
       screen.getByRole('heading', {
         level: 1,
-        name: /One mark\. Any surface\./,
+        name: /One loop\. Every release\./,
       })
     ).toBeInTheDocument();
     expect(
@@ -19,10 +19,11 @@ describe('app/brand/page', () => {
     ).toHaveAttribute('href', '#mark');
   });
 
-  it('renders all 9 anchored sections in order', () => {
+  it('renders all anchored sections in order', () => {
     const { container } = render(<BrandPage />);
     const expectedIds = [
       'hero',
+      'thesis',
       'mark',
       'wordmark',
       'lockups',
@@ -67,6 +68,8 @@ describe('app/brand/page', () => {
     );
     expect(ldScript).not.toBeNull();
     expect(ldScript?.textContent).toContain('"@type":"WebPage"');
-    expect(ldScript?.textContent).toContain('"Brand · Jovie"');
+    expect(ldScript?.textContent).toContain(
+      '"Jovie Brand | The Closed-Loop Operating System for Music Artists"'
+    );
   });
 });

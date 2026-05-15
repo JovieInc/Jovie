@@ -2,7 +2,8 @@ import { ImageResponse } from 'next/og';
 import { JOVIE_PATH } from '@/lib/brand';
 
 export const runtime = 'edge';
-export const alt = 'Jovie · Brand';
+export const revalidate = false;
+export const alt = 'Jovie Brand';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
@@ -35,20 +36,20 @@ export default function Image() {
           fontSize: 84,
           fontWeight: 800,
           color: '#F5F4F0',
-          letterSpacing: '-0.025em',
+          letterSpacing: 0,
         }}
       >
-        Jovie · Brand
+        Jovie Brand
       </div>
       <div
         style={{
           marginTop: 16,
           fontSize: 26,
           color: 'rgba(245,244,240,0.6)',
-          letterSpacing: '-0.005em',
+          letterSpacing: 0,
         }}
       >
-        One mark. Any surface.
+        One loop. Every release.
       </div>
     </div>,
     { ...size }
