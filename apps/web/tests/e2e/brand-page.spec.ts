@@ -1,4 +1,5 @@
 import { expect, test } from './setup';
+import { SMOKE_TIMEOUTS } from './utils/smoke-test-utils';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -15,6 +16,8 @@ test.describe('brand page', () => {
     }) => {
       await page.setViewportSize(viewport);
       await page.goto('/brand', { waitUntil: 'domcontentloaded' });
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(SMOKE_TIMEOUTS.HYDRATION_SETTLE);
 
       await expect(
         page.getByRole('heading', { name: 'One loop. Every release.' })
