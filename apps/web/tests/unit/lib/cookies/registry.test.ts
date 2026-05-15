@@ -62,8 +62,14 @@ describe('cookie registry', () => {
   });
 
   it('documents that Statsig does not currently set browser cookies', () => {
+    const analyticsCookieNames = getCookiesByCategory('analytics').map(
+      entry => entry.name
+    );
+
     expect(
-      getCookiesByCategory('analytics').map(entry => entry.name)
-    ).not.toEqual(expect.arrayContaining(['statsig_*', '_stsg_*']));
+      analyticsCookieNames.some(
+        name => name.startsWith('statsig_') || name.startsWith('_stsg_')
+      )
+    ).toBe(false);
   });
 });

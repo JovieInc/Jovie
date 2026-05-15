@@ -160,4 +160,26 @@ describe('GET /s/[code]', () => {
       })
     );
   });
+
+  it.each([
+    ['absent consent cookie', 'jv_cc_required=1'],
+    ['malformed consent cookie', 'jv_cc_required=1; jv_cc=not-json'],
+  ])('skips audience recording in consent-required regions with %s', async (_caseName, cookieHeader) => {
+    const request = new NextRequest('http://localhost/s/abc123', {
+      headers: {
+        Cookie: cookieHeader,
+      },
+    });
+
+    const response = await GET(request, {
+      params: Promise.resolve({ code: 'abc123' }),
+    });
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get('location')).toBe(
+      'https://example.com/profile'
+    );
+    expect(mocks.txInsertMock).not.toHaveBeenCalled();
+    expect(recordAudienceEvent).not.toHaveBeenCalled();
+  });
 });

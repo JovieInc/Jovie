@@ -6,6 +6,7 @@ import {
 } from '@/app/api/audience/lib/audience-utils';
 import { recordAudienceEvent } from '@/lib/audience/record-audience-event';
 import { appendSourceUtmParams } from '@/lib/audience/source-links';
+import { COOKIE_BANNER_REQUIRED_COOKIE } from '@/lib/cookies/consent-regions';
 import {
   CONSENT_COOKIE_NAME,
   parseConsentCookieValue,
@@ -188,12 +189,16 @@ export async function GET(
 
     const userAgent = request.headers.get('user-agent');
     const botDetection = detectBot(request, '/s/[code]');
+    const requiresCookieConsent =
+      request.cookies?.get(COOKIE_BANNER_REQUIRED_COOKIE)?.value === '1';
     const consent = parseConsentCookieValue(
       request.cookies?.get(CONSENT_COOKIE_NAME)?.value
     );
-    // Match /api/track semantics: absence of jv_cc means default-allow unless the
-    // visitor explicitly rejected marketing cookies.
-    const hasMarketingConsent = consent === null || consent.marketing === true;
+    // Match /api/track semantics: non-regulated visits remain default-allow,
+    // but consent-required visits need a valid marketing opt-in.
+    const hasMarketingConsent =
+      consent?.marketing === true ||
+      (consent === null && !requiresCookieConsent);
     const geoCity = request.headers.get('x-vercel-ip-city');
     const geoCountry =
       request.headers.get('x-vercel-ip-country') ??
