@@ -17,6 +17,7 @@ PUBLIC_MP4="$WEB_ROOT/public/demo/jovie-demo.mp4"
 PUBLIC_POSTER="$WEB_ROOT/public/demo/jovie-demo-poster.jpg"
 CONTACT_SHEET="$OUTPUT_ROOT/founder-demo-contact-sheet.jpg"
 SERVER_LOG="$OUTPUT_ROOT/founder-demo-server.log"
+BLACKDETECT_LOG="$OUTPUT_ROOT/founder-demo-blackdetect.log"
 AUDIO_FILTER="${DEMO_AUDIO_FILTER:-silenceremove=start_periods=1:start_duration=0.1:start_threshold=-30dB:start_silence=0.05:stop_periods=-1:stop_duration=0.25:stop_threshold=-30dB:stop_silence=0.12,atempo=1.025,loudnorm=I=-16:TP=-1.5:LRA=11}"
 
 for cmd in curl doppler ffmpeg ffprobe; do
@@ -116,6 +117,20 @@ ffmpeg -y -i "$RAW_VIDEO" -i "$CLEAN_AUDIO" -map 0:v:0 -map 1:a:0 -c:v libx264 -
 MP4_SIZE="$(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0:s=x "$MP4_VIDEO")"
 if [[ "$MP4_SIZE" != "1280x720" ]]; then
   echo "Unexpected MP4 video size: $MP4_SIZE" >&2
+  exit 1
+fi
+
+echo "[founder-demo] Checking for blank dark frames..."
+ffmpeg -hide_banner -nostats -i "$MP4_VIDEO" -vf "blackdetect=d=0.12:pix_th=0.06" -an -f null - >"$BLACKDETECT_LOG" 2>&1
+if awk -F 'black_start:' '
+  /black_start:/ {
+    split($2, fields, " ")
+    if ((fields[1] + 0) >= 0.5) found = 1
+  }
+  END { exit found ? 0 : 1 }
+' "$BLACKDETECT_LOG"; then
+  echo "Detected full-dark frame run after the initial recording startup window." >&2
+  grep 'black_start:' "$BLACKDETECT_LOG" >&2 || true
   exit 1
 fi
 
