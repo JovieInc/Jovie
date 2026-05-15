@@ -32,25 +32,28 @@ test.describe('Homepage', () => {
     const hero = page.getByTestId('homepage-hero-shell');
 
     await expect(hero).toBeVisible();
-    await expect(hero.getByText('Release operating system')).toHaveCount(0);
+    await expect(hero.getByText('operating system')).toHaveCount(0);
     await expect(
-      hero.getByRole('heading', { name: 'Release more music with less work' })
+      hero.getByRole('heading', {
+        name: 'Monetize your music catalog with AI',
+      })
     ).toBeVisible();
     await expect(
       hero.getByText(
-        'Plan the drop, route every fan, and keep the next release moving.'
+        'Jovie surfaces the opportunities hiding in your releases — and turns each one into a fan path, presave, or pitch you can ship today.'
       )
     ).toBeVisible();
     await expect(
-      hero.getByRole('link', { name: 'Start Free Trial', exact: true })
+      hero.getByRole('link', { name: 'Request access', exact: true })
     ).toHaveAttribute('href', '/signup');
+    // Secondary CTA hidden while WAITLIST_ENABLED is on.
     await expect(
-      hero.getByRole('link', { name: 'Explore Profiles', exact: true })
-    ).toHaveAttribute('href', '/artist-profiles');
+      hero.getByRole('link', { name: 'See a live profile', exact: true })
+    ).toHaveCount(0);
     await expect(hero.getByPlaceholder('Ask Jovie...')).toHaveCount(0);
   });
 
-  test('header uses compact homepage presentation and signup CTA', async ({
+  test('header uses compact homepage presentation and waitlist CTA', async ({
     page,
   }) => {
     const header = page.getByTestId('header-nav');
@@ -71,7 +74,7 @@ test.describe('Homepage', () => {
     await expect(header.getByRole('link', { name: 'Contact' })).toHaveCount(0);
     await expect(header.getByRole('link', { name: 'Sign in' })).toHaveCount(1);
     await expect(
-      header.getByRole('link', { name: 'Start Free Trial' })
+      header.getByRole('link', { name: 'Request access' })
     ).toHaveAttribute('href', '/signup');
   });
 
@@ -163,7 +166,7 @@ test.describe('Homepage', () => {
     }
   });
 
-  test('trust, product statement, workspace, artist profiles, pricing, FAQ, and final CTA render', async ({
+  test('trust, product statement, workspace, artist profiles, and footer CTA render (prelaunch — pricing, FAQ, go-live, AI composer flagged off)', async ({
     page,
   }) => {
     await expect(page.getByTestId('homepage-trust')).toHaveAttribute(
@@ -186,82 +189,47 @@ test.describe('Homepage', () => {
       expect(proofParallaxAnimation).toBe('homepage-proof-logos-parallax');
     }
     await expect(page.getByTestId('homepage-product-statement')).toBeVisible();
-    await expect(page.getByText('Meet Jovie')).toBeVisible();
     await expect(
       page.getByRole('heading', {
-        name: /A new kind of operating system\s+Built for music artists/,
+        name: /Meet Jovie\s+Your always-on AI artist manager\./,
       })
     ).toBeVisible();
-    const aiComposer = page.getByTestId('homepage-ai-composer-demo');
-    await expect(aiComposer).toBeVisible();
-    await expect(
-      aiComposer.getByRole('heading', {
-        name: 'Ask once. Get the launch plan',
-      })
-    ).toBeVisible();
-    const aiComposerBefore = await aiComposer.boundingBox();
-    await page.waitForTimeout(5600);
-    const aiComposerAfter = await aiComposer.boundingBox();
-    expect(
-      Math.abs((aiComposerAfter?.height ?? 0) - (aiComposerBefore?.height ?? 0))
-    ).toBeLessThanOrEqual(2);
-    await expect(page.getByTestId('homepage-go-live-section')).toBeVisible();
-    await expect(
-      page.getByRole('heading', { name: 'Go live in 60 seconds' })
-    ).toBeVisible();
+    // AI composer demo flagged off until we have a real opportunity-surfacing demo.
+    await expect(page.getByTestId('homepage-ai-composer-demo')).toHaveCount(0);
+    // 'What Jovie finds.' section flagged off (SHOW_HOMEPAGE_GO_LIVE_SECTION=false).
+    await expect(page.getByTestId('homepage-go-live-section')).toHaveCount(0);
     const productStatement = page.getByTestId('homepage-product-statement');
-    const goLiveSection = page.getByTestId('homepage-go-live-section');
     const workspaceSection = page.getByTestId('homepage-workspace-section');
-    for (const outcome of [
-      'Import the drop automatically',
-      'Generate the launch plan',
-      'Run the next action',
-    ]) {
-      await expect(
-        goLiveSection.getByRole('heading', { name: outcome })
-      ).toBeVisible();
-    }
     const sectionOrder = await page.evaluate(() => {
       const product = document.querySelector(
         '[data-testid="homepage-product-statement"]'
       );
-      const goLive = document.querySelector(
-        '[data-testid="homepage-go-live-section"]'
-      );
       const workspace = document.querySelector(
         '[data-testid="homepage-workspace-section"]'
       );
-      if (!product || !goLive || !workspace) return [];
-      return [
-        product.compareDocumentPosition(goLive),
-        goLive.compareDocumentPosition(workspace),
-      ];
+      if (!product || !workspace) return [];
+      return [product.compareDocumentPosition(workspace)];
     });
-    expect(sectionOrder).toEqual([4, 4]);
+    expect(sectionOrder).toEqual([4]);
     await expect(productStatement).toBeVisible();
-    await expect(goLiveSection).toBeVisible();
     await expect(workspaceSection).toBeVisible();
     await expect(
       page.getByRole('heading', {
-        name: 'One workspace For every release',
+        name: 'All your music. Working while you sleep.',
       })
     ).toBeVisible();
     await expect(
       page.getByTestId('homepage-workspace-screenshot').locator('img')
     ).toBeVisible();
-    await expect(
-      workspaceSection.getByRole('heading', {
-        name: 'Import the drop automatically',
-      })
-    ).toBeVisible();
-    await expect(
-      workspaceSection.getByRole('heading', {
-        name: 'Generate the launch plan',
-      })
-    ).toBeVisible();
-    await expect(
-      workspaceSection.getByRole('heading', { name: 'Run the next action' })
-    ).toBeVisible();
+    for (const outcome of [
+      'Your catalog, in one place',
+      'Opportunities surfaced',
+      'Launch the next one',
+    ]) {
+      await expect(
+        workspaceSection.getByRole('heading', { name: outcome })
+      ).toBeVisible();
+    }
     await expect(page.getByTestId('homepage-product-depth-band')).toHaveCount(
       0
     );
@@ -284,7 +252,7 @@ test.describe('Homepage', () => {
       artistProfiles.getByText('Streams. Fans. Shows. Payments. Drops.')
     ).toBeVisible();
     await expect(
-      artistProfiles.getByRole('link', { name: 'Claim your profile' })
+      artistProfiles.getByRole('link', { name: 'Request access' })
     ).toHaveAttribute('href', '/signup');
     await expect(
       artistProfiles.getByRole('link', { name: 'View example' })
@@ -338,68 +306,22 @@ test.describe('Homepage', () => {
       ).toBeGreaterThanOrEqual(image.requiredWidth);
     }
     // Spec wall section removed — JOV-2073
-    const pricing = page.getByTestId('homepage-v2-pricing');
-    await expect(pricing).toBeVisible();
-    await expect(
-      page.getByRole('heading', { name: 'Simple pricing' })
-    ).toBeVisible();
-    const freePricingCard = page.getByTestId('marketing-pricing-plan-free');
-    await expect(freePricingCard).toBeVisible();
-    await expect(
-      freePricingCard.getByText('Free forever', { exact: true })
-    ).toBeVisible();
-    await expect(
-      pricing.getByText('Artist profiles are free forever.')
-    ).toBeVisible();
-    await expect(page.getByTestId('marketing-pricing-plan-pro')).toBeVisible();
-    await expect(
-      page.getByTestId('marketing-pricing-plan-enterprise')
-    ).toHaveCount(0);
-    await expect(page.getByTestId('marketing-pricing-plan-team')).toHaveCount(
-      0
-    );
-    await expect(
-      page
-        .getByTestId('marketing-pricing-plan-pro')
-        .getByRole('link', { name: 'Request Access' })
-    ).toHaveAttribute('href', '/signup?plan=pro');
-    const pricingCtasOnGrid = await pricing
-      .locator('.marketing-pricing-plan-card')
-      .evaluateAll(cards =>
-        cards.map(card => {
-          const cta = card.querySelector<HTMLElement>(
-            '.marketing-pricing-plan-card__cta'
-          );
-          const cardRect = card.getBoundingClientRect();
-          const ctaRect = cta?.getBoundingClientRect();
-          if (!ctaRect) return false;
-          return (
-            Math.abs(
-              cardRect.left +
-                cardRect.width / 2 -
-                (ctaRect.left + ctaRect.width / 2)
-            ) <= 1 && ctaRect.right <= cardRect.right
-          );
-        })
-      );
-    expect(pricingCtasOnGrid).toEqual([true, true]);
-    await expect(page.getByTestId('homepage-faq')).toBeVisible();
-    await expect(
-      page.getByRole('heading', { name: 'Frequently Asked Questions' })
-    ).toBeVisible();
-
+    // Pricing and FAQ flagged off for prelaunch.
+    await expect(page.getByTestId('homepage-v2-pricing')).toHaveCount(0);
+    await expect(page.getByTestId('homepage-faq')).toHaveCount(0);
+    // Footer CTA on; label tracks WAITLIST_ENABLED (currently true).
     const finalCta = page.getByTestId('homepage-v2-final-cta');
     await finalCta.scrollIntoViewIfNeeded();
     await expect(finalCta).toBeVisible();
     await expect(page.getByTestId('homepage-v2-final-cta-heading')).toHaveText(
-      'Keep Your Music Moving.'
+      'Keep your music moving.'
+    );
+    await expect(page.getByTestId('homepage-v2-final-cta-primary')).toHaveText(
+      'Request access'
     );
     await expect(
       page.getByTestId('homepage-v2-final-cta-primary')
     ).toHaveAttribute('href', '/signup');
-    await expect(
-      page.getByTestId('homepage-v2-final-cta-secondary')
-    ).toHaveCount(0);
     const footer = page.getByTestId('marketing-footer');
     await expect(footer).toBeVisible();
     await expect(footer.getByRole('link', { name: 'Privacy' })).toHaveAttribute(
@@ -424,7 +346,9 @@ test.describe('Homepage', () => {
     await waitForHydration(page);
 
     await expect(
-      page.getByRole('heading', { name: 'Release more music with less work' })
+      page.getByRole('heading', {
+        name: 'Monetize your music catalog with AI',
+      })
     ).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
@@ -451,7 +375,7 @@ test.describe('Homepage', () => {
       0
     );
     await expect(
-      header.getByRole('link', { name: 'Start Free Trial', exact: true })
+      header.getByRole('link', { name: 'Request access', exact: true })
     ).toHaveAttribute('href', '/signup');
     await expect(
       header.getByRole('link', { name: 'Sign in', exact: true })
