@@ -6,6 +6,10 @@ import {
 } from '@/app/api/audience/lib/audience-utils';
 import { recordAudienceEvent } from '@/lib/audience/record-audience-event';
 import { appendSourceUtmParams } from '@/lib/audience/source-links';
+import {
+  CONSENT_COOKIE_NAME,
+  parseConsentCookieValue,
+} from '@/lib/cookies/consent-state';
 import { db } from '@/lib/db';
 import {
   audienceMembers,
@@ -19,26 +23,6 @@ import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { validateSocialLinkUrl } from '@/lib/utils/url-validation';
 
 export const runtime = 'nodejs';
-
-const CONSENT_COOKIE_NAME = 'jv_cc';
-
-interface ConsentPreferences {
-  readonly essential: boolean;
-  readonly analytics: boolean;
-  readonly marketing: boolean;
-}
-
-function parseConsentCookie(request: NextRequest): ConsentPreferences | null {
-  try {
-    const raw = request.cookies?.get(CONSENT_COOKIE_NAME)?.value;
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as ConsentPreferences;
-    if (typeof parsed?.marketing !== 'boolean') return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
 
 function inferDeviceType(
   userAgent: string | null
@@ -204,7 +188,9 @@ export async function GET(
 
     const userAgent = request.headers.get('user-agent');
     const botDetection = detectBot(request, '/s/[code]');
-    const consent = parseConsentCookie(request);
+    const consent = parseConsentCookieValue(
+      request.cookies?.get(CONSENT_COOKIE_NAME)?.value
+    );
     // Match /api/track semantics: absence of jv_cc means default-allow unless the
     // visitor explicitly rejected marketing cookies.
     const hasMarketingConsent = consent === null || consent.marketing === true;
