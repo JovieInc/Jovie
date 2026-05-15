@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { requireAuth } from '@/lib/auth/require-auth';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { notifySlackGrowthRequest } from '@/lib/notifications/providers/slack';
@@ -40,6 +41,7 @@ export async function POST(request: Request) {
     }
 
     const { reason } = parsed.data;
+    const entitlements = await getCurrentUserEntitlements();
 
     // Look up the user
     const [user] = await db
@@ -61,8 +63,8 @@ export async function POST(request: Request) {
       );
     }
 
-    // Check if already on Max plan (or legacy Growth plan)
-    if (user.plan === 'max' || user.plan === 'growth') {
+    // Check if already on Max-level entitlements.
+    if (entitlements.hasAdvancedFeatures) {
       return NextResponse.json(
         { error: 'You already have the Max plan' },
         { status: 400, headers: NO_STORE_HEADERS }

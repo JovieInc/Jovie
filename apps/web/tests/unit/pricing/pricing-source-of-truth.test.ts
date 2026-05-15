@@ -11,9 +11,17 @@
 
 import { describe, expect, it } from 'vitest';
 import { CANONICAL_PLAN_IDS, CANONICAL_PLANS } from '@/constants/plans';
-import { MARKETING_PRICING_PLANS } from '@/data/marketingPricingPlans';
+import {
+  getMarketingPlanHref,
+  getVisibleMarketingPricingPlans,
+  MARKETING_PRICING_PLAN_IDS,
+  MARKETING_PRICING_PLANS,
+} from '@/data/marketingPricingPlans';
 import { PLAN_PRICES } from '@/lib/config/plan-prices';
-import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
+import {
+  ENTITLEMENT_REGISTRY,
+  resolveCanonicalPlanId,
+} from '@/lib/entitlements/registry';
 
 // Phrases banned from any public pricing CTA or label
 const BANNED_PRICING_PHRASES = [
@@ -21,6 +29,37 @@ const BANNED_PRICING_PHRASES = [
   'request access',
   'request_access',
   'coming soon',
+] as const;
+
+const MAX_ONLY_MARKETING_FEATURES = [
+  {
+    label: 'Release plan generation',
+    entitlement: 'canGenerateReleasePlans',
+  },
+  {
+    label: 'Metadata submission agent',
+    entitlement: 'canAccessMetadataSubmissionAgent',
+  },
+  {
+    label: 'Email campaigns',
+    entitlement: 'canAccessEmailCampaigns',
+  },
+  {
+    label: 'Fan subscriptions',
+    entitlement: 'canAccessFanSubscriptions',
+  },
+  {
+    label: 'API access',
+    entitlement: 'canAccessApiKeys',
+  },
+  {
+    label: 'Team management',
+    entitlement: 'canAccessTeamManagement',
+  },
+  {
+    label: 'White-label / custom domain',
+    entitlement: 'canAccessWhiteLabel',
+  },
 ] as const;
 
 describe('CANONICAL_PLANS (constants/plans.ts) — source of truth (JOV-2079)', () => {
@@ -104,13 +143,27 @@ describe('CANONICAL_PLANS (constants/plans.ts) — source of truth (JOV-2079)', 
 
 describe('MARKETING_PRICING_PLANS (data/marketingPricingPlans.ts) — contract (JOV-2079)', () => {
   it('only contains plan IDs that exist in the entitlement registry', () => {
-    const validPlanIds = new Set<string>(['free', 'pro', 'max']);
+    const validPlanIds = new Set<string>(Object.keys(ENTITLEMENT_REGISTRY));
     for (const plan of MARKETING_PRICING_PLANS) {
       expect(
         validPlanIds.has(plan.id),
         `Marketing plan "${plan.id}" is not a valid entitlement registry plan ID`
       ).toBe(true);
     }
+  });
+
+  it('uses the canonical public billing tiers and visible pricing excludes legacy tiers', () => {
+    expect(MARKETING_PRICING_PLAN_IDS).toEqual(['free', 'pro', 'max']);
+    expect(MARKETING_PRICING_PLANS.map(plan => plan.id)).toEqual([
+      'free',
+      'pro',
+      'max',
+    ]);
+    expect(getVisibleMarketingPricingPlans().map(plan => plan.id)).toEqual([
+      'free',
+      'pro',
+      'max',
+    ]);
   });
 
   it('no CTA label or badge uses banned waitlist/request-access phrases', () => {
@@ -133,6 +186,12 @@ describe('MARKETING_PRICING_PLANS (data/marketingPricingPlans.ts) — contract (
         plan.ctaHref,
         `Marketing plan "${plan.id}" ctaHref must include ?plan= so onboarding can read intent`
       ).toContain(`plan=${plan.id}`);
+
+      const signupUrl = new URL(plan.ctaHref, 'https://jov.ie');
+      expect(resolveCanonicalPlanId(signupUrl.searchParams.get('plan'))).toBe(
+        plan.id
+      );
+      expect(getMarketingPlanHref(plan.id)).toBe(plan.ctaHref);
     }
   });
 
@@ -150,6 +209,27 @@ describe('MARKETING_PRICING_PLANS (data/marketingPricingPlans.ts) — contract (
     const planIds = MARKETING_PRICING_PLANS.map(p => p.id);
     expect(planIds).not.toContain('team');
     expect(planIds).not.toContain('enterprise');
+  });
+
+  it('does not advertise Max-only release operations on Pro', () => {
+    const proPlan = MARKETING_PRICING_PLANS.find(p => p.id === 'pro');
+    const maxPlan = MARKETING_PRICING_PLANS.find(p => p.id === 'max');
+    expect(proPlan).toBeDefined();
+    expect(maxPlan).toBeDefined();
+
+    for (const { label, entitlement } of MAX_ONLY_MARKETING_FEATURES) {
+      expect(
+        ENTITLEMENT_REGISTRY.pro.booleans[entitlement],
+        `${label} must remain disabled for Pro in the entitlement registry`
+      ).toBe(false);
+      expect(
+        ENTITLEMENT_REGISTRY.max.booleans[entitlement],
+        `${label} must remain enabled for Max in the entitlement registry`
+      ).toBe(true);
+      expect(proPlan?.features).not.toContain(label);
+      expect(maxPlan?.features).toContain(label);
+      expect(ENTITLEMENT_REGISTRY.max.marketing.features).toContain(label);
+    }
   });
 
   it('has non-empty features list for every plan (no silent drift from canonical plans)', () => {
