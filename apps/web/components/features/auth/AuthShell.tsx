@@ -12,6 +12,45 @@ import { buildDisabledOAuthProviderElements } from '@/lib/auth/oauth-providers';
 
 export type AuthShellMode = 'sign-in' | 'sign-up';
 
+type ClerkAppearanceElements = Record<string, unknown>;
+
+const REQUIRED_CLERK_AUTH_ELEMENTS = {
+  socialButtonsBlockButton: {
+    alignItems: 'center',
+    display: 'grid',
+    gridTemplateColumns: 'minmax(0, 1fr) auto',
+    overflow: 'visible',
+  },
+  lastAuthenticationStrategyBadge: {
+    alignSelf: 'center',
+    gridColumn: '2',
+    justifySelf: 'end',
+    order: 2,
+    pointerEvents: 'none',
+    position: 'static',
+    transform: 'none',
+    whiteSpace: 'nowrap',
+  },
+} as const satisfies ClerkAppearanceElements;
+
+function mergeRequiredClerkElement(
+  baseElement: unknown,
+  requiredElement: Readonly<Record<string, unknown>>
+) {
+  if (
+    typeof baseElement === 'object' &&
+    baseElement !== null &&
+    !Array.isArray(baseElement)
+  ) {
+    return {
+      ...baseElement,
+      ...requiredElement,
+    };
+  }
+
+  return requiredElement;
+}
+
 interface AuthShellProps {
   /** Which Clerk flow to render. */
   readonly mode: AuthShellMode;
@@ -35,8 +74,9 @@ interface AuthShellProps {
   readonly compact?: boolean;
   /**
    * Clerk appearance override. Merged with the canonical
-   * `buildDisabledOAuthProviderElements()` map so disabled providers stay
-   * hidden even when callers pass their own appearance.
+   * `buildDisabledOAuthProviderElements()` map and required auth layout guards
+   * so disabled providers stay hidden and Clerk's "Last used" badge cannot
+   * overlap the provider button row when callers pass their own appearance.
    */
   readonly appearance?: Record<string, unknown>;
   /**
@@ -97,11 +137,19 @@ export function AuthShell({
   const mergedAppearance = useMemo(() => {
     const providerGuard = buildDisabledOAuthProviderElements();
     const baseElements =
-      (appearance?.elements as Record<string, string> | undefined) ?? {};
+      (appearance?.elements as ClerkAppearanceElements | undefined) ?? {};
     return {
       ...appearance,
       elements: {
         ...baseElements,
+        socialButtonsBlockButton: mergeRequiredClerkElement(
+          baseElements.socialButtonsBlockButton,
+          REQUIRED_CLERK_AUTH_ELEMENTS.socialButtonsBlockButton
+        ),
+        lastAuthenticationStrategyBadge: mergeRequiredClerkElement(
+          baseElements.lastAuthenticationStrategyBadge,
+          REQUIRED_CLERK_AUTH_ELEMENTS.lastAuthenticationStrategyBadge
+        ),
         ...providerGuard,
       },
     } as Record<string, unknown>;
