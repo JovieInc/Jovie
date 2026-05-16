@@ -51,6 +51,7 @@ import {
   useTextareaAutosize,
 } from '@/components/jovie/hooks/useTextareaAutosize';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
+import { EntitySidebarShell } from '@/components/molecules/drawer';
 import {
   TOOLBAR_MENU_CONTENT_CLASS,
   TOOLBAR_MENU_SEPARATOR_CLASS,
@@ -75,7 +76,7 @@ import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { useAppFlag } from '@/lib/flags/client';
-import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
+import { useReleaseEntityQuery } from '@/lib/queries/useReleaseEntityQuery';
 import {
   useCreateTaskMutation,
   useDeleteTaskMutation,
@@ -171,6 +172,7 @@ const TASK_WORKSPACE_PANE_CLASSNAME = 'min-h-0 overflow-hidden';
 const TASK_VIEW_MODES: Array<'board' | 'list'> = ['board', 'list'];
 
 type MobileTaskScope = 'all' | 'open' | 'done';
+type ReleasePanelStatus = 'loading' | 'error' | 'empty';
 
 const MOBILE_TASK_SCOPE_OPTIONS = [
   ['all', 'All'],
@@ -247,6 +249,69 @@ function resolveArtistName(
     profile?.username_normalized ??
     profile?.username ??
     null
+  );
+}
+
+function TaskReleasePanelStatus({
+  status,
+  onClose,
+  onRetry,
+}: Readonly<{
+  status: ReleasePanelStatus;
+  onClose: () => void;
+  onRetry?: () => void;
+}>) {
+  const copy = {
+    loading: {
+      title: 'Loading release',
+      body: 'Getting release context for this task.',
+    },
+    error: {
+      title: 'Release unavailable',
+      body: 'We hit a problem loading this release. Try again when the connection settles.',
+    },
+    empty: {
+      title: 'Release not found',
+      body: 'This task still has a release link, but the release is not available in this profile.',
+    },
+  } satisfies Record<ReleasePanelStatus, { title: string; body: string }>;
+
+  const state = copy[status];
+
+  return (
+    <EntitySidebarShell
+      isOpen
+      width={344}
+      ariaLabel='Release details'
+      title='Release'
+      onClose={onClose}
+      scrollStrategy='shell'
+      data-testid='task-release-panel-status'
+    >
+      <div
+        className='rounded-lg border border-subtle bg-surface-1 px-3 py-3'
+        data-testid={`task-release-panel-${status}`}
+      >
+        {status === 'loading' ? (
+          <div className='mb-3 h-20 rounded-md skeleton' aria-hidden='true' />
+        ) : null}
+        <p className='text-sm font-medium text-primary-token'>{state.title}</p>
+        <p className='mt-1 text-xs leading-5 text-secondary-token'>
+          {state.body}
+        </p>
+        {status === 'error' && onRetry ? (
+          <Button
+            type='button'
+            size='sm'
+            variant='secondary'
+            className='mt-3'
+            onClick={onRetry}
+          >
+            Retry
+          </Button>
+        ) : null}
+      </div>
+    </EntitySidebarShell>
   );
 }
 
@@ -1251,7 +1316,10 @@ export function TasksPageClient() {
   const { mutateAsync: deleteTaskAsync } = deleteTaskMutation;
   const { mutate: updateTask } = updateTaskMutation;
   const { mutate: moveTask } = moveTaskMutation;
-  const { data: releases = [] } = useReleasesQuery(profileId ?? '');
+  const selectedReleaseQuery = useReleaseEntityQuery(
+    profileId ?? '',
+    selectedReleaseId ?? ''
+  );
   const searchFilter = deferredSearch.trim();
   const listFilters = useMemo<TaskFilters>(
     () => ({
@@ -1387,10 +1455,9 @@ export function TasksPageClient() {
     boardTasks.find(task => task.id === effectiveSelectedTaskId) ??
     tasks.find(task => task.id === effectiveSelectedTaskId) ??
     null;
-  const selectedRelease =
-    releases.find(release => release.id === selectedReleaseId) ?? null;
+  const selectedRelease = selectedReleaseQuery.data ?? null;
   const shouldPrioritizeRightPanel =
-    Boolean(selectedRelease) && !canShowTaskDocumentAlongsideReleaseSidebar;
+    Boolean(selectedReleaseId) && !canShowTaskDocumentAlongsideReleaseSidebar;
   const artistName = resolveArtistName(selectedProfile);
   const hasFilters =
     Boolean(deferredSearch.trim()) ||
@@ -1748,16 +1815,34 @@ export function TasksPageClient() {
     };
   }, [handleCloseShortcut, handleRowNavigationShortcut]);
 
-  const sidebarPanel = selectedRelease ? (
-    <ReleaseSidebar
-      release={selectedRelease}
-      mode='admin'
-      isOpen
-      providerConfig={providerConfig}
-      artistName={artistName}
-      readOnly
-      onClose={() => setSelectedReleaseId(null)}
-    />
+  const closeReleaseSidebar = useCallback(() => {
+    setSelectedReleaseId(null);
+  }, []);
+
+  const sidebarPanel = selectedReleaseId ? (
+    selectedRelease ? (
+      <ReleaseSidebar
+        release={selectedRelease}
+        mode='admin'
+        isOpen
+        providerConfig={providerConfig}
+        artistName={artistName}
+        readOnly
+        onClose={closeReleaseSidebar}
+      />
+    ) : (
+      <TaskReleasePanelStatus
+        status={
+          selectedReleaseQuery.isError
+            ? 'error'
+            : selectedReleaseQuery.isLoading
+              ? 'loading'
+              : 'empty'
+        }
+        onClose={closeReleaseSidebar}
+        onRetry={() => void selectedReleaseQuery.refetch()}
+      />
+    )
   ) : null;
   useRegisterRightPanel(sidebarPanel);
 
