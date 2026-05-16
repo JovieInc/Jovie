@@ -27,6 +27,13 @@ function isExternalUrl({
   try {
     const requestUrl = new URL(url);
     const currentPageUrl = new URL(pageUrl);
+    if (
+      !['http:', 'https:'].includes(currentPageUrl.protocol) ||
+      currentPageUrl.origin === 'null'
+    ) {
+      return false;
+    }
+
     return requestUrl.origin !== currentPageUrl.origin;
   } catch {
     return false;
