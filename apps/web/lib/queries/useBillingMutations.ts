@@ -141,10 +141,17 @@ export function usePortalMutation() {
 
 /**
  * Response from the cancel subscription API.
+ *
+ * Cancellation is scheduled at the end of the current billing period; the
+ * user keeps Pro access until `cancelAt`. See JOV-2180.
  */
 export interface CancelSubscriptionResponse {
   success: boolean;
   status?: string;
+  /** True when Stripe has flagged the subscription to cancel at period end */
+  cancelAtPeriodEnd?: boolean;
+  /** ISO timestamp when Pro access ends; null if Stripe did not return it */
+  cancelAt?: string | null;
 }
 
 /**
@@ -182,18 +189,17 @@ export function useCancelSubscriptionMutation() {
     mutationFn: cancelSubscriptionRequest,
 
     onMutate: async () => {
+      // Cancellation is scheduled at period end (JOV-2180). Pro access
+      // continues until current_period_end, so we intentionally do NOT
+      // optimistically flip isPro/plan here — the webhook will mark the
+      // subscription as cancel_at_period_end and the eventual
+      // customer.subscription.deleted event revokes access at the boundary.
       await queryClient.cancelQueries({
         queryKey: queryKeys.billing.status(),
       });
 
       const previousBilling = queryClient.getQueryData(
         queryKeys.billing.status()
-      );
-
-      queryClient.setQueryData(
-        queryKeys.billing.status(),
-        (old: { isPro: boolean; plan: string | null } | undefined) =>
-          old ? { ...old, isPro: false, plan: 'free' } : old
       );
 
       return { previousBilling };

@@ -293,16 +293,29 @@ export async function getCustomerSubscription(
 }
 
 /**
- * Cancel a subscription immediately
+ * Schedule a subscription to cancel at the end of the current billing period.
+ *
+ * Industry-norm cancel UX: the user keeps Pro access through the period they
+ * already paid for, and Stripe auto-cancels at `current_period_end`. The
+ * `customer.subscription.updated` webhook fires immediately with
+ * `cancel_at_period_end: true`, and `customer.subscription.deleted` fires at
+ * the period boundary when access is revoked.
+ *
+ * @see JOV-2180 — subset #1 (cancel period-end)
  */
 export async function cancelSubscription(
   subscriptionId: string
 ): Promise<Stripe.Subscription> {
   try {
-    const subscription = await getStripe().subscriptions.cancel(subscriptionId);
+    const subscription = await getStripe().subscriptions.update(
+      subscriptionId,
+      { cancel_at_period_end: true }
+    );
     return subscription;
   } catch (error) {
-    captureError('Error canceling subscription', error, { subscriptionId });
+    captureError('Error scheduling subscription cancellation', error, {
+      subscriptionId,
+    });
     throw new Error('Failed to cancel subscription');
   }
 }
