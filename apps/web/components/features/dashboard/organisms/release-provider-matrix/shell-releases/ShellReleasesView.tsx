@@ -16,12 +16,14 @@ import {
   convertContextMenuItems,
   useAmbientListSelection,
 } from '@/components/organisms/table';
-import { PillSearch } from '@/components/shell/PillSearch';
 import type {
   FilterField,
   FilterPill,
 } from '@/components/shell/pill-search.types';
-import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
+import {
+  useRegisterHeaderSearch,
+  useSetHeaderActions,
+} from '@/contexts/HeaderActionsContext';
 import { buildReleaseActions } from '@/features/dashboard/organisms/releases/release-actions';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { openChatWithPrompt } from '@/lib/chat/open-chat-with-prompt';
@@ -29,7 +31,6 @@ import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { useAppFlag } from '@/lib/flags/client';
 import { usePlanGate } from '@/lib/queries';
 import { cn } from '@/lib/utils';
-import { isFormElement } from '@/lib/utils/keyboard';
 import {
   type AppleMusicArtistSelection,
   connectSelectedAppleMusicArtist,
@@ -128,11 +129,6 @@ function distinctValues(
     if (seen.size >= 200) break;
   }
   return [...seen];
-}
-
-function formatReleaseCountSuffix(visibleCount: number, totalCount: number) {
-  if (visibleCount === totalCount) return '';
-  return ` of ${totalCount}`;
 }
 
 // ── Empty / list content ───────────────────────────────────────────────────────
@@ -332,7 +328,7 @@ export interface ShellReleasesViewProps {
  *
  * Restores parity with the production `ReleaseProviderMatrix` (create / sync /
  * import progress / Apple Music sync / soft-cap gates / smart-link locks)
- * while keeping the shell-style row list, PillSearch header, and production
+ * while keeping the shell-style row list, shell-owned filter header, and production
  * release drawer.
  */
 export function ShellReleasesView({
@@ -361,7 +357,6 @@ export function ShellReleasesView({
   const { setHeaderActions } = useSetHeaderActions();
   const albumArtFlagEnabled = useAppFlag('ALBUM_ART_GENERATION');
 
-  const [searchOpen, setSearchOpen] = useState(false);
   const [pills, setPills] = useState<FilterPill[]>([]);
   const [isConnected, setIsConnected] = useState(spotifyConnected);
   const [artistName, setArtistName] = useState<string | null>(
@@ -797,56 +792,41 @@ export function ShellReleasesView({
   // ── Header actions: NewReleaseHeaderAction + secondary filter control ──
 
   const selectedReleaseId = editingRelease?.id ?? null;
-  const releaseCountSuffix = formatReleaseCountSuffix(
-    visibleReleases.length,
-    rows.length
-  );
 
   const handleClearFilters = useCallback(() => {
     setPills([]);
   }, []);
 
-  const headerActions = useMemo(() => {
-    const searchNode = searchOpen ? (
-      <div className='w-[min(560px,calc(100vw-2rem))] rounded-lg border border-(--linear-app-shell-border) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] px-2 py-1 shadow-[0_10px_32px_rgba(0,0,0,0.16)] sm:w-[440px] lg:w-[520px]'>
-        <PillSearch
-          active={searchOpen}
-          pills={pills}
-          onPillsChange={setPills}
-          artistOptions={artistOptions}
-          titleOptions={titleOptions}
-          albumOptions={albumOptions}
-          ariaLabel='Filter releases'
-          placeholder='Filter releases — / for fields'
-          onClose={() => {
-            setSearchOpen(false);
-            setPills([]);
-          }}
-        />
-      </div>
-    ) : (
-      <button
-        type='button'
-        data-app-filter-trigger='true'
-        data-app-search-trigger='true'
-        onClick={() => setSearchOpen(true)}
-        className='inline-flex h-7 items-center gap-1.5 rounded-md border border-(--linear-app-shell-border) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_94%,transparent)] px-2 text-[12px] text-secondary-token transition-[background-color,border-color,color] duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
-        aria-label='Filter releases'
-        title='Filter releases (/)'
-      >
-        <Icon name='Filter' className='h-3.5 w-3.5' aria-hidden='true' />
-        <span className='hidden sm:inline'>Filter</span>
-        <span className='hidden text-tertiary-token lg:inline'>/</span>
-        <span className='tabular-nums text-tertiary-token'>
-          {visibleReleases.length}
-          {releaseCountSuffix}
-        </span>
-      </button>
-    );
+  const headerSearchAdapter = useMemo(
+    () => ({
+      key: 'shell-releases',
+      pills,
+      onPillsChange: setPills,
+      artistOptions,
+      titleOptions,
+      albumOptions,
+      totalCount: rows.length,
+      visibleCount: visibleReleases.length,
+      triggerLabel: 'Filter',
+      ariaLabel: 'Filter releases',
+      placeholder: 'Filter releases - / for fields',
+      allowedFields: ['artist', 'title', 'album', 'status', 'has'] as const,
+    }),
+    [
+      albumOptions,
+      artistOptions,
+      pills,
+      rows.length,
+      titleOptions,
+      visibleReleases.length,
+    ]
+  );
 
+  useRegisterHeaderSearch(headerSearchAdapter);
+
+  const headerActions = useMemo(() => {
     return (
       <div className='flex items-center gap-2'>
-        {searchNode}
         <NewReleaseHeaderAction
           canCreateManualReleases={canCreateManualReleases}
           isSyncing={isSyncing}
@@ -855,50 +835,12 @@ export function ShellReleasesView({
         />
       </div>
     );
-  }, [
-    albumOptions,
-    artistOptions,
-    canCreateManualReleases,
-    handleNewRelease,
-    handleSync,
-    isSyncing,
-    pills,
-    releaseCountSuffix,
-    searchOpen,
-    titleOptions,
-    visibleReleases.length,
-  ]);
+  }, [canCreateManualReleases, handleNewRelease, handleSync, isSyncing]);
 
   useEffect(() => {
     setHeaderActions(headerActions);
     return () => setHeaderActions(null);
   }, [headerActions, setHeaderActions]);
-
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.defaultPrevented) return;
-
-      const hasModifier =
-        event.metaKey || event.ctrlKey || event.altKey || event.shiftKey;
-
-      if (event.key === '/' && !hasModifier) {
-        if (isFormElement(event.target)) return;
-        event.preventDefault();
-        setSearchOpen(true);
-        return;
-      }
-
-      if (event.key === 'Escape' && searchOpen) {
-        const target = event.target as HTMLElement | null;
-        if (target?.matches('[data-app-search-field="true"]')) return;
-        event.preventDefault();
-        setSearchOpen(false);
-      }
-    }
-
-    globalThis.addEventListener('keydown', onKeyDown);
-    return () => globalThis.removeEventListener('keydown', onKeyDown);
-  }, [searchOpen]);
 
   useReleaseRightPanelTableMeta({
     rows,

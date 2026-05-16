@@ -82,6 +82,7 @@ export function HeaderSearchSurface({
         albumOptions={adapter.albumOptions}
         ariaLabel={adapter.ariaLabel ?? `Filter ${adapter.triggerLabel}`}
         placeholder={adapter.placeholder ?? 'Type to filter — / for fields'}
+        allowedFields={adapter.allowedFields}
         onClose={handleCloseAndClear}
       />
     </div>

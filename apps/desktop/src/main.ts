@@ -18,6 +18,7 @@ if (APP_ENV === 'staging') {
 }
 
 const APP_ORIGIN = new URL(APP_URL).origin;
+const APP_ENTRY_URL = new URL('/app', APP_URL).toString();
 const SETTINGS_URL = new URL('/app/settings', APP_URL).toString();
 const APP_BACKGROUND_COLOR = '#09090b';
 const APP_ICON_FILENAME =
@@ -161,7 +162,7 @@ function showWindow(win: BrowserWindow): void {
   win.focus();
 }
 
-function createWindow(initialUrl = APP_URL): BrowserWindow {
+function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   const windowState = loadWindowState();
 
   const win = new BrowserWindow({

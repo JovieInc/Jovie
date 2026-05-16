@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ShellReleasesView } from '@/components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView';
+import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurface';
 import {
   HeaderActionsProvider,
   useOptionalHeaderActions,
@@ -305,7 +306,12 @@ function RightPanelProbe() {
 
 function HeaderActionsProbe() {
   const state = useOptionalHeaderActions();
-  return <div data-testid='header-actions-probe'>{state?.headerActions}</div>;
+  return (
+    <div data-testid='header-actions-probe'>
+      <HeaderSearchSurfaceFromContext />
+      {state?.headerActions}
+    </div>
+  );
 }
 
 function renderShell(
@@ -324,8 +330,7 @@ function renderShell(
       <HeaderActionsProvider>
         <RightPanelProvider>
           {/* Mimics the AuthShell header slot so the route's registered
-              header actions (search trigger + new-release affordance) render
-              in the DOM where tests can inspect them. */}
+              search adapter + header actions render in the DOM. */}
           <ShellReleasesView
             releases={releases}
             providerConfig={providerConfig}
@@ -441,14 +446,11 @@ describe('ShellReleasesView', () => {
     });
   });
 
-  it('registers header actions exposing the release count in a secondary filter trigger', async () => {
+  it('registers shell search exposing the release count in the shared trigger', async () => {
     renderShell([
       fakeRelease({ id: '1', title: 'Alpha' }),
       fakeRelease({ id: '2', title: 'Beta' }),
     ]);
-    // The route registers headerActions (not a structured adapter) so the shell
-    // header slot renders an inline filter trigger with the visible count.
-    // Use findByTestId so we wait for the effect that calls setHeaderActions to run.
     const probe = await screen.findByTestId('header-actions-probe');
     expect(probe).toBeInTheDocument();
     expect(
@@ -461,27 +463,20 @@ describe('ShellReleasesView', () => {
     expect(filterTrigger).toHaveAttribute('data-app-search-trigger', 'true');
   });
 
-  it('opens the releases filter with / unless focus is in a form field', async () => {
+  it('opens the releases filter through the shell-owned trigger', async () => {
     renderShell([fakeRelease({ id: '1', title: 'Alpha' })]);
-    const textInput = document.createElement('input');
-    textInput.setAttribute('aria-label', 'Release note');
-    document.body.appendChild(textInput);
-
-    textInput.focus();
-    fireEvent.keyDown(textInput, { key: '/' });
 
     expect(
       screen.queryByRole('combobox', { name: 'Filter releases' })
     ).not.toBeInTheDocument();
 
-    textInput.blur();
-    fireEvent.keyDown(window, { key: '/' });
+    fireEvent.click(
+      await screen.findByRole('button', { name: /filter releases/i })
+    );
 
     expect(
       await screen.findByRole('combobox', { name: 'Filter releases' })
     ).toBeInTheDocument();
-
-    textInput.remove();
   });
 
   describe('entitlement gating', () => {
