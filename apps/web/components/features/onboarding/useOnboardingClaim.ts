@@ -24,6 +24,13 @@ import { useAuthSafe } from '@/hooks/useClerkSafe';
  * so the existing post-claim path takes over. If the claim returned
  * `claimed: 0` (no anonymous conversation for this session), we stay put
  * and retry after later chat activity.
+ *
+ * Duplicate-request guard (JOV-2203):
+ * React 18+ re-runs effects whenever any dependency changes. Clerk's auth
+ * state updates (`isLoaded`, `isSignedIn`) can fire the effect multiple
+ * times before the first fetch resolves, causing duplicate POST calls.
+ * `inflightTriggersRef` prevents a second fetch starting for the same
+ * `claimTrigger` value while one is already in-flight.
  */
 
 type ClaimStatus =
@@ -50,16 +57,24 @@ export function useOnboardingClaim(claimTrigger = 0): ClaimStatus {
   const router = useRouter();
   const [status, setStatus] = useState<ClaimStatus>('idle');
   const completedTriggersRef = useRef<Set<number>>(new Set());
+  const inflightTriggersRef = useRef<Set<number>>(new Set());
   const claimedRef = useRef(false);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     if (claimedRef.current) return;
     if (completedTriggersRef.current.has(claimTrigger)) return;
+    // Prevent duplicate in-flight requests for the same trigger value.
+    // This guards against React re-running the effect before the fetch
+    // resolves (e.g. Clerk auth state updates: isLoaded false→true, then
+    // isSignedIn false→true on the same claimTrigger value).
+    if (inflightTriggersRef.current.has(claimTrigger)) return;
+    inflightTriggersRef.current.add(claimTrigger);
 
     let cancelled = false;
     const markTriggerCompleted = () => {
       completedTriggersRef.current.add(claimTrigger);
+      inflightTriggersRef.current.delete(claimTrigger);
     };
 
     const attemptClaim = async (attempt: number): Promise<void> => {
@@ -136,7 +151,15 @@ export function useOnboardingClaim(claimTrigger = 0): ClaimStatus {
     return () => {
       cancelled = true;
     };
-  }, [claimTrigger, isLoaded, isSignedIn, router]);
+    // `router` is intentionally excluded from deps. useRouter() returns a
+    // stable singleton in Next.js App Router — including it would cause
+    // spurious effect re-runs only in test environments where the mock
+    // returns a new object reference on every call. The `inflightTriggersRef`
+    // guard already prevents duplicate requests if the effect does re-run.
+    // The router closure value is always current for the navigate-on-claim
+    // path because navigation only happens after a successful fetch response,
+    // long after any router reference churn would have settled.
+  }, [claimTrigger, isLoaded, isSignedIn]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return status;
 }
