@@ -24,6 +24,35 @@ describe('test-mode auth bypass', () => {
     vi.stubEnv('NODE_ENV', 'test');
     expect(isTestAuthBypassEnabled()).toBe(false);
   });
+
+  it('does not enable the bypass on Vercel preview deployments even when the flag is set', () => {
+    vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+    vi.stubEnv('VERCEL_ENV', 'preview');
+    expect(isTestAuthBypassEnabled()).toBe(false);
+  });
+
+  it('does not leak bypass access on Vercel preview even for preview.jov.ie', () => {
+    vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+    vi.stubEnv('VERCEL_ENV', 'preview');
+
+    expect(
+      resolveTestBypassUserId({
+        get: (name: string) => {
+          if (name === 'host') {
+            return 'preview.jov.ie';
+          }
+          if (name === TEST_MODE_HEADER) {
+            return TEST_AUTH_BYPASS_MODE;
+          }
+          if (name === TEST_USER_ID_HEADER) {
+            return 'user_preview_host';
+          }
+          return null;
+        },
+      })
+    ).toBeNull();
+  });
+
   it('returns null when bypass mode is absent', () => {
     expect(
       resolveTestBypassUserId({ get: () => null }, { get: () => undefined })
@@ -105,7 +134,28 @@ describe('test-mode auth bypass', () => {
     ).toBe('user_private_host');
   });
 
-  it('allows bypass markers on trusted preview hosts', () => {
+  it('allows bypass markers on the explicit trusted preview host (preview.jov.ie)', () => {
+    vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+
+    expect(
+      resolveTestBypassUserId({
+        get: (name: string) => {
+          if (name === 'host') {
+            return 'preview.jov.ie';
+          }
+          if (name === TEST_MODE_HEADER) {
+            return TEST_AUTH_BYPASS_MODE;
+          }
+          if (name === TEST_USER_ID_HEADER) {
+            return 'user_preview_host';
+          }
+          return null;
+        },
+      })
+    ).toBe('user_preview_host');
+  });
+
+  it('rejects bypass markers on arbitrary *.vercel.app preview hostnames', () => {
     vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
 
     expect(
@@ -123,7 +173,7 @@ describe('test-mode auth bypass', () => {
           return null;
         },
       })
-    ).toBe('user_preview_host');
+    ).toBeNull();
   });
 
   it('prefers request headers over cookies when both are present', () => {
