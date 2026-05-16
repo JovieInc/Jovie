@@ -7,7 +7,7 @@ import {
   useTransform,
 } from 'motion/react';
 import Image from 'next/image';
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 
 type HomepageMarketingImage = {
@@ -21,8 +21,18 @@ export function HomepageWorkspaceSection({
   screenshot,
 }: Readonly<{ screenshot: HomepageMarketingImage }>) {
   const sectionRef = useRef<HTMLElement | null>(null);
+  // isMounted is false on the server and during the initial hydration render,
+  // so MotionValue style props are deferred until after mount. This ensures
+  // server HTML and the first client render are identical (zero hydration mismatch).
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   const prefersReducedMotion = useReducedMotion();
-  const shouldReduceMotion = Boolean(prefersReducedMotion);
+  // Use a stable initial value of false that matches the server render.
+  // After mount, isMounted is true and we read the real preference.
+  const shouldReduceMotion = isMounted && Boolean(prefersReducedMotion);
   const headlineLines = HOMEPAGE_LAUNCH_COPY.workspace.headline.split('\n');
 
   const { scrollYProgress } = useScroll({
@@ -83,14 +93,16 @@ export function HomepageWorkspaceSection({
         <motion.div
           className='homepage-workspace-visual'
           style={
-            shouldReduceMotion
-              ? undefined
-              : {
+            // Only apply MotionValues after client mount to prevent hydration
+            // mismatch between SSR-serialised styles and client initial render.
+            isMounted && !shouldReduceMotion
+              ? {
                   opacity: mediaOpacity,
                   y: mediaY,
                   scale: mediaScale,
                   rotateX: mediaRotateX,
                 }
+              : undefined
           }
         >
           <div
@@ -117,9 +129,10 @@ export function HomepageWorkspaceSection({
                 className={`homepage-workspace-callout homepage-workspace-callout--${callout.key}`}
                 key={callout.title}
                 style={
-                  shouldReduceMotion
-                    ? undefined
-                    : (calloutMotion[index] ?? undefined)
+                  // Same guard: only bind MotionValues after mount.
+                  isMounted && !shouldReduceMotion
+                    ? (calloutMotion[index] ?? undefined)
+                    : undefined
                 }
               >
                 <span>{callout.number}</span>

@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.9] - 2026-05-16
+
+> [internal] Homepage hydration fix — eliminates React mismatch warning on the homepage workspace section.
+
+### Fixed
+
+- [internal] **Homepage hydration mismatch in `HomepageWorkspaceSection`**: Framer Motion scroll-linked `MotionValue` style props were serialised differently during SSR vs. the initial client render, producing a React hydration warning on every page load. Added an `isMounted` guard so both the server render and the first client paint use `style={undefined}` on `motion.div` and `motion.li`; MotionValues wire up after mount. Also fixes a secondary mismatch for visitors with `prefers-reduced-motion`: `useReducedMotion()` now reads `false` on both server and initial hydration (before mount), matching the SSR output.
+
 ## [26.5.8] - 2026-05-16
 
 > [internal] AI Connector v1 — approve/reject/execute backend for the Gmail → Google Calendar booking flow. Closed beta only (flag-gated, default off). Artists never see this; it will be allowlisted for design-partner DJs post-merge.
