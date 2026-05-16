@@ -14,7 +14,7 @@ import {
   ChevronDown,
   Disc3,
   FileText,
-  MoreVertical,
+  MoreHorizontal,
   Plus,
   Search,
   Trash2,
@@ -804,7 +804,7 @@ function TaskTitleEditor({
         aria-label='Task title'
         onChange={event => onChange(event.target.value)}
         placeholder='Untitled Task'
-        className='w-full resize-none rounded-md border-0 bg-transparent px-0 py-0 text-[clamp(1.55rem,1.9vw,2.15rem)] font-semibold leading-[1.06] tracking-[-0.04em] text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_80%,transparent)] transition-colors duration-fast focus:outline-none! focus:ring-0! focus:shadow-none! focus-visible:bg-[color-mix(in_oklab,var(--linear-border-focus)_16%,transparent)]'
+        className='w-full resize-none rounded-md border-0 bg-transparent px-0 py-0 text-[1.75rem] font-semibold leading-[1.15] tracking-normal text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_80%,transparent)] transition-colors duration-fast focus:outline-none! focus:ring-0! focus:shadow-none! focus-visible:bg-[color-mix(in_oklab,var(--linear-border-focus)_16%,transparent)]'
         style={{
           height: measuredHeight,
           overflowY: isAtMaxHeight ? 'auto' : 'hidden',
@@ -816,10 +816,10 @@ function TaskTitleEditor({
         aria-hidden='true'
         style={{
           ...HIDDEN_DIV_STYLES,
-          fontSize: 'clamp(1.55rem, 1.9vw, 2.15rem)',
-          lineHeight: '1.06',
+          fontSize: '1.75rem',
+          lineHeight: '1.15',
           fontWeight: 620,
-          letterSpacing: '-0.04em',
+          letterSpacing: '0',
           padding: '0',
         }}
       />
@@ -1271,9 +1271,8 @@ export function TasksPageClient() {
       limit: 100,
       ...(searchFilter ? { search: searchFilter } : {}),
       ...(priorityFilter !== 'all' ? { priority: priorityFilter } : {}),
-      ...(assigneeFilter !== 'all' ? { assigneeKind: assigneeFilter } : {}),
     }),
-    [assigneeFilter, priorityFilter, searchFilter]
+    [priorityFilter, searchFilter]
   );
   const visibleBoardStatuses = useMemo(
     () =>
@@ -1304,9 +1303,32 @@ export function TasksPageClient() {
     enabled: shouldFetchBoard,
   });
 
+  const boardTasks = useMemo(
+    () => boardData?.columns.flatMap(column => column.tasks) ?? [],
+    [boardData?.columns]
+  );
+  const filteredBoardData = useMemo(() => {
+    if (!boardData || assigneeFilter === 'all') return boardData;
+
+    return {
+      ...boardData,
+      columns: boardData.columns.map(column => {
+        const filteredTasks = column.tasks.filter(
+          task => task.assigneeKind === assigneeFilter
+        );
+
+        return {
+          ...column,
+          tasks: filteredTasks,
+          totalCount: filteredTasks.length,
+          nextCursor: null,
+        };
+      }),
+    };
+  }, [assigneeFilter, boardData]);
   const taskSubviewBaseTasks = useMemo(() => {
-    return data?.tasks ?? [];
-  }, [data?.tasks]);
+    return data?.tasks ?? boardTasks;
+  }, [boardTasks, data?.tasks]);
   const taskSubviewOptions = useMemo<readonly TaskSubviewOption[]>(
     () => [
       { id: 'all', label: 'All', count: taskSubviewBaseTasks.length },
@@ -1347,16 +1369,12 @@ export function TasksPageClient() {
     [mobileScope, tasks]
   );
   const visibleTasks = isDesktopTaskLayout ? tasks : mobileScopedTasks;
-  const boardTasks = useMemo(
-    () => boardData?.columns.flatMap(column => column.tasks) ?? [],
-    [boardData?.columns]
-  );
   const visibleBoardTaskCount = useMemo(
     () =>
-      (boardData?.columns ?? [])
+      (filteredBoardData?.columns ?? [])
         .filter(column => visibleBoardStatuses.includes(column.status))
         .reduce((total, column) => total + column.totalCount, 0),
-    [boardData?.columns, visibleBoardStatuses]
+    [filteredBoardData?.columns, visibleBoardStatuses]
   );
   const effectiveSelectedTaskId =
     selectedTaskId ??
@@ -1795,9 +1813,9 @@ export function TasksPageClient() {
               type='button'
               onClick={event => event.stopPropagation()}
               aria-label='Open task actions'
-              className='inline-flex h-7 w-7 items-center justify-center rounded-full bg-transparent text-tertiary-token transition-[background-color,color] duration-subtle hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_56%,transparent)] hover:text-primary-token focus-visible:outline-none focus-visible:bg-[color-mix(in_oklab,var(--linear-row-hover)_60%,transparent)] focus-visible:text-primary-token'
+              className='inline-flex h-7 w-7 items-center justify-center rounded-md bg-transparent text-tertiary-token transition-[background-color,color] duration-subtle hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_56%,transparent)] hover:text-primary-token focus-visible:outline-none focus-visible:bg-[color-mix(in_oklab,var(--linear-row-hover)_60%,transparent)] focus-visible:text-primary-token'
             >
-              <MoreVertical className='h-3.5 w-3.5' />
+              <MoreHorizontal className='h-3.5 w-3.5' />
             </button>
           </TableActionMenu>
         }
@@ -1860,7 +1878,7 @@ export function TasksPageClient() {
   } else if (isBoardMode) {
     desktopTaskPane = (
       <TaskBoard
-        board={boardData}
+        board={filteredBoardData}
         visibleStatuses={visibleBoardStatuses}
         isLoading={isActiveBoardLoading}
         artistName={artistName}

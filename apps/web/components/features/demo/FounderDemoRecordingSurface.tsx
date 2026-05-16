@@ -337,7 +337,7 @@ export function FounderDemoRecordingSurface() {
   return (
     <DemoClientProviders>
       <main
-        className='relative h-screen w-screen overflow-hidden bg-(--linear-app-content-surface)'
+        className='relative h-screen w-full max-w-full overflow-hidden bg-(--linear-app-content-surface)'
         data-testid='founder-demo-recording-surface'
       >
         <div

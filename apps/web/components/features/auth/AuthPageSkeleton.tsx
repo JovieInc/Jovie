@@ -16,7 +16,7 @@ export function AuthPageSkeleton({
   formTitle,
   formTitleClassName,
   showFormTitle,
-  showFooterPrompt,
+  showFooterPrompt = false,
   footerPrompt,
   footerLinkText,
   footerLinkHref,

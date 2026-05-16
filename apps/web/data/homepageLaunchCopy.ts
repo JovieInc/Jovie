@@ -29,7 +29,7 @@ export const HOMEPAGE_LAUNCH_COPY = {
   hero: {
     headline: 'Monetize your music catalog with AI',
     subhead:
-      'Jovie surfaces the opportunities hiding in your releases — and turns each one into a fan path, presave, or pitch you can ship today.',
+      'Connect your catalog. Jovie turns each release into the next fan path, presave, or playlist pitch.',
     primaryCta: {
       label: FRONT_DOOR_CTA_LABEL,
       href: APP_ROUTES.SIGNUP,

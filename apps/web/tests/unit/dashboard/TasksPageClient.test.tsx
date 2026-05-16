@@ -183,6 +183,7 @@ let setHeaderActionsHost: ((actions: React.ReactNode) => void) | null = null;
 let mockIsXlUp = true;
 let mockIs2xlUp = true;
 let mockTasksData: TaskView[] = [mockTask, mockTaskTwo];
+let mockListQueryData: TaskView[] | undefined | null = null;
 let mockViewMode: 'board' | 'list' = 'list';
 let mockCanShowTaskDocumentAlongsideReleaseSidebar = true;
 const mockUnifiedTable = vi.fn();
@@ -285,7 +286,12 @@ vi.mock('@/lib/queries/useReleasesQuery', () => ({
 
 vi.mock('@/lib/queries/useTasksQuery', () => ({
   useTasksQuery: () => ({
-    data: { tasks: mockTasksData },
+    data:
+      mockListQueryData === null
+        ? { tasks: mockTasksData }
+        : mockListQueryData
+          ? { tasks: mockListQueryData }
+          : undefined,
     isLoading: false,
     isError: false,
     refetch: vi.fn(),
@@ -524,6 +530,7 @@ describe('TasksPageClient', () => {
     mockIsXlUp = true;
     mockIs2xlUp = true;
     mockTasksData = [mockTask, mockTaskTwo];
+    mockListQueryData = null;
     mockViewMode = 'list';
     mockCanShowTaskDocumentAlongsideReleaseSidebar = true;
   });
@@ -554,6 +561,37 @@ describe('TasksPageClient', () => {
     fireEvent.click(screen.getByTestId('mock-board-card-task-2'));
 
     expect(screen.getByLabelText('Task title')).toHaveValue(mockTaskTwo.title);
+  });
+
+  it('uses board data for subview counts when the list query is not loaded', () => {
+    mockViewMode = 'board';
+    mockListQueryData = undefined;
+    mockTasksData = [mockTask, mockTaskTwo, mockJovieTask];
+
+    renderPage();
+
+    expect(screen.getByRole('tab', { name: 'All 3' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    expect(
+      screen.getByRole('tab', { name: 'Assigned To Me 2' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('tab', { name: 'Assigned To Jovie 1' })
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Assigned To Jovie 1' }));
+
+    expect(
+      screen.getByTestId('mock-board-card-task-jovie')
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('mock-board-card-task-1')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('mock-board-card-task-2')
+    ).not.toBeInTheDocument();
   });
 
   it('submits board moves through the move mutation', () => {

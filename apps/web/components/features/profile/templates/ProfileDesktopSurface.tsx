@@ -671,7 +671,11 @@ export function ProfileDesktopSurface({
   const nonHomeContent =
     activePrimaryTab === 'listen' ? (
       <div className='grid min-h-0 flex-1 gap-3.5 xl:grid-cols-[minmax(0,1.3fr)_360px]'>
-        <DesktopSurfaceCard title='Releases' className='min-h-0'>
+        <DesktopSurfaceCard
+          title='Releases'
+          className='min-h-0'
+          testId='profile-primary-tab-releases'
+        >
           {visibleReleases.length > 0 ? (
             <ReleasesView
               releases={visibleReleases}
@@ -737,7 +741,11 @@ export function ProfileDesktopSurface({
         </div>
       </div>
     ) : activePrimaryTab === 'tour' ? (
-      <DesktopSurfaceCard title='All Shows' className='flex-1'>
+      <DesktopSurfaceCard
+        title='All Shows'
+        className='flex-1'
+        testId='profile-primary-tab-tour'
+      >
         <div className='space-y-2'>
           {upcomingTourDates.length > 0 ? (
             upcomingTourDates.map(tourDate => (
@@ -782,7 +790,11 @@ export function ProfileDesktopSurface({
         </div>
       </DesktopSurfaceCard>
     ) : activePrimaryTab === 'about' ? (
-      <DesktopSurfaceCard title='Profile' className='flex-1'>
+      <DesktopSurfaceCard
+        title='Profile'
+        className='flex-1'
+        testId='profile-primary-tab-about'
+      >
         <AboutSection
           artist={artist}
           genres={genres}
@@ -814,6 +826,7 @@ export function ProfileDesktopSurface({
                   key={tab.mode}
                   type='button'
                   onClick={() => onModeSelect(tab.mode)}
+                  data-testid={`profile-primary-tab-${tab.mode}`}
                   className={cn(
                     'inline-flex h-10 min-w-0 items-center gap-2 rounded-full px-3 text-[13px] font-medium tracking-[-0.01em] transition-colors duration-subtle active:bg-white/[0.08]',
                     isActive

@@ -70,6 +70,34 @@ describe('surface elevation guardrails', () => {
     );
   });
 
+  it('keeps focus indicators restrained instead of drawing global text-input halos', () => {
+    const designSystem = readFileSync(
+      join(ROOT, 'styles/design-system.css'),
+      'utf-8'
+    );
+    const linearTokens = readFileSync(
+      join(ROOT, 'styles/linear-tokens.css'),
+      'utf-8'
+    );
+
+    expect(linearTokens).toContain(
+      '--linear-border-focus: rgba(255, 255, 255, 0.32);'
+    );
+    expect(designSystem).toContain('--focus-ring-width: 1px;');
+    expect(designSystem).toMatch(
+      /:where\(:focus-visible\)\s*{[\s\S]*box-shadow:\s*inset 0 0 0 var\(--focus-ring-width\)/
+    );
+    expect(designSystem).toMatch(
+      /:where\([\s\S]*input,[\s\S]*textarea,[\s\S]*\[role="textbox"\][\s\S]*\):focus\s*{[\s\S]*outline:\s*none;/
+    );
+    expect(designSystem).toMatch(
+      /:where\([\s\S]*input,[\s\S]*textarea,[\s\S]*\[role="textbox"\][\s\S]*\):focus-visible\s*{[\s\S]*box-shadow:\s*none;/
+    );
+    expect(designSystem).not.toContain(
+      'calc(var(--focus-ring-width) + var(--focus-ring-offset))'
+    );
+  });
+
   it('keeps shared content cards on the card surface instead of the shell canvas', () => {
     const contentSurfaceCard = readFileSync(
       join(ROOT, 'components/molecules/ContentSurfaceCard.tsx'),

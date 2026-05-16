@@ -54,7 +54,7 @@ describe('HomepageIntent', () => {
     ).toBeTruthy();
     expect(
       screen.getByText(
-        'Jovie surfaces the opportunities hiding in your releases — and turns each one into a fan path, presave, or pitch you can ship today.'
+        'Connect your catalog. Jovie turns each release into the next fan path, presave, or playlist pitch.'
       )
     ).toBeTruthy();
     expect(getInput()).toBeTruthy();

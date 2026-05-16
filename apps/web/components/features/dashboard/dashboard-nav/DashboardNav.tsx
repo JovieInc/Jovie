@@ -13,6 +13,7 @@ import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarMenu,
+  useSidebar,
 } from '@/components/organisms/Sidebar';
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
 import {
@@ -89,6 +90,7 @@ function formatTaskBadge(
 export function DashboardNav(_: DashboardNavProps) {
   const { isAdmin, selectedProfile } = useDashboardData();
   const { clearPendingShell, showPendingShell } = usePendingShell();
+  const { isMobile, openMobile, state: sidebarState } = useSidebar();
   const pathname = usePathname();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -122,11 +124,21 @@ export function DashboardNav(_: DashboardNavProps) {
   const { data: taskStats } = useTaskStatsQuery(profileId, {
     enabled: !isDemo && canAccessTasksWorkspace,
   });
-  const { data: conversations } = useChatConversationsQuery({
-    limit: 10,
-    enabled: shellChatV1Enabled && !isDemo,
-  });
   const isInSettings = pathname.startsWith(APP_ROUTES.SETTINGS);
+  const threadsVisible =
+    shellChatV1Enabled &&
+    !isDemo &&
+    !isInSettings &&
+    (isMobile ? openMobile : sidebarState === 'open');
+  const {
+    data: conversations,
+    isError: conversationsError,
+    isLoading: conversationsLoading,
+    refetch: refetchConversations,
+  } = useChatConversationsQuery({
+    limit: 10,
+    enabled: threadsVisible,
+  });
 
   // Settings nav: "General" (user) and artist name (or "Artist") groups
   const artistSettingsLabel = artistName || 'Artist';
@@ -291,6 +303,7 @@ export function DashboardNav(_: DashboardNavProps) {
     () =>
       (conversations ?? []).map(conversation => ({
         id: conversation.id,
+        href: `${APP_ROUTES.CHAT}/${encodeURIComponent(conversation.id)}`,
         title: conversation.title?.trim() || 'Untitled thread',
         status: 'complete',
         updatedAt: conversation.updatedAt,
@@ -305,12 +318,13 @@ export function DashboardNav(_: DashboardNavProps) {
     return id ? decodeURIComponent(id) : null;
   }, [pathname]);
 
-  const handleThreadSelect = useCallback(
-    (id: string) => {
-      router.push(`${APP_ROUTES.CHAT}/${encodeURIComponent(id)}`);
-    },
-    [router]
-  );
+  const handleNewThread = useCallback(() => {
+    router.push(APP_ROUTES.CHAT);
+  }, [router]);
+
+  const handleRetryThreads = useCallback(() => {
+    void refetchConversations();
+  }, [refetchConversations]);
 
   // Memoize renderNavItem to prevent creating new functions on every render
   const renderNavItem = useCallback(
@@ -425,12 +439,20 @@ export function DashboardNav(_: DashboardNavProps) {
         </SidebarGroup>
       )}
 
-      {shellChatV1Enabled && !isInSettings ? (
+      {threadsVisible ? (
         <div className='mt-1.5'>
           <SidebarThreadsSection
             threads={sidebarThreads}
             activeThreadId={activeThreadId}
-            onSelect={handleThreadSelect}
+            state={
+              conversationsError
+                ? 'error'
+                : conversationsLoading
+                  ? 'loading'
+                  : 'idle'
+            }
+            onRetry={handleRetryThreads}
+            onNewThread={handleNewThread}
             tight
             collapsed={false}
           />

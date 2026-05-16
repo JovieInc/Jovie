@@ -112,6 +112,8 @@ interface ProfileCompactSurfaceProps {
   readonly hideJovieBranding?: boolean;
   readonly hideMoreMenu?: boolean;
   readonly headerSocialLinksOverride?: readonly LegacySocialLink[];
+  readonly renderInteractiveOverlays?: boolean;
+  readonly renderSemanticHeading?: boolean;
 }
 
 function resolveActivePrimaryTab(params: {
@@ -200,6 +202,8 @@ export function ProfileCompactSurface({
   dataTestId,
   hideMoreMenu = false,
   headerSocialLinksOverride,
+  renderInteractiveOverlays = true,
+  renderSemanticHeading = true,
 }: Readonly<ProfileCompactSurfaceProps>) {
   const [notificationsPortalContainer, setNotificationsPortalContainer] =
     useState<HTMLDivElement | null>(null);
@@ -289,7 +293,8 @@ export function ProfileCompactSurface({
   const hasTip = surfaceState.hasTip;
   const hasReleases = surfaceState.hasReleases;
   const { heroSubtitle } = surfaceState;
-  const IdentityHeading = renderMode === 'preview' ? 'p' : 'h1';
+  const IdentityHeading =
+    renderMode === 'preview' || !renderSemanticHeading ? 'p' : 'h1';
   const isMenuActive =
     drawerOpen && drawerView === 'menu' && activeVisiblePrimaryTab !== 'tour';
   const topChromeButtonClassName =
@@ -334,6 +339,8 @@ export function ProfileCompactSurface({
     onRevealNotifications?.();
   }, [onModeSelect, onRevealNotifications]);
   const homeAlertsSubscribed = isSubscribed || showRecentActivationRow;
+  const shouldRenderInteractiveOverlays =
+    renderMode === 'interactive' && renderInteractiveOverlays;
 
   return (
     <div
@@ -349,9 +356,9 @@ export function ProfileCompactSurface({
         data-presentation={presentation}
       >
         {!isHomeMode && renderMode !== 'preview' ? (
-          <h1 className='sr-only' data-testid='profile-header'>
+          <IdentityHeading className='sr-only' data-testid='profile-header'>
             {artist.name}
-          </h1>
+          </IdentityHeading>
         ) : null}
         <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.025),transparent_34%)]' />
 
@@ -523,7 +530,7 @@ export function ProfileCompactSurface({
             isHomeMode ? 'pt-0' : 'pt-2'
           )}
         >
-          {renderMode === 'interactive' ? (
+          {shouldRenderInteractiveOverlays ? (
             <ProfileInlineNotificationsCTA
               artist={artist}
               onManageNotifications={onManageNotifications}
@@ -613,7 +620,7 @@ export function ProfileCompactSurface({
         </div>
       </div>
 
-      {renderMode !== 'preview' ? (
+      {renderMode !== 'preview' && renderInteractiveOverlays ? (
         <ProfileUnifiedDrawer
           open={drawerOpen}
           onOpenChange={onDrawerOpenChange}

@@ -7,13 +7,19 @@
 
 ## [26.5.1] - 2026-05-15
 
-> [internal] Foundation schema and encrypted token vault for AI connector v1 (OAuth token storage, per-account refresh lock, 8 new tables, 7 new enums).
+> [internal] Foundation schema and encrypted token vault for AI connector v1 (OAuth token storage, per-account refresh lock, 8 new tables, 7 new enums). Admin design-system polish: Title Case labels, no ALL-CAPS CSS transforms, and visible metric cards.
 
 ### Added
 
 - **[internal] AI Connector schema (v1)**: 8 new Drizzle ORM tables — `connector_accounts`, `connector_sync_states`, `external_objects`, `webhook_deliveries`, `context_facts`, `agent_runs`, `suggested_actions`, `workflow_runs` — plus 7 enums covering connector provider, status, webhook provider, context fact kind, suggested action status, agent run status, and workflow run status.
 - **[internal] Token vault**: `storeTokens`, `loadDecryptedToken`, and `withRefreshLock` helpers encrypt OAuth tokens at rest (AES-256-GCM) and implement a row-level CAS refresh lock in `connector_sync_states` to prevent concurrent token refreshes per account.
 - **[internal] Idempotent migration 0048**: All `CREATE TYPE` and `CREATE TABLE` statements are wrapped in `IF NOT EXISTS` guards so the migration is safe to replay.
+
+### Fixed
+
+- **[internal] Admin KPI label casing**: LeadGtmInsights KpiItem titles corrected from ALL-CAPS to Title Case per design-system rules (JOV-2170).
+- **[internal] Admin uppercase CSS utility removed**: Dropped `uppercase tracking-[0.08em]` from GtmFunnel section sub-labels and TimActionRequiredSection issue identifier/priority badge, which were visually forcing Title Case strings to ALL-CAPS (JOV-2171).
+- **[internal] ContentMetricCard surface elevation**: Removed `bg-surface-0 shadow-none` override from ContentMetricCard usage in GrowthStatusPanel (4 cards) and CampaignSettingsPanel (1 card) — those cards sit inside a surface-1 parent and were invisible without a visible background and border (JOV-2172).
 
 ## [26.5.0] - 2026-05-15
 
