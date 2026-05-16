@@ -4,7 +4,11 @@
  * Type guard functions for database query results.
  */
 
-import type { ActiveConnectionsRow, TableExistsRow } from './types';
+import type {
+  ActiveConnectionsRow,
+  ColumnExistsRow,
+  TableExistsRow,
+} from './types';
 
 /**
  * Check if a value is a record (object)
@@ -22,6 +26,17 @@ export function isTableExistsRow(value: unknown): value is TableExistsRow {
   }
 
   return typeof value.table_exists === 'boolean';
+}
+
+/**
+ * Type guard for column existence query result
+ */
+export function isColumnExistsRow(value: unknown): value is ColumnExistsRow {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return typeof value.column_exists === 'boolean';
 }
 
 /**
