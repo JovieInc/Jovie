@@ -1,10 +1,10 @@
 'use client';
 
-import { X } from 'lucide-react';
 import { skillById } from '@/lib/commands/registry';
 import { cn } from '@/lib/utils';
 import type { TrayChip } from '../hooks/useChipTray';
 import { EntityChip } from './EntityChip';
+import { SkillChip } from './SkillChip';
 
 interface ChipTrayProps {
   readonly chips: readonly TrayChip[];
@@ -28,30 +28,11 @@ export function ChipTray({ chips, onRemoveAt, className }: ChipTrayProps) {
         if (chip.type === 'skill') {
           const label = skillById(chip.id)?.label ?? chip.id;
           return (
-            <span
+            <SkillChip
               key={chip.uid}
-              className='inline-flex h-7 max-w-[220px] shrink-0 items-center gap-1.5 rounded-[9px] border border-white/[0.085] bg-white/[0.035] px-2 text-[13px] font-medium leading-none text-primary-token shadow-[inset_0_1px_0_rgba(255,255,255,0.045)]'
-              title={label}
-            >
-              <span
-                aria-hidden
-                className='h-1.5 w-1.5 shrink-0 rounded-full bg-tertiary-token'
-              />
-              <span className='min-w-0 truncate'>{label}</span>
-              <button
-                type='button'
-                aria-label={`Remove ${label} skill`}
-                onMouseDown={e => {
-                  e.preventDefault();
-                }}
-                onClick={() => {
-                  onRemoveAt(i);
-                }}
-                className='-mr-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-sm text-tertiary-token transition-colors duration-fast hover:bg-white/[0.07] hover:text-primary-token focus:outline-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30'
-              >
-                <X className='h-3 w-3' />
-              </button>
-            </span>
+              label={label}
+              onRemove={() => onRemoveAt(i)}
+            />
           );
         }
         return (

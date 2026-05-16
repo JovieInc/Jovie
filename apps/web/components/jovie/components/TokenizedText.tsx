@@ -3,7 +3,9 @@
 import { Fragment, useMemo } from 'react';
 import { type ChatToken, parseTokens } from '@/lib/chat/tokens';
 import { cn } from '@/lib/utils';
-import { EntityChip } from './EntityChip';
+import { EntityChip, type EntityChipTone } from './EntityChip';
+import { EntityChipPopover } from './EntityChipPopover';
+import { useEntityResolution } from './EntityResolutionProvider';
 
 function tokenKey(token: ChatToken, index: number): string {
   if (token.type === 'text') return `t:${index}:${token.value.length}`;
@@ -16,6 +18,12 @@ function tokenKey(token: ChatToken, index: number): string {
 interface TokenizedTextProps {
   readonly content: string;
   readonly className?: string;
+  /**
+   * Surface tone for entity chips. Forwarded to each `EntityChip` so chips
+   * blend with the bubble background (user bubble = onLight, dark transcript
+   * surfaces = onDark). Defaults to `onDark` for backwards compatibility.
+   */
+  readonly tone?: EntityChipTone;
 }
 
 /**
@@ -25,8 +33,17 @@ interface TokenizedTextProps {
  *
  * Used for user-authored messages in the transcript (assistant replies go
  * through ChatMarkdown, which should not show raw tokens).
+ *
+ * When an `EntityResolutionProvider` is mounted above, entity chips lift
+ * thumbnail + meta out of the existing TanStack Query cache and render the
+ * hover popover with rich preview. Outside the provider, chips degrade to
+ * label + accent dot (still surface-aware via `tone`).
  */
-export function TokenizedText({ content, className }: TokenizedTextProps) {
+export function TokenizedText({
+  content,
+  className,
+  tone = 'onDark',
+}: TokenizedTextProps) {
   const tokens = useMemo(() => parseTokens(content), [content]);
 
   if (tokens.length === 0) return null;
@@ -49,14 +66,12 @@ export function TokenizedText({ content, className }: TokenizedTextProps) {
         }
         if (token.type === 'entity') {
           return (
-            <EntityChip
+            <TranscriptEntityChip
               key={key}
-              variant='transcript'
-              data={{
-                kind: token.kind,
-                id: token.id,
-                label: token.label,
-              }}
+              kind={token.kind}
+              id={token.id}
+              label={token.label}
+              tone={tone}
             />
           );
         }
@@ -71,5 +86,35 @@ export function TokenizedText({ content, className }: TokenizedTextProps) {
         );
       })}
     </span>
+  );
+}
+
+interface TranscriptEntityChipProps {
+  readonly kind: 'release' | 'artist' | 'track' | 'event';
+  readonly id: string;
+  readonly label: string;
+  readonly tone: EntityChipTone;
+}
+
+function TranscriptEntityChip({
+  kind,
+  id,
+  label,
+  tone,
+}: TranscriptEntityChipProps) {
+  const { ref: resolved } = useEntityResolution(kind, id);
+  return (
+    <EntityChipPopover kind={kind} id={id} label={label} entity={resolved}>
+      <EntityChip
+        data={{
+          kind,
+          id,
+          label,
+          thumbnail: resolved?.thumbnail,
+        }}
+        variant='transcript'
+        tone={tone}
+      />
+    </EntityChipPopover>
   );
 }
