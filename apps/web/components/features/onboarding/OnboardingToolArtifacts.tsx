@@ -337,7 +337,7 @@ export function OnboardingSpotifyArtistPickerCard({
 
   return (
     <div
-      className='w-full max-w-[440px] rounded-xl border border-subtle bg-surface-1 p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]'
+      className='min-h-[192px] w-full max-w-[440px] rounded-xl border border-subtle bg-surface-1 p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]'
       data-testid='onboarding-artist-picker'
     >
       <div className='flex items-start gap-3 px-0.5'>
