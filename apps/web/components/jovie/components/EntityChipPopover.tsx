@@ -152,8 +152,8 @@ export function EntityChipPopover({
           onPointerLeave={handlePointerLeave}
           onKeyDown={handleKeyDown}
           className={cn(
-            'inline-flex items-baseline align-baseline appearance-none p-0 m-0 bg-transparent border-0 cursor-pointer',
-            'focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_oklab,var(--linear-border-focus)_72%,transparent)] focus-visible:rounded-md'
+            'm-0 inline-flex cursor-pointer appearance-none items-baseline align-baseline border-0 bg-transparent p-0',
+            'rounded-(--linear-app-radius-item) focus:outline-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/35'
           )}
           data-testid='entity-chip-popover-trigger'
         >
@@ -161,7 +161,7 @@ export function EntityChipPopover({
         </button>
       </PopoverTrigger>
       <PopoverContent
-        className='w-[280px] p-0 overflow-hidden'
+        className='w-[272px] overflow-hidden p-0'
         sideOffset={6}
         align='start'
         testId='entity-chip-popover-content'
@@ -209,7 +209,7 @@ function EntityChipPopoverBody({
   const thumbnail = entity?.thumbnail;
 
   return (
-    <div className='flex gap-3 p-3'>
+    <div className='flex gap-2.5 p-2'>
       <div className='shrink-0'>
         {thumbnail ? (
           <Image
@@ -217,27 +217,25 @@ function EntityChipPopoverBody({
             alt=''
             width={48}
             height={48}
-            className='h-12 w-12 rounded-md object-cover'
+            className='h-12 w-12 rounded-(--linear-app-radius-item) border border-subtle object-cover shadow-app-control'
             aria-hidden
           />
         ) : (
           <div
             aria-hidden
-            className='h-12 w-12 rounded-md border border-subtle bg-surface-1 flex items-center justify-center'
+            className='flex h-12 w-12 items-center justify-center rounded-(--linear-app-radius-item) border border-subtle bg-surface-1 shadow-app-control'
           >
             <span className='h-2 w-2 rounded-full bg-tertiary-token' />
           </div>
         )}
       </div>
       <div className='min-w-0 flex-1'>
-        <p className='text-2xs font-medium uppercase tracking-[0.06em] text-tertiary-token'>
-          {eyebrow}
-        </p>
-        <p className='mt-0.5 truncate text-[13px] font-medium leading-tight text-primary-token'>
+        <p className='text-2xs font-caption text-tertiary-token'>{eyebrow}</p>
+        <p className='mt-0.5 truncate text-app font-caption leading-tight text-primary-token'>
           {label}
         </p>
         {subtitle ? (
-          <p className='mt-0.5 truncate text-xs leading-tight text-secondary-token'>
+          <p className='mt-0.5 truncate text-2xs leading-tight text-secondary-token'>
             {subtitle}
           </p>
         ) : null}
@@ -250,7 +248,7 @@ function EntityChipPopoverBody({
           <button
             type='button'
             onClick={onOpenEntity}
-            className='mt-2 inline-flex items-center gap-1 rounded-md text-xs font-medium text-primary-token hover:text-primary-token focus:outline-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[color-mix(in_oklab,var(--linear-border-focus)_72%,transparent)]'
+            className='mt-2 inline-flex items-center gap-1 rounded-(--linear-app-radius-item) px-1 py-0.5 text-2xs font-caption text-secondary-token transition-colors duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token focus:outline-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/35'
           >
             Open {KIND_PREFIX[kind].toLowerCase()}
             <ArrowUpRight className='h-3 w-3' />

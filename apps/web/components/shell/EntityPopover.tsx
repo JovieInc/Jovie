@@ -15,6 +15,7 @@
 
 import Image from 'next/image';
 import {
+  type KeyboardEvent,
   type ReactNode,
   useCallback,
   useEffect,
@@ -191,11 +192,11 @@ export function EntityRowArt({
     const stamp = stampParts(entity.eventDate);
     if (stamp) {
       return (
-        <span className='flex h-7 w-7 shrink-0 flex-col items-center justify-center rounded-md border border-subtle bg-surface-1 shadow-[inset_0_0.5px_0_rgba(255,255,255,0.05)]'>
-          <span className='text-[7px] font-semibold uppercase tracking-[0.1em] text-tertiary-token leading-none'>
+        <span className='flex h-7 w-7 shrink-0 flex-col items-center justify-center rounded-(--linear-app-radius-item) border border-subtle bg-surface-1 shadow-app-control'>
+          <span className='text-3xs font-caption leading-none text-tertiary-token'>
             {stamp.month}
           </span>
-          <span className='text-[12px] font-bold leading-none tracking-[-0.02em] text-primary-token mt-0.5'>
+          <span className='mt-0.5 text-2xs font-bold leading-none text-primary-token'>
             {stamp.day}
           </span>
         </span>
@@ -212,7 +213,7 @@ export function EntityRowArt({
     return (
       <span
         className={cn(
-          'relative h-7 w-7 shrink-0 overflow-hidden shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.06)]',
+          'relative h-7 w-7 shrink-0 overflow-hidden shadow-app-control',
           rounded
         )}
       >
@@ -234,8 +235,8 @@ export function EntityRowArt({
   return (
     <span
       className={cn(
-        'flex h-7 w-7 shrink-0 items-center justify-center border border-subtle bg-surface-1 text-[10px] font-semibold text-primary-token shadow-[inset_0_0.5px_0_rgba(255,255,255,0.05)]',
-        isCircular ? 'rounded-full' : 'rounded-md'
+        'flex h-7 w-7 shrink-0 items-center justify-center border border-subtle bg-surface-1 text-3xs font-caption text-primary-token shadow-app-control',
+        isCircular ? 'rounded-full' : 'rounded-(--linear-app-radius-item)'
       )}
     >
       {initialsOf(entity.label) || '·'}
@@ -422,11 +423,11 @@ function CardArtwork({ entity }: { readonly entity: EntityPopoverData }) {
     const stamp = stampParts(entity.eventDate);
     if (stamp) {
       return (
-        <div className='flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-md border border-subtle bg-surface-1 shadow-[inset_0_0.5px_0_rgba(255,255,255,0.05)]'>
-          <span className='text-[8px] font-semibold uppercase tracking-[0.12em] text-tertiary-token'>
+        <div className='flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-(--linear-app-radius-item) border border-subtle bg-surface-1 shadow-app-control'>
+          <span className='text-3xs font-caption text-tertiary-token'>
             {stamp.month}
           </span>
-          <span className='text-[20px] font-bold leading-none tracking-[-0.02em] text-primary-token'>
+          <span className='text-mid font-bold leading-none text-primary-token'>
             {stamp.day}
           </span>
         </div>
@@ -441,8 +442,8 @@ function CardArtwork({ entity }: { readonly entity: EntityPopoverData }) {
     return (
       <div
         className={cn(
-          'relative h-12 w-12 shrink-0 overflow-hidden border border-subtle shadow-[inset_0_0.5px_0_rgba(255,255,255,0.05)]',
-          isCircular ? 'rounded-full' : 'rounded-md'
+          'relative h-12 w-12 shrink-0 overflow-hidden border border-subtle shadow-app-control',
+          isCircular ? 'rounded-full' : 'rounded-(--linear-app-radius-item)'
         )}
       >
         <Image
@@ -459,8 +460,8 @@ function CardArtwork({ entity }: { readonly entity: EntityPopoverData }) {
   return (
     <div
       className={cn(
-        'flex h-12 w-12 shrink-0 items-center justify-center border border-subtle bg-surface-1 text-[15px] font-semibold text-primary-token shadow-[inset_0_0.5px_0_rgba(255,255,255,0.05)]',
-        isCircular ? 'rounded-full' : 'rounded-md'
+        'flex h-12 w-12 shrink-0 items-center justify-center border border-subtle bg-surface-1 text-app font-caption text-primary-token shadow-app-control',
+        isCircular ? 'rounded-full' : 'rounded-(--linear-app-radius-item)'
       )}
     >
       {initialsOf(entity.label) || '·'}
@@ -487,10 +488,10 @@ function EntityCard({ entity, onActivate }: EntityCardProps) {
     <div className='flex items-start gap-2.5'>
       <CardArtwork entity={entity} />
       <div className='min-w-0 flex-1 pt-0.5'>
-        <div className='mb-1 text-[9.5px] font-semibold uppercase tracking-[0.1em] text-quaternary-token'>
+        <div className='mb-1 text-2xs font-caption text-tertiary-token'>
           {eyebrow}
         </div>
-        <h3 className='m-0 mb-2 truncate text-[14px] font-semibold leading-[1.25] text-primary-token'>
+        <h3 className='m-0 mb-2 truncate text-app font-caption leading-tight text-primary-token'>
           {entity.label}
         </h3>
         {artistLink ? (
@@ -504,20 +505,20 @@ function EntityCard({ entity, onActivate }: EntityCardProps) {
                 label: artistLink,
               });
             }}
-            className='mb-2 inline-flex items-center text-[11.5px] text-tertiary-token hover:text-primary-token underline underline-offset-2 decoration-(--linear-app-shell-border) hover:decoration-current transition-colors duration-subtle ease-out'
+            className='mb-2 inline-flex items-center text-2xs font-caption text-secondary-token underline decoration-subtle underline-offset-2 transition-colors duration-subtle ease-subtle hover:text-primary-token hover:decoration-default'
           >
             {artistLink}
           </button>
         ) : null}
         {stats.length > 0 ? (
-          <div className='flex flex-wrap items-center text-[11.5px] leading-[1.5] text-tertiary-token'>
+          <div className='flex flex-wrap items-center text-2xs leading-normal text-tertiary-token'>
             {stats.map((stat, i) => (
               <span
                 key={stat.key}
                 className={cn(
                   'relative inline-flex items-center whitespace-nowrap',
                   stat.emphasis === 'solid'
-                    ? 'ml-1.5 rounded-[3px] border border-subtle bg-surface-1 px-1.5 py-px text-[9.5px] font-semibold uppercase tracking-[0.1em] text-primary-token'
+                    ? 'ml-1.5 rounded-(--linear-app-radius-item) border border-subtle bg-surface-1 px-1.5 py-px text-3xs font-caption text-primary-token'
                     : 'px-1.5',
                   i === 0 && stat.emphasis !== 'solid' && 'pl-0',
                   i > 0 &&
@@ -621,10 +622,10 @@ export function EntityPopover({
       }}
       className={cn(
         'z-[80]',
-        'rounded-lg border border-(--linear-app-shell-border)',
-        'bg-(--linear-app-content-surface)/95 backdrop-blur-xl',
-        'p-2.5 shadow-[0_12px_40px_rgba(0,0,0,0.32)]',
-        'animate-in fade-in-0 duration-subtle ease-out',
+        'rounded-(--linear-app-radius-menu) border border-default',
+        'bg-(--linear-bg-surface-0) text-primary-token shadow-card-elevated',
+        'p-2',
+        'animate-in fade-in-0 zoom-in-95 duration-subtle ease-subtle',
         pos?.side === 'left' ? 'slide-in-from-right-1' : 'slide-in-from-left-1'
       )}
     >
@@ -670,6 +671,19 @@ export function EntityHoverLink({
     }
   }, []);
 
+  const cancelOpen = useCallback(() => {
+    if (openTimer.current !== undefined) {
+      window.clearTimeout(openTimer.current);
+      openTimer.current = undefined;
+    }
+  }, []);
+
+  const closeNow = useCallback(() => {
+    cancelOpen();
+    cancelClose();
+    setOpen(false);
+  }, [cancelClose, cancelOpen]);
+
   const requestOpen = useCallback(() => {
     cancelClose();
     if (openTimer.current !== undefined) return;
@@ -680,25 +694,29 @@ export function EntityHoverLink({
   }, [cancelClose]);
 
   const requestClose = useCallback(() => {
-    if (openTimer.current !== undefined) {
-      window.clearTimeout(openTimer.current);
-      openTimer.current = undefined;
-    }
+    cancelOpen();
     if (closeTimer.current !== undefined) return;
     closeTimer.current = window.setTimeout(() => {
       setOpen(false);
       closeTimer.current = undefined;
     }, HOVER_CLOSE_MS);
-  }, []);
+  }, [cancelOpen]);
 
   useEffect(
     () => () => {
-      if (openTimer.current !== undefined)
-        window.clearTimeout(openTimer.current);
-      if (closeTimer.current !== undefined)
-        window.clearTimeout(closeTimer.current);
+      cancelOpen();
+      cancelClose();
     },
-    []
+    [cancelClose, cancelOpen]
+  );
+
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLButtonElement>) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      closeNow();
+    },
+    [closeNow]
   );
 
   return (
@@ -710,13 +728,15 @@ export function EntityHoverLink({
         onMouseLeave={requestClose}
         onFocus={requestOpen}
         onBlur={requestClose}
+        onKeyDown={handleKeyDown}
         onClick={() => onActivate?.(entity)}
         // Subtle treatment: underline only on hover/focus, no static
         // decoration — keeps entity-rich copy from reading as a wall of
         // dotted lines while still surfacing the affordance on intent.
         className={cn(
-          'inline-flex items-center hover:text-primary-token transition-colors duration-subtle ease-out',
+          'inline-flex items-center rounded-(--linear-app-radius-item) transition-colors duration-subtle ease-subtle hover:text-primary-token',
           'no-underline hover:underline focus-visible:underline underline-offset-2',
+          'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/35',
           className
         )}
       >
