@@ -4,10 +4,12 @@ import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
 import { getAppFlagValue } from '@/lib/flags/server';
+import { queryKeys } from '@/lib/queries';
+import { HydrateClient } from '@/lib/queries/HydrateClient';
+import { getDehydratedState, getQueryClient } from '@/lib/queries/server';
 import { getDashboardShellData } from '../dashboard/actions';
 import { loadReleaseMatrix } from '../dashboard/releases/actions';
-import { LibrarySurface } from './LibrarySurface';
-import { buildLibraryReleaseAssets } from './library-data';
+import { LibraryPageClient } from './LibraryPageClient';
 
 export const runtime = 'nodejs';
 
@@ -38,7 +40,27 @@ export default async function LibraryPage() {
   }
 
   const profileId = dashboardData.selectedProfile?.id;
-  const releases = profileId ? await loadReleaseMatrix(profileId) : [];
+  if (profileId) {
+    const queryClient = getQueryClient();
+    try {
+      await queryClient.fetchQuery({
+        queryKey: queryKeys.releases.matrix(profileId),
+        queryFn: () => loadReleaseMatrix(profileId),
+      });
+    } catch (error) {
+      void captureError(
+        'Release matrix prefetch failed on library page',
+        error,
+        {
+          route: APP_ROUTES.LIBRARY,
+        }
+      );
+    }
+  }
 
-  return <LibrarySurface assets={buildLibraryReleaseAssets(releases)} />;
+  return (
+    <HydrateClient state={getDehydratedState()}>
+      <LibraryPageClient />
+    </HydrateClient>
+  );
 }

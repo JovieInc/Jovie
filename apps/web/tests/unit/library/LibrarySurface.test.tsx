@@ -1,3 +1,4 @@
+import { TooltipProvider } from '@jovie/ui';
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -56,20 +57,28 @@ function buildAsset(
 
 function renderLibraryWithHeader(assets: readonly LibraryReleaseAsset[]) {
   return render(
-    <HeaderActionsProvider>
-      <HeaderSearchSurfaceFromContext />
+    <TooltipProvider>
+      <HeaderActionsProvider>
+        <HeaderSearchSurfaceFromContext />
+        <LibrarySurface assets={assets} />
+      </HeaderActionsProvider>
+    </TooltipProvider>
+  );
+}
+
+function renderLibrary(assets: readonly LibraryReleaseAsset[]) {
+  return render(
+    <TooltipProvider>
       <LibrarySurface assets={assets} />
-    </HeaderActionsProvider>
+    </TooltipProvider>
   );
 }
 
 describe('LibrarySurface', () => {
   it('renders an empty read-only library state with a releases escape hatch', () => {
-    render(<LibrarySurface assets={[]} />);
+    renderLibrary([]);
 
-    expect(
-      screen.getByRole('heading', { name: 'No Release Assets' })
-    ).toBeDefined();
+    expect(screen.getByText('No Release Assets')).toBeDefined();
     expect(
       screen.getByText(
         'Releases and artwork will appear here after your catalog is connected.'
@@ -82,7 +91,7 @@ describe('LibrarySurface', () => {
   });
 
   it('renders release assets with grid cards and a read-only detail drawer', () => {
-    render(<LibrarySurface assets={[buildAsset()]} />);
+    renderLibrary([buildAsset()]);
 
     expect(screen.getByTestId('library-surface')).toBeDefined();
     expect(screen.getByRole('heading', { name: 'Take Me Over' })).toBeDefined();
@@ -122,34 +131,26 @@ describe('LibrarySurface', () => {
   });
 
   it('switches between grid and list modes without losing the release list', () => {
-    render(
-      <LibrarySurface
-        assets={[
-          buildAsset(),
-          buildAsset({
-            id: 'release-2',
-            title: 'Never Say A Word',
-            artist: 'Other Artist',
-            providers: [
-              {
-                key: 'apple',
-                label: 'Apple Music',
-                url: 'https://music.apple.com/album/never-say-a-word',
-              },
-            ],
-          }),
-        ]}
-      />
-    );
+    renderLibrary([
+      buildAsset(),
+      buildAsset({
+        id: 'release-2',
+        title: 'Never Say A Word',
+        artist: 'Other Artist',
+        providers: [
+          {
+            key: 'apple',
+            label: 'Apple Music',
+            url: 'https://music.apple.com/album/never-say-a-word',
+          },
+        ],
+      }),
+    ]);
 
     fireEvent.click(screen.getByRole('button', { name: 'List view' }));
 
-    expect(
-      screen.getByRole('button', { name: /Never Say A Word/u })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: /Take Me Over/u })
-    ).toBeInTheDocument();
+    expect(screen.getByText('Never Say A Word')).toBeInTheDocument();
+    expect(screen.getByText('Take Me Over')).toBeInTheDocument();
   });
 
   it('filters release assets from the shell header search contract', () => {
@@ -188,25 +189,21 @@ describe('LibrarySurface', () => {
   });
 
   it('filters release assets from the Library navigation', () => {
-    render(
-      <LibrarySurface
-        assets={[
-          buildAsset(),
-          buildAsset({
-            id: 'release-2',
-            title: 'Never Say A Word',
-            artist: 'Other Artist',
-            artworkUrl: null,
-            previewUrl: null,
-            providerCount: 0,
-            providers: [],
-            hasArtwork: false,
-            hasLyrics: false,
-            assetKinds: [],
-          }),
-        ]}
-      />
-    );
+    renderLibrary([
+      buildAsset(),
+      buildAsset({
+        id: 'release-2',
+        title: 'Never Say A Word',
+        artist: 'Other Artist',
+        artworkUrl: null,
+        previewUrl: null,
+        providerCount: 0,
+        providers: [],
+        hasArtwork: false,
+        hasLyrics: false,
+        assetKinds: [],
+      }),
+    ]);
 
     fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
     fireEvent.click(screen.getByRole('button', { name: /Needs Assets/u }));

@@ -13,8 +13,10 @@ import { getAppFlagValue } from '@/lib/flags/server';
 import ChatLoading from './chat/loading';
 import { DashboardShellContent } from './DashboardShellContent';
 import { ReleaseTableSkeleton } from './dashboard/releases/loading';
+import { LibraryLoadingState } from './library/LibrarySurface';
 import {
   isChatShellRoute,
+  isLibraryShellRoute,
   isLyricsShellRoute,
   isReleasesShellRoute,
   isTasksShellRoute,
@@ -65,6 +67,13 @@ export default async function AppShellLayout({
       shellFallback = (
         <AppShellSkeleton
           main={<ReleaseTableSkeleton showHeader={false} />}
+          variant={shellVariant}
+        />
+      );
+    } else if (isLibraryShellRoute(pathname)) {
+      shellFallback = (
+        <AppShellSkeleton
+          main={<LibraryLoadingState />}
           variant={shellVariant}
         />
       );
