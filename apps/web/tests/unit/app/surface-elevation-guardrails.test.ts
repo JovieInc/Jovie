@@ -285,6 +285,37 @@ describe('surface elevation guardrails', () => {
     expect(authShellWrapper).toContain('HeaderSearchSurface');
   });
 
+  it('keeps admin shell tables on the canonical AdminDataTable wrapper', () => {
+    const files = [
+      'components/features/admin/ActivityTableUnified.tsx',
+      'components/features/admin/admin-creator-profiles/AdminCreatorProfilesUnified.tsx',
+      'components/features/admin/admin-releases-table/AdminReleasesTableUnified.tsx',
+      'components/features/admin/admin-users-table/AdminUsersTableUnified.tsx',
+      'components/features/admin/feedback-table/AdminFeedbackTable.tsx',
+      'components/features/admin/waitlist-table/AdminWaitlistTableUnified.tsx',
+    ] as const;
+
+    const adminDataTable = readFileSync(
+      join(ROOT, 'components/features/admin/table/AdminDataTable.tsx'),
+      'utf-8'
+    );
+
+    expect(adminDataTable).toContain('ADMIN_DATA_TABLE_CLASSNAME');
+    expect(adminDataTable).toContain('enableVirtualization = true');
+
+    for (const file of files) {
+      const content = readFileSync(join(ROOT, file), 'utf-8');
+      expect(
+        content,
+        `${file} should use canonical admin table chrome`
+      ).toContain('AdminDataTable');
+      expect(
+        content,
+        `${file} should not bypass AdminDataTable with direct UnifiedTable usage`
+      ).not.toMatch(/<UnifiedTable\b/);
+    }
+  });
+
   it('keeps task and preview cards off the shell canvas token', () => {
     const files = [
       'components/features/dashboard/layout/PreviewPanel.tsx',

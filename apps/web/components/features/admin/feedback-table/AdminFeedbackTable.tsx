@@ -20,15 +20,14 @@ import {
   PAGE_TOOLBAR_META_TEXT_CLASS,
   PageToolbarActionButton,
   TableEmptyState,
-  UnifiedTable,
 } from '@/components/organisms/table';
 import { convertContextMenuItems } from '@/components/organisms/table/molecules/TableContextMenu';
+import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import {
   AdminTableHeader,
   AdminTableSubheader,
 } from '@/features/admin/table/AdminTableHeader';
 import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
-import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { useDismissFeedbackMutation } from '@/lib/queries';
 
 interface FeedbackRow {
@@ -322,7 +321,7 @@ export function AdminFeedbackTable({
         />
         <AdminTableShell testId='admin-feedback-table'>
           {() => (
-            <UnifiedTable
+            <AdminDataTable
               data={rows}
               columns={columns}
               getRowId={row => row.id}
@@ -330,9 +329,6 @@ export function AdminFeedbackTable({
               onRowClick={row => setSelectedId(row.id)}
               onFocusedRowChange={handleFocusedRowChange}
               getContextMenuItems={getContextMenuItems}
-              enableVirtualization={true}
-              minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
-              className='text-[12.5px] [&_thead_th]:py-1 [&_thead_th]:text-[10px] [&_thead_th]:tracking-[0.07em]'
               emptyState={
                 <TableEmptyState
                   icon={
