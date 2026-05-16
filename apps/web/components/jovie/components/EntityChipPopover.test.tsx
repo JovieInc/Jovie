@@ -54,6 +54,26 @@ describe('EntityChipPopover', () => {
     expect(screen.getByTestId('entity-chip-popover-content')).toBeTruthy();
   });
 
+  it('opens on mouse hover and closes after pointer leave', async () => {
+    const user = userEvent.setup();
+    renderPopover();
+    const trigger = screen.getByTestId('entity-chip-popover-trigger');
+
+    await user.hover(trigger);
+
+    await waitFor(() =>
+      expect(trigger.getAttribute('aria-expanded')).toBe('true')
+    );
+    expect(screen.getByTestId('entity-chip-popover-content')).toBeTruthy();
+
+    await user.unhover(trigger);
+
+    await waitFor(() =>
+      expect(trigger.getAttribute('aria-expanded')).toBe('false')
+    );
+    expect(screen.queryByTestId('entity-chip-popover-content')).toBeNull();
+  });
+
   it('opens on keyboard Enter', async () => {
     const user = userEvent.setup();
     renderPopover();
