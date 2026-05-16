@@ -73,6 +73,7 @@ export function AuthClientProviders({
       appearance={authClerkAppearance}
       localization={authClerkLocalization}
       ui={ui}
+      prefetchUI={false}
       signInUrl={APP_ROUTES.SIGNIN}
       signUpUrl={APP_ROUTES.SIGNUP}
       signInFallbackRedirectUrl={APP_ROUTES.DASHBOARD}
