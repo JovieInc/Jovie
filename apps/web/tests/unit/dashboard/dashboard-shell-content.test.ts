@@ -76,9 +76,12 @@ describe('@critical DashboardShellContent behavior contracts', () => {
       expect(shouldUseEssentialShellData('/app/dashboard/releases')).toBe(true);
     });
 
-    it('lyrics and library routes use essential shell data', () => {
+    it('lyrics, library, and tasks routes use essential shell data', () => {
       expect(shouldUseEssentialShellData(APP_ROUTES.LYRICS)).toBe(true);
       expect(shouldUseEssentialShellData(APP_ROUTES.LIBRARY)).toBe(true);
+      expect(shouldUseEssentialShellData(APP_ROUTES.DASHBOARD_TASKS)).toBe(
+        true
+      );
     });
 
     it('dashboard root uses essential shell data', () => {

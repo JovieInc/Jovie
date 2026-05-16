@@ -17,27 +17,6 @@ vi.mock('@jovie/ui', () => ({
   ),
 }));
 
-vi.mock('@/components/molecules/AppSearchField', () => ({
-  AppSearchField: ({
-    value,
-    onChange,
-    ariaLabel,
-    placeholder,
-  }: {
-    readonly value: string;
-    readonly onChange: (value: string) => void;
-    readonly ariaLabel: string;
-    readonly placeholder?: string;
-  }) => (
-    <input
-      aria-label={ariaLabel}
-      value={value}
-      placeholder={placeholder}
-      onChange={event => onChange(event.target.value)}
-    />
-  ),
-}));
-
 vi.mock('@/components/molecules/filters', () => ({
   TableFilterDropdown: () => <button type='button'>Filters</button>,
 }));
@@ -77,7 +56,6 @@ vi.mock('@/components/organisms/table/molecules/DisplayMenuDropdown', () => ({
 
 function createBaseProps() {
   return {
-    search: '',
     draftTitle: '',
     taskCount: 2,
     subviews: [
@@ -87,10 +65,7 @@ function createBaseProps() {
     ],
     activeSubview: 'all',
     onSubviewChange: vi.fn(),
-    onSearchChange: vi.fn(),
     onDraftTitleChange: vi.fn(),
-    onEnterSearch: vi.fn(),
-    onExitSearch: vi.fn(),
     onCancelCreate: vi.fn(),
     onSubmitCreate: vi.fn((event: FormEvent<HTMLFormElement>) =>
       event.preventDefault()
@@ -127,8 +102,8 @@ describe('TaskWorkspaceHeaderBar', () => {
       screen.getByRole('tab', { name: 'Assigned To Me 1' })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Search tasks' })
-    ).toBeInTheDocument();
+      screen.queryByRole('button', { name: 'Search tasks' })
+    ).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Filters' })).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Display options' })
@@ -153,20 +128,6 @@ describe('TaskWorkspaceHeaderBar', () => {
     fireEvent.click(screen.getByRole('button', { name: 'List view' }));
 
     expect(props.onViewModeChange).toHaveBeenCalledWith('list');
-  });
-
-  it('renders search mode controls without reintroducing the divider', () => {
-    const props = createBaseProps();
-
-    render(<TaskWorkspaceHeaderBar {...props} mode='search' />);
-
-    const subheader = screen.getByTestId('tasks-workspace-subheader');
-    expect(subheader).not.toHaveClass('border-b');
-    expect(screen.getByRole('textbox', { name: 'Search tasks' })).toHaveValue(
-      ''
-    );
-    fireEvent.click(screen.getByRole('button', { name: 'Close search' }));
-    expect(props.onExitSearch).toHaveBeenCalledTimes(1);
   });
 
   it('renders create mode controls and submits the draft form', () => {

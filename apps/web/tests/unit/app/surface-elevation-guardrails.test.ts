@@ -218,10 +218,22 @@ describe('surface elevation guardrails', () => {
       join(ROOT, 'components/organisms/AppShellContentPanel.tsx'),
       'utf-8'
     );
+    const shellRouteMatches = readFileSync(
+      join(ROOT, 'app/app/(shell)/shell-route-matches.ts'),
+      'utf-8'
+    );
+    const appShellLayout = readFileSync(
+      join(ROOT, 'app/app/(shell)/layout.tsx'),
+      'utf-8'
+    );
 
     expect(tasksPage).toContain('PageShell');
     expect(dashboardPanel).toContain("frame = 'content-container'");
     expect(tasksPage).toContain("data-testid='tasks-content-panel'");
+    expect(tasksPage).toContain('TaskDataTable');
+    expect(tasksPage).not.toMatch(/<UnifiedTable\b/);
+    expect(shellRouteMatches).toContain('isTasksShellRoute');
+    expect(appShellLayout).toContain('TasksRouteSkeleton');
   });
 
   it('keeps presence and earnings inside framed content panels', () => {

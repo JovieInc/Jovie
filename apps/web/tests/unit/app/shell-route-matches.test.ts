@@ -4,6 +4,7 @@ import {
   isLibraryShellRoute,
   isLyricsShellRoute,
   isReleasesShellRoute,
+  isTasksShellRoute,
   resolveAppShellRequestPath,
   shouldRedirectToOnboarding,
   shouldUseEssentialShellData,
@@ -101,6 +102,19 @@ describe('isLibraryShellRoute', () => {
   });
 });
 
+describe('isTasksShellRoute', () => {
+  it('matches the dashboard tasks route', () => {
+    expect(isTasksShellRoute(APP_ROUTES.DASHBOARD_TASKS)).toBe(true);
+    expect(isTasksShellRoute(APP_ROUTES.TASKS)).toBe(true);
+  });
+
+  it('matches nested task subroutes', () => {
+    expect(isTasksShellRoute(`${APP_ROUTES.DASHBOARD_TASKS}/task-abc`)).toBe(
+      true
+    );
+  });
+});
+
 describe('shouldUseEssentialShellData', () => {
   it('returns true for chat routes', () => {
     expect(shouldUseEssentialShellData(APP_ROUTES.CHAT)).toBe(true);
@@ -110,9 +124,10 @@ describe('shouldUseEssentialShellData', () => {
     expect(shouldUseEssentialShellData('/app/dashboard/releases')).toBe(true);
   });
 
-  it('returns true for lyrics and library routes', () => {
+  it('returns true for lyrics, library, and tasks routes', () => {
     expect(shouldUseEssentialShellData(APP_ROUTES.LYRICS)).toBe(true);
     expect(shouldUseEssentialShellData(APP_ROUTES.LIBRARY)).toBe(true);
+    expect(shouldUseEssentialShellData(APP_ROUTES.DASHBOARD_TASKS)).toBe(true);
   });
 
   it('returns true for dashboard root', () => {
@@ -130,6 +145,7 @@ describe('shouldRedirectToOnboarding', () => {
     expect(shouldRedirectToOnboarding('/app/dashboard/releases')).toBe(true);
     expect(shouldRedirectToOnboarding(APP_ROUTES.LYRICS)).toBe(true);
     expect(shouldRedirectToOnboarding(APP_ROUTES.LIBRARY)).toBe(true);
+    expect(shouldRedirectToOnboarding(APP_ROUTES.DASHBOARD_TASKS)).toBe(true);
   });
 
   it('returns false for null', () => {
