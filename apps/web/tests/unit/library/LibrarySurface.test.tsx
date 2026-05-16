@@ -3,8 +3,9 @@ import type { ComponentProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { LibrarySurface } from '@/app/app/(shell)/library/LibrarySurface';
 import type { LibraryReleaseAsset } from '@/app/app/(shell)/library/library-data';
-import { OPEN_COMMAND_PALETTE_EVENT } from '@/components/organisms/command-palette-events';
+import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurface';
 import { APP_ROUTES } from '@/constants/routes';
+import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 
 vi.mock('next/image', () => ({
   default: (
@@ -51,6 +52,15 @@ function buildAsset(
     totalDurationMs: 212_000,
     ...overrides,
   };
+}
+
+function renderLibraryWithHeader(assets: readonly LibraryReleaseAsset[]) {
+  return render(
+    <HeaderActionsProvider>
+      <HeaderSearchSurfaceFromContext />
+      <LibrarySurface assets={assets} />
+    </HeaderActionsProvider>
+  );
 }
 
 describe('LibrarySurface', () => {
@@ -142,44 +152,39 @@ describe('LibrarySurface', () => {
     ).toBeInTheDocument();
   });
 
-  it('uses the shared command palette event from the Library navigation search', () => {
-    const onOpenCommandPalette = vi.fn();
-    globalThis.addEventListener(
-      OPEN_COMMAND_PALETTE_EVENT,
-      onOpenCommandPalette
+  it('filters release assets from the shell header search contract', () => {
+    renderLibraryWithHeader([
+      buildAsset(),
+      buildAsset({
+        id: 'release-2',
+        title: 'Never Say A Word',
+        artist: 'Other Artist',
+        providers: [
+          {
+            key: 'apple',
+            label: 'Apple Music',
+            url: 'https://music.apple.com/album/never-say-a-word',
+          },
+        ],
+      }),
+    ]);
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Filter library assets' })
+    );
+    fireEvent.change(screen.getByLabelText('Filter library assets'), {
+      target: { value: 'Never' },
+    });
+    fireEvent.mouseDown(
+      screen.getByRole('option', { name: /Never Say A Word/u })
     );
 
-    try {
-      render(
-        <LibrarySurface
-          assets={[
-            buildAsset(),
-            buildAsset({
-              id: 'release-2',
-              title: 'Never Say A Word',
-              artist: 'Other Artist',
-              providers: [
-                {
-                  key: 'apple',
-                  label: 'Apple Music',
-                  url: 'https://music.apple.com/album/never-say-a-word',
-                },
-              ],
-            }),
-          ]}
-        />
-      );
-
-      fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
-      fireEvent.click(screen.getByRole('button', { name: /Search/u }));
-
-      expect(onOpenCommandPalette).toHaveBeenCalledTimes(1);
-    } finally {
-      globalThis.removeEventListener(
-        OPEN_COMMAND_PALETTE_EVENT,
-        onOpenCommandPalette
-      );
-    }
+    expect(
+      screen.getByRole('heading', { name: 'Never Say A Word' })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Take Me Over' })
+    ).not.toBeInTheDocument();
   });
 
   it('filters release assets from the Library navigation', () => {

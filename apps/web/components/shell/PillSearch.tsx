@@ -34,6 +34,10 @@ export interface PillSearchProps {
   readonly titleOptions: readonly string[];
   /** Distinct album names. */
   readonly albumOptions: readonly string[];
+  /** Distinct status values. Defaults to release status values. */
+  readonly statusOptions?: readonly string[];
+  /** Distinct "has" values. Defaults to release asset values. */
+  readonly hasOptions?: readonly string[];
   /** Called when the user hits Esc on an empty input or focus leaves the surface. */
   readonly onClose: () => void;
   readonly ariaLabel?: string;
@@ -91,7 +95,9 @@ function fieldValueOptions(
   field: FilterField,
   artistOptions: readonly string[],
   titleOptions: readonly string[],
-  albumOptions: readonly string[]
+  albumOptions: readonly string[],
+  statusOptions: readonly string[],
+  hasOptions: readonly string[]
 ): readonly string[] {
   switch (field) {
     case 'artist':
@@ -101,9 +107,9 @@ function fieldValueOptions(
     case 'album':
       return albumOptions;
     case 'status':
-      return STATUS_VALUES;
+      return statusOptions;
     case 'has':
-      return HAS_VALUES;
+      return hasOptions;
   }
 }
 
@@ -147,6 +153,8 @@ export function PillSearch({
   artistOptions,
   titleOptions,
   albumOptions,
+  statusOptions = STATUS_VALUES,
+  hasOptions = HAS_VALUES,
   onClose,
   ariaLabel = 'Filter tracks',
   placeholder = 'Type to filter — / for fields',
@@ -211,7 +219,9 @@ export function PillSearch({
         slash.field,
         artistOptions,
         titleOptions,
-        albumOptions
+        albumOptions,
+        statusOptions,
+        hasOptions
       );
       return opts
         .map(v => ({
@@ -249,14 +259,14 @@ export function PillSearch({
       });
     }
     if (allowedFieldSet.has('status')) {
-      STATUS_VALUES.forEach(v => {
+      statusOptions.forEach(v => {
         const s = fuzzy(q, v);
         if (s > 0)
           out.push({ kind: 'value', field: 'status', value: v, score: s });
       });
     }
     if (allowedFieldSet.has('has')) {
-      HAS_VALUES.forEach(v => {
+      hasOptions.forEach(v => {
         const s = fuzzy(q, v);
         if (s > 0)
           out.push({ kind: 'value', field: 'has', value: v, score: s });
@@ -269,6 +279,8 @@ export function PillSearch({
     artistOptions,
     titleOptions,
     albumOptions,
+    statusOptions,
+    hasOptions,
     effectiveFields,
     text,
   ]);

@@ -15,7 +15,6 @@ import {
   type LucideIcon,
   Music2,
   PlayCircle,
-  Search,
   Video,
   X,
 } from 'lucide-react';
@@ -29,10 +28,11 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { OPEN_COMMAND_PALETTE_EVENT } from '@/components/organisms/command-palette-events';
+import type { FilterPill } from '@/components/shell/pill-search.types';
 import { ShellDropdown } from '@/components/shell/ShellDropdown';
 import { Tooltip } from '@/components/shell/Tooltip';
 import { APP_ROUTES } from '@/constants/routes';
+import { useRegisterHeaderSearch } from '@/contexts/HeaderActionsContext';
 import { useRegisterShellSidebarOverride } from '@/contexts/ShellSidebarOverrideContext';
 import {
   getArtworkFallbackAccentStyle,
@@ -200,6 +200,42 @@ function assetMatchesFilters(
     return false;
   }
   return true;
+}
+
+function normalizePillValue(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function valuesMatchPill(values: readonly string[], pill: FilterPill): boolean {
+  const normalizedValues = new Set(values.map(normalizePillValue));
+  const normalizedPillValues = pill.values.map(normalizePillValue);
+  const hasAny = normalizedPillValues.some(value =>
+    normalizedValues.has(value)
+  );
+
+  return pill.op === 'is' ? hasAny : !hasAny;
+}
+
+function assetMatchesPills(
+  asset: LibraryReleaseAsset,
+  pills: readonly FilterPill[]
+): boolean {
+  if (pills.length === 0) return true;
+
+  return pills.every(pill => {
+    switch (pill.field) {
+      case 'artist':
+        return valuesMatchPill([asset.artist], pill);
+      case 'title':
+        return valuesMatchPill([asset.title], pill);
+      case 'status':
+        return valuesMatchPill([asset.status], pill);
+      case 'has':
+        return valuesMatchPill(asset.assetKinds, pill);
+      case 'album':
+        return true;
+    }
+  });
 }
 
 function hasActiveFilters(filters: LibraryFilters): boolean {
@@ -385,27 +421,12 @@ function LibraryRail({
     filters.releaseTypes.size +
     filters.assetKinds.size +
     filters.providers.size;
-  const openCommandPalette = () => {
-    globalThis.dispatchEvent(new Event(OPEN_COMMAND_PALETTE_EVENT));
-  };
 
   return (
     <nav
       aria-label='Library navigation'
       className={cn('flex min-h-0 flex-col bg-surface-0 p-2.5', className)}
     >
-      <div className='px-1.5 pb-2'>
-        <button
-          type='button'
-          onClick={openCommandPalette}
-          className='flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-[12.5px] text-secondary-token transition-colors duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
-        >
-          <Search className='h-3.5 w-3.5 shrink-0 text-sidebar-item-icon' />
-          <span className='min-w-0 flex-1 truncate'>Search</span>
-          <span className='text-2xs text-tertiary-token'>Cmd K</span>
-        </button>
-      </div>
-
       <div className='px-1.5 pb-2'>
         <div className='flex items-center justify-between gap-2'>
           <p className='text-xs font-semibold text-primary-token'>Views</p>
@@ -1184,6 +1205,7 @@ export function LibrarySurface({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [pills, setPills] = useState<FilterPill[]>([]);
 
   const visibleAssets = useMemo(() => {
     const presetPredicate =
@@ -1192,8 +1214,26 @@ export function LibrarySurface({
     return assets
       .filter(presetPredicate)
       .filter(asset => assetMatchesFilters(asset, filters))
+      .filter(asset => assetMatchesPills(asset, pills))
       .toSorted(compareAssets(sort));
-  }, [assets, filters, preset, sort]);
+  }, [assets, filters, pills, preset, sort]);
+
+  const artistOptions = useMemo(
+    () => uniqueSorted(assets.map(asset => asset.artist)),
+    [assets]
+  );
+  const titleOptions = useMemo(
+    () => uniqueSorted(assets.map(asset => asset.title)),
+    [assets]
+  );
+  const statusOptions = useMemo(
+    () => uniqueSorted(assets.map(asset => asset.status)),
+    [assets]
+  );
+  const hasOptions = useMemo(
+    () => uniqueSorted(assets.flatMap(asset => asset.assetKinds)),
+    [assets]
+  );
 
   const selectedAsset =
     visibleAssets.find(asset => asset.id === selectedId) ?? null;
@@ -1224,6 +1264,7 @@ export function LibrarySurface({
   function resetView() {
     setPreset('all');
     setFilters(emptyFilters());
+    setPills([]);
   }
 
   function openAsset(id: string) {
@@ -1256,6 +1297,39 @@ export function LibrarySurface({
   );
 
   useRegisterShellSidebarOverride(sidebarOverride);
+
+  const headerSearchAdapter = useMemo(
+    () =>
+      assets.length === 0
+        ? null
+        : {
+            key: 'library',
+            pills,
+            onPillsChange: setPills,
+            artistOptions,
+            titleOptions,
+            albumOptions: [],
+            statusOptions,
+            hasOptions,
+            totalCount: assets.length,
+            visibleCount: visibleAssets.length,
+            triggerLabel: 'Filter',
+            ariaLabel: 'Filter library assets',
+            placeholder: 'Filter library - / for fields',
+            allowedFields: ['artist', 'title', 'status', 'has'] as const,
+          },
+    [
+      artistOptions,
+      assets.length,
+      hasOptions,
+      pills,
+      statusOptions,
+      titleOptions,
+      visibleAssets.length,
+    ]
+  );
+
+  useRegisterHeaderSearch(headerSearchAdapter);
 
   if (assets.length === 0) {
     return <EmptyCatalog />;

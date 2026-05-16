@@ -316,6 +316,18 @@ describe('surface elevation guardrails', () => {
     }
   });
 
+  it('routes library filters through the shared header search contract', () => {
+    const librarySurface = readFileSync(
+      join(ROOT, 'app/app/(shell)/library/LibrarySurface.tsx'),
+      'utf-8'
+    );
+
+    expect(librarySurface).toContain('useRegisterHeaderSearch');
+    expect(librarySurface).toContain("key: 'library'");
+    expect(librarySurface).toContain("triggerLabel: 'Filter'");
+    expect(librarySurface).not.toContain('OPEN_COMMAND_PALETTE_EVENT');
+  });
+
   it('keeps task and preview cards off the shell canvas token', () => {
     const files = [
       'components/features/dashboard/layout/PreviewPanel.tsx',
