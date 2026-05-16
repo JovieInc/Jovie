@@ -353,8 +353,8 @@
 
   /* Focus ring — Jovie/Linear keyboard focus token */
   --color-focus-ring: var(--linear-border-focus);
-  --focus-ring-width: 2px;
-  --focus-ring-offset: 2px;
+  --focus-ring-width: 1px;
+  --focus-ring-offset: 0px;
 
   /* Font size scale — extracted from Linear CSS vars (2026-02-17)
      --font-size-micro: 11px, --font-size-mini: 12px, --font-size-small: 13px,
@@ -1360,21 +1360,28 @@
   letter-spacing: -0.01em;
 }
 
-/* Keyboard focus fallback — tokenized Jovie focus halo instead of the
-   browser's default ring. Uses box-shadow so it inherits the element's
-   border-radius automatically.
+/* Keyboard focus fallback — tokenized Jovie focus indicator instead of the
+   browser's default ring. Uses an inset shadow so it reads as part of the
+   control chrome instead of a detached purple halo.
    :where() keeps specificity at 0 so component-level focus styles
    (Clerk inputs, etc.) keep overriding this default. */
 :where(:focus-visible) {
   outline: none;
-  box-shadow:
-    0 0 0 var(--focus-ring-width)
-    color-mix(in oklab, var(--color-focus-ring) 58%, transparent),
-    0 0 0 calc(var(--focus-ring-width) + var(--focus-ring-offset))
-    color-mix(in oklab, var(--color-focus-ring) 18%, transparent);
+  box-shadow: inset 0 0 0 var(--focus-ring-width)
+    color-mix(in oklab, var(--color-focus-ring) 76%, transparent);
   transition:
     box-shadow 150ms cubic-bezier(0.32, 0.72, 0, 1),
     border-color 150ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+:where(
+    input,
+    textarea,
+    select,
+    [contenteditable="true"],
+    [role="textbox"]
+  ):focus-visible {
+  box-shadow: none;
 }
 
 /* ============================================

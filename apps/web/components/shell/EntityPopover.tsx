@@ -191,7 +191,7 @@ export function EntityRowArt({
     const stamp = stampParts(entity.eventDate);
     if (stamp) {
       return (
-        <span className='flex h-7 w-7 shrink-0 flex-col items-center justify-center rounded-md bg-gradient-to-b from-[#1a1a1f] to-[#0a0a0c] shadow-[inset_0_0.5px_0_rgba(255,255,255,0.08),inset_0_0_0_0.5px_rgba(255,255,255,0.04)]'>
+        <span className='flex h-7 w-7 shrink-0 flex-col items-center justify-center rounded-md border border-subtle bg-surface-1 shadow-[inset_0_0.5px_0_rgba(255,255,255,0.05)]'>
           <span className='text-[7px] font-semibold uppercase tracking-[0.1em] text-tertiary-token leading-none'>
             {stamp.month}
           </span>
@@ -234,9 +234,7 @@ export function EntityRowArt({
   return (
     <span
       className={cn(
-        'flex h-7 w-7 shrink-0 items-center justify-center text-[10px] font-semibold tracking-[-0.01em] text-primary-token',
-        'bg-gradient-to-br from-[#2a2a2f] to-[#16161a]',
-        'shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.06)]',
+        'flex h-7 w-7 shrink-0 items-center justify-center border border-subtle bg-surface-1 text-[10px] font-semibold text-primary-token shadow-[inset_0_0.5px_0_rgba(255,255,255,0.05)]',
         isCircular ? 'rounded-full' : 'rounded-md'
       )}
     >
@@ -418,16 +416,13 @@ function stampParts(iso: string | undefined): DateStampParts | null {
   };
 }
 
-// 56×56 hero artwork inside the card.
+// 48px hero artwork inside the card.
 function CardArtwork({ entity }: { readonly entity: EntityPopoverData }) {
   if (entity.kind === 'event' && !entity.thumbnail) {
     const stamp = stampParts(entity.eventDate);
     if (stamp) {
       return (
-        <div
-          className='flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-[8px] shadow-[0_0_0_0.5px_rgba(255,255,255,0.06),inset_0_0.5px_0_rgba(255,255,255,0.08),0_8px_18px_-8px_rgba(0,0,0,0.55)]'
-          style={{ background: 'linear-gradient(180deg,#1a1a1f,#0a0a0c)' }}
-        >
+        <div className='flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-md border border-subtle bg-surface-1 shadow-[inset_0_0.5px_0_rgba(255,255,255,0.05)]'>
           <span className='text-[8px] font-semibold uppercase tracking-[0.12em] text-tertiary-token'>
             {stamp.month}
           </span>
@@ -446,15 +441,15 @@ function CardArtwork({ entity }: { readonly entity: EntityPopoverData }) {
     return (
       <div
         className={cn(
-          'relative h-14 w-14 shrink-0 overflow-hidden shadow-[0_0_0_0.5px_rgba(255,255,255,0.06),inset_0_0.5px_0_rgba(255,255,255,0.08),0_8px_18px_-8px_rgba(0,0,0,0.55)]',
-          isCircular ? 'rounded-full' : 'rounded-[8px]'
+          'relative h-12 w-12 shrink-0 overflow-hidden border border-subtle shadow-[inset_0_0.5px_0_rgba(255,255,255,0.05)]',
+          isCircular ? 'rounded-full' : 'rounded-md'
         )}
       >
         <Image
           src={entity.thumbnail}
           alt=''
           fill
-          sizes='56px'
+          sizes='48px'
           className='object-cover'
           unoptimized
         />
@@ -464,10 +459,8 @@ function CardArtwork({ entity }: { readonly entity: EntityPopoverData }) {
   return (
     <div
       className={cn(
-        'flex h-14 w-14 shrink-0 items-center justify-center text-[16px] font-semibold tracking-[-0.02em] text-primary-token',
-        'bg-gradient-to-br from-[#2a2a2f] to-[#16161a]',
-        'shadow-[0_0_0_0.5px_rgba(255,255,255,0.06),inset_0_0.5px_0_rgba(255,255,255,0.08),0_8px_18px_-8px_rgba(0,0,0,0.55)]',
-        isCircular ? 'rounded-full' : 'rounded-[8px]'
+        'flex h-12 w-12 shrink-0 items-center justify-center border border-subtle bg-surface-1 text-[15px] font-semibold text-primary-token shadow-[inset_0_0.5px_0_rgba(255,255,255,0.05)]',
+        isCircular ? 'rounded-full' : 'rounded-md'
       )}
     >
       {initialsOf(entity.label) || '·'}
@@ -491,13 +484,13 @@ function EntityCard({ entity, onActivate }: EntityCardProps) {
       : null;
 
   return (
-    <div className='flex items-start gap-3'>
+    <div className='flex items-start gap-2.5'>
       <CardArtwork entity={entity} />
       <div className='min-w-0 flex-1 pt-0.5'>
-        <div className='mb-1 text-[9.5px] font-semibold uppercase tracking-[0.12em] text-quaternary-token'>
+        <div className='mb-1 text-[9.5px] font-semibold uppercase tracking-[0.1em] text-quaternary-token'>
           {eyebrow}
         </div>
-        <h3 className='m-0 mb-2 text-[15px] font-semibold leading-[1.2] tracking-[-0.02em] text-primary-token truncate'>
+        <h3 className='m-0 mb-2 truncate text-[14px] font-semibold leading-[1.25] text-primary-token'>
           {entity.label}
         </h3>
         {artistLink ? (
@@ -511,21 +504,21 @@ function EntityCard({ entity, onActivate }: EntityCardProps) {
                 label: artistLink,
               });
             }}
-            className='mb-2 inline-flex items-center text-[11.5px] text-tertiary-token hover:text-primary-token underline underline-offset-2 decoration-(--linear-app-shell-border) hover:decoration-current transition-colors duration-150 ease-out'
+            className='mb-2 inline-flex items-center text-[11.5px] text-tertiary-token hover:text-primary-token underline underline-offset-2 decoration-(--linear-app-shell-border) hover:decoration-current transition-colors duration-subtle ease-out'
           >
             {artistLink}
           </button>
         ) : null}
         {stats.length > 0 ? (
-          <div className='flex flex-wrap items-center text-[11.5px] leading-[1.5] tracking-[-0.002em] text-tertiary-token'>
+          <div className='flex flex-wrap items-center text-[11.5px] leading-[1.5] text-tertiary-token'>
             {stats.map((stat, i) => (
               <span
                 key={stat.key}
                 className={cn(
                   'relative inline-flex items-center whitespace-nowrap',
                   stat.emphasis === 'solid'
-                    ? 'ml-2 rounded-[3px] bg-white/10 px-[6px] py-px text-[9.5px] font-semibold uppercase tracking-[0.1em] text-primary-token'
-                    : 'px-[8px]',
+                    ? 'ml-1.5 rounded-[3px] border border-subtle bg-surface-1 px-1.5 py-px text-[9.5px] font-semibold uppercase tracking-[0.1em] text-primary-token'
+                    : 'px-1.5',
                   i === 0 && stat.emphasis !== 'solid' && 'pl-0',
                   i > 0 &&
                     stat.emphasis !== 'solid' &&
@@ -554,7 +547,7 @@ interface EntityPopoverProps {
   readonly onActivate?: (entity: EntityPopoverData) => void;
 }
 
-const POPOVER_WIDTH = 288;
+const POPOVER_WIDTH = 272;
 const POPOVER_MARGIN = 8;
 const SIDE_OFFSET = 6;
 
@@ -628,10 +621,10 @@ export function EntityPopover({
       }}
       className={cn(
         'z-[80]',
-        'rounded-xl border border-(--linear-app-shell-border)',
+        'rounded-lg border border-(--linear-app-shell-border)',
         'bg-(--linear-app-content-surface)/95 backdrop-blur-xl',
-        'shadow-[0_12px_40px_rgba(0,0,0,0.32)] p-3',
-        'animate-in fade-in-0 duration-150 ease-out',
+        'p-2.5 shadow-[0_12px_40px_rgba(0,0,0,0.32)]',
+        'animate-in fade-in-0 duration-subtle ease-out',
         pos?.side === 'left' ? 'slide-in-from-right-1' : 'slide-in-from-left-1'
       )}
     >
@@ -722,7 +715,7 @@ export function EntityHoverLink({
         // decoration — keeps entity-rich copy from reading as a wall of
         // dotted lines while still surfacing the affordance on intent.
         className={cn(
-          'inline-flex items-center hover:text-primary-token transition-colors duration-150 ease-out',
+          'inline-flex items-center hover:text-primary-token transition-colors duration-subtle ease-out',
           'no-underline hover:underline focus-visible:underline underline-offset-2',
           className
         )}

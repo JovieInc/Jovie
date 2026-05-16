@@ -5,6 +5,16 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.1] - 2026-05-15
+
+> [internal] Admin design-system polish: Title Case labels, no ALL-CAPS CSS transforms, and visible metric cards.
+
+### Fixed
+
+- **[internal] Admin KPI label casing**: LeadGtmInsights KpiItem titles corrected from ALL-CAPS to Title Case per design-system rules (JOV-2170).
+- **[internal] Admin uppercase CSS utility removed**: Dropped `uppercase tracking-[0.08em]` from GtmFunnel section sub-labels and TimActionRequiredSection issue identifier/priority badge, which were visually forcing Title Case strings to ALL-CAPS (JOV-2171).
+- **[internal] ContentMetricCard surface elevation**: Removed `bg-surface-0 shadow-none` override from ContentMetricCard usage in GrowthStatusPanel (4 cards) and CampaignSettingsPanel (1 card) — those cards sit inside a surface-1 parent and were invisible without a visible background and border (JOV-2172).
+
 ## [26.5.0] - 2026-05-15
 
 > Chat now uses the dark app-native composer across shell surfaces, with hardened focus, picker, attachment, and typed-entity states.
