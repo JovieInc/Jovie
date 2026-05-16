@@ -52,7 +52,7 @@ export function ArtworkThumb({
   return (
     <div
       className={cn(
-        'relative rounded-sm overflow-hidden shrink-0 bg-surface-1 grid place-items-center',
+        'relative grid shrink-0 place-items-center overflow-hidden rounded-md border border-subtle bg-surface-1',
         className
       )}
       style={{ height: size, width: size }}
@@ -64,7 +64,7 @@ export function ArtworkThumb({
           style={{ backgroundImage: `url(${src})` }}
         />
       ) : (
-        <span className='text-[10px] font-caption text-tertiary-token tracking-tight'>
+        <span className='text-[10px] font-caption text-tertiary-token'>
           {fallbackLetter}
         </span>
       )}
