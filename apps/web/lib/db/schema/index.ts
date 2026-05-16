@@ -23,7 +23,6 @@ export {
   selectAdminSystemSettingsSchema,
   selectCampaignSettingsSchema,
 } from './admin';
-
 // Analytics (Clicks, Audience, Tips, Blocks)
 export {
   type AudienceAction,
@@ -65,7 +64,6 @@ export {
   type Tip,
   tips,
 } from './analytics';
-
 // Audit (Ingest Audit Logs)
 export {
   type IngestAuditLog,
@@ -116,6 +114,49 @@ export {
   selectChatConversationSchema,
   selectChatMessageSchema,
 } from './chat';
+// AI Connectors (v1)
+export {
+  type AgentRun,
+  agentRuns,
+  type ConnectorAccount,
+  type ConnectorSyncState,
+  type ContextFact,
+  connectorAccounts,
+  connectorSyncStates,
+  contextFacts,
+  type ExternalObject,
+  externalObjects,
+  insertAgentRunSchema,
+  insertConnectorAccountSchema,
+  insertConnectorSyncStateSchema,
+  insertContextFactSchema,
+  insertExternalObjectSchema,
+  insertSuggestedActionSchema,
+  insertWebhookDeliverySchema,
+  insertWorkflowRunSchema,
+  type NewAgentRun,
+  type NewConnectorAccount,
+  type NewConnectorSyncState,
+  type NewContextFact,
+  type NewExternalObject,
+  type NewSuggestedAction,
+  type NewWebhookDelivery,
+  type NewWorkflowRun,
+  type SuggestedAction,
+  selectAgentRunSchema,
+  selectConnectorAccountSchema,
+  selectConnectorSyncStateSchema,
+  selectContextFactSchema,
+  selectExternalObjectSchema,
+  selectSuggestedActionSchema,
+  selectWebhookDeliverySchema,
+  selectWorkflowRunSchema,
+  suggestedActions,
+  type WebhookDelivery,
+  type WorkflowRun,
+  webhookDeliveries,
+  workflowRuns,
+} from './connectors';
 // Content (Providers, Releases, Recordings, Tracks)
 export {
   type Artist,
@@ -250,6 +291,7 @@ export {
 } from './email-engagement';
 // Enums
 export {
+  agentRunStatusEnum,
   artistRoleEnum,
   artistTypeEnum,
   audienceDeviceTypeEnum,
@@ -260,9 +302,12 @@ export {
   catalogScanStatusEnum,
   chatMessageRoleEnum,
   claimInviteStatusEnum,
+  connectorProviderEnum,
+  connectorStatusEnum,
   contactChannelEnum,
   contactRoleEnum,
   contentSlugTypeEnum,
+  contextFactKindEnum,
   creatorDistributionEventTypeEnum,
   creatorDistributionPlatformEnum,
   creatorTypeEnum,
@@ -319,6 +364,7 @@ export {
   socialSuggestionStatusEnum,
   subscriptionPlanEnum,
   subscriptionStatusEnum,
+  suggestedActionStatusEnum,
   suppressionReasonEnum,
   taskAgentStatusEnum,
   taskAssigneeKindEnum,
@@ -327,6 +373,8 @@ export {
   userStatusLifecycleEnum,
   waitlistInviteStatusEnum,
   waitlistStatusEnum,
+  webhookProviderEnum,
+  workflowRunStatusEnum,
 } from './enums';
 // Feedback
 export {

@@ -6,6 +6,14 @@ All schema files live in `apps/web/lib/db/schema/`. Import tables and types from
 
 ## Schema Files by Domain
 
+### AI Connectors (v1)
+
+| Schema File | Tables | Key Relations |
+|-------------|--------|---------------|
+| `connectors.ts` | `connectorAccounts`, `connectorSyncStates`, `externalObjects`, `webhookDeliveries`, `contextFacts`, `agentRuns`, `suggestedActions`, `workflowRuns` | `connectorAccounts.userId` → `users`; `connectorSyncStates.connectorAccountId` → `connectorAccounts`; `contextFacts.userId` → `users`; `suggestedActions.agentRunId` → `agentRuns` |
+
+Token read/write must go through `apps/web/lib/connectors/token-vault.ts` — never write `encryptedAccessToken`/`encryptedRefreshToken` directly.
+
 ### Identity & Access
 
 | Schema File | Tables | Key Relations |
