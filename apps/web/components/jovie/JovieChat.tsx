@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAppFlag } from '@/lib/flags/client';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
 
+import { CHAT_COMPOSER_DOCK_CLASSNAME } from './chat-layout';
 import {
   ChatInput,
   ChatMessage,
@@ -387,11 +388,11 @@ export function JovieChat({
     getFirstNameForGreeting(displayName) ?? getFirstNameForGreeting(username);
   let emptyStateHeading: string;
   if (isFirstSession) {
-    emptyStateHeading = 'Welcome to Jovie';
+    emptyStateHeading = "Hey, I'm Jovie";
   } else if (greetingName) {
-    emptyStateHeading = `Welcome Back ${greetingName}`;
+    emptyStateHeading = `Welcome back, ${greetingName}`;
   } else {
-    emptyStateHeading = 'Welcome Back';
+    emptyStateHeading = 'Welcome back';
   }
 
   return (
@@ -423,16 +424,18 @@ export function JovieChat({
           {isDragOver && (
             <motion.div
               data-testid='chat-attachment-dropzone'
-              className='absolute inset-0 z-50 flex items-center justify-center rounded-[var(--linear-app-shell-radius)] border border-dashed border-white/22 bg-black/58 p-6 backdrop-blur-md'
-              initial={{ opacity: 0, scale: 0.995 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.995 }}
+              className='absolute inset-0 z-50 flex items-center justify-center rounded-[var(--linear-app-shell-radius)] border border-dashed border-(--linear-app-frame-seam) bg-[linear-gradient(180deg,color-mix(in_oklab,var(--linear-app-content-surface)_82%,black),color-mix(in_oklab,var(--linear-app-content-surface)_70%,black))] p-6 backdrop-blur-md'
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
             >
-              <div className='flex min-h-40 w-full max-w-sm flex-col items-center justify-center gap-3 rounded-2xl border border-white/[0.1] bg-[linear-gradient(180deg,rgba(255,255,255,0.07),rgba(255,255,255,0.03)),#17181d] px-6 py-8 text-center shadow-[0_24px_80px_-32px_rgba(0,0,0,0.95)]'>
-                <span className='flex h-11 w-11 items-center justify-center rounded-full bg-white text-black shadow-[0_8px_24px_-12px_rgba(0,0,0,0.9)]'>
-                  <ImagePlus className='h-5 w-5' />
-                </span>
+              <div className='flex min-h-40 w-full max-w-sm flex-col items-center justify-center gap-3 rounded-xl border border-(--linear-app-frame-seam) bg-surface-1 px-6 py-8 text-center shadow-[0_24px_80px_-32px_rgba(0,0,0,0.95)]'>
+                <ImagePlus
+                  className='h-7 w-7 text-secondary-token'
+                  aria-hidden='true'
+                  strokeWidth={2.25}
+                />
                 <div>
                   <p className='text-sm font-semibold tracking-[-0.01em] text-primary-token'>
                     Drop images to attach
@@ -553,7 +556,7 @@ export function JovieChat({
             mounted. Now each alert opts in to its own bottom margin and is
             unmounted entirely when empty.
           */}
-            <div className='shrink-0 bg-(--linear-app-content-surface) px-4 pb-4 pt-2 sm:px-5 sm:pb-5 sm:pt-2.5'>
+            <div className={CHAT_COMPOSER_DOCK_CLASSNAME}>
               <div className='mx-auto w-full max-w-[45rem]'>
                 {/* Transient alerts stack above the input. Each contributes its
                   own bottom margin only when rendered, so toggling them does
@@ -659,7 +662,7 @@ export function JovieChat({
               </div>
             </div>
 
-            <div className='shrink-0 bg-(--linear-app-content-surface) px-4 pb-4 pt-2 sm:px-5 sm:pb-5 sm:pt-2.5'>
+            <div className={CHAT_COMPOSER_DOCK_CLASSNAME}>
               <div className='mx-auto w-full max-w-[45rem]'>
                 <ChatUsageAlert />
 
