@@ -112,6 +112,10 @@ export { CLERK_KEY_STATUS_HEADER } from '@/lib/auth/clerk-key-status';
  *
  * Falls back to hostname-based resolution for environments running without
  * the middleware (e.g., direct Node.js server, some test setups).
+ *
+ * NOTE: Calls headers() which opts the page into dynamic rendering.
+ * Use resolvePublishableKeyStaticFirst() for layouts that should remain static
+ * on production (e.g., parallel slot layouts that render on marketing routes).
  */
 export async function resolvePublishableKeyFromHeaders(): Promise<
   string | undefined
@@ -128,4 +132,42 @@ export async function resolvePublishableKeyFromHeaders(): Promise<
     return keys.publishableKey;
   }
   return undefined;
+}
+
+/**
+ * Resolve the publishable key without calling headers() on production.
+ *
+ * On production (VERCEL_ENV === 'production'), the build-time
+ * NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is the correct key — no per-request
+ * header read required. Returns the key without opting the page into
+ * dynamic rendering, preserving static ISR caching for marketing routes.
+ *
+ * On staging/preview/local (VERCEL_ENV !== 'production'), falls back to
+ * resolvePublishableKeyFromHeaders() which reads the x-clerk-publishable-key
+ * header set by middleware. Staging is inherently dynamic so calling headers()
+ * there is acceptable.
+ *
+ * Use this in parallel-slot layouts (e.g., @auth/layout.tsx) that mount on
+ * every route including marketing pages. Using resolvePublishableKeyFromHeaders()
+ * in those layouts forces ALL routes — including static marketing pages — into
+ * dynamic rendering, emitting per-request nonce headers that violate the
+ * static-marketing rule (.claude/rules/ui.md).
+ */
+export async function resolvePublishableKeyStaticFirst(): Promise<
+  string | undefined
+> {
+  // On production the build-time key is always correct. Avoid calling headers()
+  // so the caller (e.g., @auth slot layout) does not opt marketing routes into
+  // dynamic rendering.
+  if (process.env.VERCEL_ENV === 'production') {
+    const pk = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+    if (pk && process.env.CLERK_SECRET_KEY) return pk;
+    // No valid key pair — Clerk unavailable on production. Caller will show
+    // AuthUnavailableCard without opting into dynamic rendering.
+    return undefined;
+  }
+
+  // Staging, preview, and local: fall back to the per-request header so the
+  // correct environment-specific Clerk instance is used.
+  return resolvePublishableKeyFromHeaders();
 }
