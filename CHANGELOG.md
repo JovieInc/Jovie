@@ -5,6 +5,24 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.6] - 2026-05-16
+
+> Connect Gmail and Google Calendar to your Jovie account. Once connected, Jovie scans your inbox for confirmed booking emails and proposes calendar events — all reviewable before anything is added.
+
+### Added
+
+- **Gmail + Google Calendar OAuth connector**: Connect your Google accounts from Settings → Connectors. The OAuth flow requests read-only Gmail and Calendar access, stores encrypted tokens, and shows connection status with the connected email address.
+- **AI booking extractor**: New `extractEventSignal` function uses Claude to identify confirmed DJ booking emails from your inbox and extract event details (title, venue, city, dates, confidence score). Prompt-injection defense and Zod-validated structured output prevent malformed data from reaching the UI.
+- **Suggested actions UI**: Extracted events surface as pending action cards on the Connectors settings page. Each card shows event title, dates, venue, rationale, and the source email subject — ready to accept or dismiss.
+- **Token vault**: Encrypted storage layer (`token-vault.ts`) for OAuth access and refresh tokens using AES-256-GCM, with automatic refresh-if-expired logic.
+- **Admin agent runs page**: New `/app/admin/agent-runs/[id]` page for inspecting AI extraction runs, including prompt, token usage, cost, and status.
+- **Dev fixtures**: Dev-only seed endpoint (`/api/dev/connectors/seed-fixtures`) populates mock Gmail and Calendar accounts with realistic booking email fixtures so the extraction pipeline can be tested without real OAuth credentials.
+
+### Fixed
+
+- **[internal] Connector routes use `getCachedAuth()` instead of `auth()` directly**: All connector API routes and the settings page now use the canonical `getCachedAuth()` helper, which supports the dev test-auth bypass. Direct `auth()` calls were crashing the settings page and all connector API routes in the dev environment.
+- **[internal] Static `node:crypto` import in `extract-event-signal.ts`**: Replaced dynamic `require('node:crypto')` inside `buildDigest()` with a static top-level import. The file has `import 'server-only'` making the original edge-runtime concern moot.
+
 ## [26.5.5] - 2026-05-16
 
 > Rich chips in chat now render cleanly on the white user bubble, lift artwork from cached release data, and reveal a richer preview on hover. Image attachments use the same chip language, so a message with a release reference and a dragged-in image reads as one coherent strip.
