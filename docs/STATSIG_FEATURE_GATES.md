@@ -23,6 +23,7 @@ experiments used by the web app.
 | `stripe-connect-enabled` | `LEGACY_STATSIG_GATE_KEYS.STRIPE_CONNECT_ENABLED` | `false` | Stripe Connect payouts (settings + payment routes) | Active |
 | `chat_jank_monitor` | `LEGACY_STATSIG_GATE_KEYS.CHAT_JANK_MONITOR` | `false` | Chat jank instrumentation (message continuity + streaming) | Active |
 | `design_v1` | `LEGACY_STATSIG_GATE_KEYS.DESIGN_V1` | `false` | Unified Design V1 rollout for shell, releases, tasks, chat entities, lyrics, library, auth, and onboarding app flags | Active |
+| `ai_connectors_beta` | `LEGACY_STATSIG_GATE_KEYS.AI_CONNECTORS_BETA` | `false` | AI Connector v1 closed beta — Gmail booking email → Google Calendar event flow | Active |
 | `ai_chat_disabled` | `CHAT_KILL_SWITCH_GATES.DISABLED` | `false` | Emergency kill switch for `/api/chat` | Active |
 | `ai_chat_force_light` | `CHAT_KILL_SWITCH_GATES.FORCE_LIGHT` | `false` | Runtime switch to route `/api/chat` to the lighter model | Active |
 
