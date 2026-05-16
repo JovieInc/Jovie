@@ -32,6 +32,13 @@ describe('dropDateMeta', () => {
     });
   });
 
+  it('formats past beyond a year as Ny ago with past tone', () => {
+    expect(dropDateMeta('2024-04-19T12:00:00Z', NOW)).toEqual({
+      label: '2y ago',
+      tone: 'past',
+    });
+  });
+
   it('formats inside-a-week future as Drops in Nd with soon tone', () => {
     expect(dropDateMeta('2026-04-30T12:00:00Z', NOW)).toEqual({
       label: 'Drops in 5d',

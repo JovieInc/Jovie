@@ -1,5 +1,6 @@
 'use client';
 
+import { Disc3 } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -11,7 +12,7 @@ import { cn } from '@/lib/utils';
  * without attaching `onError` to a rendered `<img>` (sidesteps Next's
  * `@next/next/no-img-element` rule — we never render an `<img>`). On success
  * the source paints as a CSS background; on failure or while loading we render
- * deterministic abstract art instead of letter tiles that look like missing
+ * a deterministic cover tile instead of letter tiles that look like missing
  * album assets in recording frames.
  *
  * Pure leaf — owns no app state. Caller controls `src`, `title`, `size`.
@@ -29,18 +30,24 @@ function hashTitle(title: string): number {
   return hash;
 }
 
-function getFallbackStyle(title: string): CSSProperties {
+function getFallbackSurfaceStyle(title: string): CSSProperties {
   const hash = hashTitle(title);
   const hue = (hash * 47) % 360;
-  const accentHue = (hue + 34 + (hash % 56)) % 360;
   const depthHue = (hue + 210) % 360;
 
   return {
     background: [
-      `radial-gradient(circle at 28% 24%, oklch(0.78 0.12 ${accentHue}) 0 13%, transparent 34%)`,
-      `radial-gradient(circle at 72% 78%, oklch(0.5 0.11 ${depthHue}) 0 16%, transparent 39%)`,
-      `linear-gradient(${128 + (hash % 42)}deg, oklch(0.24 0.075 ${hue}), oklch(0.16 0.04 ${depthHue}) 62%, oklch(0.32 0.09 ${accentHue}))`,
+      `linear-gradient(${132 + (hash % 36)}deg, oklch(0.23 0.045 ${hue}), oklch(0.12 0.022 ${depthHue}) 62%, oklch(0.18 0.036 ${hue}))`,
+      'repeating-linear-gradient(90deg, rgba(255,255,255,0.028) 0 1px, transparent 1px 7px)',
     ].join(', '),
+  };
+}
+
+function getFallbackAccentStyle(title: string): CSSProperties {
+  const hash = hashTitle(title);
+  const hue = (hash * 47 + 28) % 360;
+  return {
+    background: `linear-gradient(90deg, oklch(0.72 0.12 ${hue}), oklch(0.55 0.1 ${(hue + 42) % 360}))`,
   };
 }
 
@@ -99,11 +106,22 @@ export function ArtworkThumb({
             aria-hidden='true'
             className='absolute inset-0'
             data-artwork-fallback='true'
-            style={getFallbackStyle(title)}
+            style={getFallbackSurfaceStyle(title)}
           />
           <span
             aria-hidden='true'
-            className='absolute inset-[1px] rounded-[3px] border border-white/10 bg-white/5'
+            className='absolute inset-0 grid place-items-center text-white/25'
+          >
+            <Disc3 className='h-[42%] w-[42%]' strokeWidth={1.85} />
+          </span>
+          <span
+            aria-hidden='true'
+            className='absolute inset-x-0 bottom-0 h-1'
+            style={getFallbackAccentStyle(title)}
+          />
+          <span
+            aria-hidden='true'
+            className='absolute inset-[1px] rounded-[3px] border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
           />
         </>
       )}
