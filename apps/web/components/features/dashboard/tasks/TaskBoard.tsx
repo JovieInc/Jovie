@@ -20,7 +20,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { UserAvatar } from '@jovie/ui';
-import { Disc3, MoreVertical, Plus } from 'lucide-react';
+import { Disc3, MoreHorizontal, Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import { ReleaseDueBadge } from '@/components/molecules/ReleaseDueBadge';
@@ -469,7 +469,7 @@ function SortableTaskBoardCard({
             aria-label='Open task actions'
             className='inline-flex h-7 w-7 items-center justify-center rounded-md text-tertiary-token opacity-0 transition-[background-color,color,opacity] hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_68%,transparent)] hover:text-primary-token focus-visible:opacity-100 focus-visible:outline-none focus-visible:bg-[color-mix(in_oklab,var(--linear-row-hover)_70%,transparent)] group-hover/task-board-card-shell:opacity-100'
           >
-            <MoreVertical className='h-3.5 w-3.5' />
+            <MoreHorizontal className='h-3.5 w-3.5' />
           </button>
         </TableActionMenu>
       </div>
