@@ -67,6 +67,9 @@ vi.mock('@/components/features/dashboard/release-tasks', () => ({
       {releaseId}:{releaseTitle}
     </div>
   ),
+  ReleaseTaskPageSkeleton: () => (
+    <div data-testid='release-task-page-skeleton'>Loading tasks</div>
+  ),
 }));
 
 vi.mock(
