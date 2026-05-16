@@ -8,7 +8,7 @@
  * @smoke
  */
 
-import { expect, type Page, test } from '@playwright/test';
+import { expect, type Locator, type Page, test } from '@playwright/test';
 import { APP_FLAG_OVERRIDE_KEYS } from '@/lib/flags/contracts';
 import {
   APP_FLAG_OVERRIDES_COOKIE,
@@ -60,12 +60,18 @@ async function forceDesignV1(page: Page) {
   );
 }
 
-function shellChatFrameLocators(page: Page) {
-  const shellFrame = page.locator('[data-shell-design="shellChatV1"]').filter({
-    has: page.locator(
-      '[data-testid="app-shell-scroll"] [data-testid="chat-content"]'
-    ),
-  });
+type ShellChatLocators = {
+  chatContent: Locator;
+  composer: Locator;
+  input: Locator;
+  shellFrame: Locator;
+  shellScroll: Locator;
+};
+
+function shellChatFrameLocators(page: Page): ShellChatLocators {
+  const shellFrame = page.locator(
+    '[data-shell-design="shellChatV1"]:has([data-testid="app-shell-scroll"] [data-testid="chat-content"])'
+  );
   const shellScroll = shellFrame.locator('[data-testid="app-shell-scroll"]');
   const chatContent = shellScroll.locator('[data-testid="chat-content"]');
   const composer = chatContent.locator('[data-testid="chat-composer-surface"]');
