@@ -1,5 +1,10 @@
 import { expect, test } from '@playwright/test';
 import sharp from 'sharp';
+import { waitForHydration } from './utils/smoke-test-utils';
+
+const BEST_EFFORT_EXTERNAL_RESOURCE_TYPES = new Set(['font', 'image', 'media']);
+const BEST_EFFORT_EXTERNAL_ASSET_EXTENSIONS =
+  /\.(?:avif|gif|jpe?g|mov|mp4|otf|png|svg|ttf|webm|webp|woff2?)(?:$|\?)/iu;
 
 type PosterStats =
   | {
@@ -12,6 +17,70 @@ type PosterStats =
       readonly status: 'unavailable';
     };
 
+function isExternalUrl({
+  pageUrl,
+  url,
+}: {
+  readonly pageUrl: string;
+  readonly url: string;
+}) {
+  try {
+    const requestUrl = new URL(url);
+    const currentPageUrl = new URL(pageUrl);
+    if (
+      !['http:', 'https:'].includes(currentPageUrl.protocol) ||
+      currentPageUrl.origin === 'null'
+    ) {
+      return false;
+    }
+
+    return requestUrl.origin !== currentPageUrl.origin;
+  } catch {
+    return false;
+  }
+}
+
+function isBestEffortExternalAssetFailure({
+  pageUrl,
+  resourceType,
+  url,
+}: {
+  readonly pageUrl: string;
+  readonly resourceType: string;
+  readonly url: string;
+}) {
+  if (!BEST_EFFORT_EXTERNAL_RESOURCE_TYPES.has(resourceType)) {
+    return false;
+  }
+
+  return isExternalUrl({ pageUrl, url });
+}
+
+function isBestEffortExternalAssetConsoleError({
+  pageUrl,
+  text,
+  url,
+}: {
+  readonly pageUrl: string;
+  readonly text: string;
+  readonly url: string;
+}) {
+  if (!text.toLowerCase().includes('failed to load resource')) {
+    return false;
+  }
+
+  try {
+    const requestUrl = new URL(url);
+    return (
+      isExternalUrl({ pageUrl, url }) &&
+      (BEST_EFFORT_EXTERNAL_ASSET_EXTENSIONS.test(requestUrl.pathname) ||
+        requestUrl.hostname.includes('cdn'))
+    );
+  } catch {
+    return false;
+  }
+}
+
 test.use({
   storageState: { cookies: [], origins: [] },
   viewport: { width: 1280, height: 900 },
@@ -23,20 +92,56 @@ test('demovideo renders a stable non-empty initial visual', async ({
   const consoleErrors: string[] = [];
   const failedRequests: string[] = [];
   const failedResponses: string[] = [];
+  const bestEffortExternalFailures: string[] = [];
 
   page.on('console', message => {
     if (message.type() === 'error') {
+      if (
+        isBestEffortExternalAssetConsoleError({
+          pageUrl: page.url(),
+          text: message.text(),
+          url: message.location().url,
+        })
+      ) {
+        bestEffortExternalFailures.push(
+          `console ${message.location().url} ${message.text()}`
+        );
+        return;
+      }
+
       consoleErrors.push(message.text());
     }
   });
   page.on('requestfailed', request => {
-    failedRequests.push(
-      `${request.method()} ${request.url()} ${request.failure()?.errorText ?? ''}`
-    );
+    const failure = `${request.method()} ${request.url()} ${request.failure()?.errorText ?? ''}`;
+    if (
+      isBestEffortExternalAssetFailure({
+        pageUrl: page.url(),
+        resourceType: request.resourceType(),
+        url: request.url(),
+      })
+    ) {
+      bestEffortExternalFailures.push(failure);
+      return;
+    }
+
+    failedRequests.push(failure);
   });
   page.on('response', response => {
     if (response.status() >= 400) {
-      failedResponses.push(`${response.status()} ${response.url()}`);
+      const failure = `${response.status()} ${response.url()}`;
+      if (
+        isBestEffortExternalAssetFailure({
+          pageUrl: page.url(),
+          resourceType: response.request().resourceType(),
+          url: response.url(),
+        })
+      ) {
+        bestEffortExternalFailures.push(failure);
+        return;
+      }
+
+      failedResponses.push(failure);
     }
   });
 
@@ -44,6 +149,7 @@ test('demovideo renders a stable non-empty initial visual', async ({
     waitUntil: 'domcontentloaded',
     timeout: 60_000,
   });
+  await waitForHydration(page);
 
   await expect(page.getByTestId('demo-video-page')).toBeVisible();
   await expect(page.getByTestId('dev-toolbar')).toHaveCount(0);
@@ -165,6 +271,12 @@ test('demovideo renders a stable non-empty initial visual', async ({
   const screenshotStats = await sharp(screenshot).greyscale().stats();
   expect(screenshotStats.channels[0].max).toBeGreaterThan(120);
   expect(screenshotStats.channels[0].stdev).toBeGreaterThan(5);
+
+  if (bestEffortExternalFailures.length > 0) {
+    console.warn('[demo-video] Ignored external asset failures', {
+      failures: bestEffortExternalFailures,
+    });
+  }
 
   expect(consoleErrors).toEqual([]);
   expect(failedRequests).toEqual([]);
