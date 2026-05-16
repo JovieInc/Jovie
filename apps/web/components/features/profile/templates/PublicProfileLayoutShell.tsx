@@ -74,14 +74,7 @@ export function PublicProfileLayoutShell({
             className='public-profile-layout-desktop-shell'
             data-testid='profile-desktop-shell'
           >
-            {isDesktopLayout ? (
-              desktopSurface
-            ) : (
-              <div
-                className='public-profile-layout-desktop-placeholder'
-                data-testid='profile-desktop-surface-reserved'
-              />
-            )}
+            {desktopSurface}
           </div>
           <div className='public-profile-layout-compact-slot'>
             {compactSurface}
