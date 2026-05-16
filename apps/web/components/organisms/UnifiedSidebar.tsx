@@ -36,6 +36,7 @@ import { InstallBanner } from '@/components/shell/InstallBanner';
 import { Tooltip } from '@/components/shell/Tooltip';
 import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
+import { useShellSidebarOverride } from '@/contexts/ShellSidebarOverrideContext';
 import { DashboardNav } from '@/features/dashboard/dashboard-nav';
 import {
   adminSettingsNavItem,
@@ -61,7 +62,7 @@ import { ProfileSwitcher } from './ProfileSwitcher';
 import { SidebarBottomNowPlayingBridge } from './SidebarBottomNowPlayingBridge';
 
 export interface UnifiedSidebarProps {
-  readonly section: 'admin' | 'dashboard' | 'settings';
+  readonly section: 'admin' | 'dashboard' | 'library' | 'settings';
 }
 
 const VERSION_DISMISSAL_KEY = 'jovie-version-update-dismissed';
@@ -239,19 +240,23 @@ function SidebarDockButton() {
 
 /** Workspace button (logo + name) or back button for settings */
 function SidebarHeaderNav({
-  isInSettings,
+  isRouteSidebar,
   isAdmin,
   isDashboardOrAdmin,
   profileHref,
   hasMultipleProfiles,
   isDemoRoute,
+  routeBackHref = APP_ROUTES.DASHBOARD,
+  routeBackLabel = 'Back to App',
 }: Readonly<{
-  isInSettings: boolean;
+  isRouteSidebar: boolean;
   isAdmin: boolean;
   isDashboardOrAdmin: boolean;
   profileHref: string | undefined;
   hasMultipleProfiles: boolean;
   isDemoRoute: boolean;
+  routeBackHref?: string;
+  routeBackLabel?: string;
 }>) {
   const shellChatV1Enabled = useAppFlag('DESIGN_V1');
   const legacyNewThreadLink = (
@@ -267,12 +272,12 @@ function SidebarHeaderNav({
   return (
     <div className='flex w-full items-center'>
       {(() => {
-        if (isInSettings) {
+        if (isRouteSidebar) {
           return (
             <div className='flex w-full items-center gap-2'>
               <Link
-                href={APP_ROUTES.DASHBOARD}
-                aria-label='Back to App'
+                href={routeBackHref}
+                aria-label={routeBackLabel}
                 className={cn(
                   'inline-flex h-6 shrink-0 items-center gap-1 rounded-lg px-2 text-xs text-sidebar-item-foreground transition-[background,border-color,color] duration-normal ease-interactive hover:bg-sidebar-accent/55 hover:text-sidebar-item-foreground focus-visible:outline-none focus-visible:bg-sidebar-accent/55 focus-visible:text-sidebar-item-foreground [font-weight:var(--font-weight-nav)]',
                   'group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0'
@@ -283,7 +288,7 @@ function SidebarHeaderNav({
                   aria-hidden='true'
                 />
                 <span className='truncate group-data-[collapsible=icon]:hidden'>
-                  Back to App
+                  {routeBackLabel}
                 </span>
               </Link>
             </div>
@@ -344,7 +349,7 @@ function SidebarHeaderNav({
         );
       })()}
 
-      {!isInSettings &&
+      {!isRouteSidebar &&
         isDashboardOrAdmin &&
         (shellChatV1Enabled ? (
           <div className='ml-auto flex items-center group-data-[collapsible=icon]:hidden'>
@@ -446,11 +451,14 @@ function ShellSidebarInstallBanner() {
 export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
   const { isAdmin: isUserAdmin, creatorProfiles } = useDashboardData();
   const shellChatV1Enabled = useAppFlag('DESIGN_V1');
+  const sidebarOverride = useShellSidebarOverride();
   const pathname = usePathname();
   const isDemoRoute = isDemoRoutePath(pathname);
   const isInSettings = section === 'settings';
   const isAdmin = section === 'admin';
-  const isDashboardOrAdmin = section !== 'settings';
+  const isInLibrary = section === 'library';
+  const isRouteSidebar = isInSettings || isInLibrary;
+  const isDashboardOrAdmin = section === 'dashboard' || section === 'admin';
   const hasMultipleProfiles = creatorProfiles.length >= 2;
 
   const { profileHref } = useProfileData(isDashboardOrAdmin);
@@ -473,28 +481,36 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         )}
       >
         <SidebarHeaderNav
-          isInSettings={isInSettings}
+          isRouteSidebar={isRouteSidebar}
           isAdmin={isAdmin}
           isDashboardOrAdmin={isDashboardOrAdmin}
           profileHref={profileHref}
           hasMultipleProfiles={hasMultipleProfiles}
           isDemoRoute={isDemoRoute}
+          routeBackHref={sidebarOverride?.backHref}
+          routeBackLabel={sidebarOverride?.backLabel}
         />
       </SidebarHeader>
 
       <SidebarContent className='min-h-0 flex-1 px-2.5 pb-2.5 pt-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
         <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-1'>
           <SidebarGroupContent className='flex-1'>
-            {isDashboardOrAdmin ? (
-              <DashboardNav />
-            ) : (
+            {isInSettings ? (
               <SettingsNavigation pathname={pathname} section={section} />
+            ) : isInLibrary ? (
+              (sidebarOverride?.content ?? (
+                <div className='px-2.5 py-2 text-xs text-sidebar-muted'>
+                  Loading Library
+                </div>
+              ))
+            ) : (
+              <DashboardNav />
             )}
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
 
-      {isInSettings ? null : (
+      {isRouteSidebar ? null : (
         <div className='mt-auto shrink-0'>
           <SidebarBottomNowPlayingBridge />
           {isDemoRoute ? null : <SidebarUpgradeBanner />}

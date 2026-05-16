@@ -67,6 +67,16 @@ describe('library data', () => {
         ],
         hasLyrics: true,
         hasArtwork: true,
+        hasVideoLinks: false,
+        assetKinds: ['artwork', 'preview', 'lyrics', 'providers'],
+        genres: [],
+        spotifyPopularity: null,
+        targetPlaylistCount: 0,
+        isExplicit: false,
+        label: null,
+        upc: null,
+        distributor: null,
+        totalDurationMs: null,
       },
     ]);
   });
@@ -96,6 +106,7 @@ describe('library data', () => {
       providerCount: 0,
       providers: [],
       hasArtwork: false,
+      assetKinds: [],
     });
   });
 
