@@ -8,6 +8,8 @@ import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchS
 import { APP_ROUTES } from '@/constants/routes';
 import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 
+Element.prototype.scrollIntoView = vi.fn();
+
 vi.mock('next/image', () => ({
   default: (
     props: ComponentProps<'img'> & { readonly unoptimized?: boolean }
@@ -149,8 +151,28 @@ describe('LibrarySurface', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'List view' }));
 
+    expect(screen.getByRole('table')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('library-release-row-release-1')
+    ).toBeInTheDocument();
     expect(screen.getByText('Never Say A Word')).toBeInTheDocument();
     expect(screen.getByText('Take Me Over')).toBeInTheDocument();
+  });
+
+  it('opens the read-only asset drawer from list rows', () => {
+    renderLibrary([buildAsset()]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'List view' }));
+    fireEvent.click(screen.getByTestId('library-release-row-release-1'));
+
+    expect(screen.getByTestId('library-asset-drawer')).toHaveAttribute(
+      'aria-hidden',
+      'false'
+    );
+    expect(screen.getByRole('link', { name: /Open Release/u })).toHaveAttribute(
+      'href',
+      '/tim/take-me-over'
+    );
   });
 
   it('filters release assets from the shell header search contract', () => {

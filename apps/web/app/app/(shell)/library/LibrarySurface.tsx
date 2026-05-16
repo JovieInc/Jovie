@@ -51,6 +51,7 @@ import {
   getArtworkFallbackAccentStyle,
   getArtworkFallbackSurfaceStyle,
 } from '@/lib/artwork-fallback';
+import { SKELETON_ROW_COUNT } from '@/lib/constants/layout';
 import { cn } from '@/lib/utils';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
 import {
@@ -60,16 +61,7 @@ import {
   type LibraryReleaseAsset,
 } from './library-data';
 
-const LIBRARY_LOADING_PLACEHOLDERS = [
-  'library-loading-release-1',
-  'library-loading-release-2',
-  'library-loading-release-3',
-  'library-loading-release-4',
-  'library-loading-release-5',
-  'library-loading-release-6',
-] as const;
-
-const LIBRARY_TABLE_ROW_HEIGHT = 58;
+const LIBRARY_TABLE_ROW_HEIGHT = 56;
 const LIBRARY_TABLE_MIN_WIDTH = '0';
 
 const LIBRARY_TABLE_SKELETON_CONFIG: Array<{
@@ -490,7 +482,7 @@ export function LibraryLoadingState() {
         hideHeader
         rowHeight={LIBRARY_TABLE_ROW_HEIGHT}
         minWidth={LIBRARY_TABLE_MIN_WIDTH}
-        skeletonRows={LIBRARY_LOADING_PLACEHOLDERS.length}
+        skeletonRows={SKELETON_ROW_COUNT.TABLE}
         skeletonColumnConfig={LIBRARY_TABLE_SKELETON_CONFIG}
         containerClassName='h-full px-2.5 pb-2.5 pt-1'
       />
@@ -975,7 +967,7 @@ function AssetGrid({
   );
 }
 
-function AssetList({
+function LibraryDataTable({
   assets,
   selectedId,
   onSelect,
@@ -984,7 +976,12 @@ function AssetList({
   readonly selectedId: string | null;
   readonly onSelect: (id: string) => void;
 }) {
+  const tableData = useMemo(() => [...assets], [assets]);
   const getRowId = useMemo(() => (asset: LibraryReleaseAsset) => asset.id, []);
+  const getRowTestId = useMemo(
+    () => (asset: LibraryReleaseAsset) => `library-release-row-${asset.id}`,
+    []
+  );
   const getRowClassName = useMemo(
     () => (asset: LibraryReleaseAsset) =>
       cn(
@@ -997,10 +994,11 @@ function AssetList({
 
   return (
     <UnifiedTable<LibraryReleaseAsset>
-      data={[...assets]}
+      data={tableData}
       columns={LIBRARY_TABLE_COLUMNS}
       onRowClick={asset => onSelect(asset.id)}
       getRowId={getRowId}
+      getRowTestId={getRowTestId}
       getRowClassName={getRowClassName}
       enableVirtualization={assets.length >= 20}
       rowHeight={LIBRARY_TABLE_ROW_HEIGHT}
@@ -1008,7 +1006,7 @@ function AssetList({
       hideHeader
       className='text-app text-primary-token'
       containerClassName='h-full px-2.5 pb-2.5 pt-1'
-      skeletonRows={LIBRARY_LOADING_PLACEHOLDERS.length}
+      skeletonRows={SKELETON_ROW_COUNT.TABLE}
       skeletonColumnConfig={LIBRARY_TABLE_SKELETON_CONFIG}
     />
   );
@@ -1450,7 +1448,7 @@ export function LibrarySurface({
               onSelect={openAsset}
             />
           ) : (
-            <AssetList
+            <LibraryDataTable
               assets={visibleAssets}
               selectedId={selectedId}
               onSelect={openAsset}
