@@ -7,11 +7,13 @@ import type { TaskBoardResult, TaskStatus, TaskView } from '@/lib/tasks/types';
 const {
   mockRegisterRightPanel,
   mockUseAppFlag,
+  mockUseReleaseEntityQuery,
   mockUseTaskBoardQuery,
   mockUseTasksQuery,
 } = vi.hoisted(() => ({
   mockRegisterRightPanel: vi.fn(),
   mockUseAppFlag: vi.fn(),
+  mockUseReleaseEntityQuery: vi.fn(),
   mockUseTaskBoardQuery: vi.fn(),
   mockUseTasksQuery: vi.fn(),
 }));
@@ -285,10 +287,17 @@ vi.mock('@/components/organisms/table/utils/useViewMode', () => ({
   }),
 }));
 
-vi.mock('@/lib/queries/useReleasesQuery', () => ({
-  useReleasesQuery: () => ({
-    data: [{ id: 'release-1', title: 'QA Release' }],
-  }),
+vi.mock('@/lib/queries/useReleaseEntityQuery', () => ({
+  useReleaseEntityQuery: (profileId: string, releaseId: string) => {
+    mockUseReleaseEntityQuery(profileId, releaseId);
+
+    return {
+      data: releaseId ? { id: releaseId, title: 'QA Release' } : null,
+      isError: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    };
+  },
 }));
 
 vi.mock('@/lib/queries/useTasksQuery', () => ({
@@ -548,6 +557,7 @@ describe('TasksPageClient', () => {
     mockSetViewMode.mockClear();
     mockSetHeaderActions.mockReset();
     mockRegisterRightPanel.mockReset();
+    mockUseReleaseEntityQuery.mockClear();
     mockUseTaskBoardQuery.mockClear();
     mockUseTasksQuery.mockClear();
     mockUseAppFlag.mockReturnValue(false);
@@ -572,6 +582,17 @@ describe('TasksPageClient', () => {
     expect(screen.queryByText('All Statuses')).not.toBeInTheDocument();
     expect(screen.queryByText('All Priorities')).not.toBeInTheDocument();
     expect(screen.queryByText('All Assignees')).not.toBeInTheDocument();
+  });
+
+  it('keeps release detail loading disabled until a release context is opened', () => {
+    renderPage();
+
+    expect(mockUseReleaseEntityQuery).toHaveBeenCalledWith('profile-1', '');
+    expect(
+      mockUseReleaseEntityQuery.mock.calls.some(
+        ([, releaseId]) => releaseId === 'release-1'
+      )
+    ).toBe(false);
   });
 
   it('renders the board workspace when board mode is active', () => {
@@ -788,6 +809,10 @@ describe('TasksPageClient', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'QA Release' }));
 
+    expect(mockUseReleaseEntityQuery).toHaveBeenLastCalledWith(
+      'profile-1',
+      'release-1'
+    );
     expect(screen.getByTestId('task-document-pane')).toHaveClass('hidden');
     expect(screen.getByTestId('tasks-table')).toBeInTheDocument();
   });
@@ -797,6 +822,10 @@ describe('TasksPageClient', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'QA Release' }));
 
+    expect(mockUseReleaseEntityQuery).toHaveBeenLastCalledWith(
+      'profile-1',
+      'release-1'
+    );
     expect(mockRegisterRightPanel).toHaveBeenLastCalledWith(
       expect.objectContaining({
         type: expect.any(Function),
