@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.3] - 2026-05-15
+
+> [internal] Security: fix middleware matcher dot-escape bug that allowed WordPress scanner paths to bypass auth middleware.
+
+### Fixed
+
+- **[internal] Middleware matcher dot-escape (JOV-2236)**: Dots inside the `proxy.ts` matcher pattern were single-escaped (`\.`) which a JS string silently strips to a bare `.` (any-character wildcard). Paths like `/wp-json`, `/wp-json/wp/v2/users`, and `/a-css/foo` bypassed middleware entirely. Fixed by double-escaping to `\\.` so the compiled regex sees literal-dot separators. Added 35 integration tests covering WordPress scanning paths and true static-asset bypass.
+
 ## [26.5.2] - 2026-05-15
 
 > [internal] Marketing page performance: remove an unnecessary 68 KB font preload and reduce hero screenshot file size.

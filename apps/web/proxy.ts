@@ -1507,7 +1507,10 @@ export default async function middleware(
 export const config = {
   matcher: [
     // Skip Next.js internals, static files, .well-known, and Sentry tunnel (/monitoring)
-    '/((?!_next|monitoring(?:/|$)|\.well-known|.*\.(?:html?|css|js|json|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    // NOTE: use \\\\ (double-escape) so the string contains \\. which is a literal dot in
+    // the compiled regex. A single \\. in a JS string becomes just . (any char), which
+    // would allow paths like /wp-json or /a-css/foo to bypass middleware (JOV-2236).
+    '/((?!_next|monitoring(?:/|$)|\\.well-known|.*\\.(?:html?|css|js|json|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
     // Always run for API routes
     '/(api|trpc)(.*)',
     // Always run for Clerk proxy paths (including .js bundles from /npm/)
