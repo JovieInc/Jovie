@@ -112,6 +112,7 @@ interface ProfileCompactSurfaceProps {
   readonly hideJovieBranding?: boolean;
   readonly hideMoreMenu?: boolean;
   readonly headerSocialLinksOverride?: readonly LegacySocialLink[];
+  readonly renderInteractiveOverlays?: boolean;
   readonly renderSemanticHeading?: boolean;
 }
 
@@ -201,6 +202,7 @@ export function ProfileCompactSurface({
   dataTestId,
   hideMoreMenu = false,
   headerSocialLinksOverride,
+  renderInteractiveOverlays = true,
   renderSemanticHeading = true,
 }: Readonly<ProfileCompactSurfaceProps>) {
   const [notificationsPortalContainer, setNotificationsPortalContainer] =
@@ -337,6 +339,8 @@ export function ProfileCompactSurface({
     onRevealNotifications?.();
   }, [onModeSelect, onRevealNotifications]);
   const homeAlertsSubscribed = isSubscribed || showRecentActivationRow;
+  const shouldRenderInteractiveOverlays =
+    renderMode === 'interactive' && renderInteractiveOverlays;
 
   return (
     <div
@@ -526,7 +530,7 @@ export function ProfileCompactSurface({
             isHomeMode ? 'pt-0' : 'pt-2'
           )}
         >
-          {renderMode === 'interactive' ? (
+          {shouldRenderInteractiveOverlays ? (
             <ProfileInlineNotificationsCTA
               artist={artist}
               onManageNotifications={onManageNotifications}
@@ -616,7 +620,7 @@ export function ProfileCompactSurface({
         </div>
       </div>
 
-      {renderMode !== 'preview' ? (
+      {renderMode !== 'preview' && renderInteractiveOverlays ? (
         <ProfileUnifiedDrawer
           open={drawerOpen}
           onOpenChange={onDrawerOpenChange}
