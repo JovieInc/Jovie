@@ -1,12 +1,12 @@
 {
   "name": "@jovie/desktop",
-  "version": "26.5.11",
+  "version": "26.5.12",
   "description": "Jovie desktop app",
   "author": "Jovie Inc.",
   "private": true,
   "main": "dist-electron/main.js",
   "scripts": {
-    "predev": "node scripts/write-env.mjs",
+    "predev": "cross-env ELECTRON_ENV=local node scripts/write-env.mjs",
     "dev": "tsc && electron .",
     "prepare:assets": "node scripts/prepare-icons.mjs && node scripts/generate-dmg-background.mjs",
     "prepare:dmg-background": "node scripts/generate-dmg-background.mjs",

@@ -18,8 +18,8 @@ if (APP_ENV === 'staging') {
 }
 
 const APP_ORIGIN = new URL(APP_URL).origin;
-const APP_ENTRY_URL = new URL('/app', APP_URL).toString();
-const SETTINGS_URL = new URL('/app/settings', APP_URL).toString();
+const APP_ENTRY_URL = buildAppUrl('/app');
+const SETTINGS_URL = buildAppUrl('/app/settings');
 const APP_BACKGROUND_COLOR = '#09090b';
 const APP_ICON_FILENAME =
   APP_ENV === 'staging' ? 'icon-staging.png' : 'icon.png';
@@ -68,8 +68,19 @@ function parseUrl(urlString: string): URL | null {
   }
 }
 
+function buildAppUrl(pathname: string): string {
+  const url = new URL(pathname, APP_URL);
+  url.searchParams.set('runtime', 'electron');
+  return url.toString();
+}
+
 function isAllowedInAppUrl(parsed: URL): boolean {
-  if (parsed.protocol !== 'https:') return false;
+  if (
+    parsed.protocol !== 'https:' &&
+    !(APP_ENV === 'local' && parsed.protocol === 'http:')
+  ) {
+    return false;
+  }
   return parsed.origin === APP_ORIGIN || isAllowedAuthHost(parsed.hostname);
 }
 
