@@ -200,6 +200,40 @@ describe('proxy.ts middleware', () => {
   });
 
   // ==========================================================================
+  // Scanner probe drop (JOV-2189) — must be the earliest exit so probes
+  // never reach Clerk, DB lookups, or the page handler.
+  // ==========================================================================
+  describe('scanner probe drop', () => {
+    it.each([
+      '/some-creator/wp-content/plugins/hellopress/wp_filemanager.php',
+      '/timwhite/wp-admin/install.php',
+      '/xmlrpc.php',
+      '/.env',
+      '/some/random.php',
+    ])('returns 404 for probe path %s without invoking Clerk', async path => {
+      const req = createUnauthenticatedRequest({ pathname: path });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBe(404);
+      // Critical: probe must not touch auth or DB; if any of these were
+      // called the early-return failed and the request leaked deeper.
+      expect(mocks.resolveTestBypassUserId).not.toHaveBeenCalled();
+      expect(mocks.getUserState).not.toHaveBeenCalled();
+      expect(mocks.shouldBypassClerkForRequest).not.toHaveBeenCalled();
+    });
+
+    it('still serves a legitimate profile path that contains no probe markers', async () => {
+      const req = createUnauthenticatedRequest({
+        pathname: '/timwhite/listen',
+      });
+      const res = await callMiddleware(req);
+      // Anything other than the 404 drop response means the probe gate
+      // correctly let real traffic through.
+      expect(res.status).not.toBe(404);
+    });
+  });
+
+  // ==========================================================================
   // Cookie Banner Geo-Detection
   // ==========================================================================
   describe('cookie banner geo-detection', () => {

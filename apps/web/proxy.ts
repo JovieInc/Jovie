@@ -55,6 +55,10 @@ import {
   buildReportToHeader,
   getCspReportUri,
 } from '@/lib/security/csp-reporting';
+import {
+  createProbeDropResponse,
+  isMaliciousProbePath,
+} from '@/lib/security/probe-detection';
 import { ensureSentry } from '@/lib/sentry/ensure';
 import { createBotResponse } from '@/lib/utils/bot-detection';
 
@@ -1187,6 +1191,18 @@ export default async function middleware(
   req: NextRequest,
   event: NextFetchEvent
 ) {
+  // ========================================================================
+  // Drop obvious scanner probes early (e.g. /username/wp-content/...,
+  // /xmlrpc.php, /.env). These paths can never legitimately match a Jovie
+  // route, but the public profile catch-all redirects them into the page
+  // pipeline — which wakes up rendering, billing for an invocation, and
+  // emits Sentry warnings. The dedicated detector returns a quiet 404
+  // before any other handling so probe traffic costs nothing downstream.
+  // ========================================================================
+  if (isMaliciousProbePath(req.nextUrl.pathname)) {
+    return createProbeDropResponse();
+  }
+
   const hostInfo = analyzeHost(req.nextUrl.hostname);
   if (hostInfo.isSupportHost) {
     const targetUrl = new URL(APP_ROUTES.SUPPORT, BASE_URL);
