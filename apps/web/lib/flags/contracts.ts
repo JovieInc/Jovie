@@ -158,7 +158,7 @@ export const LOCAL_DEFAULT_ONLY_FLAGS = new Set<AppFlagName>([
   'PLAYLIST_ENGINE', // early prototype; not ready for remote control
   'ALBUM_ART_GENERATION', // default-true feature; controlled by Statsig experiment separately in usage, not a gate
   'CHAT_JANK_MONITOR', // monitoring-only flag; was missing Statsig gate (bug fixed in #8271 — kept here for local-dev override support)
-  'RELEASE_PLAN_DEMO', // YC wedge demo page; admin/internal only, not externally gated
+  'RELEASE_PLAN_DEMO', // YC wedge demo page; on by default in dev/preview, off in production — see registry.ts for env-aware decide()
   'DESIGN_V1', // permanently enabled — new design is the only design
   'SHELL_CHAT_V1', // alias of DESIGN_V1 — permanently enabled
   'DESIGN_V1_RELEASES', // alias of DESIGN_V1 — permanently enabled
