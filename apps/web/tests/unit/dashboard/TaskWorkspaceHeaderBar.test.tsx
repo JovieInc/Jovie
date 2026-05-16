@@ -83,6 +83,9 @@ function createBaseProps() {
       event.preventDefault()
     ),
     createPending: false,
+    searchValue: '',
+    onSearchValueChange: vi.fn(),
+    onClearSearch: vi.fn(),
     filterCategories: [],
     onClearFilters: vi.fn(),
     viewMode: 'board',
@@ -114,8 +117,8 @@ describe('TaskWorkspaceHeaderBar', () => {
       screen.getByRole('tab', { name: 'Assigned To Me 1' })
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: 'Search tasks' })
-    ).not.toBeInTheDocument();
+      screen.getByRole('searchbox', { name: 'Search tasks' })
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Filters' })).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Display options' })
@@ -140,6 +143,22 @@ describe('TaskWorkspaceHeaderBar', () => {
     fireEvent.click(screen.getByRole('button', { name: 'List view' }));
 
     expect(props.onViewModeChange).toHaveBeenCalledWith('list');
+  });
+
+  it('emits compact task search changes and clears the field', () => {
+    const props = createBaseProps();
+
+    render(
+      <TaskWorkspaceHeaderBar {...props} mode='default' searchValue='press' />
+    );
+
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search tasks' }), {
+      target: { value: 'metadata' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Clear task search' }));
+
+    expect(props.onSearchValueChange).toHaveBeenCalledWith('metadata');
+    expect(props.onClearSearch).toHaveBeenCalledTimes(1);
   });
 
   it('renders create mode controls and submits the draft form', () => {

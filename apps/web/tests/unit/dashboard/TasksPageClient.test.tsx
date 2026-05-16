@@ -4,9 +4,16 @@ import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TaskBoardResult, TaskStatus, TaskView } from '@/lib/tasks/types';
 
-const { mockRegisterRightPanel, mockUseAppFlag } = vi.hoisted(() => ({
+const {
+  mockRegisterRightPanel,
+  mockUseAppFlag,
+  mockUseTaskBoardQuery,
+  mockUseTasksQuery,
+} = vi.hoisted(() => ({
   mockRegisterRightPanel: vi.fn(),
   mockUseAppFlag: vi.fn(),
+  mockUseTaskBoardQuery: vi.fn(),
+  mockUseTasksQuery: vi.fn(),
 }));
 
 vi.mock('@jovie/ui', async () => {
@@ -285,23 +292,39 @@ vi.mock('@/lib/queries/useReleasesQuery', () => ({
 }));
 
 vi.mock('@/lib/queries/useTasksQuery', () => ({
-  useTasksQuery: () => ({
-    data:
-      mockListQueryData === null
-        ? { tasks: mockTasksData }
-        : mockListQueryData
-          ? { tasks: mockListQueryData }
-          : undefined,
-    isLoading: false,
-    isError: false,
-    refetch: vi.fn(),
-  }),
-  useTaskBoardQuery: () => ({
-    data: createMockTaskBoardResult(mockTasksData as TaskView[]),
-    isLoading: false,
-    isError: false,
-    refetch: vi.fn(),
-  }),
+  useTasksQuery: (
+    profileId: string | undefined,
+    filters: unknown,
+    options: unknown
+  ) => {
+    mockUseTasksQuery(profileId, filters, options);
+
+    return {
+      data:
+        mockListQueryData === null
+          ? { tasks: mockTasksData }
+          : mockListQueryData
+            ? { tasks: mockListQueryData }
+            : undefined,
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    };
+  },
+  useTaskBoardQuery: (
+    profileId: string | undefined,
+    filters: unknown,
+    options: unknown
+  ) => {
+    mockUseTaskBoardQuery(profileId, filters, options);
+
+    return {
+      data: createMockTaskBoardResult(mockTasksData as TaskView[]),
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    };
+  },
   useTaskQuery: (taskId: string | null) => ({
     data: mockTasksData.find(task => task.id === taskId),
   }),
@@ -525,6 +548,8 @@ describe('TasksPageClient', () => {
     mockSetViewMode.mockClear();
     mockSetHeaderActions.mockReset();
     mockRegisterRightPanel.mockReset();
+    mockUseTaskBoardQuery.mockClear();
+    mockUseTasksQuery.mockClear();
     mockUseAppFlag.mockReturnValue(false);
     mockUnifiedTable.mockReset();
     mockIsXlUp = true;
@@ -1008,34 +1033,60 @@ describe('TasksPageClient', () => {
     expect(screen.getByRole('button', { name: 'Next task' })).toBeEnabled();
   });
 
-  it('promotes the header into search mode when search is triggered', () => {
+  it('keeps task search local to the workspace controls', () => {
     renderPage();
 
+    const headerActions = screen.getByTestId('header-actions-host');
+
     expect(
-      screen.queryByRole('searchbox', { name: 'Search tasks' })
+      headerActions.querySelector('[aria-label="Search tasks"]')
     ).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Search tasks' }));
-
+    expect(
+      screen.getByRole('button', { name: 'Create task' })
+    ).toBeInTheDocument();
     expect(
       screen.getByRole('searchbox', { name: 'Search tasks' })
     ).toBeInTheDocument();
   });
 
-  it('opens task search with / unless focus is in a text editor', () => {
+  it('does not open or focus task search with the slash key', () => {
     renderPage();
+
+    const searchBox = screen.getByRole('searchbox', { name: 'Search tasks' });
 
     fireEvent.keyDown(screen.getByLabelText('Task title'), { key: '/' });
 
-    expect(
-      screen.queryByRole('searchbox', { name: 'Search tasks' })
-    ).not.toBeInTheDocument();
+    expect(document.activeElement).not.toBe(searchBox);
 
     fireEvent.keyDown(window, { key: '/' });
 
-    expect(
-      screen.getByRole('searchbox', { name: 'Search tasks' })
-    ).toBeInTheDocument();
+    expect(document.activeElement).not.toBe(searchBox);
+  });
+
+  it('keeps task title search wired into list filters', () => {
+    renderPage();
+
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search tasks' }), {
+      target: { value: 'metadata' },
+    });
+
+    expect(mockUseTasksQuery.mock.calls.at(-1)?.[1]).toEqual(
+      expect.objectContaining({ search: 'metadata' })
+    );
+  });
+
+  it('keeps task title search wired into board filters', () => {
+    mockViewMode = 'board';
+
+    renderPage();
+
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search tasks' }), {
+      target: { value: 'press' },
+    });
+
+    expect(mockUseTaskBoardQuery.mock.calls.at(-1)?.[1]).toEqual(
+      expect.objectContaining({ search: 'press' })
+    );
   });
 
   it('promotes the header into create mode when new task is triggered', () => {
@@ -1216,7 +1267,7 @@ describe('TasksPageClient', () => {
 
     expect(screen.getByText('2 total tasks')).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Search tasks' })
+      screen.getByRole('searchbox', { name: 'Search tasks' })
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getAllByTestId('mobile-task-row')[0]!);
