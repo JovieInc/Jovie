@@ -1,5 +1,6 @@
 'use client';
 
+import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import {
   ArrowUpDown,
   Check,
@@ -28,12 +29,24 @@ import {
   useMemo,
   useState,
 } from 'react';
+import { PageShell } from '@/components/organisms/PageShell';
+import {
+  PAGE_TOOLBAR_END_GROUP_CLASS,
+  PAGE_TOOLBAR_ICON_CLASS,
+  PAGE_TOOLBAR_MENU_TRIGGER_CLASS,
+  PAGE_TOOLBAR_META_TEXT_CLASS,
+  PageToolbar,
+  PageToolbarActionButton,
+  TableEmptyState,
+  UnifiedTable,
+  UnifiedTableSkeleton,
+} from '@/components/organisms/table';
 import type { FilterPill } from '@/components/shell/pill-search.types';
 import { ShellDropdown } from '@/components/shell/ShellDropdown';
-import { Tooltip } from '@/components/shell/Tooltip';
 import { APP_ROUTES } from '@/constants/routes';
 import { useRegisterHeaderSearch } from '@/contexts/HeaderActionsContext';
 import { useRegisterShellSidebarOverride } from '@/contexts/ShellSidebarOverrideContext';
+import { useBreakpoint } from '@/hooks/useBreakpoint';
 import {
   getArtworkFallbackAccentStyle,
   getArtworkFallbackSurfaceStyle,
@@ -55,6 +68,26 @@ const LIBRARY_LOADING_PLACEHOLDERS = [
   'library-loading-release-5',
   'library-loading-release-6',
 ] as const;
+
+const LIBRARY_TABLE_ROW_HEIGHT = 58;
+const LIBRARY_TABLE_MIN_WIDTH = '0';
+
+const LIBRARY_TABLE_SKELETON_CONFIG: Array<{
+  readonly width?: string;
+  readonly variant?:
+    | 'text'
+    | 'avatar'
+    | 'badge'
+    | 'button'
+    | 'release'
+    | 'meta';
+}> = [
+  { variant: 'release', width: '100%' },
+  { variant: 'badge', width: '92px' },
+  { variant: 'text', width: '88px' },
+  { variant: 'meta', width: '72px' },
+  { variant: 'text', width: '96px' },
+];
 
 type LibraryViewMode = 'grid' | 'list';
 type LibrarySortKey = 'releaseDate' | 'title' | 'status' | 'providers';
@@ -339,41 +372,129 @@ function Artwork({
   );
 }
 
+function ReleaseCell({ asset }: { readonly asset: LibraryReleaseAsset }) {
+  return (
+    <div className='flex min-w-0 items-center gap-2.5'>
+      <span className='h-10 w-10 shrink-0 overflow-hidden rounded-md bg-black'>
+        <Artwork asset={asset} size='row' />
+      </span>
+      <span className='min-w-0'>
+        <span className='block truncate text-sm font-medium text-primary-token'>
+          {asset.title}
+        </span>
+        <span className='mt-0.5 block truncate text-xs text-tertiary-token'>
+          {asset.artist}
+        </span>
+      </span>
+    </div>
+  );
+}
+
+function StatusCell({ asset }: { readonly asset: LibraryReleaseAsset }) {
+  return (
+    <span
+      className={cn(
+        'inline-flex h-6 w-fit items-center rounded-md border px-2 text-[11px] leading-4',
+        releaseStatusClasses(asset.status)
+      )}
+    >
+      {formatReleaseStatus(asset.status)}
+    </span>
+  );
+}
+
+function ProvidersCell({ asset }: { readonly asset: LibraryReleaseAsset }) {
+  return (
+    <span className='inline-flex h-6 min-w-7 items-center justify-center rounded-md border border-subtle bg-surface-0 px-2 text-xs tabular-nums text-secondary-token'>
+      {formatCompactCount(asset.providerCount)}
+    </span>
+  );
+}
+
+const libraryColumnHelper = createColumnHelper<LibraryReleaseAsset>();
+
+const LIBRARY_TABLE_COLUMNS = [
+  libraryColumnHelper.accessor('title', {
+    id: 'release',
+    header: 'Release',
+    cell: ({ row }) => <ReleaseCell asset={row.original} />,
+    minSize: 220,
+    size: 9999,
+    enableSorting: false,
+    meta: { className: 'pl-2.5 pr-2' },
+  }),
+  libraryColumnHelper.display({
+    id: 'status',
+    header: 'Status',
+    cell: ({ row }) => <StatusCell asset={row.original} />,
+    size: 112,
+    minSize: 96,
+    meta: { className: 'hidden md:table-cell px-2' },
+  }),
+  libraryColumnHelper.display({
+    id: 'type',
+    header: 'Type',
+    cell: ({ row }) => (
+      <span className='truncate text-xs text-tertiary-token'>
+        {formatReleaseType(row.original.releaseType)}
+      </span>
+    ),
+    size: 104,
+    minSize: 88,
+    meta: { className: 'hidden lg:table-cell px-2' },
+  }),
+  libraryColumnHelper.display({
+    id: 'providers',
+    header: 'Providers',
+    cell: ({ row }) => <ProvidersCell asset={row.original} />,
+    size: 86,
+    minSize: 72,
+    meta: { className: 'hidden md:table-cell px-2' },
+  }),
+  libraryColumnHelper.display({
+    id: 'releaseDate',
+    header: 'Release Date',
+    cell: ({ row }) => (
+      <span className='block whitespace-nowrap text-right text-xs tabular-nums text-tertiary-token'>
+        {row.original.releaseDate
+          ? formatLibraryReleaseDate(row.original.releaseDate)
+          : 'No date'}
+      </span>
+    ),
+    size: 112,
+    minSize: 96,
+    meta: { className: 'hidden sm:table-cell pl-2 pr-3' },
+  }),
+] as ColumnDef<LibraryReleaseAsset, unknown>[];
+
 export function LibraryLoadingState() {
   return (
-    <main
+    <PageShell
       aria-busy='true'
       aria-label='Loading Library'
-      className='h-full overflow-hidden px-4 py-4 sm:px-5 lg:px-6'
+      frame='content-container'
+      contentPadding='none'
+      data-testid='library-surface-loading'
+      toolbar={
+        <PageToolbar
+          start={
+            <span className={PAGE_TOOLBAR_META_TEXT_CLASS}>
+              Loading library assets
+            </span>
+          }
+        />
+      }
     >
-      <div className='mx-auto grid h-full max-w-[1440px] overflow-hidden rounded-lg border border-subtle bg-surface-1 shadow-card'>
-        <div className='flex min-w-0 flex-col'>
-          <div className='border-b border-subtle p-3'>
-            <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
-              <div className='space-y-2'>
-                <div className='h-4 w-56 max-w-[72vw] rounded-md bg-surface-0' />
-                <div className='h-4 w-32 rounded-md bg-surface-0' />
-              </div>
-              <div className='h-8 w-full rounded-md bg-surface-0 sm:w-80' />
-            </div>
-          </div>
-          <div className='grid gap-3 p-3 sm:grid-cols-2 xl:grid-cols-3'>
-            {LIBRARY_LOADING_PLACEHOLDERS.map(placeholderId => (
-              <div
-                key={placeholderId}
-                className='min-w-0 rounded-lg border border-subtle bg-surface-0 p-2'
-              >
-                <div className='aspect-square rounded-md bg-surface-1' />
-                <div className='space-y-2 px-1 py-3'>
-                  <div className='h-4 w-3/4 rounded-md bg-surface-1' />
-                  <div className='h-3 w-1/2 rounded-md bg-surface-1' />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </main>
+      <UnifiedTableSkeleton<LibraryReleaseAsset>
+        columns={LIBRARY_TABLE_COLUMNS}
+        hideHeader
+        rowHeight={LIBRARY_TABLE_ROW_HEIGHT}
+        minWidth={LIBRARY_TABLE_MIN_WIDTH}
+        skeletonRows={LIBRARY_LOADING_PLACEHOLDERS.length}
+        skeletonColumnConfig={LIBRARY_TABLE_SKELETON_CONFIG}
+        containerClassName='h-full px-2.5 pb-2.5 pt-1'
+      />
+    </PageShell>
   );
 }
 
@@ -653,11 +774,8 @@ function SortDropdown({
       sideOffset={6}
       width={184}
       trigger={
-        <button
-          type='button'
-          className='inline-flex h-8 items-center gap-1.5 rounded-md border border-(--linear-app-shell-border) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_94%,transparent)] px-2.5 text-[12px] text-secondary-token transition-[background-color,border-color,color] duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
-        >
-          <ArrowUpDown className='h-3.5 w-3.5' strokeWidth={2.25} />
+        <button type='button' className={PAGE_TOOLBAR_MENU_TRIGGER_CLASS}>
+          <ArrowUpDown className={PAGE_TOOLBAR_ICON_CLASS} strokeWidth={2.25} />
           <span className='hidden sm:inline'>{SORT_LABELS[sort]}</span>
           <ChevronDown className='h-3 w-3' strokeWidth={2.25} />
         </button>
@@ -688,37 +806,23 @@ function ViewToggle({
   readonly onView: (view: LibraryViewMode) => void;
 }) {
   return (
-    <div className='inline-flex h-8 rounded-md border border-(--linear-app-shell-border) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_94%,transparent)] p-0.5'>
-      <Tooltip label='Grid View' side='bottom'>
-        <button
-          type='button'
-          onClick={() => onView('grid')}
-          aria-label='Grid view'
-          className={cn(
-            'grid h-7 w-8 place-items-center rounded-[5px] transition-colors duration-subtle focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
-            view === 'grid'
-              ? 'bg-surface-2 text-primary-token'
-              : 'text-tertiary-token hover:text-primary-token'
-          )}
-        >
-          <Grid3x3 className='h-3.5 w-3.5' />
-        </button>
-      </Tooltip>
-      <Tooltip label='List View' side='bottom'>
-        <button
-          type='button'
-          onClick={() => onView('list')}
-          aria-label='List view'
-          className={cn(
-            'grid h-7 w-8 place-items-center rounded-[5px] transition-colors duration-subtle focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
-            view === 'list'
-              ? 'bg-surface-2 text-primary-token'
-              : 'text-tertiary-token hover:text-primary-token'
-          )}
-        >
-          <LayoutList className='h-3.5 w-3.5' />
-        </button>
-      </Tooltip>
+    <div className={cn(PAGE_TOOLBAR_END_GROUP_CLASS, 'ml-0 gap-0.5')}>
+      <PageToolbarActionButton
+        label='Grid view'
+        icon={<Grid3x3 className={PAGE_TOOLBAR_ICON_CLASS} />}
+        active={view === 'grid'}
+        onClick={() => onView('grid')}
+        iconOnly
+        tooltipLabel='Grid view'
+      />
+      <PageToolbarActionButton
+        label='List view'
+        icon={<LayoutList className={PAGE_TOOLBAR_ICON_CLASS} />}
+        active={view === 'list'}
+        onClick={() => onView('list')}
+        iconOnly
+        tooltipLabel='List view'
+      />
     </div>
   );
 }
@@ -743,32 +847,28 @@ function LibraryToolbar({
   readonly onToggleMobileFilters: () => void;
 }) {
   return (
-    <div className='border-b border-subtle bg-[color-mix(in_oklab,var(--linear-app-content-surface)_94%,transparent)] p-3'>
-      <div className='flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between'>
-        <div className='min-w-0'>
-          <p className='text-sm text-secondary-token'>
-            Release assets from your connected catalog.
-          </p>
-          <p className='mt-0.5 text-xs text-tertiary-token'>
-            {visibleCount}
-            {visibleCount === totalCount ? '' : ` of ${totalCount}`} visible
-          </p>
-        </div>
-        <div className='flex min-w-0 flex-wrap items-center justify-end gap-2'>
-          <button
-            type='button'
+    <PageToolbar
+      start={
+        <span className={PAGE_TOOLBAR_META_TEXT_CLASS}>
+          {visibleCount}
+          {visibleCount === totalCount ? '' : ` of ${totalCount}`} visible
+        </span>
+      }
+      end={
+        <>
+          <PageToolbarActionButton
+            label='Filters'
+            icon={<Filter className={PAGE_TOOLBAR_ICON_CLASS} />}
             onClick={onToggleMobileFilters}
             aria-expanded={mobileFiltersOpen}
-            className='inline-flex h-8 items-center gap-1.5 rounded-md border border-(--linear-app-shell-border) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_94%,transparent)] px-2.5 text-[12px] text-secondary-token transition-colors duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus) lg:hidden'
-          >
-            <Filter className='h-3.5 w-3.5' />
-            Filters
-          </button>
+            ariaPressed={mobileFiltersOpen}
+            className='lg:hidden'
+          />
           <SortDropdown sort={sort} onSort={onSort} />
           <ViewToggle view={view} onView={onView} />
-        </div>
-      </div>
-    </div>
+        </>
+      }
+    />
   );
 }
 
@@ -884,117 +984,78 @@ function AssetList({
   readonly selectedId: string | null;
   readonly onSelect: (id: string) => void;
 }) {
+  const getRowId = useMemo(() => (asset: LibraryReleaseAsset) => asset.id, []);
+  const getRowClassName = useMemo(
+    () => (asset: LibraryReleaseAsset) =>
+      cn(
+        'rounded-md border-transparent bg-transparent transition-[background-color,box-shadow] duration-subtle hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_70%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-hover)_78%,transparent)]',
+        selectedId === asset.id &&
+          'bg-surface-1 shadow-[inset_3px_0_0_0_var(--linear-accent)] hover:bg-surface-1'
+      ),
+    [selectedId]
+  );
+
   return (
-    <div className='p-2'>
-      <div className='hidden grid-cols-[52px_minmax(0,1.4fr)_110px_92px_92px_96px] items-center gap-2 border-b border-subtle px-2 py-1.5 text-2xs font-medium text-tertiary-token md:grid'>
-        <span />
-        <span>Title</span>
-        <span>Status</span>
-        <span>Type</span>
-        <span>Providers</span>
-        <span className='text-right'>Release Date</span>
-      </div>
-      <div className='space-y-px'>
-        {assets.map(asset => {
-          const selected = selectedId === asset.id;
-          return (
-            <button
-              type='button'
-              key={asset.id}
-              onClick={() => onSelect(asset.id)}
-              className={cn(
-                'grid w-full grid-cols-[44px_minmax(0,1fr)_auto] items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors duration-subtle focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus) md:grid-cols-[52px_minmax(0,1.4fr)_110px_92px_92px_96px]',
-                selected
-                  ? 'bg-surface-1 text-primary-token'
-                  : 'text-secondary-token hover:bg-surface-1 hover:text-primary-token'
-              )}
-            >
-              <span className='overflow-hidden rounded-md bg-black'>
-                <Artwork asset={asset} size='row' />
-              </span>
-              <span className='min-w-0'>
-                <span className='block truncate text-sm font-medium text-primary-token'>
-                  {asset.title}
-                </span>
-                <span className='mt-0.5 block truncate text-xs text-tertiary-token'>
-                  {asset.artist}
-                </span>
-              </span>
-              <span
-                className={cn(
-                  'hidden w-fit rounded-md border px-1.5 py-0.5 text-[11px] leading-4 md:inline-flex',
-                  releaseStatusClasses(asset.status)
-                )}
-              >
-                {formatReleaseStatus(asset.status)}
-              </span>
-              <span className='hidden truncate text-xs text-tertiary-token md:block'>
-                {formatReleaseType(asset.releaseType)}
-              </span>
-              <span className='hidden text-xs tabular-nums text-tertiary-token md:block'>
-                {asset.providerCount}
-              </span>
-              <span className='hidden text-right text-xs tabular-nums text-tertiary-token md:block'>
-                {formatLibraryReleaseDate(asset.releaseDate)}
-              </span>
-              <span className='text-xs tabular-nums text-tertiary-token md:hidden'>
-                {asset.providerCount}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
+    <UnifiedTable<LibraryReleaseAsset>
+      data={[...assets]}
+      columns={LIBRARY_TABLE_COLUMNS}
+      onRowClick={asset => onSelect(asset.id)}
+      getRowId={getRowId}
+      getRowClassName={getRowClassName}
+      enableVirtualization={assets.length >= 20}
+      rowHeight={LIBRARY_TABLE_ROW_HEIGHT}
+      minWidth={LIBRARY_TABLE_MIN_WIDTH}
+      hideHeader
+      className='text-app text-primary-token'
+      containerClassName='h-full px-2.5 pb-2.5 pt-1'
+      skeletonRows={LIBRARY_LOADING_PLACEHOLDERS.length}
+      skeletonColumnConfig={LIBRARY_TABLE_SKELETON_CONFIG}
+    />
   );
 }
 
 function EmptyCatalog() {
   return (
-    <main
+    <PageShell
       aria-label='Library'
-      className='flex h-full min-h-[420px] items-center justify-center px-6'
+      frame='content-container'
+      contentPadding='none'
       data-testid='library-surface'
     >
-      <div className='max-w-sm text-center'>
-        <div className='mx-auto mb-4 grid h-10 w-10 place-items-center rounded-md border border-subtle bg-surface-1 text-tertiary-token'>
-          <Music2 className='h-4 w-4' strokeWidth={2.25} />
-        </div>
-        <h2 className='text-base font-semibold text-primary-token'>
-          No Release Assets
-        </h2>
-        <p className='mt-2 text-sm leading-6 text-secondary-token'>
-          Releases and artwork will appear here after your catalog is connected.
-        </p>
-        <Link
-          href={APP_ROUTES.DASHBOARD_RELEASES}
-          className='mt-5 inline-flex h-8 items-center rounded-md border border-subtle bg-surface-0 px-3 text-sm font-medium text-primary-token transition-[background-color,border-color] duration-subtle hover:border-default hover:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token'
-        >
-          Open Releases
-        </Link>
-      </div>
-    </main>
+      <TableEmptyState
+        icon={<Music2 className='h-5 w-5' strokeWidth={2.25} />}
+        title='No Release Assets'
+        description='Releases and artwork will appear here after your catalog is connected.'
+        className='m-3 min-h-[360px]'
+        action={
+          <Link
+            href={APP_ROUTES.DASHBOARD_RELEASES}
+            className='inline-flex h-8 items-center rounded-md border border-subtle bg-surface-0 px-3 text-sm font-medium text-primary-token transition-[background-color,border-color] duration-subtle hover:border-default hover:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token'
+          >
+            Open Releases
+          </Link>
+        }
+      />
+    </PageShell>
   );
 }
 
 function NoResults({ onReset }: { readonly onReset: () => void }) {
   return (
-    <div className='grid min-h-[300px] place-items-center px-6 text-center'>
-      <div className='max-w-sm'>
-        <h2 className='text-base font-semibold text-primary-token'>
-          No Assets Match
-        </h2>
-        <p className='mt-2 text-sm leading-6 text-secondary-token'>
-          No release assets match the selected view or filters.
-        </p>
+    <TableEmptyState
+      title='No Assets Match'
+      description='No release assets match the selected view or filters.'
+      className='m-3 min-h-[300px]'
+      action={
         <button
           type='button'
           onClick={onReset}
-          className='mt-4 inline-flex h-8 items-center rounded-md border border-subtle bg-surface-0 px-3 text-sm font-medium text-primary-token transition-[background-color,border-color] duration-subtle hover:border-default hover:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token'
+          className='inline-flex h-8 items-center rounded-md border border-subtle bg-surface-0 px-3 text-sm font-medium text-primary-token transition-[background-color,border-color] duration-subtle hover:border-default hover:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token'
         >
           Reset View
         </button>
-      </div>
-    </div>
+      }
+    />
   );
 }
 
@@ -1206,6 +1267,7 @@ export function LibrarySurface({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [pills, setPills] = useState<FilterPill[]>([]);
+  const isDesktopLayout = useBreakpoint('lg');
 
   const visibleAssets = useMemo(() => {
     const presetPredicate =
@@ -1336,71 +1398,71 @@ export function LibrarySurface({
   }
 
   return (
-    <main
+    <PageShell
       aria-label='Library'
-      className='h-full overflow-hidden px-4 py-4 sm:px-5 lg:px-6'
+      frame='content-container'
+      contentPadding='none'
       data-testid='library-surface'
+      toolbar={
+        <LibraryToolbar
+          sort={sort}
+          onSort={setSort}
+          view={view}
+          onView={setView}
+          visibleCount={visibleAssets.length}
+          totalCount={assets.length}
+          mobileFiltersOpen={mobileFiltersOpen}
+          onToggleMobileFilters={() => setMobileFiltersOpen(value => !value)}
+        />
+      }
     >
-      <div className='mx-auto flex h-full max-w-[1440px] overflow-hidden rounded-lg border border-subtle bg-surface-1 shadow-card'>
-        <section className='flex min-w-0 flex-1 flex-col overflow-hidden'>
-          <LibraryToolbar
-            sort={sort}
-            onSort={setSort}
-            view={view}
-            onView={setView}
-            visibleCount={visibleAssets.length}
-            totalCount={assets.length}
-            mobileFiltersOpen={mobileFiltersOpen}
-            onToggleMobileFilters={() => setMobileFiltersOpen(value => !value)}
-          />
+      {mobileFiltersOpen ? (
+        <LibraryRail
+          assets={assets}
+          preset={preset}
+          filters={filters}
+          onPreset={setPreset}
+          onFilters={setFilters}
+          onClearFilters={() => setFilters(emptyFilters())}
+          className='max-h-[45svh] shrink-0 border-b border-subtle lg:hidden'
+        />
+      ) : null}
 
-          {mobileFiltersOpen ? (
-            <LibraryRail
-              assets={assets}
-              preset={preset}
-              filters={filters}
-              onPreset={setPreset}
-              onFilters={setFilters}
-              onClearFilters={() => setFilters(emptyFilters())}
-              className='max-h-[45svh] border-b border-subtle lg:hidden'
+      <div
+        className='grid min-h-0 flex-1 overflow-hidden'
+        style={
+          {
+            gridTemplateColumns: isDesktopLayout
+              ? `minmax(0, 1fr) ${drawerOpen ? '360px' : '0px'}`
+              : 'minmax(0, 1fr)',
+            transition:
+              'grid-template-columns var(--duration-cinematic) var(--ease-cinematic)',
+          } as CSSProperties
+        }
+      >
+        <div className='min-w-0 overflow-y-auto'>
+          {visibleAssets.length === 0 ? (
+            <NoResults onReset={resetView} />
+          ) : view === 'grid' ? (
+            <AssetGrid
+              assets={visibleAssets}
+              selectedId={selectedId}
+              onSelect={openAsset}
             />
-          ) : null}
-
-          <div
-            className='grid min-h-0 flex-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_var(--library-drawer-width)]'
-            style={
-              {
-                '--library-drawer-width': drawerOpen ? '360px' : '0px',
-                transition:
-                  'grid-template-columns var(--duration-cinematic) var(--ease-cinematic)',
-              } as CSSProperties
-            }
-          >
-            <div className='min-w-0 overflow-y-auto'>
-              {visibleAssets.length === 0 ? (
-                <NoResults onReset={resetView} />
-              ) : view === 'grid' ? (
-                <AssetGrid
-                  assets={visibleAssets}
-                  selectedId={selectedId}
-                  onSelect={openAsset}
-                />
-              ) : (
-                <AssetList
-                  assets={visibleAssets}
-                  selectedId={selectedId}
-                  onSelect={openAsset}
-                />
-              )}
-            </div>
-            <AssetDrawer
-              asset={selectedAsset}
-              open={drawerOpen}
-              onClose={() => setDrawerOpen(false)}
+          ) : (
+            <AssetList
+              assets={visibleAssets}
+              selectedId={selectedId}
+              onSelect={openAsset}
             />
-          </div>
-        </section>
+          )}
+        </div>
+        <AssetDrawer
+          asset={selectedAsset}
+          open={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+        />
       </div>
-    </main>
+    </PageShell>
   );
 }
