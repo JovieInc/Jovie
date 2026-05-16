@@ -279,8 +279,8 @@ describe('surface elevation guardrails', () => {
     expect(shellReleasesView).toContain('useRegisterHeaderSearch');
     expect(shellReleasesView).toContain("key: 'shell-releases'");
     expect(shellReleasesView).toContain("triggerLabel: 'Filter'");
-    expect(shellReleasesView).not.toContain(
-      'const [searchOpen, setSearchOpen]'
+    expect(shellReleasesView).not.toMatch(
+      /const\s*\[\s*searchOpen\s*,\s*setSearchOpen\s*\]\s*=\s*useState/
     );
     expect(authShellWrapper).toContain('HeaderSearchSurface');
   });
