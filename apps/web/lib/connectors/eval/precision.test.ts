@@ -132,8 +132,10 @@ const PRECISION_GATE = 0.97;
 // Main eval suite
 // ---------------------------------------------------------------------------
 
+// env.CI is not a string schema var — safe to read process.env here for test-only control flags
+// that are intentionally not in the validated server schema.
 const RUN_EXPENSIVE_EVAL =
-  process.env.RUN_EXPENSIVE_EVAL === '1' || process.env.CI !== 'true';
+  process.env['RUN_EXPENSIVE_EVAL'] === '1' || process.env['CI'] !== 'true';
 
 describe('connector eval: extraction precision gate', () => {
   it(`precision ≥ ${PRECISION_GATE} across ${Object.keys(fixtureModule).length} labeled fixtures`, async () => {
@@ -192,7 +194,7 @@ describe('connector eval: extraction precision gate', () => {
       }
     }
 
-    const precision = tp + fp > 0 ? tp / (tp + fp) : 1.0;
+    const precision = tp + fp > 0 ? tp / (tp + fp) : 0.0;
     const recall = tp + fn > 0 ? tp / (tp + fn) : 1.0;
 
     console.info(

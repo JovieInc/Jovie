@@ -116,7 +116,7 @@ export class CalendarWriteError extends Error {
 export function uuidToGoogleEventId(uuid: string): string {
   // Strip hyphens from UUID, yielding 32 lowercase hex chars (0-9, a-f).
   // Base32hex alphabet is 0-9, a-v — hex chars 0-9 and a-f are all valid.
-  return uuid.replace(/-/g, '').toLowerCase();
+  return uuid.replaceAll('-', '').toLowerCase();
 }
 
 // ---------------------------------------------------------------------------
@@ -204,7 +204,7 @@ export async function createCalendarEvent(
       err !== null &&
       typeof err === 'object' &&
       'status' in err &&
-      (err as { status: unknown }).status === 409;
+      (err as Record<string, unknown>).status === 409;
 
     if (isConflict) {
       idempotent = true;

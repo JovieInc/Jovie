@@ -1,16 +1,20 @@
 /**
- * E2E: AI Connectors magic moment flow.
+ * E2E: AI Connectors — endpoint auth and approve/reject CAS behavior.
  *
- * Tests the end-to-end flow:
- * 1. Gmail extraction → suggested_action created
- * 2. DJ approves → workflow_runs inserted
- * 3. Second approve → 409 (idempotent)
- * 4. Cron picks up workflow_run → Google Calendar event created
+ * What this file tests:
+ * 1. Approve and reject endpoints reject unauthenticated requests (401 checks).
+ * 2. Approve CAS: pending → accepted + workflow_run inserted (RUN_CONNECTOR_E2E=1 only).
+ * 3. Second approve → 409 (idempotent, RUN_CONNECTOR_E2E=1 only).
+ * 4. Reject CAS: pending → dismissed (RUN_CONNECTOR_E2E=1 only).
  *
- * Run condition: requires RUN_CONNECTOR_E2E=1 (expensive, hits real DB + Google API).
+ * NOTE: Cron pickup and Google Calendar event creation are NOT tested here.
+ * Those are covered by the unit tests in lib/connectors/google-calendar/create-event.test.ts
+ * and the integration test in tests/integration/connectors/suggested-actions-approve.test.ts.
+ *
+ * Run condition: requires RUN_CONNECTOR_E2E=1 (expensive, hits real DB).
  * In CI this runs only when RUN_CONNECTOR_E2E=1.
  *
- * The basic endpoint-existence tests (401 checks) run always.
+ * The basic endpoint-auth tests (401 checks) run always.
  */
 
 import { expect, test } from '@playwright/test';

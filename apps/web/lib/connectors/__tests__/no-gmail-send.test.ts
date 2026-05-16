@@ -47,12 +47,15 @@ describe('Gmail connector: no send export', () => {
     for (const file of tsFiles) {
       const filePath = path.join(dirToCheck, file);
       try {
-        // Dynamic import — use string variable to avoid static resolution
+        // Dynamic import — use string variable to avoid static resolution.
+        // Do NOT .catch() here: let errors fall through to the catch block
+        // so the source-text fallback actually runs on import failure.
         const modulePath = filePath;
-        const mod = await import(/* @vite-ignore */ modulePath).catch(
-          () => null
-        );
-        if (mod && 'send' in mod) {
+        const mod = (await import(/* @vite-ignore */ modulePath)) as Record<
+          string,
+          unknown
+        >;
+        if ('send' in mod) {
           expect.fail(
             `${file} exports 'send' — Jovie must NEVER send email on behalf of artists. ` +
               `Remove or rename the export. See .claude/rules/security.md.`

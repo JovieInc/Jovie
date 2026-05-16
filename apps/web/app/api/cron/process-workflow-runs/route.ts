@@ -29,6 +29,7 @@ import {
 } from '@/lib/connectors/workflows/execute-approved-action';
 import { db } from '@/lib/db';
 import { workflowRuns } from '@/lib/db/schema/connectors';
+import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 
@@ -40,7 +41,7 @@ const MAX_CONCURRENT_RUNS = 5;
 export async function GET(request: Request): Promise<Response> {
   // Verify cron secret
   const authHeader = request.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (authHeader !== `Bearer ${env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
