@@ -160,8 +160,7 @@ describe('DashboardNav interactions', () => {
     );
   });
 
-  it('renders recent threads in the Design V1 sidebar and opens a selected thread', async () => {
-    const user = userEvent.setup();
+  it('renders recent threads in the Design V1 sidebar as App Router links', () => {
     mockUseChatConversationsQuery.mockReturnValueOnce({
       data: [
         {
@@ -190,12 +189,45 @@ describe('DashboardNav interactions', () => {
       enabled: true,
     });
 
-    await user.click(screen.getByRole('button', { name: 'Pitch tasks' }));
-
-    expect(mockRouterPush).toHaveBeenCalledWith('/app/chat/thread-newer');
+    expect(screen.getByRole('link', { name: 'Pitch tasks' })).toHaveAttribute(
+      'href',
+      '/app/chat/thread-newer'
+    );
     expect(
       screen.queryByRole('button', { name: 'Thread actions' })
     ).not.toBeInTheDocument();
+  });
+
+  it('renders compact thread loading and empty states from the real conversations query', async () => {
+    const user = userEvent.setup();
+
+    mockUseChatConversationsQuery.mockReturnValueOnce({
+      data: undefined,
+      isLoading: true,
+    });
+
+    const { unmount } = renderDashboardNav({
+      renderFn: render,
+      appFlags: { DESIGN_V1: true },
+    });
+
+    expect(screen.getByText('Loading threads')).toBeInTheDocument();
+    unmount();
+
+    mockUseChatConversationsQuery.mockReturnValueOnce({
+      data: [],
+      isLoading: false,
+      isError: false,
+    });
+
+    renderDashboardNav({
+      renderFn: render,
+      appFlags: { DESIGN_V1: true },
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Start a thread' }));
+
+    expect(mockRouterPush).toHaveBeenCalledWith(APP_ROUTES.CHAT);
   });
 
   it('profile button navigates to chat before opening the drawer off chat routes', async () => {

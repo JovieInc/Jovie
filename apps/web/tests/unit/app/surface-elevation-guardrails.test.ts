@@ -88,6 +88,9 @@ describe('surface elevation guardrails', () => {
       /:where\(:focus-visible\)\s*{[\s\S]*box-shadow:\s*inset 0 0 0 var\(--focus-ring-width\)/
     );
     expect(designSystem).toMatch(
+      /:where\([\s\S]*input,[\s\S]*textarea,[\s\S]*\[role="textbox"\][\s\S]*\):focus\s*{[\s\S]*outline:\s*none;/
+    );
+    expect(designSystem).toMatch(
       /:where\([\s\S]*input,[\s\S]*textarea,[\s\S]*\[role="textbox"\][\s\S]*\):focus-visible\s*{[\s\S]*box-shadow:\s*none;/
     );
     expect(designSystem).not.toContain(

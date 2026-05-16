@@ -1417,6 +1417,16 @@
     select,
     [contenteditable="true"],
     [role="textbox"]
+  ):focus {
+  outline: none;
+}
+
+:where(
+    input,
+    textarea,
+    select,
+    [contenteditable="true"],
+    [role="textbox"]
   ):focus-visible {
   box-shadow: none;
 }

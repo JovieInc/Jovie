@@ -150,6 +150,7 @@ async function globalSetup() {
     '/api/stripe/checkout',
     '/api/stripe/pricing-options',
     APP_ROUTES.CHAT, // auth.setup.ts navigates here — warm up to avoid cold-compile 404
+    APP_ROUTES.LIBRARY,
     APP_ROUTES.DASHBOARD_RELEASES,
     APP_ROUTES.DASHBOARD_AUDIENCE,
     APP_ROUTES.PRESENCE,
