@@ -84,14 +84,14 @@ function ActionRow({ issue, onClose, isClosing }: Readonly<ActionRowProps>) {
             aria-hidden='true'
           />
         </a>
-        <p className='mt-0.5 text-[11px] uppercase tracking-[0.08em] text-tertiary-token'>
+        <p className='mt-0.5 text-[11px] text-tertiary-token'>
           {issue.identifier}
         </p>
       </div>
 
       {/* Priority badge */}
       <span
-        className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] ${priorityConfig.className}`}
+        className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${priorityConfig.className}`}
       >
         {priorityConfig.label}
       </span>
