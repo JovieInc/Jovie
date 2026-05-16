@@ -5,6 +5,21 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.5] - 2026-05-16
+
+> Rich chips in chat now render cleanly on the white user bubble, lift artwork from cached release data, and reveal a richer preview on hover. Image attachments use the same chip language, so a message with a release reference and a dragged-in image reads as one coherent strip.
+
+### Fixed
+
+- **Chat user-message chips no longer render as dark rectangles on the white bubble**: `EntityChip` is now surface-aware (`tone='onLight' | 'onDark'`) and uses neutral text with accent-tinted thumbnail/dot/border on light, so release/artist/track/event chips stay readable inside the user bubble without candy-coloring across kinds.
+
+### Changed
+
+- **Rich chips reveal details on hover/tap/focus**: Transcript chips wrap in a popover trigger with full keyboard (Enter/Space/Escape), touch (tap), and pointer-hover (200ms open, 120ms close) affordances. Popover body shows artwork + kind eyebrow + label + compact stats, with an "Open release" CTA when the side-panel flag is enabled.
+- **Image attachments render as inline chips with full-preview popover**: User messages no longer drop a 128×128 grid; pasted/dragged images render as compact `ImageAttachmentChip`s matching the rich-chip visual language, and the full image (max 480×480) appears in a hover/tap popover with filename caption.
+- **Transcript chips lift artwork from already-loaded cache**: New `EntityResolutionProvider` consults `queryClient.getQueryData` for releases and events without triggering fetches, so chips light up with artwork whenever the slash menu has loaded data and degrade gracefully (label + accent dot) when it hasn't or when no provider is mounted (e.g. onboarding chat).
+- **Skill input pills extracted into shared `SkillChip`**: `ChipTray` no longer duplicates ~30 lines of input-pill styling; future chip-style changes touch one place.
+
 ## [26.5.4] - 2026-05-16
 
 > Public artist profiles now load roughly 400 KB less JavaScript for anonymous visitors. Faster first paint on every fan-facing profile page.

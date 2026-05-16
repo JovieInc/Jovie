@@ -4,12 +4,12 @@ import { SimpleTooltip } from '@jovie/ui';
 import { Check, Copy } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import dynamic from 'next/dynamic';
-import Image from 'next/image';
 import { useClipboard } from '@/hooks/useClipboard';
 import { cn } from '@/lib/utils';
 import { getRenderableToolEvents, ToolPartsRenderer } from '../tool-ui';
 import type { MessagePart } from '../types';
 import { getMessageText } from '../utils';
+import { ImageAttachmentChip } from './ImageAttachmentChip';
 import { TokenizedText } from './TokenizedText';
 
 const ChatMarkdown = dynamic(
@@ -54,12 +54,22 @@ export function ChatMessage({
   const shouldReduceMotion = useReducedMotion();
   const toolEvents = getRenderableToolEvents(parts);
   const fileParts = parts.filter(
-    (p): p is MessagePart & { url: string; mediaType: string } =>
+    (p): p is MessagePart & { url: string; mediaType: string; name?: string } =>
       p.type === 'file' &&
       typeof p.url === 'string' &&
       typeof p.mediaType === 'string' &&
       p.mediaType.startsWith('image/')
   );
+  const imageChips = (() => {
+    const seenFileKeys = new Map<string, number>();
+    return fileParts.map(file => {
+      const seenCount = seenFileKeys.get(file.url) ?? 0;
+      seenFileKeys.set(file.url, seenCount + 1);
+      const dedupeKey =
+        seenCount === 0 ? file.url : `${file.url}-${seenCount + 1}`;
+      return { dedupeKey, url: file.url, name: file.name };
+    });
+  })();
   const hasAssistantContent = Boolean(messageText) || toolEvents.length > 0;
 
   return (
@@ -75,40 +85,26 @@ export function ChatMessage({
     >
       {isUser ? (
         <div className='max-w-[78%] rounded-[18px] border border-white/80 bg-white px-4 py-3.5 text-[#111216] shadow-[0_12px_38px_-28px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.9)]'>
-          {fileParts.length > 0 && (
-            <div className={cn('flex flex-wrap gap-2', messageText && 'mb-2')}>
-              {(() => {
-                const seenFileKeys = new Map<string, number>();
-
-                return fileParts.map(file => {
-                  const seenCount = seenFileKeys.get(file.url) ?? 0;
-                  seenFileKeys.set(file.url, seenCount + 1);
-
-                  return (
-                    <div
-                      key={
-                        seenCount === 0
-                          ? file.url
-                          : `${file.url}-${seenCount + 1}`
-                      }
-                      className='relative h-32 w-32 overflow-hidden rounded-lg'
-                    >
-                      <Image
-                        src={file.url}
-                        alt='Attached image'
-                        fill
-                        className='object-cover'
-                        unoptimized
-                      />
-                    </div>
-                  );
-                });
-              })()}
+          {imageChips.length > 0 && (
+            <div
+              className={cn(
+                'flex flex-wrap items-center gap-1.5',
+                messageText && 'mb-2'
+              )}
+            >
+              {imageChips.map(chip => (
+                <ImageAttachmentChip
+                  key={chip.dedupeKey}
+                  url={chip.url}
+                  name={chip.name}
+                  tone='onLight'
+                />
+              ))}
             </div>
           )}
           {messageText && (
             <div className='text-[15px] leading-6 tracking-normal'>
-              <TokenizedText content={messageText} />
+              <TokenizedText content={messageText} tone='onLight' />
             </div>
           )}
         </div>
