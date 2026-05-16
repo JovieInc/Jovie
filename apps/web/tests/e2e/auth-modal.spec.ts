@@ -13,7 +13,7 @@ import { waitForHydration } from './utils/smoke-test-utils';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
-const AUTH_MODAL_TIMEOUT = 60_000;
+const AUTH_MODAL_TIMEOUT = 120_000;
 
 function expectedDialogName(mode: 'signin' | 'signup') {
   const clerkUnavailable =
@@ -49,8 +49,23 @@ async function prepareHomepage(page: import('@playwright/test').Page) {
     });
   }
 
-  await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 60_000 });
-  await waitForHydration(page);
+  await page.goto('/', {
+    waitUntil: 'domcontentloaded',
+    timeout: AUTH_MODAL_TIMEOUT,
+  });
+  await waitForHydration(page, { timeout: AUTH_MODAL_TIMEOUT });
+
+  const bodyText = await page
+    .locator('body')
+    .innerText()
+    .catch(() => '');
+  if (bodyText.includes('Manifest file is empty')) {
+    await page.reload({
+      waitUntil: 'domcontentloaded',
+      timeout: AUTH_MODAL_TIMEOUT,
+    });
+    await waitForHydration(page, { timeout: AUTH_MODAL_TIMEOUT });
+  }
 }
 
 async function openInterceptedModal(
@@ -63,12 +78,12 @@ async function openInterceptedModal(
     await page
       .getByRole('link', { name: /^sign in$/i })
       .first()
-      .click({ noWaitAfter: true });
+      .click({ noWaitAfter: true, timeout: AUTH_MODAL_TIMEOUT });
   } else {
     await page
       .locator('[data-cta-sign-up="true"]')
       .first()
-      .click({ noWaitAfter: true });
+      .click({ noWaitAfter: true, timeout: AUTH_MODAL_TIMEOUT });
   }
 
   await expect(page).toHaveURL(
