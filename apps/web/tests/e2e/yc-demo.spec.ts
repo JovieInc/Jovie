@@ -51,10 +51,6 @@ const LOADING_SELECTORS = [
   '[class*="animate-spin"]',
   '[class*="animate-pulse"]',
 ];
-const TRANSITION_VEIL_ID = 'demo-transition-veil';
-const TRANSITION_STORAGE_KEY = 'demo-transition-visible';
-const TRANSITION_FADE_MS = 140;
-const TRANSITION_BACKGROUND = '#080a10';
 const TOTAL_CLICKS_METRIC_TEST_ID = 'drawer-analytics-metric-total-clicks';
 const TOTAL_CLICKS_METRIC_VALUE_TEST_ID =
   'drawer-analytics-metric-value-total-clicks';
@@ -105,95 +101,12 @@ async function configureRecordingContext(
   context: BrowserContext,
   cookieBaseUrl: string
 ) {
-  await context.addInitScript(
-    ({ transitionBackground }) => {
-      localStorage.setItem('jv_cc', '1');
-      localStorage.removeItem('__dev_toolbar_open');
-      localStorage.removeItem('__dev_toolbar_hidden');
-
-      const isTransitionVisible = () => {
-        try {
-          return sessionStorage.getItem('demo-transition-visible') === '1';
-        } catch {
-          return false;
-        }
-      };
-
-      const syncTransitionRoot = () => {
-        document.documentElement.setAttribute(
-          'data-demo-transition',
-          isTransitionVisible() ? '1' : '0'
-        );
-      };
-
-      const ensureTransitionStyle = () => {
-        const styleId = 'demo-transition-style';
-        const existing = document.getElementById(
-          styleId
-        ) as HTMLStyleElement | null;
-
-        if (existing) {
-          return;
-        }
-
-        const style = document.createElement('style');
-        style.id = styleId;
-        style.textContent = `
-        html {
-          background: ${transitionBackground};
-        }
-
-        html[data-demo-transition="1"]::before,
-        html[data-demo-transition="1"] body::before {
-          content: '';
-          position: fixed;
-          inset: 0;
-          background: ${transitionBackground};
-          pointer-events: none;
-          z-index: 2147483647;
-        }
-      `;
-        (document.head ?? document.documentElement).appendChild(style);
-      };
-
-      const ensureTransitionVeil = () => {
-        const existing = document.getElementById(
-          'demo-transition-veil'
-        ) as HTMLDivElement | null;
-        if (existing) {
-          syncTransitionRoot();
-          existing.style.opacity = isTransitionVisible() ? '1' : '0';
-          existing.style.pointerEvents = 'none';
-          return;
-        }
-
-        const veil = document.createElement('div');
-        veil.id = 'demo-transition-veil';
-        Object.assign(veil.style, {
-          position: 'fixed',
-          inset: '0',
-          background: transitionBackground,
-          opacity: isTransitionVisible() ? '1' : '0',
-          pointerEvents: 'none',
-          transition: 'opacity 140ms ease',
-          zIndex: '2147483647',
-        });
-        document.body.appendChild(veil);
-      };
-
-      ensureTransitionStyle();
-      syncTransitionRoot();
-
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', ensureTransitionVeil, {
-          once: true,
-        });
-      } else {
-        ensureTransitionVeil();
-      }
-    },
-    { transitionBackground: TRANSITION_BACKGROUND }
-  );
+  await context.addInitScript(() => {
+    localStorage.setItem('jv_cc', '1');
+    localStorage.removeItem('__dev_toolbar_open');
+    localStorage.removeItem('__dev_toolbar_hidden');
+    document.documentElement.removeAttribute('data-demo-transition');
+  });
 
   await context.addCookies([
     {
@@ -273,65 +186,6 @@ async function installCleanupStyle(page: Page) {
       });
     }
   }, CLEANUP_SELECTORS);
-}
-
-async function setTransitionVeilVisible(page: Page, visible: boolean) {
-  await page.evaluate(
-    ({ background, storageKey, veilId, nextVisible }) => {
-      try {
-        sessionStorage.setItem(storageKey, nextVisible ? '1' : '0');
-      } catch {}
-
-      const styleId = 'demo-transition-style';
-      if (!document.getElementById(styleId)) {
-        const style = document.createElement('style');
-        style.id = styleId;
-        style.textContent = `
-          html {
-            background: ${background};
-          }
-
-          html[data-demo-transition="1"]::before,
-          html[data-demo-transition="1"] body::before {
-            content: '';
-            position: fixed;
-            inset: 0;
-            background: ${background};
-            pointer-events: none;
-            z-index: 2147483647;
-          }
-        `;
-        (document.head ?? document.documentElement).appendChild(style);
-      }
-
-      document.documentElement.setAttribute(
-        'data-demo-transition',
-        nextVisible ? '1' : '0'
-      );
-
-      let veil = document.getElementById(veilId) as HTMLDivElement | null;
-      if (!veil) {
-        veil = document.createElement('div');
-        veil.id = veilId;
-        Object.assign(veil.style, {
-          position: 'fixed',
-          inset: '0',
-          background,
-          transition: 'opacity 140ms ease',
-          zIndex: '2147483647',
-        });
-        document.body.appendChild(veil);
-      }
-      veil.style.opacity = nextVisible ? '1' : '0';
-      veil.style.pointerEvents = 'none';
-    },
-    {
-      background: TRANSITION_BACKGROUND,
-      nextVisible: visible,
-      storageKey: TRANSITION_STORAGE_KEY,
-      veilId: TRANSITION_VEIL_ID,
-    }
-  );
 }
 
 async function injectCaptionOverlay(page: Page) {
@@ -655,24 +509,17 @@ async function gotoDemoSceneWithTransition(
   url: string,
   options: DemoSceneReadyOptions
 ) {
-  if (page.url() !== 'about:blank') {
-    await setTransitionVeilVisible(page, true);
-  }
   await gotoDemoScene(page, url, options);
-  await setTransitionVeilVisible(page, false);
-  await page.waitForTimeout(TRANSITION_FADE_MS);
+  await waitForAnimationFrames(page, 3);
 }
 
 async function revealDemoSceneAfter(
   page: Page,
   prepareScene: () => Promise<void>
 ) {
-  await setTransitionVeilVisible(page, true);
   await prepareScene();
   await waitForSceneCleanup(page);
   await waitForAnimationFrames(page, 3);
-  await setTransitionVeilVisible(page, false);
-  await page.waitForTimeout(TRANSITION_FADE_MS);
 }
 
 async function smoothScrollPage(
