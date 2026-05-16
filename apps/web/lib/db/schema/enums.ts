@@ -704,3 +704,24 @@ export const workflowRunStatusEnum = pgEnum('workflow_run_status', [
   'failed',
   'cancelled',
 ]);
+
+// ---------------------------------------------------------------------------
+// Agent Registry Enums (v1)
+// ---------------------------------------------------------------------------
+
+export const skillKindEnum = pgEnum('skill_kind', [
+  'vertical_agent',
+  'tool',
+  'style',
+]);
+
+export const retouchJobStatusEnum = pgEnum('retouch_job_status', [
+  'queued',
+  'running',
+  'identity_check_failed',
+  'identity_check_retrying',
+  'completed',
+  'failed',
+  'rejected_by_user',
+  'accepted_by_user',
+]);

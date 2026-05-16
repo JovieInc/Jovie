@@ -23,6 +23,24 @@ export {
   selectAdminSystemSettingsSchema,
   selectCampaignSettingsSchema,
 } from './admin';
+// Agent Registry (Skills Catalog, Tools Catalog, Retouch Jobs)
+export {
+  insertRetouchJobSchema,
+  insertSkillsCatalogSchema,
+  insertToolsCatalogSchema,
+  type NewRetouchJob,
+  type NewSkillsCatalogRow,
+  type NewToolsCatalogRow,
+  type RetouchJob,
+  retouchJobs,
+  type SkillsCatalogRow,
+  selectRetouchJobSchema,
+  selectSkillsCatalogSchema,
+  selectToolsCatalogSchema,
+  skillsCatalog,
+  type ToolsCatalogRow,
+  toolsCatalog,
+} from './agents';
 // Analytics (Clicks, Audience, Tips, Blocks)
 export {
   type AudienceAction,
@@ -357,8 +375,10 @@ export {
   releaseTaskAssigneeTypeEnum,
   releaseTaskPriorityEnum,
   releaseTaskStatusEnum,
+  retouchJobStatusEnum,
   scraperStrategyEnum,
   senderStatusEnum,
+  skillKindEnum,
   socialAccountStatusEnum,
   socialLinkStateEnum,
   socialSuggestionStatusEnum,
