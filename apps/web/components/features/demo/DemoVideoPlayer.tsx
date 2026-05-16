@@ -24,6 +24,7 @@ export function DemoVideoPlayer({
   const [state, setState] = useState<VideoState>(videoUrl ? 'ready' : 'error');
   const [hasStarted, setHasStarted] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const shouldShowPlayButton = !hasStarted && (Boolean(posterUrl) || !controls);
   const handleError = useCallback(() => {
     setState('error');
   }, []);
@@ -72,7 +73,7 @@ export function DemoVideoPlayer({
           <video
             aria-label={label}
             className={`relative z-10 aspect-[1280/720] w-full bg-transparent object-contain transition-opacity duration-subtle ${
-              hasStarted ? 'opacity-100' : 'opacity-0'
+              hasStarted || !posterUrl ? 'opacity-100' : 'opacity-0'
             }`}
             controls={controls}
             onError={handleError}
@@ -91,7 +92,7 @@ export function DemoVideoPlayer({
               default
             />
           </video>
-          {!hasStarted && posterUrl ? (
+          {shouldShowPlayButton ? (
             <button
               type='button'
               aria-label='Play Jovie demo video'
