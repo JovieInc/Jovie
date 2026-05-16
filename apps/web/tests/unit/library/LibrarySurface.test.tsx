@@ -149,35 +149,37 @@ describe('LibrarySurface', () => {
       onOpenCommandPalette
     );
 
-    render(
-      <LibrarySurface
-        assets={[
-          buildAsset(),
-          buildAsset({
-            id: 'release-2',
-            title: 'Never Say A Word',
-            artist: 'Other Artist',
-            providers: [
-              {
-                key: 'apple',
-                label: 'Apple Music',
-                url: 'https://music.apple.com/album/never-say-a-word',
-              },
-            ],
-          }),
-        ]}
-      />
-    );
+    try {
+      render(
+        <LibrarySurface
+          assets={[
+            buildAsset(),
+            buildAsset({
+              id: 'release-2',
+              title: 'Never Say A Word',
+              artist: 'Other Artist',
+              providers: [
+                {
+                  key: 'apple',
+                  label: 'Apple Music',
+                  url: 'https://music.apple.com/album/never-say-a-word',
+                },
+              ],
+            }),
+          ]}
+        />
+      );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
-    fireEvent.click(screen.getByRole('button', { name: /Search/u }));
+      fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+      fireEvent.click(screen.getByRole('button', { name: /Search/u }));
 
-    expect(onOpenCommandPalette).toHaveBeenCalledTimes(1);
-
-    globalThis.removeEventListener(
-      OPEN_COMMAND_PALETTE_EVENT,
-      onOpenCommandPalette
-    );
+      expect(onOpenCommandPalette).toHaveBeenCalledTimes(1);
+    } finally {
+      globalThis.removeEventListener(
+        OPEN_COMMAND_PALETTE_EVENT,
+        onOpenCommandPalette
+      );
+    }
   });
 
   it('filters release assets from the Library navigation', () => {

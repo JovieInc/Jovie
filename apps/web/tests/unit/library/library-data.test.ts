@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildLibraryReleaseAssets,
+  formatLibraryDuration,
   formatLibraryReleaseDate,
 } from '@/app/app/(shell)/library/library-data';
 import type { ReleaseViewModel } from '@/lib/discography/types';
@@ -115,5 +116,12 @@ describe('library data', () => {
       'Apr 28, 2026'
     );
     expect(formatLibraryReleaseDate(null)).toBe('No Release Date');
+  });
+
+  it('formats duration values with consistent fallbacks and clock formatting', () => {
+    expect(formatLibraryDuration(null)).toBe('No Duration');
+    expect(formatLibraryDuration(0)).toBe('No Duration');
+    expect(formatLibraryDuration(212_000)).toBe('3:32');
+    expect(formatLibraryDuration(3_661_000)).toBe('1:01:01');
   });
 });
