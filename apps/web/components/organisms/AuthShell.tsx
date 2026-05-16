@@ -18,7 +18,7 @@ import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 import { AppShellFrame } from './AppShellFrame';
 import { PersistentAudioBar } from './PersistentAudioBar';
 export interface AuthShellProps {
-  readonly section: 'admin' | 'dashboard' | 'settings';
+  readonly section: 'admin' | 'dashboard' | 'library' | 'settings';
   readonly breadcrumbs: DashboardBreadcrumbItem[];
   readonly headerBadge?: ReactNode;
   readonly headerAction?: ReactNode;

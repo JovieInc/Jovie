@@ -14,7 +14,7 @@ import { getBreadcrumbLabel } from '@/lib/constants/breadcrumb-labels';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 
 export interface AuthRouteConfig {
-  section: 'admin' | 'dashboard' | 'settings';
+  section: 'admin' | 'dashboard' | 'library' | 'settings';
   breadcrumbs: DashboardBreadcrumbItem[];
   showMobileTabs: boolean;
   isTableRoute: boolean;
@@ -51,9 +51,17 @@ export function useAuthRouteConfig(): AuthRouteConfig {
   const isDemoRoute = isDemoRoutePath(pathname);
 
   // Detect section based on pathname
-  const section = useMemo<'admin' | 'dashboard' | 'settings'>(() => {
+  const section = useMemo<
+    'admin' | 'dashboard' | 'library' | 'settings'
+  >(() => {
     if (pathname.startsWith(APP_ROUTES.ADMIN)) return 'admin';
     if (pathname.startsWith(APP_ROUTES.SETTINGS)) return 'settings';
+    if (
+      pathname === APP_ROUTES.LIBRARY ||
+      pathname.startsWith(`${APP_ROUTES.LIBRARY}/`)
+    ) {
+      return 'library';
+    }
     return 'dashboard';
   }, [pathname]);
 

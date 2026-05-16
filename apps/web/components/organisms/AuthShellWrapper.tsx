@@ -1,7 +1,6 @@
 'use client';
 
 import { TooltipProvider } from '@jovie/ui';
-import { Search } from 'lucide-react';
 import type { ReactNode } from 'react';
 import {
   useCallback,
@@ -24,6 +23,7 @@ import {
   useKeyboardShortcuts,
 } from '@/contexts/KeyboardShortcutsContext';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
+import { ShellSidebarOverrideProvider } from '@/contexts/ShellSidebarOverrideContext';
 import {
   type TableMeta,
   TableMetaContext,
@@ -40,7 +40,6 @@ import { useAppFlag } from '@/lib/flags/client';
 import { isFormElement } from '@/lib/utils/keyboard';
 import { AuthShell } from './AuthShell';
 import { CommandPalette } from './CommandPalette';
-import { OPEN_COMMAND_PALETTE_EVENT } from './command-palette-events';
 import { KeyboardShortcutsSheet } from './keyboard-shortcuts-sheet';
 import {
   PendingShellContext,
@@ -67,26 +66,6 @@ function KeyboardShortcutsHandler() {
   return <KeyboardShortcutsSheet />;
 }
 
-function HeaderCommandSearchButton() {
-  const openCommandPalette = useCallback(() => {
-    globalThis.dispatchEvent(new Event(OPEN_COMMAND_PALETTE_EVENT));
-  }, []);
-
-  return (
-    <button
-      type='button'
-      data-app-search-trigger='true'
-      onClick={openCommandPalette}
-      className='inline-flex h-7 items-center gap-1.5 rounded-md border border-(--linear-app-shell-border) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_94%,transparent)] px-2 text-[12px] text-secondary-token transition-[background-color,border-color,color] duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
-      aria-label='Search Jovie'
-    >
-      <Search className='h-3.5 w-3.5' aria-hidden='true' />
-      <span className='hidden sm:inline'>Search</span>
-      <span className='hidden text-tertiary-token lg:inline'>/</span>
-    </button>
-  );
-}
-
 /**
  * AuthShellWrapperInner - Inner component with access to HeaderActionsContext
  */
@@ -103,7 +82,6 @@ function AuthShellWrapperInner({
 }>) {
   const config = useAuthRouteConfig();
   const headerActions = useHeaderActions();
-  const designV1Enabled = useAppFlag('DESIGN_V1');
   const shellChatV1Enabled = useAppFlag('SHELL_CHAT_V1');
   const isElectron = useIsElectronRuntime();
   const { headerSearchAdapter, isSearchOpen, openSearch, closeSearch } =
@@ -127,13 +105,15 @@ function AuthShellWrapperInner({
     config.section === 'dashboard' || config.isArtistProfileSettings;
   const shouldDefaultOpenPreviewPanel =
     config.section === 'dashboard' && previewPanelDefaultOpen;
+  const previewPanelScope = config.isArtistProfileSettings
+    ? 'artist-profile-settings'
+    : 'app-shell';
 
   // Determine header action: use custom actions from context if available,
   // otherwise fall back to default based on route type
   const defaultHeaderAction = useMemo(
     () => (
       <>
-        {designV1Enabled ? <HeaderCommandSearchButton /> : null}
         {config.showChatUsageIndicator && !config.isDemoRoute ? (
           <HeaderChatUsageIndicator />
         ) : null}
@@ -141,12 +121,7 @@ function AuthShellWrapperInner({
         {isElectron ? null : <UpdateAvailablePill />}
       </>
     ),
-    [
-      config.isDemoRoute,
-      config.showChatUsageIndicator,
-      designV1Enabled,
-      isElectron,
-    ]
+    [config.isDemoRoute, config.showChatUsageIndicator, isElectron]
   );
   // Wrap page-injected header elements in ErrorBoundary so a throwing badge/action
   // degrades gracefully (renders nothing + toast) instead of crashing the shell.
@@ -355,7 +330,7 @@ function AuthShellWrapperInner({
       <PendingShellContext.Provider value={pendingShellContextValue}>
         <RightPanelProvider>
           <PreviewPanelProvider
-            key={config.section}
+            key={previewPanelScope}
             defaultOpen={shouldDefaultOpenPreviewPanel}
             enabled={previewEnabled}
           >
@@ -404,15 +379,17 @@ export function AuthShellWrapper({
     <TooltipProvider delayDuration={1200}>
       <KeyboardShortcutsProvider>
         <HeaderActionsProvider>
-          <AuthShellWrapperInner
-            persistSidebarCollapsed={persistSidebarCollapsed}
-            sidebarDefaultOpen={sidebarDefaultOpen}
-            previewPanelDefaultOpen={previewPanelDefaultOpen}
-          >
-            {children}
-          </AuthShellWrapperInner>
-          <KeyboardShortcutsHandler />
-          <CommandPalette />
+          <ShellSidebarOverrideProvider>
+            <AuthShellWrapperInner
+              persistSidebarCollapsed={persistSidebarCollapsed}
+              sidebarDefaultOpen={sidebarDefaultOpen}
+              previewPanelDefaultOpen={previewPanelDefaultOpen}
+            >
+              {children}
+            </AuthShellWrapperInner>
+            <KeyboardShortcutsHandler />
+            <CommandPalette />
+          </ShellSidebarOverrideProvider>
         </HeaderActionsProvider>
       </KeyboardShortcutsProvider>
     </TooltipProvider>
