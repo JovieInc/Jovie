@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { Suspense, useMemo, useState } from 'react';
 import { CTAButton } from '@/components/molecules/CTAButton';
 import { useProfileNotifications } from '@/components/organisms/profile-shell/ProfileNotificationsContext';
 import { AUDIENCE_SPOTIFY_PREFERRED_COOKIE } from '@/constants/app';
@@ -27,6 +27,14 @@ const ctaLoadingFallback = (
   </div>
 );
 
+// `ssr: false` on these dynamic imports defers the notification flow modules
+// (which include Statsig calls, browser cookie/contact storage, and form
+// submission UI) to the client. Without an explicit <Suspense> boundary at
+// each consumer site, Next.js 15 + React 19 bail the parent tree to
+// client-side rendering and emit `BAILOUT_TO_CLIENT_SIDE_RENDERING` on the
+// route's implicit Suspense boundary (loading.tsx) — shipping the animated
+// skeleton as the initial visible HTML instead of the actual profile content
+// (JOV-2273). Suspense boundaries are added at each consumer below.
 const ArtistNotificationsCTA = dynamic(
   () =>
     import(
@@ -121,17 +129,21 @@ export function ProfilePrimaryCTA({
     if (subscribeTwoStep) {
       return (
         <div className='space-y-3 py-2 sm:py-3'>
-          <TwoStepNotificationsCTA artist={artist} />
+          <Suspense fallback={ctaLoadingFallback}>
+            <TwoStepNotificationsCTA artist={artist} />
+          </Suspense>
         </div>
       );
     }
     return (
       <div className='space-y-3 py-2 sm:py-3'>
-        <ArtistNotificationsCTA
-          artist={artist}
-          variant='button'
-          autoOpen={autoOpenCapture}
-        />
+        <Suspense fallback={ctaLoadingFallback}>
+          <ArtistNotificationsCTA
+            artist={artist}
+            variant='button'
+            autoOpen={autoOpenCapture}
+          />
+        </Suspense>
       </div>
     );
   }
