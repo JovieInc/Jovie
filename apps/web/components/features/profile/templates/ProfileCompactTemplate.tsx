@@ -1,6 +1,5 @@
 'use client';
 
-import dynamic from 'next/dynamic';
 import {
   type CSSProperties,
   useCallback,
@@ -47,23 +46,20 @@ import type { Artist, LegacySocialLink } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
 import { ProfileCompactSurface } from './ProfileCompactSurface';
+import { ProfileDesktopSurface } from './ProfileDesktopSurface';
 import { PublicProfileLayoutShell } from './PublicProfileLayoutShell';
 
-const ProfileDesktopSurface = dynamic(
-  () =>
-    import('./ProfileDesktopSurface').then(mod => ({
-      default: mod.ProfileDesktopSurface,
-    })),
-  {
-    ssr: false,
-    loading: () => (
-      <div
-        data-testid='profile-desktop-surface-loading'
-        className='h-[min(940px,calc(100dvh-48px))] w-full rounded-[36px] border border-white/8 bg-[rgba(8,10,14,0.9)]'
-      />
-    ),
-  }
-);
+// Previously imported via `dynamic({ ssr: false })`. That bailed the parent
+// SSR tree to client-side rendering and emitted
+// `<template data-dgst="BAILOUT_TO_CLIENT_SIDE_RENDERING">` in the streaming
+// payload, forcing the animated skeleton from `loading.tsx` to be the initial
+// visible HTML for every cold visit (JOV-2273).
+//
+// `ProfileDesktopSurface` is only rendered when `isDesktopLayout === true`,
+// which starts as `false` during SSR and is set in `useEffect` from
+// `matchMedia('(min-width: 1180px)')`. So the component is never rendered
+// server-side anyway — the `ssr: false` deferral was costing us a visible
+// CSR bailout for no rendering benefit.
 
 interface ProfileCompactTemplateProps {
   readonly mode: ProfileMode;
