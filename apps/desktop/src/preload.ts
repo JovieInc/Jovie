@@ -15,6 +15,11 @@ interface MinimalDocument {
   readonly documentElement?: {
     readonly dataset: Record<string, string | undefined>;
   };
+  addEventListener?: (
+    type: 'DOMContentLoaded',
+    listener: () => void,
+    options?: { once: boolean }
+  ) => void;
 }
 
 interface MinimalLocation {
@@ -31,13 +36,23 @@ function isTrustedAppOrigin(): boolean {
   return TRUSTED_APP_ORIGINS.has(getCurrentOrigin() ?? '');
 }
 
-function markElectronRuntime(): void {
+function markElectronRuntime(): boolean {
   const maybeDocument = (globalThis as { document?: MinimalDocument }).document;
   const root = maybeDocument?.documentElement;
-  if (!root) return;
+  if (!root) return false;
 
   root.dataset.desktopRuntime = 'electron';
   root.dataset.electronPlatform = process.platform;
+  return true;
+}
+
+function installElectronRuntimeMarker(): void {
+  if (markElectronRuntime()) return;
+
+  const maybeDocument = (globalThis as { document?: MinimalDocument }).document;
+  maybeDocument?.addEventListener?.('DOMContentLoaded', markElectronRuntime, {
+    once: true,
+  });
 }
 
 type UpdateChannel =
@@ -53,7 +68,7 @@ function onUpdateChannel(channel: UpdateChannel, cb: () => void): () => void {
 }
 
 if (isTrustedAppOrigin()) {
-  markElectronRuntime();
+  installElectronRuntimeMarker();
 
   contextBridge.exposeInMainWorld('electronAPI', {
     platform: process.platform,

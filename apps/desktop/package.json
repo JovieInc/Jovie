@@ -10,6 +10,7 @@
     "dev": "tsc && electron .",
     "prepare:assets": "node scripts/prepare-icons.mjs && node scripts/generate-dmg-background.mjs",
     "prepare:dmg-background": "node scripts/generate-dmg-background.mjs",
+    "test:desktop-shell": "node --test scripts/desktop-shell-contract.test.mjs",
     "test:dmg-background": "node --test scripts/generate-dmg-background.test.mjs",
     "prebuild:staging": "node scripts/sync-version.mjs && cross-env ELECTRON_ENV=staging node scripts/write-env.mjs && pnpm run prepare:assets",
     "build:staging": "tsc && electron-builder --config electron-builder.staging.yml --publish always",

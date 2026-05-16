@@ -38,6 +38,8 @@ export interface PillSearchProps {
   readonly onClose: () => void;
   readonly ariaLabel?: string;
   readonly placeholder?: string;
+  /** Restrict suggestions and slash fields to the route's supported filters. */
+  readonly allowedFields?: readonly FilterField[];
 }
 
 type Suggestion =
@@ -148,6 +150,7 @@ export function PillSearch({
   onClose,
   ariaLabel = 'Filter tracks',
   placeholder = 'Type to filter — / for fields',
+  allowedFields,
 }: PillSearchProps) {
   const [text, setText] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -156,6 +159,14 @@ export function PillSearch({
   const wrapperRef = useRef<HTMLDivElement>(null);
   const listboxId = useId();
   const optionIdPrefix = useId();
+  const effectiveFields = useMemo(
+    () => allowedFields ?? (Object.keys(FIELD_LABEL) as FilterField[]),
+    [allowedFields]
+  );
+  const allowedFieldSet = useMemo(
+    () => new Set<FilterField>(effectiveFields),
+    [effectiveFields]
+  );
 
   useEffect(() => {
     if (!active) return undefined;
@@ -175,9 +186,8 @@ export function PillSearch({
 
     if (slash?.kind === 'choosing') {
       const q = slash.query.toLowerCase();
-      const fields = Object.keys(FIELD_LABEL) as FilterField[];
       const acc: Suggestion[] = [];
-      for (const f of fields) {
+      for (const f of effectiveFields) {
         const labelMatch = fuzzy(q, FIELD_LABEL[f]);
         const aliasMatch = Object.entries(SLASH_ALIAS).reduce(
           (m, [alias, target]) =>
@@ -195,6 +205,7 @@ export function PillSearch({
     }
 
     if (slash?.kind === 'scoped') {
+      if (!allowedFieldSet.has(slash.field)) return [];
       const q = slash.query.toLowerCase().trim();
       const opts = fieldValueOptions(
         slash.field,
@@ -216,33 +227,51 @@ export function PillSearch({
 
     const q = text.trim();
     const out: Suggestion[] = [];
-    artistOptions.forEach(v => {
-      const s = fuzzy(q, v);
-      if (s > 0)
-        out.push({ kind: 'value', field: 'artist', value: v, score: s + 5 });
-    });
-    titleOptions.forEach(v => {
-      const s = fuzzy(q, v);
-      if (s > 0)
-        out.push({ kind: 'value', field: 'title', value: v, score: s });
-    });
-    albumOptions.forEach(v => {
-      const s = fuzzy(q, v);
-      if (s > 0)
-        out.push({ kind: 'value', field: 'album', value: v, score: s });
-    });
-    STATUS_VALUES.forEach(v => {
-      const s = fuzzy(q, v);
-      if (s > 0)
-        out.push({ kind: 'value', field: 'status', value: v, score: s });
-    });
-    HAS_VALUES.forEach(v => {
-      const s = fuzzy(q, v);
-      if (s > 0) out.push({ kind: 'value', field: 'has', value: v, score: s });
-    });
+    if (allowedFieldSet.has('artist')) {
+      artistOptions.forEach(v => {
+        const s = fuzzy(q, v);
+        if (s > 0)
+          out.push({ kind: 'value', field: 'artist', value: v, score: s + 5 });
+      });
+    }
+    if (allowedFieldSet.has('title')) {
+      titleOptions.forEach(v => {
+        const s = fuzzy(q, v);
+        if (s > 0)
+          out.push({ kind: 'value', field: 'title', value: v, score: s });
+      });
+    }
+    if (allowedFieldSet.has('album')) {
+      albumOptions.forEach(v => {
+        const s = fuzzy(q, v);
+        if (s > 0)
+          out.push({ kind: 'value', field: 'album', value: v, score: s });
+      });
+    }
+    if (allowedFieldSet.has('status')) {
+      STATUS_VALUES.forEach(v => {
+        const s = fuzzy(q, v);
+        if (s > 0)
+          out.push({ kind: 'value', field: 'status', value: v, score: s });
+      });
+    }
+    if (allowedFieldSet.has('has')) {
+      HAS_VALUES.forEach(v => {
+        const s = fuzzy(q, v);
+        if (s > 0)
+          out.push({ kind: 'value', field: 'has', value: v, score: s });
+      });
+    }
     out.sort((a, b) => b.score - a.score);
     return out.slice(0, 8);
-  }, [text, artistOptions, titleOptions, albumOptions]);
+  }, [
+    allowedFieldSet,
+    artistOptions,
+    titleOptions,
+    albumOptions,
+    effectiveFields,
+    text,
+  ]);
 
   function commitSuggestion(sug: Suggestion) {
     if (sug.kind === 'value') {

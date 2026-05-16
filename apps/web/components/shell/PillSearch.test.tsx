@@ -64,6 +64,24 @@ describe('PillSearch', () => {
     });
   });
 
+  it('only suggests fields allowed by the route adapter', () => {
+    const { onPillsChange } = setup({ allowedFields: ['artist'] });
+    const input = screen.getByLabelText('Filter tracks');
+
+    fireEvent.change(input, { target: { value: 'Pyramids' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onPillsChange).not.toHaveBeenCalled();
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+
+    fireEvent.change(input, { target: { value: 'Frank' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onPillsChange).toHaveBeenCalledOnce();
+    expect(onPillsChange.mock.calls[0]![0][0]).toMatchObject({
+      field: 'artist',
+      values: ['Frank Ocean'],
+    });
+  });
+
   it('drops the last pill when Backspace is pressed on an empty input', () => {
     const { onPillsChange } = setup({
       pills: [

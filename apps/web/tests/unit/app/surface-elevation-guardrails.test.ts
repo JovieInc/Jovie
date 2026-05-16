@@ -263,6 +263,28 @@ describe('surface elevation guardrails', () => {
     expect(releaseMatrix).toContain("data-testid='release-table-shell'");
   });
 
+  it('routes shell release filters through the shared header search contract', () => {
+    const shellReleasesView = readFileSync(
+      join(
+        ROOT,
+        'components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView.tsx'
+      ),
+      'utf-8'
+    );
+    const authShellWrapper = readFileSync(
+      join(ROOT, 'components/organisms/AuthShellWrapper.tsx'),
+      'utf-8'
+    );
+
+    expect(shellReleasesView).toContain('useRegisterHeaderSearch');
+    expect(shellReleasesView).toContain("key: 'shell-releases'");
+    expect(shellReleasesView).toContain("triggerLabel: 'Filter'");
+    expect(shellReleasesView).not.toContain(
+      'const [searchOpen, setSearchOpen]'
+    );
+    expect(authShellWrapper).toContain('HeaderSearchSurface');
+  });
+
   it('keeps task and preview cards off the shell canvas token', () => {
     const files = [
       'components/features/dashboard/layout/PreviewPanel.tsx',
