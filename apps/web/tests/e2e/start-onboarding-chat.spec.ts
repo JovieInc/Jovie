@@ -58,6 +58,43 @@ function collectConsoleFailures(page: Page) {
   return failures;
 }
 
+async function suppressDevToolbar(page: Page) {
+  await page.addInitScript(() => {
+    localStorage.setItem('__dev_toolbar_hidden', '1');
+
+    const resetToolbarHeight = () => {
+      document.documentElement?.style.setProperty(
+        '--dev-toolbar-height',
+        '0px'
+      );
+    };
+
+    resetToolbarHeight();
+
+    const hideToolbar = () => {
+      resetToolbarHeight();
+      if (
+        !document.head ||
+        document.getElementById('jovie-e2e-hide-dev-toolbar')
+      ) {
+        return;
+      }
+      const style = document.createElement('style');
+      style.id = 'jovie-e2e-hide-dev-toolbar';
+      style.textContent = '[data-testid="dev-toolbar"]{display:none!important}';
+      document.head.appendChild(style);
+    };
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', hideToolbar, {
+        once: true,
+      });
+    } else {
+      hideToolbar();
+    }
+  });
+}
+
 function relevantConsoleFailures(failures: readonly string[]) {
   return failures.filter(
     failure => !IGNORABLE_CONSOLE_ERRORS.some(pattern => pattern.test(failure))
@@ -164,7 +201,7 @@ async function mockOnboardingChat(page: import('@playwright/test').Page) {
                 imageUrl: null,
                 followers: 12_300,
                 popularity: 48,
-                genres: ['indie pop'],
+                genres: ['progressive house'],
               },
               summary: 'Test Artist matched on Spotify.',
             },
@@ -200,6 +237,10 @@ async function mockOnboardingChatFailure(
 }
 
 test.describe('canonical /start onboarding chat', () => {
+  test.beforeEach(async ({ page }) => {
+    await suppressDevToolbar(page);
+  });
+
   test('redirect shims land on /start without loops', async ({ page }) => {
     const navigations: string[] = [];
     page.on('framenavigated', frame => {
@@ -363,7 +404,26 @@ test.describe('canonical /start onboarding chat', () => {
     await expect(
       page
         .getByTestId('onboarding-artist-confirmed')
-        .getByText('12.3K followers')
+        .getByTitle('12,300 Spotify followers')
+    ).toBeVisible();
+    await expect(
+      page
+        .getByTestId('onboarding-artist-confirmed')
+        .getByTitle('Popularity score: 48 out of 100')
+    ).toBeVisible();
+    await expect(
+      page
+        .getByTestId('onboarding-artist-confirmed')
+        .getByText('PROGRESSIVE HOUSE', { exact: true })
+    ).toBeVisible();
+    await expect(page.getByTestId('onboarding-profile-rail')).toHaveAttribute(
+      'data-visible',
+      'true'
+    );
+    await expect(
+      page
+        .getByTestId('onboarding-profile-rail')
+        .getByText('Building Test Artist')
     ).toBeVisible();
     await expect(
       page.getByText('find the exact Spotify profile')

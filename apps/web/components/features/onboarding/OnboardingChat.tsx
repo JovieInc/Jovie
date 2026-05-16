@@ -27,6 +27,10 @@ import {
   ChatProposeNextStepCard,
   type NextStepCardPayload,
 } from './ChatProposeNextStepCard';
+import type {
+  OnboardingProfileArtist,
+  OnboardingProfileBuilderState,
+} from './OnboardingProfileRail';
 import {
   type ArtistConfirmedOutput,
   type ArtistPickerOutput,
@@ -54,6 +58,10 @@ interface OnboardingChatProps {
   readonly turnstileToken: string | null;
   /** Fires after a submitted user turn reaches the ready state. */
   readonly onConversationActivity?: () => void;
+  /** Emits selected/matched profile state for the progressive builder rail. */
+  readonly onProfileBuilderChange?: (
+    state: OnboardingProfileBuilderState
+  ) => void;
 }
 
 /** Pull the user-visible text out of a UIMessage's parts. */
@@ -182,6 +190,83 @@ function getOnboardingErrorMessage(message: string): string {
     return 'Jovie is still connecting. Try again in a moment.';
   }
   return message;
+}
+
+function artistFromSelection(
+  artist: OnboardingArtistSelection | null
+): OnboardingProfileArtist | null {
+  if (!artist) return null;
+  return {
+    id: artist.id,
+    name: artist.name,
+    url: artist.url,
+    imageUrl: artist.imageUrl ?? null,
+    followers: artist.followers ?? null,
+    popularity: artist.popularity ?? null,
+    genres: [],
+  };
+}
+
+function artistFromConfirmedOutput(
+  output: ArtistConfirmedOutput
+): OnboardingProfileArtist | null {
+  const artist = output.artist;
+  if (!artist) return null;
+  return {
+    id: artist.id,
+    name: artist.name,
+    url: artist.url,
+    imageUrl: artist.imageUrl ?? null,
+    followers: artist.followers ?? null,
+    popularity: artist.popularity ?? null,
+    genres: artist.genres ?? [],
+  };
+}
+
+function cleanHandle(handle: string | undefined): string | null {
+  const cleaned = handle?.replace(/^@/, '').trim().toLowerCase();
+  return cleaned || null;
+}
+
+function deriveProfileBuilderState({
+  messages,
+  selectedArtist,
+}: {
+  readonly messages: readonly UIMessage[];
+  readonly selectedArtist: OnboardingArtistSelection | null;
+}): OnboardingProfileBuilderState {
+  let artist = artistFromSelection(selectedArtist);
+  let artistConfirmed = false;
+  let handle: string | null = null;
+  const socialLinks: string[] = [];
+
+  for (const message of messages) {
+    for (const part of getToolParts(message)) {
+      const output = part.output;
+
+      if (isArtistConfirmedOutput(output)) {
+        const confirmedArtist = artistFromConfirmedOutput(output);
+        artist = confirmedArtist ?? artist;
+        artistConfirmed =
+          Boolean(confirmedArtist) || Boolean(output.spotifyArtistId);
+      }
+
+      if (isHandleCheckOutput(output)) {
+        handle = cleanHandle(output.handle) ?? handle;
+      }
+
+      if (isSocialLinkOutput(output) && output.url) {
+        socialLinks.push(output.url);
+      }
+    }
+  }
+
+  return {
+    artist,
+    artistConfirmed,
+    handle,
+    socialLinks,
+  };
 }
 
 const renderSearchSpotifyArtist: OnboardingToolRenderer = ({
@@ -397,12 +482,15 @@ function OnboardingMessageList({
 
 export function OnboardingChat({
   onConversationActivity,
+  onProfileBuilderChange,
   turnstileToken,
 }: OnboardingChatProps) {
   const [input, setInput] = useState('');
   const [hasSentFirst, setHasSentFirst] = useState(false);
   const [chatError, setChatError] = useState<ChatError | null>(null);
   const [composerPickerOpen, setComposerPickerOpen] = useState(false);
+  const [selectedArtist, setSelectedArtist] =
+    useState<OnboardingArtistSelection | null>(null);
   const completedUserTurnsRef = useRef(0);
   const lastAttemptedMessageRef = useRef<string | null>(null);
   const formatArtistSelectionMessage = useArtistSelectionMessage();
@@ -512,10 +600,20 @@ export function OnboardingChat({
 
   const handleArtistSelect = useCallback(
     (artist: OnboardingArtistSelection) => {
+      setSelectedArtist(artist);
       submitText(formatArtistSelectionMessage(artist));
     },
     [formatArtistSelectionMessage, submitText]
   );
+
+  const profileBuilderState = useMemo(
+    () => deriveProfileBuilderState({ messages, selectedArtist }),
+    [messages, selectedArtist]
+  );
+
+  useEffect(() => {
+    onProfileBuilderChange?.(profileBuilderState);
+  }, [onProfileBuilderChange, profileBuilderState]);
 
   useEffect(() => {
     if (status !== 'ready') return;

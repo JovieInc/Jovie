@@ -5,9 +5,11 @@ import {
   AtSign,
   Check,
   ExternalLink,
+  Gauge,
   Link2,
   Loader2,
   Search,
+  Users,
 } from 'lucide-react';
 import Image from 'next/image';
 import type { ReactNode } from 'react';
@@ -78,17 +80,50 @@ function isFailed(state: ToolState): boolean {
   return state === 'output-error' || state === 'output-denied';
 }
 
-function formatFollowers(count: number | null | undefined): string | null {
+export function formatCompactCount(
+  count: number | null | undefined
+): string | null {
   if (typeof count !== 'number' || !Number.isFinite(count)) return null;
-  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M followers`;
-  if (count >= 1_000) return `${(count / 1_000).toFixed(1)}K followers`;
-  return `${count.toLocaleString('en-US')} followers`;
+  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
+  if (count >= 1_000) return `${(count / 1_000).toFixed(1)}K`;
+  return count.toLocaleString('en-US');
+}
+
+export function formatExactCount(
+  count: number | null | undefined
+): string | null {
+  if (typeof count !== 'number' || !Number.isFinite(count)) return null;
+  return count.toLocaleString('en-US');
+}
+
+export function formatGenreLabel(genre: string): string {
+  return genre.trim().toUpperCase();
+}
+
+function formatFollowers(count: number | null | undefined): string | null {
+  const compact = formatCompactCount(count);
+  return compact ? `${compact} followers` : null;
 }
 
 function hostnameFor(url: string | undefined): string | null {
   if (!url) return null;
   try {
     return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return null;
+  }
+}
+
+export function getSafeSpotifyArtistUrl(
+  url: string | null | undefined
+): string | null {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'https:') return null;
+    if (parsed.hostname !== 'open.spotify.com') return null;
+    if (!parsed.pathname.startsWith('/artist/')) return null;
+    return parsed.toString();
   } catch {
     return null;
   }
@@ -189,6 +224,31 @@ function ArtistAvatar({
     >
       {initials || <AtSign className='h-4 w-4' />}
     </div>
+  );
+}
+
+function MetadataChip({
+  children,
+  icon,
+  title,
+}: {
+  readonly children: ReactNode;
+  readonly icon?: ReactNode;
+  readonly title: string;
+}) {
+  return (
+    <span
+      title={title}
+      className='inline-flex h-6 items-center gap-1 rounded-full border border-subtle bg-surface-0 px-2 text-[11.5px] leading-none text-secondary-token'
+    >
+      {icon ? (
+        <span className='shrink-0 text-tertiary-token' aria-hidden>
+          {icon}
+        </span>
+      ) : null}
+      <span className='sr-only'>{title}</span>
+      <span aria-hidden>{children}</span>
+    </span>
   );
 }
 
@@ -431,15 +491,14 @@ export function OnboardingArtistConfirmedCard({
     );
   }
 
-  const followers = formatFollowers(artist.followers);
+  const followers = formatCompactCount(artist.followers);
+  const exactFollowers = formatExactCount(artist.followers);
   const genres = artist.genres?.slice(0, 2) ?? [];
-  const chips = [
-    followers,
-    typeof artist.popularity === 'number'
-      ? `Popularity ${artist.popularity}`
-      : null,
-    ...genres,
-  ].filter((value): value is string => Boolean(value));
+  const safeArtistUrl = getSafeSpotifyArtistUrl(artist.url);
+  const hasMetadata =
+    Boolean(followers) ||
+    typeof artist.popularity === 'number' ||
+    genres.length > 0;
 
   return (
     <div
@@ -457,28 +516,46 @@ export function OnboardingArtistConfirmedCard({
               Matched
             </span>
           </div>
-          {chips.length > 0 ? (
+          {hasMetadata ? (
             <div className='mt-2 flex flex-wrap gap-1.5'>
-              {chips.map(chip => (
-                <span
-                  key={chip}
-                  className='rounded-full border border-subtle bg-surface-0 px-2 py-0.5 text-[11.5px] leading-5 text-secondary-token'
+              {followers ? (
+                <MetadataChip
+                  title={`${exactFollowers ?? followers} Spotify followers`}
+                  icon={<Users className='h-3 w-3' />}
                 >
-                  {chip}
-                </span>
-              ))}
+                  {followers}
+                </MetadataChip>
+              ) : null}
+              {typeof artist.popularity === 'number' ? (
+                <MetadataChip
+                  title={`Popularity score: ${artist.popularity} out of 100`}
+                  icon={<Gauge className='h-3 w-3' />}
+                >
+                  {artist.popularity}
+                </MetadataChip>
+              ) : null}
+              {genres.map(genre => {
+                const label = formatGenreLabel(genre);
+                return (
+                  <MetadataChip key={genre} title={`Genre: ${label}`}>
+                    {label}
+                  </MetadataChip>
+                );
+              })}
             </div>
           ) : null}
         </div>
-        <a
-          href={artist.url}
-          target='_blank'
-          rel='noreferrer'
-          className='inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-subtle text-secondary-token transition-colors duration-fast hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20'
-          aria-label={`Open ${artist.name} on Spotify`}
-        >
-          <ExternalLink className='h-3.5 w-3.5' />
-        </a>
+        {safeArtistUrl ? (
+          <a
+            href={safeArtistUrl}
+            target='_blank'
+            rel='noreferrer'
+            className='inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-subtle text-secondary-token transition-colors duration-fast hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20'
+            aria-label={`Open ${artist.name} on Spotify`}
+          >
+            <ExternalLink className='h-3.5 w-3.5' />
+          </a>
+        ) : null}
       </div>
     </div>
   );
@@ -597,7 +674,7 @@ export function OnboardingSocialLinkCard({
 export function useArtistSelectionMessage() {
   return useMemo(
     () => (artist: OnboardingArtistSelection) =>
-      `I picked ${artist.name} on Spotify: ${artist.url}.`,
+      `I picked ${artist.name} on Spotify. Let's build my artist profile from here: ${artist.url}.`,
     []
   );
 }
