@@ -22,6 +22,18 @@ vi.mock('@/components/molecules/filters', () => ({
 }));
 
 vi.mock('@/components/organisms/table', () => ({
+  PageToolbar: ({
+    start,
+    end,
+  }: {
+    readonly start: ReactNode;
+    readonly end?: ReactNode;
+  }) => (
+    <div>
+      <div>{start}</div>
+      <div>{end}</div>
+    </div>
+  ),
   PageToolbarActionButton: ({
     ariaLabel,
     label,
