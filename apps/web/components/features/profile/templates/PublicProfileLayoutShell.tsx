@@ -69,13 +69,14 @@ export function PublicProfileLayoutShell({
           {shouldRenderHeading ? (
             <h1 className='sr-only'>{artistName}</h1>
           ) : null}
-          <div
-            aria-hidden={isDesktopLayout ? undefined : true}
-            className='public-profile-layout-desktop-shell'
-            data-testid='profile-desktop-shell'
-          >
-            {desktopSurface}
-          </div>
+          {isDesktopLayout ? (
+            <div
+              className='public-profile-layout-desktop-shell'
+              data-testid='profile-desktop-shell'
+            >
+              {desktopSurface}
+            </div>
+          ) : null}
           <div className='public-profile-layout-compact-slot'>
             {compactSurface}
           </div>
