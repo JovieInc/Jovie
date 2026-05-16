@@ -29,10 +29,15 @@ const satoshi = localFont({
   weight: '300 900',
 });
 
+// JOV-2267: DM Sans is only used in below-fold marketing sections
+// (HomeLoopDiagramSection, HomeStatQuoteSection, HomeBentoPairs) via
+// --marketing-font-body. Setting preload:false prevents a 68KB preload hint
+// on every page; display:'optional' already suppresses FOUT.
 const dmSans = localFont({
   src: '../public/fonts/DMSans-Latin.woff2',
   variable: '--font-dm-sans',
   display: 'optional',
+  preload: false,
   weight: '100 1000',
 });
 

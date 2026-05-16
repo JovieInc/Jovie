@@ -5,6 +5,15 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.2] - 2026-05-15
+
+> [internal] Marketing page performance: remove an unnecessary 68 KB font preload and reduce hero screenshot file size.
+
+### Changed
+
+- **[internal] DM Sans preload removed**: DM Sans is only used in below-fold marketing sections. Setting `preload: false` eliminates a 68 KB early-load hint emitted on every page without affecting visual quality — `display: optional` already suppresses FOUT (JOV-2267).
+- **[internal] Hero screenshot quality reduced**: Homepage hero product screenshots lowered from `quality=100` to `quality=85`. Next.js image compression cuts ~30–40% off JPEG/WebP bytes at this setting with no perceptible quality loss at marketing-page viewing distance (JOV-2264).
+
 ## [26.5.1] - 2026-05-15
 
 > [internal] Foundation schema and encrypted token vault for AI connector v1 (OAuth token storage, per-account refresh lock, 8 new tables, 7 new enums). Admin design-system polish: Title Case labels, no ALL-CAPS CSS transforms, and visible metric cards.

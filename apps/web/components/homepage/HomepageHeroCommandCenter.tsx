@@ -76,7 +76,7 @@ function ProductPane({
         fetchPriority={priority ? 'high' : 'auto'}
         sizes={sizes}
         className='homepage-product-pane__image'
-        quality={100}
+        quality={85}
       />
     </figure>
   );
