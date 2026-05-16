@@ -125,7 +125,8 @@ const EXPECTED_WARNING_PATTERNS = [
 ] as const;
 
 const EXPECTED_WARNING_REGEXES = [
-  /the resource https:\/\/.*\/npm\/@clerk\/ui@1(?:\.\d+\.\d+)?\/dist\/ui\.browser\.js was preloaded .* but not used/i,
+  // clerk-js@6 preload warning may still appear in dev/test environments where the
+  // /__clerk proxy URL is used as the preload host but the FAPI CNAME serves the script.
   /the resource https:\/\/.*\/npm\/@clerk\/clerk-js@6(?:\.\d+\.\d+)?\/dist\/clerk\.browser\.js was preloaded .* but not used/i,
 ] as const;
 

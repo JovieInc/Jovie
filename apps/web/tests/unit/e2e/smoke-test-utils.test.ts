@@ -50,9 +50,11 @@ describe('smoke-test-utils', () => {
         )
       ).toBe(true);
 
+      // clerk-js@6 preload warning may still appear in dev environments where the
+      // proxy URL host differs from the FAPI CNAME that ultimately serves the script.
       expect(
         isExpectedWarning(
-          "The resource https://distinct-giraffe-5.clerk.accounts.dev/npm/@clerk/ui@1/dist/ui.browser.js was preloaded using link preload but not used within a few seconds from the window's load event."
+          "The resource https://distinct-giraffe-5.clerk.accounts.dev/npm/@clerk/clerk-js@6/dist/clerk.browser.js was preloaded using link preload but not used within a few seconds from the window's load event."
         )
       ).toBe(true);
 
