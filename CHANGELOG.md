@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.14] - 2026-05-16
+
+> [internal] Desktop shell identity hardening: added a branded Electron recovery screen and bumped the DMG release version.
+
+### Fixed
+
+- [internal] **Desktop shell identity and failure fallback (JOV-2314)**: Electron launch failures now render a branded Jovie Desktop recovery surface with retry affordance instead of a blank or generic web failure. The desktop app name is set explicitly for production/staging, and the desktop release version is bumped so the next DMG carries the current app-shell identity.
+
 ## [26.5.13] - 2026-05-16
 
 > [internal] Security: drop unauthenticated scanner traffic at the edge so off-platform probe URLs no longer reach the page handler or generate observability warnings.
