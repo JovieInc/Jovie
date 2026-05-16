@@ -122,7 +122,7 @@ export function TaskListRow({
       data-selected={isSelected ? 'true' : undefined}
       data-testid={`task-list-row-${task.id}`}
       className={cn(
-        'relative grid h-full min-w-0 grid-cols-[1.25rem_minmax(0,1fr)_4.75rem] items-center gap-3 rounded-md border border-transparent px-2.5 py-1.5 transition-[background-color,border-color,box-shadow,opacity]',
+        'relative grid h-full min-w-0 grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-transparent px-2.5 py-1.5 transition-[background-color,border-color,box-shadow,opacity]',
         'group-hover/task-row:bg-[color-mix(in_oklab,var(--linear-row-hover)_72%,transparent)]',
         'group-focus-visible/task-row:border-[color-mix(in_oklab,var(--linear-border-focus)_58%,transparent)] group-focus-visible/task-row:bg-[color-mix(in_oklab,var(--linear-row-hover)_66%,var(--linear-app-content-surface))] group-focus-visible/task-row:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]',
         isSelected &&
@@ -183,8 +183,8 @@ export function TaskListRow({
         </div>
       </div>
 
-      <div className='flex min-w-[4.75rem] shrink-0 items-center justify-end gap-1.5'>
-        <div className='flex min-w-0 flex-1 items-center justify-end overflow-hidden'>
+      <div className='flex shrink-0 items-center justify-end gap-1.5'>
+        <div className='flex shrink-0 items-center justify-end'>
           {task.dueAt ? (
             <ReleaseDueBadge
               dueDate={task.dueAt}
