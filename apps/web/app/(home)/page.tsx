@@ -2,10 +2,13 @@ import { ArrowRight } from 'lucide-react';
 import type { Metadata } from 'next';
 import dynamic from 'next/dynamic';
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
+import { HomepageArtistProfilesCarouselLazy } from '@/components/homepage/HomepageArtistProfilesCarouselLazy';
 import { HomepageHeroCommandCenter } from '@/components/homepage/HomepageHeroCommandCenter';
 import { HomepageTrackedLink } from '@/components/homepage/HomepageTrackedLink';
+import { HomepageWorkspaceSectionLazy } from '@/components/homepage/HomepageWorkspaceSectionLazy';
 import { HERO_COPY } from '@/components/homepage/intent';
 import { FaqSection } from '@/components/marketing';
+import { FridayRhythmSectionLazy } from '@/components/marketing/FridayRhythmSectionLazy';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
@@ -20,16 +23,17 @@ import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
 
 // Below-the-fold sections are dynamic-loaded so their `motion/react`
-// hydration cost doesn't compete with above-the-fold work. SSR stays on
-// (SEO + initial HTML preserved) — only the client JS chunk is deferred.
+// hydration cost doesn't compete with above-the-fold work.
+//
 // JOV-1835: cuts homepage TBT from ~1365ms toward the 300ms budget.
-const FridayRhythmSection = dynamic(
-  () =>
-    import('@/components/marketing/friday-rhythm-section').then(m => ({
-      default: m.FridayRhythmSection,
-    })),
-  { ssr: true }
-);
+//
+// Sections that are not motion-heavy keep `ssr: true` so their HTML
+// stays in the initial document for SEO. The heaviest motion-driven
+// sections (FridayRhythmSection / HomepageWorkspaceSection /
+// HomepageArtistProfilesCarousel) live in their own `'use client'`
+// `*Lazy.tsx` shims that pass `ssr: false` to `next/dynamic` (forbidden
+// in Server Components in Next 15 App Router) so the JS chunk and
+// motion subscriptions don't load or execute on initial hydration.
 const HomepageV2Pricing = dynamic(
   () =>
     import('@/components/marketing/homepage-v2/HomepageV2Ctas').then(m => ({
@@ -69,20 +73,6 @@ const HomeStatQuoteSection = dynamic(
   () =>
     import('@/components/features/home/HomeStatQuoteSection').then(m => ({
       default: m.HomeStatQuoteSection,
-    })),
-  { ssr: true }
-);
-const HomepageWorkspaceSection = dynamic(
-  () =>
-    import('@/components/homepage/HomepageWorkspaceSection').then(m => ({
-      default: m.HomepageWorkspaceSection,
-    })),
-  { ssr: true }
-);
-const HomepageArtistProfilesCarousel = dynamic(
-  () =>
-    import('@/components/homepage/HomepageArtistProfilesCarousel').then(m => ({
-      default: m.HomepageArtistProfilesCarousel,
     })),
   { ssr: true }
 );
@@ -344,10 +334,10 @@ function HomepageUnlockedSections() {
       {FEATURE_FLAGS.SHOW_HOMEPAGE_GO_LIVE_SECTION ? (
         <HomepageGoLiveStepsSection />
       ) : null}
-      <HomepageWorkspaceSection screenshot={WORKSPACE_SCREENSHOT} />
-      <HomepageArtistProfilesCarousel cards={ARTIST_PROFILE_CARDS} />
+      <HomepageWorkspaceSectionLazy screenshot={WORKSPACE_SCREENSHOT} />
+      <HomepageArtistProfilesCarouselLazy cards={ARTIST_PROFILE_CARDS} />
       {FEATURE_FLAGS.SHOW_HOMEPAGE_FRIDAY_RHYTHM ? (
-        <FridayRhythmSection />
+        <FridayRhythmSectionLazy />
       ) : null}
       {FEATURE_FLAGS.SHOW_HOME_REFRESH_2026 ? <HomeBentoPairs /> : null}
       {FEATURE_FLAGS.SHOW_HOME_REFRESH_2026 ? <HomeLoopDiagramSection /> : null}
