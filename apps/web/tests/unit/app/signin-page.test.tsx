@@ -57,6 +57,10 @@ describe('signin page', () => {
     });
 
     expect(screen.getByTestId('clerk-sign-in')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Welcome back to Jovie.')
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Don't have access?")).not.toBeInTheDocument();
     expect(routerPrefetchMock).toHaveBeenCalledWith(APP_ROUTES.SIGNUP);
     expect(clerkSignInMock).toHaveBeenCalledWith(
       expect.objectContaining({

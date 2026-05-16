@@ -42,13 +42,13 @@ body:has(.home-viewport)::-webkit-scrollbar {
   --homepage-radius: 1rem;
   --homepage-hero-top: calc(
     var(--linear-header-height) +
-    clamp(8rem, 15.3vh, 10.5rem)
+    clamp(6.4rem, 11.6vh, 8.35rem)
   );
   --homepage-hero-copy-max: min(
     67.5rem,
     calc(100vw - var(--homepage-page-gutter) - var(--homepage-page-gutter))
   );
-  --homepage-hero-subhead-max: 44rem;
+  --homepage-hero-subhead-max: 38rem;
   --homepage-hero-cta-gap: 0.75rem;
   --homepage-carousel-width: 100vw;
   --homepage-carousel-stage-height: clamp(22rem, 31vw, 30rem);
@@ -336,7 +336,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   text-wrap: normal;
   margin-left: auto;
   margin-right: auto;
-  max-width: min(22ch, var(--homepage-hero-copy-max));
+  max-width: min(20ch, var(--homepage-hero-copy-max));
   color: rgb(252, 252, 252);
 }
 
@@ -2427,7 +2427,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   position: relative;
   width: 100vw;
   max-width: none;
-  margin-top: clamp(2.5rem, 4.4vw, 4rem);
+  margin-top: clamp(2.1rem, 3.2vw, 3.1rem);
   padding-inline: 0;
   overflow: hidden;
 }
@@ -4732,7 +4732,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 @media (max-width: 767px) {
   .homepage-hero-inner {
-    padding-top: calc(var(--linear-header-height) + 2.85rem);
+    padding-top: calc(var(--linear-header-height) + 2.45rem);
     padding-bottom: clamp(3.25rem, 9vw, 4.25rem);
   }
 
@@ -4743,10 +4743,10 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
   .homepage-hero-headline {
     font-family: -apple-system, system-ui, sans-serif;
-    max-width: 9.1ch;
-    font-size: clamp(3rem, 13vw, 3.85rem);
+    max-width: 11.8ch;
+    font-size: clamp(2.8rem, 11.6vw, 3.65rem);
     letter-spacing: 0;
-    line-height: 0.98;
+    line-height: 1;
   }
 
   .homepage-hero-command-center {
@@ -4755,7 +4755,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
       calc(100vw - var(--homepage-page-gutter) * 2),
       calc(var(--homepage-product-rail-height) * 1.6)
     );
-    margin-top: 2.2rem;
+    margin-top: 1.85rem;
   }
 
   .homepage-product-pane--release {

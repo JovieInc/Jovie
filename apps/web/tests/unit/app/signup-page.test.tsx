@@ -103,6 +103,10 @@ describe('signup page', () => {
     });
 
     expect(screen.getByTestId('clerk-sign-up')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Start your private launch request.')
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Don't have access?")).not.toBeInTheDocument();
     expect(routerPrefetchMock).toHaveBeenCalledWith(APP_ROUTES.WAITLIST);
     expect(clerkSignUpMock).toHaveBeenCalledWith(
       expect.objectContaining({

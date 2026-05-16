@@ -64,7 +64,7 @@ function SignupModalBody() {
 
   return (
     <AuthModalShell
-      ariaLabel='Create your Jovie account'
+      ariaLabel='Request access to Jovie'
       statusRow={statusRow}
       backButtonLabel={promptHint ? 'Back to chat' : 'Go back'}
     >

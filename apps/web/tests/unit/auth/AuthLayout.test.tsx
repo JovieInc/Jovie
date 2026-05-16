@@ -84,7 +84,7 @@ describe('AuthLayout', () => {
     );
   });
 
-  it('renders the footer prompt and link through the auth shell contract', async () => {
+  it('keeps the footer prompt opt-in through the auth shell contract', async () => {
     const { AuthLayout } = await import('@/features/auth/AuthLayout');
 
     render(
@@ -93,6 +93,7 @@ describe('AuthLayout', () => {
         footerPrompt='Need an account?'
         footerLinkText='Join now'
         footerLinkHref='/signup'
+        showFooterPrompt
       >
         <div>Auth form body</div>
       </AuthLayout>

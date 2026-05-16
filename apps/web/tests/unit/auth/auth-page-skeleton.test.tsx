@@ -7,15 +7,18 @@ vi.mock('@/features/auth/AuthLayout', () => ({
     children,
     formTitle,
     showFormTitle,
+    showFooterPrompt,
   }: {
     children: ReactNode;
     formTitle: string;
     showFormTitle?: boolean;
+    showFooterPrompt?: boolean;
   }) => (
     <div
       data-testid='auth-layout'
       data-form-title={formTitle}
       data-show-form-title={showFormTitle ? 'true' : 'false'}
+      data-show-footer-prompt={showFooterPrompt ? 'true' : 'false'}
     >
       {children}
     </div>
@@ -36,6 +39,10 @@ describe('AuthPageSkeleton', () => {
     );
     expect(screen.getByTestId('auth-layout')).toHaveAttribute(
       'data-show-form-title',
+      'false'
+    );
+    expect(screen.getByTestId('auth-layout')).toHaveAttribute(
+      'data-show-footer-prompt',
       'false'
     );
   });

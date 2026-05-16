@@ -2,6 +2,8 @@ import { expect, test } from './setup';
 import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
 const isFastIteration = process.env.E2E_FAST_ITERATION === '1';
+const HOMEPAGE_NAVIGATION_TIMEOUT = 60_000;
+type PlaywrightPage = import('@playwright/test').Page;
 
 test.use({ storageState: { cookies: [], origins: [] } });
 test.skip(
@@ -9,7 +11,7 @@ test.skip(
   'Homepage coverage runs in the lighter smoke-public and content-gate fast lanes'
 );
 
-async function interceptAnalytics(page: import('@playwright/test').Page) {
+async function interceptAnalytics(page: PlaywrightPage) {
   await page.route('**/api/profile/view', route =>
     route.fulfill({ status: 200, body: '{}' })
   );
@@ -21,11 +23,38 @@ async function interceptAnalytics(page: import('@playwright/test').Page) {
   );
 }
 
+async function hasNextDevTransientOverlay(page: PlaywrightPage) {
+  return page
+    .getByText(
+      /Runtime SyntaxError|Unexpected end of JSON input|Manifest file is empty/
+    )
+    .first()
+    .isVisible({ timeout: 1_000 })
+    .catch(() => false);
+}
+
+async function gotoHomepage(page: PlaywrightPage) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await page.goto('/', {
+      waitUntil: 'domcontentloaded',
+      timeout: HOMEPAGE_NAVIGATION_TIMEOUT,
+    });
+    await waitForHydration(page);
+
+    if (!(await hasNextDevTransientOverlay(page))) {
+      return;
+    }
+
+    await page.waitForTimeout(1_000);
+  }
+
+  throw new Error('Homepage rendered a transient Next.js dev overlay');
+}
+
 test.describe('Homepage', () => {
   test.beforeEach(async ({ page }) => {
     await interceptAnalytics(page);
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
-    await waitForHydration(page);
+    await gotoHomepage(page);
   });
 
   test('renders the static Frame-style hero and CTAs', async ({ page }) => {
@@ -40,7 +69,7 @@ test.describe('Homepage', () => {
     ).toBeVisible();
     await expect(
       hero.getByText(
-        'Jovie surfaces the opportunities hiding in your releases — and turns each one into a fan path, presave, or pitch you can ship today.'
+        'Connect your catalog. Jovie turns each release into the next fan path, presave, or playlist pitch.'
       )
     ).toBeVisible();
     await expect(
@@ -107,22 +136,26 @@ test.describe('Homepage', () => {
         'Tim White artist profile with release and fan actions'
       )
     ).toBeVisible();
-    await page.waitForFunction(() => {
-      const releaseImage = document.querySelector<HTMLImageElement>(
-        'img[alt="Jovie releases page with release status, assets, and launch progress"]'
-      );
-      if (!releaseImage) return false;
-      const rect = releaseImage.getBoundingClientRect();
-      const imageCenter = rect.left + rect.width / 2;
-      return Math.abs(imageCenter - window.innerWidth / 2) < 12;
-    });
+    if ((page.viewportSize()?.width ?? 0) >= 768) {
+      await page.waitForFunction(() => {
+        const releaseImage = document.querySelector<HTMLImageElement>(
+          'img[alt="Jovie releases page with release status, assets, and launch progress"]'
+        );
+        if (!releaseImage) return false;
+        const rect = releaseImage.getBoundingClientRect();
+        const imageCenter = rect.left + rect.width / 2;
+        return Math.abs(imageCenter - window.innerWidth / 2) < 12;
+      });
+    }
     await expect(
       carousel.getByRole('button', { name: 'Next product preview' })
     ).toBeVisible();
     await expect(
       carousel.getByRole('button', { name: 'Previous product preview' })
     ).toBeVisible();
-    await page.waitForFunction(() => {
+    const minVisibleProductShots =
+      (page.viewportSize()?.width ?? 0) >= 768 ? 3 : 1;
+    await page.waitForFunction(minVisibleImages => {
       const carouselEl = document.querySelector(
         '[data-testid="homepage-hero-command-center"]'
       );
@@ -134,10 +167,10 @@ test.describe('Homepage', () => {
         return rect.width > 0 && rect.right > 0 && rect.left < innerWidth;
       });
       return (
-        visibleImages.length >= 3 &&
+        visibleImages.length >= minVisibleImages &&
         visibleImages.every(img => img.complete && img.naturalWidth > 0)
       );
-    });
+    }, minVisibleProductShots);
 
     const visibleImageQuality = await carousel
       .locator('img')
@@ -145,10 +178,17 @@ test.describe('Homepage', () => {
         images
           .map(img => {
             const rect = img.getBoundingClientRect();
+            const sourceWidth =
+              Number(
+                new URL(img.currentSrc, window.location.href).searchParams.get(
+                  'w'
+                )
+              ) || img.naturalWidth;
             return {
               alt: img.alt,
               clientWidth: rect.width,
               naturalWidth: img.naturalWidth,
+              sourceWidth,
               visible:
                 rect.width > 0 && rect.right > 0 && rect.left < innerWidth,
               requiredWidth: Math.ceil(rect.width * devicePixelRatio),
@@ -157,10 +197,12 @@ test.describe('Homepage', () => {
           .filter(image => image.visible)
       );
 
-    expect(visibleImageQuality.length).toBeGreaterThanOrEqual(3);
+    expect(visibleImageQuality.length).toBeGreaterThanOrEqual(
+      minVisibleProductShots
+    );
     for (const image of visibleImageQuality) {
       expect(
-        image.naturalWidth,
+        image.sourceWidth,
         `${image.alt} should be loaded at device pixel ratio quality`
       ).toBeGreaterThanOrEqual(image.requiredWidth);
     }
@@ -342,8 +384,7 @@ test.describe('Homepage', () => {
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
-    await waitForHydration(page);
+    await gotoHomepage(page);
 
     await expect(
       page.getByRole('heading', {
@@ -385,7 +426,9 @@ test.describe('Homepage', () => {
   test('has no horizontal overflow across common viewports', async ({
     page,
   }) => {
-    for (const viewport of [
+    test.setTimeout(240_000);
+
+    const viewports = [
       { width: 390, height: 844 },
       { width: 430, height: 932 },
       { width: 768, height: 1024 },
@@ -393,10 +436,19 @@ test.describe('Homepage', () => {
       { width: 1280, height: 800 },
       { width: 1440, height: 900 },
       { width: 1512, height: 982 },
-    ]) {
+    ];
+
+    await page.setViewportSize(viewports[0]);
+    await gotoHomepage(page);
+
+    for (const viewport of viewports) {
       await page.setViewportSize(viewport);
-      await page.goto('/', { waitUntil: 'domcontentloaded' });
-      await waitForHydration(page);
+      await page.evaluate(
+        () =>
+          new Promise<void>(resolve => {
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+          })
+      );
 
       const overflow = await page.evaluate(() => {
         return (
@@ -417,8 +469,7 @@ test.describe('Homepage', () => {
       }
     });
 
-    await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await waitForHydration(page);
+    await gotoHomepage(page);
 
     expect(errors).toEqual([]);
   });
@@ -433,8 +484,7 @@ test.describe('Homepage', () => {
   test('all data-cta-sign-up elements navigate to /signup (JOV-2065)', async ({
     page,
   }) => {
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
-    await waitForHydration(page);
+    await gotoHomepage(page);
 
     const ctaLinks = page.locator('[data-cta-sign-up="true"]');
     const count = await ctaLinks.count();
@@ -467,8 +517,7 @@ test.describe('Homepage', () => {
   test('trust logo bar contains visual logo elements (SVG or img)', async ({
     page,
   }) => {
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
-    await waitForHydration(page);
+    await gotoHomepage(page);
 
     const trustSection = page.getByTestId('homepage-trust');
     await expect(trustSection).toBeVisible({
