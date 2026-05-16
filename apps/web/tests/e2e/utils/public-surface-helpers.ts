@@ -203,17 +203,21 @@ export async function assertPublicSurfaceHealthy(
 }
 
 /**
- * JOV-2145: assert that the marketing-glass-header flyouts ("Features",
- * "Resources" megamenus) start fully hidden on any surface that mounts
- * MarketingHeader. The flyout's visibility is CSS-only — without the
- * stylesheet, the DOM renders the menu content fully expanded as
- * unstyled text. Existing health checks (status, text length, overflow,
- * console errors, keyboard reach) all pass against that broken state,
- * which is why CI missed the regression.
+ * JOV-2145 / JOV-2147: assert that the marketing-glass-header flyouts
+ * ("Features", "Resources" megamenus) are not rendered when closed on any
+ * surface that mounts MarketingHeader.
  *
- * No-op on surfaces that don't mount the marketing header. Asserts all
- * three CSS props (visibility, opacity, pointer-events) so the assertion
- * can't false-pass mid-transition (the flyout uses a 130ms ease).
+ * After JOV-2147, flyouts use conditional render — they are only mounted in
+ * the DOM when open (always with the `--open` class). A closed flyout has no
+ * DOM node. This makes it impossible for flyout content to appear as unstyled
+ * text regardless of CSS availability, eliminating the JOV-2145 bug class.
+ *
+ * The assertion: any `.marketing-glass-header__flyout` node in the DOM on
+ * initial page load (before any user interaction) must not exist, because
+ * none should be open at that point. If a node is found without the `--open`
+ * class it means the conditional-render guard was removed, which is a bug.
+ *
+ * No-op on surfaces that don't mount the marketing header.
  */
 export async function assertMarketingHeaderFlyoutsHidden(
   page: Page,
@@ -224,35 +228,18 @@ export async function assertMarketingHeaderFlyoutsHidden(
     return;
   }
 
-  const flyouts = page.locator('.marketing-glass-header__flyout');
-  const flyoutCount = await flyouts.count();
-  if (flyoutCount === 0) {
-    return;
-  }
+  // After JOV-2147 (conditional render), closed flyouts are not in the DOM.
+  // Any flyout element present on initial load must have --open, meaning it
+  // was explicitly opened. On a fresh page load none should be open.
+  const closedFlyouts = page.locator(
+    '.marketing-glass-header__flyout:not(.marketing-glass-header__flyout--open)'
+  );
+  const closedCount = await closedFlyouts.count();
 
-  for (let i = 0; i < flyoutCount; i += 1) {
-    const computed = await flyouts.nth(i).evaluate(el => {
-      const style = getComputedStyle(el);
-      return {
-        visibility: style.visibility,
-        opacity: style.opacity,
-        pointerEvents: style.pointerEvents,
-      };
-    });
-
-    expect(
-      computed.visibility,
-      `${surface.id} flyout ${i} visibility (CSS missing? see JOV-2145)`
-    ).toBe('hidden');
-    expect(
-      Number.parseFloat(computed.opacity),
-      `${surface.id} flyout ${i} opacity`
-    ).toBe(0);
-    expect(
-      computed.pointerEvents,
-      `${surface.id} flyout ${i} pointer-events`
-    ).toBe('none');
-  }
+  expect(
+    closedCount,
+    `${surface.id}: found ${closedCount} closed flyout(s) in DOM — conditional render guard missing (JOV-2147)`
+  ).toBe(0);
 }
 
 async function visibleLocators(page: Page, selectors: readonly string[]) {

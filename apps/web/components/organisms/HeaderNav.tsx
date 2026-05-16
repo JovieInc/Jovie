@@ -159,15 +159,14 @@ function MarketingGlassFlyout({
   menu: HeaderFlyoutMenu;
   open: boolean;
 }>) {
+  if (!open) {
+    return null;
+  }
+
   return (
     <div
       id={`marketing-header-flyout-${menu.id}`}
-      className={cn(
-        'marketing-glass-header__flyout',
-        open && 'marketing-glass-header__flyout--open'
-      )}
-      aria-hidden={!open}
-      inert={!open}
+      className='marketing-glass-header__flyout marketing-glass-header__flyout--open'
     >
       <div className='marketing-glass-header__flyout-inner'>
         <p className='marketing-glass-header__flyout-heading'>{menu.heading}</p>
@@ -177,7 +176,6 @@ function MarketingGlassFlyout({
               href={link.href}
               key={`${menu.id}-${link.label}`}
               className='marketing-glass-header__flyout-link focus-ring-themed'
-              tabIndex={open ? undefined : -1}
             >
               <span
                 className='marketing-glass-header__flyout-number'

@@ -103,16 +103,27 @@ describe('HeaderNav flyout interactions', () => {
 
     const trigger = screen.getByRole('button', { name: /Features/ });
     const header = screen.getByTestId('header-nav');
-    const flyout = container.querySelector('#marketing-header-flyout-features');
+
+    // After JOV-2147 (conditional render): flyout is not in the DOM when closed.
+    expect(
+      container.querySelector('#marketing-header-flyout-features')
+    ).toBeNull();
 
     fireEvent.pointerEnter(trigger);
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
+
+    // Flyout is now in the DOM (conditionally rendered when open).
+    const flyout = container.querySelector('#marketing-header-flyout-features');
+    expect(flyout).not.toBeNull();
 
     fireEvent.pointerLeave(header, { relatedTarget: null });
     fireEvent.pointerEnter(flyout as Element);
     vi.advanceTimersByTime(220);
 
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
-    expect(flyout).toHaveAttribute('aria-hidden', 'false');
+    // Flyout stays mounted while open.
+    expect(
+      container.querySelector('#marketing-header-flyout-features')
+    ).not.toBeNull();
   });
 });
