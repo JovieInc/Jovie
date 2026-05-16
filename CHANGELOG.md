@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.9] - 2026-05-16
+
+> [internal] Bug fix: the onboarding claim endpoint no longer fires twice on a single /start page visit when Clerk's auth state updates mid-effect.
+
+### Fixed
+
+- [internal] **`useOnboardingClaim` duplicate request guard (JOV-2203)**: React 18 re-runs `useEffect` whenever any dependency changes. When Clerk's auth state transitions (`isLoaded false→true`, then `isSignedIn false→true`) on the same `claimTrigger` value, the effect could fire twice before the first `POST /api/onboarding/claim` resolved — sending a duplicate request. Added an `inflightTriggersRef` (`useRef<Set<number>>`) that gates the async work synchronously before the first `await`. The guard is cleared only after the fetch settles, not in the effect cleanup. Three Vitest tests verify: (1) sequential trigger advancement fires exactly once per trigger, (2) concurrent re-renders with a slow in-flight fetch fire exactly once, (3) retrying a signed-in user after chat activity advances the trigger correctly.
+
 ## [26.5.8] - 2026-05-16
 
 > [internal] AI Connector v1 — approve/reject/execute backend for the Gmail → Google Calendar booking flow. Closed beta only (flag-gated, default off). Artists never see this; it will be allowlisted for design-partner DJs post-merge.
