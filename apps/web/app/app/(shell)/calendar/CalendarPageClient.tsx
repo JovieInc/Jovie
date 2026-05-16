@@ -23,6 +23,11 @@ import {
   rejectEvents,
   undoRejectEvent,
 } from '@/app/app/(shell)/dashboard/tour-dates/events-actions';
+import {
+  PageContent,
+  PageHeader,
+  PageShell,
+} from '@/components/organisms/PageShell';
 import { getEventLocalDateKey } from '@/lib/events/date';
 import { normalizeTicketUrl } from '@/lib/events/ticket-url';
 import { queryKeys } from '@/lib/queries';
@@ -408,360 +413,358 @@ export function CalendarPageClient() {
   const isLoading = isLoadingReleases || isLoadingEvents;
 
   return (
-    <div className='flex h-full flex-col gap-6 p-6'>
-      <header className='flex flex-col gap-1'>
-        <h1
-          className='text-[24px] font-semibold leading-tight text-primary-token'
-          style={{ letterSpacing: '-0.018em' }}
-        >
-          Calendar
-        </h1>
-        <p className='text-[12.5px] text-tertiary-token'>
-          Releases and events — month at a glance.
-        </p>
-      </header>
-
-      <div className='flex items-center gap-3'>
-        <button
-          type='button'
-          onClick={() => {
-            const next = new Date(cursor);
-            next.setMonth(cursor.getMonth() - 1);
-            setCursor(startOfMonth(next));
-          }}
-          className='h-7 w-7 grid place-items-center rounded-md text-tertiary-token hover:text-primary-token hover:bg-surface-1/70 transition-colors duration-subtle ease-subtle'
-          aria-label='Previous month'
-        >
-          <ChevronLeft className='h-4 w-4' strokeWidth={2.25} />
-        </button>
-        <h2 className='text-[15px] font-medium text-primary-token tabular-nums'>
-          {MONTH_NAMES[cursor.getMonth()]} {cursor.getFullYear()}
-        </h2>
-        <button
-          type='button'
-          onClick={() => {
-            const next = new Date(cursor);
-            next.setMonth(cursor.getMonth() + 1);
-            setCursor(startOfMonth(next));
-          }}
-          className='h-7 w-7 grid place-items-center rounded-md text-tertiary-token hover:text-primary-token hover:bg-surface-1/70 transition-colors duration-subtle ease-subtle'
-          aria-label='Next month'
-        >
-          <ChevronRight className='h-4 w-4' strokeWidth={2.25} />
-        </button>
-        <button
-          type='button'
-          onClick={() => setCursor(startOfMonth(new Date()))}
-          className='ml-2 h-7 px-3 rounded-md text-[12px] font-caption text-tertiary-token hover:text-primary-token hover:bg-surface-1/70 transition-colors duration-subtle ease-subtle'
-        >
-          Today
-        </button>
-
-        <div className='ml-auto flex items-center gap-1'>
-          <FilterPill
-            label='All'
-            active={filter === 'all'}
-            onClick={() => setFilter('all')}
-          />
-          <FilterPill
-            label='Releases'
-            active={filter === 'releases'}
-            onClick={() => setFilter('releases')}
-          />
-          <FilterPill
-            label='Events'
-            active={filter === 'events'}
-            onClick={() => setFilter('events')}
-          />
-          <FilterPill
-            label={
-              'Needs review' + (pendingCount > 0 ? ' · ' + pendingCount : '')
-            }
-            active={filter === 'needs_review'}
-            onClick={() => setFilter('needs_review')}
-            tone={pendingCount > 0 ? 'warn' : 'default'}
-          />
-        </div>
-      </div>
-
-      <div className='rounded-xl border border-(--linear-app-shell-border) overflow-hidden bg-(--linear-app-content-surface)'>
-        <div className='grid grid-cols-7 border-b border-(--linear-app-shell-border)/60'>
-          {DAY_NAMES.map(d => (
-            <div
-              key={d}
-              className='px-2 py-2 text-[10.5px] font-caption uppercase tracking-[0.06em] text-quaternary-token text-center'
+    <PageShell>
+      <PageHeader
+        title='Calendar'
+        description='Releases and events at a glance.'
+        action={
+          <div className='flex flex-wrap items-center justify-end gap-1'>
+            <FilterPill
+              label='All'
+              active={filter === 'all'}
+              onClick={() => setFilter('all')}
+            />
+            <FilterPill
+              label='Releases'
+              active={filter === 'releases'}
+              onClick={() => setFilter('releases')}
+            />
+            <FilterPill
+              label='Events'
+              active={filter === 'events'}
+              onClick={() => setFilter('events')}
+            />
+            <FilterPill
+              label={
+                'Needs review' + (pendingCount > 0 ? ' · ' + pendingCount : '')
+              }
+              active={filter === 'needs_review'}
+              onClick={() => setFilter('needs_review')}
+              tone={pendingCount > 0 ? 'warn' : 'default'}
+            />
+          </div>
+        }
+      />
+      <PageContent>
+        <div className='flex h-full min-h-0 flex-col gap-4'>
+          <div className='flex flex-wrap items-center gap-3'>
+            <button
+              type='button'
+              onClick={() => {
+                const next = new Date(cursor);
+                next.setMonth(cursor.getMonth() - 1);
+                setCursor(startOfMonth(next));
+              }}
+              className='grid h-7 w-7 place-items-center rounded-md text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token'
+              aria-label='Previous month'
             >
-              {d}
-            </div>
-          ))}
-        </div>
-        <div className='grid grid-cols-7'>
-          {grid.map(cell => {
-            const key = localDateKey(cell.date);
-            const visibleReleases = cellShowsRelease ? cell.releases : [];
-            const visibleEvents = cell.events.filter(cellShowsEvent);
-            const hasContent =
-              visibleReleases.length > 0 || visibleEvents.length > 0;
-            const isSelected = selectedDay && isSameDay(cell.date, selectedDay);
-            const totalShown = Math.min(
-              3,
-              visibleReleases.length + visibleEvents.length
-            );
-            const overflow =
-              visibleReleases.length + visibleEvents.length - totalShown;
-            return (
-              <button
-                key={key}
-                type='button'
-                onClick={() => setSelectedDay(cell.date)}
-                className={cn(
-                  'relative flex flex-col items-start gap-1 min-h-[88px] px-2 pt-2 pb-1.5 border-b border-r border-(--linear-app-shell-border)/40 text-left transition-colors duration-subtle ease-subtle',
-                  cell.inMonth
-                    ? 'hover:bg-surface-1/40'
-                    : 'text-quaternary-token/70',
-                  isSelected && 'bg-cyan-300/[0.06]',
-                  cell.isToday &&
-                    'before:absolute before:left-1.5 before:top-1.5 before:h-1.5 before:w-1.5 before:rounded-full before:bg-cyan-300'
-                )}
-              >
-                <span
-                  className={cn(
-                    'text-[12px] font-caption tabular-nums',
-                    cell.isToday && 'pl-3 text-primary-token font-medium',
-                    !cell.isToday && cell.inMonth && 'text-secondary-token'
-                  )}
+              <ChevronLeft className='h-4 w-4' strokeWidth={2.25} />
+            </button>
+            <h2 className='text-[15px] font-medium text-primary-token tabular-nums'>
+              {MONTH_NAMES[cursor.getMonth()]} {cursor.getFullYear()}
+            </h2>
+            <button
+              type='button'
+              onClick={() => {
+                const next = new Date(cursor);
+                next.setMonth(cursor.getMonth() + 1);
+                setCursor(startOfMonth(next));
+              }}
+              className='grid h-7 w-7 place-items-center rounded-md text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token'
+              aria-label='Next month'
+            >
+              <ChevronRight className='h-4 w-4' strokeWidth={2.25} />
+            </button>
+            <button
+              type='button'
+              onClick={() => setCursor(startOfMonth(new Date()))}
+              className='h-7 rounded-md px-3 text-[12px] font-caption text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token'
+            >
+              Today
+            </button>
+          </div>
+
+          <div className='overflow-hidden rounded-lg border border-subtle bg-surface-1 shadow-card'>
+            <div className='grid grid-cols-7 border-b border-subtle'>
+              {DAY_NAMES.map(d => (
+                <div
+                  key={d}
+                  className='px-2 py-2 text-center text-[10.5px] font-caption text-quaternary-token'
                 >
-                  {cell.date.getDate()}
-                </span>
-                {hasContent && (
-                  <div className='flex flex-col gap-1 w-full'>
-                    {visibleReleases.slice(0, 3).map(r => (
-                      <div
-                        key={`r-${r.id}`}
-                        className='flex items-center gap-1.5 min-w-0'
-                        title={`${r.title} (${r.status})`}
-                      >
-                        <span
-                          aria-hidden='true'
-                          className={cn(
-                            'h-1.5 w-1.5 rounded-full shrink-0',
-                            statusTone(r.status)
-                          )}
-                        />
-                        <span className='text-[10.5px] text-secondary-token truncate'>
-                          {r.title}
-                        </span>
-                      </div>
-                    ))}
-                    {visibleEvents
-                      .slice(0, Math.max(0, 3 - visibleReleases.length))
-                      .map(e => (
-                        <div
-                          key={`e-${e.id}`}
-                          className='flex items-center gap-1.5 min-w-0'
-                          title={`${EVENT_TYPE_LABEL[e.eventType]} · ${e.subtitle}${e.confirmationStatus === 'pending' ? ' · pending review' : ''}`}
-                        >
-                          <span
-                            aria-hidden='true'
-                            className={eventDotClasses(e)}
-                          />
-                          <span
-                            className={cn(
-                              'text-[10.5px] truncate',
-                              e.confirmationStatus === 'pending'
-                                ? 'text-tertiary-token italic'
-                                : e.confirmationStatus === 'rejected'
-                                  ? 'text-quaternary-token line-through'
-                                  : 'text-secondary-token'
-                            )}
-                          >
-                            {e.title}
-                          </span>
-                        </div>
-                      ))}
-                    {overflow > 0 && (
-                      <span className='text-[10px] text-quaternary-token'>
-                        +{overflow} more
-                      </span>
+                  {d}
+                </div>
+              ))}
+            </div>
+            <div className='grid grid-cols-7'>
+              {grid.map(cell => {
+                const key = localDateKey(cell.date);
+                const visibleReleases = cellShowsRelease ? cell.releases : [];
+                const visibleEvents = cell.events.filter(cellShowsEvent);
+                const hasContent =
+                  visibleReleases.length > 0 || visibleEvents.length > 0;
+                const isSelected =
+                  selectedDay && isSameDay(cell.date, selectedDay);
+                const totalShown = Math.min(
+                  3,
+                  visibleReleases.length + visibleEvents.length
+                );
+                const overflow =
+                  visibleReleases.length + visibleEvents.length - totalShown;
+                return (
+                  <button
+                    key={key}
+                    type='button'
+                    onClick={() => setSelectedDay(cell.date)}
+                    className={cn(
+                      'relative flex min-h-[88px] flex-col items-start gap-1 border-(--linear-app-shell-border)/40 border-r border-b px-2 pt-2 pb-1.5 text-left transition-colors duration-subtle ease-subtle',
+                      cell.inMonth
+                        ? 'hover:bg-surface-0'
+                        : 'text-quaternary-token/70',
+                      isSelected && 'bg-cyan-300/[0.06]',
+                      cell.isToday &&
+                        'before:absolute before:top-1.5 before:left-1.5 before:h-1.5 before:w-1.5 before:rounded-full before:bg-cyan-300'
                     )}
-                  </div>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {selectedDay && (
-        <section className='rounded-xl border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) p-4'>
-          <h3 className='text-[13px] font-medium text-primary-token'>
-            {selectedDay.toLocaleDateString(undefined, {
-              weekday: 'long',
-              month: 'long',
-              day: 'numeric',
-              year: 'numeric',
-            })}
-          </h3>
-
-          {actionError && (
-            <p className='mt-2 text-[12px] text-red-300'>{actionError}</p>
-          )}
-
-          {/* Releases */}
-          {selectedReleases.length > 0 && (
-            <div className='mt-3'>
-              <h4 className='text-[11px] font-caption uppercase tracking-[0.06em] text-quaternary-token'>
-                Releases
-              </h4>
-              <ul className='mt-2 flex flex-col gap-2'>
-                {selectedReleases.map(r => (
-                  <li key={r.id} className='flex items-center gap-3'>
-                    <div className='relative h-9 w-9 rounded overflow-hidden bg-surface-2 shrink-0'>
-                      {r.artworkUrl && (
-                        <Image
-                          src={r.artworkUrl}
-                          alt=''
-                          fill
-                          sizes='36px'
-                          className='object-cover'
-                          unoptimized
-                        />
+                  >
+                    <span
+                      className={cn(
+                        'text-[12px] font-caption tabular-nums',
+                        cell.isToday && 'pl-3 font-medium text-primary-token',
+                        !cell.isToday && cell.inMonth && 'text-secondary-token'
                       )}
-                    </div>
-                    <div className='min-w-0 flex-1'>
-                      <div className='text-[12.5px] font-caption text-primary-token truncate'>
-                        {r.title}
+                    >
+                      {cell.date.getDate()}
+                    </span>
+                    {hasContent && (
+                      <div className='flex w-full flex-col gap-1'>
+                        {visibleReleases.slice(0, 3).map(r => (
+                          <div
+                            key={`r-${r.id}`}
+                            className='flex min-w-0 items-center gap-1.5'
+                            title={`${r.title} (${r.status})`}
+                          >
+                            <span
+                              aria-hidden='true'
+                              className={cn(
+                                'h-1.5 w-1.5 shrink-0 rounded-full',
+                                statusTone(r.status)
+                              )}
+                            />
+                            <span className='truncate text-[10.5px] text-secondary-token'>
+                              {r.title}
+                            </span>
+                          </div>
+                        ))}
+                        {visibleEvents
+                          .slice(0, Math.max(0, 3 - visibleReleases.length))
+                          .map(e => (
+                            <div
+                              key={`e-${e.id}`}
+                              className='flex min-w-0 items-center gap-1.5'
+                              title={`${EVENT_TYPE_LABEL[e.eventType]} · ${e.subtitle}${e.confirmationStatus === 'pending' ? ' · pending review' : ''}`}
+                            >
+                              <span
+                                aria-hidden='true'
+                                className={eventDotClasses(e)}
+                              />
+                              <span
+                                className={cn(
+                                  'truncate text-[10.5px]',
+                                  e.confirmationStatus === 'pending'
+                                    ? 'text-tertiary-token italic'
+                                    : e.confirmationStatus === 'rejected'
+                                      ? 'text-quaternary-token line-through'
+                                      : 'text-secondary-token'
+                                )}
+                              >
+                                {e.title}
+                              </span>
+                            </div>
+                          ))}
+                        {overflow > 0 && (
+                          <span className='text-[10px] text-quaternary-token'>
+                            +{overflow} more
+                          </span>
+                        )}
                       </div>
-                      <div className='text-[10.5px] text-tertiary-token capitalize'>
-                        {r.status}
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+                    )}
+                  </button>
+                );
+              })}
             </div>
-          )}
+          </div>
 
-          {/* Confirmed events */}
-          {confirmedSelectedEvents.length > 0 && (
-            <div className='mt-4'>
-              <h4 className='text-[11px] font-caption uppercase tracking-[0.06em] text-quaternary-token'>
-                Events
-              </h4>
-              <ul className='mt-2 flex flex-col gap-2'>
-                {confirmedSelectedEvents.map(e => (
-                  <EventRow
-                    key={e.id}
-                    event={e}
-                    variant='confirmed'
-                    onReject={() => handleReject(e.id)}
-                    disabled={isActionPending}
-                  />
-                ))}
-              </ul>
-            </div>
-          )}
+          {selectedDay && (
+            <section className='rounded-lg border border-subtle bg-surface-1 p-4 shadow-card'>
+              <h3 className='text-[13px] font-medium text-primary-token'>
+                {selectedDay.toLocaleDateString(undefined, {
+                  weekday: 'long',
+                  month: 'long',
+                  day: 'numeric',
+                  year: 'numeric',
+                })}
+              </h3>
 
-          {/* Pending events — the trust queue */}
-          {pendingSelectedEvents.length > 0 && (
-            <div className='mt-4'>
-              <div className='flex items-center justify-between'>
-                <h4 className='text-[11px] font-caption uppercase tracking-[0.06em] text-amber-400/90'>
-                  Pending review · {pendingSelectedEvents.length}
-                </h4>
-              </div>
-              <ul className='mt-2 flex flex-col gap-2'>
-                {pendingSelectedEvents.map(e => (
-                  <EventRow
-                    key={e.id}
-                    event={e}
-                    variant='pending'
-                    selected={selectedPendingIds.has(e.id)}
-                    onToggleSelect={() => togglePendingSelected(e.id)}
-                    onConfirm={() => handleConfirm(e.id)}
-                    onReject={() => handleReject(e.id)}
-                    disabled={isActionPending}
-                  />
-                ))}
-              </ul>
-              {selectedPendingIds.size > 0 && (
-                <div className='mt-3 flex items-center gap-2'>
-                  <button
-                    type='button'
-                    onClick={handleBulkConfirm}
-                    disabled={isActionPending}
-                    className='h-7 px-3 rounded-md text-[12px] font-caption bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 transition-colors'
-                  >
-                    Confirm selected ({selectedPendingIds.size})
-                  </button>
-                  <button
-                    type='button'
-                    onClick={handleBulkReject}
-                    disabled={isActionPending}
-                    className='h-7 px-3 rounded-md text-[12px] font-caption bg-red-500/15 text-red-300 hover:bg-red-500/25 transition-colors'
-                  >
-                    Reject selected ({selectedPendingIds.size})
-                  </button>
-                  <button
-                    type='button'
-                    onClick={() => setSelectedPendingIds(new Set())}
-                    disabled={isActionPending}
-                    className='h-7 px-2 rounded-md text-[11px] text-tertiary-token hover:text-primary-token transition-colors'
-                  >
-                    Clear
-                  </button>
+              {actionError && (
+                <p className='mt-2 text-[12px] text-red-300'>{actionError}</p>
+              )}
+
+              {/* Releases */}
+              {selectedReleases.length > 0 && (
+                <div className='mt-3'>
+                  <h4 className='text-[11px] font-caption text-quaternary-token'>
+                    Releases
+                  </h4>
+                  <ul className='mt-2 flex flex-col gap-2'>
+                    {selectedReleases.map(r => (
+                      <li key={r.id} className='flex items-center gap-3'>
+                        <div className='relative h-9 w-9 rounded overflow-hidden bg-surface-2 shrink-0'>
+                          {r.artworkUrl && (
+                            <Image
+                              src={r.artworkUrl}
+                              alt=''
+                              fill
+                              sizes='36px'
+                              className='object-cover'
+                              unoptimized
+                            />
+                          )}
+                        </div>
+                        <div className='min-w-0 flex-1'>
+                          <div className='text-[12.5px] font-caption text-primary-token truncate'>
+                            {r.title}
+                          </div>
+                          <div className='text-[10.5px] text-tertiary-token capitalize'>
+                            {r.status}
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               )}
-            </div>
-          )}
 
-          {/* Rejected events — collapsed by default */}
-          {rejectedSelectedEvents.length > 0 && (
-            <div className='mt-4'>
-              <button
-                type='button'
-                onClick={() => setShowRejected(s => !s)}
-                aria-expanded={showRejected}
-                aria-controls='rejected-events-list'
-                className='text-[11px] font-caption uppercase tracking-[0.06em] text-quaternary-token hover:text-tertiary-token transition-colors'
-              >
-                {showRejected
-                  ? 'Hide rejected'
-                  : `Show rejected · ${rejectedSelectedEvents.length}`}
-              </button>
-              {showRejected && (
-                <ul
-                  id='rejected-events-list'
-                  className='mt-2 flex flex-col gap-2'
-                >
-                  {rejectedSelectedEvents.map(e => (
-                    <EventRow
-                      key={e.id}
-                      event={e}
-                      variant='rejected'
-                      onUndoReject={() => handleUndoReject(e.id)}
-                      disabled={isActionPending}
-                    />
-                  ))}
-                </ul>
+              {/* Confirmed events */}
+              {confirmedSelectedEvents.length > 0 && (
+                <div className='mt-4'>
+                  <h4 className='text-[11px] font-caption text-quaternary-token'>
+                    Events
+                  </h4>
+                  <ul className='mt-2 flex flex-col gap-2'>
+                    {confirmedSelectedEvents.map(e => (
+                      <EventRow
+                        key={e.id}
+                        event={e}
+                        variant='confirmed'
+                        onReject={() => handleReject(e.id)}
+                        disabled={isActionPending}
+                      />
+                    ))}
+                  </ul>
+                </div>
               )}
+
+              {/* Pending events — the trust queue */}
+              {pendingSelectedEvents.length > 0 && (
+                <div className='mt-4'>
+                  <div className='flex items-center justify-between'>
+                    <h4 className='text-[11px] font-caption text-amber-400/90'>
+                      Pending review · {pendingSelectedEvents.length}
+                    </h4>
+                  </div>
+                  <ul className='mt-2 flex flex-col gap-2'>
+                    {pendingSelectedEvents.map(e => (
+                      <EventRow
+                        key={e.id}
+                        event={e}
+                        variant='pending'
+                        selected={selectedPendingIds.has(e.id)}
+                        onToggleSelect={() => togglePendingSelected(e.id)}
+                        onConfirm={() => handleConfirm(e.id)}
+                        onReject={() => handleReject(e.id)}
+                        disabled={isActionPending}
+                      />
+                    ))}
+                  </ul>
+                  {selectedPendingIds.size > 0 && (
+                    <div className='mt-3 flex items-center gap-2'>
+                      <button
+                        type='button'
+                        onClick={handleBulkConfirm}
+                        disabled={isActionPending}
+                        className='h-7 px-3 rounded-md text-[12px] font-caption bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 transition-colors'
+                      >
+                        Confirm selected ({selectedPendingIds.size})
+                      </button>
+                      <button
+                        type='button'
+                        onClick={handleBulkReject}
+                        disabled={isActionPending}
+                        className='h-7 px-3 rounded-md text-[12px] font-caption bg-red-500/15 text-red-300 hover:bg-red-500/25 transition-colors'
+                      >
+                        Reject selected ({selectedPendingIds.size})
+                      </button>
+                      <button
+                        type='button'
+                        onClick={() => setSelectedPendingIds(new Set())}
+                        disabled={isActionPending}
+                        className='h-7 px-2 rounded-md text-[11px] text-tertiary-token hover:text-primary-token transition-colors'
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Rejected events — collapsed by default */}
+              {rejectedSelectedEvents.length > 0 && (
+                <div className='mt-4'>
+                  <button
+                    type='button'
+                    onClick={() => setShowRejected(s => !s)}
+                    aria-expanded={showRejected}
+                    aria-controls='rejected-events-list'
+                    className='text-[11px] font-caption text-quaternary-token transition-colors hover:text-tertiary-token'
+                  >
+                    {showRejected
+                      ? 'Hide rejected'
+                      : `Show rejected · ${rejectedSelectedEvents.length}`}
+                  </button>
+                  {showRejected && (
+                    <ul
+                      id='rejected-events-list'
+                      className='mt-2 flex flex-col gap-2'
+                    >
+                      {rejectedSelectedEvents.map(e => (
+                        <EventRow
+                          key={e.id}
+                          event={e}
+                          variant='rejected'
+                          onUndoReject={() => handleUndoReject(e.id)}
+                          disabled={isActionPending}
+                        />
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              {selectedReleases.length === 0 && selectedEvents.length === 0 && (
+                <p className='mt-2 text-[12px] text-tertiary-token'>
+                  Nothing on this day.
+                </p>
+              )}
+            </section>
+          )}
+
+          {isLoading && (
+            <div className='text-[12px] text-quaternary-token'>
+              Loading calendar…
             </div>
           )}
-
-          {selectedReleases.length === 0 && selectedEvents.length === 0 && (
-            <p className='mt-2 text-[12px] text-tertiary-token'>
-              Nothing on this day.
-            </p>
-          )}
-        </section>
-      )}
-
-      {isLoading && (
-        <div className='text-[12px] text-quaternary-token'>
-          Loading calendar…
         </div>
-      )}
-    </div>
+      </PageContent>
+    </PageShell>
   );
 }
 
@@ -779,7 +782,7 @@ function FilterPill(props: FilterPillProps) {
       onClick={props.onClick}
       aria-pressed={props.active}
       className={cn(
-        'h-7 px-3 rounded-md text-[11.5px] font-caption transition-colors duration-subtle ease-subtle',
+        'h-7 rounded-md px-3 text-[11.5px] font-caption transition-colors duration-subtle ease-subtle',
         props.active
           ? props.tone === 'warn'
             ? 'bg-amber-400/15 text-amber-300'
@@ -827,7 +830,7 @@ function EventRow(props: EventRowProps) {
           <ProviderChip provider={event.provider ?? 'Manual'} />
           <TypeChip type={event.eventType} />
           {event.status && (
-            <span className='text-[10.5px] text-amber-400/90 uppercase tracking-[0.04em]'>
+            <span className='text-[10.5px] text-amber-400/90'>
               {event.status}
             </span>
           )}
@@ -852,7 +855,7 @@ function EventRow(props: EventRowProps) {
             href={safeTicketUrl}
             target='_blank'
             rel='noreferrer'
-            className='h-7 px-2 grid place-items-center rounded-md text-[11px] text-tertiary-token hover:text-primary-token hover:bg-surface-1/70 transition-colors'
+            className='grid h-7 place-items-center rounded-md px-2 text-[11px] text-tertiary-token transition-colors hover:bg-surface-1 hover:text-primary-token'
           >
             Tickets
           </a>
@@ -908,7 +911,7 @@ type ProviderChipProps = Readonly<{
 
 function ProviderChip({ provider }: ProviderChipProps) {
   return (
-    <span className='text-[10px] uppercase tracking-[0.06em] px-1.5 py-0.5 rounded bg-surface-1 text-quaternary-token'>
+    <span className='rounded bg-surface-0 px-1.5 py-0.5 text-[10px] text-quaternary-token'>
       {provider}
     </span>
   );
@@ -920,7 +923,7 @@ type TypeChipProps = Readonly<{
 
 function TypeChip({ type }: TypeChipProps) {
   return (
-    <span className='text-[10px] uppercase tracking-[0.06em] px-1.5 py-0.5 rounded bg-violet-400/15 text-violet-300'>
+    <span className='rounded bg-violet-400/15 px-1.5 py-0.5 text-[10px] text-violet-300'>
       {EVENT_TYPE_LABEL[type]}
     </span>
   );
