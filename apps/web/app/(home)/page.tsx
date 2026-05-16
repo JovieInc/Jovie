@@ -20,15 +20,32 @@ import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
 
 // Below-the-fold sections are dynamic-loaded so their `motion/react`
-// hydration cost doesn't compete with above-the-fold work. SSR stays on
-// (SEO + initial HTML preserved) — only the client JS chunk is deferred.
+// hydration cost doesn't compete with above-the-fold work.
+//
 // JOV-1835: cuts homepage TBT from ~1365ms toward the 300ms budget.
+//
+// The heaviest motion-driven sections (`HomepageWorkspaceSection` runs
+// `useScroll` + 7 `useTransform`s on hydration) ship with `ssr: false`
+// and a fixed-height server-rendered placeholder. The placeholder reserves
+// the visual height upfront so there's no layout shift, while the client
+// chunk + motion subscriptions don't load or execute on initial hydration.
+// Other below-the-fold sections keep `ssr: true` so their HTML stays in
+// the initial document for SEO.
 const FridayRhythmSection = dynamic(
   () =>
     import('@/components/marketing/friday-rhythm-section').then(m => ({
       default: m.FridayRhythmSection,
     })),
-  { ssr: true }
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        aria-hidden='true'
+        className='w-full'
+        style={{ minHeight: 'min(96svh, 760px)' }}
+      />
+    ),
+  }
 );
 const HomepageV2Pricing = dynamic(
   () =>
@@ -72,19 +89,70 @@ const HomeStatQuoteSection = dynamic(
     })),
   { ssr: true }
 );
+// `HomepageWorkspaceSection` is the single biggest TBT contributor in
+// CI (motion `useScroll` + 7 `useTransform` derivations subscribe to
+// scroll on hydration). Defer its JS entirely; the placeholder reuses
+// the same outer CSS shell so its rendered height matches the real
+// component to avoid CLS when the chunk mounts.
 const HomepageWorkspaceSection = dynamic(
   () =>
     import('@/components/homepage/HomepageWorkspaceSection').then(m => ({
       default: m.HomepageWorkspaceSection,
     })),
-  { ssr: true }
+  {
+    ssr: false,
+    loading: () => (
+      <section
+        aria-hidden='true'
+        data-testid='homepage-workspace-section-placeholder'
+        className='homepage-workspace-section'
+      >
+        <div className='homepage-workspace-section__inner'>
+          <div className='homepage-workspace-section__copy'>
+            <h2 style={{ visibility: 'hidden' }}>
+              {HOMEPAGE_LAUNCH_COPY.workspace.headline.split('\n').map(line => (
+                <span key={line}>{line}</span>
+              ))}
+            </h2>
+          </div>
+          <div className='homepage-workspace-visual' />
+        </div>
+      </section>
+    ),
+  }
 );
+// `HomepageArtistProfilesCarousel` is a horizontally-scrollable client
+// rail with lazy images. Defer its JS chunk; the placeholder reuses
+// the same outer CSS classes plus a reserved rail height to avoid
+// CLS when the chunk mounts.
 const HomepageArtistProfilesCarousel = dynamic(
   () =>
     import('@/components/homepage/HomepageArtistProfilesCarousel').then(m => ({
       default: m.HomepageArtistProfilesCarousel,
     })),
-  { ssr: true }
+  {
+    ssr: false,
+    loading: () => (
+      <section
+        aria-hidden='true'
+        data-testid='homepage-artist-profiles-section-placeholder'
+        className='homepage-artist-profiles-section'
+      >
+        <div className='homepage-artist-profiles-section__inner'>
+          <div className='homepage-artist-profiles-section__header'>
+            <h2 style={{ visibility: 'hidden' }}>
+              <span>{HOMEPAGE_LAUNCH_COPY.artistProfiles.headline}</span>
+              <span>{HOMEPAGE_LAUNCH_COPY.artistProfiles.headlineAccent}</span>
+            </h2>
+          </div>
+          <div
+            className='homepage-artist-profiles-carousel'
+            style={{ minHeight: 'clamp(28rem, 56vw, 38rem)' }}
+          />
+        </div>
+      </section>
+    ),
+  }
 );
 
 const HERO_PRODUCT_IMAGES = {
