@@ -1,9 +1,9 @@
-import { auth } from '@clerk/nextjs/server';
 import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import type { ConnectorStatus } from '@/components/features/connectors/ConnectorCard';
 import { APP_ROUTES } from '@/constants/routes';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import {
@@ -31,7 +31,7 @@ function toConnectorStatus(
 }
 
 export default async function SettingsConnectorsPage() {
-  const { userId: clerkId } = await auth();
+  const { userId: clerkId } = await getCachedAuth();
   if (!clerkId) {
     redirect(APP_ROUTES.DASHBOARD);
   }
