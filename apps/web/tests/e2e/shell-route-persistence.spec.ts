@@ -363,7 +363,11 @@ test('app shell persists across core app routes without duplicate request bursts
   await assertPersistentShellFrame(page, 'library route');
   await assertNoDocumentReloadSince(page, baselineLoadCount, 'library route');
 
-  await clickFirstVisibleAppLink(page, [APP_ROUTES.CHAT], [APP_ROUTES.CHAT]);
+  await clickFirstVisibleAppLink(
+    page,
+    [APP_ROUTES.CHAT],
+    [APP_ROUTES.CHAT, chatThreadPath]
+  );
   await expectRouteContent(page, 'chat');
   await assertPersistentShellFrame(page, 'library back route');
   await assertNoDocumentReloadSince(

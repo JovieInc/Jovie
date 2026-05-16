@@ -21,7 +21,14 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { type CSSProperties, useEffect, useMemo, useState } from 'react';
+import {
+  type CSSProperties,
+  type ReactNode,
+  useEffect,
+  useId,
+  useMemo,
+  useState,
+} from 'react';
 import { OPEN_COMMAND_PALETTE_EVENT } from '@/components/organisms/command-palette-events';
 import { ShellDropdown } from '@/components/shell/ShellDropdown';
 import { Tooltip } from '@/components/shell/Tooltip';
@@ -509,14 +516,20 @@ function FilterSection({
   children,
 }: {
   readonly label: string;
-  readonly children: React.ReactNode;
+  readonly children: ReactNode;
 }) {
   const [open, setOpen] = useState(true);
+  const disclosureId = useId();
+  const buttonId = `${disclosureId}-button`;
+  const panelId = `${disclosureId}-panel`;
 
   return (
     <div className='pt-2'>
       <button
+        id={buttonId}
         type='button'
+        aria-controls={panelId}
+        aria-expanded={open}
         onClick={() => setOpen(value => !value)}
         className='flex h-6 w-full items-center justify-between rounded-md px-1 text-[11px] font-medium text-tertiary-token transition-colors duration-subtle hover:bg-surface-1 hover:text-primary-token'
       >
@@ -529,7 +542,15 @@ function FilterSection({
           aria-hidden='true'
         />
       </button>
-      {open ? <div className='space-y-px pt-0.5'>{children}</div> : null}
+      {open ? (
+        <section
+          id={panelId}
+          aria-labelledby={buttonId}
+          className='space-y-px pt-0.5'
+        >
+          {children}
+        </section>
+      ) : null}
     </div>
   );
 }
@@ -969,10 +990,12 @@ function AssetDrawer({
   }, [asset]);
 
   const current = asset ?? stickyAsset;
+  const closedInteractiveProps = open ? {} : { tabIndex: -1 };
 
   return (
     <aside
       aria-hidden={!open}
+      inert={open ? undefined : true}
       className={cn(
         'overflow-hidden border-l border-subtle bg-surface-0 transition-[opacity,transform] duration-cinematic ease-cinematic',
         'fixed inset-x-3 bottom-3 top-16 z-40 rounded-lg border shadow-[0_18px_48px_rgba(0,0,0,0.28)] lg:static lg:z-auto lg:rounded-none lg:border-y-0 lg:border-r-0 lg:shadow-none',
@@ -992,6 +1015,7 @@ function AssetDrawer({
               type='button'
               onClick={onClose}
               aria-label='Close asset details'
+              {...closedInteractiveProps}
               className='grid h-7 w-7 place-items-center rounded-md text-tertiary-token transition-colors duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
             >
               <X className='h-3.5 w-3.5' />
@@ -1031,6 +1055,7 @@ function AssetDrawer({
             <div className='mt-4 flex flex-wrap gap-1.5'>
               <Link
                 href={current.smartLinkPath}
+                {...closedInteractiveProps}
                 className='inline-flex h-8 items-center gap-1.5 rounded-md border border-subtle bg-surface-1 px-3 text-xs font-medium text-primary-token transition-[background-color,border-color] duration-subtle hover:border-default hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token'
               >
                 Open Release
@@ -1041,6 +1066,7 @@ function AssetDrawer({
                   href={current.previewUrl}
                   target='_blank'
                   rel='noopener noreferrer'
+                  {...closedInteractiveProps}
                   className='inline-flex h-8 items-center gap-1.5 rounded-md border border-subtle bg-surface-1 px-3 text-xs font-medium text-primary-token transition-[background-color,border-color] duration-subtle hover:border-default hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token'
                 >
                   <PlayCircle className='h-3 w-3' />
@@ -1102,6 +1128,7 @@ function AssetDrawer({
                       href={provider.url}
                       target='_blank'
                       rel='noopener noreferrer'
+                      {...closedInteractiveProps}
                       className='flex h-8 items-center gap-2 rounded-md px-2 text-xs text-secondary-token transition-colors duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
                     >
                       <Music2 className='h-3.5 w-3.5 text-tertiary-token' />
