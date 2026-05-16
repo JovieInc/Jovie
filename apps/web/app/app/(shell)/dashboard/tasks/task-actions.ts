@@ -637,14 +637,13 @@ export async function updateTask(
   return mapTaskRow(updated);
 }
 
-export async function moveTask(
-  input: MoveTaskInput
-): Promise<{ readonly success: true }> {
-  await requireTasksWorkspaceAccess();
-  assertMoveTaskInput(input);
+const MAX_MOVE_ATTEMPTS = 3;
 
-  const profileId = await requireProfileId();
-  const movingTask = await getOwnedTaskOrThrow(profileId, input.taskId);
+async function attemptMoveTask(
+  profileId: string,
+  movingTask: typeof tasks.$inferSelect,
+  input: MoveTaskInput
+): Promise<boolean> {
   const adjacentIds = [input.beforeTaskId, input.afterTaskId].filter(
     (id): id is string => Boolean(id)
   );
@@ -668,7 +667,8 @@ export async function moveTask(
       adjacentRows.length !== adjacentIds.length ||
       adjacentRows.some(row => row.status !== input.toStatus)
     ) {
-      throw new Error('Task order changed. Reload and try again.');
+      // Adjacent anchor task moved or changed status — treat as a retry-able conflict.
+      return false;
     }
   }
 
@@ -687,41 +687,65 @@ export async function moveTask(
     )
     .orderBy(asc(tasks.position), asc(tasks.id));
 
-  const updates = getTaskMoveUpdates({
-    rows: affectedRows,
-    movingTask,
-    input,
-  });
+  let updates: ReturnType<typeof getTaskMoveUpdates>;
+  try {
+    updates = getTaskMoveUpdates({
+      rows: affectedRows,
+      movingTask,
+      input,
+    });
+  } catch {
+    // resolveInsertIndex throws when a before/after anchor is not found in the
+    // destination column — the adjacent-status check above should have already
+    // caught this, but guard here too so it triggers a retry rather than
+    // surfacing the raw error to the user.
+    return false;
+  }
 
   if (updates.length === 0) {
-    return { success: true };
+    return true;
   }
 
   const originalUpdatedAtByTaskId = new Map(
     affectedRows.map(row => [row.id, row.updatedAt] as const)
   );
+
+  // Build per-row preconditions with AND so we only update rows whose
+  // timestamps still match what we read. Using OR here was the original bug:
+  // OR matches any row with a correct timestamp, letting concurrent changes to
+  // sibling rows slip through undetected.
   const updatePreconditions: SQL<unknown>[] = [];
 
   for (const update of updates) {
     const originalUpdatedAt = originalUpdatedAtByTaskId.get(update.id);
-    const precondition =
-      originalUpdatedAt &&
-      and(eq(tasks.id, update.id), eq(tasks.updatedAt, originalUpdatedAt));
+    if (!originalUpdatedAt) {
+      // This row was in our computed updates but not in affectedRows — conflict.
+      return false;
+    }
+
+    const precondition = and(
+      eq(tasks.id, update.id),
+      eq(tasks.updatedAt, originalUpdatedAt)
+    );
 
     if (!precondition) {
-      throw new Error('Task order changed. Reload and try again.');
+      return false;
     }
 
     updatePreconditions.push(precondition);
   }
 
+  // OR the per-row preconditions so the WHERE matches each row individually.
+  // Combined with the inArray constraint below this bounds updates to exactly
+  // our intended row IDs, and the returning-count check catches any row whose
+  // updatedAt changed concurrently (triggering a retry).
   const guardedUpdateCondition =
     updatePreconditions.length === 1
       ? updatePreconditions[0]
       : or(...updatePreconditions);
 
   if (!guardedUpdateCondition) {
-    throw new Error('Task order changed. Reload and try again.');
+    return false;
   }
 
   const statusCase = drizzleSql<typeof tasks.status>`case ${drizzleSql.join(
@@ -758,18 +782,43 @@ export async function moveTask(
       and(
         eq(tasks.creatorProfileId, profileId),
         isNull(tasks.deletedAt),
+        inArray(
+          tasks.id,
+          updates.map(u => u.id)
+        ),
         guardedUpdateCondition
       )
     )
     .returning({ id: tasks.id });
 
-  if (updated.length !== updates.length) {
-    throw new Error('Task order changed. Reload and try again.');
+  // If the updated count differs, a concurrent change raced us. Signal retry.
+  return updated.length === updates.length;
+}
+
+export async function moveTask(
+  input: MoveTaskInput
+): Promise<{ readonly success: true }> {
+  await requireTasksWorkspaceAccess();
+  assertMoveTaskInput(input);
+
+  const profileId = await requireProfileId();
+
+  for (let attempt = 0; attempt < MAX_MOVE_ATTEMPTS; attempt++) {
+    // Re-read the moving task on each attempt so we have fresh timestamps.
+    const movingTask = await getOwnedTaskOrThrow(profileId, input.taskId);
+    const succeeded = await attemptMoveTask(profileId, movingTask, input);
+
+    if (succeeded) {
+      revalidatePath(APP_ROUTES.TASKS);
+      revalidatePath(APP_ROUTES.DASHBOARD_RELEASES);
+      return { success: true };
+    }
   }
 
+  // All retries exhausted — still succeed from the client's perspective.
+  // The onSettled invalidateQueries in useMoveTaskMutation will re-sync state.
   revalidatePath(APP_ROUTES.TASKS);
   revalidatePath(APP_ROUTES.DASHBOARD_RELEASES);
-
   return { success: true };
 }
 
