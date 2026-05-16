@@ -190,14 +190,28 @@ const SENSITIVE_QUERY_PARAMS =
 const DEPLOYMENT_TRANSITION_PATTERN = /^.+ is not defined$/;
 
 /**
- * Pattern matching stale server action IDs after deployment.
+ * Message patterns matching stale server action errors after deployment.
  *
- * When a deployment changes server action manifests, clients with stale
- * JavaScript can reference an old action hash and trigger
- * `UnrecognizedActionError` until refresh.
+ * Next.js uses two error shapes for this condition:
+ *
+ * 1. Client-side `UnrecognizedActionError` (type field) — thrown by the
+ *    App Router when the server returns NEXT_ACTION_NOT_FOUND_HEADER.
+ *    Message: `Server Action "<hash>" was not found on the server.`
+ *
+ * 2. Server-side `Error` — thrown by action-handler.js when the action
+ *    manifest lookup fails (E974/E975 error codes).
+ *    Message: `Failed to find Server Action. This request might be from
+ *              an older or newer deployment.`
+ *
+ * Both are deployment-skew artifacts handled by the UI (reload prompt),
+ * not application bugs. Filter both from Sentry.
  */
-const STALE_SERVER_ACTION_PATTERN =
-  /unrecognizedactionerror: server action ".+" was not found on the server\.?$/;
+const STALE_SERVER_ACTION_MESSAGE_PATTERNS = [
+  // Client: UnrecognizedActionError message body (type checked separately)
+  'was not found on the server',
+  // Server: E974/E975 error message (plain Error type)
+  'failed to find server action',
+] as const;
 
 /**
  * React/Next.js internal error patterns that are framework noise.
@@ -294,7 +308,15 @@ function isDeploymentTransitionError(event: SentryEvent): boolean {
     return true;
   }
 
-  if (STALE_SERVER_ACTION_PATTERN.test(message)) {
+  // Filter stale server action errors (deployment skew).
+  // Check the error type directly (UnrecognizedActionError) and/or message
+  // patterns that cover both the client-side and server-side error shapes.
+  if (
+    type === 'unrecognizedactionerror' ||
+    STALE_SERVER_ACTION_MESSAGE_PATTERNS.some(pattern =>
+      message.includes(pattern)
+    )
+  ) {
     return true;
   }
 
