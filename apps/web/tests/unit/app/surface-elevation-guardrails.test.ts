@@ -294,7 +294,7 @@ describe('surface elevation guardrails', () => {
     expect(shellReleasesView).not.toMatch(
       /const\s*\[\s*searchOpen\s*,\s*setSearchOpen\s*\]\s*=\s*useState/
     );
-    expect(authShellWrapper).toContain('HeaderSearchSurface');
+    expect(authShellWrapper).not.toContain('HeaderSearchSurface');
   });
 
   it('keeps admin shell tables on the canonical AdminDataTable wrapper', () => {
