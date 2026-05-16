@@ -17,9 +17,9 @@ const SLIDE_MS = 5500;
  * doesn't shift size when the carousel advances.
  */
 const SLIDES = [
-  'dashboard-releases-sidebar-desktop',
-  'dashboard-audience-desktop',
-  'public-profile-desktop',
+  'shell-v1-releases-desktop',
+  'design-studio-music-ai-command-desktop',
+  'shell-v1-library-desktop',
 ] as const;
 
 export function AuthBrandPanel({ className }: Readonly<AuthBrandPanelProps>) {

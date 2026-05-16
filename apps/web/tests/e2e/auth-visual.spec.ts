@@ -69,8 +69,31 @@ function isClerkHandshakeRedirect(url: string): boolean {
   return url.includes('clerk') && url.includes('handshake');
 }
 
+async function openInterceptedAuthModal(
+  page: import('@playwright/test').Page,
+  mode: 'signin' | 'signup'
+) {
+  await page.goto('/', {
+    waitUntil: 'networkidle',
+    timeout: NAV_TIMEOUT,
+  });
+
+  if (mode === 'signin') {
+    await page
+      .getByRole('link', { name: /^sign in$/i })
+      .first()
+      .click();
+  } else {
+    await page.locator('[data-cta-sign-up="true"]').first().click();
+  }
+
+  await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {
+    // Clerk can leave background requests open; the dialog probe below is the gate.
+  });
+}
+
 // ---------------------------------------------------------------------------
-// Marketing modal snapshots — opens via ?auth= on homepage
+// Marketing modal snapshots — opens through intercepted auth routes
 // ---------------------------------------------------------------------------
 test.describe('Auth modal visual regression', () => {
   for (const bp of BREAKPOINTS) {
@@ -79,10 +102,7 @@ test.describe('Auth modal visual regression', () => {
         await blockAnalytics(page);
         await page.setViewportSize({ width: bp.width, height: bp.height });
 
-        await page.goto(`/?auth=signin`, {
-          waitUntil: 'networkidle',
-          timeout: NAV_TIMEOUT,
-        });
+        await openInterceptedAuthModal(page, 'signin');
 
         if (isClerkHandshakeRedirect(page.url())) {
           test.skip(true, 'Clerk handshake redirect — modal not available');
@@ -111,10 +131,7 @@ test.describe('Auth modal visual regression', () => {
         await blockAnalytics(page);
         await page.setViewportSize({ width: bp.width, height: bp.height });
 
-        await page.goto(`/?auth=signup`, {
-          waitUntil: 'networkidle',
-          timeout: NAV_TIMEOUT,
-        });
+        await openInterceptedAuthModal(page, 'signup');
 
         if (isClerkHandshakeRedirect(page.url())) {
           test.skip(true, 'Clerk handshake redirect — modal not available');

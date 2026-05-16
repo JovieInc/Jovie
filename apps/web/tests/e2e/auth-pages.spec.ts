@@ -76,7 +76,7 @@ async function waitForClerkAuthUi(page: import('@playwright/test').Page) {
           bodyText.includes('Continue') ||
           bodyText.includes('Google') ||
           bodyText.includes('Sign in to Jovie') ||
-          bodyText.includes('Request Access') ||
+          bodyText.includes('Request access') ||
           bodyText.includes('Create your')
         );
       },

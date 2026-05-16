@@ -17,15 +17,14 @@ type ClerkAppearanceElements = Record<string, unknown>;
 const REQUIRED_CLERK_AUTH_ELEMENTS = {
   socialButtonsBlockButton: {
     alignItems: 'center',
-    display: 'grid',
-    gridTemplateColumns: 'minmax(0, 1fr) auto',
+    display: 'flex',
+    justifyContent: 'center',
     overflow: 'visible',
+    position: 'relative',
   },
   lastAuthenticationStrategyBadge: {
     alignSelf: 'center',
-    gridColumn: '2',
     justifySelf: 'end',
-    order: 2,
     pointerEvents: 'none',
     position: 'static',
     transform: 'none',
@@ -67,9 +66,9 @@ interface AuthShellProps {
    */
   readonly oppositeModeUrl?: string;
   /**
-   * When true, render only the Clerk form — no surrounding headline, terms
-   * footer, or sign-in/sign-up cross-link. Used by the modal surface that
-   * supplies its own chrome (back button, status row).
+   * Marks the intercepted modal surface. AuthShell always renders only the
+   * Clerk form plus required sign-up legal terms; modal chrome lives in
+   * AuthModalShell.
    */
   readonly compact?: boolean;
   /**
@@ -94,10 +93,9 @@ interface AuthShellProps {
  * content frame so the full-page route and the intercepted modal route share
  * the exact same content model, typography, links, and provider list.
  *
- * Provider buttons are gated by `lib/auth/oauth-providers.ts`. A provider can
- * only render when its `NEXT_PUBLIC_CLERK_OAUTH_<PROVIDER>_ENABLED=1` flag is
- * set — otherwise the appearance config hides it. This is the prevention test
- * for JOV-2062 (Apple "invalid client" in production).
+ * Provider buttons are gated by `lib/auth/oauth-providers.ts`; otherwise the
+ * appearance config hides them. This is the prevention test for JOV-2062
+ * (Apple "invalid client" in production).
  *
  * See JOV-2064.
  */
@@ -155,28 +153,16 @@ export function AuthShell({
     } as Record<string, unknown>;
   }, [appearance]);
 
-  const headline = isSignUp ? 'Create your account' : 'Sign in';
-  const subhead = isSignUp
-    ? 'Start your private launch request.'
-    : 'Welcome back to Jovie.';
-  const crossLinkPrompt = isSignUp ? 'Have an account?' : "Don't have access?";
-  const crossLinkLabel = isSignUp ? 'Sign in' : 'Join the waitlist';
-
   if (!isMounted) {
     return <AuthFormSkeleton />;
   }
 
   return (
-    <div ref={containerRef} data-auth-shell-mode={mode}>
-      {compact ? null : (
-        <div className='mb-4 text-center lg:text-left'>
-          <h1 className='text-[22px] font-semibold leading-7 text-white'>
-            {headline}
-          </h1>
-          <p className='mt-2 text-[13px] leading-5 text-white/58'>{subhead}</p>
-        </div>
-      )}
-
+    <div
+      ref={containerRef}
+      data-auth-shell-mode={mode}
+      data-auth-shell-compact={compact ? 'true' : undefined}
+    >
       {isSignUp ? (
         <SignUp
           routing='path'
@@ -198,38 +184,25 @@ export function AuthShell({
         />
       )}
 
-      {compact ? null : (
-        <>
-          <p className='mt-4 text-center text-app font-normal text-white/58'>
-            {crossLinkPrompt}{' '}
-            <Link
-              href={crossLinkUrl}
-              className='focus-ring-themed rounded-md text-white underline'
-            >
-              {crossLinkLabel}
-            </Link>
-          </p>
-          {isSignUp ? (
-            <p className='mt-4 text-center text-2xs leading-relaxed text-white/80'>
-              By signing up, you agree to our{' '}
-              <Link
-                href={APP_ROUTES.LEGAL_TERMS}
-                className='focus-ring-themed rounded-md py-1 text-white underline underline-offset-2 transition-colors hover:text-white'
-              >
-                Terms of Service
-              </Link>{' '}
-              and{' '}
-              <Link
-                href={APP_ROUTES.LEGAL_PRIVACY}
-                className='focus-ring-themed rounded-md py-1 text-white underline underline-offset-2 transition-colors hover:text-white'
-              >
-                Privacy Policy
-              </Link>
-              .
-            </p>
-          ) : null}
-        </>
-      )}
+      {isSignUp ? (
+        <p className='mt-4 text-center text-2xs leading-relaxed text-white/80'>
+          By signing up, you agree to our{' '}
+          <Link
+            href={APP_ROUTES.LEGAL_TERMS}
+            className='focus-ring-themed rounded-md py-1 text-white underline underline-offset-2 transition-colors hover:text-white'
+          >
+            Terms of Service
+          </Link>{' '}
+          and{' '}
+          <Link
+            href={APP_ROUTES.LEGAL_PRIVACY}
+            className='focus-ring-themed rounded-md py-1 text-white underline underline-offset-2 transition-colors hover:text-white'
+          >
+            Privacy Policy
+          </Link>
+          .
+        </p>
+      ) : null}
     </div>
   );
 }

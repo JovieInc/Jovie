@@ -38,7 +38,7 @@ describe('AuthShell Clerk appearance guards', () => {
             },
             socialButtonsBlockButton: {
               backgroundColor: 'rgb(1, 2, 3)',
-              display: 'flex',
+              display: 'grid',
               overflow: 'hidden',
             },
             socialButtonsBlockButton__facebook: 'block',
@@ -61,15 +61,14 @@ describe('AuthShell Clerk appearance guards', () => {
     expect(elements?.socialButtonsBlockButton).toEqual(
       expect.objectContaining({
         backgroundColor: 'rgb(1, 2, 3)',
-        display: 'grid',
-        gridTemplateColumns: 'minmax(0, 1fr) auto',
+        display: 'flex',
+        justifyContent: 'center',
         overflow: 'visible',
+        position: 'relative',
       })
     );
     expect(elements?.lastAuthenticationStrategyBadge).toEqual(
       expect.objectContaining({
-        gridColumn: '2',
-        order: 2,
         position: 'static',
         transform: 'none',
         whiteSpace: 'nowrap',

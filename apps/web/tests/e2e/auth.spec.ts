@@ -59,7 +59,7 @@ async function waitForClerkAuthUi(page: Page): Promise<void> {
         bodyText.includes('Continue') ||
         bodyText.includes('Google') ||
         bodyText.includes('Sign in to Jovie') ||
-        bodyText.includes('Create your account')
+        bodyText.includes('Request access')
       );
     },
     undefined,
