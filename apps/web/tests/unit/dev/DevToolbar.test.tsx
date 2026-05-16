@@ -42,6 +42,7 @@ vi.mock('@/lib/flags/contracts', () => ({
 }));
 
 import { DevToolbar } from '@/components/features/dev/DevToolbar';
+import { isDevToolbarSuppressedPath } from '@/components/features/dev/DevToolbarGate';
 
 const TOOLBAR_HIDDEN_KEY = '__dev_toolbar_hidden';
 const TOOLBAR_OPEN_KEY = '__dev_toolbar_open';
@@ -91,6 +92,17 @@ describe('DevToolbar', () => {
   afterEach(() => {
     cleanup();
     document.documentElement.style.setProperty('--dev-toolbar-height', '0px');
+  });
+
+  describe('gate suppression', () => {
+    it('suppresses demo capture routes without suppressing normal app routes', () => {
+      expect(isDevToolbarSuppressedPath('/demovideo')).toBe(true);
+      expect(isDevToolbarSuppressedPath('/demo')).toBe(true);
+      expect(isDevToolbarSuppressedPath('/demo/video')).toBe(true);
+      expect(isDevToolbarSuppressedPath('/demo/founder-video')).toBe(true);
+      expect(isDevToolbarSuppressedPath('/app/dashboard/releases')).toBe(false);
+      expect(isDevToolbarSuppressedPath('/start')).toBe(false);
+    });
   });
 
   // ─── Show/Hide ───────────────────────────────────────────────
@@ -934,7 +946,9 @@ describe('DevToolbar', () => {
       vi.stubGlobal('fetch', fetchSpy);
       setTimeoutSpy = vi
         .spyOn(globalThis, 'setTimeout')
-        .mockImplementation((() => 0) as typeof globalThis.setTimeout);
+        .mockImplementation(
+          (() => 0) as unknown as typeof globalThis.setTimeout
+        );
     });
 
     afterEach(() => {

@@ -106,6 +106,52 @@ async function configureRecordingContext(
     localStorage.removeItem('__dev_toolbar_open');
     localStorage.removeItem('__dev_toolbar_hidden');
     document.documentElement.removeAttribute('data-demo-transition');
+
+    let applyingDemoChrome = false;
+    const markDemoRecordingChrome = () => {
+      if (applyingDemoChrome) return;
+      applyingDemoChrome = true;
+      const recordingWindow = window as Window & {
+        __JOVIE_DEMO_RECORDING__?: boolean;
+        __JOVIE_DEV_CHROME_DISABLED__?: boolean;
+      };
+      recordingWindow.__JOVIE_DEMO_RECORDING__ = true;
+      recordingWindow.__JOVIE_DEV_CHROME_DISABLED__ = true;
+      document.documentElement.dataset.demoRecording = '1';
+      document.documentElement.dataset.devChromeDisabled = '1';
+      document.documentElement.style.setProperty('--dev-toolbar-height', '0px');
+      applyingDemoChrome = false;
+    };
+
+    const ensureDemoRecordingChrome = () => {
+      if (
+        document.documentElement.dataset.demoRecording === '1' &&
+        document.documentElement.dataset.devChromeDisabled === '1' &&
+        document.documentElement.style.getPropertyValue(
+          '--dev-toolbar-height'
+        ) === '0px'
+      ) {
+        return;
+      }
+
+      markDemoRecordingChrome();
+    };
+
+    markDemoRecordingChrome();
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', ensureDemoRecordingChrome);
+    }
+    new MutationObserver(ensureDemoRecordingChrome).observe(
+      document.documentElement,
+      {
+        attributes: true,
+        attributeFilter: [
+          'data-demo-recording',
+          'data-dev-chrome-disabled',
+          'style',
+        ],
+      }
+    );
   });
 
   await context.addCookies([
@@ -625,6 +671,13 @@ test.describe('YC Demo Recording', () => {
         readyText: selectedReleases[0].title,
       });
     });
+    await expect(demoPage.getByTestId('dev-toolbar')).toHaveCount(0);
+    await expect(
+      demoPage.getByRole('button', { name: /search releases/i })
+    ).toHaveCount(0);
+    await expect(
+      demoPage.getByRole('button', { name: /filter releases/i })
+    ).toHaveCount(1);
     await injectCaptionOverlay(demoPage);
     await setCaption(
       demoPage,
