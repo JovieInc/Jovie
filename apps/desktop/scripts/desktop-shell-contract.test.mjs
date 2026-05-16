@@ -19,6 +19,11 @@ test('desktop window enters the authenticated app shell instead of the web root'
   assert.match(mainSource, /url\.searchParams\.set\('runtime', 'electron'\);/);
   assert.match(
     mainSource,
+    /const DESKTOP_USER_AGENT_PRODUCT = `JovieDesktop\/\$\{app\.getVersion\(\)\}`;/
+  );
+  assert.match(mainSource, /win\.webContents\.setUserAgent\(/);
+  assert.match(
+    mainSource,
     /function createWindow\(initialUrl = APP_ENTRY_URL\): BrowserWindow/
   );
   assert.doesNotMatch(
@@ -86,4 +91,19 @@ test('desktop dev defaults to the local app shell and packaged builds keep produ
   );
   assert.match(productionStdout, /APP_ENV='production'/);
   assert.match(productionEnv, /APP_URL = 'https:\/\/jov\.ie'/);
+});
+
+test('hosted web app has an early Electron runtime marker before first paint', async () => {
+  const webRoot = join(desktopRoot, '..', 'web');
+  const rootLayout = await readFile(join(webRoot, 'app/layout.tsx'), 'utf8');
+  const runtimeInit = await readFile(
+    join(webRoot, 'public/electron-runtime-init.js'),
+    'utf8'
+  );
+
+  assert.match(rootLayout, /<script src='\/electron-runtime-init\.js' \/>/);
+  assert.match(runtimeInit, /params\.get\('runtime'\) === 'electron'/);
+  assert.match(runtimeInit, /JovieDesktop\\\//);
+  assert.match(runtimeInit, /root\.dataset\.desktopRuntime = 'electron'/);
+  assert.match(runtimeInit, /root\.dataset\.devChromeDisabled = '1'/);
 });
