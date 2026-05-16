@@ -54,6 +54,7 @@ export const APP_ROUTES = {
   SETTINGS_DATA_PRIVACY: '/app/settings/data-privacy',
   SETTINGS_CONTACTS: '/app/settings/contacts',
   SETTINGS_TOURING: '/app/settings/touring',
+  SETTINGS_CONNECTORS: '/app/settings/connectors',
   SETTINGS_AUDIENCE: '/app/settings/audience',
   SETTINGS_ANALYTICS: '/app/settings/analytics',
   SETTINGS_ADMIN: '/app/settings/admin',
@@ -96,6 +97,8 @@ export const APP_ROUTES = {
   ADMIN_ALGORITHM_HEALTH: '/app/admin/algorithm-health',
   ADMIN_PLAYLISTS: '/app/admin/playlists',
   ADMIN_PLATFORM_CONNECTIONS: '/app/admin/platform-connections',
+  ADMIN_AGENT_RUN: '/app/admin/agent-runs',
+  ADMIN_AGENT_RUN_DETAIL: '/app/admin/agent-runs/[id]',
 
   // System
   UNAVAILABLE: '/unavailable',

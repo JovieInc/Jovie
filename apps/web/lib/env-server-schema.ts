@@ -202,6 +202,18 @@ export const ServerEnvSchema = z.object({
   ALBUM_ART_GENERATION_DAILY_LIMIT: z.string().optional(),
   ALBUM_ART_GENERATION_BURST_LIMIT: z.string().optional(),
 
+  // Google OAuth + Connectors (AI Connector v1 — JOV-2230)
+  GOOGLE_OAUTH_CLIENT_ID: z.string().optional(),
+  GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
+  /** Base URL for the Google OAuth redirect URI, e.g. https://jov.ie/api/connectors/google */
+  GOOGLE_OAUTH_REDIRECT_URI_BASE: z.string().url().optional(),
+  /** Days before/after today to fetch Calendar events (default: 90 past, 365 future) */
+  GOOGLE_CALENDAR_DEFAULT_WINDOW_DAYS: z.string().optional(),
+  /** Days of Gmail history to scan for booking signals (default: 30) */
+  GMAIL_HISTORY_WINDOW_DAYS: z.string().optional(),
+  /** Per-user per-day Gateway token budget for AI Connector extraction (default: 100000) */
+  AI_CONNECTORS_DAILY_TOKEN_BUDGET: z.string().optional(),
+
   // Development tools
   JOVIE_DEV_MEMORY_MONITOR: z.string().optional(),
 
@@ -367,4 +379,10 @@ export const ENV_KEYS = [
   'TWILIO_FROM_NUMBER',
   'NATIVE_SMS_ENABLED',
   'SMS_DEMO_BYPASS_PRO_GATE',
+  'GOOGLE_OAUTH_CLIENT_ID',
+  'GOOGLE_OAUTH_CLIENT_SECRET',
+  'GOOGLE_OAUTH_REDIRECT_URI_BASE',
+  'GOOGLE_CALENDAR_DEFAULT_WINDOW_DAYS',
+  'GMAIL_HISTORY_WINDOW_DAYS',
+  'AI_CONNECTORS_DAILY_TOKEN_BUDGET',
 ] as const satisfies readonly (keyof z.infer<typeof ServerEnvSchema>)[];
