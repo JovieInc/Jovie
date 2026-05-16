@@ -1,6 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import { APP_URL } from './env';
 
 const TRUSTED_APP_ORIGINS = new Set([
+  new URL(APP_URL).origin,
   'https://jov.ie',
   'https://staging.app.jov.ie',
 ]);
