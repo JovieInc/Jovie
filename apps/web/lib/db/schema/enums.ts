@@ -642,3 +642,65 @@ export const referralCommissionStatusEnum = pgEnum(
     'cancelled', // Commission cancelled (e.g., refund/chargeback)
   ]
 );
+
+// ---------------------------------------------------------------------------
+// AI Connector Enums (v1)
+// ---------------------------------------------------------------------------
+
+export const connectorProviderEnum = pgEnum('connector_provider', [
+  'spotify',
+  'apple_music',
+  'youtube',
+  'instagram',
+  'tiktok',
+  'soundcloud',
+]);
+
+export const connectorStatusEnum = pgEnum('connector_status', [
+  'connected',
+  'disconnected',
+  'error',
+  'reauth_required',
+]);
+
+export const webhookProviderEnum = pgEnum('webhook_provider', [
+  'spotify',
+  'apple_music',
+  'youtube',
+  'instagram',
+  'tiktok',
+  'soundcloud',
+]);
+
+export const contextFactKindEnum = pgEnum('context_fact_kind', [
+  'streaming_stats',
+  'audience_demographics',
+  'release_performance',
+  'social_engagement',
+  'playlist_placement',
+  'other',
+]);
+
+export const suggestedActionStatusEnum = pgEnum('suggested_action_status', [
+  'pending',
+  'accepted',
+  'dismissed',
+  'completed',
+]);
+
+export const agentRunStatusEnum = pgEnum('agent_run_status', [
+  'queued',
+  'running',
+  'waiting_for_approval',
+  'completed',
+  'failed',
+]);
+
+export const workflowRunStatusEnum = pgEnum('workflow_run_status', [
+  'pending',
+  'running',
+  'waiting_for_approval',
+  'completed',
+  'failed',
+  'cancelled',
+]);
