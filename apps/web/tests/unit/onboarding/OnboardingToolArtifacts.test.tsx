@@ -113,9 +113,37 @@ describe('onboarding tool artifacts', () => {
 
     expect(screen.getByTestId('onboarding-artist-confirmed')).toBeDefined();
     expect(screen.getByText('Test Artist')).toBeDefined();
-    expect(screen.getByText('1.2K followers')).toBeDefined();
-    expect(screen.getByText('Popularity 42')).toBeDefined();
+    expect(screen.getByTitle('1,234 Spotify followers')).toBeDefined();
+    expect(screen.getByText('1,234 Spotify followers')).toBeDefined();
+    expect(screen.getByText('1.2K')).toBeDefined();
+    expect(screen.getByTitle('Popularity score: 42 out of 100')).toBeDefined();
+    expect(screen.getByText('Popularity score: 42 out of 100')).toBeDefined();
+    expect(screen.getByText('42')).toBeDefined();
+    expect(screen.getByText('Genre: INDIE POP')).toBeDefined();
+    expect(screen.getByText('INDIE POP')).toBeDefined();
     expect(screen.queryByText('confirmSpotifyArtist')).toBeNull();
+  });
+
+  it('does not render unsafe Spotify profile links', () => {
+    fastRender(
+      <OnboardingArtistConfirmedCard
+        state='output-available'
+        output={{
+          action: 'spotify_artist_confirmed',
+          spotifyArtistId: 'artist-1',
+          artist: {
+            id: 'artist-1',
+            name: 'Test Artist',
+            url: 'javascript:alert(1)',
+            followers: 1_234,
+            popularity: 42,
+            genres: ['indie pop'],
+          },
+        }}
+      />
+    );
+
+    expect(screen.queryByLabelText('Open Test Artist on Spotify')).toBeNull();
   });
 
   it('renders handle availability without leaking the tool name', () => {

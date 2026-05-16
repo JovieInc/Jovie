@@ -5,6 +5,11 @@ import { AppShellFrame } from '@/components/organisms/AppShellFrame';
 import { SidebarProvider } from '@/components/organisms/Sidebar';
 import { cn } from '@/lib/utils';
 import { OnboardingChat } from './OnboardingChat';
+import {
+  EMPTY_ONBOARDING_PROFILE_BUILDER_STATE,
+  type OnboardingProfileBuilderState,
+  OnboardingProfileRail,
+} from './OnboardingProfileRail';
 import { OnboardingTurnstile } from './OnboardingTurnstile';
 import { useOnboardingClaim } from './useOnboardingClaim';
 
@@ -18,10 +23,52 @@ interface OnboardingShellProps {
   readonly sessionLabel: string;
 }
 
+function areStringArraysEqual(
+  left: readonly string[],
+  right: readonly string[]
+): boolean {
+  return (
+    left.length === right.length && left.every((item, i) => item === right[i])
+  );
+}
+
+function areProfileArtistsEqual(
+  left: OnboardingProfileBuilderState['artist'],
+  right: OnboardingProfileBuilderState['artist']
+): boolean {
+  if (left === right) return true;
+  if (!left || !right) return false;
+  return (
+    left.id === right.id &&
+    left.name === right.name &&
+    left.url === right.url &&
+    left.imageUrl === right.imageUrl &&
+    left.followers === right.followers &&
+    left.popularity === right.popularity &&
+    areStringArraysEqual(left.genres ?? [], right.genres ?? [])
+  );
+}
+
+function areProfileBuilderStatesEqual(
+  left: OnboardingProfileBuilderState,
+  right: OnboardingProfileBuilderState
+): boolean {
+  return (
+    left.artistConfirmed === right.artistConfirmed &&
+    left.handle === right.handle &&
+    areProfileArtistsEqual(left.artist, right.artist) &&
+    areStringArraysEqual(left.socialLinks, right.socialLinks)
+  );
+}
+
 export function OnboardingShell({ sessionLabel }: OnboardingShellProps) {
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [turnstileError, setTurnstileError] = useState<string | null>(null);
   const [claimTrigger, setClaimTrigger] = useState(0);
+  const [profileBuilderState, setProfileBuilderState] =
+    useState<OnboardingProfileBuilderState>(
+      EMPTY_ONBOARDING_PROFILE_BUILDER_STATE
+    );
 
   const handleConversationActivity = useCallback(() => {
     setClaimTrigger(current => current + 1);
@@ -36,6 +83,15 @@ export function OnboardingShell({ sessionLabel }: OnboardingShellProps) {
     setTurnstileError(message);
   }, []);
 
+  const handleProfileBuilderChange = useCallback(
+    (nextState: OnboardingProfileBuilderState) => {
+      setProfileBuilderState(current =>
+        areProfileBuilderStatesEqual(current, nextState) ? current : nextState
+      );
+    },
+    []
+  );
+
   // Auto-claim any anonymous transcript onto the user the moment Clerk
   // reports they're authenticated, then retry after completed chat turns.
   // On success, this hook navigates away to
@@ -44,6 +100,7 @@ export function OnboardingShell({ sessionLabel }: OnboardingShellProps) {
   const claimStatus = useOnboardingClaim(claimTrigger);
   const isLinking =
     claimStatus === 'pending' || claimStatus === 'retry-after-webhook';
+  const shouldShowProfileRail = Boolean(profileBuilderState.artist);
 
   return (
     <SidebarProvider defaultOpen={false}>
@@ -59,6 +116,7 @@ export function OnboardingShell({ sessionLabel }: OnboardingShellProps) {
           >
             <OnboardingChat
               onConversationActivity={handleConversationActivity}
+              onProfileBuilderChange={handleProfileBuilderChange}
               turnstileToken={turnstileToken}
             />
 
@@ -73,6 +131,11 @@ export function OnboardingShell({ sessionLabel }: OnboardingShellProps) {
               visible={isLinking}
             />
           </div>
+        }
+        rightPanel={
+          shouldShowProfileRail ? (
+            <OnboardingProfileRail state={profileBuilderState} />
+          ) : null
         }
       />
 
