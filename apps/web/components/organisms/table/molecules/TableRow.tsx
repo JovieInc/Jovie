@@ -23,7 +23,7 @@ export function TableRow({
     <tr
       className={cn(
         // Base styles
-        'group transition-colors duration-150',
+        'group transition-colors duration-subtle',
         // Fixed height to prevent layout shift
         'h-[32px]',
         // Hover state — Linear: rgba(255,255,255,0.02)
