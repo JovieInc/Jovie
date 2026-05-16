@@ -18,6 +18,12 @@ describe('relativeDate', () => {
     expect(relativeDate('2026-04-18T12:00:00Z', NOW)).toBe('7d ago');
   });
 
+  it('formats older past dates without raw multi-year day counts', () => {
+    expect(relativeDate('2026-04-04T12:00:00Z', NOW)).toBe('3w ago');
+    expect(relativeDate('2026-01-15T12:00:00Z', NOW)).toBe('3mo ago');
+    expect(relativeDate('2024-04-19T12:00:00Z', NOW)).toBe('2y ago');
+  });
+
   it('formats short future inside a week as "in Nd"', () => {
     expect(relativeDate('2026-04-28T12:00:00Z', NOW)).toBe('in 3d');
     expect(relativeDate('2026-05-02T12:00:00Z', NOW)).toBe('in 7d');
