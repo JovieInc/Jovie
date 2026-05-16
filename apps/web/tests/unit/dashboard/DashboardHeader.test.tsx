@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { DashboardHeader } from '@/components/features/dashboard/organisms/DashboardHeader';
 
@@ -49,6 +49,24 @@ describe('DashboardHeader', () => {
     ).toBeInTheDocument();
   });
 
+  it('keeps the closed search surface reachable in the mobile header', () => {
+    const { container } = render(
+      <DashboardHeader
+        breadcrumbs={[{ label: 'Library', href: '/app/library' }]}
+        searchSurface={<button type='button'>Filter Library</button>}
+        isSearchActive={false}
+      />
+    );
+
+    const mobileHeader = container.querySelector('.hidden.max-sm\\:flex');
+
+    expect(mobileHeader).not.toBeNull();
+    expect(within(mobileHeader!).getByText('Library')).toBeInTheDocument();
+    expect(
+      within(mobileHeader!).getByRole('button', { name: 'Filter Library' })
+    ).toBeInTheDocument();
+  });
+
   it('collapses the breadcrumb when the search surface takes over', () => {
     const { container } = render(
       <DashboardHeader
@@ -66,7 +84,7 @@ describe('DashboardHeader', () => {
     expect(desktopRow).not.toBeNull();
     expect(within(desktopRow!).queryByText('Releases')).not.toBeInTheDocument();
     expect(
-      screen.getByRole('searchbox', { name: 'Filter releases' })
+      within(desktopRow!).getByRole('searchbox', { name: 'Filter releases' })
     ).toBeInTheDocument();
   });
 });

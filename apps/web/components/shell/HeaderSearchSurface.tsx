@@ -80,6 +80,8 @@ export function HeaderSearchSurface({
         artistOptions={adapter.artistOptions}
         titleOptions={adapter.titleOptions}
         albumOptions={adapter.albumOptions}
+        statusOptions={adapter.statusOptions}
+        hasOptions={adapter.hasOptions}
         ariaLabel={adapter.ariaLabel ?? `Filter ${adapter.triggerLabel}`}
         placeholder={adapter.placeholder ?? 'Type to filter — / for fields'}
         allowedFields={adapter.allowedFields}

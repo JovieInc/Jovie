@@ -82,6 +82,24 @@ describe('PillSearch', () => {
     });
   });
 
+  it('uses route-provided status and has suggestions when supplied', () => {
+    const { onPillsChange } = setup({
+      allowedFields: ['status', 'has'],
+      statusOptions: ['released', 'scheduled'],
+      hasOptions: ['artwork', 'lyrics'],
+    });
+    const input = screen.getByLabelText('Filter tracks');
+
+    fireEvent.change(input, { target: { value: 'released' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(onPillsChange).toHaveBeenCalledOnce();
+    expect(onPillsChange.mock.calls[0]![0][0]).toMatchObject({
+      field: 'status',
+      values: ['released'],
+    });
+  });
+
   it('drops the last pill when Backspace is pressed on an empty input', () => {
     const { onPillsChange } = setup({
       pills: [
