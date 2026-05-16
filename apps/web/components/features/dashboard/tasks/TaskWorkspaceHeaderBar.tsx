@@ -1,9 +1,8 @@
 'use client';
 
 import { Button, Input } from '@jovie/ui';
-import { ArrowDown, ArrowUp, Search, Settings2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Settings2 } from 'lucide-react';
 import type { FormEvent } from 'react';
-import { AppSearchField } from '@/components/molecules/AppSearchField';
 import {
   TableFilterDropdown,
   type TableFilterDropdownCategory,
@@ -24,17 +23,13 @@ export interface TaskSubviewOption {
 }
 
 export interface TaskWorkspaceHeaderBarProps {
-  readonly mode: 'default' | 'search' | 'create';
-  readonly search: string;
+  readonly mode: 'default' | 'create';
   readonly draftTitle: string;
   readonly taskCount: number;
   readonly subviews: ReadonlyArray<TaskSubviewOption>;
   readonly activeSubview: TaskSubviewId;
   readonly onSubviewChange: (subview: TaskSubviewId) => void;
-  readonly onSearchChange: (value: string) => void;
   readonly onDraftTitleChange: (value: string) => void;
-  readonly onEnterSearch: () => void;
-  readonly onExitSearch: () => void;
   readonly onCancelCreate: () => void;
   readonly onSubmitCreate: (event: FormEvent<HTMLFormElement>) => void;
   readonly createPending: boolean;
@@ -53,13 +48,9 @@ export interface TaskWorkspaceHeaderBarProps {
 
 export function TaskWorkspaceHeaderBar({
   mode,
-  search,
   draftTitle,
   taskCount,
-  onSearchChange,
   onDraftTitleChange,
-  onEnterSearch,
-  onExitSearch,
   onCancelCreate,
   onSubmitCreate,
   createPending,
@@ -86,18 +77,6 @@ export function TaskWorkspaceHeaderBar({
       className='flex h-[var(--linear-app-header-height-compact)] min-h-[var(--linear-app-header-height-compact)] items-center justify-between gap-3 px-app-header'
     >
       <div className='min-w-0 flex-1'>
-        {mode === 'search' && (
-          <AppSearchField
-            value={search}
-            onChange={onSearchChange}
-            onEscape={onExitSearch}
-            placeholder='Search Tasks'
-            ariaLabel='Search tasks'
-            autoFocus
-            className='h-8 max-w-[28rem] bg-transparent'
-            inputClassName='text-xs'
-          />
-        )}
         {mode === 'create' && (
           <form
             id={createFormId}
@@ -114,7 +93,7 @@ export function TaskWorkspaceHeaderBar({
             />
           </form>
         )}
-        {mode !== 'search' && mode !== 'create' && (
+        {mode !== 'create' && (
           <TaskSubviewTabs
             subviews={subviews}
             activeSubview={activeSubview}
@@ -148,36 +127,13 @@ export function TaskWorkspaceHeaderBar({
           </>
         ) : (
           <>
-            {mode === 'search' ? (
-              <PageToolbarActionButton
-                ariaLabel='Close search'
-                label='Close search'
-                onClick={onExitSearch}
-                icon={<X className='h-3.5 w-3.5' />}
-                iconOnly
-                tooltipLabel='Close search'
-              />
-            ) : (
-              <PageToolbarActionButton
-                ariaLabel='Search tasks'
-                label='Search tasks'
-                onClick={onEnterSearch}
-                tooltipLabel='Search'
-                tooltipShortcut='/'
-                iconOnly
-                data-app-search-trigger='true'
-                icon={<Search className='h-3.5 w-3.5' />}
-              />
-            )}
-            <div className={cn(mode === 'search' && 'opacity-100')}>
-              <TableFilterDropdown
-                categories={filterCategories}
-                onClearAll={onClearFilters}
-                iconOnly
-                align='end'
-                shortcutHint='S'
-              />
-            </div>
+            <TableFilterDropdown
+              categories={filterCategories}
+              onClearAll={onClearFilters}
+              iconOnly
+              align='end'
+              shortcutHint='S'
+            />
             <DisplayMenuDropdown
               viewMode={viewMode}
               availableViewModes={['board', 'list']}

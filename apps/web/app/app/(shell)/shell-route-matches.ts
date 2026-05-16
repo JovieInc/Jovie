@@ -84,6 +84,16 @@ export function isLibraryShellRoute(pathname: string | null): boolean {
   );
 }
 
+export function isTasksShellRoute(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return (
+    pathname === APP_ROUTES.TASKS ||
+    pathname.startsWith(`${APP_ROUTES.TASKS}/`) ||
+    pathname === APP_ROUTES.DASHBOARD_TASKS ||
+    pathname.startsWith(`${APP_ROUTES.DASHBOARD_TASKS}/`)
+  );
+}
+
 function isDashboardSubRoute(pathname: string | null): boolean {
   if (!pathname) return false;
   return pathname.startsWith(`${APP_ROUTES.LEGACY_DASHBOARD}/`);
@@ -95,6 +105,7 @@ function isLightweightShellRoute(pathname: string | null): boolean {
     isReleasesShellRoute(pathname) ||
     isLyricsShellRoute(pathname) ||
     isLibraryShellRoute(pathname) ||
+    isTasksShellRoute(pathname) ||
     isDashboardSubRoute(pathname)
   );
 }

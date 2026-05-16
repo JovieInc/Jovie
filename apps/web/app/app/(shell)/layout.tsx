@@ -4,6 +4,7 @@ import { redirect, unstable_rethrow } from 'next/navigation';
 import { Suspense } from 'react';
 import { AppShellSkeleton } from '@/components/organisms/AppShellSkeleton';
 import { LyricsRouteSkeleton } from '@/components/shell/LyricsRouteSkeleton';
+import { TasksRouteSkeleton } from '@/components/shell/TasksRouteSkeleton';
 import { APP_ROUTES } from '@/constants/routes';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
 import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
@@ -16,6 +17,7 @@ import {
   isChatShellRoute,
   isLyricsShellRoute,
   isReleasesShellRoute,
+  isTasksShellRoute,
   resolveAppShellRequestPath,
 } from './shell-route-matches';
 
@@ -70,6 +72,13 @@ export default async function AppShellLayout({
       shellFallback = (
         <AppShellSkeleton
           main={<LyricsRouteSkeleton />}
+          variant={shellVariant}
+        />
+      );
+    } else if (isTasksShellRoute(pathname)) {
+      shellFallback = (
+        <AppShellSkeleton
+          main={<TasksRouteSkeleton />}
           variant={shellVariant}
         />
       );

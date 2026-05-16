@@ -16,7 +16,6 @@ import {
   FileText,
   MoreHorizontal,
   Plus,
-  Search,
   Trash2,
 } from 'lucide-react';
 import {
@@ -38,6 +37,7 @@ import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActio
 import { DashboardHeaderActionButton } from '@/components/features/dashboard/atoms/DashboardHeaderActionButton';
 import { DashboardHeaderActionGroup } from '@/components/features/dashboard/atoms/DashboardHeaderActionGroup';
 import { ReleaseTaskDueBadge } from '@/components/features/dashboard/release-tasks/ReleaseTaskDueBadge';
+import { TaskDataTable } from '@/components/features/dashboard/tasks/TaskDataTable';
 import { TaskDescriptionHelper } from '@/components/features/dashboard/tasks/TaskDescriptionHelper';
 import {
   PriorityBars,
@@ -48,6 +48,7 @@ import {
   useTextareaAutosize,
 } from '@/components/jovie/hooks/useTextareaAutosize';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
+import { HeaderSearchAction } from '@/components/molecules/HeaderSearchAction';
 import {
   TOOLBAR_MENU_CONTENT_CLASS,
   TOOLBAR_MENU_SEPARATOR_CLASS,
@@ -59,7 +60,6 @@ import { ReleaseSidebar } from '@/components/organisms/release-sidebar';
 import {
   type ContextMenuItemType,
   convertContextMenuItems,
-  UnifiedTable,
 } from '@/components/organisms/table';
 import {
   isFormElement,
@@ -1211,10 +1211,11 @@ export function TasksPageClient() {
   const canShowTaskDocumentAlongsideReleaseSidebar = useMediaQuery(
     '(min-width: 1720px)'
   );
-  const [headerMode, setHeaderMode] = useState<'default' | 'search' | 'create'>(
-    'default'
-  );
+  const [headerMode, setHeaderMode] = useState<'default' | 'create'>('default');
   const [search, setSearch] = useState('');
+  const [taskSearchOpenSignal, setTaskSearchOpenSignal] = useState<
+    number | undefined
+  >(undefined);
   const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all'>('all');
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | 'all'>(
     'all'
@@ -1737,7 +1738,7 @@ export function TasksPageClient() {
 
       if (isTaskSearchShortcut(event)) {
         event.preventDefault();
-        setHeaderMode('search');
+        setTaskSearchOpenSignal(signal => (signal ?? 0) + 1);
         return;
       }
 
@@ -1774,6 +1775,16 @@ export function TasksPageClient() {
   const headerActions = useMemo(
     () => (
       <DashboardHeaderActionGroup>
+        <HeaderSearchAction
+          searchValue={search}
+          onSearchValueChange={setSearch}
+          onClearAction={() => setSearch('')}
+          placeholder='Search tasks'
+          ariaLabel='Search tasks'
+          submitAriaLabel='Search tasks'
+          tooltipLabel='Search'
+          openSignal={taskSearchOpenSignal}
+        />
         <DashboardHeaderActionButton
           ariaLabel='Create task'
           icon={<Plus className='h-3.5 w-3.5' />}
@@ -1784,7 +1795,7 @@ export function TasksPageClient() {
         />
       </DashboardHeaderActionGroup>
     ),
-    [headerMode]
+    [headerMode, search, taskSearchOpenSignal]
   );
 
   useEffect(() => {
@@ -1891,25 +1902,13 @@ export function TasksPageClient() {
     );
   } else if (isDesktopTaskLayout) {
     desktopTaskPane = (
-      <UnifiedTable
+      <TaskDataTable
         data={visibleTasks}
         columns={columns}
         isLoading={isLoading}
         getRowId={row => row.id}
-        hideHeader
-        enableVirtualization={false}
-        rowHeight={64}
-        skeletonRows={8}
-        className='text-app'
-        containerClassName='h-full overflow-y-auto overflow-x-hidden px-2.5 pb-2 pt-0.5'
-        minWidth='100%'
         onRowClick={row => openTaskDocument(row)}
         getContextMenuItems={getTaskContextMenuItems}
-        getRowClassName={_row =>
-          cn(
-            'group/task-row bg-transparent shadow-none hover:bg-transparent focus-within:shadow-none focus-visible:bg-transparent focus-visible:shadow-none'
-          )
-        }
         emptyState={
           <TaskEmptyState
             hasFilters={hasFilters}
@@ -1980,7 +1979,6 @@ export function TasksPageClient() {
           isDesktopTaskLayout || headerMode !== 'default' ? (
             <TaskWorkspaceHeaderBar
               mode={headerMode}
-              search={search}
               draftTitle={draftTitle}
               taskCount={
                 isBoardMode ? visibleBoardTaskCount : visibleTasks.length
@@ -1988,15 +1986,7 @@ export function TasksPageClient() {
               subviews={taskSubviewOptions}
               activeSubview={activeTaskSubview}
               onSubviewChange={setTaskSubview}
-              onSearchChange={value => {
-                setSearch(value);
-                if (headerMode === 'default') {
-                  setHeaderMode('search');
-                }
-              }}
               onDraftTitleChange={setDraftTitle}
-              onEnterSearch={() => setHeaderMode('search')}
-              onExitSearch={() => setHeaderMode('default')}
               onCancelCreate={() => {
                 setDraftTitle('');
                 setHeaderMode('default');
@@ -2064,24 +2054,10 @@ export function TasksPageClient() {
                     className='flex h-full min-h-0 flex-col overflow-hidden'
                     data-testid='mobile-task-list'
                   >
-                    <div className='flex items-center justify-between px-4 pb-1 pt-3'>
-                      <div>
-                        <p className='text-xs text-secondary-token'>
-                          {mobileScopeCounts.all} total tasks
-                        </p>
-                      </div>
-                      <button
-                        type='button'
-                        onClick={() =>
-                          setHeaderMode(current =>
-                            current === 'search' ? 'default' : 'search'
-                          )
-                        }
-                        aria-label='Search tasks'
-                        className='inline-flex h-10 w-10 items-center justify-center rounded-full bg-surface-1 text-secondary-token transition-[background-color,color] duration-subtle hover:bg-surface-0 hover:text-primary-token'
-                      >
-                        <Search className='h-4 w-4' />
-                      </button>
+                    <div className='flex items-center px-4 pb-1 pt-3'>
+                      <p className='text-xs text-secondary-token'>
+                        {mobileScopeCounts.all} total tasks
+                      </p>
                     </div>
                     <TaskSubviewTabs
                       subviews={taskSubviewOptions}
