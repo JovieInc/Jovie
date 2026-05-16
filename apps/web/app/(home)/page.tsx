@@ -2,10 +2,13 @@ import { ArrowRight } from 'lucide-react';
 import type { Metadata } from 'next';
 import dynamic from 'next/dynamic';
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
+import { HomepageArtistProfilesCarouselLazy } from '@/components/homepage/HomepageArtistProfilesCarouselLazy';
 import { HomepageHeroCommandCenter } from '@/components/homepage/HomepageHeroCommandCenter';
 import { HomepageTrackedLink } from '@/components/homepage/HomepageTrackedLink';
+import { HomepageWorkspaceSectionLazy } from '@/components/homepage/HomepageWorkspaceSectionLazy';
 import { HERO_COPY } from '@/components/homepage/intent';
 import { FaqSection } from '@/components/marketing';
+import { FridayRhythmSectionLazy } from '@/components/marketing/FridayRhythmSectionLazy';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
@@ -24,29 +27,13 @@ import { getMarketingExportImage } from '@/lib/screenshots/registry';
 //
 // JOV-1835: cuts homepage TBT from ~1365ms toward the 300ms budget.
 //
-// The heaviest motion-driven sections (`HomepageWorkspaceSection` runs
-// `useScroll` + 7 `useTransform`s on hydration) ship with `ssr: false`
-// and a fixed-height server-rendered placeholder. The placeholder reserves
-// the visual height upfront so there's no layout shift, while the client
-// chunk + motion subscriptions don't load or execute on initial hydration.
-// Other below-the-fold sections keep `ssr: true` so their HTML stays in
-// the initial document for SEO.
-const FridayRhythmSection = dynamic(
-  () =>
-    import('@/components/marketing/friday-rhythm-section').then(m => ({
-      default: m.FridayRhythmSection,
-    })),
-  {
-    ssr: false,
-    loading: () => (
-      <div
-        aria-hidden='true'
-        className='w-full'
-        style={{ minHeight: 'min(96svh, 760px)' }}
-      />
-    ),
-  }
-);
+// Sections that are not motion-heavy keep `ssr: true` so their HTML
+// stays in the initial document for SEO. The heaviest motion-driven
+// sections (FridayRhythmSection / HomepageWorkspaceSection /
+// HomepageArtistProfilesCarousel) live in their own `'use client'`
+// `*Lazy.tsx` shims that pass `ssr: false` to `next/dynamic` (forbidden
+// in Server Components in Next 15 App Router) so the JS chunk and
+// motion subscriptions don't load or execute on initial hydration.
 const HomepageV2Pricing = dynamic(
   () =>
     import('@/components/marketing/homepage-v2/HomepageV2Ctas').then(m => ({
@@ -88,71 +75,6 @@ const HomeStatQuoteSection = dynamic(
       default: m.HomeStatQuoteSection,
     })),
   { ssr: true }
-);
-// `HomepageWorkspaceSection` is the single biggest TBT contributor in
-// CI (motion `useScroll` + 7 `useTransform` derivations subscribe to
-// scroll on hydration). Defer its JS entirely; the placeholder reuses
-// the same outer CSS shell so its rendered height matches the real
-// component to avoid CLS when the chunk mounts.
-const HomepageWorkspaceSection = dynamic(
-  () =>
-    import('@/components/homepage/HomepageWorkspaceSection').then(m => ({
-      default: m.HomepageWorkspaceSection,
-    })),
-  {
-    ssr: false,
-    loading: () => (
-      <section
-        aria-hidden='true'
-        data-testid='homepage-workspace-section-placeholder'
-        className='homepage-workspace-section'
-      >
-        <div className='homepage-workspace-section__inner'>
-          <div className='homepage-workspace-section__copy'>
-            <h2 style={{ visibility: 'hidden' }}>
-              {HOMEPAGE_LAUNCH_COPY.workspace.headline.split('\n').map(line => (
-                <span key={line}>{line}</span>
-              ))}
-            </h2>
-          </div>
-          <div className='homepage-workspace-visual' />
-        </div>
-      </section>
-    ),
-  }
-);
-// `HomepageArtistProfilesCarousel` is a horizontally-scrollable client
-// rail with lazy images. Defer its JS chunk; the placeholder reuses
-// the same outer CSS classes plus a reserved rail height to avoid
-// CLS when the chunk mounts.
-const HomepageArtistProfilesCarousel = dynamic(
-  () =>
-    import('@/components/homepage/HomepageArtistProfilesCarousel').then(m => ({
-      default: m.HomepageArtistProfilesCarousel,
-    })),
-  {
-    ssr: false,
-    loading: () => (
-      <section
-        aria-hidden='true'
-        data-testid='homepage-artist-profiles-section-placeholder'
-        className='homepage-artist-profiles-section'
-      >
-        <div className='homepage-artist-profiles-section__inner'>
-          <div className='homepage-artist-profiles-section__header'>
-            <h2 style={{ visibility: 'hidden' }}>
-              <span>{HOMEPAGE_LAUNCH_COPY.artistProfiles.headline}</span>
-              <span>{HOMEPAGE_LAUNCH_COPY.artistProfiles.headlineAccent}</span>
-            </h2>
-          </div>
-          <div
-            className='homepage-artist-profiles-carousel'
-            style={{ minHeight: 'clamp(28rem, 56vw, 38rem)' }}
-          />
-        </div>
-      </section>
-    ),
-  }
 );
 
 const HERO_PRODUCT_IMAGES = {
@@ -412,10 +334,10 @@ function HomepageUnlockedSections() {
       {FEATURE_FLAGS.SHOW_HOMEPAGE_GO_LIVE_SECTION ? (
         <HomepageGoLiveStepsSection />
       ) : null}
-      <HomepageWorkspaceSection screenshot={WORKSPACE_SCREENSHOT} />
-      <HomepageArtistProfilesCarousel cards={ARTIST_PROFILE_CARDS} />
+      <HomepageWorkspaceSectionLazy screenshot={WORKSPACE_SCREENSHOT} />
+      <HomepageArtistProfilesCarouselLazy cards={ARTIST_PROFILE_CARDS} />
       {FEATURE_FLAGS.SHOW_HOMEPAGE_FRIDAY_RHYTHM ? (
-        <FridayRhythmSection />
+        <FridayRhythmSectionLazy />
       ) : null}
       {FEATURE_FLAGS.SHOW_HOME_REFRESH_2026 ? <HomeBentoPairs /> : null}
       {FEATURE_FLAGS.SHOW_HOME_REFRESH_2026 ? <HomeLoopDiagramSection /> : null}
