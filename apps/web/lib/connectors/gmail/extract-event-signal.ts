@@ -1,4 +1,5 @@
 import 'server-only';
+import { createHash } from 'node:crypto';
 import { gateway } from '@ai-sdk/gateway';
 import { generateObject } from 'ai';
 import { and, sql as drizzleSql, eq, gte } from 'drizzle-orm';
@@ -276,8 +277,6 @@ Return only events you are highly confident represent confirmed performance book
 
 function buildDigest(content: string): string {
   // SHA-256 hex hash using Node crypto, used as input context digest.
-  // We do this without importing crypto at module level to avoid edge-runtime issues.
-  const { createHash } = require('node:crypto') as typeof import('node:crypto');
   return createHash('sha256').update(content).digest('hex').slice(0, 64);
 }
 
