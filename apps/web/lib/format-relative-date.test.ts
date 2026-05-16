@@ -29,9 +29,18 @@ describe('relativeDate', () => {
     expect(relativeDate('2026-05-02T12:00:00Z', NOW)).toBe('in 7d');
   });
 
-  it('falls back to localised absolute date past a week', () => {
+  it('falls back to localised absolute date for later future dates', () => {
     const out = relativeDate('2026-06-01T12:00:00Z', NOW);
     expect(out).toMatch(/Jun/);
+  });
+
+  it('omits the year for same-year absolute dates and includes it across years', () => {
+    const sameYear = relativeDate('2026-12-20T12:00:00Z', NOW);
+    expect(sameYear).toMatch(/Dec/);
+    expect(sameYear).not.toMatch(/2026/);
+
+    const crossYear = relativeDate('2027-01-10T12:00:00Z', NOW);
+    expect(crossYear).toMatch(/2027/);
   });
 
   it('returns an empty string for invalid date input', () => {
