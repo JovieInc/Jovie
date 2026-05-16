@@ -19,16 +19,24 @@ const AUTH_TIMEOUT = 60_000;
 const VISIBILITY_TIMEOUT = 20_000;
 const EMPTY_STATE = { cookies: [], origins: [] };
 
+const AUTH_UNAVAILABLE_PHRASES = [
+  'auth unavailable',
+  'authentication unavailable',
+  'temporarily unavailable',
+  'clerk is not configured',
+];
+
+function hasAuthUnavailableCopy(text: string | null | undefined) {
+  const normalized = (text ?? '').toLowerCase();
+  return AUTH_UNAVAILABLE_PHRASES.some(phrase => normalized.includes(phrase));
+}
+
 async function isAuthUnavailable(page: import('@playwright/test').Page) {
   const bodyText = await page
     .locator('body')
     .textContent()
     .catch(() => '');
-  return Boolean(
-    bodyText?.includes('Auth unavailable') ||
-      bodyText?.includes('temporarily unavailable') ||
-      bodyText?.includes('Clerk is not configured')
-  );
+  return hasAuthUnavailableCopy(bodyText);
 }
 
 async function blockAnalytics(page: import('@playwright/test').Page) {
@@ -80,19 +88,23 @@ async function waitForClerkAuthUi(page: import('@playwright/test').Page) {
   await page
     .waitForFunction(
       () => {
-        const bodyText = document.body.innerText ?? '';
+        const bodyText = (document.body.innerText ?? '').toLowerCase();
+        const authUnavailable = [
+          'auth unavailable',
+          'authentication unavailable',
+          'temporarily unavailable',
+          'clerk is not configured',
+        ].some(phrase => bodyText.includes(phrase));
         return (
           document.querySelector(
             'input[type="email"], input[name="identifier"]'
           ) !== null ||
-          bodyText.includes('Continue') ||
-          bodyText.includes('Google') ||
-          bodyText.includes('Auth unavailable') ||
-          bodyText.includes('temporarily unavailable') ||
-          bodyText.includes('Clerk is not configured') ||
-          bodyText.includes('Sign in to Jovie') ||
-          bodyText.includes('Request access') ||
-          bodyText.includes('Create your')
+          bodyText.includes('continue') ||
+          bodyText.includes('google') ||
+          authUnavailable ||
+          bodyText.includes('sign in to jovie') ||
+          bodyText.includes('request access') ||
+          bodyText.includes('create your')
         );
       },
       undefined,

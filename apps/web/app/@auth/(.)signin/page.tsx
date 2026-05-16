@@ -6,6 +6,7 @@ import { AuthModalShell } from '@/components/auth/AuthModalShell';
 import { AuthShell } from '@/components/features/auth/AuthShell';
 import { APP_ROUTES } from '@/constants/routes';
 import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
+import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 
 /**
  * Intercepted sign-in modal.
@@ -16,7 +17,9 @@ import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
 function SigninModalBody() {
   const searchParams = useSearchParams();
   const signUpUrl = buildAuthRouteUrl(APP_ROUTES.SIGNUP, searchParams);
-  const redirectUrl = searchParams.get('redirect_url') ?? APP_ROUTES.DASHBOARD;
+  const redirectUrl =
+    sanitizeRedirectUrl(searchParams.get('redirect_url')) ??
+    APP_ROUTES.DASHBOARD;
 
   return (
     <AuthModalShell ariaLabel='Sign in to Jovie'>

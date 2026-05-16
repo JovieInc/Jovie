@@ -16,16 +16,24 @@ const EMPTY_STORAGE_STATE = {
   origins: [],
 };
 
+const AUTH_UNAVAILABLE_PHRASES = [
+  'auth unavailable',
+  'authentication unavailable',
+  'temporarily unavailable',
+  'clerk is not configured',
+];
+
+function hasAuthUnavailableCopy(text: string | null | undefined): boolean {
+  const normalized = (text ?? '').toLowerCase();
+  return AUTH_UNAVAILABLE_PHRASES.some(phrase => normalized.includes(phrase));
+}
+
 async function isAuthUnavailable(page: Page): Promise<boolean> {
   const bodyText = await page
     .locator('body')
     .textContent()
     .catch(() => '');
-  return Boolean(
-    bodyText?.includes('Auth unavailable') ||
-      bodyText?.includes('temporarily unavailable') ||
-      bodyText?.includes('Clerk is not configured')
-  );
+  return hasAuthUnavailableCopy(bodyText);
 }
 
 async function interceptAnalytics(page: Page): Promise<void> {
@@ -49,12 +57,13 @@ async function waitForClerk(page: Page): Promise<void> {
     ),
     page.waitForFunction(
       () => {
-        const bodyText = document.body.innerText || '';
-        return (
-          bodyText.includes('Auth unavailable') ||
-          bodyText.includes('temporarily unavailable') ||
-          bodyText.includes('Clerk is not configured')
-        );
+        const bodyText = (document.body.innerText || '').toLowerCase();
+        return [
+          'auth unavailable',
+          'authentication unavailable',
+          'temporarily unavailable',
+          'clerk is not configured',
+        ].some(phrase => bodyText.includes(phrase));
       },
       undefined,
       {
@@ -80,15 +89,18 @@ async function waitForClerkAuthUi(page: Page): Promise<void> {
         return true;
       }
 
-      const bodyText = document.body.innerText || '';
+      const bodyText = (document.body.innerText || '').toLowerCase();
       return (
-        bodyText.includes('Auth unavailable') ||
-        bodyText.includes('temporarily unavailable') ||
-        bodyText.includes('Clerk is not configured') ||
-        bodyText.includes('Continue') ||
-        bodyText.includes('Google') ||
-        bodyText.includes('Sign in to Jovie') ||
-        bodyText.includes('Request access')
+        [
+          'auth unavailable',
+          'authentication unavailable',
+          'temporarily unavailable',
+          'clerk is not configured',
+        ].some(phrase => bodyText.includes(phrase)) ||
+        bodyText.includes('continue') ||
+        bodyText.includes('google') ||
+        bodyText.includes('sign in to jovie') ||
+        bodyText.includes('request access')
       );
     },
     undefined,
