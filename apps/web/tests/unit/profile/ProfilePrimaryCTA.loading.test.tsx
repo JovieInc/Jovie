@@ -4,18 +4,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { ProfilePrimaryCTA } from '@/features/profile/ProfilePrimaryCTA';
 import type { Artist, LegacySocialLink } from '@/types/db';
 
-vi.mock('next/dynamic', () => ({
-  default: (
-    _loader: unknown,
-    options?: { loading?: () => React.ReactNode }
-  ) => {
-    const Loading = options?.loading;
-    return function DynamicComponent() {
-      return Loading ? Loading() : null;
-    };
-  },
-}));
-
 vi.mock('next/link', () => ({
   __esModule: true,
   default: ({
@@ -76,6 +64,26 @@ vi.mock('@/components/organisms/profile-shell', () => ({
   }),
 }));
 
+vi.mock(
+  '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA',
+  () => ({
+    ArtistNotificationsCTA: () => (
+      <div data-testid='artist-notifications-cta'>ArtistNotificationsCTA</div>
+    ),
+  })
+);
+
+vi.mock(
+  '@/features/profile/artist-notifications-cta/TwoStepNotificationsCTA',
+  () => ({
+    TwoStepNotificationsCTA: () => (
+      <div data-testid='two-step-notifications-cta'>
+        TwoStepNotificationsCTA
+      </div>
+    ),
+  })
+);
+
 function makeArtist(overrides: Partial<Artist> = {}): Artist {
   return {
     id: 'artist-1',
@@ -92,8 +100,15 @@ function makeArtist(overrides: Partial<Artist> = {}): Artist {
   };
 }
 
-describe('ProfilePrimaryCTA loading fallback', () => {
-  it('renders the subscription skeleton while dynamic CTA loads', () => {
+describe('ProfilePrimaryCTA notifications branch', () => {
+  // Previously this test asserted the `SubscriptionFormSkeleton` "Loading
+  // subscription form" copy because `ArtistNotificationsCTA` was dynamically
+  // imported with `ssr: false` and the test mocked `next/dynamic` to surface
+  // the loading fallback. After JOV-2273 the dynamic import was removed —
+  // the CTA renders synchronously without an SSR bailout — so the loading
+  // fallback no longer appears in the first render and the assertion has
+  // been updated to verify the CTA renders directly instead.
+  it('renders the ArtistNotificationsCTA when capture is enabled', () => {
     render(
       <ProfilePrimaryCTA
         artist={makeArtist()}
@@ -102,6 +117,6 @@ describe('ProfilePrimaryCTA loading fallback', () => {
       />
     );
 
-    expect(screen.getByText('Loading subscription form')).toBeInTheDocument();
+    expect(screen.getByTestId('artist-notifications-cta')).toBeInTheDocument();
   });
 });

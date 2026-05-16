@@ -1,9 +1,7 @@
 'use client';
 
-import dynamic from 'next/dynamic';
 import {
   type CSSProperties,
-  Suspense,
   useCallback,
   useEffect,
   useMemo,
@@ -48,38 +46,20 @@ import type { Artist, LegacySocialLink } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
 import { ProfileCompactSurface } from './ProfileCompactSurface';
+import { ProfileDesktopSurface } from './ProfileDesktopSurface';
 import { PublicProfileLayoutShell } from './PublicProfileLayoutShell';
 
-// `ssr: false` deferred this component to the client because it is only
-// rendered on >=1180px desktop viewports (gated by isDesktopLayout, which is
-// false during SSR). Without a <Suspense> wrapper, Next.js 15 + React 19 bail
-// the parent tree to client-side rendering and emit
-// `BAILOUT_TO_CLIENT_SIDE_RENDERING` on the route's implicit Suspense boundary
-// (loading.tsx) — shipping the animated skeleton as the initial visible HTML
-// instead of the actual profile content (JOV-2273). The fix is the explicit
-// <Suspense> boundary at the consumer site below.
-const ProfileDesktopSurface = dynamic(
-  () =>
-    import('./ProfileDesktopSurface').then(mod => ({
-      default: mod.ProfileDesktopSurface,
-    })),
-  {
-    ssr: false,
-    loading: () => (
-      <div
-        data-testid='profile-desktop-surface-loading'
-        className='h-[min(940px,calc(100dvh-48px))] w-full rounded-[36px] border border-white/8 bg-[rgba(8,10,14,0.9)]'
-      />
-    ),
-  }
-);
-
-const desktopSurfaceFallback = (
-  <div
-    data-testid='profile-desktop-surface-loading'
-    className='h-[min(940px,calc(100dvh-48px))] w-full rounded-[36px] border border-white/8 bg-[rgba(8,10,14,0.9)]'
-  />
-);
+// Previously imported via `dynamic({ ssr: false })`. That bailed the parent
+// SSR tree to client-side rendering and emitted
+// `<template data-dgst="BAILOUT_TO_CLIENT_SIDE_RENDERING">` in the streaming
+// payload, forcing the animated skeleton from `loading.tsx` to be the initial
+// visible HTML for every cold visit (JOV-2273).
+//
+// `ProfileDesktopSurface` is only rendered when `isDesktopLayout === true`,
+// which starts as `false` during SSR and is set in `useEffect` from
+// `matchMedia('(min-width: 1180px)')`. So the component is never rendered
+// server-side anyway — the `ssr: false` deferral was costing us a visible
+// CSR bailout for no rendering benefit.
 
 interface ProfileCompactTemplateProps {
   readonly mode: ProfileMode;
@@ -724,46 +704,44 @@ export function ProfileCompactTemplate({
         shouldRenderHeading={shouldRenderTemplateHeading}
         profileAccentStyle={profileAccentStyle}
         desktopSurface={
-          <Suspense fallback={desktopSurfaceFallback}>
-            <ProfileDesktopSurface
-              presentation={drawerPresentation}
-              artist={artist}
-              socialLinks={socialLinks}
-              contacts={contacts}
-              showPayButton={showPayButton}
-              latestRelease={latestRelease}
-              profileSettings={profileSettings}
-              alertOptInVariant={resolvedAlertOptInVariant}
-              genres={genres}
-              pressPhotos={pressPhotos}
-              allowPhotoDownloads={allowPhotoDownloads}
-              photoDownloadSizes={photoDownloadSizes}
-              tourDates={tourDates}
-              viewerCountryCode={viewerCountryCode}
-              drawerOpen={drawerOpen}
-              drawerView={drawerView}
-              activeMode={requestedMode}
-              onModeSelect={nextMode => {
-                clearCloseResetTimer();
-                setRequestedMode(nextMode);
-              }}
-              onAlertsModalClose={() => {
-                clearCloseResetTimer();
-                setRequestedMode(lastPrimaryModeRef.current);
-              }}
-              onDrawerOpenChange={handleDrawerOpenChange}
-              onDrawerViewChange={handleDrawerViewChange}
-              onOpenMenu={() => openDrawerMode('menu')}
-              onPlayClick={handlePlayClick}
-              profileHref={profileHref}
-              isSubscribed={isSubscribed}
-              contentPrefs={contentPrefs}
-              onTogglePref={handleTogglePref}
-              onUnsubscribe={handleUnsubscribe}
-              isUnsubscribing={unsubMutation.isPending}
-              releases={releases}
-            />
-          </Suspense>
+          <ProfileDesktopSurface
+            presentation={drawerPresentation}
+            artist={artist}
+            socialLinks={socialLinks}
+            contacts={contacts}
+            showPayButton={showPayButton}
+            latestRelease={latestRelease}
+            profileSettings={profileSettings}
+            alertOptInVariant={resolvedAlertOptInVariant}
+            genres={genres}
+            pressPhotos={pressPhotos}
+            allowPhotoDownloads={allowPhotoDownloads}
+            photoDownloadSizes={photoDownloadSizes}
+            tourDates={tourDates}
+            viewerCountryCode={viewerCountryCode}
+            drawerOpen={drawerOpen}
+            drawerView={drawerView}
+            activeMode={requestedMode}
+            onModeSelect={nextMode => {
+              clearCloseResetTimer();
+              setRequestedMode(nextMode);
+            }}
+            onAlertsModalClose={() => {
+              clearCloseResetTimer();
+              setRequestedMode(lastPrimaryModeRef.current);
+            }}
+            onDrawerOpenChange={handleDrawerOpenChange}
+            onDrawerViewChange={handleDrawerViewChange}
+            onOpenMenu={() => openDrawerMode('menu')}
+            onPlayClick={handlePlayClick}
+            profileHref={profileHref}
+            isSubscribed={isSubscribed}
+            contentPrefs={contentPrefs}
+            onTogglePref={handleTogglePref}
+            onUnsubscribe={handleUnsubscribe}
+            isUnsubscribing={unsubMutation.isPending}
+            releases={releases}
+          />
         }
         compactSurface={
           <div

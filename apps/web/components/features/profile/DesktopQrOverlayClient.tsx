@@ -1,31 +1,22 @@
 'use client';
 
-import dynamic from 'next/dynamic';
-import { Suspense } from 'react';
+import { DesktopQrOverlay } from './DesktopQrOverlay';
 
-// Wrapped in <Suspense> so the `ssr: false` dynamic import does not bail the
-// entire parent React tree to client-side rendering. Without the boundary,
-// Next.js 15 + React 19 emit `BAILOUT_TO_CLIENT_SIDE_RENDERING` on the nearest
-// ancestor Suspense, which on the /[username] route is the implicit boundary
-// wrapping `loading.tsx` — causing the animated skeleton to ship as the
-// initial visible HTML instead of the actual profile content (JOV-2273).
-const DesktopQrOverlay = dynamic(
-  () =>
-    import('./DesktopQrOverlay').then(mod => ({
-      default: mod.DesktopQrOverlay,
-    })),
-  {
-    ssr: false,
-    loading: () => null,
-  }
-);
-
+// Previously wrapped `DesktopQrOverlay` in a `dynamic({ ssr: false })` import.
+// That bailed the parent SSR tree to client-side rendering and emitted
+// `<template data-dgst="BAILOUT_TO_CLIENT_SIDE_RENDERING">` in the streaming
+// payload — which on the /[username] route forced the animated skeleton from
+// `loading.tsx` to be the initial visible HTML for every cold visit
+// (JOV-2273).
+//
+// `DesktopQrOverlay` initial state is `mode: 'hidden'` and renders `null` on
+// first paint, so SSR is safe: server-rendered output is also `null`, and the
+// component progressively enables itself in `useEffect` once
+// `globalThis.matchMedia('(min-width: 768px)')` resolves on the client. The
+// `ssr: false` deferral was costing us a visible CSR bailout for no rendering
+// benefit.
 export function DesktopQrOverlayClient({
   handle,
 }: Readonly<{ handle: string }>) {
-  return (
-    <Suspense fallback={null}>
-      <DesktopQrOverlay handle={handle} />
-    </Suspense>
-  );
+  return <DesktopQrOverlay handle={handle} />;
 }
