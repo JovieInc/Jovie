@@ -115,8 +115,8 @@ describe('JovieChat empty state', () => {
       <JovieChat profileId='profile-1' />
     );
 
-    expect(getByText('Welcome Back')).toBeTruthy();
-    expect(queryByText('Welcome to Jovie')).toBeNull();
+    expect(getByText('Welcome back')).toBeTruthy();
+    expect(queryByText("Hey, I'm Jovie")).toBeNull();
     expect(queryByText('Jovie Assistant')).toBeNull();
     expect(queryByText('Ask anything or tell Jovie what you need')).toBeNull();
     expect(getByTestId('chat-input')).toBeTruthy();
@@ -135,7 +135,7 @@ describe('JovieChat empty state', () => {
       <JovieChat profileId='profile-1' isFirstSession />
     );
 
-    expect(getByText('Welcome to Jovie')).toBeTruthy();
+    expect(getByText("Hey, I'm Jovie")).toBeTruthy();
   });
 
   it('uses only the first name in the returning-user welcome heading', () => {
@@ -143,8 +143,8 @@ describe('JovieChat empty state', () => {
       <JovieChat profileId='profile-1' displayName='Tim White' />
     );
 
-    expect(getByText('Welcome Back Tim')).toBeTruthy();
-    expect(queryByText('Welcome Back Tim White')).toBeNull();
+    expect(getByText('Welcome back, Tim')).toBeTruthy();
+    expect(queryByText('Welcome back, Tim White')).toBeNull();
   });
 
   it('renders chat messages after in-place message array updates', () => {
@@ -153,7 +153,7 @@ describe('JovieChat empty state', () => {
       <JovieChat profileId='profile-1' />
     );
 
-    expect(queryByText('Welcome Back')).toBeTruthy();
+    expect(queryByText('Welcome back')).toBeTruthy();
 
     messages.push(
       {
@@ -173,7 +173,7 @@ describe('JovieChat empty state', () => {
 
     rerender(<JovieChat profileId='profile-1' />);
 
-    expect(queryByText('Welcome Back')).toBeNull();
+    expect(queryByText('Welcome back')).toBeNull();
     expect(getAllByTestId('chat-message')).toHaveLength(2);
   });
 });
