@@ -129,6 +129,12 @@ const STATIC_CSP_PARTS = {
     'wss://ws-us3.pusher.com',
     'https://r2.leadsy.ai',
     'https://wvbknd.leadsy.ai',
+    // Google OAuth + AI Connector APIs (JOV-2230)
+    'https://accounts.google.com',
+    'https://oauth2.googleapis.com',
+    'https://www.googleapis.com',
+    'https://gmail.googleapis.com',
+    'https://calendar-pa.clients6.google.com',
   ].join(' '),
 
   // Pre-computed frame-src prefix (excludes dev-only vercel.live)
