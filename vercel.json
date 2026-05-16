@@ -43,6 +43,10 @@
     {
       "path": "/api/cron/process-metadata-submissions",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/process-workflow-runs",
+      "schedule": "* * * * *"
     }
   ],
   "functions": {

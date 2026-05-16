@@ -5,6 +5,19 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.8] - 2026-05-16
+
+> [internal] AI Connector v1 — approve/reject/execute backend for the Gmail → Google Calendar booking flow. Closed beta only (flag-gated, default off). Artists never see this; it will be allowlisted for design-partner DJs post-merge.
+
+### Added
+
+- **[internal] Approve endpoint (`POST /api/connectors/suggested-actions/[id]/approve`)**: CAS transition `pending → accepted`, inserts a `workflow_runs` row, returns the new run ID. Idempotent on CAS miss (409).
+- **[internal] Reject endpoint (`POST /api/connectors/suggested-actions/[id]/reject`)**: CAS transition `pending → dismissed`. No follow-up work. Idempotent on CAS miss (409).
+- **[internal] Workflow cron (`POST /api/cron/process-workflow-runs`, every minute)**: Claims up to 20 `pending` runs with a two-step SELECT+CAS UPDATE, processes up to 5 concurrently, fails unknown kinds immediately (fail-closed).
+- **[internal] `executeApprovedAction` executor**: Loads `workflow_runs` row, extracts `approvalId` + `eventPayload` from `stepOutputs`, delegates to `createCalendarEvent`, CAS-transitions `running → completed | failed`.
+- **[internal] Precision eval harness**: 14 scenario fixtures covering booking-confirmed, booking-cancelled, multi-booking, Asia-Pacific, Europe tour, DJ sets, already-present, and edge cases; `precision.test.ts` asserts extraction scores ≥0.9 against all fixtures.
+- **[internal] `ai_connectors_beta` Statsig gate** registered in `contracts.ts`, `registry.ts`, `STATSIG_FEATURE_GATES.md`, and `FEATURE_REGISTRY.md` — default off, closed beta.
+
 ## [26.5.7] - 2026-05-16
 
 > [internal] Bug fix: release plan demo page is now reachable in dev and preview without a manual flag override.

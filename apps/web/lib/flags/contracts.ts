@@ -18,6 +18,7 @@ export const LEGACY_STATSIG_GATE_KEYS = {
   DESIGN_V1_AUTH: 'design_v1_auth',
   DESIGN_V1_ONBOARDING: 'design_v1_onboarding',
   CHAT_JANK_MONITOR: 'chat_jank_monitor',
+  AI_CONNECTORS_BETA: 'ai_connectors_beta',
 } as const;
 
 export type StatsigGateKey =
@@ -39,6 +40,7 @@ export const APP_FLAG_DEFAULTS = {
   ALBUM_ART_GENERATION: true,
   CHAT_JANK_MONITOR: false,
   RELEASE_PLAN_DEMO: false,
+  AI_CONNECTORS_BETA: false,
   // DESIGN_V1 and all its surface aliases are permanently enabled.
   // Statsig gate "design_v1" is also set to 100% rollout.
   // The true default here ensures the new design is on even if Statsig is
@@ -67,6 +69,7 @@ export const APP_FLAG_KEYS = {
   ALBUM_ART_GENERATION: 'album_art_generation',
   CHAT_JANK_MONITOR: 'chat_jank_monitor',
   RELEASE_PLAN_DEMO: 'release_plan_demo',
+  AI_CONNECTORS_BETA: 'ai_connectors_beta',
   DESIGN_V1: 'design_v1',
   SHELL_CHAT_V1: LEGACY_STATSIG_GATE_KEYS.DESIGN_V1,
   DESIGN_V1_RELEASES: LEGACY_STATSIG_GATE_KEYS.DESIGN_V1,
@@ -88,6 +91,7 @@ export const APP_FLAG_OVERRIDE_KEYS = {
   ALBUM_ART_GENERATION: 'code:ALBUM_ART_GENERATION',
   CHAT_JANK_MONITOR: 'code:CHAT_JANK_MONITOR',
   RELEASE_PLAN_DEMO: 'code:RELEASE_PLAN_DEMO',
+  AI_CONNECTORS_BETA: 'code:AI_CONNECTORS_BETA',
   DESIGN_V1: 'code:DESIGN_V1',
   SHELL_CHAT_V1: 'code:DESIGN_V1',
   DESIGN_V1_RELEASES: 'code:DESIGN_V1',
@@ -106,6 +110,7 @@ export const APP_FLAG_TO_STATSIG_GATE = {
   SPOTIFY_OAUTH: LEGACY_STATSIG_GATE_KEYS.SPOTIFY_OAUTH,
   STRIPE_CONNECT_ENABLED: LEGACY_STATSIG_GATE_KEYS.STRIPE_CONNECT_ENABLED,
   CHAT_JANK_MONITOR: LEGACY_STATSIG_GATE_KEYS.CHAT_JANK_MONITOR,
+  AI_CONNECTORS_BETA: LEGACY_STATSIG_GATE_KEYS.AI_CONNECTORS_BETA,
 } as const satisfies Partial<Record<AppFlagName, StatsigGateKey>>;
 
 export type StatsigBackedAppFlagName = keyof typeof APP_FLAG_TO_STATSIG_GATE;
@@ -121,6 +126,8 @@ export const APP_FLAG_DESCRIPTIONS = {
   CHAT_JANK_MONITOR:
     'Chat jank instrumentation (message continuity + streaming)',
   RELEASE_PLAN_DEMO: 'Release plan demo page (YC wedge)',
+  AI_CONNECTORS_BETA:
+    'AI Connectors v1 beta (Gmail booking extraction → calendar)',
   DESIGN_V1: 'New production design',
   SHELL_CHAT_V1: 'New production design alias for shell and chat',
   DESIGN_V1_RELEASES: 'New production design alias for releases',
