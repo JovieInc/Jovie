@@ -192,6 +192,7 @@ function findLastAssistantMessageId(messages: readonly UIMessage[]) {
     const message = messages[i];
     if (
       message.role === 'assistant' &&
+      message.id !== ONBOARDING_INTRO_MESSAGE_ID &&
       message.id !== THINKING_PLACEHOLDER_ID
     ) {
       return message.id;
