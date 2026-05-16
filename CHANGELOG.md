@@ -5,6 +5,15 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.15] - 2026-05-16
+
+> [internal] Profile image performance: Spotify cover art now goes through Next.js image optimisation (AVIF/WebP + responsive sizing) instead of serving full-res JPEGs. The blur-background stage on public profiles switches from a redundant blurred image fetch to a CSS-only radial gradient.
+
+### Fixed
+
+- **[internal] Spotify CDN no longer bypasses image optimisation (JOV-2261)**: `shouldBypassImageOptimization()` was routing all DSP CDN images — including Spotify's `i.scdn.co` — through the unoptimised bypass path. Spotify domains are declared in `next.config.js` `remotePatterns` and are proxiable; they now go through `/_next/image` for AVIF/WebP conversion and viewport-appropriate resizing. Regression test added.
+- **[internal] Blur background replaced with CSS gradient (JOV-2263)**: `PublicProfileLayoutShell` was loading the hero image a second time at full resolution for the blurred background stage. At `blur-[84px]` + `opacity-28` the image is visually indistinguishable from a CSS `radial-gradient()` using the artist accent colour, saving ~96 KB per profile page load.
+
 ## [26.5.11] - 2026-05-16
 
 > [internal] Desktop release bump for the Electron app-shell launch fix and a guard that prevents future desktop code from landing without DMG release handling.
