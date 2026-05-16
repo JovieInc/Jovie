@@ -24,6 +24,7 @@ const APP_BACKGROUND_COLOR = '#09090b';
 const APP_ICON_FILENAME =
   APP_ENV === 'staging' ? 'icon-staging.png' : 'icon.png';
 const APP_ICON_PATH = path.join(__dirname, '..', 'assets', APP_ICON_FILENAME);
+const DESKTOP_USER_AGENT_PRODUCT = `JovieDesktop/${app.getVersion()}`;
 const ENABLE_DEVTOOLS = APP_ENV !== 'production' || !app.isPackaged;
 const UPDATE_AVAILABLE_CHANNEL = 'update-available';
 const UPDATE_DOWNLOADED_CHANNEL = 'update-downloaded';
@@ -206,6 +207,10 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   win.once('ready-to-show', () => {
     showWindow(win);
   });
+
+  win.webContents.setUserAgent(
+    `${win.webContents.getUserAgent()} ${DESKTOP_USER_AGENT_PRODUCT}`
+  );
 
   void win.loadURL(initialUrl);
 
