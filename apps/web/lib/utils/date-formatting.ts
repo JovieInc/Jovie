@@ -138,7 +138,9 @@ export function formatISODateTime(
 // ============================================================================
 
 /**
- * Format as relative time: "just now", "5m ago", "2h ago", "3d ago"
+ * Format as relative time: "just now", "5m ago", "2h ago", "3d ago".
+ * Older dates collapse to weeks, months, or years so shell tables never render
+ * raw multi-year day counts like "2193d ago".
  * Used in: activity feeds, last seen indicators
  */
 export function formatTimeAgo(value: string | Date | null | undefined): string {
@@ -150,11 +152,17 @@ export function formatTimeAgo(value: string | Date | null | undefined): string {
   const minutes = Math.floor(seconds / 60);
   const hours = Math.floor(minutes / 60);
   const days = Math.floor(hours / 24);
+  const weeks = Math.max(1, Math.round(days / 7));
+  const months = Math.max(1, Math.round(days / 30));
+  const years = Math.max(1, Math.round(days / 365));
 
   if (seconds < 60) return 'just now';
   if (minutes < 60) return `${minutes}m ago`;
   if (hours < 24) return `${hours}h ago`;
-  return `${days}d ago`;
+  if (days < 7) return `${days}d ago`;
+  if (days < 30) return `${weeks}w ago`;
+  if (days < 365) return `${months}mo ago`;
+  return `${years}y ago`;
 }
 
 /**

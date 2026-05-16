@@ -30,6 +30,13 @@ describe('PillSearch', () => {
     ).toBeInTheDocument();
   });
 
+  it('does not use browser-style cyan focus rings on the input', () => {
+    setup();
+    const input = screen.getByLabelText('Filter tracks');
+    expect(input.className).toContain('focus-visible:ring-0');
+    expect(input.className).not.toContain('ring-cyan');
+  });
+
   it('switches to the "and…" placeholder once a pill is present', () => {
     setup({
       pills: [{ id: '1', field: 'artist', op: 'is', values: ['Frank Ocean'] }],

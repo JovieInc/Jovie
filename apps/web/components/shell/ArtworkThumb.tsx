@@ -1,8 +1,11 @@
 'use client';
 
 import { Disc3 } from 'lucide-react';
-import type { CSSProperties } from 'react';
 import { useEffect, useState } from 'react';
+import {
+  getArtworkFallbackAccentStyle,
+  getArtworkFallbackSurfaceStyle,
+} from '@/lib/artwork-fallback';
 import { cn } from '@/lib/utils';
 
 /**
@@ -22,35 +25,6 @@ import { cn } from '@/lib/utils';
  * <ArtworkThumb src={release.artwork} title={release.title} size={40} />
  * ```
  */
-function hashTitle(title: string): number {
-  let hash = 0;
-  for (const char of title.trim() || 'release') {
-    hash = (hash * 31 + char.charCodeAt(0)) % 997;
-  }
-  return hash;
-}
-
-function getFallbackSurfaceStyle(title: string): CSSProperties {
-  const hash = hashTitle(title);
-  const hue = (hash * 47) % 360;
-  const depthHue = (hue + 210) % 360;
-
-  return {
-    background: [
-      `linear-gradient(${132 + (hash % 36)}deg, oklch(0.23 0.045 ${hue}), oklch(0.12 0.022 ${depthHue}) 62%, oklch(0.18 0.036 ${hue}))`,
-      'repeating-linear-gradient(90deg, rgba(255,255,255,0.028) 0 1px, transparent 1px 7px)',
-    ].join(', '),
-  };
-}
-
-function getFallbackAccentStyle(title: string): CSSProperties {
-  const hash = hashTitle(title);
-  const hue = (hash * 47 + 28) % 360;
-  return {
-    background: `linear-gradient(90deg, oklch(0.72 0.12 ${hue}), oklch(0.55 0.1 ${(hue + 42) % 360}))`,
-  };
-}
-
 export function ArtworkThumb({
   src,
   title,
@@ -106,7 +80,7 @@ export function ArtworkThumb({
             aria-hidden='true'
             className='absolute inset-0'
             data-artwork-fallback='true'
-            style={getFallbackSurfaceStyle(title)}
+            style={getArtworkFallbackSurfaceStyle(title)}
           />
           <span
             aria-hidden='true'
@@ -117,7 +91,7 @@ export function ArtworkThumb({
           <span
             aria-hidden='true'
             className='absolute inset-x-0 bottom-0 h-1'
-            style={getFallbackAccentStyle(title)}
+            style={getArtworkFallbackAccentStyle(title)}
           />
           <span
             aria-hidden='true'

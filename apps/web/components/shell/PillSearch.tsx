@@ -361,7 +361,7 @@ export function PillSearch({
           aria-autocomplete='list'
           aria-activedescendant={activeOptionId}
           placeholder={pills.length === 0 ? placeholder : 'and… (/ for fields)'}
-          className='flex-1 min-w-[120px] bg-transparent text-[13px] text-primary-token placeholder:text-tertiary-token outline-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cyan-500/30 rounded-sm'
+          className='flex-1 min-w-[120px] rounded-sm bg-transparent text-[13px] text-primary-token outline-none placeholder:text-tertiary-token focus:outline-none focus:ring-0 focus:shadow-none focus-visible:outline-none focus-visible:ring-0 focus-visible:shadow-none'
         />
         <button
           type='button'

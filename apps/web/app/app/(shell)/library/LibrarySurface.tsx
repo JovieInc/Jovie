@@ -34,6 +34,10 @@ import { ShellDropdown } from '@/components/shell/ShellDropdown';
 import { Tooltip } from '@/components/shell/Tooltip';
 import { APP_ROUTES } from '@/constants/routes';
 import { useRegisterShellSidebarOverride } from '@/contexts/ShellSidebarOverrideContext';
+import {
+  getArtworkFallbackAccentStyle,
+  getArtworkFallbackSurfaceStyle,
+} from '@/lib/artwork-fallback';
 import { cn } from '@/lib/utils';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
 import {
@@ -274,11 +278,27 @@ function Artwork({
   return (
     <div
       className={cn(
-        'grid place-items-center border border-subtle bg-surface-1 text-tertiary-token',
+        'relative overflow-hidden border border-subtle bg-surface-1 text-white/25',
         sizeClasses[size]
       )}
+      data-artwork-fallback='true'
+      style={getArtworkFallbackSurfaceStyle(asset.title)}
     >
-      <ImageIcon className='h-5 w-5' strokeWidth={2.25} />
+      <div className='absolute inset-0 grid place-items-center'>
+        <Disc3
+          className={cn(size === 'row' ? 'h-4 w-4' : 'h-[18%] w-[18%]')}
+          strokeWidth={1.85}
+        />
+      </div>
+      <span
+        aria-hidden='true'
+        className='absolute inset-x-0 bottom-0 h-1'
+        style={getArtworkFallbackAccentStyle(asset.title)}
+      />
+      <span
+        aria-hidden='true'
+        className='absolute inset-[1px] rounded-[3px] border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
+      />
     </div>
   );
 }
