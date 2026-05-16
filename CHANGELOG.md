@@ -5,6 +5,15 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.14] - 2026-05-16
+
+> [internal] Security: close auth bypass wildcard that allowed forged sessions on Vercel preview URLs.
+
+### Fixed
+
+- **[internal] Test-mode bypass wildcard removed**: `isTrustedTestBypassHostname()` no longer accepts arbitrary `*.vercel.app` hostnames. Only `preview.jov.ie` and loopback/private-network addresses are trusted (JOV-2265).
+- **[internal] Preview env gate added**: `isTestAuthBypassEnabled()` now returns `false` when `VERCEL_ENV=preview`, blocking the bypass on Vercel preview deployments even if `E2E_USE_TEST_AUTH_BYPASS=1` is accidentally set there (JOV-2265).
+
 ## [26.5.11] - 2026-05-16
 
 > [internal] Desktop release bump for the Electron app-shell launch fix and a guard that prevents future desktop code from landing without DMG release handling.
