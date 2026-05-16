@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { APP_ROUTES } from '@/constants/routes';
 import {
+  mockUseChatConversationsQuery,
   mockUsePathname,
   mockUsePlanGate,
   mockUseTaskStatsQuery,
@@ -64,11 +65,16 @@ describe('DashboardNav', () => {
     const { container } = renderDashboardNav({
       renderFn: fastRender,
       sidebarProps: { defaultOpen: false },
+      appFlags: { DESIGN_V1: true },
     });
 
     const profileButton = container.querySelector('button[aria-pressed]');
     expect(profileButton).toBeTruthy();
     expect(profileButton?.className).toContain('justify-center');
+    expect(mockUseChatConversationsQuery).toHaveBeenCalledWith({
+      limit: 10,
+      enabled: false,
+    });
   });
 
   it('differentiates primary and secondary nav styling', () => {
