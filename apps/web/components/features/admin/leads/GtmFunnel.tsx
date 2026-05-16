@@ -109,7 +109,7 @@ export async function GtmFunnel({ counts }: GtmFunnelProps) {
       data-testid='gtm-pipeline-status'
     >
       {/* Pipeline status (all time) */}
-      <p className='mb-2 text-2xs font-medium uppercase tracking-[0.08em] text-tertiary-token'>
+      <p className='mb-2 text-2xs font-medium text-tertiary-token'>
         Pipeline status
       </p>
       <div className='flex flex-wrap items-start gap-x-1 gap-y-3'>
@@ -134,7 +134,7 @@ export async function GtmFunnel({ counts }: GtmFunnelProps) {
       {/* Conversion (last 30 days) */}
       {summary.contacted > 0 && (
         <div className='mt-4 border-t border-subtle pt-3'>
-          <p className='mb-1 text-2xs font-medium uppercase tracking-[0.08em] text-tertiary-token'>
+          <p className='mb-1 text-2xs font-medium text-tertiary-token'>
             Conversion (last 30 days)
           </p>
           <p className='text-app font-book text-secondary-token'>

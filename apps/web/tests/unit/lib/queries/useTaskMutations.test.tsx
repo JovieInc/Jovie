@@ -3,7 +3,10 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { queryKeys } from '@/lib/queries';
-import { useUpdateTaskMutation } from '@/lib/queries/useTaskMutations';
+import {
+  useMoveTaskMutation,
+  useUpdateTaskMutation,
+} from '@/lib/queries/useTaskMutations';
 import type {
   TaskBoardResult,
   TaskListResult,
@@ -13,11 +16,13 @@ import type {
 } from '@/lib/tasks/types';
 
 const mockUpdateTask = vi.hoisted(() => vi.fn());
+const mockMoveTask = vi.hoisted(() => vi.fn());
 
 vi.mock('@/app/app/(shell)/dashboard/tasks/task-actions', () => ({
   bulkUpdateTasks: vi.fn(),
   createTask: vi.fn(),
   deleteTask: vi.fn(),
+  moveTask: mockMoveTask,
   updateTask: mockUpdateTask,
 }));
 
@@ -385,5 +390,124 @@ describe('useTaskMutations', () => {
         queryKeys.tasks.detail(task.id, 'profile-1')
       )
     ).toEqual(task);
+  });
+
+  describe('useMoveTaskMutation', () => {
+    it('applies board move optimistically and settles on success', async () => {
+      const task = createTask({ status: 'todo' });
+      let resolveMoveTask!: (value: { success: true }) => void;
+
+      mockMoveTask.mockImplementation(
+        () =>
+          new Promise<{ success: true }>(resolve => {
+            resolveMoveTask = resolve;
+          })
+      );
+
+      queryClient.setQueryData(
+        queryKeys.tasks.board('profile-1'),
+        createTaskBoard(task)
+      );
+
+      const { result } = renderHook(() => useMoveTaskMutation(), { wrapper });
+
+      act(() => {
+        result.current.mutate({ taskId: task.id, toStatus: 'done' });
+      });
+
+      // Optimistic: task should appear in the 'done' column immediately.
+      await waitFor(() => {
+        const board = queryClient.getQueryData<TaskBoardResult>(
+          queryKeys.tasks.board('profile-1')
+        );
+        const doneTask = board?.columns
+          .find(c => c.status === 'done')
+          ?.tasks.find(t => t.id === task.id);
+        expect(doneTask).toBeDefined();
+      });
+
+      await act(async () => {
+        resolveMoveTask({ success: true });
+      });
+
+      await waitFor(() => {
+        expect(result.current.isSuccess).toBe(true);
+      });
+    });
+
+    it('rolls back board optimistic move when the server action fails', async () => {
+      const task = createTask({ status: 'todo' });
+      const previousBoard = createTaskBoard(task);
+      let rejectMoveTask!: (error: Error) => void;
+
+      mockMoveTask.mockImplementation(
+        () =>
+          new Promise<{ success: true }>((_resolve, reject) => {
+            rejectMoveTask = reject;
+          })
+      );
+
+      queryClient.setQueryData(
+        queryKeys.tasks.board('profile-1'),
+        previousBoard
+      );
+
+      const { result } = renderHook(() => useMoveTaskMutation(), { wrapper });
+
+      act(() => {
+        result.current.mutate({ taskId: task.id, toStatus: 'done' });
+      });
+
+      // Wait for optimistic patch to be applied.
+      await waitFor(() => {
+        const board = queryClient.getQueryData<TaskBoardResult>(
+          queryKeys.tasks.board('profile-1')
+        );
+        const doneTask = board?.columns
+          .find(c => c.status === 'done')
+          ?.tasks.find(t => t.id === task.id);
+        expect(doneTask).toBeDefined();
+      });
+
+      await act(async () => {
+        rejectMoveTask(new Error('server conflict'));
+      });
+
+      await waitFor(() => {
+        expect(result.current.isError).toBe(true);
+      });
+
+      // Rollback: original board state should be restored.
+      expect(
+        queryClient.getQueryData<TaskBoardResult>(
+          queryKeys.tasks.board('profile-1')
+        )
+      ).toEqual(previousBoard);
+    });
+
+    it('does not surface an error to the caller when moveTask succeeds silently after retries', async () => {
+      const task = createTask({ status: 'todo' });
+
+      // Server action returns success even after internal retries — no throw.
+      mockMoveTask.mockResolvedValue({ success: true });
+
+      queryClient.setQueryData(
+        queryKeys.tasks.board('profile-1'),
+        createTaskBoard(task)
+      );
+
+      const { result } = renderHook(() => useMoveTaskMutation(), { wrapper });
+
+      act(() => {
+        result.current.mutate({ taskId: task.id, toStatus: 'in_progress' });
+      });
+
+      await waitFor(() => {
+        expect(result.current.isSuccess).toBe(true);
+      });
+
+      // No error should have been set.
+      expect(result.current.error).toBeNull();
+    });
   });
 });

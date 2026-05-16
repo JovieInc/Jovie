@@ -76,31 +76,31 @@ export async function LeadGtmInsights() {
         <div className='space-y-4 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
           <div className='grid gap-3 sm:grid-cols-2 xl:grid-cols-5'>
             <KpiItem
-              title='SCRAPED'
+              title='Scraped'
               value={String(report.summary.scraped)}
               metadata={<span>Leads in the current cohort window</span>}
               icon={Sparkles}
             />
             <KpiItem
-              title='CONTACTED'
+              title='Contacted'
               value={String(report.summary.contacted)}
               metadata={<span>Email queued or DM sent</span>}
               icon={Mail}
             />
             <KpiItem
-              title='CLAIM RATE'
+              title='Claim Rate'
               value={formatRate(claimRate)}
               metadata={<span>Claim page views / contacted</span>}
               icon={Link2}
             />
             <KpiItem
-              title='SIGNUP RATE'
+              title='Signup Rate'
               value={formatRate(signupRate)}
               metadata={<span>Signups / claim page views</span>}
               icon={TrendingUp}
             />
             <KpiItem
-              title='PAID RATE'
+              title='Paid Rate'
               value={formatRate(paidRate)}
               metadata={<span>Paid conversions / signups</span>}
               icon={BarChart2}
