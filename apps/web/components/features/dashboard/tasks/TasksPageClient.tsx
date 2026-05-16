@@ -6,6 +6,7 @@ import {
   DropdownMenuContent,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  Input,
   UserAvatar,
 } from '@jovie/ui';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
@@ -16,7 +17,9 @@ import {
   FileText,
   MoreHorizontal,
   Plus,
+  Search,
   Trash2,
+  X,
 } from 'lucide-react';
 import {
   type ComponentPropsWithoutRef,
@@ -48,7 +51,6 @@ import {
   useTextareaAutosize,
 } from '@/components/jovie/hooks/useTextareaAutosize';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
-import { HeaderSearchAction } from '@/components/molecules/HeaderSearchAction';
 import {
   TOOLBAR_MENU_CONTENT_CLASS,
   TOOLBAR_MENU_SEPARATOR_CLASS,
@@ -124,10 +126,6 @@ function shouldIgnoreTaskShortcut(event: KeyboardEvent): boolean {
   return (
     event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey
   );
-}
-
-function isTaskSearchShortcut(event: KeyboardEvent): boolean {
-  return event.key === '/' && !event.shiftKey && !isFormElement(event.target);
 }
 
 function isTaskRowNavigationAction(
@@ -1213,9 +1211,6 @@ export function TasksPageClient() {
   );
   const [headerMode, setHeaderMode] = useState<'default' | 'create'>('default');
   const [search, setSearch] = useState('');
-  const [taskSearchOpenSignal, setTaskSearchOpenSignal] = useState<
-    number | undefined
-  >(undefined);
   const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all'>('all');
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | 'all'>(
     'all'
@@ -1736,12 +1731,6 @@ export function TasksPageClient() {
     function handleKeyDown(event: KeyboardEvent) {
       if (shouldIgnoreTaskShortcut(event)) return;
 
-      if (isTaskSearchShortcut(event)) {
-        event.preventDefault();
-        setTaskSearchOpenSignal(signal => (signal ?? 0) + 1);
-        return;
-      }
-
       const action = resolveTableNavAction(event.key, event.target);
       if (action === 'close') {
         handleCloseShortcut(event);
@@ -1775,16 +1764,6 @@ export function TasksPageClient() {
   const headerActions = useMemo(
     () => (
       <DashboardHeaderActionGroup>
-        <HeaderSearchAction
-          searchValue={search}
-          onSearchValueChange={setSearch}
-          onClearAction={() => setSearch('')}
-          placeholder='Search tasks'
-          ariaLabel='Search tasks'
-          submitAriaLabel='Search tasks'
-          tooltipLabel='Search'
-          openSignal={taskSearchOpenSignal}
-        />
         <DashboardHeaderActionButton
           ariaLabel='Create task'
           icon={<Plus className='h-3.5 w-3.5' />}
@@ -1795,7 +1774,7 @@ export function TasksPageClient() {
         />
       </DashboardHeaderActionGroup>
     ),
-    [headerMode, search, taskSearchOpenSignal]
+    [headerMode]
   );
 
   useEffect(() => {
@@ -1993,6 +1972,9 @@ export function TasksPageClient() {
               }}
               onSubmitCreate={handleCreateTask}
               createPending={createTaskMutation.isPending}
+              searchValue={search}
+              onSearchValueChange={setSearch}
+              onClearSearch={() => setSearch('')}
               filterCategories={taskFilterCategories}
               onClearFilters={clearFilters}
               viewMode={viewMode}
@@ -2054,10 +2036,34 @@ export function TasksPageClient() {
                     className='flex h-full min-h-0 flex-col overflow-hidden'
                     data-testid='mobile-task-list'
                   >
-                    <div className='flex items-center px-4 pb-1 pt-3'>
+                    <div className='flex items-center justify-between gap-3 px-4 pb-1 pt-3'>
                       <p className='text-xs text-secondary-token'>
                         {mobileScopeCounts.all} total tasks
                       </p>
+                      <div className='relative w-[min(12rem,48vw)] min-w-[8.5rem]'>
+                        <Search
+                          className='pointer-events-none absolute bottom-0 left-2 top-0 my-auto h-3.5 w-3.5 text-quaternary-token'
+                          aria-hidden='true'
+                        />
+                        <Input
+                          type='search'
+                          value={search}
+                          onChange={event => setSearch(event.target.value)}
+                          placeholder='Search tasks'
+                          aria-label='Search tasks'
+                          className='h-7 w-full rounded-md border-border-token bg-surface-0 py-0 pl-7 pr-7 text-[12.5px] text-primary-token placeholder:text-quaternary-token'
+                        />
+                        {search ? (
+                          <button
+                            type='button'
+                            aria-label='Clear task search'
+                            onClick={() => setSearch('')}
+                            className='absolute bottom-0 right-1 top-0 my-auto inline-flex h-5 w-5 items-center justify-center rounded text-quaternary-token transition-[background-color,color] hover:bg-surface-1 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-token'
+                          >
+                            <X className='h-3 w-3' aria-hidden='true' />
+                          </button>
+                        ) : null}
+                      </div>
                     </div>
                     <TaskSubviewTabs
                       subviews={taskSubviewOptions}
