@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.9] - 2026-05-16
+
+> [internal] HeaderNav flyout now conditionally renders (JOV-2147), eliminating the JOV-2145 class of bugs where megamenu content rendered as unstyled text on routes that didn't load the marketing CSS.
+
+### Fixed
+
+- **[internal] Marketing header flyout conditional render**: `MarketingGlassFlyout` now returns `null` when closed instead of relying on CSS-only visibility toggling. The flyout DOM node is only present when the menu is open, which eliminates the root cause of JOV-2145 (404 pages rendering flyout content as a wall of unstyled text). E2E helper `assertMarketingHeaderFlyoutsHidden` updated to assert on DOM structure rather than computed CSS properties.
+
 ## [26.5.6] - 2026-05-16
 
 > Connect Gmail and Google Calendar to your Jovie account. Once connected, Jovie scans your inbox for confirmed booking emails and proposes calendar events — all reviewable before anything is added.
