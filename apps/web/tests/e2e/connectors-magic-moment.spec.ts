@@ -59,10 +59,11 @@ test.describe('Connector endpoints: basic auth checks', () => {
 });
 
 test.describe('Connector magic moment: full flow', () => {
+  // Intentional conditional skip — only runs when RUN_CONNECTOR_E2E=1. NOSONAR S1607
   test.skip(
     SKIP_EXPENSIVE,
     'set RUN_CONNECTOR_E2E=1 to run connector E2E tests'
-  );
+  ); // NOSONAR
 
   test('approve → 200, second approve → 409', async ({ request }) => {
     // This test requires a seeded suggested_actions row.
@@ -70,10 +71,10 @@ test.describe('Connector magic moment: full flow', () => {
     // For local runs, you need a valid session + a pending suggested_action.
 
     const SUGGESTED_ACTION_ID = process.env.TEST_SUGGESTED_ACTION_ID;
-    test.skip(
-      !SUGGESTED_ACTION_ID,
-      'set TEST_SUGGESTED_ACTION_ID to run full approval flow'
-    );
+    if (!SUGGESTED_ACTION_ID) {
+      test.skip(); // NOSONAR S1607 — intentional conditional skip for missing credential env var
+      return;
+    }
 
     const firstApprove = await request.post(
       `/api/connectors/suggested-actions/${SUGGESTED_ACTION_ID}/approve`
@@ -93,10 +94,10 @@ test.describe('Connector magic moment: full flow', () => {
 
   test('reject → 200, second reject → 409', async ({ request }) => {
     const SUGGESTED_ACTION_ID = process.env.TEST_REJECT_ACTION_ID;
-    test.skip(
-      !SUGGESTED_ACTION_ID,
-      'set TEST_REJECT_ACTION_ID to run full rejection flow'
-    );
+    if (!SUGGESTED_ACTION_ID) {
+      test.skip(); // NOSONAR S1607 — intentional conditional skip for missing credential env var
+      return;
+    }
 
     const firstReject = await request.post(
       `/api/connectors/suggested-actions/${SUGGESTED_ACTION_ID}/reject`
