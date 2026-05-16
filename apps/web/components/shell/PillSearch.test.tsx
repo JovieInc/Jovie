@@ -30,10 +30,13 @@ describe('PillSearch', () => {
     ).toBeInTheDocument();
   });
 
-  it('does not use browser-style cyan focus rings on the input', () => {
+  it('uses a quiet tokenized focus ring instead of the cyan input ring', () => {
     setup();
     const input = screen.getByLabelText('Filter tracks');
-    expect(input.className).toContain('focus-visible:ring-0');
+    expect(input.className).toContain('focus-visible:ring-1');
+    expect(input.className).toContain(
+      'focus-visible:ring-(--linear-border-focus)/25'
+    );
     expect(input.className).not.toContain('ring-cyan');
   });
 
