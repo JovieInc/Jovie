@@ -1,7 +1,7 @@
-import { auth } from '@clerk/nextjs/server';
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { FIXTURE_BOOKING_EMAILS } from '@/lib/connectors/gmail/__fixtures__/booking-emails';
 import { storeTokens } from '@/lib/connectors/token-vault';
 import { db } from '@/lib/db';
@@ -34,7 +34,7 @@ export async function GET(request: Request) {
     searchParams.get('returnTo') ?? APP_ROUTES.SETTINGS_CONNECTORS;
 
   try {
-    const { userId: clerkId } = await auth();
+    const { userId: clerkId } = await getCachedAuth();
     if (!clerkId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

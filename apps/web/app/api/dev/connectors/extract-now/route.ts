@@ -1,6 +1,6 @@
-import { auth } from '@clerk/nextjs/server';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { extractAndPropose } from '@/lib/connectors/extract-and-propose';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -26,7 +26,7 @@ export async function POST() {
   }
 
   try {
-    const { userId: clerkId } = await auth();
+    const { userId: clerkId } = await getCachedAuth();
     if (!clerkId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
