@@ -139,7 +139,7 @@ export function AudioBar({
         <button
           type='button'
           onClick={onPlay}
-          className='h-8 w-8 rounded-full grid place-items-center bg-primary text-on-primary transition-colors duration-150 ease-out hover:bg-primary/90'
+          className='h-8 w-8 rounded-full grid place-items-center bg-primary text-on-primary transition-colors duration-subtle ease-subtle hover:bg-primary/90'
           aria-label={isPlaying ? 'Pause (space)' : 'Play (space)'}
         >
           {isPlaying ? (
@@ -176,7 +176,7 @@ export function AudioBar({
     <div className='flex items-center gap-1.5 justify-self-end'>
       {track.hasLyrics && onOpenLyrics && (
         <IconBtn
-          label='Lyrics'
+          label={lyricsActive ? 'Close lyrics' : 'Lyrics'}
           shortcut={SHORTCUTS.toggleLyrics}
           onClick={onOpenLyrics}
           active={lyricsActive}

@@ -30,14 +30,15 @@ describe('OnboardingProfileRail', () => {
     expect(screen.getByText('Building Test Artist')).toBeDefined();
     expect(screen.getByText('Matched')).toBeDefined();
     expect(
-      screen.getByRole('link', { name: 'open.spotify.com' })
+      screen.getByRole('link', { name: 'Open Test Artist on Spotify' })
     ).toHaveAttribute('href', 'https://open.spotify.com/artist/artist-1');
+    expect(screen.queryByText('open.spotify.com')).toBeNull();
     expect(screen.getByTitle('12,300 Spotify followers')).toBeDefined();
     expect(screen.getByText('12,300 Spotify followers')).toBeDefined();
     expect(screen.getByTitle('Popularity score: 48 out of 100')).toBeDefined();
     expect(screen.getByText('Popularity score: 48 out of 100')).toBeDefined();
-    expect(screen.getByText('Genre: PROGRESSIVE HOUSE')).toBeDefined();
-    expect(screen.getByText('PROGRESSIVE HOUSE')).toBeDefined();
+    expect(screen.getByText('Genre: Progressive House')).toBeDefined();
+    expect(screen.getByText('Progressive House')).toBeDefined();
     expect(screen.getByText('jov.ie/testartist')).toBeDefined();
     expect(screen.getByText('instagram.com')).toBeDefined();
   });

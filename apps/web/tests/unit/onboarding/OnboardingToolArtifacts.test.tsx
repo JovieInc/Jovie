@@ -1,6 +1,7 @@
 import { fireEvent, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  formatGenreLabel,
   OnboardingArtistConfirmedCard,
   OnboardingHandleCheckCard,
   OnboardingSocialLinkCard,
@@ -119,9 +120,14 @@ describe('onboarding tool artifacts', () => {
     expect(screen.getByTitle('Popularity score: 42 out of 100')).toBeDefined();
     expect(screen.getByText('Popularity score: 42 out of 100')).toBeDefined();
     expect(screen.getByText('42')).toBeDefined();
-    expect(screen.getByText('Genre: INDIE POP')).toBeDefined();
-    expect(screen.getByText('INDIE POP')).toBeDefined();
+    expect(screen.getByText('Genre: Indie Pop')).toBeDefined();
+    expect(screen.getByText('Indie Pop')).toBeDefined();
     expect(screen.queryByText('confirmSpotifyArtist')).toBeNull();
+  });
+
+  it('formats genre labels without shouting', () => {
+    expect(formatGenreLabel('progressive house')).toBe('Progressive House');
+    expect(formatGenreLabel('alt-pop')).toBe('Alt-Pop');
   });
 
   it('does not render unsafe Spotify profile links', () => {

@@ -180,8 +180,7 @@ export function ChatPageClient({
     isFirstSession: dashboardIsFirstSession,
   } = useDashboardData();
   const { setPreviewData } = usePreviewPanelData();
-  const { isOpen: isPreviewPanelOpen, open: openPreviewPanel } =
-    usePreviewPanelState();
+  const { open: openPreviewPanel } = usePreviewPanelState();
   const router = useRouter();
   const searchParams = useSearchParams();
   const notifications = useNotifications();
@@ -226,11 +225,10 @@ export function ChatPageClient({
   const fromOnboarding = searchParams.get('from') === 'onboarding';
   const panelParam = searchParams.get('panel');
   const designV1ChatEntitiesEnabled = useAppFlag('DESIGN_V1');
-  // Hydrate only when the panel is open, deep-linked, or onboarding requested it.
-  // This keeps closed chat routes cheap while allowing sidebar/mobile profile clicks.
+  // Hydrate the profile panel only for explicit profile entry. Entity mentions
+  // use ChatEntityPanelContext and do not need the profile preview fallback.
   const shouldHydratePreviewPanel =
-    enablePreviewPanel &&
-    (isPreviewPanelOpen || panelParam === 'profile' || fromOnboarding);
+    enablePreviewPanel && panelParam === 'profile';
 
   useEffect(() => {
     if (shouldHydratePreviewPanel) return;

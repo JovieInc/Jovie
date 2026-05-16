@@ -270,6 +270,7 @@ test.describe('canonical /start onboarding chat', () => {
       )
     ).toBeVisible();
     await expect(page.locator(CHAT_PANEL)).toBeVisible();
+    await expect(page.getByText("Hey, I'm Jovie.")).toBeVisible();
     const mainBox = await page.locator('#main-content').boundingBox();
     const chatBox = await page.locator(CHAT_PANEL).boundingBox();
     expect(mainBox).not.toBeNull();
@@ -292,6 +293,9 @@ test.describe('canonical /start onboarding chat', () => {
     await expect(
       page.locator('[data-testid="slash-command-menu"]')
     ).toBeVisible();
+    await expect(
+      page.getByRole('option', { name: /send feedback/i })
+    ).toBeVisible();
     const after = await surface.boundingBox();
     expect(before).not.toBeNull();
     expect(after).not.toBeNull();
@@ -307,23 +311,38 @@ test.describe('canonical /start onboarding chat', () => {
     ).toEqual([]);
   });
 
-  test('empty narrow screen hides the headline behind the root picker', async ({
+  test('narrow screen keeps the intro and feedback slash command usable', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 615, height: 407 });
     await page.goto('/start', { waitUntil: 'domcontentloaded' });
     await waitForHydration(page);
+    await expect(page.getByText("Hey, I'm Jovie.")).toBeVisible();
 
     const textarea = page.locator(COMPOSER_TEXTAREA);
-    await textarea.fill('/');
+    await textarea.fill('/feed');
     await expect(
       page.locator('[data-testid="slash-command-menu"]')
     ).toBeVisible();
-    await expect(page.locator('h1')).toHaveCSS('opacity', '0');
+    await expect(page.getByTestId('onboarding-intro-message')).toHaveCSS(
+      'opacity',
+      '0'
+    );
+    await expect(
+      page.getByRole('option', { name: /send feedback/i })
+    ).toBeVisible();
 
     await expect(page).toHaveScreenshot('start-empty-picker-narrow.png', {
       maxDiffPixelRatio: 0.04,
     });
+
+    await page.getByRole('option', { name: /send feedback/i }).click();
+    await expect(page.getByTestId('chat-input-chip-tray')).toContainText(
+      'Send feedback'
+    );
+    await expect(
+      page.getByRole('button', { name: 'Send message' })
+    ).toBeEnabled();
   });
 
   test('auth error and slash picker do not collide at narrow desktop size', async ({
@@ -414,17 +433,12 @@ test.describe('canonical /start onboarding chat', () => {
     await expect(
       page
         .getByTestId('onboarding-artist-confirmed')
-        .getByText('PROGRESSIVE HOUSE', { exact: true })
+        .getByText('Progressive House', { exact: true })
     ).toBeVisible();
-    await expect(page.getByTestId('onboarding-profile-rail')).toHaveAttribute(
-      'data-visible',
-      'true'
-    );
+    await expect(page.getByTestId('onboarding-profile-rail')).toHaveCount(0);
     await expect(
-      page
-        .getByTestId('onboarding-profile-rail')
-        .getByText('Building Test Artist')
-    ).toBeVisible();
+      page.getByTestId('onboarding-profile-rail-inline')
+    ).toHaveCount(0);
     await expect(
       page.getByText('find the exact Spotify profile')
     ).toBeVisible();
@@ -436,6 +450,7 @@ test.describe('canonical /start onboarding chat', () => {
     expect(bodyText).not.toContain('searchSpotifyArtist');
     expect(bodyText).not.toContain('confirmSpotifyArtist');
     expect(bodyText).not.toContain('recordInterviewSignal');
+    expect(bodyText).not.toContain('open.spotify.com');
     expect(getChatRequestCount()).toBe(2);
 
     const cookies = await page.context().cookies();

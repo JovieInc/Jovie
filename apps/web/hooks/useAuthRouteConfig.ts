@@ -19,6 +19,7 @@ export interface AuthRouteConfig {
   showMobileTabs: boolean;
   isTableRoute: boolean;
   isArtistProfileSettings: boolean;
+  isChatRoute: boolean;
   isDemoRoute: boolean;
   showChatUsageIndicator: boolean;
 }
@@ -159,8 +160,10 @@ export function useAuthRouteConfig(): AuthRouteConfig {
     [pathname]
   );
 
-  const showChatUsageIndicator = useMemo(
-    () => pathname.startsWith(`${APP_ROUTES.CHAT}/`),
+  const isChatRoute = useMemo(
+    () =>
+      pathname === APP_ROUTES.CHAT ||
+      pathname.startsWith(`${APP_ROUTES.CHAT}/`),
     [pathname]
   );
 
@@ -170,7 +173,8 @@ export function useAuthRouteConfig(): AuthRouteConfig {
     showMobileTabs,
     isTableRoute,
     isArtistProfileSettings,
+    isChatRoute,
     isDemoRoute,
-    showChatUsageIndicator,
+    showChatUsageIndicator: isChatRoute,
   };
 }

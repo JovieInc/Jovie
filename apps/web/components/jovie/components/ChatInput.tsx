@@ -164,6 +164,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const isOverLimit = characterCount > MAX_MESSAGE_LENGTH;
     const hasAttachButton = Boolean(onImageAttach);
     const hasPendingImages = (pendingImages?.length ?? 0) > 0;
+    const hasChips = (chips?.length ?? 0) > 0;
 
     const [plusMenuOpen, setPlusMenuOpen] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
@@ -219,7 +220,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     // is open above it and Enter is committing the active row, not sending.
     const sendBlockedByPicker = isPickerOpen && value.trim() === '/';
     const canSend =
-      Boolean(value.trim() || hasPendingImages) &&
+      Boolean(value.trim() || hasPendingImages || hasChips) &&
       !isLoading &&
       !isSubmitting &&
       !isOverLimit &&
