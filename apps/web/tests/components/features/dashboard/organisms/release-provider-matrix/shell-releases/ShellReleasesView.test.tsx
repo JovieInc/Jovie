@@ -441,24 +441,27 @@ describe('ShellReleasesView', () => {
     });
   });
 
-  it('registers header actions exposing the release count in the search trigger', async () => {
+  it('registers header actions exposing the release count in a secondary filter trigger', async () => {
     renderShell([
       fakeRelease({ id: '1', title: 'Alpha' }),
       fakeRelease({ id: '2', title: 'Beta' }),
     ]);
     // The route registers headerActions (not a structured adapter) so the shell
-    // header slot renders an inline search trigger with the visible count.
+    // header slot renders an inline filter trigger with the visible count.
     // Use findByTestId so we wait for the effect that calls setHeaderActions to run.
     const probe = await screen.findByTestId('header-actions-probe');
     expect(probe).toBeInTheDocument();
-    // The closed search trigger has aria-label="Search releases" and renders the count.
-    const searchTrigger = await screen.findByRole('button', {
-      name: /search releases/i,
+    expect(
+      screen.queryByRole('button', { name: /search releases/i })
+    ).not.toBeInTheDocument();
+    const filterTrigger = await screen.findByRole('button', {
+      name: /filter releases/i,
     });
-    expect(searchTrigger).toHaveTextContent('2');
+    expect(filterTrigger).toHaveTextContent('2');
+    expect(filterTrigger).toHaveAttribute('data-app-search-trigger', 'true');
   });
 
-  it('opens header search with / unless focus is in a form field', async () => {
+  it('opens the releases filter with / unless focus is in a form field', async () => {
     renderShell([fakeRelease({ id: '1', title: 'Alpha' })]);
     const textInput = document.createElement('input');
     textInput.setAttribute('aria-label', 'Release note');
@@ -472,7 +475,7 @@ describe('ShellReleasesView', () => {
     ).not.toBeInTheDocument();
 
     textInput.blur();
-    fireEvent.keyDown(globalThis, { key: '/' });
+    fireEvent.keyDown(window, { key: '/' });
 
     expect(
       await screen.findByRole('combobox', { name: 'Filter releases' })

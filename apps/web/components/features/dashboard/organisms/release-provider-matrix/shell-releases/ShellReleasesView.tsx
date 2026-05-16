@@ -794,7 +794,7 @@ export function ShellReleasesView({
 
   useRegisterRightPanel(sidebarPanel);
 
-  // ── Header actions: NewReleaseHeaderAction + search trigger / PillSearch ──
+  // ── Header actions: NewReleaseHeaderAction + secondary filter control ──
 
   const selectedReleaseId = editingRelease?.id ?? null;
   const releaseCountSuffix = formatReleaseCountSuffix(
@@ -827,14 +827,15 @@ export function ShellReleasesView({
     ) : (
       <button
         type='button'
+        data-app-filter-trigger='true'
         data-app-search-trigger='true'
         onClick={() => setSearchOpen(true)}
         className='inline-flex h-7 items-center gap-1.5 rounded-md border border-(--linear-app-shell-border) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_94%,transparent)] px-2 text-[12px] text-secondary-token transition-[background-color,border-color,color] duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
-        aria-label='Search releases'
-        title='Search releases (/)'
+        aria-label='Filter releases'
+        title='Filter releases (/)'
       >
-        <Icon name='Search' className='h-3.5 w-3.5' aria-hidden='true' />
-        <span className='hidden sm:inline'>Search Releases</span>
+        <Icon name='Filter' className='h-3.5 w-3.5' aria-hidden='true' />
+        <span className='hidden sm:inline'>Filter</span>
         <span className='hidden text-tertiary-token lg:inline'>/</span>
         <span className='tabular-nums text-tertiary-token'>
           {visibleReleases.length}

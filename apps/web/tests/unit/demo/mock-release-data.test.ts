@@ -1,9 +1,16 @@
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   DEMO_RELEASE_SIDEBAR_FIXTURES,
   DEMO_RELEASE_VIEW_MODELS,
+  FOUNDER_DEMO_RELEASE_VIEW_MODELS,
 } from '@/features/demo/mock-release-data';
 import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
+
+const WEB_ROOT = process.cwd().endsWith('/apps/web')
+  ? process.cwd()
+  : join(process.cwd(), 'apps/web');
 
 describe('mock release data', () => {
   it('keeps the 96 Months sidebar fixture sparse relative to the full release', () => {
@@ -32,5 +39,34 @@ describe('mock release data', () => {
     expect(fixtureText).not.toContain('Blessings');
     expect(fixtureText).not.toContain('Clementine Douglas');
     expect(fixtureText).not.toContain('Tim White');
+  });
+
+  it('keeps demo-visible release artwork resolvable or explicitly external', () => {
+    const demoReleases = [
+      ...DEMO_RELEASE_VIEW_MODELS,
+      ...FOUNDER_DEMO_RELEASE_VIEW_MODELS,
+    ];
+
+    expect(demoReleases.length).toBeGreaterThan(0);
+
+    for (const release of demoReleases) {
+      const artworkUrl = release.artworkUrl?.trim();
+      expect(artworkUrl, release.title).toBeTruthy();
+      if (!artworkUrl) continue;
+
+      if (!artworkUrl.startsWith('/')) {
+        expect(
+          URL.canParse(artworkUrl),
+          `${release.title} has invalid external artwork`
+        ).toBe(true);
+        continue;
+      }
+
+      const publicPath = join(WEB_ROOT, 'public', artworkUrl);
+      expect(
+        existsSync(publicPath),
+        `${release.title} artwork asset is missing at ${publicPath}`
+      ).toBe(true);
+    }
   });
 });

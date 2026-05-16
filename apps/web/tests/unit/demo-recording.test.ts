@@ -44,6 +44,8 @@ afterEach(() => {
 
   delete document.documentElement.dataset.demoRecording;
   delete document.documentElement.dataset.devChromeDisabled;
+  delete window.__JOVIE_DEMO_RECORDING__;
+  delete window.__JOVIE_DEV_CHROME_DISABLED__;
 });
 
 describe('demo recording helpers', () => {
@@ -161,5 +163,29 @@ describe('demo recording helpers', () => {
     const { isDevChromeDisabledClient } = await loadModule();
 
     expect(isDevChromeDisabledClient()).toBe(true);
+  });
+
+  it('reads client chrome suppression from the stable window marker', async () => {
+    window.__JOVIE_DEV_CHROME_DISABLED__ = true;
+
+    const { isDevChromeDisabledClient } = await loadModule();
+
+    expect(isDevChromeDisabledClient()).toBe(true);
+  });
+
+  it('reads client recording mode from the html dataset', async () => {
+    document.documentElement.dataset.demoRecording = '1';
+
+    const { isDemoRecordingClient } = await loadModule();
+
+    expect(isDemoRecordingClient()).toBe(true);
+  });
+
+  it('reads client recording mode from the stable window marker', async () => {
+    window.__JOVIE_DEMO_RECORDING__ = true;
+
+    const { isDemoRecordingClient } = await loadModule();
+
+    expect(isDemoRecordingClient()).toBe(true);
   });
 });
