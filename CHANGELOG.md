@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.7] - 2026-05-16
+
+> [internal] Bug fix: release plan demo page is now reachable in dev and preview without a manual flag override.
+
+### Fixed
+
+- [internal] **Release plan demo page 404 in dev/preview**: `RELEASE_PLAN_DEMO` feature flag now returns `true` in all non-production environments. The flag's `decide()` in `registry.ts` returns `!IS_VERCEL_PRODUCTION`, matching the same env-aware pattern used by `shouldHonorClientFlagOverrides`. Production keeps the flag off (default `false`) and can be unlocked via the DevToolbar or `localStorage` override.
+
 ## [26.5.6] - 2026-05-16
 
 > Connect Gmail and Google Calendar to your Jovie account. Once connected, Jovie scans your inbox for confirmed booking emails and proposes calendar events — all reviewable before anything is added.
