@@ -611,7 +611,7 @@ export function CalendarPageClient() {
               {/* Releases */}
               {selectedReleases.length > 0 && (
                 <div className='mt-3'>
-                  <h4 className='text-[11px] font-caption text-quaternary-token'>
+                  <h4 className='text-[12px] font-medium text-secondary-token'>
                     Releases
                   </h4>
                   <ul className='mt-2 flex flex-col gap-2'>
@@ -633,7 +633,7 @@ export function CalendarPageClient() {
                           <div className='text-[12.5px] font-caption text-primary-token truncate'>
                             {r.title}
                           </div>
-                          <div className='text-[10.5px] text-tertiary-token capitalize'>
+                          <div className='text-[11px] text-tertiary-token capitalize'>
                             {r.status}
                           </div>
                         </div>
@@ -646,7 +646,7 @@ export function CalendarPageClient() {
               {/* Confirmed events */}
               {confirmedSelectedEvents.length > 0 && (
                 <div className='mt-4'>
-                  <h4 className='text-[11px] font-caption text-quaternary-token'>
+                  <h4 className='text-[12px] font-medium text-secondary-token'>
                     Events
                   </h4>
                   <ul className='mt-2 flex flex-col gap-2'>
@@ -667,7 +667,7 @@ export function CalendarPageClient() {
               {pendingSelectedEvents.length > 0 && (
                 <div className='mt-4'>
                   <div className='flex items-center justify-between'>
-                    <h4 className='text-[11px] font-caption text-amber-400/90'>
+                    <h4 className='text-[12px] font-medium text-amber-300'>
                       Pending review · {pendingSelectedEvents.length}
                     </h4>
                   </div>
@@ -691,7 +691,7 @@ export function CalendarPageClient() {
                         type='button'
                         onClick={handleBulkConfirm}
                         disabled={isActionPending}
-                        className='h-7 px-3 rounded-md text-[12px] font-caption bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 transition-colors'
+                        className='h-7 rounded-md bg-emerald-500/15 px-3 text-[12px] font-caption text-emerald-300 transition-colors duration-subtle ease-subtle hover:bg-emerald-500/25'
                       >
                         Confirm selected ({selectedPendingIds.size})
                       </button>
@@ -699,7 +699,7 @@ export function CalendarPageClient() {
                         type='button'
                         onClick={handleBulkReject}
                         disabled={isActionPending}
-                        className='h-7 px-3 rounded-md text-[12px] font-caption bg-red-500/15 text-red-300 hover:bg-red-500/25 transition-colors'
+                        className='h-7 rounded-md bg-red-500/15 px-3 text-[12px] font-caption text-red-300 transition-colors duration-subtle ease-subtle hover:bg-red-500/25'
                       >
                         Reject selected ({selectedPendingIds.size})
                       </button>
@@ -707,7 +707,7 @@ export function CalendarPageClient() {
                         type='button'
                         onClick={() => setSelectedPendingIds(new Set())}
                         disabled={isActionPending}
-                        className='h-7 px-2 rounded-md text-[11px] text-tertiary-token hover:text-primary-token transition-colors'
+                        className='h-7 rounded-md px-2 text-[11px] text-tertiary-token transition-colors duration-subtle ease-subtle hover:text-primary-token'
                       >
                         Clear
                       </button>
@@ -724,7 +724,7 @@ export function CalendarPageClient() {
                     onClick={() => setShowRejected(s => !s)}
                     aria-expanded={showRejected}
                     aria-controls='rejected-events-list'
-                    className='text-[11px] font-caption text-quaternary-token transition-colors hover:text-tertiary-token'
+                    className='text-[11px] font-caption text-quaternary-token transition-colors duration-subtle ease-subtle hover:text-tertiary-token'
                   >
                     {showRejected
                       ? 'Hide rejected'
@@ -855,7 +855,7 @@ function EventRow(props: EventRowProps) {
             href={safeTicketUrl}
             target='_blank'
             rel='noreferrer'
-            className='grid h-7 place-items-center rounded-md px-2 text-[11px] text-tertiary-token transition-colors hover:bg-surface-1 hover:text-primary-token'
+            className='grid h-7 place-items-center rounded-md px-2 text-[11px] text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token'
           >
             Tickets
           </a>
@@ -866,7 +866,7 @@ function EventRow(props: EventRowProps) {
               type='button'
               onClick={props.onConfirm}
               disabled={props.disabled}
-              className='h-7 px-3 rounded-md text-[11px] font-caption bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 transition-colors'
+              className='h-7 rounded-md bg-emerald-500/15 px-3 text-[11px] font-caption text-emerald-300 transition-colors duration-subtle ease-subtle hover:bg-emerald-500/25'
             >
               Confirm
             </button>
@@ -874,7 +874,7 @@ function EventRow(props: EventRowProps) {
               type='button'
               onClick={props.onReject}
               disabled={props.disabled}
-              className='h-7 px-3 rounded-md text-[11px] font-caption bg-red-500/15 text-red-300 hover:bg-red-500/25 transition-colors'
+              className='h-7 rounded-md bg-red-500/15 px-3 text-[11px] font-caption text-red-300 transition-colors duration-subtle ease-subtle hover:bg-red-500/25'
             >
               Reject
             </button>
@@ -885,7 +885,7 @@ function EventRow(props: EventRowProps) {
             type='button'
             onClick={props.onReject}
             disabled={props.disabled}
-            className='h-7 px-2 rounded-md text-[11px] text-tertiary-token hover:text-red-300 hover:bg-red-500/10 transition-colors'
+            className='h-7 rounded-md px-2 text-[11px] text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-red-500/10 hover:text-red-300'
           >
             Reject
           </button>
@@ -895,7 +895,7 @@ function EventRow(props: EventRowProps) {
             type='button'
             onClick={props.onUndoReject}
             disabled={props.disabled}
-            className='h-7 px-3 rounded-md text-[11px] font-caption bg-surface-1 text-tertiary-token hover:text-primary-token hover:bg-surface-2 transition-colors'
+            className='h-7 rounded-md bg-surface-1 px-3 text-[11px] font-caption text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-surface-2 hover:text-primary-token'
           >
             Undo reject
           </button>
@@ -911,7 +911,7 @@ type ProviderChipProps = Readonly<{
 
 function ProviderChip({ provider }: ProviderChipProps) {
   return (
-    <span className='rounded bg-surface-0 px-1.5 py-0.5 text-[10px] text-quaternary-token'>
+    <span className='rounded bg-surface-0 px-1.5 py-0.5 text-[11px] text-tertiary-token'>
       {provider}
     </span>
   );
@@ -923,7 +923,7 @@ type TypeChipProps = Readonly<{
 
 function TypeChip({ type }: TypeChipProps) {
   return (
-    <span className='rounded bg-violet-400/15 px-1.5 py-0.5 text-[10px] text-violet-300'>
+    <span className='rounded bg-violet-400/15 px-1.5 py-0.5 text-[11px] text-violet-300'>
       {EVENT_TYPE_LABEL[type]}
     </span>
   );
