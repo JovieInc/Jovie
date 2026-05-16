@@ -93,6 +93,32 @@ describe('onboarding tool artifacts', () => {
     );
   });
 
+  it('renders Spotify search failures as an actionable retry state', () => {
+    mocks.artistSearch.error =
+      'Request failed due to a temporary server issue. Please try again.';
+    mocks.artistSearch.query = 'Test Artist';
+
+    fastRender(
+      <OnboardingSpotifyArtistPickerCard
+        state='output-available'
+        output={{ action: 'open_artist_picker', query: 'Test Artist' }}
+        onSelectArtist={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('Spotify search is having trouble')).toBeDefined();
+    expect(
+      screen.getByText('Try again, or paste the Spotify artist link in chat.')
+    ).toBeDefined();
+    expect(screen.queryByText(/Request failed due/u)).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+    expect(mocks.artistSearch.searchImmediate).toHaveBeenCalledWith(
+      'Test Artist'
+    );
+  });
+
   it('renders confirmed Spotify data as a compact artifact', () => {
     fastRender(
       <OnboardingArtistConfirmedCard

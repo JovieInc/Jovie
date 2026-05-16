@@ -2,7 +2,7 @@
 /**
  * Generates the staging variant of the Jovie desktop icon.
  *
- * Reads the canonical Jovie-logo.png from apps/web/public/,
+ * Reads the canonical desktop icon source from apps/desktop/assets/,
  * composites an orange "S" badge in the bottom-right corner,
  * and writes the result to apps/desktop/assets/icon-staging.png.
  *
@@ -17,8 +17,8 @@ import sharp from 'sharp';
 
 const REPO_ROOT = path.resolve(fileURLToPath(import.meta.url), '../../../..');
 
-const SOURCE_LOGO = path.join(REPO_ROOT, 'apps/web/public/Jovie-logo.png');
 const ASSETS_DIR = path.join(REPO_ROOT, 'apps/desktop/assets');
+const SOURCE_ICON = path.join(ASSETS_DIR, 'icon-source.png');
 const ICON_PATH = path.join(ASSETS_DIR, 'icon.png');
 const OUTPUT_PATH = path.join(ASSETS_DIR, 'icon-staging.png');
 
@@ -39,7 +39,7 @@ const BADGE_SVG = `<svg width="${BADGE_SIZE}" height="${BADGE_SIZE}" xmlns="http
 </svg>`;
 
 // Ensure the base icon is present and correctly sized
-await sharp(SOURCE_LOGO)
+await sharp(SOURCE_ICON)
   .resize(ICON_SIZE, ICON_SIZE, {
     fit: 'contain',
     background: { r: 0, g: 0, b: 0, alpha: 0 },

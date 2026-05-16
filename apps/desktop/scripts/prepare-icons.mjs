@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 /**
- * Prepares all desktop app icons from the canonical Jovie-logo.png.
+ * Prepares all desktop app icons from the canonical desktop icon source.
  *
- * - Copies and resizes the logo to apps/desktop/assets/icon.png (512×512)
+ * - Copies and resizes apps/desktop/assets/icon-source.png to
+ *   apps/desktop/assets/icon.png (512×512)
  * - Generates the staging variant with an orange "S" badge at the
  *   bottom-right corner → apps/desktop/assets/icon-staging.png
  *
@@ -21,8 +22,8 @@ import sharp from 'sharp';
 
 const REPO_ROOT = path.resolve(fileURLToPath(import.meta.url), '../../../..');
 
-const SOURCE_LOGO = path.join(REPO_ROOT, 'apps/web/public/Jovie-logo.png');
 const ASSETS_DIR = path.join(REPO_ROOT, 'apps/desktop/assets');
+const SOURCE_ICON = path.join(ASSETS_DIR, 'icon-source.png');
 const ICON_PATH = path.join(ASSETS_DIR, 'icon.png');
 const STAGING_ICON_PATH = path.join(ASSETS_DIR, 'icon-staging.png');
 
@@ -42,8 +43,8 @@ const BADGE_SVG = `<svg width="${BADGE_SIZE}" height="${BADGE_SIZE}" xmlns="http
   >S</text>
 </svg>`;
 
-// 1. Production icon — resize source logo to 512×512
-await sharp(SOURCE_LOGO)
+// 1. Production icon — resize source icon to 512×512
+await sharp(SOURCE_ICON)
   .resize(ICON_SIZE, ICON_SIZE, {
     fit: 'contain',
     background: { r: 0, g: 0, b: 0, alpha: 0 },

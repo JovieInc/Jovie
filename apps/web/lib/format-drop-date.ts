@@ -10,7 +10,8 @@ export type DropDateTone = 'past' | 'soon' | 'future';
  * `DropDateChip` primitive (or any drop-date status surface). The label
  * mirrors English release-calendar phrasing:
  *
- * - past >1 day → `"Nd ago"` (past)
+ * - past >1 day and <1 year → `"Nd ago"` (past)
+ * - past >=1 year → `"Ny ago"` (past)
  * - past 1 day → `"Yesterday"` (past)
  * - today → `"Today"` (soon)
  * - tomorrow → `"Tomorrow"` (soon)
@@ -35,7 +36,16 @@ export function dropDateMeta(
   const ms = new Date(iso).getTime() - now.getTime();
   if (!Number.isFinite(ms)) return { label: '', tone: 'future' };
   const days = Math.round(ms / 86400000);
-  if (days < -1) return { label: `${Math.abs(days)}d ago`, tone: 'past' };
+  if (days < -1) {
+    const pastDays = Math.abs(days);
+    if (pastDays >= 365) {
+      return {
+        label: `${Math.max(1, Math.round(pastDays / 365))}y ago`,
+        tone: 'past',
+      };
+    }
+    return { label: `${pastDays}d ago`, tone: 'past' };
+  }
   if (days === -1) return { label: 'Yesterday', tone: 'past' };
   if (days === 0) return { label: 'Today', tone: 'soon' };
   if (days === 1) return { label: 'Tomorrow', tone: 'soon' };

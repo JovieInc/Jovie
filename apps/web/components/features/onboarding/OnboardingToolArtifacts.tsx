@@ -120,6 +120,36 @@ function formatFollowers(count: number | null | undefined): string | null {
   return compact ? `${compact} followers` : null;
 }
 
+function getArtistSearchFailureCopy(error: string | null): {
+  title: string;
+  body: string;
+} {
+  const normalizedError = error?.toLowerCase() ?? '';
+
+  if (normalizedError.includes('too many')) {
+    return {
+      title: 'Too many Spotify searches',
+      body: 'Give it a moment, then try again.',
+    };
+  }
+
+  if (
+    normalizedError.includes('unavailable') ||
+    normalizedError.includes('temporary') ||
+    normalizedError.includes('server')
+  ) {
+    return {
+      title: 'Spotify search is having trouble',
+      body: 'Try again, or paste the Spotify artist link in chat.',
+    };
+  }
+
+  return {
+    title: 'Spotify search did not finish',
+    body: 'Check the artist name and try again.',
+  };
+}
+
 function hostnameFor(url: string | undefined): string | null {
   if (!url) return null;
   try {
@@ -296,7 +326,7 @@ export function OnboardingSpotifyArtistPickerCard({
     limit: 5,
     minQueryLength: 1,
   });
-  const { search, clear } = artistSearch;
+  const { search, searchImmediate, clear } = artistSearch;
 
   useEffect(() => {
     const trimmed = query.trim();
@@ -376,11 +406,28 @@ export function OnboardingSpotifyArtistPickerCard({
 
         {!isSearching && artistSearch.error ? (
           <div
-            className='flex items-start gap-2 rounded-lg border border-red-500/20 px-2.5 py-2.5 text-[12.5px] leading-5 text-secondary-token'
+            className='flex items-start gap-2 rounded-lg border border-subtle bg-surface-0/70 px-2.5 py-2.5 text-[12.5px] leading-5 text-secondary-token'
             role='alert'
           >
-            <AlertCircle className='mt-0.5 h-3.5 w-3.5 shrink-0 text-error' />
-            <span>{artistSearch.error}</span>
+            <AlertCircle className='mt-0.5 h-3.5 w-3.5 shrink-0 text-warning' />
+            <span className='min-w-0 flex-1'>
+              <span className='block font-medium text-primary-token'>
+                {getArtistSearchFailureCopy(artistSearch.error).title}
+              </span>
+              <span className='mt-0.5 block'>
+                {getArtistSearchFailureCopy(artistSearch.error).body}
+              </span>
+            </span>
+            {hasQuery ? (
+              <button
+                type='button'
+                onClick={() => searchImmediate(query.trim())}
+                disabled={disabled}
+                className='mt-0.5 shrink-0 rounded-full border border-subtle px-2 py-0.5 text-[11.5px] font-medium text-secondary-token transition-colors duration-fast hover:border-white/15 hover:text-primary-token focus-visible:outline-none disabled:opacity-50'
+              >
+                Retry
+              </button>
+            ) : null}
           </div>
         ) : null}
 

@@ -20,6 +20,9 @@ if (APP_ENV === 'staging') {
 const APP_ORIGIN = new URL(APP_URL).origin;
 const SETTINGS_URL = new URL('/app/settings', APP_URL).toString();
 const APP_BACKGROUND_COLOR = '#09090b';
+const APP_ICON_FILENAME =
+  APP_ENV === 'staging' ? 'icon-staging.png' : 'icon.png';
+const APP_ICON_PATH = path.join(__dirname, '..', 'assets', APP_ICON_FILENAME);
 const ENABLE_DEVTOOLS = APP_ENV !== 'production' || !app.isPackaged;
 const UPDATE_AVAILABLE_CHANNEL = 'update-available';
 const UPDATE_DOWNLOADED_CHANNEL = 'update-downloaded';
@@ -110,6 +113,10 @@ const WINDOW_STATE_FILE = path.join(
   'window-state.json'
 );
 
+function getAppIconPath(): string | undefined {
+  return fs.existsSync(APP_ICON_PATH) ? APP_ICON_PATH : undefined;
+}
+
 function loadWindowState(): WindowState {
   try {
     const raw = fs.readFileSync(WINDOW_STATE_FILE, 'utf8');
@@ -167,6 +174,7 @@ function createWindow(initialUrl = APP_URL): BrowserWindow {
     y: windowState.y,
     minWidth: 800,
     minHeight: 600,
+    icon: getAppIconPath(),
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     trafficLightPosition:
       process.platform === 'darwin' ? { x: 13, y: 11 } : undefined,
@@ -396,6 +404,11 @@ ipcMain.handle(GO_FORWARD_CHANNEL, (event: IpcMainInvokeEvent) => {
 });
 
 app.whenReady().then(() => {
+  const appIconPath = getAppIconPath();
+  if (process.platform === 'darwin' && appIconPath && app.dock) {
+    app.dock.setIcon(appIconPath);
+  }
+
   Menu.setApplicationMenu(buildApplicationMenu());
   createWindow();
 

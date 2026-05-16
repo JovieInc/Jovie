@@ -8,6 +8,8 @@ directories:
 afterPack: scripts/apply-electron-fuses.cjs
 files:
   - dist-electron/**
+  - assets/icon.png
+  - assets/icon-staging.png
   - package.json
 mac:
   category: public.app-category.music
