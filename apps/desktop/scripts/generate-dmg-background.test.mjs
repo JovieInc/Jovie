@@ -24,9 +24,11 @@ test('dmg background uses the generated year and installer geometry', () => {
   const svg = buildDmgBackgroundSvg({ year: 2028 });
 
   assert.match(svg, new RegExp(`width="${WIDTH}" height="${HEIGHT}"`));
-  assert.match(svg, /COPYRIGHT &#169; 2028/);
+  assert.match(svg, /&#169; 2028/);
+  assert.match(svg, /Jovie Technology Inc\./);
+  assert.match(svg, /Built for artists/);
   assert.match(svg, /Drag Jovie to Applications/);
-  assert.doesNotMatch(svg, /COPYRIGHT &#169; 2025/);
+  assert.doesNotMatch(svg, /&#169; 2025/);
 });
 
 test('electron-builder configs do not pin a stale copyright year', async () => {

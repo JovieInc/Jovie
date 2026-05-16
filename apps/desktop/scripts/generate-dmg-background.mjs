@@ -34,17 +34,17 @@ export function buildDmgBackgroundSvg({ year = getDesktopBuildYear() } = {}) {
       <path d="M12 7V17M7 12H17" stroke="#2B323D" stroke-width="1" stroke-linecap="round" opacity="0.52"/>
     </pattern>
     <linearGradient id="stage-glow" x1="68" y1="60" x2="692" y2="374" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#11211C"/>
-      <stop offset="0.5" stop-color="#0C1015"/>
-      <stop offset="1" stop-color="#101825"/>
+      <stop stop-color="#11131A"/>
+      <stop offset="0.52" stop-color="#0B0D12"/>
+      <stop offset="1" stop-color="#12101B"/>
     </linearGradient>
     <radialGradient id="accent-left" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(204 184) rotate(52) scale(148 112)">
-      <stop stop-color="#4ED7A8" stop-opacity="0.38"/>
-      <stop offset="1" stop-color="#4ED7A8" stop-opacity="0"/>
+      <stop stop-color="#715CFF" stop-opacity="0.20"/>
+      <stop offset="1" stop-color="#715CFF" stop-opacity="0"/>
     </radialGradient>
     <radialGradient id="accent-right" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(558 180) rotate(116) scale(156 112)">
-      <stop stop-color="#63A3FF" stop-opacity="0.26"/>
-      <stop offset="1" stop-color="#63A3FF" stop-opacity="0"/>
+      <stop stop-color="#D76DFF" stop-opacity="0.14"/>
+      <stop offset="1" stop-color="#D76DFF" stop-opacity="0"/>
     </radialGradient>
     <filter id="soft-shadow" x="-20%" y="-20%" width="140%" height="150%" color-interpolation-filters="sRGB">
       <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#000000" flood-opacity="0.34"/>
@@ -56,6 +56,11 @@ export function buildDmgBackgroundSvg({ year = getDesktopBuildYear() } = {}) {
   <rect x="32" y="30" width="696" height="366" rx="22" fill="url(#accent-left)"/>
   <rect x="32" y="30" width="696" height="366" rx="22" fill="url(#accent-right)"/>
   <rect x="68" y="66" width="624" height="294" rx="18" fill="#090B0F" opacity="0.42"/>
+  <g transform="translate(474 86) scale(5.2)" opacity="0.055">
+    <circle cx="22" cy="22" r="22" fill="#F7F8FA"/>
+    <path d="M31 10A20 20 0 0 0 11 30H31V10Z" fill="#090B0F"/>
+    <path d="M11 31L30 31M14 36L31 36M18 41L32 41" stroke="#090B0F" stroke-width="3.8" stroke-linecap="round"/>
+  </g>
   <text x="380" y="86" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="24" font-weight="700" letter-spacing="0" fill="#F5F7FA">Install Jovie</text>
   <text x="380" y="112" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif" font-size="13" font-weight="500" letter-spacing="0" fill="#9AA4B2">Drag Jovie to Applications</text>
   <rect x="${APP_ZONE_X}" y="${ZONE_Y}" width="${DROP_ZONE_SIZE}" height="${DROP_ZONE_SIZE}" rx="30" fill="#141922" fill-opacity="0.82" stroke="#2E3743" filter="url(#soft-shadow)"/>
@@ -70,10 +75,9 @@ export function buildDmgBackgroundSvg({ year = getDesktopBuildYear() } = {}) {
     <path d="M31 10A20 20 0 0 0 11 30H31V10Z" fill="#101217"/>
     <path d="M11 31L30 31M14 36L31 36M18 41L32 41" stroke="#101217" stroke-width="3.8" stroke-linecap="round"/>
   </g>
-  <text x="104" y="435" font-family="'SF Mono', ui-monospace, Menlo, Consolas, monospace" font-size="15" font-weight="700" letter-spacing="0" fill="#E9EDF2">JOVIE SYSTEM</text>
-  <text x="104" y="459" font-family="'SF Mono', ui-monospace, Menlo, Consolas, monospace" font-size="14" font-weight="500" letter-spacing="0" fill="#A8B0BB">DESKTOP WORKSPACE</text>
-  <text x="708" y="435" text-anchor="end" font-family="'SF Mono', ui-monospace, Menlo, Consolas, monospace" font-size="15" font-weight="700" letter-spacing="0" fill="#E9EDF2">COPYRIGHT &#169; ${year}</text>
-  <text x="708" y="459" text-anchor="end" font-family="'SF Mono', ui-monospace, Menlo, Consolas, monospace" font-size="14" font-weight="500" letter-spacing="0" fill="#A8B0BB">DESIGNED FOR ARTISTS</text>
+  <text x="104" y="436" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif" font-size="15" font-weight="650" letter-spacing="0" fill="#F2F5F8">Jovie Technology Inc.</text>
+  <text x="104" y="460" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif" font-size="13" font-weight="500" letter-spacing="0" fill="#9CA6B4">&#169; ${year}</text>
+  <text x="708" y="446" text-anchor="end" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="18" font-weight="700" letter-spacing="0" fill="#F2F5F8">Built for artists</text>
 </svg>`;
 }
 
