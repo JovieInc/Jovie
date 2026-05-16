@@ -28,10 +28,20 @@ export function DemoVideoPlayer({
     setState('error');
   }, []);
   const handlePlay = useCallback(() => {
-    setHasStarted(true);
-    void videoRef.current?.play().catch(() => {
-      // If autoplay is blocked despite the click, keep native controls visible.
-    });
+    const video = videoRef.current;
+    if (!video) {
+      return;
+    }
+
+    void video
+      .play()
+      .then(() => {
+        setHasStarted(true);
+      })
+      .catch(() => {
+        // Keep the custom CTA available so the user can retry playback.
+        setHasStarted(false);
+      });
   }, []);
 
   // No video URL configured — show carousel directly
