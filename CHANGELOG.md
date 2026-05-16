@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.11] - 2026-05-16
+
+> [internal] Desktop release bump for the Electron app-shell launch fix and a guard that prevents future desktop code from landing without DMG release handling.
+
+### Fixed
+
+- [internal] **Desktop DMG app-shell release guard (JOV-2295)**: Bumped desktop release metadata so the shipped DMG includes the Electron `/app` launch behavior. Added a CI guard that fails when `apps/desktop/**` changes without either a `VERSION` bump or an explicit update to `.github/workflows/desktop-release.yml`, preventing desktop-only fixes from landing without a publish trigger.
+
 ## [26.5.10] - 2026-05-16
 
 > [internal] Bug fix: the onboarding claim endpoint no longer fires twice on a single /start page visit when Clerk's auth state updates mid-effect.
