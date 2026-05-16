@@ -47,12 +47,13 @@ describe('buildWelcomeMessage', () => {
   });
 
   describe('basic message structure', () => {
-    it('includes the artist display name', () => {
+    it('greets with the first name from the artist display name', () => {
       const message = buildWelcomeMessage({
         ...BASE_PARAMS,
         careerHighlights: null,
       });
-      expect(message).toContain('Welcome to Jovie, Test Artist.');
+      expect(message).toContain('Welcome to Jovie, Test.');
+      expect(message).not.toContain('Welcome to Jovie, Test Artist.');
     });
 
     it('falls back to "there" for empty display name', () => {

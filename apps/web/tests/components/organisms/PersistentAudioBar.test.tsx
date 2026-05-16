@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildLyricsRoute } from '@/constants/routes';
+import { APP_ROUTES, buildLyricsRoute } from '@/constants/routes';
 import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
 
@@ -282,6 +282,29 @@ describe('PersistentAudioBar', () => {
     expect(push).toHaveBeenCalledWith(buildLyricsRoute('track-1'));
   });
 
+  it('closes the shell V1 lyrics button back to the last non-lyrics route', async () => {
+    const user = userEvent.setup();
+    setPlaying({ artistName: 'DJ Cool', hasLyrics: true });
+    pathname = APP_ROUTES.RELEASES;
+
+    const { rerender } = render(
+      <AppFlagProvider initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1: true }}>
+        <PersistentAudioBar variant='shellChatV1' />
+      </AppFlagProvider>
+    );
+
+    pathname = buildLyricsRoute('track-1');
+    rerender(
+      <AppFlagProvider initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1: true }}>
+        <PersistentAudioBar variant='shellChatV1' />
+      </AppFlagProvider>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Close lyrics' }));
+
+    expect(push).toHaveBeenCalledWith(APP_ROUTES.RELEASES);
+  });
+
   it('keeps the shell V1 lyrics button hidden when the active track has no lyrics', () => {
     setPlaying({ artistName: 'DJ Cool', hasLyrics: false });
 
@@ -349,5 +372,27 @@ describe('PersistentAudioBar', () => {
 
     fireEvent.keyDown(globalThis, { key: '`' });
     expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
+  });
+
+  it('closes the lyrics route with Escape when an active track is present', () => {
+    setPlaying({ artistName: 'DJ Cool', hasLyrics: true });
+    pathname = APP_ROUTES.CHAT;
+
+    const { rerender } = render(
+      <AppFlagProvider initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1: true }}>
+        <PersistentAudioBar variant='shellChatV1' />
+      </AppFlagProvider>
+    );
+
+    pathname = buildLyricsRoute('track-1');
+    rerender(
+      <AppFlagProvider initialFlags={{ ...APP_FLAG_DEFAULTS, DESIGN_V1: true }}>
+        <PersistentAudioBar variant='shellChatV1' />
+      </AppFlagProvider>
+    );
+
+    fireEvent.keyDown(globalThis, { key: 'Escape' });
+
+    expect(push).toHaveBeenCalledWith(APP_ROUTES.CHAT);
   });
 });

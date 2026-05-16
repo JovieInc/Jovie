@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { redirect, unstable_rethrow } from 'next/navigation';
 import { Suspense } from 'react';
 import { AppShellSkeleton } from '@/components/organisms/AppShellSkeleton';
+import { LyricsRouteSkeleton } from '@/components/shell/LyricsRouteSkeleton';
 import { APP_ROUTES } from '@/constants/routes';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
 import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
@@ -13,6 +14,7 @@ import { DashboardShellContent } from './DashboardShellContent';
 import { ReleaseTableSkeleton } from './dashboard/releases/loading';
 import {
   isChatShellRoute,
+  isLyricsShellRoute,
   isReleasesShellRoute,
   resolveAppShellRequestPath,
 } from './shell-route-matches';
@@ -61,6 +63,13 @@ export default async function AppShellLayout({
       shellFallback = (
         <AppShellSkeleton
           main={<ReleaseTableSkeleton showHeader={false} />}
+          variant={shellVariant}
+        />
+      );
+    } else if (isLyricsShellRoute(pathname)) {
+      shellFallback = (
+        <AppShellSkeleton
+          main={<LyricsRouteSkeleton />}
           variant={shellVariant}
         />
       );

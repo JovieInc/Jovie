@@ -1,11 +1,12 @@
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen } from '@testing-library/react';
-import type { ComponentProps, ReactNode } from 'react';
+import type { ComponentProps, FormEvent, ReactNode } from 'react';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ChatInput } from '@/components/jovie/components/ChatInput';
+import { useChipTray } from '@/components/jovie/hooks/useChipTray';
 
 /**
  * ARIA combobox contract for the chat composer textarea.
@@ -30,6 +31,10 @@ vi.mock('@/lib/queries/useArtistSearchQuery', () => ({
     state: 'idle' as const,
     search: vi.fn(),
   }),
+}));
+
+vi.mock('@/lib/queries/useEventsQuery', () => ({
+  useEventsQuery: () => ({ data: [], isLoading: false }),
 }));
 
 // Match ChatInput.test.tsx's motion mock so motion's ref forwarding doesn't
@@ -105,18 +110,25 @@ function withProviders(ui: ReactNode) {
 
 interface HarnessProps {
   readonly initialValue?: string;
+  readonly onSubmit?: (e?: FormEvent) => void;
 }
 
-function Harness({ initialValue = '' }: HarnessProps) {
+function Harness({ initialValue = '', onSubmit = () => {} }: HarnessProps) {
   const [value, setValue] = useState(initialValue);
+  const chipTray = useChipTray();
   return (
     <ChatInput
       value={value}
       onChange={setValue}
-      onSubmit={() => {}}
+      onSubmit={onSubmit}
       isLoading={false}
       isSubmitting={false}
       profileId='profile-test'
+      chips={chipTray.chips}
+      onRemoveChipAt={chipTray.removeAt}
+      onRemoveLastChip={chipTray.removeLast}
+      onAddSkill={chipTray.addSkill}
+      onAddEntity={chipTray.addEntity}
     />
   );
 }
@@ -197,5 +209,30 @@ describe('ChatInput combobox ARIA wiring', () => {
 
     const sendButton = screen.getByRole('button', { name: /send message/i });
     expect(sendButton).toBeDisabled();
+  });
+
+  it('commits the Feedback slash command into a sendable skill chip', () => {
+    const onSubmit = vi.fn();
+    render(withProviders(<Harness onSubmit={onSubmit} />));
+    const textarea = getTextarea();
+    textarea.focus();
+    fireEvent.change(textarea, { target: { value: '/feed' } });
+
+    expect(
+      screen.getByRole('option', { name: /send feedback/i })
+    ).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: 'Enter' });
+
+    expect(screen.getByTestId('chat-input-chip-tray')).toHaveTextContent(
+      'Send feedback'
+    );
+    expect(textarea).toHaveValue('');
+
+    const sendButton = screen.getByRole('button', { name: /send message/i });
+    expect(sendButton).toBeEnabled();
+
+    fireEvent.click(sendButton);
+    expect(onSubmit).toHaveBeenCalledTimes(1);
   });
 });

@@ -138,6 +138,15 @@ describe('JovieChat empty state', () => {
     expect(getByText('Welcome to Jovie')).toBeTruthy();
   });
 
+  it('uses only the first name in the returning-user welcome heading', () => {
+    const { getByText, queryByText } = renderWithQueryClient(
+      <JovieChat profileId='profile-1' displayName='Tim White' />
+    );
+
+    expect(getByText('Welcome Back Tim')).toBeTruthy();
+    expect(queryByText('Welcome Back Tim White')).toBeNull();
+  });
+
   it('renders chat messages after in-place message array updates', () => {
     const messages = mockChatState.messages;
     const { getAllByTestId, queryByText, rerender } = renderWithQueryClient(

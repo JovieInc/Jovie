@@ -14,6 +14,7 @@ import {
 import Image from 'next/image';
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
+import { SocialIcon } from '@/components/atoms/SocialIcon';
 import type { SpotifyArtistResult } from '@/lib/contracts/api';
 import { useArtistSearchQuery } from '@/lib/queries/useArtistSearchQuery';
 import { useHandleAvailabilityQuery } from '@/lib/queries/useHandleAvailabilityQuery';
@@ -97,7 +98,21 @@ export function formatExactCount(
 }
 
 export function formatGenreLabel(genre: string): string {
-  return genre.trim().toUpperCase();
+  return genre
+    .trim()
+    .replaceAll(/\s+/g, ' ')
+    .split(' ')
+    .map(word =>
+      word
+        .split('-')
+        .map(part =>
+          part
+            ? `${part.charAt(0).toUpperCase()}${part.slice(1).toLowerCase()}`
+            : part
+        )
+        .join('-')
+    )
+    .join(' ');
 }
 
 function formatFollowers(count: number | null | undefined): string | null {
@@ -155,9 +170,9 @@ function StatusShell({
       <div className='flex items-start gap-3'>
         <span
           className={cn(
-            'mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token',
-            tone === 'error' && 'border-red-500/20 text-red-400',
-            tone === 'success' && 'border-green-500/20 text-green-500'
+            'mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center text-secondary-token',
+            tone === 'error' && 'text-red-400',
+            tone === 'success' && 'text-green-500'
           )}
         >
           {icon}
@@ -248,6 +263,15 @@ function MetadataChip({
       ) : null}
       <span className='sr-only'>{title}</span>
       <span aria-hidden>{children}</span>
+    </span>
+  );
+}
+
+function SpotifyMatchBadge({ label }: { readonly label: string }) {
+  return (
+    <span className='inline-flex h-5 shrink-0 items-center gap-1 rounded-full border border-green-500/20 px-1.5 text-[10.5px] font-medium text-green-500'>
+      <SocialIcon platform='spotify' className='h-3 w-3' aria-hidden />
+      <span>{label}</span>
     </span>
   );
 }
@@ -512,9 +536,7 @@ export function OnboardingArtistConfirmedCard({
             <p className='truncate text-[14.5px] font-semibold leading-5 tracking-[-0.01em] text-primary-token'>
               {artist.name}
             </p>
-            <span className='inline-flex h-5 shrink-0 items-center rounded-full border border-green-500/20 px-1.5 text-[10.5px] font-medium text-green-500'>
-              Matched
-            </span>
+            <SpotifyMatchBadge label='Matched' />
           </div>
           {hasMetadata ? (
             <div className='mt-2 flex flex-wrap gap-1.5'>
@@ -674,7 +696,7 @@ export function OnboardingSocialLinkCard({
 export function useArtistSelectionMessage() {
   return useMemo(
     () => (artist: OnboardingArtistSelection) =>
-      `I picked ${artist.name} on Spotify. Let's build my artist profile from here: ${artist.url}.`,
+      `I picked ${artist.name} on Spotify. Let's build my artist profile from that match.`,
     []
   );
 }

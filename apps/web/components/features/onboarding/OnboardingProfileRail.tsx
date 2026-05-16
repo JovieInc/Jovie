@@ -1,8 +1,16 @@
 'use client';
 
-import { Check, Circle, Gauge, Music2, UserRound, Users } from 'lucide-react';
+import {
+  Circle,
+  CircleCheckBig,
+  Gauge,
+  Music2,
+  UserRound,
+  Users,
+} from 'lucide-react';
 import Image from 'next/image';
 import type { ReactNode } from 'react';
+import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { cn } from '@/lib/utils';
 import {
   formatCompactCount,
@@ -79,6 +87,48 @@ function RailAvatar({ artist }: { readonly artist: OnboardingProfileArtist }) {
   );
 }
 
+function RailMatchBadge({
+  artistName,
+  href,
+  label,
+  tone,
+}: {
+  readonly artistName: string;
+  readonly href: string | null;
+  readonly label: string;
+  readonly tone: 'matched' | 'selected';
+}) {
+  const className = cn(
+    'inline-flex h-5 shrink-0 items-center gap-1 rounded-full border px-1.5 text-[10.5px] font-medium leading-5 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20',
+    tone === 'matched'
+      ? 'border-green-500/20 text-green-500'
+      : 'border-cyan-400/20 text-cyan-300',
+    href && 'hover:bg-surface-2'
+  );
+  const content = (
+    <>
+      <SocialIcon platform='spotify' className='h-3 w-3' aria-hidden />
+      <span>{label}</span>
+    </>
+  );
+
+  if (href) {
+    return (
+      <a
+        href={href}
+        target='_blank'
+        rel='noreferrer'
+        className={className}
+        aria-label={`Open ${artistName} on Spotify`}
+      >
+        {content}
+      </a>
+    );
+  }
+
+  return <span className={className}>{content}</span>;
+}
+
 function RailMetric({
   children,
   icon,
@@ -115,19 +165,22 @@ function TimelineItem({
     <li className='relative z-10 grid grid-cols-[18px_minmax(0,1fr)] gap-2.5 max-lg:gap-2'>
       <span
         className={cn(
-          'mt-0.5 flex h-[18px] w-[18px] items-center justify-center rounded-full border',
+          'mt-0.5 flex h-[18px] w-[18px] items-center justify-center',
           state === 'done'
-            ? 'border-green-500/25 bg-green-500/10 text-green-500'
+            ? 'text-green-500'
             : state === 'active'
-              ? 'border-cyan-400/25 bg-cyan-400/10 text-cyan-300'
-              : 'border-subtle bg-surface-0 text-tertiary-token'
+              ? 'text-cyan-300'
+              : 'text-tertiary-token'
         )}
         aria-hidden
       >
         {state === 'done' ? (
-          <Check className='h-3 w-3' />
+          <CircleCheckBig className='h-[18px] w-[18px]' strokeWidth={2.65} />
         ) : (
-          <Circle className='h-2 w-2 fill-current' />
+          <Circle
+            className={cn('h-2.5 w-2.5', state === 'active' && 'fill-current')}
+            strokeWidth={2.4}
+          />
         )}
       </span>
       <span className='min-w-0'>
@@ -148,8 +201,10 @@ function TimelineItem({
 }
 
 export function OnboardingProfileRail({
+  placement = 'side',
   state,
 }: {
+  readonly placement?: 'inline' | 'side';
   readonly state: OnboardingProfileBuilderState;
 }) {
   const artist = state.artist;
@@ -159,22 +214,33 @@ export function OnboardingProfileRail({
   const genres = artist?.genres?.slice(0, 2).map(formatGenreLabel) ?? [];
   const firstSocialLink = state.socialLinks[0] ?? null;
   const safeArtistUrl = getSafeSpotifyArtistUrl(artist?.url);
+  const isInline = placement === 'inline';
 
   return (
     <aside
       className={cn(
-        'z-30 overflow-hidden bg-(--linear-app-content-surface) text-primary-token transition-[opacity,transform,width,border-color] duration-cinematic ease-out',
-        'max-lg:absolute max-lg:inset-x-3 max-lg:bottom-[calc(5.25rem+env(safe-area-inset-bottom))] max-lg:max-h-[44vh] max-lg:w-auto max-lg:rounded-2xl max-lg:border max-lg:shadow-[0_24px_80px_rgba(0,0,0,0.45)]',
-        'lg:relative lg:h-full lg:border-l lg:border-(--linear-app-shell-border)',
+        'overflow-hidden bg-(--linear-app-content-surface) text-primary-token transition-[opacity,transform,width,border-color] duration-cinematic ease-out',
+        isInline
+          ? 'relative z-0 w-full rounded-2xl border border-(--linear-app-shell-border)'
+          : 'z-30 max-lg:hidden lg:relative lg:h-full lg:border-l lg:border-(--linear-app-shell-border)',
         visible
-          ? 'pointer-events-auto translate-y-0 opacity-100 lg:w-[322px] lg:translate-x-0'
-          : 'pointer-events-none translate-y-4 opacity-0 lg:w-0 lg:translate-x-3'
+          ? cn(
+              'pointer-events-auto opacity-100',
+              isInline ? 'translate-y-0' : 'lg:w-[322px] lg:translate-x-0'
+            )
+          : cn(
+              'pointer-events-none opacity-0',
+              isInline ? 'hidden' : 'lg:w-0 lg:translate-x-3'
+            )
       )}
       aria-hidden={!visible}
-      data-testid='onboarding-profile-rail'
+      data-testid={
+        isInline ? 'onboarding-profile-rail-inline' : 'onboarding-profile-rail'
+      }
       data-visible={visible ? 'true' : 'false'}
+      data-placement={placement}
     >
-      <div className='max-lg:max-h-[44vh] max-lg:overflow-y-auto lg:w-[322px]'>
+      <div className={cn(!isInline && 'lg:w-[322px]')}>
         <div className='border-b border-(--linear-app-shell-border) px-4 py-3.5 max-lg:px-3.5 max-lg:py-3'>
           <p className='text-[12px] font-medium leading-5 text-secondary-token'>
             Artist Profile
@@ -194,27 +260,13 @@ export function OnboardingProfileRail({
                     <p className='truncate text-[13.5px] font-semibold leading-5 text-primary-token'>
                       {artist.name}
                     </p>
-                    <span
-                      className={cn(
-                        'h-5 shrink-0 rounded-full border px-1.5 text-[10.5px] font-medium leading-5',
-                        state.artistConfirmed
-                          ? 'border-green-500/20 text-green-500'
-                          : 'border-cyan-400/20 text-cyan-300'
-                      )}
-                    >
-                      {state.artistConfirmed ? 'Matched' : 'Selected'}
-                    </span>
-                  </div>
-                  {safeArtistUrl ? (
-                    <a
+                    <RailMatchBadge
+                      artistName={artist.name}
                       href={safeArtistUrl}
-                      target='_blank'
-                      rel='noreferrer'
-                      className='mt-0.5 block truncate text-[12px] leading-5 text-tertiary-token transition-colors hover:text-secondary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20'
-                    >
-                      {hostnameFor(safeArtistUrl)}
-                    </a>
-                  ) : null}
+                      label={state.artistConfirmed ? 'Matched' : 'Selected'}
+                      tone={state.artistConfirmed ? 'matched' : 'selected'}
+                    />
+                  </div>
                 </div>
               </div>
 

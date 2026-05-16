@@ -104,7 +104,9 @@ function AuthShellWrapperInner({
   const previewEnabled =
     config.section === 'dashboard' || config.isArtistProfileSettings;
   const shouldDefaultOpenPreviewPanel =
-    config.section === 'dashboard' && previewPanelDefaultOpen;
+    config.section === 'dashboard' &&
+    !config.isChatRoute &&
+    previewPanelDefaultOpen;
   const previewPanelScope = config.isArtistProfileSettings
     ? 'artist-profile-settings'
     : 'app-shell';

@@ -29,6 +29,14 @@ import type { JovieChatProps, MessagePart } from './types';
 const THINKING_PLACEHOLDER_ID = 'thinking-placeholder';
 const VIRTUALIZATION_THRESHOLD = 12;
 
+export function getFirstNameForGreeting(
+  name: string | null | undefined
+): string | null {
+  const trimmed = name?.trim();
+  if (!trimmed) return null;
+  return trimmed.split(/\s+/)[0] ?? null;
+}
+
 function findLastAssistantIndex(
   messages: readonly { id: string; role: string }[]
 ): number {
@@ -374,7 +382,8 @@ export function JovieChat({
     profileId,
   } as const;
 
-  const greetingName = displayName?.trim() || username?.trim() || null;
+  const greetingName =
+    getFirstNameForGreeting(displayName) ?? getFirstNameForGreeting(username);
   let emptyStateHeading: string;
   if (isFirstSession) {
     emptyStateHeading = 'Welcome to Jovie';

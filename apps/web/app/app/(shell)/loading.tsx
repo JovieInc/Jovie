@@ -1,8 +1,10 @@
 import { headers } from 'next/headers';
+import { LyricsRouteSkeleton } from '@/components/shell/LyricsRouteSkeleton';
 import ChatLoading from './chat/loading';
 import { ReleaseTableSkeleton } from './dashboard/releases/loading';
 import {
   isChatShellRoute,
+  isLyricsShellRoute,
   isReleasesShellRoute,
   resolveAppShellRequestPath,
 } from './shell-route-matches';
@@ -29,6 +31,10 @@ export default async function ShellLoading() {
 
   if (isReleasesShellRoute(pathname)) {
     return <ReleaseTableSkeleton showHeader={false} />;
+  }
+
+  if (isLyricsShellRoute(pathname)) {
+    return <LyricsRouteSkeleton />;
   }
 
   return (

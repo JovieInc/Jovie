@@ -10,6 +10,10 @@ import {
   ErrorDisplay,
 } from '@/components/jovie/components';
 import { useChatJankMonitor, useStickToBottom } from '@/components/jovie/hooks';
+import {
+  composeMessage,
+  useChipTray,
+} from '@/components/jovie/hooks/useChipTray';
 import { ToolPartsRenderer } from '@/components/jovie/tool-ui';
 import type { ChatError, MessagePart } from '@/components/jovie/types';
 import {
@@ -66,6 +70,17 @@ interface OnboardingChatProps {
 
 /** Pull the user-visible text out of a UIMessage's parts. */
 const THINKING_PLACEHOLDER_ID = 'thinking-placeholder';
+const ONBOARDING_INTRO_MESSAGE_ID = 'onboarding-intro';
+const ONBOARDING_INTRO_MESSAGE = {
+  id: ONBOARDING_INTRO_MESSAGE_ID,
+  role: 'assistant',
+  parts: [
+    {
+      type: 'text',
+      text: "Hey, I'm Jovie. What are you working on?",
+    },
+  ],
+} satisfies UIMessage;
 
 function getMessageText(message: UIMessage): string {
   return (message.parts ?? [])
@@ -430,12 +445,14 @@ function renderOnboardingTools({
 
 function OnboardingMessageList({
   displayMessages,
+  hideIntroMessage,
   isStreaming,
   lastAssistantMessageId,
   isBusy,
   onSelectArtist,
 }: {
   readonly displayMessages: readonly UIMessage[];
+  readonly hideIntroMessage: boolean;
   readonly isStreaming: boolean;
   readonly lastAssistantMessageId: string | null;
   readonly isBusy: boolean;
@@ -447,11 +464,25 @@ function OnboardingMessageList({
         const text = getMessageText(message);
         const toolParts = getToolParts(message);
         const isThinking = message.id === THINKING_PLACEHOLDER_ID;
+        const isIntroHidden =
+          hideIntroMessage && message.id === ONBOARDING_INTRO_MESSAGE_ID;
         const shouldRenderMessage =
           isThinking || Boolean(text) || toolParts.length === 0;
 
         return (
-          <div key={message.id} className='pb-5'>
+          <div
+            key={message.id}
+            className={cn(
+              'pb-5 transition-opacity duration-fast',
+              isIntroHidden && 'pointer-events-none opacity-0'
+            )}
+            aria-hidden={isIntroHidden ? 'true' : undefined}
+            data-testid={
+              message.id === ONBOARDING_INTRO_MESSAGE_ID
+                ? 'onboarding-intro-message'
+                : undefined
+            }
+          >
             {shouldRenderMessage ? (
               <ChatMessage
                 id={message.id}
@@ -491,6 +522,7 @@ export function OnboardingChat({
   const [composerPickerOpen, setComposerPickerOpen] = useState(false);
   const [selectedArtist, setSelectedArtist] =
     useState<OnboardingArtistSelection | null>(null);
+  const chipTray = useChipTray();
   const completedUserTurnsRef = useRef(0);
   const lastAttemptedMessageRef = useRef<string | null>(null);
   const formatArtistSelectionMessage = useArtistSelectionMessage();
@@ -544,6 +576,7 @@ export function OnboardingChat({
   const shouldShowThinking = isBusy && lastMessage?.role === 'user';
   const displayMessages: readonly UIMessage[] = shouldShowThinking
     ? [
+        ONBOARDING_INTRO_MESSAGE,
         ...messages,
         {
           id: THINKING_PLACEHOLDER_ID,
@@ -551,7 +584,7 @@ export function OnboardingChat({
           parts: [],
         },
       ]
-    : messages;
+    : [ONBOARDING_INTRO_MESSAGE, ...messages];
   const lastAssistantMessageId = findLastAssistantMessageId(displayMessages);
   const { isStuckToBottom, onScroll, totalSizeRef, scrollContainerRef } =
     useStickToBottom({ messageCount: displayMessages.length });
@@ -567,7 +600,7 @@ export function OnboardingChat({
 
   const submitText = useCallback(
     (rawText: string) => {
-      const text = rawText.trim();
+      const text = composeMessage(chipTray.chips, rawText).trim();
       if (!text || isBusy) return;
       if (isAwaitingFirstToken) {
         // Turnstile hasn't issued a token yet; the widget normally resolves
@@ -578,10 +611,11 @@ export function OnboardingChat({
       setChatError(null);
       notifyJankSend();
       sendMessage({ text });
+      chipTray.clear();
       setHasSentFirst(true);
       setInput('');
     },
-    [isAwaitingFirstToken, isBusy, notifyJankSend, sendMessage]
+    [chipTray, isAwaitingFirstToken, isBusy, notifyJankSend, sendMessage]
   );
 
   const handleSubmit = useCallback(
@@ -607,11 +641,15 @@ export function OnboardingChat({
   );
 
   const profileBuilderState = useMemo(
-    () => deriveProfileBuilderState({ messages, selectedArtist }),
-    [messages, selectedArtist]
+    () =>
+      onProfileBuilderChange
+        ? deriveProfileBuilderState({ messages, selectedArtist })
+        : null,
+    [messages, onProfileBuilderChange, selectedArtist]
   );
 
   useEffect(() => {
+    if (!profileBuilderState) return;
     onProfileBuilderChange?.(profileBuilderState);
   }, [onProfileBuilderChange, profileBuilderState]);
 
@@ -668,27 +706,14 @@ export function OnboardingChat({
           ref={totalSizeRef}
           className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col'
         >
-          {messages.length === 0 ? (
-            <div className='flex flex-1 items-center justify-center py-12'>
-              <h1
-                className={cn(
-                  'text-balance text-center text-[2.25rem] font-semibold leading-[1.08] tracking-[-0.035em] text-primary-token transition-opacity duration-fast sm:text-[3rem]',
-                  composerPickerOpen && 'opacity-0'
-                )}
-                aria-hidden={composerPickerOpen}
-              >
-                What are you working on?
-              </h1>
-            </div>
-          ) : (
-            <OnboardingMessageList
-              displayMessages={displayMessages}
-              isStreaming={isStreaming}
-              lastAssistantMessageId={lastAssistantMessageId}
-              isBusy={isBusy}
-              onSelectArtist={handleArtistSelect}
-            />
-          )}
+          <OnboardingMessageList
+            displayMessages={displayMessages}
+            hideIntroMessage={composerPickerOpen}
+            isStreaming={isStreaming}
+            lastAssistantMessageId={lastAssistantMessageId}
+            isBusy={isBusy}
+            onSelectArtist={handleArtistSelect}
+          />
         </div>
       </div>
 
@@ -716,6 +741,11 @@ export function OnboardingChat({
               isAwaitingFirstToken ? 'Securing chat...' : 'Ask Jovie...'
             }
             onPickerOpenChange={setComposerPickerOpen}
+            chips={chipTray.chips}
+            onRemoveChipAt={chipTray.removeAt}
+            onRemoveLastChip={chipTray.removeLast}
+            onAddSkill={chipTray.addSkill}
+            onAddEntity={chipTray.addEntity}
             shellChatV1
             statusBanner={composerStatusBanner}
           />

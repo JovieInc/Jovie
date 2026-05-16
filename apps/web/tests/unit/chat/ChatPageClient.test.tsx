@@ -289,13 +289,14 @@ describe('ChatPageClient', () => {
     expect(mockSetHeaderActions).toHaveBeenCalledWith(null);
   });
 
-  it('hydrates the profile right panel when preview state is open without a panel query', () => {
+  it('does not hydrate the profile right panel from ambient preview state without a panel query', () => {
     mockPreviewPanelState.isOpen = true;
 
     renderChatPage();
 
     expect(mockUseRegisterRightPanel).toHaveBeenCalled();
-    expect(hasRegisteredRightPanel()).toBe(true);
+    expect(hasRegisteredRightPanel()).toBe(false);
+    expect(mockSetPreviewData).toHaveBeenCalledWith(null);
   });
 
   it('clears preview data while profile panel hydration is inactive', () => {

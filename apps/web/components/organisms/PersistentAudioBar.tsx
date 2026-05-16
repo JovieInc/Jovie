@@ -3,7 +3,7 @@
 import { Pause, Play, X } from 'lucide-react';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { SeekBar } from '@/components/atoms/SeekBar';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
@@ -11,7 +11,7 @@ import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useT
 import { AudioBar, type AudioBarTrack } from '@/components/shell/AudioBar';
 import { SidebarBottomNowPlaying } from '@/components/shell/SidebarBottomNowPlaying';
 import { SidebarNowPlaying } from '@/components/shell/SidebarNowPlaying';
-import { buildLyricsRoute } from '@/constants/routes';
+import { APP_ROUTES, buildLyricsRoute } from '@/constants/routes';
 import { useAppFlag } from '@/lib/flags/client';
 import { cn } from '@/lib/utils';
 import { formatDuration } from '@/lib/utils/formatDuration';
@@ -26,6 +26,13 @@ interface PersistentAudioBarProps {
 const SHELL_AUDIO_BAR_TRANSITION =
   'max-height var(--duration-cinematic) var(--ease-cinematic), opacity var(--duration-cinematic) var(--ease-cinematic), transform var(--duration-cinematic) var(--ease-cinematic)';
 
+function isLyricsRoutePath(pathname: string | null): boolean {
+  return (
+    pathname === APP_ROUTES.LYRICS ||
+    Boolean(pathname?.startsWith(`${APP_ROUTES.LYRICS}/`))
+  );
+}
+
 export function PersistentAudioBar({
   variant = 'legacy',
 }: Readonly<PersistentAudioBarProps>) {
@@ -37,6 +44,7 @@ export function PersistentAudioBar({
   const [imgError, setImgError] = useState(false);
   const [barCollapsed, setBarCollapsed] = useState(false);
   const [waveformOn, setWaveformOn] = useState(true);
+  const lastNonLyricsPathRef = useRef<string>(APP_ROUTES.LIBRARY);
 
   useEffect(() => {
     return onError(() => {
@@ -52,6 +60,12 @@ export function PersistentAudioBar({
     setBarCollapsed(false);
   }, [playbackState.activeTrackId]);
 
+  useEffect(() => {
+    if (!isLyricsRoutePath(pathname) && pathname) {
+      lastNonLyricsPathRef.current = pathname;
+    }
+  }, [pathname]);
+
   const handleToggle = useCallback(() => {
     if (playbackState.playbackStatus === 'loading') return;
     if (!playbackState.activeTrackId || !playbackState.trackTitle) return;
@@ -66,10 +80,19 @@ export function PersistentAudioBar({
     toggleTrack,
   ]);
 
+  const handleCloseLyrics = useCallback(() => {
+    router.push(lastNonLyricsPathRef.current);
+  }, [router]);
+
   const handleOpenLyrics = useCallback(() => {
     if (!playbackState.activeTrackId) return;
-    router.push(buildLyricsRoute(playbackState.activeTrackId));
-  }, [playbackState.activeTrackId, router]);
+    const lyricsPath = buildLyricsRoute(playbackState.activeTrackId);
+    if (pathname === lyricsPath) {
+      handleCloseLyrics();
+      return;
+    }
+    router.push(lyricsPath);
+  }, [handleCloseLyrics, pathname, playbackState.activeTrackId, router]);
 
   const activeTrackId = playbackState.activeTrackId;
 
@@ -82,6 +105,12 @@ export function PersistentAudioBar({
       const hasModifier = event.metaKey || event.ctrlKey || event.altKey;
       const plainKey = !hasModifier && !event.shiftKey;
       const key = event.key.toLowerCase();
+
+      if (event.key === 'Escape' && isLyricsRoutePath(pathname)) {
+        event.preventDefault();
+        handleCloseLyrics();
+        return;
+      }
 
       if (event.key === ' ' && plainKey) {
         event.preventDefault();
@@ -128,8 +157,10 @@ export function PersistentAudioBar({
   }, [
     activeTrackId,
     designV1LyricsEnabled,
+    handleCloseLyrics,
     handleOpenLyrics,
     handleToggle,
+    pathname,
     playbackState.hasLyrics,
     variant,
   ]);

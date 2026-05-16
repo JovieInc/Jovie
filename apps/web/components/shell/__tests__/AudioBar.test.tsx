@@ -44,6 +44,18 @@ describe('AudioBar', () => {
     expect(screen.getByLabelText(/^Lyrics/)).toBeInTheDocument();
   });
 
+  it('labels the lyrics button as a close action when active', () => {
+    render(
+      <AudioBar
+        {...baseProps}
+        track={{ ...baseTrack, hasLyrics: true }}
+        onOpenLyrics={() => {}}
+        lyricsActive
+      />
+    );
+    expect(screen.getByLabelText(/^Close lyrics/)).toBeInTheDocument();
+  });
+
   it('calls onPlay when the play button is pressed', () => {
     const onPlay = vi.fn();
     render(<AudioBar {...baseProps} onPlay={onPlay} />);
