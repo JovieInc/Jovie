@@ -31,12 +31,12 @@ import {
   PAGE_TOOLBAR_END_GROUP_CLASS,
   PAGE_TOOLBAR_META_TEXT_CLASS,
   TableBulkActionsToolbar,
-  UnifiedTable,
   useRowSelection,
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useTableMeta } from '@/contexts/TableMetaContext';
+import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import {
   AdminTableHeader,
   AdminTableSubheader,
@@ -52,7 +52,7 @@ import {
   usersCSVColumns,
 } from '@/lib/admin/csv-configs/users';
 import type { AdminUserRow } from '@/lib/admin/types';
-import { SIDEBAR_WIDTH, TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
+import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { QueryErrorBoundary, useAdminUsersInfiniteQuery } from '@/lib/queries';
 import { AdminUserDetailDrawer } from './AdminUserDetailDrawer';
 import {
@@ -595,41 +595,43 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
     <QueryErrorBoundary fallback={TableErrorFallback}>
       <div className='flex h-full'>
         <div className='flex-1 min-w-0'>
-          <AdminTableHeader
-            title='Users'
-            subtitle='Review lifecycle state, profile completion, and suppression health.'
-          />
-          <AdminTableSubheader
-            start={
-              <div className={PAGE_TOOLBAR_META_TEXT_CLASS}>
-                Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
-                {total.toLocaleString()} users
-              </div>
-            }
-            end={
-              <div className={PAGE_TOOLBAR_END_GROUP_CLASS}>
-                <ExportCSVButton<AdminUserRow>
-                  getData={() => users}
-                  columns={usersCSVColumns}
-                  filename={USERS_CSV_FILENAME_PREFIX}
-                  disabled={users.length === 0}
-                  ariaLabel='Export users to CSV file'
-                  chrome='page-toolbar'
-                  iconOnly
-                  tooltipLabel='Export'
-                />
-              </div>
-            }
-          />
           <AdminTableShell
             testId='admin-users-content'
             className='rounded-none border-0'
             toolbar={
-              <TableBulkActionsToolbar
-                selectedCount={selectedCount}
-                onClearSelection={clearSelection}
-                actions={bulkActions}
-              />
+              <>
+                <TableBulkActionsToolbar
+                  selectedCount={selectedCount}
+                  onClearSelection={clearSelection}
+                  actions={bulkActions}
+                />
+                <AdminTableHeader
+                  title='Users'
+                  subtitle='Review lifecycle state, profile completion, and suppression health.'
+                />
+                <AdminTableSubheader
+                  start={
+                    <div className={PAGE_TOOLBAR_META_TEXT_CLASS}>
+                      Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
+                      {total.toLocaleString()} users
+                    </div>
+                  }
+                  end={
+                    <div className={PAGE_TOOLBAR_END_GROUP_CLASS}>
+                      <ExportCSVButton<AdminUserRow>
+                        getData={() => users}
+                        columns={usersCSVColumns}
+                        filename={USERS_CSV_FILENAME_PREFIX}
+                        disabled={users.length === 0}
+                        ariaLabel='Export users to CSV file'
+                        chrome='page-toolbar'
+                        iconOnly
+                        tooltipLabel='Export'
+                      />
+                    </div>
+                  }
+                />
+              </>
             }
           >
             {() =>
@@ -677,7 +679,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                   ) : null}
                 </div>
               ) : (
-                <UnifiedTable
+                <AdminDataTable
                   data={users}
                   columns={columns}
                   rowSelection={rowSelection}
@@ -706,9 +708,6 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                   onRowClick={handleRowClick}
                   onFocusedRowChange={handleFocusedRowChange}
                   getContextMenuItems={getContextMenuItems}
-                  enableVirtualization={true}
-                  minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
-                  className='text-[12.5px] [&_thead_th]:py-1 [&_thead_th]:text-3xs [&_thead_th]:tracking-[0.07em]'
                   hasNextPage={hasNextPage}
                   isFetchingNextPage={isFetchingNextPage}
                   onLoadMore={() => {
