@@ -8,7 +8,7 @@ import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { cn } from '@/lib/utils';
 
 export const ADMIN_DATA_TABLE_CLASSNAME =
-  'text-[12.5px] [&_thead_th]:py-1 [&_thead_th]:text-3xs [&_thead_th]:tracking-[0.07em]';
+  'text-[12.5px] [&_thead_th]:py-1 [&_thead_th]:text-3xs [&_thead_th]:tracking-normal';
 
 export type AdminDataTableProps<TData> = UnifiedTableProps<TData>;
 
