@@ -33,6 +33,12 @@ export async function installPublicRouteMocks(page: Page) {
   await page.route('**/api/profile/view', route =>
     route.fulfill({ status: 200, body: '{}' })
   );
+  await page.route('**/api/audience/visit-token*', route =>
+    route.fulfill({
+      status: 200,
+      body: JSON.stringify({ token: null, expiresAt: null }),
+    })
+  );
   await page.route('**/api/audience/visit', route =>
     route.fulfill({ status: 200, body: '{}' })
   );
