@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.4] - 2026-05-16
+
+> Public artist profiles now load roughly 400 KB less JavaScript for anonymous visitors. Faster first paint on every fan-facing profile page.
+
+### Changed
+
+- **Public profile pages skip Clerk auth bundle**: `app/[username]/layout.tsx` now bypasses ClerkProvider on the public profile route, so anonymous visitors no longer download the ~400 KB Clerk JS runtime they never use. Sign-in flows are unaffected — they live in a separate route group with their own provider. The single client-side Clerk consumer in the profile subtree (`ProfileInlineNotificationsCTA`) already degrades gracefully when Clerk is bypassed (JOV-2268).
+
 ## [26.5.3] - 2026-05-15
 
 > [internal] Security: fix middleware matcher dot-escape bug that allowed WordPress scanner paths to bypass auth middleware.
