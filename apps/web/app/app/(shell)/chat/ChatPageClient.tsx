@@ -84,18 +84,16 @@ export function resetWelcomeChatBootstrapState(
 }
 
 /**
- * Header badge that displays the conversation title as a subtle breadcrumb suffix.
+ * Header badge that displays the conversation title as the breadcrumb suffix.
  * Rendered inside the DashboardHeader via HeaderActionsContext.
  */
 function ChatTitleBadge({ title }: { readonly title: string }) {
   return (
-    <span className='flex min-w-0 items-center gap-2 rounded-xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-2.5 py-1.5'>
-      <span className='shrink-0 text-2xs font-semibold tracking-normal text-tertiary-token'>
-        Thread
-      </span>
-      <span className='block max-w-[220px] truncate text-xs font-caption text-primary-token'>
-        {title}
-      </span>
+    <span
+      className='block max-w-[260px] truncate text-xs font-semibold tracking-[-0.01em] text-primary-token'
+      title={title}
+    >
+      {title}
     </span>
   );
 }
