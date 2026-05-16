@@ -5,6 +5,16 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.1] - 2026-05-15
+
+> [internal] Foundation schema and encrypted token vault for AI connector v1 (OAuth token storage, per-account refresh lock, 8 new tables, 7 new enums).
+
+### Added
+
+- **[internal] AI Connector schema (v1)**: 8 new Drizzle ORM tables — `connector_accounts`, `connector_sync_states`, `external_objects`, `webhook_deliveries`, `context_facts`, `agent_runs`, `suggested_actions`, `workflow_runs` — plus 7 enums covering connector provider, status, webhook provider, context fact kind, suggested action status, agent run status, and workflow run status.
+- **[internal] Token vault**: `storeTokens`, `loadDecryptedToken`, and `withRefreshLock` helpers encrypt OAuth tokens at rest (AES-256-GCM) and implement a row-level CAS refresh lock in `connector_sync_states` to prevent concurrent token refreshes per account.
+- **[internal] Idempotent migration 0048**: All `CREATE TYPE` and `CREATE TABLE` statements are wrapped in `IF NOT EXISTS` guards so the migration is safe to replay.
+
 ## [26.5.0] - 2026-05-15
 
 > Chat now uses the dark app-native composer across shell surfaces, with hardened focus, picker, attachment, and typed-entity states.
