@@ -163,4 +163,19 @@ describe('sync-skills-catalog', () => {
     await expect(main()).resolves.toBe('skipped');
     expect(mockInsert).not.toHaveBeenCalled();
   });
+
+  it('skips deploy-time sync when catalog tables are not migrated yet', async () => {
+    const missingTableError = {
+      cause: {
+        code: '42P01',
+        message: 'relation "skills_catalog" does not exist',
+      },
+    };
+
+    await expect(
+      main(async () => {
+        throw missingTableError;
+      })
+    ).resolves.toBe('skipped');
+  });
 });

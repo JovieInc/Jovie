@@ -37,6 +37,7 @@ function createScriptDb(databaseUrl: string) {
 }
 
 type CatalogDb = Pick<ReturnType<typeof createScriptDb>, 'insert'>;
+type SyncResult = 'skipped' | 'synced';
 
 function readDatabaseUrl(): string {
   const databaseUrl = scriptEnv.DATABASE_URL;
@@ -44,6 +45,32 @@ function readDatabaseUrl(): string {
     throw new Error('DATABASE_URL is required to sync the skills catalog');
   }
   return databaseUrl;
+}
+
+function isMissingCatalogTableError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  const candidate = error as {
+    cause?: unknown;
+    code?: unknown;
+    message?: unknown;
+  };
+
+  if (candidate.code === '42P01') {
+    return true;
+  }
+
+  if (isMissingCatalogTableError(candidate.cause)) {
+    return true;
+  }
+
+  return (
+    typeof candidate.message === 'string' &&
+    (candidate.message.includes('relation "skills_catalog" does not exist') ||
+      candidate.message.includes('relation "tools_catalog" does not exist'))
+  );
 }
 
 const skillCatalogChanged = drizzleSql`
@@ -157,7 +184,9 @@ export async function syncSkillsCatalog(
   );
 }
 
-export async function main(): Promise<'skipped' | 'synced'> {
+export async function main(
+  syncCatalog: () => Promise<void> = syncSkillsCatalog
+): Promise<SyncResult> {
   // Skip gracefully when DATABASE_URL is unavailable (e.g., lint-only CI builds).
   // Real deploys (Vercel, db:web:migrate) always have DATABASE_URL injected by Doppler.
   if (!scriptEnv.DATABASE_URL) {
@@ -167,7 +196,19 @@ export async function main(): Promise<'skipped' | 'synced'> {
     return 'skipped';
   }
 
-  await syncSkillsCatalog();
+  try {
+    await syncCatalog();
+  } catch (err: unknown) {
+    if (isMissingCatalogTableError(err)) {
+      console.warn(
+        '[sync-skills-catalog] catalog tables missing — skipping until migrations have run'
+      );
+      return 'skipped';
+    }
+
+    throw err;
+  }
+
   return 'synced';
 }
 
