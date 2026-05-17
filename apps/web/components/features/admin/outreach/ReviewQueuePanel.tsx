@@ -52,7 +52,7 @@ export function ReviewQueuePanel() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [skippingId, setSkippingId] = useState<string | null>(null);
+  const [skippingIds, setSkippingIds] = useState<Set<string>>(() => new Set());
   const limit = 50;
 
   const fetchQueue = useCallback(async () => {
@@ -90,7 +90,7 @@ export function ReviewQueuePanel() {
 
   const handleSkip = useCallback(
     async (id: string) => {
-      setSkippingId(id);
+      setSkippingIds(current => new Set(current).add(id));
       try {
         const res = await fetch(`/api/admin/leads/${id}/skip`, {
           method: 'PATCH',
@@ -103,7 +103,11 @@ export function ReviewQueuePanel() {
       } catch {
         toast.error('Failed to skip lead');
       } finally {
-        setSkippingId(null);
+        setSkippingIds(current => {
+          const next = new Set(current);
+          next.delete(id);
+          return next;
+        });
       }
     },
     [fetchQueue]
@@ -192,10 +196,10 @@ export function ReviewQueuePanel() {
             onClick={() => {
               void handleSkip(row.original.id);
             }}
-            disabled={skippingId === row.original.id}
+            disabled={skippingIds.has(row.original.id)}
             className='h-8 px-3 text-xs'
           >
-            {skippingId === row.original.id ? (
+            {skippingIds.has(row.original.id) ? (
               <LoadingSpinner size='sm' tone='muted' className='mr-1.5' />
             ) : null}
             Skip
@@ -204,7 +208,7 @@ export function ReviewQueuePanel() {
         size: 110,
       }) as ColumnDef<ReviewLead, unknown>,
     ],
-    [handleSkip, skippingId]
+    [handleSkip, skippingIds]
   );
 
   const totalPages = Math.ceil(total / limit);
