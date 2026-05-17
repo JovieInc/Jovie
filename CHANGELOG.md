@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.21] - 2026-05-17
+
+> [internal] Design polish: stripped banned uppercase tracking eyebrow text from dashboard surfaces and fixed title case in upgrade interstitials.
+
+### Fixed
+
+- [internal] **Remove uppercase tracking eyebrow text from dashboard surfaces (JOV-2250, JOV-2251, JOV-2252, JOV-2249, JOV-2248, JOV-2257, JOV-2258)**: stripped `uppercase tracking-*` Tailwind classes from settings sidebar group labels, ad pixels field labels, profile photo section labels, preview panel section headers, MetadataAgent card headers, and release-plan track number label. Also fixed title case in `ReleasePlanPromptDialog`, `ReleasePlanUpgradeInterstitial`, and `CompactReleasePlanUpgradeCard` headings — "Upgrade to Generate a Release Plan" (not all-caps title case).
+
 ## [26.5.15] - 2026-05-16
 
 > [internal] Observability: AI responses now flow into the Braintrust "Jovie" project when the API key is configured, so we can see model traces and run evals against production.
