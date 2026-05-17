@@ -65,9 +65,8 @@ export async function DashboardShellContent({
   readonly pathname: string | null;
   readonly children: React.ReactNode;
 }) {
-  // Keep the shell fast on the chat-first landing path and releases.
-  // Other dashboard/settings routes still receive the full dashboard context
-  // because they rely on supplementary fields from the slower fetch.
+  // Keep the shell fast on route-owned workspaces. Routes that fetch their own
+  // page data should not force the shared shell through the full dashboard path.
   const useEssentialShell = shouldUseEssentialShellData(pathname);
   const cookieStorePromise = cookies();
   const initialFlagsPromise = useEssentialShell

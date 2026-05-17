@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  isAudienceShellRoute,
   isChatShellRoute,
   isInsightsShellRoute,
   isLibraryShellRoute,
@@ -145,6 +146,23 @@ describe('isPresenceShellRoute', () => {
   });
 });
 
+describe('isAudienceShellRoute', () => {
+  it('matches the canonical audience route', () => {
+    expect(isAudienceShellRoute(APP_ROUTES.AUDIENCE)).toBe(true);
+  });
+
+  it('matches the legacy dashboard audience route', () => {
+    expect(isAudienceShellRoute(APP_ROUTES.DASHBOARD_AUDIENCE)).toBe(true);
+  });
+
+  it('matches nested audience subroutes', () => {
+    expect(isAudienceShellRoute(`${APP_ROUTES.AUDIENCE}/segments`)).toBe(true);
+    expect(
+      isAudienceShellRoute(`${APP_ROUTES.DASHBOARD_AUDIENCE}/segments`)
+    ).toBe(true);
+  });
+});
+
 describe('shouldUseEssentialShellData', () => {
   it('returns true for chat routes', () => {
     expect(shouldUseEssentialShellData(APP_ROUTES.CHAT)).toBe(true);
@@ -167,6 +185,13 @@ describe('shouldUseEssentialShellData', () => {
 
   it('returns true for the canonical presence route', () => {
     expect(shouldUseEssentialShellData(APP_ROUTES.PRESENCE)).toBe(true);
+  });
+
+  it('returns true for audience routes that own their page data', () => {
+    expect(shouldUseEssentialShellData(APP_ROUTES.AUDIENCE)).toBe(true);
+    expect(shouldUseEssentialShellData(APP_ROUTES.DASHBOARD_AUDIENCE)).toBe(
+      true
+    );
   });
 
   it('returns true for dashboard root', () => {
@@ -202,6 +227,7 @@ describe('shouldRedirectToOnboarding', () => {
     expect(shouldRedirectToOnboarding(APP_ROUTES.DASHBOARD_TASKS)).toBe(true);
     expect(shouldRedirectToOnboarding(APP_ROUTES.INSIGHTS)).toBe(true);
     expect(shouldRedirectToOnboarding(APP_ROUTES.PRESENCE)).toBe(true);
+    expect(shouldRedirectToOnboarding(APP_ROUTES.AUDIENCE)).toBe(true);
   });
 
   it('does not add onboarding redirects to settings route chrome optimization', () => {
