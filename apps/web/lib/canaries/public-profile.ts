@@ -119,17 +119,18 @@ export async function checkHttpGet(
       };
     }
 
+    const body = await res.text();
+    if (hasServerError(body)) {
+      return {
+        name,
+        ok: false,
+        statusCode: res.status,
+        detail: 'Response body contains server error indicator',
+        durationMs,
+      };
+    }
+
     if (expectBodyFn) {
-      const body = await res.text();
-      if (hasServerError(body)) {
-        return {
-          name,
-          ok: false,
-          statusCode: res.status,
-          detail: 'Response body contains server error indicator',
-          durationMs,
-        };
-      }
       if (!expectBodyFn(body)) {
         return {
           name,

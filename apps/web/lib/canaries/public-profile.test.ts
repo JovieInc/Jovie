@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   buildReport,
   buildVisitPayload,
@@ -6,10 +6,15 @@ import {
   CANARY_CREATOR_SPOTIFY_ID,
   CANARY_ROUTES,
   type CanaryCheckResult,
+  checkHttpGet,
   formatReportSummary,
   hasServerError,
   isOkStatus,
 } from './public-profile';
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe('isOkStatus', () => {
   it('accepts 200', () => {
@@ -88,6 +93,24 @@ describe('buildVisitPayload', () => {
     const utm = payload.utmParams as { source: string; medium: string };
     expect(utm.source).toBe('canary');
     expect(utm.medium).toBe('monitoring');
+  });
+});
+
+describe('checkHttpGet', () => {
+  it('rejects a 200 response containing a server error body without a custom assertion', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('Application error', { status: 200 }))
+    );
+
+    const result = await checkHttpGet(
+      'alerts-200',
+      'https://jov.ie/tim/alerts'
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.statusCode).toBe(200);
+    expect(result.detail).toBe('Response body contains server error indicator');
   });
 });
 
