@@ -31,6 +31,10 @@ Tools are NOT defined here. They are built in the route (`buildFreeChatTools`, `
 - **Free tier** (always available): photo upload, social link add/remove, feedback
 - **Paid tier**: profile edits, bio writing, canvas planning, album art generation, pitch generation, promo strategy, release creation, analytics insights
 
+## Observability (Braintrust)
+
+`streamText`, `generateText`, `generateObject`, and `streamObject` are re-exported from `@/lib/ai/sdk` (wrapped by `braintrust.wrapAISDK`). Any new AI SDK caller must import from `@/lib/ai/sdk`, not directly from `'ai'`, so traces flow into the Braintrust "Jovie" project. Direct Anthropic SDK callers use `getAnthropicClient()` from `@/lib/ai/anthropic`. Tracing only runs when `BRAINTRUST_API_KEY` is set; the wrapper is a no-op otherwise.
+
 ## Telemetry contract
 
 `types.ts` defines `ChatTelemetry` with `setTags`, `setExtra`, `captureException`. The route binds Sentry; eval scripts pass a no-op. The pipeline never imports `@sentry/nextjs` directly.
