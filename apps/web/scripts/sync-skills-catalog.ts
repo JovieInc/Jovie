@@ -15,9 +15,15 @@ import { pathToFileURL } from 'node:url';
 import { sql as drizzleSql } from 'drizzle-orm';
 import { SKILL_REGISTRY } from '@/lib/agents/registry';
 import type { SkillDefinition, ToolDefinition } from '@/lib/agents/types';
-import { db } from '@/lib/db';
 import { skillsCatalog, toolsCatalog } from '@/lib/db/schema/agents';
-import { env } from '@/lib/env-server';
+
+// Postbuild runs this file under tsx; env-server imports server-only and cannot
+// be loaded outside Next's server graph.
+const scriptEnv = {
+  get DATABASE_URL(): string | undefined {
+    return process.env.DATABASE_URL;
+  },
+};
 
 const skillCatalogChanged = drizzleSql`
   ${skillsCatalog.name} IS DISTINCT FROM excluded.name OR
@@ -44,6 +50,7 @@ const toolCatalogChanged = drizzleSql`
 `;
 
 export async function syncSkillsCatalog(): Promise<void> {
+  const { db } = await import('@/lib/db');
   const now = new Date();
   const skills = Object.values(SKILL_REGISTRY) as SkillDefinition[];
   const toolSkills = skills.filter(
@@ -131,7 +138,7 @@ export async function syncSkillsCatalog(): Promise<void> {
 export async function main(): Promise<'skipped' | 'synced'> {
   // Skip gracefully when DATABASE_URL is unavailable (e.g., lint-only CI builds).
   // Real deploys (Vercel, db:web:migrate) always have DATABASE_URL injected by Doppler.
-  if (!env.DATABASE_URL) {
+  if (!scriptEnv.DATABASE_URL) {
     console.log(
       '[sync-skills-catalog] DATABASE_URL not set — skipping catalog sync (no-op in lint/type-check CI)'
     );

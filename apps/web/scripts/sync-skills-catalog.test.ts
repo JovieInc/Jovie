@@ -15,10 +15,6 @@ import { main, syncSkillsCatalog } from './sync-skills-catalog';
 // Mocks
 // ---------------------------------------------------------------------------
 
-const mockEnv = vi.hoisted(() => ({
-  DATABASE_URL: 'postgres://unit-test' as string | undefined,
-}));
-
 const { mockInsert, mockOnConflictDoUpdate, mockValues } = vi.hoisted(() => {
   const onConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
   const values = vi.fn().mockReturnValue({
@@ -41,10 +37,6 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
-vi.mock('@/lib/env-server', () => ({
-  env: mockEnv,
-}));
-
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -57,7 +49,8 @@ describe('sync-skills-catalog', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockEnv.DATABASE_URL = 'postgres://unit-test';
+    vi.unstubAllEnvs();
+    vi.stubEnv('DATABASE_URL', 'postgres://unit-test');
     delete mutableRegistry.unitTool;
   });
 
@@ -168,7 +161,7 @@ describe('sync-skills-catalog', () => {
   });
 
   it('skips DB writes when DATABASE_URL is unavailable', async () => {
-    mockEnv.DATABASE_URL = undefined;
+    vi.stubEnv('DATABASE_URL', '');
 
     await expect(main()).resolves.toBe('skipped');
     expect(mockInsert).not.toHaveBeenCalled();
