@@ -4,8 +4,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  getFirstSliceInteractionHotPaths,
-  getInteractionHotPathManifest,
+  type InteractionScenarioDefinition,
   type InteractionTier,
   selectInteractionHotPaths,
 } from './performance-interaction-manifest';
@@ -24,6 +23,17 @@ export interface InteractionAuditCliOptions {
   readonly sampleFile?: string;
   readonly scenarioIds: readonly string[];
   readonly tiers: readonly InteractionTier[];
+}
+
+export interface InteractionAuditEnvironment {
+  readonly authPersona?: string;
+  readonly baseUrl?: string;
+  readonly browser?: string;
+  readonly buildMode?: InteractionRunMetadata['buildMode'];
+  readonly cpuProfile?: string;
+  readonly datasetSize?: string;
+  readonly networkProfile?: string;
+  readonly viewport?: string;
 }
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -155,14 +165,18 @@ function ensureDir(path: string) {
   mkdirSync(path, { recursive: true });
 }
 
-function normalizeSamples(raw: unknown): readonly InteractionLatencySample[] {
+export function normalizeSamples(
+  raw: unknown
+): readonly InteractionLatencySample[] {
   if (Array.isArray(raw)) {
     return raw as readonly InteractionLatencySample[];
   }
 
   if (raw && typeof raw === 'object' && 'samples' in raw) {
-    return (raw as { readonly samples: readonly InteractionLatencySample[] })
-      .samples;
+    const samples = (raw as { readonly samples?: unknown }).samples;
+    if (Array.isArray(samples)) {
+      return samples as readonly InteractionLatencySample[];
+    }
   }
 
   throw new TypeError(
@@ -182,17 +196,63 @@ function readSamples(sampleFile: string | undefined) {
   return normalizeSamples(readJsonFile<unknown>(sampleFile));
 }
 
-function buildMetadata(options: InteractionAuditCliOptions) {
+function normalizeBuildMode(
+  value: string | undefined
+): InteractionRunMetadata['buildMode'] | undefined {
+  if (
+    value === 'development' ||
+    value === 'preview' ||
+    value === 'production' ||
+    value === 'test'
+  ) {
+    return value;
+  }
+
+  return undefined;
+}
+
+export function resolveInteractionAuditEnvironment(
+  source: Readonly<Record<string, string | undefined>> = process.env
+): InteractionAuditEnvironment {
+  return {
+    authPersona: source.INTERACTION_AUDIT_AUTH_PERSONA,
+    baseUrl: source.BASE_URL,
+    browser: source.INTERACTION_AUDIT_BROWSER ?? 'chromium',
+    buildMode: normalizeBuildMode(source.NODE_ENV),
+    cpuProfile: source.INTERACTION_AUDIT_CPU_PROFILE,
+    datasetSize: source.INTERACTION_AUDIT_DATASET_SIZE,
+    networkProfile: source.INTERACTION_AUDIT_NETWORK_PROFILE,
+    viewport: source.INTERACTION_AUDIT_VIEWPORT,
+  };
+}
+
+export function selectInteractionAuditScenarios(
+  options: Pick<
+    InteractionAuditCliOptions,
+    'firstSliceOnly' | 'scenarioIds' | 'tiers'
+  >
+): readonly InteractionScenarioDefinition[] {
+  return selectInteractionHotPaths({
+    firstSliceOnly: options.firstSliceOnly,
+    scenarioIds: options.scenarioIds,
+    tiers: options.tiers,
+  });
+}
+
+function buildMetadata(
+  options: InteractionAuditCliOptions,
+  auditEnv = resolveInteractionAuditEnvironment()
+) {
   const metadata = {
-    authPersona: process.env.INTERACTION_AUDIT_AUTH_PERSONA,
-    baseUrl: process.env.BASE_URL,
-    browser: process.env.INTERACTION_AUDIT_BROWSER ?? 'chromium',
-    buildMode: process.env.NODE_ENV as InteractionRunMetadata['buildMode'],
-    cpuProfile: process.env.INTERACTION_AUDIT_CPU_PROFILE,
-    datasetSize: process.env.INTERACTION_AUDIT_DATASET_SIZE,
-    networkProfile: process.env.INTERACTION_AUDIT_NETWORK_PROFILE,
+    authPersona: auditEnv.authPersona,
+    baseUrl: auditEnv.baseUrl,
+    browser: auditEnv.browser ?? 'chromium',
+    buildMode: auditEnv.buildMode,
+    cpuProfile: auditEnv.cpuProfile,
+    datasetSize: auditEnv.datasetSize,
+    networkProfile: auditEnv.networkProfile,
     sampleCount: undefined,
-    viewport: process.env.INTERACTION_AUDIT_VIEWPORT,
+    viewport: auditEnv.viewport,
   } satisfies InteractionRunMetadata;
 
   return {
@@ -202,16 +262,7 @@ function buildMetadata(options: InteractionAuditCliOptions) {
 }
 
 export function runInteractionAuditReport(options: InteractionAuditCliOptions) {
-  const scenarios =
-    options.scenarioIds.length > 0 || options.tiers.length > 0
-      ? selectInteractionHotPaths({
-          firstSliceOnly: options.firstSliceOnly,
-          scenarioIds: options.scenarioIds,
-          tiers: options.tiers,
-        })
-      : options.firstSliceOnly
-        ? getFirstSliceInteractionHotPaths()
-        : getInteractionHotPathManifest();
+  const scenarios = selectInteractionAuditScenarios(options);
   const samples = readSamples(options.sampleFile);
 
   return buildInteractionLatencyReport({
@@ -244,12 +295,7 @@ async function main() {
   const options = parseInteractionAuditCliArgs(process.argv.slice(2));
 
   if (options.list) {
-    const scenarios = options.firstSliceOnly
-      ? getFirstSliceInteractionHotPaths()
-      : selectInteractionHotPaths({
-          scenarioIds: options.scenarioIds,
-          tiers: options.tiers,
-        });
+    const scenarios = selectInteractionAuditScenarios(options);
     const output = scenarios.map(scenario => ({
       budget: scenario.budget,
       id: scenario.id,

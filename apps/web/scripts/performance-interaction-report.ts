@@ -248,6 +248,33 @@ function rankSummary(summary: InteractionScenarioSummary) {
   );
 }
 
+function resolveScenariosFromSamples(
+  samples: readonly InteractionLatencySample[]
+) {
+  const scenarioIds = [...new Set(samples.map(sample => sample.scenarioId))];
+  const scenarios: InteractionScenarioDefinition[] = [];
+  const unknownScenarioIds: string[] = [];
+
+  for (const scenarioId of scenarioIds) {
+    const scenario = getInteractionHotPathById(scenarioId);
+
+    if (!scenario) {
+      unknownScenarioIds.push(scenarioId);
+      continue;
+    }
+
+    scenarios.push(scenario);
+  }
+
+  if (unknownScenarioIds.length > 0) {
+    throw new TypeError(
+      `Unknown scenarioId in samples: ${unknownScenarioIds.join(', ')}`
+    );
+  }
+
+  return scenarios;
+}
+
 export function buildInteractionLatencyReport(options: {
   readonly generatedAt?: string;
   readonly metadata?: InteractionRunMetadata;
@@ -255,13 +282,7 @@ export function buildInteractionLatencyReport(options: {
   readonly scenarios?: readonly InteractionScenarioDefinition[];
 }): InteractionLatencyReport {
   const scenarios =
-    options.scenarios ??
-    [...new Set(options.samples.map(sample => sample.scenarioId))]
-      .map(scenarioId => getInteractionHotPathById(scenarioId))
-      .filter(
-        (scenario): scenario is InteractionScenarioDefinition =>
-          scenario !== undefined
-      );
+    options.scenarios ?? resolveScenariosFromSamples(options.samples);
 
   const summaries = scenarios
     .map(scenario =>

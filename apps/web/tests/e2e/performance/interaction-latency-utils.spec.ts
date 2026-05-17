@@ -35,4 +35,78 @@ test.describe('interaction latency measurement helper', () => {
     expect(sample.nextPaintMs).toBeLessThanOrEqual(sample.firstFeedbackMs);
     expect(sample.usableStateMs).toBeGreaterThanOrEqual(sample.firstFeedbackMs);
   });
+
+  test('disconnects and resets the long-task observer between measurements', async ({
+    page,
+  }) => {
+    await page.setContent('<main>Ready</main>');
+    await page.evaluate(() => {
+      const stateWindow = window as Window & {
+        __jovieDisconnectCount?: number;
+        __jovieObserverActive?: boolean;
+      };
+
+      class TestPerformanceObserver {
+        private readonly callback: PerformanceObserverCallback;
+
+        constructor(callback: PerformanceObserverCallback) {
+          this.callback = callback;
+        }
+
+        observe() {
+          stateWindow.__jovieObserverActive = true;
+          this.callback(
+            {
+              getEntries: () =>
+                [
+                  {
+                    duration: 12,
+                    startTime: performance.now(),
+                  },
+                ] as PerformanceEntry[],
+            } as unknown as PerformanceObserverEntryList,
+            this as unknown as PerformanceObserver
+          );
+        }
+
+        disconnect() {
+          stateWindow.__jovieDisconnectCount =
+            (stateWindow.__jovieDisconnectCount ?? 0) + 1;
+          stateWindow.__jovieObserverActive = false;
+        }
+      }
+
+      Object.defineProperty(window, 'PerformanceObserver', {
+        configurable: true,
+        value: TestPerformanceObserver,
+      });
+    });
+
+    const first = await measureInteractionLatency(page, {
+      action: () => page.evaluate(() => undefined),
+      firstFeedback: async () => undefined,
+      scenarioId: 'synthetic-first-feedback',
+    });
+    const second = await measureInteractionLatency(page, {
+      action: () => page.evaluate(() => undefined),
+      firstFeedback: async () => undefined,
+      scenarioId: 'synthetic-first-feedback',
+    });
+
+    const observerState = await page.evaluate(() => {
+      const stateWindow = window as Window & {
+        __jovieDisconnectCount?: number;
+        __jovieObserverActive?: boolean;
+      };
+      return {
+        disconnectCount: stateWindow.__jovieDisconnectCount ?? 0,
+        observerActive: stateWindow.__jovieObserverActive ?? false,
+      };
+    });
+
+    expect(first.longTaskCount).toBe(1);
+    expect(second.longTaskCount).toBe(1);
+    expect(observerState.disconnectCount).toBe(2);
+    expect(observerState.observerActive).toBe(false);
+  });
 });

@@ -1,7 +1,12 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { parseInteractionAuditCliArgs } from './performance-interaction-audit';
+import {
+  normalizeSamples,
+  parseInteractionAuditCliArgs,
+  resolveInteractionAuditEnvironment,
+  selectInteractionAuditScenarios,
+} from './performance-interaction-audit';
 import {
   getFirstSliceInteractionHotPaths,
   getInteractionHotPathById,
@@ -58,6 +63,48 @@ describe('performance interaction audit cli', () => {
         'samples.json'
       )
     );
+  });
+
+  it('rejects malformed sample envelopes with a clear error', () => {
+    expect(() => normalizeSamples({ samples: { scenarioId: 'bad' } })).toThrow(
+      'Sample file must be an array or an object with a samples array'
+    );
+  });
+
+  it('applies first-slice, scenario, and tier filters consistently', () => {
+    const scenarios = selectInteractionAuditScenarios({
+      firstSliceOnly: true,
+      scenarioIds: ['command-palette-open', 'release-table-row-move'],
+      tiers: ['P0'],
+    });
+
+    expect(scenarios.map(scenario => scenario.id)).toEqual([
+      'command-palette-open',
+    ]);
+  });
+
+  it('resolves interaction audit metadata from a typed script env snapshot', () => {
+    expect(
+      resolveInteractionAuditEnvironment({
+        BASE_URL: 'https://preview.jov.ie',
+        INTERACTION_AUDIT_AUTH_PERSONA: 'artist-manager',
+        INTERACTION_AUDIT_BROWSER: 'chromium',
+        INTERACTION_AUDIT_CPU_PROFILE: '4x',
+        INTERACTION_AUDIT_DATASET_SIZE: 'large',
+        INTERACTION_AUDIT_NETWORK_PROFILE: 'fast-4g',
+        INTERACTION_AUDIT_VIEWPORT: '1440x900',
+        NODE_ENV: 'preview',
+      })
+    ).toEqual({
+      authPersona: 'artist-manager',
+      baseUrl: 'https://preview.jov.ie',
+      browser: 'chromium',
+      buildMode: 'preview',
+      cpuProfile: '4x',
+      datasetSize: 'large',
+      networkProfile: 'fast-4g',
+      viewport: '1440x900',
+    });
   });
 });
 
@@ -123,5 +170,19 @@ describe('performance interaction report', () => {
       '| 1 | Command palette opens from keyboard | 90ms |'
     );
     expect(markdown).toContain('90ms');
+  });
+
+  it('fails closed when samples reference an unknown scenario id', () => {
+    expect(() =>
+      buildInteractionLatencyReport({
+        samples: [
+          {
+            firstFeedbackMs: 80,
+            runIndex: 0,
+            scenarioId: 'unknown-hot-path',
+          },
+        ],
+      })
+    ).toThrow('Unknown scenarioId in samples: unknown-hot-path');
   });
 });
