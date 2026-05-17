@@ -25,7 +25,7 @@ export const metadata: Metadata = {
   description: 'Releases and events at a glance',
 };
 
-const CALENDAR_ROUTE = `${APP_ROUTES.DASHBOARD}/calendar`;
+const CALENDAR_ROUTE = APP_ROUTES.CALENDAR;
 
 function formatProvider(provider: TourDateProviderValue): string {
   if (provider === 'bandsintown') return 'Bandsintown';
