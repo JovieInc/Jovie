@@ -161,6 +161,7 @@ vi.mock('@/lib/db', () => ({
     }),
     execute: vi.fn().mockResolvedValue({}),
   },
+  doesTableExist: vi.fn(async () => false),
 }));
 
 vi.mock('@/lib/db/query-timeout', () => ({
@@ -189,6 +190,7 @@ vi.mock('@/lib/db/schema/auth', () => ({
 vi.mock('@/lib/db/schema/links', () => ({
   socialLinks: {
     creatorProfileId: 'creatorProfileId',
+    isActive: 'isActive',
     state: 'state',
     platformType: 'platformType',
     platform: 'platform',
@@ -196,6 +198,12 @@ vi.mock('@/lib/db/schema/links', () => ({
 }));
 
 vi.mock('@/lib/db/schema/profiles', () => ({
+  creatorDistributionEvents: {
+    createdAt: 'createdAt',
+    creatorProfileId: 'creatorProfileId',
+    eventType: 'eventType',
+    platform: 'platform',
+  },
   creatorProfiles: { userId: 'userId', id: 'id', createdAt: 'createdAt' },
 }));
 
@@ -433,6 +441,39 @@ describe('dashboard data prefetch', () => {
 
     expect(result.isAdmin).toBe(true);
     expect(result.needsOnboarding).toBe(false);
+  });
+
+  it('loads dashboard overview supplement without full dashboard fields', async () => {
+    const selectMock = vi.fn().mockReturnValueOnce({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi
+            .fn()
+            .mockResolvedValue([{ hasLinks: 't', hasMusicLinks: '0' }]),
+        }),
+      }),
+    } as never);
+
+    withDbSessionTxMock.mockImplementationOnce(async handler =>
+      handler({ select: selectMock }, 'user_123')
+    );
+
+    const { getDashboardOverviewSupplement } = await import(
+      '@/app/app/(shell)/dashboard/actions/dashboard-data'
+    );
+
+    const result = await getDashboardOverviewSupplement({
+      onboardingCompletedAt: null,
+      profileId: 'profile_1',
+      userId: 'user_db_1',
+    });
+
+    expect(withDbSessionTxMock).toHaveBeenCalledWith(expect.any(Function));
+    expect(result).toEqual({
+      hasSocialLinks: true,
+      hasMusicLinks: false,
+      bioLinkActivation: null,
+    });
   });
 });
 

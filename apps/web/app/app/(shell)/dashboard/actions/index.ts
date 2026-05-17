@@ -32,6 +32,7 @@ export {
   getDashboardDataCached,
   getDashboardDataEssential,
   getDashboardDataFresh,
+  getDashboardOverviewSupplement,
   getDashboardShellData,
   prefetchDashboardData,
 } from './dashboard-data';
