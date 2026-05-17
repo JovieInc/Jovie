@@ -88,7 +88,7 @@ describe('LibrarySurface', () => {
     ).toBeDefined();
     expect(screen.getByRole('link', { name: 'Open Releases' })).toHaveAttribute(
       'href',
-      APP_ROUTES.DASHBOARD_RELEASES
+      APP_ROUTES.RELEASES
     );
   });
 
