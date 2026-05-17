@@ -26,6 +26,8 @@ const APP_ICON_FILENAME =
   APP_ENV === 'staging' ? 'icon-staging.png' : 'icon.png';
 const APP_ICON_PATH = path.join(__dirname, '..', 'assets', APP_ICON_FILENAME);
 const DESKTOP_USER_AGENT_PRODUCT = `JovieDesktop/${app.getVersion()}`;
+const JOVIE_MARK_SVG_PATH =
+  'm176.84,0l3.08.05c8.92,1.73,16.9,6.45,23.05,13.18,7.95,8.7,12.87,20.77,12.87,34.14s-4.92,25.44-12.87,34.14c-6.7,7.34-15.59,12.28-25.49,13.57h-.64s0,.01,0,.01h0c-22.2,0-42.3,8.84-56.83,23.13-14.5,14.27-23.49,33.99-23.49,55.77h0v.02c0,21.78,8.98,41.5,23.49,55.77,14.54,14.3,34.64,23.15,56.83,23.15v-.02h.01c22.2,0,42.3-8.84,56.83-23.13,14.51-14.27,23.49-33.99,23.49-55.77h0c0-17.55-5.81-33.75-15.63-46.82-10.08-13.43-24.42-23.61-41.05-28.62l-2.11-.64c4.36-2.65,8.34-5.96,11.84-9.78,9.57-10.47,15.5-24.89,15.5-40.77s-5.93-30.3-15.5-40.77c-1.44-1.57-2.95-3.06-4.55-4.44l7.67,1.58c40.44,8.35,75.81,30.3,100.91,60.75,24.66,29.91,39.44,68.02,39.44,109.5h0c0,48.05-19.81,91.55-51.83,123.05-31.99,31.46-76.19,50.92-125,50.92v.02h-.01c-48.79,0-93-19.47-125-50.94C19.81,265.54,0,222.04,0,173.99h0c0-48.05,19.81-91.56,51.83-123.05C83.84,19.47,128.04,0,176.84,0Z';
 const ENABLE_DEVTOOLS = APP_ENV !== 'production' || !app.isPackaged;
 const UPDATE_AVAILABLE_CHANNEL = 'update-available';
 const UPDATE_DOWNLOADED_CHANNEL = 'update-downloaded';
@@ -204,17 +206,13 @@ function buildDesktopLoadFailureUrl(): string {
   </head>
   <body>
     <main class="shell" role="main">
-      <svg class="mark" viewBox="0 0 44 44" aria-hidden="true">
-        <circle cx="22" cy="22" r="22" fill="currentColor"/>
-        <path d="M31 10A20 20 0 0 0 11 30H31V10Z" fill="#07080b"/>
-        <path d="M11 31L30 31M14 36L31 36M18 41L32 41" stroke="#07080b" stroke-width="3.8" stroke-linecap="round"/>
+      <svg class="mark" viewBox="0 0 353.68 347.97" aria-hidden="true">
+        <path fill="currentColor" d="${JOVIE_MARK_SVG_PATH}"/>
       </svg>
       <div class="brand">
         <div class="icon" aria-hidden="true">
-          <svg width="28" height="28" viewBox="0 0 44 44">
-            <circle cx="22" cy="22" r="22" fill="currentColor"/>
-            <path d="M31 10A20 20 0 0 0 11 30H31V10Z" fill="#080a0d"/>
-            <path d="M11 31L30 31M14 36L31 36M18 41L32 41" stroke="#080a0d" stroke-width="3.8" stroke-linecap="round"/>
+          <svg width="28" height="28" viewBox="0 0 353.68 347.97">
+            <path fill="currentColor" d="${JOVIE_MARK_SVG_PATH}"/>
           </svg>
         </div>
         <div>

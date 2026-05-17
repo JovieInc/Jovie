@@ -47,6 +47,9 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(mainSource, /did-fail-load/);
   assert.match(mainSource, /NAVIGATION_ABORTED_ERROR_CODE/);
   assert.match(mainSource, /showDesktopLoadFailure\(win\)/);
+  assert.match(mainSource, /viewBox="0 0 353\.68 347\.97"/);
+  assert.doesNotMatch(mainSource, /M31 10A20 20 0 0 0 11 30H31V10Z/);
+  assert.doesNotMatch(mainSource, /M11 31L30 31M14 36L31 36M18 41L32 41/);
 });
 
 test('preload marks the hosted app as Electron after the document root is ready', async () => {
