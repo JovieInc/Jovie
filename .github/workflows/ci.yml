@@ -3674,8 +3674,8 @@ jobs:
               mv "${env_file}.tmp" "$env_file"
             fi
           done
-      - name: Check signup readiness (production env file)
-        run: pnpm --filter=@jovie/web exec tsx scripts/check-signup-readiness.ts --target=prd --source=vercel-file --file=.vercel/.env.production.local
+      - name: Check signup readiness (production deploy env)
+        run: pnpm --filter=@jovie/web exec tsx scripts/check-signup-readiness.ts --target=prd --source=env
       - name: Build (preview target for staging verification)
         run: |
           scope_args=()
