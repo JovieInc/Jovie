@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   mockGetCachedAuth,
-  mockGetDashboardData,
+  mockGetDashboardDataEssential,
   mockDbSelect,
   mockDbInsert,
   mockDbUpdate,
@@ -24,7 +24,7 @@ const {
   mockRedirect,
 } = vi.hoisted(() => ({
   mockGetCachedAuth: vi.fn(),
-  mockGetDashboardData: vi.fn(),
+  mockGetDashboardDataEssential: vi.fn(),
   mockDbSelect: vi.fn(),
   mockDbInsert: vi.fn(),
   mockDbUpdate: vi.fn(),
@@ -50,10 +50,10 @@ vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: mockGetCachedAuth,
 }));
 
-// The source file imports getDashboardData from '../actions' which resolves to
-// the dashboard actions barrel. We mock the entire barrel re-export here.
+// The source file imports getDashboardDataEssential from '../actions' which
+// resolves to the dashboard actions barrel. We mock the barrel re-export here.
 vi.mock('@/app/app/(shell)/dashboard/actions', () => ({
-  getDashboardData: mockGetDashboardData,
+  getDashboardDataEssential: mockGetDashboardDataEssential,
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -146,7 +146,7 @@ vi.mock('drizzle-orm', () => ({
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Default authenticated profile returned by getDashboardData */
+/** Default authenticated profile returned by getDashboardDataEssential */
 const DEFAULT_PROFILE = {
   id: 'prof_123',
   username: 'testartist',
@@ -159,7 +159,7 @@ function setupAuthenticatedUser(
   overrides: Partial<typeof DEFAULT_PROFILE> = {}
 ) {
   mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
-  mockGetDashboardData.mockResolvedValue({
+  mockGetDashboardDataEssential.mockResolvedValue({
     needsOnboarding: false,
     selectedProfile: { ...DEFAULT_PROFILE, ...overrides },
   });

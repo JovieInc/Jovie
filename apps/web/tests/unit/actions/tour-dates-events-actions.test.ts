@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   mockGetCachedAuth,
-  mockGetDashboardData,
+  mockGetDashboardDataEssential,
   mockDbUpdate,
   mockDbSelect,
   mockSelectFrom,
@@ -15,7 +15,7 @@ const {
   mockEq,
 } = vi.hoisted(() => ({
   mockGetCachedAuth: vi.fn(),
-  mockGetDashboardData: vi.fn(),
+  mockGetDashboardDataEssential: vi.fn(),
   mockDbUpdate: vi.fn(),
   mockDbSelect: vi.fn(),
   mockSelectFrom: vi.fn(),
@@ -33,7 +33,7 @@ vi.mock('@/lib/auth/cached', () => ({
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/actions', () => ({
-  getDashboardData: mockGetDashboardData,
+  getDashboardDataEssential: mockGetDashboardDataEssential,
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -71,7 +71,7 @@ const OTHER_EVENT_ID = '550e8400-e29b-41d4-a716-446655440001';
 
 function setupAuthenticatedUser() {
   mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
-  mockGetDashboardData.mockResolvedValue({
+  mockGetDashboardDataEssential.mockResolvedValue({
     dashboardLoadError: null,
     needsOnboarding: false,
     selectedProfile: { id: 'prof_123' },
