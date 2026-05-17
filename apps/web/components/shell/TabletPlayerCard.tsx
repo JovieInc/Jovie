@@ -63,7 +63,7 @@ export function TabletPlayerCard({
         className
       )}
     >
-      <div className='rounded-2xl backdrop-blur-2xl bg-(--linear-app-content-surface)/70 border border-white/10 shadow-[0_10px_40px_rgba(0,0,0,0.18)] relative overflow-hidden'>
+      <div className='rounded-2xl backdrop-blur-2xl bg-(--linear-app-content-surface)/70 border border-(--linear-app-frame-seam) shadow-[0_10px_40px_rgba(0,0,0,0.18)] relative overflow-hidden'>
         <span
           aria-hidden='true'
           className='absolute top-0 left-0 right-0 h-px bg-tertiary-token/30'
@@ -102,7 +102,7 @@ export function TabletPlayerCard({
             <button
               type='button'
               onClick={onPrevious}
-              className='h-8 w-8 rounded grid place-items-center text-quaternary-token hover:text-primary-token transition-colors duration-150 ease-out'
+              className='h-8 w-8 rounded grid place-items-center text-quaternary-token hover:text-primary-token transition-colors duration-subtle ease-out'
               aria-label='Previous'
             >
               <SkipBack
@@ -114,7 +114,7 @@ export function TabletPlayerCard({
             <button
               type='button'
               onClick={onPlay}
-              className='h-9 w-9 rounded-full grid place-items-center bg-primary text-on-primary transition-transform duration-150 ease-out active:scale-95'
+              className='h-9 w-9 rounded-full grid place-items-center bg-primary text-on-primary transition-transform duration-subtle ease-out active:scale-95'
               aria-label={isPlaying ? 'Pause' : 'Play'}
             >
               {isPlaying ? (
@@ -134,7 +134,7 @@ export function TabletPlayerCard({
             <button
               type='button'
               onClick={onNext}
-              className='h-8 w-8 rounded grid place-items-center text-quaternary-token hover:text-primary-token transition-colors duration-150 ease-out'
+              className='h-8 w-8 rounded grid place-items-center text-quaternary-token hover:text-primary-token transition-colors duration-subtle ease-out'
               aria-label='Next'
             >
               <SkipForward

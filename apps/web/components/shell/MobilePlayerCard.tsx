@@ -52,7 +52,7 @@ export function MobilePlayerCard({
 
   return (
     <div className={cn('md:hidden fixed inset-x-3 z-40 bottom-3', className)}>
-      <div className='rounded-2xl px-2.5 py-2 flex items-center gap-2.5 backdrop-blur-2xl bg-(--linear-app-content-surface)/70 border border-white/10 shadow-[0_10px_40px_rgba(0,0,0,0.18)] relative overflow-hidden'>
+      <div className='rounded-2xl px-2.5 py-2 flex items-center gap-2.5 backdrop-blur-2xl bg-(--linear-app-content-surface)/70 border border-(--linear-app-frame-seam) shadow-[0_10px_40px_rgba(0,0,0,0.18)] relative overflow-hidden'>
         <span
           aria-hidden='true'
           className='absolute top-0 left-0 right-0 h-px bg-tertiary-token/30'
@@ -88,7 +88,7 @@ export function MobilePlayerCard({
         <button
           type='button'
           onClick={onPlay}
-          className='h-9 w-9 rounded-full grid place-items-center bg-primary text-on-primary shrink-0 transition-transform duration-150 ease-out active:scale-95'
+          className='h-9 w-9 rounded-full grid place-items-center bg-primary text-on-primary shrink-0 transition-transform duration-subtle ease-out active:scale-95'
           aria-label={isPlaying ? 'Pause' : 'Play'}
         >
           {isPlaying ? (

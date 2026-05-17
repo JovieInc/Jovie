@@ -23,7 +23,7 @@ describe('TabletPlayerCard', () => {
   });
 
   it('renders title, artist, and formatted timestamps', () => {
-    render(
+    const { container } = render(
       <TabletPlayerCard
         track={TRACK}
         isPlaying
@@ -36,6 +36,11 @@ describe('TabletPlayerCard', () => {
     expect(screen.getByText('Bahamas')).toBeInTheDocument();
     expect(screen.getByText('1:18')).toBeInTheDocument();
     expect(screen.getByText('3:33')).toBeInTheDocument();
+    expect(container.innerHTML).toContain('border-(--linear-app-frame-seam)');
+    expect(container.innerHTML).toContain(
+      'bg-(--linear-app-content-surface)/70'
+    );
+    expect(container.innerHTML).not.toContain('border-white/10');
   });
 
   it('coerces NaN duration to 0:00', () => {
