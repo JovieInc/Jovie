@@ -380,6 +380,16 @@ const nextConfig = {
         permanent: true,
       },
       {
+        source: '/sign-up',
+        destination: '/signup',
+        permanent: true,
+      },
+      {
+        source: '/sign-in',
+        destination: '/signin',
+        permanent: true,
+      },
+      {
         source: '/app/analytics',
         destination: '/app/dashboard/audience',
         permanent: false,

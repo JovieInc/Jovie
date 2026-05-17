@@ -10,6 +10,7 @@ import { HERO_COPY } from '@/components/homepage/intent';
 import { FaqSection } from '@/components/marketing';
 import { FridayRhythmSectionLazy } from '@/components/marketing/FridayRhythmSectionLazy';
 import { APP_NAME, BASE_URL } from '@/constants/app';
+import { getHomepageFrontDoorCtaContract } from '@/data/homepageFrontDoorCta';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
 import {
@@ -220,6 +221,10 @@ const ORGANIZATION_SCHEMA = buildOrganizationSchema({
 const FAQ_SCHEMA = buildFaqSchema([...HOMEPAGE_LAUNCH_COPY.faq]);
 
 function HomepageHeroActions() {
+  const secondaryCta = getHomepageFrontDoorCtaContract(
+    FEATURE_FLAGS.WAITLIST_ENABLED
+  ).secondary;
+
   return (
     <div className='homepage-hero-actions'>
       <HomepageTrackedLink
@@ -232,20 +237,20 @@ function HomepageHeroActions() {
       >
         {HERO_COPY.primaryCta.label}
       </HomepageTrackedLink>
-      {FEATURE_FLAGS.WAITLIST_ENABLED ? null : (
+      {secondaryCta ? (
         <HomepageTrackedLink
-          href={HERO_COPY.secondaryCta.href}
+          href={secondaryCta.href}
           className='homepage-hero-secondary-link focus-ring-themed'
           eventName='homepage_hero_cta_clicked'
           eventProperties={{
             cta: 'secondary',
-            label: HERO_COPY.secondaryCta.label,
+            label: secondaryCta.label,
           }}
         >
-          {HERO_COPY.secondaryCta.label}
+          {secondaryCta.label}
           <ArrowRight aria-hidden='true' size={15} strokeWidth={1.9} />
         </HomepageTrackedLink>
-      )}
+      ) : null}
     </div>
   );
 }
