@@ -3,12 +3,14 @@
 import { Button, Input } from '@jovie/ui';
 import { ArrowDown, ArrowUp, Search, Settings2, X } from 'lucide-react';
 import type { FormEvent } from 'react';
-import { AppSearchField } from '@/components/molecules/AppSearchField';
 import {
   TableFilterDropdown,
   type TableFilterDropdownCategory,
 } from '@/components/molecules/filters';
-import { PageToolbarActionButton } from '@/components/organisms/table';
+import {
+  PageToolbar,
+  PageToolbarActionButton,
+} from '@/components/organisms/table';
 import {
   DisplayMenuDropdown,
   type ViewMode,
@@ -24,20 +26,19 @@ export interface TaskSubviewOption {
 }
 
 export interface TaskWorkspaceHeaderBarProps {
-  readonly mode: 'default' | 'search' | 'create';
-  readonly search: string;
+  readonly mode: 'default' | 'create';
   readonly draftTitle: string;
   readonly taskCount: number;
   readonly subviews: ReadonlyArray<TaskSubviewOption>;
   readonly activeSubview: TaskSubviewId;
   readonly onSubviewChange: (subview: TaskSubviewId) => void;
-  readonly onSearchChange: (value: string) => void;
   readonly onDraftTitleChange: (value: string) => void;
-  readonly onEnterSearch: () => void;
-  readonly onExitSearch: () => void;
   readonly onCancelCreate: () => void;
   readonly onSubmitCreate: (event: FormEvent<HTMLFormElement>) => void;
   readonly createPending: boolean;
+  readonly searchValue: string;
+  readonly onSearchValueChange: (value: string) => void;
+  readonly onClearSearch: () => void;
   readonly filterCategories: ReadonlyArray<TableFilterDropdownCategory>;
   readonly onClearFilters: () => void;
   readonly viewMode: ViewMode;
@@ -53,16 +54,15 @@ export interface TaskWorkspaceHeaderBarProps {
 
 export function TaskWorkspaceHeaderBar({
   mode,
-  search,
   draftTitle,
   taskCount,
-  onSearchChange,
   onDraftTitleChange,
-  onEnterSearch,
-  onExitSearch,
   onCancelCreate,
   onSubmitCreate,
   createPending,
+  searchValue,
+  onSearchValueChange,
+  onClearSearch,
   filterCategories,
   onClearFilters,
   viewMode,
@@ -80,150 +80,140 @@ export function TaskWorkspaceHeaderBar({
 }: Readonly<TaskWorkspaceHeaderBarProps>) {
   const createFormId = 'task-workspace-create-form';
 
-  return (
-    <div
-      data-testid='tasks-workspace-subheader'
-      className='flex h-[var(--linear-app-header-height-compact)] min-h-[var(--linear-app-header-height-compact)] items-center justify-between gap-3 px-app-header'
-    >
-      <div className='min-w-0 flex-1'>
-        {mode === 'search' && (
-          <AppSearchField
-            value={search}
-            onChange={onSearchChange}
-            onEscape={onExitSearch}
-            placeholder='Search Tasks'
-            ariaLabel='Search tasks'
-            autoFocus
-            className='h-8 max-w-[28rem] bg-transparent'
-            inputClassName='text-xs'
-          />
-        )}
-        {mode === 'create' && (
-          <form
-            id={createFormId}
-            onSubmit={onSubmitCreate}
-            className='flex min-w-0 items-center gap-2'
-          >
-            <Input
-              value={draftTitle}
-              onChange={event => onDraftTitleChange(event.target.value)}
-              placeholder='Draft press release, update bio, pitch sync supervisor...'
-              aria-label='New task name'
-              autoFocus
-              className='h-8 max-w-[32rem] min-w-0'
-            />
-          </form>
-        )}
-        {mode !== 'search' && mode !== 'create' && (
-          <TaskSubviewTabs
-            subviews={subviews}
-            activeSubview={activeSubview}
-            onSubviewChange={onSubviewChange}
-            taskCount={taskCount}
-          />
-        )}
-      </div>
+  const toolbarStart =
+    mode === 'create' ? (
+      <form
+        id={createFormId}
+        onSubmit={onSubmitCreate}
+        className='flex min-w-0 flex-1 items-center gap-2'
+      >
+        <Input
+          value={draftTitle}
+          onChange={event => onDraftTitleChange(event.target.value)}
+          placeholder='Draft press release, update bio, pitch sync supervisor...'
+          aria-label='New task name'
+          autoFocus
+          className='h-8 max-w-[32rem] min-w-0'
+        />
+      </form>
+    ) : (
+      <TaskSubviewTabs
+        subviews={subviews}
+        activeSubview={activeSubview}
+        onSubviewChange={onSubviewChange}
+        taskCount={taskCount}
+      />
+    );
 
-      <div className='flex shrink-0 items-center gap-1'>
-        {mode === 'create' ? (
-          <>
-            <Button
-              type='submit'
-              size='sm'
-              form={createFormId}
-              disabled={createPending || !draftTitle.trim()}
-              className='h-7 px-2.5'
-            >
-              Create
-            </Button>
-            <Button
+  const toolbarEnd =
+    mode === 'create' ? (
+      <>
+        <Button
+          type='submit'
+          size='sm'
+          form={createFormId}
+          disabled={createPending || !draftTitle.trim()}
+          className='h-7 px-2.5'
+        >
+          Create
+        </Button>
+        <Button
+          type='button'
+          variant='secondary'
+          size='sm'
+          onClick={onCancelCreate}
+          className='h-7 px-2.5'
+        >
+          Cancel
+        </Button>
+      </>
+    ) : (
+      <>
+        <div className='relative hidden h-7 w-[min(12rem,24vw)] min-w-[9rem] items-center lg:flex'>
+          <Search
+            className='pointer-events-none absolute bottom-0 left-2 top-0 my-auto h-3.5 w-3.5 text-quaternary-token'
+            aria-hidden='true'
+          />
+          <Input
+            type='search'
+            value={searchValue}
+            onChange={event => onSearchValueChange(event.target.value)}
+            placeholder='Search tasks'
+            aria-label='Search tasks'
+            className='h-7 w-full rounded-md border-border-token bg-surface-0 py-0 pl-7 pr-7 text-[12.5px] text-primary-token placeholder:text-quaternary-token'
+          />
+          {searchValue ? (
+            <button
               type='button'
-              variant='secondary'
-              size='sm'
-              onClick={onCancelCreate}
-              className='h-7 px-2.5'
+              aria-label='Clear task search'
+              onClick={onClearSearch}
+              className='absolute bottom-0 right-1 top-0 my-auto inline-flex h-5 w-5 items-center justify-center rounded text-quaternary-token transition-[background-color,color] hover:bg-surface-1 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-token'
             >
-              Cancel
-            </Button>
-          </>
-        ) : (
-          <>
-            {mode === 'search' ? (
-              <PageToolbarActionButton
-                ariaLabel='Close search'
-                label='Close search'
-                onClick={onExitSearch}
-                icon={<X className='h-3.5 w-3.5' />}
-                iconOnly
-                tooltipLabel='Close search'
-              />
-            ) : (
-              <PageToolbarActionButton
-                ariaLabel='Search tasks'
-                label='Search tasks'
-                onClick={onEnterSearch}
-                tooltipLabel='Search'
-                tooltipShortcut='/'
-                iconOnly
-                data-app-search-trigger='true'
-                icon={<Search className='h-3.5 w-3.5' />}
-              />
-            )}
-            <div className={cn(mode === 'search' && 'opacity-100')}>
-              <TableFilterDropdown
-                categories={filterCategories}
-                onClearAll={onClearFilters}
-                iconOnly
-                align='end'
-                shortcutHint='S'
-              />
-            </div>
-            <DisplayMenuDropdown
-              viewMode={viewMode}
-              availableViewModes={['board', 'list']}
-              onViewModeChange={onViewModeChange}
-              availableColumns={[{ id: 'cancelled', label: 'Cancelled' }]}
-              columnVisibility={{ cancelled: showCancelledColumn }}
-              onColumnVisibilityChange={(columnId, visible) => {
-                if (columnId === 'cancelled') {
-                  onShowCancelledColumnChange(visible);
-                }
-              }}
-              trigger={
-                <PageToolbarActionButton
-                  ariaLabel='Display options'
-                  label='Display options'
-                  tooltipLabel='Display'
-                  iconOnly
-                  icon={<Settings2 className='h-3.5 w-3.5' />}
-                />
-              }
+              <X className='h-3 w-3' aria-hidden='true' />
+            </button>
+          ) : null}
+        </div>
+        <TableFilterDropdown
+          categories={filterCategories}
+          onClearAll={onClearFilters}
+          iconOnly
+          align='end'
+          shortcutHint='S'
+        />
+        <DisplayMenuDropdown
+          viewMode={viewMode}
+          availableViewModes={['board', 'list']}
+          onViewModeChange={onViewModeChange}
+          availableColumns={[{ id: 'cancelled', label: 'Cancelled' }]}
+          columnVisibility={{ cancelled: showCancelledColumn }}
+          onColumnVisibilityChange={(columnId, visible) => {
+            if (columnId === 'cancelled') {
+              onShowCancelledColumnChange(visible);
+            }
+          }}
+          trigger={
+            <PageToolbarActionButton
+              ariaLabel='Display options'
+              label='Display options'
+              tooltipLabel='Display'
+              iconOnly
+              icon={<Settings2 className='h-3.5 w-3.5' />}
             />
-            {showTaskNavigation ? (
-              <div className='flex items-center gap-0.5'>
-                <PageToolbarActionButton
-                  ariaLabel='Previous task'
-                  label='Previous task'
-                  onClick={onSelectPrevious}
-                  tooltipLabel='Previous task'
-                  disabled={!canSelectPrevious}
-                  iconOnly
-                  icon={<ArrowUp className='h-3.5 w-3.5' />}
-                />
-                <PageToolbarActionButton
-                  ariaLabel='Next task'
-                  label='Next task'
-                  onClick={onSelectNext}
-                  tooltipLabel='Next task'
-                  disabled={!canSelectNext}
-                  iconOnly
-                  icon={<ArrowDown className='h-3.5 w-3.5' />}
-                />
-              </div>
-            ) : null}
-          </>
-        )}
-      </div>
+          }
+        />
+        {showTaskNavigation ? (
+          <div className='flex items-center gap-0.5'>
+            <PageToolbarActionButton
+              ariaLabel='Previous task'
+              label='Previous task'
+              onClick={onSelectPrevious}
+              tooltipLabel='Previous task'
+              disabled={!canSelectPrevious}
+              iconOnly
+              icon={<ArrowUp className='h-3.5 w-3.5' />}
+            />
+            <PageToolbarActionButton
+              ariaLabel='Next task'
+              label='Next task'
+              onClick={onSelectNext}
+              tooltipLabel='Next task'
+              disabled={!canSelectNext}
+              iconOnly
+              icon={<ArrowDown className='h-3.5 w-3.5' />}
+            />
+          </div>
+        ) : null}
+      </>
+    );
+
+  return (
+    <div data-testid='tasks-workspace-subheader' className='contents'>
+      <PageToolbar
+        start={toolbarStart}
+        end={toolbarEnd}
+        className='h-[var(--linear-app-header-height-compact)] min-h-[var(--linear-app-header-height-compact)]'
+        startClassName={mode === 'create' ? 'overflow-visible' : undefined}
+      />
     </div>
   );
 }

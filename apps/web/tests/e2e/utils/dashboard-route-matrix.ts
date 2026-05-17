@@ -91,7 +91,7 @@ const creatorRoutes = [
     resolver: resolveChatConversationPath,
   },
   {
-    path: APP_ROUTES.DASHBOARD_AUDIENCE,
+    path: APP_ROUTES.AUDIENCE,
     name: 'Audience',
     kind: 'render',
     surface: 'creator',
@@ -596,7 +596,7 @@ export const EXCLUDED_ROUTES: Record<string, string> = {
 const fastHealthPaths = new Set([
   APP_ROUTES.DASHBOARD,
   APP_ROUTES.CHAT,
-  APP_ROUTES.DASHBOARD_AUDIENCE,
+  APP_ROUTES.AUDIENCE,
   APP_ROUTES.DASHBOARD_RELEASES,
   APP_ROUTES.SETTINGS_ACCOUNT,
   APP_ROUTES.LEGACY_DASHBOARD,

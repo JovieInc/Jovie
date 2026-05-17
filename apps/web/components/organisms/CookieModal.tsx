@@ -23,6 +23,9 @@ import { APP_ROUTES } from '@/constants/routes';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { type Consent, saveConsent } from '@/lib/cookies/consent';
 
+const CONSENT_SAVE_ERROR =
+  'We could not save preferences. Check your connection and try again.';
+
 const COOKIE_CATEGORIES: ReadonlyArray<{
   id: keyof Consent;
   label: string;
@@ -136,22 +139,27 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
     return { essential: true, analytics: false, marketing: false };
   });
   const isMobile = useMediaQuery('(max-width: 639px)');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const handleCheckedChange = (key: keyof Consent, checked: boolean) => {
     if (key === 'essential') return;
+    setSaveError(null);
     setSettings(prev => ({ ...prev, [key]: checked }));
   };
 
-  const save = () => {
-    // Invoke the parent's onSave callback first so the banner hides and
-    // localStorage is updated synchronously, regardless of whether the
-    // server-side cookie write succeeds. The server action is best-effort.
-    onSave?.(settings);
-    onClose();
-    // Best-effort server-side persistence (httpOnly cookie). Errors are
-    // suppressed — the client-side localStorage write is the source of truth
-    // for subsequent page loads.
-    saveConsent(settings).catch(() => undefined);
+  const save = async () => {
+    setIsSaving(true);
+    setSaveError(null);
+    try {
+      await saveConsent(settings);
+      onSave?.(settings);
+      onClose();
+    } catch {
+      setSaveError(CONSENT_SAVE_ERROR);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   if (isMobile) {
@@ -184,6 +192,7 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
               variant='secondary'
               size='sm'
               onClick={onClose}
+              disabled={isSaving}
               className='flex-1'
             >
               Cancel
@@ -193,11 +202,20 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
               variant='primary'
               size='sm'
               onClick={save}
+              disabled={isSaving}
               className='flex-1'
             >
               Save preferences
             </Button>
           </SheetFooter>
+          {saveError ? (
+            <p
+              role='alert'
+              className='mt-3 text-center text-2xs text-secondary-token'
+            >
+              {saveError}
+            </p>
+          ) : null}
         </SheetContent>
       </Sheet>
     );
@@ -222,13 +240,33 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
           settings={settings}
           onCheckedChange={handleCheckedChange}
         />
+        {saveError ? (
+          <p
+            role='alert'
+            className='pt-3 text-center text-2xs text-secondary-token'
+          >
+            {saveError}
+          </p>
+        ) : null}
       </DialogBody>
 
       <DialogActions className='mt-3'>
-        <Button type='button' variant='secondary' size='sm' onClick={onClose}>
+        <Button
+          type='button'
+          variant='secondary'
+          size='sm'
+          onClick={onClose}
+          disabled={isSaving}
+        >
           Cancel
         </Button>
-        <Button type='button' variant='primary' size='sm' onClick={save}>
+        <Button
+          type='button'
+          variant='primary'
+          size='sm'
+          onClick={save}
+          disabled={isSaving}
+        >
           Save preferences
         </Button>
       </DialogActions>

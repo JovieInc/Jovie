@@ -33,7 +33,7 @@ function ToggleSwitch({
       role='switch'
       aria-checked={checked}
       onClick={onToggle}
-      className='flex w-full items-center justify-between gap-2 rounded px-1.5 py-1 transition-[background-color] duration-150 hover:bg-surface-1 focus-visible:bg-surface-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+      className='flex w-full items-center justify-between gap-2 rounded px-1.5 py-1 transition-[background-color] duration-subtle hover:bg-surface-1 focus-visible:bg-surface-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
     >
       <span className='text-app text-secondary-token'>{label}</span>
       <span
@@ -77,7 +77,7 @@ const ColumnToggleButton = memo(function ColumnToggleButton({
       aria-pressed={isVisible}
       aria-label={`${isVisible ? 'Hide' : 'Show'} ${label} column`}
       className={cn(
-        'rounded-full px-2 py-0.5 text-2xs font-caption transition-[background-color,color] duration-150 focus-visible:outline-none focus-visible:bg-surface-1',
+        'rounded-full px-2 py-0.5 text-2xs font-caption transition-[background-color,color] duration-subtle focus-visible:outline-none focus-visible:bg-surface-1',
         isVisible
           ? 'bg-surface-1 text-secondary-token'
           : 'text-tertiary-token hover:bg-surface-1 hover:text-secondary-token'
@@ -140,7 +140,7 @@ export function DisplayMenuDropdown({
   const defaultTrigger = (
     <button
       type='button'
-      className='inline-flex items-center gap-1.5 rounded-full border border-transparent px-2 py-1 text-app font-caption text-secondary-token transition-[background-color,border-color,color] duration-150 hover:border-subtle hover:bg-surface-1 hover:text-primary-token'
+      className='inline-flex items-center gap-1.5 rounded-full border border-transparent px-2 py-1 text-app font-caption text-secondary-token transition-[background-color,border-color,color] duration-subtle hover:border-subtle hover:bg-surface-1 hover:text-primary-token'
     >
       <Settings2 className='h-4 w-4' />
       Display
@@ -158,7 +158,7 @@ export function DisplayMenuDropdown({
           </span>
           <PopoverPrimitive.Close
             aria-label='Close'
-            className='rounded-full border border-transparent p-0.5 text-tertiary-token transition-[background-color,border-color,color] duration-150 hover:border-subtle hover:bg-surface-1 hover:text-secondary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1'
+            className='rounded-full border border-transparent p-0.5 text-tertiary-token transition-[background-color,border-color,color] duration-subtle hover:border-subtle hover:bg-surface-1 hover:text-secondary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1'
           >
             <X className='h-4 w-4' />
           </PopoverPrimitive.Close>
@@ -174,7 +174,7 @@ export function DisplayMenuDropdown({
               {/* Sliding background indicator */}
               <div
                 className={cn(
-                  'absolute inset-y-0.5 w-[calc(50%-2px)] rounded bg-surface-0 transition-all duration-200 ease-out',
+                  'absolute inset-y-0.5 w-[calc(50%-2px)] rounded bg-surface-0 transition-[left,background-color] duration-normal ease-out',
                   viewMode === 'list' ? 'left-0.5' : 'left-[calc(50%+0.5px)]'
                 )}
                 aria-hidden='true'
@@ -184,7 +184,7 @@ export function DisplayMenuDropdown({
                 type='button'
                 onClick={() => onViewModeChange?.('list')}
                 className={cn(
-                  'relative z-10 inline-flex flex-1 items-center justify-center gap-1.5 rounded px-2.5 py-1 text-xs font-caption transition-colors duration-150',
+                  'relative z-10 inline-flex flex-1 items-center justify-center gap-1.5 rounded px-2.5 py-1 text-xs font-caption transition-colors duration-subtle',
                   viewMode === 'list'
                     ? 'text-primary-token'
                     : 'text-tertiary-token hover:text-secondary-token'
@@ -200,7 +200,7 @@ export function DisplayMenuDropdown({
                 type='button'
                 onClick={() => onViewModeChange?.('board')}
                 className={cn(
-                  'relative z-10 inline-flex flex-1 items-center justify-center gap-1.5 rounded px-2.5 py-1 text-xs font-caption transition-colors duration-150',
+                  'relative z-10 inline-flex flex-1 items-center justify-center gap-1.5 rounded px-2.5 py-1 text-xs font-caption transition-colors duration-subtle',
                   viewMode === 'board'
                     ? 'text-primary-token'
                     : 'text-tertiary-token hover:text-secondary-token'

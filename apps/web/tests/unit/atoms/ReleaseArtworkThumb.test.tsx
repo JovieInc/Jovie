@@ -49,6 +49,27 @@ describe('ReleaseArtworkThumb', () => {
     expect(srOnly).toHaveClass('sr-only');
   });
 
+  it('uses deterministic restrained fallback style hooks', () => {
+    const first = render(<ReleaseArtworkThumb src={null} alt='Missing art' />);
+    const firstFallback = first.container.querySelector(
+      '[data-artwork-fallback="true"]'
+    ) as HTMLElement;
+    const firstStyle = firstFallback.getAttribute('style') ?? '';
+
+    const second = render(<ReleaseArtworkThumb src={null} alt='Missing art' />);
+    const secondFallback = second.container.querySelector(
+      '[data-artwork-fallback="true"]'
+    ) as HTMLElement;
+
+    expect(
+      firstFallback.style.getPropertyValue('--artwork-fallback-angle')
+    ).toBe(secondFallback.style.getPropertyValue('--artwork-fallback-angle'));
+    expect(firstStyle).toContain('--artwork-fallback-base: oklch(');
+    expect(firstStyle).toContain('--artwork-fallback-depth: oklch(');
+    expect(firstStyle).toContain('--artwork-fallback-accent: oklch(');
+    expect(firstStyle).not.toMatch(/cyan|teal|green/u);
+  });
+
   it('fires onError handler and shows fallback when image fails to load', () => {
     render(<ReleaseArtworkThumb src='/broken.jpg' alt='Broken' />);
     const img = screen.getByRole('img');

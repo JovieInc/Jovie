@@ -6,6 +6,7 @@ import {
   DropdownMenuContent,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  Input,
   UserAvatar,
 } from '@jovie/ui';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
@@ -18,6 +19,7 @@ import {
   Plus,
   Search,
   Trash2,
+  X,
 } from 'lucide-react';
 import {
   type ComponentPropsWithoutRef,
@@ -38,6 +40,7 @@ import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActio
 import { DashboardHeaderActionButton } from '@/components/features/dashboard/atoms/DashboardHeaderActionButton';
 import { DashboardHeaderActionGroup } from '@/components/features/dashboard/atoms/DashboardHeaderActionGroup';
 import { ReleaseTaskDueBadge } from '@/components/features/dashboard/release-tasks/ReleaseTaskDueBadge';
+import { TaskDataTable } from '@/components/features/dashboard/tasks/TaskDataTable';
 import { TaskDescriptionHelper } from '@/components/features/dashboard/tasks/TaskDescriptionHelper';
 import {
   PriorityBars,
@@ -48,6 +51,7 @@ import {
   useTextareaAutosize,
 } from '@/components/jovie/hooks/useTextareaAutosize';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
+import { EntitySidebarShell } from '@/components/molecules/drawer';
 import {
   TOOLBAR_MENU_CONTENT_CLASS,
   TOOLBAR_MENU_SEPARATOR_CLASS,
@@ -59,7 +63,6 @@ import { ReleaseSidebar } from '@/components/organisms/release-sidebar';
 import {
   type ContextMenuItemType,
   convertContextMenuItems,
-  UnifiedTable,
 } from '@/components/organisms/table';
 import {
   isFormElement,
@@ -73,7 +76,7 @@ import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { useAppFlag } from '@/lib/flags/client';
-import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
+import { useReleaseEntityQuery } from '@/lib/queries/useReleaseEntityQuery';
 import {
   useCreateTaskMutation,
   useDeleteTaskMutation,
@@ -126,10 +129,6 @@ function shouldIgnoreTaskShortcut(event: KeyboardEvent): boolean {
   );
 }
 
-function isTaskSearchShortcut(event: KeyboardEvent): boolean {
-  return event.key === '/' && !event.shiftKey && !isFormElement(event.target);
-}
-
 function isTaskRowNavigationAction(
   action: TableNavAction
 ): action is 'next' | 'prev' {
@@ -173,6 +172,7 @@ const TASK_WORKSPACE_PANE_CLASSNAME = 'min-h-0 overflow-hidden';
 const TASK_VIEW_MODES: Array<'board' | 'list'> = ['board', 'list'];
 
 type MobileTaskScope = 'all' | 'open' | 'done';
+type ReleasePanelStatus = 'loading' | 'error' | 'empty';
 
 const MOBILE_TASK_SCOPE_OPTIONS = [
   ['all', 'All'],
@@ -249,6 +249,69 @@ function resolveArtistName(
     profile?.username_normalized ??
     profile?.username ??
     null
+  );
+}
+
+function TaskReleasePanelStatus({
+  status,
+  onClose,
+  onRetry,
+}: Readonly<{
+  status: ReleasePanelStatus;
+  onClose: () => void;
+  onRetry?: () => void;
+}>) {
+  const copy = {
+    loading: {
+      title: 'Loading release',
+      body: 'Getting release context for this task.',
+    },
+    error: {
+      title: 'Release unavailable',
+      body: 'We hit a problem loading this release. Try again when the connection settles.',
+    },
+    empty: {
+      title: 'Release not found',
+      body: 'This task still has a release link, but the release is not available in this profile.',
+    },
+  } satisfies Record<ReleasePanelStatus, { title: string; body: string }>;
+
+  const state = copy[status];
+
+  return (
+    <EntitySidebarShell
+      isOpen
+      width={344}
+      ariaLabel='Release details'
+      title='Release'
+      onClose={onClose}
+      scrollStrategy='shell'
+      data-testid='task-release-panel-status'
+    >
+      <div
+        className='rounded-lg border border-subtle bg-surface-1 px-3 py-3'
+        data-testid={`task-release-panel-${status}`}
+      >
+        {status === 'loading' ? (
+          <div className='mb-3 h-20 rounded-md skeleton' aria-hidden='true' />
+        ) : null}
+        <p className='text-sm font-medium text-primary-token'>{state.title}</p>
+        <p className='mt-1 text-xs leading-5 text-secondary-token'>
+          {state.body}
+        </p>
+        {status === 'error' && onRetry ? (
+          <Button
+            type='button'
+            size='sm'
+            variant='secondary'
+            className='mt-3'
+            onClick={onRetry}
+          >
+            Retry
+          </Button>
+        ) : null}
+      </div>
+    </EntitySidebarShell>
   );
 }
 
@@ -870,7 +933,7 @@ function TaskEmptyState({
               variant='secondary'
               size='sm'
               onClick={() => {
-                globalThis.location.href = APP_ROUTES.DASHBOARD_RELEASES;
+                globalThis.location.href = APP_ROUTES.RELEASES;
               }}
             >
               Set Up Release
@@ -1211,9 +1274,7 @@ export function TasksPageClient() {
   const canShowTaskDocumentAlongsideReleaseSidebar = useMediaQuery(
     '(min-width: 1720px)'
   );
-  const [headerMode, setHeaderMode] = useState<'default' | 'search' | 'create'>(
-    'default'
-  );
+  const [headerMode, setHeaderMode] = useState<'default' | 'create'>('default');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all'>('all');
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | 'all'>(
@@ -1255,7 +1316,10 @@ export function TasksPageClient() {
   const { mutateAsync: deleteTaskAsync } = deleteTaskMutation;
   const { mutate: updateTask } = updateTaskMutation;
   const { mutate: moveTask } = moveTaskMutation;
-  const { data: releases = [] } = useReleasesQuery(profileId ?? '');
+  const selectedReleaseQuery = useReleaseEntityQuery(
+    profileId ?? '',
+    selectedReleaseId ?? ''
+  );
   const searchFilter = deferredSearch.trim();
   const listFilters = useMemo<TaskFilters>(
     () => ({
@@ -1391,10 +1455,9 @@ export function TasksPageClient() {
     boardTasks.find(task => task.id === effectiveSelectedTaskId) ??
     tasks.find(task => task.id === effectiveSelectedTaskId) ??
     null;
-  const selectedRelease =
-    releases.find(release => release.id === selectedReleaseId) ?? null;
+  const selectedRelease = selectedReleaseQuery.data ?? null;
   const shouldPrioritizeRightPanel =
-    Boolean(selectedRelease) && !canShowTaskDocumentAlongsideReleaseSidebar;
+    Boolean(selectedReleaseId) && !canShowTaskDocumentAlongsideReleaseSidebar;
   const artistName = resolveArtistName(selectedProfile);
   const hasFilters =
     Boolean(deferredSearch.trim()) ||
@@ -1735,12 +1798,6 @@ export function TasksPageClient() {
     function handleKeyDown(event: KeyboardEvent) {
       if (shouldIgnoreTaskShortcut(event)) return;
 
-      if (isTaskSearchShortcut(event)) {
-        event.preventDefault();
-        setHeaderMode('search');
-        return;
-      }
-
       const action = resolveTableNavAction(event.key, event.target);
       if (action === 'close') {
         handleCloseShortcut(event);
@@ -1758,16 +1815,34 @@ export function TasksPageClient() {
     };
   }, [handleCloseShortcut, handleRowNavigationShortcut]);
 
-  const sidebarPanel = selectedRelease ? (
-    <ReleaseSidebar
-      release={selectedRelease}
-      mode='admin'
-      isOpen
-      providerConfig={providerConfig}
-      artistName={artistName}
-      readOnly
-      onClose={() => setSelectedReleaseId(null)}
-    />
+  const closeReleaseSidebar = useCallback(() => {
+    setSelectedReleaseId(null);
+  }, []);
+
+  const sidebarPanel = selectedReleaseId ? (
+    selectedRelease ? (
+      <ReleaseSidebar
+        release={selectedRelease}
+        mode='admin'
+        isOpen
+        providerConfig={providerConfig}
+        artistName={artistName}
+        readOnly
+        onClose={closeReleaseSidebar}
+      />
+    ) : (
+      <TaskReleasePanelStatus
+        status={
+          selectedReleaseQuery.isError
+            ? 'error'
+            : selectedReleaseQuery.isLoading
+              ? 'loading'
+              : 'empty'
+        }
+        onClose={closeReleaseSidebar}
+        onRetry={() => void selectedReleaseQuery.refetch()}
+      />
+    )
   ) : null;
   useRegisterRightPanel(sidebarPanel);
 
@@ -1891,25 +1966,13 @@ export function TasksPageClient() {
     );
   } else if (isDesktopTaskLayout) {
     desktopTaskPane = (
-      <UnifiedTable
+      <TaskDataTable
         data={visibleTasks}
         columns={columns}
         isLoading={isLoading}
         getRowId={row => row.id}
-        hideHeader
-        enableVirtualization={false}
-        rowHeight={64}
-        skeletonRows={8}
-        className='text-app'
-        containerClassName='h-full overflow-y-auto overflow-x-hidden px-2.5 pb-2 pt-0.5'
-        minWidth='100%'
         onRowClick={row => openTaskDocument(row)}
         getContextMenuItems={getTaskContextMenuItems}
-        getRowClassName={_row =>
-          cn(
-            'group/task-row bg-transparent shadow-none hover:bg-transparent focus-within:shadow-none focus-visible:bg-transparent focus-visible:shadow-none'
-          )
-        }
         emptyState={
           <TaskEmptyState
             hasFilters={hasFilters}
@@ -1980,7 +2043,6 @@ export function TasksPageClient() {
           isDesktopTaskLayout || headerMode !== 'default' ? (
             <TaskWorkspaceHeaderBar
               mode={headerMode}
-              search={search}
               draftTitle={draftTitle}
               taskCount={
                 isBoardMode ? visibleBoardTaskCount : visibleTasks.length
@@ -1988,21 +2050,16 @@ export function TasksPageClient() {
               subviews={taskSubviewOptions}
               activeSubview={activeTaskSubview}
               onSubviewChange={setTaskSubview}
-              onSearchChange={value => {
-                setSearch(value);
-                if (headerMode === 'default') {
-                  setHeaderMode('search');
-                }
-              }}
               onDraftTitleChange={setDraftTitle}
-              onEnterSearch={() => setHeaderMode('search')}
-              onExitSearch={() => setHeaderMode('default')}
               onCancelCreate={() => {
                 setDraftTitle('');
                 setHeaderMode('default');
               }}
               onSubmitCreate={handleCreateTask}
               createPending={createTaskMutation.isPending}
+              searchValue={search}
+              onSearchValueChange={setSearch}
+              onClearSearch={() => setSearch('')}
               filterCategories={taskFilterCategories}
               onClearFilters={clearFilters}
               viewMode={viewMode}
@@ -2064,24 +2121,34 @@ export function TasksPageClient() {
                     className='flex h-full min-h-0 flex-col overflow-hidden'
                     data-testid='mobile-task-list'
                   >
-                    <div className='flex items-center justify-between px-4 pb-1 pt-3'>
-                      <div>
-                        <p className='text-xs text-secondary-token'>
-                          {mobileScopeCounts.all} total tasks
-                        </p>
+                    <div className='flex items-center justify-between gap-3 px-4 pb-1 pt-3'>
+                      <p className='text-xs text-secondary-token'>
+                        {mobileScopeCounts.all} total tasks
+                      </p>
+                      <div className='relative w-[min(12rem,48vw)] min-w-[8.5rem]'>
+                        <Search
+                          className='pointer-events-none absolute bottom-0 left-2 top-0 my-auto h-3.5 w-3.5 text-quaternary-token'
+                          aria-hidden='true'
+                        />
+                        <Input
+                          type='search'
+                          value={search}
+                          onChange={event => setSearch(event.target.value)}
+                          placeholder='Search tasks'
+                          aria-label='Search tasks'
+                          className='h-7 w-full rounded-md border-border-token bg-surface-0 py-0 pl-7 pr-7 text-[12.5px] text-primary-token placeholder:text-quaternary-token'
+                        />
+                        {search ? (
+                          <button
+                            type='button'
+                            aria-label='Clear task search'
+                            onClick={() => setSearch('')}
+                            className='absolute bottom-0 right-1 top-0 my-auto inline-flex h-5 w-5 items-center justify-center rounded text-quaternary-token transition-[background-color,color] hover:bg-surface-1 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-token'
+                          >
+                            <X className='h-3 w-3' aria-hidden='true' />
+                          </button>
+                        ) : null}
                       </div>
-                      <button
-                        type='button'
-                        onClick={() =>
-                          setHeaderMode(current =>
-                            current === 'search' ? 'default' : 'search'
-                          )
-                        }
-                        aria-label='Search tasks'
-                        className='inline-flex h-10 w-10 items-center justify-center rounded-full bg-surface-1 text-secondary-token transition-[background-color,color] duration-subtle hover:bg-surface-0 hover:text-primary-token'
-                      >
-                        <Search className='h-4 w-4' />
-                      </button>
                     </div>
                     <TaskSubviewTabs
                       subviews={taskSubviewOptions}

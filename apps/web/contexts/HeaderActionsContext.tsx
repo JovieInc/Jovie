@@ -31,6 +31,10 @@ export interface HeaderSearchAdapter {
   readonly artistOptions: readonly string[];
   readonly titleOptions: readonly string[];
   readonly albumOptions: readonly string[];
+  /** Distinct status values surfaced as suggestions. Defaults to release statuses. */
+  readonly statusOptions?: readonly string[];
+  /** Distinct "has" values surfaced as suggestions. Defaults to release asset tags. */
+  readonly hasOptions?: readonly string[];
   /** Total rows the underlying data set has, before filters apply. */
   readonly totalCount: number;
   /** Rows visible after filters apply. Defaults to `totalCount` when omitted. */

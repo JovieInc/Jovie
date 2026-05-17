@@ -3,6 +3,20 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { JovieChat } from '@/components/jovie/JovieChat';
 import { renderWithQueryClient } from '@/tests/utils/test-utils';
 
+const mockCapabilitiesQueryState = vi.hoisted(() => ({
+  data: {
+    tools: {
+      albumArt: {
+        availability: 'unavailable' as const,
+        reason: 'Album art generation is not available for this profile.',
+        reasonCode: 'PROFILE_REQUIRED',
+      },
+    },
+  },
+  isLoading: false,
+  isError: false,
+}));
+
 const mockChatState = {
   input: '',
   setInput: vi.fn(),
@@ -83,6 +97,18 @@ vi.mock('@/components/jovie/hooks', () => ({
   }),
 }));
 
+vi.mock('@/lib/queries', () => ({
+  queryKeys: {
+    releases: {
+      matrix: (profileId: string) => ['releases', 'matrix', profileId],
+    },
+    events: {
+      list: (profileId: string) => ['events', 'list', profileId],
+    },
+  },
+  useChatCapabilitiesQuery: () => mockCapabilitiesQueryState,
+}));
+
 vi.mock('@/components/jovie/components', async () => {
   const actual = await vi.importActual<
     typeof import('@/components/jovie/components')
@@ -108,21 +134,33 @@ describe('JovieChat empty state', () => {
     mockChatState.hasMessages = false;
     mockChatState.isLoading = false;
     mockChatState.isSubmitting = false;
+    mockCapabilitiesQueryState.data = {
+      tools: {
+        albumArt: {
+          availability: 'unavailable',
+          reason: 'Album art generation is not available for this profile.',
+          reasonCode: 'PROFILE_REQUIRED',
+        },
+      },
+    };
+    mockCapabilitiesQueryState.isLoading = false;
+    mockCapabilitiesQueryState.isError = false;
   });
 
   it('renders the minimal welcome state with hero-style heading, pills, and composer', () => {
-    const { getByTestId, getByText, queryByText } = renderWithQueryClient(
-      <JovieChat profileId='profile-1' />
-    );
+    const { getByRole, getByTestId, getByText, queryByText } =
+      renderWithQueryClient(<JovieChat profileId='profile-1' />);
 
-    expect(getByText('Welcome Back')).toBeTruthy();
-    expect(queryByText('Welcome to Jovie')).toBeNull();
+    expect(getByText('What are we working on?')).toBeTruthy();
+    expect(queryByText('Welcome back')).toBeNull();
+    expect(queryByText('Welcome back, Tim')).toBeNull();
+    expect(queryByText("Hey, I'm Jovie")).toBeNull();
     expect(queryByText('Jovie Assistant')).toBeNull();
     expect(queryByText('Ask anything or tell Jovie what you need')).toBeNull();
     expect(getByTestId('chat-input')).toBeTruthy();
     // New hero-style pills sourced from DEFAULT_SUGGESTIONS (mirrors homepage).
     expect(getByText('Plan a release')).toBeTruthy();
-    expect(getByText('Generate album art')).toBeTruthy();
+    expect(getByRole('button', { name: 'Generate album art' })).toBeDisabled();
     expect(getByText('Pitch playlists')).toBeTruthy();
     // Old task-list-style actions should NOT appear — they belong in the profile switcher.
     expect(queryByText('Preview profile')).toBeNull();
@@ -130,12 +168,23 @@ describe('JovieChat empty state', () => {
     expect(queryByText('Release link')).toBeNull();
   });
 
+  it('shows an enabled draft brief action when album art is unavailable', () => {
+    const { getByRole } = renderWithQueryClient(
+      <JovieChat profileId='profile-1' />
+    );
+
+    expect(getByRole('button', { name: 'Generate album art' })).toBeDisabled();
+    expect(
+      getByRole('button', { name: 'Draft album-art brief' })
+    ).toBeEnabled();
+  });
+
   it('renders first-session greeting for new users', () => {
     const { getByText } = renderWithQueryClient(
       <JovieChat profileId='profile-1' isFirstSession />
     );
 
-    expect(getByText('Welcome to Jovie')).toBeTruthy();
+    expect(getByText("Hey, I'm Jovie")).toBeTruthy();
   });
 
   it('uses only the first name in the returning-user welcome heading', () => {
@@ -143,8 +192,22 @@ describe('JovieChat empty state', () => {
       <JovieChat profileId='profile-1' displayName='Tim White' />
     );
 
-    expect(getByText('Welcome Back Tim')).toBeTruthy();
-    expect(queryByText('Welcome Back Tim White')).toBeNull();
+    expect(getByText('What are we working on, Tim?')).toBeTruthy();
+    expect(queryByText('Welcome back')).toBeNull();
+    expect(queryByText('Welcome back, Tim')).toBeNull();
+    expect(queryByText('Welcome back, Tim White')).toBeNull();
+  });
+
+  it('disables album art while capability is unknown without showing the draft brief action', () => {
+    mockCapabilitiesQueryState.data = undefined;
+    mockCapabilitiesQueryState.isLoading = true;
+
+    const { getByRole, queryByRole } = renderWithQueryClient(
+      <JovieChat profileId='profile-1' />
+    );
+
+    expect(getByRole('button', { name: 'Generate album art' })).toBeDisabled();
+    expect(queryByRole('button', { name: 'Draft album-art brief' })).toBeNull();
   });
 
   it('renders chat messages after in-place message array updates', () => {
@@ -153,7 +216,8 @@ describe('JovieChat empty state', () => {
       <JovieChat profileId='profile-1' />
     );
 
-    expect(queryByText('Welcome Back')).toBeTruthy();
+    expect(queryByText('What are we working on?')).toBeTruthy();
+    expect(queryByText('Welcome back')).toBeNull();
 
     messages.push(
       {
@@ -173,7 +237,8 @@ describe('JovieChat empty state', () => {
 
     rerender(<JovieChat profileId='profile-1' />);
 
-    expect(queryByText('Welcome Back')).toBeNull();
+    expect(queryByText('What are we working on?')).toBeNull();
+    expect(queryByText('Welcome back')).toBeNull();
     expect(getAllByTestId('chat-message')).toHaveLength(2);
   });
 });

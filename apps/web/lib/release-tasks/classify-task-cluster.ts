@@ -1,5 +1,5 @@
 import 'server-only';
-import Anthropic from '@anthropic-ai/sdk';
+import { getAnthropicClient } from '@/lib/ai/anthropic';
 import { captureError } from '@/lib/error-tracking';
 import { withTimeout } from '@/lib/resilience/primitives';
 
@@ -99,7 +99,7 @@ export async function classifyTaskCluster(
   const prompt = buildPrompt(userText, clusters);
 
   const runReal = async (): Promise<{ text: string } | null> => {
-    const anthropic = new Anthropic();
+    const anthropic = getAnthropicClient();
     const message = await withTimeout(
       anthropic.messages.create({
         model: 'claude-haiku-4-5-20251001',

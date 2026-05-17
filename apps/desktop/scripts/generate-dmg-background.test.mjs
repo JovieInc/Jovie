@@ -21,13 +21,16 @@ test('desktop build year never falls behind the first production year', () => {
 });
 
 test('dmg background uses the generated year and installer geometry', () => {
-  const svg = buildDmgBackgroundSvg({ year: 2028 });
+  const iconDataUri = 'data:image/png;base64,am92aWU=';
+  const svg = buildDmgBackgroundSvg({ year: 2028, appIconDataUri: iconDataUri });
 
   assert.match(svg, new RegExp(`width="${WIDTH}" height="${HEIGHT}"`));
   assert.match(svg, /&#169; 2028/);
   assert.match(svg, /Jovie Technology Inc\./);
   assert.match(svg, /Built for artists/);
   assert.match(svg, /Drag Jovie to Applications/);
+  assert.match(svg, new RegExp(`href="${iconDataUri}"`));
+  assert.doesNotMatch(svg, /M31 10A20 20 0 0 0 11 30H31V10Z/);
   assert.doesNotMatch(svg, /&#169; 2025/);
 });
 

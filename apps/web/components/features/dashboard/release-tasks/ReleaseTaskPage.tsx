@@ -1,6 +1,12 @@
 'use client';
 
+import { ChevronRight } from 'lucide-react';
 import { useMemo } from 'react';
+import { PageShell } from '@/components/organisms/PageShell';
+import {
+  PAGE_TOOLBAR_META_TEXT_CLASS,
+  PageToolbar,
+} from '@/components/organisms/table';
 import { useTaskToggleMutation } from '@/lib/queries/useReleaseTaskMutations';
 import { useReleaseTasksQuery } from '@/lib/queries/useReleaseTasksQuery';
 import type { ReleaseTaskView } from '@/lib/release-tasks/types';
@@ -36,6 +42,30 @@ function getUpNextTasks(tasks: ReleaseTaskView[]): ReleaseTaskView[] {
     .slice(0, 3);
 }
 
+function ReleaseTaskBreadcrumbs({
+  releaseTitle,
+}: Readonly<{ releaseTitle: string }>) {
+  return (
+    <div className='flex min-w-0 items-center gap-1.5'>
+      <span className='shrink-0 text-tertiary-token'>Releases</span>
+      <ChevronRight
+        className='h-3 w-3 shrink-0 text-quaternary-token'
+        strokeWidth={2}
+        aria-hidden='true'
+      />
+      <span className='max-w-[min(46vw,20rem)] truncate text-secondary-token'>
+        {releaseTitle}
+      </span>
+      <ChevronRight
+        className='h-3 w-3 shrink-0 text-quaternary-token'
+        strokeWidth={2}
+        aria-hidden='true'
+      />
+      <span className='shrink-0 text-primary-token'>Tasks</span>
+    </div>
+  );
+}
+
 export function ReleaseTaskPage({
   profileId,
   releaseId,
@@ -59,55 +89,98 @@ export function ReleaseTaskPage({
   };
 
   return (
-    <div
-      className='mx-auto max-w-2xl px-4 py-6'
+    <PageShell
+      aria-label={`${releaseTitle} tasks`}
+      contentClassName='overflow-y-auto overflow-x-hidden'
+      contentPadding='none'
+      frame='content-container'
       data-testid='release-task-page'
-    >
-      {/* Breadcrumb */}
-      <nav className='mb-4 text-xs text-tertiary-token'>
-        <span className='hover:text-secondary-token cursor-pointer'>
-          Releases
-        </span>
-        <span className='mx-1.5'>/</span>
-        <span className='hover:text-secondary-token cursor-pointer'>
-          {releaseTitle}
-        </span>
-        <span className='mx-1.5'>/</span>
-        <span className='text-primary-token'>Tasks</span>
-      </nav>
-
-      {showMetadataAgentPanel ? (
-        <MetadataAgentPanel
-          profileId={profileId}
-          releaseId={releaseId}
-          releaseTitle={releaseTitle}
+      toolbar={
+        <PageToolbar
+          start={
+            <div className={PAGE_TOOLBAR_META_TEXT_CLASS}>
+              <ReleaseTaskBreadcrumbs releaseTitle={releaseTitle} />
+            </div>
+          }
         />
-      ) : null}
+      }
+    >
+      <div className='mx-auto flex w-full max-w-3xl flex-col gap-5 px-3 py-3 sm:px-4 lg:px-5'>
+        {showMetadataAgentPanel ? (
+          <MetadataAgentPanel
+            profileId={profileId}
+            releaseId={releaseId}
+            releaseTitle={releaseTitle}
+          />
+        ) : null}
 
-      {/* Up Next section (only when tasks exist and not all done) */}
-      {upNextTasks.length > 0 && !allDone && (
-        <div className='mb-6'>
-          <h3 className='px-4 text-2xs font-medium uppercase tracking-wider text-tertiary-token mb-2'>
-            Up Next
-          </h3>
-          <div className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-1'>
-            {upNextTasks.map(task => (
-              <ReleaseTaskRow
-                key={task.id}
-                task={task}
-                onToggle={handleToggle}
-              />
-            ))}
-          </div>
+        {upNextTasks.length > 0 && !allDone && (
+          <section aria-label='Up next' className='space-y-2'>
+            <h2 className='px-1 text-xs font-medium text-secondary-token'>
+              Up next
+            </h2>
+            <div className='rounded-lg border border-subtle bg-surface-1 p-1 shadow-app-control'>
+              {upNextTasks.map(task => (
+                <ReleaseTaskRow
+                  key={task.id}
+                  task={task}
+                  onToggle={handleToggle}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
+        <div className='min-w-0'>
+          <ReleaseTaskChecklist
+            releaseId={releaseId}
+            variant='full'
+            releaseDate={releaseDate}
+          />
         </div>
-      )}
+      </div>
+    </PageShell>
+  );
+}
 
-      {/* Main checklist */}
-      <ReleaseTaskChecklist
-        releaseId={releaseId}
-        variant='full'
-        releaseDate={releaseDate}
-      />
-    </div>
+export function ReleaseTaskPageSkeleton() {
+  return (
+    <PageShell
+      aria-busy='true'
+      aria-label='Loading release tasks'
+      contentClassName='overflow-y-auto overflow-x-hidden'
+      contentPadding='none'
+      frame='content-container'
+      toolbar={
+        <PageToolbar
+          start={
+            <div className='flex items-center gap-1.5'>
+              <div className='skeleton h-3 w-14 rounded' />
+              <div className='skeleton h-3 w-3 rounded' />
+              <div className='skeleton h-3 w-28 rounded' />
+              <div className='skeleton h-3 w-3 rounded' />
+              <div className='skeleton h-3 w-10 rounded' />
+            </div>
+          }
+        />
+      }
+    >
+      <div className='mx-auto flex w-full max-w-3xl flex-col gap-5 px-3 py-3 sm:px-4 lg:px-5'>
+        <div className='rounded-lg border border-subtle bg-surface-1 p-3 shadow-app-control'>
+          <div className='mb-2 h-3 w-24 rounded bg-surface-2' />
+          <div className='h-1 w-full rounded-full bg-surface-2' />
+        </div>
+
+        <div className='space-y-3'>
+          {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+            <div
+              key={i}
+              className='h-10 animate-pulse rounded-lg bg-surface-1'
+              style={{ opacity: 1 - i * 0.08 }}
+            />
+          ))}
+        </div>
+      </div>
+    </PageShell>
   );
 }

@@ -39,6 +39,15 @@ describe('dropDateMeta', () => {
     });
   });
 
+  it('formats multi-year past dates as years instead of raw days', () => {
+    const out = dropDateMeta('2020-04-24T12:00:00Z', NOW);
+    expect(out).toEqual({
+      label: '6y ago',
+      tone: 'past',
+    });
+    expect(out.label).not.toMatch(/^\d{4,}d ago$/u);
+  });
+
   it('formats inside-a-week future as Drops in Nd with soon tone', () => {
     expect(dropDateMeta('2026-04-30T12:00:00Z', NOW)).toEqual({
       label: 'Drops in 5d',

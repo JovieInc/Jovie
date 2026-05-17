@@ -280,11 +280,19 @@ async function clickOptionalFirstVisibleAppLink(
     const link = links.nth(index);
     if (!(await link.isVisible().catch(() => false))) continue;
 
-    await link.click({ noWaitAfter: true });
-    await page.waitForURL(url => expectedPathnames.includes(url.pathname), {
-      timeout: 60_000,
-      waitUntil: 'commit',
-    });
+    const currentPathname = new URL(page.url()).pathname;
+    const waitForTargetRoute = expectedPathnames.includes(currentPathname)
+      ? Promise.resolve()
+      : page.waitForURL(url => expectedPathnames.includes(url.pathname), {
+          timeout: 60_000,
+          waitUntil: 'commit',
+        });
+
+    await Promise.all([waitForTargetRoute, link.click({ noWaitAfter: true })]);
+    await expect(page).toHaveURL(
+      url => expectedPathnames.includes(url.pathname),
+      { timeout: 60_000 }
+    );
     return true;
   }
 

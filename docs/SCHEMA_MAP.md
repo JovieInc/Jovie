@@ -12,7 +12,7 @@ All schema files live in `apps/web/lib/db/schema/`. Import tables and types from
 |-------------|--------|---------------|
 | `agents.ts` | `skills_catalog`, `tools_catalog`, `retouch_jobs` | `skills_catalog.id` is the slug PK (e.g. `retouch`); `tools_catalog.id` same; `retouch_jobs.userId` → `users` cascade |
 
-**Sync:** `skills_catalog` and `tools_catalog` are upserted from `SKILL_REGISTRY` / `TOOL_REGISTRY` at deploy time by `apps/web/scripts/sync-skills-catalog.ts` (wired into `postbuild`). Do not hand-edit these rows.
+**Sync:** `skills_catalog` and `tools_catalog` are upserted from `SKILL_REGISTRY` at deploy time by `apps/web/scripts/sync-skills-catalog.ts` (wired into `postbuild`). Do not hand-edit these rows.
 
 **Enums:** `skillKindEnum` (`vertical_agent`, `tool`, `style`); `retouchJobStatusEnum` (`queued`, `running`, `identity_check_failed`, `identity_check_retrying`, `completed`, `failed`, `rejected_by_user`, `accepted_by_user`).
 

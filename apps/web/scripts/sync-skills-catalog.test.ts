@@ -8,19 +8,30 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SKILL_REGISTRY } from '@/lib/agents/registry';
+import { main, syncSkillsCatalog } from './sync-skills-catalog';
 
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
 
-// Capture insert calls for assertion
-const capturedInserts: Array<{ table: string; values: unknown }> = [];
+const mockEnv = vi.hoisted(() => ({
+  DATABASE_URL: 'postgres://unit-test' as string | undefined,
+}));
 
-const mockOnConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
-const mockInsert = vi.fn().mockReturnValue({
-  values: vi.fn().mockReturnValue({
-    onConflictDoUpdate: mockOnConflictDoUpdate,
-  }),
+const { mockInsert, mockOnConflictDoUpdate, mockValues } = vi.hoisted(() => {
+  const onConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
+  const values = vi.fn().mockReturnValue({
+    onConflictDoUpdate,
+  });
+  const insert = vi.fn().mockReturnValue({
+    values,
+  });
+
+  return {
+    mockInsert: insert,
+    mockOnConflictDoUpdate: onConflictDoUpdate,
+    mockValues: values,
+  };
 });
 
 vi.mock('@/lib/db', () => ({
@@ -29,17 +40,8 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
-vi.mock('drizzle-orm', async importOriginal => {
-  const actual = await importOriginal<typeof import('drizzle-orm')>();
-  return {
-    ...actual,
-    sql: actual.sql,
-  };
-});
-
-vi.mock('@/lib/db/schema/agents', () => ({
-  skillsCatalog: { id: 'skills_catalog_mock_table' },
-  toolsCatalog: { id: 'tools_catalog_mock_table' },
+vi.mock('@/lib/env-server', () => ({
+  env: mockEnv,
 }));
 
 // ---------------------------------------------------------------------------
@@ -49,7 +51,7 @@ vi.mock('@/lib/db/schema/agents', () => ({
 describe('sync-skills-catalog', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    capturedInserts.length = 0;
+    mockEnv.DATABASE_URL = 'postgres://unit-test';
   });
 
   it('SKILL_REGISTRY exports at least one non-tool skill', () => {
@@ -83,5 +85,32 @@ describe('sync-skills-catalog', () => {
       s => s.kind === 'tool'
     ).length;
     expect(toolCount).toBe(0);
+  });
+
+  it('upserts non-tool skills with conflict guards', async () => {
+    await syncSkillsCatalog();
+
+    expect(mockInsert).toHaveBeenCalledTimes(1);
+    const insertedRows = mockValues.mock.calls[0]?.[0];
+
+    expect(insertedRows).toEqual([
+      expect.objectContaining({
+        id: 'retouch',
+        kind: 'vertical_agent',
+        entitlementRequired: 'ai_retouching',
+      }),
+    ]);
+    expect(mockOnConflictDoUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        setWhere: expect.anything(),
+      })
+    );
+  });
+
+  it('skips DB writes when DATABASE_URL is unavailable', async () => {
+    mockEnv.DATABASE_URL = undefined;
+
+    await expect(main()).resolves.toBe('skipped');
+    expect(mockInsert).not.toHaveBeenCalled();
   });
 });

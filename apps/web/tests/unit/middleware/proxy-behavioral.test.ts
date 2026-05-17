@@ -113,9 +113,11 @@ vi.mock('@clerk/nextjs/server', () => ({
 vi.mock('@/constants/app', () => ({
   AUDIENCE_ANON_COOKIE: 'audience_anon',
   AUDIENCE_IDENTIFIED_COOKIE: 'audience_identified',
+  AUDIENCE_SPOTIFY_PREFERRED_COOKIE: 'audience_spotify_preferred',
   COUNTRY_CODE_COOKIE: 'country_code',
   HOMEPAGE_CITY_COOKIE: 'homepage_city',
   HOMEPAGE_REGION_COOKIE: 'homepage_region',
+  LISTEN_COOKIE: 'listen_cookie',
 }));
 vi.mock('@/constants/domains', () => ({
   BASE_URL: 'https://jov.ie',
@@ -200,6 +202,40 @@ describe('proxy.ts middleware', () => {
   });
 
   // ==========================================================================
+  // Scanner probe drop (JOV-2189) — must be the earliest exit so probes
+  // never reach Clerk, DB lookups, or the page handler.
+  // ==========================================================================
+  describe('scanner probe drop', () => {
+    it.each([
+      '/some-creator/wp-content/plugins/hellopress/wp_filemanager.php',
+      '/timwhite/wp-admin/install.php',
+      '/xmlrpc.php',
+      '/.env',
+      '/some/random.php',
+    ])('returns 404 for probe path %s without invoking Clerk', async path => {
+      const req = createUnauthenticatedRequest({ pathname: path });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBe(404);
+      // Critical: probe must not touch auth or DB; if any of these were
+      // called the early-return failed and the request leaked deeper.
+      expect(mocks.resolveTestBypassUserId).not.toHaveBeenCalled();
+      expect(mocks.getUserState).not.toHaveBeenCalled();
+      expect(mocks.shouldBypassClerkForRequest).not.toHaveBeenCalled();
+    });
+
+    it('still serves a legitimate profile path that contains no probe markers', async () => {
+      const req = createUnauthenticatedRequest({
+        pathname: '/timwhite/listen',
+      });
+      const res = await callMiddleware(req);
+      // Anything other than the 404 drop response means the probe gate
+      // correctly let real traffic through.
+      expect(res.status).not.toBe(404);
+    });
+  });
+
+  // ==========================================================================
   // Cookie Banner Geo-Detection
   // ==========================================================================
   describe('cookie banner geo-detection', () => {
@@ -215,6 +251,136 @@ describe('proxy.ts middleware', () => {
       expect(mocks.isCookieBannerRequired).toHaveBeenCalledWith('DE', null);
       const cookies = getResponseCookies(res);
       expect(cookies.jv_cc_required).toBe('1');
+    });
+
+    it('keeps only pre-consent cookies for consent-required visitors without consent', async () => {
+      mocks.isCookieBannerRequired.mockReturnValue(true);
+
+      const req = createUnauthenticatedRequest({
+        pathname: '/',
+        headers: {
+          'x-vercel-ip-country': 'DE',
+          'x-vercel-ip-city': 'Berlin',
+          'x-vercel-ip-country-region': 'BE',
+        },
+      });
+      const res = await callMiddleware(req);
+
+      const cookies = getResponseCookies(res);
+      expect(cookies.jv_cc_required).toBe('1');
+      expect(cookies.country_code).toBe('DE');
+      expect(cookies.homepage_city).toBeUndefined();
+      expect(cookies.homepage_region).toBeUndefined();
+      expect(cookies.audience_anon).toBeUndefined();
+    });
+
+    it('deletes existing nonessential proxy cookies when consent is missing', async () => {
+      mocks.isCookieBannerRequired.mockReturnValue(true);
+
+      const req = createUnauthenticatedRequest({
+        pathname: '/',
+        headers: {
+          'x-vercel-ip-country': 'DE',
+          'x-vercel-ip-city': 'Berlin',
+          'x-vercel-ip-country-region': 'BE',
+        },
+        cookies: {
+          audience_anon: 'anon-1',
+          audience_identified: '1',
+          homepage_city: 'Munich',
+          homepage_region: 'BY',
+        },
+      });
+      const res = await callMiddleware(req);
+
+      const cookies = getResponseCookies(res);
+      expect(cookies.audience_anon).toBe('');
+      expect(cookies.audience_identified).toBe('');
+      expect(cookies.homepage_city).toBe('');
+      expect(cookies.homepage_region).toBe('');
+    });
+
+    it('sets nonessential proxy cookies after analytics consent is granted', async () => {
+      mocks.isCookieBannerRequired.mockReturnValue(true);
+
+      const req = createUnauthenticatedRequest({
+        pathname: '/',
+        headers: {
+          'x-vercel-ip-country': 'DE',
+          'x-vercel-ip-city': 'Berlin',
+          'x-vercel-ip-country-region': 'BE',
+        },
+        cookies: {
+          jv_cc: JSON.stringify({
+            essential: true,
+            analytics: true,
+            marketing: false,
+          }),
+        },
+      });
+      const res = await callMiddleware(req);
+
+      const cookies = getResponseCookies(res);
+      expect(cookies.homepage_city).toBe('Berlin');
+      expect(cookies.homepage_region).toBe('BE');
+      expect(cookies.audience_anon).toBeDefined();
+    });
+
+    it('does not set analytics-classified cookies for marketing-only consent', async () => {
+      mocks.isCookieBannerRequired.mockReturnValue(true);
+
+      const req = createUnauthenticatedRequest({
+        pathname: '/',
+        headers: {
+          'x-vercel-ip-country': 'DE',
+          'x-vercel-ip-city': 'Berlin',
+          'x-vercel-ip-country-region': 'BE',
+        },
+        cookies: {
+          jv_cc: JSON.stringify({
+            essential: true,
+            analytics: false,
+            marketing: true,
+          }),
+        },
+      });
+      const res = await callMiddleware(req);
+
+      const cookies = getResponseCookies(res);
+      expect(cookies.homepage_city).toBeUndefined();
+      expect(cookies.homepage_region).toBeUndefined();
+      expect(cookies.audience_anon).toBeUndefined();
+    });
+
+    it('deletes analytics-classified cookies for marketing-only consent', async () => {
+      mocks.isCookieBannerRequired.mockReturnValue(true);
+
+      const req = createUnauthenticatedRequest({
+        pathname: '/',
+        headers: {
+          'x-vercel-ip-country': 'DE',
+          'x-vercel-ip-city': 'Berlin',
+          'x-vercel-ip-country-region': 'BE',
+        },
+        cookies: {
+          jv_cc: JSON.stringify({
+            essential: true,
+            analytics: false,
+            marketing: true,
+          }),
+          audience_anon: 'anon-1',
+          audience_identified: '1',
+          homepage_city: 'Munich',
+          homepage_region: 'BY',
+        },
+      });
+      const res = await callMiddleware(req);
+
+      const cookies = getResponseCookies(res);
+      expect(cookies.audience_anon).toBe('');
+      expect(cookies.audience_identified).toBe('');
+      expect(cookies.homepage_city).toBe('');
+      expect(cookies.homepage_region).toBe('');
     });
 
     it('sets jv_cc_required=1 for US California (CCPA)', async () => {

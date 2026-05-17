@@ -1,6 +1,6 @@
 {
   "name": "jovie-monorepo",
-  "version": "26.5.9",
+  "version": "26.5.15",
   "private": true,
   "config": {
     "commitizen": {

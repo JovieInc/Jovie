@@ -28,23 +28,36 @@ export interface DashboardHeaderProps {
 function MobileHeader({
   currentLabel,
   action,
+  searchSurface,
+  isSearchActive,
   mobileProfileSlot,
 }: {
   readonly currentLabel: string;
   readonly action?: ReactNode;
+  readonly searchSurface?: ReactNode;
+  readonly isSearchActive: boolean;
   readonly mobileProfileSlot?: ReactNode;
 }) {
+  if (searchSurface && isSearchActive) {
+    return (
+      <div className='hidden max-sm:flex px-4 pb-2 pt-3'>{searchSurface}</div>
+    );
+  }
+
   return (
     <div className='hidden max-sm:flex items-center justify-between px-4 pb-2 pt-3'>
       <h1 className='text-[17px] font-semibold leading-tight tracking-[-0.018em] text-primary-token'>
         {currentLabel}
       </h1>
       <div className='flex items-center gap-2'>
+        {searchSurface ? (
+          <div className='flex items-center'>{searchSurface}</div>
+        ) : null}
         {action ? (
           <div className='flex items-center gap-1 [&_button]:h-8 [&_button]:rounded-full [&_button]:shadow-none [&_button>svg]:h-4 [&_button>svg]:w-4'>
             {action}
           </div>
-        ) : (
+        ) : searchSurface ? null : (
           mobileProfileSlot
         )}
       </div>
@@ -125,6 +138,8 @@ export function DashboardHeader({
       <MobileHeader
         currentLabel={currentLabel}
         action={action}
+        searchSurface={searchSurface}
+        isSearchActive={searchTakesOver}
         mobileProfileSlot={mobileProfileSlot}
       />
       <div className='relative max-sm:hidden h-(--linear-app-header-height-compact) w-full items-center gap-2 px-2.5 sm:flex'>

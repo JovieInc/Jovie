@@ -345,6 +345,10 @@ async function assertTasksLayout(
   await expect(page.getByTestId('task-list-pane')).toBeVisible({
     timeout: 30_000,
   });
+
+  await page.getByRole('button', { name: 'Search tasks' }).click();
+  await page.getByRole('searchbox', { name: 'Search tasks' }).fill(taskTitle);
+
   const targetRow = await openTaskRowByTitle(page, taskTitle);
 
   const listPane = page.getByTestId('task-list-pane');

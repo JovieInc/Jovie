@@ -8,6 +8,7 @@ import {
   DrawerLoadingSkeleton,
   DrawerSurfaceCard,
 } from '@/components/molecules/drawer';
+import { PageShell } from '@/components/organisms/PageShell';
 import type {
   ReleaseSidebarProps,
   TrackSidebarData,
@@ -861,9 +862,11 @@ export function ShellReleasesView({
 
   return (
     <>
-      <section
+      <PageShell
         aria-label='Releases'
-        className='flex h-full flex-col focus:outline-none'
+        frame='content-container'
+        contentPadding='none'
+        className='h-full focus:outline-none'
         data-design-v1-releases='true'
         data-testid='shell-releases-view'
       >
@@ -903,7 +906,7 @@ export function ShellReleasesView({
             onClearFilters={handleClearFilters}
           />
         </div>
-      </section>
+      </PageShell>
 
       <ReleaseWorkflowOverlays
         amPaletteOpen={amPaletteOpen}

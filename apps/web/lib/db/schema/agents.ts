@@ -2,12 +2,14 @@
  * Agent Registry Schema — Skills Catalog, Tools Catalog, Retouch Jobs
  *
  * This file is the sibling of connectors.ts. It holds the DB-side mirror of the
- * code-side SKILL_REGISTRY / TOOL_REGISTRY so admins can inspect versions, costs,
+ * code-side SKILL_REGISTRY so admins can inspect versions, costs,
  * and prompt paths without reading source. Synced at deploy time by
  * scripts/sync-skills-catalog.ts.
  */
 
+import { sql as drizzleSql } from 'drizzle-orm';
 import {
+  check,
   index,
   jsonb,
   numeric,
@@ -30,23 +32,32 @@ import { retouchJobStatusEnum, skillKindEnum } from './enums';
  * scripts/sync-skills-catalog.ts so the admin skills page reflects the
  * deployed version without a separate API call into source.
  */
-export const skillsCatalog = pgTable('skills_catalog', {
-  id: text('id').primaryKey(), // slug, e.g. 'retouch'
-  name: text('name').notNull(),
-  description: text('description'),
-  kind: skillKindEnum('kind').notNull(),
-  version: text('version').notNull(),
-  entitlementRequired: text('entitlement_required'),
-  model: text('model'),
-  promptPath: text('prompt_path'), // relative to repo root
-  metadata: jsonb('metadata').default({}).notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-});
+export const skillsCatalog = pgTable(
+  'skills_catalog',
+  {
+    id: text('id').primaryKey(), // slug, e.g. 'retouch'
+    name: text('name').notNull(),
+    description: text('description'),
+    kind: skillKindEnum('kind').notNull(),
+    version: text('version').notNull(),
+    entitlementRequired: text('entitlement_required'),
+    model: text('model'),
+    promptPath: text('prompt_path'), // relative to repo root
+    metadata: jsonb('metadata').default({}).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  table => ({
+    skillKindCheck: check(
+      'skills_catalog_kind_check',
+      drizzleSql`${table.kind} IN ('vertical_agent', 'style')`
+    ),
+  })
+);
 
 export type SkillsCatalogRow = typeof skillsCatalog.$inferSelect;
 export type NewSkillsCatalogRow = typeof skillsCatalog.$inferInsert;
@@ -64,25 +75,34 @@ export const selectSkillsCatalogSchema = createSelectSchema(skillsCatalog);
  * input/output specs without running the tool. Empty in v1 (no tools yet).
  * Populated when the first tool skill ships.
  */
-export const toolsCatalog = pgTable('tools_catalog', {
-  id: text('id').primaryKey(), // slug, e.g. 'fetch-spotify-stats'
-  name: text('name').notNull(),
-  description: text('description'),
-  kind: skillKindEnum('kind').notNull().default('tool'),
-  version: text('version').notNull(),
-  entitlementRequired: text('entitlement_required'),
-  model: text('model'),
-  promptPath: text('prompt_path'),
-  inputSchemaZodPath: text('input_schema_zod_path'), // path to Zod input schema
-  outputSchemaZodPath: text('output_schema_zod_path'), // path to Zod output schema
-  metadata: jsonb('metadata').default({}).notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-});
+export const toolsCatalog = pgTable(
+  'tools_catalog',
+  {
+    id: text('id').primaryKey(), // slug, e.g. 'fetch-spotify-stats'
+    name: text('name').notNull(),
+    description: text('description'),
+    kind: skillKindEnum('kind').notNull().default('tool'),
+    version: text('version').notNull(),
+    entitlementRequired: text('entitlement_required'),
+    model: text('model'),
+    promptPath: text('prompt_path'),
+    inputSchemaZodPath: text('input_schema_zod_path'), // path to Zod input schema
+    outputSchemaZodPath: text('output_schema_zod_path'), // path to Zod output schema
+    metadata: jsonb('metadata').default({}).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  table => ({
+    toolKindCheck: check(
+      'tools_catalog_kind_check',
+      drizzleSql`${table.kind} = 'tool'`
+    ),
+  })
+);
 
 export type ToolsCatalogRow = typeof toolsCatalog.$inferSelect;
 export type NewToolsCatalogRow = typeof toolsCatalog.$inferInsert;

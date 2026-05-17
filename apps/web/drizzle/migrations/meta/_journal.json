@@ -348,8 +348,22 @@
     {
       "idx": 49,
       "version": "7",
-      "when": 1778956368361,
-      "tag": "0049_yielding_iron_man",
+      "when": 1778975768797,
+      "tag": "0049_lyrical_korvac",
+      "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1778977327016,
+      "tag": "0050_smart_mastermind",
+      "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1778996928720,
+      "tag": "0051_yielding_iron_man",
       "breakpoints": true
     }
   ]

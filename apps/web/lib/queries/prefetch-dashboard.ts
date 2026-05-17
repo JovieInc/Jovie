@@ -25,6 +25,7 @@ export function prefetchForRoute(
   const { staleTime } = FREQUENT_CACHE;
 
   switch (routeId) {
+    case 'library':
     case 'releases':
       queryClient.prefetchQuery({
         queryKey: queryKeys.releases.matrix(profileId),

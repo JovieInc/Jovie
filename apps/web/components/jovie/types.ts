@@ -33,7 +33,10 @@ export interface JovieChatProps {
   /** Conversation ID to load and continue */
   readonly conversationId?: string | null;
   /** Callback when a new conversation is created */
-  readonly onConversationCreate?: (conversationId: string) => void;
+  readonly onConversationCreate?: (
+    conversationId: string,
+    phase?: ChatConversationCreatePhase
+  ) => void;
   /** Pre-fill and auto-submit a message on mount (e.g. from ?q= param) */
   readonly initialQuery?: string;
   /**
@@ -55,6 +58,8 @@ export interface JovieChatProps {
   /** Optional latest release title for contextual first-session prompts */
   readonly latestReleaseTitle?: string | null;
 }
+
+export type ChatConversationCreatePhase = 'reserved' | 'completed';
 
 export type ChatErrorType = 'network' | 'rate_limit' | 'server' | 'unknown';
 

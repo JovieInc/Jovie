@@ -28,11 +28,11 @@ describe('DashboardNav interactions', () => {
     expect(screen.getByRole('button', { name: 'Profile' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Releases' })).toHaveAttribute(
       'href',
-      APP_ROUTES.DASHBOARD_RELEASES
+      APP_ROUTES.RELEASES
     );
     expect(screen.getByRole('link', { name: 'Audience' })).toHaveAttribute(
       'href',
-      APP_ROUTES.DASHBOARD_AUDIENCE
+      APP_ROUTES.AUDIENCE
     );
     expect(screen.getByRole('link', { name: 'Library' })).toBeInTheDocument();
   });
@@ -78,6 +78,21 @@ describe('DashboardNav interactions', () => {
     expect(screen.getByRole('button', { name: 'Profile' })).not.toHaveAttribute(
       'aria-pressed',
       'true'
+    );
+  });
+
+  it('highlights the canonical Audience nav item from the legacy dashboard path', () => {
+    mockUsePathname.mockReturnValueOnce(APP_ROUTES.DASHBOARD_AUDIENCE);
+
+    renderDashboardNav({ renderFn: render });
+
+    expect(screen.getByRole('link', { name: 'Audience' })).toHaveAttribute(
+      'href',
+      APP_ROUTES.AUDIENCE
+    );
+    expect(screen.getByRole('link', { name: 'Audience' })).toHaveAttribute(
+      'aria-current',
+      'page'
     );
   });
 
@@ -152,11 +167,11 @@ describe('DashboardNav interactions', () => {
     expect(screen.getByRole('button', { name: 'Profile' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Releases' })).toHaveAttribute(
       'href',
-      APP_ROUTES.DASHBOARD_RELEASES
+      APP_ROUTES.RELEASES
     );
     expect(screen.getByRole('link', { name: 'Audience' })).toHaveAttribute(
       'href',
-      APP_ROUTES.DASHBOARD_AUDIENCE
+      APP_ROUTES.AUDIENCE
     );
   });
 
@@ -233,7 +248,7 @@ describe('DashboardNav interactions', () => {
   it('profile button navigates to chat before opening the drawer off chat routes', async () => {
     const user = userEvent.setup();
 
-    mockUsePathname.mockReturnValueOnce(APP_ROUTES.DASHBOARD_AUDIENCE);
+    mockUsePathname.mockReturnValueOnce(APP_ROUTES.AUDIENCE);
     renderDashboardNav({ renderFn: render });
 
     await user.click(screen.getByRole('button', { name: 'Profile' }));

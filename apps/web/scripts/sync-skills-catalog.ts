@@ -11,13 +11,38 @@
  *   doppler run --project jovie-web --config dev -- tsx apps/web/scripts/sync-skills-catalog.ts
  */
 
+import { pathToFileURL } from 'node:url';
 import { sql as drizzleSql } from 'drizzle-orm';
 import { SKILL_REGISTRY } from '@/lib/agents/registry';
 import type { SkillDefinition } from '@/lib/agents/types';
 import { db } from '@/lib/db';
 import { skillsCatalog, toolsCatalog } from '@/lib/db/schema/agents';
+import { env } from '@/lib/env-server';
 
-async function syncSkillsCatalog(): Promise<void> {
+const skillCatalogChanged = drizzleSql`
+  ${skillsCatalog.name} IS DISTINCT FROM excluded.name OR
+  ${skillsCatalog.description} IS DISTINCT FROM excluded.description OR
+  ${skillsCatalog.kind} IS DISTINCT FROM excluded.kind OR
+  ${skillsCatalog.version} IS DISTINCT FROM excluded.version OR
+  ${skillsCatalog.entitlementRequired} IS DISTINCT FROM excluded.entitlement_required OR
+  ${skillsCatalog.model} IS DISTINCT FROM excluded.model OR
+  ${skillsCatalog.promptPath} IS DISTINCT FROM excluded.prompt_path OR
+  ${skillsCatalog.metadata} IS DISTINCT FROM excluded.metadata
+`;
+
+const toolCatalogChanged = drizzleSql`
+  ${toolsCatalog.name} IS DISTINCT FROM excluded.name OR
+  ${toolsCatalog.description} IS DISTINCT FROM excluded.description OR
+  ${toolsCatalog.kind} IS DISTINCT FROM excluded.kind OR
+  ${toolsCatalog.version} IS DISTINCT FROM excluded.version OR
+  ${toolsCatalog.entitlementRequired} IS DISTINCT FROM excluded.entitlement_required OR
+  ${toolsCatalog.model} IS DISTINCT FROM excluded.model OR
+  ${toolsCatalog.promptPath} IS DISTINCT FROM excluded.prompt_path OR
+  ${toolsCatalog.metadata} IS DISTINCT FROM excluded.metadata
+`;
+
+export async function syncSkillsCatalog(): Promise<void> {
+  const now = new Date();
   const skills = Object.values(SKILL_REGISTRY) as SkillDefinition[];
   const toolSkills = skills.filter(s => s.kind === 'tool');
   const nonToolSkills = skills.filter(s => s.kind !== 'tool');
@@ -36,7 +61,7 @@ async function syncSkillsCatalog(): Promise<void> {
           model: skill.model ?? null,
           promptPath: skill.promptPath ?? null,
           metadata: skill.metadata,
-          updatedAt: new Date(),
+          updatedAt: now,
         }))
       )
       .onConflictDoUpdate({
@@ -52,6 +77,7 @@ async function syncSkillsCatalog(): Promise<void> {
           metadata: drizzleSql`excluded.metadata`,
           updatedAt: drizzleSql`excluded.updated_at`,
         },
+        setWhere: skillCatalogChanged,
       });
   }
 
@@ -69,7 +95,7 @@ async function syncSkillsCatalog(): Promise<void> {
           model: skill.model ?? null,
           promptPath: skill.promptPath ?? null,
           metadata: skill.metadata,
-          updatedAt: new Date(),
+          updatedAt: now,
         }))
       )
       .onConflictDoUpdate({
@@ -85,6 +111,7 @@ async function syncSkillsCatalog(): Promise<void> {
           metadata: drizzleSql`excluded.metadata`,
           updatedAt: drizzleSql`excluded.updated_at`,
         },
+        setWhere: toolCatalogChanged,
       });
   }
 
@@ -93,20 +120,28 @@ async function syncSkillsCatalog(): Promise<void> {
   );
 }
 
-// Skip gracefully when DATABASE_URL is unavailable (e.g., lint-only CI builds).
-// Real deploys (Vercel, db:web:migrate) always have DATABASE_URL injected by Doppler.
-if (!process.env.DATABASE_URL) {
-  console.log(
-    '[sync-skills-catalog] DATABASE_URL not set — skipping catalog sync (no-op in lint/type-check CI)'
-  );
-  process.exit(0);
+export async function main(): Promise<'skipped' | 'synced'> {
+  // Skip gracefully when DATABASE_URL is unavailable (e.g., lint-only CI builds).
+  // Real deploys (Vercel, db:web:migrate) always have DATABASE_URL injected by Doppler.
+  if (!env.DATABASE_URL) {
+    console.log(
+      '[sync-skills-catalog] DATABASE_URL not set — skipping catalog sync (no-op in lint/type-check CI)'
+    );
+    return 'skipped';
+  }
+
+  await syncSkillsCatalog();
+  return 'synced';
 }
 
-syncSkillsCatalog()
-  .then(() => {
-    process.exit(0);
-  })
-  .catch((err: unknown) => {
-    console.error('[sync-skills-catalog] failed:', err);
-    process.exit(1);
-  });
+const invokedPath = process.argv[1];
+if (invokedPath && import.meta.url === pathToFileURL(invokedPath).href) {
+  main()
+    .then(() => {
+      process.exit(0);
+    })
+    .catch((err: unknown) => {
+      console.error('[sync-skills-catalog] failed:', err);
+      process.exit(1);
+    });
+}

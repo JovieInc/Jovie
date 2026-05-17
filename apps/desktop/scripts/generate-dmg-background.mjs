@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import sharp from 'sharp';
@@ -9,6 +9,7 @@ const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(SCRIPT_DIR, '../../..');
 const ASSETS_DIR = path.join(REPO_ROOT, 'apps/desktop/assets');
 const OUTPUT_PATH = path.join(ASSETS_DIR, 'dmg-background.png');
+const ICON_PATH = path.join(ASSETS_DIR, 'icon.png');
 
 export const WIDTH = 760;
 export const HEIGHT = 480;
@@ -20,13 +21,27 @@ const DROP_ZONE_SIZE = 128;
 const APP_ZONE_X = APP_CENTER.x - DROP_ZONE_SIZE / 2;
 const TARGET_ZONE_X = APPLICATIONS_CENTER.x - DROP_ZONE_SIZE / 2;
 const ZONE_Y = APP_CENTER.y - DROP_ZONE_SIZE / 2;
+const DEFAULT_JOVIE_ICON_DATA_URI = `data:image/svg+xml,${encodeURIComponent(
+  `<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+    <rect width="512" height="512" rx="116" fill="#050506"/>
+    <path fill="#F5F5F2" d="M256 52c112.7 0 204 91.3 204 204s-91.3 204-204 204S52 368.7 52 256 143.3 52 256 52Zm0 116a88 88 0 1 0 0 176 88 88 0 0 0 0-176Z" fill-rule="evenodd"/>
+  </svg>`
+)}`;
 
 export function getDesktopBuildYear(now = new Date()) {
   const year = now.getFullYear();
   return Number.isFinite(year) ? Math.max(year, YEAR_MIN) : YEAR_MIN;
 }
 
-export function buildDmgBackgroundSvg({ year = getDesktopBuildYear() } = {}) {
+async function pngDataUri(filePath) {
+  const buffer = await readFile(filePath);
+  return `data:image/png;base64,${buffer.toString('base64')}`;
+}
+
+export function buildDmgBackgroundSvg({
+  year = getDesktopBuildYear(),
+  appIconDataUri = DEFAULT_JOVIE_ICON_DATA_URI,
+} = {}) {
   return `<svg width="${WIDTH}" height="${HEIGHT}" viewBox="0 0 ${WIDTH} ${HEIGHT}" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <pattern id="jovie-grid" width="24" height="24" patternUnits="userSpaceOnUse">
@@ -56,11 +71,7 @@ export function buildDmgBackgroundSvg({ year = getDesktopBuildYear() } = {}) {
   <rect x="32" y="30" width="696" height="366" rx="22" fill="url(#accent-left)"/>
   <rect x="32" y="30" width="696" height="366" rx="22" fill="url(#accent-right)"/>
   <rect x="68" y="66" width="624" height="294" rx="18" fill="#090B0F" opacity="0.42"/>
-  <g transform="translate(474 86) scale(5.2)" opacity="0.055">
-    <circle cx="22" cy="22" r="22" fill="#F7F8FA"/>
-    <path d="M31 10A20 20 0 0 0 11 30H31V10Z" fill="#090B0F"/>
-    <path d="M11 31L30 31M14 36L31 36M18 41L32 41" stroke="#090B0F" stroke-width="3.8" stroke-linecap="round"/>
-  </g>
+  <image href="${appIconDataUri}" x="480" y="80" width="208" height="208" opacity="0.13" preserveAspectRatio="xMidYMid meet"/>
   <text x="380" y="86" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="24" font-weight="700" letter-spacing="0" fill="#F5F7FA">Install Jovie</text>
   <text x="380" y="112" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif" font-size="13" font-weight="500" letter-spacing="0" fill="#9AA4B2">Drag Jovie to Applications</text>
   <rect x="${APP_ZONE_X}" y="${ZONE_Y}" width="${DROP_ZONE_SIZE}" height="${DROP_ZONE_SIZE}" rx="30" fill="#141922" fill-opacity="0.82" stroke="#2E3743" filter="url(#soft-shadow)"/>
@@ -70,13 +81,9 @@ export function buildDmgBackgroundSvg({ year = getDesktopBuildYear() } = {}) {
   <path d="M373 226L391 244L373 262" fill="none" stroke="#717A87" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0.58"/>
   <path d="M408 226L426 244L408 262" fill="none" stroke="#BFC7D2" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0.88"/>
   <rect x="0" y="396" width="${WIDTH}" height="84" fill="#0E1116" stroke="#242A33"/>
-  <g transform="translate(50 424)">
-    <circle cx="22" cy="22" r="22" fill="#F5F7FA"/>
-    <path d="M31 10A20 20 0 0 0 11 30H31V10Z" fill="#101217"/>
-    <path d="M11 31L30 31M14 36L31 36M18 41L32 41" stroke="#101217" stroke-width="3.8" stroke-linecap="round"/>
-  </g>
-  <text x="104" y="436" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif" font-size="15" font-weight="650" letter-spacing="0" fill="#F2F5F8">Jovie Technology Inc.</text>
-  <text x="104" y="460" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif" font-size="13" font-weight="500" letter-spacing="0" fill="#9CA6B4">&#169; ${year}</text>
+  <image href="${appIconDataUri}" x="50" y="418" width="50" height="50" preserveAspectRatio="xMidYMid meet"/>
+  <text x="114" y="436" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif" font-size="15" font-weight="650" letter-spacing="0" fill="#F2F5F8">Jovie Technology Inc.</text>
+  <text x="114" y="460" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif" font-size="13" font-weight="500" letter-spacing="0" fill="#9CA6B4">&#169; ${year}</text>
   <text x="708" y="446" text-anchor="end" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="18" font-weight="700" letter-spacing="0" fill="#F2F5F8">Built for artists</text>
 </svg>`;
 }
@@ -84,9 +91,13 @@ export function buildDmgBackgroundSvg({ year = getDesktopBuildYear() } = {}) {
 export async function generateDmgBackground({
   outputPath = OUTPUT_PATH,
   year = getDesktopBuildYear(),
+  appIconPath = ICON_PATH,
 } = {}) {
   await mkdir(path.dirname(outputPath), { recursive: true });
-  await sharp(Buffer.from(buildDmgBackgroundSvg({ year }))).png().toFile(outputPath);
+  const appIconDataUri = await pngDataUri(appIconPath);
+  await sharp(Buffer.from(buildDmgBackgroundSvg({ year, appIconDataUri })))
+    .png()
+    .toFile(outputPath);
   return outputPath;
 }
 

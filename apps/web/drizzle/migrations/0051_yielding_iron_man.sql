@@ -63,6 +63,38 @@ CREATE TABLE IF NOT EXISTS "tools_catalog" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-ALTER TABLE "retouch_jobs" ADD CONSTRAINT "retouch_jobs_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'skills_catalog_kind_check'
+      AND conrelid = 'public.skills_catalog'::regclass
+  ) THEN
+    ALTER TABLE "skills_catalog" ADD CONSTRAINT "skills_catalog_kind_check" CHECK ("kind" IN ('vertical_agent', 'style'));
+  END IF;
+END $$;
+--> statement-breakpoint
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'tools_catalog_kind_check'
+      AND conrelid = 'public.tools_catalog'::regclass
+  ) THEN
+    ALTER TABLE "tools_catalog" ADD CONSTRAINT "tools_catalog_kind_check" CHECK ("kind" = 'tool');
+  END IF;
+END $$;
+--> statement-breakpoint
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'retouch_jobs_user_id_users_id_fk'
+      AND conrelid = 'public.retouch_jobs'::regclass
+  ) THEN
+    ALTER TABLE "retouch_jobs" ADD CONSTRAINT "retouch_jobs_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;
+  END IF;
+END $$;
+--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "retouch_jobs_user_status_idx" ON "retouch_jobs" USING btree ("user_id","status","started_at");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "retouch_jobs_status_started_idx" ON "retouch_jobs" USING btree ("status","started_at");
