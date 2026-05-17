@@ -54,10 +54,10 @@
     }
   ],
   "functions": {
-    "apps/web/app/api/**/*.ts": {
+    "apps/web/app/api/**/*": {
       "maxDuration": 30
     },
-    "apps/web/app/api/cron/**/*.ts": {
+    "apps/web/app/api/cron/**/*": {
       "maxDuration": 300
     }
   },
