@@ -1,11 +1,7 @@
 'use client';
 
-import { Disc3 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import {
-  getArtworkFallbackAccentStyle,
-  getArtworkFallbackSurfaceStyle,
-} from '@/lib/artwork-fallback';
+import { ArtworkFallbackTile } from '@/components/atoms/ArtworkFallbackTile';
 import { cn } from '@/lib/utils';
 
 /**
@@ -75,29 +71,7 @@ export function ArtworkThumb({
           style={{ backgroundImage: `url(${src})` }}
         />
       ) : (
-        <>
-          <span
-            aria-hidden='true'
-            className='absolute inset-0'
-            data-artwork-fallback='true'
-            style={getArtworkFallbackSurfaceStyle(title)}
-          />
-          <span
-            aria-hidden='true'
-            className='absolute inset-0 grid place-items-center text-white/25'
-          >
-            <Disc3 className='h-[42%] w-[42%]' strokeWidth={1.85} />
-          </span>
-          <span
-            aria-hidden='true'
-            className='absolute inset-x-0 bottom-0 h-1'
-            style={getArtworkFallbackAccentStyle(title)}
-          />
-          <span
-            aria-hidden='true'
-            className='absolute inset-[1px] rounded-[3px] border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
-          />
-        </>
+        <ArtworkFallbackTile seed={title} />
       )}
     </div>
   );
