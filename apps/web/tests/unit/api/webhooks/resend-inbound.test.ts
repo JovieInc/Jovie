@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto';
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -17,6 +18,10 @@ const hoisted = vi.hoisted(() => {
     profileLimitMock,
   };
 });
+
+const TEST_WEBHOOK_SECRET = vi.hoisted(
+  () => 'whsec_dGVzdC1zZWNyZXQtZm9yLXVuaXQtdGVzdHM='
+);
 
 vi.mock('@/lib/db', () => ({
   db: {
@@ -45,7 +50,7 @@ vi.mock('@/lib/db/schema/profiles', () => ({
 
 vi.mock('@/lib/env-server', () => ({
   env: {
-    RESEND_INBOUND_WEBHOOK_SECRET: undefined,
+    RESEND_INBOUND_WEBHOOK_SECRET: TEST_WEBHOOK_SECRET,
     RESEND_API_KEY: undefined,
   },
 }));
@@ -86,6 +91,21 @@ vi.mock('drizzle-orm', () => ({
   sql: vi.fn(),
 }));
 
+function signPayload(
+  rawBody: string,
+  timestamp: string,
+  secret: string
+): string {
+  const secretBytes = Buffer.from(
+    secret.startsWith('whsec_') ? secret.slice(6) : secret,
+    'base64'
+  );
+  const signature = createHmac('sha256', secretBytes)
+    .update(`${timestamp}.${rawBody}`)
+    .digest('base64');
+  return `v1,${signature}`;
+}
+
 describe('POST /api/webhooks/resend-inbound', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -103,22 +123,32 @@ describe('POST /api/webhooks/resend-inbound', () => {
   it('captures critical errors when inbound email processing fails', async () => {
     const thrownError = new Error('Thread lookup failed');
     hoisted.findThreadMock.mockRejectedValue(thrownError);
+    const rawBody = JSON.stringify({
+      type: 'email.received',
+      data: {
+        email_id: 'email_123',
+        from: 'fan@example.com',
+        to: ['artist@jovie.fm'],
+        subject: 'Hello',
+        message_id: 'message_123',
+      },
+    });
+    const timestamp = Math.floor(Date.now() / 1000).toString();
 
     const { POST } = await import('@/app/api/webhooks/resend-inbound/route');
     const response = await POST(
       new NextRequest('http://localhost/api/webhooks/resend-inbound', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'email.received',
-          data: {
-            email_id: 'email_123',
-            from: 'fan@example.com',
-            to: ['artist@jovie.fm'],
-            subject: 'Hello',
-            message_id: 'message_123',
-          },
-        }),
+        headers: {
+          'Content-Type': 'application/json',
+          'svix-timestamp': timestamp,
+          'svix-signature': signPayload(
+            rawBody,
+            timestamp,
+            TEST_WEBHOOK_SECRET
+          ),
+        },
+        body: rawBody,
       })
     );
 
