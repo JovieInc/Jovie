@@ -64,7 +64,8 @@ describe('settings shell normalization', () => {
       const source = readFileSync(filePath, 'utf8');
       expect(source).not.toMatch(/<PageShell\b/);
       expect(source).not.toMatch(/import\s*\{[^}]*PageShell/);
-      expect(source).toMatch(/<PageContent\b/);
+      expect(source).not.toMatch(/<PageContent\b/);
+      expect(source).not.toMatch(/import\s*\{[^}]*PageContent/);
     }
   });
 });
