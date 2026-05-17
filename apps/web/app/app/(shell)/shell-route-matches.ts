@@ -100,6 +100,20 @@ function isDashboardSubRoute(pathname: string | null): boolean {
   return pathname.startsWith(`${APP_ROUTES.LEGACY_DASHBOARD}/`);
 }
 
+function isShellOptimizedSettingsRoute(pathname: string | null): boolean {
+  if (!pathname) return false;
+  if (
+    pathname === APP_ROUTES.SETTINGS_ARTIST_PROFILE ||
+    pathname.startsWith(`${APP_ROUTES.SETTINGS_ARTIST_PROFILE}/`)
+  ) {
+    return false;
+  }
+  return (
+    pathname === APP_ROUTES.SETTINGS ||
+    pathname.startsWith(`${APP_ROUTES.SETTINGS}/`)
+  );
+}
+
 function isLightweightShellRoute(pathname: string | null): boolean {
   return (
     isChatShellRoute(pathname) ||
@@ -107,7 +121,8 @@ function isLightweightShellRoute(pathname: string | null): boolean {
     isLyricsShellRoute(pathname) ||
     isLibraryShellRoute(pathname) ||
     isTasksShellRoute(pathname) ||
-    isDashboardSubRoute(pathname)
+    isDashboardSubRoute(pathname) ||
+    isShellOptimizedSettingsRoute(pathname)
   );
 }
 
@@ -116,5 +131,12 @@ export function shouldUseEssentialShellData(pathname: string | null): boolean {
 }
 
 export function shouldRedirectToOnboarding(pathname: string | null): boolean {
-  return isLightweightShellRoute(pathname);
+  return (
+    isChatShellRoute(pathname) ||
+    isReleasesShellRoute(pathname) ||
+    isLyricsShellRoute(pathname) ||
+    isLibraryShellRoute(pathname) ||
+    isTasksShellRoute(pathname) ||
+    isDashboardSubRoute(pathname)
+  );
 }

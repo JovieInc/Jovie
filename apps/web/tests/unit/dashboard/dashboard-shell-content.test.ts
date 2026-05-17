@@ -88,8 +88,23 @@ describe('@critical DashboardShellContent behavior contracts', () => {
       expect(shouldUseEssentialShellData('/app')).toBe(true);
     });
 
-    it('settings routes use full dashboard data', () => {
-      expect(shouldUseEssentialShellData('/app/settings')).toBe(false);
+    it('optimized settings routes use essential shell data', () => {
+      expect(shouldUseEssentialShellData(APP_ROUTES.SETTINGS)).toBe(true);
+      expect(shouldUseEssentialShellData(APP_ROUTES.SETTINGS_ACCOUNT)).toBe(
+        true
+      );
+      expect(shouldUseEssentialShellData(APP_ROUTES.SETTINGS_CONTACTS)).toBe(
+        true
+      );
+      expect(shouldUseEssentialShellData(APP_ROUTES.SETTINGS_TOURING)).toBe(
+        true
+      );
+    });
+
+    it('artist profile settings routes use full dashboard data', () => {
+      expect(
+        shouldUseEssentialShellData(APP_ROUTES.SETTINGS_ARTIST_PROFILE)
+      ).toBe(false);
     });
 
     it('null pathname uses full dashboard data', () => {
@@ -124,8 +139,17 @@ describe('@critical DashboardShellContent behavior contracts', () => {
       // instead of wrapping in HydrateClient + FeatureFlagsProvider
     });
 
-    it('settings route is not essential (gets HydrateClient wrapper)', () => {
-      expect(isChatShellRoute('/app/settings')).toBe(false);
+    it('optimized settings route is essential but not a chat route', () => {
+      expect(shouldUseEssentialShellData(APP_ROUTES.SETTINGS_CONTACTS)).toBe(
+        true
+      );
+      expect(isChatShellRoute(APP_ROUTES.SETTINGS_CONTACTS)).toBe(false);
+    });
+
+    it('artist profile settings route gets full shell hydration', () => {
+      expect(
+        shouldUseEssentialShellData(APP_ROUTES.SETTINGS_ARTIST_PROFILE)
+      ).toBe(false);
     });
   });
 });
