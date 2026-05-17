@@ -4,7 +4,7 @@ import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import { instantiateReleaseTasksFromCatalog } from '@/app/app/(shell)/dashboard/releases/catalog-task-actions';
 import { instantiateReleaseTasks } from '@/app/app/(shell)/dashboard/releases/task-actions';
-import { APP_ROUTES } from '@/constants/routes';
+import { buildReleaseTasksRoute } from '@/constants/routes';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { captureError } from '@/lib/error-tracking';
 import type { ReleaseContext } from '@/lib/release-tasks/applicability';
@@ -19,7 +19,7 @@ export async function generateReleasePlanTasks(
     await instantiateReleaseTasks(releaseId);
   }
 
-  return APP_ROUTES.DASHBOARD_RELEASE_TASKS.replace('[releaseId]', releaseId);
+  return buildReleaseTasksRoute(releaseId);
 }
 
 interface UsePostCreateReleasePlanOptions {

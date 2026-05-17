@@ -24,6 +24,8 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
   '/app/admin/playlists': 'Internal admin workflow (manual entry)',
   '/app/dashboard/releases/[releaseId]/tasks':
     'Dynamic workflow route reached from releases actions',
+  '/app/releases/[releaseId]/tasks':
+    'Canonical dynamic workflow route reached from release actions',
   '/app/dashboard/releases/[releaseId]/downloads':
     'Internal release workflow (manual entry)',
   '/app/dashboard/releases':

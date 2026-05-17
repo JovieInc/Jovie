@@ -138,9 +138,7 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
       .find(el => el.textContent?.includes('Midnight Run'));
     expect(releaseRow).toBeDefined();
     fireEvent.mouseDown(releaseRow!);
-    expect(pushMock).toHaveBeenCalledWith(
-      '/app/dashboard/releases/rel-1/tasks'
-    );
+    expect(pushMock).toHaveBeenCalledWith('/app/releases/rel-1/tasks');
   });
 
   it('renders additional sections (e.g. recent threads) and routes via callback', () => {
