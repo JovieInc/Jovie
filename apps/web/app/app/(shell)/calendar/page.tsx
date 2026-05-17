@@ -4,7 +4,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
-import { queryKeys, type RecentRelease } from '@/lib/queries';
+import { queryKeys } from '@/lib/queries';
 import { HydrateClient } from '@/lib/queries/HydrateClient';
 import { getDehydratedState, getQueryClient } from '@/lib/queries/server';
 import type { EventRecord } from '@/lib/queries/useEventsQuery';
@@ -77,24 +77,8 @@ async function prefetchCalendarQueries(profileId: string) {
 
   await Promise.all([
     queryClient.fetchQuery({
-      queryKey: queryKeys.releases.recent(profileId),
-      queryFn: async (): Promise<RecentRelease[]> => {
-        const releases = await loadReleaseMatrix(profileId);
-        return [...releases]
-          .sort((a, b) => {
-            const aTime = a.releaseDate ? Date.parse(a.releaseDate) : 0;
-            const bTime = b.releaseDate ? Date.parse(b.releaseDate) : 0;
-            return bTime - aTime;
-          })
-          .slice(0, 8)
-          .map(release => ({
-            id: release.id,
-            title: release.title,
-            artworkUrl: release.artworkUrl ?? null,
-            releaseDate: release.releaseDate ?? null,
-            releaseType: release.releaseType,
-          }));
-      },
+      queryKey: queryKeys.releases.matrix(profileId),
+      queryFn: () => loadReleaseMatrix(profileId),
     }),
     queryClient.fetchQuery({
       queryKey: queryKeys.events.list(profileId),
@@ -109,7 +93,7 @@ async function prefetchCalendarQueries(profileId: string) {
 /**
  * Calendar route — unified month-grid view of releases + events.
  *
- * Releases come from `useRecentReleasesQuery`. Events (tour, livestream,
+ * Releases come from the shared release matrix query. Events (tour, livestream,
  * listening party, AMA, signing) come from `useEventsQuery`. Synced
  * provider events land as `pending` and surface in the day-detail
  * sidebar with inline confirm/reject — they do not bleed to fans or
