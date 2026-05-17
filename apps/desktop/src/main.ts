@@ -18,7 +18,7 @@ if (APP_ENV === 'staging') {
 }
 
 const APP_ORIGIN = new URL(APP_URL).origin;
-const APP_ENTRY_URL = buildAppUrl('/app');
+const APP_ENTRY_URL = buildAppUrl('/app/chat');
 const SETTINGS_URL = buildAppUrl('/app/settings');
 const APP_BACKGROUND_COLOR = '#09090b';
 const NAVIGATION_ABORTED_ERROR_CODE = -3;

@@ -9,12 +9,12 @@ import { promisify } from 'node:util';
 const desktopRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const execFileAsync = promisify(execFile);
 
-test('desktop window enters the authenticated app shell instead of the web root', async () => {
+test('desktop window enters the authenticated chat shell instead of the web root', async () => {
   const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
 
   assert.match(
     mainSource,
-    /const APP_ENTRY_URL = buildAppUrl\('\/app'\);/
+    /const APP_ENTRY_URL = buildAppUrl\('\/app\/chat'\);/
   );
   assert.match(mainSource, /url\.searchParams\.set\('runtime', 'electron'\);/);
   assert.match(
