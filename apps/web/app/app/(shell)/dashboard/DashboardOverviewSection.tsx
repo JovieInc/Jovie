@@ -3,12 +3,15 @@ import { APP_ROUTES } from '@/constants/routes';
 import { DashboardOverview } from '@/features/dashboard/organisms/DashboardOverview';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { convertDrizzleCreatorProfileToArtist } from '@/types/db';
-import { getDashboardData } from './actions';
+import {
+  getDashboardDataEssential,
+  getDashboardOverviewSupplement,
+} from './actions';
 import { getLinkClicksByPlatform } from './actions/link-clicks';
 
 export async function DashboardOverviewSection() {
   const [dashboardData, auth] = await Promise.all([
-    getDashboardData(),
+    getDashboardDataEssential(),
     getCachedAuth(),
   ]);
 
@@ -20,25 +23,38 @@ export async function DashboardOverviewSection() {
     ? convertDrizzleCreatorProfileToArtist(dashboardData.selectedProfile)
     : null;
 
-  // Fetch link click stats (non-blocking, errors resolve to empty)
-  let linkClickStats = {
-    stats: [] as { platform: string; clicks: number }[],
-    total: 0,
-  };
-  if (auth.userId) {
-    try {
-      linkClickStats = await getLinkClicksByPlatform(auth.userId);
-    } catch {
-      // Silent failure — card shows empty state
-    }
-  }
+  const [overviewSupplement, linkClickStats] = await Promise.all([
+    dashboardData.selectedProfile && dashboardData.user?.id && auth.userId
+      ? getDashboardOverviewSupplement({
+          clerkUserId: auth.userId,
+          onboardingCompletedAt:
+            dashboardData.selectedProfile.onboardingCompletedAt?.toISOString() ??
+            null,
+          profileId: dashboardData.selectedProfile.id,
+          userId: dashboardData.user.id,
+        })
+      : Promise.resolve({
+          hasSocialLinks: false,
+          hasMusicLinks: false,
+          bioLinkActivation: null,
+        }),
+    auth.userId
+      ? getLinkClicksByPlatform(auth.userId).catch(() => ({
+          stats: [] as { platform: string; clicks: number }[],
+          total: 0,
+        }))
+      : Promise.resolve({
+          stats: [] as { platform: string; clicks: number }[],
+          total: 0,
+        }),
+  ]);
 
   return (
     <DashboardOverview
       artist={artist}
-      bioLinkActivation={dashboardData.bioLinkActivation}
-      hasSocialLinks={dashboardData.hasSocialLinks}
-      hasMusicLinks={dashboardData.hasMusicLinks}
+      bioLinkActivation={overviewSupplement.bioLinkActivation}
+      hasSocialLinks={overviewSupplement.hasSocialLinks}
+      hasMusicLinks={overviewSupplement.hasMusicLinks}
       linkClickStats={linkClickStats.stats}
       linkClickTotal={linkClickStats.total}
     />
