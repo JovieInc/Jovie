@@ -2,10 +2,10 @@ import { gateway } from '@ai-sdk/gateway';
 import {
   convertToModelMessages,
   type ModelMessage,
-  streamText,
   type ToolSet,
   type UIMessage,
 } from 'ai';
+import { streamText } from '@/lib/ai/sdk';
 import { selectKnowledgeContext } from '@/lib/chat/knowledge/router';
 import { ONBOARDING_SYSTEM_PROMPT } from '@/lib/chat/prompts/onboarding';
 import { buildSystemPrompt } from '@/lib/chat/system-prompt';

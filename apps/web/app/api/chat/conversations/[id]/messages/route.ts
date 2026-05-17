@@ -1,7 +1,7 @@
 import { gateway } from '@ai-sdk/gateway';
-import { generateText } from 'ai';
 import { and, eq, isNull } from 'drizzle-orm';
 import { after, NextResponse } from 'next/server';
+import { generateText } from '@/lib/ai/sdk';
 import { getSessionContext } from '@/lib/auth/session';
 import {
   type ChatPersistenceMessage,

@@ -1,9 +1,9 @@
 import 'server-only';
 import { createHash } from 'node:crypto';
 import { gateway } from '@ai-sdk/gateway';
-import { generateObject } from 'ai';
 import { and, sql as drizzleSql, eq, gte } from 'drizzle-orm';
 import { z } from 'zod';
+import { generateObject } from '@/lib/ai/sdk';
 import { db } from '@/lib/db';
 import { agentRuns } from '@/lib/db/schema/connectors';
 import { env } from '@/lib/env-server';
