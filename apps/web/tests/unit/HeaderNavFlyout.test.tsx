@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HeaderNav } from '@/components/organisms/HeaderNav';
 
@@ -112,9 +112,15 @@ describe('HeaderNav flyout interactions', () => {
     fireEvent.pointerEnter(trigger);
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
 
-    // Flyout is now in the DOM (conditionally rendered when open).
+    // Flyout mounts closed first, then gets the open class on the next frame so
+    // the CSS transition can run.
     const flyout = container.querySelector('#marketing-header-flyout-features');
     expect(flyout).not.toBeNull();
+    expect(flyout).not.toHaveClass('marketing-glass-header__flyout--open');
+    act(() => {
+      vi.advanceTimersByTime(16);
+    });
+    expect(flyout).toHaveClass('marketing-glass-header__flyout--open');
 
     fireEvent.pointerLeave(header, { relatedTarget: null });
     fireEvent.pointerEnter(flyout as Element);

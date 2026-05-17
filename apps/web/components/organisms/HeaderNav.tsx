@@ -159,6 +159,18 @@ function MarketingGlassFlyout({
   menu: HeaderFlyoutMenu;
   open: boolean;
 }>) {
+  const [animateOpen, setAnimateOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      setAnimateOpen(false);
+      return;
+    }
+
+    const frame = requestAnimationFrame(() => setAnimateOpen(true));
+    return () => cancelAnimationFrame(frame);
+  }, [open]);
+
   if (!open) {
     return null;
   }
@@ -166,7 +178,10 @@ function MarketingGlassFlyout({
   return (
     <div
       id={`marketing-header-flyout-${menu.id}`}
-      className='marketing-glass-header__flyout marketing-glass-header__flyout--open'
+      className={cn(
+        'marketing-glass-header__flyout',
+        animateOpen && 'marketing-glass-header__flyout--open'
+      )}
     >
       <div className='marketing-glass-header__flyout-inner'>
         <p className='marketing-glass-header__flyout-heading'>{menu.heading}</p>

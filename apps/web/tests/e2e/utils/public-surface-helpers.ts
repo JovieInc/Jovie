@@ -228,17 +228,12 @@ export async function assertMarketingHeaderFlyoutsHidden(
     return;
   }
 
-  // After JOV-2147 (conditional render), closed flyouts are not in the DOM.
-  // Any flyout element present on initial load must have --open, meaning it
-  // was explicitly opened. On a fresh page load none should be open.
-  const closedFlyouts = page.locator(
-    '.marketing-glass-header__flyout:not(.marketing-glass-header__flyout--open)'
-  );
-  const closedCount = await closedFlyouts.count();
+  const flyouts = page.locator('.marketing-glass-header__flyout');
+  const flyoutCount = await flyouts.count();
 
   expect(
-    closedCount,
-    `${surface.id}: found ${closedCount} closed flyout(s) in DOM — conditional render guard missing (JOV-2147)`
+    flyoutCount,
+    `${surface.id}: found ${flyoutCount} initial flyout(s) in DOM — marketing flyouts must only mount after user intent (JOV-2147)`
   ).toBe(0);
 }
 
