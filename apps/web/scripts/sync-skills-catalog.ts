@@ -14,7 +14,7 @@
 import { pathToFileURL } from 'node:url';
 import { sql as drizzleSql } from 'drizzle-orm';
 import { SKILL_REGISTRY } from '@/lib/agents/registry';
-import type { SkillDefinition } from '@/lib/agents/types';
+import type { SkillDefinition, ToolDefinition } from '@/lib/agents/types';
 import { db } from '@/lib/db';
 import { skillsCatalog, toolsCatalog } from '@/lib/db/schema/agents';
 import { env } from '@/lib/env-server';
@@ -38,13 +38,17 @@ const toolCatalogChanged = drizzleSql`
   ${toolsCatalog.entitlementRequired} IS DISTINCT FROM excluded.entitlement_required OR
   ${toolsCatalog.model} IS DISTINCT FROM excluded.model OR
   ${toolsCatalog.promptPath} IS DISTINCT FROM excluded.prompt_path OR
+  ${toolsCatalog.inputSchemaZodPath} IS DISTINCT FROM excluded.input_schema_zod_path OR
+  ${toolsCatalog.outputSchemaZodPath} IS DISTINCT FROM excluded.output_schema_zod_path OR
   ${toolsCatalog.metadata} IS DISTINCT FROM excluded.metadata
 `;
 
 export async function syncSkillsCatalog(): Promise<void> {
   const now = new Date();
   const skills = Object.values(SKILL_REGISTRY) as SkillDefinition[];
-  const toolSkills = skills.filter(s => s.kind === 'tool');
+  const toolSkills = skills.filter(
+    (s): s is ToolDefinition => s.kind === 'tool'
+  );
   const nonToolSkills = skills.filter(s => s.kind !== 'tool');
 
   if (nonToolSkills.length > 0) {
@@ -94,6 +98,8 @@ export async function syncSkillsCatalog(): Promise<void> {
           entitlementRequired: skill.entitlement ?? null,
           model: skill.model ?? null,
           promptPath: skill.promptPath ?? null,
+          inputSchemaZodPath: skill.inputSchemaZodPath ?? null,
+          outputSchemaZodPath: skill.outputSchemaZodPath ?? null,
           metadata: skill.metadata,
           updatedAt: now,
         }))
@@ -108,6 +114,8 @@ export async function syncSkillsCatalog(): Promise<void> {
           entitlementRequired: drizzleSql`excluded.entitlement_required`,
           model: drizzleSql`excluded.model`,
           promptPath: drizzleSql`excluded.prompt_path`,
+          inputSchemaZodPath: drizzleSql`excluded.input_schema_zod_path`,
+          outputSchemaZodPath: drizzleSql`excluded.output_schema_zod_path`,
           metadata: drizzleSql`excluded.metadata`,
           updatedAt: drizzleSql`excluded.updated_at`,
         },

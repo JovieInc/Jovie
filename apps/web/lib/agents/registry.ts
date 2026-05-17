@@ -13,7 +13,9 @@
  * 5. The postbuild hook will sync the catalog on next deploy.
  */
 
-import type { SkillDefinition } from './types';
+import type { SkillDefinition, ToolDefinition } from './types';
+
+type RegistryDefinition = SkillDefinition | ToolDefinition;
 
 export const SKILL_REGISTRY = {
   retouch: {
@@ -32,6 +34,6 @@ export const SKILL_REGISTRY = {
       style: 'white-space',
     },
   },
-} as const satisfies Record<string, SkillDefinition>;
+} as const satisfies Record<string, RegistryDefinition>;
 
 export type SkillId = keyof typeof SKILL_REGISTRY;

@@ -8,6 +8,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SKILL_REGISTRY } from '@/lib/agents/registry';
+import type { SkillDefinition, ToolDefinition } from '@/lib/agents/types';
 import { main, syncSkillsCatalog } from './sync-skills-catalog';
 
 // ---------------------------------------------------------------------------
@@ -49,9 +50,15 @@ vi.mock('@/lib/env-server', () => ({
 // ---------------------------------------------------------------------------
 
 describe('sync-skills-catalog', () => {
+  const mutableRegistry = SKILL_REGISTRY as unknown as Record<
+    string,
+    SkillDefinition | ToolDefinition
+  >;
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockEnv.DATABASE_URL = 'postgres://unit-test';
+    delete mutableRegistry.unitTool;
   });
 
   it('SKILL_REGISTRY exports at least one non-tool skill', () => {
@@ -102,6 +109,44 @@ describe('sync-skills-catalog', () => {
     ]);
     expect(mockOnConflictDoUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
+        setWhere: expect.anything(),
+      })
+    );
+  });
+
+  it('upserts tool schema paths with conflict guards', async () => {
+    mutableRegistry.unitTool = {
+      id: 'unitTool',
+      name: 'Unit tool',
+      description: 'Tool catalog test entry',
+      kind: 'tool',
+      version: '1.0.0',
+      entitlement: 'ai_retouching',
+      model: 'unit-model',
+      inputSchemaZodPath: 'apps/web/lib/agents/tools/unit/input.ts',
+      outputSchemaZodPath: 'apps/web/lib/agents/tools/unit/output.ts',
+      metadata: { surface: 'unit' },
+    };
+
+    await syncSkillsCatalog();
+
+    expect(mockInsert).toHaveBeenCalledTimes(2);
+    const toolRows = mockValues.mock.calls[1]?.[0];
+
+    expect(toolRows).toEqual([
+      expect.objectContaining({
+        id: 'unitTool',
+        kind: 'tool',
+        inputSchemaZodPath: 'apps/web/lib/agents/tools/unit/input.ts',
+        outputSchemaZodPath: 'apps/web/lib/agents/tools/unit/output.ts',
+      }),
+    ]);
+    expect(mockOnConflictDoUpdate.mock.calls[1]?.[0]).toEqual(
+      expect.objectContaining({
+        set: expect.objectContaining({
+          inputSchemaZodPath: expect.anything(),
+          outputSchemaZodPath: expect.anything(),
+        }),
         setWhere: expect.anything(),
       })
     );
