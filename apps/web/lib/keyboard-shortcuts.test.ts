@@ -103,6 +103,10 @@ describe('keyboard-shortcuts definitions', () => {
     it('uses the canonical releases route for release navigation', () => {
       expect(NAV_SHORTCUTS.releases.href).toBe(APP_ROUTES.RELEASES);
     });
+
+    it('uses the canonical audience route for audience navigation', () => {
+      expect(NAV_SHORTCUTS.audience.href).toBe(APP_ROUTES.AUDIENCE);
+    });
   });
 
   describe('modifier shortcuts', () => {
