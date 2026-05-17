@@ -1,6 +1,10 @@
 import { eq } from 'drizzle-orm';
 import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
+import type { ReactNode } from 'react';
+import { AdminToolPage } from '@/components/features/admin/layout/AdminToolPage';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
 import { formatUsd } from '@/lib/admin/format';
 import { db } from '@/lib/db';
@@ -62,99 +66,108 @@ export default async function AgentRunDebugPage({
   const costDisplay = run.cost ? formatUsd(Number(run.cost)) : '—';
 
   return (
-    <div className='mx-auto max-w-4xl space-y-6 p-6'>
-      <div className='space-y-1'>
-        <h1 className='text-xl font-semibold text-primary'>Agent Run Debug</h1>
-        <p className='text-sm text-tertiary font-mono'>{run.id}</p>
-      </div>
-
+    <AdminToolPage
+      title='Agent Run Debug'
+      description={run.id}
+      testId='admin-agent-run-detail-page'
+      className='max-w-(--app-shell-content-max-reading)'
+    >
       {/* Run metadata */}
-      <Section title='Run Metadata'>
-        <MetaRow label='Agent' value={run.agentSlug} />
-        <MetaRow label='Model' value={run.model ?? '—'} />
-        <MetaRow label='Status' value={run.status} />
-        <MetaRow label='Trigger' value={run.triggerKind} />
-        <MetaRow label='Started' value={run.startedAt?.toISOString() ?? '—'} />
-        <MetaRow
-          label='Completed'
-          value={run.completedAt?.toISOString() ?? '—'}
-        />
-        <MetaRow label='Cost' value={costDisplay} />
-      </Section>
+      <DebugSection title='Run Metadata'>
+        <dl className='space-y-2'>
+          <MetaRow label='Agent' value={run.agentSlug} />
+          <MetaRow label='Model' value={run.model ?? '—'} />
+          <MetaRow label='Status' value={run.status} />
+          <MetaRow label='Trigger' value={run.triggerKind} />
+          <MetaRow
+            label='Started'
+            value={run.startedAt?.toISOString() ?? '—'}
+          />
+          <MetaRow
+            label='Completed'
+            value={run.completedAt?.toISOString() ?? '—'}
+          />
+          <MetaRow label='Cost' value={costDisplay} />
+        </dl>
+      </DebugSection>
 
       {/* Token usage */}
       {tokenUsage && (
-        <Section title='Token Usage'>
-          <MetaRow
-            label='Prompt tokens'
-            value={String(tokenUsage.promptTokens ?? '—')}
-          />
-          <MetaRow
-            label='Completion tokens'
-            value={String(tokenUsage.completionTokens ?? '—')}
-          />
-          <MetaRow
-            label='Total tokens'
-            value={String(tokenUsage.totalTokens ?? '—')}
-          />
-        </Section>
+        <DebugSection title='Token Usage'>
+          <dl className='space-y-2'>
+            <MetaRow
+              label='Prompt tokens'
+              value={String(tokenUsage.promptTokens ?? '—')}
+            />
+            <MetaRow
+              label='Completion tokens'
+              value={String(tokenUsage.completionTokens ?? '—')}
+            />
+            <MetaRow
+              label='Total tokens'
+              value={String(tokenUsage.totalTokens ?? '—')}
+            />
+          </dl>
+        </DebugSection>
       )}
 
       {/* Input context digest */}
-      <Section title='Input Context Digest'>
-        <code className='block break-all rounded bg-surface-0 p-3 text-xs font-mono text-secondary'>
+      <DebugSection title='Input Context Digest'>
+        <code className='block break-all rounded-md bg-surface-0 px-3 py-2.5 font-mono text-[12px] text-secondary-token'>
           {run.inputContextDigest}
         </code>
-        <p className='mt-1 text-xs text-tertiary'>
+        <p className='mt-1 text-xs text-tertiary-token'>
           SHA-256 of the input context. Raw context is never stored (PII
           protection).
         </p>
-      </Section>
+      </DebugSection>
 
       {/* Rendered prompt */}
       {run.prompt && (
-        <Section title='Rendered Prompt'>
-          <pre className='max-h-96 overflow-y-auto whitespace-pre-wrap rounded bg-surface-0 p-3 text-xs font-mono text-secondary'>
+        <DebugSection title='Rendered Prompt'>
+          <pre className='max-h-96 overflow-y-auto whitespace-pre-wrap rounded-md bg-surface-0 px-3 py-2.5 font-mono text-[12px] text-secondary-token'>
             {run.prompt}
           </pre>
-        </Section>
+        </DebugSection>
       )}
 
       {/* Tool calls */}
       {toolCalls.length > 0 && (
-        <Section title={`Tool Calls (${toolCalls.length})`}>
-          <pre className='max-h-64 overflow-y-auto whitespace-pre-wrap rounded bg-surface-0 p-3 text-xs font-mono text-secondary'>
+        <DebugSection title={`Tool Calls (${toolCalls.length})`}>
+          <pre className='max-h-64 overflow-y-auto whitespace-pre-wrap rounded-md bg-surface-0 px-3 py-2.5 font-mono text-[12px] text-secondary-token'>
             {JSON.stringify(toolCalls, null, 2)}
           </pre>
-        </Section>
+        </DebugSection>
       )}
 
       {/* Error */}
       {run.error && (
-        <Section title='Error'>
-          <pre className='whitespace-pre-wrap rounded bg-surface-0 p-3 text-xs font-mono text-destructive'>
+        <DebugSection title='Error'>
+          <pre className='whitespace-pre-wrap rounded-md bg-surface-0 px-3 py-2.5 font-mono text-[12px] text-destructive'>
             {run.error}
           </pre>
-        </Section>
+        </DebugSection>
       )}
-    </div>
+    </AdminToolPage>
   );
 }
 
-function Section({
+function DebugSection({
   title,
   children,
 }: {
   readonly title: string;
-  readonly children: React.ReactNode;
+  readonly children: ReactNode;
 }) {
   return (
-    <section className='space-y-2'>
-      <h2 className='text-sm font-medium text-secondary'>{title}</h2>
-      <div className='rounded-lg border border-subtle bg-surface-1 p-4 space-y-2'>
-        {children}
-      </div>
-    </section>
+    <ContentSurfaceCard
+      as='section'
+      surface='details'
+      className='overflow-hidden p-0'
+    >
+      <ContentSectionHeader title={title} density='compact' />
+      <div className='space-y-2 p-3.5'>{children}</div>
+    </ContentSurfaceCard>
   );
 }
 
@@ -166,9 +179,11 @@ function MetaRow({
   readonly value: string;
 }) {
   return (
-    <div className='flex items-baseline justify-between gap-4 text-sm'>
-      <span className='text-tertiary shrink-0'>{label}</span>
-      <span className='font-mono text-xs text-secondary truncate'>{value}</span>
+    <div className='grid gap-1 text-[13px] sm:grid-cols-[minmax(120px,0.4fr)_minmax(0,1fr)] sm:items-baseline'>
+      <dt className='shrink-0 text-tertiary-token'>{label}</dt>
+      <dd className='min-w-0 truncate font-mono text-[12px] text-secondary-token sm:text-right'>
+        {value}
+      </dd>
     </div>
   );
 }
