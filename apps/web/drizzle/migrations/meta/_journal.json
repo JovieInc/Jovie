@@ -358,6 +358,13 @@
       "when": 1778977327016,
       "tag": "0050_smart_mastermind",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1778996928720,
+      "tag": "0051_yielding_iron_man",
+      "breakpoints": true
     }
   ]
 }

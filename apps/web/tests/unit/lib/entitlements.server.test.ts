@@ -80,6 +80,8 @@ describe('getCurrentUserEntitlements', () => {
       canAccessWhiteLabel: false,
       canAccessAbTesting: false,
       aiPitchGenPerRelease: 1,
+      canAccessAiRetouching: false,
+      aiRetouchDailyLimit: null,
     });
   });
 
@@ -225,6 +227,8 @@ describe('getCurrentUserEntitlements', () => {
       canAccessWhiteLabel: false,
       canAccessAbTesting: false,
       aiPitchGenPerRelease: 1,
+      canAccessAiRetouching: false,
+      aiRetouchDailyLimit: null,
     });
   });
 
@@ -291,6 +295,8 @@ describe('getCurrentUserEntitlements', () => {
       smartLinksLimit: null,
       aiDailyMessageLimit: 100,
       aiPitchGenPerRelease: 5,
+      canAccessAiRetouching: true,
+      aiRetouchDailyLimit: 10,
     });
   });
 
@@ -357,6 +363,8 @@ describe('getCurrentUserEntitlements', () => {
       smartLinksLimit: null,
       aiDailyMessageLimit: 500,
       aiPitchGenPerRelease: null,
+      canAccessAiRetouching: true,
+      aiRetouchDailyLimit: 50,
     });
   });
 
