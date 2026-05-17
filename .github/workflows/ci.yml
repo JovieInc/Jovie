@@ -3000,10 +3000,16 @@ jobs:
         with:
           secrets: ${{ toJSON(secrets) }}
       - name: Pull env (preview)
-        run: ./node_modules/.bin/vercel pull --yes --environment=preview --token ${{ secrets.VERCEL_TOKEN }} --scope ${{ secrets.VERCEL_ORG_ID }}
+        run: |
+          scope_args=()
+          if [ -n "${VERCEL_ORG_ID:-}" ]; then
+            scope_args=(--scope "$VERCEL_ORG_ID")
+          fi
+          ./node_modules/.bin/vercel pull --yes --environment=preview --token "$VERCEL_TOKEN" "${scope_args[@]}"
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       - name: Strip deprecated Turbo env overrides (preview)
         run: |
           for env_file in .vercel/.env.preview.local .vercel/.env.local; do
@@ -3013,12 +3019,18 @@ jobs:
             fi
           done
       - name: Build (PR preview)
-        run: env -u TURBO_REMOTE_ONLY ./node_modules/.bin/vercel build --token ${{ secrets.VERCEL_TOKEN }} --scope ${{ secrets.VERCEL_ORG_ID }}
+        run: |
+          scope_args=()
+          if [ -n "${VERCEL_ORG_ID:-}" ]; then
+            scope_args=(--scope "$VERCEL_ORG_ID")
+          fi
+          env -u TURBO_REMOTE_ONLY ./node_modules/.bin/vercel build --token "$VERCEL_TOKEN" "${scope_args[@]}"
         env:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       - name: Deploy (PR preview, fast deployment for UI-only changes)
         id: pr_deploy
         run: |
@@ -3644,10 +3656,16 @@ jobs:
           NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
           TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
       - name: Pull env (production)
-        run: ./node_modules/.bin/vercel pull --yes --environment=production --token ${{ secrets.VERCEL_TOKEN }} --scope ${{ secrets.VERCEL_ORG_ID }}
+        run: |
+          scope_args=()
+          if [ -n "${VERCEL_ORG_ID:-}" ]; then
+            scope_args=(--scope "$VERCEL_ORG_ID")
+          fi
+          ./node_modules/.bin/vercel pull --yes --environment=production --token "$VERCEL_TOKEN" "${scope_args[@]}"
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       - name: Strip deprecated Turbo env overrides (production)
         run: |
           for env_file in .vercel/.env.production.local .vercel/.env.local; do
@@ -3659,12 +3677,18 @@ jobs:
       - name: Check signup readiness (production env file)
         run: pnpm --filter=@jovie/web exec tsx scripts/check-signup-readiness.ts --target=prd --source=vercel-file --file=.vercel/.env.production.local
       - name: Build (preview target for staging verification)
-        run: env -u TURBO_REMOTE_ONLY ./node_modules/.bin/vercel build --token ${{ secrets.VERCEL_TOKEN }} --scope ${{ secrets.VERCEL_ORG_ID }}
+        run: |
+          scope_args=()
+          if [ -n "${VERCEL_ORG_ID:-}" ]; then
+            scope_args=(--scope "$VERCEL_ORG_ID")
+          fi
+          env -u TURBO_REMOTE_ONLY ./node_modules/.bin/vercel build --token "$VERCEL_TOKEN" "${scope_args[@]}"
         env:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       - name: Deploy (staging preview, prebuilt)
         id: deploy
         run: |

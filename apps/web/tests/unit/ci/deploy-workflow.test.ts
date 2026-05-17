@@ -79,8 +79,13 @@ describe('deploy workflow Vercel env resolution', () => {
       expect(step).toContain(
         'VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}'
       );
+      expect(step).toContain('VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}');
       expect(step).toContain(command);
-      expect(step).toContain('--scope ${{ secrets.VERCEL_ORG_ID }}');
+      expect(step).toContain('scope_args=()');
+      expect(step).toContain('if [ -n "${VERCEL_ORG_ID:-}" ]; then');
+      expect(step).toContain('scope_args=(--scope "$VERCEL_ORG_ID")');
+      expect(step).toContain('"${scope_args[@]}"');
+      expect(step).not.toContain('--scope ${{ secrets.VERCEL_ORG_ID }}');
     }
   });
 
