@@ -1,4 +1,6 @@
+import { Button } from '@jovie/ui';
 import { and, desc, eq } from 'drizzle-orm';
+import { ExternalLink } from 'lucide-react';
 import type { Metadata } from 'next';
 import { revalidatePath } from 'next/cache';
 import { AdminWorkspacePage } from '@/components/features/admin/layout/AdminWorkspacePage';
@@ -234,7 +236,7 @@ export default async function AdminPlaylistsPage({
     >
       {/* Playlist list */}
       {playlists.length === 0 ? (
-        <div className='py-16 text-center text-app text-white/40'>
+        <div className='py-16 text-center text-app text-tertiary-token'>
           {tab === 'pending'
             ? 'No pending playlists. Next one generates at 6:00 AM UTC.'
             : `No ${tab} playlists.`}
@@ -242,13 +244,16 @@ export default async function AdminPlaylistsPage({
       ) : (
         <div className='space-y-3'>
           {playlists.map(playlist => (
-            <ContentSurfaceCard key={playlist.id} className='p-4'>
-              <div className='flex items-start justify-between'>
-                <div>
-                  <h3 className='text-mid font-medium text-white'>
+            <ContentSurfaceCard
+              key={playlist.id}
+              className='overflow-hidden p-0'
+            >
+              <div className='flex flex-col gap-3 px-(--linear-app-header-padding-x) py-3 sm:flex-row sm:items-start sm:justify-between'>
+                <div className='min-w-0'>
+                  <h3 className='truncate text-app font-caption text-primary-token'>
                     {playlist.title}
                   </h3>
-                  <p className='mt-1 text-app text-white/40'>
+                  <p className='mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-2xs text-tertiary-token'>
                     {playlist.trackCount} tracks
                     {playlist.genreTags?.length
                       ? ` \u2022 ${playlist.genreTags.join(', ')}`
@@ -259,19 +264,16 @@ export default async function AdminPlaylistsPage({
                 </div>
 
                 {tab === 'pending' && (
-                  <div className='flex gap-2'>
+                  <div className='flex shrink-0 gap-1.5'>
                     <form action={approvePlaylist}>
                       <input
                         type='hidden'
                         name='playlistId'
                         value={playlist.id}
                       />
-                      <button
-                        type='submit'
-                        className='rounded-md bg-[#1DB954] px-3 py-1.5 text-app font-medium text-white hover:opacity-90'
-                      >
+                      <Button type='submit' size='sm' className='h-7'>
                         Approve
-                      </button>
+                      </Button>
                     </form>
                     <form action={rejectPlaylist}>
                       <input
@@ -279,25 +281,37 @@ export default async function AdminPlaylistsPage({
                         name='playlistId'
                         value={playlist.id}
                       />
-                      <button
+                      <Button
                         type='submit'
-                        className='rounded-md bg-white/5 px-3 py-1.5 text-app font-book text-white/60 hover:bg-white/10'
+                        variant='ghost'
+                        size='sm'
+                        className='h-7'
                       >
                         Reject
-                      </button>
+                      </Button>
                     </form>
                   </div>
                 )}
 
                 {tab === 'published' && playlist.spotifyPlaylistId && (
-                  <a
-                    href={`https://open.spotify.com/playlist/${playlist.spotifyPlaylistId}`}
-                    target='_blank'
-                    rel='noopener noreferrer'
-                    className='text-app text-[#1DB954] hover:underline'
+                  <Button
+                    asChild
+                    variant='ghost'
+                    size='sm'
+                    className='h-7 shrink-0'
                   >
-                    View on Spotify
-                  </a>
+                    <a
+                      href={`https://open.spotify.com/playlist/${playlist.spotifyPlaylistId}`}
+                      target='_blank'
+                      rel='noopener noreferrer'
+                    >
+                      <ExternalLink
+                        className='h-3.5 w-3.5'
+                        aria-hidden='true'
+                      />
+                      View on Spotify
+                    </a>
+                  </Button>
                 )}
               </div>
             </ContentSurfaceCard>
