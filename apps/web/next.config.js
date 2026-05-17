@@ -429,15 +429,11 @@ const nextConfig = {
   },
   async rewrites() {
     return [
-      // Keep canonical app URLs attached to legacy dashboard route owners while
-      // those surfaces are migrated one-by-one.
+      // Keep canonical releases attached to the legacy dashboard route owner
+      // until the releases surface is migrated.
       {
         source: '/app/releases',
         destination: '/app/dashboard/releases',
-      },
-      {
-        source: '/app/presence',
-        destination: '/app/dashboard/presence',
       },
     ];
   },

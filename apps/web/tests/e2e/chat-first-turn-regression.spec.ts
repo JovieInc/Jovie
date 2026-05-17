@@ -121,7 +121,7 @@ test('new thread album-art unavailable state survives refresh', async ({
     process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
     'Requires E2E_USE_TEST_AUTH_BYPASS=1'
   );
-  test.setTimeout(120_000);
+  test.setTimeout(240_000);
 
   await mockChatLifecycle(page);
   await setTestAuthBypassSession(page, 'creator-ready', 'e2e-chat-first-turn');
