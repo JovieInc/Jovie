@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { APP_ROUTES } from '@/constants/routes';
 
 type RewriteRule = {
   readonly source: string;
@@ -34,5 +35,25 @@ describe('chat route rewrites', () => {
     expect(
       rewrites.find(rewrite => rewrite.source === '/app/chat')
     ).toBeUndefined();
-  });
+  }, 20_000);
+
+  it('does not rewrite canonical insights through the legacy dashboard alias', async () => {
+    const nextConfigModule = await import('../../../next.config.js');
+    const nextConfig = nextConfigModule.default ?? nextConfigModule;
+    const rewrites = flattenRewrites(await nextConfig.rewrites());
+
+    expect(
+      rewrites.find(rewrite => rewrite.source === APP_ROUTES.INSIGHTS)
+    ).toBeUndefined();
+  }, 20_000);
+
+  it('does not rewrite canonical presence through the legacy dashboard alias', async () => {
+    const nextConfigModule = await import('../../../next.config.js');
+    const nextConfig = nextConfigModule.default ?? nextConfigModule;
+    const rewrites = flattenRewrites(await nextConfig.rewrites());
+
+    expect(
+      rewrites.find(rewrite => rewrite.source === APP_ROUTES.PRESENCE)
+    ).toBeUndefined();
+  }, 20_000);
 });

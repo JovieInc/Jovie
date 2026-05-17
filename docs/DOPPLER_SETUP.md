@@ -183,6 +183,39 @@ doppler secrets set SECRET_NAME=value --project jovie-web --config dev
 - Document required secrets in `.env.example`
 - Never commit actual secret values to Git
 
+### Production Signup Readiness
+
+Production signup and anonymous onboarding chat are blocked unless these keys are present in `prd`:
+
+```bash
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+CLERK_SECRET_KEY
+DATABASE_URL
+SESSION_SECRET
+AI_GATEWAY_API_KEY
+NEXT_PUBLIC_TURNSTILE_SITE_KEY
+TURNSTILE_SECRET_KEY
+```
+
+Run the redacted readiness check before promoting production:
+
+```bash
+doppler run --project jovie-web --config prd -- \
+  pnpm --filter=@jovie/web run check:signup-readiness -- --target=prd
+```
+
+The production synthetic signup canary also requires these `prd` secrets:
+
+```bash
+E2E_PROD_SIGNUP_EMAIL_BASE
+E2E_PROD_SIGNUP_PASSWORD
+E2E_PROD_MAILBOX_PROVIDER=gmail
+E2E_PROD_MAILBOX_CLIENT_ID
+E2E_PROD_MAILBOX_CLIENT_SECRET
+E2E_PROD_MAILBOX_REFRESH_TOKEN
+E2E_PROD_MAILBOX_QUERY_FROM # optional Gmail query narrowing
+```
+
 ### Migrating from .env Files
 
 If you have existing `.env` files, you can import them:

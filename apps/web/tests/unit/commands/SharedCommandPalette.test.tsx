@@ -115,7 +115,7 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
       .find(el => el.textContent?.includes('Manage your release catalog'));
     expect(releasesNav).toBeDefined();
     fireEvent.mouseDown(releasesNav!);
-    expect(pushMock).toHaveBeenCalledWith('/app/dashboard/releases');
+    expect(pushMock).toHaveBeenCalledWith('/app/releases');
   });
 
   it('routes a skill commit to chat with the ?skill= handoff', () => {

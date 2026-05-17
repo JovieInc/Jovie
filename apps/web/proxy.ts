@@ -38,6 +38,11 @@ import {
   COOKIE_BANNER_REQUIRED_COOKIE,
   isCookieBannerRequired,
 } from '@/lib/cookies/consent-regions';
+import {
+  CONSENT_COOKIE_NAME,
+  hasAnalyticsConsent,
+} from '@/lib/cookies/consent-state';
+import { NONESSENTIAL_PROXY_COOKIE_NAMES } from '@/lib/cookies/registry';
 import { captureError } from '@/lib/error-tracking';
 import {
   analyzeHost,
@@ -55,6 +60,10 @@ import {
   buildReportToHeader,
   getCspReportUri,
 } from '@/lib/security/csp-reporting';
+import {
+  createProbeDropResponse,
+  isMaliciousProbePath,
+} from '@/lib/security/probe-detection';
 import { ensureSentry } from '@/lib/sentry/ensure';
 import { createBotResponse } from '@/lib/utils/bot-detection';
 
@@ -1010,30 +1019,6 @@ function buildFinalResponse(
   }
 
   const geo = getGeoFromRequest(req);
-
-  if (geo.city && req.cookies.get(HOMEPAGE_CITY_COOKIE)?.value !== geo.city) {
-    res.cookies.set(HOMEPAGE_CITY_COOKIE, geo.city, {
-      httpOnly: false,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7,
-      path: '/',
-    });
-  }
-
-  if (
-    geo.region &&
-    req.cookies.get(HOMEPAGE_REGION_COOKIE)?.value !== geo.region
-  ) {
-    res.cookies.set(HOMEPAGE_REGION_COOKIE, geo.region, {
-      httpOnly: false,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7,
-      path: '/',
-    });
-  }
-
   const countryCode =
     req.headers.get('x-vercel-ip-country') ?? req.headers.get('cf-ipcountry');
   const normalizedCountryCode = countryCode?.trim().toUpperCase() ?? null;
@@ -1047,6 +1032,9 @@ function buildFinalResponse(
   const currentCountryCode =
     req.cookies.get(COUNTRY_CODE_COOKIE)?.value ?? null;
   const nextCookieRequirement = requiresCookieConsent ? '1' : '0';
+  const canSetAnalyticsProxyCookies =
+    !requiresCookieConsent ||
+    hasAnalyticsConsent(req.cookies.get(CONSENT_COOKIE_NAME)?.value);
 
   if (normalizedCountryCode && currentCountryCode !== normalizedCountryCode) {
     res.cookies.set(COUNTRY_CODE_COOKIE, normalizedCountryCode, {
@@ -1071,25 +1059,63 @@ function buildFinalResponse(
     });
   }
 
-  // Set audience tracking cookies
-  if (!req.cookies.get(AUDIENCE_ANON_COOKIE)?.value) {
-    res.cookies.set(AUDIENCE_ANON_COOKIE, crypto.randomUUID(), {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 365,
-      path: '/',
-    });
+  if (requiresCookieConsent && !canSetAnalyticsProxyCookies) {
+    for (const cookieName of NONESSENTIAL_PROXY_COOKIE_NAMES) {
+      if (req.cookies.get(cookieName)?.value) {
+        res.cookies.set(cookieName, '', {
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 0,
+          path: '/',
+        });
+      }
+    }
   }
 
-  if (userId && res.cookies.get(AUDIENCE_IDENTIFIED_COOKIE)?.value !== '1') {
-    res.cookies.set(AUDIENCE_IDENTIFIED_COOKIE, '1', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 365,
-      path: '/',
-    });
+  if (canSetAnalyticsProxyCookies) {
+    if (geo.city && req.cookies.get(HOMEPAGE_CITY_COOKIE)?.value !== geo.city) {
+      res.cookies.set(HOMEPAGE_CITY_COOKIE, geo.city, {
+        httpOnly: false,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 7,
+        path: '/',
+      });
+    }
+
+    if (
+      geo.region &&
+      req.cookies.get(HOMEPAGE_REGION_COOKIE)?.value !== geo.region
+    ) {
+      res.cookies.set(HOMEPAGE_REGION_COOKIE, geo.region, {
+        httpOnly: false,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 7,
+        path: '/',
+      });
+    }
+
+    // Set audience tracking cookies.
+    if (!req.cookies.get(AUDIENCE_ANON_COOKIE)?.value) {
+      res.cookies.set(AUDIENCE_ANON_COOKIE, crypto.randomUUID(), {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 365,
+        path: '/',
+      });
+    }
+
+    if (userId && req.cookies.get(AUDIENCE_IDENTIFIED_COOKIE)?.value !== '1') {
+      res.cookies.set(AUDIENCE_IDENTIFIED_COOKIE, '1', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 365,
+        path: '/',
+      });
+    }
   }
 
   // Performance monitoring
@@ -1187,6 +1213,18 @@ export default async function middleware(
   req: NextRequest,
   event: NextFetchEvent
 ) {
+  // ========================================================================
+  // Drop obvious scanner probes early (e.g. /username/wp-content/...,
+  // /xmlrpc.php, /.env). These paths can never legitimately match a Jovie
+  // route, but the public profile catch-all redirects them into the page
+  // pipeline — which wakes up rendering, billing for an invocation, and
+  // emits Sentry warnings. The dedicated detector returns a quiet 404
+  // before any other handling so probe traffic costs nothing downstream.
+  // ========================================================================
+  if (isMaliciousProbePath(req.nextUrl.pathname)) {
+    return createProbeDropResponse();
+  }
+
   const hostInfo = analyzeHost(req.nextUrl.hostname);
   if (hostInfo.isSupportHost) {
     const targetUrl = new URL(APP_ROUTES.SUPPORT, BASE_URL);

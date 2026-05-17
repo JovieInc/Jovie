@@ -22,6 +22,7 @@ export { isActiveConnectionsRow, isRecord, isTableExistsRow } from './guards';
 export {
   checkDbHealth,
   checkDbPerformance,
+  doesColumnExist,
   doesTableExist,
   getDbConfig,
   validateDbConnection,
@@ -36,6 +37,7 @@ export { setSessionUser, withDb } from './session';
 // Types
 export type {
   ActiveConnectionsRow,
+  ColumnExistsRow,
   ConnectionValidationResult,
   DbOrTransaction,
   DbType,

@@ -32,6 +32,10 @@ export interface RecordAudienceEventInput {
   readonly duplicateWindowMs?: number;
 }
 
+export interface RecordAudienceEventOptions {
+  readonly includeLatestActionLabel?: boolean;
+}
+
 function compactActionProjection(
   input: RecordAudienceEventInput,
   label: string
@@ -62,7 +66,8 @@ function compactActionProjection(
 
 export async function recordAudienceEvent(
   tx: DbOrTransaction,
-  input: RecordAudienceEventInput
+  input: RecordAudienceEventInput,
+  options: RecordAudienceEventOptions = {}
 ): Promise<void> {
   const now = input.timestamp ?? new Date();
   if (input.eventType === 'source_scanned' && input.sourceLinkId) {
@@ -134,7 +139,9 @@ export async function recordAudienceEvent(
           LIMIT 5
         ) AS entry
       )`,
-      latestActionLabel: label,
+      ...(options.includeLatestActionLabel === false
+        ? {}
+        : { latestActionLabel: label }),
       lastSeenAt: now,
       updatedAt: now,
     })

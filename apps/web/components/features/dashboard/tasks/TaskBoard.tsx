@@ -343,12 +343,12 @@ function TaskBoardColumn({
       aria-label={`${visual.label} tasks`}
       data-testid={`tasks-board-column-${column.status}`}
       className={cn(
-        'flex h-full min-h-0 w-[19.5rem] shrink-0 flex-col rounded-lg border border-[color-mix(in_oklab,var(--linear-app-shell-border)_70%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_82%,transparent)]',
+        'flex h-full min-h-0 w-[19.5rem] shrink-0 flex-col rounded-lg border border-subtle bg-surface-0',
         isOver &&
           'border-[color-mix(in_oklab,var(--linear-border-focus)_70%,transparent)] bg-[color-mix(in_oklab,var(--linear-row-hover)_36%,var(--linear-app-content-surface))]'
       )}
     >
-      <div className='flex h-10 min-h-10 items-center justify-between gap-2 border-b border-[color-mix(in_oklab,var(--linear-app-shell-border)_58%,transparent)] px-3'>
+      <div className='flex h-10 min-h-10 items-center justify-between gap-2 border-b border-subtle px-3'>
         <div className='flex min-w-0 items-center gap-2'>
           <StatusIcon
             className={cn(
@@ -380,7 +380,7 @@ function TaskBoardColumn({
       >
         <div className='min-h-0 flex-1 space-y-2 overflow-y-auto px-2.5 py-2.5'>
           {column.tasks.length === 0 ? (
-            <div className='flex min-h-[7rem] items-center justify-center rounded-md border border-dashed border-[color-mix(in_oklab,var(--linear-app-shell-border)_70%,transparent)] px-4 text-center text-[11.5px] leading-relaxed text-tertiary-token'>
+            <div className='flex min-h-[7rem] items-center justify-center rounded-md border border-dashed border-subtle px-4 text-center text-[11.5px] leading-relaxed text-tertiary-token'>
               Drop tasks here
             </div>
           ) : (
@@ -499,9 +499,9 @@ function TaskBoardCard({
   return (
     <div
       className={cn(
-        'group/task-board-card min-h-[7.25rem] w-full rounded-lg border border-[color-mix(in_oklab,var(--linear-app-shell-border)_68%,transparent)] bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_38%,var(--linear-app-content-surface))] px-3 py-2.5 text-left shadow-[0_1px_0_rgba(255,255,255,0.025)] transition-[background-color,border-color,box-shadow,opacity]',
+        'group/task-board-card min-h-[7.25rem] w-full rounded-lg border border-subtle bg-surface-1 px-3 py-2.5 text-left shadow-card transition-[background-color,border-color,box-shadow,opacity]',
         draggingOverlay ? 'cursor-grabbing' : 'cursor-grab',
-        'hover:border-[color-mix(in_oklab,var(--linear-app-shell-border)_90%,transparent)] hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_42%,var(--linear-app-content-surface))]',
+        'hover:border-subtle hover:bg-surface-2 hover:shadow-card-elevated',
         'focus-visible:outline-none focus-visible:border-[color-mix(in_oklab,var(--linear-border-focus)_74%,transparent)] focus-visible:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]',
         selected &&
           'border-[color-mix(in_oklab,var(--linear-border-focus)_70%,transparent)] bg-[color-mix(in_oklab,var(--linear-row-hover)_52%,var(--linear-app-content-surface))]',
@@ -543,8 +543,8 @@ function TaskBoardCard({
             className={cn(
               'rounded-full border px-1.5 py-0.5 text-[10px] font-semibold',
               task.agentStatus === 'failed'
-                ? 'border-[color-mix(in_oklab,var(--color-accent-red)_36%,transparent)] text-[color:var(--color-accent-red)]'
-                : 'border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] text-tertiary-token'
+                ? 'border-error/30 text-error'
+                : 'border-subtle text-tertiary-token'
             )}
           >
             {agentLabel}
@@ -582,16 +582,16 @@ function TaskBoardSkeleton() {
       {[0, 1, 2, 3].map(column => (
         <div
           key={column}
-          className='flex h-full min-h-0 w-[19.5rem] shrink-0 flex-col rounded-lg border border-[color-mix(in_oklab,var(--linear-app-shell-border)_58%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_76%,transparent)]'
+          className='flex h-full min-h-0 w-[19.5rem] shrink-0 flex-col rounded-lg border border-subtle bg-surface-0'
         >
-          <div className='h-10 border-b border-[color-mix(in_oklab,var(--linear-app-shell-border)_50%,transparent)] px-3 py-3'>
+          <div className='h-10 border-b border-subtle px-3 py-3'>
             <div className='h-3 w-24 rounded bg-surface-2' />
           </div>
           <div className='space-y-2 px-2.5 py-2.5'>
             {[0, 1, 2].map(card => (
               <div
                 key={card}
-                className='h-[7.25rem] rounded-lg border border-[color-mix(in_oklab,var(--linear-app-shell-border)_54%,transparent)] bg-surface-1/40 p-3'
+                className='h-[7.25rem] animate-pulse rounded-lg border border-subtle bg-surface-1 p-3'
               >
                 <div className='h-2.5 w-14 rounded bg-surface-2' />
                 <div className='mt-3 h-3 w-11/12 rounded bg-surface-2' />

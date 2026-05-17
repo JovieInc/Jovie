@@ -1,7 +1,6 @@
 appId: app.jov.ie.staging
 productName: Jovie Staging
 executableName: Jovie Staging
-copyright: "Copyright © 2026 Jovie Inc."
 artifactName: Jovie-Staging-${version}-${arch}.${ext}
 directories:
   output: dist
@@ -32,17 +31,17 @@ mac:
 dmg:
   title: Jovie Staging
   background: assets/dmg-background.png
-  iconSize: 96
-  iconTextSize: 12
+  iconSize: 112
+  iconTextSize: 13
   window:
-    width: 660
-    height: 400
+    width: 760
+    height: 480
   contents:
-    - x: 180
-      y: 218
+    - x: 242
+      y: 244
       type: file
-    - x: 480
-      y: 218
+    - x: 518
+      y: 244
       type: link
       path: /Applications
 win:

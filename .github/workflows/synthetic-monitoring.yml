@@ -16,7 +16,7 @@ jobs:
   synthetic-test:
     name: Production Synthetic Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 20
 
     steps:
       - name: Safety check - only run on schedule or manual dispatch
@@ -50,6 +50,12 @@ jobs:
           echo "deb [signed-by=/usr/share/keyrings/doppler-archive-keyring.gpg] https://packages.doppler.com/public/cli/deb/debian any-version main" | sudo tee /etc/apt/sources.list.d/doppler-cli.list
           sudo apt-get update && sudo apt-get install -y doppler
           doppler --version
+
+      - name: Check production signup readiness
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+        run: |
+          doppler run -- pnpm --filter=@jovie/web exec tsx scripts/check-signup-readiness.ts --target=prd --source=env
 
       - name: Run Golden Path Test
         env:
@@ -86,14 +92,11 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-      - name: Cleanup Synthetic E2E Users
+      - name: Confirm scoped synthetic cleanup
         if: always()
-        continue-on-error: true
-        env:
-          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
         run: |
-          cd apps/web
-          doppler run -- pnpm tsx scripts/cleanup-e2e-users.ts --force
+          echo "Production signup canary cleanup is scoped inside synthetic-golden-path.spec.ts by exact plus-addressed email."
+          echo "No broad production Clerk cleanup script is run from this workflow."
 
       - name: Parse test results
         id: test-results
@@ -290,7 +293,7 @@ jobs:
                     },
                     {
                       "title": "Status",
-                      "value": "Configured production synthetic checks passing (${{ steps.test-results.outputs.warning_count }} warnings)",
+                      "value": "Production signup and public-profile synthetic checks passing",
                       "short": false
                     },
                     {

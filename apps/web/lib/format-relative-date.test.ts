@@ -18,14 +18,32 @@ describe('relativeDate', () => {
     expect(relativeDate('2026-04-18T12:00:00Z', NOW)).toBe('7d ago');
   });
 
+  it('formats older past dates without raw multi-year day counts', () => {
+    expect(relativeDate('2026-04-04T12:00:00Z', NOW)).toBe('3w ago');
+    expect(relativeDate('2026-01-15T12:00:00Z', NOW)).toBe('3mo ago');
+    expect(relativeDate('2024-04-19T12:00:00Z', NOW)).toBe('2y ago');
+    const multiYear = relativeDate('2020-04-24T12:00:00Z', NOW);
+    expect(multiYear).toBe('6y ago');
+    expect(multiYear).not.toMatch(/^\d{4,}d ago$/u);
+  });
+
   it('formats short future inside a week as "in Nd"', () => {
     expect(relativeDate('2026-04-28T12:00:00Z', NOW)).toBe('in 3d');
     expect(relativeDate('2026-05-02T12:00:00Z', NOW)).toBe('in 7d');
   });
 
-  it('falls back to localised absolute date past a week', () => {
+  it('falls back to localised absolute date for later future dates', () => {
     const out = relativeDate('2026-06-01T12:00:00Z', NOW);
     expect(out).toMatch(/Jun/);
+  });
+
+  it('omits the year for same-year absolute dates and includes it across years', () => {
+    const sameYear = relativeDate('2026-12-20T12:00:00Z', NOW);
+    expect(sameYear).toMatch(/Dec/);
+    expect(sameYear).not.toMatch(/2026/);
+
+    const crossYear = relativeDate('2027-01-10T12:00:00Z', NOW);
+    expect(crossYear).toMatch(/2027/);
   });
 
   it('returns an empty string for invalid date input', () => {

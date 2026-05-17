@@ -5,13 +5,74 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.5.9] - 2026-05-16
+## [26.5.15] - 2026-05-16
 
-> [internal] HeaderNav flyout now conditionally renders (JOV-2147), eliminating the JOV-2145 class of bugs where megamenu content rendered as unstyled text on routes that didn't load the marketing CSS.
+> [internal] Observability: AI responses now flow into the Braintrust "Jovie" project when the API key is configured, so we can see model traces and run evals against production.
+
+### Added
+
+- [internal] **Braintrust LLM observability**: every Vercel AI SDK call (`streamText`, `generateText`, `generateObject`, `streamObject`) is wrapped through `apps/web/lib/ai/sdk.ts` and every direct Anthropic SDK call goes through `getAnthropicClient()` in `apps/web/lib/ai/anthropic.ts`. Wiring includes `initLogger` in `apps/web/instrumentation.ts` (Node runtime only, fail-open on init), the `braintrust/webpack-loader` rule in `apps/web/next.config.js`, the `braintrust@^3.10.0` dependency, a `BRAINTRUST_API_KEY` slot in `apps/web/lib/env-server-schema.ts`, and an MCP server entry in `.mcp.json` (`https://api.braintrust.dev/mcp`) so agents can query traces. Wrapper functions are lazy so partial `vi.mock('ai')` calls in unit tests don't fault on sibling exports they never invoke.
+
+## [26.5.14] - 2026-05-16
+
+> [internal] Desktop shell identity hardening: added a branded Electron recovery screen and bumped the DMG release version.
 
 ### Fixed
 
-- **[internal] Marketing header flyout conditional render**: `MarketingGlassFlyout` now returns `null` when closed instead of relying on CSS-only visibility toggling. The flyout DOM node is only present when the menu is open, which eliminates the root cause of JOV-2145 (404 pages rendering flyout content as a wall of unstyled text). E2E helper `assertMarketingHeaderFlyoutsHidden` updated to assert on DOM structure rather than computed CSS properties.
+- [internal] **Desktop shell identity and failure fallback (JOV-2314)**: Electron launch failures now render a branded Jovie Desktop recovery surface with retry affordance instead of a blank or generic web failure. The desktop app name is set explicitly for production/staging, and the desktop release version is bumped so the next DMG carries the current app-shell identity.
+
+## [26.5.13] - 2026-05-16
+
+> [internal] Security: drop unauthenticated scanner traffic at the edge so off-platform probe URLs no longer reach the page handler or generate observability warnings.
+
+### Fixed
+
+- [internal] Drop unauthenticated scanner traffic at the edge so off-platform probe URLs no longer reach the page handler or generate observability warnings.
+
+## [26.5.11] - 2026-05-16
+
+> [internal] Desktop release bump for the Electron app-shell launch fix and a guard that prevents future desktop code from landing without DMG release handling.
+
+### Fixed
+
+- [internal] **Desktop DMG app-shell release guard (JOV-2295)**: Bumped desktop release metadata so the shipped DMG includes the Electron `/app` launch behavior. Added a CI guard that fails when `apps/desktop/**` changes without either a `VERSION` bump or an explicit update to `.github/workflows/desktop-release.yml`, preventing desktop-only fixes from landing without a publish trigger.
+
+## [26.5.10] - 2026-05-16
+
+> [internal] Bug fix: the onboarding claim endpoint no longer fires twice on a single /start page visit when Clerk's auth state updates mid-effect.
+
+### Fixed
+
+- [internal] **`useOnboardingClaim` duplicate request guard (JOV-2203)**: React 18 re-runs `useEffect` whenever any dependency changes. When Clerk's auth state transitions (`isLoaded false→true`, then `isSignedIn false→true`) on the same `claimTrigger` value, the effect could fire twice before the first `POST /api/onboarding/claim` resolved — sending a duplicate request. Added an `inflightTriggersRef` (`useRef<Set<number>>`) that gates the async work synchronously before the first `await`. The guard is cleared only after the fetch settles, not in the effect cleanup. Three Vitest tests verify: (1) sequential trigger advancement fires exactly once per trigger, (2) concurrent re-renders with a slow in-flight fetch fire exactly once, (3) retrying a signed-in user after chat activity advances the trigger correctly.
+
+## [26.5.9] - 2026-05-16
+
+> [internal] Homepage hydration fix — eliminates React mismatch warning on the homepage workspace section.
+
+### Fixed
+
+- [internal] **Homepage hydration mismatch in `HomepageWorkspaceSection`**: Framer Motion scroll-linked `MotionValue` style props were serialised differently during SSR vs. the initial client render, producing a React hydration warning on every page load. Added an `isMounted` guard so both the server render and the first client paint use `style={undefined}` on `motion.div` and `motion.li`; MotionValues wire up after mount. Also fixes a secondary mismatch for visitors with `prefers-reduced-motion`: `useReducedMotion()` now reads `false` on both server and initial hydration (before mount), matching the SSR output.
+
+## [26.5.8] - 2026-05-16
+
+> [internal] AI Connector v1 — approve/reject/execute backend for the Gmail → Google Calendar booking flow. Closed beta only (flag-gated, default off). Artists never see this; it will be allowlisted for design-partner DJs post-merge.
+
+### Added
+
+- **[internal] Approve endpoint (`POST /api/connectors/suggested-actions/[id]/approve`)**: CAS transition `pending → accepted`, inserts a `workflow_runs` row, returns the new run ID. Idempotent on CAS miss (409).
+- **[internal] Reject endpoint (`POST /api/connectors/suggested-actions/[id]/reject`)**: CAS transition `pending → dismissed`. No follow-up work. Idempotent on CAS miss (409).
+- **[internal] Workflow cron (`POST /api/cron/process-workflow-runs`, every minute)**: Claims up to 20 `pending` runs with a two-step SELECT+CAS UPDATE, processes up to 5 concurrently, fails unknown kinds immediately (fail-closed).
+- **[internal] `executeApprovedAction` executor**: Loads `workflow_runs` row, extracts `approvalId` + `eventPayload` from `stepOutputs`, delegates to `createCalendarEvent`, CAS-transitions `running → completed | failed`.
+- **[internal] Precision eval harness**: 14 scenario fixtures covering booking-confirmed, booking-cancelled, multi-booking, Asia-Pacific, Europe tour, DJ sets, already-present, and edge cases; `precision.test.ts` asserts extraction scores ≥0.9 against all fixtures.
+- **[internal] `ai_connectors_beta` Statsig gate** registered in `contracts.ts`, `registry.ts`, `STATSIG_FEATURE_GATES.md`, and `FEATURE_REGISTRY.md` — default off, closed beta.
+
+## [26.5.7] - 2026-05-16
+
+> [internal] Bug fix: release plan demo page is now reachable in dev and preview without a manual flag override.
+
+### Fixed
+
+- [internal] **Release plan demo page 404 in dev/preview**: `RELEASE_PLAN_DEMO` feature flag now returns `true` in all non-production environments. The flag's `decide()` in `registry.ts` returns `!IS_VERCEL_PRODUCTION`, matching the same env-aware pattern used by `shouldHonorClientFlagOverrides`. Production keeps the flag off (default `false`) and can be unlocked via the DevToolbar or `localStorage` override.
 
 ## [26.5.6] - 2026-05-16
 

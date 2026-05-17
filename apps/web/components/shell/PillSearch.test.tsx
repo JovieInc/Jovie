@@ -30,6 +30,16 @@ describe('PillSearch', () => {
     ).toBeInTheDocument();
   });
 
+  it('uses a quiet tokenized focus ring instead of the cyan input ring', () => {
+    setup();
+    const input = screen.getByLabelText('Filter tracks');
+    expect(input.className).toContain('focus-visible:ring-1');
+    expect(input.className).toContain(
+      'focus-visible:ring-(--linear-border-focus)/25'
+    );
+    expect(input.className).not.toContain('ring-cyan');
+  });
+
   it('switches to the "and…" placeholder once a pill is present', () => {
     setup({
       pills: [{ id: '1', field: 'artist', op: 'is', values: ['Frank Ocean'] }],
@@ -51,6 +61,42 @@ describe('PillSearch', () => {
       field: 'artist',
       op: 'is',
       values: ['Frank Ocean'],
+    });
+  });
+
+  it('only suggests fields allowed by the route adapter', () => {
+    const { onPillsChange } = setup({ allowedFields: ['artist'] });
+    const input = screen.getByLabelText('Filter tracks');
+
+    fireEvent.change(input, { target: { value: 'Pyramids' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onPillsChange).not.toHaveBeenCalled();
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+
+    fireEvent.change(input, { target: { value: 'Frank' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onPillsChange).toHaveBeenCalledOnce();
+    expect(onPillsChange.mock.calls[0]![0][0]).toMatchObject({
+      field: 'artist',
+      values: ['Frank Ocean'],
+    });
+  });
+
+  it('uses route-provided status and has suggestions when supplied', () => {
+    const { onPillsChange } = setup({
+      allowedFields: ['status', 'has'],
+      statusOptions: ['released', 'scheduled'],
+      hasOptions: ['artwork', 'lyrics'],
+    });
+    const input = screen.getByLabelText('Filter tracks');
+
+    fireEvent.change(input, { target: { value: 'released' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(onPillsChange).toHaveBeenCalledOnce();
+    expect(onPillsChange.mock.calls[0]![0][0]).toMatchObject({
+      field: 'status',
+      values: ['released'],
     });
   });
 

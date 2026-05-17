@@ -35,6 +35,11 @@ export interface TableExistsRow {
   table_exists: boolean;
 }
 
+/** Row type for column existence check query */
+export interface ColumnExistsRow {
+  column_exists: boolean;
+}
+
 /** Row type for active connections query */
 export interface ActiveConnectionsRow {
   active_connections: string | number;

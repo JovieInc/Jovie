@@ -185,8 +185,16 @@ describe('surface elevation guardrails', () => {
       join(ROOT, 'app/(auth)/signin/page.tsx'),
       'utf-8'
     );
+    const signinShell = readFileSync(
+      join(ROOT, 'app/(auth)/signin/SignInPageClient.tsx'),
+      'utf-8'
+    );
     const signupPage = readFileSync(
       join(ROOT, 'app/(auth)/signup/page.tsx'),
+      'utf-8'
+    );
+    const signupShell = readFileSync(
+      join(ROOT, 'app/(auth)/signup/SignUpPageClient.tsx'),
       'utf-8'
     );
     const userCreationFailed = readFileSync(
@@ -202,8 +210,10 @@ describe('surface elevation guardrails', () => {
       'utf-8'
     );
 
-    expect(signinPage).toContain('<AuthLayout');
-    expect(signupPage).toContain('<AuthLayout');
+    expect(signinPage).toContain('<SignInPageClient');
+    expect(signinShell).toContain('<AuthLayout');
+    expect(signupPage).toContain('<SignUpPageClient');
+    expect(signupShell).toContain('<AuthLayout');
     expect(userCreationFailed).toContain('<AuthLayout');
     expect(onboardingCheckout).toContain('<AuthLayout');
     expect(waitlistSuccess).toContain('<AuthLayout');
@@ -218,10 +228,22 @@ describe('surface elevation guardrails', () => {
       join(ROOT, 'components/organisms/AppShellContentPanel.tsx'),
       'utf-8'
     );
+    const shellRouteMatches = readFileSync(
+      join(ROOT, 'app/app/(shell)/shell-route-matches.ts'),
+      'utf-8'
+    );
+    const appShellLayout = readFileSync(
+      join(ROOT, 'app/app/(shell)/layout.tsx'),
+      'utf-8'
+    );
 
     expect(tasksPage).toContain('PageShell');
     expect(dashboardPanel).toContain("frame = 'content-container'");
     expect(tasksPage).toContain("data-testid='tasks-content-panel'");
+    expect(tasksPage).toContain('TaskDataTable');
+    expect(tasksPage).not.toMatch(/<UnifiedTable\b/);
+    expect(shellRouteMatches).toContain('isTasksShellRoute');
+    expect(appShellLayout).toContain('TasksRouteSkeleton');
   });
 
   it('keeps presence and earnings inside framed content panels', () => {
@@ -261,6 +283,71 @@ describe('surface elevation guardrails', () => {
 
     expect(releaseMatrix).toContain("className='mt-2.5'");
     expect(releaseMatrix).toContain("data-testid='release-table-shell'");
+  });
+
+  it('routes shell release filters through the shared header search contract', () => {
+    const shellReleasesView = readFileSync(
+      join(
+        ROOT,
+        'components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView.tsx'
+      ),
+      'utf-8'
+    );
+    const authShellWrapper = readFileSync(
+      join(ROOT, 'components/organisms/AuthShellWrapper.tsx'),
+      'utf-8'
+    );
+
+    expect(shellReleasesView).toContain('useRegisterHeaderSearch');
+    expect(shellReleasesView).toContain("key: 'shell-releases'");
+    expect(shellReleasesView).toContain("triggerLabel: 'Filter'");
+    expect(shellReleasesView).not.toMatch(
+      /const\s*\[\s*searchOpen\s*,\s*setSearchOpen\s*\]\s*=\s*useState/
+    );
+    expect(authShellWrapper).not.toContain('HeaderSearchSurface');
+  });
+
+  it('keeps admin shell tables on the canonical AdminDataTable wrapper', () => {
+    const files = [
+      'components/features/admin/ActivityTableUnified.tsx',
+      'components/features/admin/admin-creator-profiles/AdminCreatorProfilesUnified.tsx',
+      'components/features/admin/admin-releases-table/AdminReleasesTableUnified.tsx',
+      'components/features/admin/admin-users-table/AdminUsersTableUnified.tsx',
+      'components/features/admin/feedback-table/AdminFeedbackTable.tsx',
+      'components/features/admin/waitlist-table/AdminWaitlistTableUnified.tsx',
+    ] as const;
+
+    const adminDataTable = readFileSync(
+      join(ROOT, 'components/features/admin/table/AdminDataTable.tsx'),
+      'utf-8'
+    );
+
+    expect(adminDataTable).toContain('ADMIN_DATA_TABLE_CLASSNAME');
+    expect(adminDataTable).toContain('enableVirtualization = true');
+
+    for (const file of files) {
+      const content = readFileSync(join(ROOT, file), 'utf-8');
+      expect(
+        content,
+        `${file} should use canonical admin table chrome`
+      ).toContain('AdminDataTable');
+      expect(
+        content,
+        `${file} should not bypass AdminDataTable with direct UnifiedTable usage`
+      ).not.toMatch(/<UnifiedTable\b/);
+    }
+  });
+
+  it('routes library filters through the shared header search contract', () => {
+    const librarySurface = readFileSync(
+      join(ROOT, 'app/app/(shell)/library/LibrarySurface.tsx'),
+      'utf-8'
+    );
+
+    expect(librarySurface).toContain('useRegisterHeaderSearch');
+    expect(librarySurface).toContain("key: 'library'");
+    expect(librarySurface).toContain("triggerLabel: 'Filter'");
+    expect(librarySurface).not.toContain('OPEN_COMMAND_PALETTE_EVENT');
   });
 
   it('keeps task and preview cards off the shell canvas token', () => {

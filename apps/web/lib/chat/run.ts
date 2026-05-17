@@ -2,10 +2,10 @@ import { gateway } from '@ai-sdk/gateway';
 import {
   convertToModelMessages,
   type ModelMessage,
-  streamText,
   type ToolSet,
   type UIMessage,
 } from 'ai';
+import { streamText } from '@/lib/ai/sdk';
 import { selectKnowledgeContext } from '@/lib/chat/knowledge/router';
 import { ONBOARDING_SYSTEM_PROMPT } from '@/lib/chat/prompts/onboarding';
 import { buildSystemPrompt } from '@/lib/chat/system-prompt';
@@ -124,6 +124,8 @@ export interface ExecuteChatTurnInput {
   requestId: string;
   /** Telemetry hooks (Sentry in prod, no-op in eval/tests). */
   telemetry?: ChatTelemetry;
+  /** Optional durable persistence hook for model stream failures. */
+  onStreamError?: (error: unknown) => PromiseLike<void> | void;
   /**
    * Mode discriminator (JOV-2132). `'app'` is the existing authenticated
    * artist chat path; `'onboarding'` is the anonymous /start visitor flow
@@ -180,6 +182,7 @@ export async function executeChatTurn(
     requestId,
     resolvedProfileId,
     telemetry,
+    onStreamError,
     mode = 'app',
   } = input;
 
@@ -250,7 +253,7 @@ export async function executeChatTurn(
       functionId: 'jovie-chat',
       metadata: { model: selectedModel, plan: userPlan },
     },
-    onError: ({ error }) => {
+    onError: async ({ error }) => {
       if (isClientDisconnect(error, signal)) return;
 
       telemetry?.captureException?.(error, {
@@ -263,6 +266,7 @@ export async function executeChatTurn(
           conversationId: resolvedConversationId,
         },
       });
+      await onStreamError?.(error);
     },
   });
 

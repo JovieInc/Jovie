@@ -9,7 +9,6 @@ import {
 } from '@jovie/ui';
 import { Copy, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import {
   type ComponentType,
   type MouseEvent,
@@ -114,7 +113,6 @@ export function NavMenuItem({
   onPrefetch,
   useShellNavItem = false,
 }: NavMenuItemProps) {
-  const router = useRouter();
   const isElectronRuntime = useIsElectronRuntime();
   const pendingNavigationRef = useRef(false);
   const clearPendingNavigationListenersRef = useRef<(() => void) | null>(null);
@@ -204,7 +202,7 @@ export function NavMenuItem({
       if (preventNavigation) {
         event.preventDefault();
       }
-      const shouldInterceptNavigation =
+      const isPlainNavigation =
         !preventNavigation &&
         Boolean(onNavigate) &&
         event.button === 0 &&
@@ -213,30 +211,21 @@ export function NavMenuItem({
         !event.shiftKey &&
         !event.altKey;
 
-      if (!hadPendingPointerNavigation && shouldInterceptNavigation) {
+      if (!hadPendingPointerNavigation && isPlainNavigation) {
         showPendingShell();
       }
       onClick?.();
 
-      if (!shouldInterceptNavigation && onNavigate) {
+      if (!isPlainNavigation && onNavigate) {
         onCancelNavigate?.();
-      }
-
-      if (shouldInterceptNavigation) {
-        event.preventDefault();
-        requestAnimationFrame(() => {
-          router.push(item.href);
-        });
       }
     },
     [
-      item.href,
       clearPendingNavigationListeners,
       onCancelNavigate,
       onClick,
       onNavigate,
       preventNavigation,
-      router,
       showPendingShell,
     ]
   );

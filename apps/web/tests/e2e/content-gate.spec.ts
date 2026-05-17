@@ -587,7 +587,7 @@ test.describe('Content Gate — Authenticated Pages', () => {
         ]
       : [
           {
-            path: APP_ROUTES.DASHBOARD_AUDIENCE,
+            path: APP_ROUTES.AUDIENCE,
             name: 'Audience',
             minLength: 10,
             readyText: /audience|fans|subscribers/i,

@@ -4,6 +4,7 @@ import { redirect, unstable_rethrow } from 'next/navigation';
 import { Suspense } from 'react';
 import { AppShellSkeleton } from '@/components/organisms/AppShellSkeleton';
 import { LyricsRouteSkeleton } from '@/components/shell/LyricsRouteSkeleton';
+import { TasksRouteSkeleton } from '@/components/shell/TasksRouteSkeleton';
 import { APP_ROUTES } from '@/constants/routes';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
 import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
@@ -12,10 +13,13 @@ import { getAppFlagValue } from '@/lib/flags/server';
 import ChatLoading from './chat/loading';
 import { DashboardShellContent } from './DashboardShellContent';
 import { ReleaseTableSkeleton } from './dashboard/releases/loading';
+import { LibraryLoadingState } from './library/LibrarySurface';
 import {
   isChatShellRoute,
+  isLibraryShellRoute,
   isLyricsShellRoute,
   isReleasesShellRoute,
+  isTasksShellRoute,
   resolveAppShellRequestPath,
 } from './shell-route-matches';
 
@@ -66,10 +70,24 @@ export default async function AppShellLayout({
           variant={shellVariant}
         />
       );
+    } else if (isLibraryShellRoute(pathname)) {
+      shellFallback = (
+        <AppShellSkeleton
+          main={<LibraryLoadingState />}
+          variant={shellVariant}
+        />
+      );
     } else if (isLyricsShellRoute(pathname)) {
       shellFallback = (
         <AppShellSkeleton
           main={<LyricsRouteSkeleton />}
+          variant={shellVariant}
+        />
+      );
+    } else if (isTasksShellRoute(pathname)) {
+      shellFallback = (
+        <AppShellSkeleton
+          main={<TasksRouteSkeleton />}
           variant={shellVariant}
         />
       );

@@ -152,3 +152,57 @@ test('chat route picker opens without moving the shell or composer', async ({
   }
   expect(afterScrollTop).toBe(beforeScrollTop);
 });
+
+test('chat composer clears mobile shell tabs on tablet and phone', async ({
+  page,
+}) => {
+  test.skip(
+    process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
+    'Requires E2E_USE_TEST_AUTH_BYPASS=1'
+  );
+  test.setTimeout(180_000);
+
+  await forceDesignV1(page);
+  await setTestAuthBypassSession(
+    page,
+    'creator-ready',
+    'e2e-shell-chat-mobile-user'
+  );
+
+  for (const viewport of [
+    { label: 'tablet', width: 768, height: 1024 },
+    { label: 'phone', width: 390, height: 844 },
+    { label: 'small phone', width: 320, height: 568 },
+  ] as const) {
+    await page.setViewportSize({
+      width: viewport.width,
+      height: viewport.height,
+    });
+    await gotoChatRoute(page);
+    await page.waitForURL(/\/app\/chat/, { timeout: 60_000 });
+
+    const { composer } = shellChatFrameLocators(page);
+    const mobileTabs = page.getByRole('navigation', {
+      name: 'Dashboard tabs',
+    });
+
+    await expect(composer).toBeVisible({ timeout: 30_000 });
+    await expect(mobileTabs).toBeVisible({ timeout: 30_000 });
+
+    const composerBox = await composer.boundingBox();
+    const tabsBox = await mobileTabs.boundingBox();
+
+    expect(composerBox, `${viewport.label} composer is measurable`).not.toBe(
+      null
+    );
+    expect(tabsBox, `${viewport.label} mobile tabs are measurable`).not.toBe(
+      null
+    );
+    if (composerBox && tabsBox) {
+      expect(
+        composerBox.y + composerBox.height,
+        `${viewport.label} composer bottom clears tabs`
+      ).toBeLessThanOrEqual(tabsBox.y - 2);
+    }
+  }
+});

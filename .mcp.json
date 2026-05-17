@@ -23,6 +23,12 @@
       "headers": {
         "X-Goog-Api-Key": "${GOOGLE_STITCH_API_KEY:-}"
       }
+    },
+    "braintrust": {
+      "url": "https://api.braintrust.dev/mcp",
+      "headers": {
+        "Authorization": "Bearer ${BRAINTRUST_API_KEY:-}"
+      }
     }
   }
 }

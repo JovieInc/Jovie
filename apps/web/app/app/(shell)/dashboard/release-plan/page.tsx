@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { notFound } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { ReleaseCalendar } from '@/components/jovie/release-calendar/ReleaseCalendar';
@@ -25,16 +26,7 @@ export default function ReleasePlanPage() {
   }
 
   return (
-    <div className='flex flex-col gap-6 p-6'>
-      <header className='flex flex-col gap-1'>
-        <h1 className='text-2xl font-semibold text-(--linear-text-primary)'>
-          Release plan
-        </h1>
-        <p className='text-sm text-(--linear-text-secondary)'>
-          Friday-cadence release calendar with workflows under every moment.
-        </p>
-      </header>
-
+    <div className='flex min-h-0 flex-1 flex-col gap-6 p-6'>
       {plan === null ? (
         <section
           data-testid='release-plan-empty-state'
@@ -68,14 +60,15 @@ export default function ReleasePlanPage() {
             ))}
           </div>
 
-          <button
+          <Button
             type='button'
             data-testid='release-plan-generate-button'
             onClick={() => setPlan(generateDemoPlan())}
-            className='self-start rounded-md bg-fuchsia-500 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-fuchsia-600'
+            size='sm'
+            className='self-start'
           >
             Generate plan
-          </button>
+          </Button>
         </section>
       ) : (
         <ReleaseCalendar

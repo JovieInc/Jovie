@@ -10,6 +10,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { Tooltip } from './Tooltip';
 
 // Thread types — co-located so consumers import from one place. Production
 // adapters should map real conversation records into this flat shell contract.
@@ -183,9 +184,16 @@ export function SidebarThreadsSection({
         {visible.map(t => {
           const active = activeThreadId === t.id;
           const unread = !!t.unread && !active;
+          const hasThreadActions = Boolean(onThreadContextMenu);
           const rowClasses = cn(
-            'flex-1 flex items-center gap-2 min-w-0 text-left',
-            tight ? 'h-6 pl-2.5 pr-2' : 'h-7 pl-3 pr-2'
+            'flex w-full min-w-0 items-center gap-2 rounded-md text-left transition-colors duration-subtle ease-out focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/35',
+            tight ? 'h-6 pl-2.5' : 'h-7 pl-3',
+            hasThreadActions ? 'pr-7' : 'pr-2',
+            active
+              ? 'bg-surface-1 text-primary-token'
+              : unread
+                ? 'text-primary-token hover:bg-surface-1 focus-visible:bg-surface-1'
+                : 'text-secondary-token hover:bg-surface-1 hover:text-primary-token focus-visible:bg-surface-1 focus-visible:text-primary-token'
           );
           const rowContent = (
             <>
@@ -204,7 +212,7 @@ export function SidebarThreadsSection({
               <span
                 className={cn(
                   'flex-1 truncate',
-                  tight ? 'text-[12px]' : 'text-[12.5px]',
+                  'text-[12.5px]',
                   unread && 'font-medium'
                 )}
               >
@@ -213,46 +221,53 @@ export function SidebarThreadsSection({
             </>
           );
           return (
-            // biome-ignore lint/a11y/noStaticElementInteractions: row hosts a real link/button; div is hover container with right-click menu
-            // biome-ignore lint/a11y/noNoninteractiveElementInteractions: same
             <div
               key={t.id}
               className={cn(
-                'group/thread relative flex items-center rounded-md transition-colors duration-subtle ease-out',
-                tight ? 'h-6' : 'h-7',
-                active
-                  ? 'bg-surface-1 text-primary-token'
-                  : unread
-                    ? 'text-primary-token hover:bg-surface-1/50'
-                    : 'text-tertiary-token hover:bg-surface-1/50 hover:text-primary-token'
+                'group/thread relative flex items-center',
+                tight ? 'h-6' : 'h-7'
               )}
-              onContextMenu={e => onThreadContextMenu?.(e, t)}
             >
-              {t.href ? (
-                <Link href={t.href} className={rowClasses}>
-                  {rowContent}
-                </Link>
-              ) : (
-                <button
-                  type='button'
-                  onClick={() => onSelect?.(t.id)}
-                  className={rowClasses}
-                >
-                  {rowContent}
-                </button>
-              )}
+              <Tooltip label={t.title} side='right' block>
+                {t.href ? (
+                  <Link
+                    href={t.href}
+                    aria-current={active ? 'page' : undefined}
+                    className={rowClasses}
+                    onContextMenu={e => onThreadContextMenu?.(e, t)}
+                  >
+                    {rowContent}
+                  </Link>
+                ) : (
+                  <button
+                    type='button'
+                    onClick={() => onSelect?.(t.id)}
+                    onContextMenu={e => onThreadContextMenu?.(e, t)}
+                    aria-pressed={active}
+                    className={rowClasses}
+                  >
+                    {rowContent}
+                  </button>
+                )}
+              </Tooltip>
               {onThreadContextMenu ? (
-                <button
-                  type='button'
-                  onClick={e => onThreadContextMenu(e, t)}
-                  aria-label='Thread actions'
-                  className={cn(
-                    'absolute right-1 top-1/2 -translate-y-1/2 h-5 w-5 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-opacity duration-subtle ease-out',
-                    'opacity-0 group-hover/thread:opacity-100 focus-visible:opacity-100'
-                  )}
-                >
-                  <MoreHorizontal className='h-3 w-3' strokeWidth={2.25} />
-                </button>
+                <Tooltip label='Thread actions' side='right'>
+                  <button
+                    type='button'
+                    onClick={e => onThreadContextMenu(e, t)}
+                    aria-label={`Thread actions for ${t.title}`}
+                    className={cn(
+                      'absolute right-1 top-1/2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-md text-quaternary-token transition-[background-color,color,opacity] duration-subtle ease-out hover:bg-surface-1 hover:text-primary-token focus-visible:bg-surface-1 focus-visible:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/35',
+                      'opacity-0 group-hover/thread:opacity-100 focus-visible:opacity-100'
+                    )}
+                  >
+                    <MoreHorizontal
+                      className='h-3 w-3'
+                      strokeWidth={2.25}
+                      aria-hidden='true'
+                    />
+                  </button>
+                </Tooltip>
               ) : null}
             </div>
           );

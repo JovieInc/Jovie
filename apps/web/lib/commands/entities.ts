@@ -94,6 +94,13 @@ export type UseEntitySearch = (query: string) => EntitySearchResult;
 
 export interface EntityProvider {
   readonly kind: EntityKind;
+  /**
+   * Stable semantic identity for dev duplicate-registration checks.
+   * Providers that are recreated for the same profile/scope should keep the
+   * same key so React Strict Mode and route remounts do not look like wiring
+   * bugs.
+   */
+  readonly registryKey?: string;
   readonly label: string;
   readonly useSearch: UseEntitySearch;
   readonly renderChip: (ref: EntityRef) => ReactNode;
@@ -108,7 +115,12 @@ const PROVIDERS: Partial<Record<EntityKind, EntityProvider>> = {};
 
 export function registerEntityProvider(provider: EntityProvider): void {
   const existing = PROVIDERS[provider.kind];
-  if (existing && existing !== provider) {
+  const isSameProvider =
+    existing === provider ||
+    (existing?.registryKey !== undefined &&
+      existing.registryKey === provider.registryKey);
+
+  if (existing && !isSameProvider) {
     // Dev warning only — multiple mount/unmount cycles (React strict mode,
     // test renders, profile switches) legitimately create new provider
     // instances for the same kind. Overwrite is the sane default; a true
@@ -119,6 +131,12 @@ export function registerEntityProvider(provider: EntityProvider): void {
     );
   }
   PROVIDERS[provider.kind] = provider;
+}
+
+export function unregisterEntityProvider(provider: EntityProvider): void {
+  if (PROVIDERS[provider.kind] === provider) {
+    delete PROVIDERS[provider.kind];
+  }
 }
 
 export function getEntityProvider(

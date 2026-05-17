@@ -67,7 +67,7 @@ export const primaryNavigation: NavItem[] = [
   profileNavItem,
   {
     name: 'Releases',
-    href: APP_ROUTES.DASHBOARD_RELEASES,
+    href: APP_ROUTES.RELEASES,
     id: 'releases',
     icon: Music,
     description: 'Link out every provider with one smart link',
@@ -81,7 +81,7 @@ export const primaryNavigation: NavItem[] = [
   },
   {
     name: 'Audience',
-    href: APP_ROUTES.DASHBOARD_AUDIENCE,
+    href: APP_ROUTES.AUDIENCE,
     id: 'audience',
     icon: Users,
     description: 'Understand your audience demographics',

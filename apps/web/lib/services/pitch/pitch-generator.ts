@@ -9,8 +9,8 @@
  */
 
 import { gateway } from '@ai-sdk/gateway';
-import { generateObject } from 'ai';
 import { z } from 'zod';
+import { generateObject } from '@/lib/ai/sdk';
 import { PITCH_MODEL } from '@/lib/constants/ai-models';
 import { buildSystemPrompt, buildUserPrompt } from './prompts';
 import {
