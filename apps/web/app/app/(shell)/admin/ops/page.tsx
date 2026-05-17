@@ -1,5 +1,5 @@
 import { Button } from '@jovie/ui';
-import { Maximize2 } from 'lucide-react';
+import { CheckCircle2, Maximize2, XCircle } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import type {
@@ -8,6 +8,7 @@ import type {
 } from '@/app/api/admin/hud/shipping-velocity/route';
 import { AdminToolPage } from '@/components/features/admin/layout/AdminToolPage';
 import { APP_ROUTES } from '@/constants/routes';
+import { getPublicProfileCanaryStatus } from '@/lib/admin/ops-queries';
 import { env } from '@/lib/env-server';
 import { getHudMetrics } from '@/lib/hud/metrics';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
@@ -81,9 +82,10 @@ export default async function AdminOpsPage({
   // The admin layout has already verified admin entitlement; getHudMetrics
   // accepts the access mode for downstream auth-aware features (e.g. AI ops
   // dispatch UI). Admin sees full dispatch; kiosk-token would not.
-  const [metrics, shippingPrefetch] = await Promise.all([
+  const [metrics, shippingPrefetch, canaryStatus] = await Promise.all([
     getHudMetrics('admin'),
     getInitialShippingData(),
+    getPublicProfileCanaryStatus(),
   ]);
 
   // In admin-kiosk presentation, render the kiosk-density body inside the
@@ -102,6 +104,19 @@ export default async function AdminOpsPage({
       </div>
     );
   }
+
+  // Derive canary display state
+  const canaryPass = canaryStatus?.pass ?? null;
+  const canaryRunAt = canaryStatus?.runAt
+    ? new Date(canaryStatus.runAt).toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        timeZone: 'UTC',
+        timeZoneName: 'short',
+      })
+    : null;
 
   return (
     <AdminToolPage
@@ -122,6 +137,47 @@ export default async function AdminOpsPage({
         </Button>
       }
     >
+      {/* Public-profile canary status (JOV-1872) — one line + status dot */}
+      <div
+        className='flex items-center gap-2 rounded-md border border-subtle bg-surface-1 px-3 py-2 text-[13px]'
+        data-testid='public-profile-canary-status'
+      >
+        {canaryPass === null ? (
+          <span
+            className='h-2 w-2 rounded-full bg-tertiary-token'
+            aria-hidden='true'
+          />
+        ) : canaryPass ? (
+          <CheckCircle2
+            className='h-3.5 w-3.5 shrink-0 text-success'
+            aria-label='Pass'
+          />
+        ) : (
+          <XCircle
+            className='h-3.5 w-3.5 shrink-0 text-destructive'
+            aria-label='Fail'
+          />
+        )}
+        <span className='font-medium text-secondary-token'>
+          Public profile canary
+        </span>
+        <span className='text-tertiary-token'>
+          {canaryPass === null
+            ? 'No data yet'
+            : canaryPass
+              ? 'Pass'
+              : `Fail — ${canaryStatus?.checks
+                  .filter(c => !c.ok)
+                  .map(c => c.name)
+                  .join(', ')}`}
+        </span>
+        {canaryRunAt ? (
+          <span className='ml-auto text-[12px] text-tertiary-token'>
+            {canaryRunAt}
+          </span>
+        ) : null}
+      </div>
+
       <HudDashboardClient
         initialMetrics={metrics}
         density='shell'
