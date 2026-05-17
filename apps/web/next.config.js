@@ -251,10 +251,11 @@ const nextConfig = {
       { source: '/app/dashboard', destination: '/app' },
       { source: '/app/dashboard/overview', destination: '/app' },
       // NOTE: shell-owned aliases such as /app/profile, /app/tipping,
-      // /app/earnings, /app/contacts, /app/tour-dates, and dashboard chat/
-      // profile aliases are intentionally omitted here. App Router pages handle
-      // their final destination so middleware can preserve the requested deep
-      // link for unauthenticated users.
+      // /app/earnings, /app/contacts, /app/tour-dates, and dashboard profile
+      // aliases are intentionally omitted here. App Router pages handle their
+      // final destination so middleware can preserve the requested deep link
+      // for unauthenticated users.
+      { source: '/app/dashboard/chat', destination: '/app/chat' },
       { source: '/app/settings', destination: '/app/settings/account' },
       {
         source: '/app/settings/profile',

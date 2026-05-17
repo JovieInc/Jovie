@@ -46,7 +46,6 @@ describe('shell alias redirects', () => {
             APP_ROUTES.DASHBOARD_LINKS,
             APP_ROUTES.DASHBOARD_PROFILE,
             APP_ROUTES.DASHBOARD_TIPPING,
-            '/app/dashboard/chat',
             '/app/tipping',
             APP_ROUTES.CONTACTS,
             APP_ROUTES.DASHBOARD_CONTACTS,
