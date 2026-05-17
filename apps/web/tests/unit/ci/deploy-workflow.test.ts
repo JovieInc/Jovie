@@ -98,6 +98,20 @@ describe('deploy workflow Vercel env resolution', () => {
       expect(deployStep).toContain(`${key}: \${{ secrets.${key} }}`);
     }
   });
+
+  it('verifies production promotion through the canonical public alias', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const promoteStep = getStepBlock(
+      workflow,
+      'Promote specific deployment for this SHA'
+    );
+
+    expect(promoteStep).toContain('"https://jov.ie/api/health/build-info"');
+    expect(promoteStep).toContain('probe_labels=(');
+    expect(promoteStep).toContain('"production-alias"');
+    expect(promoteStep).toContain('max_attempts=30');
+    expect(promoteStep).toContain('URLs can return 401');
+  });
 });
 
 describe('canary health gate workflow', () => {
