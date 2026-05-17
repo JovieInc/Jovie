@@ -139,7 +139,9 @@ jobs:
               -b "$COOKIE_JAR"
             )
           else
-            echo "⚠ VERCEL_AUTOMATION_BYPASS_SECRET not set; canary may hit Vercel Security Checkpoint (HTTP 429)."
+            echo "❌ Canary failed: VERCEL_AUTOMATION_BYPASS_SECRET is required for deterministic staging verification."
+            echo "canary_status=failed_config" >> "$GITHUB_OUTPUT"
+            exit 1
           fi
 
           attempt=1
@@ -263,17 +265,9 @@ jobs:
 
               if [ "$response_code" != "200" ]; then
                 if [ "$response_code" = "429" ]; then
-                  if [ -z "$BYPASS_SECRET" ]; then
-                    echo "⚠️ Canary INCONCLUSIVE: Vercel returned HTTP 429 Security Checkpoint after retries."
-                    echo "⚠️ Cannot verify deployment health without VERCEL_AUTOMATION_BYPASS_SECRET."
-                    echo "⚠️ ACTION REQUIRED: Set VERCEL_AUTOMATION_BYPASS_SECRET to enable proper canary verification."
-                    echo "canary_status=verified" >> "$GITHUB_OUTPUT"
-                    exit 0
-                  else
-                    echo "❌ Canary failed: HTTP 429 Security Checkpoint even though bypass secret is set."
-                    echo "canary_status=failed" >> "$GITHUB_OUTPUT"
-                    exit 1
-                  fi
+                  echo "❌ Canary failed: HTTP 429 after retries even though bypass secret is set."
+                  echo "canary_status=failed" >> "$GITHUB_OUTPUT"
+                  exit 1
                 else
                   echo "❌ Canary fallback failed after retries: HTTP $response_code"
                   echo "canary_status=failed" >> "$GITHUB_OUTPUT"

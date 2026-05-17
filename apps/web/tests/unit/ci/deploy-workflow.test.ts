@@ -6,6 +6,10 @@ import { describe, expect, it } from 'vitest';
 const testDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(testDir, '..', '..', '..', '..', '..');
 const workflowPath = resolve(repoRoot, '.github/workflows/ci.yml');
+const canaryWorkflowPath = resolve(
+  repoRoot,
+  '.github/workflows/canary-health-gate.yml'
+);
 
 function getStepBlock(workflow: string, stepName: string): string {
   const lines = workflow.split('\n');
@@ -64,6 +68,40 @@ describe('deploy workflow Vercel env resolution', () => {
         'VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}'
       );
     }
+  });
+
+  it('passes the automation bypass secret into the staging preview runtime', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const deployStep = getStepBlock(
+      workflow,
+      'Deploy (staging preview, prebuilt)'
+    );
+
+    expect(deployStep).toContain(
+      'VERCEL_AUTOMATION_BYPASS_SECRET is required for staging canary verification.'
+    );
+    expect(deployStep).toContain(
+      '--env VERCEL_AUTOMATION_BYPASS_SECRET="${VERCEL_AUTOMATION_BYPASS_SECRET}"'
+    );
+    expect(deployStep).toContain(
+      'VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}'
+    );
+  });
+});
+
+describe('canary health gate workflow', () => {
+  it('fails closed when the automation bypass secret is missing', () => {
+    const workflow = readFileSync(canaryWorkflowPath, 'utf8');
+    const canaryStep = getStepBlock(workflow, 'Canary health check');
+
+    expect(canaryStep).toContain(
+      'VERCEL_AUTOMATION_BYPASS_SECRET is required for deterministic staging verification.'
+    );
+    expect(canaryStep).toContain('canary_status=failed_config');
+    expect(canaryStep).not.toContain('Canary INCONCLUSIVE');
+    expect(canaryStep).not.toContain(
+      'canary_status=verified" >> "$GITHUB_OUTPUT"\n                    exit 0'
+    );
   });
 });
 
