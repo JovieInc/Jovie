@@ -100,7 +100,7 @@ async function goAndWait(
     timeout: SMOKE_TIMEOUTS.NAVIGATION,
   });
   const status = response?.status() ?? 0;
-  if (status === 0 || status >= 500) {
+  if (status === 0 || status === 404 || status >= 500) {
     return { status, ok: false };
   }
   await waitForHydration(page);
@@ -466,6 +466,15 @@ test.describe('Public-profile canary', () => {
         test.skip(true, '/tim not seeded');
         return;
       }
+      expect(
+        status,
+        `/tim returned ${status} before hydration check`
+      ).toBeGreaterThan(0);
+      expect(
+        status,
+        `/tim returned ${status} before hydration check`
+      ).toBeLessThan(500);
+      return;
     }
 
     // Wait a tick so all hydration messages have flushed

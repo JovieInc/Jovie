@@ -16,6 +16,11 @@
 export const CANARY_CREATOR_HANDLE = 'tim';
 export const CANARY_CREATOR_SPOTIFY_ID = '4u';
 export const CANARY_AUDIENCE_VISIT_PATH = '/api/audience/visit';
+export const CANARY_REDIS_KEY = 'canary:public_profile:last_run';
+
+const CANARY_FETCH_TIMEOUT_MS = 10_000;
+const CANARY_FETCH_MAX_ATTEMPTS = 3;
+const CANARY_FETCH_BACKOFF_MS = 200;
 
 /** Routes under /[handle] that the canary exercises. */
 export const CANARY_ROUTES = {
@@ -63,6 +68,20 @@ export function isOkStatus(status: number): boolean {
   return status >= 200 && status < 400;
 }
 
+function is2xxStatus(status: number): boolean {
+  return status >= 200 && status < 300;
+}
+
+function isTransientStatus(status: number): boolean {
+  return status >= 500;
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise(resolve => {
+    setTimeout(resolve, ms);
+  });
+}
+
 /**
  * Check whether `body` text contains an obvious server error indicator.
  */
@@ -92,6 +111,43 @@ export function buildVisitPayload(profileId: string): Record<string, unknown> {
   };
 }
 
+async function fetchWithRetry(
+  url: string,
+  init: RequestInit,
+  options: {
+    maxAttempts?: number;
+    timeoutMs?: number;
+    backoffMs?: number;
+  } = {}
+): Promise<Response> {
+  const maxAttempts = options.maxAttempts ?? CANARY_FETCH_MAX_ATTEMPTS;
+  const timeoutMs = options.timeoutMs ?? CANARY_FETCH_TIMEOUT_MS;
+  const backoffMs = options.backoffMs ?? CANARY_FETCH_BACKOFF_MS;
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    try {
+      const res = await fetch(url, {
+        ...init,
+        signal: init.signal ?? AbortSignal.timeout(timeoutMs),
+      });
+
+      if (!isTransientStatus(res.status) || attempt === maxAttempts - 1) {
+        return res;
+      }
+
+      lastError = new Error(`HTTP ${res.status}`);
+    } catch (err) {
+      lastError = err;
+      if (attempt === maxAttempts - 1) break;
+    }
+
+    await wait(backoffMs * 2 ** attempt);
+  }
+
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
+}
+
 /**
  * Perform a timed HTTP GET against `url` and return a CanaryCheckResult.
  * Intended for server-side (Node / cron) usage only — not browser.
@@ -103,8 +159,7 @@ export async function checkHttpGet(
 ): Promise<CanaryCheckResult> {
   const start = Date.now();
   try {
-    const res = await fetch(url, {
-      signal: AbortSignal.timeout(10_000),
+    const res = await fetchWithRetry(url, {
       redirect: 'follow',
     });
     const durationMs = Date.now() - start;
@@ -164,16 +219,15 @@ export async function checkHttpPost(
 ): Promise<CanaryCheckResult> {
   const start = Date.now();
   try {
-    const res = await fetch(url, {
+    const res = await fetchWithRetry(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(10_000),
     });
     const durationMs = Date.now() - start;
 
     // 429 is acceptable (rate-limited canary is a healthy system)
-    if (!isOkStatus(res.status) && res.status !== 429) {
+    if (!is2xxStatus(res.status) && res.status !== 429) {
       return {
         name,
         ok: false,
@@ -181,6 +235,19 @@ export async function checkHttpPost(
         detail: `HTTP ${res.status}`,
         durationMs,
       };
+    }
+
+    if (res.status !== 429) {
+      const responseBody = await res.text();
+      if (hasServerError(responseBody)) {
+        return {
+          name,
+          ok: false,
+          statusCode: res.status,
+          detail: 'Response body contains server error indicator',
+          durationMs,
+        };
+      }
     }
 
     return { name, ok: true, statusCode: res.status, durationMs };

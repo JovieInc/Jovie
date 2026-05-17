@@ -7,6 +7,7 @@ import {
   CANARY_ROUTES,
   type CanaryCheckResult,
   checkHttpGet,
+  checkHttpPost,
   formatReportSummary,
   hasServerError,
   isOkStatus,
@@ -111,6 +112,107 @@ describe('checkHttpGet', () => {
     expect(result.ok).toBe(false);
     expect(result.statusCode).toBe(200);
     expect(result.detail).toBe('Response body contains server error indicator');
+  });
+});
+
+describe('checkHttpPost', () => {
+  it('accepts a 200 response', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('{}', { status: 200 }))
+    );
+
+    const result = await checkHttpPost(
+      'audience-visit',
+      'https://jov.ie/api/audience/visit',
+      { profileId: 'profile-id' }
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.statusCode).toBe(200);
+  });
+
+  it('accepts a 429 response', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('{}', { status: 429 }))
+    );
+
+    const result = await checkHttpPost(
+      'audience-visit',
+      'https://jov.ie/api/audience/visit',
+      { profileId: 'profile-id' }
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.statusCode).toBe(429);
+  });
+
+  it('rejects a 200 response containing a server error body', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('Application error', { status: 200 }))
+    );
+
+    const result = await checkHttpPost(
+      'audience-visit',
+      'https://jov.ie/api/audience/visit',
+      { profileId: 'profile-id' }
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.statusCode).toBe(200);
+    expect(result.detail).toBe('Response body contains server error indicator');
+  });
+
+  it('rejects a 404 response', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('{}', { status: 404 }))
+    );
+
+    const result = await checkHttpPost(
+      'audience-visit',
+      'https://jov.ie/api/audience/visit',
+      { profileId: 'profile-id' }
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.statusCode).toBe(404);
+    expect(result.detail).toBe('HTTP 404');
+  });
+
+  it('rejects a 500 response after retrying', async () => {
+    const fetchMock = vi.fn(async () => new Response('{}', { status: 500 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await checkHttpPost(
+      'audience-visit',
+      'https://jov.ie/api/audience/visit',
+      { profileId: 'profile-id' }
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(result.ok).toBe(false);
+    expect(result.statusCode).toBe(500);
+    expect(result.detail).toBe('HTTP 500');
+  });
+
+  it('rejects a 307 redirect response', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('{}', { status: 307 }))
+    );
+
+    const result = await checkHttpPost(
+      'audience-visit',
+      'https://jov.ie/api/audience/visit',
+      { profileId: 'profile-id' }
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.statusCode).toBe(307);
+    expect(result.detail).toBe('HTTP 307');
   });
 });
 

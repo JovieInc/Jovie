@@ -34,6 +34,7 @@ import {
   buildVisitPayload,
   CANARY_AUDIENCE_VISIT_PATH,
   CANARY_CREATOR_HANDLE,
+  CANARY_REDIS_KEY,
   CANARY_ROUTES,
   type CanaryReport,
   checkHttpGet,
@@ -48,7 +49,6 @@ import { logger } from '@/lib/utils/logger';
 export const runtime = 'nodejs';
 export const maxDuration = 30;
 
-export const CANARY_REDIS_KEY = 'canary:public_profile:last_run';
 /** 26 hours so the key persists through a brief cron delay. */
 const CANARY_REDIS_TTL_SECONDS = 26 * 60 * 60;
 
