@@ -76,6 +76,24 @@ describe('entity provider registry', () => {
     expect(getEntityProvider('artist')).toBeUndefined();
   });
 
+  it('keeps a duplicate provider registered when one cleanup runs twice', () => {
+    const provider = makeProvider('artist', 'Artists');
+    const unregisterFirst = registerEntityProvider(provider);
+    const unregisterSecond = registerEntityProvider(provider);
+
+    unregisterFirst();
+
+    expect(getEntityProvider('artist')).toBe(provider);
+
+    unregisterFirst();
+
+    expect(getEntityProvider('artist')).toBe(provider);
+
+    unregisterSecond();
+
+    expect(getEntityProvider('artist')).toBeUndefined();
+  });
+
   it('ref-counts providers with the same registry key', () => {
     const firstProvider = makeProvider('release', 'Releases', 'release:p1');
     const secondProvider = makeProvider('release', 'Releases', 'release:p1');

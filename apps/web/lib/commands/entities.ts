@@ -128,13 +128,26 @@ function isSameProvider(
   );
 }
 
+function createProviderDisposer(provider: EntityProvider): () => void {
+  let disposed = false;
+
+  return () => {
+    if (disposed) {
+      return;
+    }
+
+    disposed = true;
+    unregisterEntityProvider(provider);
+  };
+}
+
 export function registerEntityProvider(provider: EntityProvider): () => void {
   const existing = PROVIDERS[provider.kind];
 
   if (existing && isSameProvider(existing.provider, provider)) {
     existing.provider = provider;
     existing.registrations += 1;
-    return () => unregisterEntityProvider(provider);
+    return createProviderDisposer(provider);
   }
 
   if (existing) {
@@ -149,7 +162,7 @@ export function registerEntityProvider(provider: EntityProvider): () => void {
   }
   PROVIDERS[provider.kind] = { provider, registrations: 1 };
 
-  return () => unregisterEntityProvider(provider);
+  return createProviderDisposer(provider);
 }
 
 export function unregisterEntityProvider(provider: EntityProvider): void {
