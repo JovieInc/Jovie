@@ -248,30 +248,13 @@ const nextConfig = {
     ];
 
     const legacyAppRedirects = [
-      { source: '/app/profile', destination: '/app/chat?panel=profile' },
-      {
-        source: '/app/tipping',
-        destination: '/app/settings/artist-profile?tab=earn#pay',
-      },
       { source: '/app/dashboard', destination: '/app' },
       { source: '/app/dashboard/overview', destination: '/app' },
-      // NOTE: shell-owned aliases such as /app/earnings, /app/contacts, and
-      // /app/tour-dates are intentionally omitted here. App Router pages handle
+      // NOTE: shell-owned aliases such as /app/profile, /app/tipping,
+      // /app/earnings, /app/contacts, /app/tour-dates, and dashboard chat/
+      // profile aliases are intentionally omitted here. App Router pages handle
       // their final destination so middleware can preserve the requested deep
       // link for unauthenticated users.
-      {
-        source: '/app/dashboard/links',
-        destination: '/app/chat?panel=profile',
-      },
-      {
-        source: '/app/dashboard/tipping',
-        destination: '/app/settings/artist-profile?tab=earn#pay',
-      },
-      {
-        source: '/app/dashboard/profile',
-        destination: '/app/chat?panel=profile',
-      },
-      { source: '/app/dashboard/chat', destination: '/app/chat' },
       { source: '/app/settings', destination: '/app/settings/account' },
       {
         source: '/app/settings/profile',
