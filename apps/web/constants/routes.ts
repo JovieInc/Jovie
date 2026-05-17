@@ -164,6 +164,10 @@ export function buildLyricsRoute(trackId: string): string {
   return `${APP_ROUTES.LYRICS}/${encodeURIComponent(trackId)}`;
 }
 
+export function buildReleaseTasksRoute(releaseId: string): string {
+  return `${APP_ROUTES.RELEASES}/${encodeURIComponent(releaseId)}/tasks`;
+}
+
 export function isDemoRoutePath(pathname: string | null | undefined): boolean {
   return (
     typeof pathname === 'string' &&
