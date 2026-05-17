@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, isAbsolute, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parse } from 'dotenv';
 import {
   checkSignupOnboardingReadiness,
@@ -14,6 +15,10 @@ interface CliOptions {
   readonly source: SignupOnboardingReadinessSource;
   readonly file?: string;
 }
+
+const scriptDir = dirname(fileURLToPath(import.meta.url));
+const webRoot = resolve(scriptDir, '..');
+const repoRoot = resolve(webRoot, '..', '..');
 
 function parseArgValue(arg: string, name: string): string | null {
   const prefix = `${name}=`;
@@ -73,11 +78,27 @@ function defaultVercelEnvFile(target: SignupOnboardingReadinessTarget): string {
   return '.env.local';
 }
 
-function readEnvFile(path: string): Record<string, string> {
-  const resolvedPath = resolve(process.cwd(), path);
-  if (!existsSync(resolvedPath)) {
-    throw new Error(`Env file not found: ${path}`);
+export function resolveEnvFilePath(path: string): string {
+  const candidates = isAbsolute(path)
+    ? [path]
+    : [
+        resolve(process.cwd(), path),
+        resolve(webRoot, path),
+        resolve(repoRoot, path),
+      ];
+  const resolvedPath = candidates.find(candidate => existsSync(candidate));
+
+  if (!resolvedPath) {
+    throw new Error(
+      `Env file not found: ${path} (checked ${candidates.join(', ')})`
+    );
   }
+
+  return resolvedPath;
+}
+
+function readEnvFile(path: string): Record<string, string> {
+  const resolvedPath = resolveEnvFilePath(path);
   return parse(readFileSync(resolvedPath));
 }
 
@@ -113,11 +134,16 @@ async function main() {
   process.exit(result.ok ? 0 : 1);
 }
 
-main().catch(error => {
-  console.error(
-    `[signup-readiness] crashed: ${
-      error instanceof Error ? error.message : String(error)
-    }`
-  );
-  process.exit(1);
-});
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
+  main().catch(error => {
+    console.error(
+      `[signup-readiness] crashed: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+    process.exit(1);
+  });
+}
