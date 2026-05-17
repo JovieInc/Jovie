@@ -3593,6 +3593,53 @@ jobs:
         uses: oNaiPs/secrets-to-env-action@75f319b3c8c926ac2eabcca34daa6cf531daf32f # v1.8
         with:
           secrets: ${{ toJSON(secrets) }}
+      - name: Sync required production env to Vercel project
+        run: |
+          set -euo pipefail
+          set +x
+
+          required_vercel_env=(
+            NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+            CLERK_SECRET_KEY
+            DATABASE_URL
+            SESSION_SECRET
+            AI_GATEWAY_API_KEY
+            NEXT_PUBLIC_TURNSTILE_SITE_KEY
+            TURNSTILE_SECRET_KEY
+          )
+
+          missing_env=()
+          for key in "${required_vercel_env[@]}"; do
+            if [ -z "${!key:-}" ]; then
+              missing_env+=("$key")
+            fi
+          done
+
+          if [ "${#missing_env[@]}" -gt 0 ]; then
+            echo "Missing GitHub secrets required for Vercel production env: ${missing_env[*]}"
+            exit 1
+          fi
+
+          for key in "${required_vercel_env[@]}"; do
+            ./node_modules/.bin/vercel env add "$key" production \
+              --force \
+              --yes \
+              --value "${!key}" \
+              --token "$VERCEL_TOKEN" \
+              --scope "$VERCEL_ORG_ID" >/dev/null
+            echo "Synced ${key} to Vercel production env."
+          done
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
+          TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
       - name: Pull env (production)
         run: ./node_modules/.bin/vercel pull --yes --environment=production --token ${{ secrets.VERCEL_TOKEN }}
         env:
