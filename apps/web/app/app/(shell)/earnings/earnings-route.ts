@@ -6,7 +6,8 @@ export async function redirectFromEarningsRoute(returnPath: string) {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    redirect(`${APP_ROUTES.SIGNIN}?redirect_url=${returnPath}`);
+    const redirectUrl = encodeURIComponent(returnPath);
+    redirect(`${APP_ROUTES.SIGNIN}?redirect_url=${redirectUrl}`);
   }
 
   redirect(`${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn#pay`);
