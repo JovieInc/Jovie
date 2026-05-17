@@ -215,6 +215,12 @@ describe('shouldUseEssentialShellData', () => {
     expect(shouldUseEssentialShellData(APP_ROUTES.DASHBOARD)).toBe(true);
   });
 
+  it('does not treat the legacy dashboard root as a nested dashboard subroute', () => {
+    expect(shouldUseEssentialShellData(APP_ROUTES.LEGACY_DASHBOARD)).toBe(
+      false
+    );
+  });
+
   it('returns true for settings routes that do not need supplementary dashboard data', () => {
     expect(shouldUseEssentialShellData(APP_ROUTES.SETTINGS_ACCOUNT)).toBe(true);
     expect(shouldUseEssentialShellData(APP_ROUTES.SETTINGS_CONTACTS)).toBe(
@@ -246,6 +252,10 @@ describe('shouldRedirectToOnboarding', () => {
     expect(shouldRedirectToOnboarding(APP_ROUTES.PRESENCE)).toBe(true);
     expect(shouldRedirectToOnboarding(APP_ROUTES.AUDIENCE)).toBe(true);
     expect(shouldRedirectToOnboarding(APP_ROUTES.CALENDAR)).toBe(true);
+  });
+
+  it('does not add onboarding redirects to the legacy dashboard root', () => {
+    expect(shouldRedirectToOnboarding(APP_ROUTES.LEGACY_DASHBOARD)).toBe(false);
   });
 
   it('does not add onboarding redirects to settings route chrome optimization', () => {

@@ -70,22 +70,33 @@ describe('deploy workflow Vercel env resolution', () => {
     }
   });
 
-  it('passes the automation bypass secret into the staging preview runtime', () => {
+  it('passes signup readiness keys into the staging preview runtime', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const deployStep = getStepBlock(
       workflow,
       'Deploy (staging preview, prebuilt)'
     );
+    const runtimeKeys = [
+      'VERCEL_AUTOMATION_BYPASS_SECRET',
+      'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY',
+      'CLERK_SECRET_KEY',
+      'DATABASE_URL',
+      'SESSION_SECRET',
+      'AI_GATEWAY_API_KEY',
+      'NEXT_PUBLIC_TURNSTILE_SITE_KEY',
+      'TURNSTILE_SECRET_KEY',
+      'CLERK_PUBLISHABLE_KEY_STAGING',
+      'CLERK_SECRET_KEY_STAGING',
+    ];
 
-    expect(deployStep).toContain(
-      'VERCEL_AUTOMATION_BYPASS_SECRET is required for staging canary verification.'
-    );
-    expect(deployStep).toContain(
-      '--env VERCEL_AUTOMATION_BYPASS_SECRET="${VERCEL_AUTOMATION_BYPASS_SECRET}"'
-    );
-    expect(deployStep).toContain(
-      'VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}'
-    );
+    expect(deployStep).toContain('required_runtime_env=(');
+    expect(deployStep).toContain('Missing staging preview runtime env:');
+
+    for (const key of runtimeKeys) {
+      expect(deployStep).toContain(key);
+      expect(deployStep).toContain(`--env ${key}="\${${key}}"`);
+      expect(deployStep).toContain(`${key}: \${{ secrets.${key} }}`);
+    }
   });
 });
 
