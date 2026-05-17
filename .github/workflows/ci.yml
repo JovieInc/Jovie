@@ -60,6 +60,7 @@ jobs:
       run_chat_lighthouse: ${{ steps.detect.outputs.run_chat_lighthouse }}
       run_e2e: ${{ steps.detect.outputs.run_e2e }}
       run_drizzle: ${{ steps.detect.outputs.run_drizzle }}
+      run_neon: ${{ steps.detect.outputs.run_neon }}
       has_code_changes: ${{ steps.detect.outputs.has_code_changes }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -75,7 +76,7 @@ jobs:
           # Force run all if the 'testing' label is present
           if [[ "$FULL_CI_LABEL" == "true" ]]; then
             echo "Forcing full CI run due to 'testing' label"
-            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_e2e run_drizzle has_code_changes; do
+            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_e2e run_drizzle run_neon has_code_changes; do
               echo "$t=true" >> "$GITHUB_OUTPUT"
             done
             exit 0
@@ -88,7 +89,7 @@ jobs:
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             # Manual dispatch: run everything
             echo "Manual dispatch: running all checks"
-            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_e2e run_drizzle has_code_changes; do
+            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_e2e run_drizzle run_neon has_code_changes; do
               echo "$t=true" >> "$GITHUB_OUTPUT"
             done
             exit 0
@@ -99,7 +100,7 @@ jobs:
           # Check if only docs changed (exclude .github/ — workflow changes must run CI)
           if echo "$CHANGED_FILES" | grep -v -E '^\.(github/)' | grep -v -E '\.(md|txt)$' | wc -l | grep -q '^0$'; then
             echo "Only documentation files changed"
-            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_e2e run_drizzle has_code_changes; do
+            for t in run_build run_test run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_e2e run_drizzle run_neon has_code_changes; do
               echo "$t=false" >> "$GITHUB_OUTPUT"
             done
             exit 0
@@ -176,6 +177,17 @@ jobs:
             echo "run_drizzle=true" >> "$GITHUB_OUTPUT"
           else
             echo "run_drizzle=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          # Neon ephemeral-branch gate: only spin up Neon when DB-relevant code changed.
+          # Covers drizzle, lib/db, lib/queries, schema, cron routes, SQL files, and
+          # package.json changes that could affect drizzle/DB deps.
+          # Jobs that create ephemeral Neon branches must check this flag before doing so.
+          NEON_PATTERN='^(apps/web/drizzle/|apps/web/lib/db/|apps/web/lib/queries/|apps/web/drizzle\.config\.ts|drizzle\.kit\.(m?js|ts)|.*\.sql$|apps/web/app/api/cron/|apps/web/package.*\.json|package.*\.json)'
+          if echo "$CHANGED_FILES" | grep -q -E "$NEON_PATTERN"; then
+            echo "run_neon=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_neon=false" >> "$GITHUB_OUTPUT"
           fi
 
           # Fork guard: disable E2E for forks (no secrets)
@@ -361,8 +373,10 @@ jobs:
   neon-db:
     name: Neon DB
     needs: [ci-path-changes]
-    # Run for push to main, risky PRs with the testing label, or schema PRs that need a shared Neon branch.
-    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && (contains(github.event.pull_request.labels.*.name, 'testing') || needs.ci-path-changes.outputs.run_drizzle == 'true')) }}
+    # Run for push to main, risky PRs with the testing label, or PRs touching DB-relevant paths.
+    # run_neon covers drizzle, lib/db, lib/queries, schema, cron routes, SQL files, and
+    # package.json changes. PRs touching only UI/perf/docs skip this job entirely.
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && (contains(github.event.pull_request.labels.*.name, 'testing') || needs.ci-path-changes.outputs.run_neon == 'true')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -830,6 +844,9 @@ jobs:
         run: pnpm --filter=@jovie/web run mobile-overflow:guard
 
       - name: Create ephemeral Neon database branch (with retry)
+        # Only create an ephemeral branch when DB-relevant code changed (saves 3 Neon branches
+        # per PR run — one per matrix shard — on UI-only PRs that just need a read-only DB).
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
         id: neon-branch
         uses: ./.github/actions/neon-create-branch-with-retry
         with:
@@ -840,6 +857,8 @@ jobs:
           protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
+        # Only resolve from the ephemeral branch when one was created.
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
         id: resolve-mobile-overflow-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
@@ -848,10 +867,17 @@ jobs:
           credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
           credential_fallback_url: ${{ secrets.DATABASE_URL }}
 
-      - name: Export DATABASE_URL
+      - name: Export DATABASE_URL (ephemeral branch)
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
         run: echo "DATABASE_URL=${{ steps.resolve-mobile-overflow-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
 
+      - name: Export DATABASE_URL (main — non-DB PR)
+        # No ephemeral branch was created; use the stable main DB for SSR reads.
+        if: needs.ci-path-changes.outputs.run_neon != 'true'
+        run: echo "DATABASE_URL=${{ secrets.DATABASE_URL_MAIN }}" >> "$GITHUB_ENV"
+
       - name: Run migrations (ephemeral Neon)
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
@@ -860,6 +886,7 @@ jobs:
           ALLOW_PROD_MIGRATIONS: 'true'
 
       - name: Seed mobile overflow fixtures
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
         run: pnpm --filter=@jovie/web exec tsx tests/seed-test-data.ts
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
@@ -939,6 +966,9 @@ jobs:
         run: pnpm --filter=@jovie/web exec playwright install chromium
 
       - name: Create ephemeral Neon database branch (with retry)
+        # Only create an ephemeral branch when DB-relevant code changed (saves Neon compute).
+        # Non-DB PRs skip branch creation and fall back to DATABASE_URL_MAIN for SSR reads.
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
         id: neon-branch
         uses: ./.github/actions/neon-create-branch-with-retry
         with:
@@ -949,6 +979,8 @@ jobs:
           protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
+        # Only resolve from the ephemeral branch when one was created.
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
         id: resolve-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
@@ -957,10 +989,18 @@ jobs:
           credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
           credential_fallback_url: ${{ secrets.DATABASE_URL }}
 
-      - name: Export DATABASE_URL
+      - name: Export DATABASE_URL (ephemeral branch)
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
         run: echo "DATABASE_URL=${{ steps.resolve-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
 
+      - name: Export DATABASE_URL (main — non-DB PR)
+        # No ephemeral branch was created; use the stable main DB for SSR reads.
+        if: needs.ci-path-changes.outputs.run_neon != 'true'
+        run: echo "DATABASE_URL=${{ secrets.DATABASE_URL_MAIN }}" >> "$GITHUB_ENV"
+
       - name: Run migrations (ephemeral Neon)
+        # Only migrate when we have a fresh ephemeral branch (DB-relevant changes).
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
@@ -969,6 +1009,7 @@ jobs:
           ALLOW_PROD_MIGRATIONS: 'true'
 
       - name: Seed public QA fixtures
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
         run: pnpm --filter=@jovie/web exec tsx tests/seed-test-data.ts
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
@@ -1215,6 +1256,9 @@ jobs:
         run: pnpm --filter=@jovie/web exec playwright install chromium
 
       - name: Create ephemeral Neon database branch (with retry)
+        # Only create an ephemeral branch when DB-relevant code changed.
+        # Non-DB PRs skip branch creation; resolve-neon-database-url falls back to DATABASE_URL_MAIN.
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
         id: neon-branch
         uses: ./.github/actions/neon-create-branch-with-retry
         with:
@@ -1225,6 +1269,8 @@ jobs:
           protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
+        # Only resolve from the ephemeral branch when one was created.
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
         id: resolve-onboarding-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
@@ -1233,10 +1279,17 @@ jobs:
           credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
           credential_fallback_url: ${{ secrets.DATABASE_URL }}
 
-      - name: Export DATABASE_URL
+      - name: Export DATABASE_URL (ephemeral branch)
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
         run: echo "DATABASE_URL=${{ steps.resolve-onboarding-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
 
+      - name: Export DATABASE_URL (main — non-DB PR)
+        # No ephemeral branch was created; use the stable main DB for SSR reads.
+        if: needs.ci-path-changes.outputs.run_neon != 'true'
+        run: echo "DATABASE_URL=${{ secrets.DATABASE_URL_MAIN }}" >> "$GITHUB_ENV"
+
       - name: Run migrations (ephemeral Neon)
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
@@ -2203,7 +2256,9 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
 
       - name: Create ephemeral Neon database branch (with retry)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        # Only create an ephemeral branch when DB-relevant code changed.
+        # Non-DB PRs skip branch creation; resolve-neon-database-url falls back to DATABASE_URL_MAIN.
+        if: steps.check_changes.outputs.run_full_ci == 'true' && needs.ci-path-changes.outputs.run_neon == 'true'
         id: neon-branch
         uses: ./.github/actions/neon-create-branch-with-retry
         with:
@@ -2214,7 +2269,8 @@ jobs:
           protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        # Only resolve from the ephemeral branch when one was created.
+        if: steps.check_changes.outputs.run_full_ci == 'true' && needs.ci-path-changes.outputs.run_neon == 'true'
         id: resolve-a11y-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
@@ -2223,9 +2279,14 @@ jobs:
           credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
           credential_fallback_url: ${{ secrets.DATABASE_URL }}
 
-      - name: Export DATABASE_URL
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+      - name: Export DATABASE_URL (ephemeral branch)
+        if: steps.check_changes.outputs.run_full_ci == 'true' && needs.ci-path-changes.outputs.run_neon == 'true'
         run: echo "DATABASE_URL=${{ steps.resolve-a11y-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
+
+      - name: Export DATABASE_URL (main — non-DB PR)
+        # No ephemeral branch was created; use the stable main DB for SSR reads.
+        if: steps.check_changes.outputs.run_full_ci == 'true' && needs.ci-path-changes.outputs.run_neon != 'true'
+        run: echo "DATABASE_URL=${{ secrets.DATABASE_URL_MAIN }}" >> "$GITHUB_ENV"
 
       - name: Cache Playwright Browsers
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -2253,7 +2314,7 @@ jobs:
         run: tar -xf /tmp/nextjs-build-download/nextjs-build.tar -C apps/web
 
       - name: Run migrations (ephemeral Neon)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: steps.check_changes.outputs.run_full_ci == 'true' && needs.ci-path-changes.outputs.run_neon == 'true'
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
@@ -2262,7 +2323,7 @@ jobs:
           ALLOW_PROD_MIGRATIONS: 'true'
 
       - name: Seed public QA fixtures
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: steps.check_changes.outputs.run_full_ci == 'true' && needs.ci-path-changes.outputs.run_neon == 'true'
         run: pnpm --filter=@jovie/web exec tsx tests/seed-test-data.ts
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
