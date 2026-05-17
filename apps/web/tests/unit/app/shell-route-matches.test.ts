@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   isAudienceShellRoute,
+  isCalendarShellRoute,
   isChatShellRoute,
   isInsightsShellRoute,
   isLibraryShellRoute,
@@ -163,6 +164,18 @@ describe('isAudienceShellRoute', () => {
   });
 });
 
+describe('isCalendarShellRoute', () => {
+  it('matches the canonical calendar route', () => {
+    expect(isCalendarShellRoute(APP_ROUTES.CALENDAR)).toBe(true);
+  });
+
+  it('matches nested calendar subroutes', () => {
+    expect(isCalendarShellRoute(`${APP_ROUTES.CALENDAR}/week/2026-05-15`)).toBe(
+      true
+    );
+  });
+});
+
 describe('shouldUseEssentialShellData', () => {
   it('returns true for chat routes', () => {
     expect(shouldUseEssentialShellData(APP_ROUTES.CHAT)).toBe(true);
@@ -192,6 +205,10 @@ describe('shouldUseEssentialShellData', () => {
     expect(shouldUseEssentialShellData(APP_ROUTES.DASHBOARD_AUDIENCE)).toBe(
       true
     );
+  });
+
+  it('returns true for the canonical calendar route', () => {
+    expect(shouldUseEssentialShellData(APP_ROUTES.CALENDAR)).toBe(true);
   });
 
   it('returns true for dashboard root', () => {
@@ -228,6 +245,7 @@ describe('shouldRedirectToOnboarding', () => {
     expect(shouldRedirectToOnboarding(APP_ROUTES.INSIGHTS)).toBe(true);
     expect(shouldRedirectToOnboarding(APP_ROUTES.PRESENCE)).toBe(true);
     expect(shouldRedirectToOnboarding(APP_ROUTES.AUDIENCE)).toBe(true);
+    expect(shouldRedirectToOnboarding(APP_ROUTES.CALENDAR)).toBe(true);
   });
 
   it('does not add onboarding redirects to settings route chrome optimization', () => {
