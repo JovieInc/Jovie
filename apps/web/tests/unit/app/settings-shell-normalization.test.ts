@@ -86,6 +86,25 @@ const SETTINGS_ALIAS_ROUTES = [
   },
 ] as const;
 
+const SETTINGS_PROFILE_SCOPED_PREFETCH_ROUTES = [
+  findSourceFile(
+    resolve(process.cwd(), 'app/app/(shell)/settings/contacts/page.tsx'),
+    resolve(
+      process.cwd(),
+      'apps/web/app/app/(shell)/settings/contacts/page.tsx'
+    )
+  ),
+  findSourceFile(
+    resolve(process.cwd(), 'app/app/(shell)/settings/touring/page.tsx'),
+    resolve(process.cwd(), 'apps/web/app/app/(shell)/settings/touring/page.tsx')
+  ),
+] as const;
+
+const SETTINGS_PROFILE_SCOPED_PREFETCH_CANDIDATES = [
+  resolve(process.cwd(), 'app/app/(shell)/settings/contacts/page.tsx'),
+  resolve(process.cwd(), 'app/app/(shell)/settings/touring/page.tsx'),
+] as const;
+
 describe('settings shell normalization', () => {
   it('keeps the settings route group as the only PageShell owner', () => {
     expect(SETTINGS_LAYOUT).toBeDefined();
@@ -131,6 +150,26 @@ describe('settings shell normalization', () => {
       expect(source).not.toContain('getCachedAuth');
       expect(source).not.toContain('DashboardSettings');
       expect(source).not.toContain('redirect_url=/app/settings');
+    }
+  });
+
+  it('keeps profile-scoped settings prefetches on the shell data path', () => {
+    const missingFiles = SETTINGS_PROFILE_SCOPED_PREFETCH_ROUTES.filter(
+      filePath => !filePath
+    );
+    expect(missingFiles).toEqual([]);
+
+    for (const filePath of SETTINGS_PROFILE_SCOPED_PREFETCH_ROUTES) {
+      if (!filePath) {
+        throw new Error(
+          `Could not find profile-scoped settings source. Checked: ${SETTINGS_PROFILE_SCOPED_PREFETCH_CANDIDATES.join(', ')}`
+        );
+      }
+
+      const source = readFileSync(filePath, 'utf8');
+      expect(source).toContain('getCachedAuth');
+      expect(source).toContain('getDashboardShellData');
+      expect(source).not.toContain('getDashboardData');
     }
   });
 });

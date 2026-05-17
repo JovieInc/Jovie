@@ -139,6 +139,20 @@ describe('shouldUseEssentialShellData', () => {
     expect(shouldUseEssentialShellData(APP_ROUTES.DASHBOARD)).toBe(true);
   });
 
+  it('returns true for settings routes that do not need supplementary dashboard data', () => {
+    expect(shouldUseEssentialShellData(APP_ROUTES.SETTINGS_ACCOUNT)).toBe(true);
+    expect(shouldUseEssentialShellData(APP_ROUTES.SETTINGS_CONTACTS)).toBe(
+      true
+    );
+    expect(shouldUseEssentialShellData(APP_ROUTES.SETTINGS_TOURING)).toBe(true);
+  });
+
+  it('keeps artist profile settings on the full dashboard data path', () => {
+    expect(
+      shouldUseEssentialShellData(APP_ROUTES.SETTINGS_ARTIST_PROFILE)
+    ).toBe(false);
+  });
+
   it('returns false for null', () => {
     expect(shouldUseEssentialShellData(null)).toBe(false);
   });
@@ -151,6 +165,12 @@ describe('shouldRedirectToOnboarding', () => {
     expect(shouldRedirectToOnboarding(APP_ROUTES.LYRICS)).toBe(true);
     expect(shouldRedirectToOnboarding(APP_ROUTES.LIBRARY)).toBe(true);
     expect(shouldRedirectToOnboarding(APP_ROUTES.DASHBOARD_TASKS)).toBe(true);
+  });
+
+  it('does not add onboarding redirects to settings route chrome optimization', () => {
+    expect(shouldRedirectToOnboarding(APP_ROUTES.SETTINGS_CONTACTS)).toBe(
+      false
+    );
   });
 
   it('returns false for null', () => {
