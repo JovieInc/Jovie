@@ -302,16 +302,32 @@ else
   warn "daemon not registered"; VERIFY_OK=false
 fi
 
-if curl -fsS --max-time 5 http://localhost:7800/health >/dev/null; then
+DAEMON_OK=false
+for _ in 1 2 3 4 5; do
+  if curl -fsS --max-time 5 http://localhost:7800/health >/dev/null; then
+    DAEMON_OK=true
+    break
+  fi
+  sleep 2
+done
+if $DAEMON_OK; then
   ok "daemon /health responds"
 else
-  warn "daemon /health does not respond yet (may need ~10s)"
+  warn "daemon /health did not respond after 10s"; VERIFY_OK=false
 fi
 
-if curl -fsS --max-time 5 "http://127.0.0.1:7801/health" >/dev/null 2>&1; then
+GBRAIN_OK=false
+for _ in 1 2 3 4 5; do
+  if curl -fsS --max-time 5 "http://127.0.0.1:7801/health" >/dev/null 2>&1; then
+    GBRAIN_OK=true
+    break
+  fi
+  sleep 2
+done
+if $GBRAIN_OK; then
   ok "gbrain server responds locally"
 else
-  warn "gbrain server not responding on :7801"
+  warn "gbrain server not responding on :7801"; VERIFY_OK=false
 fi
 
 if [[ -f "${HERMES_HOME}/.env" ]] && [[ "$(stat -f '%Lp' "${HERMES_HOME}/.env")" == "600" ]]; then

@@ -132,20 +132,34 @@ async function processPr(pr: Pr): Promise<void> {
 
   if (filed.success) {
     // Label the PR so we don't refile next run.
+    let labelOk = false;
     try {
       execFileSync(
         'gh',
         ['pr', 'edit', String(pr.number), '--add-label', 'hermes-air-flagged'],
         { encoding: 'utf8', timeout: 15_000 }
       );
-    } catch {
-      // Label might not exist yet; non-fatal.
+      labelOk = true;
+    } catch (err) {
+      // Without the label, the next run will refile and create a duplicate
+      // Linear issue. Surface this as an error event so we can spot it in
+      // ~/.hermes/logs/jobs.jsonl and either create the label or wire a
+      // fallback dedupe (e.g. a local "filed-prs" ledger keyed by PR
+      // number). For now we accept the duplicate risk but mark it loud.
+      logJobEvent({
+        job: JOB,
+        event: 'label_add_failed_dedupe_risk',
+        pr: pr.number,
+        identifier: filed.identifier,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
     logJobEvent({
       job: JOB,
       event: 'issue_filed',
       pr: pr.number,
       identifier: filed.identifier,
+      labelApplied: labelOk,
       reasons: verdict.reasons,
     });
   } else {

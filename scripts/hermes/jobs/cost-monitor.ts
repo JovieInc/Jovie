@@ -58,9 +58,15 @@ function totalLocalPaidSpend(sinceMs: number): number {
   }
 }
 
-async function fetchOpenRouterUsage24h(): Promise<number> {
+/**
+ * Returns the 24h delta in OpenRouter spend, or null if usage is
+ * unknowable (no key, API down after retries). Null tells the caller to
+ * fail closed rather than assume zero spend — silently assuming zero
+ * defeats the whole point of the kill switch.
+ */
+async function fetchOpenRouterUsage24h(): Promise<number | null> {
   const key = process.env.OPENROUTER_API_KEY;
-  if (!key) return 0;
+  if (!key) return null;
   try {
     const data = await withRetry(
       async () => {
@@ -102,7 +108,7 @@ async function fetchOpenRouterUsage24h(): Promise<number> {
     );
     return Math.max(0, usageNow - usagePrev);
   } catch {
-    return 0;
+    return null;
   }
 }
 
@@ -135,16 +141,26 @@ async function main(): Promise<void> {
     const since = Date.now() - 24 * 3_600 * 1000;
     const localSpend = totalLocalPaidSpend(since);
     const remoteSpend = await fetchOpenRouterUsage24h();
-    const totalSpend = localSpend + remoteSpend;
 
     logJobEvent({
       job: JOB,
       event: 'checked',
       localSpend,
       remoteSpend,
-      totalSpend,
+      remoteKnown: remoteSpend !== null,
     });
 
+    // Fail closed: if we can't read remote usage, assume the worst and
+    // notify (but don't trip the kill switch unless local spend is
+    // already positive — we don't want repeated transient OpenRouter API
+    // outages to lock the user out of their own machine).
+    if (remoteSpend === null) {
+      await sendTelegram(
+        `Hermes-Air cost monitor: could not verify OpenRouter usage in last 24h. Local paid spend: $${localSpend.toFixed(4)}. If this persists, check OPENROUTER_API_KEY and the OpenRouter status page.`
+      );
+    }
+
+    const totalSpend = localSpend + (remoteSpend ?? 0);
     if (totalSpend > 0) {
       tripKillSwitch(totalSpend);
       await sendTelegram(
@@ -156,5 +172,9 @@ async function main(): Promise<void> {
 
 void main().catch(err => {
   console.error(`[${JOB}] fatal:`, err);
-  process.exit(0);
+  // Non-zero exit so launchd surfaces the failure in `launchctl print` and
+  // operator dashboards. The launchd plist intentionally has no
+  // throttle/restart loop around this, so a single bad run is visible
+  // without spinning.
+  process.exit(1);
 });

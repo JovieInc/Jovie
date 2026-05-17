@@ -50,6 +50,8 @@ function mergedPrsYesterday(): ReadonlyArray<{
         'list',
         '--state',
         'merged',
+        '--base',
+        'main',
         '--limit',
         '40',
         '--json',
