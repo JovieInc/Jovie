@@ -203,6 +203,7 @@ export {
 } from './useBuildInfoQuery';
 // Campaign invites
 export {
+  type CampaignInviteListItem,
   type CampaignPreviewResponse,
   type CampaignStats,
   type CampaignStatsResponse,
