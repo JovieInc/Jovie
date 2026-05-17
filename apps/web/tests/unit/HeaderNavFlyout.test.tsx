@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HeaderNav } from '@/components/organisms/HeaderNav';
 
@@ -103,16 +103,33 @@ describe('HeaderNav flyout interactions', () => {
 
     const trigger = screen.getByRole('button', { name: /Features/ });
     const header = screen.getByTestId('header-nav');
-    const flyout = container.querySelector('#marketing-header-flyout-features');
+
+    // After JOV-2147 (conditional render): flyout is not in the DOM when closed.
+    expect(
+      container.querySelector('#marketing-header-flyout-features')
+    ).toBeNull();
 
     fireEvent.pointerEnter(trigger);
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
+
+    // Flyout mounts closed first, then gets the open class on the next frame so
+    // the CSS transition can run.
+    const flyout = container.querySelector('#marketing-header-flyout-features');
+    expect(flyout).not.toBeNull();
+    expect(flyout).not.toHaveClass('marketing-glass-header__flyout--open');
+    act(() => {
+      vi.advanceTimersByTime(16);
+    });
+    expect(flyout).toHaveClass('marketing-glass-header__flyout--open');
 
     fireEvent.pointerLeave(header, { relatedTarget: null });
     fireEvent.pointerEnter(flyout as Element);
     vi.advanceTimersByTime(220);
 
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
-    expect(flyout).toHaveAttribute('aria-hidden', 'false');
+    // Flyout stays mounted while open.
+    expect(
+      container.querySelector('#marketing-header-flyout-features')
+    ).not.toBeNull();
   });
 });

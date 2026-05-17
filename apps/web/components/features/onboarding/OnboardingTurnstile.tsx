@@ -28,7 +28,7 @@ declare global {
           'error-callback'?: (code: string) => void;
           'expired-callback'?: () => void;
           appearance?: 'always' | 'execute' | 'interaction-only';
-          size?: 'normal' | 'flexible' | 'compact' | 'invisible';
+          size?: 'normal' | 'flexible' | 'compact';
           theme?: 'auto' | 'light' | 'dark';
         }
       ) => string;
@@ -62,7 +62,6 @@ export function OnboardingTurnstile({
     try {
       widgetIdRef.current = window.turnstile.render(containerRef.current, {
         sitekey: siteKey,
-        size: 'invisible',
         appearance: 'interaction-only',
         theme: 'dark',
         callback: token => onToken(token),
