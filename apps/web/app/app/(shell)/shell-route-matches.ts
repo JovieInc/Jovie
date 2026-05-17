@@ -121,6 +121,14 @@ export function isAudienceShellRoute(pathname: string | null): boolean {
   );
 }
 
+export function isCalendarShellRoute(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return (
+    pathname === APP_ROUTES.CALENDAR ||
+    pathname.startsWith(`${APP_ROUTES.CALENDAR}/`)
+  );
+}
+
 function isDashboardSubRoute(pathname: string | null): boolean {
   if (!pathname) return false;
   return pathname.startsWith(`${APP_ROUTES.LEGACY_DASHBOARD}/`);
@@ -150,6 +158,7 @@ function isLightweightShellRoute(pathname: string | null): boolean {
     isInsightsShellRoute(pathname) ||
     isPresenceShellRoute(pathname) ||
     isAudienceShellRoute(pathname) ||
+    isCalendarShellRoute(pathname) ||
     isDashboardSubRoute(pathname) ||
     isShellOptimizedSettingsRoute(pathname)
   );
@@ -169,6 +178,7 @@ export function shouldRedirectToOnboarding(pathname: string | null): boolean {
     isInsightsShellRoute(pathname) ||
     isPresenceShellRoute(pathname) ||
     isAudienceShellRoute(pathname) ||
+    isCalendarShellRoute(pathname) ||
     isDashboardSubRoute(pathname)
   );
 }
