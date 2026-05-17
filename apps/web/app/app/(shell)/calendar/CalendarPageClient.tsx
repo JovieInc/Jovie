@@ -32,7 +32,7 @@ import { getEventLocalDateKey } from '@/lib/events/date';
 import { normalizeTicketUrl } from '@/lib/events/ticket-url';
 import { queryKeys } from '@/lib/queries';
 import { type EventRecord, useEventsQuery } from '@/lib/queries/useEventsQuery';
-import { useRecentReleasesQuery } from '@/lib/queries/useRecentReleasesQuery';
+import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
 import { cn } from '@/lib/utils';
 import { useDashboardData } from '../dashboard/DashboardDataContext';
 
@@ -204,7 +204,7 @@ export function CalendarPageClient() {
   const profileId = selectedProfile?.id ?? '';
   const queryClient = useQueryClient();
   const { data: releases, isLoading: isLoadingReleases } =
-    useRecentReleasesQuery(profileId);
+    useReleasesQuery(profileId);
   const { data: events, isLoading: isLoadingEvents } =
     useEventsQuery(profileId);
 
@@ -218,7 +218,7 @@ export function CalendarPageClient() {
         id: r.id,
         title: r.title,
         artworkUrl: r.artworkUrl ?? undefined,
-        status: deriveStatus(r.releaseDate),
+        status: deriveStatus(r.releaseDate ?? null),
       };
       const list = map.get(key);
       if (list) list.push(dot);

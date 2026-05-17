@@ -171,7 +171,7 @@ describe('CalendarPage', () => {
     expect(mocks.fetchQuery).not.toHaveBeenCalled();
   });
 
-  it('hydrates recent releases and events for the selected profile', async () => {
+  it('hydrates release matrix and events for the selected profile', async () => {
     render(await CalendarPage());
 
     expect(screen.getByTestId('hydrate-client')).toHaveAttribute(
@@ -181,7 +181,7 @@ describe('CalendarPage', () => {
     expect(screen.getByTestId('calendar-client')).toBeInTheDocument();
     expect(mocks.fetchQuery).toHaveBeenCalledWith(
       expect.objectContaining({
-        queryKey: queryKeys.releases.recent('profile-1'),
+        queryKey: queryKeys.releases.matrix('profile-1'),
       })
     );
     expect(mocks.fetchQuery).toHaveBeenCalledWith(
