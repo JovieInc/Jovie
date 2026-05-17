@@ -99,6 +99,48 @@ describe('deploy workflow Vercel env resolution', () => {
     }
   });
 
+  it('syncs required signup readiness keys into the configured production Vercel project before pulling env', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const syncStep = getStepBlock(
+      workflow,
+      'Sync required production env to Vercel project'
+    );
+    const pullStep = getStepBlock(workflow, 'Pull env (production)');
+    const syncIndex = workflow.indexOf(
+      '- name: Sync required production env to Vercel project'
+    );
+    const pullIndex = workflow.indexOf('- name: Pull env (production)');
+    const requiredKeys = [
+      'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY',
+      'CLERK_SECRET_KEY',
+      'DATABASE_URL',
+      'SESSION_SECRET',
+      'AI_GATEWAY_API_KEY',
+      'NEXT_PUBLIC_TURNSTILE_SITE_KEY',
+      'TURNSTILE_SECRET_KEY',
+    ];
+
+    expect(syncIndex).toBeGreaterThanOrEqual(0);
+    expect(pullIndex).toBeGreaterThan(syncIndex);
+    expect(syncStep).toContain('required_vercel_env=(');
+    expect(syncStep).toContain('vercel env add "$key" production');
+    expect(syncStep).toContain('--force');
+    expect(syncStep).toContain('--value "${!key}"');
+    expect(syncStep).toContain('>/dev/null');
+    expect(syncStep).toContain('set +x');
+    expect(syncStep).toContain(
+      'VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}'
+    );
+    expect(pullStep).toContain(
+      'VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}'
+    );
+
+    for (const key of requiredKeys) {
+      expect(syncStep).toContain(key);
+      expect(syncStep).toContain(`${key}: \${{ secrets.${key} }}`);
+    }
+  });
+
   it('verifies production promotion through the canonical public alias', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const promoteStep = getStepBlock(
