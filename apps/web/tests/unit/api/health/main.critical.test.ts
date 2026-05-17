@@ -3,6 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mockHealthLimiterLimit = vi.hoisted(() => vi.fn());
 const mockDbExecute = vi.hoisted(() => vi.fn());
 const mockCaptureWarning = vi.hoisted(() => vi.fn());
+const mockEnv = vi.hoisted(() => ({
+  DATABASE_URL: 'postgres://test:test@localhost:5432/test',
+  VERCEL_AUTOMATION_BYPASS_SECRET: undefined as string | undefined,
+}));
 
 vi.mock('@/lib/rate-limit', () => ({
   healthLimiter: {
@@ -23,15 +27,15 @@ vi.mock('@/lib/error-tracking', () => ({
 }));
 
 vi.mock('@/lib/env-server', () => ({
-  env: {
-    DATABASE_URL: 'postgres://test:test@localhost:5432/test',
-  },
+  env: mockEnv,
 }));
 
 describe('@critical GET /api/health', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+    mockEnv.DATABASE_URL = 'postgres://test:test@localhost:5432/test';
+    mockEnv.VERCEL_AUTOMATION_BYPASS_SECRET = undefined;
     mockHealthLimiterLimit.mockResolvedValue({
       success: true,
       limit: 30,
@@ -55,6 +59,50 @@ describe('@critical GET /api/health', () => {
 
     expect(response.status).toBe(429);
     expect(data.error).toBe('Too many requests');
+  });
+
+  it('skips rate limiting for trusted Vercel automation bypass checks', async () => {
+    mockEnv.VERCEL_AUTOMATION_BYPASS_SECRET = 'trusted-bypass-secret';
+    mockDbExecute.mockResolvedValue(undefined);
+
+    const { GET } = await import('@/app/api/health/route');
+    const response = await GET(
+      new Request('http://localhost/api/health', {
+        headers: {
+          'x-vercel-protection-bypass': 'trusted-bypass-secret',
+        },
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data).toEqual({ status: 'ok' });
+    expect(mockHealthLimiterLimit).not.toHaveBeenCalled();
+  });
+
+  it('keeps rate limiting when the Vercel automation bypass is invalid', async () => {
+    mockEnv.VERCEL_AUTOMATION_BYPASS_SECRET = 'trusted-bypass-secret';
+    mockHealthLimiterLimit.mockResolvedValue({
+      success: false,
+      limit: 30,
+      remaining: 0,
+      reset: new Date(Date.now() + 60000),
+      reason: 'Rate limit exceeded',
+    });
+
+    const { GET } = await import('@/app/api/health/route');
+    const response = await GET(
+      new Request('http://localhost/api/health', {
+        headers: {
+          'x-vercel-protection-bypass': 'wrong-secret',
+        },
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(429);
+    expect(data.error).toBe('Too many requests');
+    expect(mockHealthLimiterLimit).toHaveBeenCalledWith('127.0.0.1');
   });
 
   it('returns ok status when database is healthy', async () => {

@@ -45,6 +45,7 @@ export const ServerEnvSchema = z.object({
         'VERCEL_URL must be a hostname or hostname:port without a scheme or path',
     })
     .optional(),
+  VERCEL_AUTOMATION_BYPASS_SECRET: z.string().optional(),
 
   // Clerk server-side configuration
   CLERK_SECRET_KEY: z.string().optional(),
@@ -283,6 +284,7 @@ export const ENV_KEYS = [
   'VITEST',
   'VERCEL_ENV',
   'VERCEL_URL',
+  'VERCEL_AUTOMATION_BYPASS_SECRET',
   'CLERK_SECRET_KEY',
   'CLERK_WEBHOOK_SECRET',
   'RESEND_API_KEY',
