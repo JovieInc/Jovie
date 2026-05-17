@@ -2256,9 +2256,10 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
 
       - name: Create ephemeral Neon database branch (with retry)
-        # Only create an ephemeral branch when DB-relevant code changed.
-        # Non-DB PRs skip branch creation; resolve-neon-database-url falls back to DATABASE_URL_MAIN.
-        if: steps.check_changes.outputs.run_full_ci == 'true' && needs.ci-path-changes.outputs.run_neon == 'true'
+        # Public a11y routes depend on seeded QA profiles and smart links.
+        # Always use an isolated branch when this job runs so the gate is
+        # deterministic and never relies on or mutates the stable main DB.
+        if: steps.check_changes.outputs.run_full_ci == 'true'
         id: neon-branch
         uses: ./.github/actions/neon-create-branch-with-retry
         with:
@@ -2269,8 +2270,7 @@ jobs:
           protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
-        # Only resolve from the ephemeral branch when one was created.
-        if: steps.check_changes.outputs.run_full_ci == 'true' && needs.ci-path-changes.outputs.run_neon == 'true'
+        if: steps.check_changes.outputs.run_full_ci == 'true'
         id: resolve-a11y-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
@@ -2280,13 +2280,8 @@ jobs:
           credential_fallback_url: ${{ secrets.DATABASE_URL }}
 
       - name: Export DATABASE_URL (ephemeral branch)
-        if: steps.check_changes.outputs.run_full_ci == 'true' && needs.ci-path-changes.outputs.run_neon == 'true'
+        if: steps.check_changes.outputs.run_full_ci == 'true'
         run: echo "DATABASE_URL=${{ steps.resolve-a11y-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
-
-      - name: Export DATABASE_URL (main — non-DB PR)
-        # No ephemeral branch was created; use the stable main DB for SSR reads.
-        if: steps.check_changes.outputs.run_full_ci == 'true' && needs.ci-path-changes.outputs.run_neon != 'true'
-        run: echo "DATABASE_URL=${{ secrets.DATABASE_URL_MAIN }}" >> "$GITHUB_ENV"
 
       - name: Cache Playwright Browsers
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -2314,7 +2309,7 @@ jobs:
         run: tar -xf /tmp/nextjs-build-download/nextjs-build.tar -C apps/web
 
       - name: Run migrations (ephemeral Neon)
-        if: steps.check_changes.outputs.run_full_ci == 'true' && needs.ci-path-changes.outputs.run_neon == 'true'
+        if: steps.check_changes.outputs.run_full_ci == 'true'
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
@@ -2323,7 +2318,7 @@ jobs:
           ALLOW_PROD_MIGRATIONS: 'true'
 
       - name: Seed public QA fixtures
-        if: steps.check_changes.outputs.run_full_ci == 'true' && needs.ci-path-changes.outputs.run_neon == 'true'
+        if: steps.check_changes.outputs.run_full_ci == 'true'
         run: pnpm --filter=@jovie/web exec tsx tests/seed-test-data.ts
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}

@@ -27,6 +27,25 @@ function getStepBlock(workflow: string, stepName: string): string {
   return block.join('\n');
 }
 
+function getJobBlock(workflow: string, jobKey: string): string {
+  const lines = workflow.split('\n');
+  const start = lines.findIndex(line => line === `  ${jobKey}:`);
+
+  expect(start, `Missing workflow job: ${jobKey}`).toBeGreaterThanOrEqual(0);
+
+  const block: string[] = [];
+
+  for (let index = start; index < lines.length; index++) {
+    const line = lines[index]!;
+
+    if (index > start && /^  [a-zA-Z0-9_-]+:/.test(line)) break;
+
+    block.push(line);
+  }
+
+  return block.join('\n');
+}
+
 describe('deploy workflow Vercel env resolution', () => {
   it('pins Vercel pull and build commands to the configured project', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
@@ -45,5 +64,42 @@ describe('deploy workflow Vercel env resolution', () => {
         'VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}'
       );
     }
+  });
+});
+
+describe('CI public a11y workflow', () => {
+  it('uses seeded isolated Neon fixtures instead of the stable main DB', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const a11yJob = getJobBlock(workflow, 'ci-a11y');
+    const createBranchStep = getStepBlock(
+      a11yJob,
+      'Create ephemeral Neon database branch (with retry)'
+    );
+    const exportStep = getStepBlock(
+      a11yJob,
+      'Export DATABASE_URL (ephemeral branch)'
+    );
+    const migrateStep = getStepBlock(
+      a11yJob,
+      'Run migrations (ephemeral Neon)'
+    );
+    const seedStep = getStepBlock(a11yJob, 'Seed public QA fixtures');
+
+    expect(createBranchStep).toContain(
+      "if: steps.check_changes.outputs.run_full_ci == 'true'"
+    );
+    expect(exportStep).toContain(
+      "if: steps.check_changes.outputs.run_full_ci == 'true'"
+    );
+    expect(migrateStep).toContain(
+      "if: steps.check_changes.outputs.run_full_ci == 'true'"
+    );
+    expect(seedStep).toContain(
+      "if: steps.check_changes.outputs.run_full_ci == 'true'"
+    );
+
+    expect(createBranchStep).not.toContain('run_neon');
+    expect(seedStep).not.toContain('run_neon');
+    expect(a11yJob).not.toContain('Export DATABASE_URL (main');
   });
 });
