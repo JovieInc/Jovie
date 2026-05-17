@@ -92,6 +92,20 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
     expect(slashNavs).toHaveLength(0);
   });
 
+  it('keeps Feedback available on both command surfaces', () => {
+    for (const surface of ['chat-slash', 'cmdk'] as const) {
+      expect(commandsForSurface(surface)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            kind: 'skill',
+            id: 'submitFeedback',
+            label: 'Send feedback',
+          }),
+        ])
+      );
+    }
+  });
+
   it('renders nav, skill, and release sections when open', () => {
     render(<CmdKPalette profileId='profile-1' open onOpenChange={vi.fn()} />);
     expect(screen.getByTestId('shared-command-palette')).toBeInTheDocument();
@@ -139,6 +153,17 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
     expect(skillRow).toBeDefined();
     fireEvent.mouseDown(skillRow!);
     expect(pushMock).toHaveBeenCalledWith('/app/chat?skill=generateAlbumArt');
+  });
+
+  it('routes Feedback from cmd+k through the same skill handoff', () => {
+    pushMock.mockClear();
+    render(<CmdKPalette profileId='profile-1' open onOpenChange={vi.fn()} />);
+    const feedbackRow = screen
+      .getAllByRole('option')
+      .find(el => el.textContent?.includes('Share feedback'));
+    expect(feedbackRow).toBeDefined();
+    fireEvent.mouseDown(feedbackRow!);
+    expect(pushMock).toHaveBeenCalledWith('/app/chat?skill=submitFeedback');
   });
 
   it('routes a release entity commit to its tasks page', () => {
