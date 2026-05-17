@@ -148,7 +148,8 @@ export const retouchJobs = pgTable(
 
     status: retouchJobStatusEnum('status').notNull().default('queued'),
 
-    // ArcFace cosine similarity vs. original (null until identity check runs)
+    // ArcFace cosine similarity vs. original (null until identity check runs).
+    // Inserting services must clamp scores to [-1, 1] before persistence.
     identityScore: numeric('identity_score', { precision: 4, scale: 3 }),
 
     // Raw token counts from the model response

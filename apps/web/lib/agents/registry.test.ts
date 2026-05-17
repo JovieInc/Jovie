@@ -54,8 +54,8 @@ describe('SKILL_REGISTRY', () => {
       expect(retouch.model).toBe('google/gemini-2.5-flash-image');
     });
 
-    it('gates on ai_retouching entitlement', () => {
-      expect(retouch.entitlement).toBe('ai_retouching');
+    it('gates on the AI retouching boolean entitlement', () => {
+      expect(retouch.entitlement).toBe('canAccessAiRetouching');
     });
 
     it('has a promptPath for the white-space style', () => {

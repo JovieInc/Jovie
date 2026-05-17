@@ -25,7 +25,7 @@ export const SKILL_REGISTRY = {
       'AI retouching using the White Space style (Kodak Portra cinematic editorial). Hard identity-preservation guardrails.',
     kind: 'vertical_agent',
     version: '1.0.0',
-    entitlement: 'ai_retouching',
+    entitlement: 'canAccessAiRetouching',
     model: 'google/gemini-2.5-flash-image',
     promptPath: 'apps/web/lib/services/retouching/styles/white-space.md',
     metadata: {

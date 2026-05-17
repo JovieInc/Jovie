@@ -100,7 +100,7 @@ describe('sync-skills-catalog', () => {
         expect.objectContaining({
           id: 'retouch',
           kind: 'vertical_agent',
-          entitlementRequired: 'ai_retouching',
+          entitlementRequired: 'canAccessAiRetouching',
         }),
       ])
     );
@@ -118,7 +118,7 @@ describe('sync-skills-catalog', () => {
       description: 'Tool catalog test entry',
       kind: 'tool',
       version: '1.0.0',
-      entitlement: 'ai_retouching',
+      entitlement: 'canAccessAiRetouching',
       model: 'unit-model',
       inputSchemaZodPath: 'apps/web/lib/agents/tools/unit/input.ts',
       outputSchemaZodPath: 'apps/web/lib/agents/tools/unit/output.ts',

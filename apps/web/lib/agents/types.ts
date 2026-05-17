@@ -6,6 +6,8 @@
  * dependencies — it is imported by both server code and the sync script.
  */
 
+import type { BooleanEntitlement } from '@/lib/entitlements/registry';
+
 // Matches the skillKindEnum values in enums.ts
 export type SkillKind = 'vertical_agent' | 'tool' | 'style';
 
@@ -24,8 +26,8 @@ export interface SkillDefinition {
   readonly kind: SkillKind;
   /** Semver string — stored on retouch_jobs.style_version for correlating prompt revisions. */
   readonly version: string;
-  /** Entitlement key that gates access (matches BooleanEntitlement in entitlements/registry.ts). */
-  readonly entitlement: string;
+  /** Entitlement key that gates access. */
+  readonly entitlement: BooleanEntitlement;
   /** Model identifier used for inference (e.g. 'google/gemini-2.5-flash-image'). */
   readonly model: string;
   /** Path to the style/system prompt markdown, relative to repo root. Null for tool skills. */
