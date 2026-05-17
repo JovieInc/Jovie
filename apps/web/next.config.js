@@ -428,14 +428,7 @@ const nextConfig = {
     ];
   },
   async rewrites() {
-    return [
-      // Keep canonical releases attached to the legacy dashboard route owner
-      // until the releases surface is migrated.
-      {
-        source: '/app/releases',
-        destination: '/app/dashboard/releases',
-      },
-    ];
+    return [];
   },
   env: {
     // Build-time env vars — these get inlined into client bundles by Next.js

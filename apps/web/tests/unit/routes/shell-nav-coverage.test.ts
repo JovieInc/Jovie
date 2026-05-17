@@ -15,10 +15,6 @@ import {
 
 const SHELL_ROOT = path.resolve(__dirname, '../../../app/app/(shell)');
 
-const NAV_ROUTE_PAGE_ALIASES: Record<string, string> = {
-  '/app/releases': '/app/dashboard/releases',
-};
-
 const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
   '/app': 'Shell root entry page',
   '/app/chat/[id]': 'Thread detail is reached from chat history',
@@ -30,6 +26,8 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
     'Dynamic workflow route reached from releases actions',
   '/app/dashboard/releases/[releaseId]/downloads':
     'Internal release workflow (manual entry)',
+  '/app/dashboard/releases':
+    'Legacy releases workspace retained for old bookmarks',
   '/app/settings/retargeting-ads':
     'Legacy settings route redirected to Audience',
   '/app/dashboard/release-plan':
@@ -105,9 +103,7 @@ function getNavRoutePaths(): Set<string> {
     ...adminSettingsNavigation,
   ];
 
-  return new Set(
-    navItems.map(item => NAV_ROUTE_PAGE_ALIASES[item.href] ?? item.href)
-  );
+  return new Set(navItems.map(item => item.href));
 }
 
 describe('shell route coverage', () => {
