@@ -3618,18 +3618,52 @@ jobs:
       - name: Deploy (staging preview, prebuilt)
         id: deploy
         run: |
-          if [ -z "${VERCEL_AUTOMATION_BYPASS_SECRET:-}" ]; then
-            echo "VERCEL_AUTOMATION_BYPASS_SECRET is required for staging canary verification."
+          required_runtime_env=(
+            VERCEL_AUTOMATION_BYPASS_SECRET
+            NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+            CLERK_SECRET_KEY
+            DATABASE_URL
+            SESSION_SECRET
+            AI_GATEWAY_API_KEY
+            NEXT_PUBLIC_TURNSTILE_SITE_KEY
+            TURNSTILE_SECRET_KEY
+            CLERK_PUBLISHABLE_KEY_STAGING
+            CLERK_SECRET_KEY_STAGING
+          )
+
+          missing_runtime_env=()
+          for key in "${required_runtime_env[@]}"; do
+            if [ -z "${!key:-}" ]; then
+              missing_runtime_env+=("$key")
+            fi
+          done
+
+          if [ "${#missing_runtime_env[@]}" -gt 0 ]; then
+            echo "Missing staging preview runtime env: ${missing_runtime_env[*]}"
             exit 1
           fi
 
           bash .github/scripts/vercel-prebuilt-deploy.sh deploy_url \
             --env VERCEL_AUTOMATION_BYPASS_SECRET="${VERCEL_AUTOMATION_BYPASS_SECRET}" \
+            --env NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}" \
+            --env CLERK_SECRET_KEY="${CLERK_SECRET_KEY}" \
+            --env DATABASE_URL="${DATABASE_URL}" \
+            --env SESSION_SECRET="${SESSION_SECRET}" \
+            --env AI_GATEWAY_API_KEY="${AI_GATEWAY_API_KEY}" \
+            --env NEXT_PUBLIC_TURNSTILE_SITE_KEY="${NEXT_PUBLIC_TURNSTILE_SITE_KEY}" \
+            --env TURNSTILE_SECRET_KEY="${TURNSTILE_SECRET_KEY}" \
             --env CLERK_PUBLISHABLE_KEY_STAGING="${CLERK_PUBLISHABLE_KEY_STAGING}" \
             --env CLERK_SECRET_KEY_STAGING="${CLERK_SECRET_KEY_STAGING}"
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
+          TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
           CLERK_PUBLISHABLE_KEY_STAGING: ${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}
           CLERK_SECRET_KEY_STAGING: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
