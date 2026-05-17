@@ -1,10 +1,7 @@
 'use client';
 
 import { useEffect, useMemo } from 'react';
-import {
-  registerEntityProvider,
-  unregisterEntityProvider,
-} from '@/lib/commands/entities';
+import { registerEntityProvider } from '@/lib/commands/entities';
 import { artistProvider } from './artist-provider';
 import { createEventProvider } from './event-provider';
 import { createReleaseProvider } from './release-provider';
@@ -33,13 +30,14 @@ export function ChatProvidersRegistrar({
   );
 
   useEffect(() => {
-    registerEntityProvider(releaseProvider);
-    registerEntityProvider(artistProvider);
-    registerEntityProvider(eventProvider);
+    const unregisterReleaseProvider = registerEntityProvider(releaseProvider);
+    const unregisterArtistProvider = registerEntityProvider(artistProvider);
+    const unregisterEventProvider = registerEntityProvider(eventProvider);
+
     return () => {
-      unregisterEntityProvider(releaseProvider);
-      unregisterEntityProvider(artistProvider);
-      unregisterEntityProvider(eventProvider);
+      unregisterEventProvider();
+      unregisterArtistProvider();
+      unregisterReleaseProvider();
     };
   }, [releaseProvider, eventProvider]);
 
