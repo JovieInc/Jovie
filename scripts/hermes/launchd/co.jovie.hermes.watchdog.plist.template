@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>co.jovie.hermes.watchdog</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>-c</string>
+        <string>curl -fsS --max-time 5 http://localhost:7800/health > /dev/null || launchctl kickstart -k gui/$(id -u)/co.jovie.hermes.daemon</string>
+    </array>
+    <key>StartInterval</key>
+    <integer>60</integer>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>{{HOME}}/.hermes/logs/launchd/watchdog.log</string>
+    <key>StandardErrorPath</key>
+    <string>{{HOME}}/.hermes/logs/launchd/watchdog.err.log</string>
+</dict>
+</plist>

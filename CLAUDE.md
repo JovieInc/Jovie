@@ -134,6 +134,7 @@ Read the file for the topic you're touching. More-local instructions override th
 | [`.claude/rules/linear.md`](.claude/rules/linear.md) | Issue gating, ownership contract |
 | [`.claude/rules/gstack.md`](.claude/rules/gstack.md) | Vendored toolkit, skill routing |
 | [`.claude/rules/swarm.md`](.claude/rules/swarm.md) | Ruflo-coordinated parallel swarms (pre-created worktrees, claims, ship recipe) |
+| [`.claude/rules/hermes-air.md`](.claude/rules/hermes-air.md) | Always-on Hermes node (MacBook Air): voice/Telegram intake, ops crons, Linear-as-bus contract |
 
 ## Skill routing
 

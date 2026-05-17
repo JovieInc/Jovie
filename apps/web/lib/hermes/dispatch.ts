@@ -50,7 +50,7 @@ export class HermesDispatchGitHubError extends Error {
 }
 
 const HermesDispatchRequestSchema = z.object({
-  source: z.enum(['github', 'linear', 'sentry', 'hermes', 'ci']),
+  source: z.enum(['github', 'linear', 'sentry', 'hermes', 'hermes-air', 'ci']),
   sourceId: z.string().trim().min(1).max(160).optional(),
   sourceUrl: z
     .union([z.string().trim().url(), z.literal(''), z.null()])
