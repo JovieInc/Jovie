@@ -6,7 +6,6 @@ import { Icon } from '@/components/atoms/Icon';
 import {
   DrawerButton,
   DrawerLoadingSkeleton,
-  DrawerSurfaceCard,
 } from '@/components/molecules/drawer';
 import { PageShell } from '@/components/organisms/PageShell';
 import type {
@@ -212,18 +211,10 @@ function ReleasesListContent({
   if (showConnectedEmptyState) {
     return (
       <div className='py-12 grid place-items-center text-center'>
-        <DrawerSurfaceCard
-          variant='card'
-          className='flex min-h-[212px] flex-col items-center justify-center px-5 py-9 text-center'
-          testId='shell-releases-empty-state-connected'
+        <div
+          className='max-w-sm'
+          data-testid='shell-releases-empty-state-connected'
         >
-          <div className='mb-2.5 flex h-9 w-9 items-center justify-center rounded-[10px] border border-subtle bg-surface-1'>
-            <Icon
-              name='Disc3'
-              className='h-4 w-4 text-tertiary-token'
-              aria-hidden='true'
-            />
-          </div>
           <h3 className='text-app font-caption text-primary-token'>
             No releases yet
           </h3>
@@ -261,7 +252,7 @@ function ReleasesListContent({
               </DrawerButton>
             )}
           </div>
-        </DrawerSurfaceCard>
+        </div>
       </div>
     );
   }
