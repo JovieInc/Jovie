@@ -54,20 +54,47 @@ describe('deploy workflow Vercel env resolution', () => {
   it('pins Vercel pull and build commands to the configured project', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const steps = [
-      'Pull env (preview)',
-      'Build (PR preview)',
-      'Pull env (production)',
-      'Build (preview target for staging verification)',
+      {
+        command: 'vercel pull',
+        name: 'Pull env (preview)',
+      },
+      {
+        command: 'vercel build',
+        name: 'Build (PR preview)',
+      },
+      {
+        command: 'vercel pull',
+        name: 'Pull env (production)',
+      },
+      {
+        command: 'vercel build',
+        name: 'Build (preview target for staging verification)',
+      },
     ];
 
-    for (const stepName of steps) {
-      const step = getStepBlock(workflow, stepName);
+    for (const { command, name } of steps) {
+      const step = getStepBlock(workflow, name);
 
       expect(step).toContain('VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}');
       expect(step).toContain(
         'VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}'
       );
+      expect(step).toContain(command);
+      expect(step).toContain('--scope ${{ secrets.VERCEL_ORG_ID }}');
     }
+  });
+
+  it('scopes prebuilt Vercel deploys to the configured team', () => {
+    const deployScript = readFileSync(
+      resolve(repoRoot, '.github/scripts/vercel-prebuilt-deploy.sh'),
+      'utf8'
+    );
+
+    expect(deployScript).toContain('VERCEL_SCOPE_ARGS=()');
+    expect(deployScript).toContain(
+      'VERCEL_SCOPE_ARGS=(--scope "$VERCEL_ORG_ID")'
+    );
+    expect(deployScript).toContain('"${VERCEL_SCOPE_ARGS[@]}"');
   });
 
   it('passes signup readiness keys into the staging preview runtime', () => {
