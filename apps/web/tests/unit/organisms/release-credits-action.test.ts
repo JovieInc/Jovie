@@ -1,16 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockGetOptionalAuth, mockGetDashboardData } = vi.hoisted(() => ({
-  mockGetOptionalAuth: vi.fn(),
-  mockGetDashboardData: vi.fn(),
-}));
+const { mockGetOptionalAuth, mockGetDashboardDataEssential } = vi.hoisted(
+  () => ({
+    mockGetOptionalAuth: vi.fn(),
+    mockGetDashboardDataEssential: vi.fn(),
+  })
+);
 
 vi.mock('@/lib/auth/cached', () => ({
   getOptionalAuth: mockGetOptionalAuth,
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/actions', () => ({
-  getDashboardData: mockGetDashboardData,
+  getDashboardDataEssential: mockGetDashboardDataEssential,
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -50,6 +52,6 @@ describe('fetchReleaseCreditsAction', () => {
     });
 
     await expect(fetchReleaseCreditsAction('release_123')).resolves.toEqual([]);
-    expect(mockGetDashboardData).not.toHaveBeenCalled();
+    expect(mockGetDashboardDataEssential).not.toHaveBeenCalled();
   });
 });
