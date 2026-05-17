@@ -11,7 +11,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 import { users } from './auth';
-import { chatMessageRoleEnum } from './enums';
+import { chatMessageRoleEnum, chatTurnStatusEnum } from './enums';
 import { creatorProfiles } from './profiles';
 
 /**
@@ -72,6 +72,53 @@ export const chatConversations = pgTable(
 );
 
 /**
+ * Chat turns table.
+ * Reserves one durable outcome for each client-submitted chat action.
+ */
+export const chatTurns = pgTable(
+  'chat_turns',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    conversationId: uuid('conversation_id')
+      .notNull()
+      .references(() => chatConversations.id, { onDelete: 'cascade' }),
+    clientTurnId: text('client_turn_id').notNull(),
+    status: chatTurnStatusEnum('status').notNull().default('reserved'),
+    source: text('source').notNull().default('typed'),
+    toolIntent: text('tool_intent'),
+    errorCode: text('error_code'),
+    errorMessage: text('error_message'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    startedAt: timestamp('started_at'),
+    completedAt: timestamp('completed_at'),
+  },
+  table => ({
+    conversationClientTurnUnique: uniqueIndex(
+      'idx_chat_turns_conversation_client_turn_unique'
+    ).on(table.conversationId, table.clientTurnId),
+    profileClientTurnUnique: uniqueIndex(
+      'idx_chat_turns_profile_client_turn_unique'
+    ).on(table.creatorProfileId, table.userId, table.clientTurnId),
+    userIdIdx: index('idx_chat_turns_user_id').on(table.userId),
+    creatorProfileIdIdx: index('idx_chat_turns_creator_profile_id').on(
+      table.creatorProfileId
+    ),
+    conversationIdIdx: index('idx_chat_turns_conversation_id').on(
+      table.conversationId
+    ),
+    statusIdx: index('idx_chat_turns_status').on(table.status),
+    updatedAtIdx: index('idx_chat_turns_updated_at').on(table.updatedAt),
+  })
+);
+
+/**
  * Chat messages table.
  * Stores individual messages within conversations.
  */
@@ -82,6 +129,10 @@ export const chatMessages = pgTable(
     conversationId: uuid('conversation_id')
       .notNull()
       .references(() => chatConversations.id, { onDelete: 'cascade' }),
+    turnId: uuid('turn_id').references(() => chatTurns.id, {
+      onDelete: 'set null',
+    }),
+    clientMessageId: text('client_message_id'),
     role: chatMessageRoleEnum('role').notNull(),
     content: text('content').notNull(),
     toolCalls: jsonb('tool_calls'),
@@ -91,7 +142,13 @@ export const chatMessages = pgTable(
     conversationIdIdx: index('idx_chat_messages_conversation_id').on(
       table.conversationId
     ),
+    turnIdIdx: index('idx_chat_messages_turn_id').on(table.turnId),
     createdAtIdx: index('idx_chat_messages_created_at').on(table.createdAt),
+    conversationClientMessageUnique: uniqueIndex(
+      'idx_chat_messages_conversation_client_message_unique'
+    )
+      .on(table.conversationId, table.clientMessageId)
+      .where(drizzleSql`${table.clientMessageId} IS NOT NULL`),
   })
 );
 
@@ -154,6 +211,9 @@ export const selectChatConversationSchema =
 export const insertChatMessageSchema = createInsertSchema(chatMessages);
 export const selectChatMessageSchema = createSelectSchema(chatMessages);
 
+export const insertChatTurnSchema = createInsertSchema(chatTurns);
+export const selectChatTurnSchema = createSelectSchema(chatTurns);
+
 export const insertChatAuditLogSchema = createInsertSchema(chatAuditLog);
 export const selectChatAuditLogSchema = createSelectSchema(chatAuditLog);
 
@@ -163,6 +223,9 @@ export type NewChatConversation = typeof chatConversations.$inferInsert;
 
 export type ChatMessage = typeof chatMessages.$inferSelect;
 export type NewChatMessage = typeof chatMessages.$inferInsert;
+
+export type ChatTurn = typeof chatTurns.$inferSelect;
+export type NewChatTurn = typeof chatTurns.$inferInsert;
 
 export type ChatAuditLog = typeof chatAuditLog.$inferSelect;
 export type NewChatAuditLog = typeof chatAuditLog.$inferInsert;

@@ -291,13 +291,13 @@ describe('CheckoutSuccessPage — CTAs and verification', () => {
     );
   });
 
-  it('secondary CTA routes to /app/dashboard/releases', () => {
+  it('secondary CTA routes to /app/releases', () => {
     setSearchParams('plan_id=pro');
     mockBilling('pro');
     render(<CheckoutSuccessPage />);
     expect(
       screen.getByRole('link', { name: /view your releases/i })
-    ).toHaveAttribute('href', '/app/dashboard/releases');
+    ).toHaveAttribute('href', '/app/releases');
   });
 
   it('hides the secondary CTA on onboarding flow and shows "Explore your dashboard"', () => {

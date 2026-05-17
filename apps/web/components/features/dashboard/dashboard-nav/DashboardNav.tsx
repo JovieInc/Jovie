@@ -54,8 +54,11 @@ function isItemActive(pathname: string, item: NavItem): boolean {
     ) {
       return APP_ROUTES.RELEASES;
     }
-    if (pathname === APP_ROUTES.AUDIENCE) {
-      return APP_ROUTES.DASHBOARD_AUDIENCE;
+    if (
+      pathname === APP_ROUTES.DASHBOARD_AUDIENCE ||
+      pathname === APP_ROUTES.AUDIENCE
+    ) {
+      return APP_ROUTES.AUDIENCE;
     }
     return pathname;
   })();
@@ -63,7 +66,8 @@ function isItemActive(pathname: string, item: NavItem): boolean {
   if (
     normalizedPathname === item.href ||
     (normalizedPathname === APP_ROUTES.RELEASES &&
-      item.href === APP_ROUTES.DASHBOARD_RELEASES)
+      (item.href === APP_ROUTES.RELEASES ||
+        item.href === APP_ROUTES.DASHBOARD_RELEASES))
   ) {
     return true;
   }
@@ -252,7 +256,7 @@ export function DashboardNav(_: DashboardNavProps) {
     // change) leaves the ref null and a later visit will retry.
     const handle = setTimeout(() => {
       releasesPrefetchedProfileIdRef.current = profileId;
-      router.prefetch(APP_ROUTES.DASHBOARD_RELEASES);
+      router.prefetch(APP_ROUTES.RELEASES);
       void import(
         '@/features/dashboard/organisms/release-provider-matrix'
       ).catch(() => {

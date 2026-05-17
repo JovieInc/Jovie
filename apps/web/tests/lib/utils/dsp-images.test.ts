@@ -37,11 +37,11 @@ describe('shouldBypassImageOptimization', () => {
   describe('non-Spotify DSP domains (non-proxiable — should bypass)', () => {
     it('bypasses Apple Music CDN (is.mzstatic.com)', () => {
       // Apple Music images are NOT in next.config.js remotePatterns — bypass is correct.
-      const result = shouldBypassImageOptimization(
-        'https://is1-ssl.mzstatic.com/image/thumb/Music/abc/cover.jpg/300x300bb.jpg'
-      );
-      // Non-Spotify DSP domains should still bypass (unless they are proxiable)
-      expect(typeof result).toBe('boolean');
+      expect(
+        shouldBypassImageOptimization(
+          'https://is1-ssl.mzstatic.com/image/thumb/Music/abc/cover.jpg/300x300bb.jpg'
+        )
+      ).toBe(true);
     });
   });
 

@@ -1,7 +1,10 @@
 import { and, eq } from 'drizzle-orm';
 import { notFound, redirect } from 'next/navigation';
 import { Suspense } from 'react';
-import { ReleaseTaskPage } from '@/components/features/dashboard/release-tasks';
+import {
+  ReleaseTaskPage,
+  ReleaseTaskPageSkeleton,
+} from '@/components/features/dashboard/release-tasks';
 import { ReleasePlanUpgradeInterstitial } from '@/components/features/dashboard/tasks/TasksUpgradeInterstitial';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCurrentUserProfile } from '@/lib/auth/session';
@@ -17,13 +20,7 @@ export default async function TasksPage({ params }: TasksPageProps) {
   const { releaseId } = await params;
 
   return (
-    <Suspense
-      fallback={
-        <div className='flex flex-1 items-center justify-center p-8'>
-          <div className='h-6 w-6 animate-spin rounded-full border-2 border-current border-t-transparent' />
-        </div>
-      }
-    >
+    <Suspense fallback={<ReleaseTaskPageSkeleton />}>
       <TasksContent releaseId={releaseId} />
     </Suspense>
   );

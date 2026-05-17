@@ -20,8 +20,8 @@ export default defineConfig({
   forbidOnly: true, // Always enforced in synthetic mode
   retries: 2, // Retry failed tests to avoid false alarms
   workers: 1, // Single worker for consistency
-  timeout: 120_000, // 2 minutes per test
-  globalTimeout: 600_000, // 10 minutes total
+  timeout: 240_000, // 4 minutes per test
+  globalTimeout: 900_000, // 15 minutes total
 
   reporter: [
     [

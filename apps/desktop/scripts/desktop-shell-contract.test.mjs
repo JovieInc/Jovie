@@ -21,6 +21,10 @@ test('desktop window enters the authenticated app shell instead of the web root'
     mainSource,
     /const DESKTOP_USER_AGENT_PRODUCT = `JovieDesktop\/\$\{app\.getVersion\(\)\}`;/
   );
+  assert.match(
+    mainSource,
+    /app\.setName\(APP_ENV === 'staging' \? 'Jovie Staging' : 'Jovie'\);/
+  );
   assert.match(mainSource, /win\.webContents\.setUserAgent\(/);
   assert.match(
     mainSource,
@@ -30,6 +34,19 @@ test('desktop window enters the authenticated app shell instead of the web root'
     mainSource,
     /function createWindow\(initialUrl = APP_URL\): BrowserWindow/
   );
+});
+
+test('desktop window fails into a branded Jovie recovery surface', async () => {
+  const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+
+  assert.match(mainSource, /function buildDesktopLoadFailureUrl\(\): string/);
+  assert.match(mainSource, /Jovie Desktop/);
+  assert.match(mainSource, /Built for artists/);
+  assert.match(mainSource, /Desktop shell runtime: Electron/);
+  assert.match(mainSource, /data:text\/html;charset=utf-8/);
+  assert.match(mainSource, /did-fail-load/);
+  assert.match(mainSource, /NAVIGATION_ABORTED_ERROR_CODE/);
+  assert.match(mainSource, /showDesktopLoadFailure\(win\)/);
 });
 
 test('preload marks the hosted app as Electron after the document root is ready', async () => {

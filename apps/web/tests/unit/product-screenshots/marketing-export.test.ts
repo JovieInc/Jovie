@@ -1,9 +1,29 @@
 import { describe, expect, it } from 'vitest';
 import {
+  HOMEPAGE_HERO_CAROUSEL_SLIDES,
+  HOMEPAGE_LAUNCH_COPY,
+} from '@/data/homepageLaunchCopy';
+import {
   getMarketingExportImage,
   getMarketingExportScenarios,
+  SCREENSHOT_SCENARIOS,
   SCREENSHOT_VIEWPORTS,
 } from '../../../lib/screenshots/registry';
+import screenshotCatalogManifest from '../../../screenshot-catalog/current/manifest.json';
+
+const MAX_HOMEPAGE_SCREENSHOT_AGE_MS = 45 * 24 * 60 * 60 * 1000;
+const HOMEPAGE_SCREENSHOT_IDS = Array.from(
+  new Set([
+    HOMEPAGE_LAUNCH_COPY.workspace.screenshotKey,
+    ...HOMEPAGE_LAUNCH_COPY.artistProfiles.cards.map(
+      card => card.screenshotScenarioId
+    ),
+    ...HOMEPAGE_HERO_CAROUSEL_SLIDES.flatMap(slide => [
+      slide.desktopScreenshotKey,
+      slide.mobileScreenshotKey,
+    ]),
+  ])
+);
 
 describe('getMarketingExportScenarios', () => {
   it('returns only scenarios tagged with marketing-export', () => {
@@ -108,6 +128,44 @@ describe('getMarketingExportImage', () => {
       );
     } else {
       expect(scenarios.every(s => Boolean(s.publicExportPath))).toBe(true);
+    }
+  });
+
+  it('keeps homepage public screenshots exported, fresh, and out of mock states', () => {
+    const manifestById = new Map(
+      screenshotCatalogManifest.map(entry => [entry.id, entry])
+    );
+
+    for (const id of HOMEPAGE_SCREENSHOT_IDS) {
+      const scenario = SCREENSHOT_SCENARIOS.find(
+        candidate => candidate.id === id
+      );
+      const manifestEntry = manifestById.get(id);
+
+      expect(scenario, `${id} must be registered`).toBeTruthy();
+      expect(
+        manifestEntry,
+        `${id} must be in the current screenshot manifest`
+      ).toBeTruthy();
+
+      if (!scenario || !manifestEntry) continue;
+
+      expect(scenario.consumers).toContain('marketing-export');
+      expect(scenario.route).not.toMatch(/state=[^&]*(mock|fallback|empty)/i);
+      expect(scenario.route).not.toMatch(/[?&]showcase=/i);
+      expect(scenario.publicExportPath).toBeTruthy();
+      expect(scenario.publicExportPath).not.toMatch(
+        /mock|fallback|empty|demo/i
+      );
+
+      const image = getMarketingExportImage(id);
+      expect(image.publicUrl).toContain('/product-screenshots/');
+
+      const capturedAt = Date.parse(manifestEntry.capturedAt);
+      expect(Number.isNaN(capturedAt)).toBe(false);
+      expect(Date.now() - capturedAt).toBeLessThanOrEqual(
+        MAX_HOMEPAGE_SCREENSHOT_AGE_MS
+      );
     }
   });
 });

@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation';
-
-const CHAT_ROUTE = '/app/chat';
+import { APP_ROUTES } from '@/constants/routes';
 
 interface OldChatPageProps {
   readonly searchParams?: Promise<
@@ -25,5 +24,5 @@ export default async function OldChatPage({ searchParams }: OldChatPageProps) {
   }
 
   const queryString = query.toString();
-  redirect(queryString ? `${CHAT_ROUTE}?${queryString}` : CHAT_ROUTE);
+  redirect(queryString ? `${APP_ROUTES.CHAT}?${queryString}` : APP_ROUTES.CHAT);
 }

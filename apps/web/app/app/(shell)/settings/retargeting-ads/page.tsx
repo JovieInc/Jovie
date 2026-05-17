@@ -5,7 +5,6 @@ import { Download, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { PageContent, PageShell } from '@/components/organisms/PageShell';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 
 interface AttributionStats {
@@ -30,12 +29,8 @@ function SummaryCard({
 }: Readonly<SummaryCardProps>) {
   return (
     <ContentSurfaceCard surface='nested' className='space-y-1 p-4'>
-      <p className='text-2xl font-semibold tracking-[-0.03em] text-primary-token'>
-        {value}
-      </p>
-      <p className='text-xs font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
-        {label}
-      </p>
+      <p className='text-2xl font-semibold text-primary-token'>{value}</p>
+      <p className='text-xs font-medium text-tertiary-token'>{label}</p>
       <p className='text-app leading-5 text-secondary-token'>{description}</p>
     </ContentSurfaceCard>
   );
@@ -80,7 +75,7 @@ function AttributionStatsCard() {
       />
       <div className='space-y-3 p-3 pt-0 sm:p-4 sm:pt-0'>
         <div>
-          <p className='text-2xl font-semibold tracking-[-0.03em] text-primary-token'>
+          <p className='text-2xl font-semibold text-primary-token'>
             {stats.total}
           </p>
           <p className='text-app text-secondary-token'>
@@ -211,8 +206,8 @@ function AdPreviewCard({ variant }: { readonly variant: AdVariant }) {
       <div
         className={
           variant.size === 'story'
-            ? 'relative aspect-[9/16] overflow-hidden rounded-[10px] bg-surface-2'
-            : 'relative aspect-square overflow-hidden rounded-[10px] bg-surface-2'
+            ? 'relative aspect-[9/16] overflow-hidden rounded-lg bg-surface-2'
+            : 'relative aspect-square overflow-hidden rounded-lg bg-surface-2'
         }
       >
         {/* eslint-disable-next-line @next/next/no-img-element -- Preview image from our own API */}
@@ -292,80 +287,75 @@ function AdGroupSection({
 
 export default function RetargetingAdsPage() {
   return (
-    <PageShell>
-      <PageContent>
-        <div className='space-y-6'>
-          <ContentSurfaceCard surface='details'>
-            <ContentSectionHeader
-              density='compact'
-              title='Retargeting ads'
-              subtitle='Download ready-to-run creatives for Meta retargeting campaigns.'
-            />
-            <div className='grid grid-cols-1 gap-3 p-3 pt-0 sm:grid-cols-3 sm:p-4 sm:pt-0'>
-              <SummaryCard
-                value='4'
-                label='Creatives'
-                description='Feed and story assets for both fan retargeting and profile-claim campaigns.'
-              />
-              <SummaryCard
-                value='2'
-                label='Audiences'
-                description='Separate messaging for returning fans and artists who have not claimed their profile.'
-              />
-              <SummaryCard
-                value='Meta'
-                label='Destination'
-                description='Upload these PNG assets directly to Ads Manager for Instagram and Facebook placements.'
-              />
-            </div>
-          </ContentSurfaceCard>
-
-          <AttributionStatsCard />
-
-          <AdGroupSection
-            title='Fan retargeting'
-            subtitle="Show these ads to fans who visited your profile but haven't enabled notifications yet."
-            variants={AD_VARIANTS.filter(variant => variant.type === 'fan')}
+    <div className='space-y-6'>
+      <ContentSurfaceCard surface='details'>
+        <ContentSectionHeader
+          density='compact'
+          title='Retargeting ads'
+          subtitle='Download ready-to-run creatives for Meta retargeting campaigns.'
+        />
+        <div className='grid grid-cols-1 gap-3 p-3 pt-0 sm:grid-cols-3 sm:p-4 sm:pt-0'>
+          <SummaryCard
+            value='4'
+            label='Creatives'
+            description='Feed and story assets for both fan retargeting and profile-claim campaigns.'
           />
-
-          <AdGroupSection
-            title='Profile claim'
-            subtitle='Show these ads to artists who have an unclaimed profile and want to take ownership.'
-            variants={AD_VARIANTS.filter(variant => variant.type === 'claim')}
+          <SummaryCard
+            value='2'
+            label='Audiences'
+            description='Separate messaging for returning fans and artists who have not claimed their profile.'
           />
-
-          <ContentSurfaceCard surface='details'>
-            <ContentSectionHeader
-              density='compact'
-              title='How to use these ads'
-              subtitle='Upload the feed and story assets directly to Meta Ads Manager.'
-            />
-            <ol className='list-decimal space-y-2 px-8 py-5 pt-4 text-app text-secondary-token'>
-              <li>Download the ad images above.</li>
-              <li>
-                Create a new campaign in Meta Ads Manager with the Traffic
-                objective.
-              </li>
-              <li>
-                Target your website visitors custom audience built from your
-                pixel.
-              </li>
-              <li>
-                Exclude your existing subscribers so these ads stay focused on
-                conversion opportunities.
-              </li>
-              <li>
-                Use the square asset for feed placements and the vertical asset
-                for stories.
-              </li>
-              <li>
-                Set your daily budget, publish, and monitor attribution above
-                for results.
-              </li>
-            </ol>
-          </ContentSurfaceCard>
+          <SummaryCard
+            value='Meta'
+            label='Destination'
+            description='Upload these PNG assets directly to Ads Manager for Instagram and Facebook placements.'
+          />
         </div>
-      </PageContent>
-    </PageShell>
+      </ContentSurfaceCard>
+
+      <AttributionStatsCard />
+
+      <AdGroupSection
+        title='Fan retargeting'
+        subtitle="Show these ads to fans who visited your profile but haven't enabled notifications yet."
+        variants={AD_VARIANTS.filter(variant => variant.type === 'fan')}
+      />
+
+      <AdGroupSection
+        title='Profile claim'
+        subtitle='Show these ads to artists who have an unclaimed profile and want to take ownership.'
+        variants={AD_VARIANTS.filter(variant => variant.type === 'claim')}
+      />
+
+      <ContentSurfaceCard surface='details'>
+        <ContentSectionHeader
+          density='compact'
+          title='How to use these ads'
+          subtitle='Upload the feed and story assets directly to Meta Ads Manager.'
+        />
+        <ol className='list-decimal space-y-2 px-8 py-5 pt-4 text-app text-secondary-token'>
+          <li>Download the ad images above.</li>
+          <li>
+            Create a new campaign in Meta Ads Manager with the Traffic
+            objective.
+          </li>
+          <li>
+            Target your website visitors custom audience built from your pixel.
+          </li>
+          <li>
+            Exclude your existing subscribers so these ads stay focused on
+            conversion opportunities.
+          </li>
+          <li>
+            Use the square asset for feed placements and the vertical asset for
+            stories.
+          </li>
+          <li>
+            Set your daily budget, publish, and monitor attribution above for
+            results.
+          </li>
+        </ol>
+      </ContentSurfaceCard>
+    </div>
   );
 }

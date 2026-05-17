@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAppFlag } from '@/lib/flags/client';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
+import { useChatCapabilitiesQuery } from '@/lib/queries';
 
 import { CHAT_COMPOSER_DOCK_CLASSNAME } from './chat-layout';
 import {
@@ -103,6 +104,32 @@ export function JovieChat({
     onConversationCreate,
     username,
   });
+  const {
+    data: chatCapabilities,
+    isLoading: isLoadingCapabilities,
+    isError: isCapabilitiesError,
+  } = useChatCapabilitiesQuery({
+    profileId,
+    enabled: Boolean(profileId),
+  });
+  const albumArtCapability =
+    chatCapabilities?.tools.albumArt ??
+    (isCapabilitiesError
+      ? {
+          availability: 'unavailable' as const,
+          reason: 'Album art availability could not be verified.',
+          reasonCode: 'CAPABILITY_CHECK_FAILED',
+        }
+      : {
+          availability:
+            profileId && isLoadingCapabilities
+              ? ('unknown' as const)
+              : ('unavailable' as const),
+          reason: profileId
+            ? 'Checking album art availability...'
+            : 'Album art generation needs an artist profile.',
+          reasonCode: profileId ? 'CHECKING' : 'PROFILE_REQUIRED',
+        });
 
   const followUpQuickActions = useMemo(
     () => [
@@ -389,10 +416,10 @@ export function JovieChat({
   let emptyStateHeading: string;
   if (isFirstSession) {
     emptyStateHeading = "Hey, I'm Jovie";
-  } else if (greetingName) {
-    emptyStateHeading = `Welcome back, ${greetingName}`;
   } else {
-    emptyStateHeading = 'Welcome back';
+    emptyStateHeading = greetingName
+      ? `What are we working on, ${greetingName}?`
+      : 'What are we working on?';
   }
 
   return (
@@ -645,6 +672,7 @@ export function JovieChat({
                     onSelect={handleSuggestedPromptWithJank}
                     isFirstSession={isFirstSession}
                     latestReleaseTitle={latestReleaseTitle}
+                    albumArtCapability={albumArtCapability}
                     layout='rail'
                     dimmed={composerPickerOpen}
                   />

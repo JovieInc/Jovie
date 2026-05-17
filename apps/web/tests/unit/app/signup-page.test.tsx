@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   clearSignupClaimValueMock,
+  authLayoutMock,
   clerkSignUpMock,
   fetchMock,
   persistSignupClaimValueMock,
@@ -14,6 +15,7 @@ const {
   validatePlanMock,
 } = vi.hoisted(() => ({
   clearSignupClaimValueMock: vi.fn(),
+  authLayoutMock: vi.fn(),
   clerkSignUpMock: vi.fn(),
   fetchMock: vi.fn(),
   persistSignupClaimValueMock: vi.fn(),
@@ -38,12 +40,14 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/features/auth', async () => {
   const reactModule = await import('react');
   return {
-    AuthLayout: ({ children }: { children: ReactNode }) =>
-      reactModule.createElement(
+    AuthLayout: (props: { children: ReactNode }) => {
+      authLayoutMock(props);
+      return reactModule.createElement(
         'div',
         { 'data-testid': 'auth-layout' },
-        children
-      ),
+        props.children
+      );
+    },
     AuthRoutePrefetch: ({ href }: { href: string }) => {
       routerPrefetchMock(href);
       return null;
@@ -79,6 +83,7 @@ import SignUpPage from '../../../app/(auth)/signup/page';
 describe('signup page', () => {
   beforeEach(() => {
     clearSignupClaimValueMock.mockReset();
+    authLayoutMock.mockReset();
     clerkSignUpMock.mockReset();
     fetchMock.mockReset();
     fetchMock.mockResolvedValue({
@@ -103,6 +108,14 @@ describe('signup page', () => {
     });
 
     expect(screen.getByTestId('clerk-sign-up')).toBeInTheDocument();
+    expect(authLayoutMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        formTitle: 'Request access',
+        showFormTitle: false,
+        showFooterPrompt: false,
+        layoutVariant: 'split',
+      })
+    );
     expect(
       screen.queryByText('Start your private launch request.')
     ).not.toBeInTheDocument();
