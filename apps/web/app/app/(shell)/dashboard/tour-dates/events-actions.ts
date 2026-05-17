@@ -6,7 +6,7 @@ import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import { tourDates } from '@/lib/db/schema/tour';
 import { trackServerEvent } from '@/lib/server-analytics';
-import { getDashboardData } from '../actions';
+import { getDashboardDataEssential } from '../actions';
 
 /**
  * Trust-gate server actions for events. Confirm, reject, and undo-reject —
@@ -47,7 +47,7 @@ async function requireAuthedProfile(): Promise<AuthedProfile | null> {
   if (!userId) {
     return null;
   }
-  const data = await getDashboardData();
+  const data = await getDashboardDataEssential();
   if (data.needsOnboarding && !data.dashboardLoadError) {
     return null;
   }
