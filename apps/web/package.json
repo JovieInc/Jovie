@@ -13,6 +13,7 @@
     "dev:local:browse": "E2E_USE_TEST_AUTH_BYPASS=1 NEXT_PUBLIC_CLERK_MOCK=1 NEXT_PUBLIC_CLERK_PROXY_DISABLED=1 next dev",
     "dev:local:playwright": "NEXT_PUBLIC_E2E_MODE=1 NEXT_DISABLE_TOOLBAR=1 next dev --webpack",
     "validate-env": "tsx scripts/validate-env.ts",
+    "check:signup-readiness": "tsx scripts/check-signup-readiness.ts",
     "build": "NODE_OPTIONS=--max-old-space-size=8192 NEXT_IGNORE_TYPECHECK=1 next build --turbopack",
     "build:strict": "pnpm run typecheck && NODE_OPTIONS=--max-old-space-size=8192 next build --turbopack",
     "analyze": "NODE_OPTIONS=--max-old-space-size=8192 ANALYZE=true NEXT_IGNORE_TYPECHECK=1 next build --webpack",

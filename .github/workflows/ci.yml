@@ -1820,15 +1820,20 @@ jobs:
             FAILURES=$((FAILURES + 1))
           fi
 
-          # -- 4. Critical pages: /signup, /pricing -- no 5xx --
+          # -- 4. Critical pages: /signup, /start, /pricing -- no 5xx --
           check_critical_pages() {
-            for route in "/signup" "/pricing"; do
+            for route in "/signup" "/start" "/pricing"; do
               local response
               response=$(fetch "https://jov.ie${route}")
               local status="${response##*$'\n'}"
+              local body="${response%$'\n'*}"
 
               if [ "$status" -ge 500 ] 2>/dev/null; then
                 echo "  Route ${route} returned HTTP $status (server error)"
+                return 1
+              fi
+              if echo "$body" | grep -qi "turnstile is not configured\|auth unavailable\|clerk is not configured"; then
+                echo "  Route ${route} contains front-door config error"
                 return 1
               fi
               echo "  ${route}: HTTP $status"
@@ -3537,6 +3542,8 @@ jobs:
               mv "${env_file}.tmp" "$env_file"
             fi
           done
+      - name: Check signup readiness (production env file)
+        run: pnpm --filter=@jovie/web exec tsx scripts/check-signup-readiness.ts --target=prd --source=vercel-file --file=.vercel/.env.production.local
       - name: Build (preview target for staging verification)
         run: env -u TURBO_REMOTE_ONLY ./node_modules/.bin/vercel build --token ${{ secrets.VERCEL_TOKEN }}
         env:

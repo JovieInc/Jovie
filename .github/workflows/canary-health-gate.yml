@@ -362,7 +362,7 @@ jobs:
               route_code="${response##*$'\n'}"
               route_body="${response%$'\n'*}"
 
-              if [ "$route_code" = "200" ] && [ ${#route_body} -ge "$min_chars" ] && ! echo "$route_body" | grep -qi "application error\|internal server error\|something went wrong\|error occurred\|this page could not be found\|temporarily unavailable\|auth unavailable"; then
+              if [ "$route_code" = "200" ] && [ ${#route_body} -ge "$min_chars" ] && ! echo "$route_body" | grep -qi "application error\|internal server error\|something went wrong\|error occurred\|this page could not be found\|temporarily unavailable\|auth unavailable\|turnstile is not configured"; then
                 echo "✅ ${route_label} renders correctly"
                 return 0
               fi
@@ -396,6 +396,9 @@ jobs:
 
           # Verify signin still renders because staging auth must stay healthy.
           check_route_renders "Signin" "/signin" 500 "failed_signin"
+
+          # Verify anonymous onboarding chat can render without Turnstile configuration errors.
+          check_route_renders "Start onboarding chat" "/start" 500 "failed_start"
 
           # Verify /api/chat is reachable and auth-gated.
           #

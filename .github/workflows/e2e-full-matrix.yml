@@ -20,6 +20,8 @@ jobs:
     environment: Preview – jovie
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    env:
+      E2E_FULL_MATRIX: '1'
     strategy:
       fail-fast: false
       matrix:
@@ -58,7 +60,12 @@ jobs:
             ${{ runner.os }}-playwright-${{ matrix.browser }}-
 
       - name: Install Playwright (${{ matrix.browser }})
-        run: pnpm --filter=@jovie/web exec playwright install ${{ matrix.browser }} --with-deps
+        run: |
+          if [ "${{ matrix.browser }}" = "chromium" ]; then
+            pnpm --filter=@jovie/web exec playwright install chromium --with-deps
+          else
+            pnpm --filter=@jovie/web exec playwright install chromium ${{ matrix.browser }} --with-deps
+          fi
 
       - name: Run E2E tests (${{ matrix.browser }})
         run: |

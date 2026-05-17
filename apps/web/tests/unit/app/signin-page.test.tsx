@@ -2,13 +2,17 @@ import { render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { clerkSignInMock, routerPrefetchMock, searchParamsState } = vi.hoisted(
-  () => ({
-    clerkSignInMock: vi.fn(),
-    routerPrefetchMock: vi.fn(),
-    searchParamsState: { value: '' },
-  })
-);
+const {
+  authLayoutMock,
+  clerkSignInMock,
+  routerPrefetchMock,
+  searchParamsState,
+} = vi.hoisted(() => ({
+  authLayoutMock: vi.fn(),
+  clerkSignInMock: vi.fn(),
+  routerPrefetchMock: vi.fn(),
+  searchParamsState: { value: '' },
+}));
 
 vi.mock('@clerk/nextjs', () => ({
   SignIn: (props: unknown) => {
@@ -24,12 +28,14 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/features/auth', async () => {
   const reactModule = await import('react');
   return {
-    AuthLayout: ({ children }: { children: ReactNode }) =>
-      reactModule.createElement(
+    AuthLayout: (props: { children: ReactNode }) => {
+      authLayoutMock(props);
+      return reactModule.createElement(
         'div',
         { 'data-testid': 'auth-layout' },
-        children
-      ),
+        props.children
+      );
+    },
     AuthRoutePrefetch: ({ href }: { href: string }) => {
       routerPrefetchMock(href);
       return null;
@@ -44,6 +50,7 @@ import SignInPage from '../../../app/(auth)/signin/page';
 
 describe('signin page', () => {
   beforeEach(() => {
+    authLayoutMock.mockReset();
     clerkSignInMock.mockReset();
     routerPrefetchMock.mockReset();
     searchParamsState.value = '';
@@ -57,6 +64,14 @@ describe('signin page', () => {
     });
 
     expect(screen.getByTestId('clerk-sign-in')).toBeInTheDocument();
+    expect(authLayoutMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        formTitle: 'Sign in',
+        showFormTitle: false,
+        showFooterPrompt: false,
+        layoutVariant: 'split',
+      })
+    );
     expect(
       screen.queryByText('Welcome back to Jovie.')
     ).not.toBeInTheDocument();
