@@ -78,7 +78,7 @@ function VoiceRecordingWaveform({ levels }: { readonly levels: number[] }) {
       {levels.map(level => (
         <span
           key={`wave-${level.toFixed(3)}`}
-          className='w-1 rounded-full bg-accent/80 transition-all duration-150'
+          className='w-1 rounded-full bg-accent/80 transition-[height] duration-subtle'
           style={{ height: `${Math.max(6, Math.round(level * 22))}px` }}
         />
       ))}
@@ -131,7 +131,7 @@ export function UniversalLinkInputUrlMode({
     <div className='relative w-full'>
       <div
         className={cn(
-          'relative flex w-full items-center gap-2 overflow-hidden bg-(--linear-app-content-surface) px-2 py-1 transition-all',
+          'relative flex w-full items-center gap-2 overflow-hidden bg-(--linear-app-content-surface) px-2 py-1 transition-[border-color,box-shadow]',
           isDropdownOpen
             ? 'rounded-t-[12px] border-2 border-b-0 border-accent'
             : 'rounded-xl border border-(--linear-app-frame-seam) focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/20',
@@ -179,7 +179,7 @@ export function UniversalLinkInputUrlMode({
             <button
               type='button'
               onClick={onVoiceInput}
-              className='flex h-10 w-10 items-center justify-center rounded-full text-tertiary-token transition-colors hover:bg-surface-2 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:scale-95'
+              className='flex h-10 w-10 items-center justify-center rounded-full text-tertiary-token transition-colors hover:bg-surface-2 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
               aria-label={
                 dictationState === 'listening'
                   ? 'Stop voice input'
@@ -212,7 +212,7 @@ export function UniversalLinkInputUrlMode({
             <button
               type='button'
               onClick={onClear}
-              className='flex h-9 w-9 items-center justify-center rounded-full text-tertiary-token transition-colors hover:bg-surface-2 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:scale-95'
+              className='flex h-9 w-9 items-center justify-center rounded-full text-tertiary-token transition-colors hover:bg-surface-2 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
               aria-label='Clear input'
             >
               <X className='h-4 w-4' />
@@ -223,7 +223,7 @@ export function UniversalLinkInputUrlMode({
             type='button'
             onClick={onSubmit}
             disabled={disabled || !canSubmit}
-            className='flex h-10 w-10 items-center justify-center rounded-full bg-secondary-token text-primary-inverse transition-all hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-45 active:scale-95'
+            className='flex h-10 w-10 items-center justify-center rounded-full bg-secondary-token text-primary-inverse transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-45'
             aria-label='Submit'
           >
             <ArrowUp className='h-4 w-4' />
@@ -233,7 +233,7 @@ export function UniversalLinkInputUrlMode({
 
       <section
         className={cn(
-          'overflow-hidden transition-all duration-300 ease-out',
+          'overflow-hidden transition-[opacity,max-height,transform] duration-subtle ease-out',
           isDictationOpen
             ? 'mt-2 max-h-48 translate-y-0 opacity-100'
             : 'pointer-events-none max-h-0 -translate-y-1 opacity-0'
@@ -246,7 +246,7 @@ export function UniversalLinkInputUrlMode({
               <button
                 type='button'
                 onClick={onCancelVoiceRecording}
-                className='flex h-9 w-9 items-center justify-center rounded-[10px] text-tertiary-token transition-colors hover:bg-surface-1 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:scale-95'
+                className='flex h-9 w-9 items-center justify-center rounded-[10px] text-tertiary-token transition-colors hover:bg-surface-1 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
                 aria-label='Cancel voice recording'
               >
                 <X className='h-4 w-4' />
@@ -265,7 +265,7 @@ export function UniversalLinkInputUrlMode({
               <button
                 type='button'
                 onClick={onSendVoiceRecording}
-                className='flex h-9 w-9 items-center justify-center rounded-[10px] bg-secondary-token text-primary-inverse transition-all hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:scale-95'
+                className='flex h-9 w-9 items-center justify-center rounded-[10px] bg-secondary-token text-primary-inverse transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
                 aria-label='Send voice recording'
               >
                 <Check className='h-4 w-4' />

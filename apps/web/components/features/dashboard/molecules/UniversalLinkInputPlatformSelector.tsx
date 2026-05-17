@@ -41,7 +41,7 @@ export function UniversalLinkInputPlatformSelector({
         <button
           type='button'
           disabled={disabled}
-          className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-2 text-secondary-token transition-colors hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:z-10 disabled:cursor-not-allowed disabled:opacity-60 active:scale-95'
+          className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-2 text-secondary-token transition-colors hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:z-10 disabled:cursor-not-allowed disabled:opacity-60'
           aria-label='Add link from platform'
         >
           <Plus className='h-4 w-4' aria-hidden='true' />

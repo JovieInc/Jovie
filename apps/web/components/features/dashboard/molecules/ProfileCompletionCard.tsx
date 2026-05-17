@@ -132,7 +132,7 @@ export const ProfileCompletionCard = memo(
                       </p>
                     </div>
                     <ArrowRight
-                      className='h-4 w-4 shrink-0 text-tertiary-token transition-transform group-hover:translate-x-0.5'
+                      className='h-4 w-4 shrink-0 text-tertiary-token transition-colors group-hover:text-secondary-token'
                       aria-hidden='true'
                     />
                   </Link>
