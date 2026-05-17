@@ -62,10 +62,11 @@ describe('OnboardingTurnstile', () => {
         expect.any(HTMLElement),
         expect.objectContaining({
           sitekey: 'site-key',
-          size: 'invisible',
+          appearance: 'interaction-only',
         })
       );
     });
+    expect(renderMock.mock.calls[0]?.[1]).not.toHaveProperty('size');
     expect(onToken).toHaveBeenCalledWith('turnstile-token');
     expect(onError).not.toHaveBeenCalled();
   });
