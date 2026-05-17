@@ -436,10 +436,6 @@ const nextConfig = {
         destination: '/app/dashboard/releases',
       },
       {
-        source: '/app/insights',
-        destination: '/app/dashboard/insights',
-      },
-      {
         source: '/app/presence',
         destination: '/app/dashboard/presence',
       },

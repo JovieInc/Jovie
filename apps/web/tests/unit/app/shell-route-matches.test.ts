@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   isChatShellRoute,
+  isInsightsShellRoute,
   isLibraryShellRoute,
   isLyricsShellRoute,
   isReleasesShellRoute,
@@ -120,6 +121,18 @@ describe('isTasksShellRoute', () => {
   });
 });
 
+describe('isInsightsShellRoute', () => {
+  it('matches the canonical insights route', () => {
+    expect(isInsightsShellRoute(APP_ROUTES.INSIGHTS)).toBe(true);
+  });
+
+  it('matches nested insights subroutes', () => {
+    expect(isInsightsShellRoute(`${APP_ROUTES.INSIGHTS}/priority/high`)).toBe(
+      true
+    );
+  });
+});
+
 describe('shouldUseEssentialShellData', () => {
   it('returns true for chat routes', () => {
     expect(shouldUseEssentialShellData(APP_ROUTES.CHAT)).toBe(true);
@@ -133,6 +146,10 @@ describe('shouldUseEssentialShellData', () => {
     expect(shouldUseEssentialShellData(APP_ROUTES.LYRICS)).toBe(true);
     expect(shouldUseEssentialShellData(APP_ROUTES.LIBRARY)).toBe(true);
     expect(shouldUseEssentialShellData(APP_ROUTES.DASHBOARD_TASKS)).toBe(true);
+  });
+
+  it('returns true for the canonical insights route', () => {
+    expect(shouldUseEssentialShellData(APP_ROUTES.INSIGHTS)).toBe(true);
   });
 
   it('returns true for dashboard root', () => {
@@ -165,6 +182,7 @@ describe('shouldRedirectToOnboarding', () => {
     expect(shouldRedirectToOnboarding(APP_ROUTES.LYRICS)).toBe(true);
     expect(shouldRedirectToOnboarding(APP_ROUTES.LIBRARY)).toBe(true);
     expect(shouldRedirectToOnboarding(APP_ROUTES.DASHBOARD_TASKS)).toBe(true);
+    expect(shouldRedirectToOnboarding(APP_ROUTES.INSIGHTS)).toBe(true);
   });
 
   it('does not add onboarding redirects to settings route chrome optimization', () => {
