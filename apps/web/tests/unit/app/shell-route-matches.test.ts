@@ -4,6 +4,7 @@ import {
   isInsightsShellRoute,
   isLibraryShellRoute,
   isLyricsShellRoute,
+  isPresenceShellRoute,
   isReleasesShellRoute,
   isTasksShellRoute,
   resolveAppShellRequestPath,
@@ -133,6 +134,16 @@ describe('isInsightsShellRoute', () => {
   });
 });
 
+describe('isPresenceShellRoute', () => {
+  it('matches the canonical presence route', () => {
+    expect(isPresenceShellRoute(APP_ROUTES.PRESENCE)).toBe(true);
+  });
+
+  it('matches nested presence subroutes', () => {
+    expect(isPresenceShellRoute(`${APP_ROUTES.PRESENCE}/platforms`)).toBe(true);
+  });
+});
+
 describe('shouldUseEssentialShellData', () => {
   it('returns true for chat routes', () => {
     expect(shouldUseEssentialShellData(APP_ROUTES.CHAT)).toBe(true);
@@ -150,6 +161,10 @@ describe('shouldUseEssentialShellData', () => {
 
   it('returns true for the canonical insights route', () => {
     expect(shouldUseEssentialShellData(APP_ROUTES.INSIGHTS)).toBe(true);
+  });
+
+  it('returns true for the canonical presence route', () => {
+    expect(shouldUseEssentialShellData(APP_ROUTES.PRESENCE)).toBe(true);
   });
 
   it('returns true for dashboard root', () => {
@@ -183,6 +198,7 @@ describe('shouldRedirectToOnboarding', () => {
     expect(shouldRedirectToOnboarding(APP_ROUTES.LIBRARY)).toBe(true);
     expect(shouldRedirectToOnboarding(APP_ROUTES.DASHBOARD_TASKS)).toBe(true);
     expect(shouldRedirectToOnboarding(APP_ROUTES.INSIGHTS)).toBe(true);
+    expect(shouldRedirectToOnboarding(APP_ROUTES.PRESENCE)).toBe(true);
   });
 
   it('does not add onboarding redirects to settings route chrome optimization', () => {
