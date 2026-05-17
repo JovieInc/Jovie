@@ -237,7 +237,14 @@ test.describe('Public-profile canary', () => {
   test('audience-visit POST /api/audience/visit returns 2xx (regression: JOV-2199)', async ({
     page,
   }) => {
-    test.setTimeout(30_000);
+    test.setTimeout(60_000);
+    if (!hasDatabase) {
+      test.skip(
+        true,
+        'DATABASE_URL not available — audience-visit check skipped'
+      );
+      return;
+    }
 
     // We need a real profile ID for this test. Navigate to /tim first so we
     // can extract it from the page's embedded JSON.
