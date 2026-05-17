@@ -73,7 +73,7 @@ describe('dev-test-auth.server', () => {
     });
   });
 
-  it('allows trusted preview hosts when bypass mode is enabled', async () => {
+  it('allows trusted preview hosts but rejects wildcard Vercel hosts when bypass mode is enabled', async () => {
     vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
     const { getDevTestAuthAvailability } = await import(
       '@/lib/auth/dev-test-auth.server'
@@ -88,8 +88,8 @@ describe('dev-test-auth.server', () => {
       getDevTestAuthAvailability('jovie-git-feature-123-jovie.vercel.app')
     ).toEqual({
       enabled: true,
-      trustedHost: true,
-      reason: null,
+      trustedHost: false,
+      reason: 'Only available on loopback and private dev hosts',
     });
   });
 
