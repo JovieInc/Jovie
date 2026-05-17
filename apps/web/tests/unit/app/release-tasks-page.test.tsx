@@ -85,7 +85,8 @@ vi.mock(
   })
 );
 
-import ReleaseTasksPage from '@/app/app/(shell)/dashboard/releases/[releaseId]/tasks/page';
+import LegacyReleaseTasksPage from '@/app/app/(shell)/dashboard/releases/[releaseId]/tasks/page';
+import CanonicalReleaseTasksPage from '@/app/app/(shell)/releases/[releaseId]/tasks/page';
 
 function setupReleaseQueryRows(rows: Array<Record<string, unknown>>) {
   mockDbRows.rows = rows;
@@ -99,7 +100,7 @@ function setupReleaseQueryRows(rows: Array<Record<string, unknown>>) {
 }
 
 async function renderResolvedTasksContent() {
-  const tree = await ReleaseTasksPage({
+  const tree = await LegacyReleaseTasksPage({
     params: Promise.resolve({ releaseId: 'release_1' }),
   });
   const tasksContentElement = (tree as React.ReactElement).props.children;
@@ -152,5 +153,9 @@ describe('release tasks page', () => {
     expect(screen.getByTestId('release-task-page')).toHaveTextContent(
       'release_1:My Release'
     );
+  });
+
+  it('uses the same implementation for the canonical release route', () => {
+    expect(CanonicalReleaseTasksPage).toBe(LegacyReleaseTasksPage);
   });
 });

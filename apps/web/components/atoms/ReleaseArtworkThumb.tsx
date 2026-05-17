@@ -2,11 +2,7 @@
 
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
-import { Icon } from '@/components/atoms/Icon';
-import {
-  getArtworkFallbackAccentStyle,
-  getArtworkFallbackSurfaceStyle,
-} from '@/lib/artwork-fallback';
+import { ArtworkFallbackTile } from '@/components/atoms/ArtworkFallbackTile';
 import { cn } from '@/lib/utils';
 
 interface ReleaseArtworkThumbProps {
@@ -57,27 +53,11 @@ export function ReleaseArtworkThumb({
           onError={() => setImgError(true)}
         />
       ) : (
-        <div
-          className='relative flex h-full w-full items-center justify-center overflow-hidden text-white/25'
-          data-artwork-fallback='true'
-          style={getArtworkFallbackSurfaceStyle(alt)}
-        >
-          <Icon
-            name='Disc3'
-            className={cn('relative z-10', fallbackIconClass)}
-            aria-hidden='true'
-          />
-          <span
-            aria-hidden='true'
-            className='absolute inset-x-0 bottom-0 h-1'
-            style={getArtworkFallbackAccentStyle(alt)}
-          />
-          <span
-            aria-hidden='true'
-            className='absolute inset-[1px] rounded-[3px] border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
-          />
-          <span className='sr-only'>{alt}</span>
-        </div>
+        <ArtworkFallbackTile
+          seed={alt}
+          label={alt}
+          iconClassName={fallbackIconClass}
+        />
       )}
     </div>
   );

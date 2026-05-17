@@ -192,7 +192,7 @@ export function EntityRowArt({
     const stamp = stampParts(entity.eventDate);
     if (stamp) {
       return (
-        <span className='flex h-7 w-7 shrink-0 flex-col items-center justify-center rounded-(--linear-app-radius-item) border border-subtle bg-surface-1 shadow-app-control'>
+        <span className='flex h-7 w-7 shrink-0 flex-col items-center justify-center rounded-md border border-subtle bg-surface-1 shadow-app-control'>
           <span className='text-3xs font-caption leading-none text-tertiary-token'>
             {stamp.month}
           </span>
@@ -236,7 +236,7 @@ export function EntityRowArt({
     <span
       className={cn(
         'flex h-7 w-7 shrink-0 items-center justify-center border border-subtle bg-surface-1 text-3xs font-caption text-primary-token shadow-app-control',
-        isCircular ? 'rounded-full' : 'rounded-(--linear-app-radius-item)'
+        isCircular ? 'rounded-full' : 'rounded-md'
       )}
     >
       {initialsOf(entity.label) || '·'}
@@ -423,7 +423,7 @@ function CardArtwork({ entity }: { readonly entity: EntityPopoverData }) {
     const stamp = stampParts(entity.eventDate);
     if (stamp) {
       return (
-        <div className='flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-(--linear-app-radius-item) border border-subtle bg-surface-1 shadow-app-control'>
+        <div className='flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-md border border-subtle bg-surface-1 shadow-app-control'>
           <span className='text-3xs font-caption text-tertiary-token'>
             {stamp.month}
           </span>
@@ -443,7 +443,7 @@ function CardArtwork({ entity }: { readonly entity: EntityPopoverData }) {
       <div
         className={cn(
           'relative h-12 w-12 shrink-0 overflow-hidden border border-subtle shadow-app-control',
-          isCircular ? 'rounded-full' : 'rounded-(--linear-app-radius-item)'
+          isCircular ? 'rounded-full' : 'rounded-md'
         )}
       >
         <Image
@@ -461,7 +461,7 @@ function CardArtwork({ entity }: { readonly entity: EntityPopoverData }) {
     <div
       className={cn(
         'flex h-12 w-12 shrink-0 items-center justify-center border border-subtle bg-surface-1 text-app font-caption text-primary-token shadow-app-control',
-        isCircular ? 'rounded-full' : 'rounded-(--linear-app-radius-item)'
+        isCircular ? 'rounded-full' : 'rounded-md'
       )}
     >
       {initialsOf(entity.label) || '·'}
@@ -485,13 +485,13 @@ function EntityCard({ entity, onActivate }: EntityCardProps) {
       : null;
 
   return (
-    <div className='flex items-start gap-2.5'>
+    <div className='flex items-start gap-3'>
       <CardArtwork entity={entity} />
-      <div className='min-w-0 flex-1 pt-0.5'>
+      <div className='min-w-0 flex-1'>
         <div className='mb-1 text-2xs font-caption text-tertiary-token'>
           {eyebrow}
         </div>
-        <h3 className='m-0 mb-2 truncate text-app font-caption leading-tight text-primary-token'>
+        <h3 className='m-0 mb-1.5 truncate text-app font-caption leading-tight text-primary-token'>
           {entity.label}
         </h3>
         {artistLink ? (
@@ -511,19 +511,18 @@ function EntityCard({ entity, onActivate }: EntityCardProps) {
           </button>
         ) : null}
         {stats.length > 0 ? (
-          <div className='flex flex-wrap items-center text-2xs leading-normal text-tertiary-token'>
+          <div className='flex flex-wrap items-center gap-x-1.5 gap-y-1 text-2xs leading-normal text-tertiary-token'>
             {stats.map((stat, i) => (
               <span
                 key={stat.key}
                 className={cn(
-                  'relative inline-flex items-center whitespace-nowrap',
+                  'relative inline-flex h-5 items-center whitespace-nowrap rounded-full',
                   stat.emphasis === 'solid'
-                    ? 'ml-1.5 rounded-(--linear-app-radius-item) border border-subtle bg-surface-1 px-1.5 py-px text-3xs font-caption text-primary-token'
-                    : 'px-1.5',
-                  i === 0 && stat.emphasis !== 'solid' && 'pl-0',
+                    ? 'border border-subtle bg-surface-1 px-1.5 text-3xs font-caption text-primary-token'
+                    : 'px-0',
                   i > 0 &&
                     stat.emphasis !== 'solid' &&
-                    "before:absolute before:left-0 before:top-1/2 before:h-[2px] before:w-[2px] before:-translate-y-1/2 before:rounded-full before:bg-quaternary-token before:content-['']"
+                    'before:mr-1.5 before:h-0.5 before:w-0.5 before:rounded-full before:bg-quaternary-token before:content-[""]'
                 )}
               >
                 {stat.node}
@@ -622,9 +621,9 @@ export function EntityPopover({
       }}
       className={cn(
         'z-[80]',
-        'rounded-(--linear-app-radius-menu) border border-default',
-        'bg-(--linear-bg-surface-0) text-primary-token shadow-card-elevated',
-        'p-2',
+        'rounded-lg border border-default',
+        'bg-surface-0 text-primary-token shadow-card-elevated',
+        'p-2.5',
         'animate-in fade-in-0 zoom-in-95 duration-subtle ease-subtle',
         pos?.side === 'left' ? 'slide-in-from-right-1' : 'slide-in-from-left-1'
       )}
@@ -734,9 +733,9 @@ export function EntityHoverLink({
         // decoration — keeps entity-rich copy from reading as a wall of
         // dotted lines while still surfacing the affordance on intent.
         className={cn(
-          'inline-flex items-center rounded-(--linear-app-radius-item) transition-colors duration-subtle ease-subtle hover:text-primary-token',
+          'inline-flex items-center rounded-md transition-colors duration-subtle ease-subtle hover:text-primary-token',
           'no-underline hover:underline focus-visible:underline underline-offset-2',
-          'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/35',
+          'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus/35',
           className
         )}
       >

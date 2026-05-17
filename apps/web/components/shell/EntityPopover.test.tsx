@@ -45,6 +45,22 @@ describe('EntityHoverLink', () => {
     expect(screen.queryByRole('tooltip')).toBeNull();
   });
 
+  it('uses named shell tokens for the popover surface', () => {
+    vi.useFakeTimers();
+    fastRender(<EntityHoverLink entity={release}>Sober</EntityHoverLink>);
+    const trigger = screen.getByRole('button', { name: 'Sober' });
+
+    fireEvent.mouseEnter(trigger);
+    advanceTimers(200);
+
+    const tooltip = screen.getByRole('tooltip');
+    expect(tooltip).toHaveClass('rounded-lg', 'bg-surface-0', 'p-2.5');
+    expect(tooltip.className).not.toContain('bg-(--linear-bg-surface-0)');
+    expect(tooltip.className).not.toContain(
+      'rounded-(--linear-app-radius-menu)'
+    );
+  });
+
   it('opens on focus and closes on Escape', () => {
     vi.useFakeTimers();
     fastRender(<EntityHoverLink entity={release}>Sober</EntityHoverLink>);

@@ -86,7 +86,7 @@ import { slugify } from '@/lib/utils';
 import { toISOStringOrNull } from '@/lib/utils/date';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import { targetPlaylistsSchema } from '@/lib/validation/schemas/dashboard/profile';
-import { getDashboardData, getDashboardShellData } from '../actions';
+import { getDashboardDataEssential, getDashboardShellData } from '../actions';
 
 const SPOTIFY_ALREADY_CLAIMED_MESSAGE =
   'This Spotify artist is already linked to another Jovie account. Please sign in with the original account or choose a different artist.';
@@ -190,7 +190,7 @@ async function requireProfile(profileId?: string): Promise<{
   spotifyId: string | null;
   handle: string;
 }> {
-  const data = await getDashboardData();
+  const data = await getDashboardDataEssential();
 
   if (data.needsOnboarding && !data.dashboardLoadError) {
     redirect(APP_ROUTES.START);
@@ -1242,7 +1242,7 @@ export async function checkSpotifyConnection(): Promise<{
   }
 
   try {
-    const data = await getDashboardData();
+    const data = await getDashboardDataEssential();
 
     if (data.needsOnboarding || !data.selectedProfile) {
       return { connected: false, spotifyId: null, artistName: null };

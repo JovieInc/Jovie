@@ -182,7 +182,7 @@ export const COMMANDS: readonly Command[] = [
     'Audience',
     'Understand your audience demographics.',
     'Users',
-    APP_ROUTES.DASHBOARD_AUDIENCE
+    APP_ROUTES.AUDIENCE
   ),
   nav(
     'go-tasks',

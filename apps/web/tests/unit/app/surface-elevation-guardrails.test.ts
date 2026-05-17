@@ -236,6 +236,10 @@ describe('surface elevation guardrails', () => {
       join(ROOT, 'app/app/(shell)/layout.tsx'),
       'utf-8'
     );
+    const appShellLoading = readFileSync(
+      join(ROOT, 'app/app/(shell)/loading.tsx'),
+      'utf-8'
+    );
 
     expect(tasksPage).toContain('PageShell');
     expect(dashboardPanel).toContain("frame = 'content-container'");
@@ -244,6 +248,7 @@ describe('surface elevation guardrails', () => {
     expect(tasksPage).not.toMatch(/<UnifiedTable\b/);
     expect(shellRouteMatches).toContain('isTasksShellRoute');
     expect(appShellLayout).toContain('TasksRouteSkeleton');
+    expect(appShellLoading).toContain('TasksRouteSkeleton');
   });
 
   it('keeps presence and earnings inside framed content panels', () => {
@@ -310,10 +315,12 @@ describe('surface elevation guardrails', () => {
   it('keeps admin shell tables on the canonical AdminDataTable wrapper', () => {
     const files = [
       'components/features/admin/ActivityTableUnified.tsx',
+      'components/features/admin/agent-os/AgentOsRunsPanel.tsx',
       'components/features/admin/admin-creator-profiles/AdminCreatorProfilesUnified.tsx',
       'components/features/admin/admin-releases-table/AdminReleasesTableUnified.tsx',
       'components/features/admin/admin-users-table/AdminUsersTableUnified.tsx',
       'components/features/admin/feedback-table/AdminFeedbackTable.tsx',
+      'components/features/admin/leads/LeadTable.tsx',
       'components/features/admin/waitlist-table/AdminWaitlistTableUnified.tsx',
     ] as const;
 
@@ -343,11 +350,17 @@ describe('surface elevation guardrails', () => {
       join(ROOT, 'app/app/(shell)/library/LibrarySurface.tsx'),
       'utf-8'
     );
+    const appShellLoading = readFileSync(
+      join(ROOT, 'app/app/(shell)/loading.tsx'),
+      'utf-8'
+    );
 
     expect(librarySurface).toContain('useRegisterHeaderSearch');
     expect(librarySurface).toContain("key: 'library'");
     expect(librarySurface).toContain("triggerLabel: 'Filter'");
     expect(librarySurface).not.toContain('OPEN_COMMAND_PALETTE_EVENT');
+    expect(appShellLoading).toContain('isLibraryShellRoute');
+    expect(appShellLoading).toContain('LibraryLoadingState');
   });
 
   it('keeps task and preview cards off the shell canvas token', () => {

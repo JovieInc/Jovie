@@ -1,5 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
+import {
+  APP_ROUTES,
+  buildReleaseTasksRoute,
+  isDemoRoutePath,
+} from '@/constants/routes';
+
+describe('buildReleaseTasksRoute', () => {
+  it('builds the canonical release tasks path', () => {
+    expect(buildReleaseTasksRoute('release_1')).toBe(
+      '/app/releases/release_1/tasks'
+    );
+  });
+
+  it('encodes release ids for path-safe navigation', () => {
+    expect(buildReleaseTasksRoute('release 1/alt')).toBe(
+      '/app/releases/release%201%2Falt/tasks'
+    );
+  });
+});
 
 describe('isDemoRoutePath', () => {
   it('matches the demo landing route', () => {

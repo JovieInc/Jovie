@@ -130,7 +130,7 @@ describe('CalendarPage', () => {
     mocks.getCachedAuth.mockResolvedValueOnce({ userId: null });
 
     await expect(CalendarPage()).rejects.toThrow(
-      `REDIRECT:${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.DASHBOARD}/calendar`
+      `REDIRECT:${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.CALENDAR}`
     );
 
     expect(mocks.getDashboardShellData).not.toHaveBeenCalled();
@@ -152,7 +152,7 @@ describe('CalendarPage', () => {
     expect(mocks.captureError).toHaveBeenCalledWith(
       'Dashboard data load failed on calendar page',
       dashboardLoadError,
-      { route: `${APP_ROUTES.DASHBOARD}/calendar` }
+      { route: APP_ROUTES.CALENDAR }
     );
     expect(mocks.fetchQuery).not.toHaveBeenCalled();
   });

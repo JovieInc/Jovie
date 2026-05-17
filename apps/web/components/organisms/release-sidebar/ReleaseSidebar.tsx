@@ -48,7 +48,7 @@ import {
   StatusBadge,
 } from '@/components/shell/StatusBadge';
 import { TypeBadge } from '@/components/shell/TypeBadge';
-import { APP_ROUTES } from '@/constants/routes';
+import { buildReleaseTasksRoute } from '@/constants/routes';
 import { buildReleaseActions } from '@/features/dashboard/organisms/releases/release-actions';
 import { CompactReleasePlanUpgradeCard } from '@/features/dashboard/tasks/TasksUpgradeInterstitial';
 import {
@@ -805,10 +805,7 @@ export function ReleaseSidebar({
       return;
     }
 
-    globalThis.location.href = APP_ROUTES.DASHBOARD_RELEASE_TASKS.replace(
-      '[releaseId]',
-      release.id
-    );
+    globalThis.location.href = buildReleaseTasksRoute(release.id);
   }, [release]);
 
   const handleDismissTasksUpgrade = useCallback(() => {

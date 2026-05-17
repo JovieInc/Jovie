@@ -32,7 +32,7 @@ import type { TicketStatus, TourDateViewModel } from '@/lib/tour-dates/types';
 import { mapTourDateToViewModel } from '@/lib/tour-dates/view-model';
 import { toISOStringOrNull } from '@/lib/utils/date';
 import { decryptPII, encryptPII } from '@/lib/utils/pii-encryption';
-import { getDashboardData } from '../actions';
+import { getDashboardDataEssential } from '../actions';
 
 // ============================================================================
 // Types
@@ -55,7 +55,7 @@ async function requireProfile(): Promise<{
   bandsintownApiKey: string | null;
   handle: string;
 }> {
-  const data = await getDashboardData();
+  const data = await getDashboardDataEssential();
 
   if (data.needsOnboarding && !data.dashboardLoadError) {
     redirect(APP_ROUTES.START);
@@ -66,7 +66,7 @@ async function requireProfile(): Promise<{
     redirect(APP_ROUTES.START);
   }
 
-  // Use bandsintown fields directly from selectedProfile (already fetched by getDashboardData)
+  // Use bandsintown fields directly from selectedProfile (already fetched by the essential dashboard path)
   return {
     id: data.selectedProfile.id,
     bandsintownArtistName: data.selectedProfile.bandsintownArtistName,

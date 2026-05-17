@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  isAudienceShellRoute,
+  isCalendarShellRoute,
   isChatShellRoute,
   isInsightsShellRoute,
   isLibraryShellRoute,
@@ -145,6 +147,35 @@ describe('isPresenceShellRoute', () => {
   });
 });
 
+describe('isAudienceShellRoute', () => {
+  it('matches the canonical audience route', () => {
+    expect(isAudienceShellRoute(APP_ROUTES.AUDIENCE)).toBe(true);
+  });
+
+  it('matches the legacy dashboard audience route', () => {
+    expect(isAudienceShellRoute(APP_ROUTES.DASHBOARD_AUDIENCE)).toBe(true);
+  });
+
+  it('matches nested audience subroutes', () => {
+    expect(isAudienceShellRoute(`${APP_ROUTES.AUDIENCE}/segments`)).toBe(true);
+    expect(
+      isAudienceShellRoute(`${APP_ROUTES.DASHBOARD_AUDIENCE}/segments`)
+    ).toBe(true);
+  });
+});
+
+describe('isCalendarShellRoute', () => {
+  it('matches the canonical calendar route', () => {
+    expect(isCalendarShellRoute(APP_ROUTES.CALENDAR)).toBe(true);
+  });
+
+  it('matches nested calendar subroutes', () => {
+    expect(isCalendarShellRoute(`${APP_ROUTES.CALENDAR}/week/2026-05-15`)).toBe(
+      true
+    );
+  });
+});
+
 describe('shouldUseEssentialShellData', () => {
   it('returns true for chat routes', () => {
     expect(shouldUseEssentialShellData(APP_ROUTES.CHAT)).toBe(true);
@@ -169,8 +200,25 @@ describe('shouldUseEssentialShellData', () => {
     expect(shouldUseEssentialShellData(APP_ROUTES.PRESENCE)).toBe(true);
   });
 
+  it('returns true for audience routes that own their page data', () => {
+    expect(shouldUseEssentialShellData(APP_ROUTES.AUDIENCE)).toBe(true);
+    expect(shouldUseEssentialShellData(APP_ROUTES.DASHBOARD_AUDIENCE)).toBe(
+      true
+    );
+  });
+
+  it('returns true for the canonical calendar route', () => {
+    expect(shouldUseEssentialShellData(APP_ROUTES.CALENDAR)).toBe(true);
+  });
+
   it('returns true for dashboard root', () => {
     expect(shouldUseEssentialShellData(APP_ROUTES.DASHBOARD)).toBe(true);
+  });
+
+  it('does not treat the legacy dashboard root as a nested dashboard subroute', () => {
+    expect(shouldUseEssentialShellData(APP_ROUTES.LEGACY_DASHBOARD)).toBe(
+      false
+    );
   });
 
   it('returns true for settings routes that do not need supplementary dashboard data', () => {
@@ -202,6 +250,12 @@ describe('shouldRedirectToOnboarding', () => {
     expect(shouldRedirectToOnboarding(APP_ROUTES.DASHBOARD_TASKS)).toBe(true);
     expect(shouldRedirectToOnboarding(APP_ROUTES.INSIGHTS)).toBe(true);
     expect(shouldRedirectToOnboarding(APP_ROUTES.PRESENCE)).toBe(true);
+    expect(shouldRedirectToOnboarding(APP_ROUTES.AUDIENCE)).toBe(true);
+    expect(shouldRedirectToOnboarding(APP_ROUTES.CALENDAR)).toBe(true);
+  });
+
+  it('does not add onboarding redirects to the legacy dashboard root', () => {
+    expect(shouldRedirectToOnboarding(APP_ROUTES.LEGACY_DASHBOARD)).toBe(false);
   });
 
   it('does not add onboarding redirects to settings route chrome optimization', () => {

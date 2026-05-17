@@ -2256,9 +2256,10 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
 
       - name: Create ephemeral Neon database branch (with retry)
-        # Only create an ephemeral branch when DB-relevant code changed.
-        # Non-DB PRs skip branch creation; resolve-neon-database-url falls back to DATABASE_URL_MAIN.
-        if: steps.check_changes.outputs.run_full_ci == 'true' && needs.ci-path-changes.outputs.run_neon == 'true'
+        # Public a11y routes depend on seeded QA profiles and smart links.
+        # Always use an isolated branch when this job runs so the gate is
+        # deterministic and never relies on or mutates the stable main DB.
+        if: steps.check_changes.outputs.run_full_ci == 'true'
         id: neon-branch
         uses: ./.github/actions/neon-create-branch-with-retry
         with:
@@ -2269,8 +2270,7 @@ jobs:
           protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
-        # Only resolve from the ephemeral branch when one was created.
-        if: steps.check_changes.outputs.run_full_ci == 'true' && needs.ci-path-changes.outputs.run_neon == 'true'
+        if: steps.check_changes.outputs.run_full_ci == 'true'
         id: resolve-a11y-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
@@ -2280,13 +2280,8 @@ jobs:
           credential_fallback_url: ${{ secrets.DATABASE_URL }}
 
       - name: Export DATABASE_URL (ephemeral branch)
-        if: steps.check_changes.outputs.run_full_ci == 'true' && needs.ci-path-changes.outputs.run_neon == 'true'
+        if: steps.check_changes.outputs.run_full_ci == 'true'
         run: echo "DATABASE_URL=${{ steps.resolve-a11y-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
-
-      - name: Export DATABASE_URL (main — non-DB PR)
-        # No ephemeral branch was created; use the stable main DB for SSR reads.
-        if: steps.check_changes.outputs.run_full_ci == 'true' && needs.ci-path-changes.outputs.run_neon != 'true'
-        run: echo "DATABASE_URL=${{ secrets.DATABASE_URL_MAIN }}" >> "$GITHUB_ENV"
 
       - name: Cache Playwright Browsers
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -2314,7 +2309,7 @@ jobs:
         run: tar -xf /tmp/nextjs-build-download/nextjs-build.tar -C apps/web
 
       - name: Run migrations (ephemeral Neon)
-        if: steps.check_changes.outputs.run_full_ci == 'true' && needs.ci-path-changes.outputs.run_neon == 'true'
+        if: steps.check_changes.outputs.run_full_ci == 'true'
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
@@ -2323,7 +2318,7 @@ jobs:
           ALLOW_PROD_MIGRATIONS: 'true'
 
       - name: Seed public QA fixtures
-        if: steps.check_changes.outputs.run_full_ci == 'true' && needs.ci-path-changes.outputs.run_neon == 'true'
+        if: steps.check_changes.outputs.run_full_ci == 'true'
         run: pnpm --filter=@jovie/web exec tsx tests/seed-test-data.ts
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
@@ -3623,14 +3618,55 @@ jobs:
       - name: Deploy (staging preview, prebuilt)
         id: deploy
         run: |
+          required_runtime_env=(
+            VERCEL_AUTOMATION_BYPASS_SECRET
+            NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+            CLERK_SECRET_KEY
+            DATABASE_URL
+            SESSION_SECRET
+            AI_GATEWAY_API_KEY
+            NEXT_PUBLIC_TURNSTILE_SITE_KEY
+            TURNSTILE_SECRET_KEY
+            CLERK_PUBLISHABLE_KEY_STAGING
+            CLERK_SECRET_KEY_STAGING
+          )
+
+          missing_runtime_env=()
+          for key in "${required_runtime_env[@]}"; do
+            if [ -z "${!key:-}" ]; then
+              missing_runtime_env+=("$key")
+            fi
+          done
+
+          if [ "${#missing_runtime_env[@]}" -gt 0 ]; then
+            echo "Missing staging preview runtime env: ${missing_runtime_env[*]}"
+            exit 1
+          fi
+
           bash .github/scripts/vercel-prebuilt-deploy.sh deploy_url \
+            --env VERCEL_AUTOMATION_BYPASS_SECRET="${VERCEL_AUTOMATION_BYPASS_SECRET}" \
+            --env NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}" \
+            --env CLERK_SECRET_KEY="${CLERK_SECRET_KEY}" \
+            --env DATABASE_URL="${DATABASE_URL}" \
+            --env SESSION_SECRET="${SESSION_SECRET}" \
+            --env AI_GATEWAY_API_KEY="${AI_GATEWAY_API_KEY}" \
+            --env NEXT_PUBLIC_TURNSTILE_SITE_KEY="${NEXT_PUBLIC_TURNSTILE_SITE_KEY}" \
+            --env TURNSTILE_SECRET_KEY="${TURNSTILE_SECRET_KEY}" \
             --env CLERK_PUBLISHABLE_KEY_STAGING="${CLERK_PUBLISHABLE_KEY_STAGING}" \
             --env CLERK_SECRET_KEY_STAGING="${CLERK_SECRET_KEY_STAGING}"
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
+          TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
           CLERK_PUBLISHABLE_KEY_STAGING: ${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}
           CLERK_SECRET_KEY_STAGING: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK: 'true'
 
@@ -3807,20 +3843,19 @@ jobs:
             BYPASS_ARGS+=(-H "x-vercel-protection-bypass: ${VERCEL_AUTOMATION_BYPASS_SECRET}")
           fi
 
-          # Probe the DEPLOYMENT URL directly rather than jov.ie. Rationale:
-          # jov.ie is fronted by Vercel's edge router + CDN. After `vercel
-          # promote` succeeds, the alias IS atomically pointed at the new
-          # deployment at the router level, but edge caches can take longer
-          # than our 60s window to start serving fresh responses (observed
-          # 2026-04-24 on commit 57a7dc3 — promote succeeded, prod flipped
-          # within ~2 min, but the verify loop expired first and emitted a
-          # false-positive verify_mismatch). The deployment URL is stable —
-          # it always serves exactly this deployment's code, no aliases, no
-          # edge timing. If the deployment's /api/health/build-info returns
-          # expected commitSha, the promote was successful and prod is
-          # serving it (edge cache will catch up asynchronously).
-          probe_url="${deploy_url}/api/health/build-info"
-          echo "Verifying ${probe_url} serves ${expected}..."
+          # Prefer the deployment URL when Vercel allows direct access, but
+          # also verify the canonical production alias. Protected deployment
+          # URLs can return 401 even after a successful promote; jov.ie is the
+          # user-facing surface and catches domain/project wiring regressions.
+          probe_urls=(
+            "${deploy_url}/api/health/build-info"
+            "https://jov.ie/api/health/build-info"
+          )
+          probe_labels=(
+            "deployment"
+            "production-alias"
+          )
+          echo "Verifying promoted deployment serves ${expected}..."
           # Track confirmed_mismatch separately from saw_valid_probe so a
           # late 500 can't overwrite an earlier confirmed mismatch. Once we
           # see a 200 with a wrong SHA, it IS a mismatch — routing a
@@ -3830,59 +3865,61 @@ jobs:
           last_status=""
           saw_valid_probe=false
           confirmed_mismatch=false
-          # Vercel edge rollout can lag behind a successful `vercel promote`
-          # by more than a minute. Keep verification strict, but use a longer
-          # bounded window to avoid false negatives on healthy deploys.
-          max_attempts=18
+          # Vercel edge rollout can lag behind a successful `vercel promote`.
+          # Keep verification strict, but use a bounded 5-minute window to
+          # avoid false negatives on healthy deploys.
+          max_attempts=30
           for attempt in $(seq 1 "$max_attempts"); do
             # Skip sleep on the first attempt; wait between retries so we
             # don't burn 10s after the final failing attempt.
             if [ "$attempt" -gt 1 ]; then
               sleep 10
             fi
-            response=$(curl -sS -L \
-              --connect-timeout 5 \
-              --max-time 10 \
-              -A "$USER_AGENT" \
-              -H "Cache-Control: no-cache" \
-              "${BYPASS_ARGS[@]}" \
-              -w "\n%{http_code}" \
-              "${probe_url}?_cb=$(date +%s%N)" 2>/dev/null || printf '\n000')
-            last_status="${response##*$'\n'}"
-            body="${response%$'\n'*}"
+            for index in "${!probe_urls[@]}"; do
+              probe_url="${probe_urls[$index]}"
+              probe_label="${probe_labels[$index]}"
+              response=$(curl -sS -L \
+                --connect-timeout 5 \
+                --max-time 10 \
+                -A "$USER_AGENT" \
+                -H "Cache-Control: no-cache" \
+                "${BYPASS_ARGS[@]}" \
+                -w "\n%{http_code}" \
+                "${probe_url}?_cb=$(date +%s%N)" 2>/dev/null || printf '\n000')
+              last_status="${response##*$'\n'}"
+              body="${response%$'\n'*}"
 
-            if [ "$last_status" != "200" ]; then
-              echo "  attempt ${attempt}: build-info returned HTTP ${last_status}"
-              continue
-            fi
+              if [ "$last_status" != "200" ]; then
+                echo "  attempt ${attempt} ${probe_label}: build-info returned HTTP ${last_status}"
+                continue
+              fi
 
-            actual=$(printf '%s' "$body" | jq -r '.commitSha // ""' 2>/dev/null || echo "")
-            if [ -z "$actual" ]; then
-              echo "  attempt ${attempt}: build-info returned 200 without commitSha"
-              continue
-            fi
+              actual=$(printf '%s' "$body" | jq -r '.commitSha // ""' 2>/dev/null || echo "")
+              if [ -z "$actual" ]; then
+                echo "  attempt ${attempt} ${probe_label}: build-info returned 200 without commitSha"
+                continue
+              fi
 
-            echo "  attempt ${attempt}: build-info commitSha=${actual}"
-            saw_valid_probe=true
-            if [ "$actual" = "$expected" ]; then
-              echo "✅ Deployment ${deploy_url} serves ${expected} — promote succeeded."
-              echo "   Edge cache on jov.ie will catch up asynchronously (typically 1-3 min)."
-              exit 0
-            fi
-            confirmed_mismatch=true
+              echo "  attempt ${attempt} ${probe_label}: build-info commitSha=${actual}"
+              saw_valid_probe=true
+              if [ "$actual" = "$expected" ]; then
+                echo "✅ ${probe_label} serves ${expected} — promote succeeded."
+                exit 0
+              fi
+              confirmed_mismatch=true
+            done
           done
 
           if [ "$confirmed_mismatch" = "true" ]; then
-            echo "❌ Deployment ${deploy_url} returned commitSha='${actual:-<empty>}' but expected '${expected}'."
-            echo "   This is a data integrity problem: the Vercel API matched this deployment"
-            echo "   URL to GITHUB_SHA, but the deployment's runtime reports a different SHA."
+            echo "❌ Production verification returned commitSha='${actual:-<empty>}' but expected '${expected}'."
+            echo "   The promoted deployment or jov.ie alias is serving a different SHA."
             echo "failure_subtype=verify_mismatch" >> "$GITHUB_OUTPUT"
             exit 1
           fi
 
           if [ "$saw_valid_probe" != "true" ]; then
-            echo "❌ Deployment build-info probe failed across all attempts (last HTTP ${last_status})."
-            echo "   Cannot confirm whether the deployment itself is serving ${expected}."
+            echo "❌ Production build-info probes failed across all attempts (last HTTP ${last_status})."
+            echo "   Cannot confirm whether production is serving ${expected}."
             echo "failure_subtype=verify_probe_failed" >> "$GITHUB_OUTPUT"
             exit 1
           fi

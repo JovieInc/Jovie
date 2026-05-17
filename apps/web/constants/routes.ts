@@ -38,6 +38,7 @@ export const APP_ROUTES = {
   CONTACTS: '/app/contacts',
   RELEASES: '/app/releases',
   TOUR_DATES: '/app/tour-dates',
+  CALENDAR: '/app/calendar',
   AUDIENCE: '/app/audience',
   EARNINGS: '/app/earnings',
   LIBRARY: '/app/library',
@@ -162,6 +163,10 @@ export type AppRoute = (typeof APP_ROUTES)[keyof typeof APP_ROUTES];
 
 export function buildLyricsRoute(trackId: string): string {
   return `${APP_ROUTES.LYRICS}/${encodeURIComponent(trackId)}`;
+}
+
+export function buildReleaseTasksRoute(releaseId: string): string {
+  return `${APP_ROUTES.RELEASES}/${encodeURIComponent(releaseId)}/tasks`;
 }
 
 export function isDemoRoutePath(pathname: string | null | undefined): boolean {

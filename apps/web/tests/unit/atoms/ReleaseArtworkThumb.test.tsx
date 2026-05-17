@@ -15,12 +15,6 @@ vi.mock('next/image', () => ({
   ),
 }));
 
-vi.mock('@/components/atoms/Icon', () => ({
-  Icon: ({ name, className, 'aria-hidden': ariaHidden }: any) => (
-    <svg data-icon={name} className={className} aria-hidden={ariaHidden} />
-  ),
-}));
-
 describe('ReleaseArtworkThumb', () => {
   it('renders image when src is provided', () => {
     render(<ReleaseArtworkThumb src='/art.jpg' alt='Album art' />);
@@ -35,12 +29,16 @@ describe('ReleaseArtworkThumb', () => {
   it('renders fallback icon when src is null', () => {
     render(<ReleaseArtworkThumb src={null} alt='Missing art' />);
     expect(screen.getByText('Missing art')).toBeInTheDocument();
-    expect(document.querySelector('[data-icon="Disc3"]')).toBeInTheDocument();
+    expect(
+      document.querySelector('[data-artwork-fallback-icon="true"]')
+    ).toBeInTheDocument();
   });
 
   it('renders fallback icon when src is undefined', () => {
     render(<ReleaseArtworkThumb src={undefined} alt='Missing art' />);
-    expect(document.querySelector('[data-icon="Disc3"]')).toBeInTheDocument();
+    expect(
+      document.querySelector('[data-artwork-fallback-icon="true"]')
+    ).toBeInTheDocument();
   });
 
   it('renders fallback sr-only text when showing fallback', () => {
@@ -74,7 +72,9 @@ describe('ReleaseArtworkThumb', () => {
     render(<ReleaseArtworkThumb src='/broken.jpg' alt='Broken' />);
     const img = screen.getByRole('img');
     fireEvent.error(img);
-    expect(document.querySelector('[data-icon="Disc3"]')).toBeInTheDocument();
+    expect(
+      document.querySelector('[data-artwork-fallback-icon="true"]')
+    ).toBeInTheDocument();
     expect(screen.getByText('Broken')).toBeInTheDocument();
   });
 
