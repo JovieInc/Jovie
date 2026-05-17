@@ -1,7 +1,10 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { fireEvent } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
+import { OPEN_COMMAND_PALETTE_EVENT } from '@/components/organisms/command-palette-events';
 import { APP_ROUTES } from '@/constants/routes';
 import {
+  mockRouterPush,
   mockUseChatConversationsQuery,
   mockUsePathname,
   mockUsePlanGate,
@@ -70,6 +73,28 @@ describe('DashboardNav', () => {
     expect(
       getByRole('link', { name: 'New thread' }).getAttribute('aria-current')
     ).toBeNull();
+  });
+
+  it('opens the global command palette from Search instead of navigating', () => {
+    const onOpenPalette = vi.fn();
+    globalThis.addEventListener(OPEN_COMMAND_PALETTE_EVENT, onOpenPalette);
+
+    try {
+      const { getByRole, queryByRole } = renderDashboardNav({
+        renderFn: fastRender,
+        appFlags: { DESIGN_V1: true },
+      });
+
+      const searchButton = getByRole('button', { name: 'Search' });
+      expect(queryByRole('link', { name: 'Search' })).toBeNull();
+
+      fireEvent.click(searchButton);
+
+      expect(onOpenPalette).toHaveBeenCalledTimes(1);
+      expect(mockRouterPush).not.toHaveBeenCalled();
+    } finally {
+      globalThis.removeEventListener(OPEN_COMMAND_PALETTE_EVENT, onOpenPalette);
+    }
   });
 
   it('handles collapsed state', () => {
