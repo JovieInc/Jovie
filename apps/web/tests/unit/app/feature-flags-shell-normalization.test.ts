@@ -16,6 +16,13 @@ const FEATURE_FLAGS_PAGE = findSourceFile(
   resolve(process.cwd(), 'app/app/(shell)/feature-flags/page.tsx'),
   resolve(process.cwd(), 'apps/web/app/app/(shell)/feature-flags/page.tsx')
 );
+const FEATURE_FLAGS_TABLE = findSourceFile(
+  resolve(process.cwd(), 'app/app/(shell)/feature-flags/FeatureFlagsTable.tsx'),
+  resolve(
+    process.cwd(),
+    'apps/web/app/app/(shell)/feature-flags/FeatureFlagsTable.tsx'
+  )
+);
 
 describe('feature flags shell normalization', () => {
   it('keeps feature flags in the shared admin tool shell', () => {
@@ -23,16 +30,22 @@ describe('feature flags shell normalization', () => {
 
     expect(source).toContain('AdminToolPage');
     expect(source).toContain("testId='feature-flags-page'");
-    expect(source).toContain('ContentSurfaceCard');
+    expect(source).not.toContain('title=');
+    expect(source).not.toContain('description=');
   });
 
-  it('uses shared content table primitives instead of bespoke table chrome', () => {
-    const source = readFileSync(FEATURE_FLAGS_PAGE, 'utf8');
+  it('uses shared admin table primitives instead of bespoke table chrome', () => {
+    const pageSource = readFileSync(FEATURE_FLAGS_PAGE, 'utf8');
+    const tableSource = readFileSync(FEATURE_FLAGS_TABLE, 'utf8');
 
-    expect(source).toContain('ContentTable');
-    expect(source).toContain('CONTENT_TABLE_HEAD_CELL_CLASS');
-    expect(source).toContain('CONTENT_TABLE_ROW_CLASS');
-    expect(source).not.toContain('max-w-3xl');
-    expect(source).not.toContain("className='w-full text-sm'");
+    expect(pageSource).toContain('FeatureFlagsTable');
+    expect(tableSource).toContain('AdminTableShell');
+    expect(tableSource).toContain('AdminTableSubheader');
+    expect(tableSource).toContain('AdminDataTable');
+    expect(pageSource).not.toContain('ContentTable');
+    expect(pageSource).not.toContain('ContentSurfaceCard');
+    expect(pageSource).not.toContain('CONTENT_TABLE_HEAD_CELL_CLASS');
+    expect(pageSource).not.toContain('CONTENT_TABLE_ROW_CLASS');
+    expect(tableSource).not.toMatch(/<table\b/);
   });
 });
