@@ -103,6 +103,14 @@ export function isInsightsShellRoute(pathname: string | null): boolean {
   );
 }
 
+export function isPresenceShellRoute(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return (
+    pathname === APP_ROUTES.PRESENCE ||
+    pathname.startsWith(`${APP_ROUTES.PRESENCE}/`)
+  );
+}
+
 function isDashboardSubRoute(pathname: string | null): boolean {
   if (!pathname) return false;
   return pathname.startsWith(`${APP_ROUTES.LEGACY_DASHBOARD}/`);
@@ -130,6 +138,7 @@ function isLightweightShellRoute(pathname: string | null): boolean {
     isLibraryShellRoute(pathname) ||
     isTasksShellRoute(pathname) ||
     isInsightsShellRoute(pathname) ||
+    isPresenceShellRoute(pathname) ||
     isDashboardSubRoute(pathname) ||
     isShellOptimizedSettingsRoute(pathname)
   );
@@ -147,6 +156,7 @@ export function shouldRedirectToOnboarding(pathname: string | null): boolean {
     isLibraryShellRoute(pathname) ||
     isTasksShellRoute(pathname) ||
     isInsightsShellRoute(pathname) ||
+    isPresenceShellRoute(pathname) ||
     isDashboardSubRoute(pathname)
   );
 }
