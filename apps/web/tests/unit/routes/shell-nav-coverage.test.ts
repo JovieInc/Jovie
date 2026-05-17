@@ -88,7 +88,11 @@ function findShellPages(dir: string = SHELL_ROOT): ShellPage[] {
 }
 
 function isRedirectStub(source: string): boolean {
-  return /\bredirect\(/.test(source) || /\bpermanentRedirect\(/.test(source);
+  return (
+    /\bredirect\(/.test(source) ||
+    /\bpermanentRedirect\(/.test(source) ||
+    /\bredirectFromEarningsRoute\(/.test(source)
+  );
 }
 
 function getNavRoutePaths(): Set<string> {

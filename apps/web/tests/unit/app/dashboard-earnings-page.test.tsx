@@ -17,6 +17,7 @@ vi.mock('@/lib/auth/cached', () => ({
 }));
 
 import EarningsPage from '@/app/app/(shell)/dashboard/earnings/page';
+import CanonicalEarningsPage from '@/app/app/(shell)/earnings/page';
 
 describe('dashboard earnings page', () => {
   it('redirects unauthenticated users to sign-in with the legacy route as the return target', async () => {
@@ -35,6 +36,32 @@ describe('dashboard earnings page', () => {
     getCachedAuthMock.mockResolvedValueOnce({ userId: 'user_123' });
 
     await expect(EarningsPage()).rejects.toThrow(
+      `REDIRECT:${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn#pay`
+    );
+
+    expect(redirectMock).toHaveBeenCalledWith(
+      `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn#pay`
+    );
+  });
+});
+
+describe('canonical earnings page', () => {
+  it('redirects unauthenticated users to sign-in with the canonical route as the return target', async () => {
+    getCachedAuthMock.mockResolvedValueOnce({ userId: null });
+
+    await expect(CanonicalEarningsPage()).rejects.toThrow(
+      `REDIRECT:${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.EARNINGS}`
+    );
+
+    expect(redirectMock).toHaveBeenCalledWith(
+      `${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.EARNINGS}`
+    );
+  });
+
+  it('redirects authenticated users to artist profile tips', async () => {
+    getCachedAuthMock.mockResolvedValueOnce({ userId: 'user_123' });
+
+    await expect(CanonicalEarningsPage()).rejects.toThrow(
       `REDIRECT:${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn#pay`
     );
 
