@@ -123,10 +123,11 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(syncIndex).toBeGreaterThanOrEqual(0);
     expect(pullIndex).toBeGreaterThan(syncIndex);
     expect(syncStep).toContain('required_vercel_env=(');
+    expect(syncStep).toContain('vercel env rm "$key" production');
     expect(syncStep).toContain('vercel env add "$key" production');
-    expect(syncStep).toContain('--force');
     expect(syncStep).toContain('--value "${!key}"');
     expect(syncStep).toContain('>/dev/null');
+    expect(syncStep).toContain('>/dev/null 2>&1 || true');
     expect(syncStep).toContain('set +x');
     expect(syncStep).toContain(
       'VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}'

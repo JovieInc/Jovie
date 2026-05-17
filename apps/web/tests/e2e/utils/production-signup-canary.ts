@@ -4,13 +4,26 @@ export const PRODUCTION_SIGNUP_CANARY_KEYS = [
   'E2E_PROD_SIGNUP_EMAIL_BASE',
   'E2E_PROD_SIGNUP_PASSWORD',
   'E2E_PROD_MAILBOX_PROVIDER',
-  'E2E_PROD_MAILBOX_CLIENT_ID',
-  'E2E_PROD_MAILBOX_CLIENT_SECRET',
-  'E2E_PROD_MAILBOX_REFRESH_TOKEN',
   'CLERK_SECRET_KEY',
 ] as const;
 
-type ProductionSignupCanaryKey = (typeof PRODUCTION_SIGNUP_CANARY_KEYS)[number];
+const GMAIL_SIGNUP_CANARY_KEYS = [
+  'E2E_PROD_MAILBOX_CLIENT_ID',
+  'E2E_PROD_MAILBOX_CLIENT_SECRET',
+  'E2E_PROD_MAILBOX_REFRESH_TOKEN',
+] as const;
+
+const CLOUDFLARE_OTP_SIGNUP_CANARY_KEYS = [
+  'E2E_PROD_OTP_CHECK_URL',
+  'E2E_PROD_OTP_CHECK_TOKEN',
+] as const;
+
+type ProductionSignupCanaryKey =
+  | (typeof PRODUCTION_SIGNUP_CANARY_KEYS)[number]
+  | (typeof GMAIL_SIGNUP_CANARY_KEYS)[number]
+  | (typeof CLOUDFLARE_OTP_SIGNUP_CANARY_KEYS)[number];
+
+type ProductionSignupMailboxProvider = 'gmail' | 'cloudflare-email-routing';
 
 interface CanaryEnv {
   readonly [key: string]: string | undefined;
@@ -47,19 +60,46 @@ interface GmailMessage {
   readonly payload?: GmailMessagePart;
 }
 
+interface CloudflareOtpCheckResponse {
+  readonly otp?: string | null;
+  readonly code?: string | null;
+  readonly text?: string | null;
+  readonly receivedAtMs?: number | null;
+}
+
+function isProductionSignupMailboxProvider(
+  value: string | undefined
+): value is ProductionSignupMailboxProvider {
+  return value === 'gmail' || value === 'cloudflare-email-routing';
+}
+
+function isMissing(env: CanaryEnv, key: ProductionSignupCanaryKey): boolean {
+  const value = env[key];
+  return typeof value !== 'string' || value.trim().length === 0;
+}
+
 export function validateProductionSignupCanaryConfig(
   env: CanaryEnv
 ): ProductionSignupCanaryConfigResult {
-  const missing = PRODUCTION_SIGNUP_CANARY_KEYS.filter(key => {
-    const value = env[key];
-    return typeof value !== 'string' || value.trim().length === 0;
-  });
-  const lines = PRODUCTION_SIGNUP_CANARY_KEYS.map(
+  const commonMissing = PRODUCTION_SIGNUP_CANARY_KEYS.filter(key =>
+    isMissing(env, key)
+  );
+  const provider = env.E2E_PROD_MAILBOX_PROVIDER;
+  const providerKeys: readonly ProductionSignupCanaryKey[] =
+    provider === 'cloudflare-email-routing'
+      ? CLOUDFLARE_OTP_SIGNUP_CANARY_KEYS
+      : GMAIL_SIGNUP_CANARY_KEYS;
+  const providerMissing =
+    !provider || isProductionSignupMailboxProvider(provider)
+      ? providerKeys.filter(key => isMissing(env, key))
+      : [];
+  const missing = [...commonMissing, ...providerMissing];
+  const summaryKeys = [...PRODUCTION_SIGNUP_CANARY_KEYS, ...providerKeys];
+  const lines = summaryKeys.map(
     key => `${key}: ${missing.includes(key) ? 'MISSING' : 'SET'}`
   );
 
-  const provider = env.E2E_PROD_MAILBOX_PROVIDER;
-  if (provider && provider !== 'gmail') {
+  if (provider && !isProductionSignupMailboxProvider(provider)) {
     lines.push('E2E_PROD_MAILBOX_PROVIDER: INVALID');
     return {
       ok: false,
@@ -69,7 +109,7 @@ export function validateProductionSignupCanaryConfig(
   }
 
   return {
-    ok: missing.length === 0,
+    ok: missing.length === 0 && isProductionSignupMailboxProvider(provider),
     missing,
     summary: lines.join('\n'),
   };
@@ -199,7 +239,7 @@ async function getGmailMessage(
   );
 }
 
-export async function waitForProductionSignupOtp({
+async function waitForGmailProductionSignupOtp({
   email,
   env,
   startedAtMs,
@@ -235,6 +275,109 @@ export async function waitForProductionSignupOtp({
   }
 
   throw new Error(`Timed out waiting for production signup OTP for ${email}`);
+}
+
+async function fetchCloudflareOtpCheck({
+  email,
+  env,
+  startedAtMs,
+}: {
+  readonly email: string;
+  readonly env: CanaryEnv;
+  readonly startedAtMs: number;
+}): Promise<string | null> {
+  const url = env.E2E_PROD_OTP_CHECK_URL;
+  const token = env.E2E_PROD_OTP_CHECK_TOKEN;
+  if (!url || !token) {
+    throw new Error(
+      'Cloudflare OTP check is missing E2E_PROD_OTP_CHECK_URL or E2E_PROD_OTP_CHECK_TOKEN'
+    );
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15_000);
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, sinceMs: startedAtMs }),
+      signal: controller.signal,
+    });
+
+    if (response.status === 404 || response.status === 204) {
+      return null;
+    }
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => '');
+      throw new Error(
+        `Cloudflare OTP check failed: HTTP ${response.status} ${body}`
+      );
+    }
+
+    const payload = (await response.json()) as CloudflareOtpCheckResponse;
+    const rawCode = payload.otp ?? payload.code;
+    if (rawCode) return extractClerkOtp(rawCode) ?? rawCode;
+    if (payload.text) return extractClerkOtp(payload.text);
+    return null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function waitForCloudflareProductionSignupOtp({
+  email,
+  env,
+  startedAtMs,
+  timeoutMs = 90_000,
+}: {
+  readonly email: string;
+  readonly env: CanaryEnv;
+  readonly startedAtMs: number;
+  readonly timeoutMs?: number;
+}): Promise<string> {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const code = await fetchCloudflareOtpCheck({ email, env, startedAtMs });
+    if (code) return code;
+    await new Promise(resolve => setTimeout(resolve, 3_000));
+  }
+
+  throw new Error(
+    `Timed out waiting for Cloudflare-routed production signup OTP for ${email}`
+  );
+}
+
+export async function waitForProductionSignupOtp({
+  email,
+  env,
+  startedAtMs,
+  timeoutMs = 90_000,
+}: {
+  readonly email: string;
+  readonly env: CanaryEnv;
+  readonly startedAtMs: number;
+  readonly timeoutMs?: number;
+}): Promise<string> {
+  if (env.E2E_PROD_MAILBOX_PROVIDER === 'cloudflare-email-routing') {
+    return waitForCloudflareProductionSignupOtp({
+      email,
+      env,
+      startedAtMs,
+      timeoutMs,
+    });
+  }
+
+  return waitForGmailProductionSignupOtp({
+    email,
+    env,
+    startedAtMs,
+    timeoutMs,
+  });
 }
 
 export async function fillOtpCode(page: Page, code: string) {

@@ -244,11 +244,15 @@ export const ServerEnvSchema = z.object({
   E2E_CLERK_USER_USERNAME: z.string().optional(),
   E2E_PROD_SIGNUP_EMAIL_BASE: z.string().email().optional(),
   E2E_PROD_SIGNUP_PASSWORD: z.string().optional(),
-  E2E_PROD_MAILBOX_PROVIDER: z.enum(['gmail']).optional(),
+  E2E_PROD_MAILBOX_PROVIDER: z
+    .enum(['gmail', 'cloudflare-email-routing'])
+    .optional(),
   E2E_PROD_MAILBOX_CLIENT_ID: z.string().optional(),
   E2E_PROD_MAILBOX_CLIENT_SECRET: z.string().optional(),
   E2E_PROD_MAILBOX_REFRESH_TOKEN: z.string().optional(),
   E2E_PROD_MAILBOX_QUERY_FROM: z.string().optional(),
+  E2E_PROD_OTP_CHECK_URL: z.string().url().optional(),
+  E2E_PROD_OTP_CHECK_TOKEN: z.string().optional(),
   DEMO_RECORDING: z.string().optional(),
   DEMO_CLERK_USER_ID: z.string().optional(),
 

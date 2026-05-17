@@ -15,7 +15,7 @@ The primary test covers the complete front-door journey:
 1. **`/start` onboarding chat** - verifies the first anonymous chat turn can POST without Turnstile configuration errors.
 2. **Homepage CTA** - verifies the primary front-door CTA is visible and routes to `/signup`.
 3. **Clerk sign-up** - creates a plus-addressed synthetic production user through the rendered UI.
-4. **Mailbox OTP** - reads the Clerk code from a dedicated Gmail mailbox and completes verification.
+4. **Mailbox OTP** - reads the Clerk code from a dedicated mailbox provider and completes verification.
 5. **Post-signup app state** - confirms the signed-in user can reach a non-empty usable app/onboarding surface.
 6. **Scoped cleanup** - deletes only the exact plus-addressed synthetic Clerk user created by that run.
 
@@ -97,6 +97,34 @@ E2E_PROD_MAILBOX_PROVIDER=gmail
 E2E_PROD_MAILBOX_CLIENT_ID=...
 E2E_PROD_MAILBOX_CLIENT_SECRET=...
 E2E_PROD_MAILBOX_REFRESH_TOKEN=...
+```
+
+Preferred no-inbox provider:
+
+```bash
+E2E_PROD_SIGNUP_EMAIL_BASE=synthetic-signup@<dedicated-e2e-domain>
+E2E_PROD_MAILBOX_PROVIDER=cloudflare-email-routing
+E2E_PROD_OTP_CHECK_URL=https://<otp-worker-host>/latest
+E2E_PROD_OTP_CHECK_TOKEN=...
+```
+
+Cloudflare Email Routing should be configured on a dedicated e2e domain with a
+catch-all route to an Email Worker. The Worker parses Clerk verification emails,
+stores only short-lived OTP state for the addressed run, and exposes a
+bearer-protected `POST` endpoint. The synthetic canary calls
+`E2E_PROD_OTP_CHECK_URL` with:
+
+```json
+{ "email": "synthetic-signup+run-id@<dedicated-e2e-domain>", "sinceMs": 1770000000000 }
+```
+
+The endpoint should return `404` or `204` while no fresh code is available, or
+`200` with one of:
+
+```json
+{ "otp": "123456" }
+{ "code": "123456" }
+{ "text": "Your verification code is 123456." }
 ```
 
 ### GitHub Secrets
