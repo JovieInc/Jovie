@@ -84,7 +84,10 @@ export function ChatMessage({
       transition={{ duration: 0.2, ease: 'easeOut' }}
     >
       {isUser ? (
-        <div className='max-w-[78%] rounded-[18px] border border-white/80 bg-white px-4 py-3.5 text-[#111216] shadow-[0_12px_38px_-28px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.9)]'>
+        <div
+          data-testid='chat-user-bubble'
+          className='flex min-h-8 max-w-[78%] flex-col justify-center rounded-full border border-white/80 bg-white px-3 py-1.5 text-[#111216] shadow-[0_12px_38px_-28px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.9)]'
+        >
           {imageChips.length > 0 && (
             <div
               className={cn(
@@ -103,7 +106,7 @@ export function ChatMessage({
             </div>
           )}
           {messageText && (
-            <div className='text-[15px] leading-6 tracking-normal'>
+            <div className='text-[13px] leading-5 tracking-[-0.011em]'>
               <TokenizedText content={messageText} tone='onLight' />
             </div>
           )}
