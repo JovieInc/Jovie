@@ -109,10 +109,10 @@ describe('@critical DashboardShellContent behavior contracts', () => {
       );
     });
 
-    it('artist profile settings routes use full dashboard data', () => {
+    it('artist profile settings routes use essential shell data', () => {
       expect(
         shouldUseEssentialShellData(APP_ROUTES.SETTINGS_ARTIST_PROFILE)
-      ).toBe(false);
+      ).toBe(true);
     });
 
     it('null pathname uses full dashboard data', () => {
@@ -154,10 +154,10 @@ describe('@critical DashboardShellContent behavior contracts', () => {
       expect(isChatShellRoute(APP_ROUTES.SETTINGS_CONTACTS)).toBe(false);
     });
 
-    it('artist profile settings route gets full shell hydration', () => {
+    it('artist profile settings route uses route-owned hydration', () => {
       expect(
         shouldUseEssentialShellData(APP_ROUTES.SETTINGS_ARTIST_PROFILE)
-      ).toBe(false);
+      ).toBe(true);
     });
   });
 });

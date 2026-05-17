@@ -130,9 +130,6 @@ function isDashboardSubRoute(pathname: string | null): boolean {
 }
 
 function isShellOptimizedSettingsRoute(pathname: string | null): boolean {
-  if (matchesRoutePrefix(pathname, APP_ROUTES.SETTINGS_ARTIST_PROFILE)) {
-    return false;
-  }
   return matchesRoutePrefix(pathname, APP_ROUTES.SETTINGS);
 }
 
