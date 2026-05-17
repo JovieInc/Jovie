@@ -116,6 +116,7 @@ describe('isTasksShellRoute', () => {
   });
 
   it('matches nested task subroutes', () => {
+    expect(isTasksShellRoute(`${APP_ROUTES.TASKS}/task-abc`)).toBe(true);
     expect(isTasksShellRoute(`${APP_ROUTES.DASHBOARD_TASKS}/task-abc`)).toBe(
       true
     );
@@ -156,6 +157,7 @@ describe('shouldUseEssentialShellData', () => {
   it('returns true for lyrics, library, and tasks routes', () => {
     expect(shouldUseEssentialShellData(APP_ROUTES.LYRICS)).toBe(true);
     expect(shouldUseEssentialShellData(APP_ROUTES.LIBRARY)).toBe(true);
+    expect(shouldUseEssentialShellData(APP_ROUTES.TASKS)).toBe(true);
     expect(shouldUseEssentialShellData(APP_ROUTES.DASHBOARD_TASKS)).toBe(true);
   });
 
@@ -196,6 +198,7 @@ describe('shouldRedirectToOnboarding', () => {
     expect(shouldRedirectToOnboarding('/app/dashboard/releases')).toBe(true);
     expect(shouldRedirectToOnboarding(APP_ROUTES.LYRICS)).toBe(true);
     expect(shouldRedirectToOnboarding(APP_ROUTES.LIBRARY)).toBe(true);
+    expect(shouldRedirectToOnboarding(APP_ROUTES.TASKS)).toBe(true);
     expect(shouldRedirectToOnboarding(APP_ROUTES.DASHBOARD_TASKS)).toBe(true);
     expect(shouldRedirectToOnboarding(APP_ROUTES.INSIGHTS)).toBe(true);
     expect(shouldRedirectToOnboarding(APP_ROUTES.PRESENCE)).toBe(true);

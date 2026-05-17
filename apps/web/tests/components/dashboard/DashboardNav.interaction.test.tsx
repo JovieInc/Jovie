@@ -322,7 +322,7 @@ describe('DashboardNav interactions', () => {
     });
 
     const tasksLink = screen.getByRole('link', { name: 'Tasks' });
-    expect(tasksLink).toHaveAttribute('href', APP_ROUTES.DASHBOARD_TASKS);
+    expect(tasksLink).toHaveAttribute('href', APP_ROUTES.TASKS);
     tasksLink.addEventListener('click', event => event.preventDefault());
 
     await user.click(tasksLink);

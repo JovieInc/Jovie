@@ -23,7 +23,9 @@ describe('DashboardNav', () => {
 
     expect(getByRole('button', { name: 'Profile' })).toBeDefined();
     expect(getByRole('link', { name: 'Releases' })).toBeDefined();
-    expect(getByRole('link', { name: 'Tasks' })).toBeDefined();
+    expect(getByRole('link', { name: 'Tasks' }).getAttribute('href')).toBe(
+      APP_ROUTES.TASKS
+    );
     expect(getByRole('link', { name: 'Audience' })).toBeDefined();
     expect(getByRole('link', { name: 'Library' })).toBeDefined();
     expect(queryByRole('link', { name: 'Earnings' })).toBeNull();

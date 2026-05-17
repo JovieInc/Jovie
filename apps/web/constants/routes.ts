@@ -25,6 +25,7 @@ export const APP_ROUTES = {
   DASHBOARD_LIBRARY: '/app/library',
   /** Legacy release workspace route. Keep for old bookmarks and nested task aliases; use RELEASES for navigation. */
   DASHBOARD_RELEASES: '/app/dashboard/releases',
+  /** Legacy tasks path. Keep for old bookmarks; use TASKS for navigation. */
   DASHBOARD_TASKS: '/app/dashboard/tasks',
   DASHBOARD_RELEASE_TASKS: '/app/dashboard/releases/[releaseId]/tasks',
   DASHBOARD_TIPPING: '/app/dashboard/tipping',
@@ -39,7 +40,7 @@ export const APP_ROUTES = {
   AUDIENCE: '/app/audience',
   EARNINGS: '/app/earnings',
   LIBRARY: '/app/library',
-  TASKS: '/app/dashboard/tasks',
+  TASKS: '/app/tasks',
   CHAT: '/app/chat',
   CHAT_PROFILE_PANEL: '/app/chat?panel=profile',
   INSIGHTS: '/app/insights',
