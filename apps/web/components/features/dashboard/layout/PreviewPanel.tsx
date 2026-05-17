@@ -64,7 +64,7 @@ function PreviewPanelEmpty({
           <div className='space-y-3 pb-5'>
             <div className={cn(LINEAR_SURFACE.drawerCard, 'space-y-3 p-3')}>
               <div className='space-y-0.5'>
-                <p className='text-3xs font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
+                <p className='text-3xs font-semibold text-tertiary-token'>
                   Live preview
                 </p>
                 <p className='text-xs text-secondary-token'>
@@ -329,7 +329,7 @@ export function PreviewPanel() {
             <div className={cn(LINEAR_SURFACE.drawerCard, 'space-y-3 p-3')}>
               <div className='flex items-center justify-between gap-3'>
                 <div>
-                  <p className='text-3xs font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
+                  <p className='text-3xs font-semibold text-tertiary-token'>
                     Public profile
                   </p>
                   <p className='text-xs text-secondary-token'>
@@ -440,7 +440,7 @@ export function PreviewPanel() {
 
             <div className={cn(LINEAR_SURFACE.drawerCard, 'space-y-2.5 p-3')}>
               <div className='space-y-0.5'>
-                <p className='text-3xs font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
+                <p className='text-3xs font-semibold text-tertiary-token'>
                   Share link
                 </p>
                 <p className='text-xs text-secondary-token'>

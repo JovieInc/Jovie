@@ -58,7 +58,7 @@ export function ReleasePlanPromptDialog({
       </Button>
     );
   } else {
-    dialogTitle = 'Upgrade To Generate A Release Plan';
+    dialogTitle = 'Upgrade to Generate a Release Plan';
     dialogDescription =
       'Upgrade to turn this release into a step-by-step plan with tasks you can assign to Jovie AI.';
     actionButton = <UpgradeButton size='sm'>Upgrade to Pro</UpgradeButton>;

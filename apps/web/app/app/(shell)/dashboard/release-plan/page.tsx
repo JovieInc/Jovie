@@ -50,7 +50,7 @@ export default function ReleasePlanPage() {
                 data-testid={`release-plan-track-${index}`}
                 className='flex flex-col gap-1 rounded-md border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 py-3'
               >
-                <span className='text-[10px] font-semibold uppercase tracking-wide text-(--linear-text-tertiary)'>
+                <span className='text-[10px] font-semibold text-(--linear-text-tertiary)'>
                   Track {index + 1}
                 </span>
                 <span className='text-sm font-medium text-(--linear-text-primary)'>
