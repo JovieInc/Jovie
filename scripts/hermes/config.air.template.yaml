@@ -61,7 +61,8 @@ mcp:
       transport: http
       url: https://mcp.linear.app/mcp
       headers:
-        Authorization: "Bearer {{LINEAR_API_KEY}}"
+        # Hermes expands ${ENV} from ~/.hermes/.env at runtime.
+        Authorization: "Bearer ${LINEAR_API_KEY}"
     - name: airtable
       transport: stdio
       command: npx
@@ -69,7 +70,7 @@ mcp:
         - "-y"
         - "airtable-mcp-server"
       env:
-        AIRTABLE_API_KEY: "{{AIRTABLE_API_KEY}}"
+        AIRTABLE_API_KEY: "${AIRTABLE_API_KEY}"
     - name: gmail
       transport: http
       url: https://gmail-mcp.jov.ie/mcp

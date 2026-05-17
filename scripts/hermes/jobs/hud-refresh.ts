@@ -14,6 +14,7 @@ import { join } from 'node:path';
 
 import { HERMES_PATHS } from '../lib/hermes-paths';
 import { logJobEvent, withJobLogging } from '../lib/jobs-log';
+import { withRetry } from '../lib/retry';
 import { sendTelegram } from '../lib/telegram-client';
 
 const JOB = 'hud-refresh';
@@ -47,16 +48,21 @@ function saveSnapshot(summary: HudSummary): void {
 }
 
 async function fetchSummary(): Promise<HudSummary> {
-  const response = await fetch(HUD_ENDPOINT, {
-    headers: HUD_API_KEY ? { Authorization: `Bearer ${HUD_API_KEY}` } : {},
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (!response.ok) {
-    throw new Error(
-      `HUD ${response.status}: ${await response.text().catch(() => '')}`
-    );
-  }
-  return (await response.json()) as HudSummary;
+  return withRetry(
+    async () => {
+      const response = await fetch(HUD_ENDPOINT, {
+        headers: HUD_API_KEY ? { Authorization: `Bearer ${HUD_API_KEY}` } : {},
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!response.ok) {
+        throw new Error(
+          `HUD ${response.status}: ${await response.text().catch(() => '')}`
+        );
+      }
+      return (await response.json()) as HudSummary;
+    },
+    { caller: 'hud-refresh.fetch', attempts: 3 }
+  );
 }
 
 function detectAnomalies(
@@ -91,7 +97,7 @@ async function main(): Promise<void> {
     });
     if (anomalies.length > 0) {
       await sendTelegram(
-        `🚨 *HUD anomaly*\n${anomalies.map(a => `• ${a}`).join('\n')}`
+        `HUD anomaly:\n${anomalies.map(a => `- ${a}`).join('\n')}`
       );
     }
   });

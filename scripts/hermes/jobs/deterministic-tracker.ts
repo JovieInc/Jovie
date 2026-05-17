@@ -52,8 +52,9 @@ function loadDispatches(): ReadonlyArray<DispatchEntry> {
       }
     })
     .filter((entry): entry is DispatchEntry => {
-      if (!entry) return false;
-      if (!entry.ts) return true;
+      // Entries without a timestamp predate this job and would otherwise
+      // pollute the cluster window forever; drop them.
+      if (!entry || !entry.ts) return false;
       return new Date(entry.ts).getTime() >= cutoff;
     });
 }

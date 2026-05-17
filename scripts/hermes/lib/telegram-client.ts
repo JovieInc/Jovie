@@ -20,6 +20,13 @@ function getChatId(): string | null {
   }
 }
 
+/**
+ * Send a plain-text Telegram message. We intentionally do NOT use
+ * parse_mode='Markdown' because hermes-air messages can contain user voice
+ * memo content, error strings with backticks, and JSON snippets — any of
+ * which can trip Telegram's parser and silently drop the message. Plain
+ * text is robust; we don't need formatting for ops notifications.
+ */
 export async function sendTelegram(text: string): Promise<boolean> {
   const token = process.env.HERMES_TELEGRAM_BOT_TOKEN;
   const chatId = getChatId();
@@ -30,8 +37,7 @@ export async function sendTelegram(text: string): Promise<boolean> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         chat_id: chatId,
-        text,
-        parse_mode: 'Markdown',
+        text: text.slice(0, 4000), // Telegram hard cap 4096; leave headroom
         disable_web_page_preview: true,
       }),
       signal: AbortSignal.timeout(10_000),

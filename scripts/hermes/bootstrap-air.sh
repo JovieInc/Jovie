@@ -219,18 +219,20 @@ log "Rendering ~/.hermes/.env"
 chmod 600 "${HERMES_HOME}/.env"
 ok "Secrets rendered (chmod 600)"
 
-# 11. Render ~/.hermes/config.yaml from template
+# 11. Render ~/.hermes/config.yaml from template.
+# Only path substitution; secrets stay as ${ENV} references that Hermes
+# expands at runtime from ~/.hermes/.env. This keeps secrets out of YAML on
+# disk and avoids sed-special-char corruption for keys containing | or &.
 log "Rendering ~/.hermes/config.yaml"
-LINEAR_API_KEY_VAL="$(doppler_get LINEAR_API_KEY)"
-AIRTABLE_API_KEY_VAL="$(doppler_get AIRTABLE_API_KEY)"
-sed \
-  -e "s|{{HOME}}|${HOME}|g" \
-  -e "s|{{LINEAR_API_KEY}}|${LINEAR_API_KEY_VAL}|g" \
-  -e "s|{{AIRTABLE_API_KEY}}|${AIRTABLE_API_KEY_VAL}|g" \
-  "${REPO_ROOT}/scripts/hermes/config.air.template.yaml" \
-  > "${HERMES_HOME}/config.yaml"
+python3 - "$REPO_ROOT" "$HOME" "${HERMES_HOME}/config.yaml" <<'PYEOF'
+import sys
+from pathlib import Path
+repo_root, home, out_path = sys.argv[1], sys.argv[2], sys.argv[3]
+tmpl = Path(repo_root, "scripts/hermes/config.air.template.yaml").read_text()
+Path(out_path).write_text(tmpl.replace("{{HOME}}", home))
+PYEOF
 chmod 600 "${HERMES_HOME}/config.yaml"
-ok "Hermes config rendered"
+ok "Hermes config rendered (secrets stay as env refs)"
 
 # 12. Render launchd plists
 log "Rendering launchd plists"
@@ -239,14 +241,27 @@ for tmpl in "${REPO_ROOT}/scripts/hermes/launchd/"*.plist.template; do
   [[ -f "$tmpl" ]] || continue
   label="$(basename "$tmpl" .plist.template)"
   out="${LAUNCH_AGENTS}/${label}.plist"
-  sed \
-    -e "s|{{HOME}}|${HOME}|g" \
-    -e "s|{{JOVIE_REPO}}|${REPO_ROOT}|g" \
-    -e "s|{{HERMES_BIN}}|${HERMES_BIN}|g" \
-    -e "s|{{GBRAIN_BIN}}|${GBRAIN_BIN}|g" \
-    -e "s|{{TSX_BIN}}|${TSX_BIN}|g" \
-    -e "s|{{TAILSCALE_IP}}|${TAILSCALE_IP}|g" \
-    "$tmpl" > "$out"
+  # Python substitution is safer than sed for paths that may contain |, &, /, etc.
+  HOME_V="$HOME" REPO_V="$REPO_ROOT" HERMES_V="$HERMES_BIN" \
+  GBRAIN_V="$GBRAIN_BIN" TSX_V="$TSX_BIN" TS_IP_V="$TAILSCALE_IP" \
+  python3 - "$tmpl" "$out" <<'PYEOF'
+import os, sys
+src, dst = sys.argv[1], sys.argv[2]
+mapping = {
+    "{{HOME}}": os.environ["HOME_V"],
+    "{{JOVIE_REPO}}": os.environ["REPO_V"],
+    "{{HERMES_BIN}}": os.environ["HERMES_V"],
+    "{{GBRAIN_BIN}}": os.environ["GBRAIN_V"],
+    "{{TSX_BIN}}": os.environ["TSX_V"],
+    "{{TAILSCALE_IP}}": os.environ["TS_IP_V"],
+}
+with open(src, "r") as f:
+    content = f.read()
+for k, v in mapping.items():
+    content = content.replace(k, v)
+with open(dst, "w") as f:
+    f.write(content)
+PYEOF
   ok "rendered $label"
 done
 

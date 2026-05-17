@@ -31,6 +31,7 @@ import {
   readdirSync,
   readFileSync,
   statSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { basename, join } from 'node:path';
@@ -129,55 +130,72 @@ async function whisperTranscribe(filePath: string): Promise<string> {
     const model =
       process.env.HERMES_WHISPER_MODEL ??
       join(process.env.HOME ?? '', 'share', 'whisper', 'ggml-small.en.bin');
-    const result = spawnSync(
-      whisperBin,
-      ['-m', model, '-f', filePath, '-otxt', '-of', '/tmp/hermes-whisper-out'],
-      { encoding: 'utf8', timeout: 10 * 60 * 1000 }
+    // Per-invocation output prefix so two whisper runs (lock-bypassed in
+    // pathological cases, or rerun after crash) never trample each other's
+    // output file.
+    const tmpdir = process.env.TMPDIR ?? '/tmp';
+    const outPrefix = join(
+      tmpdir,
+      `hermes-whisper-${process.pid}-${Date.now()}`
     );
-    if (result.status !== 0) {
-      throw new Error(
-        `whisper-cli failed (${result.status}): ${result.stderr ?? ''}`
+    try {
+      const result = spawnSync(
+        whisperBin,
+        ['-m', model, '-f', filePath, '-otxt', '-of', outPrefix],
+        { encoding: 'utf8', timeout: 10 * 60 * 1000 }
       );
+      if (result.status !== 0) {
+        throw new Error(
+          `whisper-cli failed (${result.status}): ${result.stderr ?? ''}`
+        );
+      }
+      const outFile = `${outPrefix}.txt`;
+      if (!existsSync(outFile)) {
+        throw new Error('whisper output file missing');
+      }
+      return readFileSync(outFile, 'utf8').trim();
+    } finally {
+      // best-effort cleanup
+      try {
+        const outFile = `${outPrefix}.txt`;
+        if (existsSync(outFile)) unlinkSync(outFile);
+      } catch {
+        // ignore
+      }
     }
-    if (!existsSync('/tmp/hermes-whisper-out.txt')) {
-      throw new Error('whisper output file missing');
-    }
-    return readFileSync('/tmp/hermes-whisper-out.txt', 'utf8').trim();
   });
 }
 
+/**
+ * Ingest into gbrain. Returns the gbrain entry id on success, or throws on
+ * failure so the caller can decide whether to mark the memo "seen" (we only
+ * mark seen after a successful gbrain write — otherwise a transient gbrain
+ * outage would silently lose a memo).
+ */
 async function gbrainIngest(args: {
   readonly text: string;
   readonly recordedAt: string;
   readonly filePath: string;
   readonly durationS: number;
-}): Promise<string | null> {
-  // gbrain CLI accepts stdin for content. We tag with source + metadata.
+}): Promise<string> {
   const tags = [
     `source:voice-memo`,
     `recorded:${args.recordedAt}`,
     `duration:${args.durationS}`,
     `file:${basename(args.filePath)}`,
   ].join(',');
-  try {
-    const out = execFileSync(
-      process.env.HERMES_GBRAIN_BIN ?? 'gbrain',
-      ['ingest', '--tags', tags, '--stdin-text', '--print-id'],
-      {
-        encoding: 'utf8',
-        input: args.text,
-        timeout: 30_000,
-      }
-    );
-    return out.trim() || null;
-  } catch (err) {
-    logJobEvent({
-      job: JOB,
-      event: 'gbrain_ingest_failed',
-      error: err instanceof Error ? err.message : String(err),
-    });
-    return null;
-  }
+  const out = execFileSync(
+    process.env.HERMES_GBRAIN_BIN ?? 'gbrain',
+    ['ingest', '--tags', tags, '--stdin-text', '--print-id'],
+    {
+      encoding: 'utf8',
+      input: args.text,
+      timeout: 30_000,
+    }
+  );
+  const id = out.trim();
+  if (!id) throw new Error('gbrain ingest returned empty id');
+  return id;
 }
 
 interface ClassifiedSpan {
@@ -211,12 +229,33 @@ async function classifyTranscript(
     if (jsonStart < 0 || jsonEnd < 0) {
       throw new Error('no JSON array found');
     }
-    const parsed = JSON.parse(
-      text.slice(jsonStart, jsonEnd + 1)
-    ) as ReadonlyArray<ClassifiedSpan>;
-    return parsed.filter(
-      s => s.kind === 'memory' || s.kind === 'issue' || s.kind === 'task'
-    );
+    const parsed = JSON.parse(text.slice(jsonStart, jsonEnd + 1)) as unknown;
+    if (!Array.isArray(parsed)) throw new Error('classification not array');
+    const validKinds = new Set(['memory', 'issue', 'task']);
+    const validTargets = new Set([
+      'chief',
+      'cfo',
+      'founder-os',
+      'code-orchestrator',
+    ]);
+    return parsed.filter((s): s is ClassifiedSpan => {
+      if (!s || typeof s !== 'object') return false;
+      const obj = s as Record<string, unknown>;
+      if (typeof obj.kind !== 'string' || !validKinds.has(obj.kind)) {
+        return false;
+      }
+      if (typeof obj.text !== 'string' || obj.text.length === 0) return false;
+      if (obj.title !== undefined && typeof obj.title !== 'string') {
+        return false;
+      }
+      if (obj.target !== undefined && typeof obj.target !== 'string') {
+        return false;
+      }
+      if (obj.target !== undefined && !validTargets.has(obj.target as string)) {
+        return false;
+      }
+      return true;
+    });
   } catch (err) {
     logJobEvent({
       job: JOB,
@@ -231,14 +270,14 @@ async function classifyTranscript(
 
 async function fileIssueFromSpan(args: {
   readonly span: ClassifiedSpan;
-  readonly gbrainId: string | null;
+  readonly gbrainId: string;
   readonly memoFile: string;
 }): Promise<{ readonly identifier: string; readonly url: string } | null> {
   if (args.span.kind !== 'issue') return null;
   const title = (args.span.title ?? args.span.text.slice(0, 70)).trim();
   const description = buildFollowUpBody({
     source: `voice-memo:${basename(args.memoFile)}`,
-    sourceUrl: args.gbrainId ? `gbrain://${args.gbrainId}` : undefined,
+    sourceUrl: `gbrain://${args.gbrainId}`,
     followUp: args.span.text.trim(),
     whyItMatters:
       'Captured from a voice memo by hermes-air. Pickup agent should evaluate whether it is in-scope before implementing.',
@@ -327,8 +366,8 @@ async function ingestFile(filePath: string): Promise<void> {
   saveSeen(ledger);
 
   const summaryParts = [
-    `🎙️ Memo ingested (${durationS}s).`,
-    gbrainId ? `gbrain: ${gbrainId.slice(0, 12)}…` : 'gbrain: unavailable',
+    `Memo ingested (${durationS}s).`,
+    `gbrain: ${gbrainId.slice(0, 12)}…`,
     filedIssues.length > 0
       ? `Linear: ${filedIssues.map(f => f.identifier).join(', ')}`
       : null,

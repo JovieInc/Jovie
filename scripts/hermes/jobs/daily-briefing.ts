@@ -23,13 +23,17 @@ import { sendTelegram } from '../lib/telegram-client';
 const JOB = 'daily-briefing';
 
 function yesterdayRange(): { since: string; until: string } {
+  // Yesterday in UTC, matching the JSONL timestamps we read (all written
+  // via new Date().toISOString()). Local-time math here would slide the
+  // window by the operator's tz offset and miss late-evening events.
   const now = new Date();
-  const yesterday = new Date(now.getTime() - 24 * 3_600 * 1000);
-  yesterday.setHours(0, 0, 0, 0);
-  const endOfYesterday = new Date(yesterday.getTime() + 24 * 3_600 * 1000);
+  const todayUtc = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+  );
+  const yesterdayUtc = new Date(todayUtc.getTime() - 24 * 3_600 * 1000);
   return {
-    since: yesterday.toISOString(),
-    until: endOfYesterday.toISOString(),
+    since: yesterdayUtc.toISOString(),
+    until: todayUtc.toISOString(),
   };
 }
 
@@ -66,14 +70,19 @@ function mergedPrsYesterday(): ReadonlyArray<{
   }
 }
 
-function countLinesSince(path: string, sinceIso: string): number {
+function countLinesBetween(
+  path: string,
+  sinceIso: string,
+  untilIso: string
+): number {
   if (!existsSync(path)) return 0;
   try {
     const lines = readFileSync(path, 'utf8').split('\n').filter(Boolean);
     return lines.filter(line => {
       try {
         const parsed = JSON.parse(line) as { ts?: string };
-        return parsed.ts ? parsed.ts >= sinceIso : false;
+        if (!parsed.ts) return false;
+        return parsed.ts >= sinceIso && parsed.ts < untilIso;
       } catch {
         return false;
       }
@@ -113,10 +122,18 @@ function totalPaidSpendYesterday(): number {
 
 async function main(): Promise<void> {
   await withJobLogging(JOB, async () => {
-    const { since } = yesterdayRange();
+    const { since, until } = yesterdayRange();
     const merged = mergedPrsYesterday();
-    const voiceMemos = countLinesSince(HERMES_PATHS.voiceMemoLog, since);
-    const dispatches = countLinesSince(HERMES_PATHS.dispatchLog, since);
+    const voiceMemos = countLinesBetween(
+      HERMES_PATHS.voiceMemoLog,
+      since,
+      until
+    );
+    const dispatches = countLinesBetween(
+      HERMES_PATHS.dispatchLog,
+      since,
+      until
+    );
     const paidSpend = totalPaidSpendYesterday();
 
     const context = JSON.stringify(
@@ -145,7 +162,7 @@ async function main(): Promise<void> {
       { caller: JOB, need: 'reasoning', maxTokens: 600, temperature: 0.4 }
     );
 
-    await sendTelegram(`*Morning brief*\n\n${result.text.trim()}`);
+    await sendTelegram(`Morning brief\n\n${result.text.trim()}`);
     logJobEvent({
       job: JOB,
       event: 'sent',

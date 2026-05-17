@@ -11,15 +11,13 @@
  * Lives on the Air; not bundled with the web app.
  */
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 
-const HERMES_HOME = process.env.HERMES_HOME ?? join(homedir(), '.hermes');
-const STATE_DIR = join(HERMES_HOME, 'state');
-const RANKINGS_PATH = join(STATE_DIR, 'model-router-rankings.json');
-const LOGS_DIR = join(HERMES_HOME, 'logs');
-const COST_LOG = join(LOGS_DIR, 'cost.jsonl');
+import { HERMES_PATHS } from './hermes-paths';
+
+const RANKINGS_PATH = HERMES_PATHS.modelRankings;
+const COST_LOG = HERMES_PATHS.costLog;
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY ?? '';
 const OPENROUTER_BASE = 'https://openrouter.ai/api/v1';
@@ -119,11 +117,13 @@ function loadRankings(): Rankings {
 }
 
 function saveRankings(rankings: Rankings): void {
+  mkdirSync(dirname(RANKINGS_PATH), { recursive: true });
   writeFileSync(RANKINGS_PATH, JSON.stringify(rankings, null, 2));
 }
 
 function logCost(entry: Record<string, unknown>): void {
   try {
+    mkdirSync(dirname(COST_LOG), { recursive: true });
     const line = `${JSON.stringify({ ...entry, ts: new Date().toISOString() })}\n`;
     writeFileSync(COST_LOG, line, { flag: 'a' });
   } catch {

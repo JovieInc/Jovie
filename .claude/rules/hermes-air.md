@@ -81,7 +81,7 @@ Per `CLAUDE.md` → Workspace Topology: this Air is the **third workspace** alon
 
 - `scripts/hermes/bootstrap-air.sh` — installer
 - `scripts/hermes/config.air.template.yaml` — Hermes config template
-- `scripts/hermes/launchd/*.plist` — launchd unit files
+- `scripts/hermes/launchd/*.plist.template` — launchd unit templates (bootstrap renders to `~/Library/LaunchAgents/`)
 - `scripts/hermes/jobs/*.ts` — cron handlers
 - `scripts/hermes/lib/free-model-router.ts` — cost-safe model selection
 - `docs/HERMES_AIR.md` — operator runbook

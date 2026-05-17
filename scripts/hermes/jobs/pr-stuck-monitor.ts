@@ -82,7 +82,11 @@ function verdictFor(pr: Pr): Verdict {
     );
   }
 
-  if (hoursSinceUpdate > 6 && pr.statusCheckRollup.length > 0) {
+  // "No activity" is only stuck if the PR is in a non-clean state. A green
+  // PR sitting idle for 6h is usually just waiting on a reviewer, not stuck.
+  const hasFailedChecks = failed.length > 0;
+  const hasNoChecks = pr.statusCheckRollup.length === 0;
+  if (hoursSinceUpdate > 6 && (hasFailedChecks || hasNoChecks)) {
     reasons.push(`no activity for ${hoursSinceUpdate.toFixed(1)}h`);
   }
 

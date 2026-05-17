@@ -85,9 +85,15 @@ function logsForRun(runId: number): string {
 
 function classifyAgainstKnown(
   log: string,
+  workflowName: string,
   flakes: ReadonlyArray<KnownFlake>
 ): KnownFlake | null {
   for (const flake of flakes) {
+    // A flake with workflow=='*' matches any workflow; otherwise the
+    // workflow name must match exactly. This prevents an Audio test flake
+    // signature from silencing an unrelated Build failure that happens to
+    // contain similar text.
+    if (flake.workflow !== '*' && flake.workflow !== workflowName) continue;
     try {
       if (new RegExp(flake.pattern, 'i').test(log)) return flake;
     } catch {
@@ -102,7 +108,7 @@ async function processFailure(
   flakes: ReadonlyArray<KnownFlake>
 ): Promise<void> {
   const log = logsForRun(run.databaseId);
-  const known = classifyAgainstKnown(log, flakes);
+  const known = classifyAgainstKnown(log, run.workflowName, flakes);
 
   if (known) {
     logJobEvent({

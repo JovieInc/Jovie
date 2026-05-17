@@ -55,7 +55,9 @@ In Telegram, chat with `@BotFather`:
 Save the token to Doppler:
 
 ```bash
-doppler secrets set --project jovie-web --config dev HERMES_TELEGRAM_BOT_TOKEN <token>
+TELEGRAM_TOKEN='paste-token-from-BotFather'
+doppler secrets set HERMES_TELEGRAM_BOT_TOKEN="$TELEGRAM_TOKEN" \
+  --project jovie-web --config dev
 ```
 
 Then send the bot any message from your iPhone so it can capture your chat ID. The bootstrap script will surface the chat ID and write it to `~/.hermes/state/telegram-chat-id`.

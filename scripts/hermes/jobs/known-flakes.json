@@ -1,4 +1,4 @@
 {
-  "_doc": "Known flaky CI signatures. Each entry: id (kebab-case), workflow (GH workflow name), pattern (JS regex, case-insensitive), note (why we tolerate it). Adding a signature here causes ci-failure-monitor.ts to skip filing a Linear issue for matching failures. Seeded empty; populated as failures recur.",
+  "_doc": "Known flaky CI signatures. Each entry: id (kebab-case), workflow (exact GH workflow name OR '*' to match any workflow), pattern (JS regex, case-insensitive), note (why we tolerate it). Adding a signature here causes ci-failure-monitor.ts to skip filing a Linear issue for matching failures, but only when the workflow matches. Seeded empty; populated as failures recur.",
   "flakes": []
 }

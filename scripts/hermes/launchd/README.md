@@ -2,7 +2,7 @@
 
 Templates for the launchd unit files installed by `scripts/hermes/bootstrap-air.sh`.
 
-Each `.plist.template` uses `{{HOME}}`, `{{JOVIE_REPO}}`, and `{{HERMES_BIN}}` placeholders. The bootstrap script substitutes these at install time before copying to `~/Library/LaunchAgents/`.
+Each `.plist.template` uses `{{HOME}}`, `{{JOVIE_REPO}}`, `{{HERMES_BIN}}`, `{{GBRAIN_BIN}}`, `{{TSX_BIN}}`, and `{{TAILSCALE_IP}}` placeholders. The bootstrap script substitutes these at install time (via Python so values containing shell-special characters render safely) before copying to `~/Library/LaunchAgents/`.
 
 ## Units
 
@@ -27,21 +27,25 @@ Every unit writes stdout/stderr to `~/.hermes/logs/launchd/<label>.log` so failu
 ## Operating
 
 Boot a unit:
+
 ```bash
 launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/<label>.plist
 ```
 
 Stop a unit:
+
 ```bash
 launchctl bootout gui/$(id -u)/<label>
 ```
 
 Force re-run:
+
 ```bash
 launchctl kickstart -k gui/$(id -u)/<label>
 ```
 
 Check status:
+
 ```bash
 launchctl print gui/$(id -u)/<label>
 ```

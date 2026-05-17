@@ -15,6 +15,7 @@ import { join } from 'node:path';
 
 import { HERMES_PATHS } from '../lib/hermes-paths';
 import { logJobEvent, withJobLogging } from '../lib/jobs-log';
+import { withRetry } from '../lib/retry';
 import { sendTelegram } from '../lib/telegram-client';
 
 const JOB = 'cost-monitor';
@@ -61,14 +62,24 @@ async function fetchOpenRouterUsage24h(): Promise<number> {
   const key = process.env.OPENROUTER_API_KEY;
   if (!key) return 0;
   try {
-    const response = await fetch('https://openrouter.ai/api/v1/credits', {
-      headers: { Authorization: `Bearer ${key}` },
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (!response.ok) return 0;
-    const data = (await response.json()) as {
-      data?: { usage?: number; limit?: number | null };
-    };
+    const data = await withRetry(
+      async () => {
+        const response = await fetch('https://openrouter.ai/api/v1/credits', {
+          headers: { Authorization: `Bearer ${key}` },
+          signal: AbortSignal.timeout(10_000),
+        });
+        if (response.status === 429 || response.status >= 500) {
+          throw new Error(`OpenRouter ${response.status}`);
+        }
+        if (!response.ok) {
+          return { data: { usage: 0 } };
+        }
+        return (await response.json()) as {
+          data?: { usage?: number; limit?: number | null };
+        };
+      },
+      { caller: 'cost-monitor.openrouter', attempts: 3 }
+    );
     // OpenRouter returns lifetime usage; we treat any increase since the
     // last snapshot as the 24h delta. Snapshot file at state/openrouter-usage.json.
     const snapshotPath = join(HERMES_PATHS.stateDir, 'openrouter-usage.json');
@@ -137,7 +148,7 @@ async function main(): Promise<void> {
     if (totalSpend > 0) {
       tripKillSwitch(totalSpend);
       await sendTelegram(
-        `⚠️ *Hermes-Air cost kill switch tripped*\nDetected $${totalSpend.toFixed(4)} in paid model spend in 24h. All non-watchdog services stopped.\n\nInvestigate \`~/.hermes/logs/cost.jsonl\`, then run \`./scripts/hermes/bootstrap-air.sh --resume-after-cost-kill\`.`
+        `Hermes-Air cost kill switch tripped.\nDetected $${totalSpend.toFixed(4)} in paid model spend in 24h. All non-watchdog services stopped.\nInvestigate ~/.hermes/logs/cost.jsonl then run ./scripts/hermes/bootstrap-air.sh --resume-after-cost-kill`
       );
     }
   });
