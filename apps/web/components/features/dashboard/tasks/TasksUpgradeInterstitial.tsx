@@ -33,11 +33,11 @@ function TasksUpgradeContent({
         'mx-auto flex w-full flex-col items-center justify-center text-center',
         compact
           ? 'rounded-[18px] border border-(--linear-app-frame-seam) bg-surface-1 px-5 py-8'
-          : 'max-w-xl rounded-[24px] border border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,transparent)] px-8 py-14'
+          : 'max-w-xl rounded-[24px] border border-subtle bg-surface-1 px-8 py-14'
       )}
       data-testid={testId}
     >
-      <div className='mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-[color-mix(in_oklab,var(--linear-app-content-surface)_84%,transparent)] text-amber-700'>
+      <div className='mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-surface-0 text-amber-700'>
         {compact ? (
           <Lock className='h-5 w-5' aria-hidden='true' />
         ) : (
