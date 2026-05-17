@@ -28,6 +28,7 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
     'Internal release workflow (manual entry)',
   '/app/dashboard/releases':
     'Legacy releases workspace retained for old bookmarks',
+  '/app/dashboard/tasks': 'Legacy tasks workspace retained for old bookmarks',
   '/app/settings/retargeting-ads':
     'Legacy settings route redirected to Audience',
   '/app/dashboard/release-plan':
