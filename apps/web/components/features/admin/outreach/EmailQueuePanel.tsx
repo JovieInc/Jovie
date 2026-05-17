@@ -1,18 +1,12 @@
 'use client';
 
 import { Button, Input, Switch } from '@jovie/ui';
+import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { useCallback, useEffect, useState } from 'react';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import {
-  CONTENT_TABLE_CELL_CLASS,
-  CONTENT_TABLE_FOOTER_CLASS,
-  CONTENT_TABLE_HEAD_CELL_CLASS,
-  CONTENT_TABLE_HEAD_ROW_CLASS,
-  CONTENT_TABLE_ROW_CLASS,
-  ContentTable,
-  ContentTableStateRow,
-} from '@/components/molecules/ContentTable';
+import { TableEmptyState } from '@/components/organisms/table';
+import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { AdminTablePagination } from '@/features/admin/table/AdminTablePagination';
 import { cn } from '@/lib/utils';
 import { OutreachStatusBadge } from './OutreachStatusBadge';
@@ -46,6 +40,57 @@ interface QueueOutreachResponse {
 interface QueueOutreachErrorResponse {
   error?: string;
 }
+
+const emailQueueColumnHelper = createColumnHelper<EmailQueueLead>();
+
+function formatQueuedAt(value: string | null): string {
+  return value ? new Date(value).toLocaleString() : 'Not queued';
+}
+
+const EMAIL_QUEUE_COLUMNS: ColumnDef<EmailQueueLead, unknown>[] = [
+  emailQueueColumnHelper.accessor('displayName', {
+    header: 'Name',
+    cell: ({ getValue }) => (
+      <span className='font-semibold text-primary-token'>
+        {getValue() || 'Unknown creator'}
+      </span>
+    ),
+    size: 180,
+  }) as ColumnDef<EmailQueueLead, unknown>,
+  emailQueueColumnHelper.accessor('priorityScore', {
+    header: 'Priority',
+    cell: ({ getValue }) => (
+      <span className='tabular-nums'>{getValue() ?? '-'}</span>
+    ),
+    size: 92,
+  }) as ColumnDef<EmailQueueLead, unknown>,
+  emailQueueColumnHelper.accessor('fitScore', {
+    header: 'Fit',
+    cell: ({ getValue }) => (
+      <span className='tabular-nums'>{getValue() ?? '-'}</span>
+    ),
+    size: 72,
+  }) as ColumnDef<EmailQueueLead, unknown>,
+  emailQueueColumnHelper.accessor('contactEmail', {
+    header: 'Email',
+    cell: ({ getValue }) => (
+      <span className='text-secondary-token'>{getValue() || '-'}</span>
+    ),
+    size: 220,
+  }) as ColumnDef<EmailQueueLead, unknown>,
+  emailQueueColumnHelper.accessor('outreachQueuedAt', {
+    header: 'Queued',
+    cell: ({ getValue }) => (
+      <span className='text-secondary-token'>{formatQueuedAt(getValue())}</span>
+    ),
+    size: 190,
+  }) as ColumnDef<EmailQueueLead, unknown>,
+  emailQueueColumnHelper.accessor('outreachStatus', {
+    header: 'Status',
+    cell: ({ getValue }) => <OutreachStatusBadge status={getValue()} />,
+    size: 120,
+  }) as ColumnDef<EmailQueueLead, unknown>,
+];
 
 export function EmailQueuePanel() {
   const [leads, setLeads] = useState<EmailQueueLead[]>([]);
@@ -248,64 +293,27 @@ export function EmailQueuePanel() {
           </div>
         )}
 
-        <ContentTable>
-          <thead>
-            <tr className={CONTENT_TABLE_HEAD_ROW_CLASS}>
-              <th className={CONTENT_TABLE_HEAD_CELL_CLASS}>Name</th>
-              <th className={CONTENT_TABLE_HEAD_CELL_CLASS}>Priority</th>
-              <th className={CONTENT_TABLE_HEAD_CELL_CLASS}>Fit</th>
-              <th className={CONTENT_TABLE_HEAD_CELL_CLASS}>Email</th>
-              <th className={CONTENT_TABLE_HEAD_CELL_CLASS}>Queued</th>
-              <th className={CONTENT_TABLE_HEAD_CELL_CLASS}>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading || leads.length === 0 ? (
-              <ContentTableStateRow
-                colSpan={6}
-                isLoading={loading}
-                emptyMessage={
-                  loadError ?? 'No leads are queued for email right now.'
-                }
-                loadingLabel='Loading email queue'
-              />
-            ) : (
-              leads.map(lead => (
-                <tr key={lead.id} className={CONTENT_TABLE_ROW_CLASS}>
-                  <td className={CONTENT_TABLE_CELL_CLASS}>
-                    <span className='font-semibold text-primary-token'>
-                      {lead.displayName || 'Unknown creator'}
-                    </span>
-                  </td>
-                  <td className={cn(CONTENT_TABLE_CELL_CLASS, 'tabular-nums')}>
-                    {lead.priorityScore ?? '-'}
-                  </td>
-                  <td className={cn(CONTENT_TABLE_CELL_CLASS, 'tabular-nums')}>
-                    {lead.fitScore ?? '-'}
-                  </td>
-                  <td className={CONTENT_TABLE_CELL_CLASS}>
-                    <span className='text-secondary-token'>
-                      {lead.contactEmail || '-'}
-                    </span>
-                  </td>
-                  <td className={CONTENT_TABLE_CELL_CLASS}>
-                    <span className='text-secondary-token'>
-                      {lead.outreachQueuedAt
-                        ? new Date(lead.outreachQueuedAt).toLocaleString()
-                        : 'Not queued'}
-                    </span>
-                  </td>
-                  <td className={CONTENT_TABLE_CELL_CLASS}>
-                    <OutreachStatusBadge status={lead.outreachStatus} />
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </ContentTable>
+        <AdminDataTable
+          data={leads}
+          columns={EMAIL_QUEUE_COLUMNS}
+          isLoading={loading}
+          getRowId={lead => lead.id}
+          enableVirtualization={false}
+          minWidth='720px'
+          emptyState={
+            <TableEmptyState
+              title={
+                loadError ? 'Unable to load email queue' : 'No email leads'
+              }
+              description={
+                loadError ?? 'No leads are queued for email right now.'
+              }
+            />
+          }
+        />
 
         {totalPages > 1 && (
-          <div className={CONTENT_TABLE_FOOTER_CLASS}>
+          <div className='border-t border-subtle px-(--linear-app-content-padding-x) py-2'>
             <AdminTablePagination
               page={page}
               totalPages={totalPages}
