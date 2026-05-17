@@ -16896,7 +16896,16 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "retouch_jobs_identity_score_range_check": {
+          "name": "retouch_jobs_identity_score_range_check",
+          "value": "\"retouch_jobs\".\"identity_score\" IS NULL OR (\"retouch_jobs\".\"identity_score\" >= -1 AND \"retouch_jobs\".\"identity_score\" <= 1)"
+        },
+        "retouch_jobs_cost_non_negative_check": {
+          "name": "retouch_jobs_cost_non_negative_check",
+          "value": "\"retouch_jobs\".\"cost\" >= 0"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.scraper_configs": {

@@ -6,12 +6,10 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import type { SkillId } from './registry';
 import { SKILL_REGISTRY } from './registry';
-import type { SkillDefinition } from './types';
 
 describe('SKILL_REGISTRY', () => {
-  const skills = Object.entries(SKILL_REGISTRY) as [SkillId, SkillDefinition][];
+  const skills = Object.entries(SKILL_REGISTRY);
 
   it('has at least one skill entry', () => {
     expect(skills.length).toBeGreaterThanOrEqual(1);

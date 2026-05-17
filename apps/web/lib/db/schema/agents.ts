@@ -149,7 +149,7 @@ export const retouchJobs = pgTable(
     status: retouchJobStatusEnum('status').notNull().default('queued'),
 
     // ArcFace cosine similarity vs. original (null until identity check runs).
-    // Inserting services must clamp scores to [-1, 1] before persistence.
+    // The database check constraint enforces the valid cosine range.
     identityScore: numeric('identity_score', { precision: 4, scale: 3 }),
 
     // Raw token counts from the model response
@@ -175,6 +175,11 @@ export const retouchJobs = pgTable(
       .notNull(),
   },
   t => [
+    check(
+      'retouch_jobs_identity_score_range_check',
+      drizzleSql`${t.identityScore} IS NULL OR (${t.identityScore} >= -1 AND ${t.identityScore} <= 1)`
+    ),
+    check('retouch_jobs_cost_non_negative_check', drizzleSql`${t.cost} >= 0`),
     // Per-user status feed — used by dashboard and entitlement daily-budget check
     index('retouch_jobs_user_status_idx').on(t.userId, t.status, t.startedAt),
     // Cron sweeper index — GC rejected results, sweep stale running jobs

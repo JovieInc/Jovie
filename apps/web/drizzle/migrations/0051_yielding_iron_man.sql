@@ -89,6 +89,28 @@ DO $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint
+    WHERE conname = 'retouch_jobs_identity_score_range_check'
+      AND conrelid = 'public.retouch_jobs'::regclass
+  ) THEN
+    ALTER TABLE "retouch_jobs" ADD CONSTRAINT "retouch_jobs_identity_score_range_check" CHECK ("identity_score" IS NULL OR ("identity_score" >= -1 AND "identity_score" <= 1));
+  END IF;
+END $$;
+--> statement-breakpoint
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'retouch_jobs_cost_non_negative_check'
+      AND conrelid = 'public.retouch_jobs'::regclass
+  ) THEN
+    ALTER TABLE "retouch_jobs" ADD CONSTRAINT "retouch_jobs_cost_non_negative_check" CHECK ("cost" >= 0);
+  END IF;
+END $$;
+--> statement-breakpoint
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
     WHERE conname = 'retouch_jobs_user_id_users_id_fk'
       AND conrelid = 'public.retouch_jobs'::regclass
   ) THEN
