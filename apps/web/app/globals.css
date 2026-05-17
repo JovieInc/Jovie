@@ -23,6 +23,19 @@
 
 @source "../../../packages/ui";
 @source "../../../node_modules/streamdown/dist/*.js";
+
+/* JOV-2269: Exclude app-shell and dashboard-only source paths from the
+   global Tailwind scan. These directories contain components that are never
+   rendered on public routes (homepage, /[username] profile, marketing pages).
+   Excluding them prevents shell-specific Tailwind utilities (sidebar tokens,
+   dashboard colour-mix variants, shell chrome classes) from being compiled
+   into the shared CSS chunk that is served on every public page.
+   Note: components/shell is intentionally NOT excluded — it is imported by
+   shared organisms (PersistentAudioBar, release-sidebar, etc.) that may
+   render on any route. */
+@source not "../app/app";
+@source not "../components/features/dashboard";
+@source not "../components/features/admin";
 @custom-variant dark (&:is(.dark *));
 
 /* Base document sizing and immediate dark-aware fallback colors */
