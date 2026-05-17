@@ -229,10 +229,10 @@ describe('shouldUseEssentialShellData', () => {
     expect(shouldUseEssentialShellData(APP_ROUTES.SETTINGS_TOURING)).toBe(true);
   });
 
-  it('keeps artist profile settings on the full dashboard data path', () => {
+  it('returns true for artist profile settings after its page owns supplementary data', () => {
     expect(
       shouldUseEssentialShellData(APP_ROUTES.SETTINGS_ARTIST_PROFILE)
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('returns false for null', () => {
