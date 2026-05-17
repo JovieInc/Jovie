@@ -48,6 +48,15 @@ describe('DashboardNav', () => {
     expect(activeLink.getAttribute('aria-current')).toBe('page');
   });
 
+  it('keeps the legacy releases dashboard alias active', () => {
+    mockUsePathname.mockReturnValueOnce(APP_ROUTES.DASHBOARD_RELEASES);
+    const { getByRole } = renderDashboardNav({ renderFn: fastRender });
+
+    const releasesLink = getByRole('link', { name: 'Releases' });
+    expect(releasesLink.getAttribute('href')).toBe(APP_ROUTES.RELEASES);
+    expect(releasesLink.getAttribute('aria-current')).toBe('page');
+  });
+
   it('only marks New thread active on the chat root', () => {
     mockUsePathname.mockReturnValueOnce(`${APP_ROUTES.CHAT}/thread-123`);
 

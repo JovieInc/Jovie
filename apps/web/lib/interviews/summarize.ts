@@ -1,6 +1,6 @@
 import 'server-only';
-import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
+import { getAnthropicClient } from '@/lib/ai/anthropic';
 import type {
   InterviewSummaryStructured,
   InterviewTranscriptEntry,
@@ -77,7 +77,7 @@ export interface SummarizeResult {
 export async function summarizeInterview(
   transcript: InterviewTranscriptEntry[]
 ): Promise<SummarizeResult> {
-  const anthropic = new Anthropic();
+  const anthropic = getAnthropicClient();
   const prompt = buildPrompt(transcript);
 
   const message = await withTimeout(

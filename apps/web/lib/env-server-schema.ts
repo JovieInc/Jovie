@@ -193,6 +193,9 @@ export const ServerEnvSchema = z.object({
   // AI Gateway auth (required for chat completions)
   AI_GATEWAY_API_KEY: z.string().optional(),
 
+  // Braintrust observability (LLM tracing + evals)
+  BRAINTRUST_API_KEY: z.string().optional(),
+
   // AgentOS workflows are compile-ready but runtime-disabled by default.
   AGENT_OS_WORKFLOWS_ENABLED: z.enum(['true', 'false']).optional(),
 
@@ -238,6 +241,13 @@ export const ServerEnvSchema = z.object({
   E2E_USE_TEST_AUTH_BYPASS: z.string().optional(),
   E2E_CLERK_USER_ID: z.string().optional(),
   E2E_CLERK_USER_USERNAME: z.string().optional(),
+  E2E_PROD_SIGNUP_EMAIL_BASE: z.string().email().optional(),
+  E2E_PROD_SIGNUP_PASSWORD: z.string().optional(),
+  E2E_PROD_MAILBOX_PROVIDER: z.enum(['gmail']).optional(),
+  E2E_PROD_MAILBOX_CLIENT_ID: z.string().optional(),
+  E2E_PROD_MAILBOX_CLIENT_SECRET: z.string().optional(),
+  E2E_PROD_MAILBOX_REFRESH_TOKEN: z.string().optional(),
+  E2E_PROD_MAILBOX_QUERY_FROM: z.string().optional(),
   DEMO_RECORDING: z.string().optional(),
   DEMO_CLERK_USER_ID: z.string().optional(),
 
@@ -348,6 +358,7 @@ export const ENV_KEYS = [
   'VERCEL_GIT_REPO_SLUG',
   'STATSIG_SERVER_SECRET',
   'AI_GATEWAY_API_KEY',
+  'BRAINTRUST_API_KEY',
   'AGENT_OS_WORKFLOWS_ENABLED',
   'XAI_API_KEY',
   'ALBUM_ART_IMAGE_MODEL',

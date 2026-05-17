@@ -1,4 +1,12 @@
-import { expect, type Locator, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
+import {
+  buildProductionSignupEmail,
+  cleanupProductionSyntheticSignup,
+  fillOtpCode,
+  tagProductionSyntheticSignup,
+  validateProductionSignupCanaryConfig,
+  waitForProductionSignupOtp,
+} from './utils/production-signup-canary';
 import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
 // Override global storageState to run these tests as unauthenticated
@@ -6,23 +14,137 @@ test.use({ storageState: { cookies: [], origins: [] } });
 
 const HOMEPAGE_PRIMARY_CTA_TEST_ID = 'homepage-primary-cta';
 const SIGNUP_PATH = '/signup';
-const SIGNUP_COVERAGE_WARNING =
-  'Onboarding/profile creation not exercised while production email signup is unavailable. See JOV-1919.';
+const START_PATH = '/start';
+const TURNSTILE_CONFIG_ERROR = 'turnstile is not configured';
 
-async function isVisibleWithin(
-  locator: Locator,
-  timeout: number
-): Promise<boolean> {
-  try {
-    await locator.waitFor({ state: 'visible', timeout });
-    return true;
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('Timeout')) {
-      return false;
-    }
+async function installSyntheticRouteStubs(page: Page) {
+  await page.route('**/api/profile/view', route =>
+    route.fulfill({ status: 200, body: '{}' })
+  );
+  await page.route('**/api/audience/visit', route =>
+    route.fulfill({ status: 200, body: '{}' })
+  );
+  await page.route('**/api/track', route =>
+    route.fulfill({ status: 200, body: '{}' })
+  );
+}
 
-    throw error;
+async function assertNoFrontDoorConfigErrors(page: Page) {
+  const bodyText = await page
+    .locator('body')
+    .innerText({ timeout: 10_000 })
+    .catch(() => '');
+
+  expect(bodyText.toLowerCase()).not.toContain(TURNSTILE_CONFIG_ERROR);
+  expect(bodyText.toLowerCase()).not.toContain('auth unavailable');
+  expect(bodyText.toLowerCase()).not.toContain('clerk is not configured');
+}
+
+async function verifyStartChatCanSendFirstTurn(page: Page) {
+  await page.goto(START_PATH, {
+    waitUntil: 'commit',
+    timeout: SMOKE_TIMEOUTS.NAVIGATION,
+  });
+  await waitForHydration(page);
+  await assertNoFrontDoorConfigErrors(page);
+
+  const textarea = page.locator('[aria-label="Chat message input"]');
+  await expect(textarea).toBeVisible({ timeout: 20_000 });
+  await textarea.fill('I manage a production canary artist.');
+
+  const chatResponse = page.waitForResponse(
+    response =>
+      response.url().includes('/api/chat') &&
+      response.request().method() === 'POST',
+    { timeout: 45_000 }
+  );
+  await page.getByRole('button', { name: 'Send message' }).click();
+  const response = await chatResponse;
+
+  expect(
+    response.status(),
+    `First onboarding chat turn returned HTTP ${response.status()}`
+  ).toBeLessThan(500);
+  expect(response.status()).not.toBe(401);
+  expect(response.status()).not.toBe(403);
+}
+
+async function completeProductionMailboxSignup({
+  page,
+  email,
+  password,
+  startedAtMs,
+}: {
+  readonly page: Page;
+  readonly email: string;
+  readonly password: string;
+  readonly startedAtMs: number;
+}) {
+  const emailInput = page
+    .locator('input[name="emailAddress"], input[type="email"]')
+    .first();
+  await expect(emailInput).toBeVisible({ timeout: 20_000 });
+  await emailInput.fill(email);
+
+  const firstPasswordInput = page
+    .locator('input[name="password"], input[type="password"]')
+    .first();
+  if (
+    await firstPasswordInput.isVisible({ timeout: 2_000 }).catch(() => false)
+  ) {
+    await firstPasswordInput.fill(password);
   }
+
+  await page
+    .getByRole('button', { name: /continue|sign up|create/i })
+    .first()
+    .click();
+
+  const secondPasswordInput = page
+    .locator('input[name="password"], input[type="password"]')
+    .first();
+  if (
+    await secondPasswordInput.isVisible({ timeout: 5_000 }).catch(() => false)
+  ) {
+    await secondPasswordInput.fill(password);
+    await page
+      .getByRole('button', { name: /continue|sign up|create/i })
+      .first()
+      .click();
+  }
+
+  const otp = await waitForProductionSignupOtp({
+    email,
+    env: process.env,
+    startedAtMs,
+  });
+  await fillOtpCode(page, otp);
+
+  const verifyButton = page
+    .getByRole('button', { name: /verify|continue|complete|submit/i })
+    .first();
+  if (await verifyButton.isVisible({ timeout: 5_000 }).catch(() => false)) {
+    await verifyButton.click();
+  }
+
+  await page.waitForLoadState('domcontentloaded').catch(() => {});
+  await expect(page).not.toHaveURL(/\/signup(?:\?|$)/, { timeout: 45_000 });
+}
+
+async function verifyPostSignupUsableState(page: Page) {
+  await page.goto('/app', {
+    waitUntil: 'commit',
+    timeout: SMOKE_TIMEOUTS.NAVIGATION,
+  });
+  await waitForHydration(page);
+
+  const url = new URL(page.url());
+  expect(url.pathname).not.toBe('/signin');
+  expect(url.pathname).not.toBe('/signup');
+  await assertNoFrontDoorConfigErrors(page);
+
+  const bodyText = await page.locator('body').innerText({ timeout: 15_000 });
+  expect(bodyText.length).toBeGreaterThan(50);
 }
 
 /**
@@ -30,7 +152,7 @@ async function isVisibleWithin(
  *
  * This test is specifically designed for production synthetic monitoring:
  * - Uses throwaway accounts with auto-cleanup
- * - Runs every 5-10 minutes in production
+ * - Runs on the production synthetic schedule
  * - Alerts on failure via Slack
  * - Minimal assertions focused on critical functionality
  * - Handles production-specific edge cases
@@ -44,157 +166,74 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
     }
   });
 
-  test('Production golden path monitoring', async ({ page }) => {
-    test.setTimeout(120_000); // 2 minutes for production environment
+  test('Production signup, onboarding, and app-shell canary', async ({
+    page,
+  }) => {
+    test.setTimeout(240_000);
 
-    // Generate unique throwaway account
-    const timestamp = Date.now();
-    const testEmail = `synthetic-${timestamp}@jovie-monitoring.test`;
-    const testHandle = `synth${timestamp}`;
+    const config = validateProductionSignupCanaryConfig(process.env);
+    if (!config.ok) {
+      throw new Error(
+        `Production signup canary is not configured:\n${config.summary}`
+      );
+    }
 
-    console.log(
-      `[Synthetic] Testing with: ${testEmail}, handle: ${testHandle}`
+    const runId = process.env.SYNTHETIC_RUN_ID ?? `synthetic-${Date.now()}`;
+    const testEmail = buildProductionSignupEmail(
+      process.env.E2E_PROD_SIGNUP_EMAIL_BASE!,
+      runId
     );
+    const startedAtMs = Date.now();
+
+    console.log(`[Synthetic] Testing signup canary with: ${testEmail}`);
 
     try {
-      // Intercept analytics to prevent test interference
-      await page.route('**/api/profile/view', route =>
-        route.fulfill({ status: 200, body: '{}' })
-      );
-      await page.route('**/api/audience/visit', route =>
-        route.fulfill({ status: 200, body: '{}' })
-      );
-      await page.route('**/api/track', route =>
-        route.fulfill({ status: 200, body: '{}' })
-      );
+      await installSyntheticRouteStubs(page);
+      await cleanupProductionSyntheticSignup({
+        email: testEmail,
+        env: process.env,
+      });
 
-      // CRITICAL PATH 1: Homepage loads
-      console.log('[Synthetic] Step 1: Homepage load test');
+      console.log('[Synthetic] Step 1: /start first-turn chat readiness');
+      await verifyStartChatCanSendFirstTurn(page);
+
+      console.log('[Synthetic] Step 2: Homepage load test');
       await page.goto('/', {
         waitUntil: 'commit',
         timeout: SMOKE_TIMEOUTS.NAVIGATION,
       });
       await waitForHydration(page);
+      await assertNoFrontDoorConfigErrors(page);
 
-      // Essential homepage entry point
       const primaryCta = page.getByTestId(HOMEPAGE_PRIMARY_CTA_TEST_ID);
       await expect(primaryCta).toBeVisible({
         timeout: 15000,
       });
 
-      // CRITICAL PATH 2: Sign up flow initiation
-      console.log('[Synthetic] Step 2: Sign up flow test');
+      console.log('[Synthetic] Step 3: Sign up flow test');
       await primaryCta.click();
       await expect(page).toHaveURL(new RegExp(SIGNUP_PATH), {
         timeout: 20000,
       });
+      await assertNoFrontDoorConfigErrors(page);
 
-      // CRITICAL PATH 3: Clerk sign-up entry
-      console.log('[Synthetic] Step 3: Clerk sign-up entry test');
-      const emailInput = page
-        .locator('input[name="emailAddress"], input[type="email"]')
-        .first();
-      const hasEmailSignup = await isVisibleWithin(emailInput, 15000);
+      console.log('[Synthetic] Step 4: Clerk email OTP signup');
+      await completeProductionMailboxSignup({
+        page,
+        email: testEmail,
+        password: process.env.E2E_PROD_SIGNUP_PASSWORD!,
+        startedAtMs,
+      });
+      await tagProductionSyntheticSignup({
+        email: testEmail,
+        env: process.env,
+        runId,
+      });
 
-      if (!hasEmailSignup) {
-        const oauthSignupButton = page
-          .locator('button:has-text("Apple"), button:has-text("Google")')
-          .first();
-        await expect(
-          oauthSignupButton,
-          'Production sign-up should expose at least one supported OAuth option'
-        ).toBeVisible({ timeout: 5000 });
-        console.log(
-          '[Synthetic] Email sign-up unavailable; OAuth sign-up entry is visible'
-        );
-        test.info().annotations.push({
-          type: 'synthetic-warning',
-          description: SIGNUP_COVERAGE_WARNING,
-        });
-        console.warn(`[Synthetic][warning] ${SIGNUP_COVERAGE_WARNING}`);
-      } else {
-        await emailInput.fill(testEmail);
+      console.log('[Synthetic] Step 5: Post-signup app shell readiness');
+      await verifyPostSignupUsableState(page);
 
-        const passwordInput = page
-          .locator('input[name="password"], input[type="password"]')
-          .first();
-        await passwordInput.fill('SyntheticTest123!');
-
-        // Handle both test and production Clerk flows
-        const submitButton = page
-          .getByRole('button', { name: /continue|sign up/i })
-          .first();
-        await submitButton.click();
-
-        // Wait for navigation after submit instead of arbitrary timeout
-        await page.waitForLoadState('domcontentloaded');
-
-        // Production environment might require email verification
-        // Skip verification if in test mode, otherwise handle production flow
-        if (process.env.E2E_ENVIRONMENT === 'production') {
-          // In production, we might need to handle verification differently
-          // This is a placeholder for production-specific verification handling
-          try {
-            const verifyButton = page.getByRole('button', {
-              name: /verify|continue/i,
-            });
-            if (await verifyButton.isVisible({ timeout: 5000 })) {
-              await verifyButton.click();
-            }
-          } catch {
-            console.log('[Synthetic] No verification step needed');
-          }
-        }
-
-        // CRITICAL PATH 4: Onboarding flow
-        console.log('[Synthetic] Step 4: Onboarding flow test');
-        await expect(page).toHaveURL('/onboarding', { timeout: 45000 });
-
-        const usernameInput = page.getByLabel('Claim your handle');
-        await expect(usernameInput).toBeVisible({ timeout: 15000 });
-
-        await usernameInput.fill(testHandle);
-        // Poll for validation to clear instead of arbitrary wait
-        await expect
-          .poll(
-            async () => {
-              const claimBtn = page.getByTestId('onboarding-handle-submit');
-              return claimBtn.isEnabled().catch(() => false);
-            },
-            { timeout: SMOKE_TIMEOUTS.VISIBILITY, intervals: [300, 500, 1000] }
-          )
-          .toBeTruthy();
-
-        const claimButton = page.getByTestId('onboarding-handle-submit');
-        await expect(claimButton).toBeEnabled({ timeout: 15000 });
-        await claimButton.click();
-
-        // CRITICAL PATH 5: Onboarding continuation
-        console.log('[Synthetic] Step 5: Onboarding continuation test');
-        await expect(page).toHaveURL(/\/onboarding.*resume=spotify/, {
-          timeout: 45000,
-        });
-
-        await expect(
-          page.getByPlaceholder(
-            /search by artist name or paste a spotify link/i
-          )
-        ).toBeVisible({ timeout: 15000 });
-
-        // CRITICAL PATH 6: Public profile accessibility
-        console.log('[Synthetic] Step 6: Public profile test');
-        await page.goto(`/${testHandle}`, {
-          waitUntil: 'commit',
-          timeout: SMOKE_TIMEOUTS.NAVIGATION,
-        });
-        await waitForHydration(page);
-
-        await expect(page).toHaveURL(`/${testHandle}`);
-        const publicProfile = page.locator('[data-test="public-profile-root"]');
-        await expect(publicProfile).toBeVisible({ timeout: 15000 });
-
-        console.log('[Synthetic] ✅ All critical paths verified successfully');
-      }
+      console.log('[Synthetic] ✅ Production signup canary passed');
     } catch (error) {
       console.error('[Synthetic] ❌ Critical path failure:', error);
 
@@ -206,13 +245,19 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
         currentUrl,
         pageTitle,
         testEmail,
-        testHandle,
         environment: process.env.E2E_ENVIRONMENT,
         timestamp: new Date().toISOString(),
       });
 
       // Re-throw to fail the test
       throw error;
+    } finally {
+      await cleanupProductionSyntheticSignup({
+        email: testEmail,
+        env: process.env,
+      }).catch(error => {
+        console.error('[Synthetic] Cleanup failed:', error);
+      });
     }
   });
 
@@ -232,6 +277,7 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
 
     const criticalPages = [
       { path: '/', name: 'Homepage' },
+      { path: START_PATH, name: 'Start Onboarding Chat' },
       { path: '/dualipa', name: 'Profile Page' },
       { path: '/dualipa?mode=listen', name: 'Listen Mode' },
       { path: '/dualipa?mode=pay', name: 'Pay Mode' },
@@ -257,6 +303,7 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
         'text="500"',
         'text="Internal Server Error"',
         'text="Something went wrong"',
+        `text="${TURNSTILE_CONFIG_ERROR}"`,
         '[data-testid="error-boundary"]',
       ];
 

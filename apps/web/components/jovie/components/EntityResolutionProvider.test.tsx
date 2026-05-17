@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { renderHook } from '@testing-library/react';
-import type { ReactElement, ReactNode } from 'react';
+import { act, render, renderHook } from '@testing-library/react';
+import { type ReactElement, type ReactNode, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { queryKeys } from '@/lib/queries';
@@ -66,6 +66,18 @@ function wrapperWithClient(
   };
 }
 
+function CacheWriter({
+  client,
+}: Readonly<{ client: QueryClient }>): ReactElement | null {
+  useState(() => {
+    client.setQueryData(queryKeys.releases.matrix('p1'), [
+      makeRelease('rel_sync'),
+    ]);
+    return null;
+  });
+  return null;
+}
+
 describe('EntityResolutionProvider', () => {
   it('returns NULL_ENTITY_RESOLUTION when no provider is mounted', () => {
     const client = new QueryClient();
@@ -107,6 +119,70 @@ describe('EntityResolutionProvider', () => {
     expect(result.current.ref?.label).toBe('Sober');
     expect(result.current.ref?.thumbnail).toBe('https://example.com/cover.jpg');
     expect(result.current.ref?.meta?.kind).toBe('release');
+  });
+
+  it('refreshes release chips when the cached matrix key updates', async () => {
+    const client = new QueryClient();
+    const { result } = renderHook(
+      () => useEntityResolution('release', 'rel_later'),
+      { wrapper: wrapperWithClient(client, 'p1') }
+    );
+
+    expect(result.current.ref).toBeUndefined();
+
+    await act(async () => {
+      client.setQueryData(queryKeys.releases.matrix('p1'), [
+        makeRelease('rel_later', { title: 'Late Arrival' }),
+      ]);
+      await Promise.resolve();
+    });
+
+    expect(result.current.ref?.label).toBe('Late Arrival');
+  });
+
+  it('ignores unrelated release detail cache updates', async () => {
+    const client = new QueryClient();
+    let renderCount = 0;
+    renderHook(
+      () => {
+        renderCount += 1;
+        return useEntityResolution('release', 'rel_detail');
+      },
+      { wrapper: wrapperWithClient(client, 'p1') }
+    );
+
+    await act(async () => {
+      client.setQueryData(queryKeys.releases.detail('p1', 'rel_detail'), {
+        id: 'rel_detail',
+      });
+      await Promise.resolve();
+    });
+
+    expect(renderCount).toBe(1);
+  });
+
+  it('defers cache notifications that happen during child render', async () => {
+    const client = new QueryClient();
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    render(
+      <QueryClientProvider client={client}>
+        <EntityResolutionProvider profileId='p1'>
+          <CacheWriter client={client} />
+        </EntityResolutionProvider>
+      </QueryClientProvider>
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(
+      errorSpy.mock.calls.some(args =>
+        String(args[0]).includes('Cannot update a component')
+      )
+    ).toBe(false);
+    errorSpy.mockRestore();
   });
 
   it('returns undefined when release id is not in the cache', () => {

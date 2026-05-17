@@ -5,14 +5,29 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.15] - 2026-05-16
+
+> [internal] Observability: AI responses now flow into the Braintrust "Jovie" project when the API key is configured, so we can see model traces and run evals against production.
+
+### Added
+
+- [internal] **Braintrust LLM observability**: every Vercel AI SDK call (`streamText`, `generateText`, `generateObject`, `streamObject`) is wrapped through `apps/web/lib/ai/sdk.ts` and every direct Anthropic SDK call goes through `getAnthropicClient()` in `apps/web/lib/ai/anthropic.ts`. Wiring includes `initLogger` in `apps/web/instrumentation.ts` (Node runtime only, fail-open on init), the `braintrust/webpack-loader` rule in `apps/web/next.config.js`, the `braintrust@^3.10.0` dependency, a `BRAINTRUST_API_KEY` slot in `apps/web/lib/env-server-schema.ts`, and an MCP server entry in `.mcp.json` (`https://api.braintrust.dev/mcp`) so agents can query traces. Wrapper functions are lazy so partial `vi.mock('ai')` calls in unit tests don't fault on sibling exports they never invoke.
+
 ## [26.5.14] - 2026-05-16
 
-> [internal] Security: close auth bypass wildcard that allowed forged sessions on Vercel preview URLs.
+> [internal] Desktop shell identity hardening: added a branded Electron recovery screen and bumped the DMG release version.
 
 ### Fixed
 
-- **[internal] Test-mode bypass wildcard removed**: `isTrustedTestBypassHostname()` no longer accepts arbitrary `*.vercel.app` hostnames. Only `preview.jov.ie` and loopback/private-network addresses are trusted (JOV-2265).
-- **[internal] Preview env gate added**: `isTestAuthBypassEnabled()` now returns `false` when `VERCEL_ENV=preview`, blocking the bypass on Vercel preview deployments even if `E2E_USE_TEST_AUTH_BYPASS=1` is accidentally set there (JOV-2265).
+- [internal] **Desktop shell identity and failure fallback (JOV-2314)**: Electron launch failures now render a branded Jovie Desktop recovery surface with retry affordance instead of a blank or generic web failure. The desktop app name is set explicitly for production/staging, and the desktop release version is bumped so the next DMG carries the current app-shell identity.
+
+## [26.5.13] - 2026-05-16
+
+> [internal] Security: drop unauthenticated scanner traffic at the edge so off-platform probe URLs no longer reach the page handler or generate observability warnings.
+
+### Fixed
+
+- [internal] Drop unauthenticated scanner traffic at the edge so off-platform probe URLs no longer reach the page handler or generate observability warnings.
 
 ## [26.5.11] - 2026-05-16
 

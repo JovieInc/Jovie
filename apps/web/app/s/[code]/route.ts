@@ -6,6 +6,14 @@ import {
 } from '@/app/api/audience/lib/audience-utils';
 import { recordAudienceEvent } from '@/lib/audience/record-audience-event';
 import { appendSourceUtmParams } from '@/lib/audience/source-links';
+import {
+  COOKIE_BANNER_REQUIRED_COOKIE,
+  isCookieBannerRequired,
+} from '@/lib/cookies/consent-regions';
+import {
+  CONSENT_COOKIE_NAME,
+  parseConsentCookieValue,
+} from '@/lib/cookies/consent-state';
 import { db } from '@/lib/db';
 import {
   audienceMembers,
@@ -19,26 +27,6 @@ import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { validateSocialLinkUrl } from '@/lib/utils/url-validation';
 
 export const runtime = 'nodejs';
-
-const CONSENT_COOKIE_NAME = 'jv_cc';
-
-interface ConsentPreferences {
-  readonly essential: boolean;
-  readonly analytics: boolean;
-  readonly marketing: boolean;
-}
-
-function parseConsentCookie(request: NextRequest): ConsentPreferences | null {
-  try {
-    const raw = request.cookies?.get(CONSENT_COOKIE_NAME)?.value;
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as ConsentPreferences;
-    if (typeof parsed?.marketing !== 'boolean') return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
 
 function inferDeviceType(
   userAgent: string | null
@@ -204,14 +192,22 @@ export async function GET(
 
     const userAgent = request.headers.get('user-agent');
     const botDetection = detectBot(request, '/s/[code]');
-    const consent = parseConsentCookie(request);
-    // Match /api/track semantics: absence of jv_cc means default-allow unless the
-    // visitor explicitly rejected marketing cookies.
-    const hasMarketingConsent = consent === null || consent.marketing === true;
     const geoCity = request.headers.get('x-vercel-ip-city');
     const geoCountry =
       request.headers.get('x-vercel-ip-country') ??
       request.headers.get('cf-ipcountry');
+    const geoRegion = request.headers.get('x-vercel-ip-country-region');
+    const requiresCookieConsent =
+      request.cookies?.get(COOKIE_BANNER_REQUIRED_COOKIE)?.value === '1' ||
+      isCookieBannerRequired(geoCountry, geoRegion);
+    const consent = parseConsentCookieValue(
+      request.cookies?.get(CONSENT_COOKIE_NAME)?.value
+    );
+    // Match /api/track semantics: non-regulated visits remain default-allow,
+    // but consent-required visits need a valid marketing opt-in.
+    const hasMarketingConsent =
+      consent?.marketing === true ||
+      (consent === null && !requiresCookieConsent);
 
     try {
       await withSystemIngestionSession(async tx => {

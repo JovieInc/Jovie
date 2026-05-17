@@ -4,10 +4,10 @@ import { QueryClientContext } from '@tanstack/react-query';
 import {
   createContext,
   type ReactNode,
+  useCallback,
   useContext,
-  useEffect,
   useMemo,
-  useState,
+  useSyncExternalStore,
 } from 'react';
 import type { EntityKind } from '@/lib/chat/tokens';
 import type { EntityRef } from '@/lib/commands/entities';
@@ -34,10 +34,21 @@ const NULL_RESOLUTION: EntityResolution = {
 const NULL_RESOLVER: ResolverFn = () => NULL_RESOLUTION;
 
 const EntityResolutionContext = createContext<ResolverFn>(NULL_RESOLVER);
+const EMPTY_ENTITY_CACHE_SNAPSHOT = '0:0:0:0';
 
 interface EntityResolutionProviderProps {
   readonly profileId: string | null | undefined;
   readonly children: ReactNode;
+}
+
+function areQueryKeysEqual(
+  left: readonly unknown[],
+  right: readonly unknown[]
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every((value, index) => Object.is(value, right[index]))
+  );
 }
 
 /**
@@ -65,29 +76,75 @@ export function EntityResolutionProvider({
   // of JovieChat, or hypothetical SSR-only consumers). `useQueryClient()`
   // throws on missing provider; we'd rather no-op.
   const queryClient = useContext(QueryClientContext);
-  // Bump on every QueryCache update — the resolver function reads from
-  // getQueryData, so its closed-over cache snapshot is implicit. The version
-  // counter forces a context re-publish when the underlying data changes.
-  const [cacheVersion, setCacheVersion] = useState(0);
+  const releaseMatrixKey = useMemo(
+    () => (profileId ? queryKeys.releases.matrix(profileId) : null),
+    [profileId]
+  );
+  const eventsListKey = useMemo(
+    () => (profileId ? queryKeys.events.list(profileId) : null),
+    [profileId]
+  );
 
-  useEffect(() => {
-    if (!queryClient) return;
-    const cache = queryClient.getQueryCache();
-    const unsubscribe = cache.subscribe(event => {
-      // Only re-publish when releases or events data actually changes.
-      // Filters out unrelated cache churn (billing, audience, etc.).
-      const key = event.query.queryKey;
-      if (!Array.isArray(key)) return;
-      const root = key[0];
-      if (root === 'releases' || root === 'events') {
-        setCacheVersion(v => v + 1);
+  const getEntityCacheSnapshot = useCallback(() => {
+    if (!queryClient || !releaseMatrixKey || !eventsListKey) {
+      return EMPTY_ENTITY_CACHE_SNAPSHOT;
+    }
+
+    const releaseState = queryClient.getQueryState(releaseMatrixKey);
+    const eventState = queryClient.getQueryState(eventsListKey);
+    return [
+      releaseState?.dataUpdateCount ?? 0,
+      releaseState?.dataUpdatedAt ?? 0,
+      eventState?.dataUpdateCount ?? 0,
+      eventState?.dataUpdatedAt ?? 0,
+    ].join(':');
+  }, [eventsListKey, queryClient, releaseMatrixKey]);
+
+  const subscribeToEntityCache = useCallback(
+    (notify: () => void) => {
+      if (!queryClient || !releaseMatrixKey || !eventsListKey) {
+        return () => {};
       }
-    });
-    return unsubscribe;
-  }, [queryClient]);
+
+      let isSubscribed = true;
+      let notifyQueued = false;
+      const queueNotify = () => {
+        if (notifyQueued) return;
+        notifyQueued = true;
+        queueMicrotask(() => {
+          notifyQueued = false;
+          if (!isSubscribed) return;
+          notify();
+        });
+      };
+
+      const cache = queryClient.getQueryCache();
+      const unsubscribe = cache.subscribe(event => {
+        const key = event.query.queryKey;
+        if (!Array.isArray(key)) return;
+        if (
+          areQueryKeysEqual(key, releaseMatrixKey) ||
+          areQueryKeysEqual(key, eventsListKey)
+        ) {
+          queueNotify();
+        }
+      });
+      return () => {
+        isSubscribed = false;
+        unsubscribe();
+      };
+    },
+    [eventsListKey, queryClient, releaseMatrixKey]
+  );
+
+  const cacheSnapshot = useSyncExternalStore(
+    subscribeToEntityCache,
+    getEntityCacheSnapshot,
+    () => EMPTY_ENTITY_CACHE_SNAPSHOT
+  );
 
   const resolver = useMemo<ResolverFn>(() => {
-    // cacheVersion is intentionally part of the closure so memoization
+    // cacheSnapshot is intentionally part of the closure so memoization
     // re-fires when caches change. Reads are deferred until each chip calls.
     if (!profileId || !queryClient) {
       return () => NULL_RESOLUTION;
@@ -116,10 +173,10 @@ export function EntityResolutionProvider({
       // + label, which is identical to today's empty-thumbnail behavior.
       return NULL_RESOLUTION;
     };
-    // cacheVersion participates so consumers re-derive on cache change.
+    // cacheSnapshot participates so consumers re-derive on cache change.
     // queryClient is stable from React Query's provider.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profileId, queryClient, cacheVersion]);
+  }, [profileId, queryClient, cacheSnapshot]);
 
   return (
     <EntityResolutionContext.Provider value={resolver}>

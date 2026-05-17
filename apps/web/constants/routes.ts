@@ -18,10 +18,12 @@ export const APP_ROUTES = {
   DASHBOARD_EARNINGS: '/app/dashboard/earnings',
   DASHBOARD_LINKS: '/app/dashboard/links',
   DASHBOARD_PROFILE: '/app/dashboard/profile',
+  /** Legacy audience path. Keep as a redirect source only. */
   DASHBOARD_AUDIENCE: '/app/dashboard/audience',
   /** Legacy library path. Keep as a redirect source only. */
   LEGACY_DASHBOARD_LIBRARY: '/app/dashboard/library',
   DASHBOARD_LIBRARY: '/app/library',
+  /** Legacy release workspace route. Keep for old bookmarks and nested task aliases; use RELEASES for navigation. */
   DASHBOARD_RELEASES: '/app/dashboard/releases',
   DASHBOARD_TASKS: '/app/dashboard/tasks',
   DASHBOARD_RELEASE_TASKS: '/app/dashboard/releases/[releaseId]/tasks',

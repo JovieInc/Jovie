@@ -177,6 +177,7 @@ export async function instantiateReleaseTasks(releaseId: string) {
 
   await db.insert(tasks).values(taskRows);
 
+  revalidatePath(APP_ROUTES.RELEASES);
   revalidatePath(APP_ROUTES.DASHBOARD_RELEASES);
   revalidatePath(APP_ROUTES.TASKS);
 
@@ -400,6 +401,7 @@ export async function recomputeTaskDueDates(
       AND metadata ->> 'dueDaysOffset' IS NOT NULL
   `);
 
+  revalidatePath(APP_ROUTES.RELEASES);
   revalidatePath(APP_ROUTES.DASHBOARD_RELEASES);
   revalidatePath(APP_ROUTES.TASKS);
 }

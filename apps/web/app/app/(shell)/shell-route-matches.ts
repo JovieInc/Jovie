@@ -59,6 +59,7 @@ export function isReleasesShellRoute(pathname: string | null): boolean {
   if (!pathname) return false;
   return (
     pathname === APP_ROUTES.RELEASES ||
+    pathname.startsWith(`${APP_ROUTES.RELEASES}/`) ||
     pathname === APP_ROUTES.DASHBOARD_RELEASES ||
     pathname.startsWith(`${APP_ROUTES.DASHBOARD_RELEASES}/`)
   );
@@ -94,9 +95,39 @@ export function isTasksShellRoute(pathname: string | null): boolean {
   );
 }
 
+export function isInsightsShellRoute(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return (
+    pathname === APP_ROUTES.INSIGHTS ||
+    pathname.startsWith(`${APP_ROUTES.INSIGHTS}/`)
+  );
+}
+
+export function isPresenceShellRoute(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return (
+    pathname === APP_ROUTES.PRESENCE ||
+    pathname.startsWith(`${APP_ROUTES.PRESENCE}/`)
+  );
+}
+
 function isDashboardSubRoute(pathname: string | null): boolean {
   if (!pathname) return false;
   return pathname.startsWith(`${APP_ROUTES.LEGACY_DASHBOARD}/`);
+}
+
+function isShellOptimizedSettingsRoute(pathname: string | null): boolean {
+  if (!pathname) return false;
+  if (
+    pathname === APP_ROUTES.SETTINGS_ARTIST_PROFILE ||
+    pathname.startsWith(`${APP_ROUTES.SETTINGS_ARTIST_PROFILE}/`)
+  ) {
+    return false;
+  }
+  return (
+    pathname === APP_ROUTES.SETTINGS ||
+    pathname.startsWith(`${APP_ROUTES.SETTINGS}/`)
+  );
 }
 
 function isLightweightShellRoute(pathname: string | null): boolean {
@@ -106,7 +137,10 @@ function isLightweightShellRoute(pathname: string | null): boolean {
     isLyricsShellRoute(pathname) ||
     isLibraryShellRoute(pathname) ||
     isTasksShellRoute(pathname) ||
-    isDashboardSubRoute(pathname)
+    isInsightsShellRoute(pathname) ||
+    isPresenceShellRoute(pathname) ||
+    isDashboardSubRoute(pathname) ||
+    isShellOptimizedSettingsRoute(pathname)
   );
 }
 
@@ -115,5 +149,14 @@ export function shouldUseEssentialShellData(pathname: string | null): boolean {
 }
 
 export function shouldRedirectToOnboarding(pathname: string | null): boolean {
-  return isLightweightShellRoute(pathname);
+  return (
+    isChatShellRoute(pathname) ||
+    isReleasesShellRoute(pathname) ||
+    isLyricsShellRoute(pathname) ||
+    isLibraryShellRoute(pathname) ||
+    isTasksShellRoute(pathname) ||
+    isInsightsShellRoute(pathname) ||
+    isPresenceShellRoute(pathname) ||
+    isDashboardSubRoute(pathname)
+  );
 }

@@ -185,9 +185,6 @@ describe('test-mode auth bypass', () => {
             if (name === 'host') {
               return 'localhost:3100';
             }
-            if (name === 'host') {
-              return 'localhost:3100';
-            }
             if (name === TEST_MODE_HEADER) {
               return TEST_AUTH_BYPASS_MODE;
             }

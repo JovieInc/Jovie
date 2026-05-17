@@ -380,13 +380,23 @@ const nextConfig = {
         permanent: true,
       },
       {
+        source: '/sign-up',
+        destination: '/signup',
+        permanent: true,
+      },
+      {
+        source: '/sign-in',
+        destination: '/signin',
+        permanent: true,
+      },
+      {
         source: '/app/analytics',
-        destination: '/app/dashboard/audience',
+        destination: '/app/audience',
         permanent: false,
       },
       {
         source: '/app/dashboard/analytics',
-        destination: '/app/dashboard/audience',
+        destination: '/app/audience',
         permanent: false,
       },
       ...legacyAppRedirects,
@@ -418,25 +428,7 @@ const nextConfig = {
     ];
   },
   async rewrites() {
-    return [
-      // Rewrite /app/* to /app/dashboard/* for cleaner URLs
-      {
-        source: '/app/releases',
-        destination: '/app/dashboard/releases',
-      },
-      {
-        source: '/app/audience',
-        destination: '/app/dashboard/audience',
-      },
-      {
-        source: '/app/insights',
-        destination: '/app/dashboard/insights',
-      },
-      {
-        source: '/app/presence',
-        destination: '/app/dashboard/presence',
-      },
-    ];
+    return [];
   },
   env: {
     // Build-time env vars — these get inlined into client bundles by Next.js

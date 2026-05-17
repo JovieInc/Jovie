@@ -150,6 +150,21 @@ async function runEnvironmentValidationWithRetry() {
 
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
+    // Braintrust observability. Lazy dynamic import keeps the SDK out of the
+    // Edge bundle; the webpack-loader (next.config.js) handles foreign-module
+    // span propagation. Init failure must not block app boot.
+    if (process.env.BRAINTRUST_API_KEY) {
+      try {
+        const { initLogger } = await import('braintrust');
+        initLogger({
+          projectName: 'Jovie',
+          apiKey: process.env.BRAINTRUST_API_KEY,
+        });
+      } catch (error) {
+        console.warn('[STARTUP] Braintrust initLogger failed:', error);
+      }
+    }
+
     // Skip Sentry server SDK and startup validation in local/dev and CI.
     // CI public-route jobs boot production builds for smoke/a11y/Lighthouse, and
     // the server SDK adds no signal there while increasing startup fragility.

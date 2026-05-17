@@ -73,7 +73,7 @@ export function TasksWorkspaceUpgradeInterstitial() {
         <TasksUpgradeContent
           heading='Upgrade to access Tasks'
           description='Upgrade to turn releases into step-by-step plans and manage all of your work in one task workspace.'
-          secondaryHref={APP_ROUTES.DASHBOARD_RELEASES}
+          secondaryHref={APP_ROUTES.RELEASES}
           secondaryLabel='Back to Releases'
         />
       </section>
@@ -94,7 +94,7 @@ export function ReleasePlanUpgradeInterstitial({
       <TasksUpgradeContent
         heading='Upgrade To Generate A Release Plan'
         description={`Upgrade to turn ${releaseName} into a step-by-step plan with tasks you can assign to Jovie AI.`}
-        secondaryHref={APP_ROUTES.DASHBOARD_RELEASES}
+        secondaryHref={APP_ROUTES.RELEASES}
         secondaryLabel='Back to Releases'
       />
     </div>
