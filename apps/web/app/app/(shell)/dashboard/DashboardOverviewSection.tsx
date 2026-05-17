@@ -24,8 +24,9 @@ export async function DashboardOverviewSection() {
     : null;
 
   const [overviewSupplement, linkClickStats] = await Promise.all([
-    dashboardData.selectedProfile && dashboardData.user?.id
+    dashboardData.selectedProfile && dashboardData.user?.id && auth.userId
       ? getDashboardOverviewSupplement({
+          clerkUserId: auth.userId,
           onboardingCompletedAt:
             dashboardData.selectedProfile.onboardingCompletedAt?.toISOString() ??
             null,

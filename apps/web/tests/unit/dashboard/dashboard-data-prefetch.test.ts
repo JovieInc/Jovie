@@ -463,12 +463,18 @@ describe('dashboard data prefetch', () => {
     );
 
     const result = await getDashboardOverviewSupplement({
+      clerkUserId: 'user_123',
       onboardingCompletedAt: null,
       profileId: 'profile_1',
       userId: 'user_db_1',
     });
 
-    expect(withDbSessionTxMock).toHaveBeenCalledWith(expect.any(Function));
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(1);
+    expect(withDbSessionTxMock).toHaveBeenCalledWith(expect.any(Function), {
+      clerkUserId: 'user_123',
+    });
+    expect(withDbSessionMock).not.toHaveBeenCalled();
+    expect(selectMock).toHaveBeenCalledTimes(1);
     expect(result).toEqual({
       hasSocialLinks: true,
       hasMusicLinks: false,

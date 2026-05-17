@@ -165,6 +165,7 @@ export interface DashboardOverviewSupplement {
 }
 
 interface DashboardOverviewSupplementArgs {
+  clerkUserId: string;
   onboardingCompletedAt: string | null;
   profileId: string;
   userId: string;
@@ -360,33 +361,37 @@ async function fetchSocialLinkExistence(
 }
 
 async function fetchDashboardOverviewSupplementWithSession({
+  clerkUserId,
   onboardingCompletedAt,
   profileId,
   userId,
 }: DashboardOverviewSupplementArgs): Promise<DashboardOverviewSupplement> {
   try {
-    return await withDbSessionTx(async tx => {
-      const linkCounts = await fetchSocialLinkExistence(tx, {
-        context: 'dashboard_overview_supplement',
-        operation: 'dashboard_overview_social_links_existence',
-        profileId,
-        queryLabel: 'Dashboard overview social links existence query',
-        userId,
-      });
+    return await withDbSessionTx(
+      async tx => {
+        const linkCounts = await fetchSocialLinkExistence(tx, {
+          context: 'dashboard_overview_supplement',
+          operation: 'dashboard_overview_social_links_existence',
+          profileId,
+          queryLabel: 'Dashboard overview social links existence query',
+          userId,
+        });
 
-      const bioLinkActivation = await buildBioLinkActivation(tx, {
-        id: profileId,
-        onboardingCompletedAt: onboardingCompletedAt
-          ? new Date(onboardingCompletedAt)
-          : null,
-      });
+        const bioLinkActivation = await buildBioLinkActivation(tx, {
+          id: profileId,
+          onboardingCompletedAt: onboardingCompletedAt
+            ? new Date(onboardingCompletedAt)
+            : null,
+        });
 
-      return {
-        hasSocialLinks: linkCounts.hasLinks,
-        hasMusicLinks: linkCounts.hasMusicLinks,
-        bioLinkActivation,
-      };
-    });
+        return {
+          hasSocialLinks: linkCounts.hasLinks,
+          hasMusicLinks: linkCounts.hasMusicLinks,
+          bioLinkActivation,
+        };
+      },
+      { clerkUserId }
+    );
   } catch (error) {
     Sentry.captureException(error, {
       level: 'warning',

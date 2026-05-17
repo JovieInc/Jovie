@@ -16,6 +16,6 @@ describe('dashboard overview fast path', () => {
 
     expect(source).toContain('getDashboardDataEssential');
     expect(source).toContain('getDashboardOverviewSupplement');
-    expect(source).not.toContain('getDashboardData()');
+    expect(source).not.toMatch(/\bgetDashboardData\s*\(/);
   });
 });
