@@ -14,6 +14,15 @@ describe('DropDateChip', () => {
     expect(screen.queryByText('2193d ago')).not.toBeInTheDocument();
   });
 
+  it('preserves compact date casing instead of forcing uppercase labels', () => {
+    const { container } = render(<DropDateChip label='2y ago' tone='past' />);
+
+    const chip = container.firstElementChild as HTMLElement;
+    expect(screen.getByText('2y ago')).toBeInTheDocument();
+    expect(chip.className).not.toContain('uppercase');
+    expect(chip.className).not.toContain('tracking-[');
+  });
+
   it('lights up cyan when tone is soon', () => {
     const { container } = render(
       <DropDateChip label='Drops in 4 days' tone='soon' />
