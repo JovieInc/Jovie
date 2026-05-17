@@ -42,4 +42,28 @@ describe('release plan shell contract', () => {
     expect(source).toContain('<Button');
     expect(source).not.toMatch(/(?:bg-fuchsia|hover:bg-fuchsia|bg-fuchsia-)/);
   });
+
+  it('uses shared app-shell surfaces and compact token typography', () => {
+    expect(RELEASE_PLAN_PAGE).toBeDefined();
+
+    if (!RELEASE_PLAN_PAGE) {
+      throw new Error('Could not find release plan page source');
+    }
+
+    const source = readFileSync(RELEASE_PLAN_PAGE, 'utf8');
+    expect(source).toContain(
+      "import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';"
+    );
+    expect(source).toContain(
+      "import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';"
+    );
+    expect(source).toContain('<ContentSurfaceCard');
+    expect(source).toContain('<ContentSectionHeader');
+    expect(source).toContain('font-caption text-tertiary-token');
+    expect(source).not.toContain('flex min-h-0 flex-1 flex-col gap-6 p-6');
+    expect(source).not.toContain('border-(--linear-border-subtle)');
+    expect(source).not.toContain('bg-(--linear-bg-surface-0)');
+    expect(source).not.toContain('text-(--linear-text-primary)');
+    expect(source).not.toContain('text-(--linear-text-secondary)');
+  });
 });
