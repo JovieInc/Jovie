@@ -248,21 +248,17 @@ const nextConfig = {
     ];
 
     const legacyAppRedirects = [
-      { source: '/app/contact', destination: '/app/settings/contacts' },
       { source: '/app/profile', destination: '/app/chat?panel=profile' },
-      { source: '/app/contacts', destination: '/app/settings/contacts' },
       {
         source: '/app/tipping',
         destination: '/app/settings/artist-profile?tab=earn#pay',
       },
-      { source: '/app/tour-dates', destination: '/app/settings/touring' },
       { source: '/app/dashboard', destination: '/app' },
       { source: '/app/dashboard/overview', destination: '/app' },
-      // NOTE: /app/earnings and /app/dashboard/earnings are intentionally
-      // omitted here. proxy.ts handles auth-aware redirection: unauthenticated
-      // users are sent to /signin?redirect_url=<requested earnings path>, while
-      // authenticated users go to the canonical artist profile pay section.
-      // Static redirects bypass Clerk middleware and lose the original deep link.
+      // NOTE: shell-owned aliases such as /app/earnings, /app/contacts, and
+      // /app/tour-dates are intentionally omitted here. App Router pages handle
+      // their final destination so middleware can preserve the requested deep
+      // link for unauthenticated users.
       {
         source: '/app/dashboard/links',
         destination: '/app/chat?panel=profile',
@@ -276,14 +272,6 @@ const nextConfig = {
         destination: '/app/chat?panel=profile',
       },
       { source: '/app/dashboard/chat', destination: '/app/chat' },
-      {
-        source: '/app/dashboard/contacts',
-        destination: '/app/settings/contacts',
-      },
-      {
-        source: '/app/dashboard/tour-dates',
-        destination: '/app/settings/touring',
-      },
       { source: '/app/settings', destination: '/app/settings/account' },
       {
         source: '/app/settings/profile',

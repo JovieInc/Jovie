@@ -176,6 +176,7 @@ import { ThreadView as ShellThreadView } from '@/components/shell/ThreadView';
 import { Tooltip } from '@/components/shell/Tooltip';
 import { TypeBadge } from '@/components/shell/TypeBadge';
 import { dropDateMeta } from '@/lib/format-drop-date';
+import { relativeDate as formatRelativeDate } from '@/lib/format-relative-date';
 // ---------------------------------------------------------------------------
 // DESIGN RULE — NO AI-SLOP GRADIENTS ON UI CHROME
 // ---------------------------------------------------------------------------
@@ -1691,19 +1692,7 @@ function trackFromRelease(r: Release): TrackInfo {
 }
 
 function relativeDate(iso: string, now = new Date('2026-04-25')) {
-  const d = new Date(iso);
-  const days = Math.round(
-    (d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-  );
-  if (days === 0) return 'today';
-  if (days === 1) return 'tomorrow';
-  if (days === -1) return 'yesterday';
-  if (days > 1 && days < 14) return `in ${days}d`;
-  if (days < -1 && days > -14) return `${-days}d ago`;
-  if (days >= 14 && days < 60) return `in ${Math.round(days / 7)}w`;
-  if (days <= -14 && days > -60) return `${Math.round(-days / 7)}w ago`;
-  if (days >= 60) return `in ${Math.round(days / 30)}mo`;
-  return `${Math.round(-days / 30)}mo ago`;
+  return formatRelativeDate(iso, now).toLowerCase();
 }
 
 function formatStreams(n: number) {

@@ -44,3 +44,11 @@ test('electron-builder configs do not pin a stale copyright year', async () => {
     assert.doesNotMatch(config, /^copyright:\s*["']?Copyright/m);
   }
 });
+
+test('desktop package metadata uses the legal Jovie company name', async () => {
+  const packageJson = JSON.parse(
+    await readFile(join(desktopRoot, 'package.json'), 'utf8')
+  );
+
+  assert.equal(packageJson.author, 'Jovie Technology Inc.');
+});

@@ -15,6 +15,7 @@ export const APP_ROUTES = {
   DASHBOARD: '/app',
   /** Legacy dashboard landing path. Kept as a constant so the legacy redirect in `next.config.js` has a referenceable source. Do NOT use for navigation. */
   LEGACY_DASHBOARD: '/app/dashboard',
+  /** Legacy earnings path. Keep for old bookmarks; use EARNINGS for canonical entry. */
   DASHBOARD_EARNINGS: '/app/dashboard/earnings',
   DASHBOARD_LINKS: '/app/dashboard/links',
   DASHBOARD_PROFILE: '/app/dashboard/profile',
