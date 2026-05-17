@@ -21,12 +21,6 @@ const nextConfig = {
     // tsconfig resolution and causes "Could not parse module" errors
     // for server-only files (JOV-1062, JOV-1063).
     resolveExtensions: ['.tsx', '.ts', '.jsx', '.js', '.mjs', '.json'],
-    rules: {
-      '*.{js,mjs,cjs}': {
-        condition: 'foreign',
-        loaders: [{ loader: require.resolve('braintrust/webpack-loader') }],
-      },
-    },
   },
   // React Compiler: auto-memoization to eliminate render loops and manual useMemo/useCallback
   reactCompiler: true,
