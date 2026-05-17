@@ -32,6 +32,9 @@ describe('ReleaseArtworkThumb', () => {
     expect(
       document.querySelector('[data-artwork-fallback-icon="true"]')
     ).toBeInTheDocument();
+    expect(
+      document.querySelector('[data-artwork-fallback-sleeve="true"]')
+    ).toBeInTheDocument();
   });
 
   it('renders fallback icon when src is undefined', () => {

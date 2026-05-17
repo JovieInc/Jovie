@@ -11,7 +11,9 @@ describe('artwork fallback styles', () => {
 
     expect(background).toContain('linear-gradient');
     expect(background).toContain('repeating-linear-gradient');
+    expect(background).toContain('color-mix');
     expect(background).toContain('--artwork-fallback-panel');
+    expect(background).not.toMatch(/cyan|teal|green/u);
     expect(background).not.toContain('radial-gradient');
     expect(background).not.toContain('#');
   });

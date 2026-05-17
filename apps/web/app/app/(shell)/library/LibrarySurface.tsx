@@ -342,7 +342,7 @@ function Artwork({
     >
       <ArtworkFallbackTile
         seed={asset.title}
-        iconClassName={size === 'row' ? 'h-4 w-4' : 'h-[18%] w-[18%]'}
+        iconClassName={size === 'row' ? 'h-4 w-4' : 'h-[36%] w-[36%]'}
       />
     </div>
   );
