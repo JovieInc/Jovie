@@ -1,11 +1,15 @@
 import { headers } from 'next/headers';
 import { LyricsRouteSkeleton } from '@/components/shell/LyricsRouteSkeleton';
+import { TasksRouteSkeleton } from '@/components/shell/TasksRouteSkeleton';
 import ChatLoading from './chat/loading';
 import { ReleaseTableSkeleton } from './dashboard/releases/loading';
+import { LibraryLoadingState } from './library/LibrarySurface';
 import {
   isChatShellRoute,
+  isLibraryShellRoute,
   isLyricsShellRoute,
   isReleasesShellRoute,
+  isTasksShellRoute,
   resolveAppShellRequestPath,
 } from './shell-route-matches';
 
@@ -33,8 +37,16 @@ export default async function ShellLoading() {
     return <ReleaseTableSkeleton showHeader={false} />;
   }
 
+  if (isLibraryShellRoute(pathname)) {
+    return <LibraryLoadingState />;
+  }
+
   if (isLyricsShellRoute(pathname)) {
     return <LyricsRouteSkeleton />;
+  }
+
+  if (isTasksShellRoute(pathname)) {
+    return <TasksRouteSkeleton />;
   }
 
   return (
