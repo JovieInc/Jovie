@@ -857,6 +857,8 @@ jobs:
           protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
+        # Only resolve from the ephemeral branch when one was created.
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
         id: resolve-mobile-overflow-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
@@ -865,8 +867,14 @@ jobs:
           credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
           credential_fallback_url: ${{ secrets.DATABASE_URL }}
 
-      - name: Export DATABASE_URL
+      - name: Export DATABASE_URL (ephemeral branch)
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
         run: echo "DATABASE_URL=${{ steps.resolve-mobile-overflow-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
+
+      - name: Export DATABASE_URL (main — non-DB PR)
+        # No ephemeral branch was created; use the stable main DB for SSR reads.
+        if: needs.ci-path-changes.outputs.run_neon != 'true'
+        run: echo "DATABASE_URL=${{ secrets.DATABASE_URL_MAIN }}" >> "$GITHUB_ENV"
 
       - name: Run migrations (ephemeral Neon)
         if: needs.ci-path-changes.outputs.run_neon == 'true'
@@ -971,6 +979,8 @@ jobs:
           protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
+        # Only resolve from the ephemeral branch when one was created.
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
         id: resolve-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
@@ -979,8 +989,14 @@ jobs:
           credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
           credential_fallback_url: ${{ secrets.DATABASE_URL }}
 
-      - name: Export DATABASE_URL
+      - name: Export DATABASE_URL (ephemeral branch)
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
         run: echo "DATABASE_URL=${{ steps.resolve-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
+
+      - name: Export DATABASE_URL (main — non-DB PR)
+        # No ephemeral branch was created; use the stable main DB for SSR reads.
+        if: needs.ci-path-changes.outputs.run_neon != 'true'
+        run: echo "DATABASE_URL=${{ secrets.DATABASE_URL_MAIN }}" >> "$GITHUB_ENV"
 
       - name: Run migrations (ephemeral Neon)
         # Only migrate when we have a fresh ephemeral branch (DB-relevant changes).
@@ -1253,6 +1269,8 @@ jobs:
           protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
+        # Only resolve from the ephemeral branch when one was created.
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
         id: resolve-onboarding-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
@@ -1261,8 +1279,14 @@ jobs:
           credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
           credential_fallback_url: ${{ secrets.DATABASE_URL }}
 
-      - name: Export DATABASE_URL
+      - name: Export DATABASE_URL (ephemeral branch)
+        if: needs.ci-path-changes.outputs.run_neon == 'true'
         run: echo "DATABASE_URL=${{ steps.resolve-onboarding-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
+
+      - name: Export DATABASE_URL (main — non-DB PR)
+        # No ephemeral branch was created; use the stable main DB for SSR reads.
+        if: needs.ci-path-changes.outputs.run_neon != 'true'
+        run: echo "DATABASE_URL=${{ secrets.DATABASE_URL_MAIN }}" >> "$GITHUB_ENV"
 
       - name: Run migrations (ephemeral Neon)
         if: needs.ci-path-changes.outputs.run_neon == 'true'
@@ -2245,7 +2269,8 @@ jobs:
           protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        # Only resolve from the ephemeral branch when one was created.
+        if: steps.check_changes.outputs.run_full_ci == 'true' && needs.ci-path-changes.outputs.run_neon == 'true'
         id: resolve-a11y-neon-db-url
         uses: ./.github/actions/resolve-neon-database-url
         with:
@@ -2254,9 +2279,14 @@ jobs:
           credential_source_url: ${{ secrets.DATABASE_URL_MAIN }}
           credential_fallback_url: ${{ secrets.DATABASE_URL }}
 
-      - name: Export DATABASE_URL
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+      - name: Export DATABASE_URL (ephemeral branch)
+        if: steps.check_changes.outputs.run_full_ci == 'true' && needs.ci-path-changes.outputs.run_neon == 'true'
         run: echo "DATABASE_URL=${{ steps.resolve-a11y-neon-db-url.outputs.database_url }}" >> "$GITHUB_ENV"
+
+      - name: Export DATABASE_URL (main — non-DB PR)
+        # No ephemeral branch was created; use the stable main DB for SSR reads.
+        if: steps.check_changes.outputs.run_full_ci == 'true' && needs.ci-path-changes.outputs.run_neon != 'true'
+        run: echo "DATABASE_URL=${{ secrets.DATABASE_URL_MAIN }}" >> "$GITHUB_ENV"
 
       - name: Cache Playwright Browsers
         if: steps.check_changes.outputs.run_full_ci == 'true'
