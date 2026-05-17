@@ -1,6 +1,8 @@
+import { Badge } from '@jovie/ui';
 import { desc, eq } from 'drizzle-orm';
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
+import { AdminToolPage } from '@/components/features/admin/layout/AdminToolPage';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
 import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
@@ -12,6 +14,7 @@ import {
   type InterviewTranscriptEntry,
   userInterviews,
 } from '@/lib/db/schema/user-interviews';
+import { capitalizeFirst } from '@/lib/utils/string-utils';
 
 export const metadata: Metadata = { title: 'Interviews — Admin' };
 export const runtime = 'nodejs';
@@ -31,17 +34,17 @@ function formatDate(iso: Date | string): string {
   });
 }
 
-function statusBadge(status: string): string {
+function statusBadgeTone(status: string) {
   switch (status) {
     case 'summarized':
-      return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+      return 'success';
     case 'pending':
     case 'summarizing':
-      return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+      return 'warning';
     case 'failed':
-      return 'bg-rose-500/10 text-rose-400 border-rose-500/20';
+      return 'error';
     default:
-      return 'bg-white/[0.05] text-secondary-token border-white/10';
+      return 'neutral';
   }
 }
 
@@ -67,20 +70,18 @@ export default async function AdminInterviewsPage() {
     .limit(200);
 
   return (
-    <div className='space-y-4 p-6'>
-      <header>
-        <h1 className='text-xl font-medium'>User interviews</h1>
-        <p className='text-sm text-secondary-token'>
-          Mom Test interviews captured after onboarding.
-        </p>
-      </header>
-      <ContentSurfaceCard>
+    <AdminToolPage
+      title='User Interviews'
+      description='Mom Test interviews captured after onboarding.'
+      testId='admin-interviews-page'
+    >
+      <ContentSurfaceCard className='overflow-hidden p-0'>
         {rows.length === 0 ? (
-          <div className='p-6 text-sm text-secondary-token'>
+          <div className='px-(--linear-app-header-padding-x) py-6 text-app text-secondary-token'>
             No interviews yet.
           </div>
         ) : (
-          <div className='divide-y divide-white/[0.06]'>
+          <div className='divide-y divide-subtle'>
             {rows.map(row => {
               const transcript =
                 (row.transcript as InterviewTranscriptEntry[] | null) ?? [];
@@ -91,10 +92,13 @@ export default async function AdminInterviewsPage() {
                   : (row.userEmail ?? 'unknown user');
 
               return (
-                <details key={row.id} className='group p-4'>
-                  <summary className='flex cursor-pointer items-start justify-between gap-4 list-none'>
+                <details
+                  key={row.id}
+                  className='group px-(--linear-app-header-padding-x) py-3'
+                >
+                  <summary className='flex cursor-pointer list-none items-start justify-between gap-4'>
                     <div className='min-w-0 flex-1'>
-                      <div className='flex items-center gap-2 text-xs text-secondary-token'>
+                      <div className='flex flex-wrap items-center gap-x-2 gap-y-1 text-2xs text-tertiary-token'>
                         <span>{formatDate(row.createdAt)}</span>
                         <span>•</span>
                         <span>{label}</span>
@@ -112,16 +116,18 @@ export default async function AdminInterviewsPage() {
                             : 'Summary pending…')}
                       </div>
                     </div>
-                    <span
-                      className={`shrink-0 rounded-full border px-2 py-0.5 text-xs ${statusBadge(row.status)}`}
+                    <Badge
+                      tone={statusBadgeTone(row.status)}
+                      size='sm'
+                      className='shrink-0'
                     >
-                      {row.status}
-                    </span>
+                      {capitalizeFirst(row.status)}
+                    </Badge>
                   </summary>
-                  <div className='mt-4 space-y-3 rounded-lg bg-white/[0.03] p-4 text-sm'>
+                  <div className='mt-3 space-y-3 rounded-md bg-surface-0 p-3 text-app'>
                     {transcript.map((entry, idx) => (
                       <div key={`${row.id}-${entry.questionId}`}>
-                        <div className='font-medium text-primary-token'>
+                        <div className='font-caption text-primary-token'>
                           Q{idx + 1}. {entry.prompt}
                         </div>
                         <div className='mt-1 whitespace-pre-wrap text-secondary-token'>
@@ -140,6 +146,6 @@ export default async function AdminInterviewsPage() {
           </div>
         )}
       </ContentSurfaceCard>
-    </div>
+    </AdminToolPage>
   );
 }
