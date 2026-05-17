@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 
@@ -18,5 +20,18 @@ describe('settings page aliases', () => {
     SettingsPage();
 
     expect(redirectMock).toHaveBeenCalledWith(APP_ROUTES.SETTINGS_ACCOUNT);
+  });
+
+  it('keeps artist profile settings on the essential dashboard data path', () => {
+    const source = readFileSync(
+      resolve(
+        process.cwd(),
+        'app/app/(shell)/settings/artist-profile/page.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).toContain('getDashboardDataEssential');
+    expect(source).not.toMatch(/\bgetDashboardData\(/);
   });
 });
