@@ -219,6 +219,8 @@ export {
   useSaveCampaignSettings,
   useSendCampaignInvitesMutation,
 } from './useCampaignInvites';
+// Chat capabilities query
+export { useChatCapabilitiesQuery } from './useChatCapabilitiesQuery';
 // Chat conversation query
 export { useChatConversationQuery } from './useChatConversationQuery';
 // Chat conversations list query

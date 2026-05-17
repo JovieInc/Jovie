@@ -383,10 +383,26 @@ export function ChatPageClient({
   ]);
 
   const handleConversationCreate = useCallback(
-    (newConversationId: string) => {
-      router.replace(`${APP_ROUTES.CHAT}/${newConversationId}`, {
-        scroll: false,
-      });
+    (
+      newConversationId: string,
+      phase: 'reserved' | 'completed' = 'completed'
+    ) => {
+      const nextRoute = `${APP_ROUTES.CHAT}/${encodeURIComponent(newConversationId)}`;
+      const currentPath = globalThis.location?.pathname;
+
+      if (currentPath === APP_ROUTES.CHAT) {
+        globalThis.history?.replaceState(
+          globalThis.history.state,
+          '',
+          nextRoute
+        );
+      }
+
+      if (phase === 'completed') {
+        router.replace(nextRoute, {
+          scroll: false,
+        });
+      }
     },
     [router]
   );
