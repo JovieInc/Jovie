@@ -174,6 +174,19 @@ describe('deploy workflow Vercel env resolution', () => {
     }
   });
 
+  it('checks production signup readiness against the deploy env instead of the pulled Vercel file', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const readinessStep = getStepBlock(
+      workflow,
+      'Check signup readiness (production deploy env)'
+    );
+
+    expect(readinessStep).toContain('--target=prd');
+    expect(readinessStep).toContain('--source=env');
+    expect(readinessStep).not.toContain('--source=vercel-file');
+    expect(readinessStep).not.toContain('.vercel/.env.production.local');
+  });
+
   it('verifies production promotion through the canonical public alias', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const promoteStep = getStepBlock(
