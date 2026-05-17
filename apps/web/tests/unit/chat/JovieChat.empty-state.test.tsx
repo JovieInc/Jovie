@@ -98,6 +98,14 @@ vi.mock('@/components/jovie/hooks', () => ({
 }));
 
 vi.mock('@/lib/queries', () => ({
+  queryKeys: {
+    releases: {
+      matrix: (profileId: string) => ['releases', 'matrix', profileId],
+    },
+    events: {
+      list: (profileId: string) => ['events', 'list', profileId],
+    },
+  },
   useChatCapabilitiesQuery: () => mockCapabilitiesQueryState,
 }));
 
