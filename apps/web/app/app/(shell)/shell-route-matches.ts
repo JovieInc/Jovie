@@ -59,6 +59,7 @@ export function isReleasesShellRoute(pathname: string | null): boolean {
   if (!pathname) return false;
   return (
     pathname === APP_ROUTES.RELEASES ||
+    pathname.startsWith(`${APP_ROUTES.RELEASES}/`) ||
     pathname === APP_ROUTES.DASHBOARD_RELEASES ||
     pathname.startsWith(`${APP_ROUTES.DASHBOARD_RELEASES}/`)
   );

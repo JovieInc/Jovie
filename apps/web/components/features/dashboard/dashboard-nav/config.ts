@@ -67,7 +67,7 @@ export const primaryNavigation: NavItem[] = [
   profileNavItem,
   {
     name: 'Releases',
-    href: APP_ROUTES.DASHBOARD_RELEASES,
+    href: APP_ROUTES.RELEASES,
     id: 'releases',
     icon: Music,
     description: 'Link out every provider with one smart link',

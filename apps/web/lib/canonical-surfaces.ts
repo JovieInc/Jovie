@@ -78,9 +78,9 @@ export const CANONICAL_SURFACES = [
   {
     id: 'dashboard-releases',
     label: 'Dashboard Releases',
-    liveRoutes: [APP_ROUTES.DASHBOARD_RELEASES],
+    liveRoutes: [APP_ROUTES.RELEASES, APP_ROUTES.DASHBOARD_RELEASES],
     reviewRoute: '/demo',
-    sourceRoute: APP_ROUTES.DASHBOARD_RELEASES,
+    sourceRoute: APP_ROUTES.RELEASES,
     sourceComponent:
       'features/dashboard/organisms/release-provider-matrix/ReleasesExperience',
     demoRoute: '/demo',

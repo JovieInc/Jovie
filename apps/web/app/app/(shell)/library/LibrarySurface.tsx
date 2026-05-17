@@ -1027,7 +1027,7 @@ function EmptyCatalog() {
         className='m-3 min-h-[360px]'
         action={
           <Link
-            href={APP_ROUTES.DASHBOARD_RELEASES}
+            href={APP_ROUTES.RELEASES}
             className='inline-flex h-8 items-center rounded-md border border-subtle bg-surface-0 px-3 text-sm font-medium text-primary-token transition-[background-color,border-color] duration-subtle hover:border-default hover:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token'
           >
             Open Releases

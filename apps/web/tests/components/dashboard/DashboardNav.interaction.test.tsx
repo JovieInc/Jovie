@@ -28,7 +28,7 @@ describe('DashboardNav interactions', () => {
     expect(screen.getByRole('button', { name: 'Profile' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Releases' })).toHaveAttribute(
       'href',
-      APP_ROUTES.DASHBOARD_RELEASES
+      APP_ROUTES.RELEASES
     );
     expect(screen.getByRole('link', { name: 'Audience' })).toHaveAttribute(
       'href',
@@ -152,7 +152,7 @@ describe('DashboardNav interactions', () => {
     expect(screen.getByRole('button', { name: 'Profile' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Releases' })).toHaveAttribute(
       'href',
-      APP_ROUTES.DASHBOARD_RELEASES
+      APP_ROUTES.RELEASES
     );
     expect(screen.getByRole('link', { name: 'Audience' })).toHaveAttribute(
       'href',
