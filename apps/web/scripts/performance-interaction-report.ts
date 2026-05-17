@@ -152,6 +152,9 @@ function summarizeScenario(
 ): InteractionScenarioSummary {
   for (const sample of samples) {
     assertFiniteSampleValue(sample.firstFeedbackMs, 'firstFeedbackMs');
+    if (sample.nextPaintMs !== undefined) {
+      assertFiniteSampleValue(sample.nextPaintMs, 'nextPaintMs');
+    }
     if (sample.usableStateMs !== undefined) {
       assertFiniteSampleValue(sample.usableStateMs, 'usableStateMs');
     }

@@ -185,4 +185,19 @@ describe('performance interaction report', () => {
       })
     ).toThrow('Unknown scenarioId in samples: unknown-hot-path');
   });
+
+  it('rejects malformed next-paint timing samples', () => {
+    expect(() =>
+      buildInteractionLatencyReport({
+        samples: [
+          {
+            firstFeedbackMs: 80,
+            nextPaintMs: -1,
+            runIndex: 0,
+            scenarioId: 'command-palette-open',
+          },
+        ],
+      })
+    ).toThrow('Expected non-negative finite nextPaintMs');
+  });
 });
