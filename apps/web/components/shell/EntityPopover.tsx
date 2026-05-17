@@ -24,6 +24,7 @@ import {
   useState,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { LINEAR_SURFACE } from '@/components/tokens/linear-surface';
 import { cn } from '@/lib/utils';
 
 // ---------------------------------------------------------------------------
@@ -485,7 +486,7 @@ function EntityCard({ entity, onActivate }: EntityCardProps) {
       : null;
 
   return (
-    <div className='flex items-start gap-3'>
+    <div className='flex items-start gap-3.5'>
       <CardArtwork entity={entity} />
       <div className='min-w-0 flex-1'>
         <div className='mb-1 text-2xs font-caption text-tertiary-token'>
@@ -621,14 +622,15 @@ export function EntityPopover({
       }}
       className={cn(
         'z-[80]',
-        'rounded-lg border border-default',
-        'bg-surface-0 text-primary-token shadow-card-elevated',
-        'p-2.5',
+        LINEAR_SURFACE.popover,
+        'text-primary-token',
         'animate-in fade-in-0 zoom-in-95 duration-subtle ease-subtle',
         pos?.side === 'left' ? 'slide-in-from-right-1' : 'slide-in-from-left-1'
       )}
     >
-      <EntityCard entity={entity} onActivate={onActivate} />
+      <div className='p-3'>
+        <EntityCard entity={entity} onActivate={onActivate} />
+      </div>
     </div>,
     document.body
   );

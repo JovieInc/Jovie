@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { act, fireEvent, screen } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -54,11 +56,12 @@ describe('EntityHoverLink', () => {
     advanceTimers(200);
 
     const tooltip = screen.getByRole('tooltip');
-    expect(tooltip).toHaveClass('rounded-lg', 'bg-surface-0', 'p-2.5');
+    expect(tooltip).toHaveClass('rounded-xl', 'bg-surface-1', 'p-0');
     expect(tooltip.className).not.toContain('bg-(--linear-bg-surface-0)');
     expect(tooltip.className).not.toContain(
       'rounded-(--linear-app-radius-menu)'
     );
+    expect(tooltip.firstElementChild).toHaveClass('p-3');
   });
 
   it('opens on focus and closes on Escape', () => {
@@ -74,5 +77,22 @@ describe('EntityHoverLink', () => {
     fireEvent.keyDown(trigger, { key: 'Escape' });
 
     expect(screen.queryByRole('tooltip')).toBeNull();
+  });
+});
+
+describe('EntityPopover source contract', () => {
+  it('keeps floating surface chrome on the shared token', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'components/shell/EntityPopover.tsx'),
+      'utf8'
+    );
+
+    expect(source).toContain(
+      "import { LINEAR_SURFACE } from '@/components/tokens/linear-surface';"
+    );
+    expect(source).toContain('LINEAR_SURFACE.popover');
+    expect(source).not.toContain("'rounded-lg border border-default'");
+    expect(source).not.toContain("'bg-surface-0 text-primary-token");
+    expect(source).not.toContain("'p-2.5'");
   });
 });
