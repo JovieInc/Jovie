@@ -7,6 +7,7 @@ export interface CookieActionsProps {
   readonly onReject: () => void;
   readonly onCustomize: () => void;
   readonly className?: string;
+  readonly disabled?: boolean;
 }
 
 const secondaryButtonStyle: CSSProperties = {
@@ -37,6 +38,7 @@ export function CookieActions({
   onReject,
   onCustomize,
   className = '',
+  disabled = false,
 }: CookieActionsProps) {
   return (
     <div
@@ -47,6 +49,7 @@ export function CookieActions({
         <button
           type='button'
           onClick={onReject}
+          disabled={disabled}
           className='flex-1 sm:flex-none transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent'
           style={secondaryButtonStyle}
         >
@@ -55,6 +58,7 @@ export function CookieActions({
         <button
           type='button'
           onClick={onCustomize}
+          disabled={disabled}
           className='flex-1 sm:flex-none transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent'
           style={secondaryButtonStyle}
         >
@@ -64,6 +68,7 @@ export function CookieActions({
       <button
         type='button'
         onClick={onAcceptAll}
+        disabled={disabled}
         className='w-full sm:w-auto transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent'
         style={primaryButtonStyle}
       >

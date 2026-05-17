@@ -38,6 +38,11 @@ import {
   COOKIE_BANNER_REQUIRED_COOKIE,
   isCookieBannerRequired,
 } from '@/lib/cookies/consent-regions';
+import {
+  CONSENT_COOKIE_NAME,
+  hasAnalyticsConsent,
+} from '@/lib/cookies/consent-state';
+import { NONESSENTIAL_PROXY_COOKIE_NAMES } from '@/lib/cookies/registry';
 import { captureError } from '@/lib/error-tracking';
 import {
   analyzeHost,
@@ -1014,30 +1019,6 @@ function buildFinalResponse(
   }
 
   const geo = getGeoFromRequest(req);
-
-  if (geo.city && req.cookies.get(HOMEPAGE_CITY_COOKIE)?.value !== geo.city) {
-    res.cookies.set(HOMEPAGE_CITY_COOKIE, geo.city, {
-      httpOnly: false,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7,
-      path: '/',
-    });
-  }
-
-  if (
-    geo.region &&
-    req.cookies.get(HOMEPAGE_REGION_COOKIE)?.value !== geo.region
-  ) {
-    res.cookies.set(HOMEPAGE_REGION_COOKIE, geo.region, {
-      httpOnly: false,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7,
-      path: '/',
-    });
-  }
-
   const countryCode =
     req.headers.get('x-vercel-ip-country') ?? req.headers.get('cf-ipcountry');
   const normalizedCountryCode = countryCode?.trim().toUpperCase() ?? null;
@@ -1051,6 +1032,9 @@ function buildFinalResponse(
   const currentCountryCode =
     req.cookies.get(COUNTRY_CODE_COOKIE)?.value ?? null;
   const nextCookieRequirement = requiresCookieConsent ? '1' : '0';
+  const canSetAnalyticsProxyCookies =
+    !requiresCookieConsent ||
+    hasAnalyticsConsent(req.cookies.get(CONSENT_COOKIE_NAME)?.value);
 
   if (normalizedCountryCode && currentCountryCode !== normalizedCountryCode) {
     res.cookies.set(COUNTRY_CODE_COOKIE, normalizedCountryCode, {
@@ -1075,25 +1059,63 @@ function buildFinalResponse(
     });
   }
 
-  // Set audience tracking cookies
-  if (!req.cookies.get(AUDIENCE_ANON_COOKIE)?.value) {
-    res.cookies.set(AUDIENCE_ANON_COOKIE, crypto.randomUUID(), {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 365,
-      path: '/',
-    });
+  if (requiresCookieConsent && !canSetAnalyticsProxyCookies) {
+    for (const cookieName of NONESSENTIAL_PROXY_COOKIE_NAMES) {
+      if (req.cookies.get(cookieName)?.value) {
+        res.cookies.set(cookieName, '', {
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 0,
+          path: '/',
+        });
+      }
+    }
   }
 
-  if (userId && res.cookies.get(AUDIENCE_IDENTIFIED_COOKIE)?.value !== '1') {
-    res.cookies.set(AUDIENCE_IDENTIFIED_COOKIE, '1', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 365,
-      path: '/',
-    });
+  if (canSetAnalyticsProxyCookies) {
+    if (geo.city && req.cookies.get(HOMEPAGE_CITY_COOKIE)?.value !== geo.city) {
+      res.cookies.set(HOMEPAGE_CITY_COOKIE, geo.city, {
+        httpOnly: false,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 7,
+        path: '/',
+      });
+    }
+
+    if (
+      geo.region &&
+      req.cookies.get(HOMEPAGE_REGION_COOKIE)?.value !== geo.region
+    ) {
+      res.cookies.set(HOMEPAGE_REGION_COOKIE, geo.region, {
+        httpOnly: false,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 7,
+        path: '/',
+      });
+    }
+
+    // Set audience tracking cookies.
+    if (!req.cookies.get(AUDIENCE_ANON_COOKIE)?.value) {
+      res.cookies.set(AUDIENCE_ANON_COOKIE, crypto.randomUUID(), {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 365,
+        path: '/',
+      });
+    }
+
+    if (userId && req.cookies.get(AUDIENCE_IDENTIFIED_COOKIE)?.value !== '1') {
+      res.cookies.set(AUDIENCE_IDENTIFIED_COOKIE, '1', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 365,
+        path: '/',
+      });
+    }
   }
 
   // Performance monitoring
