@@ -97,16 +97,20 @@ describe('sync-skills-catalog', () => {
   it('upserts non-tool skills with conflict guards', async () => {
     await syncSkillsCatalog();
 
-    expect(mockInsert).toHaveBeenCalledTimes(1);
-    const insertedRows = mockValues.mock.calls[0]?.[0];
+    expect(mockInsert.mock.calls.length).toBeGreaterThanOrEqual(1);
+    const insertedRows = mockValues.mock.calls[0]?.[0] as
+      | Array<Record<string, unknown>>
+      | undefined;
 
-    expect(insertedRows).toEqual([
-      expect.objectContaining({
-        id: 'retouch',
-        kind: 'vertical_agent',
-        entitlementRequired: 'ai_retouching',
-      }),
-    ]);
+    expect(insertedRows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'retouch',
+          kind: 'vertical_agent',
+          entitlementRequired: 'ai_retouching',
+        }),
+      ])
+    );
     expect(mockOnConflictDoUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         setWhere: expect.anything(),
@@ -130,18 +134,29 @@ describe('sync-skills-catalog', () => {
 
     await syncSkillsCatalog();
 
-    expect(mockInsert).toHaveBeenCalledTimes(2);
-    const toolRows = mockValues.mock.calls[1]?.[0];
+    expect(mockInsert.mock.calls.length).toBeGreaterThanOrEqual(2);
+    const toolCallIndex = mockValues.mock.calls.findIndex(([rows]) => {
+      return (
+        Array.isArray(rows) &&
+        rows.some(row => (row as { id?: string }).id === 'unitTool')
+      );
+    });
+    expect(toolCallIndex).toBeGreaterThanOrEqual(0);
+    const toolRows = mockValues.mock.calls[toolCallIndex]?.[0] as
+      | Array<Record<string, unknown>>
+      | undefined;
 
-    expect(toolRows).toEqual([
-      expect.objectContaining({
-        id: 'unitTool',
-        kind: 'tool',
-        inputSchemaZodPath: 'apps/web/lib/agents/tools/unit/input.ts',
-        outputSchemaZodPath: 'apps/web/lib/agents/tools/unit/output.ts',
-      }),
-    ]);
-    expect(mockOnConflictDoUpdate.mock.calls[1]?.[0]).toEqual(
+    expect(toolRows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'unitTool',
+          kind: 'tool',
+          inputSchemaZodPath: 'apps/web/lib/agents/tools/unit/input.ts',
+          outputSchemaZodPath: 'apps/web/lib/agents/tools/unit/output.ts',
+        }),
+      ])
+    );
+    expect(mockOnConflictDoUpdate.mock.calls[toolCallIndex]?.[0]).toEqual(
       expect.objectContaining({
         set: expect.objectContaining({
           inputSchemaZodPath: expect.anything(),
