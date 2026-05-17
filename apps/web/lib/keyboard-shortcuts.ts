@@ -198,7 +198,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     keys: 'G then A',
     category: 'navigation',
     icon: Users,
-    href: APP_ROUTES.DASHBOARD_AUDIENCE,
+    href: APP_ROUTES.AUDIENCE,
     isSequential: true,
     firstKey: 'g',
     secondKey: 'a',
