@@ -26,6 +26,14 @@ const PRIVATE_IPV4_BLOCKS = [
 ] as const;
 
 export function isTestAuthBypassEnabled(): boolean {
+  // Explicitly block the bypass on Vercel preview deployments even if
+  // E2E_USE_TEST_AUTH_BYPASS=1 is set in the preview environment.  Combined
+  // with the removal of the *.vercel.app wildcard from isTrustedTestBypassHostname,
+  // this gives defence-in-depth: an attacker who knows a preview URL cannot forge
+  // a session even if the env-var is accidentally set to "1" in that env.
+  if (process.env.VERCEL_ENV === 'preview') {
+    return false;
+  }
   return process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
 }
 
@@ -76,7 +84,6 @@ export function isTrustedTestBypassHostname(hostname: string | null): boolean {
     normalizedHostname === '[::1]' ||
     Boolean(normalizedHostname?.endsWith('.localhost')) ||
     Boolean(normalizedHostname?.endsWith('.local')) ||
-    Boolean(normalizedHostname?.endsWith('.vercel.app')) ||
     Boolean(
       normalizedHostname && TRUSTED_PREVIEW_HOSTS.has(normalizedHostname)
     ) ||

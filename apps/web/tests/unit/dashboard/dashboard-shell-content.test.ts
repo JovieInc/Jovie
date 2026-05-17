@@ -80,6 +80,7 @@ describe('@critical DashboardShellContent behavior contracts', () => {
     it('lyrics, library, tasks, insights, and presence routes use essential shell data', () => {
       expect(shouldUseEssentialShellData(APP_ROUTES.LYRICS)).toBe(true);
       expect(shouldUseEssentialShellData(APP_ROUTES.LIBRARY)).toBe(true);
+      expect(shouldUseEssentialShellData(APP_ROUTES.TASKS)).toBe(true);
       expect(shouldUseEssentialShellData(APP_ROUTES.DASHBOARD_TASKS)).toBe(
         true
       );

@@ -24,9 +24,10 @@ vi.mock(
   })
 );
 
-import TasksPage from '@/app/app/(shell)/dashboard/tasks/page';
+import LegacyTasksPage from '@/app/app/(shell)/dashboard/tasks/page';
+import TasksPage from '@/app/app/(shell)/tasks/page';
 
-describe('dashboard tasks page', () => {
+describe('tasks page routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -55,5 +56,15 @@ describe('dashboard tasks page', () => {
     expect(
       screen.queryByTestId('tasks-upgrade-interstitial')
     ).not.toBeInTheDocument();
+  });
+
+  it('keeps the legacy dashboard entry point on the same task contract', async () => {
+    mockGetCurrentUserEntitlements.mockResolvedValueOnce({
+      canAccessTasksWorkspace: true,
+    });
+
+    render(await LegacyTasksPage());
+
+    expect(screen.getByTestId('tasks-page-client')).toBeInTheDocument();
   });
 });
