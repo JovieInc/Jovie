@@ -139,6 +139,7 @@
     "test:a11y": "vitest run --config=vitest.config.storybook.mts",
     "test:visual-a11y": "pnpm run e2e:visual && pnpm run test:a11y",
     "perf:auth": "tsx scripts/performance-auth.ts",
+    "perf:interactions": "tsx scripts/performance-interaction-audit.ts",
     "perf:queue": "doppler run --project jovie-web --config dev -- tsx scripts/performance-batch-queue.ts",
     "qa:routes": "tsx scripts/route-qa.ts",
     "public:route-qa": "tsx scripts/public-route-qa.ts",
