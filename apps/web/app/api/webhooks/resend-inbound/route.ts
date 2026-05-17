@@ -132,7 +132,14 @@ async function processInboundEmail(
   }
 }
 
-/** Verify webhook signature, returning an error response if verification fails. */
+/**
+ * Verify webhook signature, returning an error response if verification fails.
+ *
+ * Fail closed in ALL environments when the secret is absent. Previously this
+ * helper allowed unauthenticated requests through in non-production
+ * environments, which created an unauthenticated write path to the artist
+ * email database on staging/preview deploys.
+ */
 function verifyWebhookSignature(
   req: NextRequest,
   rawBody: string
@@ -141,32 +148,28 @@ function verifyWebhookSignature(
   const svixSignature = req.headers.get('svix-signature');
   const webhookSecret = env.RESEND_INBOUND_WEBHOOK_SECRET;
 
-  if (!webhookSecret && process.env.NODE_ENV === 'production') {
-    logger.error('RESEND_INBOUND_WEBHOOK_SECRET not configured in production');
+  if (!webhookSecret) {
+    logger.error('RESEND_INBOUND_WEBHOOK_SECRET not configured');
     return NextResponse.json(
       { error: 'Webhook not configured' },
       { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 
-  if (webhookSecret) {
-    if (!svixSignature || !svixTimestamp) {
-      logger.warn('Inbound webhook missing required signature headers');
-      return NextResponse.json(
-        { error: 'Missing signature headers' },
-        { status: 401, headers: NO_STORE_HEADERS }
-      );
-    }
+  if (!svixSignature || !svixTimestamp) {
+    logger.warn('Inbound webhook missing required signature headers');
+    return NextResponse.json(
+      { error: 'Missing signature headers' },
+      { status: 401, headers: NO_STORE_HEADERS }
+    );
+  }
 
-    if (
-      !verifySignature(rawBody, svixSignature, svixTimestamp, webhookSecret)
-    ) {
-      logger.warn('Inbound webhook signature verification failed');
-      return NextResponse.json(
-        { error: 'Invalid signature' },
-        { status: 401, headers: NO_STORE_HEADERS }
-      );
-    }
+  if (!verifySignature(rawBody, svixSignature, svixTimestamp, webhookSecret)) {
+    logger.warn('Inbound webhook signature verification failed');
+    return NextResponse.json(
+      { error: 'Invalid signature' },
+      { status: 401, headers: NO_STORE_HEADERS }
+    );
   }
 
   return null;
