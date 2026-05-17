@@ -24,9 +24,7 @@ export const runtime = 'nodejs';
 export default async function ReleasesPage() {
   const { userId } = await getCachedAuth();
   if (!userId) {
-    redirect(
-      `${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.DASHBOARD_RELEASES}`
-    );
+    redirect(`${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.RELEASES}`);
   }
 
   // Shell data is cached from the shell layout (same request) — resolves instantly.
@@ -36,7 +34,7 @@ export default async function ReleasesPage() {
     void captureError(
       'Dashboard data load failed on releases page',
       dashboardData.dashboardLoadError,
-      { route: APP_ROUTES.DASHBOARD_RELEASES }
+      { route: APP_ROUTES.RELEASES }
     );
     return (
       <PageErrorState message='Failed to load releases data. Please refresh the page.' />
@@ -60,7 +58,7 @@ export default async function ReleasesPage() {
         'Release matrix prefetch failed on releases page',
         error,
         {
-          route: APP_ROUTES.DASHBOARD_RELEASES,
+          route: APP_ROUTES.RELEASES,
         }
       );
     }

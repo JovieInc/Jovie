@@ -271,6 +271,7 @@ async function createTaskForProfile(
       .returning();
 
     revalidatePath(APP_ROUTES.TASKS);
+    revalidatePath(APP_ROUTES.RELEASES);
     revalidatePath(APP_ROUTES.DASHBOARD_RELEASES);
 
     return mapTaskRow(created);
@@ -632,6 +633,7 @@ export async function updateTask(
     .returning();
 
   revalidatePath(APP_ROUTES.TASKS);
+  revalidatePath(APP_ROUTES.RELEASES);
   revalidatePath(APP_ROUTES.DASHBOARD_RELEASES);
 
   return mapTaskRow(updated);
@@ -810,6 +812,7 @@ export async function moveTask(
 
     if (succeeded) {
       revalidatePath(APP_ROUTES.TASKS);
+      revalidatePath(APP_ROUTES.RELEASES);
       revalidatePath(APP_ROUTES.DASHBOARD_RELEASES);
       return { success: true };
     }
@@ -818,6 +821,7 @@ export async function moveTask(
   // All retries exhausted — still succeed from the client's perspective.
   // The onSettled invalidateQueries in useMoveTaskMutation will re-sync state.
   revalidatePath(APP_ROUTES.TASKS);
+  revalidatePath(APP_ROUTES.RELEASES);
   revalidatePath(APP_ROUTES.DASHBOARD_RELEASES);
   return { success: true };
 }
@@ -838,6 +842,7 @@ export async function deleteTask(
     .where(eq(tasks.id, taskId));
 
   revalidatePath(APP_ROUTES.TASKS);
+  revalidatePath(APP_ROUTES.RELEASES);
   revalidatePath(APP_ROUTES.DASHBOARD_RELEASES);
 
   return { success: true };

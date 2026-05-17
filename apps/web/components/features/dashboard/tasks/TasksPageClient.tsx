@@ -933,7 +933,7 @@ function TaskEmptyState({
               variant='secondary'
               size='sm'
               onClick={() => {
-                globalThis.location.href = APP_ROUTES.DASHBOARD_RELEASES;
+                globalThis.location.href = APP_ROUTES.RELEASES;
               }}
             >
               Set Up Release

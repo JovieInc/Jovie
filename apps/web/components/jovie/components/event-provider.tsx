@@ -55,6 +55,7 @@ function eventToEntityRef(event: EventRecord): EntityRef {
 export function createEventProvider(profileId: string): EntityProvider {
   return {
     kind: 'event',
+    registryKey: `event:${profileId}`,
     label: 'Events',
     useSearch(query: string): EntitySearchResult {
       const { data, isLoading } = useEventsQuery(profileId);

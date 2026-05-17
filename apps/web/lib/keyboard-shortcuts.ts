@@ -174,7 +174,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     keys: 'G then R',
     category: 'navigation',
     icon: Music,
-    href: APP_ROUTES.DASHBOARD_RELEASES,
+    href: APP_ROUTES.RELEASES,
     isSequential: true,
     firstKey: 'g',
     secondKey: 'r',

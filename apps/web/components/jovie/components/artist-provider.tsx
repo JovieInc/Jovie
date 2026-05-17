@@ -19,6 +19,7 @@ import { EntityChip } from './EntityChip';
  */
 export const artistProvider: EntityProvider = {
   kind: 'artist',
+  registryKey: 'artist:spotify-search',
   label: 'Artists',
   useSearch(query: string): EntitySearchResult {
     const { results, state, search } = useArtistSearchQuery({
