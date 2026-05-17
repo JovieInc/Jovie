@@ -2,7 +2,7 @@
   "name": "@jovie/desktop",
   "version": "26.5.14",
   "description": "Jovie desktop app",
-  "author": "Jovie Inc.",
+  "author": "Jovie Technology Inc.",
   "private": true,
   "main": "dist-electron/main.js",
   "scripts": {
