@@ -90,8 +90,13 @@ function collectHydrationErrors(page: Page): {
   };
 }
 
+function expectPageSuccessStatus(status: number, message: string) {
+  expect(status, message).toBeGreaterThanOrEqual(200);
+  expect(status, message).toBeLessThan(400);
+}
+
 /** Navigate to a route and wait for hydration. Returns false if the page
- *  could not be loaded (profile not seeded), so callers can skip. */
+ *  could not be loaded, so callers can skip seeded-profile 404s or fail. */
 async function goAndWait(
   page: Page,
   path: string
@@ -100,7 +105,7 @@ async function goAndWait(
     timeout: SMOKE_TIMEOUTS.NAVIGATION,
   });
   const status = response?.status() ?? 0;
-  if (status === 0 || status === 404 || status >= 500) {
+  if (status < 200 || status >= 400) {
     return { status, ok: false };
   }
   await waitForHydration(page);
@@ -128,10 +133,10 @@ test.describe('Public-profile canary', () => {
         test.skip(true, '/tim profile not seeded in this environment');
         return;
       }
-      expect(
+      expectPageSuccessStatus(
         status,
         `/${CANARY_CREATOR.handle} returned ${status}`
-      ).toBeLessThan(500);
+      );
     }
 
     // h1 must be visible and non-empty
@@ -173,7 +178,7 @@ test.describe('Public-profile canary', () => {
         test.skip(true, '/tim/alerts not available in this environment');
         return;
       }
-      expect(status, '/tim/alerts returned error').toBeLessThan(500);
+      expectPageSuccessStatus(status, '/tim/alerts returned error');
     }
 
     // The page must have a way for fans to subscribe (email input or CTA button)
@@ -215,10 +220,10 @@ test.describe('Public-profile canary', () => {
     }
 
     // After following the redirect, the final page should be 200
-    expect(
+    expectPageSuccessStatus(
       status,
       '/tim/pay (or final redirect destination) returned error'
-    ).toBeLessThan(500);
+    );
 
     await waitForHydration(page);
 
@@ -330,7 +335,7 @@ test.describe('Public-profile canary', () => {
         test.skip(true, '/tim/alerts not seeded');
         return;
       }
-      expect(status).toBeLessThan(500);
+      expectPageSuccessStatus(status, '/tim/alerts returned error');
     }
 
     // Locate email input
@@ -391,12 +396,17 @@ test.describe('Public-profile canary', () => {
       })
       .catch(() => null);
 
-    if (capturedStatus !== null) {
-      expect(
-        capturedStatus,
-        `Subscription API returned ${capturedStatus} — 5xx indicates a broken subscribe path`
-      ).toBeLessThan(500);
+    expect(
+      capturedStatus,
+      'No /api/audience response captured after submit'
+    ).not.toBeNull();
+    if (capturedStatus === null) {
+      throw new Error('No /api/audience response captured after submit');
     }
+    expect(
+      capturedStatus,
+      `Subscription API returned ${capturedStatus} — 5xx indicates a broken subscribe path`
+    ).toBeLessThan(500);
   });
 
   // --------------------------------------------------------------------------
@@ -420,7 +430,7 @@ test.describe('Public-profile canary', () => {
         test.skip(true, '/tim not seeded');
         return;
       }
-      expect(status).toBeLessThan(500);
+      expectPageSuccessStatus(status, '/tim?noredirect=1 returned error');
     }
 
     // Should still be on the /tim route (not redirected to /app/dashboard)
@@ -466,14 +476,10 @@ test.describe('Public-profile canary', () => {
         test.skip(true, '/tim not seeded');
         return;
       }
-      expect(
+      expectPageSuccessStatus(
         status,
         `/tim returned ${status} before hydration check`
-      ).toBeGreaterThan(0);
-      expect(
-        status,
-        `/tim returned ${status} before hydration check`
-      ).toBeLessThan(500);
+      );
       return;
     }
 
@@ -506,7 +512,7 @@ test.describe('Public-profile canary', () => {
         test.skip(true, '/tim/alerts not seeded');
         return;
       }
-      expect(status).toBeLessThan(500);
+      expectPageSuccessStatus(status, '/tim/alerts returned error');
     }
 
     // At least one of email or SMS input must be present
