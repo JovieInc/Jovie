@@ -56,4 +56,14 @@ describe('chat route rewrites', () => {
       rewrites.find(rewrite => rewrite.source === APP_ROUTES.PRESENCE)
     ).toBeUndefined();
   }, 20_000);
+
+  it('does not rewrite canonical releases through the legacy dashboard alias', async () => {
+    const nextConfigModule = await import('../../../next.config.js');
+    const nextConfig = nextConfigModule.default ?? nextConfigModule;
+    const rewrites = flattenRewrites(await nextConfig.rewrites());
+
+    expect(
+      rewrites.find(rewrite => rewrite.source === APP_ROUTES.RELEASES)
+    ).toBeUndefined();
+  }, 20_000);
 });

@@ -73,6 +73,7 @@ describe('@critical DashboardShellContent behavior contracts', () => {
     });
 
     it('releases routes use essential shell data', () => {
+      expect(shouldUseEssentialShellData(APP_ROUTES.RELEASES)).toBe(true);
       expect(shouldUseEssentialShellData('/app/dashboard/releases')).toBe(true);
     });
 
