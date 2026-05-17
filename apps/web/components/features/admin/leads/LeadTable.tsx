@@ -12,9 +12,9 @@ import {
   PageToolbar,
   PageToolbarTabButton,
   TableEmptyState,
-  UnifiedTable,
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
+import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { useSearchUrlSync } from '@/hooks/useSearchUrlSync';
 import {
   type AdminLead,
@@ -379,7 +379,7 @@ export function LeadTable({
           Unable to refresh leads. Showing cached data.
         </div>
       )}
-      <UnifiedTable
+      <AdminDataTable
         data={leads}
         columns={columns as ColumnDef<AdminLead, unknown>[]}
         isLoading={isLoading}

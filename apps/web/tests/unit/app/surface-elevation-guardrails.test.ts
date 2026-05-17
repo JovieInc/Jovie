@@ -315,10 +315,12 @@ describe('surface elevation guardrails', () => {
   it('keeps admin shell tables on the canonical AdminDataTable wrapper', () => {
     const files = [
       'components/features/admin/ActivityTableUnified.tsx',
+      'components/features/admin/agent-os/AgentOsRunsPanel.tsx',
       'components/features/admin/admin-creator-profiles/AdminCreatorProfilesUnified.tsx',
       'components/features/admin/admin-releases-table/AdminReleasesTableUnified.tsx',
       'components/features/admin/admin-users-table/AdminUsersTableUnified.tsx',
       'components/features/admin/feedback-table/AdminFeedbackTable.tsx',
+      'components/features/admin/leads/LeadTable.tsx',
       'components/features/admin/waitlist-table/AdminWaitlistTableUnified.tsx',
     ] as const;
 
