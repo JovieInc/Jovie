@@ -6,6 +6,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 
 import { HERMES_PATHS } from './hermes-paths';
+import { withRetry } from './retry';
 
 const TELEGRAM_API = 'https://api.telegram.org';
 
@@ -32,17 +33,33 @@ export async function sendTelegram(text: string): Promise<boolean> {
   const chatId = getChatId();
   if (!token || !chatId) return false;
   try {
-    const response = await fetch(`${TELEGRAM_API}/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: text.slice(0, 4000), // Telegram hard cap 4096; leave headroom
-        disable_web_page_preview: true,
-      }),
-      signal: AbortSignal.timeout(10_000),
-    });
-    return response.ok;
+    await withRetry(
+      async () => {
+        const response = await fetch(
+          `${TELEGRAM_API}/bot${token}/sendMessage`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: chatId,
+              text: text.slice(0, 4000), // Telegram cap is 4096; leave headroom
+              disable_web_page_preview: true,
+            }),
+            signal: AbortSignal.timeout(10_000),
+          }
+        );
+        if (response.status === 429 || response.status >= 500) {
+          throw new Error(`Telegram ${response.status}`);
+        }
+        if (!response.ok) {
+          const err = new Error(`Telegram ${response.status}`);
+          (err as Error & { permanent?: boolean }).permanent = true;
+          throw err;
+        }
+      },
+      { caller: 'telegram.send', attempts: 3, baseMs: 300 }
+    );
+    return true;
   } catch {
     return false;
   }
