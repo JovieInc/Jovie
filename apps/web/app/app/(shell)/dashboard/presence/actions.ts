@@ -14,7 +14,7 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import type { DspMatchStatus, DspProviderId } from '@/lib/dsp-enrichment/types';
 import { PROVIDER_DOMAINS } from '@/lib/dsp-registry';
 import { captureError } from '@/lib/error-tracking';
-import { getDashboardData } from '../actions';
+import { getDashboardDataEssential } from '../actions';
 
 // ============================================================================
 // Types
@@ -142,7 +142,7 @@ export async function loadDspPresenceForProfile(
 }
 
 export async function loadDspPresence(): Promise<DspPresenceData> {
-  const data = await getDashboardData();
+  const data = await getDashboardDataEssential();
 
   if (data.needsOnboarding && !data.dashboardLoadError) {
     redirect(APP_ROUTES.START);
@@ -189,7 +189,7 @@ export async function addManualDspMatch(input: {
   url: string;
   artistName: string;
 }): Promise<{ success: boolean; error?: string }> {
-  const data = await getDashboardData();
+  const data = await getDashboardDataEssential();
 
   if (data.needsOnboarding && !data.dashboardLoadError) {
     redirect(APP_ROUTES.START);
