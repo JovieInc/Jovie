@@ -513,7 +513,7 @@ export function ProfileContactSidebar() {
   }, [monetizationSummary, router]);
 
   const handleViewAnalytics = useCallback(() => {
-    router.push(APP_ROUTES.DASHBOARD_AUDIENCE);
+    router.push(APP_ROUTES.AUDIENCE);
   }, [router]);
 
   // Handle smart add — receives a detected link from SidebarLinkInput

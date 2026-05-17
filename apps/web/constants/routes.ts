@@ -18,6 +18,7 @@ export const APP_ROUTES = {
   DASHBOARD_EARNINGS: '/app/dashboard/earnings',
   DASHBOARD_LINKS: '/app/dashboard/links',
   DASHBOARD_PROFILE: '/app/dashboard/profile',
+  /** Legacy audience path. Keep as a redirect source only. */
   DASHBOARD_AUDIENCE: '/app/dashboard/audience',
   /** Legacy library path. Keep as a redirect source only. */
   LEGACY_DASHBOARD_LIBRARY: '/app/dashboard/library',

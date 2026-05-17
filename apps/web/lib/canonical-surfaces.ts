@@ -100,15 +100,14 @@ export const CANONICAL_SURFACES = [
   {
     id: 'dashboard-audience',
     label: 'Dashboard Audience',
-    liveRoutes: [APP_ROUTES.DASHBOARD_AUDIENCE],
+    liveRoutes: [APP_ROUTES.AUDIENCE],
     reviewRoute: '/demo/audience',
-    sourceRoute: APP_ROUTES.DASHBOARD_AUDIENCE,
+    sourceRoute: APP_ROUTES.AUDIENCE,
     sourceComponent: 'features/dashboard/organisms/DashboardAudienceWorkspace',
     demoRoute: '/demo/audience',
     fixtureSetId: 'dashboard-audience-demo',
     screenshotIds: ['dashboard-audience-desktop'],
-    routeOwner:
-      'app/app/(shell)/dashboard/audience/page.tsx -> DashboardAudienceClient',
+    routeOwner: 'app/app/(shell)/audience/page.tsx -> DashboardAudienceClient',
     componentFamily: 'features/dashboard/organisms',
     description:
       'Canonical authenticated audience CRM workspace mirrored by the public /demo/audience route.',
