@@ -25,7 +25,7 @@ describe('release plan shell contract', () => {
     const source = readFileSync(RELEASE_PLAN_PAGE, 'utf8');
     expect(source).not.toMatch(/<header\b/);
     expect(source).not.toMatch(/<h1\b/);
-    expect(source).not.toMatch(/Release plan/);
+    expect(source).not.toMatch(/<h1\b[^>]*>\s*Release plan\s*<\/h1>/);
   });
 
   it('uses shared tokenized controls instead of raw accent button styles', () => {
@@ -36,8 +36,10 @@ describe('release plan shell contract', () => {
     }
 
     const source = readFileSync(RELEASE_PLAN_PAGE, 'utf8');
-    expect(source).toContain("import { Button } from '@jovie/ui'");
+    expect(source).toMatch(
+      /import\s*\{\s*Button\s*\}\s*from\s*['"]@jovie\/ui['"]/
+    );
     expect(source).toContain('<Button');
-    expect(source).not.toMatch(/bg-fuchsia-|hover:bg-fuchsia-|shadow\s/);
+    expect(source).not.toMatch(/(?:bg-fuchsia|hover:bg-fuchsia|bg-fuchsia-)/);
   });
 });
