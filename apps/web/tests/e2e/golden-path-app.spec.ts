@@ -194,7 +194,7 @@ test.describe('Golden Path: Core App Flows', { tag: '@golden-path' }, () => {
   test('audience page loads', async ({ page }) => {
     test.setTimeout(240_000);
 
-    await smokeNavigateWithRetry(page, APP_ROUTES.DASHBOARD_AUDIENCE, {
+    await smokeNavigateWithRetry(page, APP_ROUTES.AUDIENCE, {
       timeout: 60_000,
       retries: 2,
     });

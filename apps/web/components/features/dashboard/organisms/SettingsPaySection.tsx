@@ -96,7 +96,7 @@ export function SettingsPaySection() {
   }, [router, summary]);
 
   const handleViewAnalytics = useCallback(() => {
-    router.push(APP_ROUTES.DASHBOARD_AUDIENCE);
+    router.push(APP_ROUTES.AUDIENCE);
   }, [router]);
 
   return (

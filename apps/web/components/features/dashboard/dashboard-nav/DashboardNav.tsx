@@ -54,8 +54,11 @@ function isItemActive(pathname: string, item: NavItem): boolean {
     ) {
       return APP_ROUTES.RELEASES;
     }
-    if (pathname === APP_ROUTES.AUDIENCE) {
-      return APP_ROUTES.DASHBOARD_AUDIENCE;
+    if (
+      pathname === APP_ROUTES.DASHBOARD_AUDIENCE ||
+      pathname === APP_ROUTES.AUDIENCE
+    ) {
+      return APP_ROUTES.AUDIENCE;
     }
     return pathname;
   })();

@@ -109,7 +109,7 @@ const AUTHENTICATED_ROUTES = [
   },
   {
     id: 'app-audience',
-    path: APP_ROUTES.DASHBOARD_AUDIENCE,
+    path: APP_ROUTES.AUDIENCE,
     readySelectors: ['[data-testid="dashboard-audience-client"]', 'main'],
   },
   {

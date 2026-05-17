@@ -81,7 +81,7 @@ export const primaryNavigation: NavItem[] = [
   },
   {
     name: 'Audience',
-    href: APP_ROUTES.DASHBOARD_AUDIENCE,
+    href: APP_ROUTES.AUDIENCE,
     id: 'audience',
     icon: Users,
     description: 'Understand your audience demographics',

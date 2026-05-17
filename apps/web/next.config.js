@@ -381,12 +381,12 @@ const nextConfig = {
       },
       {
         source: '/app/analytics',
-        destination: '/app/dashboard/audience',
+        destination: '/app/audience',
         permanent: false,
       },
       {
         source: '/app/dashboard/analytics',
-        destination: '/app/dashboard/audience',
+        destination: '/app/audience',
         permanent: false,
       },
       ...legacyAppRedirects,
@@ -419,14 +419,11 @@ const nextConfig = {
   },
   async rewrites() {
     return [
-      // Rewrite /app/* to /app/dashboard/* for cleaner URLs
+      // Keep canonical app URLs attached to legacy dashboard route owners while
+      // those surfaces are migrated one-by-one.
       {
         source: '/app/releases',
         destination: '/app/dashboard/releases',
-      },
-      {
-        source: '/app/audience',
-        destination: '/app/dashboard/audience',
       },
       {
         source: '/app/insights',
