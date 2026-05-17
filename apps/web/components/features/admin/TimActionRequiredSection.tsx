@@ -76,7 +76,7 @@ function ActionRow({ issue, onClose, isClosing }: Readonly<ActionRowProps>) {
           rel='noopener noreferrer'
           className='group flex items-center gap-1.5'
         >
-          <p className='truncate text-[13px] font-semibold text-primary-token transition-colors group-hover:text-[#FACC15]'>
+          <p className='truncate text-[13px] font-semibold text-primary-token transition-colors group-hover:text-warning'>
             {issue.title}
           </p>
           <ExternalLink
@@ -105,7 +105,7 @@ function ActionRow({ issue, onClose, isClosing }: Readonly<ActionRowProps>) {
         onClick={() => void onClose(issue.id)}
         disabled={isClosing}
         aria-label={`Mark "${issue.title}" as done`}
-        className='shrink-0 rounded-lg border border-subtle bg-surface-1 p-1.5 text-tertiary-token transition-colors hover:border-[#FACC15]/30 hover:bg-[#FACC15]/10 hover:text-[#FACC15] disabled:cursor-not-allowed disabled:opacity-40'
+        className='shrink-0 rounded-lg border border-subtle bg-surface-1 p-1.5 text-tertiary-token transition-colors hover:border-warning/30 hover:bg-warning/10 hover:text-warning disabled:cursor-not-allowed disabled:opacity-40'
       >
         <Check className='h-3.5 w-3.5' aria-hidden='true' />
       </button>
@@ -219,13 +219,12 @@ export function TimActionRequiredSection() {
       <div className='space-y-2.5'>
         {/* Section header */}
         <div className='flex items-center gap-2'>
-          {/* Amber accent dot matching the #FACC15 tim-action-required label color */}
+          {/* Warning accent dot for Tim action-required state. */}
           <span
-            className='h-2 w-2 shrink-0 rounded-full'
-            style={{ backgroundColor: '#FACC15' }}
+            className='h-2 w-2 shrink-0 rounded-full bg-warning'
             aria-hidden='true'
           />
-          <p className='text-[11px] font-semibold uppercase tracking-[0.16em] text-tertiary-token'>
+          <p className='text-[12px] font-caption text-tertiary-token'>
             Tim Action Required
           </p>
           {!isLoading && visibleIssues.length > 0 ? (
