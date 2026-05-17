@@ -5,10 +5,12 @@ import {
 } from '@/app/app/(shell)/dashboard/presence/actions';
 import type { DspMatchConfidenceBreakdown } from '@/lib/db/schema/dsp-enrichment';
 
-const { dashboardQueryMock, getDashboardDataMock } = vi.hoisted(() => ({
-  dashboardQueryMock: vi.fn(),
-  getDashboardDataMock: vi.fn(),
-}));
+const { dashboardQueryMock, getDashboardDataEssentialMock } = vi.hoisted(
+  () => ({
+    dashboardQueryMock: vi.fn(),
+    getDashboardDataEssentialMock: vi.fn(),
+  })
+);
 
 vi.mock('@/lib/auth/session', () => ({
   getSessionContext: vi.fn().mockResolvedValue({
@@ -44,7 +46,7 @@ vi.mock('@/lib/db/query-timeout', () => ({
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/actions', () => ({
-  getDashboardData: getDashboardDataMock,
+  getDashboardDataEssential: getDashboardDataEssentialMock,
 }));
 
 const confidenceBreakdown: DspMatchConfidenceBreakdown = {
@@ -146,7 +148,7 @@ describe('presence actions', () => {
   });
 
   it('loads presence for the selected dashboard profile', async () => {
-    getDashboardDataMock.mockResolvedValueOnce({
+    getDashboardDataEssentialMock.mockResolvedValueOnce({
       needsOnboarding: false,
       selectedProfile: {
         id: 'profile-789',

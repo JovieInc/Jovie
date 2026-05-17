@@ -24,7 +24,8 @@ import {
 } from 'react';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { TableEmptyState, UnifiedTable } from '@/components/organisms/table';
+import { TableEmptyState } from '@/components/organisms/table';
+import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import type { AgentRunArtifact, AgentRunStatus } from '@/lib/agent-os/artifact';
 import { cn } from '@/lib/utils';
 import { ApprovalQueuePanel } from './ApprovalQueuePanel';
@@ -555,7 +556,7 @@ export function AgentOsRunsPanel({
             />
           ) : (
             <div className='min-w-0 rounded-lg border border-subtle bg-(--linear-app-content-surface)'>
-              <UnifiedTable
+              <AdminDataTable
                 data={rows}
                 columns={columns}
                 isLoading={false}
@@ -578,7 +579,6 @@ export function AgentOsRunsPanel({
                 getRowTestId={artifact => `agent-os-run-${artifact.id}`}
                 enableVirtualization={false}
                 minWidth='700px'
-                className='text-[12.5px] [&_thead_th]:py-1 [&_thead_th]:text-3xs [&_thead_th]:tracking-[0.07em]'
                 containerClassName='max-h-[460px]'
               />
             </div>
