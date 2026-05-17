@@ -76,11 +76,11 @@ export function GroupedTableBody<T>({
       {groupedData.map((group, groupIndex) => {
         const isUpcomingGroup = groupIndex === visibleGroupIndex + 1;
         const labelClassName = cn(
-          'transition-colors duration-150 ease-out',
+          'transition-colors duration-subtle ease-out',
           isUpcomingGroup && 'text-secondary-token'
         );
         const countClassName = cn(
-          'transition-colors duration-150 ease-out',
+          'transition-colors duration-subtle ease-out',
           isUpcomingGroup && 'text-tertiary-token'
         );
 

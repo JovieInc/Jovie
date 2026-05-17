@@ -7,8 +7,8 @@
  */
 
 import { gateway } from '@ai-sdk/gateway';
-import { generateObject } from 'ai';
 import { z } from 'zod';
+import { generateObject } from '@/lib/ai/sdk';
 import { CHAT_MODEL_LIGHT } from '@/lib/constants/ai-models';
 import { logger } from '@/lib/utils/logger';
 

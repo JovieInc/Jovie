@@ -1,6 +1,6 @@
 import { gateway } from '@ai-sdk/gateway';
-import { generateObject } from 'ai';
 import { z } from 'zod';
+import { generateObject } from '@/lib/ai/sdk';
 import { INSIGHT_MODEL } from '@/lib/constants/ai-models';
 import type { GeneratedInsight, MetricSnapshot } from '@/types/insights';
 import { buildSystemPrompt, buildUserPrompt } from './prompts';

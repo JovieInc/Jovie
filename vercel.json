@@ -47,6 +47,10 @@
     {
       "path": "/api/cron/process-workflow-runs",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/public-profile-canary",
+      "schedule": "13 6 * * *"
     }
   ],
   "functions": {

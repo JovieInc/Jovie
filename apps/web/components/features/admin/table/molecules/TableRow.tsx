@@ -50,7 +50,7 @@ export function TableRow({
       data-index={dataIndex}
       className={cn(
         // Base styles
-        'group border-b border-subtle transition-[background-color,box-shadow] duration-150 last:border-b-0',
+        'group border-b border-subtle transition-[background-color,box-shadow] duration-subtle last:border-b-0',
         // Fixed height to prevent layout shift
         'h-[60px]',
         // Hover and selected states — aligned with Linear design tokens

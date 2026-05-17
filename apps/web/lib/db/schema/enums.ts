@@ -439,6 +439,18 @@ export const chatMessageRoleEnum = pgEnum('chat_message_role', [
   'assistant',
 ]);
 
+export const chatTurnStatusEnum = pgEnum('chat_turn_status', [
+  'reserved',
+  'running',
+  'streaming',
+  'completed',
+  'failed_tool_unavailable',
+  'failed_model_error',
+  'failed_timeout',
+  'failed_network',
+  'canceled',
+]);
+
 // AI Insights Enums
 export const insightCategoryEnum = pgEnum('insight_category', [
   'geographic',

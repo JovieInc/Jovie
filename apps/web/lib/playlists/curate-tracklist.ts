@@ -6,8 +6,8 @@
  */
 
 import 'server-only';
-import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
+import { getAnthropicClient } from '@/lib/ai/anthropic';
 import { captureError } from '@/lib/error-tracking';
 import { withTimeout } from '@/lib/resilience/primitives';
 import type { CandidateTrack } from './discover-tracks';
@@ -107,7 +107,7 @@ export async function curateTracklist(options: {
     targetSize,
   });
 
-  const anthropic = new Anthropic();
+  const anthropic = getAnthropicClient();
   const validIds = new Set([
     ...candidates.map(track => track.id),
     ...jovieArtistTracks.map(track => track.spotifyTrackId),

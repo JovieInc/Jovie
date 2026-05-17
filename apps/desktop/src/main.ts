@@ -21,9 +21,11 @@ const APP_ORIGIN = new URL(APP_URL).origin;
 const APP_ENTRY_URL = buildAppUrl('/app');
 const SETTINGS_URL = buildAppUrl('/app/settings');
 const APP_BACKGROUND_COLOR = '#09090b';
+const NAVIGATION_ABORTED_ERROR_CODE = -3;
 const APP_ICON_FILENAME =
   APP_ENV === 'staging' ? 'icon-staging.png' : 'icon.png';
 const APP_ICON_PATH = path.join(__dirname, '..', 'assets', APP_ICON_FILENAME);
+const DESKTOP_USER_AGENT_PRODUCT = `JovieDesktop/${app.getVersion()}`;
 const ENABLE_DEVTOOLS = APP_ENV !== 'production' || !app.isPackaged;
 const UPDATE_AVAILABLE_CHANNEL = 'update-available';
 const UPDATE_DOWNLOADED_CHANNEL = 'update-downloaded';
@@ -42,6 +44,8 @@ interface NavState {
 }
 
 let updateReadyToInstall = false;
+
+app.setName(APP_ENV === 'staging' ? 'Jovie Staging' : 'Jovie');
 
 // Explicit allowlist of OAuth/Clerk hosts permitted to load inside the app.
 // Using endsWith() rather than includes() prevents hostname spoofing via
@@ -173,6 +177,69 @@ function showWindow(win: BrowserWindow): void {
   win.focus();
 }
 
+function buildDesktopLoadFailureUrl(): string {
+  const retryUrl = JSON.stringify(APP_ENTRY_URL);
+  const appOrigin = JSON.stringify(APP_ORIGIN);
+  const html = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Jovie Desktop</title>
+    <style>
+      :root { color-scheme: dark; }
+      html, body { margin: 0; min-height: 100%; background: #07080b; color: #f4f6fa; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, sans-serif; }
+      body { display: grid; place-items: center; overflow: hidden; }
+      .shell { position: relative; display: grid; width: min(520px, calc(100vw - 48px)); gap: 22px; padding: 40px; border: 1px solid rgba(255,255,255,0.08); border-radius: 28px; background: linear-gradient(145deg, rgba(14,17,24,0.94), rgba(7,9,13,0.98)); box-shadow: 0 30px 120px rgba(0,0,0,0.42); }
+      .mark { position: absolute; right: -52px; top: -46px; width: 220px; height: 220px; opacity: 0.055; }
+      .brand { display: flex; align-items: center; gap: 14px; }
+      .icon { display: grid; width: 42px; height: 42px; place-items: center; border-radius: 14px; background: #f4f6fa; color: #080a0d; }
+      h1 { margin: 0; font-size: 17px; font-weight: 650; letter-spacing: 0; }
+      p { margin: 0; max-width: 38ch; color: #a8b0bd; font-size: 13px; line-height: 1.55; }
+      .actions { display: flex; flex-wrap: wrap; gap: 10px; }
+      button, a { display: inline-flex; height: 34px; align-items: center; justify-content: center; border-radius: 10px; padding: 0 13px; border: 1px solid rgba(255,255,255,0.1); background: #f4f6fa; color: #080a0d; font-size: 12px; font-weight: 590; text-decoration: none; }
+      a { background: transparent; color: #d9dee7; }
+      .meta { color: #737d8c; font-size: 11px; }
+    </style>
+  </head>
+  <body>
+    <main class="shell" role="main">
+      <svg class="mark" viewBox="0 0 44 44" aria-hidden="true">
+        <circle cx="22" cy="22" r="22" fill="currentColor"/>
+        <path d="M31 10A20 20 0 0 0 11 30H31V10Z" fill="#07080b"/>
+        <path d="M11 31L30 31M14 36L31 36M18 41L32 41" stroke="#07080b" stroke-width="3.8" stroke-linecap="round"/>
+      </svg>
+      <div class="brand">
+        <div class="icon" aria-hidden="true">
+          <svg width="28" height="28" viewBox="0 0 44 44">
+            <circle cx="22" cy="22" r="22" fill="currentColor"/>
+            <path d="M31 10A20 20 0 0 0 11 30H31V10Z" fill="#080a0d"/>
+            <path d="M11 31L30 31M14 36L31 36M18 41L32 41" stroke="#080a0d" stroke-width="3.8" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div>
+          <h1>Jovie Desktop</h1>
+          <p>Built for artists.</p>
+        </div>
+      </div>
+      <p>Jovie could not load the app shell. Check your connection, then retry. If this keeps happening, open Jovie in your browser and install the latest desktop build.</p>
+      <div class="actions">
+        <button type="button" onclick="window.location.href = ${retryUrl}">Retry</button>
+        <a href=${appOrigin}>Open Jovie</a>
+      </div>
+      <div class="meta">Desktop shell runtime: Electron</div>
+    </main>
+  </body>
+</html>`;
+
+  return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
+}
+
+function showDesktopLoadFailure(win: BrowserWindow): void {
+  if (win.isDestroyed()) return;
+  void win.loadURL(buildDesktopLoadFailureUrl());
+}
+
 function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   const windowState = loadWindowState();
 
@@ -207,7 +274,22 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
     showWindow(win);
   });
 
+  win.webContents.setUserAgent(
+    `${win.webContents.getUserAgent()} ${DESKTOP_USER_AGENT_PRODUCT}`
+  );
+
   void win.loadURL(initialUrl);
+
+  win.webContents.on(
+    'did-fail-load',
+    (_event, errorCode, _errorDescription, _validatedURL, isMainFrame) => {
+      if (!isMainFrame || errorCode === NAVIGATION_ABORTED_ERROR_CODE) {
+        return;
+      }
+
+      showDesktopLoadFailure(win);
+    }
+  );
 
   win.webContents.session.setPermissionRequestHandler(
     (_webContents, _permission, callback) => {

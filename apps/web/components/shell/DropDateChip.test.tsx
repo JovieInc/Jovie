@@ -8,6 +8,12 @@ describe('DropDateChip', () => {
     expect(screen.getByText('Released Mar 12')).toBeInTheDocument();
   });
 
+  it('collapses raw multi-year day counts to years', () => {
+    render(<DropDateChip label='2193d ago' tone='past' />);
+    expect(screen.getByText('6y ago')).toBeInTheDocument();
+    expect(screen.queryByText('2193d ago')).not.toBeInTheDocument();
+  });
+
   it('lights up cyan when tone is soon', () => {
     const { container } = render(
       <DropDateChip label='Drops in 4 days' tone='soon' />

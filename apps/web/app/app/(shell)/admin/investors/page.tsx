@@ -17,6 +17,14 @@ import { APP_ROUTES } from '@/constants/routes';
 import { db } from '@/lib/db';
 import { investorLinks } from '@/lib/db/schema/investors';
 import { cn } from '@/lib/utils';
+import {
+  InvestorTable,
+  InvestorTableCell,
+  InvestorTableHead,
+  InvestorTableHeaderCell,
+  InvestorTableHeaderRow,
+  InvestorTableRow,
+} from './_components/InvestorTablePrimitives';
 import { TokenCopyButton } from './TokenCopyButton';
 
 export const metadata: Metadata = {
@@ -70,13 +78,13 @@ export default function InvestorPipelinePage() {
       </div>
 
       <Suspense fallback={<TableSkeleton />}>
-        <InvestorTable />
+        <InvestorPipelineTable />
       </Suspense>
     </AdminToolPage>
   );
 }
 
-async function InvestorTable() {
+async function InvestorPipelineTable() {
   const links = await db
     .select({
       id: investorLinks.id,
@@ -133,58 +141,53 @@ async function InvestorTable() {
         title='Active investor links'
         subtitle={`${links.length} tracked link${links.length === 1 ? '' : 's'} across your pipeline.`}
       />
-      <div className='overflow-x-auto'>
-        <table className='w-full min-w-[760px] border-collapse text-app'>
-          <thead className='bg-surface-0'>
-            <tr className='border-b border-subtle text-left text-2xs uppercase tracking-[0.08em] text-tertiary-token'>
-              <th className='px-4 py-2.5 font-semibold'>Label</th>
-              <th className='px-4 py-2.5 font-semibold'>Investor</th>
-              <th className='px-4 py-2.5 font-semibold'>Stage</th>
-              <th className='px-4 py-2.5 font-semibold'>Score</th>
-              <th className='px-4 py-2.5 font-semibold'>Views</th>
-              <th className='px-4 py-2.5 font-semibold'>Last viewed</th>
-              <th className='px-4 py-2.5 font-semibold'>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {links.map(link => (
-              <tr
-                key={link.id}
-                className='border-b border-subtle bg-transparent transition-colors duration-150 hover:bg-surface-1'
-              >
-                <td className='px-4 py-3 align-middle'>
-                  <div className='flex min-w-0 flex-col'>
-                    <span className='truncate font-semibold text-primary-token'>
-                      {link.label}
-                    </span>
-                    <TokenDisplay token={link.token} />
-                  </div>
-                </td>
-                <td className='px-4 py-3 align-middle text-secondary-token'>
-                  {link.investorName || 'Unknown investor'}
-                </td>
-                <td className='px-4 py-3 align-middle'>
-                  <StageBadge stage={link.stage} />
-                </td>
-                <td className='px-4 py-3 align-middle'>
-                  <ScoreBadge score={link.engagementScore} />
-                </td>
-                <td className='px-4 py-3 align-middle text-secondary-token'>
-                  {link.viewCount}
-                </td>
-                <td className='px-4 py-3 align-middle text-secondary-token'>
-                  {link.lastViewed
-                    ? new Date(link.lastViewed).toLocaleDateString()
-                    : 'No views yet'}
-                </td>
-                <td className='px-4 py-3 align-middle'>
-                  <StatusBadge isActive={link.isActive} />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <InvestorTable>
+        <InvestorTableHead>
+          <InvestorTableHeaderRow>
+            <InvestorTableHeaderCell>Label</InvestorTableHeaderCell>
+            <InvestorTableHeaderCell>Investor</InvestorTableHeaderCell>
+            <InvestorTableHeaderCell>Stage</InvestorTableHeaderCell>
+            <InvestorTableHeaderCell>Score</InvestorTableHeaderCell>
+            <InvestorTableHeaderCell>Views</InvestorTableHeaderCell>
+            <InvestorTableHeaderCell>Last viewed</InvestorTableHeaderCell>
+            <InvestorTableHeaderCell>Status</InvestorTableHeaderCell>
+          </InvestorTableHeaderRow>
+        </InvestorTableHead>
+        <tbody>
+          {links.map(link => (
+            <InvestorTableRow key={link.id}>
+              <InvestorTableCell>
+                <div className='flex min-w-0 flex-col'>
+                  <span className='truncate font-semibold text-primary-token'>
+                    {link.label}
+                  </span>
+                  <TokenDisplay token={link.token} />
+                </div>
+              </InvestorTableCell>
+              <InvestorTableCell className='text-secondary-token'>
+                {link.investorName || 'Unknown investor'}
+              </InvestorTableCell>
+              <InvestorTableCell>
+                <StageBadge stage={link.stage} />
+              </InvestorTableCell>
+              <InvestorTableCell>
+                <ScoreBadge score={link.engagementScore} />
+              </InvestorTableCell>
+              <InvestorTableCell className='text-secondary-token'>
+                {link.viewCount}
+              </InvestorTableCell>
+              <InvestorTableCell className='text-secondary-token'>
+                {link.lastViewed
+                  ? new Date(link.lastViewed).toLocaleDateString()
+                  : 'No views yet'}
+              </InvestorTableCell>
+              <InvestorTableCell>
+                <StatusBadge isActive={link.isActive} />
+              </InvestorTableCell>
+            </InvestorTableRow>
+          ))}
+        </tbody>
+      </InvestorTable>
     </ContentSurfaceCard>
   );
 }
@@ -276,9 +279,7 @@ function SummaryCard({
   return (
     <ContentSurfaceCard surface='nested' className='p-3.5'>
       <p className='text-2xs text-tertiary-token'>{label}</p>
-      <p className='mt-1 text-sm font-semibold tracking-[-0.016em] text-primary-token'>
-        {value}
-      </p>
+      <p className='mt-1 text-sm font-semibold text-primary-token'>{value}</p>
       <p className='mt-1 text-xs leading-[18px] text-secondary-token'>
         {description}
       </p>
@@ -309,7 +310,7 @@ function TableSkeleton() {
         {TABLE_SKELETON_KEYS.map(skeletonKey => (
           <div
             key={skeletonKey}
-            className='h-11 animate-pulse rounded-xl bg-surface-0'
+            className='h-11 animate-pulse rounded-lg bg-surface-0'
           />
         ))}
       </div>

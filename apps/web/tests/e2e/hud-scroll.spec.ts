@@ -79,8 +79,8 @@ test.describe('App-shell scroll-pane regression', () => {
     {
       label: 'dashboard audience',
       bypass:
-        '/api/dev/test-auth/enter?persona=creator-ready&redirect=/app/dashboard/audience',
-      expectedPath: /\/app\/dashboard\/audience/,
+        '/api/dev/test-auth/enter?persona=creator-ready&redirect=/app/audience',
+      expectedPath: /\/app\/audience/,
     },
   ] as const;
 

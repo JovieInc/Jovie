@@ -47,6 +47,7 @@ function isSuppressedClientContext(pathname: string): boolean {
   return (
     isDemoRecordingClient() ||
     isDevChromeDisabledClient() ||
+    document.documentElement.dataset.desktopRuntime === 'electron' ||
     isDevToolbarSuppressedPath(pathname)
   );
 }
@@ -96,7 +97,11 @@ export function DevToolbarGate({
         : new MutationObserver(syncToolbarVisibility);
     observer?.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ['data-demo-recording', 'data-dev-chrome-disabled'],
+      attributeFilter: [
+        'data-demo-recording',
+        'data-desktop-runtime',
+        'data-dev-chrome-disabled',
+      ],
     });
 
     return () => {

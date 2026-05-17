@@ -380,13 +380,23 @@ const nextConfig = {
         permanent: true,
       },
       {
+        source: '/sign-up',
+        destination: '/signup',
+        permanent: true,
+      },
+      {
+        source: '/sign-in',
+        destination: '/signin',
+        permanent: true,
+      },
+      {
         source: '/app/analytics',
-        destination: '/app/dashboard/audience',
+        destination: '/app/audience',
         permanent: false,
       },
       {
         source: '/app/dashboard/analytics',
-        destination: '/app/dashboard/audience',
+        destination: '/app/audience',
         permanent: false,
       },
       ...legacyAppRedirects,
@@ -419,22 +429,11 @@ const nextConfig = {
   },
   async rewrites() {
     return [
-      // Rewrite /app/* to /app/dashboard/* for cleaner URLs
+      // Keep canonical releases attached to the legacy dashboard route owner
+      // until the releases surface is migrated.
       {
         source: '/app/releases',
         destination: '/app/dashboard/releases',
-      },
-      {
-        source: '/app/audience',
-        destination: '/app/dashboard/audience',
-      },
-      {
-        source: '/app/insights',
-        destination: '/app/dashboard/insights',
-      },
-      {
-        source: '/app/presence',
-        destination: '/app/dashboard/presence',
       },
     ];
   },

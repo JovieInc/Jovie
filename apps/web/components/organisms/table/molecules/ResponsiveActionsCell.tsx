@@ -123,7 +123,7 @@ export function ResponsiveActionsCell({
           onClick={action.onClick}
           disabled={action.disabled}
           className={cn(
-            'inline-flex items-center gap-2 rounded-full border border-transparent px-2.5 py-1.5 text-xs font-caption tracking-[-0.01em] transition-[background-color,border-color,color,box-shadow] duration-150 ease-out',
+            'inline-flex items-center gap-2 rounded-full border border-transparent px-2.5 py-1.5 text-xs font-caption tracking-[-0.01em] transition-[background-color,border-color,color,box-shadow] duration-subtle ease-out',
             action.destructive
               ? 'text-destructive hover:border-destructive/20 hover:bg-destructive/10 hover:text-destructive [&_svg]:text-destructive'
               : 'text-secondary-token hover:border-subtle hover:bg-surface-1 hover:text-primary-token',
@@ -145,7 +145,7 @@ export function ResponsiveActionsCell({
           <DropdownMenuTrigger asChild>
             <button
               type='button'
-              className='inline-flex h-7 w-7 items-center justify-center rounded-full bg-surface-0 text-tertiary-token transition-[background-color,color,box-shadow] duration-150 ease-out hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:bg-surface-1 focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
+              className='inline-flex h-7 w-7 items-center justify-center rounded-full bg-surface-0 text-tertiary-token transition-[background-color,color,box-shadow] duration-subtle ease-out hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:bg-surface-1 focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
               aria-label='More actions'
             >
               <MoreVertical className='h-4 w-4' />

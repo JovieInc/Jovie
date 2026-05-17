@@ -331,6 +331,8 @@ export const queryKeys = {
     conversation: (id: string) =>
       [...queryKeys.chat.all, 'conversation', id] as const,
     usage: () => [...queryKeys.chat.all, 'usage'] as const,
+    capabilities: (profileId: string | null | undefined) =>
+      [...queryKeys.chat.all, 'capabilities', profileId ?? 'active'] as const,
   },
 
   // Audience infinite scroll
