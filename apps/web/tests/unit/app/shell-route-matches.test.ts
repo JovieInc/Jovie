@@ -48,11 +48,16 @@ describe('resolveAppShellRequestPath', () => {
 });
 
 describe('isReleasesShellRoute', () => {
+  it('matches the canonical releases route', () => {
+    expect(isReleasesShellRoute(APP_ROUTES.RELEASES)).toBe(true);
+  });
+
   it('matches the releases dashboard route', () => {
     expect(isReleasesShellRoute('/app/dashboard/releases')).toBe(true);
   });
 
   it('matches nested releases subroutes', () => {
+    expect(isReleasesShellRoute('/app/releases/abc/tasks')).toBe(true);
     expect(isReleasesShellRoute('/app/dashboard/releases/abc/tasks')).toBe(
       true
     );

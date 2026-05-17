@@ -8,31 +8,21 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { matchCommand } from '@/lib/chat/command-registry';
 import { consumePendingChatPrompt } from '@/lib/chat/open-chat-with-prompt';
-import type {
-  ChatPersistenceMessage,
-  PendingToolPersistenceEnvelope,
-} from '@/lib/chat/tool-events';
 import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
-import {
-  FetchError,
-  queryKeys,
-  useAddMessagesMutation,
-  useChatConversationQuery,
-  useCreateConversationMutation,
-} from '@/lib/queries';
-import { addBreadcrumb, captureException } from '@/lib/sentry/client-lite';
-import { logger } from '@/lib/utils/logger';
+import { queryKeys, useChatConversationQuery } from '@/lib/queries';
+import { captureException } from '@/lib/sentry/client-lite';
 
-import {
-  extractPersistableToolCalls,
-  hydratePersistedMessageParts,
-} from '../message-parts';
-import type { ArtistContext, ChatError, FileUIPart } from '../types';
+import { hydratePersistedMessageParts } from '../message-parts';
+import type {
+  ArtistContext,
+  ChatConversationCreatePhase,
+  ChatError,
+  FileUIPart,
+} from '../types';
 import { MAX_MESSAGE_LENGTH } from '../types';
 import {
   extractErrorMetadata,
   getErrorType,
-  getMessageText,
   getPreferredErrorMessage,
 } from '../utils';
 import { composeMessage, useChipTray } from './useChipTray';
@@ -43,7 +33,10 @@ interface UseJovieChatOptions {
   /** @deprecated Use profileId instead. Client-provided artist context for backward compatibility. */
   readonly artistContext?: ArtistContext; // NOSONAR - kept for backward compatibility
   readonly conversationId?: string | null;
-  readonly onConversationCreate?: (conversationId: string) => void;
+  readonly onConversationCreate?: (
+    conversationId: string,
+    phase?: ChatConversationCreatePhase
+  ) => void;
   /** Artist username — used by deterministic commands (e.g. "preview my profile") */
   readonly username?: string;
 }
@@ -59,6 +52,52 @@ const TITLE_POLL_MAX_DURATION_MS = 15_000;
 
 /** Number of fast poll intervals to allow before backing off. */
 const TITLE_POLL_FAST_WINDOW_MS = TITLE_POLL_FAST_INTERVAL_MS * 3;
+
+type ChatTurnSource = 'typed' | 'quick_action' | 'slash_command';
+
+interface SubmitChatMessageOptions {
+  readonly source?: ChatTurnSource;
+  readonly toolIntent?: string | null;
+}
+
+interface ChatTurnMetadata {
+  readonly conversationId?: string;
+  readonly turnId?: string;
+  readonly requestId?: string;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function extractChatTurnMetadata(value: unknown): ChatTurnMetadata | null {
+  if (!isRecord(value)) return null;
+  const conversationId =
+    typeof value.conversationId === 'string' ? value.conversationId : undefined;
+  const turnId = typeof value.turnId === 'string' ? value.turnId : undefined;
+  const requestId =
+    typeof value.requestId === 'string' ? value.requestId : undefined;
+
+  if (!conversationId && !turnId && !requestId) return null;
+  return { conversationId, turnId, requestId };
+}
+
+function inferToolIntentFromPrompt(text: string): string | null {
+  const normalized = text.trim().toLowerCase();
+  const mentionsAlbumArt =
+    /\balbum\s+art\b/.test(normalized) ||
+    /\bcover\s+art\b/.test(normalized) ||
+    /\bartwork\b/.test(normalized);
+  const asksForGeneration = /\b(generate|create|make|design|produce)\b/.test(
+    normalized
+  );
+  const asksForBrief =
+    /\bbrief\b/.test(normalized) || /\bdraft\b/.test(normalized);
+
+  return mentionsAlbumArt && asksForGeneration && !asksForBrief
+    ? 'album_art_generation'
+    : null;
+}
 
 function getTitlePollIntervalMs(
   titlePollingSince: number | null,
@@ -98,19 +137,6 @@ export function useJovieChat({
   const [activeConversationId, setActiveConversationId] = useState<
     string | null
   >(conversationId ?? null);
-  const pendingMessagesRef = useRef<PendingToolPersistenceEnvelope | null>(
-    null
-  );
-  const pendingInitialSendRef = useRef<{
-    text: string;
-    files?: FileUIPart[];
-  } | null>(null);
-  /** Deferred navigation callback — called only after the AI stream completes
-   *  to prevent component remount from killing the in-flight response (JOV-1233). */
-  const deferredNavigationRef = useRef<{
-    callback: (conversationId: string) => void;
-    conversationId: string;
-  } | null>(null);
   const queryClient = useQueryClient();
 
   // Track whether we're waiting for title generation from the server.
@@ -119,9 +145,26 @@ export function useJovieChat({
     null
   );
 
-  // Mutations for persistence
-  const createConversationMutation = useCreateConversationMutation();
-  const addMessagesMutation = useAddMessagesMutation();
+  const adoptServerConversationId = useCallback(
+    (
+      nextConversationId: string,
+      phase: ChatConversationCreatePhase = 'reserved'
+    ) => {
+      if (!nextConversationId) {
+        return;
+      }
+
+      const isNewConversation = nextConversationId !== activeConversationId;
+      if (isNewConversation) {
+        setActiveConversationId(nextConversationId);
+      }
+
+      if (isNewConversation || phase === 'completed') {
+        onConversationCreate?.(nextConversationId, phase);
+      }
+    },
+    [activeConversationId, onConversationCreate]
+  );
 
   // Determine whether to poll: only while we're actively waiting for a title
   // and haven't exceeded the max poll duration.
@@ -150,8 +193,17 @@ export function useJovieChat({
             ? { conversationId: activeConversationId }
             : {}),
         },
+        fetch: async (input, init) => {
+          const response = await globalThis.fetch(input, init);
+          const serverConversationId =
+            response.headers.get('x-conversation-id');
+          if (serverConversationId) {
+            adoptServerConversationId(serverConversationId, 'reserved');
+          }
+          return response;
+        },
       }),
-    [profileId, artistContext, activeConversationId]
+    [profileId, artistContext, activeConversationId, adoptServerConversationId]
   );
 
   // Convert loaded messages to the UIMessage format useChat expects
@@ -185,6 +237,29 @@ export function useJovieChat({
   } = useChat({
     id: activeConversationId ?? 'new-chat',
     transport,
+    onFinish: ({ message }) => {
+      const metadata = extractChatTurnMetadata(message.metadata);
+      const finishedConversationId =
+        metadata?.conversationId ?? activeConversationId;
+
+      if (metadata?.conversationId) {
+        adoptServerConversationId(metadata.conversationId, 'completed');
+      }
+
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.chat.usage(),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.chat.conversations(),
+      });
+      if (finishedConversationId) {
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.chat.conversation(finishedConversationId),
+        });
+      }
+
+      setIsSubmitting(false);
+    },
     onError: error => {
       captureException(error, {
         tags: {
@@ -219,18 +294,7 @@ export function useJovieChat({
         queryKey: queryKeys.chat.usage(),
       });
 
-      // Clear pending messages ref so the persistence effect doesn't
-      // keep trying to find an assistant message that will never arrive
-      pendingMessagesRef.current = null;
       setIsSubmitting(false);
-
-      // Fire deferred navigation on error too so the URL updates (JOV-1233)
-      if (deferredNavigationRef.current) {
-        const { callback, conversationId: navId } =
-          deferredNavigationRef.current;
-        deferredNavigationRef.current = null;
-        callback(navId);
-      }
     },
   });
 
@@ -248,11 +312,6 @@ export function useJovieChat({
 
   // Wrap stop to clear submission state so the composer re-enables immediately
   // instead of waiting for the 30s safety timeout.
-  // NOTE: We intentionally do NOT clear pendingMessagesRef here. When the stream
-  // aborts, status will transition back to 'ready', and the persistence effect
-  // needs pendingMessagesRef to still be populated so it can save the user message
-  // (and any partial assistant response) to the database. Clearing it here would
-  // cause aborted turns to silently disappear on reload.
   const stop = useCallback(() => {
     rawStop();
     setIsSubmitting(false);
@@ -304,7 +363,6 @@ export function useJovieChat({
 
     const safetyTimer = globalThis.setTimeout(() => {
       setIsSubmitting(false);
-      pendingMessagesRef.current = null;
     }, 30_000);
 
     return () => {
@@ -323,249 +381,6 @@ export function useJovieChat({
   useEffect(() => {
     setActiveConversationId(conversationId ?? null);
   }, [conversationId]);
-
-  // Ensure the first message in a new chat is sent only after activeConversationId
-  // has been committed, so transport includes conversationId on the request.
-  // Navigation is deferred until the stream completes to prevent the component
-  // remount from killing the in-flight AI response (JOV-1233).
-  useEffect(() => {
-    if (!activeConversationId || !pendingInitialSendRef.current) return;
-
-    const pendingPayload = pendingInitialSendRef.current;
-    pendingInitialSendRef.current = null;
-
-    sendMessage({
-      text: pendingPayload.text,
-      ...(pendingPayload.files && pendingPayload.files.length > 0
-        ? { files: pendingPayload.files }
-        : {}),
-    });
-  }, [activeConversationId, sendMessage]);
-
-  // Save messages to database when streaming completes.
-  // FIX: Don't clear pendingMessagesRef unless we successfully extracted the
-  // assistant message. If the assistant message is empty, leave the ref so
-  // the next render (when messages updates) will try extraction again.
-  useEffect(() => {
-    if (status !== 'ready') return;
-    if (!pendingMessagesRef.current) {
-      setIsSubmitting(false);
-      return;
-    }
-    if (!activeConversationId) {
-      // No conversation yet - wait for it
-      return;
-    }
-
-    // Extract assistant message from the completed stream
-    const lastAssistantMessage = [...messages]
-      .reverse()
-      .find(m => m.role === 'assistant');
-
-    if (!lastAssistantMessage) {
-      // No assistant message yet - leave pending for next render
-      return;
-    }
-
-    const assistantText = getMessageText(lastAssistantMessage.parts);
-    const toolCalls = extractPersistableToolCalls(lastAssistantMessage.parts);
-
-    if (!assistantText && (!toolCalls || toolCalls.length === 0)) {
-      // Assistant message exists but has no persisted text or tool payload yet - leave pending
-      return;
-    }
-
-    const { userMessage } = pendingMessagesRef.current;
-
-    // Build messages to persist - user message may be empty if already persisted during conversation creation
-    const messagesToPersist: ChatPersistenceMessage[] = [];
-
-    if (userMessage) {
-      messagesToPersist.push({ role: 'user', content: userMessage });
-    }
-
-    messagesToPersist.push({
-      role: 'assistant',
-      content: assistantText,
-      ...(toolCalls ? { toolCalls } : {}),
-    });
-
-    addMessagesMutation.mutate(
-      {
-        conversationId: activeConversationId,
-        messages: messagesToPersist,
-      },
-      {
-        onSuccess: data => {
-          pendingMessagesRef.current = null;
-          setIsSubmitting(false);
-          queryClient.invalidateQueries({
-            queryKey: queryKeys.chat.conversation(activeConversationId),
-          });
-          queryClient.invalidateQueries({
-            queryKey: queryKeys.chat.conversations(),
-          });
-
-          // If the server indicated title generation was kicked off,
-          // start polling so the title auto-updates in sidebar + header.
-          if (data?.titlePending) {
-            setTitlePollingSince(Date.now());
-          }
-
-          if (!assistantText && toolCalls && toolCalls.length > 0) {
-            addBreadcrumb({
-              category: 'ai-chat',
-              message: 'Persisted tool-only assistant response',
-              level: 'info',
-              data: {
-                conversationId: activeConversationId,
-                toolCount: toolCalls.length,
-              },
-            });
-          }
-
-          if (deferredNavigationRef.current) {
-            const { callback, conversationId: navConversationId } =
-              deferredNavigationRef.current;
-            deferredNavigationRef.current = null;
-            callback(navConversationId);
-          }
-        },
-        onError: err => {
-          const isTransient = err instanceof FetchError && err.isRetryable();
-
-          if (isTransient) {
-            addBreadcrumb({
-              category: 'ai-chat',
-              message: `Message persistence failed after retries: ${err.message}`,
-              level: 'warning',
-              data: {
-                status: err.status,
-                profileId: profileId ?? null,
-                conversationId: activeConversationId,
-              },
-            });
-          } else {
-            captureException(err, {
-              tags: {
-                feature: 'ai-chat',
-                source: 'useJovieChat',
-                errorType: 'message-persistence',
-              },
-              extra: {
-                profileId: profileId ?? null,
-                conversationId: activeConversationId,
-                messageCount: messagesToPersist.length,
-              },
-            });
-          }
-          logger.error('[useJovieChat] Failed to save messages:', err);
-          setChatError({
-            type: 'server',
-            message:
-              'Your response arrived, but we could not save it yet. Please retry in a moment.',
-            errorCode: 'MESSAGE_PERSIST_FAILED',
-            failedMessage: lastAttemptedMessageRef.current,
-          });
-          setIsSubmitting(false);
-        },
-      }
-    );
-  }, [
-    status,
-    activeConversationId,
-    addMessagesMutation,
-    queryClient,
-    messages,
-    profileId,
-  ]);
-
-  // Extracted helper: create a new conversation and set up pending refs.
-  // Returns true on success, false on failure (error state already set).
-  const handleCreateConversation = useCallback(
-    async (
-      trimmedText: string,
-      payload: { text: string; files?: FileUIPart[] }
-    ): Promise<boolean> => {
-      try {
-        const result = await createConversationMutation.mutateAsync({
-          initialMessage: trimmedText || '(image attachment)',
-        });
-        setActiveConversationId(result.conversation.id);
-
-        // User message already persisted via initialMessage in conversation creation.
-        // Only store pending ref to persist the assistant response.
-        pendingMessagesRef.current = {
-          userMessage: '', // Empty - already persisted via initialMessage
-        };
-
-        // Store the send payload for the effect that fires after activeConversationId updates.
-        pendingInitialSendRef.current = payload;
-
-        // Defer navigation until the AI stream completes (status === 'ready').
-        // Navigating earlier would remount the component and kill the stream (JOV-1233).
-        if (onConversationCreate) {
-          deferredNavigationRef.current = {
-            callback: onConversationCreate,
-            conversationId: result.conversation.id,
-          };
-        }
-
-        setInput('');
-
-        return true;
-      } catch (err) {
-        // Transient server errors (5xx, timeout, rate-limit) were already
-        // retried by TanStack Query. Only log a breadcrumb to reduce Sentry
-        // noise for temporary outages (JOV-1352).
-        const isTransient = err instanceof FetchError && err.isRetryable();
-
-        if (isTransient) {
-          addBreadcrumb({
-            category: 'ai-chat',
-            message: `Conversation create failed after retries: ${err.message}`,
-            level: 'warning',
-            data: {
-              status: err.status,
-              profileId: profileId ?? null,
-            },
-          });
-        } else {
-          captureException(err, {
-            tags: {
-              feature: 'ai-chat',
-              source: 'useJovieChat',
-              errorType: 'conversation-create',
-            },
-            extra: {
-              profileId: profileId ?? null,
-              conversationId: activeConversationId,
-            },
-          });
-        }
-        logger.error('[useJovieChat] Failed to create conversation:', err);
-        setChatError({
-          type: 'server',
-          message:
-            'We could not start a new conversation right now. Please try again.',
-          errorCode: 'CONVERSATION_CREATE_FAILED',
-          failedMessage: trimmedText,
-        });
-        setIsSubmitting(false);
-        return false;
-      }
-    },
-    [
-      createConversationMutation,
-      onConversationCreate,
-      setActiveConversationId,
-      profileId,
-      activeConversationId,
-      setInput,
-      setChatError,
-      setIsSubmitting,
-    ]
-  );
 
   /** Try to handle text as a deterministic command. Returns true if handled. */
   const tryHandleCommand = useCallback(
@@ -596,7 +411,11 @@ export function useJovieChat({
 
   // Core submit logic
   const doSubmit = useCallback(
-    async (text: string, files?: FileUIPart[]) => {
+    async (
+      text: string,
+      files?: FileUIPart[],
+      options?: SubmitChatMessageOptions
+    ) => {
       const hasFiles = files && files.length > 0;
       if (!text.trim() && !hasFiles) return;
       if (isLoading || isSubmitting) return;
@@ -625,31 +444,21 @@ export function useJovieChat({
 
       setChatError(null);
       setIsSubmitting(true);
+      const clientTurnId = crypto.randomUUID();
+      const toolIntent =
+        options?.toolIntent ?? inferToolIntentFromPrompt(trimmedText);
 
-      if (activeConversationId) {
-        // Store pending message for persistence (both user and assistant)
-        pendingMessagesRef.current = {
-          userMessage: trimmedText,
-        };
-      } else {
-        // No active conversation — create one first, then return
-        // (sendMessage is dispatched by the effect watching activeConversationId)
-        const created = await handleCreateConversation(trimmedText, payload);
-        if (!created) return;
-        return;
-      }
-
-      sendMessage(payload);
+      sendMessage(payload, {
+        body: {
+          clientTurnId,
+          clientMessageId: `${clientTurnId}:user`,
+          source: options?.source ?? 'typed',
+          ...(toolIntent ? { toolIntent } : {}),
+        },
+      });
       setInput('');
     },
-    [
-      isLoading,
-      isSubmitting,
-      sendMessage,
-      activeConversationId,
-      handleCreateConversation,
-      tryHandleCommand,
-    ]
+    [isLoading, isSubmitting, sendMessage, tryHandleCommand]
   );
 
   // Retry the last failed message
@@ -661,8 +470,13 @@ export function useJovieChat({
   }, [chatError, doSubmit]);
 
   const rateLimitedSubmitter = useAsyncRateLimiter(
-    async ({ text, files }: { text: string; files?: FileUIPart[] }) => {
-      await doSubmit(text, files);
+    async ({
+      text,
+      files,
+      source,
+      toolIntent,
+    }: { text: string; files?: FileUIPart[] } & SubmitChatMessageOptions) => {
+      await doSubmit(text, files, { source, toolIntent });
     },
     {
       limit: 1,
@@ -703,7 +517,11 @@ export function useJovieChat({
 
   const handleSuggestedPrompt = useCallback(
     (prompt: string) => {
-      rateLimitedSubmitter.maybeExecute({ text: prompt });
+      rateLimitedSubmitter.maybeExecute({
+        text: prompt,
+        source: 'quick_action',
+        toolIntent: inferToolIntentFromPrompt(prompt),
+      });
     },
     [rateLimitedSubmitter]
   );
@@ -780,7 +598,8 @@ export function useJovieChat({
     isLoading,
     isSubmitting,
     hasMessages,
-    isLoadingConversation: isLoadingConversation && !!activeConversationId,
+    isLoadingConversation:
+      isLoadingConversation && !!activeConversationId && messages.length === 0,
     status,
     activeConversationId,
     /** Auto-generated or user-set conversation title (null if not yet generated) */

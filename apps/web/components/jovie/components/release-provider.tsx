@@ -77,6 +77,7 @@ function toEntityRef(release: ReleaseLike): EntityRef {
 export function createReleaseProvider(profileId: string): EntityProvider {
   return {
     kind: 'release',
+    registryKey: `release:${profileId}`,
     label: 'Releases',
     useSearch(query: string): EntitySearchResult {
       const { data, isLoading } = useReleasesQuery(profileId);

@@ -101,18 +101,23 @@ export {
   type ChatAuditLog,
   type ChatConversation,
   type ChatMessage,
+  type ChatTurn,
   chatAuditLog,
   chatConversations,
   chatMessages,
+  chatTurns,
   insertChatAuditLogSchema,
   insertChatConversationSchema,
   insertChatMessageSchema,
+  insertChatTurnSchema,
   type NewChatAuditLog,
   type NewChatConversation,
   type NewChatMessage,
+  type NewChatTurn,
   selectChatAuditLogSchema,
   selectChatConversationSchema,
   selectChatMessageSchema,
+  selectChatTurnSchema,
 } from './chat';
 // AI Connectors (v1)
 export {
