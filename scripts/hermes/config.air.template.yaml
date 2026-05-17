@@ -1,0 +1,143 @@
+# Hermes-Air configuration template.
+#
+# Rendered by scripts/hermes/bootstrap-air.sh with {{TOKEN}} substitution.
+# DO NOT commit the rendered output; secrets land at ~/.hermes/.env (chmod 600).
+#
+# See:
+# - .claude/rules/hermes-air.md (operating contract)
+# - docs/HERMES_AIR.md (operator runbook)
+
+server:
+  host: 127.0.0.1
+  port: 7800
+  log_level: info
+  log_dir: "{{HOME}}/.hermes/logs"
+
+system:
+  # Hermes is the only thing this Air does. These limits enforce the
+  # 16 GB RAM budget documented in the plan.
+  max_memory_mb: 800
+  max_concurrent_subagents: 2
+  gateway_rate_limit_per_minute: 30
+
+models:
+  # Primary: OpenRouter free-model rotation. The free-model-router.ts script
+  # is what cron jobs use directly; the daemon points at a single known-good
+  # free model for inbound message handling.
+  primary:
+    provider: openrouter
+    base_url: https://openrouter.ai/api/v1
+    api_key_env: OPENROUTER_API_KEY
+    model: deepseek/deepseek-r1:free
+    extra_headers:
+      HTTP-Referer: https://jov.ie
+      X-Title: "Jovie Hermes (Air)"
+
+  # Fallback: local Ollama. Loaded only when OpenRouter exhausts.
+  fallback:
+    provider: openai_compatible
+    base_url: http://localhost:11434/v1
+    model: qwen3:4b-q4_K_M
+
+gateways:
+  telegram:
+    enabled: true
+    bot_token_env: HERMES_TELEGRAM_BOT_TOKEN
+    # The chat ID is captured by bootstrap-air.sh after the user sends the
+    # bot its first message; written to ~/.hermes/state/telegram-chat-id.
+    chat_id_file: "{{HOME}}/.hermes/state/telegram-chat-id"
+
+memory:
+  provider: mcp
+  mcp_server: gbrain
+  remote_url: http://127.0.0.1:7801
+
+mcp:
+  servers:
+    - name: gbrain
+      transport: http
+      url: http://127.0.0.1:7801
+    - name: linear
+      transport: http
+      url: https://mcp.linear.app/mcp
+      headers:
+        # Hermes expands ${ENV} from ~/.hermes/.env at runtime.
+        Authorization: "Bearer ${LINEAR_API_KEY}"
+    - name: airtable
+      transport: stdio
+      command: npx
+      args:
+        - "-y"
+        - "airtable-mcp-server"
+      env:
+        AIRTABLE_API_KEY: "${AIRTABLE_API_KEY}"
+    - name: gmail
+      transport: http
+      url: https://gmail-mcp.jov.ie/mcp
+    - name: gcal
+      transport: http
+      url: https://calendar-mcp.jov.ie/mcp
+
+sub_agents:
+  - name: chief
+    description: Default router. Clarifies, files Linear issues, sends status replies.
+    mcp_allowlist: [gbrain, linear]
+    skills:
+      - intake_route
+      - file_linear_issue
+      - reply_status
+    cannot:
+      - edit_code
+      - spend_money
+      - send_email_without_confirmation
+
+  - name: cfo
+    description: Finance, spend, runway, cost monitor escalations.
+    mcp_allowlist: [gbrain]
+    skills:
+      - read_doppler_usage
+      - cost_summary
+      - runway_projection
+    cannot:
+      - edit_code
+      - move_money
+      - call_stripe
+
+  - name: founder-os
+    description: Fundraising, GTM, company state, warm-network recall.
+    mcp_allowlist: [gbrain, airtable, gmail, gcal]
+    skills:
+      - fundraising_airtable
+      - warm_network_recall
+      - meeting_reschedule
+      - draft_email
+    cannot:
+      - edit_code
+      - send_email_without_confirmation
+
+  - name: code-orchestrator
+    description: PR triage, CI classification, file Linear repair issues.
+    mcp_allowlist: [gbrain, linear]
+    skills:
+      - pr_triage
+      - ci_classify
+      - file_linear_repair_issue
+    cannot:
+      - edit_code
+      - merge_pr
+      - push_branch
+
+routing:
+  default: chief
+  intent_map:
+    finance: cfo
+    spend: cfo
+    runway: cfo
+    fundraising: founder-os
+    investor: founder-os
+    pitch: founder-os
+    calendar: founder-os
+    airtable: founder-os
+    pr: code-orchestrator
+    ci: code-orchestrator
+    deploy: code-orchestrator
