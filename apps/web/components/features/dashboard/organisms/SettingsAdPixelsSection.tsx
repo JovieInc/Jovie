@@ -100,7 +100,7 @@ function PlatformSection({
         <div>
           <label
             htmlFor={pixelIdName}
-            className='mb-2 block text-2xs font-caption uppercase tracking-[0.06em] text-tertiary-token'
+            className='mb-2 block text-2xs font-caption text-tertiary-token'
           >
             {pixelIdLabel}
           </label>
@@ -118,7 +118,7 @@ function PlatformSection({
         <div>
           <label
             htmlFor={tokenName}
-            className='mb-2 block text-2xs font-caption uppercase tracking-[0.06em] text-tertiary-token'
+            className='mb-2 block text-2xs font-caption text-tertiary-token'
           >
             {tokenLabel}
           </label>

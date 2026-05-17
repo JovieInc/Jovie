@@ -92,7 +92,7 @@ export function ReleasePlanUpgradeInterstitial({
       data-testid='release-plan-upgrade-interstitial'
     >
       <TasksUpgradeContent
-        heading='Upgrade To Generate A Release Plan'
+        heading='Upgrade to Generate a Release Plan'
         description={`Upgrade to turn ${releaseName} into a step-by-step plan with tasks you can assign to Jovie AI.`}
         secondaryHref={APP_ROUTES.RELEASES}
         secondaryLabel='Back to Releases'
@@ -107,7 +107,7 @@ export function CompactReleasePlanUpgradeCard({
   return (
     <TasksUpgradeContent
       compact
-      heading='Upgrade To Generate A Release Plan'
+      heading='Upgrade to Generate a Release Plan'
       description='Upgrade to turn this release into an assignable step-by-step plan.'
       onSecondaryClick={onDismiss}
       secondaryLabel='Maybe Later'
