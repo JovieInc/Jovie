@@ -12,7 +12,9 @@ describe('SuggestedPrompts', () => {
 
     expect(getByTestId('suggested-prompts-rail')).toBeTruthy();
     expect(getByText('Plan a release')).toBeTruthy();
-    expect(getByText('Generate album art')).toBeTruthy();
+    const generateAlbumArt = getByText('Generate album art').closest('button');
+    expect(generateAlbumArt).toBeTruthy();
+    expect(generateAlbumArt).toBeDisabled();
     expect(getByText('Pitch playlists')).toBeTruthy();
     expect(getByText('Build artist profile')).toBeTruthy();
     expect(getByText('Analyze momentum')).toBeTruthy();
@@ -52,7 +54,7 @@ describe('SuggestedPrompts', () => {
     );
 
     expect(getByRole('button', { name: 'Plan a release' })).toBeTruthy();
-    expect(getByRole('button', { name: 'Generate album art' })).toBeTruthy();
+    expect(getByRole('button', { name: 'Generate album art' })).toBeDisabled();
     expect(getByRole('button', { name: 'Pitch playlists' })).toBeTruthy();
     expect(getByRole('button', { name: 'Build artist profile' })).toBeTruthy();
   });
@@ -80,5 +82,49 @@ describe('SuggestedPrompts', () => {
       })
     ).toBeTruthy();
     expect(getByRole('button', { name: 'Share feedback' })).toBeTruthy();
+  });
+
+  it('disables album art when capability is unavailable and enables a draft brief action', () => {
+    const onSelect = vi.fn();
+    const { getByRole } = fastRender(
+      <SuggestedPrompts
+        onSelect={onSelect}
+        albumArtCapability={{
+          availability: 'unavailable',
+          reason: 'Album art generation is not available for this profile.',
+          reasonCode: 'PROFILE_REQUIRED',
+        }}
+      />
+    );
+
+    getByRole('button', { name: 'Generate album art' }).click();
+    expect(onSelect).not.toHaveBeenCalled();
+
+    const draftBrief = getByRole('button', { name: 'Draft album-art brief' });
+    expect(draftBrief).toBeEnabled();
+
+    draftBrief.click();
+    expect(onSelect).toHaveBeenCalledWith(
+      'Draft an album-art brief for my latest release with visual direction, mood, palette, typography, and production notes.'
+    );
+  });
+
+  it('disables album art while capability is unknown without adding the draft brief action', () => {
+    const onSelect = vi.fn();
+    const { getByRole, queryByRole } = fastRender(
+      <SuggestedPrompts
+        onSelect={onSelect}
+        albumArtCapability={{
+          availability: 'unknown',
+          reason: 'Checking album art availability...',
+          reasonCode: 'CHECKING',
+        }}
+      />
+    );
+
+    getByRole('button', { name: 'Generate album art' }).click();
+
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(queryByRole('button', { name: 'Draft album-art brief' })).toBeNull();
   });
 });
