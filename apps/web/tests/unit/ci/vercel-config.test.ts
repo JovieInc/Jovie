@@ -29,9 +29,13 @@ describe('Vercel function config', () => {
       expect(functionGlobs, configPath).not.toContain(
         'apps/web/app/api/**/*.ts'
       );
+      expect(functionGlobs, configPath).not.toContain('apps/web/app/api/**/*');
+      expect(functionGlobs, configPath).not.toContain(
+        'apps/web/app/api/cron/**/*'
+      );
       expect(
         functionGlobs.every(
-          glob => /(^|\/)app\/api\//.test(glob) && glob.endsWith('/**/*')
+          glob => glob.startsWith('app/api/') && glob.endsWith('/**/*')
         ),
         configPath
       ).toBe(true);
