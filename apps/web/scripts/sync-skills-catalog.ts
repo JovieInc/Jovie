@@ -12,7 +12,9 @@
  */
 
 import { pathToFileURL } from 'node:url';
+import { neon } from '@neondatabase/serverless';
 import { sql as drizzleSql } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/neon-http';
 import { SKILL_REGISTRY } from '@/lib/agents/registry';
 import type { SkillDefinition, ToolDefinition } from '@/lib/agents/types';
 import { skillsCatalog, toolsCatalog } from '@/lib/db/schema/agents';
@@ -24,6 +26,25 @@ const scriptEnv = {
     return process.env.DATABASE_URL;
   },
 };
+
+function createScriptDb(databaseUrl: string) {
+  return drizzle(neon(databaseUrl), {
+    schema: {
+      skillsCatalog,
+      toolsCatalog,
+    },
+  });
+}
+
+type CatalogDb = Pick<ReturnType<typeof createScriptDb>, 'insert'>;
+
+function readDatabaseUrl(): string {
+  const databaseUrl = scriptEnv.DATABASE_URL;
+  if (!databaseUrl) {
+    throw new Error('DATABASE_URL is required to sync the skills catalog');
+  }
+  return databaseUrl;
+}
 
 const skillCatalogChanged = drizzleSql`
   ${skillsCatalog.name} IS DISTINCT FROM excluded.name OR
@@ -49,8 +70,9 @@ const toolCatalogChanged = drizzleSql`
   ${toolsCatalog.metadata} IS DISTINCT FROM excluded.metadata
 `;
 
-export async function syncSkillsCatalog(): Promise<void> {
-  const { db } = await import('@/lib/db');
+export async function syncSkillsCatalog(
+  db: CatalogDb = createScriptDb(readDatabaseUrl())
+): Promise<void> {
   const now = new Date();
   const skills = Object.values(SKILL_REGISTRY) as SkillDefinition[];
   const toolSkills = skills.filter(

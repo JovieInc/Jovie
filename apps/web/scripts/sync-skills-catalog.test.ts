@@ -2,8 +2,7 @@
  * sync-skills-catalog idempotency tests.
  *
  * Validates the shape and idempotency invariant of the catalog sync
- * without requiring a live DB connection. Uses a vi.mock for `@/lib/db`
- * so the test runs in unit context.
+ * without requiring a live DB connection.
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -31,11 +30,9 @@ const { mockInsert, mockOnConflictDoUpdate, mockValues } = vi.hoisted(() => {
   };
 });
 
-vi.mock('@/lib/db', () => ({
-  db: {
-    insert: mockInsert,
-  },
-}));
+const mockDb = { insert: mockInsert } as unknown as Parameters<
+  typeof syncSkillsCatalog
+>[0];
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -88,7 +85,7 @@ describe('sync-skills-catalog', () => {
   });
 
   it('upserts non-tool skills with conflict guards', async () => {
-    await syncSkillsCatalog();
+    await syncSkillsCatalog(mockDb);
 
     expect(mockInsert.mock.calls.length).toBeGreaterThanOrEqual(1);
     const insertedRows = mockValues.mock.calls[0]?.[0] as
@@ -125,7 +122,7 @@ describe('sync-skills-catalog', () => {
       metadata: { surface: 'unit' },
     };
 
-    await syncSkillsCatalog();
+    await syncSkillsCatalog(mockDb);
 
     expect(mockInsert.mock.calls.length).toBeGreaterThanOrEqual(2);
     const toolCallIndex = mockValues.mock.calls.findIndex(([rows]) => {
