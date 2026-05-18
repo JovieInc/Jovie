@@ -142,6 +142,14 @@ const SETTINGS_SHARED_ROUTE_CONTEXT_CANDIDATES = [
   resolve(process.cwd(), 'app/app/(shell)/settings/payments/page.tsx'),
 ] as const;
 
+const SETTINGS_CONNECTORS_PAGE = findSourceFile(
+  resolve(process.cwd(), 'app/app/(shell)/settings/connectors/page.tsx'),
+  resolve(
+    process.cwd(),
+    'apps/web/app/app/(shell)/settings/connectors/page.tsx'
+  )
+);
+
 const GATED_SETTINGS_ROUTE_FILES = [
   {
     route: 'settings admin',
@@ -248,6 +256,23 @@ describe('settings shell normalization', () => {
       expect(source).not.toContain('getCachedAuth');
       expect(source).not.toContain('getDashboardShellData');
     }
+  });
+
+  it('keeps connector queries outside the settings connectors page', () => {
+    expect(SETTINGS_CONNECTORS_PAGE).toBeDefined();
+
+    if (!SETTINGS_CONNECTORS_PAGE) {
+      throw new Error('Could not find settings connectors source');
+    }
+
+    const source = readFileSync(SETTINGS_CONNECTORS_PAGE, 'utf8');
+    expect(source).toContain('loadAppShellRouteContext');
+    expect(source).toContain('loadSettingsConnectorsData');
+    expect(source).not.toContain('@/lib/db');
+    expect(source).not.toContain('@/lib/db/queries/shared');
+    expect(source).not.toContain('@/lib/db/schema/connectors');
+    expect(source).not.toContain('getUserByClerkId');
+    expect(source).not.toContain('connectorAccounts');
   });
 
   it('keeps gated settings pages on server redirects instead of client effects', () => {
