@@ -229,6 +229,8 @@ function SubscribePanel({
             autoOpen
             forceExpanded
             hideListenFallback
+            source={sourceContext?.ctaLocation ?? 'subscribe_tab'}
+            sourceContext={sourceContext}
             portalContainer={notificationsPortalContainer}
             onFlowClosed={onFlowClosed}
             onSubscriptionActivated={onSubscriptionActivated}
