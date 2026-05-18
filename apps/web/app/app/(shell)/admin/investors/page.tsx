@@ -1,5 +1,4 @@
 import { Badge, Button } from '@jovie/ui';
-import { desc, sql as drizzleSql } from 'drizzle-orm';
 import {
   CheckCircle2,
   CircleSlash,
@@ -14,8 +13,6 @@ import { AdminToolPage } from '@/components/features/admin/layout/AdminToolPage'
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
-import { db } from '@/lib/db';
-import { investorLinks } from '@/lib/db/schema/investors';
 import { cn } from '@/lib/utils';
 import {
   InvestorTable,
@@ -25,6 +22,7 @@ import {
   InvestorTableHeaderRow,
   InvestorTableRow,
 } from './_components/InvestorTablePrimitives';
+import { loadAdminInvestorPipelineData } from './investors-data';
 import { TokenCopyButton } from './TokenCopyButton';
 
 export const metadata: Metadata = {
@@ -85,31 +83,7 @@ export default function InvestorPipelinePage() {
 }
 
 async function InvestorPipelineTable() {
-  const links = await db
-    .select({
-      id: investorLinks.id,
-      token: investorLinks.token,
-      label: investorLinks.label,
-      investorName: investorLinks.investorName,
-      email: investorLinks.email,
-      stage: investorLinks.stage,
-      engagementScore: investorLinks.engagementScore,
-      isActive: investorLinks.isActive,
-      notes: investorLinks.notes,
-      createdAt: investorLinks.createdAt,
-      updatedAt: investorLinks.updatedAt,
-      viewCount:
-        drizzleSql<number>`(SELECT COUNT(*) FROM investor_views WHERE investor_link_id = ${investorLinks.id})`.as(
-          'view_count'
-        ),
-      lastViewed: drizzleSql<
-        string | null
-      >`(SELECT MAX(viewed_at) FROM investor_views WHERE investor_link_id = ${investorLinks.id})`.as(
-        'last_viewed'
-      ),
-    })
-    .from(investorLinks)
-    .orderBy(desc(investorLinks.createdAt));
+  const links = await loadAdminInvestorPipelineData();
 
   if (links.length === 0) {
     return (
