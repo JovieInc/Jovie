@@ -6,7 +6,6 @@ import {
   DropdownMenuContent,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  Input,
   UserAvatar,
 } from '@jovie/ui';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
@@ -17,9 +16,7 @@ import {
   FileText,
   MoreHorizontal,
   Plus,
-  Search,
   Trash2,
-  X,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
@@ -2133,30 +2130,6 @@ export function TasksPageClient() {
                       <p className='text-xs text-secondary-token'>
                         {mobileScopeCounts.all} total tasks
                       </p>
-                      <div className='relative w-[min(12rem,48vw)] min-w-[8.5rem]'>
-                        <Search
-                          className='pointer-events-none absolute bottom-0 left-2 top-0 my-auto h-3.5 w-3.5 text-quaternary-token'
-                          aria-hidden='true'
-                        />
-                        <Input
-                          type='search'
-                          value={search}
-                          onChange={event => setSearch(event.target.value)}
-                          placeholder='Search tasks'
-                          aria-label='Search tasks'
-                          className='h-7 w-full rounded-md border-border-token bg-surface-0 py-0 pl-7 pr-7 text-[12.5px] text-primary-token placeholder:text-quaternary-token'
-                        />
-                        {search ? (
-                          <button
-                            type='button'
-                            aria-label='Clear task search'
-                            onClick={() => setSearch('')}
-                            className='absolute bottom-0 right-1 top-0 my-auto inline-flex h-5 w-5 items-center justify-center rounded text-quaternary-token transition-[background-color,color] hover:bg-surface-1 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-token'
-                          >
-                            <X className='h-3 w-3' aria-hidden='true' />
-                          </button>
-                        ) : null}
-                      </div>
                     </div>
                     <TaskSubviewTabs
                       subviews={taskSubviewOptions}

@@ -1370,15 +1370,15 @@ describe('TasksPageClient', () => {
     expect(screen.getByTestId('mobile-task-list')).toBeInTheDocument();
   });
 
-  it('renders the mobile list shell and opens task detail on tap', () => {
+  it('renders the mobile list shell without duplicate search and opens task detail on tap', () => {
     mockIsXlUp = false;
 
     renderPage();
 
     expect(screen.getByText('2 total tasks')).toBeInTheDocument();
     expect(
-      screen.getByRole('searchbox', { name: 'Search tasks' })
-    ).toBeInTheDocument();
+      screen.queryByRole('searchbox', { name: 'Search tasks' })
+    ).not.toBeInTheDocument();
 
     fireEvent.click(screen.getAllByTestId('mobile-task-row')[0]!);
 
