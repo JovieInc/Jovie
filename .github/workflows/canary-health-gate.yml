@@ -117,6 +117,7 @@ jobs:
             echo "canary_status=failed" >> "$GITHUB_OUTPUT"
             exit 1
           fi
+          public_deployment_url="${deployment_url%/}"
 
           if [[ "$health_url_fallback" = /* ]]; then
             health_url_fallback="${deployment_url%/}${health_url_fallback}"
@@ -183,22 +184,15 @@ jobs:
 
           if [ "$response_code" != "200" ] && [ -n "$resolved_commit_deployment_url" ] && [ "${deployment_url%/}" != "${resolved_commit_deployment_url%/}" ]; then
             echo "⚠ Canary primary URL failed with HTTP $response_code. Retrying commit deployment URL ${resolved_commit_deployment_url}..."
-            deployment_url="$resolved_commit_deployment_url"
+            diagnostic_deployment_url="$resolved_commit_deployment_url"
 
-            if [[ "$FALLBACK_HEALTH_URL" = /* ]]; then
-              health_url_fallback="${deployment_url%/}${FALLBACK_HEALTH_URL}"
-            else
-              health_url_fallback="${FALLBACK_HEALTH_URL}"
-            fi
-
-            health_url_primary="${deployment_url%/}/api/health"
-            health_url="$health_url_primary"
+            diagnostic_health_url="${diagnostic_deployment_url%/}/api/health"
 
             attempt=1
             max_attempts=5
             response_code="000"
             while [ $attempt -le $max_attempts ]; do
-              response=$(curl -s -L "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${health_url}$( [[ "$health_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || printf '\n000')
+              response=$(curl -s -L "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${diagnostic_health_url}$( [[ "$diagnostic_health_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || printf '\n000')
               response_code="${response##*$'\n'}"
 
               if [ "$response_code" = "200" ]; then
@@ -354,8 +348,8 @@ jobs:
             exit 1
           }
 
-          verify_build_info_serves_commit "$deployment_url"
-          echo "verified_deployment_url=${deployment_url%/}" >> "$GITHUB_OUTPUT"
+          verify_build_info_serves_commit "$public_deployment_url"
+          echo "verified_deployment_url=${public_deployment_url}" >> "$GITHUB_OUTPUT"
 
           health_content=$(curl -s -L "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" "${health_url}$( [[ "$health_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || echo "")
           if [[ "$health_content" != *'"status":"ok"'* ]]; then
