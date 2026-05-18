@@ -229,4 +229,26 @@ describe('electron-bridge — defensive guards', () => {
     expect(getDictationStatus).toHaveBeenCalledTimes(1);
     expect(captureWarningMock).not.toHaveBeenCalled();
   });
+
+  it('safeGetDictationStatus rejects malformed bridge payloads', async () => {
+    const getDictationStatus = vi.fn().mockResolvedValue({
+      ok: true,
+      mode: 'web-speech',
+    });
+    setElectronAPI({ getDictationStatus });
+
+    await expect(__testing.safeGetDictationStatus()).resolves.toMatchObject({
+      ok: false,
+      mode: 'unavailable',
+      webSpeechFallbackAllowed: false,
+    });
+    expect(getDictationStatus).toHaveBeenCalledTimes(1);
+    expect(captureWarningMock).toHaveBeenCalledTimes(1);
+    const [message, , context] = captureWarningMock.mock.calls[0];
+    expect(message).toContain('invalid payload');
+    expect(context).toMatchObject({
+      route: 'desktop/electron-bridge',
+      bridgeMethod: 'getDictationStatus',
+    });
+  });
 });
