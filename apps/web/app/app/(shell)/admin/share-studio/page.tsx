@@ -1,31 +1,20 @@
-import { and, desc, eq, isNull } from 'drizzle-orm';
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 import { AdminToolPage } from '@/components/features/admin/layout/AdminToolPage';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
-import { getBlogPosts } from '@/lib/blog/getBlogPosts';
-import { db } from '@/lib/db';
-import { discogReleases } from '@/lib/db/schema/content';
-import { joviePlaylists } from '@/lib/db/schema/playlists';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
-import {
-  getProfileByUsername,
-  getTopProfilesForStaticGeneration,
-} from '@/lib/services/profile';
-import {
-  buildBlogShareContext,
-  buildPlaylistShareContext,
-  buildProfileShareContext,
-  buildReleaseShareContext,
-} from '@/lib/share/context';
 import {
   buildDisplayUrl,
   buildMailtoHref,
   buildTrackedShareUrl,
 } from '@/lib/share/copy';
 import type { ShareContext } from '@/lib/share/types';
+import {
+  loadShareStudioData,
+  type SamplePickerItem,
+  type ShareStudioSearchParams,
+} from './loader';
 
 export const metadata: Metadata = {
   title: 'Share Studio | Admin',
@@ -35,37 +24,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 interface ShareStudioPageProps {
-  readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
-}
-
-interface ProfileSample {
-  readonly username: string;
-  readonly name: string;
-  readonly avatarUrl: string | null;
-  readonly bio: string | null;
-}
-
-interface ReleaseSample {
-  readonly username: string;
-  readonly artistName: string;
-  readonly slug: string;
-  readonly title: string;
-  readonly artworkUrl: string | null;
-}
-
-interface PlaylistSample {
-  readonly slug: string;
-  readonly title: string;
-  readonly coverImageUrl: string | null;
-  readonly editorialNote: string | null;
-}
-
-function getParamValue(value: string | string[] | undefined): string | null {
-  if (typeof value === 'string' && value.length > 0) {
-    return value;
-  }
-
-  return null;
+  readonly searchParams: Promise<ShareStudioSearchParams>;
 }
 
 function buildPickerHref(
@@ -136,7 +95,7 @@ function buildTrackedPreviewLinks(context: ShareContext) {
 function SamplePicker(
   props: Readonly<{
     readonly label: string;
-    readonly items: readonly { key: string; label: string }[];
+    readonly items: readonly SamplePickerItem[];
     readonly selectedKey: string;
     readonly paramKey: string;
     readonly searchParams: URLSearchParams;
@@ -265,113 +224,13 @@ function PayloadBlock(props: Readonly<{ label: string; value: string }>) {
   );
 }
 
-async function getProfileSamples(limit = 4): Promise<ProfileSample[]> {
-  const usernames = await getTopProfilesForStaticGeneration(limit);
-  const profiles = await Promise.all(
-    usernames.map(async entry => getProfileByUsername(entry.username))
-  );
-
-  return profiles
-    .filter((profile): profile is NonNullable<typeof profile> =>
-      Boolean(profile?.usernameNormalized && profile.isPublic)
-    )
-    .map(profile => ({
-      username: profile.usernameNormalized,
-      name: profile.displayName ?? profile.username,
-      avatarUrl: profile.avatarUrl,
-      bio: profile.bio,
-    }));
-}
-
-async function getReleaseSamples(limit = 4): Promise<ReleaseSample[]> {
-  return db
-    .select({
-      username: creatorProfiles.usernameNormalized,
-      artistName: creatorProfiles.displayName,
-      fallbackArtistName: creatorProfiles.username,
-      slug: discogReleases.slug,
-      title: discogReleases.title,
-      artworkUrl: discogReleases.artworkUrl,
-    })
-    .from(discogReleases)
-    .innerJoin(
-      creatorProfiles,
-      eq(discogReleases.creatorProfileId, creatorProfiles.id)
-    )
-    .where(
-      and(eq(creatorProfiles.isPublic, true), isNull(discogReleases.deletedAt))
-    )
-    .orderBy(desc(discogReleases.releaseDate), desc(discogReleases.createdAt))
-    .limit(limit)
-    .then(rows =>
-      rows.map(row => ({
-        username: row.username,
-        artistName: row.artistName ?? row.fallbackArtistName,
-        slug: row.slug,
-        title: row.title,
-        artworkUrl: row.artworkUrl,
-      }))
-    );
-}
-
-async function getPlaylistSamples(limit = 4): Promise<PlaylistSample[]> {
-  return db
-    .select({
-      slug: joviePlaylists.slug,
-      title: joviePlaylists.title,
-      coverImageUrl: joviePlaylists.coverImageUrl,
-      editorialNote: joviePlaylists.editorialNote,
-    })
-    .from(joviePlaylists)
-    .where(eq(joviePlaylists.status, 'published'))
-    .orderBy(desc(joviePlaylists.publishedAt), desc(joviePlaylists.createdAt))
-    .limit(limit);
-}
-
 export default async function AdminShareStudioPage({
   searchParams,
 }: ShareStudioPageProps) {
   const params = await searchParams;
-  const urlSearchParams = new URLSearchParams();
+  const data = await loadShareStudioData(params);
 
-  for (const [key, value] of Object.entries(params)) {
-    const normalizedValue = getParamValue(value);
-    if (normalizedValue) {
-      urlSearchParams.set(key, normalizedValue);
-    }
-  }
-
-  const [blogPosts, profileSamples, releaseSamples, playlistSamples] =
-    await Promise.all([
-      getBlogPosts(),
-      getProfileSamples(),
-      getReleaseSamples(),
-      getPlaylistSamples(),
-    ]);
-
-  const selectedBlog =
-    blogPosts.find(post => post.slug === getParamValue(params.blog)) ??
-    blogPosts[0];
-  const selectedProfile =
-    profileSamples.find(
-      profile => profile.username === getParamValue(params.profile)
-    ) ?? profileSamples[0];
-  const selectedRelease =
-    releaseSamples.find(
-      release =>
-        `${release.username}:${release.slug}` === getParamValue(params.release)
-    ) ?? releaseSamples[0];
-  const selectedPlaylist =
-    playlistSamples.find(
-      playlist => playlist.slug === getParamValue(params.playlist)
-    ) ?? playlistSamples[0];
-
-  if (
-    !selectedBlog ||
-    !selectedProfile ||
-    !selectedRelease ||
-    !selectedPlaylist
-  ) {
+  if (!data) {
     return (
       <AdminToolPage
         title='Share Studio'
@@ -386,32 +245,6 @@ export default async function AdminShareStudioPage({
     );
   }
 
-  const blogContext = buildBlogShareContext({
-    slug: selectedBlog.slug,
-    title: selectedBlog.title,
-    excerpt: selectedBlog.excerpt,
-  });
-  const profileContext = buildProfileShareContext({
-    username: selectedProfile.username,
-    artistName: selectedProfile.name,
-    avatarUrl: selectedProfile.avatarUrl,
-    bio: selectedProfile.bio,
-  });
-  const releaseContext = buildReleaseShareContext({
-    username: selectedRelease.username,
-    slug: selectedRelease.slug,
-    title: selectedRelease.title,
-    artistName: selectedRelease.artistName,
-    artworkUrl: selectedRelease.artworkUrl,
-    pathname: `/${selectedRelease.username}/${selectedRelease.slug}`,
-  });
-  const playlistContext = buildPlaylistShareContext({
-    slug: selectedPlaylist.slug,
-    title: selectedPlaylist.title,
-    coverImageUrl: selectedPlaylist.coverImageUrl,
-    editorialNote: selectedPlaylist.editorialNote,
-  });
-
   return (
     <AdminToolPage
       title='Share Studio'
@@ -421,51 +254,48 @@ export default async function AdminShareStudioPage({
       <div className='grid gap-3 xl:grid-cols-2'>
         <SamplePicker
           label='Blog Sample'
-          items={blogPosts.slice(0, 4).map(post => ({
-            key: post.slug,
-            label: post.title,
-          }))}
-          selectedKey={selectedBlog.slug}
+          items={data.blogItems}
+          selectedKey={data.selectedBlogKey}
           paramKey='blog'
-          searchParams={urlSearchParams}
+          searchParams={data.urlSearchParams}
         />
         <SamplePicker
           label='Profile Sample'
-          items={profileSamples.map(profile => ({
-            key: profile.username,
-            label: profile.name,
-          }))}
-          selectedKey={selectedProfile.username}
+          items={data.profileItems}
+          selectedKey={data.selectedProfileKey}
           paramKey='profile'
-          searchParams={urlSearchParams}
+          searchParams={data.urlSearchParams}
         />
         <SamplePicker
           label='Release Sample'
-          items={releaseSamples.map(release => ({
-            key: `${release.username}:${release.slug}`,
-            label: `${release.artistName} — ${release.title}`,
-          }))}
-          selectedKey={`${selectedRelease.username}:${selectedRelease.slug}`}
+          items={data.releaseItems}
+          selectedKey={data.selectedReleaseKey}
           paramKey='release'
-          searchParams={urlSearchParams}
+          searchParams={data.urlSearchParams}
         />
         <SamplePicker
           label='Playlist Sample'
-          items={playlistSamples.map(playlist => ({
-            key: playlist.slug,
-            label: playlist.title,
-          }))}
-          selectedKey={selectedPlaylist.slug}
+          items={data.playlistItems}
+          selectedKey={data.selectedPlaylistKey}
           paramKey='playlist'
-          searchParams={urlSearchParams}
+          searchParams={data.urlSearchParams}
         />
       </div>
 
       <div className='grid gap-4'>
-        <PayloadCard title='Blog Share Payload' context={blogContext} />
-        <PayloadCard title='Profile Share Payload' context={profileContext} />
-        <PayloadCard title='Release Share Payload' context={releaseContext} />
-        <PayloadCard title='Playlist Share Payload' context={playlistContext} />
+        <PayloadCard title='Blog Share Payload' context={data.blogContext} />
+        <PayloadCard
+          title='Profile Share Payload'
+          context={data.profileContext}
+        />
+        <PayloadCard
+          title='Release Share Payload'
+          context={data.releaseContext}
+        />
+        <PayloadCard
+          title='Playlist Share Payload'
+          context={data.playlistContext}
+        />
       </div>
     </AdminToolPage>
   );
