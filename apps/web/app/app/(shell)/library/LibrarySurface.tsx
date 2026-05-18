@@ -64,6 +64,12 @@ import {
 
 const LIBRARY_TABLE_ROW_HEIGHT = 56;
 const LIBRARY_TABLE_MIN_WIDTH = '0';
+const LIBRARY_CARD_FOCUS_CLASS =
+  'focus-visible:outline-none focus-visible:bg-(--linear-row-hover) focus-visible:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_45%,transparent)]';
+const LIBRARY_BUTTON_FOCUS_CLASS =
+  'focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1 focus-visible:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_35%,transparent)]';
+const LIBRARY_ICON_FOCUS_CLASS =
+  'focus-visible:outline-none focus-visible:bg-surface-1 focus-visible:text-primary-token focus-visible:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_45%,transparent)]';
 
 const LIBRARY_TABLE_SKELETON_CONFIG: Array<{
   readonly width?: string;
@@ -883,7 +889,10 @@ function AssetCard({
       <button
         type='button'
         onClick={onSelect}
-        className='flex h-full w-full flex-col text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)'
+        className={cn(
+          'flex h-full w-full flex-col text-left transition-[background-color,box-shadow] duration-subtle',
+          LIBRARY_CARD_FOCUS_CLASS
+        )}
       >
         <div className='relative aspect-square overflow-hidden bg-black'>
           <Artwork asset={asset} />
@@ -1011,7 +1020,10 @@ function EmptyCatalog() {
         action={
           <Link
             href={APP_ROUTES.RELEASES}
-            className='inline-flex h-8 items-center rounded-md border border-subtle bg-surface-0 px-3 text-sm font-medium text-primary-token transition-[background-color,border-color] duration-subtle hover:border-default hover:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token'
+            className={cn(
+              'inline-flex h-8 items-center rounded-md border border-subtle bg-surface-0 px-3 text-sm font-medium text-primary-token transition-[background-color,border-color,box-shadow] duration-subtle hover:border-default hover:bg-surface-1',
+              LIBRARY_BUTTON_FOCUS_CLASS
+            )}
           >
             Open Releases
           </Link>
@@ -1031,7 +1043,10 @@ function NoResults({ onReset }: { readonly onReset: () => void }) {
         <button
           type='button'
           onClick={onReset}
-          className='inline-flex h-8 items-center rounded-md border border-subtle bg-surface-0 px-3 text-sm font-medium text-primary-token transition-[background-color,border-color] duration-subtle hover:border-default hover:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token'
+          className={cn(
+            'inline-flex h-8 items-center rounded-md border border-subtle bg-surface-0 px-3 text-sm font-medium text-primary-token transition-[background-color,border-color,box-shadow] duration-subtle hover:border-default hover:bg-surface-1',
+            LIBRARY_BUTTON_FOCUS_CLASS
+          )}
         >
           Reset View
         </button>
@@ -1099,7 +1114,10 @@ function AssetDrawer({
               onClick={onClose}
               aria-label='Close asset details'
               {...closedInteractiveProps}
-              className='grid h-7 w-7 place-items-center rounded-md text-tertiary-token transition-colors duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+              className={cn(
+                'grid h-7 w-7 place-items-center rounded-md text-tertiary-token transition-[background-color,color,box-shadow] duration-subtle hover:bg-surface-1 hover:text-primary-token',
+                LIBRARY_ICON_FOCUS_CLASS
+              )}
             >
               <X className='h-3.5 w-3.5' />
             </button>
@@ -1139,7 +1157,10 @@ function AssetDrawer({
               <Link
                 href={current.smartLinkPath}
                 {...closedInteractiveProps}
-                className='inline-flex h-8 items-center gap-1.5 rounded-md border border-subtle bg-surface-1 px-3 text-xs font-medium text-primary-token transition-[background-color,border-color] duration-subtle hover:border-default hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token'
+                className={cn(
+                  'inline-flex h-8 items-center gap-1.5 rounded-md border border-subtle bg-surface-1 px-3 text-xs font-medium text-primary-token transition-[background-color,border-color,box-shadow] duration-subtle hover:border-default hover:bg-surface-2',
+                  LIBRARY_BUTTON_FOCUS_CLASS
+                )}
               >
                 Open Release
                 <ExternalLink className='h-3 w-3' />
@@ -1150,7 +1171,10 @@ function AssetDrawer({
                   target='_blank'
                   rel='noopener noreferrer'
                   {...closedInteractiveProps}
-                  className='inline-flex h-8 items-center gap-1.5 rounded-md border border-subtle bg-surface-1 px-3 text-xs font-medium text-primary-token transition-[background-color,border-color] duration-subtle hover:border-default hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token'
+                  className={cn(
+                    'inline-flex h-8 items-center gap-1.5 rounded-md border border-subtle bg-surface-1 px-3 text-xs font-medium text-primary-token transition-[background-color,border-color,box-shadow] duration-subtle hover:border-default hover:bg-surface-2',
+                    LIBRARY_BUTTON_FOCUS_CLASS
+                  )}
                 >
                   <PlayCircle className='h-3 w-3' />
                   Preview
@@ -1212,7 +1236,10 @@ function AssetDrawer({
                       target='_blank'
                       rel='noopener noreferrer'
                       {...closedInteractiveProps}
-                      className='flex h-8 items-center gap-2 rounded-md px-2 text-xs text-secondary-token transition-colors duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+                      className={cn(
+                        'flex h-8 items-center gap-2 rounded-md px-2 text-xs text-secondary-token transition-[background-color,color,box-shadow] duration-subtle hover:bg-surface-1 hover:text-primary-token',
+                        LIBRARY_CARD_FOCUS_CLASS
+                      )}
                     >
                       <Music2 className='h-3.5 w-3.5 text-tertiary-token' />
                       <span className='min-w-0 flex-1 truncate'>
