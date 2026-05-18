@@ -13,7 +13,7 @@ vi.mock('@tanstack/react-query', async () => {
   };
 });
 
-vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
+vi.mock('@/app/app/(shell)/dashboard/releases/release-matrix-loader', () => ({
   loadReleaseMatrix: vi.fn(),
 }));
 
