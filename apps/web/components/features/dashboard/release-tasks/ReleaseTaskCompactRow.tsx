@@ -1,6 +1,14 @@
 'use client';
 import type { ReleaseTaskView } from '@/lib/release-tasks/types';
+import { cn } from '@/lib/utils';
 import { ReleaseTaskDueBadge } from './ReleaseTaskDueBadge';
+import {
+  isReleaseTaskAutomated,
+  isReleaseTaskDone,
+  ReleaseTaskAutoBadge,
+  ReleaseTaskCheckbox,
+  ReleaseTaskTitleText,
+} from './ReleaseTaskRowPrimitives';
 
 interface ReleaseTaskCompactRowProps {
   readonly task: ReleaseTaskView;
@@ -13,30 +21,33 @@ export function ReleaseTaskCompactRow({
   onToggle,
   onNavigate,
 }: ReleaseTaskCompactRowProps) {
-  const isDone = task.status === 'done';
-  const isAi = task.assigneeType === 'ai_workflow';
+  const isDone = isReleaseTaskDone(task);
+  const isAi = isReleaseTaskAutomated(task);
 
   return (
     <div className='flex items-center gap-2 px-3 py-0.5 min-h-[28px] group hover:bg-surface-1 rounded transition-colors'>
-      <input
-        type='checkbox'
-        checked={isDone}
-        disabled={isAi}
-        onChange={() => onToggle(task.id, !isDone)}
-        className='h-3 w-3 flex-shrink-0 rounded accent-accent cursor-pointer disabled:cursor-default disabled:opacity-60'
-        aria-label={`Mark "${task.title}" as ${isDone ? 'incomplete' : 'complete'}`}
+      <ReleaseTaskCheckbox
+        task={task}
+        isDone={isDone}
+        onToggle={onToggle}
+        className='h-3 w-3'
       />
       <button
         type='button'
         onClick={() => onNavigate(task.id)}
-        className={`flex-1 text-left text-[11.5px] truncate transition-colors ${
-          isDone
-            ? 'text-tertiary-token line-through opacity-60'
-            : 'text-primary-token'
-        } ${isAi ? 'opacity-70' : 'hover:text-accent'}`}
+        className={cn(
+          'flex-1 text-left text-[11.5px] truncate transition-colors',
+          isAi ? 'opacity-70' : 'hover:text-accent'
+        )}
       >
-        {task.title}
-        {isAi && <span className='ml-1 text-3xs text-purple-500'>AI</span>}
+        <ReleaseTaskTitleText className='block' isDone={isDone}>
+          {task.title}
+          {isAi && (
+            <ReleaseTaskAutoBadge className='ml-1 text-purple-500'>
+              AI
+            </ReleaseTaskAutoBadge>
+          )}
+        </ReleaseTaskTitleText>
       </button>
       <ReleaseTaskDueBadge
         dueDate={task.dueDate}
