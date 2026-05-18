@@ -168,6 +168,45 @@ describe('LibrarySurface', () => {
     );
   });
 
+  it('uses shell focus tokens for library cards and drawer actions', () => {
+    renderLibrary([buildAsset()]);
+
+    const assetCardButton = screen.getByRole('button', {
+      name: /Take Me Over/u,
+    });
+
+    expect(assetCardButton.className).toContain(
+      'focus-visible:bg-(--linear-row-hover)'
+    );
+    expect(assetCardButton.className).toContain(
+      'focus-visible:shadow-[inset_0_0_0_1px'
+    );
+    expect(assetCardButton.className).not.toContain('focus-visible:ring');
+
+    fireEvent.click(assetCardButton);
+
+    const closeButton = screen.getByRole('button', {
+      name: 'Close asset details',
+    });
+    const openReleaseLink = screen.getByRole('link', {
+      name: /Open Release/u,
+    });
+    const previewLink = screen.getByRole('link', { name: /^Preview$/u });
+    const providerLink = screen.getByRole('link', { name: /Spotify/u });
+
+    for (const element of [
+      closeButton,
+      openReleaseLink,
+      previewLink,
+      providerLink,
+    ]) {
+      expect(element.className).not.toContain('focus-visible:ring');
+      expect(element.className).toContain(
+        'focus-visible:shadow-[inset_0_0_0_1px'
+      );
+    }
+  });
+
   it('switches between grid and list modes without losing the release list', () => {
     renderLibrary([
       buildAsset(),
