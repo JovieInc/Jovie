@@ -12,6 +12,10 @@ const AGENT_RUN_DETAIL_ROUTE = join(
   TEST_DIR,
   '../../../app/app/(shell)/admin/agent-runs/[id]/page.tsx'
 );
+const AGENT_RUN_DETAIL_DATA = join(
+  TEST_DIR,
+  '../../../app/app/(shell)/admin/agent-runs/[id]/agent-run-data.ts'
+);
 
 describe('admin agent run detail shell normalization', () => {
   it('keeps the run detail route inside the shared admin shell', () => {
@@ -42,5 +46,17 @@ describe('admin agent run detail shell normalization', () => {
       /bg-white\/\[|divide-white\/\[|border-white\/\[/
     );
     expect(source).not.toContain('border-subtle bg-surface-1 p-4');
+  });
+
+  it('keeps agent run route data outside the page module', () => {
+    const pageSource = readFileSync(AGENT_RUN_DETAIL_ROUTE, 'utf8');
+    const dataSource = readFileSync(AGENT_RUN_DETAIL_DATA, 'utf8');
+
+    expect(dataSource.startsWith("import 'server-only';")).toBe(true);
+    expect(pageSource).toContain('loadAdminAgentRun');
+    expect(pageSource).not.toContain("from '@/lib/db'");
+    expect(pageSource).not.toContain("from '@/lib/db/schema/connectors'");
+    expect(pageSource).not.toContain("from 'drizzle-orm'");
+    expect(pageSource).not.toContain('agentRuns');
   });
 });
