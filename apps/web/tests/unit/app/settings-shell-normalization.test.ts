@@ -39,6 +39,14 @@ const RETARGETING_ROUTE_CANDIDATES = [
   ),
 ] as const;
 
+const RETARGETING_LAYOUT = findSourceFile(
+  resolve(process.cwd(), 'app/app/(shell)/settings/retargeting-ads/layout.tsx'),
+  resolve(
+    process.cwd(),
+    'apps/web/app/app/(shell)/settings/retargeting-ads/layout.tsx'
+  )
+);
+
 const SETTINGS_ALIAS_ROUTES = [
   {
     route: 'settings root',
@@ -149,6 +157,21 @@ describe('settings shell normalization', () => {
       expect(source).not.toMatch(/<PageContent\b/);
       expect(source).not.toMatch(/import\s*\{[^}]*PageContent/);
     }
+  });
+
+  it('keeps retargeting admin auth on the shared shell route context path', () => {
+    expect(RETARGETING_LAYOUT).toBeDefined();
+
+    if (!RETARGETING_LAYOUT) {
+      throw new Error('Could not find retargeting settings layout source');
+    }
+
+    const source = readFileSync(RETARGETING_LAYOUT, 'utf8');
+    expect(source).toContain('loadAppShellRouteContext');
+    expect(source).toContain('getCurrentUserEntitlements');
+    expect(source).not.toContain('getCachedAuth');
+    expect(source).not.toContain('getDashboardDataEssential');
+    expect(source).not.toContain('getDashboardShellData');
   });
 
   it('keeps legacy settings aliases as lightweight route redirects', () => {
