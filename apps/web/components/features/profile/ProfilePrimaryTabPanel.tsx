@@ -550,7 +550,7 @@ export function ProfilePrimaryTabPanel({
           artist={artist}
           title='No music yet.'
           body='Get a note when the first release lands.'
-          triggerLabel='Get alerts'
+          triggerLabel='Turn on alerts'
           sourceContext={musicEmptySourceContext}
         />
       </div>
