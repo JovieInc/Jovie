@@ -38,6 +38,13 @@ const CREATOR_SHELL_SLICE_ROUTES = [
     navTrigger: `a[href="${APP_ROUTES.TASKS}"]`,
   },
   {
+    id: 'creator-audience',
+    path: APP_ROUTES.AUDIENCE,
+    measureMode: 'page-load',
+    warmupStrategy: 'authenticated-route',
+    primaryMetric: 'skeleton-to-content',
+  },
+  {
     id: 'creator-lyrics',
     path: `${APP_ROUTES.LYRICS}/[trackId]`,
     measureMode: 'page-load',
@@ -46,6 +53,12 @@ const CREATOR_SHELL_SLICE_ROUTES = [
     resolvesDynamicPath: true,
   },
 ] as const satisfies readonly CreatorShellRouteExpectation[];
+
+const RELEASE_BUDGET_CREATOR_SHELL_ROUTE_IDS = [
+  'creator-library',
+  'creator-tasks',
+  'creator-lyrics',
+] as const;
 
 function requireRoute(id: string) {
   const route = getEndUserPerfRouteById(id);
@@ -90,8 +103,8 @@ describe('performance route manifest shell slice coverage', () => {
     const releases = requireRoute('creator-releases');
     const releaseResourceBudgets = getRouteResourceBudgets(releases);
 
-    for (const expectation of CREATOR_SHELL_SLICE_ROUTES) {
-      const route = requireRoute(expectation.id);
+    for (const routeId of RELEASE_BUDGET_CREATOR_SHELL_ROUTE_IDS) {
+      const route = requireRoute(routeId);
       expect(getRouteResourceBudgets(route)).toEqual(releaseResourceBudgets);
     }
   });

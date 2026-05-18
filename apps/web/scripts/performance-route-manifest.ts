@@ -948,7 +948,7 @@ const CREATOR_SHELL_ROUTES = [
     id: 'creator-audience',
     group: 'creator-shell',
     surface: 'creator-app',
-    path: APP_ROUTES.DASHBOARD_AUDIENCE,
+    path: APP_ROUTES.AUDIENCE,
     requiresAuth: true,
     warmupStrategy: 'authenticated-route',
     measureMode: 'page-load',
