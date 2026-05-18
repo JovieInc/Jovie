@@ -26,7 +26,7 @@ import { expect, test } from '@playwright/test';
 import { assertDomStable } from '../helpers/dom-stability';
 
 const BYPASS_URL =
-  '/api/dev/test-auth/enter?persona=creator-ready&redirect=/app/dashboard/releases';
+  '/api/dev/test-auth/enter?persona=creator-ready&redirect=/app/releases';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 

@@ -580,7 +580,7 @@ test.describe('Content Gate — Authenticated Pages', () => {
     const dashboardPages = fastIteration
       ? [
           {
-            path: APP_ROUTES.DASHBOARD_RELEASES,
+            path: APP_ROUTES.RELEASES,
             name: 'Releases',
             readyText: /releases|music|tracks/i,
           },
@@ -593,7 +593,7 @@ test.describe('Content Gate — Authenticated Pages', () => {
             readyText: /audience|fans|subscribers/i,
           },
           {
-            path: APP_ROUTES.DASHBOARD_RELEASES,
+            path: APP_ROUTES.RELEASES,
             name: 'Releases',
             readyText: /releases|music|tracks/i,
           },

@@ -86,7 +86,7 @@ function createSummary(): GuardSummary {
       },
       {
         auth: true,
-        configuredPath: '/app/dashboard/releases',
+        configuredPath: '/app/releases',
         group: 'creator-shell',
         id: 'creator-releases',
         primaryMetric: 'warm-shell-response',
@@ -108,7 +108,7 @@ function createSummary(): GuardSummary {
           'time-to-first-byte': 120,
           'warm-shell-response': 130,
         },
-        resolvedPath: '/app/dashboard/releases',
+        resolvedPath: '/app/releases',
         resourceSizes: [],
         routeSurface: 'creator-app',
         samples: [],
@@ -122,7 +122,7 @@ function createSummary(): GuardSummary {
             unit: 'ms',
           },
         ],
-        url: 'http://127.0.0.1:4100/app/dashboard/releases',
+        url: 'http://127.0.0.1:4100/app/releases',
         violations: [
           {
             budget: 100,

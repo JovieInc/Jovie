@@ -33,7 +33,7 @@ test.describe('Command palette — Cmd+K contract', () => {
     page,
   }) => {
     await ensureSignedInUser(page);
-    await smokeNavigateWithRetry(page, APP_ROUTES.DASHBOARD_RELEASES, {
+    await smokeNavigateWithRetry(page, APP_ROUTES.RELEASES, {
       timeout: 60_000,
     });
     await waitForHydration(page);

@@ -662,7 +662,7 @@ test.describe('YC Demo Recording', () => {
 
     await revealDemoSceneAfter(demoPage, async () => {
       await authenticateDemoPage(demoPage, demoClerkUserId);
-      await gotoDemoScene(demoPage, '/app/dashboard/releases', {
+      await gotoDemoScene(demoPage, '/app/releases', {
         readyLocator: demoPage
           .locator(
             '[data-testid="releases-matrix"], [data-testid="shell-releases-view"]'

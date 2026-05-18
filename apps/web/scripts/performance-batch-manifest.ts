@@ -297,9 +297,7 @@ const PERF_ISSUES = [
     title: 'Releases workspace FCP is too slow',
     kind: 'timing-budget',
     surface: 'creator-app',
-    evidence: [
-      'Direct load for `/app/dashboard/releases` observed about 3032ms FCP.',
-    ],
+    evidence: ['Direct load for `/app/releases` observed about 3032ms FCP.'],
     batchId: 'B3-releases-workspace',
     checks: ['creator-releases-budget-pass', 'creator-releases-direct-metrics'],
   },
@@ -308,9 +306,7 @@ const PERF_ISSUES = [
     title: 'Releases workspace request count is too high',
     kind: 'network-churn',
     surface: 'creator-app',
-    evidence: [
-      'Direct load for `/app/dashboard/releases` observed 94 requests.',
-    ],
+    evidence: ['Direct load for `/app/releases` observed 94 requests.'],
     batchId: 'B3-releases-workspace',
     checks: ['creator-releases-direct-metrics'],
   },
@@ -320,7 +316,7 @@ const PERF_ISSUES = [
     kind: 'resource-budget',
     surface: 'creator-app',
     evidence: [
-      'Direct load for `/app/dashboard/releases` observed about 822KB JS and 159KB CSS.',
+      'Direct load for `/app/releases` observed about 822KB JS and 159KB CSS.',
     ],
     batchId: 'B3-releases-workspace',
     checks: ['creator-releases-direct-metrics'],
@@ -517,7 +513,7 @@ const PERF_BATCHES = [
       },
     ],
     qaScope: [
-      'Re-run screenshot parity for `/tim`, `/app`, `/start`, and `/app/dashboard/releases`.',
+      'Re-run screenshot parity for `/tim`, `/app`, `/start`, and `/app/releases`.',
       'Verify the ship runner uses the queue handoff instead of falling back to ad hoc perf commands.',
     ],
     shipLabels: ['testing'],
@@ -629,9 +625,9 @@ const PERF_BATCHES = [
         kind: 'direct-metrics',
         expectation: 'pass',
         authPersona: 'creator-ready',
-        path: APP_ROUTES.DASHBOARD_RELEASES,
+        path: APP_ROUTES.RELEASES,
         directMetrics: {
-          finalPath: APP_ROUTES.DASHBOARD_RELEASES,
+          finalPath: APP_ROUTES.RELEASES,
           requests: 69,
           scriptKB: 700,
         },

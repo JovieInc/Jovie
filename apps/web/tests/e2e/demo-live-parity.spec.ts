@@ -178,7 +178,7 @@ test.describe
     }) => {
       const liveShape = await collectReleasesShape(
         page,
-        APP_ROUTES.DASHBOARD_RELEASES,
+        APP_ROUTES.RELEASES,
         true
       );
       const demoShape = await collectUnauthenticatedShape(page, demoPage =>
