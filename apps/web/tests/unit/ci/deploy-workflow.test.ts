@@ -312,6 +312,17 @@ describe('canary health gate workflow', () => {
     expect(authSmokeStep).toContain(
       'DEPLOYMENT_URL: ${{ steps.canary-check.outputs.verified_deployment_url || inputs.deployment_url }}'
     );
+    expect(authSmokeStep).toContain('auth_smoke_attempt=1');
+    expect(authSmokeStep).toContain('auth_smoke_max_attempts=3');
+    expect(authSmokeStep).toContain(
+      'until CI=true SMOKE_ONLY=1 BASE_URL="${DEPLOYMENT_URL}" pnpm exec playwright test tests/e2e/auth-public-ready.spec.ts --project=chromium --reporter=line; do'
+    );
+    expect(authSmokeStep).toContain(
+      'Public auth controls failed after ${auth_smoke_max_attempts} attempts.'
+    );
+    expect(authSmokeStep).toContain(
+      'sleep_seconds=$((auth_smoke_attempt * 30))'
+    );
 
     expect(canaryCurlProbes.length).toBeGreaterThanOrEqual(9);
     for (const probe of canaryCurlProbes) {

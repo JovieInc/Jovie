@@ -537,7 +537,20 @@ jobs:
           cd apps/web
           mkdir -p tests/.auth
           echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
-          CI=true SMOKE_ONLY=1 BASE_URL="${DEPLOYMENT_URL}" pnpm exec playwright test tests/e2e/auth-public-ready.spec.ts --project=chromium --reporter=line
+          auth_smoke_attempt=1
+          auth_smoke_max_attempts=3
+
+          until CI=true SMOKE_ONLY=1 BASE_URL="${DEPLOYMENT_URL}" pnpm exec playwright test tests/e2e/auth-public-ready.spec.ts --project=chromium --reporter=line; do
+            if [ "$auth_smoke_attempt" -ge "$auth_smoke_max_attempts" ]; then
+              echo "❌ Public auth controls failed after ${auth_smoke_max_attempts} attempts."
+              exit 1
+            fi
+
+            sleep_seconds=$((auth_smoke_attempt * 30))
+            echo "⚠ Public auth controls were not interactive on attempt ${auth_smoke_attempt}/${auth_smoke_max_attempts}. Retrying in ${sleep_seconds}s..."
+            sleep "$sleep_seconds"
+            auth_smoke_attempt=$((auth_smoke_attempt + 1))
+          done
         env:
           DEPLOYMENT_URL: ${{ steps.canary-check.outputs.verified_deployment_url || inputs.deployment_url }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
