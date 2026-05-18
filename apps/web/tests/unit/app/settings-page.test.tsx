@@ -22,7 +22,7 @@ describe('settings page aliases', () => {
     expect(redirectMock).toHaveBeenCalledWith(APP_ROUTES.SETTINGS_ACCOUNT);
   });
 
-  it('keeps artist profile settings on the essential dashboard data path', () => {
+  it('keeps artist profile settings on the shared shell route context path', () => {
     const source = readFileSync(
       resolve(
         process.cwd(),
@@ -31,7 +31,8 @@ describe('settings page aliases', () => {
       'utf8'
     );
 
-    expect(source).toContain('getDashboardDataEssential');
+    expect(source).toContain('loadAppShellRouteContext');
+    expect(source).not.toContain('getDashboardDataEssential');
     expect(source).not.toMatch(/\bgetDashboardData\(/);
   });
 });
