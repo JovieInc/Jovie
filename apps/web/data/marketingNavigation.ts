@@ -53,6 +53,7 @@ export const MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
       { href: APP_ROUTES.BLOG, label: 'Blog' },
       { href: APP_ROUTES.CHANGELOG, label: 'Changelog' },
       { href: APP_ROUTES.INVESTORS, label: 'Investors' },
+      { href: APP_ROUTES.PITCH, label: 'Pitch' },
     ],
   },
   {

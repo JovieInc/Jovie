@@ -18,6 +18,12 @@ interface Slide {
 
 interface DeckViewerProps {
   readonly slides: Slide[];
+  /**
+   * Optional URL for a pre-generated static PDF. When present, the download
+   * button is an anchor to this asset. When absent, falls back to
+   * `globalThis.print()` (the browser print dialog).
+   */
+  readonly pdfUrl?: string;
 }
 
 const deckButtonClass = cn(
@@ -35,7 +41,7 @@ const deckButtonClass = cn(
  *
  * Slides are loaded server-side and passed as props from page.tsx.
  */
-export function DeckViewer({ slides }: DeckViewerProps) {
+export function DeckViewer({ slides, pdfUrl }: DeckViewerProps) {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -189,15 +195,29 @@ export function DeckViewer({ slides }: DeckViewerProps) {
 
         {/* Right controls */}
         <div className='flex items-center gap-1'>
-          <button
-            type='button'
-            onClick={() => globalThis.print()}
-            aria-label='Download as PDF'
-            className={deckButtonClass}
-          >
-            <Download className='h-4 w-4' aria-hidden='true' />
-            <span className='max-sm:hidden sm:inline'>PDF</span>
-          </button>
+          {pdfUrl ? (
+            <a
+              href={pdfUrl}
+              download
+              target='_blank'
+              rel='noopener'
+              aria-label='Download deck as PDF'
+              className={deckButtonClass}
+            >
+              <Download className='h-4 w-4' aria-hidden='true' />
+              <span className='max-sm:hidden sm:inline'>PDF</span>
+            </a>
+          ) : (
+            <button
+              type='button'
+              onClick={() => globalThis.print()}
+              aria-label='Download as PDF'
+              className={deckButtonClass}
+            >
+              <Download className='h-4 w-4' aria-hidden='true' />
+              <span className='max-sm:hidden sm:inline'>PDF</span>
+            </button>
+          )}
 
           <button
             type='button'
@@ -230,7 +250,7 @@ export function DeckViewer({ slides }: DeckViewerProps) {
   if (isFullscreen) {
     return (
       <div
-        className='fixed inset-0 z-[100] flex flex-col items-center justify-center p-4 transition-opacity duration-200 sm:p-8'
+        className='fixed inset-0 z-[100] flex flex-col items-center justify-center p-4 transition-opacity duration-subtle sm:p-8'
         style={{ background: 'var(--color-bg-base)' }}
       >
         <div className='w-full max-w-5xl'>{slideContent}</div>

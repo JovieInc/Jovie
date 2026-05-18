@@ -87,7 +87,10 @@ export default async function InvestorLandingPage() {
 
       {/* Pitch deck */}
       <div className='mt-12 w-full max-w-4xl sm:mt-16'>
-        <DeckViewer slides={validSlides} />
+        <DeckViewer
+          slides={validSlides}
+          pdfUrl={`/${manifest.deck.downloadFilename}`}
+        />
       </div>
     </div>
   );
