@@ -154,15 +154,30 @@ describe('DashboardNav interactions', () => {
     globalThis.removeEventListener(OPEN_COMMAND_PALETTE_EVENT, listener);
   });
 
-  it('groups artist-owned routes under Artist Workspace in Design V1', () => {
-    renderDashboardNav({
+  it('groups artist-owned routes under the artist name after Threads in Design V1', () => {
+    const { container } = renderDashboardNav({
       renderFn: render,
       appFlags: { DESIGN_V1: true },
+      overrides: {
+        selectedProfile: {
+          id: 'profile_123',
+          displayName: 'Tim White',
+          username: 'tim',
+          usernameNormalized: 'tim',
+        } as DashboardData['selectedProfile'],
+      },
     });
 
+    const threadsHeading = screen.getByText('Threads');
+    const artistGroupButton = screen.getByRole('button', {
+      name: 'Tim White',
+    });
+    expect(artistGroupButton).toBeInTheDocument();
+    expect(screen.queryByText('Artist Workspace')).not.toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Artist Workspace' })
-    ).toBeInTheDocument();
+      threadsHeading.compareDocumentPosition(artistGroupButton) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Search' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Profile' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Releases' })).toHaveAttribute(
@@ -173,6 +188,9 @@ describe('DashboardNav interactions', () => {
       'href',
       APP_ROUTES.AUDIENCE
     );
+    expect(
+      container.querySelector('[data-nav-section="artist-workspace"]')
+    ).toBeInTheDocument();
   });
 
   it('renders recent threads in the Design V1 sidebar as App Router links', () => {

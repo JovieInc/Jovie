@@ -46,6 +46,18 @@ const searchNavItem: NavItem = {
   description: 'Search routes, releases, artists, and threads',
 };
 
+type DashboardNavSection = {
+  readonly key: string;
+  readonly label?: string;
+  readonly items: NavItem[];
+};
+
+type ArtistWorkspaceNavSection = {
+  readonly key: 'artist-workspace';
+  readonly label: string;
+  readonly items: NavItem[];
+};
+
 function isItemActive(pathname: string, item: NavItem): boolean {
   const normalizedPathname = (() => {
     if (
@@ -119,8 +131,7 @@ export function DashboardNav(_: DashboardNavProps) {
     [publicProfileHref]
   );
 
-  // Replace "Profile" label with artist display name when available
-  const artistName = selectedProfile?.displayName;
+  const artistName = selectedProfile?.displayName?.trim();
   const profileId = selectedProfile?.id ?? '';
   const isDemo = isDemoRoutePath(pathname);
   const { canAccessTasksWorkspace, isLoading: isPlanGateLoading } =
@@ -146,9 +157,13 @@ export function DashboardNav(_: DashboardNavProps) {
 
   // Settings nav: "General" (user) and artist name (or "Artist") groups
   const artistSettingsLabel = artistName || 'Artist';
+  const artistWorkspaceLabel = artistName || 'Artist';
 
   // Memoize nav sections for dashboard (non-settings) mode
-  const navSections = useMemo(() => {
+  const { artistWorkspaceSection, navSections } = useMemo<{
+    readonly artistWorkspaceSection: ArtistWorkspaceNavSection | null;
+    readonly navSections: DashboardNavSection[];
+  }>(() => {
     const decorateItem = (item: NavItem): NavItem =>
       item.id === 'tasks'
         ? {
@@ -182,33 +197,39 @@ export function DashboardNav(_: DashboardNavProps) {
       );
       const tasksItem = primaryNavigation.find(item => item.id === 'tasks');
 
-      return [
-        {
-          key: 'user-work',
-          items: [
-            newThreadNavItem,
-            searchNavItem,
-            ...(tasksItem ? [decorateItem(tasksItem)] : []),
-            ...(shellChatLibraryEnabled ? [libraryNavItem] : []),
-          ],
-        },
-        {
+      return {
+        artistWorkspaceSection: {
           key: 'artist-workspace',
-          label: 'Artist Workspace',
+          label: artistWorkspaceLabel,
           items: [profileItem, releaseItem, audienceItem]
             .filter((item): item is NavItem => Boolean(item))
             .map(decorateItem),
         },
-      ];
+        navSections: [
+          {
+            key: 'user-work',
+            items: [
+              newThreadNavItem,
+              searchNavItem,
+              ...(tasksItem ? [decorateItem(tasksItem)] : []),
+              ...(shellChatLibraryEnabled ? [libraryNavItem] : []),
+            ],
+          },
+        ],
+      };
     }
 
-    return [
-      {
-        key: 'primary',
-        items: primaryItems.map(decorateItem),
-      },
-    ];
+    return {
+      artistWorkspaceSection: null,
+      navSections: [
+        {
+          key: 'primary',
+          items: primaryItems.map(decorateItem),
+        },
+      ],
+    };
   }, [
+    artistWorkspaceLabel,
     canAccessTasksWorkspace,
     isPlanGateLoading,
     shellChatV1Enabled,
@@ -460,6 +481,18 @@ export function DashboardNav(_: DashboardNavProps) {
             tight
             collapsed={false}
           />
+        </div>
+      ) : null}
+
+      {artistWorkspaceSection ? (
+        <div data-nav-section={artistWorkspaceSection.key} className='mt-3'>
+          <SidebarCollapsibleGroup
+            label={artistWorkspaceSection.label}
+            defaultOpen
+            className='-mx-0.5'
+          >
+            {renderSection(artistWorkspaceSection.items)}
+          </SidebarCollapsibleGroup>
         </div>
       ) : null}
 
