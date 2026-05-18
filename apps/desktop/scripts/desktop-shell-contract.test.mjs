@@ -23,12 +23,20 @@ test('desktop window enters the authenticated chat shell instead of the web root
   );
   assert.match(
     mainSource,
+    /const MACOS_TRAFFIC_LIGHT_POSITION = \{ x: 20, y: 17 \} as const;/
+  );
+  assert.match(
+    mainSource,
     /app\.setName\(APP_ENV === 'staging' \? 'Jovie Staging' : 'Jovie'\);/
   );
   assert.match(mainSource, /win\.webContents\.setUserAgent\(/);
   assert.match(
     mainSource,
     /function createWindow\(initialUrl = APP_ENTRY_URL\): BrowserWindow/
+  );
+  assert.match(
+    mainSource,
+    /process\.platform === 'darwin' \? MACOS_TRAFFIC_LIGHT_POSITION : undefined/
   );
   assert.doesNotMatch(
     mainSource,
@@ -116,6 +124,7 @@ test('desktop dev defaults to the local app shell and packaged builds keep produ
 test('hosted web app has an early Electron runtime marker before first paint', async () => {
   const webRoot = join(desktopRoot, '..', 'web');
   const rootLayout = await readFile(join(webRoot, 'app/layout.tsx'), 'utf8');
+  const globalsCss = await readFile(join(webRoot, 'app/globals.css'), 'utf8');
   const runtimeInit = await readFile(
     join(webRoot, 'public/electron-runtime-init.js'),
     'utf8'
@@ -126,4 +135,5 @@ test('hosted web app has an early Electron runtime marker before first paint', a
   assert.match(runtimeInit, /JovieDesktop\\\//);
   assert.match(runtimeInit, /root\.dataset\.desktopRuntime = 'electron'/);
   assert.match(runtimeInit, /root\.dataset\.devChromeDisabled = '1'/);
+  assert.match(globalsCss, /--electron-titlebar-height: 52px;/);
 });
