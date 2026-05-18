@@ -11,6 +11,8 @@ Controller file for AI agents working in this repo. `AGENTS.md` is a symlink to 
 - Don't hide failing checks. Report exact failures and the likely cause.
 - Ask before destructive operations: data deletion, irreversible migrations, credential changes, dependency replacement, auth/payment changes, or production-impacting scripts.
 
+The four canon principles (Ship Fast, Run Experiments, Document Everything, MRR Is King) are in [`docs/company/operating-principles.md`](docs/company/operating-principles.md). They supersede [`docs/company/core-values.md`](docs/company/core-values.md) when in conflict.
+
 ## Agent Role Boundary
 
 Orchestrated sessions must set `JOVIE_AGENT_PROFILE` before editing:
@@ -174,3 +176,5 @@ Examples:
 - `apps/web/tests/TESTING.md` is the deep test reference.
 - `LESSONS.md` collects post-mortems from human corrections.
 - `docs/` holds reference indexes (schema map, API map, cron registry, etc.).
+- `docs/company/operating-principles.md` is the four-principle canon (Ship Fast, Experiments, Document, MRR Is King).
+- `docs/company/PRICING-PHILOSOPHY.md` is the canon for how pricing decisions are made; `docs/company/PRICING-STRATEGY.md` is the current snapshot; `docs/company/pricing-trends-summary.md` is the Stripe data behind the philosophy.
