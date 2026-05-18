@@ -46,7 +46,7 @@ tailscale status | grep -E "(macbook-pro|hermes)"
 
 In Telegram, chat with `@BotFather`:
 
-```
+```text
 /newbot
 <name>: Hermes (jovie)
 <username>: jovie_hermes_bot   # must be unique, ends in _bot
