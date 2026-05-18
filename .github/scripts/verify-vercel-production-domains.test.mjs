@@ -5,6 +5,7 @@ import {
   fetchProjectDomains,
   PRODUCTION_DOMAIN_EXPECTATIONS,
   validateProductionDomains,
+  validateRequiredEnv,
 } from './verify-vercel-production-domains.mjs';
 
 const canonicalProjectId = 'prj_canonical';
@@ -89,6 +90,18 @@ test('fetchProjectDomains fails fast when the Vercel domains API request times o
       token: 'vercel-token',
     }),
     /Vercel domains API timed out after 1ms/
+  );
+});
+
+test('validateRequiredEnv requires the Vercel org id to avoid token-default account drift', () => {
+  assert.throws(
+    () =>
+      validateRequiredEnv({
+        orgId: '',
+        projectId: canonicalProjectId,
+        token: 'vercel-token',
+      }),
+    /VERCEL_TOKEN, VERCEL_ORG_ID, and VERCEL_PROJECT_ID are required/
   );
 });
 
