@@ -1,6 +1,7 @@
 'use client';
 
 import { ArrowLeft, ArrowRight, PanelLeft } from 'lucide-react';
+import type { CSSProperties, ReactNode } from 'react';
 import { useContext } from 'react';
 import { UpdateAvailablePill } from '@/components/atoms/UpdateAvailablePill';
 import { SidebarContext } from '@/components/organisms/sidebar/context';
@@ -9,6 +10,10 @@ import {
   useIsElectronRuntime,
 } from '@/lib/desktop/electron-bridge';
 import { cn } from '@/lib/utils';
+
+interface DesktopTitlebarProps {
+  readonly mainSlot?: ReactNode;
+}
 
 /**
  * DesktopTitlebar — Electron-only titlebar grid with traffic-light spacer,
@@ -21,7 +26,7 @@ import { cn } from '@/lib/utils';
  * Renders as a zero-height invisible element in the browser; CSS on
  * [data-electron-titlebar="true"] makes it visible only inside Electron.
  */
-export function DesktopTitlebar() {
+export function DesktopTitlebar({ mainSlot }: DesktopTitlebarProps) {
   const isDesktop = useIsElectronRuntime();
   const { canGoBack, canGoForward, goBack, goForward } = useDesktopNavigation();
   // useContext (not useSidebar) so this is safe outside SidebarProvider (e.g. demo shell)
@@ -37,7 +42,7 @@ export function DesktopTitlebar() {
       data-electron-titlebar='true'
       data-testid='electron-titlebar-row'
       data-electron-drag-region='true'
-      style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+      style={{ WebkitAppRegion: 'drag' } as CSSProperties}
     >
       {isDesktop ? (
         <>
@@ -60,7 +65,7 @@ export function DesktopTitlebar() {
                 'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30',
                 'disabled:pointer-events-none disabled:opacity-30'
               )}
-              style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+              style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}
             >
               <PanelLeft className='h-3.5 w-3.5' strokeWidth={2} />
             </button>
@@ -77,7 +82,7 @@ export function DesktopTitlebar() {
                 'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30',
                 'disabled:pointer-events-none disabled:opacity-30'
               )}
-              style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+              style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}
             >
               <ArrowLeft className='h-3.5 w-3.5' strokeWidth={2} />
             </button>
@@ -94,13 +99,13 @@ export function DesktopTitlebar() {
                 'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30',
                 'disabled:pointer-events-none disabled:opacity-30'
               )}
-              style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+              style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}
             >
               <ArrowRight className='h-3.5 w-3.5' strokeWidth={2} />
             </button>
             <div
               className='ml-auto min-w-0 shrink-0'
-              style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+              style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}
             >
               <UpdateAvailablePill compact={sidebarOpen} />
             </div>
@@ -108,13 +113,23 @@ export function DesktopTitlebar() {
 
           <div
             data-testid='electron-titlebar-main-cell'
-            className='flex min-w-0 items-center self-stretch rounded-t-[var(--linear-app-shell-radius)] border border-b-0 border-(--linear-app-shell-border) bg-(--linear-app-content-surface) px-2.5'
-            style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+            className='flex min-w-0 items-center self-stretch overflow-hidden rounded-t-[var(--linear-app-shell-radius)] border border-b-0 border-(--linear-app-shell-border) bg-(--linear-app-content-surface) px-0'
+            style={{ WebkitAppRegion: 'drag' } as CSSProperties}
           >
-            <div
-              className='min-w-0 flex-1 self-stretch'
-              style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
-            />
+            {mainSlot ? (
+              <div
+                data-testid='electron-titlebar-main-slot'
+                className='min-w-0 flex-1'
+                style={{ WebkitAppRegion: 'drag' } as CSSProperties}
+              >
+                {mainSlot}
+              </div>
+            ) : (
+              <div
+                className='min-w-0 flex-1 self-stretch'
+                style={{ WebkitAppRegion: 'drag' } as CSSProperties}
+              />
+            )}
           </div>
         </>
       ) : null}

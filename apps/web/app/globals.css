@@ -80,6 +80,25 @@ html[data-desktop-runtime="electron"] [data-electron-titlebar="true"] {
   background: rgb(var(--sidebar-background));
 }
 
+html[data-desktop-runtime="electron"]
+  [data-shell-design="shellChatV1"]
+  [data-app-shell-body="true"] {
+  padding-top: 0;
+}
+
+html[data-desktop-runtime="electron"]
+  [data-shell-design="shellChatV1"]
+  #main-content {
+  border-top-width: 0;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  padding-top: 0;
+}
+
+html[data-desktop-runtime="electron"] [data-electron-main-header="body"] {
+  display: none;
+}
+
 html[data-desktop-runtime="electron"] [data-electron-drag-region="true"] {
   -webkit-app-region: drag;
 }

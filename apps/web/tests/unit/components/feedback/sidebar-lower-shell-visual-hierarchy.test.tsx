@@ -1,11 +1,12 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SidebarUpgradeBanner } from '@/features/feedback/SidebarUpgradeBanner';
 
 const mockUsePathname = vi.fn(() => '/app/chat');
 
 vi.mock('next/navigation', () => ({
   usePathname: () => mockUsePathname(),
+  useRouter: () => ({ push: vi.fn() }),
 }));
 
 vi.mock('@/lib/env-client', () => ({
@@ -57,16 +58,31 @@ vi.mock('@/lib/hooks/useVersionMonitor', () => ({
 }));
 
 describe('Sidebar lower shell visual hierarchy', () => {
-  it('keeps upgrade banner visually quieter than nav rows', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    mockUsePathname.mockReturnValue('/app/chat');
+  });
+
+  it('uses the shell install banner treatment for upgrade nudges', () => {
     const { container } = render(<SidebarUpgradeBanner />);
 
     const card = container.querySelector('[class*="rounded-xl"]');
     expect(card).toBeTruthy();
-    expect(card?.className).toContain('bg-sidebar-accent/12');
+    expect(card?.className).toContain('bg-(--surface-1)/60');
 
     expect(
       screen.getByRole('button', { name: 'Start trial' })
     ).toBeInTheDocument();
+  });
+
+  it('lets users dismiss the current upgrade nudge for the session', () => {
+    render(<SidebarUpgradeBanner />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss prompt' }));
+
+    expect(
+      screen.queryByRole('button', { name: 'Start trial' })
+    ).not.toBeInTheDocument();
   });
 
   it('suppresses the upgrade banner on nested demo routes', () => {

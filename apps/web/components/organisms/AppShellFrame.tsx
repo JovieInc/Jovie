@@ -58,7 +58,7 @@ export const AppShellFrame = memo(function AppShellFrame({
         containerClassName
       )}
     >
-      <DesktopTitlebar />
+      <DesktopTitlebar mainSlot={isShellChatV1 ? header : undefined} />
       <div
         data-app-shell-body='true'
         className={cn(
@@ -79,7 +79,13 @@ export const AppShellFrame = memo(function AppShellFrame({
           )}
         >
           {isEnabled('CANVAS_GRAIN') && <CanvasGrain />}
-          {header}
+          {isShellChatV1 ? (
+            <div className='contents' data-electron-main-header='body'>
+              {header}
+            </div>
+          ) : (
+            header
+          )}
           <div
             className={cn(
               'flex flex-1 min-h-0 min-w-0 overflow-hidden',
