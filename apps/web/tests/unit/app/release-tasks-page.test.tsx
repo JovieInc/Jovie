@@ -30,6 +30,8 @@ vi.mock('next/navigation', () => ({
   redirect: mockRedirect,
 }));
 
+vi.mock('server-only', () => ({}));
+
 vi.mock('drizzle-orm', () => ({
   and: vi.fn((...args: unknown[]) => args),
   eq: vi.fn((...args: unknown[]) => args),
@@ -186,8 +188,13 @@ describe('release tasks page', () => {
 
     expect(source).toContain('loadAppShellRouteContext');
     expect(source).toContain('buildReleaseTasksRoute');
+    expect(source).toContain('loadReleaseTaskRouteRelease');
     expect(source).not.toContain('getCurrentUserProfile');
     expect(source).not.toContain('getDashboardShellData');
     expect(source).not.toContain('getDashboardDataEssential');
+    expect(source).not.toContain('drizzle-orm');
+    expect(source).not.toContain('@/lib/db');
+    expect(source).not.toContain('@/lib/db/schema/content');
+    expect(source).not.toContain('discogReleases');
   });
 });
