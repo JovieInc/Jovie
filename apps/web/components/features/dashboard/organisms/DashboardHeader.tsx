@@ -25,6 +25,8 @@ export interface DashboardHeaderProps {
   readonly className?: string;
 }
 
+const MOBILE_HEADER_PADDING = 'px-4 pb-2 pt-3';
+
 function MobileHeader({
   currentLabel,
   action,
@@ -40,12 +42,19 @@ function MobileHeader({
 }) {
   if (searchSurface && isSearchActive) {
     return (
-      <div className='hidden max-sm:flex px-4 pb-2 pt-3'>{searchSurface}</div>
+      <div className={cn('hidden max-sm:flex', MOBILE_HEADER_PADDING)}>
+        {searchSurface}
+      </div>
     );
   }
 
   return (
-    <div className='hidden max-sm:flex items-center justify-between px-4 pb-2 pt-3'>
+    <div
+      className={cn(
+        'hidden max-sm:flex items-center justify-between',
+        MOBILE_HEADER_PADDING
+      )}
+    >
       <h1 className='text-[17px] font-semibold leading-tight tracking-[-0.018em] text-primary-token'>
         {currentLabel}
       </h1>
@@ -104,7 +113,7 @@ function BreadcrumbTrail({
         </>
       )}
       {showInlineSearch ? (
-        <div className='ml-2 flex items-center'>{searchSurface}</div>
+        <div className='ml-1.5 flex min-w-0 items-center'>{searchSurface}</div>
       ) : null}
     </>
   );
