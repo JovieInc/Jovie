@@ -33,9 +33,31 @@ export interface LoadAppShellRouteContextOptions {
   readonly authenticatedUserId?: string | null;
 }
 
+export interface LoadAuthenticatedAppShellUserOptions {
+  readonly route: string;
+  readonly authFailure?: 'redirect' | 'notFound';
+}
+
 export type AppShellRouteContextResult =
   | AppShellRouteContext
   | AppShellRouteError;
+
+export async function loadAuthenticatedAppShellUserId({
+  route,
+  authFailure = 'redirect',
+}: LoadAuthenticatedAppShellUserOptions): Promise<string> {
+  const { userId } = await getCachedAuth();
+
+  if (!userId) {
+    if (authFailure === 'notFound') {
+      notFound();
+    }
+
+    redirect(buildAppShellSignInUrl(route));
+  }
+
+  return userId;
+}
 
 export async function loadAppShellRouteContext({
   route,
@@ -45,15 +67,9 @@ export async function loadAppShellRouteContext({
   requiredFlag,
   authenticatedUserId = null,
 }: LoadAppShellRouteContextOptions): Promise<AppShellRouteContextResult> {
-  const userId = authenticatedUserId?.trim() || (await getCachedAuth()).userId;
-
-  if (!userId) {
-    if (authFailure === 'notFound') {
-      notFound();
-    }
-
-    redirect(buildAppShellSignInUrl(route));
-  }
+  const userId =
+    authenticatedUserId?.trim() ||
+    (await loadAuthenticatedAppShellUserId({ route, authFailure }));
 
   if (requiredFlag) {
     const enabled = await getAppFlagValue(requiredFlag, { userId });

@@ -8,7 +8,6 @@ import { AudienceTableLoadingShell } from '@/features/dashboard/organisms/dashbo
 import type { AudienceSegment } from '@/features/dashboard/organisms/dashboard-audience-table/types';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
-import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
 import { audienceFilters, audienceSearchParams } from '@/lib/nuqs';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
@@ -17,7 +16,10 @@ import {
   trimTrailingSlashes,
 } from '@/lib/utils/string-utils';
 import { convertDrizzleCreatorProfileToArtist } from '@/types/db';
-import { loadAppShellRouteContext } from '../app-shell-route-context';
+import {
+  loadAppShellRouteContext,
+  loadAuthenticatedAppShellUserId,
+} from '../app-shell-route-context';
 import { getAudienceServerData } from '../dashboard/audience/audience-data';
 import { loadUpcomingTourDates } from '../dashboard/tour-dates/actions';
 
@@ -26,19 +28,17 @@ export const runtime = 'nodejs';
 /**
  * Audience page — streams instantly after auth gate.
  *
- * Auth check via getCachedAuth (Clerk JWT, no DB) runs at the page level
- * so unauthenticated users redirect immediately. The async content uses the
- * shared shell route context while preserving the Suspense table fallback.
+ * The shared early auth helper runs before Suspense so unauthenticated users
+ * redirect immediately while the async content keeps the table fallback.
  */
 export default async function AudiencePage({
   searchParams,
 }: Readonly<{
   searchParams: Promise<SearchParams>;
 }>) {
-  const { userId } = await getCachedAuth();
-  if (!userId) {
-    redirect(buildAppShellSignInUrl(APP_ROUTES.AUDIENCE));
-  }
+  const userId = await loadAuthenticatedAppShellUserId({
+    route: APP_ROUTES.AUDIENCE,
+  });
 
   return (
     <Suspense fallback={<AudienceTableLoadingShell />}>

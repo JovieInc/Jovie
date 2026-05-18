@@ -51,7 +51,10 @@ vi.mock('./dashboard/actions', () => ({
   getDashboardShellData: getDashboardShellDataMock,
 }));
 
-import { loadAppShellRouteContext } from './app-shell-route-context';
+import {
+  loadAppShellRouteContext,
+  loadAuthenticatedAppShellUserId,
+} from './app-shell-route-context';
 
 function shellData(
   overrides: Partial<{
@@ -85,6 +88,26 @@ describe('loadAppShellRouteContext', () => {
         dashboardErrorMessage: 'Failed to load releases data.',
       })
     ).rejects.toThrow('NEXT_REDIRECT:/signin?redirect_url=%2Fapp%2Freleases');
+
+    expect(getDashboardShellDataMock).not.toHaveBeenCalled();
+  });
+
+  it('centralizes early auth redirects for routes that stream after auth', async () => {
+    getCachedAuthMock.mockResolvedValue({ userId: null });
+
+    await expect(
+      loadAuthenticatedAppShellUserId({ route: '/app/audience' })
+    ).rejects.toThrow('NEXT_REDIRECT:/signin?redirect_url=%2Fapp%2Faudience');
+
+    expect(getDashboardShellDataMock).not.toHaveBeenCalled();
+  });
+
+  it('returns early authenticated user ids without loading shell data', async () => {
+    getCachedAuthMock.mockResolvedValue({ userId: 'user_early' });
+
+    await expect(
+      loadAuthenticatedAppShellUserId({ route: '/app/audience' })
+    ).resolves.toBe('user_early');
 
     expect(getDashboardShellDataMock).not.toHaveBeenCalled();
   });
