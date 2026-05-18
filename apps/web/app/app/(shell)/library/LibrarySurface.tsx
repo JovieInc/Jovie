@@ -1,6 +1,10 @@
 'use client';
 
-import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
+import {
+  type ColumnDef,
+  createColumnHelper,
+  type RowSelectionState,
+} from '@tanstack/react-table';
 import {
   ArrowUpDown,
   Check,
@@ -966,13 +970,8 @@ function LibraryDataTable({
     () => (asset: LibraryReleaseAsset) => `library-release-row-${asset.id}`,
     []
   );
-  const getRowClassName = useMemo(
-    () => (asset: LibraryReleaseAsset) =>
-      cn(
-        'rounded-md border-transparent bg-transparent transition-[background-color,box-shadow] duration-subtle hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_70%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-hover)_78%,transparent)]',
-        selectedId === asset.id &&
-          'bg-surface-1 shadow-[inset_3px_0_0_0_var(--linear-accent)] hover:bg-surface-1'
-      ),
+  const rowSelection = useMemo<RowSelectionState>(
+    () => (selectedId ? { [selectedId]: true } : {}),
     [selectedId]
   );
 
@@ -983,7 +982,7 @@ function LibraryDataTable({
       onRowClick={asset => onSelect(asset.id)}
       getRowId={getRowId}
       getRowTestId={getRowTestId}
-      getRowClassName={getRowClassName}
+      rowSelection={rowSelection}
       enableVirtualization={assets.length >= 20}
       rowHeight={LIBRARY_TABLE_ROW_HEIGHT}
       minWidth={LIBRARY_TABLE_MIN_WIDTH}
