@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils';
+import { ShellMetadataChip } from './ShellMetadataChip';
 
 // StatusBadge — release status pill with a leading dot + uppercase label.
 // All chips share the same surface + border so visual differentiation
@@ -62,22 +63,15 @@ export interface StatusBadgeProps {
 export function StatusBadge({ status, className }: StatusBadgeProps) {
   const cfg = STATUS_CHIP[status];
   return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1.5 h-[18px] pl-1.5 pr-2 rounded border border-(--linear-app-shell-border)/70 bg-(--surface-1)/40 text-tertiary-token text-[10px] font-caption uppercase tracking-[0.06em] whitespace-nowrap',
-        className
-      )}
+    <ShellMetadataChip
+      tone='neutral'
+      className={className}
       title={cfg.tooltip}
+      dotClassName={cfg.dot}
+      dotBorderClassName={cfg.dotBorder}
+      contentClassName={cn(cfg.text, 'uppercase tracking-[0.06em]')}
     >
-      <span
-        aria-hidden='true'
-        className={cn(
-          'h-1.5 w-1.5 rounded-full shrink-0',
-          cfg.dot,
-          cfg.dotBorder && `border ${cfg.dotBorder}`
-        )}
-      />
-      <span className={cfg.text}>{cfg.label}</span>
-    </span>
+      {cfg.label}
+    </ShellMetadataChip>
   );
 }

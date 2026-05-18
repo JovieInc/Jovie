@@ -1,5 +1,5 @@
 import { fireEvent } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TaskListRow } from '@/components/features/dashboard/tasks/TaskListRow';
 import { fastRender } from '@/tests/utils/fast-render';
 
@@ -35,6 +35,10 @@ const mockTask = {
 } as const;
 
 describe('TaskListRow', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('keeps long titles truncated and metadata in a wrapping flex row', () => {
     const { getByText, getByTestId } = fastRender(
       <TaskListRow
@@ -72,5 +76,25 @@ describe('TaskListRow', () => {
     expect(getByTestId('task-list-row-task-1').className).toContain(
       'bg-(--linear-row-selected)'
     );
+  });
+
+  it('renders shell due metadata through the compact chip contract', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-25T12:00:00.000Z'));
+
+    const { getByText } = fastRender(
+      <TaskListRow
+        task={{
+          ...mockTask,
+          dueAt: new Date('2026-04-26T12:00:00.000Z'),
+        }}
+        artistName='Tim White'
+        onOpenRelease={vi.fn()}
+      />
+    );
+
+    const dueChip = getByText('Due tomorrow').closest('span');
+    expect(dueChip).toHaveClass('uppercase');
+    expect(dueChip?.parentElement?.className).toContain('h-[18px]');
   });
 });

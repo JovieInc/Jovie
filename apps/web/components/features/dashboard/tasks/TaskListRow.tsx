@@ -3,8 +3,8 @@
 import { UserAvatar } from '@jovie/ui';
 import { Disc3 } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { ReleaseDueBadge } from '@/components/molecules/ReleaseDueBadge';
 import { ShellListRowFrame } from '@/components/organisms/table';
+import { DueChip } from '@/components/shell/DueChip';
 import type { TaskView } from '@/lib/tasks/types';
 import { getAccentCssVars } from '@/lib/ui/accent-palette';
 import { cn } from '@/lib/utils';
@@ -178,10 +178,9 @@ export function TaskListRow({
       <div className='flex shrink-0 items-center justify-end gap-1.5'>
         <div className='flex shrink-0 items-center justify-end'>
           {task.dueAt ? (
-            <ReleaseDueBadge
-              dueDate={task.dueAt}
-              dueDaysOffset={null}
-              isCompleted={isDone || isCancelled}
+            <DueChip
+              dueIso={task.dueAt.toISOString()}
+              muted={isDone || isCancelled}
             />
           ) : null}
         </div>
