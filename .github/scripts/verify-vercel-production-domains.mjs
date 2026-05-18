@@ -128,14 +128,20 @@ export function validateProductionDomains({
   };
 }
 
+export function validateRequiredEnv({ orgId, projectId, token }) {
+  if (!token || !orgId || !projectId) {
+    throw new Error(
+      'VERCEL_TOKEN, VERCEL_ORG_ID, and VERCEL_PROJECT_ID are required'
+    );
+  }
+}
+
 async function main() {
   const token = process.env.VERCEL_TOKEN;
   const orgId = process.env.VERCEL_ORG_ID;
   const projectId = process.env.VERCEL_PROJECT_ID;
 
-  if (!token || !projectId) {
-    throw new Error('VERCEL_TOKEN and VERCEL_PROJECT_ID are required');
-  }
+  validateRequiredEnv({ orgId, projectId, token });
 
   const domains = await fetchProjectDomains({ orgId, projectId, token });
   const result = validateProductionDomains({
