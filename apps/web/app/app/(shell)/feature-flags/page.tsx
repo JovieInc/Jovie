@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
+import { loadAppShellRouteContext } from '@/app/app/(shell)/app-shell-route-context';
 import { AdminToolPage } from '@/components/features/admin/layout/AdminToolPage';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
@@ -25,7 +26,20 @@ export interface FlagRow {
 }
 
 export default async function FeatureFlagsPage() {
-  const entitlements = await getCurrentUserEntitlements();
+  const [routeContext, entitlements] = await Promise.all([
+    loadAppShellRouteContext({
+      route: APP_ROUTES.FEATURE_FLAGS,
+      dashboardErrorLogMessage:
+        'Dashboard data load failed on feature flags page',
+      dashboardErrorMessage:
+        'Failed to load feature flags. Please refresh the page.',
+    }),
+    getCurrentUserEntitlements(),
+  ]);
+  if (!routeContext.ok) {
+    return routeContext.error;
+  }
+
   if (
     !entitlements.isAuthenticated ||
     !entitlements.userId ||

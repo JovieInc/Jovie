@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
+import { loadAppShellRouteContext } from '@/app/app/(shell)/app-shell-route-context';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 
@@ -12,13 +13,25 @@ export default async function RetargetingAdsLayout({
 }) {
   // getCurrentUserEntitlements degrades gracefully on billing failure --
   // admin status is fetched independently and preserved even when billing is down.
-  const entitlements = await getCurrentUserEntitlements();
-
-  if (!entitlements.isAuthenticated || !entitlements.userId) {
-    redirect(APP_ROUTES.SIGNIN);
+  const [routeContext, entitlements] = await Promise.all([
+    loadAppShellRouteContext({
+      route: APP_ROUTES.SETTINGS_RETARGETING_ADS,
+      dashboardErrorLogMessage:
+        'Dashboard data load failed on retargeting ads settings page',
+      dashboardErrorMessage:
+        'Failed to load retargeting ads settings. Please refresh the page.',
+    }),
+    getCurrentUserEntitlements(),
+  ]);
+  if (!routeContext.ok) {
+    return routeContext.error;
   }
 
-  if (!entitlements.isAdmin) {
+  if (
+    !entitlements.isAuthenticated ||
+    !entitlements.userId ||
+    !entitlements.isAdmin
+  ) {
     redirect(APP_ROUTES.DASHBOARD);
   }
 

@@ -30,8 +30,12 @@ describe('feature flags shell normalization', () => {
 
     expect(source).toContain('AdminToolPage');
     expect(source).toContain("testId='feature-flags-page'");
+    expect(source).toContain('loadAppShellRouteContext');
     expect(source).not.toContain('title=');
     expect(source).not.toContain('description=');
+    expect(source).not.toContain('getCachedAuth');
+    expect(source).not.toContain('getDashboardDataEssential');
+    expect(source).not.toContain('getDashboardShellData');
   });
 
   it('uses shared admin table primitives instead of bespoke table chrome', () => {
