@@ -1,3 +1,5 @@
-import DashboardReleaseTasksLoading from '@/app/app/(shell)/dashboard/releases/[releaseId]/tasks/loading';
+import { ReleaseTaskPageSkeleton } from '@/components/features/dashboard/release-tasks';
 
-export default DashboardReleaseTasksLoading;
+export default function TasksLoading() {
+  return <ReleaseTaskPageSkeleton />;
+}
