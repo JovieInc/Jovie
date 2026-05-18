@@ -155,22 +155,6 @@ export interface ProfileCompletion {
   profileIsLive: boolean;
 }
 
-export interface DashboardOverviewSupplement {
-  /** Whether the selected profile has any active social links */
-  hasSocialLinks: boolean;
-  /** Whether the selected profile has any active music/DSP links */
-  hasMusicLinks: boolean;
-  /** Instagram bio-link activation state for the dashboard overview */
-  bioLinkActivation: BioLinkActivation | null;
-}
-
-interface DashboardOverviewSupplementArgs {
-  clerkUserId: string;
-  onboardingCompletedAt: string | null;
-  profileId: string;
-  userId: string;
-}
-
 interface SocialLinkExistenceQueryOptions {
   context: string;
   operation: string;
@@ -284,14 +268,6 @@ async function buildBioLinkActivation(
   };
 }
 
-function createEmptyDashboardOverviewSupplement(): DashboardOverviewSupplement {
-  return {
-    hasSocialLinks: false,
-    hasMusicLinks: false,
-    bioLinkActivation: null,
-  };
-}
-
 async function fetchSocialLinkExistence(
   tx: DbOrTransaction,
   {
@@ -358,48 +334,6 @@ async function fetchSocialLinkExistence(
       });
       return { hasLinks: false, hasMusicLinks: false };
     });
-}
-
-async function fetchDashboardOverviewSupplementWithSession({
-  clerkUserId,
-  onboardingCompletedAt,
-  profileId,
-  userId,
-}: DashboardOverviewSupplementArgs): Promise<DashboardOverviewSupplement> {
-  try {
-    return await withDbSessionTx(
-      async tx => {
-        const linkCounts = await fetchSocialLinkExistence(tx, {
-          context: 'dashboard_overview_supplement',
-          operation: 'dashboard_overview_social_links_existence',
-          profileId,
-          queryLabel: 'Dashboard overview social links existence query',
-          userId,
-        });
-
-        const bioLinkActivation = await buildBioLinkActivation(tx, {
-          id: profileId,
-          onboardingCompletedAt: onboardingCompletedAt
-            ? new Date(onboardingCompletedAt)
-            : null,
-        });
-
-        return {
-          hasSocialLinks: linkCounts.hasLinks,
-          hasMusicLinks: linkCounts.hasMusicLinks,
-          bioLinkActivation,
-        };
-      },
-      { clerkUserId }
-    );
-  } catch (error) {
-    Sentry.captureException(error, {
-      level: 'warning',
-      tags: { context: 'dashboard_overview_supplement' },
-      extra: { profileId, userId },
-    });
-    return createEmptyDashboardOverviewSupplement();
-  }
 }
 
 function buildProfileCompletion(
@@ -1025,16 +959,6 @@ const getCachedDashboardEssential = unstableCache(
   }
 );
 
-const getCachedDashboardOverviewSupplement = unstableCache(
-  async (args: DashboardOverviewSupplementArgs) =>
-    fetchDashboardOverviewSupplementWithSession(args),
-  ['dashboard-overview-supplement'],
-  {
-    revalidate: CACHE_TTL.MEDIUM,
-    tags: [CACHE_TAGS.DASHBOARD_DATA],
-  }
-);
-
 const getCachedDashboardShell = unstableCache(
   async (clerkUserId: string) => fetchDashboardShellWithSession(clerkUserId),
   ['dashboard-shell'],
@@ -1182,10 +1106,6 @@ async function resolveDashboardShellData(
  */
 const loadDashboardData = cache(resolveDashboardData);
 const loadDashboardDataEssential = cache(resolveDashboardDataEssential);
-const loadDashboardOverviewSupplement = cache(
-  async (args: DashboardOverviewSupplementArgs) =>
-    getCachedDashboardOverviewSupplement(args)
-);
 const loadDashboardShellData = cache(resolveDashboardShellData);
 
 /**
@@ -1222,20 +1142,6 @@ export async function getDashboardData(): Promise<DashboardData> {
  */
 export async function getDashboardDataEssential(): Promise<DashboardData> {
   return loadDashboardDataEssential();
-}
-
-/**
- * Gets dashboard overview-only supplementary data.
- *
- * Use this with getDashboardDataEssential() when a route needs selected-profile
- * shell data plus social/music link existence and the Instagram activation nudge,
- * but does not need slower full-dashboard fields like tipping stats or avatar
- * review metadata.
- */
-export async function getDashboardOverviewSupplement(
-  args: DashboardOverviewSupplementArgs
-): Promise<DashboardOverviewSupplement> {
-  return loadDashboardOverviewSupplement(args);
 }
 
 /**

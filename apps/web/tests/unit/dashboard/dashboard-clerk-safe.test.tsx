@@ -1,19 +1,8 @@
 import { render, renderHook, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { AccountSettingsSection } from '@/features/dashboard/organisms/account-settings/AccountSettingsSection';
-import { DashboardOverviewMetricsClient } from '@/features/dashboard/organisms/DashboardOverviewMetricsClient';
 import { useProfileForm } from '@/features/dashboard/organisms/profile-form/useProfileForm';
 import type { Artist } from '@/types/db';
-
-vi.mock(
-  '@/features/dashboard/organisms/DashboardOverviewControlsProvider',
-  () => ({
-    useDashboardOverviewControls: () => ({
-      range: 'all',
-      refreshSignal: 0,
-    }),
-  })
-);
 
 vi.mock('@/lib/queries', () => ({
   useDashboardAnalyticsQuery: () => ({
@@ -27,23 +16,6 @@ vi.mock('@/lib/queries', () => ({
     isSuccess: false,
     reset: vi.fn(),
   }),
-}));
-
-vi.mock('@/features/dashboard/molecules/FirstFanCelebration', () => ({
-  FirstFanCelebration: ({
-    subscriberCount,
-  }: {
-    subscriberCount: number;
-    userId: string;
-  }) => <div data-testid='first-fan'>subs:{subscriberCount}</div>,
-}));
-
-vi.mock('@/features/dashboard/organisms/DashboardAnalyticsCards', () => ({
-  DashboardAnalyticsCards: () => <div data-testid='analytics-cards' />,
-}));
-
-vi.mock('@/features/dashboard/organisms/dashboard-activity-feed', () => ({
-  DashboardActivityFeed: () => <div data-testid='activity-feed' />,
 }));
 
 vi.mock(
@@ -76,19 +48,6 @@ vi.mock('@/features/dashboard/organisms/SettingsNotificationsSection', () => ({
 }));
 
 describe('dashboard clerk-safe rendering', () => {
-  it('renders DashboardOverviewMetricsClient without a Clerk provider', () => {
-    render(
-      <DashboardOverviewMetricsClient
-        profileId='profile-1'
-        showActivity={true}
-      />
-    );
-
-    expect(screen.queryByTestId('first-fan')).not.toBeInTheDocument();
-    expect(screen.getByTestId('analytics-cards')).toBeInTheDocument();
-    expect(screen.getByTestId('activity-feed')).toBeInTheDocument();
-  });
-
   it('renders AccountSettingsSection without a Clerk provider', () => {
     render(<AccountSettingsSection />);
 
