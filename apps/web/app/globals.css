@@ -49,7 +49,7 @@ body {
 }
 
 html[data-desktop-runtime="electron"] {
-  --electron-titlebar-height: 36px;
+  --electron-titlebar-height: 52px;
 }
 
 html[data-desktop-runtime="electron"] body {
