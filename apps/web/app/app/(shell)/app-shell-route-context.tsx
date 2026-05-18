@@ -30,6 +30,7 @@ export interface LoadAppShellRouteContextOptions {
   readonly dashboardErrorLogMessage?: string;
   readonly authFailure?: 'redirect' | 'notFound';
   readonly requiredFlag?: AppFlagName;
+  readonly authenticatedUserId?: string | null;
 }
 
 export type AppShellRouteContextResult =
@@ -42,8 +43,9 @@ export async function loadAppShellRouteContext({
   dashboardErrorLogMessage = 'Dashboard data load failed on app shell route',
   authFailure = 'redirect',
   requiredFlag,
+  authenticatedUserId = null,
 }: LoadAppShellRouteContextOptions): Promise<AppShellRouteContextResult> {
-  const { userId } = await getCachedAuth();
+  const userId = authenticatedUserId?.trim() || (await getCachedAuth()).userId;
 
   if (!userId) {
     if (authFailure === 'notFound') {
