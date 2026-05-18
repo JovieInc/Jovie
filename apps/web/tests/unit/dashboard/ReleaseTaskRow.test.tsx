@@ -33,6 +33,16 @@ function createTask(overrides: Partial<ReleaseTaskView> = {}): ReleaseTaskView {
 }
 
 describe('ReleaseTaskRow', () => {
+  it('renders the full row through the shared shell list row frame', () => {
+    const { container } = render(
+      <ReleaseTaskRow task={createTask()} onToggle={vi.fn()} />
+    );
+
+    expect(
+      container.querySelectorAll('[data-shell-list-row="true"]')
+    ).toHaveLength(1);
+  });
+
   it('toggles the shared checkbox control from the full row', () => {
     const onToggle = vi.fn();
 
@@ -65,6 +75,20 @@ describe('ReleaseTaskRow', () => {
 });
 
 describe('ReleaseTaskCompactRow', () => {
+  it('renders the compact row through the shared shell list row frame', () => {
+    const { container } = render(
+      <ReleaseTaskCompactRow
+        task={createTask()}
+        onNavigate={vi.fn()}
+        onToggle={vi.fn()}
+      />
+    );
+
+    expect(
+      container.querySelectorAll('[data-shell-list-row="true"]')
+    ).toHaveLength(1);
+  });
+
   it('keeps compact navigation and checkbox behavior separate', () => {
     const onNavigate = vi.fn();
     const onToggle = vi.fn();
