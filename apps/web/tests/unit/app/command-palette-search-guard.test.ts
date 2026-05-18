@@ -33,8 +33,10 @@ describe('command palette search shell guard', () => {
       'components/features/dashboard/dashboard-nav/DashboardNav.tsx'
     );
 
-    expect(source).toContain('OPEN_COMMAND_PALETTE_EVENT');
-    expect(source).toContain('globalThis.dispatchEvent');
-    expect(source).toMatch(/new\s+Event\(\s*OPEN_COMMAND_PALETTE_EVENT\s*\)/);
+    expect(source).toContain('openCommandPalette');
+    expect(source).not.toContain('globalThis.dispatchEvent');
+    expect(source).not.toMatch(
+      /new\s+Event\(\s*OPEN_COMMAND_PALETTE_EVENT\s*\)/
+    );
   });
 });

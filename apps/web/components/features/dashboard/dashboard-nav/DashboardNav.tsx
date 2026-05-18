@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
-import { OPEN_COMMAND_PALETTE_EVENT } from '@/components/organisms/command-palette-events';
+import { openCommandPalette } from '@/components/organisms/command-palette-events';
 import { usePendingShell } from '@/components/organisms/PendingShellContext';
 import {
   SidebarGroup,
@@ -321,7 +321,7 @@ export function DashboardNav(_: DashboardNavProps) {
   }, []);
 
   const handleSearchClick = useCallback(() => {
-    globalThis.dispatchEvent(new Event(OPEN_COMMAND_PALETTE_EVENT));
+    openCommandPalette();
   }, []);
 
   const sidebarThreads = useMemo<SidebarThread[]>(
