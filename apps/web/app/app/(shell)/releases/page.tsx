@@ -1,4 +1,4 @@
-import { ReleasesRoute } from '../dashboard/releases/ReleasesRoute';
+import { ReleasesRoute } from './ReleasesRoute';
 
 export const runtime = 'nodejs';
 

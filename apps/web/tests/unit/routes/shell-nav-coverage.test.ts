@@ -161,4 +161,27 @@ describe('shell route coverage', () => {
       '@/app/app/(shell)/releases/[releaseId]/tasks/ReleaseTasksRoute'
     );
   });
+
+  it('keeps release list data ownership outside the legacy dashboard route', () => {
+    const canonicalPage = pageByRoute.get('/app/releases');
+    const legacyPage = pageByRoute.get('/app/dashboard/releases');
+    const canonicalRoutePath = path.join(
+      SHELL_ROOT,
+      'releases/ReleasesRoute.tsx'
+    );
+    const canonicalRouteSource = fs.readFileSync(canonicalRoutePath, 'utf8');
+
+    expect(canonicalPage?.source).toContain(
+      "import { ReleasesRoute } from './ReleasesRoute';"
+    );
+    expect(legacyPage?.source).toContain(
+      "import { ReleasesRoute } from '../../releases/ReleasesRoute';"
+    );
+    expect(canonicalRouteSource).toContain(
+      '@/lib/releases/release-matrix-loader'
+    );
+    expect(canonicalRouteSource).not.toContain(
+      'dashboard/releases/release-matrix-loader'
+    );
+  });
 });

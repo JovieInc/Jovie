@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
   ]),
 }));
 
-vi.mock('@/app/app/(shell)/dashboard/releases/release-matrix-loader', () => ({
+vi.mock('@/lib/releases/release-matrix-loader', () => ({
   loadReleaseMatrix: mocks.loadReleaseMatrix,
 }));
 
