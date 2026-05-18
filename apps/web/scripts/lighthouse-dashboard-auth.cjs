@@ -11,6 +11,8 @@ const TEST_PERSONA_COOKIE = '__e2e_test_persona';
 const TEST_AUTH_BYPASS_MODE = 'bypass-auth';
 const DEV_TOOLBAR_OPEN_KEY = '__dev_toolbar_open';
 const DEV_TOOLBAR_HIDDEN_KEY = '__dev_toolbar_hidden';
+const RELEASES_ROUTE = '/app/releases';
+const LEGACY_RELEASES_ROUTE = '/app/dashboard/releases';
 
 // Mirrors DevTestAuthPersona in apps/web/lib/auth/dev-test-auth-types.ts.
 const ALLOWED_PERSONAS = new Set(['creator', 'creator-ready', 'admin']);
@@ -49,7 +51,7 @@ function resolveCollectUrls(baseUrl) {
         .split(',')
         .map(value => value.trim())
         .filter(Boolean)
-    : ['/app', '/app/dashboard/releases'];
+    : ['/app', RELEASES_ROUTE];
 
   return paths.map(path => new URL(path, `${baseUrl}/`).toString());
 }
@@ -57,6 +59,10 @@ function resolveCollectUrls(baseUrl) {
 function urlRequiresAuth(url) {
   const pathname = new URL(url).pathname;
   return pathname.startsWith('/app') || pathname === '/onboarding/checkout';
+}
+
+function isReleasesRoute(pathname) {
+  return pathname === RELEASES_ROUTE || pathname === LEGACY_RELEASES_ROUTE;
 }
 
 function resolveAuthStatePath() {
@@ -242,7 +248,7 @@ async function seedDashboardAuth(browser, { url }) {
 
   const warmRoute = async () => {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 });
-    if (pathname === '/app/dashboard/releases') {
+    if (isReleasesRoute(pathname)) {
       await Promise.any([
         page.waitForSelector('[data-testid="releases-matrix"]', {
           timeout: 60_000,
@@ -295,7 +301,7 @@ async function seedDashboardAuth(browser, { url }) {
       .catch(() => undefined);
   };
 
-  const warmRouteCount = pathname === '/app/dashboard/releases' ? 3 : 1;
+  const warmRouteCount = isReleasesRoute(pathname) ? 3 : 1;
   const warmRouteRepeatedly = async () => {
     await seedAuditStorage();
     await warmDashboardShell();
@@ -303,7 +309,7 @@ async function seedDashboardAuth(browser, { url }) {
       await warmRoute();
     }
     await new Promise(resolve => {
-      setTimeout(resolve, pathname === '/app/dashboard/releases' ? 750 : 250);
+      setTimeout(resolve, isReleasesRoute(pathname) ? 750 : 250);
     });
   };
 

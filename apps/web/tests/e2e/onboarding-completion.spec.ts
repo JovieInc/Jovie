@@ -180,7 +180,7 @@ test.describe('Onboarding Completion & Empty States', () => {
     );
 
     await ensureServerAuthenticated(page, completedOnboardingUser!.clerkUserId);
-    await smokeNavigateWithRetry(page, APP_ROUTES.DASHBOARD_RELEASES, {
+    await smokeNavigateWithRetry(page, APP_ROUTES.RELEASES, {
       retries: 2,
       timeout: 120_000,
     });

@@ -7,7 +7,7 @@ import {
   waitForHydration,
 } from './utils/smoke-test-utils';
 
-const RELEASES_ROUTE = '/app/dashboard/releases';
+const RELEASES_ROUTE = '/app/releases';
 const SAFE_CLICK_LIMIT = 8;
 const SIDEBAR_OPEN_TIMEOUT_MS = 30_000;
 

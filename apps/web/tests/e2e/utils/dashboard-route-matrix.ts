@@ -124,7 +124,7 @@ const creatorRoutes = [
     performanceBudgetMs: CREATOR_DEFAULT_BUDGET_MS,
   },
   {
-    path: APP_ROUTES.DASHBOARD_RELEASES,
+    path: APP_ROUTES.RELEASES,
     name: 'Releases',
     kind: 'render',
     surface: 'creator',
@@ -597,7 +597,7 @@ const fastHealthPaths = new Set([
   APP_ROUTES.DASHBOARD,
   APP_ROUTES.CHAT,
   APP_ROUTES.AUDIENCE,
-  APP_ROUTES.DASHBOARD_RELEASES,
+  APP_ROUTES.RELEASES,
   APP_ROUTES.SETTINGS_ACCOUNT,
   APP_ROUTES.LEGACY_DASHBOARD,
 ]);

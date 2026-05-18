@@ -368,7 +368,7 @@ test.describe('Admin Navigation Persistence @smoke', () => {
     const allPages = [
       APP_ROUTES.CHAT,
       APP_ROUTES.ADMIN,
-      APP_ROUTES.DASHBOARD_RELEASES,
+      APP_ROUTES.RELEASES,
       APP_ROUTES.ADMIN_USERS,
       APP_ROUTES.CHAT,
       APP_ROUTES.ADMIN_ACTIVITY,

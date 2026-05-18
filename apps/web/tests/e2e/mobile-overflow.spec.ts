@@ -93,7 +93,7 @@ const AUTHENTICATED_ROUTES = [
   },
   {
     id: 'app-releases',
-    path: APP_ROUTES.DASHBOARD_RELEASES,
+    path: APP_ROUTES.RELEASES,
     readySelectors: [
       '[data-testid="releases-matrix"]',
       '[data-testid="releases-empty-state-enriching"]',

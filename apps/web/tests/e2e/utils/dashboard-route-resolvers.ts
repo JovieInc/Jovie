@@ -1,6 +1,6 @@
 import { neon } from '@neondatabase/serverless';
 import type { Page } from '@playwright/test';
-import { APP_ROUTES } from '@/constants/routes';
+import { APP_ROUTES, buildReleaseTasksRoute } from '@/constants/routes';
 import { TEST_USER_ID_COOKIE } from '@/lib/auth/test-mode';
 
 interface ResolverProfile {
@@ -161,7 +161,7 @@ export async function resolveReleaseTasksPathFromPage(
     await page.setViewportSize({ width: 390, height: originalViewport.height });
   }
 
-  await page.goto(APP_ROUTES.DASHBOARD_RELEASES, {
+  await page.goto(APP_ROUTES.RELEASES, {
     waitUntil: 'domcontentloaded',
     timeout: 60_000,
   });
@@ -181,7 +181,7 @@ export async function resolveReleaseTasksPathFromPage(
 
   const mobileReleaseId = mobileRowTestId?.replace('mobile-release-row-', '');
   if (mobileReleaseId) {
-    return `${APP_ROUTES.DASHBOARD_RELEASES}/${mobileReleaseId}/tasks`;
+    return buildReleaseTasksRoute(mobileReleaseId);
   }
 
   const authCookies = await page.context().cookies();
@@ -281,5 +281,5 @@ export async function resolveReleaseTasksPathFromPage(
     throw new Error('No seeded release found for the E2E test user');
   }
 
-  return `${APP_ROUTES.DASHBOARD_RELEASES}/${release.id}/tasks`;
+  return buildReleaseTasksRoute(release.id);
 }

@@ -132,14 +132,18 @@ function normalizeRouteDefinition(
   };
 }
 
+const RELEASE_TASKS_ROUTE_TEMPLATE = `${APP_ROUTES.RELEASES}/[releaseId]/tasks`;
+
 function extractReleaseIdFromReleaseTasksPath(path: string) {
   const pathname = path.split('?')[0];
-  const releaseTasksPrefix = `${APP_ROUTES.DASHBOARD_RELEASES}/`;
+  const releaseTasksPrefix = [
+    APP_ROUTES.RELEASES,
+    APP_ROUTES.DASHBOARD_RELEASES,
+  ]
+    .map(prefix => `${prefix}/`)
+    .find(prefix => pathname.startsWith(prefix));
 
-  if (
-    !pathname.startsWith(releaseTasksPrefix) ||
-    !pathname.endsWith('/tasks')
-  ) {
+  if (!releaseTasksPrefix || !pathname.endsWith('/tasks')) {
     throw new Error(
       `Could not derive a lyrics route from release tasks path: ${path}`
     );
@@ -165,7 +169,7 @@ async function resolveCreatorLyricsPerfPath(
   const releaseTasksPath = await resolveReleaseTasksPerfPath(
     {
       ...route,
-      path: APP_ROUTES.DASHBOARD_RELEASE_TASKS,
+      path: RELEASE_TASKS_ROUTE_TEMPLATE,
     },
     context
   );
@@ -1041,7 +1045,7 @@ const CREATOR_SHELL_ROUTES = [
     id: 'creator-releases',
     group: 'creator-shell',
     surface: 'creator-app',
-    path: APP_ROUTES.DASHBOARD_RELEASES,
+    path: APP_ROUTES.RELEASES,
     requiresAuth: true,
     warmupStrategy: 'authenticated-shell',
     measureMode: 'warm-navigation',
@@ -1052,10 +1056,7 @@ const CREATOR_SHELL_ROUTES = [
         '[data-testid="releases-matrix"]',
       ],
       loading: ['[data-testid="releases-loading"]'],
-      navTrigger: [
-        `a[href="${APP_ROUTES.DASHBOARD_RELEASES}"]`,
-        `a[href="${APP_ROUTES.RELEASES}"]`,
-      ],
+      navTrigger: [`a[href="${APP_ROUTES.RELEASES}"]`],
       redirectDestinations: [APP_ROUTES.RELEASES],
     },
     timings: [
@@ -1146,7 +1147,7 @@ const CREATOR_SHELL_ROUTES = [
     id: 'creator-release-tasks',
     group: 'creator-shell',
     surface: 'creator-app',
-    path: APP_ROUTES.DASHBOARD_RELEASE_TASKS,
+    path: RELEASE_TASKS_ROUTE_TEMPLATE,
     resolvePath: resolveReleaseTasksPerfPath,
     requiresAuth: true,
     warmupStrategy: 'authenticated-route',

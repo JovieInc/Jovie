@@ -59,6 +59,20 @@ describe('performance route manifest', () => {
     ]);
   });
 
+  it('measures the canonical releases shell routes', () => {
+    const routes = getEndUserPerfRouteManifest();
+    const releases = routes.find(route => route.id === 'creator-releases');
+    const releaseTasks = routes.find(
+      route => route.id === 'creator-release-tasks'
+    );
+
+    expect(releases?.path).toBe('/app/releases');
+    expect(releases?.readySelectors.navTrigger).toEqual([
+      'a[href="/app/releases"]',
+    ]);
+    expect(releaseTasks?.path).toBe('/app/releases/[releaseId]/tasks');
+  });
+
   it('measures canonical chat onboarding at /start, not the legacy form shim', () => {
     const onboarding = getEndUserPerfRouteManifest().find(
       route => route.id === 'onboarding'
