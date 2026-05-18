@@ -36,15 +36,18 @@ export function InvestorTableHeaderRow({
 export function InvestorTableHeaderCell({
   children,
   align = 'left',
+  className,
 }: Readonly<{
   children: ReactNode;
   align?: 'left' | 'right';
+  className?: string;
 }>) {
   return (
     <th
       className={cn(
         'px-4 py-2.5 font-medium',
-        align === 'right' && 'text-right'
+        align === 'right' && 'text-right',
+        className
       )}
     >
       {children}
