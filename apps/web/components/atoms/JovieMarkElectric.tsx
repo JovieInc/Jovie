@@ -41,6 +41,8 @@ export function JovieMarkElectric({
 
   const prefersReducedMotion = useReducedMotion();
   const showSpark = spark && !prefersReducedMotion;
+  const sparkDuration = 'calc(var(--ds-motion-cinematic-duration) * 3.5)';
+  const sparkDelay = 'calc(var(--ds-motion-subtle-duration) * 1.6)';
 
   return (
     <span
@@ -51,10 +53,10 @@ export function JovieMarkElectric({
       {showSpark && (
         <style id={styleId}>{`
           @keyframes ${sparkAnimationName} {
-            0%   { stroke-dashoffset: 0;     opacity: 0; }
-            8%   { stroke-dashoffset: -80;   opacity: 0.9; }
-            55%  { stroke-dashoffset: -700;  opacity: 0.9; }
-            70%  { stroke-dashoffset: -950;  opacity: 0; }
+            0%   { stroke-dashoffset: 45;    opacity: 0; }
+            14%  { stroke-dashoffset: -120;  opacity: 0.56; }
+            48%  { stroke-dashoffset: -520;  opacity: 0.68; }
+            78%  { stroke-dashoffset: -820;  opacity: 0.22; }
             100% { stroke-dashoffset: -1000; opacity: 0; }
           }
         `}</style>
@@ -75,8 +77,8 @@ export function JovieMarkElectric({
         <path
           d={JOVIE_ICON_PATH}
           fill='none'
-          stroke='rgba(255,255,255,0.085)'
-          strokeWidth='1.2'
+          stroke='rgba(255,255,255,0.04)'
+          strokeWidth='1'
         />
         {showSpark && (
           <>
@@ -84,25 +86,35 @@ export function JovieMarkElectric({
               pathLength='1000'
               d={JOVIE_ICON_PATH}
               fill='none'
-              stroke='rgba(255,255,255,0.85)'
+              stroke='rgba(78,190,255,0.76)'
               strokeWidth='1.4'
-              strokeDasharray='55 945'
+              strokeDasharray='50 950'
               strokeLinecap='round'
               filter={`url(#${filterId})`}
               style={{
-                animation: `${sparkAnimationName} 18s var(--ds-motion-subtle-easing) infinite`,
+                animationName: sparkAnimationName,
+                animationDuration: sparkDuration,
+                animationTimingFunction: 'var(--ds-motion-subtle-easing)',
+                animationIterationCount: 2,
+                animationFillMode: 'both',
+                animationDelay: sparkDelay,
               }}
             />
             <path
               pathLength='1000'
               d={JOVIE_ICON_PATH}
               fill='none'
-              stroke='rgba(255,255,255,0.95)'
+              stroke='rgba(236,250,255,0.88)'
               strokeWidth='0.55'
-              strokeDasharray='22 978'
+              strokeDasharray='20 980'
               strokeLinecap='round'
               style={{
-                animation: `${sparkAnimationName} 18s var(--ds-motion-subtle-easing) infinite`,
+                animationName: sparkAnimationName,
+                animationDuration: sparkDuration,
+                animationTimingFunction: 'var(--ds-motion-subtle-easing)',
+                animationIterationCount: 2,
+                animationFillMode: 'both',
+                animationDelay: sparkDelay,
               }}
             />
           </>

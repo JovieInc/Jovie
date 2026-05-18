@@ -635,10 +635,11 @@ export function JovieChat({
               >
                 {shellChatV1Enabled ? (
                   <JovieMarkElectric
+                    className='opacity-70'
                     style={{
-                      width: 'clamp(220px, 44vw, 440px)',
-                      height: 'clamp(220px, 44vw, 440px)',
-                      transform: 'translateY(-12px)',
+                      width: 'clamp(180px, 34vw, 360px)',
+                      height: 'clamp(180px, 34vw, 360px)',
+                      transform: 'translateY(-16px)',
                       WebkitMaskImage:
                         'radial-gradient(circle, rgba(0,0,0,1) 55%, rgba(0,0,0,0.75) 75%, rgba(0,0,0,0) 95%)',
                       maskImage:

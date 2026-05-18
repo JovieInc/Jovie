@@ -30,7 +30,6 @@ import {
   useTableMeta,
 } from '@/contexts/TableMetaContext';
 import { HeaderChatUsageIndicator } from '@/features/dashboard/atoms/HeaderChatUsageIndicator';
-import { HeaderProfileProgress } from '@/features/dashboard/atoms/HeaderProfileProgress';
 import { useAuthRouteConfig } from '@/hooks/useAuthRouteConfig';
 import { useDashboardShortcuts } from '@/hooks/useDashboardShortcuts';
 import { useGlobalShortcutActions } from '@/hooks/useGlobalShortcutActions';
@@ -113,7 +112,6 @@ function AuthShellWrapperInner({
         {config.showChatUsageIndicator && !config.isDemoRoute ? (
           <HeaderChatUsageIndicator />
         ) : null}
-        <HeaderProfileProgress />
         {isElectron ? null : <UpdateAvailablePill />}
       </>
     ),

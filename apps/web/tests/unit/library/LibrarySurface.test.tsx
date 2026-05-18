@@ -7,6 +7,10 @@ import type { LibraryReleaseAsset } from '@/app/app/(shell)/library/library-data
 import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurface';
 import { APP_ROUTES } from '@/constants/routes';
 import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
+import {
+  ShellSidebarOverrideProvider,
+  useShellSidebarOverride,
+} from '@/contexts/ShellSidebarOverrideContext';
 
 Element.prototype.scrollIntoView = vi.fn();
 
@@ -72,6 +76,38 @@ function renderLibrary(assets: readonly LibraryReleaseAsset[]) {
   return render(
     <TooltipProvider>
       <LibrarySurface assets={assets} />
+    </TooltipProvider>
+  );
+}
+
+function SidebarOverrideProbe() {
+  const override = useShellSidebarOverride();
+
+  return (
+    <>
+      <output
+        aria-label='Sidebar override contract'
+        data-testid='library-sidebar-override'
+        data-back-href={override?.backHref}
+        data-back-label={override?.backLabel}
+        data-key={override?.key}
+      >
+        {override?.content ? 'registered' : 'missing'}
+      </output>
+      {override?.content}
+    </>
+  );
+}
+
+function renderLibraryWithSidebarOverride(
+  assets: readonly LibraryReleaseAsset[]
+) {
+  return render(
+    <TooltipProvider>
+      <ShellSidebarOverrideProvider>
+        <LibrarySurface assets={assets} />
+        <SidebarOverrideProbe />
+      </ShellSidebarOverrideProvider>
     </TooltipProvider>
   );
 }
@@ -244,6 +280,33 @@ describe('LibrarySurface', () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { name: 'Never Say A Word' })
+    ).toBeInTheDocument();
+  });
+
+  it('registers the route sidebar takeover contract', async () => {
+    renderLibraryWithSidebarOverride([
+      buildAsset(),
+      buildAsset({
+        id: 'release-2',
+        title: 'Never Say A Word',
+        artist: 'Other Artist',
+      }),
+    ]);
+
+    const contract = await screen.findByTestId('library-sidebar-override');
+
+    expect(contract).toHaveTextContent('registered');
+    expect(contract).toHaveAttribute('data-key', 'library');
+    expect(contract).toHaveAttribute('data-back-href', APP_ROUTES.CHAT);
+    expect(contract).toHaveAttribute('data-back-label', 'Back to App');
+    expect(
+      screen.getByRole('navigation', { name: 'Library navigation' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /All Releases/u })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /Needs Assets/u })
     ).toBeInTheDocument();
   });
 });

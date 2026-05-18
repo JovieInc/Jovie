@@ -427,7 +427,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   width: geometry.width,
                   maxWidth: geometry.maxWidth,
                 }}
-                className='overflow-hidden rounded-[24px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.035)_0%,rgba(255,255,255,0.012)_42%,transparent_100%),#16171b] shadow-[0_18px_56px_-28px_rgba(0,0,0,0.9),inset_0_1px_0_rgba(255,255,255,0.055)]'
+                className='overflow-hidden rounded-[24px] border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_84%,transparent)] bg-[linear-gradient(180deg,rgba(255,255,255,0.04)_0%,rgba(255,255,255,0.012)_100%),var(--linear-app-content-surface)] shadow-none'
               >
                 <SlashCommandMenu
                   profileId={pickerProfileId}
@@ -465,10 +465,10 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
               maxHeight: 'min(42vh, 280px)',
             }}
             className={cn(
-              'overflow-hidden border border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.035)_0%,rgba(255,255,255,0.014)_45%,transparent_100%),#16171b] text-primary-token shadow-[0_18px_56px_-30px_rgba(0,0,0,0.86),inset_0_1px_0_rgba(255,255,255,0.055)]',
+              'overflow-hidden border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_84%,transparent)] bg-[linear-gradient(180deg,rgba(255,255,255,0.04)_0%,rgba(255,255,255,0.012)_100%),var(--linear-app-content-surface)] text-primary-token shadow-none',
               isExpanded &&
-                'border-white/[0.12] shadow-[0_24px_68px_-32px_rgba(0,0,0,0.95),inset_0_1px_0_rgba(255,255,255,0.07)]',
-              'outline-none focus-within:border-white/[0.18] focus-within:shadow-[0_0_0_3px_rgba(255,255,255,0.05),0_24px_68px_-32px_rgba(0,0,0,0.95),inset_0_1px_0_rgba(255,255,255,0.07)] focus-within:outline-none',
+                'border-[color-mix(in_oklab,var(--linear-border-focus)_46%,var(--linear-app-frame-seam))] bg-[linear-gradient(180deg,rgba(255,255,255,0.052)_0%,rgba(255,255,255,0.016)_100%),var(--linear-app-content-surface)]',
+              'outline-none ring-0 focus-within:border-[color-mix(in_oklab,var(--linear-border-focus)_78%,transparent)] focus-within:ring-1 focus-within:ring-[color-mix(in_oklab,var(--linear-border-focus)_42%,transparent)] focus-within:outline-none',
               isOverLimit && 'border-error',
               showEntitySurface && !isStacked ? 'flex' : 'flex flex-col'
             )}
