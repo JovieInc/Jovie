@@ -98,7 +98,10 @@
 }
 
 .public-profile-layout-frame--desktop {
-  max-width: 1540px;
+  max-width: min(
+    100%,
+    calc(var(--profile-shell-max-width) + (var(--page-pad) * 2))
+  );
   padding-block: clamp(16px, 2vw, 24px);
 }
 
@@ -118,14 +121,6 @@
   display: none;
   min-width: 0;
   width: 100%;
-}
-
-.public-profile-layout-frame--desktop .public-profile-layout-compact-slot {
-  display: none;
-}
-
-.public-profile-layout-frame--desktop .public-profile-layout-desktop-shell {
-  display: block;
 }
 
 .public-profile-layout-desktop-placeholder {

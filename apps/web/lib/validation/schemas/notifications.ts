@@ -71,6 +71,7 @@ export const subscribeSchema = z
       .optional(),
     city: z.string().max(120).optional(),
     source: z.string().min(1).max(80).default('profile_bell'),
+    source_context: z.record(z.string(), z.unknown()).optional(),
   })
   .superRefine((data, ctx) => {
     if (data.channel === 'email' && !data.email) {

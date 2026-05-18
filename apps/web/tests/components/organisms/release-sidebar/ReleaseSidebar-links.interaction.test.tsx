@@ -7,6 +7,13 @@ const mockUsePlanGate = vi.fn(() => ({
   isLoading: false,
 }));
 const mockFetchReleaseCreditsAction = vi.fn();
+const mockRouterPush = vi.fn();
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: mockRouterPush,
+  }),
+}));
 
 // ReleaseSidebar directly uses SegmentControl from @jovie/ui for tab navigation.
 // All other sub-components that use additional @jovie/ui parts are mocked below,
@@ -415,7 +422,18 @@ vi.mock(
 );
 
 vi.mock('@/components/features/dashboard/release-tasks', () => ({
-  ReleaseTaskChecklist: () => <div data-testid='task-checklist'>Tasks</div>,
+  ReleaseTaskChecklist: ({
+    onNavigateToFullPage,
+  }: {
+    onNavigateToFullPage?: () => void;
+  }) => (
+    <div data-testid='task-checklist'>
+      Tasks
+      <button type='button' onClick={onNavigateToFullPage}>
+        Open full tasks page
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock('@/lib/queries', () => ({
@@ -427,6 +445,8 @@ vi.mock('@/constants/routes', () => ({
     DASHBOARD_RELEASES: '/dashboard/releases',
     DASHBOARD_RELEASE_TASKS: '/dashboard/releases/[releaseId]/tasks',
   },
+  buildReleaseTasksRoute: (releaseId: string) =>
+    `/dashboard/releases/${releaseId}/tasks`,
 }));
 
 vi.mock(
@@ -580,6 +600,20 @@ describe('ReleaseSidebar inspector cards', () => {
       screen.queryByTestId('compact-release-plan-upgrade-card')
     ).not.toBeInTheDocument();
     expect(screen.queryByTestId('task-checklist')).not.toBeInTheDocument();
+  });
+
+  it('uses app router navigation for the full release tasks page', async () => {
+    const user = userEvent.setup();
+
+    render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
+    await user.click(screen.getByTestId('drawer-tab-tasks'));
+    await user.click(
+      screen.getByRole('button', { name: 'Open full tasks page' })
+    );
+
+    expect(mockRouterPush).toHaveBeenCalledWith(
+      '/dashboard/releases/release_1/tasks'
+    );
   });
 
   it('does not render the generic Releases title row above the entity card', () => {

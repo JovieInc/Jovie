@@ -1,7 +1,56 @@
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import type { Artist } from '@/types/db';
 
-export type NotificationSource = 'profile_inline' | 'tour_drawer';
+export type NotificationSource =
+  | 'profile_inline'
+  | 'tour_drawer'
+  | 'home_alerts_card'
+  | 'hero_alerts_button'
+  | 'music_empty_state'
+  | 'events_empty_state'
+  | 'subscribe_tab';
+
+export type NotificationSourceTab = 'home' | 'music' | 'events' | 'alerts';
+
+export type NotificationIntent =
+  | 'music_alerts'
+  | 'event_alerts'
+  | 'general_alerts';
+
+export interface NotificationSourceContext {
+  readonly artistId?: string;
+  readonly profileId?: string;
+  readonly profileSlug?: string;
+  readonly currentTab: NotificationSourceTab;
+  readonly ctaLocation: NotificationSource;
+  readonly intent: NotificationIntent;
+  readonly releaseId?: string;
+  readonly eventId?: string;
+}
+
+export function buildNotificationSourceContext(
+  artist: Artist,
+  context: NotificationSourceContext
+) {
+  return {
+    artist_id: context.artistId ?? artist.id,
+    profile_id: context.profileId ?? artist.id,
+    profile_slug: context.profileSlug ?? artist.handle,
+    handle: artist.handle,
+    current_route_tab: context.currentTab,
+    cta_location: context.ctaLocation,
+    intent: context.intent,
+    release_id: context.releaseId,
+    event_id: context.eventId,
+  };
+}
+
+export function resolveNotificationSource(
+  source: NotificationSource | undefined,
+  context: NotificationSourceContext | undefined
+): NotificationSource {
+  return source ?? context?.ctaLocation ?? 'profile_inline';
+}
 
 export interface ArtistNotificationsCTAProps {
   readonly artist: Artist;
@@ -36,4 +85,6 @@ export interface ArtistNotificationsCTAProps {
    * Defaults to 'profile_inline'. Tour drawer passes 'tour_drawer'.
    */
   readonly source?: NotificationSource;
+  readonly sourceContext?: NotificationSourceContext;
+  readonly triggerLabel?: string;
 }

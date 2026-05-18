@@ -46,20 +46,7 @@ import type { Artist, LegacySocialLink } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
 import { ProfileCompactSurface } from './ProfileCompactSurface';
-import { ProfileDesktopSurface } from './ProfileDesktopSurface';
 import { PublicProfileLayoutShell } from './PublicProfileLayoutShell';
-
-// Previously imported via `dynamic({ ssr: false })`. That bailed the parent
-// SSR tree to client-side rendering and emitted
-// `<template data-dgst="BAILOUT_TO_CLIENT_SIDE_RENDERING">` in the streaming
-// payload, forcing the animated skeleton from `loading.tsx` to be the initial
-// visible HTML for every cold visit (JOV-2273).
-//
-// `ProfileDesktopSurface` is only rendered when `isDesktopLayout === true`,
-// which starts as `false` during SSR and is set in `useEffect` from
-// `matchMedia('(min-width: 1180px)')`. So the component is never rendered
-// server-side anyway — the `ssr: false` deferral was costing us a visible
-// CSR bailout for no rendering benefit.
 
 interface ProfileCompactTemplateProps {
   readonly mode: ProfileMode;
@@ -675,17 +662,16 @@ export function ProfileCompactTemplate({
     setRequestedMode('profile');
   }, [artist.handle, artist.name]);
 
-  const hasTourDates = tourDates.length > 0;
   const compactSurfaceShowsModeHeading = drawerOpen
     ? drawerView === 'listen' ||
       drawerView === 'releases' ||
       drawerView === 'subscribe' ||
       drawerView === 'notifications' ||
-      (drawerView === 'tour' && hasTourDates)
+      drawerView === 'tour'
     : requestedMode === 'listen' ||
       requestedMode === 'releases' ||
       requestedMode === 'subscribe' ||
-      (requestedMode === 'tour' && hasTourDates);
+      requestedMode === 'tour';
   const shouldRenderTemplateHeading = isDesktopLayout
     ? true
     : compactSurfaceShowsModeHeading;
@@ -703,46 +689,6 @@ export function ProfileCompactTemplate({
         isDesktopLayout={isDesktopLayout}
         shouldRenderHeading={shouldRenderTemplateHeading}
         profileAccentStyle={profileAccentStyle}
-        desktopSurface={
-          <ProfileDesktopSurface
-            presentation={drawerPresentation}
-            artist={artist}
-            socialLinks={socialLinks}
-            contacts={contacts}
-            showPayButton={showPayButton}
-            latestRelease={latestRelease}
-            profileSettings={profileSettings}
-            alertOptInVariant={resolvedAlertOptInVariant}
-            genres={genres}
-            pressPhotos={pressPhotos}
-            allowPhotoDownloads={allowPhotoDownloads}
-            photoDownloadSizes={photoDownloadSizes}
-            tourDates={tourDates}
-            viewerCountryCode={viewerCountryCode}
-            drawerOpen={drawerOpen}
-            drawerView={drawerView}
-            activeMode={requestedMode}
-            onModeSelect={nextMode => {
-              clearCloseResetTimer();
-              setRequestedMode(nextMode);
-            }}
-            onAlertsModalClose={() => {
-              clearCloseResetTimer();
-              setRequestedMode(lastPrimaryModeRef.current);
-            }}
-            onDrawerOpenChange={handleDrawerOpenChange}
-            onDrawerViewChange={handleDrawerViewChange}
-            onOpenMenu={() => openDrawerMode('menu')}
-            onPlayClick={handlePlayClick}
-            profileHref={profileHref}
-            isSubscribed={isSubscribed}
-            contentPrefs={contentPrefs}
-            onTogglePref={handleTogglePref}
-            onUnsubscribe={handleUnsubscribe}
-            isUnsubscribing={unsubMutation.isPending}
-            releases={releases}
-          />
-        }
         compactSurface={
           <div
             className='public-profile-compact-shell relative flex h-full min-w-0 w-full flex-col overflow-hidden bg-[color:var(--profile-content-bg)] md:mx-auto md:rounded-[var(--profile-shell-card-radius)] md:border md:border-[color:var(--profile-panel-border)] md:shadow-[var(--profile-panel-shadow)]'
@@ -770,7 +716,7 @@ export function ProfileCompactTemplate({
               viewerCountryCode={viewerCountryCode}
               hideJovieBranding={hideJovieBranding}
               hideMoreMenu={hideMoreMenu}
-              renderInteractiveOverlays={!isDesktopLayout}
+              renderInteractiveOverlays
               renderSemanticHeading={!isDesktopLayout}
               drawerOpen={drawerOpen}
               drawerView={drawerView}

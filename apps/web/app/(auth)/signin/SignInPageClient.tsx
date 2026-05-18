@@ -74,7 +74,11 @@ export function SignInPageClient() {
       layoutVariant='split'
     >
       <AuthRoutePrefetch href={APP_ROUTES.SIGNUP} />
-      <AuthShell mode='sign-in' initialValues={initialValues} />
+      <AuthShell
+        mode='sign-in'
+        forceOppositeModeHardNavigation
+        initialValues={initialValues}
+      />
       <SignInTimeoutEscape />
     </AuthLayout>
   );

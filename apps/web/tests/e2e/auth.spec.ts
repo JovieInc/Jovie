@@ -57,7 +57,7 @@ async function waitForClerk(page: Page): Promise<void> {
     ),
     page.waitForFunction(
       () => {
-        const bodyText = (document.body.innerText || '').toLowerCase();
+        const bodyText = (document.body?.innerText || '').toLowerCase();
         return [
           'auth unavailable',
           'authentication unavailable',
@@ -89,7 +89,7 @@ async function waitForClerkAuthUi(page: Page): Promise<void> {
         return true;
       }
 
-      const bodyText = (document.body.innerText || '').toLowerCase();
+      const bodyText = (document.body?.innerText || '').toLowerCase();
       return (
         [
           'auth unavailable',
@@ -243,7 +243,9 @@ test.describe('Auth', () => {
         return;
       }
 
-      await page.getByRole('link', { name: /sign up|create account/i }).click();
+      await page
+        .getByRole('link', { name: /request access|sign up|create account/i })
+        .click();
       await expect(page).toHaveURL(
         url =>
           url.pathname === APP_ROUTES.SIGNUP &&
@@ -321,7 +323,7 @@ test.describe('Auth pages: content and CTA routing (JOV-2065, JOV-2066)', () => 
 
       // Must have a cross-link to /signin — Clerk renders a "Sign in" link in its footer
       const signinLink = page
-        .locator(`a[href*="${APP_ROUTES.SIGNIN}"]`)
+        .getByRole('link', { name: /sign in|log in/i })
         .first();
       await expect(signinLink).toBeVisible({
         timeout: SMOKE_TIMEOUTS.VISIBILITY,
@@ -367,7 +369,7 @@ test.describe('Auth pages: content and CTA routing (JOV-2065, JOV-2066)', () => 
 
       // Must have a cross-link to /signup — Clerk renders a "Sign up" link in its footer
       const signupLink = page
-        .locator(`a[href*="${APP_ROUTES.SIGNUP}"]`)
+        .getByRole('link', { name: /request access|sign up|create account/i })
         .first();
       await expect(signupLink).toBeVisible({
         timeout: SMOKE_TIMEOUTS.VISIBILITY,
@@ -430,7 +432,7 @@ test.describe('Auth pages: content and CTA routing (JOV-2065, JOV-2066)', () => 
 
       // Click the sign-up cross-link
       await page
-        .getByRole('link', { name: /sign up|create account/i })
+        .getByRole('link', { name: /request access|sign up|create account/i })
         .first()
         .click();
       await expect(page).toHaveURL(url => url.pathname === APP_ROUTES.SIGNUP, {

@@ -2,20 +2,29 @@ import { TooltipProvider } from '@jovie/ui';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { APP_ROUTES } from '@/constants/routes';
 import type { TaskBoardResult, TaskStatus, TaskView } from '@/lib/tasks/types';
 
 const {
+  mockRouterPush,
   mockRegisterRightPanel,
   mockUseAppFlag,
   mockUseReleaseEntityQuery,
   mockUseTaskBoardQuery,
   mockUseTasksQuery,
 } = vi.hoisted(() => ({
+  mockRouterPush: vi.fn(),
   mockRegisterRightPanel: vi.fn(),
   mockUseAppFlag: vi.fn(),
   mockUseReleaseEntityQuery: vi.fn(),
   mockUseTaskBoardQuery: vi.fn(),
   mockUseTasksQuery: vi.fn(),
+}));
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: mockRouterPush,
+  }),
 }));
 
 vi.mock('@jovie/ui', async () => {
@@ -557,6 +566,7 @@ describe('TasksPageClient', () => {
     mockSetViewMode.mockClear();
     mockSetHeaderActions.mockReset();
     mockRegisterRightPanel.mockReset();
+    mockRouterPush.mockReset();
     mockUseReleaseEntityQuery.mockClear();
     mockUseTaskBoardQuery.mockClear();
     mockUseTasksQuery.mockClear();
@@ -582,6 +592,17 @@ describe('TasksPageClient', () => {
     expect(screen.queryByText('All Statuses')).not.toBeInTheDocument();
     expect(screen.queryByText('All Priorities')).not.toBeInTheDocument();
     expect(screen.queryByText('All Assignees')).not.toBeInTheDocument();
+  });
+
+  it('routes the empty-state release setup CTA through the app router', () => {
+    mockTasksData = [];
+    mockListQueryData = [];
+
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Set Up Release' }));
+
+    expect(mockRouterPush).toHaveBeenCalledWith(APP_ROUTES.RELEASES);
   });
 
   it('keeps release detail loading disabled until a release context is opened', () => {
