@@ -285,8 +285,11 @@ export function TaskBoard({
       onDragCancel={() => setActiveTaskId(null)}
     >
       <div
-        className='flex h-full min-h-0 gap-3 overflow-x-auto overflow-y-hidden px-3 pb-3 pt-1.5'
+        className='grid h-full min-h-0 min-w-full gap-3 overflow-x-auto overflow-y-hidden px-3 pb-3 pt-1.5'
         data-testid='tasks-board'
+        style={{
+          gridTemplateColumns: `repeat(${Math.max(columns.length, 1)}, minmax(17.5rem, 1fr))`,
+        }}
       >
         {columns.map(column => (
           <TaskBoardColumn
@@ -343,7 +346,7 @@ function TaskBoardColumn({
       aria-label={`${visual.label} tasks`}
       data-testid={`tasks-board-column-${column.status}`}
       className={cn(
-        'flex h-full min-h-0 w-[19.5rem] shrink-0 flex-col rounded-lg border border-subtle bg-surface-0',
+        'flex h-full min-h-0 w-full min-w-0 flex-col rounded-lg border border-subtle bg-surface-0',
         isOver &&
           'border-[color-mix(in_oklab,var(--linear-border-focus)_70%,transparent)] bg-[color-mix(in_oklab,var(--linear-row-hover)_36%,var(--linear-app-content-surface))]'
       )}
@@ -578,11 +581,14 @@ function TaskBoardCard({
 
 function TaskBoardSkeleton() {
   return (
-    <div className='flex h-full min-h-0 gap-3 overflow-hidden px-3 pb-3 pt-1.5'>
+    <div
+      className='grid h-full min-h-0 min-w-full gap-3 overflow-hidden px-3 pb-3 pt-1.5'
+      style={{ gridTemplateColumns: 'repeat(4, minmax(17.5rem, 1fr))' }}
+    >
       {[0, 1, 2, 3].map(column => (
         <div
           key={column}
-          className='flex h-full min-h-0 w-[19.5rem] shrink-0 flex-col rounded-lg border border-subtle bg-surface-0'
+          className='flex h-full min-h-0 w-full min-w-0 flex-col rounded-lg border border-subtle bg-surface-0'
         >
           <div className='h-10 border-b border-subtle px-3 py-3'>
             <div className='h-3 w-24 rounded bg-surface-2' />
