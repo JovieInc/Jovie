@@ -1,15 +1,7 @@
 import type { Metadata } from 'next';
 import { AdminWorkspacePage } from '@/components/features/admin/layout/AdminWorkspacePage';
-import {
-  getPlaylistEngineSettings,
-  getPlaylistSpotifyStatus,
-  isSpotifyAccount,
-  readAccountLabel,
-  readExternalAccountScopes,
-} from '@/lib/admin/platform-connections';
-import { getCachedCurrentUser } from '@/lib/auth/cached';
-import { REQUIRED_PLAYLIST_SPOTIFY_SCOPES } from '@/lib/spotify/system-account';
 import { PlatformConnectionsClient } from './PlatformConnectionsClient';
+import { loadAdminPlatformConnectionsData } from './platform-connections-data';
 
 export const metadata: Metadata = { title: 'Platform Connections — Admin' };
 export const runtime = 'nodejs';
@@ -32,18 +24,7 @@ export default async function AdminPlatformConnectionsPage({
     ['spotify', 'engine'].includes(tab) ? tab : 'spotify'
   ) as PlatformConnectionsTab;
 
-  const [spotifyStatus, engineSettings, user] = await Promise.all([
-    getPlaylistSpotifyStatus(),
-    getPlaylistEngineSettings(),
-    getCachedCurrentUser(),
-  ]);
-
-  const currentSpotifyAccount =
-    user?.externalAccounts.find(isSpotifyAccount) ?? null;
-  const approvedScopes = readExternalAccountScopes(currentSpotifyAccount);
-  const missingScopes = REQUIRED_PLAYLIST_SPOTIFY_SCOPES.filter(
-    scope => !approvedScopes.includes(scope)
-  );
+  const data = await loadAdminPlatformConnectionsData();
 
   return (
     <AdminWorkspacePage
@@ -57,21 +38,9 @@ export default async function AdminPlatformConnectionsPage({
     >
       <PlatformConnectionsClient
         currentTab={currentTab}
-        spotifyStatus={{
-          ...spotifyStatus,
-          updatedAt: spotifyStatus.updatedAt?.toISOString() ?? null,
-        }}
-        engineSettings={{
-          ...engineSettings,
-          lastGeneratedAt:
-            engineSettings.lastGeneratedAt?.toISOString() ?? null,
-          nextEligibleAt: engineSettings.nextEligibleAt?.toISOString() ?? null,
-        }}
-        currentUser={{
-          hasSpotify: Boolean(currentSpotifyAccount),
-          label: readAccountLabel(currentSpotifyAccount),
-          missingScopes,
-        }}
+        spotifyStatus={data.spotifyStatus}
+        engineSettings={data.engineSettings}
+        currentUser={data.currentUser}
       />
     </AdminWorkspacePage>
   );
