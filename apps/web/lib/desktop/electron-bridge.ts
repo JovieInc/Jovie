@@ -283,6 +283,28 @@ const DESKTOP_DICTATION_UNAVAILABLE: DesktopDictationStatus = {
   reason: 'desktop-dictation-bridge-unavailable',
 };
 
+function isDesktopDictationMode(
+  value: unknown
+): value is DesktopDictationStatus['mode'] {
+  return (
+    value === 'native' || value === 'web-speech' || value === 'unavailable'
+  );
+}
+
+function isDesktopDictationStatus(
+  value: unknown
+): value is DesktopDictationStatus {
+  if (value === null || typeof value !== 'object') return false;
+  const status = value as Partial<DesktopDictationStatus>;
+  return (
+    typeof status.ok === 'boolean' &&
+    typeof status.nativeAvailable === 'boolean' &&
+    typeof status.webSpeechFallbackAllowed === 'boolean' &&
+    isDesktopDictationMode(status.mode) &&
+    (status.reason === undefined || typeof status.reason === 'string')
+  );
+}
+
 /**
  * useDesktopNavigation — subscribes to Electron webContents nav-state IPC.
  *
@@ -332,7 +354,18 @@ async function safeGetDictationStatus(): Promise<DesktopDictationStatus> {
   }
 
   try {
-    return await api.getDictationStatus();
+    const status = await api.getDictationStatus();
+    if (isDesktopDictationStatus(status)) return status;
+
+    void captureWarning(
+      'getDictationStatus returned invalid payload',
+      'Renderer expected a DesktopDictationStatus payload from the Electron bridge.',
+      {
+        route: 'desktop/electron-bridge',
+        bridgeMethod: 'getDictationStatus',
+      }
+    );
+    return DESKTOP_DICTATION_UNAVAILABLE;
   } catch (error) {
     void captureWarning('getDictationStatus threw', error, {
       route: 'desktop/electron-bridge',

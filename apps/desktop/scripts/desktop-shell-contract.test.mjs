@@ -81,6 +81,7 @@ test('desktop bridge exposes bounded dictation support', async () => {
   );
 
   assert.match(mainSource, /const DICTATION_STATUS_CHANNEL = 'dictation-status'/);
+  assert.match(mainSource, /ipcMain\.handle\(\s*DICTATION_STATUS_CHANNEL,/);
   assert.match(mainSource, /function getDesktopDictationStatus\(\)/);
   assert.match(mainSource, /nativeAvailable: false/);
   assert.match(mainSource, /webSpeechFallbackAllowed: true/);

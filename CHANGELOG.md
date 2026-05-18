@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.28] - 2026-05-18
+
+> [internal] Desktop dictation bridge payloads are now validated before the web app trusts them.
+
+### Fixed
+
+- **Desktop dictation bridge hardening (JOV-2402)**: validates `getDictationStatus()` IPC payloads before storing them in renderer state, pins the desktop contract test to the main-process handler registration, and keeps Web Speech feature detection scoped through the shared browser window reference.
+
 ## [26.5.27] - 2026-05-18
 
 > [internal] Desktop dictation is now guarded by an explicit Electron bridge so stale desktop builds fail closed instead of showing a broken microphone.

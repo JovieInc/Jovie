@@ -94,13 +94,14 @@ export function useSpeechRecognition({
   }, [onTranscript]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (!browserWindow) return;
     const browserSpeechSupported =
-      'SpeechRecognition' in window || 'webkitSpeechRecognition' in window;
+      'SpeechRecognition' in browserWindow ||
+      'webkitSpeechRecognition' in browserWindow;
     setIsSupported(
       browserSpeechSupported && desktopDictationStatus.webSpeechFallbackAllowed
     );
-  }, [desktopDictationStatus.webSpeechFallbackAllowed]);
+  }, [browserWindow, desktopDictationStatus.webSpeechFallbackAllowed]);
 
   const getRecognition = useCallback(() => {
     if (recognitionRef.current) return recognitionRef.current;
