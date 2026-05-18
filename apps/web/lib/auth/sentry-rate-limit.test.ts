@@ -2,8 +2,8 @@
  * Unit tests for sentry-rate-limit.ts
  *
  * Covers:
- * - captureError fires on first event (count == 1)
- * - captureError is suppressed on subsequent events (count > 1)
+ * - captureError fires on first event (SET NX returns "OK")
+ * - captureError is suppressed on subsequent events (SET NX returns null)
  * - Redis-unreachable path allows captureError to fire (fail-open)
  */
 
@@ -15,8 +15,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   captureError: vi.fn().mockResolvedValue(undefined),
-  redisIncr: vi.fn<() => Promise<number>>(),
-  redisExpire: vi.fn<() => Promise<void>>(),
+  redisSet: vi.fn<() => Promise<'OK' | null>>(),
   getRedis: vi.fn(),
 }));
 
@@ -32,13 +31,12 @@ vi.mock('@/lib/redis', () => ({
 // Helpers
 // ============================================================================
 
-function makeRedisClient(incrResult: number | Error) {
+function makeRedisClient(setResult: 'OK' | null | Error) {
   return {
-    incr: vi.fn().mockImplementation(() => {
-      if (incrResult instanceof Error) return Promise.reject(incrResult);
-      return Promise.resolve(incrResult);
+    set: vi.fn().mockImplementation(() => {
+      if (setResult instanceof Error) return Promise.reject(setResult);
+      return Promise.resolve(setResult);
     }),
-    expire: mocks.redisExpire.mockResolvedValue(undefined),
   };
 }
 
@@ -55,12 +53,11 @@ const TEST_MESSAGE = '[middleware] Clerk config missing';
 describe('captureErrorWithHostnameLimit', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.redisIncr.mockReset();
-    mocks.redisExpire.mockReset();
+    mocks.redisSet.mockReset();
   });
 
-  it('fires captureError and returns true on first event (count=1)', async () => {
-    const redis = makeRedisClient(1);
+  it('fires captureError and returns true on first event (SET NX returns OK)', async () => {
+    const redis = makeRedisClient('OK');
     mocks.getRedis.mockReturnValue(redis);
 
     const result = await captureErrorWithHostnameLimit(
@@ -70,12 +67,10 @@ describe('captureErrorWithHostnameLimit', () => {
     );
 
     expect(result).toBe(true);
-    expect(redis.incr).toHaveBeenCalledWith(
-      `sentry:rate:clerk-degraded:${TEST_HOSTNAME}`
-    );
-    expect(redis.expire).toHaveBeenCalledWith(
+    expect(redis.set).toHaveBeenCalledWith(
       `sentry:rate:clerk-degraded:${TEST_HOSTNAME}`,
-      60
+      1,
+      { nx: true, ex: 60 }
     );
     expect(mocks.captureError).toHaveBeenCalledOnce();
     expect(mocks.captureError).toHaveBeenCalledWith(
@@ -85,8 +80,8 @@ describe('captureErrorWithHostnameLimit', () => {
     );
   });
 
-  it('suppresses captureError and returns false on subsequent events (count=2)', async () => {
-    const redis = makeRedisClient(2);
+  it('suppresses captureError and returns false on subsequent events (SET NX returns null)', async () => {
+    const redis = makeRedisClient(null);
     mocks.getRedis.mockReturnValue(redis);
 
     const result = await captureErrorWithHostnameLimit(
@@ -96,23 +91,7 @@ describe('captureErrorWithHostnameLimit', () => {
     );
 
     expect(result).toBe(false);
-    expect(redis.incr).toHaveBeenCalledOnce();
-    // expire should NOT be called for count > 1
-    expect(redis.expire).not.toHaveBeenCalled();
-    expect(mocks.captureError).not.toHaveBeenCalled();
-  });
-
-  it('suppresses captureError and returns false for high count (count=100)', async () => {
-    const redis = makeRedisClient(100);
-    mocks.getRedis.mockReturnValue(redis);
-
-    const result = await captureErrorWithHostnameLimit(
-      TEST_MESSAGE,
-      TEST_ERROR,
-      TEST_HOSTNAME
-    );
-
-    expect(result).toBe(false);
+    expect(redis.set).toHaveBeenCalledOnce();
     expect(mocks.captureError).not.toHaveBeenCalled();
   });
 
@@ -137,7 +116,7 @@ describe('captureErrorWithHostnameLimit', () => {
     );
   });
 
-  it('fails open when Redis incr throws: fires captureError and returns true', async () => {
+  it('fails open when Redis set throws: fires captureError and returns true', async () => {
     const redis = makeRedisClient(new Error('Connection refused'));
     mocks.getRedis.mockReturnValue(redis);
 
@@ -160,7 +139,7 @@ describe('captureErrorWithHostnameLimit', () => {
   });
 
   it('forwards extra context to captureError', async () => {
-    const redis = makeRedisClient(1);
+    const redis = makeRedisClient('OK');
     mocks.getRedis.mockReturnValue(redis);
 
     await captureErrorWithHostnameLimit(
@@ -184,11 +163,11 @@ describe('captureErrorWithHostnameLimit', () => {
   });
 
   it('uses the correct Redis key per hostname', async () => {
-    const redis1 = makeRedisClient(1);
+    const redis1 = makeRedisClient('OK');
     mocks.getRedis.mockReturnValue(redis1);
     await captureErrorWithHostnameLimit(TEST_MESSAGE, TEST_ERROR, 'jov.ie');
 
-    const redis2 = makeRedisClient(1);
+    const redis2 = makeRedisClient('OK');
     mocks.getRedis.mockReturnValue(redis2);
     await captureErrorWithHostnameLimit(
       TEST_MESSAGE,
@@ -196,11 +175,15 @@ describe('captureErrorWithHostnameLimit', () => {
       'staging.jov.ie'
     );
 
-    expect(redis1.incr).toHaveBeenCalledWith(
-      'sentry:rate:clerk-degraded:jov.ie'
+    expect(redis1.set).toHaveBeenCalledWith(
+      'sentry:rate:clerk-degraded:jov.ie',
+      1,
+      expect.objectContaining({ nx: true })
     );
-    expect(redis2.incr).toHaveBeenCalledWith(
-      'sentry:rate:clerk-degraded:staging.jov.ie'
+    expect(redis2.set).toHaveBeenCalledWith(
+      'sentry:rate:clerk-degraded:staging.jov.ie',
+      1,
+      expect.objectContaining({ nx: true })
     );
   });
 });

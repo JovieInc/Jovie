@@ -39,12 +39,19 @@ export async function captureErrorWithHostnameLimit(
     const redis = getRedis();
 
     if (redis) {
-      // INCR is atomic; first call returns 1, subsequent calls return >1.
-      const count = await redis.incr(redisKey);
+      // SET NX EX is a single atomic operation: sets the key only when it does
+      // not exist, with a TTL. Returns "OK" on the first call (new key), null
+      // on subsequent calls (key already exists).
+      // Using SET NX EX instead of INCR + EXPIRE avoids the non-atomic gap
+      // where INCR succeeds but EXPIRE fails, leaving the key without a TTL
+      // and permanently silencing alerts for that hostname.
+      const result = await redis.set(redisKey, 1, {
+        nx: true,
+        ex: RATE_LIMIT_TTL_SECONDS,
+      });
 
-      if (count === 1) {
-        // First event in the window: set TTL then fire.
-        await redis.expire(redisKey, RATE_LIMIT_TTL_SECONDS);
+      if (result === 'OK') {
+        // First event in the window.
         await captureError(message, error, {
           hostname,
           ...opts?.context,

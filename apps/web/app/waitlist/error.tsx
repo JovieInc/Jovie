@@ -14,7 +14,9 @@ function isAuthDegradedError(error: Error): boolean {
   return (
     msg.includes('clerk') ||
     msg.includes('publishable key') ||
-    msg.includes('auth') ||
+    // 'authenticationerror' is Clerk's error class name pattern; avoid the
+    // bare 'auth' substring which also matches Stripe/DB auth errors.
+    msg.includes('authentication service') ||
     name.includes('clerkerror') ||
     // Next.js CLERK_ENCRYPTION_KEY / missing env errors surface like this
     msg.includes('encryption') ||
