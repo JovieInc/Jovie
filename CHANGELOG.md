@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.22] - 2026-05-17
+
+> The empty Ask Jovie screen now wears a soft electric outline of the Jovie mark behind your input — a subtle glow that reads as ambient atmosphere, not chrome.
+
+### Changed
+
+- **Empty chat state — electric Jovie mark backdrop**: replaced the static giant "j" glyph behind the Ask Jovie empty state with a faint outline of the Jovie mark, softened by a radial mask and accented with a slow traveling spark when motion is permitted. Reduced-motion users see the same outline without the spark, preserving the visual idiom. The mark sits at `clamp(220px, 44vw, 440px)` so it scales gracefully from phone to desktop. Reuses canonical design tokens; no new accent colors introduced. Follow-ups tracked as JOV-2364 (first-run-only cinematic boot) and JOV-2365 (reuse `JovieMarkElectric` in other empty/loading surfaces).
+
 ## [26.5.21] - 2026-05-17
 
 > [internal] Design polish: stripped banned uppercase tracking eyebrow text from dashboard surfaces and fixed title case in upgrade interstitials.
