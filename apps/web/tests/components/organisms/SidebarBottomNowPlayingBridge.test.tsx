@@ -1,5 +1,9 @@
 import { render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  resetAudioChromeSnapshot,
+  setAudioChromeSnapshot,
+} from '@/components/organisms/audio-chrome-state';
 
 let _flag = false;
 let _state: Record<string, unknown> = {
@@ -32,6 +36,7 @@ vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
 import { SidebarBottomNowPlayingBridge } from '@/components/organisms/SidebarBottomNowPlayingBridge';
 
 beforeEach(() => {
+  resetAudioChromeSnapshot();
   _flag = false;
   _state = {
     activeTrackId: null,
@@ -48,6 +53,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  resetAudioChromeSnapshot();
   vi.clearAllMocks();
 });
 
@@ -82,5 +88,45 @@ describe('SidebarBottomNowPlayingBridge', () => {
     expect(screen.getByText('Lost in the Light')).toBeInTheDocument();
     expect(screen.getByText('Bahamas')).toBeInTheDocument();
     expect(screen.getByLabelText('Play')).toBeInTheDocument();
+  });
+
+  it('hides when the persistent compact player owns the active track', () => {
+    _flag = true;
+    _state = {
+      ..._state,
+      activeTrackId: 'track-1',
+      trackTitle: 'Lost in the Light',
+      artistName: 'Bahamas',
+      isPlaying: false,
+    };
+    setAudioChromeSnapshot({
+      activeTrackId: 'track-1',
+      compactPlayerVisible: true,
+      fullPlayerVisible: false,
+    });
+
+    const { container } = render(<SidebarBottomNowPlayingBridge />);
+
+    expect(container.firstChild).toBeNull();
+  });
+
+  it('still renders when compact state belongs to a different track', () => {
+    _flag = true;
+    _state = {
+      ..._state,
+      activeTrackId: 'track-1',
+      trackTitle: 'Lost in the Light',
+      artistName: 'Bahamas',
+      isPlaying: false,
+    };
+    setAudioChromeSnapshot({
+      activeTrackId: 'track-2',
+      compactPlayerVisible: true,
+      fullPlayerVisible: false,
+    });
+
+    render(<SidebarBottomNowPlayingBridge />);
+
+    expect(screen.getByText('Lost in the Light')).toBeInTheDocument();
   });
 });
