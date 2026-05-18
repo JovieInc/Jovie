@@ -3,6 +3,10 @@
 import { Bell, Copy, Download, Eye, Phone, UserMinus } from 'lucide-react';
 import type { ContextMenuItemType } from '@/components/organisms/table';
 import type { AudienceMember } from '@/types';
+import {
+  getAudienceVisibleEmail,
+  isAudienceMemberReachable,
+} from './row-contract';
 
 // Module-level icon constants — allocated once, reused across all rows and renders.
 const ICON_EYE = <Eye className='h-3.5 w-3.5' />;
@@ -34,6 +38,9 @@ export function buildAudienceActions(
   member: AudienceMember,
   callbacks: BuildAudienceActionsCallbacks
 ): ContextMenuItemType[] {
+  const visibleEmail = getAudienceVisibleEmail(member);
+  const reachable = isAudienceMemberReachable(member);
+
   return [
     // ── View group ──
     {
@@ -48,7 +55,7 @@ export function buildAudienceActions(
       label: 'Copy email',
       icon: ICON_COPY,
       onClick: () => callbacks.onCopyEmail(member),
-      disabled: !member.email,
+      disabled: !visibleEmail,
     },
     {
       id: 'copy-phone',
@@ -62,7 +69,7 @@ export function buildAudienceActions(
       label: 'Send notification',
       icon: ICON_BELL,
       onClick: () => callbacks.onSendNotification(member),
-      disabled: !member.email && !member.phone,
+      disabled: !reachable,
     },
     // ── Export group ──
     { type: 'separator' as const },

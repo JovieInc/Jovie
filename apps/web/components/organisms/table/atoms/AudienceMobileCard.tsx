@@ -12,7 +12,14 @@ import {
   isSsrNowMs,
   useNowMs,
 } from '@/components/features/dashboard/organisms/dashboard-audience-table/cells/NowMsContext';
-import { deriveAudienceState } from '@/lib/audience/derive-state';
+import {
+  AUDIENCE_STATE_LABELS,
+  AUDIENCE_STATE_STYLES,
+  getAudienceDisplayName,
+  getAudienceDisplayState,
+  isAudienceMemberAnonymous,
+  isAudienceMemberReachable,
+} from '@/components/features/dashboard/organisms/dashboard-audience-table/row-contract';
 import { cn } from '@/lib/utils';
 import { formatTimeAgo } from '@/lib/utils/audience';
 import type { AudienceMember } from '@/types';
@@ -23,26 +30,6 @@ export interface AudienceMobileCardProps {
   readonly isSelected?: boolean;
   readonly onTap: (member: AudienceMember) => void;
   readonly onAction?: (member: AudienceMember) => void;
-}
-
-const STATE_PILL = {
-  high: 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/25',
-  rising: 'bg-amber-500/15 text-amber-300 ring-amber-500/25',
-  dormant: 'bg-surface-0 text-tertiary-token ring-subtle',
-  subscriber: 'bg-violet-500/15 text-violet-200 ring-violet-500/25',
-} as const;
-
-const STATE_LABEL = {
-  high: 'High',
-  rising: 'Rising',
-  dormant: 'Dormant',
-  subscriber: 'Subscriber',
-} as const;
-
-function pickFallbackName(type: AudienceMember['type']): string {
-  if (type === 'email') return 'Email Subscriber';
-  if (type === 'sms') return 'SMS Subscriber';
-  return 'Visitor';
 }
 
 /**
@@ -63,15 +50,8 @@ export const AudienceMobileCard = React.memo(function AudienceMobileCard({
   onAction,
 }: AudienceMobileCardProps) {
   const nowMs = useNowMs();
-  const name = member.displayName?.trim() ?? '';
-  // Treat the email channel as absent when it's gated from the artist so the
-  // mobile card mirrors the desktop FanCell + privacy gate.
-  const visibleEmail =
-    member.emailVisibleToArtist === false ? null : member.email;
-  const isAnonymous =
-    !name && !visibleEmail && !member.phone && !member.spotifyConnected;
-  const displayName =
-    name || (isAnonymous ? 'Anonymous Fan' : pickFallbackName(member.type));
+  const isAnonymous = isAudienceMemberAnonymous(member);
+  const displayName = getAudienceDisplayName(member);
   const monogram = isAnonymous ? '◯' : getMonogramInitials(displayName);
   const tone = isAnonymous
     ? 'bg-surface-0 text-tertiary-token'
@@ -81,14 +61,13 @@ export const AudienceMobileCard = React.memo(function AudienceMobileCard({
   // table's hydration behaviour. While SSR_NOW_MS is in effect, every row
   // shows "Rising" until the post-mount tick swaps in the real clock.
   const isSsr = isSsrNowMs(nowMs);
-  const state: keyof typeof STATE_PILL =
-    mode === 'subscribers'
-      ? 'subscriber'
-      : isSsr
-        ? 'rising'
-        : deriveAudienceState(member, nowMs);
-
-  const reachable = Boolean(visibleEmail || member.phone);
+  const state = getAudienceDisplayState({
+    member,
+    mode,
+    nowMs,
+    isSsr,
+  });
+  const reachable = isAudienceMemberReachable(member);
 
   const handleCardClick = useCallback(() => onTap(member), [member, onTap]);
 
@@ -138,10 +117,10 @@ export const AudienceMobileCard = React.memo(function AudienceMobileCard({
           <span
             className={cn(
               'inline-flex shrink-0 items-center rounded-md px-1.5 py-0.5 text-2xs font-medium tabular-nums ring-1 ring-inset',
-              STATE_PILL[state]
+              AUDIENCE_STATE_STYLES[state]
             )}
           >
-            {STATE_LABEL[state]}
+            {AUDIENCE_STATE_LABELS[state]}
           </span>
         </div>
 
