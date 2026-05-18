@@ -304,7 +304,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     );
 
     const {
-      isSupported: hasDictation,
+      isSupported: isDictationSupported,
       isListening,
       toggle: toggleDictation,
     } = useSpeechRecognition({
@@ -525,7 +525,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                       plusMenuOpen={plusMenuOpen}
                       setPlusMenuOpen={setPlusMenuOpen}
                       handlePreserveFocus={handlePreserveFocus}
-                      hasDictation={hasDictation}
+                      isDictationSupported={isDictationSupported}
                       isListening={isListening}
                       handleMicToggle={handleMicToggle}
                       canSend={canSend}
@@ -599,7 +599,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   plusMenuOpen={plusMenuOpen}
                   setPlusMenuOpen={setPlusMenuOpen}
                   handlePreserveFocus={handlePreserveFocus}
-                  hasDictation={hasDictation}
+                  isDictationSupported={isDictationSupported}
                   isListening={isListening}
                   handleMicToggle={handleMicToggle}
                   canSend={canSend}
@@ -703,7 +703,7 @@ interface InputRowProps {
   readonly handlePreserveFocus: (
     event: React.MouseEvent<HTMLButtonElement>
   ) => void;
-  readonly hasDictation: boolean;
+  readonly isDictationSupported: boolean;
   readonly isListening: boolean;
   readonly handleMicToggle: () => void;
   readonly canSend: boolean;
@@ -748,7 +748,7 @@ function InputRow({
   plusMenuOpen,
   setPlusMenuOpen,
   handlePreserveFocus,
-  hasDictation,
+  isDictationSupported,
   isListening,
   handleMicToggle,
   canSend,
@@ -856,15 +856,14 @@ function InputRow({
           </div>
 
           <div className='flex shrink-0 items-center gap-2'>
-            {hasDictation ? (
-              <ComposerMicButton
-                isListening={isListening}
-                isLoading={isLoading}
-                isSubmitting={isSubmitting}
-                onMouseDown={handlePreserveFocus}
-                onToggle={handleMicToggle}
-              />
-            ) : null}
+            <ComposerMicButton
+              isListening={isListening}
+              isLoading={isLoading}
+              isSubmitting={isSubmitting}
+              isSupported={isDictationSupported}
+              onMouseDown={handlePreserveFocus}
+              onToggle={handleMicToggle}
+            />
 
             <ComposerSendButton
               canSend={canSend}

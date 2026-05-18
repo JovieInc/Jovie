@@ -1,9 +1,9 @@
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, screen, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ComponentProps, ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ChatInput } from '@/components/jovie/components/ChatInput';
 import { fastRender } from '@/tests/utils/fast-render';
@@ -76,6 +76,41 @@ vi.mock('motion/react', () => ({
   AnimatePresence: ({ children }: { children: ReactNode }) => <>{children}</>,
   useReducedMotion: () => false,
 }));
+
+class MockSpeechRecognition extends EventTarget {
+  static instances: MockSpeechRecognition[] = [];
+
+  continuous = false;
+  interimResults = false;
+  lang = '';
+  onresult: ((event: Event) => void) | null = null;
+  onend: (() => void) | null = null;
+  onerror: ((event: Event) => void) | null = null;
+  start = vi.fn();
+  stop = vi.fn();
+
+  constructor() {
+    super();
+    MockSpeechRecognition.instances.push(this);
+  }
+}
+
+function installMockSpeechRecognition() {
+  Object.defineProperty(window, 'SpeechRecognition', {
+    configurable: true,
+    value: MockSpeechRecognition,
+  });
+}
+
+function removeMockSpeechRecognition() {
+  MockSpeechRecognition.instances = [];
+  Reflect.deleteProperty(window, 'SpeechRecognition');
+  Reflect.deleteProperty(window, 'webkitSpeechRecognition');
+}
+
+afterEach(() => {
+  removeMockSpeechRecognition();
+});
 
 describe('ChatInput', () => {
   const baseProps = {
@@ -174,11 +209,53 @@ describe('ChatInput', () => {
       outline: 'none',
     });
 
-    for (const buttonName of [/attachment options/i, /send message/i]) {
+    for (const buttonName of [
+      /attachment options/i,
+      /dictation unavailable/i,
+      /send message/i,
+    ]) {
       expect(
         screen.getByRole('button', { name: buttonName }).className
       ).toMatch(/h-9 w-9/);
     }
+  });
+
+  it('keeps a quiet disabled dictation control when speech input is unavailable', () => {
+    fastRender(withProviders(<ChatInput {...baseProps} />));
+
+    const dictationButton = screen.getByRole('button', {
+      name: /dictation unavailable/i,
+    });
+
+    expect(dictationButton).toBeDisabled();
+    expect(screen.getByRole('button', { name: /send message/i })).toBeEnabled();
+  });
+
+  it('toggles dictation when speech input is supported', async () => {
+    const user = userEvent.setup();
+    installMockSpeechRecognition();
+
+    fastRender(withProviders(<ChatInput {...baseProps} />));
+
+    const dictationButton = await screen.findByRole('button', {
+      name: /dictate message/i,
+    });
+    await waitFor(() => expect(dictationButton).toBeEnabled());
+
+    await user.click(dictationButton);
+
+    expect(MockSpeechRecognition.instances).toHaveLength(1);
+    expect(MockSpeechRecognition.instances[0]?.start).toHaveBeenCalledTimes(1);
+    expect(
+      screen.getByRole('button', { name: /stop dictation/i })
+    ).toBeEnabled();
+
+    await user.click(screen.getByRole('button', { name: /stop dictation/i }));
+
+    expect(MockSpeechRecognition.instances[0]?.stop).toHaveBeenCalledTimes(1);
+    expect(
+      screen.getByRole('button', { name: /dictate message/i })
+    ).toBeEnabled();
   });
 
   it('keeps structured chips inline with the editable text field', () => {

@@ -182,6 +182,7 @@ export interface ComposerMicButtonProps {
   readonly isListening: boolean;
   readonly isLoading: boolean;
   readonly isSubmitting: boolean;
+  readonly isSupported: boolean;
   readonly onMouseDown: (event: React.MouseEvent<HTMLButtonElement>) => void;
   readonly onToggle: () => void;
 }
@@ -190,24 +191,33 @@ export function ComposerMicButton({
   isListening,
   isLoading,
   isSubmitting,
+  isSupported,
   onMouseDown,
   onToggle,
 }: ComposerMicButtonProps) {
+  const label = isSupported
+    ? isListening
+      ? 'Stop dictation'
+      : 'Dictate message'
+    : 'Dictation unavailable';
+
   return (
-    <SimpleTooltip content={isListening ? 'Stop dictation' : 'Dictate message'}>
+    <SimpleTooltip content={label}>
       <button
         type='button'
         onMouseDown={onMouseDown}
         onClick={onToggle}
-        disabled={isLoading || isSubmitting}
+        disabled={isLoading || isSubmitting || !isSupported}
         className={cn(
           'flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-[background-color,color,box-shadow] duration-fast',
-          isListening
-            ? 'bg-red-500/15 text-red-400 hover:bg-red-500/20'
-            : 'text-tertiary-token hover:bg-white/[0.055] hover:text-primary-token hover:shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.055)]',
+          !isSupported
+            ? 'text-quaternary-token'
+            : isListening
+              ? 'bg-red-500/15 text-red-400 hover:bg-red-500/20'
+              : 'text-tertiary-token hover:bg-white/[0.055] hover:text-primary-token hover:shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.055)]',
           'disabled:cursor-not-allowed disabled:opacity-50'
         )}
-        aria-label={isListening ? 'Stop dictation' : 'Dictate message'}
+        aria-label={label}
         aria-pressed={isListening}
       >
         {isListening ? (
