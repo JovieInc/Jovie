@@ -1,9 +1,5 @@
 import type { Metadata } from 'next';
-import { redirect } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
-import { PageErrorState } from '@/features/feedback/PageErrorState';
-import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
-import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
 import { queryKeys } from '@/lib/queries';
 import { HydrateClient } from '@/lib/queries/HydrateClient';
@@ -15,7 +11,7 @@ import type {
   TourDateProviderValue,
   TourDateViewModel,
 } from '@/lib/tour-dates/types';
-import { getDashboardShellData } from '../dashboard/actions';
+import { loadAppShellRouteContext } from '../app-shell-route-context';
 import { loadTourDates } from '../dashboard/tour-dates/actions';
 import { CalendarPageClient } from './CalendarPageClient';
 
@@ -101,28 +97,17 @@ async function prefetchCalendarQueries(profileId: string) {
  * notifications until the creator confirms.
  */
 export default async function CalendarPage() {
-  const { userId } = await getCachedAuth();
-  if (!userId) {
-    redirect(buildAppShellSignInUrl(CALENDAR_ROUTE));
+  const routeContext = await loadAppShellRouteContext({
+    route: CALENDAR_ROUTE,
+    dashboardErrorLogMessage: 'Dashboard data load failed on calendar page',
+    dashboardErrorMessage:
+      'Failed to load calendar data. Please refresh the page.',
+  });
+  if (!routeContext.ok) {
+    return routeContext.error;
   }
 
-  const dashboardData = await getDashboardShellData(userId);
-  if (dashboardData.dashboardLoadError) {
-    void captureError(
-      'Dashboard data load failed on calendar page',
-      dashboardData.dashboardLoadError,
-      { route: CALENDAR_ROUTE }
-    );
-    return (
-      <PageErrorState message='Failed to load calendar data. Please refresh the page.' />
-    );
-  }
-
-  if (dashboardData.needsOnboarding) {
-    redirect(APP_ROUTES.START);
-  }
-
-  const profileId = dashboardData.selectedProfile?.id;
+  const profileId = routeContext.profileId;
   if (profileId) {
     try {
       await prefetchCalendarQueries(profileId);
