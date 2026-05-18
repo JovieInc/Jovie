@@ -153,7 +153,7 @@ describe('settings shell normalization', () => {
     }
   });
 
-  it('keeps profile-scoped settings prefetches on the shell data path', () => {
+  it('keeps profile-scoped settings prefetches on the shared shell route context path', () => {
     const missingFiles = SETTINGS_PROFILE_SCOPED_PREFETCH_ROUTES.filter(
       filePath => !filePath
     );
@@ -167,9 +167,10 @@ describe('settings shell normalization', () => {
       }
 
       const source = readFileSync(filePath, 'utf8');
-      expect(source).toContain('getCachedAuth');
-      expect(source).toContain('getDashboardShellData');
+      expect(source).toContain('loadAppShellRouteContext');
       expect(source).not.toContain('getDashboardData');
+      expect(source).not.toContain('getCachedAuth');
+      expect(source).not.toContain('getDashboardShellData');
     }
   });
 });
