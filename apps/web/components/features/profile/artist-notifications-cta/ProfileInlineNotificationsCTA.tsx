@@ -26,7 +26,12 @@ import {
   subscriptionPrimaryActionClassName,
   subscriptionPrimaryLinkClassName,
 } from './shared';
-import type { NotificationSource } from './types';
+import {
+  buildNotificationSourceContext,
+  type NotificationSource,
+  type NotificationSourceContext,
+  resolveNotificationSource,
+} from './types';
 import { useSubscriptionForm } from './useSubscriptionForm';
 
 type FlowOrigin = 'manage' | 'subscribe';
@@ -43,6 +48,8 @@ export interface ProfileInlineNotificationsCTAProps {
   readonly onFlowClosed?: () => void;
   readonly onSubscriptionActivated?: () => void;
   readonly source?: NotificationSource;
+  readonly sourceContext?: NotificationSourceContext;
+  readonly triggerLabel?: string;
   readonly experimentVariant?: ProfileAlertOptInVariant;
 }
 
@@ -136,6 +143,8 @@ export function ProfileInlineNotificationsCTA({
   onFlowClosed,
   onSubscriptionActivated,
   source,
+  sourceContext,
+  triggerLabel: triggerLabelProp,
   experimentVariant,
 }: ProfileInlineNotificationsCTAProps) {
   const { contentPreferences, artistEmail, subscriptionDetails } =
@@ -158,7 +167,12 @@ export function ProfileInlineNotificationsCTA({
     subscribedChannels,
     openSubscription,
     hydrationStatus,
-  } = useSubscriptionForm({ artist, source, experimentVariant });
+  } = useSubscriptionForm({
+    artist,
+    source,
+    sourceContext,
+    experimentVariant,
+  });
   const { user } = useUserSafe();
   const nameMutation = useUpdateSubscriberNameMutation();
   const birthdayMutation = useUpdateSubscriberBirthdayMutation();
@@ -218,6 +232,31 @@ export function ProfileInlineNotificationsCTA({
   const flowChannel = isSmsOnlyManageFlow ? 'sms' : 'email';
   const showArtistEmailSection = flowChannel === 'email';
   const primaryUserEmail = user?.primaryEmailAddress?.emailAddress ?? '';
+  const resolvedSource = resolveNotificationSource(source, sourceContext);
+  const analyticsBase = useMemo(
+    () =>
+      buildNotificationSourceContext(artist, {
+        artistId: sourceContext?.artistId,
+        profileId: sourceContext?.profileId,
+        profileSlug: sourceContext?.profileSlug,
+        currentTab: sourceContext?.currentTab ?? 'home',
+        ctaLocation: resolvedSource,
+        intent: sourceContext?.intent ?? 'general_alerts',
+        releaseId: sourceContext?.releaseId,
+        eventId: sourceContext?.eventId,
+      }),
+    [
+      artist,
+      resolvedSource,
+      sourceContext?.artistId,
+      sourceContext?.currentTab,
+      sourceContext?.eventId,
+      sourceContext?.intent,
+      sourceContext?.profileId,
+      sourceContext?.profileSlug,
+      sourceContext?.releaseId,
+    ]
+  );
 
   const markSubscriptionActivated = useCallback(() => {
     activatedInCurrentFlowRef.current = true;
@@ -262,12 +301,25 @@ export function ProfileInlineNotificationsCTA({
     }
 
     setIsFlowOpen(true);
+    track('alert_cta_click', {
+      ...analyticsBase,
+      source: resolvedSource,
+      alert_opt_in_variant: experimentVariant,
+      flow_origin: isSubscribed ? 'manage' : 'subscribe',
+    });
+    track('alert_signup_start', {
+      ...analyticsBase,
+      source: resolvedSource,
+      alert_opt_in_variant: experimentVariant,
+      flow_origin: isSubscribed ? 'manage' : 'subscribe',
+    });
     track('subscribe_step_reveal', {
       handle: artist.handle,
-      source: source ?? 'profile_inline',
+      source: resolvedSource,
       alert_opt_in_variant: experimentVariant,
     });
   }, [
+    analyticsBase,
     artist.handle,
     emailInput,
     experimentVariant,
@@ -277,7 +329,7 @@ export function ProfileInlineNotificationsCTA({
     onManageNotifications,
     openSubscription,
     primaryUserEmail,
-    source,
+    resolvedSource,
     syncPreferencesFromStatus,
   ]);
 
@@ -610,16 +662,30 @@ export function ProfileInlineNotificationsCTA({
       }
     }
 
+    const selectedAlertToggles = Object.entries(alertPrefs)
+      .filter(([, enabled]) => enabled)
+      .map(([key]) => key);
+
+    track('alert_signup_complete', {
+      ...analyticsBase,
+      source: resolvedSource,
+      alert_opt_in_variant: experimentVariant,
+      selected_alert_toggles: selectedAlertToggles,
+      artist_email_opt_in: artistEmailOptIn,
+      signup_completion_result: 'success',
+    });
+
     setStep('done');
   }, [
     activeEmail,
-    alertPrefs.merch,
-    alertPrefs.newMusic,
-    alertPrefs.tourDates,
+    alertPrefs,
+    analyticsBase,
     artist.id,
     artistEmailOptIn,
     canEditPreferences,
+    experimentVariant,
     prefsMutation,
+    resolvedSource,
     showArtistEmailSection,
     subscriptionDetails.sms,
   ]);
@@ -639,7 +705,9 @@ export function ProfileInlineNotificationsCTA({
     return null;
   }
 
-  const triggerLabel = isSubscribed ? 'Manage alerts' : 'Get alerts';
+  const triggerLabel = isSubscribed
+    ? 'Manage alerts'
+    : (triggerLabelProp ?? 'Get alerts');
   const triggerClassName = getTriggerClassName(variant);
   const trigger =
     isInline || hideTrigger ? null : (

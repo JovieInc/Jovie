@@ -1,6 +1,5 @@
 'use client';
 
-import { Bell, MapPin } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useMemo } from 'react';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
@@ -10,11 +9,13 @@ import {
 } from '@/hooks/useTourDateProximity';
 import { useTourDateTicketClick } from '@/hooks/useTourDateTicketClick';
 import { useUserLocation } from '@/hooks/useUserLocation';
+import { track } from '@/lib/analytics';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { cn } from '@/lib/utils';
 import { formatLocationString } from '@/lib/utils/string-utils';
 import type { Artist } from '@/types/db';
 import { ArtistNotificationsCTA } from './artist-notifications-cta/ArtistNotificationsCTA';
+import type { NotificationSourceContext } from './artist-notifications-cta/types';
 import { ProfileDrawerShell } from './ProfileDrawerShell';
 
 interface TourModePanelProps {
@@ -87,15 +88,13 @@ function DateBox({
 }
 
 function TourDateRow({
+  artistId,
   artistHandle,
   item,
-  featured,
-  nearby,
 }: Readonly<{
+  readonly artistId: string;
   readonly artistHandle: string;
   readonly item: TourDateWithProximity;
-  readonly featured: boolean;
-  readonly nearby: boolean;
 }>) {
   const location = formatLocationString([
     item.date.city,
@@ -120,16 +119,9 @@ function TourDateRow({
         item.date.ticketStatus === 'cancelled' && 'opacity-50'
       )}
     >
-      <DateBox date={item.date.startDate} featured={featured} />
+      <DateBox date={item.date.startDate} featured={false} />
 
       <div className='min-w-0'>
-        {featured ? (
-          <div className='mb-1 inline-flex items-center gap-1 text-[10px] font-[680] uppercase tracking-[0.12em] text-sky-300'>
-            <MapPin className='h-[10px] w-[10px]' />
-            <span>{nearby ? 'Near You' : 'Upcoming'}</span>
-          </div>
-        ) : null}
-
         <p className='min-w-0 truncate text-[15px] font-medium tracking-[-0.03em] text-white'>
           {item.date.venueName}
         </p>
@@ -141,7 +133,19 @@ function TourDateRow({
       {canBuyTickets ? (
         <a
           href={item.date.ticketUrl ?? undefined}
-          onClick={handleTicketClick}
+          onClick={event => {
+            track('event_click', {
+              artist_id: artistId,
+              profile_id: artistId,
+              profile_slug: artistHandle,
+              handle: artistHandle,
+              current_route_tab: 'events',
+              event_id: item.date.id,
+              venue_name: item.date.venueName,
+              target_url: item.date.ticketUrl,
+            });
+            handleTicketClick(event);
+          }}
           target='_blank'
           rel='noopener noreferrer'
           className={cn(
@@ -169,57 +173,75 @@ function TourDatesContent({
   artist,
   nearby,
   allDates,
+  emptyStateSourceContext,
 }: Readonly<{
   readonly artist: Artist;
   readonly nearby: TourDateWithProximity[];
   readonly allDates: TourDateWithProximity[];
+  readonly emptyStateSourceContext: NotificationSourceContext;
 }>) {
   if (allDates.length === 0) {
     return (
-      <div className='px-4 py-3'>
-        <div className='rounded-[18px] border border-white/[0.075] bg-white/[0.035] p-4'>
-          <div className='flex items-start gap-3'>
-            <span className='flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] border border-white/8 bg-white/[0.05] text-white/72'>
-              <Bell className='h-4 w-4' />
-            </span>
-            <div className='min-w-0 flex-1'>
-              <p className='text-[16px] font-medium tracking-[-0.03em] text-white'>
-                No upcoming events.
-              </p>
-              <p className='mt-1 max-w-[30ch] text-[13px] leading-5 text-white/52'>
-                Turn on alerts to hear when new shows are announced.
-              </p>
-            </div>
-          </div>
-          <div className='mt-4'>
-            <ArtistNotificationsCTA
-              artist={artist}
-              hideListenFallback
-              source='tour_drawer'
-              presentation='overlay'
-            />
-          </div>
+      <div className='flex min-h-[42vh] flex-col items-center justify-center px-6 py-14 text-center'>
+        <p className='text-[18px] font-[650] tracking-[-0.035em] text-white'>
+          No upcoming events.
+        </p>
+        <p className='mt-2 max-w-[25ch] text-[13px] leading-5 text-white/52'>
+          Get a note when new shows are announced.
+        </p>
+        <div className='mt-5'>
+          <ArtistNotificationsCTA
+            artist={artist}
+            variant='button'
+            hideListenFallback
+            source={emptyStateSourceContext.ctaLocation}
+            sourceContext={emptyStateSourceContext}
+            triggerLabel='Get event alerts'
+            presentation='overlay'
+          />
         </div>
       </div>
     );
   }
 
   const nearbyIds = new Set(nearby.map(item => item.date.id));
-  const featuredId = nearby[0]?.date.id ?? allDates[0]?.date.id ?? null;
+  const sortedDates = [...allDates].sort(
+    (left, right) =>
+      Date.parse(left.date.startDate) - Date.parse(right.date.startDate)
+  );
+  const nearbyDates = sortedDates.filter(item => nearbyIds.has(item.date.id));
+  const upcomingDates = sortedDates.filter(
+    item => !nearbyIds.has(item.date.id)
+  );
+  const groups = [
+    nearbyDates.length > 0 ? { label: 'Nearby', items: nearbyDates } : null,
+    {
+      label: 'Upcoming',
+      items: nearbyDates.length > 0 ? upcomingDates : sortedDates,
+    },
+  ].filter(
+    (group): group is { label: string; items: TourDateWithProximity[] } =>
+      Boolean(group && group.items.length > 0)
+  );
 
   return (
-    <div
-      className='border-y border-white/[0.075]'
-      data-testid='tour-drawer-list'
-    >
-      {allDates.map(item => (
-        <TourDateRow
-          key={item.date.id}
-          artistHandle={artist.handle}
-          item={item}
-          featured={item.date.id === featuredId}
-          nearby={nearbyIds.has(item.date.id)}
-        />
+    <div data-testid='tour-drawer-list'>
+      {groups.map(group => (
+        <section key={group.label} className='pb-4'>
+          <div className='px-4 pb-2 pt-3 text-[11px] font-[680] uppercase tracking-[0.16em] text-white/32'>
+            {group.label}
+          </div>
+          <div className='border-y border-white/[0.075]'>
+            {group.items.map(item => (
+              <TourDateRow
+                key={item.date.id}
+                artistId={artist.id}
+                artistHandle={artist.handle}
+                item={item}
+              />
+            ))}
+          </div>
+        </section>
       ))}
     </div>
   );
@@ -228,12 +250,23 @@ function TourDatesContent({
 export function TourDrawerContent({
   artist,
   tourDates,
+  emptyStateSourceContext,
 }: Readonly<{
   readonly artist: Artist;
   readonly tourDates: TourDateViewModel[];
+  readonly emptyStateSourceContext?: NotificationSourceContext;
 }>) {
   const { location } = useUserLocation();
   const { nearbyDates, allDates } = useTourDateProximity(tourDates, location);
+  const resolvedEmptyStateSourceContext: NotificationSourceContext =
+    emptyStateSourceContext ?? {
+      artistId: artist.id,
+      profileId: artist.id,
+      profileSlug: artist.handle,
+      currentTab: 'events',
+      ctaLocation: 'events_empty_state',
+      intent: 'event_alerts',
+    };
 
   return (
     <div data-testid='tour-drawer-content'>
@@ -241,6 +274,7 @@ export function TourDrawerContent({
         artist={artist}
         nearby={nearbyDates}
         allDates={allDates}
+        emptyStateSourceContext={resolvedEmptyStateSourceContext}
       />
     </div>
   );

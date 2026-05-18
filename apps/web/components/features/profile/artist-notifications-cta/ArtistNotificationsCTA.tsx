@@ -15,6 +15,8 @@ export function ArtistNotificationsCTA({
   onSubscriptionActivated,
   experimentVariant,
   source,
+  sourceContext,
+  triggerLabel,
 }: ArtistNotificationsCTAProps) {
   const resolvedPresentation =
     presentation ?? (autoOpen || forceExpanded ? 'inline' : 'overlay');
@@ -31,6 +33,8 @@ export function ArtistNotificationsCTA({
       onSubscriptionActivated={onSubscriptionActivated}
       experimentVariant={experimentVariant}
       source={source}
+      sourceContext={sourceContext}
+      triggerLabel={triggerLabel}
     />
   );
 }

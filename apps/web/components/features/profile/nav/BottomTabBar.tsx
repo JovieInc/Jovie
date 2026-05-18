@@ -14,15 +14,14 @@
  * Tab definitions (spec §2.1, fixed order):
  *   1. Home     (mode: profile)   — UserRound icon
  *   2. Music    (mode: listen)    — Music2 icon
- *   3. Events   (mode: tour)      — CalendarDays icon  [conditional: only when hasTourDates]
+ *   3. Events   (mode: tour)      — CalendarDays icon
  *   4. Alerts   (mode: subscribe) — Bell icon
  *
  * A fifth "More" item follows the tabs when `hideMoreMenu` is false.
  * "More" is not a tab — it opens the menu drawer (aria-haspopup="dialog").
  *
- * Desktop / tablet behaviour: JOV-2024 owns desktop surface changes.
- * On screens > 1180px the shell loads ProfileDesktopSurface (which has no
- * bottom tab bar), so this component is naturally never mounted there.
+ * Desktop / tablet behaviour: the public profile shell may center this
+ * compact experience on larger screens, so the tab bar remains canonical.
  */
 
 import {
@@ -48,7 +47,6 @@ interface TabDefinition {
 
 /**
  * All four primary tab definitions, in canonical order.
- * Events (tour) is filtered out when `hasTourDates` is false (spec §2.3).
  */
 const ALL_PRIMARY_TABS: ReadonlyArray<TabDefinition> = [
   { mode: 'profile', label: 'Home', icon: UserRound },
@@ -69,8 +67,8 @@ export interface BottomTabBarProps {
   readonly activeTab: ProfilePrimaryTab;
 
   /**
-   * When false, the Events (tour) tab is omitted from the tab bar.
-   * The grid shrinks from 5 to 4 columns (spec §2.3 + §2.8).
+   * Retained for API compatibility; Events now remains visible so the tab can
+   * show a native empty state when no upcoming dates exist.
    */
   readonly hasTourDates: boolean;
 
@@ -112,16 +110,14 @@ export interface BottomTabBarProps {
  */
 export function BottomTabBar({
   activeTab,
-  hasTourDates,
+  hasTourDates: _hasTourDates,
   hideMoreMenu = false,
   isMenuOpen = false,
   onTabSelect,
   onOpenMenu,
   className,
 }: BottomTabBarProps) {
-  const visibleTabs = hasTourDates
-    ? ALL_PRIMARY_TABS
-    : ALL_PRIMARY_TABS.filter(tab => tab.mode !== 'tour');
+  const visibleTabs = ALL_PRIMARY_TABS;
 
   // Total column count = tabs + (More button ? 1 : 0)
   const columnCount = visibleTabs.length + (hideMoreMenu ? 0 : 1);

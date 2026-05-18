@@ -430,14 +430,11 @@ describe('ProfileCompactTemplate', () => {
     );
 
     const bottomNav = screen.getByTestId('profile-bottom-nav');
-    for (const label of ['Home', 'Music', 'Alerts', 'More options']) {
+    for (const label of ['Home', 'Music', 'Events', 'Alerts', 'More options']) {
       expect(
         within(bottomNav).getByRole('button', { name: label })
       ).toBeInTheDocument();
     }
-    expect(
-      within(bottomNav).queryByRole('button', { name: 'Events' })
-    ).not.toBeInTheDocument();
     expect(
       within(bottomNav).queryByRole('button', { name: 'Profile' })
     ).not.toBeInTheDocument();
@@ -664,6 +661,23 @@ describe('ProfileCompactTemplate', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('shows the newest catalog release on Home when latestRelease is not provided', async () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        releases={mockReleases}
+      />
+    );
+
+    const homeCard = screen.getByTestId('profile-home-primary-action-card');
+    expect(homeCard).toHaveAttribute('data-state', 'release_live');
+    expect(homeCard).toHaveTextContent("Don't Look Down");
+    expect(homeCard).not.toHaveTextContent('Holding On');
+  });
+
   it('opens the alerts tab from the compact hero alerts row', async () => {
     render(
       <ProfileCompactTemplate
@@ -719,7 +733,9 @@ describe('ProfileCompactTemplate', () => {
 
     fireEvent.click(screen.getByTestId('profile-home-alerts-fallback-card'));
 
-    expect(revealNotifications).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(revealNotifications).toHaveBeenCalledTimes(1);
+    });
     expect(
       screen.queryByTestId('mock-primary-tab-panel')
     ).not.toBeInTheDocument();
@@ -1157,7 +1173,7 @@ describe('ProfileCompactTemplate', () => {
     });
   });
 
-  it('renders the drawer at desktop widths', async () => {
+  it('renders the compact profile shell at desktop widths', async () => {
     const restoreViewport = mockViewport('desktop');
 
     render(
@@ -1170,13 +1186,14 @@ describe('ProfileCompactTemplate', () => {
     );
 
     await waitFor(() => {
-      expect(mockProfileDesktopSurface).toHaveBeenCalled();
+      expect(screen.getByTestId('profile-compact-shell')).toBeInTheDocument();
+      expect(mockProfileDesktopSurface).not.toHaveBeenCalled();
     });
 
     restoreViewport();
   });
 
-  it('passes pay, contact, tour, subscribe, and release variants into the desktop smoke surface', async () => {
+  it('keeps desktop widths on the compact surface across profile variants', async () => {
     const restoreViewport = mockViewport('desktop');
 
     const variantProps = {
@@ -1230,24 +1247,8 @@ describe('ProfileCompactTemplate', () => {
     );
 
     await waitFor(() => {
-      expect(mockProfileDesktopSurface).toHaveBeenCalledWith(
-        expect.objectContaining({
-          activeMode: 'pay',
-          contacts: mockContacts,
-          latestRelease: expect.objectContaining({
-            title: "Don't Look Down",
-            slug: 'dont-look-down',
-          }),
-          showPayButton: true,
-          tourDates: expect.arrayContaining([
-            expect.objectContaining({
-              venueName: 'The Echo',
-              ticketUrl: 'https://tickets.example.com/show',
-            }),
-          ]),
-          releases: mockReleases,
-        })
-      );
+      expect(screen.getByTestId('profile-compact-shell')).toBeInTheDocument();
+      expect(mockProfileDesktopSurface).not.toHaveBeenCalled();
     });
 
     view.rerender(
@@ -1255,20 +1256,12 @@ describe('ProfileCompactTemplate', () => {
     );
 
     await waitFor(() => {
-      expect(mockProfileDesktopSurface).toHaveBeenCalledWith(
+      expect(mockProfilePrimaryTabPanel).toHaveBeenCalledWith(
         expect.objectContaining({
-          activeMode: 'subscribe',
-          contacts: mockContacts,
-          latestRelease: expect.objectContaining({
-            title: "Don't Look Down",
-          }),
-          tourDates: expect.arrayContaining([
-            expect.objectContaining({
-              venueName: 'The Echo',
-            }),
-          ]),
+          mode: 'subscribe',
         })
       );
+      expect(mockProfileDesktopSurface).not.toHaveBeenCalled();
     });
 
     restoreViewport();

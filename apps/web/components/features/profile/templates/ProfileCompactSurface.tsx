@@ -25,6 +25,7 @@ import { getProfileModeDefinition } from '@/features/profile/registry';
 import type { PublicRelease } from '@/features/profile/releases/types';
 import { SubscriptionConfirmedBanner } from '@/features/profile/SubscriptionConfirmedBanner';
 import type { UserLocation } from '@/hooks/useUserLocation';
+import { track } from '@/lib/analytics';
 import { sortDSPsByGeoPopularity } from '@/lib/dsp';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
@@ -39,6 +40,7 @@ import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
+import type { NotificationSourceContext } from '../artist-notifications-cta/types';
 
 const ProfileUnifiedDrawer = dynamic(() =>
   import('@/features/profile/ProfileUnifiedDrawer').then(mod => ({
@@ -60,6 +62,74 @@ const DEFAULT_CONTENT_PREFS: Record<NotificationContentType, boolean> = {
   merch: true,
   general: true,
 };
+
+function mapPrimaryTabToAnalyticsTab(
+  tab: ProfilePrimaryTab
+): NotificationSourceContext['currentTab'] {
+  switch (tab) {
+    case 'listen':
+      return 'music';
+    case 'tour':
+      return 'events';
+    case 'subscribe':
+      return 'alerts';
+    case 'profile':
+    default:
+      return 'home';
+  }
+}
+
+function mapPrimaryTabToAlertIntent(
+  tab: ProfilePrimaryTab
+): NotificationSourceContext['intent'] {
+  switch (tab) {
+    case 'listen':
+      return 'music_alerts';
+    case 'tour':
+      return 'event_alerts';
+    case 'profile':
+    case 'subscribe':
+    default:
+      return 'general_alerts';
+  }
+}
+
+function toHomeLatestRelease(
+  release: PublicRelease | null | undefined
+): ProfilePrimaryActionCardRelease | null {
+  if (!release) {
+    return null;
+  }
+
+  return {
+    title: release.title,
+    slug: release.slug,
+    artworkUrl: release.artworkUrl,
+    releaseDate: release.releaseDate,
+    releaseType: release.releaseType,
+    metadata: {
+      artistNames: release.artistNames,
+      publicReleaseId: release.id,
+    },
+  };
+}
+
+function getNewestPublicRelease(
+  releases: readonly PublicRelease[]
+): PublicRelease | null {
+  return (
+    [...releases].sort((left, right) => {
+      const leftTime = left.releaseDate
+        ? new Date(left.releaseDate).getTime()
+        : Number.NEGATIVE_INFINITY;
+      const rightTime = right.releaseDate
+        ? new Date(right.releaseDate).getTime()
+        : Number.NEGATIVE_INFINITY;
+
+      return rightTime - leftTime;
+    })[0] ?? null
+  );
+}
 
 interface ProfileCompactSurfaceProps {
   readonly renderMode?: ProfileRenderMode;
@@ -208,6 +278,8 @@ export function ProfileCompactSurface({
   const [notificationsPortalContainer, setNotificationsPortalContainer] =
     useState<HTMLDivElement | null>(null);
   const [showRecentActivationRow, setShowRecentActivationRow] = useState(false);
+  const [notificationSourceContext, setNotificationSourceContext] =
+    useState<NotificationSourceContext | null>(null);
   const notificationsRevealRef = useRef<(() => void) | null>(null);
   const pendingNotificationsOpenRef = useRef(false);
   const mergedDSPs = useMemo(
@@ -233,8 +305,26 @@ export function ProfileCompactSurface({
     drawerView,
   });
   const hasTourDates = tourDates.length > 0;
-  const activeVisiblePrimaryTab =
-    activePrimaryTab === 'tour' && !hasTourDates ? 'profile' : activePrimaryTab;
+  const activeVisiblePrimaryTab = activePrimaryTab;
+  const currentAnalyticsTab = mapPrimaryTabToAnalyticsTab(
+    activeVisiblePrimaryTab
+  );
+  const defaultNotificationSourceContext = useMemo<NotificationSourceContext>(
+    () => ({
+      artistId: artist.id,
+      profileId: artist.id,
+      profileSlug: artist.handle,
+      currentTab: currentAnalyticsTab,
+      ctaLocation:
+        activeVisiblePrimaryTab === 'subscribe'
+          ? 'subscribe_tab'
+          : 'hero_alerts_button',
+      intent: mapPrimaryTabToAlertIntent(activeVisiblePrimaryTab),
+    }),
+    [activeVisiblePrimaryTab, artist.handle, artist.id, currentAnalyticsTab]
+  );
+  const activeNotificationSourceContext =
+    notificationSourceContext ?? defaultNotificationSourceContext;
   const isHomeMode = activeVisiblePrimaryTab === 'profile';
   const showBottomNav = true;
   const isPreviewEmbedded =
@@ -328,19 +418,68 @@ export function ProfileCompactSurface({
   const returnToProfileAfterNotifications = useCallback(() => {
     onModeSelect('profile');
   }, [onModeSelect]);
-  const openNotifications = useCallback(() => {
-    const reveal = notificationsRevealRef.current;
-    if (reveal) {
-      reveal();
-      return;
-    }
-    pendingNotificationsOpenRef.current = true;
-    onModeSelect('subscribe');
-    onRevealNotifications?.();
-  }, [onModeSelect, onRevealNotifications]);
+  const openNotifications = useCallback(
+    (sourceContext?: NotificationSourceContext) => {
+      setNotificationSourceContext(
+        sourceContext ?? defaultNotificationSourceContext
+      );
+      const revealLater = (reveal: () => void) => {
+        if (typeof window === 'undefined') {
+          reveal();
+          return;
+        }
+        window.setTimeout(reveal, 0);
+      };
+
+      const reveal = notificationsRevealRef.current;
+      if (reveal) {
+        revealLater(reveal);
+        return;
+      }
+      pendingNotificationsOpenRef.current = true;
+      onModeSelect('subscribe');
+      onRevealNotifications?.();
+    },
+    [defaultNotificationSourceContext, onModeSelect, onRevealNotifications]
+  );
+  const handleTabSelect = useCallback(
+    (tab: ProfilePrimaryTab) => {
+      const nextTab = mapPrimaryTabToAnalyticsTab(tab);
+      track('profile_tab_click', {
+        artist_id: artist.id,
+        profile_id: artist.id,
+        profile_slug: artist.handle,
+        handle: artist.handle,
+        tab: nextTab,
+        mode: tab,
+        previous_tab: currentAnalyticsTab,
+      });
+      onModeSelect(tab);
+    },
+    [artist.handle, artist.id, currentAnalyticsTab, onModeSelect]
+  );
+  const handleSocialClick = useCallback(
+    (link: LegacySocialLink) => {
+      track('social_click', {
+        artist_id: artist.id,
+        profile_id: artist.id,
+        profile_slug: artist.handle,
+        handle: artist.handle,
+        current_route_tab: currentAnalyticsTab,
+        platform: link.platform,
+        target_url: link.url,
+      });
+    },
+    [artist.handle, artist.id, currentAnalyticsTab]
+  );
   const homeAlertsSubscribed = isSubscribed || showRecentActivationRow;
   const shouldRenderInteractiveOverlays =
     renderMode === 'interactive' && renderInteractiveOverlays;
+  const homeLatestRelease =
+    latestRelease ?? toHomeLatestRelease(getNewestPublicRelease(releases));
+  const homeProfileSettings = homeLatestRelease
+    ? { ...profileSettings, showOldReleases: true }
+    : profileSettings;
 
   return (
     <div
@@ -434,7 +573,7 @@ export function ProfileCompactSurface({
               ) : null}
 
               <CircleIconButton
-                onClick={openNotifications}
+                onClick={() => openNotifications()}
                 size='lg'
                 variant='pearl'
                 className={topChromeButtonClassName}
@@ -506,6 +645,7 @@ export function ProfileCompactSurface({
                             href={link.url}
                             target='_blank'
                             rel='noopener noreferrer'
+                            onClick={() => handleSocialClick(link)}
                             className={socialIconClassName}
                             aria-label={link.platform}
                           >
@@ -540,6 +680,8 @@ export function ProfileCompactSurface({
               autoOpen={activeVisiblePrimaryTab === 'subscribe'}
               hideTrigger
               experimentVariant={alertOptInVariant}
+              source={activeNotificationSourceContext.ctaLocation}
+              sourceContext={activeNotificationSourceContext}
               onFlowClosed={returnToProfileAfterNotifications}
               onSubscriptionActivated={handleSubscriptionActivated}
             />
@@ -566,8 +708,8 @@ export function ProfileCompactSurface({
             {isHomeMode ? (
               <ProfileHomeRail
                 artist={artist}
-                latestRelease={latestRelease}
-                profileSettings={profileSettings}
+                latestRelease={homeLatestRelease}
+                profileSettings={homeProfileSettings}
                 featuredPlaylistFallback={featuredPlaylistFallback}
                 tourDates={tourDates}
                 hasPlayableDestinations={mergedDSPs.length > 0}
@@ -600,6 +742,7 @@ export function ProfileCompactSurface({
                 allowPhotoDownloads={allowPhotoDownloads}
                 tourDates={tourDates}
                 releases={releases}
+                alertSourceContext={defaultNotificationSourceContext}
                 previewNotificationsState={previewNotificationsState}
                 onFlowClosed={returnToProfileAfterNotifications}
                 onSubscriptionActivated={handleSubscriptionActivated}
@@ -613,7 +756,7 @@ export function ProfileCompactSurface({
               hasTourDates={hasTourDates}
               hideMoreMenu={hideMoreMenu}
               isMenuOpen={isMenuActive}
-              onTabSelect={onModeSelect}
+              onTabSelect={handleTabSelect}
               onOpenMenu={onOpenMenu}
             />
           ) : null}
