@@ -41,8 +41,9 @@ Source of truth: `apps/web/vercel.json`. The Vercel project's Root Directory is 
 | `/api/cron/monitor-metadata-submissions` | `0 * * * *` | Hourly |
 | `/api/cron/process-metadata-submissions` | `0 4 * * *` | Daily at 04:00 UTC |
 | `/api/cron/public-profile-canary` | `13 6 * * *` | Daily at 06:13 UTC |
+| `/api/cron/clerk-config-audit` | `*/30 * * * *` | Every 30 minutes (JOV-2446) |
 
-11 paths are currently scheduled in production. `cleanup-sms-intents` was folded into `daily-maintenance` as a sub-job per JOV-1901 (see AUTOMATION_AUDIT.md). Other cron route files exist as standalone endpoints whose logic is called as sub-jobs of `frequent` or `daily-maintenance`.
+12 paths are currently scheduled in production. `cleanup-sms-intents` was folded into `daily-maintenance` as a sub-job per JOV-1901 (see AUTOMATION_AUDIT.md). Other cron route files exist as standalone endpoints whose logic is called as sub-jobs of `frequent` or `daily-maintenance`.
 
 **Auth:** All crons use `Authorization: Bearer ${CRON_SECRET}`. The `data-retention` route additionally uses timing-safe comparison + origin verification.
 
@@ -106,6 +107,7 @@ These have their own Vercel schedule OR exist as callable endpoints (also invoke
 | `/api/cron/schedule-release-notifications` | 60s | Schedules release-day notifications | `daily-maintenance` |
 | `/api/cron/send-release-notifications` | 120s | Sends notifications; recovers stuck rows >10min; max 100/run | `frequent` |
 | `/api/cron/public-profile-canary` | 30s | Lightweight HTTP health check: GET /tim, /tim/alerts, /tim/pay, POST /api/audience/visit; emits Sentry breadcrumb + writes Redis key for admin ops panel (JOV-1872) | — |
+| `/api/cron/clerk-config-audit` | 60s | Polls Clerk FAPI environment endpoint for prod + staging and alerts (captureError fatal + Slack) if forbidden first-factor strategies (`password`, `email_code`, `email_link`, `phone_code`, `username`) are enabled. Closes the curl-to-FAPI bypass that defense-in-depth appearance hiding does not cover (JOV-2446) | — |
 
 ## LLM Model Usage in Web App Crons
 

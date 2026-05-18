@@ -47,6 +47,10 @@
     {
       "path": "/api/cron/process-workflow-runs",
       "schedule": "*/6 * * * *"
+    },
+    {
+      "path": "/api/cron/clerk-config-audit",
+      "schedule": "*/30 * * * *"
     }
   ],
   "functions": {
