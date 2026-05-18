@@ -860,7 +860,7 @@ export function ProfileDesktopSurface({
 
         <div className='relative flex min-h-0 flex-1 flex-col overflow-hidden'>
           <div className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.025),transparent_34%)]' />
-          <div className='relative z-10 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain p-5 pt-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
+          <div className='relative z-10 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain [touch-action:pan-y] [will-change:scroll-position] p-5 pt-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
             {nonHomeContent}
           </div>
         </div>
