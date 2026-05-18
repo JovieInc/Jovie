@@ -3,8 +3,7 @@ import type { Metadata } from 'next';
 import { cookies } from 'next/headers';
 import { db } from '@/lib/db';
 import { investorLinks } from '@/lib/db/schema/investors';
-import { getMarkdownDocument } from '@/lib/docs/getMarkdownDocument';
-import { getInvestorManifest } from '@/lib/investors/manifest';
+import { loadDeckBundle } from '@/lib/investors/loadDeckSlides';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 import { DeckViewer } from './_components/DeckViewer';
 
@@ -33,28 +32,7 @@ export default async function InvestorLandingPage() {
   }
 
   // Load deck slides server-side from markdown files
-  const manifest = await getInvestorManifest();
-  const slides = await Promise.all(
-    manifest.deck.slides.map(async filename => {
-      try {
-        const doc = await getMarkdownDocument(
-          `investors/deck/slides/${filename}`
-        );
-        // Extract title from first h1 heading in TOC, fallback to filename
-        const h1 = doc.toc.find(entry => entry.level === 1);
-        const title =
-          h1?.title ?? filename.replace(/^\d+-/, '').replace(/\.md$/, '');
-        // Remove the h1 from the rendered HTML to avoid duplication
-        const html = doc.html.replace(/<h1[^>]*>.*?<\/h1>/i, '');
-        return { title, html };
-      } catch {
-        return null;
-      }
-    })
-  );
-  const validSlides = slides.filter(
-    (s): s is { title: string; html: string } => s !== null
-  );
+  const { slides, pdfUrl } = await loadDeckBundle();
 
   return (
     <div className='flex flex-col items-center px-4 pt-12 sm:px-6 sm:pt-16 lg:pt-20'>
@@ -87,10 +65,7 @@ export default async function InvestorLandingPage() {
 
       {/* Pitch deck */}
       <div className='mt-12 w-full max-w-4xl sm:mt-16'>
-        <DeckViewer
-          slides={validSlides}
-          pdfUrl={`/${manifest.deck.downloadFilename}`}
-        />
+        <DeckViewer slides={slides} pdfUrl={pdfUrl} />
       </div>
     </div>
   );
