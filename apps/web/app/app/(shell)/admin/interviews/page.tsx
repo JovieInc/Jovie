@@ -1,12 +1,8 @@
 import { Badge } from '@jovie/ui';
 import { desc, eq } from 'drizzle-orm';
 import type { Metadata } from 'next';
-import { redirect } from 'next/navigation';
 import { AdminToolPage } from '@/components/features/admin/layout/AdminToolPage';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { APP_ROUTES } from '@/constants/routes';
-import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
-import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -18,13 +14,6 @@ import { capitalizeFirst } from '@/lib/utils/string-utils';
 
 export const metadata: Metadata = { title: 'Interviews — Admin' };
 export const runtime = 'nodejs';
-
-async function requireAdminOrRedirect(): Promise<void> {
-  const { userId } = await getCachedAuth();
-  if (!userId || !(await checkAdminRole(userId))) {
-    redirect(APP_ROUTES.DASHBOARD);
-  }
-}
 
 function formatDate(iso: Date | string): string {
   const d = typeof iso === 'string' ? new Date(iso) : iso;
@@ -49,8 +38,6 @@ function statusBadgeTone(status: string) {
 }
 
 export default async function AdminInterviewsPage() {
-  await requireAdminOrRedirect();
-
   const rows = await db
     .select({
       id: userInterviews.id,
