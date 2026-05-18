@@ -4,6 +4,7 @@ import { notFound, redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
+import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
 import type { AppFlagName } from '@/lib/flags/contracts';
@@ -35,13 +36,6 @@ export type AppShellRouteContextResult =
   | AppShellRouteContext
   | AppShellRouteError;
 
-function signInRouteFor(route: string): string {
-  const signInParams = new URLSearchParams({
-    redirect_url: route,
-  });
-  return `${APP_ROUTES.SIGNIN}?${signInParams.toString()}`;
-}
-
 export async function loadAppShellRouteContext({
   route,
   dashboardErrorMessage,
@@ -56,7 +50,7 @@ export async function loadAppShellRouteContext({
       notFound();
     }
 
-    redirect(signInRouteFor(route));
+    redirect(buildAppShellSignInUrl(route));
   }
 
   if (requiredFlag) {

@@ -130,7 +130,7 @@ describe('CalendarPage', () => {
     mocks.getCachedAuth.mockResolvedValueOnce({ userId: null });
 
     await expect(CalendarPage()).rejects.toThrow(
-      `REDIRECT:${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.CALENDAR}`
+      `REDIRECT:${APP_ROUTES.SIGNIN}?redirect_url=%2Fapp%2Fcalendar`
     );
 
     expect(mocks.getDashboardShellData).not.toHaveBeenCalled();

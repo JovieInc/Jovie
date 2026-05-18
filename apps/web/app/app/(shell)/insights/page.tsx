@@ -3,6 +3,7 @@ import { Suspense } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { InsightsPanel } from '@/features/dashboard/insights/InsightsPanel';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
+import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
@@ -124,7 +125,7 @@ export default async function InsightsPage() {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    redirect(`${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.INSIGHTS}`);
+    redirect(buildAppShellSignInUrl(APP_ROUTES.INSIGHTS));
   }
 
   return (

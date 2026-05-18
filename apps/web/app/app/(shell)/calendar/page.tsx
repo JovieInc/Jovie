@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
+import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
 import { queryKeys } from '@/lib/queries';
@@ -102,7 +103,7 @@ async function prefetchCalendarQueries(profileId: string) {
 export default async function CalendarPage() {
   const { userId } = await getCachedAuth();
   if (!userId) {
-    redirect(`${APP_ROUTES.SIGNIN}?redirect_url=${CALENDAR_ROUTE}`);
+    redirect(buildAppShellSignInUrl(CALENDAR_ROUTE));
   }
 
   const dashboardData = await getDashboardShellData(userId);
