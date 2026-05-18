@@ -120,7 +120,7 @@ export function ReleasesView({
 
   return (
     <div
-      className='border-y border-white/[0.075]'
+      className='border-y border-white/[0.075] [contain:layout_style]'
       data-testid='profile-mode-drawer-releases'
     >
       {visibleReleases.map((release, index) => {

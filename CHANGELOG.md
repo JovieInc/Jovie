@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.29] - 2026-05-18
+
+> [internal] Profile music/releases scroll is now hardware-accelerated for smooth native-feel scrolling on touch devices.
+
+### Fixed
+
+- **Profile scroll jank (JOV-1983)**: added `touch-action: pan-y`, `will-change: scroll-position`, and `contain: layout style` to all profile scroll containers — compact surface, desktop surface, drawer shell, and the releases list — eliminating scroll jank on iOS and Android.
+
 ## [26.5.28] - 2026-05-18
 
 > [internal] Desktop dictation bridge payloads are now validated before the web app trusts them.
