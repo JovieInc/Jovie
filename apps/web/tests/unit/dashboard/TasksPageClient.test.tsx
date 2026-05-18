@@ -542,6 +542,7 @@ function getLatestTableProps() {
     | {
         readonly data?: ReadonlyArray<TaskView>;
         readonly onRowClick?: (task: TaskView) => void;
+        readonly getRowClassName?: (task: TaskView, index: number) => string;
         readonly getContextMenuItems?: (task: TaskView) => ReadonlyArray<{
           readonly id?: string;
           readonly label?: string;
@@ -714,6 +715,27 @@ describe('TasksPageClient', () => {
     });
 
     expect(screen.getByLabelText('Task title')).toHaveValue(mockTaskTwo.title);
+  });
+
+  it('marks the opened DESIGN_V1 task with the shared selected row state', () => {
+    enableDesignV1Tasks();
+
+    renderPage();
+
+    expect(
+      getLatestTableProps()?.getRowClassName?.(mockTaskTwo, 0)
+    ).not.toContain('bg-(--linear-row-selected)');
+
+    act(() => {
+      getLatestTableProps()?.onRowClick?.(mockTaskTwo);
+    });
+
+    expect(getLatestTableProps()?.getRowClassName?.(mockTaskTwo, 0)).toContain(
+      'bg-(--linear-row-selected)'
+    );
+    expect(getLatestTableProps()?.getRowClassName?.(mockTask, 1)).not.toContain(
+      'bg-(--linear-row-selected)'
+    );
   });
 
   it('resets the DESIGN_V1 detail selection when subview filters exclude the selected task', () => {

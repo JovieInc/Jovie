@@ -65,6 +65,7 @@ import {
   type ContextMenuItemType,
   convertContextMenuItems,
 } from '@/components/organisms/table';
+import { rowState } from '@/components/organisms/table/table.styles';
 import {
   isFormElement,
   resolveTableNavAction,
@@ -1922,6 +1923,11 @@ export function TasksPageClient() {
       ] as ColumnDef<TaskView, unknown>[],
     [renderTaskCell]
   );
+  const getTaskRowClassName = useCallback(
+    (task: TaskView) =>
+      task.id === effectiveSelectedTaskId ? rowState.selected : '',
+    [effectiveSelectedTaskId]
+  );
 
   const handleCreateTask = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -1978,6 +1984,7 @@ export function TasksPageClient() {
         isLoading={isLoading}
         getRowId={row => row.id}
         onRowClick={row => openTaskDocument(row)}
+        getRowClassName={getTaskRowClassName}
         getContextMenuItems={getTaskContextMenuItems}
         emptyState={
           <TaskEmptyState

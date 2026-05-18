@@ -20,6 +20,7 @@ import { toast } from 'sonner';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import type { TableActionMenuItem } from '@/components/atoms/table-action-menu/types';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
+import { rowState } from '@/components/organisms/table/table.styles';
 import { ArtworkThumb } from '@/components/shell/ArtworkThumb';
 import { DropDateChip } from '@/components/shell/DropDateChip';
 import { DspAvatarStack } from '@/components/shell/DspAvatarStack';
@@ -238,20 +239,14 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
       data-shell-release-row
       data-release-id={release.id}
       data-release-active={isActiveTrack ? 'true' : undefined}
+      data-selected={isSelected ? 'true' : undefined}
       className={cn(
-        'group/row relative flex items-center gap-3 px-3 h-14 rounded-md cursor-pointer transition-colors duration-subtle ease-out outline-none focus-visible:ring-1 focus-visible:ring-cyan-400/50',
-        isSelected
-          ? 'bg-(--linear-bg-surface-1)/80'
-          : 'hover:bg-(--linear-bg-surface-1)/50'
+        'group/row relative flex h-14 cursor-pointer items-center gap-3 rounded-md px-3 outline-none',
+        rowState.base,
+        rowState.focusVisible,
+        isSelected ? rowState.selected : rowState.hover
       )}
     >
-      {isSelected ? (
-        <span
-          aria-hidden='true'
-          className='absolute left-0 top-1/2 -translate-y-1/2 h-3.5 w-[3px] rounded-full bg-cyan-400'
-        />
-      ) : null}
-
       <ArtworkCell release={release} />
 
       <div className='min-w-0 flex-1'>
