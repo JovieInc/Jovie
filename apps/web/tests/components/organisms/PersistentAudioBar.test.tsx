@@ -1,7 +1,11 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  getAudioChromeSnapshot,
+  resetAudioChromeSnapshot,
+} from '@/components/organisms/audio-chrome-state';
 import { APP_ROUTES, buildLyricsRoute } from '@/constants/routes';
 import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
@@ -109,6 +113,7 @@ describe('PersistentAudioBar', () => {
     push.mockClear();
     pathname = '/app';
     mockPlaybackState = { ...basePlaybackState };
+    resetAudioChromeSnapshot();
   });
 
   it('renders nothing when no track is active', () => {
@@ -344,6 +349,37 @@ describe('PersistentAudioBar', () => {
     expect(toggleTrack).toHaveBeenCalledWith({
       id: 'track-1',
       title: 'Midnight Drive',
+    });
+  });
+
+  it('publishes compact shell V1 chrome state while minimized and clears on unmount', async () => {
+    const user = userEvent.setup();
+    setPlaying({ artistName: 'DJ Cool' });
+
+    const { unmount } = render(<PersistentAudioBar variant='shellChatV1' />);
+
+    expect(getAudioChromeSnapshot()).toEqual({
+      activeTrackId: 'track-1',
+      compactPlayerVisible: false,
+      fullPlayerVisible: true,
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Minimize player' }));
+
+    await waitFor(() => {
+      expect(getAudioChromeSnapshot()).toEqual({
+        activeTrackId: 'track-1',
+        compactPlayerVisible: true,
+        fullPlayerVisible: false,
+      });
+    });
+
+    unmount();
+
+    expect(getAudioChromeSnapshot()).toEqual({
+      activeTrackId: null,
+      compactPlayerVisible: false,
+      fullPlayerVisible: false,
     });
   });
 

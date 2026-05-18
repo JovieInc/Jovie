@@ -16,6 +16,10 @@ import { useAppFlag } from '@/lib/flags/client';
 import { cn } from '@/lib/utils';
 import { formatDuration } from '@/lib/utils/formatDuration';
 import { isFormElement } from '@/lib/utils/keyboard';
+import {
+  resetAudioChromeSnapshot,
+  setAudioChromeSnapshot,
+} from './audio-chrome-state';
 
 export type PersistentAudioBarVariant = 'legacy' | 'shellChatV1';
 
@@ -95,6 +99,9 @@ export function PersistentAudioBar({
   }, [handleCloseLyrics, pathname, playbackState.activeTrackId, router]);
 
   const activeTrackId = playbackState.activeTrackId;
+  const isShellAudioBar = variant === 'shellChatV1';
+  const compactPlayerVisible =
+    isShellAudioBar && Boolean(activeTrackId) && barCollapsed;
 
   useEffect(() => {
     if (variant !== 'shellChatV1' || !activeTrackId) return;
@@ -164,6 +171,21 @@ export function PersistentAudioBar({
     playbackState.hasLyrics,
     variant,
   ]);
+
+  useEffect(() => {
+    if (!isShellAudioBar || !activeTrackId) {
+      resetAudioChromeSnapshot();
+      return resetAudioChromeSnapshot;
+    }
+
+    setAudioChromeSnapshot({
+      activeTrackId,
+      compactPlayerVisible,
+      fullPlayerVisible: !compactPlayerVisible,
+    });
+
+    return resetAudioChromeSnapshot;
+  }, [activeTrackId, compactPlayerVisible, isShellAudioBar]);
 
   if (!activeTrackId) return null;
 

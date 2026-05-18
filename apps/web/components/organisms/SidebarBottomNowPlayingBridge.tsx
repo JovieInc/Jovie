@@ -4,6 +4,7 @@ import { useCallback } from 'react';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import { SidebarBottomNowPlaying } from '@/components/shell/SidebarBottomNowPlaying';
 import { useAppFlag } from '@/lib/flags/client';
+import { useAudioChromeSnapshot } from './audio-chrome-state';
 
 /**
  * SidebarBottomNowPlayingBridge — flag-gated mount of the shell
@@ -17,6 +18,7 @@ import { useAppFlag } from '@/lib/flags/client';
  */
 export function SidebarBottomNowPlayingBridge() {
   const shellChatV1Enabled = useAppFlag('DESIGN_V1');
+  const audioChrome = useAudioChromeSnapshot();
   const { playbackState, toggleTrack } = useTrackAudioPlayer();
 
   const handlePlay = useCallback(() => {
@@ -29,6 +31,12 @@ export function SidebarBottomNowPlayingBridge() {
 
   if (!shellChatV1Enabled) return null;
   if (!playbackState.activeTrackId || !playbackState.trackTitle) return null;
+  if (
+    audioChrome.compactPlayerVisible &&
+    audioChrome.activeTrackId === playbackState.activeTrackId
+  ) {
+    return null;
+  }
 
   return (
     <div className='px-2 pb-2'>
