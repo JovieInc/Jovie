@@ -8,10 +8,12 @@ const mockUsePlanGate = vi.fn(() => ({
 }));
 const mockFetchReleaseCreditsAction = vi.fn();
 const mockRouterPush = vi.fn();
+const mockRouterRefresh = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
     push: mockRouterPush,
+    refresh: mockRouterRefresh,
   }),
 }));
 
@@ -614,6 +616,15 @@ describe('ReleaseSidebar inspector cards', () => {
     expect(mockRouterPush).toHaveBeenCalledWith(
       '/dashboard/releases/release_1/tasks'
     );
+  });
+
+  it('uses app router refresh for the context menu refresh fallback', async () => {
+    const user = userEvent.setup();
+
+    render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
+    await user.click(screen.getByTestId('context-menu-refresh-release'));
+
+    expect(mockRouterRefresh).toHaveBeenCalledTimes(1);
   });
 
   it('does not render the generic Releases title row above the entity card', () => {
