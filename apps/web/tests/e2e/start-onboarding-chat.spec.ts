@@ -345,6 +345,45 @@ test.describe('canonical /start onboarding chat', () => {
     ).toBeEnabled();
   });
 
+  test('submitted user turn stays compact and clear of the composer on mobile', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await mockOnboardingChat(page);
+    await page.goto('/start', { waitUntil: 'domcontentloaded' });
+    await waitForHydration(page);
+
+    await page.locator(COMPOSER_TEXTAREA).fill('yes music artist and writer');
+    await page.getByRole('button', { name: 'Send message' }).click();
+
+    const bubble = page.getByTestId('chat-user-bubble').first();
+    await expect(bubble).toBeVisible();
+    await expect(bubble).toHaveCSS('padding-top', '6px');
+    await expect(bubble).toHaveCSS('padding-right', '12px');
+    await expect(bubble).toHaveCSS('padding-bottom', '6px');
+    await expect(bubble).toHaveCSS('padding-left', '12px');
+
+    const bubbleBox = await bubble.boundingBox();
+    const composerBox = await page.locator(COMPOSER_SURFACE).boundingBox();
+    expect(bubbleBox).not.toBeNull();
+    expect(composerBox).not.toBeNull();
+    if (bubbleBox && composerBox) {
+      expect(bubbleBox.height).toBeLessThanOrEqual(40);
+      expect(bubbleBox.y + bubbleBox.height).toBeLessThan(composerBox.y);
+    }
+
+    const overflow = await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth -
+        document.documentElement.clientWidth
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
+    await expect(page.getByTestId('onboarding-profile-rail')).toHaveCount(0);
+    await expect(
+      page.getByTestId('onboarding-profile-rail-inline')
+    ).toHaveCount(0);
+  });
+
   test('auth error and slash picker do not collide at narrow desktop size', async ({
     page,
   }) => {
