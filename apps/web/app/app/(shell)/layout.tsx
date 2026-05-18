@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { redirect, unstable_rethrow } from 'next/navigation';
 import { Suspense } from 'react';
 import { CinematicAppBoot } from '@/components/organisms/CinematicAppBoot';
+import { PersistentAudioBar } from '@/components/organisms/PersistentAudioBar';
 import { LyricsRouteSkeleton } from '@/components/shell/LyricsRouteSkeleton';
 import { TasksRouteSkeleton } from '@/components/shell/TasksRouteSkeleton';
 import { APP_ROUTES } from '@/constants/routes';
@@ -57,6 +58,7 @@ export default async function AppShellLayout({
       userId: auth.userId,
     });
     const shellVariant = shellChatV1 ? 'shellChatV1' : 'legacy';
+    const audioPlayer = <PersistentAudioBar variant={shellVariant} />;
 
     // Pick the route-specific skeleton main slot.
     let routeMain: React.ReactNode = undefined;
@@ -78,7 +80,11 @@ export default async function AppShellLayout({
     // cinematic timeline before the underlying tree resolves. Per-tab gate
     // via sessionStorage flag `jovie:cinematic-boot-played`.
     const shellFallback = (
-      <CinematicAppBoot main={routeMain} variant={shellVariant} />
+      <CinematicAppBoot
+        main={routeMain}
+        audioPlayer={audioPlayer}
+        variant={shellVariant}
+      />
     );
 
     // Ban check moved inside DashboardShellContent (runs in parallel with
