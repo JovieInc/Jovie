@@ -16,15 +16,21 @@ const RELEASE_HANDLING_PATHS = new Set([
   '.github/workflows/desktop-release.yml',
 ]);
 
+function isDesktopReleaseImpactingFile(file) {
+  if (!file.startsWith(DESKTOP_PATH_PREFIX)) {
+    return false;
+  }
+
+  return !/^apps\/desktop\/scripts\/.+\.test\.mjs$/.test(file);
+}
+
 export function evaluateDesktopReleaseGuard(changedFiles) {
   const normalizedFiles = changedFiles
     .map(file => file.trim())
     .filter(Boolean)
     .map(file => file.replace(/\\/g, '/'));
 
-  const desktopFiles = normalizedFiles.filter(file =>
-    file.startsWith(DESKTOP_PATH_PREFIX)
-  );
+  const desktopFiles = normalizedFiles.filter(isDesktopReleaseImpactingFile);
   const releaseHandlingFiles = normalizedFiles.filter(file =>
     RELEASE_HANDLING_PATHS.has(file)
   );
