@@ -25,4 +25,15 @@ describe('admin child route auth normalization', () => {
       expect(source).not.toMatch(/\brequireAdmin\(\)/);
     }
   });
+
+  it('keeps admin platform route data outside the page module', () => {
+    const source = readFileSync(ADMIN_PLATFORM_CONNECTIONS_PAGE, 'utf8');
+
+    expect(source).toContain('loadAdminPlatformConnectionsData');
+    expect(source).not.toContain('getCachedCurrentUser');
+    expect(source).not.toContain('@/lib/admin/platform-connections');
+    expect(source).not.toContain('REQUIRED_PLAYLIST_SPOTIFY_SCOPES');
+    expect(source).not.toContain('readExternalAccountScopes');
+    expect(source).not.toContain('readAccountLabel');
+  });
 });
