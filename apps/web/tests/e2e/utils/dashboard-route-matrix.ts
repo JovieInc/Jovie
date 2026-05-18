@@ -53,7 +53,7 @@ const PUBLIC_DEFAULT_BUDGET_MS = 15_000;
 
 const CHAT_CONTENT_SELECTOR =
   '[placeholder*="ask jovie" i], [placeholder*="Ask Jovie" i], button[aria-label="New thread"], textarea, [contenteditable="true"], main';
-const DASHBOARD_RELEASE_TASKS_ROUTE = `${APP_ROUTES.DASHBOARD_RELEASES}/[releaseId]/tasks`;
+const RELEASE_TASKS_ROUTE = `${APP_ROUTES.RELEASES}/[releaseId]/tasks`;
 const DASHBOARD_TIPPING_ROUTE = `${APP_ROUTES.DASHBOARD}/tipping`;
 const DASHBOARD_CONTACTS_ROUTE = `${APP_ROUTES.DASHBOARD}/contacts`;
 const DASHBOARD_TOUR_DATES_ROUTE = `${APP_ROUTES.DASHBOARD}/tour-dates`;
@@ -136,7 +136,7 @@ const creatorRoutes = [
     performanceBudgetMs: CREATOR_DEFAULT_BUDGET_MS,
   },
   {
-    path: DASHBOARD_RELEASE_TASKS_ROUTE,
+    path: RELEASE_TASKS_ROUTE,
     name: 'Release Tasks',
     kind: 'dynamic',
     surface: 'creator',

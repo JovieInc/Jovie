@@ -444,11 +444,12 @@ vi.mock('@/lib/queries', () => ({
 
 vi.mock('@/constants/routes', () => ({
   APP_ROUTES: {
-    DASHBOARD_RELEASES: '/dashboard/releases',
-    DASHBOARD_RELEASE_TASKS: '/dashboard/releases/[releaseId]/tasks',
+    DASHBOARD_RELEASES: '/app/dashboard/releases',
+    DASHBOARD_RELEASE_TASKS: '/app/dashboard/releases/[releaseId]/tasks',
+    RELEASES: '/app/releases',
   },
   buildReleaseTasksRoute: (releaseId: string) =>
-    `/dashboard/releases/${releaseId}/tasks`,
+    `/app/releases/${releaseId}/tasks`,
 }));
 
 vi.mock(
@@ -614,7 +615,7 @@ describe('ReleaseSidebar inspector cards', () => {
     );
 
     expect(mockRouterPush).toHaveBeenCalledWith(
-      '/dashboard/releases/release_1/tasks'
+      '/app/releases/release_1/tasks'
     );
   });
 
