@@ -31,6 +31,12 @@ export interface ElectronAPI {
   readonly onNavStateChanged: (
     cb: (state: { canGoBack: boolean; canGoForward: boolean }) => void
   ) => () => void;
+  /**
+   * Desktop dictation capability probe. Native OS dictation APIs are not
+   * exposed directly to the sandboxed renderer; this tells the web composer
+   * whether Electron has explicitly allowed the trusted Web Speech fallback.
+   */
+  readonly getDictationStatus?: () => Promise<DesktopDictationStatus>;
 }
 
 type InstallUpdateResult = Awaited<
@@ -261,6 +267,22 @@ export interface DesktopNavState {
   readonly goForward: () => void;
 }
 
+export interface DesktopDictationStatus {
+  readonly ok: boolean;
+  readonly nativeAvailable: boolean;
+  readonly webSpeechFallbackAllowed: boolean;
+  readonly mode: 'native' | 'web-speech' | 'unavailable';
+  readonly reason?: string;
+}
+
+const DESKTOP_DICTATION_UNAVAILABLE: DesktopDictationStatus = {
+  ok: false,
+  nativeAvailable: false,
+  webSpeechFallbackAllowed: false,
+  mode: 'unavailable',
+  reason: 'desktop-dictation-bridge-unavailable',
+};
+
 /**
  * useDesktopNavigation — subscribes to Electron webContents nav-state IPC.
  *
@@ -292,10 +314,66 @@ export function useDesktopNavigation(): DesktopNavState {
   };
 }
 
+async function safeGetDictationStatus(): Promise<DesktopDictationStatus> {
+  const api = getRawElectronAPI();
+  if (!api) {
+    return {
+      ok: true,
+      nativeAvailable: false,
+      webSpeechFallbackAllowed: true,
+      mode: 'web-speech',
+      reason: 'browser-context',
+    };
+  }
+
+  if (typeof api.getDictationStatus !== 'function') {
+    reportMissingBridgeMethod('getDictationStatus');
+    return DESKTOP_DICTATION_UNAVAILABLE;
+  }
+
+  try {
+    return await api.getDictationStatus();
+  } catch (error) {
+    void captureWarning('getDictationStatus threw', error, {
+      route: 'desktop/electron-bridge',
+      bridgeMethod: 'getDictationStatus',
+    });
+    return DESKTOP_DICTATION_UNAVAILABLE;
+  }
+}
+
+export function useDesktopDictationStatus(): DesktopDictationStatus {
+  const [status, setStatus] = useState<DesktopDictationStatus>(() => {
+    if (!isElectronRuntime()) {
+      return {
+        ok: true,
+        nativeAvailable: false,
+        webSpeechFallbackAllowed: true,
+        mode: 'web-speech',
+        reason: 'browser-context',
+      };
+    }
+    return DESKTOP_DICTATION_UNAVAILABLE;
+  });
+
+  useEffect(() => {
+    let isActive = true;
+    void safeGetDictationStatus().then(nextStatus => {
+      if (isActive) setStatus(nextStatus);
+    });
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  return status;
+}
+
 // Exported for tests only — do not call directly from product code.
 export const __testing = {
   reset: () => reportedMissing.clear(),
   safeInstallUpdateAndRestart,
+  safeGetDictationStatus,
   safeOnUpdateAvailable,
   safeOnUpdateDownloaded,
   RELEASE_DOWNLOAD_URL,

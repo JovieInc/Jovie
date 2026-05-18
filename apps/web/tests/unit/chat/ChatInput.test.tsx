@@ -108,8 +108,22 @@ function removeMockSpeechRecognition() {
   Reflect.deleteProperty(window, 'webkitSpeechRecognition');
 }
 
+function setElectronAPI(api: object) {
+  Object.defineProperty(window, 'electronAPI', {
+    configurable: true,
+    writable: true,
+    value: api,
+  });
+}
+
+function removeElectronAPI() {
+  Reflect.deleteProperty(window, 'electronAPI');
+  delete document.documentElement.dataset.desktopRuntime;
+}
+
 afterEach(() => {
   removeMockSpeechRecognition();
+  removeElectronAPI();
 });
 
 describe('ChatInput', () => {
@@ -256,6 +270,44 @@ describe('ChatInput', () => {
     expect(
       screen.getByRole('button', { name: /dictate message/i })
     ).toBeEnabled();
+  });
+
+  it('keeps dictation disabled in stale Electron when the desktop bridge cannot allow fallback', async () => {
+    installMockSpeechRecognition();
+    setElectronAPI({ versions: { app: '0.1.0' } });
+
+    fastRender(withProviders(<ChatInput {...baseProps} />));
+
+    const dictationButton = screen.getByRole('button', {
+      name: /dictation unavailable/i,
+    });
+    await waitFor(() => expect(dictationButton).toBeDisabled());
+    expect(MockSpeechRecognition.instances).toHaveLength(0);
+  });
+
+  it('uses Web Speech fallback when the Electron bridge allows trusted dictation', async () => {
+    const user = userEvent.setup();
+    installMockSpeechRecognition();
+    setElectronAPI({
+      getDictationStatus: vi.fn().mockResolvedValue({
+        ok: true,
+        nativeAvailable: false,
+        webSpeechFallbackAllowed: true,
+        mode: 'web-speech',
+        reason: 'native-unavailable',
+      }),
+    });
+
+    fastRender(withProviders(<ChatInput {...baseProps} />));
+
+    const dictationButton = await screen.findByRole('button', {
+      name: /dictate message/i,
+    });
+    await waitFor(() => expect(dictationButton).toBeEnabled());
+    await user.click(dictationButton);
+
+    expect(MockSpeechRecognition.instances).toHaveLength(1);
+    expect(MockSpeechRecognition.instances[0]?.start).toHaveBeenCalledTimes(1);
   });
 
   it('keeps structured chips inline with the editable text field', () => {
