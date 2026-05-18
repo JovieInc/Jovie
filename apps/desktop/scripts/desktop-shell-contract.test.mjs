@@ -73,6 +73,28 @@ test('preload marks the hosted app as Electron after the document root is ready'
   assert.match(preloadSource, /dataset\.desktopRuntime = 'electron'/);
 });
 
+test('desktop bridge exposes bounded dictation support', async () => {
+  const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  const preloadSource = await readFile(
+    join(desktopRoot, 'src/preload.ts'),
+    'utf8'
+  );
+
+  assert.match(mainSource, /const DICTATION_STATUS_CHANNEL = 'dictation-status'/);
+  assert.match(mainSource, /function getDesktopDictationStatus\(\)/);
+  assert.match(mainSource, /nativeAvailable: false/);
+  assert.match(mainSource, /webSpeechFallbackAllowed: true/);
+  assert.match(mainSource, /permission === 'media'/);
+  assert.match(mainSource, /function isAudioOnlyMediaPermissionRequest/);
+  assert.match(mainSource, /mediaTypes\.includes\('audio'\)/);
+  assert.match(mainSource, /!mediaTypes\.includes\('video'\)/);
+  assert.match(mainSource, /mediaType\?: unknown/);
+  assert.match(mainSource, /mediaType === 'audio'/);
+  assert.match(mainSource, /isTrustedPermissionRequest/);
+  assert.match(preloadSource, /getDictationStatus/);
+  assert.match(preloadSource, /ipcRenderer\.invoke\(DICTATION_STATUS_CHANNEL\)/);
+});
+
 test('desktop dev defaults to the local app shell and packaged builds keep production', async () => {
   const packageJson = await readFile(
     join(desktopRoot, 'package.json'),

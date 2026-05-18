@@ -12,6 +12,7 @@ const QUIT_AND_INSTALL_CHANNEL = 'quit-and-install';
 const GO_BACK_CHANNEL = 'go-back';
 const GO_FORWARD_CHANNEL = 'go-forward';
 const NAV_STATE_CHANNEL = 'nav-state-changed';
+const DICTATION_STATUS_CHANNEL = 'dictation-status';
 
 interface MinimalDocument {
   readonly documentElement?: {
@@ -114,6 +115,11 @@ if (isTrustedAppOrigin()) {
       ) => cb(state);
       ipcRenderer.on(NAV_STATE_CHANNEL, listener);
       return () => ipcRenderer.removeListener(NAV_STATE_CHANNEL, listener);
+    },
+
+    /** Probe desktop dictation support without exposing node/native APIs. */
+    getDictationStatus: () => {
+      return ipcRenderer.invoke(DICTATION_STATUS_CHANNEL);
     },
   });
 }

@@ -8,6 +8,7 @@ import {
   Menu,
   type MenuItemConstructorOptions,
   shell,
+  type WebContents,
 } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import { APP_ENV, APP_URL } from './env';
@@ -36,6 +37,7 @@ const QUIT_AND_INSTALL_CHANNEL = 'quit-and-install';
 const GO_BACK_CHANNEL = 'go-back';
 const GO_FORWARD_CHANNEL = 'go-forward';
 const NAV_STATE_CHANNEL = 'nav-state-changed';
+const DICTATION_STATUS_CHANNEL = 'dictation-status';
 
 type UpdateChannel =
   | typeof UPDATE_AVAILABLE_CHANNEL
@@ -44,6 +46,14 @@ type UpdateChannel =
 interface NavState {
   canGoBack: boolean;
   canGoForward: boolean;
+}
+
+interface DesktopDictationStatus {
+  ok: boolean;
+  nativeAvailable: boolean;
+  webSpeechFallbackAllowed: boolean;
+  mode: 'native' | 'web-speech' | 'unavailable';
+  reason?: string;
 }
 
 let updateReadyToInstall = false;
@@ -118,6 +128,49 @@ function getIpcSenderUrl(event: IpcMainInvokeEvent): string {
 function isTrustedIpcSender(event: IpcMainInvokeEvent): boolean {
   const parsed = parseUrl(getIpcSenderUrl(event));
   return parsed?.origin === APP_ORIGIN;
+}
+
+function isTrustedPermissionOrigin(urlString?: string): boolean {
+  const parsed = parseUrl(urlString ?? '');
+  return parsed?.origin === APP_ORIGIN;
+}
+
+function isTrustedPermissionRequest(
+  webContents: WebContents | null,
+  requestingOrigin?: string
+): boolean {
+  if (requestingOrigin !== undefined) {
+    return isTrustedPermissionOrigin(requestingOrigin);
+  }
+  return webContents !== null && isTrustedPermissionOrigin(webContents.getURL());
+}
+
+function isAudioOnlyMediaPermissionRequest(details: unknown): boolean {
+  if (details === null || typeof details !== 'object') return false;
+  const mediaTypes = (details as { mediaTypes?: unknown }).mediaTypes;
+  return (
+    Array.isArray(mediaTypes) &&
+    mediaTypes.includes('audio') &&
+    !mediaTypes.includes('video')
+  );
+}
+
+function isAudioMediaPermissionCheck(details: unknown): boolean {
+  if (details === null || typeof details !== 'object') return false;
+  return (details as { mediaType?: unknown }).mediaType === 'audio';
+}
+
+function getDesktopDictationStatus(): DesktopDictationStatus {
+  return {
+    ok: true,
+    nativeAvailable: false,
+    webSpeechFallbackAllowed: true,
+    mode: 'web-speech',
+    reason:
+      process.platform === 'darwin'
+        ? 'native-macos-dictation-is-system-owned-web-speech-fallback-enabled'
+        : 'native-dictation-unavailable-web-speech-fallback-enabled',
+  };
 }
 
 interface WindowState {
@@ -291,12 +344,26 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   );
 
   win.webContents.session.setPermissionRequestHandler(
-    (_webContents, _permission, callback) => {
-      callback(false);
+    (webContents, permission, callback, details) => {
+      const requestingOrigin =
+        typeof details.requestingUrl === 'string'
+          ? details.requestingUrl
+          : undefined;
+      callback(
+        permission === 'media' &&
+          isAudioOnlyMediaPermissionRequest(details) &&
+          isTrustedPermissionRequest(webContents, requestingOrigin)
+      );
     }
   );
 
-  win.webContents.session.setPermissionCheckHandler(() => false);
+  win.webContents.session.setPermissionCheckHandler(
+    (webContents, permission, requestingOrigin, details) => {
+      if (permission !== 'media') return false;
+      if (!isAudioMediaPermissionCheck(details)) return false;
+      return isTrustedPermissionRequest(webContents, requestingOrigin);
+    }
+  );
 
   // Navigation guard — keep browsing inside the app host + Clerk auth flows
   win.webContents.on('will-navigate', event => {
@@ -495,6 +562,23 @@ ipcMain.handle(GO_FORWARD_CHANNEL, (event: IpcMainInvokeEvent) => {
   if (win && !win.isDestroyed() && win.webContents.canGoForward())
     win.webContents.goForward();
 });
+
+ipcMain.handle(
+  DICTATION_STATUS_CHANNEL,
+  (event: IpcMainInvokeEvent, ...args: unknown[]) => {
+    if (!isTrustedIpcSender(event) || args.length !== 0) {
+      return {
+        ok: false,
+        nativeAvailable: false,
+        webSpeechFallbackAllowed: false,
+        mode: 'unavailable',
+        reason: 'invalid-request',
+      } satisfies DesktopDictationStatus;
+    }
+
+    return getDesktopDictationStatus();
+  }
+);
 
 app.whenReady().then(() => {
   const appIconPath = getAppIconPath();

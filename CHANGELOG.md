@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.27] - 2026-05-18
+
+> [internal] Desktop dictation is now guarded by an explicit Electron bridge so stale desktop builds fail closed instead of showing a broken microphone.
+
+### Fixed
+
+- **Desktop dictation bridge (JOV-2277)**: added a guarded Electron dictation capability probe and preload/main IPC contract. Browser contexts keep the normal Web Speech path, stale Electron builds disable dictation quietly, and the desktop media permission handler now only allows audio-only requests from the trusted Jovie app origin.
+
 ## [26.5.26] - 2026-05-17
 
 > First-run cinematic boot: the very first time you land in the app each tab, Jovie greets you with a soft cinematic — logo cinematic fade, gentle reverse spin, frame settles, sidebar slides in, welcome content appears. Subsequent navigations skip straight to the skeleton — no repeat motion.
