@@ -1,4 +1,3 @@
-import { eq } from 'drizzle-orm';
 import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
@@ -7,9 +6,8 @@ import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeade
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
 import { formatUsd } from '@/lib/admin/format';
-import { db } from '@/lib/db';
-import { agentRuns } from '@/lib/db/schema/connectors';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { loadAdminAgentRun } from './agent-run-data';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -49,12 +47,7 @@ export default async function AgentRunDebugPage({
   }
 
   const { id } = await params;
-
-  const [run] = await db
-    .select()
-    .from(agentRuns)
-    .where(eq(agentRuns.id, id))
-    .limit(1);
+  const run = await loadAdminAgentRun(id);
 
   if (!run) {
     notFound();
