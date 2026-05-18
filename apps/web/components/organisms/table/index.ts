@@ -234,4 +234,4 @@ export { useTableGrouping } from './utils/useTableGrouping';
 // Styles
 // =============================================================================
 
-export { cn, presets } from './table.styles';
+export { cn, presets, rowState } from './table.styles';

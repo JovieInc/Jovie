@@ -35,6 +35,21 @@ export const selection = {
   hover: 'hover:bg-(--linear-row-hover)',
 } as const;
 
+export const rowState = {
+  base: 'transition-[background-color,box-shadow] duration-subtle ease-out',
+  hover: 'hover:bg-(--linear-row-hover)',
+  focusVisible:
+    'focus-visible:outline-none focus-visible:bg-(--linear-row-hover) focus-visible:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_45%,transparent)]',
+  focusWithin:
+    'focus-within:bg-(--linear-row-hover) focus-within:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_45%,transparent)]',
+  focused:
+    'bg-(--linear-row-hover) shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_35%,transparent)]',
+  selected:
+    'bg-(--linear-row-selected) hover:bg-(--linear-row-selected) shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_24%,transparent)]',
+  checked:
+    'bg-(--linear-row-selected) hover:bg-(--linear-row-selected) shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_28%,transparent)]',
+} as const;
+
 // Icon Colors (use CSS variables where possible)
 export const iconColors = {
   // Sort indicator - matches tertiary-token but slightly more visible
@@ -135,9 +150,10 @@ export const presets = {
   tableRow: cn(
     alignment.rowHeight,
     'border-b border-[color-mix(in_oklab,var(--linear-app-frame-seam)_60%,transparent)]',
-    selection.unchecked,
-    'last:border-b-0',
-    'focus-within:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_45%,transparent)]'
+    rowState.base,
+    rowState.hover,
+    rowState.focusWithin,
+    'last:border-b-0'
   ),
   tableCell: cn(alignment.cellPadding, typography.cellPrimary, 'align-middle'),
   tableHeader: cn(alignment.headerPadding, typography.tableHeader, 'text-left'),
