@@ -1,5 +1,6 @@
 'use client';
 
+import { ShellListRowFrame } from '@/components/organisms/table/atoms/ShellListRowFrame';
 import type { ReleaseTaskView } from '@/lib/release-tasks/types';
 import {
   getAccentCssVars,
@@ -40,7 +41,7 @@ export function ReleaseTaskRow({ task, onToggle }: ReleaseTaskRowProps) {
   const aiAccent = getAccentCssVars('purple');
 
   return (
-    <div className='flex items-center gap-2 px-4 py-1 min-h-[32px] group hover:bg-surface-1 rounded transition-colors'>
+    <ShellListRowFrame className='flex min-h-[32px] items-center gap-2 px-4 py-1'>
       <ReleaseTaskCheckbox
         task={task}
         isDone={isDone}
@@ -92,6 +93,6 @@ export function ReleaseTaskRow({ task, onToggle }: ReleaseTaskRowProps) {
           learnMoreUrl={task.learnMoreUrl}
         />
       )}
-    </div>
+    </ShellListRowFrame>
   );
 }

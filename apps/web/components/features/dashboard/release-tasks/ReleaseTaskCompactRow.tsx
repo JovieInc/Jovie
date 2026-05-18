@@ -1,4 +1,5 @@
 'use client';
+import { ShellListRowFrame } from '@/components/organisms/table/atoms/ShellListRowFrame';
 import type { ReleaseTaskView } from '@/lib/release-tasks/types';
 import { cn } from '@/lib/utils';
 import { ReleaseTaskDueBadge } from './ReleaseTaskDueBadge';
@@ -25,7 +26,7 @@ export function ReleaseTaskCompactRow({
   const isAi = isReleaseTaskAutomated(task);
 
   return (
-    <div className='flex items-center gap-2 px-3 py-0.5 min-h-[28px] group hover:bg-surface-1 rounded transition-colors'>
+    <ShellListRowFrame className='flex min-h-[28px] items-center gap-2 px-3 py-0.5'>
       <ReleaseTaskCheckbox
         task={task}
         isDone={isDone}
@@ -54,6 +55,6 @@ export function ReleaseTaskCompactRow({
         dueDaysOffset={task.dueDaysOffset}
         isCompleted={isDone}
       />
-    </div>
+    </ShellListRowFrame>
   );
 }
