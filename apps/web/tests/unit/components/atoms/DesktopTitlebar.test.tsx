@@ -68,4 +68,12 @@ describe('DesktopTitlebar', () => {
       screen.getByRole('button', { name: 'Go forward' })
     ).toBeInTheDocument();
   });
+
+  it('renders an optional main titlebar slot', () => {
+    render(<DesktopTitlebar mainSlot={<div>Route header</div>} />);
+
+    expect(screen.getByTestId('electron-titlebar-main-slot')).toHaveTextContent(
+      'Route header'
+    );
+  });
 });

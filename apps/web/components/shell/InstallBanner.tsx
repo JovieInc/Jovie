@@ -37,6 +37,8 @@ export function InstallBanner({
   ctaLabel = 'Install',
   ctaIcon: CtaIcon = ArrowDown,
   onCta,
+  ctaDisabled = false,
+  iconClassName,
   className,
 }: {
   readonly open: boolean;
@@ -47,6 +49,8 @@ export function InstallBanner({
   readonly ctaLabel?: ReactNode;
   readonly ctaIcon?: LucideIcon | null;
   readonly onCta?: () => void;
+  readonly ctaDisabled?: boolean;
+  readonly iconClassName?: string;
   readonly className?: string;
 }) {
   return (
@@ -64,13 +68,16 @@ export function InstallBanner({
           type='button'
           onClick={onDismiss}
           aria-label='Dismiss prompt'
-          className='absolute top-1.5 right-1.5 h-5 w-5 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-150 ease-out'
+          className='absolute top-1.5 right-1.5 h-5 w-5 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-subtle ease-out'
         >
           <X className='h-3 w-3' strokeWidth={2.25} />
         </button>
         <div className='flex items-center gap-1.5 mb-1 pr-5'>
           <Icon
-            className='h-3 w-3 text-cyan-300/85 shrink-0'
+            className={cn(
+              'h-3 w-3 shrink-0',
+              iconClassName ?? 'text-cyan-300/85'
+            )}
             strokeWidth={2.25}
           />
           <span className='text-[12px] font-medium text-primary-token tracking-[-0.005em]'>
@@ -83,7 +90,8 @@ export function InstallBanner({
         <button
           type='button'
           onClick={onCta}
-          className='w-full inline-flex items-center justify-center gap-1.5 h-7 rounded-full text-[12px] font-medium bg-white text-black hover:brightness-110 active:scale-[0.99] transition-all duration-150 ease-out'
+          disabled={ctaDisabled}
+          className='w-full inline-flex items-center justify-center gap-1.5 h-7 rounded-full text-[12px] font-medium bg-white text-black hover:brightness-110 transition-[filter,background-color,color] duration-subtle ease-out disabled:cursor-not-allowed disabled:opacity-60'
         >
           {ctaLabel}
           {CtaIcon ? <CtaIcon className='h-3 w-3' strokeWidth={2.5} /> : null}
