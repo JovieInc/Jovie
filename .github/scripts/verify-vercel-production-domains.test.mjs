@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   buildProjectDomainsUrl,
+  fetchProjectDomains,
   PRODUCTION_DOMAIN_EXPECTATIONS,
   validateProductionDomains,
 } from './verify-vercel-production-domains.mjs';
@@ -50,6 +51,44 @@ test('buildProjectDomainsUrl scopes non-team ids as slugs', () => {
   assert.equal(
     url.toString(),
     'https://api.vercel.com/v9/projects/prj_canonical/domains?slug=jovie'
+  );
+});
+
+test('fetchProjectDomains passes an abort signal to the Vercel domains API request', async () => {
+  let requestOptions;
+
+  await fetchProjectDomains({
+    fetchImpl: async (_url, options) => {
+      requestOptions = options;
+
+      return {
+        json: async () => ({ domains: [] }),
+        ok: true,
+      };
+    },
+    projectId: canonicalProjectId,
+    token: 'vercel-token',
+  });
+
+  assert.equal(requestOptions.headers.Authorization, 'Bearer vercel-token');
+  assert.ok(requestOptions.signal instanceof AbortSignal);
+  assert.equal(requestOptions.signal.aborted, false);
+});
+
+test('fetchProjectDomains fails fast when the Vercel domains API request times out', async () => {
+  await assert.rejects(
+    fetchProjectDomains({
+      fetchImpl: async (_url, options) =>
+        new Promise((_resolve, reject) => {
+          options.signal.addEventListener('abort', () => {
+            reject(new DOMException('aborted', 'AbortError'));
+          });
+        }),
+      projectId: canonicalProjectId,
+      timeoutMs: 1,
+      token: 'vercel-token',
+    }),
+    /Vercel domains API timed out after 1ms/
   );
 });
 
