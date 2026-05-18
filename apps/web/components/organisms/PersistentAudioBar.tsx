@@ -175,7 +175,7 @@ export function PersistentAudioBar({
   useEffect(() => {
     if (!isShellAudioBar || !activeTrackId) {
       resetAudioChromeSnapshot();
-      return resetAudioChromeSnapshot;
+      return;
     }
 
     setAudioChromeSnapshot({
@@ -183,9 +183,11 @@ export function PersistentAudioBar({
       compactPlayerVisible,
       fullPlayerVisible: !compactPlayerVisible,
     });
-
-    return resetAudioChromeSnapshot;
   }, [activeTrackId, compactPlayerVisible, isShellAudioBar]);
+
+  useEffect(() => {
+    return resetAudioChromeSnapshot;
+  }, []);
 
   if (!activeTrackId) return null;
 
