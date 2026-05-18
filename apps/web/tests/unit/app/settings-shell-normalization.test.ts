@@ -86,7 +86,7 @@ const SETTINGS_ALIAS_ROUTES = [
   },
 ] as const;
 
-const SETTINGS_PROFILE_SCOPED_PREFETCH_ROUTES = [
+const SETTINGS_SHARED_ROUTE_CONTEXT_FILES = [
   findSourceFile(
     resolve(process.cwd(), 'app/app/(shell)/settings/contacts/page.tsx'),
     resolve(
@@ -98,11 +98,19 @@ const SETTINGS_PROFILE_SCOPED_PREFETCH_ROUTES = [
     resolve(process.cwd(), 'app/app/(shell)/settings/touring/page.tsx'),
     resolve(process.cwd(), 'apps/web/app/app/(shell)/settings/touring/page.tsx')
   ),
+  findSourceFile(
+    resolve(process.cwd(), 'app/app/(shell)/settings/connectors/page.tsx'),
+    resolve(
+      process.cwd(),
+      'apps/web/app/app/(shell)/settings/connectors/page.tsx'
+    )
+  ),
 ] as const;
 
-const SETTINGS_PROFILE_SCOPED_PREFETCH_CANDIDATES = [
+const SETTINGS_SHARED_ROUTE_CONTEXT_CANDIDATES = [
   resolve(process.cwd(), 'app/app/(shell)/settings/contacts/page.tsx'),
   resolve(process.cwd(), 'app/app/(shell)/settings/touring/page.tsx'),
+  resolve(process.cwd(), 'app/app/(shell)/settings/connectors/page.tsx'),
 ] as const;
 
 describe('settings shell normalization', () => {
@@ -153,16 +161,16 @@ describe('settings shell normalization', () => {
     }
   });
 
-  it('keeps profile-scoped settings prefetches on the shared shell route context path', () => {
-    const missingFiles = SETTINGS_PROFILE_SCOPED_PREFETCH_ROUTES.filter(
+  it('keeps data-backed settings pages on the shared shell route context path', () => {
+    const missingFiles = SETTINGS_SHARED_ROUTE_CONTEXT_FILES.filter(
       filePath => !filePath
     );
     expect(missingFiles).toEqual([]);
 
-    for (const filePath of SETTINGS_PROFILE_SCOPED_PREFETCH_ROUTES) {
+    for (const filePath of SETTINGS_SHARED_ROUTE_CONTEXT_FILES) {
       if (!filePath) {
         throw new Error(
-          `Could not find profile-scoped settings source. Checked: ${SETTINGS_PROFILE_SCOPED_PREFETCH_CANDIDATES.join(', ')}`
+          `Could not find data-backed settings source. Checked: ${SETTINGS_SHARED_ROUTE_CONTEXT_CANDIDATES.join(', ')}`
         );
       }
 

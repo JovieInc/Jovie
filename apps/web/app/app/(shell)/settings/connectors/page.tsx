@@ -3,13 +3,13 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import type { ConnectorStatus } from '@/components/features/connectors/ConnectorCard';
 import { APP_ROUTES } from '@/constants/routes';
-import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema/auth';
+import { getUserByClerkId } from '@/lib/db/queries/shared';
 import {
   connectorAccounts,
   suggestedActions,
 } from '@/lib/db/schema/connectors';
+import { loadAppShellRouteContext } from '../../app-shell-route-context';
 import { ConnectorsClient } from './ConnectorsClient';
 
 export const runtime = 'nodejs';
@@ -31,16 +31,18 @@ function toConnectorStatus(
 }
 
 export default async function SettingsConnectorsPage() {
-  const { userId: clerkId } = await getCachedAuth();
-  if (!clerkId) {
-    redirect(APP_ROUTES.DASHBOARD);
+  const routeContext = await loadAppShellRouteContext({
+    route: APP_ROUTES.SETTINGS_CONNECTORS,
+    dashboardErrorLogMessage:
+      'Dashboard data load failed on settings connectors page',
+    dashboardErrorMessage:
+      'Failed to load connector settings. Please refresh the page.',
+  });
+  if (!routeContext.ok) {
+    return routeContext.error;
   }
 
-  const [dbUser] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.clerkId, clerkId))
-    .limit(1);
+  const dbUser = await getUserByClerkId(db, routeContext.userId);
 
   if (!dbUser) {
     redirect(APP_ROUTES.DASHBOARD);
