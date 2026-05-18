@@ -19,6 +19,10 @@ import {
 } from '@/constants/app';
 import { BASE_URL, HOSTNAME } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
+import {
+  buildAuthDegradedHtmlResponse,
+  isBrowserNavigation,
+} from '@/lib/auth/auth-degraded-fallback';
 import { buildProtectedAuthRedirectUrl } from '@/lib/auth/build-auth-route-url';
 import {
   type ClerkBypassPathInfo,
@@ -29,6 +33,7 @@ import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 import { decodeFapiHostFromPublishableKey } from '@/lib/auth/decode-fapi-host';
 import type { ProxyUserState } from '@/lib/auth/proxy-state';
 import { getUserState, isKnownActiveUser } from '@/lib/auth/proxy-state';
+import { captureErrorWithHostnameLimit } from '@/lib/auth/sentry-rate-limit';
 import { isStagingHost, resolveClerkKeys } from '@/lib/auth/staging-clerk-keys';
 import {
   isTestAuthBypassEnabled,
@@ -1271,6 +1276,8 @@ export default async function middleware(
     const pk = resolveClerkKeys(hostname).publishableKey;
     const fapiHost = decodeFapiHostFromPublishableKey(pk);
     if (!fapiHost) {
+      // This path is always an API/JS fetch (/__clerk is the FAPI proxy,
+      // never a direct browser navigation), so always return JSON here.
       return NextResponse.json(
         {
           error: 'Clerk proxy unavailable: missing or invalid publishable key',
@@ -1430,8 +1437,18 @@ export default async function middleware(
       return handleRequest(req, null);
     }
 
-    // For protected routes, return a service unavailable error
-    // This is better than crashing with an unhandled exception
+    // For protected routes, return a service unavailable error.
+    // Browser navigations get an HTML page; API/fetch callers get JSON.
+    await captureErrorWithHostnameLimit(
+      '[middleware] Clerk config missing for protected route',
+      new Error('Clerk config missing'),
+      hostname,
+      { context: { pathname, context: 'clerk_config_missing' } }
+    );
+
+    if (isBrowserNavigation(req.headers.get('accept'))) {
+      return buildAuthDegradedHtmlResponse();
+    }
     return new NextResponse(
       JSON.stringify({
         error: 'Service temporarily unavailable',
@@ -1490,6 +1507,16 @@ export default async function middleware(
       return handleRequest(req, null);
     }
 
+    await captureErrorWithHostnameLimit(
+      '[middleware] Clerk middleware unavailable for protected route',
+      new Error('Clerk middleware not initialized'),
+      hostname,
+      { context: { pathname, context: 'clerk_middleware_missing' } }
+    );
+
+    if (isBrowserNavigation(req.headers.get('accept'))) {
+      return buildAuthDegradedHtmlResponse();
+    }
     return new NextResponse(
       JSON.stringify({
         error: 'Service temporarily unavailable',
@@ -1512,10 +1539,12 @@ export default async function middleware(
     // domain isn't in the Clerk app's allowlist. Fall back gracefully so
     // auth routes render the "Auth unavailable" card instead of a 500.
     if (isStagingHost(hostname)) {
-      await captureError('[middleware] Staging Clerk error', error, {
-        pathname,
-        context: 'staging_clerk_middleware',
-      });
+      await captureErrorWithHostnameLimit(
+        '[middleware] Staging Clerk error',
+        error,
+        hostname,
+        { context: { pathname, context: 'staging_clerk_middleware' } }
+      );
       // Mirror the !selectedMiddleware fallback: only treat as unauthenticated
       // for auth pages and truly public paths. Protected paths (e.g. /onboarding,
       // /app) must not silently fall back to null userId — that causes a redirect
@@ -1523,6 +1552,10 @@ export default async function middleware(
       // /signin?redirect_url=%2Fonboarding instead of /onboarding (JOV-1902).
       if (canProceedWithoutClerk) {
         return handleRequest(req, null);
+      }
+
+      if (isBrowserNavigation(req.headers.get('accept'))) {
+        return buildAuthDegradedHtmlResponse();
       }
       return new NextResponse(
         JSON.stringify({
