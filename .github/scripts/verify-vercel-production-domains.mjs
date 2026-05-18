@@ -10,6 +10,8 @@ export const PRODUCTION_DOMAIN_EXPECTATIONS = Object.freeze([
   { name: 'jovie.fm', redirect: 'jov.ie', redirectStatusCode: 308 },
 ]);
 
+export const VERCEL_DOMAINS_API_TIMEOUT_MS = 10_000;
+
 export function buildProjectDomainsUrl({ projectId, orgId }) {
   const url = new URL(
     `https://api.vercel.com/v9/projects/${encodeURIComponent(projectId)}/domains`
@@ -30,27 +32,42 @@ export async function fetchProjectDomains({
   fetchImpl = fetch,
   orgId,
   projectId,
+  timeoutMs = VERCEL_DOMAINS_API_TIMEOUT_MS,
   token,
 }) {
-  const response = await fetchImpl(
-    buildProjectDomainsUrl({ projectId, orgId }),
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    }
-  );
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
-  if (!response.ok) {
-    const body = await response.text().catch(() => '');
-    throw new Error(
-      `Vercel domains API failed: HTTP ${response.status} ${body}`.trim()
+  try {
+    const response = await fetchImpl(
+      buildProjectDomainsUrl({ projectId, orgId }),
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        signal: controller.signal,
+      }
     );
-  }
 
-  const payload = await response.json();
-  return Array.isArray(payload.domains) ? payload.domains : [];
+    if (!response.ok) {
+      const body = await response.text().catch(() => '');
+      throw new Error(
+        `Vercel domains API failed: HTTP ${response.status} ${body}`.trim()
+      );
+    }
+
+    const payload = await response.json();
+    return Array.isArray(payload.domains) ? payload.domains : [];
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new Error(`Vercel domains API timed out after ${timeoutMs}ms`);
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export function validateProductionDomains({
