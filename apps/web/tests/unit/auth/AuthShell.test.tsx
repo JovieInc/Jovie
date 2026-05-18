@@ -1,14 +1,38 @@
 import { render, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { clerkSignInMock, searchParamsState } = vi.hoisted(() => ({
-  clerkSignInMock: vi.fn(),
-  searchParamsState: { value: '' },
-}));
+const { clerkRenderState, clerkSignInMock, searchParamsState } = vi.hoisted(
+  () => ({
+    clerkRenderState: {
+      signIn: 'empty' as 'empty' | 'credential' | 'social',
+    },
+    clerkSignInMock: vi.fn(),
+    searchParamsState: { value: '' },
+  })
+);
 
 vi.mock('@clerk/nextjs', () => ({
   SignIn: (props: unknown) => {
     clerkSignInMock(props);
+
+    if (clerkRenderState.signIn === 'credential') {
+      return (
+        <form data-testid='clerk-sign-in'>
+          <input name='identifier' type='text' />
+          <input name='password' type='password' />
+          <button type='submit'>Continue</button>
+        </form>
+      );
+    }
+
+    if (clerkRenderState.signIn === 'social') {
+      return (
+        <div data-testid='clerk-sign-in'>
+          <button type='button'>Continue with Google</button>
+        </div>
+      );
+    }
+
     return <div data-testid='clerk-sign-in' />;
   },
   SignUp: () => <div data-testid='clerk-sign-up' />,
@@ -23,6 +47,7 @@ import { AuthShell } from '@/features/auth';
 
 describe('AuthShell Clerk appearance guards', () => {
   beforeEach(() => {
+    clerkRenderState.signIn = 'empty';
     clerkSignInMock.mockReset();
     searchParamsState.value = '';
   });
@@ -87,6 +112,38 @@ describe('AuthShell Clerk appearance guards', () => {
     expect(
       container.querySelector('[data-auth-provider-slot="apple"]')
     ).toHaveTextContent('Continue with Apple');
+  });
+
+  it('releases the placeholder when Clerk renders a social-only start state', async () => {
+    clerkRenderState.signIn = 'social';
+
+    const { container } = render(<AuthShell mode='sign-in' />);
+
+    await waitFor(() => {
+      expect(container.firstElementChild).toHaveAttribute(
+        'data-auth-shell-ready',
+        'true'
+      );
+    });
+    expect(
+      container.querySelector('[data-auth-stable-placeholder]')
+    ).toBeNull();
+  });
+
+  it('releases the placeholder when Clerk renders a credential-only start state', async () => {
+    clerkRenderState.signIn = 'credential';
+
+    const { container } = render(<AuthShell mode='sign-in' />);
+
+    await waitFor(() => {
+      expect(container.firstElementChild).toHaveAttribute(
+        'data-auth-shell-ready',
+        'true'
+      );
+    });
+    expect(
+      container.querySelector('[data-auth-stable-placeholder]')
+    ).toBeNull();
   });
 
   it('keeps legal copy in stable line groups with valid fallback hrefs', () => {

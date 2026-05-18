@@ -41,9 +41,9 @@ jobs:
   canary-health-gate:
     name: Canary health gate
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     outputs:
-      canary_status: ${{ steps.canary-check.outputs.canary_status }}
+      canary_status: ${{ steps.canary-status.outputs.canary_status || steps.canary-check.outputs.canary_status }}
     steps:
       - name: Canary health check
         id: canary-check
@@ -445,5 +445,35 @@ jobs:
             echo "✅ /tim profile renders with content"
           fi
 
-          echo "✅ Canary passed: Deployment healthy and homepage renders"
-          echo "canary_status=verified" >> "$GITHUB_OUTPUT"
+          echo "✅ HTTP canary passed: Deployment healthy and homepage renders"
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Cache Playwright Browsers
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-
+
+      - name: Install Playwright (Chromium)
+        run: pnpm --filter=@jovie/web exec playwright install chromium
+
+      - name: Verify public auth controls are interactive
+        run: |
+          cd apps/web
+          mkdir -p tests/.auth
+          echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
+          CI=true SMOKE_ONLY=1 BASE_URL="${DEPLOYMENT_URL}" pnpm exec playwright test tests/e2e/auth-public-ready.spec.ts --project=chromium --reporter=line
+        env:
+          DEPLOYMENT_URL: ${{ inputs.deployment_url }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+
+      - name: Mark canary verified
+        id: canary-status
+        run: echo "canary_status=verified" >> "$GITHUB_OUTPUT"
