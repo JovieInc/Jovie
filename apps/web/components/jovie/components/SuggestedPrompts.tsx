@@ -296,24 +296,17 @@ export function SuggestedPrompts({
       inert={dimmed}
     >
       <div
-        className={cn(
-          CHAT_PROMPT_RAIL_SCROLL_CLASS,
-          'md:overflow-visible md:[mask-image:none] md:[-webkit-mask-image:none]'
-        )}
+        className={cn(CHAT_PROMPT_RAIL_SCROLL_CLASS, 'overscroll-x-contain')}
         style={CHAT_PROMPT_RAIL_MASK_STYLE}
         data-testid='suggested-prompts-rail'
       >
-        <div
-          className={cn(
-            CHAT_PROMPT_RAIL_CLASS,
-            'md:flex-wrap md:justify-center md:gap-2'
-          )}
-        >
+        <div className={cn(CHAT_PROMPT_RAIL_CLASS, 'snap-x snap-mandatory')}>
           {promptSuggestionsWithCapabilities.map(suggestion => (
             <SuggestionPill
               key={suggestion.label}
               suggestion={suggestion}
               onSelect={onSelect}
+              className='snap-start'
               disabled={
                 suggestion.label === 'Generate album art' && albumArtDisabled
               }
@@ -321,11 +314,16 @@ export function SuggestedPrompts({
             />
           ))}
           {pitchSuggestion && (
-            <SuggestionPill suggestion={pitchSuggestion} onSelect={onSelect} />
+            <SuggestionPill
+              suggestion={pitchSuggestion}
+              onSelect={onSelect}
+              className='snap-start'
+            />
           )}
           <SuggestionPill
             suggestion={FEEDBACK_SUGGESTION}
             onSelect={onSelect}
+            className='snap-start'
           />
         </div>
       </div>

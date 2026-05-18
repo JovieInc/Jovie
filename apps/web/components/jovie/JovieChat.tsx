@@ -8,6 +8,7 @@ import { JovieMarkElectric } from '@/components/atoms/JovieMarkElectric';
 import { useAppFlag } from '@/lib/flags/client';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
 import { useChatCapabilitiesQuery } from '@/lib/queries';
+import { cn } from '@/lib/utils';
 
 import { CHAT_COMPOSER_DOCK_CLASSNAME } from './chat-layout';
 import {
@@ -145,6 +146,27 @@ export function JovieChat({
       {
         label: 'Turn it into a checklist',
         prompt: 'Turn this conversation into a short checklist I can follow.',
+      },
+    ],
+    []
+  );
+  const starterQuickActions = useMemo(
+    () => [
+      {
+        label: 'Plan a release',
+        prompt: 'Help me plan my next release.',
+      },
+      {
+        label: 'Generate album art',
+        prompt: 'Generate album art ideas for my next release.',
+      },
+      {
+        label: 'Pitch playlists',
+        prompt: 'Help me pitch this release to playlists.',
+      },
+      {
+        label: 'Send feedback',
+        prompt: '/feedback ',
       },
     ],
     []
@@ -414,6 +436,11 @@ export function JovieChat({
 
   const greetingName =
     getFirstNameForGreeting(displayName) ?? getFirstNameForGreeting(username);
+  const showStarterPrompts =
+    input.trim().length === 0 &&
+    !composerPickerOpen &&
+    (pendingImages?.length ?? 0) === 0 &&
+    chipTray.chips.length === 0;
   let emptyStateHeading: string;
   if (isFirstSession) {
     emptyStateHeading = "Hey, I'm Jovie";
@@ -663,21 +690,43 @@ export function JovieChat({
                   </span>
                 )}
               </div>
-              <div className='relative mx-auto flex min-h-full w-full max-w-[44rem] flex-col items-center justify-center gap-6 py-8'>
-                <h1 className='text-balance text-center text-[2rem] font-semibold leading-[1.1] tracking-[-0.035em] text-primary-token sm:text-[2.5rem] md:text-[3rem]'>
+              <div
+                className='relative mx-auto flex min-h-full w-full max-w-[48rem] flex-col items-center justify-center gap-5 py-8'
+                data-testid='chat-empty-state-composer-region'
+              >
+                <h1
+                  className={cn(
+                    'text-balance text-center text-[2rem] font-semibold leading-[1.1] tracking-[-0.035em] text-primary-token sm:text-[2.5rem] md:text-[3rem]',
+                    composerPickerOpen && 'pointer-events-none opacity-0'
+                  )}
+                  aria-hidden={composerPickerOpen ? 'true' : undefined}
+                >
                   {emptyStateHeading}
                 </h1>
-                <div className='mx-auto flex w-full max-w-[38rem] flex-col items-center gap-3'>
-                  <SuggestedPrompts
-                    onSelect={handleSuggestedPromptWithJank}
-                    isFirstSession={isFirstSession}
-                    latestReleaseTitle={latestReleaseTitle}
-                    albumArtCapability={albumArtCapability}
-                    layout='rail'
-                    dimmed={composerPickerOpen}
+
+                <div className='mx-auto flex w-full max-w-[45rem] flex-col items-center gap-3'>
+                  <ChatUsageAlert />
+
+                  {isRateLimited && (
+                    <p
+                      className='text-center text-xs text-tertiary-token'
+                      aria-live='polite'
+                    >
+                      Sending too fast. Please wait a second before your next
+                      message.
+                    </p>
+                  )}
+
+                  <ChatInput
+                    {...chatInputProps}
+                    placeholder='Ask Jovie...'
+                    shellChatV1={shellChatV1Enabled}
+                    quickActions={starterQuickActions}
+                    onQuickActionSelect={handleSuggestedPromptWithJank}
                   />
+
                   {chatError && (
-                    <div className='mt-2.5 w-full'>
+                    <div className='w-full'>
                       <ErrorDisplay
                         chatError={chatError}
                         onRetry={handleRetry}
@@ -686,29 +735,17 @@ export function JovieChat({
                       />
                     </div>
                   )}
+
+                  {showStarterPrompts ? (
+                    <SuggestedPrompts
+                      onSelect={handleSuggestedPromptWithJank}
+                      isFirstSession={isFirstSession}
+                      latestReleaseTitle={latestReleaseTitle}
+                      albumArtCapability={albumArtCapability}
+                      layout='rail'
+                    />
+                  ) : null}
                 </div>
-              </div>
-            </div>
-
-            <div className={CHAT_COMPOSER_DOCK_CLASSNAME}>
-              <div className='mx-auto w-full max-w-[45rem]'>
-                <ChatUsageAlert />
-
-                {isRateLimited && (
-                  <p
-                    className='mb-1.5 text-center text-xs text-tertiary-token'
-                    aria-live='polite'
-                  >
-                    Sending too fast. Please wait a second before your next
-                    message.
-                  </p>
-                )}
-
-                <ChatInput
-                  {...chatInputProps}
-                  placeholder='Ask Jovie...'
-                  shellChatV1={shellChatV1Enabled}
-                />
               </div>
             </div>
           </div>

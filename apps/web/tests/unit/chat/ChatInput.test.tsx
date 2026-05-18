@@ -170,7 +170,7 @@ describe('ChatInput', () => {
     expect(getByRole('menu')).toBeInTheDocument();
   });
 
-  it('reveals quick actions when the composer is focused', () => {
+  it('renders quick actions inside the slash menu instead of below the composer', () => {
     const onQuickActionSelect = vi.fn();
     fastRender(
       withProviders(
@@ -191,11 +191,23 @@ describe('ChatInput', () => {
     fireEvent.focus(
       screen.getByRole('textbox', { name: /chat message input/i })
     );
+    fireEvent.change(
+      screen.getByRole('textbox', { name: /chat message input/i }),
+      {
+        target: { value: '/' },
+      }
+    );
 
-    expect(screen.getByTestId('chat-input-quick-actions')).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'Summarize this thread' })
-    ).toBeInTheDocument();
+    expect(screen.queryByTestId('chat-input-quick-actions')).toBeNull();
+    expect(screen.getByTestId('slash-command-menu')).toBeInTheDocument();
+    expect(screen.getByText('Suggestions')).toBeInTheDocument();
+
+    const action = screen.getByText('Summarize this thread').closest('button');
+    expect(action).toBeTruthy();
+    fireEvent.mouseDown(action!);
+    expect(onQuickActionSelect).toHaveBeenCalledWith(
+      'Summarize this thread in three concise bullets.'
+    );
   });
 
   it('renders the elevated no-shadow composer geometry', () => {
