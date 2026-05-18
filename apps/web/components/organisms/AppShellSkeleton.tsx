@@ -20,9 +20,11 @@ const NAV_ITEMS_2 = [
 
 export function AppShellSkeleton({
   main: mainOverride,
+  audioPlayer,
   variant,
 }: {
   readonly main?: ReactNode;
+  readonly audioPlayer?: ReactNode;
   /**
    * Match the AppShellFrame variant the post-skeleton render will use so the
    * Suspense fallback doesn't flash a different layout while data loads.
@@ -122,6 +124,7 @@ export function AppShellSkeleton({
           <div className='skeleton h-4 w-28 rounded' />
         </header>
       }
+      audioPlayer={audioPlayer}
       main={
         mainOverride ?? (
           <div className='mx-auto flex h-full w-full max-w-5xl p-4 sm:p-6'>
