@@ -66,21 +66,56 @@ function mergeRequiredClerkElement(
   return requiredElement;
 }
 
-function hasReadyClerkAuthStart(
+function hasEnabledButtonMatching(
+  root: HTMLDivElement | null,
+  predicate: (text: string) => boolean
+) {
+  if (!root) return false;
+
+  return Array.from(root.querySelectorAll('button')).some(button => {
+    if (button.disabled) return false;
+
+    const text = button.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+    return predicate(text);
+  });
+}
+
+function hasReadyClerkCredentialStart(root: HTMLDivElement | null) {
+  if (!root) return false;
+
+  const hasCredentialInput = root.querySelector(
+    'input[type="email"], input[name="identifier"], input[name="emailAddress"], input[type="password"], input[name="password"]'
+  );
+  if (!hasCredentialInput) return false;
+
+  return hasEnabledButtonMatching(root, text =>
+    /^(continue|sign in|sign up|verify)$/i.test(text)
+  );
+}
+
+function hasReadyClerkProviderStart(
   root: HTMLDivElement | null,
   expectedProviderLabels: readonly string[]
 ) {
   if (!root) return false;
 
-  const hasEmailEntry = root.querySelector(
-    'input[type="email"], input[name="identifier"], input[name="emailAddress"]'
+  if (expectedProviderLabels.length > 0) {
+    return expectedProviderLabels.some(label =>
+      hasEnabledButtonMatching(root, text => text.includes(label))
+    );
+  }
+
+  return hasEnabledButtonMatching(root, text => /^continue with /i.test(text));
+}
+
+function hasReadyClerkAuthStart(
+  root: HTMLDivElement | null,
+  expectedProviderLabels: readonly string[]
+) {
+  return (
+    hasReadyClerkCredentialStart(root) ||
+    hasReadyClerkProviderStart(root, expectedProviderLabels)
   );
-  if (!hasEmailEntry) return false;
-
-  if (expectedProviderLabels.length === 0) return true;
-
-  const text = root.textContent ?? '';
-  return expectedProviderLabels.every(label => text.includes(label));
 }
 
 interface AuthShellProps {
@@ -262,6 +297,7 @@ export function AuthShell({
 
       <div
         ref={clerkSurfaceRef}
+        data-auth-clerk-surface
         aria-hidden={showStablePlaceholder ? 'true' : undefined}
         className={cn(
           showStablePlaceholder &&
