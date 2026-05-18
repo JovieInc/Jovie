@@ -1,14 +1,14 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useMemo } from 'react';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import {
   type LyricLine,
   LyricsView,
   type LyricsViewTrack,
 } from '@/components/shell/LyricsView';
-import { APP_ROUTES } from '@/constants/routes';
+import { APP_ROUTES, resolveLyricsReturnRoute } from '@/constants/routes';
 import { isFormElement } from '@/lib/utils/keyboard';
 
 /**
@@ -30,8 +30,14 @@ export function LyricsPageClient({
   readonly trackId: string;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { playbackState, seek } = useTrackAudioPlayer();
   const isActive = playbackState.activeTrackId === trackId;
+  const returnRoute = useMemo(
+    () =>
+      resolveLyricsReturnRoute(searchParams.get('from'), APP_ROUTES.LIBRARY),
+    [searchParams]
+  );
 
   useEffect(() => {
     if (isActive) return;
@@ -46,12 +52,12 @@ export function LyricsPageClient({
       }
 
       event.preventDefault();
-      router.push(APP_ROUTES.LIBRARY);
+      router.push(returnRoute);
     }
 
     globalThis.addEventListener('keydown', handleKeyDown);
     return () => globalThis.removeEventListener('keydown', handleKeyDown);
-  }, [isActive, router]);
+  }, [isActive, returnRoute, router]);
 
   const track = {
     title:
