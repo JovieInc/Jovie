@@ -105,12 +105,20 @@ const SETTINGS_SHARED_ROUTE_CONTEXT_FILES = [
       'apps/web/app/app/(shell)/settings/connectors/page.tsx'
     )
   ),
+  findSourceFile(
+    resolve(process.cwd(), 'app/app/(shell)/settings/artist-profile/page.tsx'),
+    resolve(
+      process.cwd(),
+      'apps/web/app/app/(shell)/settings/artist-profile/page.tsx'
+    )
+  ),
 ] as const;
 
 const SETTINGS_SHARED_ROUTE_CONTEXT_CANDIDATES = [
   resolve(process.cwd(), 'app/app/(shell)/settings/contacts/page.tsx'),
   resolve(process.cwd(), 'app/app/(shell)/settings/touring/page.tsx'),
   resolve(process.cwd(), 'app/app/(shell)/settings/connectors/page.tsx'),
+  resolve(process.cwd(), 'app/app/(shell)/settings/artist-profile/page.tsx'),
 ] as const;
 
 describe('settings shell normalization', () => {
