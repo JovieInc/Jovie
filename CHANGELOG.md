@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.26] - 2026-05-17
+
+> First-run cinematic boot: the very first time you land in the app each tab, Jovie greets you with a soft cinematic — logo cinematic fade, gentle reverse spin, frame settles, sidebar slides in, welcome content appears. Subsequent navigations skip straight to the skeleton — no repeat motion.
+
+### Added
+
+- **Cinematic app boot — first-mount-per-tab (JOV-2364)**: new `CinematicAppBoot` organism wraps the `(shell)/layout.tsx` Suspense fallback. On the first shell mount of each browser tab, plays a 2.4s forward-only cinematic over a dark canvas (Jovie mark fades in → reverse spin → mark fades off → frame fades in → sidebar slides in → welcome content fades up). On subsequent shell suspensions in the same tab the cinematic is skipped and the route-specific skeleton renders directly. SSR-safe via a `mounted` guard, honors `prefers-reduced-motion`, and gates per-tab via the `jovie:cinematic-boot-played` sessionStorage flag. Final composed state mirrors the post-resolve `AppShellFrame` so the natural unmount-on-resolve is visually seamless. New atomic vitest suite (5 assertions) covers the gating logic.
+
 ## [26.5.25] - 2026-05-17
 
 > [internal] Auth reliability: middleware 503 paths now return HTML for browser navigation, and Sentry rate-limiting uses atomic Redis operations to prevent silent alert suppression.

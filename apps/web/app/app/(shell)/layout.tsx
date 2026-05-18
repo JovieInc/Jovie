@@ -2,7 +2,7 @@ import * as Sentry from '@sentry/nextjs';
 import { headers } from 'next/headers';
 import { redirect, unstable_rethrow } from 'next/navigation';
 import { Suspense } from 'react';
-import { AppShellSkeleton } from '@/components/organisms/AppShellSkeleton';
+import { CinematicAppBoot } from '@/components/organisms/CinematicAppBoot';
 import { LyricsRouteSkeleton } from '@/components/shell/LyricsRouteSkeleton';
 import { TasksRouteSkeleton } from '@/components/shell/TasksRouteSkeleton';
 import { APP_ROUTES } from '@/constants/routes';
@@ -58,42 +58,28 @@ export default async function AppShellLayout({
     });
     const shellVariant = shellChatV1 ? 'shellChatV1' : 'legacy';
 
-    let shellFallback: React.ReactNode;
+    // Pick the route-specific skeleton main slot.
+    let routeMain: React.ReactNode = undefined;
     if (isChatShellRoute(pathname)) {
-      shellFallback = (
-        <AppShellSkeleton main={<ChatLoading />} variant={shellVariant} />
-      );
+      routeMain = <ChatLoading />;
     } else if (isReleasesShellRoute(pathname)) {
-      shellFallback = (
-        <AppShellSkeleton
-          main={<ReleaseTableSkeleton showHeader={false} />}
-          variant={shellVariant}
-        />
-      );
+      routeMain = <ReleaseTableSkeleton showHeader={false} />;
     } else if (isLibraryShellRoute(pathname)) {
-      shellFallback = (
-        <AppShellSkeleton
-          main={<LibraryLoadingState />}
-          variant={shellVariant}
-        />
-      );
+      routeMain = <LibraryLoadingState />;
     } else if (isLyricsShellRoute(pathname)) {
-      shellFallback = (
-        <AppShellSkeleton
-          main={<LyricsRouteSkeleton />}
-          variant={shellVariant}
-        />
-      );
+      routeMain = <LyricsRouteSkeleton />;
     } else if (isTasksShellRoute(pathname)) {
-      shellFallback = (
-        <AppShellSkeleton
-          main={<TasksRouteSkeleton />}
-          variant={shellVariant}
-        />
-      );
-    } else {
-      shellFallback = <AppShellSkeleton variant={shellVariant} />;
+      routeMain = <TasksRouteSkeleton />;
     }
+
+    // CinematicAppBoot internally renders <AppShellSkeleton main={routeMain}
+    // variant={shellVariant} /> unless this is the FIRST shell mount of the
+    // tab AND prefers-reduced-motion is off, in which case it plays a 2.4s
+    // cinematic timeline before the underlying tree resolves. Per-tab gate
+    // via sessionStorage flag `jovie:cinematic-boot-played`.
+    const shellFallback = (
+      <CinematicAppBoot main={routeMain} variant={shellVariant} />
+    );
 
     // Ban check moved inside DashboardShellContent (runs in parallel with
     // shell data fetch). Banned users are 1-in-a-million — their experience
