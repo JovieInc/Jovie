@@ -10,6 +10,13 @@ export interface ShellListRowFrameProps
   readonly interactive?: boolean;
 }
 
+export interface ShellListRowButtonProps
+  extends ComponentPropsWithoutRef<'button'> {
+  readonly isSelected?: boolean;
+  readonly interaction?: ShellListRowInteraction;
+  readonly interactive?: boolean;
+}
+
 function getTaskRowGroupState(isSelected: boolean): string {
   if (isSelected) {
     return cn(
@@ -60,6 +67,30 @@ export function ShellListRowFrame({
 }: Readonly<ShellListRowFrameProps>) {
   return (
     <div
+      data-shell-list-row='true'
+      data-selected={isSelected ? 'true' : undefined}
+      className={getShellListRowFrameClassName({
+        className,
+        interaction,
+        interactive,
+        isSelected,
+      })}
+      {...props}
+    />
+  );
+}
+
+export function ShellListRowButton({
+  className,
+  interaction = 'self',
+  interactive = true,
+  isSelected = false,
+  type = 'button',
+  ...props
+}: Readonly<ShellListRowButtonProps>) {
+  return (
+    <button
+      type={type}
       data-shell-list-row='true'
       data-selected={isSelected ? 'true' : undefined}
       className={getShellListRowFrameClassName({

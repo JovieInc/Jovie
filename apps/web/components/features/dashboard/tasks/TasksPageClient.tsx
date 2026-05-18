@@ -61,6 +61,7 @@ import { ReleaseSidebar } from '@/components/organisms/release-sidebar';
 import {
   type ContextMenuItemType,
   convertContextMenuItems,
+  ShellListRowButton,
 } from '@/components/organisms/table';
 import { rowState } from '@/components/organisms/table/table.styles';
 import {
@@ -1009,7 +1010,7 @@ function MobileTaskSection({
         <h2 className='text-2xs font-semibold text-tertiary-token'>{title}</h2>
         <span className='text-3xs text-tertiary-token'>{tasks.length}</span>
       </div>
-      <div className='overflow-hidden rounded-[18px] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,transparent)] shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-shell-border)_65%,transparent)]'>
+      <div className='space-y-1 overflow-hidden rounded-[18px] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,transparent)] p-1 shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-shell-border)_65%,transparent)]'>
         {tasks.map(task => (
           <MobileTaskListItem
             key={task.id}
@@ -1046,16 +1047,11 @@ function MobileTaskListItem({
   const StageIcon = stage.icon;
 
   return (
-    <button
-      type='button'
+    <ShellListRowButton
       onClick={() => onOpenTask(task)}
       data-testid='mobile-task-row'
-      className={cn(
-        'flex w-full items-start gap-3 border-b border-[color-mix(in_oklab,var(--linear-app-shell-border)_58%,transparent)] px-4 py-3 text-left transition-[background-color,color] duration-subtle last:border-b-0',
-        isSelected
-          ? 'bg-[color-mix(in_oklab,var(--linear-row-hover)_68%,var(--linear-app-content-surface))]'
-          : 'bg-transparent hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_56%,transparent)]'
-      )}
+      isSelected={isSelected}
+      className='flex w-full items-start gap-3 px-3 py-2.5 text-left'
     >
       <span
         className='mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center'
@@ -1107,7 +1103,7 @@ function MobileTaskListItem({
           </span>
         ) : null}
       </span>
-    </button>
+    </ShellListRowButton>
   );
 }
 

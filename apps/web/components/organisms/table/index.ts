@@ -84,11 +84,13 @@ export { AvatarCell } from './atoms/AvatarCell';
 export { DateCell } from './atoms/DateCell';
 export { GroupHeader } from './atoms/GroupHeader';
 export type {
+  ShellListRowButtonProps,
   ShellListRowFrameProps,
   ShellListRowInteraction,
 } from './atoms/ShellListRowFrame';
 export {
   getShellListRowFrameClassName,
+  ShellListRowButton,
   ShellListRowFrame,
 } from './atoms/ShellListRowFrame';
 export { SkeletonCell } from './atoms/SkeletonCell';

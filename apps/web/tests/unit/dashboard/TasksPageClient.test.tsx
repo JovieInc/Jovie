@@ -498,6 +498,25 @@ vi.mock('@/components/organisms/table', () => ({
       {end}
     </div>
   ),
+  ShellListRowButton: ({
+    children,
+    className,
+    isSelected,
+    type = 'button',
+    ...props
+  }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+    isSelected?: boolean;
+  }) => (
+    <button
+      type={type}
+      data-shell-list-row='true'
+      data-selected={isSelected ? 'true' : undefined}
+      className={className}
+      {...props}
+    >
+      {children}
+    </button>
+  ),
   UnifiedTable: (props: { minWidth?: string; containerClassName?: string }) => {
     mockUnifiedTable(props);
     return (
@@ -1380,7 +1399,10 @@ describe('TasksPageClient', () => {
       screen.queryByRole('searchbox', { name: 'Search tasks' })
     ).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getAllByTestId('mobile-task-row')[0]!);
+    const firstMobileRow = screen.getAllByTestId('mobile-task-row')[0]!;
+    expect(firstMobileRow).toHaveAttribute('data-shell-list-row', 'true');
+
+    fireEvent.click(firstMobileRow);
 
     expect(screen.getByLabelText('Task title')).toBeInTheDocument();
   });
