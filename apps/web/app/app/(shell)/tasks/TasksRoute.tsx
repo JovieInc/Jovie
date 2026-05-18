@@ -1,41 +1,24 @@
-import { redirect } from 'next/navigation';
 import { TasksPageClient } from '@/components/features/dashboard/tasks/TasksPageClient';
 import { TasksWorkspaceUpgradeInterstitial } from '@/components/features/dashboard/tasks/TasksUpgradeInterstitial';
 import { APP_ROUTES } from '@/constants/routes';
-import { PageErrorState } from '@/features/feedback/PageErrorState';
-import { getCachedAuth } from '@/lib/auth/cached';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
 import { queryKeys } from '@/lib/queries';
 import { HydrateClient } from '@/lib/queries/HydrateClient';
 import { getDehydratedState, getQueryClient } from '@/lib/queries/server';
 import { DEFAULT_TASK_WORKSPACE_FILTERS } from '@/lib/tasks/query-defaults';
-import { getDashboardShellData } from '../dashboard/actions';
+import { loadAppShellRouteContext } from '../app-shell-route-context';
 import { getTaskBoard, getTasks } from '../dashboard/tasks/task-actions';
 
 export async function TasksRoute() {
-  const { userId } = await getCachedAuth();
-  if (!userId) {
-    const signInParams = new URLSearchParams({
-      redirect_url: APP_ROUTES.TASKS,
-    });
-    redirect(`${APP_ROUTES.SIGNIN}?${signInParams.toString()}`);
-  }
-
-  const dashboardData = await getDashboardShellData(userId);
-  if (dashboardData.dashboardLoadError) {
-    void captureError(
-      'Dashboard data load failed on tasks page',
-      dashboardData.dashboardLoadError,
-      { route: APP_ROUTES.TASKS }
-    );
-    return (
-      <PageErrorState message='Failed to load tasks data. Please refresh the page.' />
-    );
-  }
-
-  if (dashboardData.needsOnboarding) {
-    redirect(APP_ROUTES.START);
+  const routeContext = await loadAppShellRouteContext({
+    route: APP_ROUTES.TASKS,
+    dashboardErrorLogMessage: 'Dashboard data load failed on tasks page',
+    dashboardErrorMessage:
+      'Failed to load tasks data. Please refresh the page.',
+  });
+  if (!routeContext.ok) {
+    return routeContext.error;
   }
 
   const entitlements = await getCurrentUserEntitlements();
@@ -43,7 +26,7 @@ export async function TasksRoute() {
     return <TasksWorkspaceUpgradeInterstitial />;
   }
 
-  const profileId = dashboardData.selectedProfile?.id;
+  const profileId = routeContext.profileId;
   if (profileId) {
     const queryClient = getQueryClient();
     try {
