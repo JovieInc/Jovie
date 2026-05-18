@@ -4,7 +4,7 @@ import { UserAvatar } from '@jovie/ui';
 import { Disc3 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { ReleaseDueBadge } from '@/components/molecules/ReleaseDueBadge';
-import { rowState } from '@/components/organisms/table/table.styles';
+import { ShellListRowFrame } from '@/components/organisms/table';
 import type { TaskView } from '@/lib/tasks/types';
 import { getAccentCssVars } from '@/lib/ui/accent-palette';
 import { cn } from '@/lib/utils';
@@ -119,17 +119,12 @@ export function TaskListRow({
   const isCancelled = task.status === 'cancelled';
 
   return (
-    <div
-      data-selected={isSelected ? 'true' : undefined}
+    <ShellListRowFrame
       data-testid={`task-list-row-${task.id}`}
+      isSelected={isSelected}
+      interaction='task-row-group'
       className={cn(
-        'relative grid h-full min-w-0 grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-transparent px-2.5 py-1.5 transition-[background-color,box-shadow,opacity]',
-        isSelected
-          ? cn(
-              rowState.selected,
-              'group-hover/task-row:bg-(--linear-row-selected) group-focus-visible/task-row:bg-(--linear-row-selected) group-focus-visible/task-row:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_24%,transparent)]'
-            )
-          : 'group-hover/task-row:bg-(--linear-row-hover) group-focus-visible/task-row:bg-(--linear-row-hover) group-focus-visible/task-row:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_45%,transparent)]',
+        'grid h-full grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-3 px-2.5 py-1.5 transition-[opacity]',
         isDone && !isSelected && 'opacity-75',
         isCancelled && !isSelected && 'opacity-60'
       )}
@@ -192,6 +187,6 @@ export function TaskListRow({
         </div>
         <div className='shrink-0'>{actionSlot}</div>
       </div>
-    </div>
+    </ShellListRowFrame>
   );
 }
