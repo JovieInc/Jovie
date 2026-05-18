@@ -189,4 +189,24 @@ describe('loadAppShellRouteContext', () => {
       profileId: 'profile_2',
     });
   });
+
+  it('uses a caller-provided authenticated user id without a second auth lookup', async () => {
+    const data = shellData({ selectedProfile: { id: 'profile_3' } });
+    getDashboardShellDataMock.mockResolvedValue(data);
+
+    const result = await loadAppShellRouteContext({
+      route: '/app/audience',
+      authenticatedUserId: 'user_from_page',
+      dashboardErrorMessage: 'Failed to load audience data.',
+    });
+
+    expect(getCachedAuthMock).not.toHaveBeenCalled();
+    expect(getDashboardShellDataMock).toHaveBeenCalledWith('user_from_page');
+    expect(result).toMatchObject({
+      ok: true,
+      userId: 'user_from_page',
+      dashboardData: data,
+      profileId: 'profile_3',
+    });
+  });
 });

@@ -17,7 +17,7 @@ import {
   trimTrailingSlashes,
 } from '@/lib/utils/string-utils';
 import { convertDrizzleCreatorProfileToArtist } from '@/types/db';
-import { getDashboardShellData } from '../dashboard/actions';
+import { loadAppShellRouteContext } from '../app-shell-route-context';
 import { getAudienceServerData } from '../dashboard/audience/audience-data';
 import { loadUpcomingTourDates } from '../dashboard/tour-dates/actions';
 
@@ -27,9 +27,8 @@ export const runtime = 'nodejs';
  * Audience page — streams instantly after auth gate.
  *
  * Auth check via getCachedAuth (Clerk JWT, no DB) runs at the page level
- * so unauthenticated users redirect immediately. Uses getDashboardShellData
- * (skips settings/entitlements) for faster shell rendering. Audience data
- * is cached via unstable_cache (5 min TTL) so repeat visits are instant.
+ * so unauthenticated users redirect immediately. The async content uses the
+ * shared shell route context while preserving the Suspense table fallback.
  */
 export default async function AudiencePage({
   searchParams,
@@ -48,10 +47,6 @@ export default async function AudiencePage({
   );
 }
 
-/**
- * Async server component — fetches dashboard shell + audience data.
- * Suspense boundary above shows skeleton instantly while this resolves.
- */
 async function AudienceContent({
   userId,
   searchParams,
@@ -61,28 +56,18 @@ async function AudienceContent({
 }>) {
   try {
     const isE2E = process.env.NEXT_PUBLIC_E2E_MODE === '1';
-
-    // Shell data is faster than essential data (skips settings/entitlements)
-    const dashboardData = await getDashboardShellData(userId);
-
-    if (dashboardData.dashboardLoadError) {
-      void captureError(
-        'Dashboard data load failed on audience page',
-        dashboardData.dashboardLoadError,
-        { route: APP_ROUTES.AUDIENCE }
-      );
-      return (
-        <PageErrorState message='Failed to load audience data. Please refresh the page.' />
-      );
+    const routeContext = await loadAppShellRouteContext({
+      route: APP_ROUTES.AUDIENCE,
+      authenticatedUserId: userId,
+      dashboardErrorLogMessage: 'Dashboard data load failed on audience page',
+      dashboardErrorMessage:
+        'Failed to load audience data. Please refresh the page.',
+    });
+    if (!routeContext.ok) {
+      return routeContext.error;
     }
 
-    // Onboarding check first — during provisioning, user may be null but
-    // needsOnboarding is true. Checking user first would incorrectly redirect
-    // authenticated-but-not-yet-provisioned users to signin.
-    if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
-      redirect(APP_ROUTES.START);
-    }
-
+    const { dashboardData } = routeContext;
     if (!dashboardData.user?.id) {
       redirect(buildAppShellSignInUrl(APP_ROUTES.AUDIENCE));
     }
@@ -96,16 +81,12 @@ async function AudienceContent({
         ? `${trimTrailingSlashes(BASE_URL)}/${trimLeadingSlashes(artist.handle)}`
         : undefined;
 
-    // Parse search params using nuqs for type-safe URL state
     const parsedParams = await audienceSearchParams.parse(searchParams);
-
-    // Validate segments from URL against known values
     const validSegments = parsedParams.segments.filter(
       (s): s is AudienceSegment =>
         (audienceFilters as readonly string[]).includes(s)
     );
 
-    // Fetch audience data and tour dates in parallel
     const [audienceData, tourDates] = await Promise.all([
       getAudienceServerData({
         userId: dashboardData.user.id,
@@ -125,7 +106,6 @@ async function AudienceContent({
         : Promise.resolve([]),
     ]);
 
-    // Map tour dates to lightweight shape for client-side city matching
     const tourDatesForMatching = tourDates.map(
       (td: { city: string; startDate: string }) => ({
         city: td.city,
