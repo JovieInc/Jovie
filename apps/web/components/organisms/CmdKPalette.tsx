@@ -169,6 +169,7 @@ export function CmdKPalette({
         let id: string;
         if (item.kind === 'nav') id = item.nav.id;
         else if (item.kind === 'skill') id = item.skill.id;
+        else if (item.kind === 'prompt') id = item.prompt.id;
         else id = item.entity.id;
         onAdditionalSelect?.(id);
         handleClose();
@@ -183,6 +184,10 @@ export function CmdKPalette({
       if (item.kind === 'skill') {
         const url = `${APP_ROUTES.CHAT}?skill=${encodeURIComponent(item.skill.id)}`;
         router.push(url);
+        handleClose();
+        return;
+      }
+      if (item.kind === 'prompt') {
         handleClose();
         return;
       }

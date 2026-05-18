@@ -25,6 +25,20 @@ describe('SuggestedPrompts', () => {
     expect(queryByText('Getting paid')).toBeNull();
   });
 
+  it('keeps the rail as a single manually scrollable row', () => {
+    const onSelect = vi.fn();
+    const { getByTestId } = fastRender(
+      <SuggestedPrompts onSelect={onSelect} />
+    );
+
+    const rail = getByTestId('suggested-prompts-rail');
+    expect(rail.className).toContain('overflow-x-auto');
+    expect(rail.className).not.toContain('md:overflow-visible');
+    const row = rail.firstElementChild;
+    expect(row?.className).toContain('snap-x');
+    expect(row?.className).not.toContain('flex-wrap');
+  });
+
   it('renders a grid layout when requested', () => {
     const onSelect = vi.fn();
     const { getByTestId } = fastRender(

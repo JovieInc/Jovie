@@ -27,17 +27,7 @@ import {
   ComposerSendButton,
 } from './ChatComposerToolbar';
 import { ChipTray } from './ChipTray';
-import {
-  SPRING_HEIGHT,
-  TRANSITION_REVEAL,
-  TRANSITION_SURFACE,
-} from './chat-motion';
-import {
-  CHAT_PROMPT_RAIL_CLASS,
-  CHAT_PROMPT_RAIL_MASK_STYLE,
-  CHAT_PROMPT_RAIL_SCROLL_CLASS,
-  getChatPromptPillClass,
-} from './chat-prompt-styles';
+import { SPRING_HEIGHT, TRANSITION_SURFACE } from './chat-motion';
 import { EntityPreviewPane } from './EntityPreviewPane';
 import { ImagePreviewStrip } from './ImagePreviewStrip';
 import {
@@ -303,6 +293,15 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       [onAddEntity, stripSlashQuery, picker]
     );
 
+    const handleSelectPromptAction = useCallback(
+      (prompt: string) => {
+        stripSlashQuery();
+        picker.close();
+        onQuickActionSelect?.(prompt);
+      },
+      [onQuickActionSelect, picker, stripSlashQuery]
+    );
+
     const {
       isSupported: isDictationSupported,
       isListening,
@@ -381,10 +380,6 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       surfaceMode === 'entity' && !isStacked
         ? 'relative flex justify-end'
         : 'relative flex justify-center';
-
-    const hasQuickActions =
-      Boolean(onQuickActionSelect) && (quickActions?.length ?? 0) > 0;
-
     // Container the slash key listener cares about when the picker is closed.
     // (The active-listener inside SlashCommandMenu only mounts while open.)
 
@@ -413,13 +408,11 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       <form
         onSubmit={handleFormSubmit}
         aria-label='Compose a message — type / for skills and references'
-        className='relative z-10 focus-within:outline-none'
+        className='relative z-10 w-full focus-within:outline-none'
       >
         <div className={dockClass}>
-          {/* ROOT inline picker: rendered above the surface via absolute
-              positioning so it does not alter the surface height and cause
-              layout shift when it opens. `bottom-full` places it just above
-              the top edge of the surface; `mb-1` adds a small gap. */}
+          {/* ROOT inline picker is absolutely positioned so it does not alter
+              the composer surface height and cause layout shift when it opens. */}
           {showInlinePicker ? (
             <div className='absolute bottom-full left-0 right-0 z-50 mb-1 flex justify-center'>
               <div
@@ -440,6 +433,8 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   variant='inline'
                   listIdProp={pickerListId}
                   onActiveRowChange={setPickerActiveRowId}
+                  promptActions={quickActions}
+                  onSelectPrompt={handleSelectPromptAction}
                 />
               </div>
             </div>
@@ -628,38 +623,6 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             )}
           </motion.div>
         </div>
-
-        {hasQuickActions && quickActions && surfaceMode === 'typing' ? (
-          <motion.div
-            initial={reducedMotion ? undefined : { opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={reducedMotion ? undefined : TRANSITION_REVEAL}
-            className='mt-2 flex justify-center'
-          >
-            <div
-              className={CHAT_PROMPT_RAIL_SCROLL_CLASS}
-              style={CHAT_PROMPT_RAIL_MASK_STYLE}
-              data-testid='chat-input-quick-actions'
-            >
-              <div className={CHAT_PROMPT_RAIL_CLASS}>
-                {quickActions.map(action => (
-                  <button
-                    key={action.label}
-                    type='button'
-                    onMouseDown={handlePreserveFocus}
-                    onClick={() => onQuickActionSelect?.(action.prompt)}
-                    className={cn(
-                      getChatPromptPillClass('compact'),
-                      'min-w-[124px] max-w-[172px]'
-                    )}
-                  >
-                    <span className='truncate'>{action.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </motion.div>
-        ) : null}
 
         {isNearLimit ? (
           <output

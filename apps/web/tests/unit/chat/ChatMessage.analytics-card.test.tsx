@@ -92,6 +92,8 @@ describe('ChatMessage analytics cards', () => {
     fastRender(<ChatMessage {...messageProps} />);
 
     expect(screen.getByTestId('chat-analytics-card')).toBeTruthy();
+    expect(screen.getByTestId('chat-analytics-signal-carousel')).toBeTruthy();
+    expect(screen.getByTestId('chat-analytics-signal-card')).toBeTruthy();
     expect(screen.getByText('Top signals')).toBeTruthy();
     expect(
       screen.getByText('Subscribers are picking up in Chicago')
