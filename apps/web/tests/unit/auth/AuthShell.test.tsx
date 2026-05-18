@@ -18,6 +18,7 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(searchParamsState.value),
 }));
 
+import { authClerkLocalization } from '@/components/providers/clerkLocalization';
 import { AuthShell } from '@/features/auth';
 
 describe('AuthShell Clerk appearance guards', () => {
@@ -75,5 +76,43 @@ describe('AuthShell Clerk appearance guards', () => {
       })
     );
     expect(elements?.socialButtonsBlockButton__facebook).toBe('hidden');
+  });
+
+  it('renders stable full-label provider slots before Clerk is ready', () => {
+    const { container } = render(<AuthShell mode='sign-in' />);
+
+    expect(
+      container.querySelector('[data-auth-provider-slot="google"]')
+    ).toHaveTextContent('Continue with Google');
+    expect(
+      container.querySelector('[data-auth-provider-slot="apple"]')
+    ).toHaveTextContent('Continue with Apple');
+  });
+
+  it('keeps legal copy in stable line groups with valid fallback hrefs', () => {
+    const { container } = render(<AuthShell mode='sign-up' />);
+
+    expect(
+      container.querySelector('[data-auth-legal-prefix]')
+    ).toHaveTextContent('By signing up, you agree to our');
+    expect(
+      container.querySelector('[data-auth-legal-links]')
+    ).toHaveTextContent('Terms of Service and Privacy Policy.');
+
+    expect(container.querySelector('a[href="/legal/terms"]')).toHaveTextContent(
+      'Terms of Service'
+    );
+    expect(
+      container.querySelector('a[href="/legal/privacy"]')
+    ).toHaveTextContent('Privacy Policy');
+  });
+
+  it('shares the same full provider copy with Clerk localization', () => {
+    expect(authClerkLocalization.socialButtonsBlockButton).toBe(
+      'Continue with {{provider|titleize}}'
+    );
+    expect(authClerkLocalization.socialButtonsBlockButtonManyInView).toBe(
+      'Continue with {{provider|titleize}}'
+    );
   });
 });

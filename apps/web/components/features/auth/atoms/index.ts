@@ -1,3 +1,4 @@
+export { AuthAppleIcon } from './AuthAppleIcon';
 export { AuthBackButton } from './AuthBackButton';
 export { AuthButton, authButtonVariants } from './AuthButton';
 export { AuthFooterLink } from './AuthFooterLink';
