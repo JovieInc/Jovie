@@ -8,6 +8,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { AuthProviderButtonSlots } from '@/features/auth/AuthProviderButtons';
 import { useNormalizeClerkHomeLink } from '@/features/auth/useNormalizeClerkHomeLink';
 import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
+import { CLERK_COMPONENT_OPTIONS } from '@/lib/auth/clerk-options';
 import {
   buildDisabledOAuthProviderElements,
   getAuthOAuthProviderLabel,
@@ -161,10 +162,12 @@ export function AuthShell({
 
   const isSignUp = mode === 'sign-up';
 
+  // Sign-in cross-link → /waitlist (Jovie is invite-only; /signup is not a
+  // publicly navigable destination). Sign-up cross-link → /signin. #48
   const crossLinkUrl =
     oppositeModeUrl ??
     buildAuthRouteUrl(
-      isSignUp ? APP_ROUTES.SIGNIN : APP_ROUTES.SIGNUP,
+      isSignUp ? APP_ROUTES.SIGNIN : APP_ROUTES.WAITLIST,
       searchParams
     );
   const clerkCrossLinkUrl =
@@ -274,6 +277,7 @@ export function AuthShell({
               signInUrl={clerkCrossLinkUrl}
               fallbackRedirectUrl={resolvedRedirect}
               appearance={mergedAppearance}
+              oidcPrompt={CLERK_COMPONENT_OPTIONS.oidcPrompt}
             />
           ) : (
             <SignIn
@@ -284,6 +288,7 @@ export function AuthShell({
               fallbackRedirectUrl={resolvedRedirect}
               appearance={mergedAppearance}
               initialValues={initialValues}
+              oidcPrompt={CLERK_COMPONENT_OPTIONS.oidcPrompt}
             />
           )
         ) : null}
@@ -366,8 +371,8 @@ function AuthModeSwitchLink({
   forceHardNavigation: boolean;
 }>) {
   const isSignUp = mode === 'sign-up';
-  const prompt = isSignUp ? 'Have an account?' : 'No account?';
-  const label = isSignUp ? 'Sign in' : 'Request access';
+  const prompt = isSignUp ? 'Have an account?' : "Don't have access?";
+  const label = isSignUp ? 'Sign in' : 'Join the waitlist';
   const className =
     'focus-ring-themed rounded-md text-white underline underline-offset-2';
 

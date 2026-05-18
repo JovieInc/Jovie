@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthLayout, AuthRoutePrefetch, AuthShell } from '@/features/auth';
 import { track } from '@/lib/analytics';
@@ -124,6 +124,10 @@ function SignUpClaimDataPersistence() {
 function SignUpOauthErrorBanner() {
   const searchParams = useSearchParams();
   const oauthError = searchParams.get('oauth_error');
+  // Used to personalise the account_exists message when the conflicting
+  // address is known (e.g. forwarded by SsoCallbackHandler). React escapes
+  // all text content so no additional XSS sanitisation is required. #26
+  const conflictingEmail = searchParams.get('email')?.trim() ?? '';
 
   useEffect(() => {
     if (!oauthError) return;
@@ -140,13 +144,20 @@ function SignUpOauthErrorBanner() {
   if (!oauthError) return null;
 
   const isAccountExists = oauthError === 'account_exists';
-  let message = 'Something went wrong with Google sign-up. Please try again.';
+
+  let message: ReactNode =
+    'Something went wrong with sign-up. Please try again.';
   if (isAccountExists) {
-    message =
-      'An account with this email already exists. Try signing in instead.';
+    message = conflictingEmail ? (
+      <>
+        An account for <strong>{conflictingEmail}</strong> already exists. Try
+        signing in instead.
+      </>
+    ) : (
+      'An account with this email already exists. Try signing in instead.'
+    );
   } else if (oauthError === 'access_denied') {
-    message =
-      'Required permissions were not granted. Please try again and accept all permissions.';
+    message = 'Sign-in was cancelled. Try again, or pick a different method.';
   }
 
   return (

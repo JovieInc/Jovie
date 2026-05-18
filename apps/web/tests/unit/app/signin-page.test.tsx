@@ -79,14 +79,14 @@ describe('signin page', () => {
     expect(
       screen.queryByText('Welcome back to Jovie.')
     ).not.toBeInTheDocument();
-    expect(screen.queryByText("Don't have access?")).not.toBeInTheDocument();
     expect(routerPrefetchMock).toHaveBeenCalledWith(APP_ROUTES.SIGNUP);
     expect(clerkSignInMock).toHaveBeenCalledWith(
       expect.objectContaining({
         routing: 'path',
         path: '/signin',
         oauthFlow: 'redirect',
-        signUpUrl: fullAuthUrl(APP_ROUTES.SIGNUP),
+        // Cross-link for sign-in → /waitlist (Jovie is invite-only). #48
+        signUpUrl: fullAuthUrl(APP_ROUTES.WAITLIST),
         fallbackRedirectUrl: APP_ROUTES.DASHBOARD,
         initialValues: undefined,
       })
@@ -125,6 +125,54 @@ describe('signin page', () => {
     );
   });
 
+  it('passes oidcPrompt=select_account to Clerk SignIn so account chooser always appears', async () => {
+    render(<SignInPage />);
+
+    await waitFor(() => {
+      expect(clerkSignInMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(clerkSignInMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        oidcPrompt: 'select_account',
+      })
+    );
+  });
+
+  it('shows access_denied banner when oauth_error=access_denied', async () => {
+    searchParamsState.value = 'oauth_error=access_denied';
+    globalThis.history.replaceState(
+      null,
+      '',
+      '/signin?oauth_error=access_denied'
+    );
+
+    render(<SignInPage />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Sign-in was cancelled. Try again, or pick a different method.'
+    );
+
+    await waitFor(() => {
+      expect(globalThis.location.search).not.toContain('oauth_error');
+    });
+  });
+
+  it('shows a generic banner for unknown oauth_error values', async () => {
+    searchParamsState.value = 'oauth_error=server_error';
+    globalThis.history.replaceState(
+      null,
+      '',
+      '/signin?oauth_error=server_error'
+    );
+
+    render(<SignInPage />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Something went wrong with sign-in. Please try again.'
+    );
+  });
+
   it('preserves redirect_url when linking from sign in to sign up', async () => {
     searchParamsState.value = 'redirect_url=%2Fonboarding';
 
@@ -136,7 +184,8 @@ describe('signin page', () => {
 
     expect(clerkSignInMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        signUpUrl: fullAuthUrl('/signup?redirect_url=%2Fonboarding'),
+        // Cross-link for sign-in preserves redirect params toward /waitlist. #48
+        signUpUrl: fullAuthUrl('/waitlist?redirect_url=%2Fonboarding'),
       })
     );
   });

@@ -294,7 +294,7 @@ describe('signup page', () => {
     render(<SignUpPage />);
 
     expect(screen.getByRole('alert')).toHaveTextContent(
-      'Required permissions were not granted. Please try again and accept all permissions.'
+      'Sign-in was cancelled. Try again, or pick a different method.'
     );
 
     await waitFor(() => {
@@ -308,6 +308,36 @@ describe('signup page', () => {
         signInUrl: fullAuthUrl(
           '/signin?redirect_url=%2Fonboarding%3Fhandle%3Dartist'
         ),
+      })
+    );
+  });
+
+  it('interpolates the conflicting email into the account_exists banner when ?email= is present', async () => {
+    searchParamsState.value =
+      'oauth_error=account_exists&email=artist%40example.com';
+    globalThis.history.replaceState(
+      null,
+      '',
+      '/signup?oauth_error=account_exists&email=artist%40example.com'
+    );
+
+    render(<SignUpPage />);
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('artist@example.com');
+    expect(alert).toHaveTextContent('already exists');
+  });
+
+  it('passes oidcPrompt=select_account to Clerk SignUp so account chooser always appears', async () => {
+    render(<SignUpPage />);
+
+    await waitFor(() => {
+      expect(clerkSignUpMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(clerkSignUpMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        oidcPrompt: 'select_account',
       })
     );
   });

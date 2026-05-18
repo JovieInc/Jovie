@@ -8,6 +8,47 @@ import { APP_ROUTES } from '@/constants/routes';
 import { AuthLayout, AuthRoutePrefetch, AuthShell } from '@/features/auth';
 
 /**
+ * Shows a banner when the OAuth provider returned an error code.
+ * Covers the case where the user clicks "Deny" on the provider consent screen,
+ * which returns `?oauth_error=access_denied` on redirect back to /signin. #86
+ */
+function SignInOauthErrorBanner() {
+  const searchParams = useSearchParams();
+  const oauthError = searchParams.get('oauth_error');
+
+  useEffect(() => {
+    if (!oauthError) return;
+
+    const url = new URL(globalThis.location.href);
+    url.searchParams.delete('oauth_error');
+    globalThis.history.replaceState(
+      globalThis.history.state,
+      '',
+      `${url.pathname}${url.search}${url.hash}`
+    );
+  }, [oauthError]);
+
+  if (!oauthError) return null;
+
+  let message = 'Something went wrong with sign-in. Please try again.';
+  if (oauthError === 'access_denied') {
+    message = 'Sign-in was cancelled. Try again, or pick a different method.';
+  } else if (oauthError === 'account_exists') {
+    message =
+      'An account with this email already exists. Try signing in with your email instead.';
+  }
+
+  return (
+    <div
+      className='mb-4 rounded-(--linear-radius-sm) border border-destructive/30 bg-destructive/5 px-4 py-3 text-left'
+      role='alert'
+    >
+      <p className='text-sm font-medium text-destructive'>{message}</p>
+    </div>
+  );
+}
+
+/**
  * Sign-in page using the canonical AuthShell (JOV-2064).
  *
  * Both the full-page route and the intercepted modal route render the same
@@ -74,6 +115,7 @@ export function SignInPageClient() {
       layoutVariant='split'
     >
       <AuthRoutePrefetch href={APP_ROUTES.SIGNUP} />
+      <SignInOauthErrorBanner />
       <AuthShell
         mode='sign-in'
         forceOppositeModeHardNavigation

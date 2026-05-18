@@ -30,7 +30,7 @@ export function AuthProviderButtonSlot({
     <button
       type='button'
       disabled={disabled}
-      aria-label={disabled ? `${label} loading` : label}
+      aria-label={disabled ? `${label} loading` : undefined}
       data-auth-provider-slot={provider}
       className={cn(
         'flex h-10 min-h-10 w-full items-center justify-center gap-2 rounded-full border px-4 text-[0.875rem] font-semibold tracking-[-0.011em]',
