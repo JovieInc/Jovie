@@ -149,7 +149,7 @@ describe('ChatInput', () => {
     ).toBeInTheDocument();
   });
 
-  it('renders the hardened dark composer geometry', () => {
+  it('renders the elevated no-shadow composer geometry', () => {
     fastRender(
       withProviders(
         <ChatInput {...baseProps} value='' onImageAttach={vi.fn()} />
@@ -157,8 +157,10 @@ describe('ChatInput', () => {
     );
 
     const surface = screen.getByTestId('chat-composer-surface');
-    expect(surface.className).toContain('#16171b');
-    expect(surface.className).toContain('border-white');
+    expect(surface.className).toContain('--linear-app-content-surface');
+    expect(surface.className).toContain('--linear-app-frame-seam');
+    expect(surface.className).toContain('shadow-none');
+    expect(surface.className).toContain('--linear-border-focus');
 
     const textarea = screen.getByRole('textbox', {
       name: /chat message input/i,
