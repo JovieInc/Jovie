@@ -230,6 +230,10 @@ describe('deploy workflow Vercel env resolution', () => {
   it('alerts specifically when production domains drift off the canonical Vercel project', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const classifyStep = getStepBlock(workflow, 'Classify failure type');
+    const generalSlackStep = getStepBlock(
+      workflow,
+      'Slack notify (general deploy failure)'
+    );
 
     expect(classifyStep).toContain('domain_project_mismatch');
     expect(classifyStep).toContain(
@@ -238,6 +242,7 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(classifyStep).toContain(
       'Production promotion was blocked before deploy.'
     );
+    expect(generalSlackStep).toContain('promote_domain_project_mismatch');
   });
 });
 
