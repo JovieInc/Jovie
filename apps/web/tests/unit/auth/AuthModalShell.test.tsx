@@ -26,6 +26,10 @@ describe('AuthModalShell', () => {
   });
 
   afterEach(() => {
+    document.body.style.removeProperty('overflow');
+    document.body.style.removeProperty('overscroll-behavior');
+    document.documentElement.style.removeProperty('overflow');
+    document.documentElement.style.removeProperty('overscroll-behavior');
     HTMLDialogElement.prototype.showModal = originalShowModal;
     HTMLDialogElement.prototype.close = originalClose;
   });
@@ -90,6 +94,26 @@ describe('AuthModalShell', () => {
     );
 
     expect(screen.getByLabelText('Back to chat')).toBeInTheDocument();
+  });
+
+  it('locks document scroll while the modal is mounted', () => {
+    const { unmount } = render(
+      <AuthModalShell>
+        <div>body</div>
+      </AuthModalShell>
+    );
+
+    expect(document.body.style.overflow).toBe('hidden');
+    expect(document.body.style.overscrollBehavior).toBe('contain');
+    expect(document.documentElement.style.overflow).toBe('hidden');
+    expect(document.documentElement.style.overscrollBehavior).toBe('contain');
+
+    unmount();
+
+    expect(document.body.style.overflow).toBe('');
+    expect(document.body.style.overscrollBehavior).toBe('');
+    expect(document.documentElement.style.overflow).toBe('');
+    expect(document.documentElement.style.overscrollBehavior).toBe('');
   });
 
   it.each([

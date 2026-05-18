@@ -188,7 +188,7 @@ export function SignUpPageClient() {
       <AuthRoutePrefetch href={APP_ROUTES.WAITLIST} />
       <SignUpOauthErrorBanner />
       <SignUpClaimDataPersistence />
-      <AuthShell mode='sign-up' />
+      <AuthShell mode='sign-up' forceOppositeModeHardNavigation />
     </AuthLayout>
   );
 }

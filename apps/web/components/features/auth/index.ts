@@ -6,6 +6,10 @@ export { AuthFormContainer } from './AuthFormContainer';
 // Organisms
 export { AuthLayout } from './AuthLayout';
 export { AuthPageSkeleton } from './AuthPageSkeleton';
+export {
+  AuthProviderButtonSlot,
+  AuthProviderButtonSlots,
+} from './AuthProviderButtons';
 export { AuthRoutePrefetch } from './AuthRoutePrefetch';
 export { AuthShell, type AuthShellMode } from './AuthShell';
 export { AuthUnavailableCard } from './AuthUnavailableCard';
