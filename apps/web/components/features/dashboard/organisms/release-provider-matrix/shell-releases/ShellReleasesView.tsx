@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useMemo, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import {
   DrawerButton,
@@ -21,8 +21,8 @@ import type {
   FilterPill,
 } from '@/components/shell/pill-search.types';
 import {
+  useRegisterHeaderActions,
   useRegisterHeaderSearch,
-  useSetHeaderActions,
 } from '@/contexts/HeaderActionsContext';
 import { buildReleaseActions } from '@/features/dashboard/organisms/releases/release-actions';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
@@ -346,7 +346,6 @@ export function ShellReleasesView({
     router,
     captureContext: 'shell-releases-view',
   });
-  const { setHeaderActions } = useSetHeaderActions();
   const albumArtFlagEnabled = useAppFlag('ALBUM_ART_GENERATION');
 
   const [pills, setPills] = useState<FilterPill[]>([]);
@@ -829,10 +828,7 @@ export function ShellReleasesView({
     );
   }, [canCreateManualReleases, handleNewRelease, handleSync, isSyncing]);
 
-  useEffect(() => {
-    setHeaderActions(headerActions);
-    return () => setHeaderActions(null);
-  }, [headerActions, setHeaderActions]);
+  useRegisterHeaderActions(headerActions);
 
   useReleaseRightPanelTableMeta({
     rows,
