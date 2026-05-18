@@ -92,23 +92,14 @@ export interface HeaderActionsProviderProps {
 /**
  * HeaderActionsProvider - Allows pages to register custom header actions
  *
- * Pages can use the useSetHeaderActions hook to set custom actions that will
+ * Pages can use `useRegisterHeaderActions` to set custom actions that will
  * appear in the app shell's header instead of the default actions.
  *
  * @example
  * ```tsx
  * function MyPageWrapper() {
- *   const { setHeaderActions } = useSetHeaderActions();
- *
- *   useEffect(() => {
- *     setHeaderActions(
- *       <div className='flex items-center gap-1'>
- *         <CustomButton />
- *         <div className='h-6 w-px bg-border' />
- *         <DrawerToggleButton />
- *       </div>
- *     );
- *   }, [setHeaderActions]);
+ *   const actions = useMemo(() => <CustomButton />, []);
+ *   useRegisterHeaderActions(actions);
  *
  *   return <PageContent />;
  * }
@@ -236,4 +227,23 @@ export function useRegisterHeaderSearch(
     setAdapter(adapter);
     return () => setAdapter(null);
   }, [adapter, setAdapter]);
+}
+
+/**
+ * useRegisterHeaderActions - Register route-owned actions with the shell header.
+ *
+ * Routes own the action semantics; the shell owns placement, error isolation,
+ * and cleanup on navigation. This mirrors `useRegisterHeaderSearch` so shell
+ * routes do not each reimplement the same set-on-mount / clear-on-unmount
+ * lifecycle.
+ */
+export function useRegisterHeaderActions(actions: ReactNode): void {
+  const dispatch = useContext(HeaderActionsDispatchContext);
+  const setActions = dispatch?.setHeaderActions;
+
+  useEffect(() => {
+    if (!setActions) return undefined;
+    setActions(actions);
+    return () => setActions(null);
+  }, [actions, setActions]);
 }

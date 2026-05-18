@@ -73,7 +73,7 @@ import {
 } from '@/components/organisms/table/utils/tableKeyMap';
 import { useViewMode } from '@/components/organisms/table/utils/useViewMode';
 import { APP_ROUTES } from '@/constants/routes';
-import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
+import { useRegisterHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
@@ -1270,7 +1270,6 @@ export function TasksPageClient() {
   const router = useRouter();
   const designV1TasksEnabled = useAppFlag('DESIGN_V1');
   const { selectedProfile } = useDashboardData();
-  const { setHeaderActions } = useSetHeaderActions();
   const isDesktopTaskLayout = useBreakpoint('lg');
   const [hasResolvedResponsiveLayout, setHasResolvedResponsiveLayout] =
     useState(false);
@@ -1868,13 +1867,7 @@ export function TasksPageClient() {
     [headerMode]
   );
 
-  useEffect(() => {
-    setHeaderActions(headerActions);
-
-    return () => {
-      setHeaderActions(null);
-    };
-  }, [headerActions, setHeaderActions]);
+  useRegisterHeaderActions(headerActions);
 
   const renderTaskCell = useCallback(
     (info: { row: { original: TaskView } }) => (

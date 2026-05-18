@@ -6,7 +6,6 @@ import {
   Suspense,
   useCallback,
   useDeferredValue,
-  useEffect,
   useMemo,
   useState,
 } from 'react';
@@ -18,7 +17,7 @@ import {
 } from '@/components/molecules/drawer';
 import { PageShell } from '@/components/organisms/PageShell';
 import type { TrackSidebarData } from '@/components/organisms/release-sidebar';
-import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
+import { useRegisterHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { openChatWithPrompt } from '@/lib/chat/open-chat-with-prompt';
 import type { ReleaseViewModel } from '@/lib/discography/types';
@@ -399,8 +398,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     openEditor,
   });
 
-  const { setHeaderActions } = useSetHeaderActions();
-
   const syncAction = experienceAdapter?.onSync ?? handleSync;
 
   const headerActions = useMemo(
@@ -415,13 +412,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     [canCreateManualReleases, handleNewRelease, isSyncing, syncAction]
   );
 
-  useEffect(() => {
-    setHeaderActions(headerActions);
-
-    return () => {
-      setHeaderActions(null);
-    };
-  }, [headerActions, setHeaderActions]);
+  useRegisterHeaderActions(headerActions);
 
   const releaseSidebarHandlers = useMemo(
     () => ({

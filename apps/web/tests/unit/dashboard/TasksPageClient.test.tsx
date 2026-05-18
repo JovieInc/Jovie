@@ -255,11 +255,21 @@ vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
   }),
 }));
 
-vi.mock('@/contexts/HeaderActionsContext', () => ({
-  useSetHeaderActions: () => ({
-    setHeaderActions: setHeaderActionsForTest,
-  }),
-}));
+vi.mock('@/contexts/HeaderActionsContext', async () => {
+  const ReactModule = await vi.importActual<typeof import('react')>('react');
+
+  return {
+    useRegisterHeaderActions: (actions: React.ReactNode) => {
+      ReactModule.useEffect(() => {
+        setHeaderActionsForTest(actions);
+        return () => setHeaderActionsForTest(null);
+      }, [actions]);
+    },
+    useSetHeaderActions: () => ({
+      setHeaderActions: setHeaderActionsForTest,
+    }),
+  };
+});
 
 vi.mock('@/hooks/useRegisterRightPanel', () => ({
   useRegisterRightPanel: mockRegisterRightPanel,
