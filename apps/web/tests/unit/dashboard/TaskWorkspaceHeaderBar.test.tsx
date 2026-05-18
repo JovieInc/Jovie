@@ -21,6 +21,37 @@ vi.mock('@/components/molecules/filters', () => ({
   TableFilterDropdown: () => <button type='button'>Filters</button>,
 }));
 
+vi.mock('@/components/molecules/tab-bar/TabBar', () => ({
+  TabBar: ({
+    value,
+    onValueChange,
+    options,
+    ariaLabel,
+  }: {
+    readonly value: string;
+    readonly onValueChange: (value: string) => void;
+    readonly options: ReadonlyArray<{
+      readonly value: string;
+      readonly label: ReactNode;
+    }>;
+    readonly ariaLabel: string;
+  }) => (
+    <div role='tablist' aria-label={ariaLabel}>
+      {options.map(option => (
+        <button
+          key={option.value}
+          type='button'
+          role='tab'
+          aria-selected={value === option.value}
+          onClick={() => onValueChange(option.value)}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  ),
+}));
+
 vi.mock('@/components/organisms/table', () => ({
   PageToolbar: ({
     start,
