@@ -55,6 +55,17 @@ describe('admin investor shell normalization', () => {
     expect(primitivesSource).toContain('export function InvestorTableRow');
   });
 
+  it('keeps investor route data outside the page module', () => {
+    const pageSource = readFileSync(INVESTORS_PAGE, 'utf8');
+
+    expect(pageSource).toContain('loadAdminInvestorPipelineData');
+    expect(pageSource).not.toContain('@/lib/db');
+    expect(pageSource).not.toContain('@/lib/db/schema/investors');
+    expect(pageSource).not.toContain('investorLinks');
+    expect(pageSource).not.toContain('investorViews');
+    expect(pageSource).not.toContain('drizzleSql');
+  });
+
   it('uses the canonical table action menu instead of a bespoke row dropdown', () => {
     const managerSource = readFileSync(INVESTOR_LINKS_MANAGER, 'utf8');
 
