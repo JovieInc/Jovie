@@ -83,6 +83,14 @@ export { AudienceVisitsCell } from './atoms/AudienceVisitsCell';
 export { AvatarCell } from './atoms/AvatarCell';
 export { DateCell } from './atoms/DateCell';
 export { GroupHeader } from './atoms/GroupHeader';
+export type {
+  ShellListRowFrameProps,
+  ShellListRowInteraction,
+} from './atoms/ShellListRowFrame';
+export {
+  getShellListRowFrameClassName,
+  ShellListRowFrame,
+} from './atoms/ShellListRowFrame';
 export { SkeletonCell } from './atoms/SkeletonCell';
 export { SkeletonRow } from './atoms/SkeletonRow';
 export { TableBadge } from './atoms/TableBadge';

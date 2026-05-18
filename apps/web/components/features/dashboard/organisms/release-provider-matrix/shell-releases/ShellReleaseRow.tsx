@@ -20,7 +20,7 @@ import { toast } from 'sonner';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import type { TableActionMenuItem } from '@/components/atoms/table-action-menu/types';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
-import { rowState } from '@/components/organisms/table/table.styles';
+import { ShellListRowFrame } from '@/components/organisms/table';
 import { ArtworkThumb } from '@/components/shell/ArtworkThumb';
 import { DropDateChip } from '@/components/shell/DropDateChip';
 import { DspAvatarStack } from '@/components/shell/DspAvatarStack';
@@ -230,7 +230,7 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
   }
 
   return (
-    <div
+    <ShellListRowFrame
       role='option'
       aria-selected={isSelected}
       tabIndex={0}
@@ -239,13 +239,9 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
       data-shell-release-row
       data-release-id={release.id}
       data-release-active={isActiveTrack ? 'true' : undefined}
-      data-selected={isSelected ? 'true' : undefined}
-      className={cn(
-        'group/row relative flex h-14 cursor-pointer items-center gap-3 rounded-md px-3 outline-none',
-        rowState.base,
-        rowState.focusVisible,
-        isSelected ? rowState.selected : rowState.hover
-      )}
+      isSelected={isSelected}
+      interactive
+      className='group/row flex h-14 items-center gap-3 px-3'
     >
       <ArtworkCell release={release} />
 
@@ -295,6 +291,6 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
           </button>
         </TableActionMenu>
       ) : null}
-    </div>
+    </ShellListRowFrame>
   );
 });
