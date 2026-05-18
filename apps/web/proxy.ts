@@ -31,6 +31,7 @@ import {
 } from '@/lib/auth/clerk-middleware-bypass';
 import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 import { decodeFapiHostFromPublishableKey } from '@/lib/auth/decode-fapi-host';
+import { shouldRecordInvestorView } from '@/lib/auth/investor-view-dedup';
 import type { ProxyUserState } from '@/lib/auth/proxy-state';
 import { getUserState, isKnownActiveUser } from '@/lib/auth/proxy-state';
 import { captureErrorWithHostnameLimit } from '@/lib/auth/sentry-rate-limit';
@@ -489,6 +490,10 @@ async function validateInvestorToken(token: string): Promise<boolean> {
 /**
  * Record an investor page view (fire-and-forget).
  * Also updates stage from 'shared' to 'viewed' on first view.
+ *
+ * Dedup: skips the DB write if the same (token, pagePath) pair was already
+ * recorded within the last 5 minutes. Redis-backed; fail-open if Redis is
+ * unreachable (records the view rather than dropping it).
  */
 async function recordInvestorView(
   token: string,
@@ -496,6 +501,17 @@ async function recordInvestorView(
   req: NextRequest
 ): Promise<void> {
   try {
+    // 5-minute dedup: same investor hitting the same route generates at most
+    // one view row per window. visitorKey = token (uniquely identifies the
+    // investor link). route = pagePath (already query-string-free — callers
+    // pass req.nextUrl.pathname).
+    const shouldRecord = await shouldRecordInvestorView({
+      visitorKey: token,
+      route: pagePath,
+    });
+
+    if (!shouldRecord) return;
+
     const { db } = await import('@/lib/db');
     const { investorLinks, investorViews } = await import(
       '@/lib/db/schema/investors'
