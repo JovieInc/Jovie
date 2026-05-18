@@ -67,6 +67,13 @@ import {
   checkReleaseRefreshRateLimit,
   formatTimeRemaining,
 } from '@/lib/rate-limit';
+import {
+  loadReleaseEntity as loadReleaseEntityFromLoader,
+  loadReleaseMatrixForProfile as loadReleaseMatrixForProfileFromLoader,
+  loadReleaseMatrix as loadReleaseMatrixFromLoader,
+} from '@/lib/releases/release-matrix-loader';
+import type { ReleaseProfileContext } from '@/lib/releases/release-types';
+import { mapReleaseToViewModel } from '@/lib/releases/release-view-models';
 import { trackServerEvent } from '@/lib/server-analytics';
 import { buildCanvasMetadata } from '@/lib/services/canvas/service';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
@@ -74,15 +81,8 @@ import { slugify } from '@/lib/utils';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import { targetPlaylistsSchema } from '@/lib/validation/schemas/dashboard/profile';
 import { getDashboardDataEssential, getDashboardShellData } from '../actions';
-import {
-  loadReleaseEntity as loadReleaseEntityFromLoader,
-  loadReleaseMatrixForProfile as loadReleaseMatrixForProfileFromLoader,
-  loadReleaseMatrix as loadReleaseMatrixFromLoader,
-} from './release-matrix-loader';
-import type { ReleaseProfileContext } from './release-types';
-import { mapReleaseToViewModel } from './release-view-models';
 
-export type { ReleaseProfileContext } from './release-types';
+export type { ReleaseProfileContext } from '@/lib/releases/release-types';
 
 const SPOTIFY_ALREADY_CLAIMED_MESSAGE =
   'This Spotify artist is already linked to another Jovie account. Please sign in with the original account or choose a different artist.';

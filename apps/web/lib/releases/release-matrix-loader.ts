@@ -3,6 +3,7 @@
 import { unstable_cache } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { cache } from 'react';
+import { getDashboardDataEssential } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { CACHE_TTL } from '@/lib/cache/tags';
@@ -12,7 +13,6 @@ import {
 } from '@/lib/discography/queries';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { buildProviderLabels } from '@/lib/discography/view-models';
-import { getDashboardDataEssential } from '../actions/dashboard-data';
 import type { ReleaseProfileContext } from './release-types';
 import { mapReleaseToViewModel } from './release-view-models';
 

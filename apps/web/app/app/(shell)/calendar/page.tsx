@@ -8,13 +8,13 @@ import { queryKeys } from '@/lib/queries';
 import { HydrateClient } from '@/lib/queries/HydrateClient';
 import { getDehydratedState, getQueryClient } from '@/lib/queries/server';
 import type { EventRecord } from '@/lib/queries/useEventsQuery';
+import { loadReleaseMatrix } from '@/lib/releases/release-matrix-loader';
 import type {
   TicketStatus,
   TourDateProviderValue,
   TourDateViewModel,
 } from '@/lib/tour-dates/types';
 import { getDashboardShellData } from '../dashboard/actions';
-import { loadReleaseMatrix } from '../dashboard/releases/release-matrix-loader';
 import { loadTourDates } from '../dashboard/tour-dates/actions';
 import { CalendarPageClient } from './CalendarPageClient';
 
