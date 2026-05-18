@@ -11,6 +11,7 @@ import { isRedirectError } from 'next/dist/client/components/redirect-error';
 import { redirect } from 'next/navigation';
 import { cache } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
+import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
 import { getCachedAuth } from '@/lib/auth/cached';
 import {
   fetchBandsintownEvents,
@@ -176,9 +177,7 @@ async function resolveTourDates(
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    redirect(
-      `${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.SETTINGS_TOURING}`
-    );
+    redirect(buildAppShellSignInUrl(APP_ROUTES.SETTINGS_TOURING));
   }
 
   const profile = await requireProfile();

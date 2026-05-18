@@ -89,6 +89,19 @@ describe('loadAppShellRouteContext', () => {
     expect(getDashboardShellDataMock).not.toHaveBeenCalled();
   });
 
+  it('preserves route search params in shared signin redirects', async () => {
+    getCachedAuthMock.mockResolvedValue({ userId: null });
+
+    await expect(
+      loadAppShellRouteContext({
+        route: '/app/audience?view=list',
+        dashboardErrorMessage: 'Failed to load audience data.',
+      })
+    ).rejects.toThrow(
+      'NEXT_REDIRECT:/signin?redirect_url=%2Fapp%2Faudience%3Fview%3Dlist'
+    );
+  });
+
   it('uses notFound for gated routes that should not expose auth state', async () => {
     getCachedAuthMock.mockResolvedValue({ userId: null });
 

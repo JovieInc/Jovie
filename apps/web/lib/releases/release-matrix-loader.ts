@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { cache } from 'react';
 import { getDashboardDataEssential } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { APP_ROUTES } from '@/constants/routes';
+import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { CACHE_TTL } from '@/lib/cache/tags';
 import {
@@ -77,7 +78,7 @@ async function resolveReleaseMatrix(
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    redirect(`${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.RELEASES}`);
+    redirect(buildAppShellSignInUrl(APP_ROUTES.RELEASES));
   }
 
   const profile = await requireProfile(profileId);
@@ -107,7 +108,7 @@ async function resolveReleaseEntity(params: {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    redirect(`${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.RELEASES}`);
+    redirect(buildAppShellSignInUrl(APP_ROUTES.RELEASES));
   }
 
   const profile = await requireProfile(params.profileId);

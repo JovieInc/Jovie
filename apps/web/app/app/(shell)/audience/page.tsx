@@ -7,6 +7,7 @@ import { DashboardAudienceClient } from '@/features/dashboard/organisms/Dashboar
 import { AudienceTableLoadingShell } from '@/features/dashboard/organisms/dashboard-audience-table/AudienceTableLoadingShell';
 import type { AudienceSegment } from '@/features/dashboard/organisms/dashboard-audience-table/types';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
+import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
 import { audienceFilters, audienceSearchParams } from '@/lib/nuqs';
@@ -37,7 +38,7 @@ export default async function AudiencePage({
 }>) {
   const { userId } = await getCachedAuth();
   if (!userId) {
-    redirect(`${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.AUDIENCE}`);
+    redirect(buildAppShellSignInUrl(APP_ROUTES.AUDIENCE));
   }
 
   return (
@@ -83,7 +84,7 @@ async function AudienceContent({
     }
 
     if (!dashboardData.user?.id) {
-      redirect(`${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.AUDIENCE}`);
+      redirect(buildAppShellSignInUrl(APP_ROUTES.AUDIENCE));
     }
 
     const artist = dashboardData.selectedProfile
