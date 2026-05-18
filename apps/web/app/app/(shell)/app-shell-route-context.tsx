@@ -42,6 +42,18 @@ export type AppShellRouteContextResult =
   | AppShellRouteContext
   | AppShellRouteError;
 
+export function requireAppShellDashboardUserId(
+  context: AppShellRouteContext,
+  route: string
+): string {
+  const dashboardUserId = context.dashboardData.user?.id;
+  if (!dashboardUserId) {
+    redirect(buildAppShellSignInUrl(route));
+  }
+
+  return dashboardUserId;
+}
+
 export async function loadAuthenticatedAppShellUserId({
   route,
   authFailure = 'redirect',

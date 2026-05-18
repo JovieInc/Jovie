@@ -1,4 +1,3 @@
-import { redirect } from 'next/navigation';
 import type { SearchParams } from 'nuqs/server';
 import { Suspense } from 'react';
 import { BASE_URL } from '@/constants/app';
@@ -7,7 +6,6 @@ import { DashboardAudienceClient } from '@/features/dashboard/organisms/Dashboar
 import { AudienceTableLoadingShell } from '@/features/dashboard/organisms/dashboard-audience-table/AudienceTableLoadingShell';
 import type { AudienceSegment } from '@/features/dashboard/organisms/dashboard-audience-table/types';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
-import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
 import { captureError } from '@/lib/error-tracking';
 import { audienceFilters, audienceSearchParams } from '@/lib/nuqs';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
@@ -19,6 +17,7 @@ import { convertDrizzleCreatorProfileToArtist } from '@/types/db';
 import {
   loadAppShellRouteContext,
   loadAuthenticatedAppShellUserId,
+  requireAppShellDashboardUserId,
 } from '../app-shell-route-context';
 import { getAudienceServerData } from '../dashboard/audience/audience-data';
 import { loadUpcomingTourDates } from '../dashboard/tour-dates/actions';
@@ -68,9 +67,10 @@ async function AudienceContent({
     }
 
     const { dashboardData } = routeContext;
-    if (!dashboardData.user?.id) {
-      redirect(buildAppShellSignInUrl(APP_ROUTES.AUDIENCE));
-    }
+    const dashboardUserId = requireAppShellDashboardUserId(
+      routeContext,
+      APP_ROUTES.AUDIENCE
+    );
 
     const artist = dashboardData.selectedProfile
       ? convertDrizzleCreatorProfileToArtist(dashboardData.selectedProfile)
@@ -89,7 +89,7 @@ async function AudienceContent({
 
     const [audienceData, tourDates] = await Promise.all([
       getAudienceServerData({
-        userId: dashboardData.user.id,
+        userId: dashboardUserId,
         selectedProfileId: artist?.id ?? null,
         searchParams: {
           page: String(parsedParams.page),
