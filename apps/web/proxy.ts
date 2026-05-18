@@ -31,7 +31,10 @@ import {
 } from '@/lib/auth/clerk-middleware-bypass';
 import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 import { decodeFapiHostFromPublishableKey } from '@/lib/auth/decode-fapi-host';
-import { shouldRecordInvestorView } from '@/lib/auth/investor-view-dedup';
+import {
+  releaseInvestorViewDedup,
+  shouldRecordInvestorView,
+} from '@/lib/auth/investor-view-dedup';
 import type { ProxyUserState } from '@/lib/auth/proxy-state';
 import { getUserState, isKnownActiveUser } from '@/lib/auth/proxy-state';
 import { captureErrorWithHostnameLimit } from '@/lib/auth/sentry-rate-limit';
@@ -512,35 +515,45 @@ async function recordInvestorView(
 
     if (!shouldRecord) return;
 
-    const { db } = await import('@/lib/db');
-    const { investorLinks, investorViews } = await import(
-      '@/lib/db/schema/investors'
-    );
-    const { eq } = await import('drizzle-orm');
+    // Wrap DB writes so we can release the dedup lock on failure.
+    // If the DB write fails and we leave the Redis key set, the view
+    // would be silently lost for the remainder of the 5-min window.
+    try {
+      const { db } = await import('@/lib/db');
+      const { investorLinks, investorViews } = await import(
+        '@/lib/db/schema/investors'
+      );
+      const { eq } = await import('drizzle-orm');
 
-    // Find the link
-    const [link] = await db
-      .select({ id: investorLinks.id, stage: investorLinks.stage })
-      .from(investorLinks)
-      .where(eq(investorLinks.token, token))
-      .limit(1);
+      // Find the link
+      const [link] = await db
+        .select({ id: investorLinks.id, stage: investorLinks.stage })
+        .from(investorLinks)
+        .where(eq(investorLinks.token, token))
+        .limit(1);
 
-    if (!link) return;
+      if (!link) return;
 
-    // Insert view record
-    await db.insert(investorViews).values({
-      investorLinkId: link.id,
-      pagePath,
-      userAgent: req.headers.get('user-agent') ?? undefined,
-      referrer: req.headers.get('referer') ?? undefined,
-    });
+      // Insert view record
+      await db.insert(investorViews).values({
+        investorLinkId: link.id,
+        pagePath,
+        userAgent: req.headers.get('user-agent') ?? undefined,
+        referrer: req.headers.get('referer') ?? undefined,
+      });
 
-    // Auto-advance stage: shared → viewed on first view
-    if (link.stage === 'shared') {
-      await db
-        .update(investorLinks)
-        .set({ stage: 'viewed', updatedAt: new Date() })
-        .where(eq(investorLinks.id, link.id));
+      // Auto-advance stage: shared → viewed on first view
+      if (link.stage === 'shared') {
+        await db
+          .update(investorLinks)
+          .set({ stage: 'viewed', updatedAt: new Date() })
+          .where(eq(investorLinks.id, link.id));
+      }
+    } catch (dbError) {
+      // DB write failed after dedup lock was acquired — release the lock
+      // so the next request within the 5-min window can retry the write.
+      await releaseInvestorViewDedup({ visitorKey: token, route: pagePath });
+      throw dbError; // re-throw so the outer catch can log it
     }
   } catch (error) {
     // Swallow errors — view tracking should never block the response

@@ -7,8 +7,11 @@
  * - After TTL expires (simulated by a fresh "OK"), returns true again
  * - Redis unreachable (getRedis returns null) → fail-open (returns true)
  * - Redis set() throws → fail-open (returns true)
- * - Different visitorKeys don't collide
+ * - Different visitorKeys don't collide (different hashes)
  * - Different routes don't collide for the same visitorKey
+ * - Raw visitorKey is NOT present in the Redis key (token never leaks to key-space)
+ * - releaseInvestorViewDedup calls DEL on the correct key
+ * - releaseInvestorViewDedup is a no-op when Redis unavailable
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -35,14 +38,31 @@ function makeRedisClient(setResult: 'OK' | null | Error) {
       if (setResult instanceof Error) return Promise.reject(setResult);
       return Promise.resolve(setResult);
     }),
+    del: vi.fn().mockResolvedValue(1),
   };
+}
+
+/** Derive the expected Redis key using the same SHA-256 approach as the SUT. */
+async function expectedKey(visitorKey: string, route: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(visitorKey);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const keyHash = hashArray
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('')
+    .slice(0, 16);
+  return `investor:view:dedup:${keyHash}:${route}`;
 }
 
 // ============================================================================
 // Import SUT after mocks are in place
 // ============================================================================
 
-import { shouldRecordInvestorView } from './investor-view-dedup';
+import {
+  releaseInvestorViewDedup,
+  shouldRecordInvestorView,
+} from './investor-view-dedup';
 
 const VISITOR_A = 'user_abc123';
 const VISITOR_B = 'hash_192.168.1.1_aabbccdd';
@@ -66,7 +86,7 @@ describe('shouldRecordInvestorView', () => {
     expect(result).toBe(true);
     expect(redis.set).toHaveBeenCalledOnce();
     expect(redis.set).toHaveBeenCalledWith(
-      `investor:view:dedup:${VISITOR_A}:${ROUTE_OVERVIEW}`,
+      await expectedKey(VISITOR_A, ROUTE_OVERVIEW),
       1,
       { nx: true, ex: 300 }
     );
@@ -121,7 +141,27 @@ describe('shouldRecordInvestorView', () => {
     expect(result).toBe(true);
   });
 
-  it('different visitorKeys use independent dedup keys (no collision)', async () => {
+  it('does NOT include the raw visitorKey in the Redis key (token stays out of key-space)', async () => {
+    const redis = makeRedisClient('OK');
+    mocks.getRedis.mockReturnValue(redis);
+
+    await shouldRecordInvestorView({
+      visitorKey: VISITOR_A,
+      route: ROUTE_OVERVIEW,
+    });
+
+    const [[calledKey]] = redis.set.mock.calls as [[string, ...unknown[]]];
+    expect(calledKey).not.toContain(VISITOR_A);
+    expect(calledKey).toMatch(/^investor:view:dedup:[0-9a-f]{16}:/);
+  });
+
+  it('different visitorKeys use independent dedup keys (different hashes)', async () => {
+    const keyA = await expectedKey(VISITOR_A, ROUTE_OVERVIEW);
+    const keyB = await expectedKey(VISITOR_B, ROUTE_OVERVIEW);
+
+    // Keys must differ
+    expect(keyA).not.toBe(keyB);
+
     const redisA = makeRedisClient('OK');
     mocks.getRedis.mockReturnValue(redisA);
     await shouldRecordInvestorView({
@@ -137,12 +177,12 @@ describe('shouldRecordInvestorView', () => {
     });
 
     expect(redisA.set).toHaveBeenCalledWith(
-      `investor:view:dedup:${VISITOR_A}:${ROUTE_OVERVIEW}`,
+      keyA,
       1,
       expect.objectContaining({ nx: true })
     );
     expect(redisB.set).toHaveBeenCalledWith(
-      `investor:view:dedup:${VISITOR_B}:${ROUTE_OVERVIEW}`,
+      keyB,
       1,
       expect.objectContaining({ nx: true })
     );
@@ -166,14 +206,63 @@ describe('shouldRecordInvestorView', () => {
     expect(result1).toBe(true);
     expect(result2).toBe(true);
     expect(redis1.set).toHaveBeenCalledWith(
-      `investor:view:dedup:${VISITOR_A}:${ROUTE_OVERVIEW}`,
+      await expectedKey(VISITOR_A, ROUTE_OVERVIEW),
       1,
       expect.objectContaining({ nx: true })
     );
     expect(redis2.set).toHaveBeenCalledWith(
-      `investor:view:dedup:${VISITOR_A}:${ROUTE_FINANCIALS}`,
+      await expectedKey(VISITOR_A, ROUTE_FINANCIALS),
       1,
       expect.objectContaining({ nx: true })
     );
+  });
+});
+
+describe('releaseInvestorViewDedup', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('calls DEL on the correct hashed key', async () => {
+    const redis = makeRedisClient('OK');
+    mocks.getRedis.mockReturnValue(redis);
+
+    await releaseInvestorViewDedup({
+      visitorKey: VISITOR_A,
+      route: ROUTE_OVERVIEW,
+    });
+
+    expect(redis.del).toHaveBeenCalledOnce();
+    expect(redis.del).toHaveBeenCalledWith(
+      await expectedKey(VISITOR_A, ROUTE_OVERVIEW)
+    );
+  });
+
+  it('is a no-op when Redis is unavailable', async () => {
+    mocks.getRedis.mockReturnValue(null);
+
+    // Should not throw
+    await expect(
+      releaseInvestorViewDedup({
+        visitorKey: VISITOR_A,
+        route: ROUTE_OVERVIEW,
+      })
+    ).resolves.toBeUndefined();
+  });
+
+  it('swallows Redis errors silently', async () => {
+    const redis = {
+      set: vi.fn(),
+      del: vi.fn().mockRejectedValue(new Error('Redis error')),
+    };
+    mocks.getRedis.mockReturnValue(redis);
+
+    // Should not throw
+    await expect(
+      releaseInvestorViewDedup({
+        visitorKey: VISITOR_A,
+        route: ROUTE_OVERVIEW,
+      })
+    ).resolves.toBeUndefined();
   });
 });
