@@ -260,6 +260,23 @@ describe('canary health gate workflow', () => {
       'canary_status=verified" >> "$GITHUB_OUTPUT"\n                    exit 0'
     );
   });
+
+  it('waits for the public alias to serve the target build before auth smoke', () => {
+    const workflow = readFileSync(canaryWorkflowPath, 'utf8');
+    const canaryStep = getStepBlock(workflow, 'Canary health check');
+    const authSmokeStep = getStepBlock(
+      workflow,
+      'Verify public auth controls are interactive'
+    );
+
+    expect(canaryStep).toContain('/api/health/build-info');
+    expect(canaryStep).toContain('local max_attempts=30');
+    expect(canaryStep).toContain('canary_status=failed_build_info');
+    expect(canaryStep).toContain('verified_deployment_url=');
+    expect(authSmokeStep).toContain(
+      'DEPLOYMENT_URL: ${{ steps.canary-check.outputs.verified_deployment_url || inputs.deployment_url }}'
+    );
+  });
 });
 
 describe('CI public a11y workflow', () => {
