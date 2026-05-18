@@ -10,7 +10,9 @@ describe('audience app shell route', () => {
     );
 
     expect(source).toContain('loadAppShellRouteContext');
+    expect(source).toContain('loadAuthenticatedAppShellUserId');
     expect(source).toContain('authenticatedUserId: userId');
+    expect(source).not.toContain('getCachedAuth');
     expect(source).not.toContain('getDashboardShellData');
     expect(source).not.toContain('dashboardLoadError');
     expect(source).not.toMatch(/\bgetDashboardData(?:Essential)?\(/);
