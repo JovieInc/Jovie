@@ -199,12 +199,17 @@ describe('LibrarySurface', () => {
     renderLibrary([buildAsset()]);
 
     fireEvent.click(screen.getByRole('button', { name: 'List view' }));
-    fireEvent.click(screen.getByTestId('library-release-row-release-1'));
+    const row = screen.getByTestId('library-release-row-release-1');
+
+    fireEvent.click(row);
 
     expect(screen.getByTestId('library-asset-drawer')).toHaveAttribute(
       'aria-hidden',
       'false'
     );
+    expect(row).toHaveAttribute('aria-selected', 'true');
+    expect(row.className).toContain('bg-(--linear-row-selected)');
+    expect(row.className).not.toContain('shadow-[inset_3px_0_0_0');
     expect(screen.getByRole('link', { name: /Open Release/u })).toHaveAttribute(
       'href',
       '/tim/take-me-over'
