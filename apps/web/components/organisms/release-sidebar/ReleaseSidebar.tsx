@@ -9,6 +9,7 @@
 
 import type { CommonDropdownItem } from '@jovie/ui';
 import { Activity, Pause, Play, Plus, RefreshCw } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import {
   type ReactNode,
   useCallback,
@@ -561,6 +562,7 @@ export function ReleaseSidebar({
   designV1 = false,
   onTrackClick,
 }: ReleaseSidebarProps) {
+  const router = useRouter();
   const {
     isAddingLink,
     setIsAddingLink,
@@ -805,8 +807,8 @@ export function ReleaseSidebar({
       return;
     }
 
-    globalThis.location.href = buildReleaseTasksRoute(release.id);
-  }, [release]);
+    router.push(buildReleaseTasksRoute(release.id));
+  }, [release, router]);
 
   const handleDismissTasksUpgrade = useCallback(() => {
     setShowTasksUpgrade(false);
