@@ -83,7 +83,12 @@ function findNewRecordings(): ReadonlyArray<string> {
  * prefers when present).
  */
 function readTranscriptFromStore(filePath: string): string | null {
-  const dbPath = join(VOICE_MEMOS_RECORDINGS, 'CloudRecordings.db');
+  // CloudRecordings.db lives one level above Recordings/ in the group
+  // container (verified on macOS Tahoe 26). Allow override via env for
+  // future macOS layouts.
+  const dbPath =
+    process.env.HERMES_VOICE_MEMOS_DB ??
+    join(VOICE_MEMOS_RECORDINGS, '..', 'CloudRecordings.db');
   if (!existsSync(dbPath)) return null;
   const queryFile = join(
     HERMES_PATHS.stateDir,
@@ -268,11 +273,17 @@ async function classifyTranscript(
   }
 }
 
+interface FiledSpan {
+  readonly identifier: string;
+  readonly url: string;
+  readonly queued: boolean;
+}
+
 async function fileIssueFromSpan(args: {
   readonly span: ClassifiedSpan;
   readonly gbrainId: string;
   readonly memoFile: string;
-}): Promise<{ readonly identifier: string; readonly url: string } | null> {
+}): Promise<FiledSpan | null> {
   if (args.span.kind !== 'issue') return null;
   const title = (args.span.title ?? args.span.text.slice(0, 70)).trim();
   const description = buildFollowUpBody({
@@ -291,7 +302,16 @@ async function fileIssueFromSpan(args: {
     source: `voice-memo:${basename(args.memoFile)}`,
   });
   if (filed.success && filed.identifier && filed.url) {
-    return { identifier: filed.identifier, url: filed.url };
+    return { identifier: filed.identifier, url: filed.url, queued: false };
+  }
+  // Linear is down but the intent landed in the retry queue. Treat as
+  // "handled" so the memo can be marked seen; the queue will replay.
+  if (filed.queued) {
+    return {
+      identifier: `queued:${basename(args.memoFile)}`,
+      url: '',
+      queued: true,
+    };
   }
   return null;
 }
@@ -341,12 +361,15 @@ async function ingestFile(filePath: string): Promise<void> {
   });
 
   const spans = await classifyTranscript(transcript);
-  const filedIssues: Array<{ identifier: string; url: string }> = [];
+  const filedIssues: FiledSpan[] = [];
   let taskCount = 0;
   let memoryCount = 0;
 
+  let issueSpansSeen = 0;
+  let taskSpansSeen = 0;
   for (const span of spans) {
     if (span.kind === 'issue') {
+      issueSpansSeen += 1;
       const filed = await fileIssueFromSpan({
         span,
         gbrainId,
@@ -354,6 +377,7 @@ async function ingestFile(filePath: string): Promise<void> {
       });
       if (filed) filedIssues.push(filed);
     } else if (span.kind === 'task') {
+      taskSpansSeen += 1;
       logTaskSpanForDaemon(span, filePath);
       taskCount += 1;
     } else {
@@ -361,9 +385,27 @@ async function ingestFile(filePath: string): Promise<void> {
     }
   }
 
-  const ledger = loadSeen();
-  ledger.seen[fileName] = { ingestedAt: new Date().toISOString() };
-  saveSeen(ledger);
+  // Only mark the memo seen if every issue span landed in Linear (a
+  // queued fallback counts as landed — the queue will retry). If even one
+  // span dropped on the floor, leave the memo unsigned so the next run
+  // can retry the whole classification.
+  const allIssuesFiled = filedIssues.length === issueSpansSeen;
+  const allTasksLogged = taskCount === taskSpansSeen;
+  if (allIssuesFiled && allTasksLogged) {
+    const ledger = loadSeen();
+    ledger.seen[fileName] = { ingestedAt: new Date().toISOString() };
+    saveSeen(ledger);
+  } else {
+    logJobEvent({
+      job: JOB,
+      event: 'partial_ingest_keeping_for_retry',
+      file: fileName,
+      issueSpansSeen,
+      filedIssueCount: filedIssues.length,
+      taskSpansSeen,
+      taskCount,
+    });
+  }
 
   const summaryParts = [
     `Memo ingested (${durationS}s).`,

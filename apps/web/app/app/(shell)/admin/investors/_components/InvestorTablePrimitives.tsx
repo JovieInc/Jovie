@@ -27,7 +27,7 @@ export function InvestorTableHeaderRow({
   children,
 }: Readonly<{ children: ReactNode }>) {
   return (
-    <tr className='border-b border-subtle text-left text-2xs text-tertiary-token'>
+    <tr className='border-b border-subtle text-left text-2xs font-caption text-secondary-token'>
       {children}
     </tr>
   );

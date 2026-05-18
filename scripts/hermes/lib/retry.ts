@@ -25,6 +25,15 @@ export async function withRetry<T>(
       return await fn();
     } catch (err) {
       lastErr = err;
+      // Honor the `permanent` flag callers can attach to errors they know
+      // are 4xx-style permanent (e.g. 401, 403). Retrying those just wastes
+      // time and floods the upstream rate limiter.
+      if (
+        err instanceof Error &&
+        (err as Error & { permanent?: boolean }).permanent === true
+      ) {
+        break;
+      }
       if (i === attempts - 1) break;
       const exp = Math.min(maxMs, baseMs * 2 ** i);
       const jitter = Math.random() * exp * 0.3;

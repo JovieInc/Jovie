@@ -26,6 +26,7 @@ import {
   DrawerSurfaceCard,
 } from '@/components/molecules/drawer';
 import { Dialog, DialogBody, DialogTitle } from '@/components/organisms/Dialog';
+import { TableIconButton } from '@/components/organisms/table';
 import { BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import {
@@ -381,6 +382,7 @@ function LinkActions({
       icon: link.isActive ? CircleSlash : CheckCircle2,
       onClick: () => onToggleActive(link.id, !link.isActive),
     },
+    { id: 'separator', label: '' },
     {
       id: 'delete',
       label: 'Delete',
@@ -402,19 +404,19 @@ function LinkActions({
 
   return (
     <div className='flex items-center gap-2'>
-      <Button
-        variant='ghost'
-        size='sm'
+      <TableIconButton
+        ariaLabel='Copy shareable URL'
+        className='text-tertiary-token'
+        icon={
+          copied ? (
+            <Check className='h-3.5 w-3.5 text-success' />
+          ) : (
+            <Copy className='h-3.5 w-3.5' />
+          )
+        }
         onClick={handleCopy}
-        title='Copy shareable URL'
-        className='h-8 px-2'
-      >
-        {copied ? (
-          <Check className='h-3.5 w-3.5 text-success' />
-        ) : (
-          <Copy className='h-3.5 w-3.5' />
-        )}
-      </Button>
+        tooltip='Copy shareable URL'
+      />
       <TableActionMenu items={actionItems} align='end' />
     </div>
   );
@@ -538,6 +540,9 @@ export function InvestorLinksManager() {
       <ContentSurfaceCard className='overflow-hidden p-0'>
         <ContentSectionHeader
           title='Manage investor links'
+          className='flex-col items-start gap-2 py-3 sm:flex-row sm:items-center sm:gap-2 sm:py-1.5'
+          titleClassName='overflow-visible whitespace-normal sm:overflow-hidden sm:whitespace-nowrap'
+          actionsClassName='ml-0 w-full justify-end sm:ml-auto sm:w-auto'
           subtitle={(() => {
             if (links.length === 0)
               return 'Create shareable entry points into the investor portal.';

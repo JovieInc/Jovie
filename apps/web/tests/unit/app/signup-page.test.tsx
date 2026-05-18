@@ -81,6 +81,10 @@ import { APP_ROUTES } from '@/constants/routes';
 import SignUpPage from '../../../app/(auth)/signup/page';
 
 describe('signup page', () => {
+  function fullAuthUrl(path: string) {
+    return new URL(path, globalThis.location.origin).toString();
+  }
+
   beforeEach(() => {
     clearSignupClaimValueMock.mockReset();
     authLayoutMock.mockReset();
@@ -126,7 +130,7 @@ describe('signup page', () => {
         routing: 'path',
         path: '/signup',
         oauthFlow: 'redirect',
-        signInUrl: APP_ROUTES.SIGNIN,
+        signInUrl: fullAuthUrl(APP_ROUTES.SIGNIN),
         fallbackRedirectUrl: APP_ROUTES.WAITLIST,
       })
     );
@@ -203,7 +207,7 @@ describe('signup page', () => {
 
     expect(clerkSignUpMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        signInUrl: '/signin?redirect_url=%2Fonboarding',
+        signInUrl: fullAuthUrl('/signin?redirect_url=%2Fonboarding'),
       })
     );
   });
@@ -301,7 +305,9 @@ describe('signup page', () => {
 
     expect(clerkSignUpMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        signInUrl: '/signin?redirect_url=%2Fonboarding%3Fhandle%3Dartist',
+        signInUrl: fullAuthUrl(
+          '/signin?redirect_url=%2Fonboarding%3Fhandle%3Dartist'
+        ),
       })
     );
   });

@@ -116,6 +116,11 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
       try {
         track('listen_click', {
           handle,
+          artist_id: artist.id,
+          profile_id: artist.id,
+          profile_slug: artist.handle,
+          current_route_tab: 'music',
+          cta_location: 'listen_provider_row',
           linkType: 'listen',
           platform: dsp.key,
         });

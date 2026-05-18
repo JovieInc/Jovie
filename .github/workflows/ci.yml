@@ -3784,12 +3784,25 @@ jobs:
     outputs:
       # Emitted when promote-production exits non-zero so deploy-notify can
       # distinguish silent-no-op regressions from generic promote failures.
-      # Values: "no_match" (no Vercel deployment for github.sha) | "verify_mismatch"
-      # (production keeps serving the old commit after promote).
-      failure_subtype: ${{ steps.promote.outputs.failure_subtype }}
+      # Values: "domain_project_mismatch" (public domains are not on the
+      # canonical Vercel project) | "no_match" (no Vercel deployment for
+      # github.sha) | "verify_mismatch" (production keeps serving the old
+      # commit after promote).
+      failure_subtype: ${{ steps.domain-guard.outputs.failure_subtype || steps.promote.outputs.failure_subtype }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup-node-pnpm
+      - name: Verify production domains are on canonical Vercel project
+        id: domain-guard
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          if ! node .github/scripts/verify-vercel-production-domains.mjs; then
+            echo "failure_subtype=domain_project_mismatch" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
       - name: Promote specific deployment for this SHA
         id: promote
         env:
@@ -4115,6 +4128,14 @@ jobs:
           # Distinguish the silent-no-op regression (production kept old SHA
           # even though vercel promote exited 0) from a generic promote failure.
           PROMOTE_SUBTYPE="${{ needs.promote-production.outputs.failure_subtype }}"
+          if [ "$PROMOTE_RESULT" = "failure" ] && [ "$PROMOTE_SUBTYPE" = "domain_project_mismatch" ]; then
+            echo "failure_type=promote_domain_project_mismatch" >> "$GITHUB_OUTPUT"
+            echo "failure_emoji=🧭" >> "$GITHUB_OUTPUT"
+            echo "failure_title=Production domains are on the wrong Vercel project" >> "$GITHUB_OUTPUT"
+            echo "failure_detail=One or more public production domains are missing from the canonical Vercel project or have incorrect redirect wiring. Production promotion was blocked before deploy." >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           if [ "$PROMOTE_RESULT" = "failure" ] && [ "$PROMOTE_SUBTYPE" = "no_match" ]; then
             echo "failure_type=promote_no_match" >> "$GITHUB_OUTPUT"
             echo "failure_emoji=🕳️" >> "$GITHUB_OUTPUT"
@@ -4288,7 +4309,7 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
       - name: Slack notify (general deploy failure)
-        if: ${{ always() && (steps.classify-failure.outputs.failure_type == 'deploy' || steps.classify-failure.outputs.failure_type == 'promote' || steps.classify-failure.outputs.failure_type == 'promote_no_match' || steps.classify-failure.outputs.failure_type == 'promote_verify_mismatch' || steps.classify-failure.outputs.failure_type == 'promote_verify_probe_failed' || steps.classify-failure.outputs.failure_type == 'promote_missing_creds' || steps.classify-failure.outputs.failure_type == 'cancelled' || steps.classify-failure.outputs.failure_type == 'unknown') && env.SLACK_WEBHOOK_URL != '' }}
+        if: ${{ always() && (steps.classify-failure.outputs.failure_type == 'deploy' || steps.classify-failure.outputs.failure_type == 'promote' || steps.classify-failure.outputs.failure_type == 'promote_domain_project_mismatch' || steps.classify-failure.outputs.failure_type == 'promote_no_match' || steps.classify-failure.outputs.failure_type == 'promote_verify_mismatch' || steps.classify-failure.outputs.failure_type == 'promote_verify_probe_failed' || steps.classify-failure.outputs.failure_type == 'promote_missing_creds' || steps.classify-failure.outputs.failure_type == 'cancelled' || steps.classify-failure.outputs.failure_type == 'unknown') && env.SLACK_WEBHOOK_URL != '' }}
         uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
         with:
           status: custom

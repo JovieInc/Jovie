@@ -2,6 +2,7 @@
 
 import { Bell } from 'lucide-react';
 import { useMemo } from 'react';
+import type { NotificationSourceContext } from '@/features/profile/artist-notifications-cta/types';
 import type { ProfileRenderMode } from '@/features/profile/contracts';
 import {
   ProfilePrimaryActionCard,
@@ -19,7 +20,6 @@ import { useUserLocation } from '@/hooks/useUserLocation';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import { getProfileReleaseVisibility } from '@/lib/profile/release-visibility';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
-import { cn } from '@/lib/utils';
 import type { Artist } from '@/types/db';
 
 interface ProfileHomeRailProps {
@@ -34,7 +34,7 @@ interface ProfileHomeRailProps {
   readonly renderMode?: ProfileRenderMode;
   readonly previewActionLabel?: string;
   readonly onPlayClick?: () => void;
-  readonly onAlertsClick?: () => void;
+  readonly onAlertsClick?: (context: NotificationSourceContext) => void;
   readonly isSubscribed?: boolean;
   readonly viewerLocation?: UserLocation | null;
   readonly resolveNearbyTour?: boolean;
@@ -66,12 +66,14 @@ function HomeAlertsCard({
   onAlertsClick,
   renderMode,
   variant,
+  sourceContext,
 }: Readonly<{
   artist: Artist;
   isSubscribed: boolean;
-  onAlertsClick?: () => void;
+  onAlertsClick?: (context: NotificationSourceContext) => void;
   renderMode: ProfileRenderMode;
   variant: 'row' | 'bento';
+  sourceContext: NotificationSourceContext;
 }>) {
   const title = isSubscribed ? 'Alerts On' : `Get ${artist.name} alerts`;
   const description = isSubscribed
@@ -121,26 +123,10 @@ function HomeAlertsCard({
         </span>
       </span>
       <span
-        className={
-          isSubscribed
-            ? cn(
-                'relative h-6 w-10 shrink-0 rounded-full border border-white/42 bg-white p-0.5 transition-colors duration-subtle',
-                variant === 'bento' && 'self-center'
-              )
-            : cn(
-                'relative h-6 w-10 shrink-0 rounded-full border border-white/16 bg-white/10 p-0.5 transition-colors duration-subtle',
-                variant === 'bento' && 'self-center'
-              )
-        }
+        className='inline-flex h-8 shrink-0 items-center rounded-full bg-white px-3 text-[12px] font-[680] tracking-[-0.01em] text-black'
         aria-hidden='true'
       >
-        <span
-          className={
-            isSubscribed
-              ? 'block h-5 w-5 translate-x-4 rounded-full bg-black shadow-[0_4px_10px_rgba(0,0,0,0.22)] transition-transform duration-subtle'
-              : 'block h-5 w-5 translate-x-0 rounded-full bg-white shadow-[0_4px_10px_rgba(0,0,0,0.22)] transition-transform duration-subtle'
-          }
-        />
+        {isSubscribed ? 'Manage' : 'Get alerts'}
       </span>
     </>
   );
@@ -149,9 +135,7 @@ function HomeAlertsCard({
     return (
       <button
         type='button'
-        onClick={onAlertsClick}
-        role='switch'
-        aria-checked={isSubscribed}
+        onClick={() => onAlertsClick(sourceContext)}
         aria-label={ariaLabel}
         {...sharedProps}
       >
@@ -241,6 +225,14 @@ export function ProfileHomeRail({
       onAlertsClick={onAlertsClick}
       renderMode={renderMode}
       variant={hasPrimaryFeature ? 'row' : 'bento'}
+      sourceContext={{
+        artistId: artist.id,
+        profileId: artist.id,
+        profileSlug: artist.handle,
+        currentTab: 'home',
+        ctaLocation: 'home_alerts_card',
+        intent: 'general_alerts',
+      }}
     />
   );
 

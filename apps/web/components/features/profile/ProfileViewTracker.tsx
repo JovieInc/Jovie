@@ -40,6 +40,8 @@ export function ProfileViewTracker({
       track('profile_view', {
         handle,
         artist_id: artistId,
+        profile_id: artistId,
+        profile_slug: handle,
         source: source ?? (document.referrer || 'direct'),
       });
 
