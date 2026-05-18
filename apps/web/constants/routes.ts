@@ -129,6 +129,7 @@ export const APP_ROUTES = {
   DEMO_VIDEO: '/demovideo',
   ENGAGEMENT_ENGINE: '/engagement-engine',
   INVESTORS: '/investors',
+  PITCH: '/pitch',
   LANDING_NEW: '/new',
   PRICING: '/pricing',
   LAUNCH: '/launch',

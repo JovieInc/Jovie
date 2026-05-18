@@ -5,6 +5,18 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.24] - 2026-05-17
+
+> The Jovie pitch deck is now available at jov.ie/pitch with a one-click PDF download.
+
+### Added
+
+- **Public pitch deck route at `/pitch`**: 10-slide investor deck reusing the existing slide viewer, with keyboard, swipe, and dot navigation, a fullscreen mode, and a one-click PDF download of the same content. The page is search-engine hidden (NOINDEX) so it only shows up when shared directly. (JOV-2357)
+
+### Fixed
+
+- **Investor portal deck now actually renders**: the slide manifest in the web app's content directory had no slides listed, so both `/investor-portal` and the new `/pitch` route were silently rendering an empty "No slides yet — check back soon" state. Mirrored the 10 canonical slide markdown files plus the updated manifest into `apps/web/content/investors/` so the deck loads everywhere. (JOV-2357)
+
 ## [26.5.22] - 2026-05-17
 
 > The empty Ask Jovie screen now wears a soft electric outline of the Jovie mark behind your input — a subtle glow that reads as ambient atmosphere, not chrome.
