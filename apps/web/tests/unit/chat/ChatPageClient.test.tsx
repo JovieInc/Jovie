@@ -1,3 +1,4 @@
+import { waitFor } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -235,18 +236,39 @@ describe('ChatPageClient', () => {
     expect(capturedOnTitleChange).toBeDefined();
   });
 
-  it('sets header badge when title changes to non-null', () => {
+  it('seeds the header badge from the server thread title on mount', () => {
+    fastRender(
+      <DashboardDataProvider value={baseDashboardData}>
+        <ChatPageClient
+          conversationId='conv-123'
+          initialConversationTitle='Release Planning Conversation'
+        />
+      </DashboardDataProvider>
+    );
+
+    expect(mockSetHeaderBadge).toHaveBeenCalledWith(
+      expect.objectContaining({
+        props: expect.objectContaining({
+          title: 'Release Planning Conversation',
+        }),
+      })
+    );
+  });
+
+  it('sets header badge when title changes to non-null', async () => {
     renderChatPage('conv-123');
     expect(capturedOnTitleChange).toBeDefined();
 
     // Simulate title change from the chat hook
     capturedOnTitleChange!('My New Chat Title');
 
-    expect(mockSetHeaderBadge).toHaveBeenCalledWith(
-      expect.objectContaining({
-        props: expect.objectContaining({ title: 'My New Chat Title' }),
-      })
-    );
+    await waitFor(() => {
+      expect(mockSetHeaderBadge).toHaveBeenCalledWith(
+        expect.objectContaining({
+          props: expect.objectContaining({ title: 'My New Chat Title' }),
+        })
+      );
+    });
   });
 
   it('clears header badge when title changes to null', () => {

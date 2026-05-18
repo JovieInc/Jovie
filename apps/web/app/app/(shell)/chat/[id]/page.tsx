@@ -31,5 +31,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
  */
 export default async function ChatConversationPage({ params }: Props) {
   const { id } = await params;
-  return <DeferredChatPageClient conversationId={id} />;
+  const initialConversationTitle = await loadChatThreadMetadataTitle(id);
+
+  return (
+    <DeferredChatPageClient
+      conversationId={id}
+      initialConversationTitle={initialConversationTitle}
+    />
+  );
 }

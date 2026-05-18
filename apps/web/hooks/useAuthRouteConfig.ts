@@ -24,6 +24,10 @@ export interface AuthRouteConfig {
   showChatUsageIndicator: boolean;
 }
 
+function isChatThreadPath(parts: readonly string[]): boolean {
+  return parts[0] === 'app' && parts[1] === 'chat' && parts.length > 2;
+}
+
 export function getDemoBreadcrumbSegment(pathname: string): string {
   const parts = pathname.split('/').filter(Boolean);
   const demoIndex = parts.indexOf('demo');
@@ -87,7 +91,9 @@ export function useAuthRouteConfig(): AuthRouteConfig {
     const UUID_REGEX =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     let lastPart = parts[parts.length - 1];
-    if (UUID_REGEX.test(lastPart) && parts.length >= 2) {
+    if (isChatThreadPath(parts)) {
+      lastPart = 'chat';
+    } else if (UUID_REGEX.test(lastPart) && parts.length >= 2) {
       lastPart = parts[parts.length - 2];
     }
 

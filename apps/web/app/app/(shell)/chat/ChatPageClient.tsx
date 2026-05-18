@@ -25,14 +25,15 @@ import {
   usePreviewPanelData,
   usePreviewPanelState,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { ChatWorkspaceSurface } from '@/components/jovie/ChatWorkspaceSurface';
 import { JovieChat } from '@/components/jovie/JovieChat';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { DRAWER_HEADER_ICON_BUTTON_CLASSNAME } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
+import { DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
 import { useClipboard } from '@/hooks/useClipboard';
 import { env } from '@/lib/env-client';
 import { useAppFlag } from '@/lib/flags/client';
@@ -50,6 +51,7 @@ import { getHometownFromSettings } from '@/types/db';
 
 interface ChatPageClientProps {
   readonly conversationId?: string;
+  readonly initialConversationTitle?: string | null;
   readonly isFirstSession?: boolean;
 }
 
@@ -89,10 +91,7 @@ export function resetWelcomeChatBootstrapState(
  */
 function ChatTitleBadge({ title }: { readonly title: string }) {
   return (
-    <span
-      className='block max-w-[260px] truncate text-xs font-semibold tracking-[-0.01em] text-primary-token'
-      title={title}
-    >
+    <span className='block max-w-full truncate' title={title}>
       {title}
     </span>
   );
@@ -168,6 +167,7 @@ function ChatProfileFallback({
 
 export function ChatPageClient({
   conversationId,
+  initialConversationTitle = null,
   isFirstSession = false,
 }: ChatPageClientProps) {
   const {
@@ -186,14 +186,14 @@ export function ChatPageClient({
   const { setHeaderBadge, setHeaderActions } = useSetHeaderActions();
   const [autoRetryCount, setAutoRetryCount] = useState(0);
   const [currentThreadTitle, setCurrentThreadTitle] = useState<string | null>(
-    null
+    initialConversationTitle
   );
   // Reset the thread title when the conversation changes so the previous
   // thread's title doesn't leak into a fresh conversation while the new
   // conversation's metadata is loading.
   useEffect(() => {
-    setCurrentThreadTitle(null);
-  }, [conversationId]);
+    setCurrentThreadTitle(initialConversationTitle);
+  }, [conversationId, initialConversationTitle]);
   const [_welcomeChatBootstrapState, setWelcomeChatBootstrapState] =
     useState<WelcomeChatBootstrapState>('idle');
   const welcomeChatBootstrapStateRef =
@@ -351,13 +351,12 @@ export function ChatPageClient({
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button
-            type='button'
-            className={DRAWER_HEADER_ICON_BUTTON_CLASSNAME}
-            aria-label='Thread options'
+          <AppIconButton
+            ariaLabel='Thread options'
+            className={DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS}
           >
             <Ellipsis aria-hidden='true' className='size-4' />
-          </button>
+          </AppIconButton>
         </DropdownMenuTrigger>
         <DropdownMenuContent align='end'>
           <DropdownMenuItem onClick={handleCopyConversationId}>
@@ -408,17 +407,18 @@ export function ChatPageClient({
   );
 
   // Update the header badge when the conversation title changes
-  const handleTitleChange = useCallback(
-    (title: string | null) => {
-      setCurrentThreadTitle(title);
-      if (title) {
-        setHeaderBadge(<ChatTitleBadge title={title} />);
-      } else {
-        setHeaderBadge(null);
-      }
-    },
-    [setHeaderBadge]
-  );
+  const handleTitleChange = useCallback((title: string | null) => {
+    setCurrentThreadTitle(title);
+  }, []);
+
+  useEffect(() => {
+    if (currentThreadTitle) {
+      setHeaderBadge(<ChatTitleBadge title={currentThreadTitle} />);
+      return;
+    }
+
+    setHeaderBadge(null);
+  }, [currentThreadTitle, setHeaderBadge]);
 
   // Clean up header badge when leaving the chat page
   useEffect(() => {

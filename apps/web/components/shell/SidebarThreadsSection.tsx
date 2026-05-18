@@ -108,12 +108,12 @@ export function SidebarThreadsSection({
 
   return (
     <div className='space-y-1'>
-      <div className='px-3 pt-1 pb-1 flex items-center justify-between'>
-        <span className='text-[9.5px] font-medium uppercase tracking-[0.12em] text-quaternary-token/85'>
+      <div className='flex items-center justify-between px-3 pb-1 pt-1.5'>
+        <span className='text-[11px] font-medium tracking-[-0.01em] text-quaternary-token'>
           Threads
         </span>
         {unreadCount > 0 && (
-          <span className='inline-flex items-center gap-1 text-[9.5px] uppercase tracking-[0.08em] text-quaternary-token'>
+          <span className='inline-flex items-center gap-1 text-[11px] font-medium tracking-[-0.01em] text-quaternary-token'>
             <span className='h-1.5 w-1.5 rounded-full bg-cyan-300/85' />
             {unreadCount}
           </span>
@@ -178,7 +178,7 @@ export function SidebarThreadsSection({
               aria-hidden='true'
               strokeWidth={2.25}
             />
-            <span className='min-w-0 flex-1 truncate'>Start a thread</span>
+            <span className='min-w-0 flex-1 truncate'>New thread</span>
           </button>
         ) : null}
         {visible.map(t => {
@@ -278,7 +278,7 @@ export function SidebarThreadsSection({
         <button
           type='button'
           onClick={() => setExpanded(v => !v)}
-          className='w-full text-left px-3 py-1 text-[10.5px] uppercase tracking-[0.06em] text-quaternary-token hover:text-secondary-token transition-colors duration-subtle ease-out'
+          className='w-full px-3 py-1 text-left text-[11px] font-medium tracking-[-0.01em] text-quaternary-token transition-colors duration-subtle ease-out hover:text-secondary-token'
         >
           {expanded ? 'Show less' : 'View all'}
         </button>
