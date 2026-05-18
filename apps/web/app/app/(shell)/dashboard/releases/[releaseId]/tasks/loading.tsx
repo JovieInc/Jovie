@@ -1,5 +1,3 @@
-import { ReleaseTaskPageSkeleton } from '@/components/features/dashboard/release-tasks';
+import CanonicalReleaseTasksLoading from '@/app/app/(shell)/releases/[releaseId]/tasks/loading';
 
-export default function TasksLoading() {
-  return <ReleaseTaskPageSkeleton />;
-}
+export default CanonicalReleaseTasksLoading;
