@@ -85,8 +85,9 @@ describe('signin page', () => {
         routing: 'path',
         path: '/signin',
         oauthFlow: 'redirect',
-        // Cross-link for sign-in → /waitlist (Jovie is invite-only). #48
-        signUpUrl: fullAuthUrl(APP_ROUTES.WAITLIST),
+        // Cross-link for sign-in → /support (Need help?). SSO-only — waitlist
+        // is a dead end for returnees who lost their SSO session (JOV-2446).
+        signUpUrl: fullAuthUrl(APP_ROUTES.SUPPORT),
         fallbackRedirectUrl: APP_ROUTES.DASHBOARD,
         initialValues: undefined,
       })
@@ -184,8 +185,8 @@ describe('signin page', () => {
 
     expect(clerkSignInMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        // Cross-link for sign-in preserves redirect params toward /waitlist. #48
-        signUpUrl: fullAuthUrl('/waitlist?redirect_url=%2Fonboarding'),
+        // Cross-link for sign-in preserves redirect params toward /support (JOV-2446).
+        signUpUrl: fullAuthUrl('/support?redirect_url=%2Fonboarding'),
       })
     );
   });
