@@ -10,6 +10,10 @@ const ADMIN_PLATFORM_CONNECTIONS_PAGE = resolve(
   process.cwd(),
   'app/app/(shell)/admin/platform-connections/page.tsx'
 );
+const ADMIN_PLAYLISTS_PAGE = resolve(
+  process.cwd(),
+  'app/app/(shell)/admin/playlists/page.tsx'
+);
 
 describe('admin child route auth normalization', () => {
   it('keeps read-only admin child pages on the parent admin layout gate', () => {
@@ -35,5 +39,21 @@ describe('admin child route auth normalization', () => {
     expect(source).not.toContain('REQUIRED_PLAYLIST_SPOTIFY_SCOPES');
     expect(source).not.toContain('readExternalAccountScopes');
     expect(source).not.toContain('readAccountLabel');
+  });
+
+  it('keeps admin playlist data and actions outside the page module', () => {
+    const source = readFileSync(ADMIN_PLAYLISTS_PAGE, 'utf8');
+
+    expect(source).toContain('loadAdminPlaylists');
+    expect(source).toContain('approvePlaylist');
+    expect(source).toContain('rejectPlaylist');
+    expect(source).not.toContain('getCachedAuth');
+    expect(source).not.toContain('@/lib/db');
+    expect(source).not.toContain('joviePlaylists');
+    expect(source).not.toContain('joviePlaylistTracks');
+    expect(source).not.toContain('generateCoverArt');
+    expect(source).not.toContain('publishToSpotify');
+    expect(source).not.toContain('captureError');
+    expect(source).not.toMatch(/\brequireAdmin\(\)/);
   });
 });
