@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
+import { CommandPalette } from '@/components/organisms/CommandPalette';
 import { OPEN_COMMAND_PALETTE_EVENT } from '@/components/organisms/command-palette-events';
 import { APP_ROUTES } from '@/constants/routes';
 import {
@@ -16,6 +17,19 @@ import {
   renderDashboardNav,
   resetDashboardNavTestMocks,
 } from '@/tests/utils/dashboard-nav-test-support';
+
+vi.mock('@/lib/queries/useArtistSearchQuery', () => ({
+  useArtistSearchQuery: () => ({
+    clear: vi.fn(),
+    error: null,
+    isPending: false,
+    query: '',
+    results: [],
+    search: vi.fn(),
+    searchImmediate: vi.fn(),
+    state: 'idle',
+  }),
+}));
 
 describe('DashboardNav interactions', () => {
   afterEach(() => {
@@ -152,6 +166,20 @@ describe('DashboardNav interactions', () => {
 
     expect(listener).toHaveBeenCalledTimes(1);
     globalThis.removeEventListener(OPEN_COMMAND_PALETTE_EVENT, listener);
+  });
+
+  it('opens the command palette when clicking the Design V1 sidebar search row', async () => {
+    const user = userEvent.setup();
+
+    renderDashboardNav({
+      renderFn: render,
+      appFlags: { DESIGN_V1: true },
+      children: <CommandPalette />,
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Search' }));
+
+    expect(screen.getByLabelText('Command palette search')).toBeInTheDocument();
   });
 
   it('groups artist-owned routes under Artist Workspace in Design V1', () => {
