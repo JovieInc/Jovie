@@ -10,6 +10,7 @@
     "dev": "tsc && electron .",
     "prepare:assets": "node scripts/prepare-icons.mjs && node scripts/generate-dmg-background.mjs",
     "prepare:dmg-background": "node scripts/generate-dmg-background.mjs",
+    "test:desktop-icon": "node --test scripts/desktop-icon-contract.test.mjs",
     "test:desktop-shell": "node --test scripts/desktop-shell-contract.test.mjs",
     "test:dmg-background": "node --test scripts/generate-dmg-background.test.mjs",
     "test:release-guard": "node --test ../../scripts/desktop-release-guard.test.mjs",
