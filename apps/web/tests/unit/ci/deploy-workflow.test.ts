@@ -189,16 +189,55 @@ describe('deploy workflow Vercel env resolution', () => {
 
   it('verifies production promotion through the canonical public alias', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
+    const promoteJob = getJobBlock(workflow, 'promote-production');
+    const domainGuardStep = getStepBlock(
+      promoteJob,
+      'Verify production domains are on canonical Vercel project'
+    );
     const promoteStep = getStepBlock(
-      workflow,
+      promoteJob,
       'Promote specific deployment for this SHA'
     );
+    const domainGuardIndex = promoteJob.indexOf(
+      '- name: Verify production domains are on canonical Vercel project'
+    );
+    const promoteIndex = promoteJob.indexOf(
+      '- name: Promote specific deployment for this SHA'
+    );
 
+    expect(domainGuardIndex).toBeGreaterThanOrEqual(0);
+    expect(promoteIndex).toBeGreaterThan(domainGuardIndex);
+    expect(promoteJob).toContain(
+      'failure_subtype: ${{ steps.domain-guard.outputs.failure_subtype || steps.promote.outputs.failure_subtype }}'
+    );
+    expect(domainGuardStep).toContain('id: domain-guard');
+    expect(domainGuardStep).toContain(
+      'node .github/scripts/verify-vercel-production-domains.mjs'
+    );
+    expect(domainGuardStep).toContain(
+      'VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}'
+    );
+    expect(domainGuardStep).toContain(
+      'failure_subtype=domain_project_mismatch'
+    );
     expect(promoteStep).toContain('"https://jov.ie/api/health/build-info"');
     expect(promoteStep).toContain('probe_labels=(');
     expect(promoteStep).toContain('"production-alias"');
     expect(promoteStep).toContain('max_attempts=30');
     expect(promoteStep).toContain('URLs can return 401');
+  });
+
+  it('alerts specifically when production domains drift off the canonical Vercel project', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const classifyStep = getStepBlock(workflow, 'Classify failure type');
+
+    expect(classifyStep).toContain('domain_project_mismatch');
+    expect(classifyStep).toContain(
+      'Production domains are on the wrong Vercel project'
+    );
+    expect(classifyStep).toContain(
+      'Production promotion was blocked before deploy.'
+    );
   });
 });
 
