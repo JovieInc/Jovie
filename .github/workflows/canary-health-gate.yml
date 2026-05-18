@@ -462,6 +462,31 @@ jobs:
           # Verify anonymous onboarding chat can render without Turnstile configuration errors.
           check_route_renders "Start onboarding chat" "/start" 500 "failed_start"
 
+          # Verify /start chat is not accidentally disabled by a default-off
+          # feature flag. This intentionally omits a Turnstile token: a healthy
+          # production build should reach the bot gate and return 403
+          # TURNSTILE_REQUIRED, not 503 ONBOARDING_CHAT_DISABLED.
+          echo "Checking onboarding chat reaches the bot gate..."
+          onboarding_chat_url="${deployment_url%/}/api/chat"
+          onboarding_chat_response=$(curl -s -L "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -X POST -H "Content-Type: application/json" -H "Accept: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -d '{"mode":"onboarding","messages":[{"id":"canary-onboarding","role":"user","parts":[{"type":"text","text":"canary"}]}]}' -w "\n%{http_code}" "${onboarding_chat_url}" || printf '\n000')
+          onboarding_chat_code="${onboarding_chat_response##*$'\n'}"
+          onboarding_chat_body="${onboarding_chat_response%$'\n'*}"
+
+          if echo "$onboarding_chat_body" | grep -q '"errorCode":"ONBOARDING_CHAT_DISABLED"'; then
+            echo "❌ Canary failed: onboarding chat is disabled by runtime gate"
+            echo "canary_status=failed_onboarding_chat" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          if [ "$onboarding_chat_code" = "403" ] && echo "$onboarding_chat_body" | grep -q '"errorCode":"TURNSTILE_REQUIRED"'; then
+            echo "✅ Onboarding chat reached Turnstile gate"
+          else
+            echo "❌ Canary failed: onboarding chat expected 403 TURNSTILE_REQUIRED, got HTTP $onboarding_chat_code"
+            echo "Response preview: ${onboarding_chat_body:0:300}"
+            echo "canary_status=failed_onboarding_chat" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
           # Verify /api/chat is reachable and auth-gated.
           #
           # NOTE: This probe has shown intermittent false positives on staging
@@ -540,6 +565,9 @@ jobs:
           auth_smoke_attempt=1
           auth_smoke_max_attempts=3
 
+          # The HTTP canary uses Vercel bypass headers above, but this browser
+          # smoke must match real public user traffic. Passing bypass headers into
+          # Playwright keeps Clerk from reaching an interactive ready state.
           until CI=true SMOKE_ONLY=1 BASE_URL="${DEPLOYMENT_URL}" pnpm exec playwright test tests/e2e/auth-public-ready.spec.ts --project=chromium --reporter=line; do
             if [ "$auth_smoke_attempt" -ge "$auth_smoke_max_attempts" ]; then
               echo "❌ Public auth controls failed after ${auth_smoke_max_attempts} attempts."
@@ -553,7 +581,6 @@ jobs:
           done
         env:
           DEPLOYMENT_URL: ${{ steps.canary-check.outputs.verified_deployment_url || inputs.deployment_url }}
-          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
 
       - name: Mark canary verified
         id: canary-status

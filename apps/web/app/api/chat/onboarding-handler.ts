@@ -29,8 +29,8 @@ import {
 } from '@/lib/turnstile/verify';
 import { extractClientIPFromRequest } from '@/lib/utils/ip-extraction';
 
-/** Statsig kill-switch gate for the anonymous onboarding chat (JOV-2132). */
-const ONBOARDING_CHAT_GATE = 'onboarding_chat_v2';
+/** Existing Statsig kill switch for all `/api/chat` traffic. */
+const CHAT_DISABLED_GATE = 'ai_chat_disabled';
 
 /** Maximum onboarding messages we accept in a single request payload. */
 const MAX_ONBOARDING_MESSAGES = 50;
@@ -42,7 +42,7 @@ const MAX_ONBOARDING_MESSAGE_LENGTH = 4000;
  * Anonymous onboarding chat handler (JOV-2132).
  *
  * Gate chain (in order):
- *  1. Statsig kill-switch `onboarding_chat_v2` — return 503 if disabled.
+ *  1. Statsig kill-switch `ai_chat_disabled` — return 503 if disabled.
  *  2. Resolve or mint a signed onboarding session cookie.
  *  3. Resolve client IP (via trusted proxy header helper) + ASN.
  *  4. Verify Cloudflare Turnstile token on the first message of a fresh
@@ -143,16 +143,15 @@ export async function tryHandleAnonymousOnboardingChat(
   Sentry.setTag('chat_mode', 'onboarding');
   Sentry.setTag('chat_anonymous', 'true');
 
-  // --- Statsig kill switch (onboarding_chat_v2) ---
-  // The whole onboarding surface is gated. When the gate evaluates to false
-  // (default OFF / kill-switch flipped) we return 503 so on-call sees a
-  // clean signal and we never quietly burn LLM spend during an incident.
+  // --- Statsig kill switch (ai_chat_disabled) ---
+  // Anonymous onboarding is a live route, not a default-off rollout. Reuse the
+  // existing chat kill switch so unconfigured Statsig cannot disable /start.
   // Anonymous → pass `null` userId; Statsig falls back to public conditions.
-  const onboardingEnabled =
+  const chatDisabled =
     env.NODE_ENV === 'development'
-      ? true
-      : await checkGateForUser(null, ONBOARDING_CHAT_GATE, false);
-  if (!onboardingEnabled) {
+      ? false
+      : await checkGateForUser(null, CHAT_DISABLED_GATE, false);
+  if (chatDisabled) {
     return NextResponse.json(
       {
         error: 'Onboarding chat is temporarily unavailable',
