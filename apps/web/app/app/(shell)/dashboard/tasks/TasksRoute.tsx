@@ -1,13 +1,1 @@
-import { TasksPageClient } from '@/components/features/dashboard/tasks/TasksPageClient';
-import { TasksWorkspaceUpgradeInterstitial } from '@/components/features/dashboard/tasks/TasksUpgradeInterstitial';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
-
-export async function TasksRoute() {
-  const entitlements = await getCurrentUserEntitlements();
-
-  if (!entitlements.canAccessTasksWorkspace) {
-    return <TasksWorkspaceUpgradeInterstitial />;
-  }
-
-  return <TasksPageClient />;
-}
+export { TasksRoute } from '../../tasks/TasksRoute';

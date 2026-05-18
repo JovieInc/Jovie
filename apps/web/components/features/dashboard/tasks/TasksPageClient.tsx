@@ -21,6 +21,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import {
   type ComponentPropsWithoutRef,
   type FormEvent,
@@ -894,10 +895,12 @@ function TaskEmptyState({
   hasFilters,
   onClearFilters,
   onOpenComposer,
+  onOpenReleases,
 }: Readonly<{
   hasFilters: boolean;
   onClearFilters: () => void;
   onOpenComposer: () => void;
+  onOpenReleases: () => void;
 }>) {
   return (
     <div className='flex min-h-[360px] flex-col items-center justify-center gap-3 px-6 text-center'>
@@ -932,9 +935,7 @@ function TaskEmptyState({
               type='button'
               variant='secondary'
               size='sm'
-              onClick={() => {
-                globalThis.location.href = APP_ROUTES.RELEASES;
-              }}
+              onClick={onOpenReleases}
             >
               Set Up Release
             </Button>
@@ -1265,6 +1266,7 @@ function useTaskActions({
 }
 
 export function TasksPageClient() {
+  const router = useRouter();
   const designV1TasksEnabled = useAppFlag('DESIGN_V1');
   const { selectedProfile } = useDashboardData();
   const { setHeaderActions } = useSetHeaderActions();
@@ -1483,6 +1485,9 @@ export function TasksPageClient() {
     setAssigneeFilter('all');
     setMobileScope('all');
   }, []);
+  const openReleases = useCallback(() => {
+    router.push(APP_ROUTES.RELEASES);
+  }, [router]);
   const showTaskWorkbenchEmptyState =
     !isBoardMode && !isActiveListLoading && tasks.length === 0;
   const selectedTaskIndex = effectiveSelectedTaskId
@@ -1946,6 +1951,7 @@ export function TasksPageClient() {
             hasFilters={hasFilters}
             onClearFilters={clearFilters}
             onOpenComposer={() => setHeaderMode('create')}
+            onOpenReleases={openReleases}
           />
         </div>
       </div>
@@ -1978,6 +1984,7 @@ export function TasksPageClient() {
             hasFilters={hasFilters}
             onClearFilters={clearFilters}
             onOpenComposer={() => setHeaderMode('create')}
+            onOpenReleases={openReleases}
           />
         }
       />
@@ -1994,6 +2001,7 @@ export function TasksPageClient() {
           hasFilters={hasFilters || mobileScope !== 'all'}
           onClearFilters={clearFilters}
           onOpenComposer={() => setHeaderMode('create')}
+          onOpenReleases={openReleases}
         />
       </div>
     );
