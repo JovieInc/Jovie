@@ -1,6 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { loadDspPresenceForProfile } from '@/app/app/(shell)/dashboard/presence/actions';
-import { loadReleaseMatrix } from '@/app/app/(shell)/dashboard/releases/actions';
+import { loadReleaseMatrix } from '@/app/app/(shell)/dashboard/releases/release-matrix-loader';
 import { getTasks } from '@/app/app/(shell)/dashboard/tasks/task-actions';
 import { DEFAULT_TASK_WORKSPACE_FILTERS } from '@/lib/tasks/query-defaults';
 import { FREQUENT_CACHE } from './cache-strategies';

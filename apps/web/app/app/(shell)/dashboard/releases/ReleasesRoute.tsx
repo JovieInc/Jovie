@@ -7,9 +7,9 @@ import { queryKeys } from '@/lib/queries';
 import { HydrateClient } from '@/lib/queries/HydrateClient';
 import { getDehydratedState, getQueryClient } from '@/lib/queries/server';
 import { getDashboardShellData } from '../actions';
-import { loadReleaseMatrix } from './actions';
 import { ReleasesClientBoundary } from './ReleasesClientBoundary';
 import { ReleasesPageClient } from './ReleasesPageClient';
+import { loadReleaseMatrix } from './release-matrix-loader';
 
 /**
  * Releases page — client-first with shell-only server work.

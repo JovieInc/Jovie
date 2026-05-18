@@ -14,7 +14,7 @@ import type {
   TourDateViewModel,
 } from '@/lib/tour-dates/types';
 import { getDashboardShellData } from '../dashboard/actions';
-import { loadReleaseMatrix } from '../dashboard/releases/actions';
+import { loadReleaseMatrix } from '../dashboard/releases/release-matrix-loader';
 import { loadTourDates } from '../dashboard/tour-dates/actions';
 import { CalendarPageClient } from './CalendarPageClient';
 

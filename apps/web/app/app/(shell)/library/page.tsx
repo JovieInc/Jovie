@@ -8,7 +8,7 @@ import { queryKeys } from '@/lib/queries';
 import { HydrateClient } from '@/lib/queries/HydrateClient';
 import { getDehydratedState, getQueryClient } from '@/lib/queries/server';
 import { getDashboardShellData } from '../dashboard/actions';
-import { loadReleaseMatrix } from '../dashboard/releases/actions';
+import { loadReleaseMatrix } from '../dashboard/releases/release-matrix-loader';
 import { LibraryPageClient } from './LibraryPageClient';
 
 export const runtime = 'nodejs';
