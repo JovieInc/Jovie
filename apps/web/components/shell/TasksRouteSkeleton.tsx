@@ -1,3 +1,6 @@
+import { PageShell } from '@/components/organisms/PageShell';
+import { PageToolbar } from '@/components/organisms/table';
+
 const TASK_ROWS = [
   { key: 'task-1', titleWidth: '72%', metaWidth: '38%' },
   { key: 'task-2', titleWidth: '84%', metaWidth: '44%' },
@@ -10,25 +13,31 @@ const BOARD_COLUMNS = ['backlog', 'todo', 'progress'] as const;
 
 export function TasksRouteSkeleton() {
   return (
-    <section
+    <PageShell
       aria-label='Loading tasks'
       aria-busy='true'
       aria-live='polite'
-      className='flex h-full min-h-0 flex-col bg-(--linear-app-content-surface)'
+      className='absolute inset-0 overflow-hidden'
+      toolbar={
+        <PageToolbar
+          start={
+            <div className='flex items-center gap-1.5'>
+              <div className='skeleton h-7 w-20 rounded-full' />
+              <div className='skeleton h-7 w-28 rounded-full' />
+              <div className='skeleton h-7 w-32 rounded-full' />
+            </div>
+          }
+          end={
+            <div className='flex items-center gap-1'>
+              <div className='skeleton h-7 w-7 rounded-full' />
+              <div className='skeleton h-7 w-7 rounded-full' />
+            </div>
+          }
+          className='h-[var(--linear-app-header-height-compact)] min-h-[var(--linear-app-header-height-compact)]'
+        />
+      }
     >
-      <div className='flex h-(--linear-app-header-height-compact) shrink-0 items-center justify-between gap-3 px-app-header'>
-        <div className='flex items-center gap-1.5'>
-          <div className='skeleton h-7 w-20 rounded-full' />
-          <div className='skeleton h-7 w-28 rounded-full' />
-          <div className='skeleton h-7 w-32 rounded-full' />
-        </div>
-        <div className='flex items-center gap-1'>
-          <div className='skeleton h-7 w-7 rounded-full' />
-          <div className='skeleton h-7 w-7 rounded-full' />
-        </div>
-      </div>
-
-      <div className='flex min-h-0 flex-1 overflow-hidden pb-2'>
+      <section className='flex min-h-0 flex-1 flex-col overflow-hidden pb-2'>
         <div className='hidden min-h-0 flex-1 gap-2 px-2.5 pt-0.5 lg:flex'>
           {BOARD_COLUMNS.map(column => (
             <div
@@ -76,7 +85,7 @@ export function TasksRouteSkeleton() {
             </div>
           ))}
         </div>
-      </div>
-    </section>
+      </section>
+    </PageShell>
   );
 }
