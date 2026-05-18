@@ -570,6 +570,7 @@ export function ProfilePrimaryTabPanel({
           artist={artist}
           tourDates={[...tourDates]}
           emptyStateSourceContext={eventsEmptySourceContext}
+          renderMode={renderMode}
         />
       </div>
     );

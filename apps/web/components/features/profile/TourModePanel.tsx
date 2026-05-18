@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useMemo } from 'react';
+import type { ProfileRenderMode } from '@/features/profile/contracts';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import {
   type TourDateWithProximity,
@@ -174,13 +175,36 @@ function TourDatesContent({
   nearby,
   allDates,
   emptyStateSourceContext,
+  renderMode,
 }: Readonly<{
   readonly artist: Artist;
   readonly nearby: TourDateWithProximity[];
   readonly allDates: TourDateWithProximity[];
   readonly emptyStateSourceContext: NotificationSourceContext;
+  readonly renderMode: ProfileRenderMode;
 }>) {
   if (allDates.length === 0) {
+    const action =
+      renderMode === 'preview' ? (
+        <button
+          type='button'
+          className='inline-flex h-12 items-center rounded-full bg-white px-5 text-[15px] font-[680] tracking-[-0.02em] text-black'
+          disabled
+        >
+          Get event alerts
+        </button>
+      ) : (
+        <ArtistNotificationsCTA
+          artist={artist}
+          variant='button'
+          hideListenFallback
+          source={emptyStateSourceContext.ctaLocation}
+          sourceContext={emptyStateSourceContext}
+          triggerLabel='Get event alerts'
+          presentation='overlay'
+        />
+      );
+
     return (
       <div className='flex min-h-[42vh] flex-col items-center justify-center px-6 py-14 text-center'>
         <p className='text-[18px] font-[650] tracking-[-0.035em] text-white'>
@@ -189,17 +213,7 @@ function TourDatesContent({
         <p className='mt-2 max-w-[25ch] text-[13px] leading-5 text-white/52'>
           Get a note when new shows are announced.
         </p>
-        <div className='mt-5'>
-          <ArtistNotificationsCTA
-            artist={artist}
-            variant='button'
-            hideListenFallback
-            source={emptyStateSourceContext.ctaLocation}
-            sourceContext={emptyStateSourceContext}
-            triggerLabel='Get event alerts'
-            presentation='overlay'
-          />
-        </div>
+        <div className='mt-5'>{action}</div>
       </div>
     );
   }
@@ -251,10 +265,12 @@ export function TourDrawerContent({
   artist,
   tourDates,
   emptyStateSourceContext,
+  renderMode = 'interactive',
 }: Readonly<{
   readonly artist: Artist;
   readonly tourDates: TourDateViewModel[];
   readonly emptyStateSourceContext?: NotificationSourceContext;
+  readonly renderMode?: ProfileRenderMode;
 }>) {
   const { location } = useUserLocation();
   const { nearbyDates, allDates } = useTourDateProximity(tourDates, location);
@@ -275,6 +291,7 @@ export function TourDrawerContent({
         nearby={nearbyDates}
         allDates={allDates}
         emptyStateSourceContext={resolvedEmptyStateSourceContext}
+        renderMode={renderMode}
       />
     </div>
   );
