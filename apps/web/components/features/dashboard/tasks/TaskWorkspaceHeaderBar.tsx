@@ -7,6 +7,7 @@ import {
   TableFilterDropdown,
   type TableFilterDropdownCategory,
 } from '@/components/molecules/filters';
+import { TabBar } from '@/components/molecules/tab-bar/TabBar';
 import {
   PageToolbar,
   PageToolbarActionButton,
@@ -244,43 +245,25 @@ export function TaskSubviewTabs({
   }
 
   return (
-    <div
-      role='tablist'
-      aria-label='Task subviews'
-      className={cn(
-        'flex min-w-0 items-center gap-0.5 overflow-x-auto pl-0.5',
-        className
-      )}
-    >
-      {subviews.map(subview => {
-        const isActive = activeSubview === subview.id;
-
-        return (
-          <button
-            key={subview.id}
-            type='button'
-            role='tab'
-            aria-selected={isActive}
-            onClick={() => onSubviewChange(subview.id)}
-            className={cn(
-              'inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-[12.5px] font-semibold tracking-[-0.012em] transition-[background-color,color]',
-              isActive
-                ? 'bg-surface-1 text-primary-token'
-                : 'text-tertiary-token hover:bg-surface-1 hover:text-primary-token'
-            )}
-          >
+    <TabBar<TaskSubviewId>
+      value={activeSubview}
+      onValueChange={onSubviewChange}
+      ariaLabel='Task subviews'
+      overflowMode='scroll'
+      variant='segment'
+      className={cn('pl-0.5', className)}
+      triggerClassName='gap-1.5 px-2.5 text-[12.5px]'
+      options={subviews.map(subview => ({
+        value: subview.id,
+        label: (
+          <span className='inline-flex min-w-0 items-center gap-1.5'>
             <span>{subview.label}</span>
-            <span
-              className={cn(
-                'text-[10.5px] tabular-nums',
-                isActive ? 'text-tertiary-token' : 'text-quaternary-token'
-              )}
-            >
+            <span className='text-[10.5px] tabular-nums opacity-70'>
               {subview.count}
             </span>
-          </button>
-        );
-      })}
-    </div>
+          </span>
+        ),
+      }))}
+    />
   );
 }
