@@ -5,6 +5,16 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.25] - 2026-05-17
+
+> [internal] Auth reliability: middleware 503 paths now return HTML for browser navigation, and Sentry rate-limiting uses atomic Redis operations to prevent silent alert suppression.
+
+### Fixed
+
+- **[internal] Middleware 503 paths return HTML for browser requests**: when Clerk auth is degraded and the proxy returns a 503, requests from browsers (identified via `Accept: text/html`) now receive a styled HTML page rather than a JSON error response. This means users who navigate directly to a protected page during a Clerk outage see a readable "service temporarily unavailable" message instead of raw JSON. JSON responses are preserved for API clients and background fetch calls. (JOV-2393)
+- **[internal] Sentry rate-limit is now atomic**: replaced the previous non-atomic `INCR` + `EXPIRE` pair with a single atomic `SET NX EX` operation. The old implementation had a gap where `INCR` succeeded but `EXPIRE` failed, leaving the Redis key without a TTL — this permanently silenced Sentry alerts for that hostname until the key was manually removed. The new implementation writes the key and its 60-second TTL in one operation, eliminating the race. (JOV-2393)
+- **[internal] Waitlist error boundary no longer triggers on Stripe/DB auth errors**: narrowed the `isAuthDegradedError` heuristic from the broad `msg.includes('auth')` (which matched Stripe, JWT, and database auth errors) to `msg.includes('authentication service')`, which is specific to Clerk error messages. (JOV-2393)
+
 ## [26.5.24] - 2026-05-17
 
 > The Jovie pitch deck is now available at jov.ie/pitch with a one-click PDF download.
