@@ -1,45 +1,28 @@
-import { notFound, redirect } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
-import { PageErrorState } from '@/features/feedback/PageErrorState';
-import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
-import { getAppFlagValue } from '@/lib/flags/server';
 import { queryKeys } from '@/lib/queries';
 import { HydrateClient } from '@/lib/queries/HydrateClient';
 import { getDehydratedState, getQueryClient } from '@/lib/queries/server';
 import { loadReleaseMatrix } from '@/lib/releases/release-matrix-loader';
-import { getDashboardShellData } from '../dashboard/actions';
+import { loadAppShellRouteContext } from '../app-shell-route-context';
 import { LibraryPageClient } from './LibraryPageClient';
 
 export const runtime = 'nodejs';
 
 export default async function LibraryPage() {
-  const { userId } = await getCachedAuth();
-  const libraryEnabled = await getAppFlagValue('SHELL_CHAT_V1', {
-    userId,
+  const routeContext = await loadAppShellRouteContext({
+    route: APP_ROUTES.LIBRARY,
+    authFailure: 'notFound',
+    requiredFlag: 'SHELL_CHAT_V1',
+    dashboardErrorLogMessage: 'Dashboard data load failed on library page',
+    dashboardErrorMessage:
+      'Failed to load library data. Please refresh the page.',
   });
-
-  if (!userId || !libraryEnabled) {
-    notFound();
+  if (!routeContext.ok) {
+    return routeContext.error;
   }
 
-  const dashboardData = await getDashboardShellData(userId);
-  if (dashboardData.dashboardLoadError) {
-    await captureError(
-      'Dashboard data load failed on library page',
-      dashboardData.dashboardLoadError,
-      { route: APP_ROUTES.LIBRARY }
-    );
-    return (
-      <PageErrorState message='Failed to load library data. Please refresh the page.' />
-    );
-  }
-
-  if (dashboardData.needsOnboarding) {
-    redirect(APP_ROUTES.START);
-  }
-
-  const profileId = dashboardData.selectedProfile?.id;
+  const profileId = routeContext.profileId;
   if (profileId) {
     const queryClient = getQueryClient();
     try {
