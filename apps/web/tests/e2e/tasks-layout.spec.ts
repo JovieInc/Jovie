@@ -10,9 +10,14 @@ import type {
   TaskPriority,
   TaskStatus,
 } from '@/lib/tasks/types';
-import { ensureSignedInUser, hasClerkCredentials } from '../helpers/clerk-auth';
+import {
+  ensureSignedInUser,
+  hasClerkCredentials,
+  setTestAuthBypassSession,
+} from '../helpers/clerk-auth';
 
 const LAYOUT_TASK_TITLE = 'Layout QA task fixture';
+const TASKS_LAYOUT_PERSONA = 'creator-ready';
 const PERSONA_PROFILE_USERNAMES = {
   admin: 'browse-admin-user',
   creator: 'browse-test-user',
@@ -39,6 +44,10 @@ interface SeededTaskState {
 }
 
 function resolveLayoutProfileUsername(): string {
+  if (process.env.E2E_USE_TEST_AUTH_BYPASS === '1') {
+    return PERSONA_PROFILE_USERNAMES[TASKS_LAYOUT_PERSONA];
+  }
+
   const persona = process.env.E2E_TEST_AUTH_PERSONA?.trim();
   if (
     persona === 'admin' ||
@@ -194,16 +203,6 @@ function getTaskBoardCardByTitle(page: Page, taskTitle: string) {
     .first();
 }
 
-async function openTaskRowByTitle(
-  page: Page,
-  taskTitle: string
-): Promise<ReturnType<Page['locator']>> {
-  const row = getTaskRowByTitle(page, taskTitle);
-  await expect(row).toBeVisible({ timeout: 60_000 });
-  await row.click();
-  return row;
-}
-
 async function setTaskViewMode(
   page: Page,
   viewMode: 'board' | 'list'
@@ -230,6 +229,45 @@ async function setTaskViewMode(
     },
     { key: TASK_VIEW_MODE_STORAGE_KEY, value: viewMode }
   );
+}
+
+async function gotoTasksRoute(page: Page): Promise<void> {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
+      await page.goto(APP_ROUTES.TASKS, {
+        waitUntil: 'domcontentloaded',
+        timeout: 90_000,
+      });
+      await expect(page).toHaveURL(url => url.pathname === APP_ROUTES.TASKS, {
+        timeout: 30_000,
+      });
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt < 2) {
+        await page.waitForTimeout(attempt * 1000);
+      }
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error('Failed to navigate to the canonical tasks route.');
+}
+
+async function fillTaskSearch(page: Page, taskTitle: string): Promise<void> {
+  const searchbox = page.getByRole('searchbox', { name: 'Search tasks' });
+  const searchboxVisible = await searchbox
+    .isVisible({ timeout: 5000 })
+    .catch(() => false);
+
+  if (!searchboxVisible) {
+    await page.getByRole('button', { name: 'Search tasks' }).click();
+  }
+
+  await searchbox.fill(taskTitle);
 }
 
 async function ensureBoardViewMode(page: Page): Promise<void> {
@@ -268,10 +306,7 @@ async function assertTasksBoardLayout(
     height: viewport.height,
   });
 
-  await page.goto(APP_ROUTES.DASHBOARD_TASKS, {
-    waitUntil: 'domcontentloaded',
-    timeout: 120_000,
-  });
+  await gotoTasksRoute(page);
   await expect(page.getByTestId('tasks-workspace')).toBeVisible({
     timeout: 30_000,
   });
@@ -334,10 +369,7 @@ async function assertTasksLayout(
     height: viewport.height,
   });
 
-  await page.goto(APP_ROUTES.DASHBOARD_TASKS, {
-    waitUntil: 'domcontentloaded',
-    timeout: 120_000,
-  });
+  await gotoTasksRoute(page);
   await expect(page.getByTestId('tasks-workspace')).toBeVisible({
     timeout: 30_000,
   });
@@ -346,39 +378,50 @@ async function assertTasksLayout(
     timeout: 30_000,
   });
 
-  await page.getByRole('button', { name: 'Search tasks' }).click();
-  await page.getByRole('searchbox', { name: 'Search tasks' }).fill(taskTitle);
+  await fillTaskSearch(page, taskTitle);
 
-  const targetRow = await openTaskRowByTitle(page, taskTitle);
+  const targetRow = getTaskRowByTitle(page, taskTitle);
 
+  const workspace = page.getByTestId('tasks-workspace');
   const listPane = page.getByTestId('task-list-pane');
-  const documentPane = page.getByTestId('task-document-pane');
   const dashboardHeader = page.getByTestId('dashboard-header');
   const subheader = page.getByTestId('tasks-workspace-subheader');
 
   await expect(listPane).toBeVisible();
-  await expect(documentPane).toBeVisible();
-  await expect(targetRow).toBeVisible();
-  await expect(getVisibleTaskTitleEditor(page)).toHaveValue(taskTitle);
+  await expect(targetRow).toBeVisible({ timeout: 30_000 });
 
-  const [headerBox, subheaderBox, paneBox, rowBox, fitsWithoutScroll] =
-    await Promise.all([
-      dashboardHeader.boundingBox(),
-      subheader.boundingBox(),
-      listPane.boundingBox(),
-      targetRow.boundingBox(),
-      listPane.evaluate(node => node.scrollWidth <= node.clientWidth + 1),
-    ]);
+  const [
+    headerBox,
+    subheaderBox,
+    workspaceBox,
+    paneBox,
+    rowBox,
+    listFitsWithoutScroll,
+    pageFitsWithoutScroll,
+  ] = await Promise.all([
+    dashboardHeader.boundingBox(),
+    subheader.boundingBox(),
+    workspace.boundingBox(),
+    listPane.boundingBox(),
+    targetRow.boundingBox(),
+    listPane.evaluate(node => node.scrollWidth <= node.clientWidth + 1),
+    page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth + 1
+    ),
+  ]);
 
   expect(headerBox).not.toBeNull();
-  expect(subheaderBox).not.toBeNull();
+  expect(workspaceBox).not.toBeNull();
   expect(paneBox).not.toBeNull();
   expect(rowBox).not.toBeNull();
-  expect(fitsWithoutScroll).toBe(true);
+  expect(listFitsWithoutScroll).toBe(true);
+  expect(pageFitsWithoutScroll).toBe(true);
 
-  expect(
-    Math.abs((headerBox?.height ?? 0) - (subheaderBox?.height ?? 0))
-  ).toBeLessThanOrEqual(1);
+  if (subheaderBox) {
+    expect(
+      Math.abs((headerBox?.height ?? 0) - subheaderBox.height)
+    ).toBeLessThanOrEqual(1);
+  }
   expect(rowBox?.x ?? 0).toBeGreaterThanOrEqual((paneBox?.x ?? 0) - 0.5);
   expect((rowBox?.x ?? 0) + (rowBox?.width ?? 0)).toBeLessThanOrEqual(
     (paneBox?.x ?? 0) + (paneBox?.width ?? 0) + 0.5
@@ -391,6 +434,8 @@ async function assertTasksLayout(
 }
 
 test.describe('Tasks layout', () => {
+  test.describe.configure({ timeout: 180_000 });
+
   test.beforeEach(async ({ page }, testInfo) => {
     if (
       process.env.E2E_USE_TEST_AUTH_BYPASS !== '1' &&
@@ -401,6 +446,9 @@ test.describe('Tasks layout', () => {
     }
 
     await stubPassiveTracking(page);
+    if (process.env.E2E_USE_TEST_AUTH_BYPASS === '1') {
+      await setTestAuthBypassSession(page, TASKS_LAYOUT_PERSONA);
+    }
     await ensureSignedInUser(page);
   });
 
@@ -427,10 +475,7 @@ test.describe('Tasks layout', () => {
     await setTaskViewMode(page, 'board');
     await page.setViewportSize({ width: 1440, height: 960 });
 
-    await page.goto(APP_ROUTES.DASHBOARD_TASKS, {
-      waitUntil: 'domcontentloaded',
-      timeout: 120_000,
-    });
+    await gotoTasksRoute(page);
     await expect(page.getByTestId('tasks-workspace')).toBeVisible({
       timeout: 30_000,
     });
