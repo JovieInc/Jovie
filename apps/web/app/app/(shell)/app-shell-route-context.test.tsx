@@ -54,6 +54,7 @@ vi.mock('./dashboard/actions', () => ({
 import {
   loadAppShellRouteContext,
   loadAuthenticatedAppShellUserId,
+  requireAppShellDashboardUserId,
 } from './app-shell-route-context';
 
 function shellData(
@@ -61,12 +62,14 @@ function shellData(
     readonly dashboardLoadError: unknown;
     readonly needsOnboarding: boolean;
     readonly selectedProfile: { readonly id: string } | null;
+    readonly user: { readonly id: string } | null;
   }> = {}
 ): DashboardData {
   return {
     dashboardLoadError: undefined,
     needsOnboarding: false,
     selectedProfile: { id: 'profile_1' },
+    user: { id: 'dashboard_user_1' },
     ...overrides,
   } as unknown as DashboardData;
 }
@@ -110,6 +113,40 @@ describe('loadAppShellRouteContext', () => {
     ).resolves.toBe('user_early');
 
     expect(getDashboardShellDataMock).not.toHaveBeenCalled();
+  });
+
+  it('returns the dashboard database user id from shared route context', () => {
+    const dashboardData = shellData({
+      user: { id: 'dashboard_user_2' },
+    });
+
+    expect(
+      requireAppShellDashboardUserId(
+        {
+          ok: true,
+          userId: 'clerk_user_1',
+          dashboardData,
+          profileId: 'profile_1',
+        },
+        '/app/audience'
+      )
+    ).toBe('dashboard_user_2');
+  });
+
+  it('centralizes missing dashboard user signin redirects', () => {
+    const dashboardData = shellData({ user: null });
+
+    expect(() =>
+      requireAppShellDashboardUserId(
+        {
+          ok: true,
+          userId: 'clerk_user_1',
+          dashboardData,
+          profileId: 'profile_1',
+        },
+        '/app/audience'
+      )
+    ).toThrow('NEXT_REDIRECT:/signin?redirect_url=%2Fapp%2Faudience');
   });
 
   it('preserves route search params in shared signin redirects', async () => {
