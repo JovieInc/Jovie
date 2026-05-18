@@ -737,7 +737,7 @@ export function ReleaseSidebar({
             onRefresh();
             return;
           }
-          globalThis.location.reload();
+          router.refresh();
         },
         disabled: isRefreshing,
       },
@@ -750,6 +750,7 @@ export function ReleaseSidebar({
     onGenerateAlbumArt,
     isRefreshing,
     onRefresh,
+    router,
     setIsAddingLink,
   ]);
 
