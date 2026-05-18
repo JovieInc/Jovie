@@ -6,6 +6,7 @@ import { APP_ROUTES } from '@/constants/routes';
 const mocks = vi.hoisted(() => ({
   push: vi.fn(),
   seek: vi.fn(),
+  searchParams: new URLSearchParams(),
   playbackState: {
     activeTrackId: null as string | null,
     trackTitle: null as string | null,
@@ -17,6 +18,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mocks.push }),
+  useSearchParams: () => mocks.searchParams,
 }));
 
 vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
@@ -65,6 +67,7 @@ describe('LyricsPageClient', () => {
   beforeEach(() => {
     mocks.push.mockClear();
     mocks.seek.mockClear();
+    mocks.searchParams = new URLSearchParams();
     mocks.playbackState.activeTrackId = null;
     mocks.playbackState.trackTitle = null;
     mocks.playbackState.artistName = null;
@@ -83,7 +86,23 @@ describe('LyricsPageClient', () => {
     expect(screen.getByTestId('auto-focus')).toHaveTextContent('true');
   });
 
-  it('closes direct lyrics entry to the library on Escape', () => {
+  it('closes direct lyrics entry to the return route on Escape', () => {
+    mocks.searchParams = new URLSearchParams(
+      'from=%2Fapp%2Fchat%2Fthread-1%3Fpanel%3Dprofile'
+    );
+
+    render(<LyricsPageClient {...baseProps} />);
+
+    fireEvent.keyDown(globalThis, { key: 'Escape' });
+
+    expect(mocks.push).toHaveBeenCalledWith('/app/chat/thread-1?panel=profile');
+  });
+
+  it('falls back to the library when the return route is missing or loops back into lyrics', () => {
+    mocks.searchParams = new URLSearchParams(
+      'from=%2Fapp%2Flyrics%2Ftrack-2%3Ffrom%3D%252Fapp%252Fchat'
+    );
+
     render(<LyricsPageClient {...baseProps} />);
 
     fireEvent.keyDown(globalThis, { key: 'Escape' });
