@@ -563,6 +563,11 @@ function getLatestTableProps() {
     | undefined;
 }
 
+function openDesktopTaskSearch() {
+  fireEvent.click(screen.getByRole('button', { name: 'Search tasks' }));
+  return screen.getByRole('searchbox', { name: 'Search tasks' });
+}
+
 function enableDesignV1Tasks() {
   mockUseAppFlag.mockImplementation(flagName => flagName === 'DESIGN_V1');
 }
@@ -1115,7 +1120,7 @@ describe('TasksPageClient', () => {
     expect(screen.getByRole('button', { name: 'Next task' })).toBeEnabled();
   });
 
-  it('keeps task search local to the workspace controls', () => {
+  it('keeps task search collapsed in the workspace toolbar by default', () => {
     renderPage();
 
     const headerActions = screen.getByTestId('header-actions-host');
@@ -1127,6 +1132,15 @@ describe('TasksPageClient', () => {
       screen.getByRole('button', { name: 'Create task' })
     ).toBeInTheDocument();
     expect(
+      screen.getByRole('button', { name: 'Search tasks' })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('searchbox', { name: 'Search tasks' })
+    ).toBeNull();
+
+    openDesktopTaskSearch();
+
+    expect(
       screen.getByRole('searchbox', { name: 'Search tasks' })
     ).toBeInTheDocument();
   });
@@ -1134,21 +1148,35 @@ describe('TasksPageClient', () => {
   it('does not open or focus task search with the slash key', () => {
     renderPage();
 
-    const searchBox = screen.getByRole('searchbox', { name: 'Search tasks' });
+    const searchButton = screen.getByRole('button', { name: 'Search tasks' });
 
     fireEvent.keyDown(screen.getByLabelText('Task title'), { key: '/' });
 
-    expect(document.activeElement).not.toBe(searchBox);
+    expect(
+      screen.queryByRole('searchbox', { name: 'Search tasks' })
+    ).toBeNull();
+    expect(document.activeElement).not.toBe(searchButton);
 
     fireEvent.keyDown(window, { key: '/' });
 
-    expect(document.activeElement).not.toBe(searchBox);
+    expect(
+      screen.queryByRole('searchbox', { name: 'Search tasks' })
+    ).toBeNull();
+    expect(document.activeElement).not.toBe(searchButton);
+  });
+
+  it('focuses task search when the shared search action opens it', () => {
+    renderPage();
+
+    const searchBox = openDesktopTaskSearch();
+
+    expect(document.activeElement).toBe(searchBox);
   });
 
   it('keeps task title search wired into list filters', () => {
     renderPage();
 
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Search tasks' }), {
+    fireEvent.change(openDesktopTaskSearch(), {
       target: { value: 'metadata' },
     });
 
@@ -1162,7 +1190,7 @@ describe('TasksPageClient', () => {
 
     renderPage();
 
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Search tasks' }), {
+    fireEvent.change(openDesktopTaskSearch(), {
       target: { value: 'press' },
     });
 
