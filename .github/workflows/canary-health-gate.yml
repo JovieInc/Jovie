@@ -27,6 +27,9 @@ on:
       canary_status:
         description: 'Canary verification status: verified, failed'
         value: ${{ jobs.canary-health-gate.outputs.canary_status }}
+      verified_deployment_url:
+        description: Verified deployment URL after build-info commit verification.
+        value: ${{ jobs.canary-health-gate.outputs.verified_deployment_url }}
     secrets:
       VERCEL_AUTOMATION_BYPASS_SECRET:
         required: false
@@ -144,12 +147,13 @@ jobs:
             echo "canary_status=failed_config" >> "$GITHUB_OUTPUT"
             exit 1
           fi
+          CURL_TIMEOUT_ARGS=(--connect-timeout 5 --max-time 15)
 
           attempt=1
           max_attempts=8
           response_code="000"
           while [ $attempt -le $max_attempts ]; do
-            response=$(curl -s -L -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${health_url}$( [[ "$health_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || printf '\n000')
+            response=$(curl -s -L "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${health_url}$( [[ "$health_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || printf '\n000')
             response_code="${response##*$'\n'}"
 
             if [ "$response_code" = "200" ]; then
@@ -194,7 +198,7 @@ jobs:
             max_attempts=5
             response_code="000"
             while [ $attempt -le $max_attempts ]; do
-              response=$(curl -s -L -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${health_url}$( [[ "$health_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || printf '\n000')
+              response=$(curl -s -L "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${health_url}$( [[ "$health_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || printf '\n000')
               response_code="${response##*$'\n'}"
 
               if [ "$response_code" = "200" ]; then
@@ -232,7 +236,7 @@ jobs:
               max_attempts=5
               response_code="000"
               while [ $attempt -le $max_attempts ]; do
-                response=$(curl -s -L -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${health_url}$( [[ "$health_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || printf '\n000')
+                response=$(curl -s -L "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${health_url}$( [[ "$health_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || printf '\n000')
                 response_code="${response##*$'\n'}"
 
                 if [ "$response_code" = "200" ]; then
@@ -353,7 +357,7 @@ jobs:
           verify_build_info_serves_commit "$deployment_url"
           echo "verified_deployment_url=${deployment_url%/}" >> "$GITHUB_OUTPUT"
 
-          health_content=$(curl -s -L -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" "${health_url}$( [[ "$health_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || echo "")
+          health_content=$(curl -s -L "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" "${health_url}$( [[ "$health_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || echo "")
           if [[ "$health_content" != *'"status":"ok"'* ]]; then
             echo "❌ Canary failed: Health status not ok"
             echo "Health response: $health_content"
@@ -383,7 +387,7 @@ jobs:
           # CRITICAL: Verify homepage renders (not just API health)
           echo "Checking homepage renders..."
           homepage_url="${deployment_url%/}/"
-          homepage_response=$(curl -s -L -A "$USER_AGENT" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${homepage_url}$( [[ "$homepage_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || printf '\n000')
+          homepage_response=$(curl -s -L "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${homepage_url}$( [[ "$homepage_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || printf '\n000')
           homepage_code="${homepage_response##*$'\n'}"
           homepage_body="${homepage_response%$'\n'*}"
 
@@ -422,7 +426,7 @@ jobs:
             echo "Checking ${route_label} route renders..."
 
             while [ "$attempt" -le "$max_attempts" ]; do
-              response=$(curl -s -L -A "$USER_AGENT" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${route_url}$( [[ "$route_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || printf '\n000')
+              response=$(curl -s -L "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${route_url}$( [[ "$route_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || printf '\n000')
               route_code="${response##*$'\n'}"
               route_body="${response%$'\n'*}"
 
@@ -471,7 +475,7 @@ jobs:
           # this check informational so canary does not block healthy deployments.
           echo "Checking /api/chat is reachable and auth-gated (informational)..."
           chat_url="${deployment_url%/}/api/chat"
-          chat_response=$(curl -s -L -A "$USER_AGENT" -X POST -H "Content-Type: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -d '{"messages":[{"id":"1","role":"user","parts":[{"type":"text","text":"hi"}]}]}' -w "\n%{http_code}" "${chat_url}" || printf '\n000')
+          chat_response=$(curl -s -L "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -X POST -H "Content-Type: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -d '{"messages":[{"id":"1","role":"user","parts":[{"type":"text","text":"hi"}]}]}' -w "\n%{http_code}" "${chat_url}" || printf '\n000')
           chat_code="${chat_response##*$'\n'}"
 
           # The chat route checks auth before body parsing, so unauthenticated
@@ -487,7 +491,7 @@ jobs:
           # not a code regression), so only block on 5xx or actual error pages.
           echo "Checking public profile route renders..."
           profile_url="${deployment_url%/}/tim"
-          profile_response=$(curl -s -L -A "$USER_AGENT" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${profile_url}$( [[ "$profile_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || printf '\n000')
+          profile_response=$(curl -s -L "${CURL_TIMEOUT_ARGS[@]}" -A "$USER_AGENT" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${profile_url}$( [[ "$profile_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || printf '\n000')
           profile_code="${profile_response##*$'\n'}"
           profile_body="${profile_response%$'\n'*}"
 

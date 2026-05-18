@@ -268,14 +268,27 @@ describe('canary health gate workflow', () => {
       workflow,
       'Verify public auth controls are interactive'
     );
+    const canaryCurlProbes = canaryStep.match(/curl -s -L [^\n]+/g) ?? [];
 
+    expect(workflow).toContain('verified_deployment_url:');
+    expect(workflow).toContain(
+      'value: ${{ jobs.canary-health-gate.outputs.verified_deployment_url }}'
+    );
     expect(canaryStep).toContain('/api/health/build-info');
     expect(canaryStep).toContain('local max_attempts=30');
+    expect(canaryStep).toContain(
+      'CURL_TIMEOUT_ARGS=(--connect-timeout 5 --max-time 15)'
+    );
     expect(canaryStep).toContain('canary_status=failed_build_info');
     expect(canaryStep).toContain('verified_deployment_url=');
     expect(authSmokeStep).toContain(
       'DEPLOYMENT_URL: ${{ steps.canary-check.outputs.verified_deployment_url || inputs.deployment_url }}'
     );
+
+    expect(canaryCurlProbes.length).toBeGreaterThanOrEqual(8);
+    for (const probe of canaryCurlProbes) {
+      expect(probe).toContain('"${CURL_TIMEOUT_ARGS[@]}"');
+    }
   });
 });
 
