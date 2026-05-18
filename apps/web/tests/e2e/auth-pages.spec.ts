@@ -142,6 +142,15 @@ test.describe('/signin page', () => {
       const bodyText = await page.locator('body').textContent();
       expect(bodyText).not.toContain('Error boundary');
       expect(bodyText).not.toContain('Unhandled Runtime Error');
+
+      if (!(await isAuthUnavailable(page))) {
+        await expect(
+          page.getByRole('button', { name: /continue with google/i })
+        ).toBeVisible({ timeout: VISIBILITY_TIMEOUT });
+        await expect(
+          page.getByRole('button', { name: /continue with apple/i })
+        ).toBeVisible({ timeout: VISIBILITY_TIMEOUT });
+      }
     } finally {
       await context.close();
     }
@@ -217,6 +226,15 @@ test.describe('/signup page', () => {
       const bodyText = await page.locator('body').textContent();
       expect(bodyText).not.toContain('Unhandled Runtime Error');
       expect(bodyText).not.toContain('Error boundary');
+
+      if (!(await isAuthUnavailable(page))) {
+        await expect(
+          page.getByRole('button', { name: /continue with google/i })
+        ).toBeVisible({ timeout: VISIBILITY_TIMEOUT });
+        await expect(
+          page.getByRole('button', { name: /continue with apple/i })
+        ).toBeVisible({ timeout: VISIBILITY_TIMEOUT });
+      }
     } finally {
       await context.close();
     }
@@ -248,6 +266,12 @@ test.describe('/signup page', () => {
       await expect(
         page.getByRole('link', { name: /privacy policy/i })
       ).toBeVisible({ timeout: VISIBILITY_TIMEOUT });
+      await expect(
+        page.getByRole('link', { name: /terms of service/i })
+      ).toHaveAttribute('href', /terms/);
+      await expect(
+        page.getByRole('link', { name: /privacy policy/i })
+      ).toHaveAttribute('href', /privacy/);
     } finally {
       await context.close();
     }

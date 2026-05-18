@@ -1,3 +1,3 @@
-import DashboardReleaseTasksPage from '@/app/app/(shell)/dashboard/releases/[releaseId]/tasks/page';
+import { ReleaseTasksRoute } from './ReleaseTasksRoute';
 
-export default DashboardReleaseTasksPage;
+export default ReleaseTasksRoute;

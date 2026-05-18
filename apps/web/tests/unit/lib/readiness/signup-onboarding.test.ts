@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ENV_KEYS } from '@/lib/env-server-schema';
 import {
   checkSignupOnboardingReadiness,
   formatSignupOnboardingReadinessReport,
@@ -58,5 +59,24 @@ describe('signup onboarding readiness', () => {
 
     expect(result.ok).toBe(true);
     expect(result.missing).toEqual([]);
+  });
+
+  it('keeps production canary env extraction complete and deduplicated', () => {
+    const uniqueKeys = new Set(ENV_KEYS);
+
+    expect(uniqueKeys.size).toBe(ENV_KEYS.length);
+    expect(ENV_KEYS).toEqual(
+      expect.arrayContaining([
+        'E2E_PROD_SIGNUP_EMAIL_BASE',
+        'E2E_PROD_SIGNUP_PASSWORD',
+        'E2E_PROD_MAILBOX_PROVIDER',
+        'E2E_PROD_MAILBOX_CLIENT_ID',
+        'E2E_PROD_MAILBOX_CLIENT_SECRET',
+        'E2E_PROD_MAILBOX_REFRESH_TOKEN',
+        'E2E_PROD_MAILBOX_QUERY_FROM',
+        'E2E_PROD_OTP_CHECK_URL',
+        'E2E_PROD_OTP_CHECK_TOKEN',
+      ])
+    );
   });
 });

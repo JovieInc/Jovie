@@ -54,20 +54,52 @@ describe('deploy workflow Vercel env resolution', () => {
   it('pins Vercel pull and build commands to the configured project', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const steps = [
-      'Pull env (preview)',
-      'Build (PR preview)',
-      'Pull env (production)',
-      'Build (preview target for staging verification)',
+      {
+        command: 'vercel pull',
+        name: 'Pull env (preview)',
+      },
+      {
+        command: 'vercel build',
+        name: 'Build (PR preview)',
+      },
+      {
+        command: 'vercel pull',
+        name: 'Pull env (production)',
+      },
+      {
+        command: 'vercel build',
+        name: 'Build (preview target for staging verification)',
+      },
     ];
 
-    for (const stepName of steps) {
-      const step = getStepBlock(workflow, stepName);
+    for (const { command, name } of steps) {
+      const step = getStepBlock(workflow, name);
 
       expect(step).toContain('VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}');
       expect(step).toContain(
         'VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}'
       );
+      expect(step).toContain('VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}');
+      expect(step).toContain(command);
+      expect(step).toContain('scope_args=()');
+      expect(step).toContain('if [ -n "${VERCEL_ORG_ID:-}" ]; then');
+      expect(step).toContain('scope_args=(--scope "$VERCEL_ORG_ID")');
+      expect(step).toContain('"${scope_args[@]}"');
+      expect(step).not.toContain('--scope ${{ secrets.VERCEL_ORG_ID }}');
     }
+  });
+
+  it('scopes prebuilt Vercel deploys to the configured team', () => {
+    const deployScript = readFileSync(
+      resolve(repoRoot, '.github/scripts/vercel-prebuilt-deploy.sh'),
+      'utf8'
+    );
+
+    expect(deployScript).toContain('VERCEL_SCOPE_ARGS=()');
+    expect(deployScript).toContain(
+      'VERCEL_SCOPE_ARGS=(--scope "$VERCEL_ORG_ID")'
+    );
+    expect(deployScript).toContain('"${VERCEL_SCOPE_ARGS[@]}"');
   });
 
   it('passes signup readiness keys into the staging preview runtime', () => {
@@ -142,18 +174,75 @@ describe('deploy workflow Vercel env resolution', () => {
     }
   });
 
-  it('verifies production promotion through the canonical public alias', () => {
+  it('checks production signup readiness against the deploy env instead of the pulled Vercel file', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
-    const promoteStep = getStepBlock(
+    const readinessStep = getStepBlock(
       workflow,
-      'Promote specific deployment for this SHA'
+      'Check signup readiness (production deploy env)'
     );
 
+    expect(readinessStep).toContain('--target=prd');
+    expect(readinessStep).toContain('--source=env');
+    expect(readinessStep).not.toContain('--source=vercel-file');
+    expect(readinessStep).not.toContain('.vercel/.env.production.local');
+  });
+
+  it('verifies production promotion through the canonical public alias', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const promoteJob = getJobBlock(workflow, 'promote-production');
+    const domainGuardStep = getStepBlock(
+      promoteJob,
+      'Verify production domains are on canonical Vercel project'
+    );
+    const promoteStep = getStepBlock(
+      promoteJob,
+      'Promote specific deployment for this SHA'
+    );
+    const domainGuardIndex = promoteJob.indexOf(
+      '- name: Verify production domains are on canonical Vercel project'
+    );
+    const promoteIndex = promoteJob.indexOf(
+      '- name: Promote specific deployment for this SHA'
+    );
+
+    expect(domainGuardIndex).toBeGreaterThanOrEqual(0);
+    expect(promoteIndex).toBeGreaterThan(domainGuardIndex);
+    expect(promoteJob).toContain(
+      'failure_subtype: ${{ steps.domain-guard.outputs.failure_subtype || steps.promote.outputs.failure_subtype }}'
+    );
+    expect(domainGuardStep).toContain('id: domain-guard');
+    expect(domainGuardStep).toContain(
+      'node .github/scripts/verify-vercel-production-domains.mjs'
+    );
+    expect(domainGuardStep).toContain(
+      'VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}'
+    );
+    expect(domainGuardStep).toContain(
+      'failure_subtype=domain_project_mismatch'
+    );
     expect(promoteStep).toContain('"https://jov.ie/api/health/build-info"');
     expect(promoteStep).toContain('probe_labels=(');
     expect(promoteStep).toContain('"production-alias"');
     expect(promoteStep).toContain('max_attempts=30');
     expect(promoteStep).toContain('URLs can return 401');
+  });
+
+  it('alerts specifically when production domains drift off the canonical Vercel project', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const classifyStep = getStepBlock(workflow, 'Classify failure type');
+    const generalSlackStep = getStepBlock(
+      workflow,
+      'Slack notify (general deploy failure)'
+    );
+
+    expect(classifyStep).toContain('domain_project_mismatch');
+    expect(classifyStep).toContain(
+      'Production domains are on the wrong Vercel project'
+    );
+    expect(classifyStep).toContain(
+      'Production promotion was blocked before deploy.'
+    );
+    expect(generalSlackStep).toContain('promote_domain_project_mismatch');
   });
 });
 

@@ -22,6 +22,34 @@ export type ClerkOAuthProvider =
   | 'spotify'
   | 'tiktok';
 
+export type PrimaryAuthOAuthProvider = Extract<
+  ClerkOAuthProvider,
+  'apple' | 'google'
+>;
+
+export const AUTH_OAUTH_PROVIDER_ORDER = [
+  'apple',
+  'google',
+] as const satisfies readonly PrimaryAuthOAuthProvider[];
+
+export const AUTH_OAUTH_PROVIDER_LABELS = {
+  apple: 'Continue with Apple',
+  google: 'Continue with Google',
+} as const satisfies Record<PrimaryAuthOAuthProvider, string>;
+
+export const CLERK_SOCIAL_BUTTON_LABEL_TEMPLATE =
+  'Continue with {{provider|titleize}}' as const;
+
+export function getAuthOAuthProviderLabel(
+  provider: PrimaryAuthOAuthProvider
+): string {
+  return AUTH_OAUTH_PROVIDER_LABELS[provider];
+}
+
+export function getEnabledAuthOAuthProviders(): readonly PrimaryAuthOAuthProvider[] {
+  return AUTH_OAUTH_PROVIDER_ORDER.filter(isOAuthProviderEnabled);
+}
+
 /**
  * Per-provider enablement check.
  *

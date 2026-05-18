@@ -161,6 +161,29 @@ describe('EntityResolutionProvider', () => {
     expect(renderCount).toBe(1);
   });
 
+  it('ignores entity cache updates for other profiles', async () => {
+    const client = new QueryClient();
+    let renderCount = 0;
+    const { result } = renderHook(
+      () => {
+        renderCount += 1;
+        return useEntityResolution('release', 'rel_other_profile');
+      },
+      { wrapper: wrapperWithClient(client, 'p1') }
+    );
+
+    await act(async () => {
+      client.setQueryData(queryKeys.releases.matrix('p2'), [
+        makeRelease('rel_other_profile', { title: 'Wrong profile' }),
+      ]);
+      client.setQueryData(queryKeys.events.list('p2'), [makeEvent('evt_p2')]);
+      await Promise.resolve();
+    });
+
+    expect(result.current.ref).toBeUndefined();
+    expect(renderCount).toBe(1);
+  });
+
   it('defers cache notifications that happen during child render', async () => {
     const client = new QueryClient();
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});

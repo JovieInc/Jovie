@@ -1,3 +1,5 @@
+import { CLERK_SOCIAL_BUTTON_LABEL_TEMPLATE } from '@/lib/auth/oauth-providers';
+
 /**
  * Apple-level auth copy: terse, declarative, no throat-clearing.
  *
@@ -7,6 +9,8 @@
  * Applied via `<ClerkProvider localization={...}>` in AuthClientProviders.
  */
 export const authClerkLocalization = {
+  socialButtonsBlockButton: CLERK_SOCIAL_BUTTON_LABEL_TEMPLATE,
+  socialButtonsBlockButtonManyInView: CLERK_SOCIAL_BUTTON_LABEL_TEMPLATE,
   signIn: {
     start: {
       title: 'Welcome back',

@@ -15,6 +15,11 @@ if [ -z "${VERCEL_TOKEN:-}" ]; then
   exit 1
 fi
 
+VERCEL_SCOPE_ARGS=()
+if [ -n "${VERCEL_ORG_ID:-}" ]; then
+  VERCEL_SCOPE_ARGS=(--scope "$VERCEL_ORG_ID")
+fi
+
 VERCEL_CMD=()
 
 resolve_vercel_cmd() {
@@ -65,21 +70,21 @@ run_deploy() {
   shift
 
   if [ "$mode" = "tgz" ]; then
-    run_vercel deploy --prebuilt --archive=tgz "$@" --token "$VERCEL_TOKEN"
+    run_vercel deploy --prebuilt --archive=tgz "$@" --token "$VERCEL_TOKEN" "${VERCEL_SCOPE_ARGS[@]}"
     return
   fi
 
   if [ "$mode" = "split-tgz" ]; then
-    run_vercel deploy --prebuilt --archive=split-tgz "$@" --token "$VERCEL_TOKEN"
+    run_vercel deploy --prebuilt --archive=split-tgz "$@" --token "$VERCEL_TOKEN" "${VERCEL_SCOPE_ARGS[@]}"
     return
   fi
 
   if [ "$mode" = "plain" ]; then
-    run_vercel deploy --prebuilt "$@" --token "$VERCEL_TOKEN"
+    run_vercel deploy --prebuilt "$@" --token "$VERCEL_TOKEN" "${VERCEL_SCOPE_ARGS[@]}"
     return
   fi
 
-  run_vercel deploy "$@" --token "$VERCEL_TOKEN"
+  run_vercel deploy "$@" --token "$VERCEL_TOKEN" "${VERCEL_SCOPE_ARGS[@]}"
 }
 
 try_mode() {

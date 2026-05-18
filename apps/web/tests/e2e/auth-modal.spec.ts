@@ -98,6 +98,36 @@ async function openInterceptedModal(
   });
 }
 
+async function isAuthUnavailable(page: import('@playwright/test').Page) {
+  const bodyText = await page
+    .locator('body')
+    .innerText()
+    .catch(() => '');
+  return /auth unavailable|authentication unavailable|clerk is not configured/i.test(
+    bodyText
+  );
+}
+
+async function expectSharedAuthSurface(page: import('@playwright/test').Page) {
+  if (await isAuthUnavailable(page)) {
+    return;
+  }
+
+  const dialog = page.getByRole('dialog');
+  await expect(
+    dialog.getByRole('button', { name: /continue with google/i })
+  ).toBeVisible({ timeout: AUTH_MODAL_TIMEOUT });
+  await expect(
+    dialog.getByRole('button', { name: /continue with apple/i })
+  ).toBeVisible({ timeout: AUTH_MODAL_TIMEOUT });
+  await expect(
+    dialog.getByRole('link', { name: /terms of service/i })
+  ).toHaveAttribute('href', /terms/);
+  await expect(
+    dialog.getByRole('link', { name: /privacy policy/i })
+  ).toHaveAttribute('href', /privacy/);
+}
+
 test.describe('Intercepted auth modal', () => {
   test('opens sign-in from the homepage header', async ({ page }) => {
     await openInterceptedModal(page, 'signin');
@@ -118,6 +148,70 @@ test.describe('Intercepted auth modal', () => {
     });
     await expect(page.getByRole('dialog')).toHaveAccessibleName(
       expectedDialogName('signup')
+    );
+    await expectSharedAuthSurface(page);
+  });
+
+  test('request access opens the same shared sign-up auth surface', async ({
+    page,
+  }) => {
+    await prepareHomepage(page);
+
+    await page
+      .getByRole('link', { name: /request access/i })
+      .first()
+      .click({ noWaitAfter: true, timeout: AUTH_MODAL_TIMEOUT });
+
+    await expect(page).toHaveURL(url => url.pathname === APP_ROUTES.SIGNUP, {
+      timeout: AUTH_MODAL_TIMEOUT,
+    });
+    await expect(page.getByRole('dialog')).toHaveAccessibleName(
+      expectedDialogName('signup')
+    );
+    await expectSharedAuthSurface(page);
+  });
+
+  test('renders the intercepted sign-up surface full-screen on mobile', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openInterceptedModal(page, 'signup');
+
+    const dialogBox = await page.getByRole('dialog').boundingBox();
+    expect(dialogBox?.x).toBeLessThanOrEqual(1);
+    expect(dialogBox?.y).toBeLessThanOrEqual(1);
+    expect(dialogBox?.width).toBeGreaterThanOrEqual(389);
+    expect(dialogBox?.height).toBeGreaterThanOrEqual(843);
+    await expectSharedAuthSurface(page);
+  });
+
+  test('slow Clerk readiness keeps stable provider slots visible immediately', async ({
+    page,
+  }) => {
+    await page.route(/clerk|__clerk/, async route => {
+      await new Promise(resolve => setTimeout(resolve, 2_500));
+      await route.continue();
+    });
+
+    await openInterceptedModal(page, 'signup');
+    if (await isAuthUnavailable(page)) {
+      return;
+    }
+
+    const slots = page.locator('[data-auth-provider-slots]').first();
+    await expect(slots).toBeVisible({ timeout: 1_000 });
+    await expect(
+      slots.locator('[data-auth-provider-slot="google"]')
+    ).toContainText('Continue with Google');
+    await expect(
+      slots.locator('[data-auth-provider-slot="apple"]')
+    ).toContainText('Continue with Apple');
+
+    const before = await slots.boundingBox();
+    await page.waitForTimeout(800);
+    const after = await slots.boundingBox();
+    expect(Math.abs((before?.height ?? 0) - (after?.height ?? 0))).toBeLessThan(
+      1
     );
   });
 
@@ -145,5 +239,19 @@ test.describe('Intercepted auth modal', () => {
     await expect(page).toHaveURL(url => url.pathname === '/', {
       timeout: 5_000,
     });
+  });
+
+  test('keyboard focus stays inside the intercepted modal', async ({
+    page,
+  }) => {
+    await openInterceptedModal(page, 'signin');
+
+    const dialog = page.getByRole('dialog');
+    await page.keyboard.press('Tab');
+
+    const focusedInsideDialog = await dialog.evaluate(dialogElement =>
+      dialogElement.contains(document.activeElement)
+    );
+    expect(focusedInsideDialog).toBe(true);
   });
 });

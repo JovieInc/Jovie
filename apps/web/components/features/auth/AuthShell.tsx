@@ -4,11 +4,17 @@ import { SignIn, SignUp } from '@clerk/nextjs';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AuthFormSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { APP_ROUTES } from '@/constants/routes';
+import { AuthProviderButtonSlots } from '@/features/auth/AuthProviderButtons';
 import { useNormalizeClerkHomeLink } from '@/features/auth/useNormalizeClerkHomeLink';
 import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
-import { buildDisabledOAuthProviderElements } from '@/lib/auth/oauth-providers';
+import {
+  buildDisabledOAuthProviderElements,
+  getAuthOAuthProviderLabel,
+  getEnabledAuthOAuthProviders,
+  type PrimaryAuthOAuthProvider,
+} from '@/lib/auth/oauth-providers';
+import { cn } from '@/lib/utils';
 
 export type AuthShellMode = 'sign-in' | 'sign-up';
 
@@ -32,6 +38,15 @@ const REQUIRED_CLERK_AUTH_ELEMENTS = {
   },
 } as const satisfies ClerkAppearanceElements;
 
+const AUTH_LEGAL_FALLBACK_HREFS = {
+  privacy: '/legal/privacy',
+  terms: '/legal/terms',
+} as const;
+
+function resolveLegalHref(value: string | undefined, fallback: string) {
+  return value?.trim() ? value : fallback;
+}
+
 function mergeRequiredClerkElement(
   baseElement: unknown,
   requiredElement: Readonly<Record<string, unknown>>
@@ -50,6 +65,23 @@ function mergeRequiredClerkElement(
   return requiredElement;
 }
 
+function hasReadyClerkAuthStart(
+  root: HTMLDivElement | null,
+  expectedProviderLabels: readonly string[]
+) {
+  if (!root) return false;
+
+  const hasEmailEntry = root.querySelector(
+    'input[type="email"], input[name="identifier"], input[name="emailAddress"]'
+  );
+  if (!hasEmailEntry) return false;
+
+  if (expectedProviderLabels.length === 0) return true;
+
+  const text = root.textContent ?? '';
+  return expectedProviderLabels.every(label => text.includes(label));
+}
+
 interface AuthShellProps {
   /** Which Clerk flow to render. */
   readonly mode: AuthShellMode;
@@ -65,6 +97,13 @@ interface AuthShellProps {
    * preserved so deep links survive the cross-link.
    */
   readonly oppositeModeUrl?: string;
+  /**
+   * Full auth pages live under `(auth)/layout.tsx`, while soft navigations to
+   * `/signin` and `/signup` can be intercepted by the root `@auth` modal slot.
+   * Use a hard same-origin auth navigation on the full pages so the modal slot
+   * does not mount a second ClerkProvider over an existing ClerkProvider.
+   */
+  readonly forceOppositeModeHardNavigation?: boolean;
   /**
    * Marks the intercepted modal surface. AuthShell always renders only the
    * Clerk form plus required sign-up legal terms; modal chrome lives in
@@ -103,13 +142,16 @@ export function AuthShell({
   mode,
   fallbackRedirectUrl,
   oppositeModeUrl,
+  forceOppositeModeHardNavigation = false,
   compact = false,
   appearance,
   initialValues,
 }: Readonly<AuthShellProps>) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const clerkSurfaceRef = useRef<HTMLDivElement>(null);
   const searchParams = useSearchParams();
   const [isMounted, setIsMounted] = useState(false);
+  const [isClerkStartReady, setIsClerkStartReady] = useState(false);
 
   useNormalizeClerkHomeLink(containerRef);
 
@@ -125,9 +167,22 @@ export function AuthShell({
       isSignUp ? APP_ROUTES.SIGNIN : APP_ROUTES.SIGNUP,
       searchParams
     );
+  const clerkCrossLinkUrl =
+    forceOppositeModeHardNavigation &&
+    typeof globalThis.location !== 'undefined'
+      ? new URL(crossLinkUrl, globalThis.location.origin).toString()
+      : crossLinkUrl;
 
   const defaultRedirect = isSignUp ? APP_ROUTES.WAITLIST : APP_ROUTES.DASHBOARD;
   const resolvedRedirect = fallbackRedirectUrl ?? defaultRedirect;
+  const enabledOAuthProviders = useMemo(
+    () => getEnabledAuthOAuthProviders(),
+    []
+  );
+  const expectedProviderLabels = useMemo(
+    () => enabledOAuthProviders.map(getAuthOAuthProviderLabel),
+    [enabledOAuthProviders]
+  );
 
   // Combine caller-supplied Clerk appearance with the provider guard so a
   // disabled OAuth button (e.g. Apple while credentials are invalid) cannot
@@ -148,61 +203,224 @@ export function AuthShell({
           baseElements.lastAuthenticationStrategyBadge,
           REQUIRED_CLERK_AUTH_ELEMENTS.lastAuthenticationStrategyBadge
         ),
+        footer: 'hidden',
+        footerAction: 'hidden',
         ...providerGuard,
       },
     } as Record<string, unknown>;
   }, [appearance]);
 
-  if (!isMounted) {
-    return <AuthFormSkeleton />;
-  }
+  useEffect(() => {
+    if (!isMounted) return;
+
+    const root = clerkSurfaceRef.current;
+    if (!root) return;
+
+    const syncReadyState = () => {
+      if (hasReadyClerkAuthStart(root, expectedProviderLabels)) {
+        setIsClerkStartReady(true);
+      }
+    };
+
+    syncReadyState();
+
+    if (hasReadyClerkAuthStart(root, expectedProviderLabels)) {
+      return;
+    }
+
+    const observer = new MutationObserver(syncReadyState);
+    observer.observe(root, {
+      attributes: true,
+      childList: true,
+      subtree: true,
+    });
+
+    return () => observer.disconnect();
+  }, [expectedProviderLabels, isMounted]);
+
+  const showStablePlaceholder = !isMounted || !isClerkStartReady;
 
   return (
     <div
       ref={containerRef}
       data-auth-shell-mode={mode}
       data-auth-shell-compact={compact ? 'true' : undefined}
+      data-auth-shell-ready={isClerkStartReady ? 'true' : 'false'}
+      className='relative min-h-[480px]'
     >
-      {isSignUp ? (
-        <SignUp
-          routing='path'
-          path='/signup'
-          oauthFlow='redirect'
-          signInUrl={crossLinkUrl}
-          fallbackRedirectUrl={resolvedRedirect}
-          appearance={mergedAppearance}
+      {showStablePlaceholder ? (
+        <AuthStableStartPlaceholder
+          mode={mode}
+          oppositeModeUrl={crossLinkUrl}
+          forceHardNavigation={forceOppositeModeHardNavigation}
+          providers={enabledOAuthProviders}
         />
-      ) : (
-        <SignIn
-          routing='path'
-          path='/signin'
-          oauthFlow='redirect'
-          signUpUrl={crossLinkUrl}
-          fallbackRedirectUrl={resolvedRedirect}
-          appearance={mergedAppearance}
-          initialValues={initialValues}
-        />
-      )}
-
-      {isSignUp ? (
-        <p className='mt-4 text-center text-2xs leading-relaxed text-white/80'>
-          By signing up, you agree to our{' '}
-          <Link
-            href={APP_ROUTES.LEGAL_TERMS}
-            className='focus-ring-themed rounded-md py-1 text-white underline underline-offset-2 transition-colors hover:text-white'
-          >
-            Terms of Service
-          </Link>{' '}
-          and{' '}
-          <Link
-            href={APP_ROUTES.LEGAL_PRIVACY}
-            className='focus-ring-themed rounded-md py-1 text-white underline underline-offset-2 transition-colors hover:text-white'
-          >
-            Privacy Policy
-          </Link>
-          .
-        </p>
       ) : null}
+
+      <div
+        ref={clerkSurfaceRef}
+        aria-hidden={showStablePlaceholder ? 'true' : undefined}
+        className={cn(
+          showStablePlaceholder &&
+            'pointer-events-none absolute inset-x-0 top-0 opacity-0'
+        )}
+      >
+        {isMounted ? (
+          isSignUp ? (
+            <SignUp
+              routing='path'
+              path='/signup'
+              oauthFlow='redirect'
+              signInUrl={clerkCrossLinkUrl}
+              fallbackRedirectUrl={resolvedRedirect}
+              appearance={mergedAppearance}
+            />
+          ) : (
+            <SignIn
+              routing='path'
+              path='/signin'
+              oauthFlow='redirect'
+              signUpUrl={clerkCrossLinkUrl}
+              fallbackRedirectUrl={resolvedRedirect}
+              appearance={mergedAppearance}
+              initialValues={initialValues}
+            />
+          )
+        ) : null}
+      </div>
+
+      {showStablePlaceholder ? null : (
+        <>
+          <AuthModeSwitchLink
+            mode={mode}
+            oppositeModeUrl={crossLinkUrl}
+            forceHardNavigation={forceOppositeModeHardNavigation}
+          />
+          <AuthLegalText mode={mode} />
+        </>
+      )}
     </div>
+  );
+}
+
+function AuthStableStartPlaceholder({
+  mode,
+  oppositeModeUrl,
+  forceHardNavigation,
+  providers,
+}: Readonly<{
+  mode: AuthShellMode;
+  oppositeModeUrl: string;
+  forceHardNavigation: boolean;
+  providers: readonly PrimaryAuthOAuthProvider[];
+}>) {
+  const isSignUp = mode === 'sign-up';
+
+  return (
+    <output
+      data-auth-stable-placeholder
+      className='block'
+      aria-label='Loading authentication form'
+      aria-busy='true'
+    >
+      <div className='mb-4 text-center'>
+        <p className='text-[clamp(1.5rem,2.6vw,2rem)] font-[680] leading-[1.1] tracking-[-0.025em] text-white'>
+          {isSignUp ? 'Request access' : 'Welcome back'}
+        </p>
+      </div>
+
+      <AuthProviderButtonSlots providers={providers} />
+
+      <div className='my-4 flex items-center gap-4' aria-hidden='true'>
+        <span className='h-px flex-1 bg-white/10' />
+        <span className='text-xs font-medium tracking-[-0.01em] text-white/42'>
+          or
+        </span>
+        <span className='h-px flex-1 bg-white/10' />
+      </div>
+
+      <div className='space-y-3 text-left' aria-hidden='true'>
+        <span className='block h-3 w-24 rounded-full bg-white/[0.08]' />
+        <span className='block h-10 w-full rounded-full border border-white/[0.08] bg-white/[0.035]' />
+        <span className='block h-10 w-full rounded-full bg-white' />
+      </div>
+
+      <AuthModeSwitchLink
+        mode={mode}
+        oppositeModeUrl={oppositeModeUrl}
+        forceHardNavigation={forceHardNavigation}
+      />
+
+      <AuthLegalText mode={mode} />
+    </output>
+  );
+}
+
+function AuthModeSwitchLink({
+  mode,
+  oppositeModeUrl,
+  forceHardNavigation,
+}: Readonly<{
+  mode: AuthShellMode;
+  oppositeModeUrl: string;
+  forceHardNavigation: boolean;
+}>) {
+  const isSignUp = mode === 'sign-up';
+  const prompt = isSignUp ? 'Have an account?' : 'No account?';
+  const label = isSignUp ? 'Sign in' : 'Request access';
+  const className =
+    'focus-ring-themed rounded-md text-white underline underline-offset-2';
+
+  return (
+    <span className='mt-5 block text-center text-[0.9rem] text-white/58'>
+      {prompt}{' '}
+      {forceHardNavigation ? (
+        <a href={oppositeModeUrl} className={className}>
+          {label}
+        </a>
+      ) : (
+        <Link href={oppositeModeUrl} className={className}>
+          {label}
+        </Link>
+      )}
+    </span>
+  );
+}
+
+function AuthLegalText({ mode }: Readonly<{ mode: AuthShellMode }>) {
+  const termsHref = resolveLegalHref(
+    APP_ROUTES.LEGAL_TERMS,
+    AUTH_LEGAL_FALLBACK_HREFS.terms
+  );
+  const privacyHref = resolveLegalHref(
+    APP_ROUTES.LEGAL_PRIVACY,
+    AUTH_LEGAL_FALLBACK_HREFS.privacy
+  );
+
+  return (
+    <p
+      data-auth-legal-copy
+      className='mx-auto mt-4 max-w-[22rem] text-center text-2xs leading-[1.55] text-white/78'
+    >
+      <span data-auth-legal-prefix className='block'>
+        By {mode === 'sign-up' ? 'signing up' : 'continuing'}, you agree to our
+      </span>{' '}
+      <span data-auth-legal-links className='block whitespace-nowrap'>
+        <Link
+          href={termsHref}
+          className='focus-ring-themed whitespace-nowrap rounded-md py-0.5 text-white underline underline-offset-2 transition-colors hover:text-white'
+        >
+          Terms of Service
+        </Link>{' '}
+        and{' '}
+        <Link
+          href={privacyHref}
+          className='focus-ring-themed whitespace-nowrap rounded-md py-0.5 text-white underline underline-offset-2 transition-colors hover:text-white'
+        >
+          Privacy Policy
+        </Link>
+        .
+      </span>
+    </p>
   );
 }
