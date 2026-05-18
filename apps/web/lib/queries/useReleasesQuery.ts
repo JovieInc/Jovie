@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { loadReleaseMatrix } from '@/app/app/(shell)/dashboard/releases/actions';
+import { loadReleaseMatrix } from '@/app/app/(shell)/dashboard/releases/release-matrix-loader';
 import { queryKeys, STANDARD_NO_REMOUNT_CACHE } from '@/lib/queries';
 
 interface UseReleasesQueryOptions {

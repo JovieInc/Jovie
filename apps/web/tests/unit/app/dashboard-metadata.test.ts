@@ -43,6 +43,10 @@ vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
   }),
 }));
 
+vi.mock('@/app/app/(shell)/dashboard/releases/release-matrix-loader', () => ({
+  loadReleaseMatrix: vi.fn().mockResolvedValue([]),
+}));
+
 vi.mock('@/lib/queries/server', () => ({
   getQueryClient: vi.fn(() => ({
     prefetchQuery: vi.fn().mockResolvedValue(undefined),
