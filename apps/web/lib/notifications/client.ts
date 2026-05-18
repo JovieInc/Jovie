@@ -17,6 +17,7 @@ export type NotificationSubscribePayload = {
   countryCode?: string;
   city?: string;
   source?: string;
+  sourceContext?: Record<string, unknown>;
 };
 
 export type NotificationUnsubscribePayload = {
@@ -138,6 +139,7 @@ export const subscribeToNotifications = async (
       country_code: payload.countryCode,
       city: payload.city,
       source: payload.source,
+      source_context: payload.sourceContext,
     },
     NOTIFICATION_COPY.errors.subscribe
   );

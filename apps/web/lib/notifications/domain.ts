@@ -619,12 +619,21 @@ export const subscribeToNotificationsDomain = async (
         error_type: 'validation_error',
         validation_errors: result.error.format()._errors,
         source: props.source,
+        source_context: props.source_context,
       });
       return buildSubscribeValidationError();
     }
 
-    const { artist_id, email, phone, channel, source, country_code, city } =
-      result.data;
+    const {
+      artist_id,
+      email,
+      phone,
+      channel,
+      source,
+      source_context,
+      country_code,
+      city,
+    } = result.data;
 
     const artistResult = await fetchArtistProfile(artist_id, source);
     if (!isArtistProfileResult(artistResult)) {
@@ -645,6 +654,7 @@ export const subscribeToNotificationsDomain = async (
         artist_id,
         error_type: 'sms_requires_pro',
         source,
+        source_context,
       });
       return buildSubscribeValidationError(
         'SMS notifications are only available for Pro creators.'
@@ -657,6 +667,7 @@ export const subscribeToNotificationsDomain = async (
         artist_id,
         error_type: 'sms_us_only',
         source,
+        source_context,
       });
       return buildSubscribeValidationError(
         'SMS notifications are currently available in the US only.'
@@ -749,6 +760,7 @@ export const subscribeToNotificationsDomain = async (
       phone_present: Boolean(normalizedPhone),
       country_code: countryCode ?? undefined,
       source,
+      source_context,
       creator_is_pro: creatorIsPro,
       dynamic_enabled: dynamicEnabled,
     });

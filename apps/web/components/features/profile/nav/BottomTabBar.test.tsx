@@ -2,8 +2,7 @@
  * Unit tests for BottomTabBar (JOV-2022)
  *
  * Covers:
- *  - All four tabs render when hasTourDates = true
- *  - Three tabs render when hasTourDates = false (Events omitted)
+ *  - All four tabs render whether or not events exist
  *  - Active tab is marked with aria-current="page"
  *  - Active tab uses correct text/icon colour class (font-semibold)
  *  - Inactive tabs do not have aria-current
@@ -15,8 +14,7 @@
  *  - Grid column count matches visible tab count
  *  - No horizontal overflow at narrow viewports (320px) — structural check
  *  - 44×44pt touch target minimum via min-h-[52px] class
- *  - Active state: Events tab falls back to profile when hasTourDates=false but activeTab='tour'
- *    (caller resolves this before passing — BottomTabBar just renders what it receives)
+ *  - Empty Events tabs remain reachable so the surface can show alert signup
  */
 
 import { fireEvent, render, screen } from '@testing-library/react';
@@ -53,13 +51,11 @@ describe('BottomTabBar — tab rendering', () => {
     expect(screen.getByRole('button', { name: 'Alerts' })).toBeInTheDocument();
   });
 
-  it('omits the Events tab when hasTourDates is false', () => {
+  it('keeps the Events tab when hasTourDates is false', () => {
     render(<BottomTabBar {...makeProps({ hasTourDates: false })} />);
-    expect(
-      screen.queryByRole('button', { name: 'Events' })
-    ).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Home' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Music' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Events' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Alerts' })).toBeInTheDocument();
   });
 
@@ -231,14 +227,14 @@ describe('BottomTabBar — grid layout', () => {
     expect(grid?.getAttribute('style')).toContain('repeat(5,');
   });
 
-  it('has 4 columns when hasTourDates=false and hideMoreMenu=false', () => {
+  it('has 5 columns when hasTourDates=false and hideMoreMenu=false', () => {
     const { container } = render(
       <BottomTabBar
         {...makeProps({ hasTourDates: false, hideMoreMenu: false })}
       />
     );
     const grid = container.querySelector('[style*="grid-template-columns"]');
-    expect(grid?.getAttribute('style')).toContain('repeat(4,');
+    expect(grid?.getAttribute('style')).toContain('repeat(5,');
   });
 
   it('has 4 columns when hasTourDates=true and hideMoreMenu=true', () => {
@@ -251,14 +247,14 @@ describe('BottomTabBar — grid layout', () => {
     expect(grid?.getAttribute('style')).toContain('repeat(4,');
   });
 
-  it('has 3 columns when hasTourDates=false and hideMoreMenu=true', () => {
+  it('has 4 columns when hasTourDates=false and hideMoreMenu=true', () => {
     const { container } = render(
       <BottomTabBar
         {...makeProps({ hasTourDates: false, hideMoreMenu: true })}
       />
     );
     const grid = container.querySelector('[style*="grid-template-columns"]');
-    expect(grid?.getAttribute('style')).toContain('repeat(3,');
+    expect(grid?.getAttribute('style')).toContain('repeat(4,');
   });
 
   it('all primary tab buttons have min-h-[52px] for 44pt touch target compliance', () => {

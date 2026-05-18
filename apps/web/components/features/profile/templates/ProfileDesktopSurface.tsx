@@ -679,6 +679,7 @@ export function ProfileDesktopSurface({
           {visibleReleases.length > 0 ? (
             <ReleasesView
               releases={visibleReleases}
+              artistId={artist.id}
               artistHandle={artist.handle}
               artistName={artist.name}
             />

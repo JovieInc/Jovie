@@ -13,7 +13,6 @@ interface PublicProfileLayoutShellProps {
   readonly isDesktopLayout: boolean;
   readonly shouldRenderHeading: boolean;
   readonly profileAccentStyle: CSSProperties;
-  readonly desktopSurface: ReactNode;
   readonly compactSurface: ReactNode;
 }
 
@@ -24,7 +23,6 @@ export function PublicProfileLayoutShell({
   isDesktopLayout,
   shouldRenderHeading,
   profileAccentStyle,
-  desktopSurface,
   compactSurface,
 }: Readonly<PublicProfileLayoutShellProps>) {
   // The background blur stage is 84px blurred and 28% opaque — a CSS radial
@@ -70,14 +68,6 @@ export function PublicProfileLayoutShell({
         <main className='relative flex h-full min-w-0 w-full items-stretch md:items-center'>
           {shouldRenderHeading ? (
             <h1 className='sr-only'>{artistName}</h1>
-          ) : null}
-          {isDesktopLayout ? (
-            <div
-              className='public-profile-layout-desktop-shell'
-              data-testid='profile-desktop-shell'
-            >
-              {desktopSurface}
-            </div>
           ) : null}
           <div className='public-profile-layout-compact-slot'>
             {compactSurface}
