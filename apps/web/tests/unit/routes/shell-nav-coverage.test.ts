@@ -147,4 +147,18 @@ describe('shell route coverage', () => {
 
     expect(staleAllowlistEntries).toEqual([]);
   });
+
+  it('keeps release task implementation owned by the canonical shell route', () => {
+    const canonicalPage = pageByRoute.get('/app/releases/[releaseId]/tasks');
+    const legacyPage = pageByRoute.get(
+      '/app/dashboard/releases/[releaseId]/tasks'
+    );
+
+    expect(canonicalPage?.source).toContain(
+      "import { ReleaseTasksRoute } from './ReleaseTasksRoute';"
+    );
+    expect(legacyPage?.source).toContain(
+      '@/app/app/(shell)/releases/[releaseId]/tasks/ReleaseTasksRoute'
+    );
+  });
 });

@@ -100,7 +100,7 @@ function setupReleaseQueryRows(rows: Array<Record<string, unknown>>) {
 }
 
 async function renderResolvedTasksContent() {
-  const tree = await LegacyReleaseTasksPage({
+  const tree = await CanonicalReleaseTasksPage({
     params: Promise.resolve({ releaseId: 'release_1' }),
   });
   const tasksContentElement = (tree as React.ReactElement).props.children;
@@ -155,7 +155,7 @@ describe('release tasks page', () => {
     );
   });
 
-  it('uses the same implementation for the canonical release route', () => {
-    expect(CanonicalReleaseTasksPage).toBe(LegacyReleaseTasksPage);
+  it('keeps the legacy dashboard route aliased to the canonical release route', () => {
+    expect(LegacyReleaseTasksPage).toBe(CanonicalReleaseTasksPage);
   });
 });
