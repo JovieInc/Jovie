@@ -204,7 +204,6 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       });
 
     const dictationBaselineRef = useRef('');
-
     const picker = useChatPicker();
     // Picker queries scope to this profile's catalog when present; absent
     // profileId yields an empty release set (artist search is global).
