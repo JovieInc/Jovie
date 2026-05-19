@@ -159,6 +159,12 @@ export {
 export type { PageToolbarSearchFormProps } from './molecules/PageToolbarSearchForm';
 export { PageToolbarSearchForm } from './molecules/PageToolbarSearchForm';
 export { ResponsiveActionsCell } from './molecules/ResponsiveActionsCell';
+export {
+  TableBody,
+  TableHead,
+  TableRoot,
+  TableRow,
+} from './molecules/SemanticTable';
 export { SocialLinksCell } from './molecules/SocialLinksCell';
 export type { BulkAction } from './molecules/TableBulkActionsToolbar';
 export { TableBulkActionsToolbar } from './molecules/TableBulkActionsToolbar';

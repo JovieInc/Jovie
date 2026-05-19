@@ -18,6 +18,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { cn } from '@/lib/utils';
 import {
   InvestorTable,
+  InvestorTableBody,
   InvestorTableCell,
   InvestorTableHead,
   InvestorTableHeaderCell,
@@ -210,7 +211,7 @@ async function InvestorPipelineTable() {
             </InvestorTableHeaderCell>
           </InvestorTableHeaderRow>
         </InvestorTableHead>
-        <tbody>
+        <InvestorTableBody>
           {links.map(link => (
             <InvestorTableRow key={link.id}>
               <InvestorTableCell className='w-[200px]'>
@@ -243,7 +244,7 @@ async function InvestorPipelineTable() {
               </InvestorTableCell>
             </InvestorTableRow>
           ))}
-        </tbody>
+        </InvestorTableBody>
       </InvestorTable>
     </ContentSurfaceCard>
   );
