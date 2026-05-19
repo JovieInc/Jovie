@@ -80,7 +80,7 @@ export function InstallBanner({
             )}
             strokeWidth={2.25}
           />
-          <span className='text-[12px] font-medium text-primary-token tracking-[-0.005em]'>
+          <span className='text-[12px] font-medium text-primary-token'>
             {title}
           </span>
         </div>
