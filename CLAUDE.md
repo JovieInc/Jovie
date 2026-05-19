@@ -113,6 +113,7 @@ Run the narrowest relevant checks:
 - Lint/format for edited packages: `pnpm biome check --write apps/web`
 - Unit/integration tests for changed logic: `pnpm --filter web exec vitest run <file>`
 - Build for routing/config/cross-package changes
+- **Layout shift audit (mandatory):** Before any UI edit, enumerate all visual states of the component/surface and verify (via inspection, manual dev run, Playwright bounding boxes, or visual regression) that **no state transition causes layout shift**. Reserve space with min-height or stable wrappers for conditional content. Update relevant tests. This is non-negotiable (see `.claude/rules/ui.md` → "Layout Shift Prevention", `DESIGN.md` → "Layout Shift Prevention", `docs/TESTING_GUIDELINES.md`, and `apps/web/tests/TESTING.md`).
 
 If checks are unavailable or fail for unrelated reasons, say so clearly. Paste passing output as evidence in the PR description.
 
