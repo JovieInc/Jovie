@@ -24,9 +24,13 @@ vi.mock('@/components/atoms/SwipeToReveal', () => ({
 }));
 
 vi.mock('@/components/atoms/TruncatedText', () => ({
-  TruncatedText: ({ children }: { children: ReactNode }) => (
-    <span>{children}</span>
-  ),
+  TruncatedText: ({
+    children,
+    className,
+  }: {
+    children: ReactNode;
+    className?: string;
+  }) => <span className={className}>{children}</span>,
 }));
 
 function createRelease(
@@ -94,18 +98,33 @@ describe('MobileReleaseList', () => {
       />
     );
 
-    await user.click(screen.getByTestId('mobile-release-row-release-1'));
+    const row = screen.getByTestId('mobile-release-row-release-1');
+    expect(row).toHaveAttribute('data-shell-list-row', 'true');
+    expect(row.className).toContain('hover:bg-(--linear-row-hover)');
+    expect(row.className).toContain('focus-visible:bg-(--linear-row-hover)');
+
+    await user.click(row);
 
     expect(onEdit).toHaveBeenCalledWith(release);
   });
 
-  it('uses centered badge styling for the release type label', () => {
+  it('uses the shell release typography tokens for mobile scanning', () => {
     render(
       <MobileReleaseList
         releases={[createRelease()]}
         artistName='Jovie Artist'
         onEdit={vi.fn()}
       />
+    );
+
+    expect(screen.getByText('Summer Lights').className).toContain(
+      'font-caption'
+    );
+    expect(screen.getByText('Summer Lights').className).toContain(
+      'text-[13px]'
+    );
+    expect(screen.getByText('Jovie Artist').parentElement?.className).toContain(
+      'text-[11px]'
     );
 
     const badge = screen.getByText('Single');

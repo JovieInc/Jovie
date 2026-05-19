@@ -31,6 +31,10 @@ import { cn } from '@/lib/utils';
 import { releaseStatusToShell, releaseToDspItems } from './release-adapters';
 
 export type ShellRowLockReason = 'scheduled' | 'cap' | null;
+export const shellReleaseRowTypography = {
+  title: 'truncate text-[13px] font-caption text-primary-token leading-[1.2]',
+  subtitle: 'truncate text-[11px] text-tertiary-token leading-[1.3] mt-0.5',
+} as const;
 
 // ── Subcomponents ─────────────────────────────────────────────────────────────
 
@@ -246,12 +250,8 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
       <ArtworkCell release={release} />
 
       <div className='min-w-0 flex-1'>
-        <div className='truncate text-[13px] font-caption text-primary-token leading-[1.2]'>
-          {release.title}
-        </div>
-        <div className='truncate text-[11px] text-tertiary-token leading-[1.3] mt-0.5'>
-          {artistLabel}
-        </div>
+        <div className={shellReleaseRowTypography.title}>{release.title}</div>
+        <div className={shellReleaseRowTypography.subtitle}>{artistLabel}</div>
       </div>
 
       <div className='hidden md:inline-flex shrink-0'>
