@@ -2,6 +2,7 @@
 
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, type UIMessage } from 'ai';
+import { AnimatePresence } from 'motion/react';
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -696,7 +697,12 @@ export function OnboardingChat({
         <p className='mt-0.5 text-secondary-token'>{chatError.message}</p>
       </div>
     ) : null;
+
+  // Persistent bottom dock composer: showInitialComposer now only controls
+  // the *upper* morphing content (intro vs messages). The composer itself is
+  // always rendered in the bottom dock for zero structural jump on first turn.
   const showInitialComposer = messages.length === 0 && !hasSentFirst;
+
   const onboardingChatInputProps = {
     value: input,
     onChange: setInput,
@@ -705,7 +711,9 @@ export function OnboardingChat({
     isSubmitting: isSubmitted || isAwaitingFirstToken,
     isStreaming,
     onStop: stop,
-    placeholder: isAwaitingFirstToken ? 'Securing chat...' : 'Ask Jovie...',
+    // Raw "Securing chat..." text is replaced in follow-up pass with
+    // statusBanner skeleton treatment; placeholder stays stable.
+    placeholder: 'Ask Jovie...',
     onPickerOpenChange: setComposerPickerOpen,
     chips: chipTray.chips,
     onRemoveChipAt: chipTray.removeAt,
@@ -736,6 +744,7 @@ export function OnboardingChat({
         </div>
       ) : null}
 
+      {/* Scroll area (flex-1) — upper content morphs on first message */}
       <div
         ref={scrollContainerRef}
         onScroll={onScroll}
@@ -744,42 +753,38 @@ export function OnboardingChat({
       >
         <div
           ref={totalSizeRef}
-          className={cn(
-            'mx-auto flex min-h-full w-full max-w-[44rem] flex-col',
-            showInitialComposer && 'justify-center gap-3 pb-8'
-          )}
+          className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col'
         >
-          {showInitialComposer ? (
-            <OnboardingInitialIntro hidden={composerPickerOpen} />
-          ) : (
-            <OnboardingMessageList
-              displayMessages={displayMessages}
-              hideIntroMessage={composerPickerOpen}
-              isStreaming={isStreaming}
-              lastAssistantMessageId={lastAssistantMessageId}
-              isBusy={isBusy}
-              onSelectArtist={handleArtistSelect}
-            />
-          )}
-
-          {showInitialComposer ? (
-            <div
-              className='mx-auto flex w-full max-w-[45rem] flex-col gap-2'
-              data-testid='onboarding-empty-composer-region'
-            >
-              <ChatInput {...onboardingChatInputProps} />
-            </div>
-          ) : null}
+          <AnimatePresence mode='popLayout' initial={false}>
+            {showInitialComposer ? (
+              <div key='onboarding-empty-upper'>
+                <OnboardingInitialIntro hidden={composerPickerOpen} />
+              </div>
+            ) : (
+              <div key='onboarding-messages'>
+                <OnboardingMessageList
+                  displayMessages={displayMessages}
+                  hideIntroMessage={composerPickerOpen}
+                  isStreaming={isStreaming}
+                  lastAssistantMessageId={lastAssistantMessageId}
+                  isBusy={isBusy}
+                  onSelectArtist={handleArtistSelect}
+                />
+              </div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 
-      {!showInitialComposer ? (
-        <div className='shrink-0 bg-(--linear-app-content-surface) px-4 pb-4 pt-2 sm:px-6 sm:pb-5 sm:pt-2.5 lg:px-8'>
-          <div className='mx-auto w-full max-w-[45rem]'>
-            <ChatInput {...onboardingChatInputProps} />
-          </div>
+      {/* Persistent always-bottom composer dock (Hyp 1 stabilization).
+          No more conditional render or justify-center teleport for the input.
+          The motion surface inside ChatInput (with layoutId) + stable dock
+          position guarantees zero layout shift on first user message. */}
+      <div className='shrink-0 bg-(--linear-app-content-surface) px-4 pb-4 pt-2 sm:px-6 sm:pb-5 sm:pt-2.5 lg:px-8'>
+        <div className='mx-auto w-full max-w-[45rem]'>
+          <ChatInput {...onboardingChatInputProps} />
         </div>
-      ) : null}
+      </div>
     </section>
   );
 }

@@ -204,7 +204,6 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       });
 
     const dictationBaselineRef = useRef('');
-
     const picker = useChatPicker();
     // Picker queries scope to this profile's catalog when present; absent
     // profileId yields an empty release set (artist search is global).
@@ -449,6 +448,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             </div>
           ) : null}
           <motion.div
+            layoutId='jovie-composer-surface'
             data-testid='chat-composer-surface'
             data-surface-mode={surfaceMode}
             data-compact={isCompact ? 'true' : 'false'}

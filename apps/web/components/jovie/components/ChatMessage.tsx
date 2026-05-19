@@ -1,6 +1,6 @@
 'use client';
 
-import { SimpleTooltip } from '@jovie/ui';
+import { SimpleTooltip, Skeleton } from '@jovie/ui';
 import { Check, Copy } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import dynamic from 'next/dynamic';
@@ -23,7 +23,7 @@ interface ChatMessageProps {
   readonly parts: MessagePart[];
   /** Whether this message is actively being streamed from the AI. */
   readonly isStreaming?: boolean;
-  /** Whether this is a synthetic thinking placeholder (bouncing dots). */
+  /** Whether this is a synthetic thinking placeholder (now rendered as shimmer skeleton). */
   readonly isThinking?: boolean;
   /** Avatar URL for user messages. */
   readonly avatarUrl?: string | null;
@@ -116,16 +116,27 @@ export function ChatMessage({
           {isThinking ? (
             <div
               data-testid='chat-loading-indicator'
-              className='flex min-h-7 items-center gap-2 text-[15px] leading-7 text-secondary-token'
+              className='flex min-h-7 w-full max-w-[78%] flex-col gap-2 text-[15px] leading-7'
               role='status'
               aria-live='polite'
+              aria-label='Jovie is thinking'
             >
-              <span>Jovie is thinking</span>
-              <span className='flex items-center gap-1' aria-hidden='true'>
-                <span className='h-1.5 w-1.5 animate-bounce rounded-full bg-tertiary-token [animation-delay:-0.3s] motion-reduce:animate-none' />
-                <span className='h-1.5 w-1.5 animate-bounce rounded-full bg-tertiary-token [animation-delay:-0.15s] motion-reduce:animate-none' />
-                <span className='h-1.5 w-1.5 animate-bounce rounded-full bg-tertiary-token motion-reduce:animate-none' />
-              </span>
+              {/* Assistant thinking shimmer — ChatMessageSkeleton-style reserved space */}
+              <div className='flex items-center gap-2 pl-0.5'>
+                <Skeleton
+                  className='h-5.5 w-5.5 shrink-0'
+                  rounded='full'
+                  aria-hidden='true'
+                />
+                <Skeleton className='h-3 w-8' rounded='sm' aria-hidden='true' />
+              </div>
+              <div className='space-y-1.5 pl-7'>
+                <Skeleton
+                  className='h-4 w-[65%]'
+                  rounded='lg'
+                  aria-hidden='true'
+                />
+              </div>
             </div>
           ) : null}
 
