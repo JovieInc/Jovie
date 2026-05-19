@@ -13,6 +13,7 @@
 // Touch / coarse pointer is suppressed at the ShellDropdown level — this
 // component just renders what it's given.
 
+import { Gauge, Music, Users } from 'lucide-react';
 import Image from 'next/image';
 import {
   type KeyboardEvent,
@@ -111,7 +112,8 @@ export function formatEntitySubtitle(entity: EntityPopoverData): string | null {
       return parts.join(' · ') || null;
     }
     case 'artist': {
-      if (entity.handle)
+      // Token cleanup: never surface raw Spotify URLs in subtitles (entity matching in chat/onboarding)
+      if (entity.handle && !/open\.spotify\.com/i.test(entity.handle))
         return `@${entity.handle}${entity.isYou ? ' · You' : ''}`;
       if (entity.followers)
         return `${compactNumber(entity.followers)} followers`;
@@ -281,17 +283,22 @@ function buildStats(entity: EntityPopoverData): StatChip[] {
       break;
     }
     case 'artist': {
-      if (entity.handle) out.push({ key: 'handle', node: `@${entity.handle}` });
+      if (entity.handle && !/open\.spotify\.com/i.test(entity.handle))
+        out.push({ key: 'handle', node: `@${entity.handle}` });
       if (entity.followers) {
         out.push({
           key: 'followers',
           node: (
-            <>
+            <span
+              title={`${entity.followers.toLocaleString()} Spotify followers`}
+              className='inline-flex items-center gap-1'
+            >
+              <Users className='h-3 w-3 text-tertiary-token' aria-hidden />
               <strong className='font-semibold tabular-nums text-primary-token'>
                 {compactNumber(entity.followers)}
-              </strong>{' '}
-              followers
-            </>
+              </strong>
+              <span className='sr-only'>followers</span>
+            </span>
           ),
         });
       }
@@ -299,12 +306,15 @@ function buildStats(entity: EntityPopoverData): StatChip[] {
         out.push({
           key: 'pop',
           node: (
-            <>
-              Spotify{' '}
+            <span
+              title={`Spotify popularity: ${entity.popularity} / 100`}
+              className='inline-flex items-center gap-1'
+            >
+              <Gauge className='h-3 w-3 text-tertiary-token' aria-hidden />
               <strong className='font-semibold tabular-nums text-primary-token'>
                 {entity.popularity}
               </strong>
-            </>
+            </span>
           ),
         });
       }
@@ -424,7 +434,7 @@ function CardArtwork({ entity }: { readonly entity: EntityPopoverData }) {
     const stamp = stampParts(entity.eventDate);
     if (stamp) {
       return (
-        <div className='flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-md border border-subtle bg-surface-1 shadow-app-control'>
+        <div className='flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-md bg-surface-1'>
           <span className='text-3xs font-caption text-tertiary-token'>
             {stamp.month}
           </span>
@@ -443,7 +453,7 @@ function CardArtwork({ entity }: { readonly entity: EntityPopoverData }) {
     return (
       <div
         className={cn(
-          'relative h-12 w-12 shrink-0 overflow-hidden border border-subtle shadow-app-control',
+          'relative h-12 w-12 shrink-0 overflow-hidden',
           isCircular ? 'rounded-full' : 'rounded-md'
         )}
       >
@@ -461,7 +471,7 @@ function CardArtwork({ entity }: { readonly entity: EntityPopoverData }) {
   return (
     <div
       className={cn(
-        'flex h-12 w-12 shrink-0 items-center justify-center border border-subtle bg-surface-1 text-app font-caption text-primary-token shadow-app-control',
+        'flex h-12 w-12 shrink-0 items-center justify-center bg-surface-1 text-app font-caption text-primary-token',
         isCircular ? 'rounded-full' : 'rounded-md'
       )}
     >
@@ -486,14 +496,26 @@ function EntityCard({ entity, onActivate }: EntityCardProps) {
       : null;
 
   return (
-    <div className='flex items-start gap-3.5'>
+    <div className='flex items-start gap-2.5'>
       <CardArtwork entity={entity} />
       <div className='min-w-0 flex-1'>
-        <div className='mb-1 text-2xs font-caption text-tertiary-token'>
+        <div className='mb-0.5 text-2xs font-caption text-tertiary-token'>
           {eyebrow}
         </div>
-        <h3 className='m-0 mb-1.5 truncate text-app font-caption leading-tight text-primary-token'>
-          {entity.label}
+        <h3 className='m-0 mb-1 truncate text-app font-caption leading-tight text-primary-token'>
+          {entity.kind === 'artist' &&
+          /open\.spotify\.com|spotify\.com\/artist/i.test(entity.label) ? (
+            <span className='inline-flex items-center gap-1.5'>
+              <Music
+                className='h-3.5 w-3.5 shrink-0'
+                style={{ color: '#1DB954' }}
+                aria-hidden='true'
+              />
+              Spotify artist
+            </span>
+          ) : (
+            entity.label
+          )}
         </h3>
         {artistLink ? (
           <button
@@ -512,14 +534,14 @@ function EntityCard({ entity, onActivate }: EntityCardProps) {
           </button>
         ) : null}
         {stats.length > 0 ? (
-          <div className='flex flex-wrap items-center gap-x-1.5 gap-y-1 text-2xs leading-normal text-tertiary-token'>
+          <div className='flex flex-wrap items-center gap-x-1 gap-y-0.5 text-2xs leading-normal text-tertiary-token'>
             {stats.map((stat, i) => (
               <span
                 key={stat.key}
                 className={cn(
                   'relative inline-flex h-5 items-center whitespace-nowrap rounded-full',
                   stat.emphasis === 'solid'
-                    ? 'border border-subtle bg-surface-1 px-1.5 text-3xs font-caption text-primary-token'
+                    ? 'border border-subtle bg-surface-1 px-1 text-3xs font-caption text-primary-token'
                     : 'px-0',
                   i > 0 &&
                     stat.emphasis !== 'solid' &&
