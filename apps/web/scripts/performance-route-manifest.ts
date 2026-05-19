@@ -1050,7 +1050,7 @@ const CREATOR_SHELL_ROUTES = [
     warmupStrategy: 'authenticated-shell',
     measureMode: 'warm-navigation',
     readySelectors: {
-      shell: ['[data-testid="releases-shell-ready"]'],
+      shell: ['[data-app-shell-frame="true"]'],
       content: [
         '[data-testid="releases-loading"]',
         '[data-testid="releases-matrix"]',

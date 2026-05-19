@@ -130,6 +130,83 @@ async function markPersistentShellFrame(page: Page): Promise<void> {
   }, PERSISTENCE_PROBE_VALUE);
 }
 
+async function attachReleasesOverlayProbe(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    type ReleasesOverlayProbe = {
+      readonly activations: number;
+      readonly disconnect: () => void;
+    };
+    const probeWindow = globalThis as typeof globalThis & {
+      __JOVIE_RELEASES_OVERLAY_PROBE__?: ReleasesOverlayProbe;
+    };
+    const target = document.querySelector<HTMLElement>(
+      '[data-testid="releases-shell-ready"]'
+    );
+
+    if (!target) {
+      probeWindow.__JOVIE_RELEASES_OVERLAY_PROBE__ = {
+        activations: 0,
+        disconnect: () => {},
+      };
+      return;
+    }
+
+    let activations = 0;
+    const countIfVisible = () => {
+      const visible =
+        target.getAttribute('aria-hidden') === 'false' &&
+        globalThis.getComputedStyle(target).display !== 'none';
+
+      if (visible) {
+        activations += 1;
+      }
+    };
+
+    countIfVisible();
+
+    const observer = new MutationObserver(() => {
+      countIfVisible();
+    });
+
+    observer.observe(target, {
+      attributes: true,
+      attributeFilter: ['aria-hidden', 'class', 'style'],
+    });
+
+    probeWindow.__JOVIE_RELEASES_OVERLAY_PROBE__ = {
+      get activations() {
+        return activations;
+      },
+      disconnect: () => observer.disconnect(),
+    };
+  });
+}
+
+async function readReleasesOverlayActivations(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const probeWindow = globalThis as typeof globalThis & {
+      __JOVIE_RELEASES_OVERLAY_PROBE__?: {
+        readonly activations: number;
+      };
+    };
+
+    return probeWindow.__JOVIE_RELEASES_OVERLAY_PROBE__?.activations ?? 0;
+  });
+}
+
+async function detachReleasesOverlayProbe(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const probeWindow = globalThis as typeof globalThis & {
+      __JOVIE_RELEASES_OVERLAY_PROBE__?: {
+        readonly disconnect?: () => void;
+      };
+    };
+
+    probeWindow.__JOVIE_RELEASES_OVERLAY_PROBE__?.disconnect?.();
+    delete probeWindow.__JOVIE_RELEASES_OVERLAY_PROBE__;
+  });
+}
+
 async function assertPersistentShellFrame(
   page: Page,
   label: string
@@ -345,6 +422,7 @@ test('app shell persists across core app routes without duplicate request bursts
 
   await markPersistentShellFrame(page);
   const baselineLoadCount = await readDocumentLoadCount(page);
+  await attachReleasesOverlayProbe(page);
 
   await clickFirstVisibleAppLink(
     page,
@@ -361,6 +439,8 @@ test('app shell persists across core app routes without duplicate request bursts
     return;
   }
   await assertNoDocumentReloadSince(page, baselineLoadCount, 'releases route');
+  expect(await readReleasesOverlayActivations(page)).toBe(0);
+  await detachReleasesOverlayProbe(page);
 
   await clickFirstVisibleAppLink(
     page,
