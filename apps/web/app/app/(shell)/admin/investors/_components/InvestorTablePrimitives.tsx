@@ -8,6 +8,7 @@ import {
   TableRoot,
   TableRow,
 } from '@/components/organisms/table';
+import { rowState } from '@/components/organisms/table/table.styles';
 import { cn } from '@/lib/utils';
 
 export function InvestorTable({
@@ -61,7 +62,7 @@ export function InvestorTableHeaderCell({
     <TableHeaderCell
       align={align}
       sticky={false}
-      className={cn('px-4 py-2.5 font-medium', className)}
+      className={cn('px-3 py-1.5 font-medium', className)}
     >
       {children}
     </TableHeaderCell>
@@ -72,7 +73,13 @@ export function InvestorTableRow({
   children,
 }: Readonly<{ children: ReactNode }>) {
   return (
-    <TableRow className='border-b border-subtle bg-transparent transition-colors duration-subtle hover:bg-surface-0'>
+    <TableRow
+      className={cn(
+        'border-b border-subtle bg-transparent',
+        rowState.base,
+        rowState.hover
+      )}
+    >
       {children}
     </TableRow>
   );
@@ -90,7 +97,7 @@ export function InvestorTableCell({
   return (
     <TableCell
       align={align}
-      className={cn('px-4 py-3 align-middle', className)}
+      className={cn('px-3 py-1 align-middle', className)}
     >
       {children}
     </TableCell>
