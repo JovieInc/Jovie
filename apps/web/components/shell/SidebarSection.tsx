@@ -71,8 +71,8 @@ export function SidebarSection({
         type='button'
         onClick={onToggle}
         className={cn(
-          'relative w-full flex items-center gap-2.5 pl-3 pr-2 rounded-md hover:bg-surface-1/70 transition-colors duration-subtle ease-out',
-          tight ? 'h-6' : 'h-7'
+          'relative w-full flex items-center gap-2.5 pl-2.5 pr-2 rounded-md hover:bg-[color-mix(in_oklab,var(--color-sidebar-accent)_82%,transparent)] transition-[background-color] duration-fast ease-interactive',
+          tight ? 'h-6' : 'h-6.5'
         )}
         aria-expanded={open}
       >
