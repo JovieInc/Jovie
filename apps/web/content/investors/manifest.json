@@ -8,18 +8,7 @@
     }
   ],
   "deck": {
-    "slides": [
-      "01-cover.md",
-      "02-problem.md",
-      "03-solution.md",
-      "04-product.md",
-      "05-why-now.md",
-      "06-differentiation.md",
-      "07-metrics.md",
-      "08-roadmap.md",
-      "09-team.md",
-      "10-funding.md"
-    ],
+    "slides": [],
     "downloadFilename": "Jovie-Pitch-Deck.pdf"
   }
 }
