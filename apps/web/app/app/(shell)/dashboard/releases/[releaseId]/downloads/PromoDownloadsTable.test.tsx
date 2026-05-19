@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { PromoDownloadsTable } from './PromoDownloadsTable';
 
@@ -56,6 +56,15 @@ describe('PromoDownloadsTable', () => {
     expect(screen.getByText('Instrumental')).toBeInTheDocument();
     expect(screen.getByText('WAV')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Hidden' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Active' }));
+    expect(onToggleActive).toHaveBeenCalledWith('download_1', false);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Radio Edit' }));
+    expect(onDelete).toHaveBeenCalledWith('download_1');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hidden' }));
+    expect(onToggleActive).toHaveBeenCalledWith('download_2', true);
   });
 
   it('renders the shared empty state after loading with no files', () => {
