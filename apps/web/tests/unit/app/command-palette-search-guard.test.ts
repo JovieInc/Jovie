@@ -19,13 +19,17 @@ describe('command palette search shell guard', () => {
     expect(source).not.toContain('isHeaderSearchActive=');
   });
 
-  it('keeps AuthShell from forwarding header search props into DashboardHeader', () => {
+  it('keeps AuthShell owning the shared header search surface', () => {
     const source = readSource('components/organisms/AuthShell.tsx');
 
     expect(source).not.toContain('headerSearchSurface');
     expect(source).not.toContain('isHeaderSearchActive');
-    expect(source).not.toContain('searchSurface=');
-    expect(source).not.toContain('isSearchActive=');
+    expect(source).toContain('HeaderSearchSurfaceFromContext');
+    expect(source).toContain('useOptionalHeaderActions');
+    expect(source).toContain('searchSurface={searchSurface}');
+    expect(source).toContain(
+      'isSearchActive={headerActionsState?.isSearchOpen ?? false}'
+    );
   });
 
   it('keeps DashboardNav Search wired to the command palette event', () => {
