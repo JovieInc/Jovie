@@ -2,13 +2,7 @@
 
 import { Button, CommonDropdown, type CommonDropdownItem } from '@jovie/ui';
 import { useQueryClient } from '@tanstack/react-query';
-import {
-  type ColumnDef,
-  createColumnHelper,
-  type OnChangeFn,
-  type SortingState,
-  type VisibilityState,
-} from '@tanstack/react-table';
+import { type OnChangeFn, type SortingState } from '@tanstack/react-table';
 import { Copy, Download, ExternalLink, Users } from 'lucide-react';
 import * as React from 'react';
 import { memo, useMemo } from 'react';
@@ -36,7 +30,6 @@ import {
 import { useAudiencePanel } from '@/features/dashboard/organisms/AudiencePanelContext';
 import { AudienceMemberSidebar } from '@/features/dashboard/organisms/audience-member-sidebar';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
-import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { captureError } from '@/lib/error-tracking';
 import { queryKeys } from '@/lib/queries';
 import { cn } from '@/lib/utils';
@@ -56,21 +49,16 @@ import {
 } from './AudienceTableContext';
 import { AudienceTableSubheader } from './AudienceTableSubheader';
 import { buildAudienceActions } from './audience-actions';
+import { NowMsProvider } from './cells';
 import {
-  AudienceActionCell,
-  AudienceAlertsCell,
-  AudienceEngagementBars,
-  AudienceFanCell,
-  AudienceLastCell,
-  AudienceStateCell,
-  NowMsProvider,
-} from './cells';
+  AUDIENCE_TABLE_CONTAINER_CLASS,
+  buildAudienceMemberColumns,
+  getAudienceColumnVisibility,
+  getAudienceTableMinWidth,
+} from './table-config';
 import type { DashboardAudienceTableProps } from './types';
 import { useDashboardAudienceTable } from './useDashboardAudienceTable';
 import { copyTextToClipboard, downloadVCard } from './utils';
-import { SelectCell } from './utils/column-renderers';
-
-const memberColumnHelper = createColumnHelper<AudienceMember>();
 
 function getSrDescription(isEmpty: boolean): string {
   if (isEmpty) {
@@ -118,122 +106,6 @@ function sanitizeQrFilename(value: string): string {
     .toLowerCase()
     .replaceAll(/[^a-z0-9]+/g, '-')
     .replaceAll(/^-|-$/g, '');
-}
-
-/**
- * Compact 6-column layout per the redesigned mockup.
- * Layout: Select | Fan | State | Alerts | Engagement | Last | Action
- */
-function buildMemberColumns(
-  mode: 'members' | 'subscribers'
-): ColumnDef<AudienceMember, any>[] {
-  return [
-    memberColumnHelper.display({
-      id: 'select',
-      header: () => null,
-      cell: SelectCell,
-      size: 40,
-      enableSorting: false,
-    }),
-    memberColumnHelper.accessor('displayName', {
-      id: 'fan',
-      header: 'Fan',
-      cell: ({ row }) => <AudienceFanCell member={row.original} />,
-      size: 9999,
-      minSize: 220,
-      enableSorting: false,
-    }),
-    memberColumnHelper.display({
-      id: 'state',
-      header: 'State',
-      cell: ({ row }) => (
-        <AudienceStateCell member={row.original} mode={mode} />
-      ),
-      size: 96,
-      enableSorting: false,
-    }),
-    memberColumnHelper.display({
-      id: 'alerts',
-      header: 'Alerts',
-      cell: ({ row }) => <AudienceAlertsCell member={row.original} />,
-      size: 96,
-      enableSorting: false,
-    }),
-    memberColumnHelper.accessor('engagementScore', {
-      id: 'engagement',
-      header: 'Engagement',
-      cell: ({ row }) => (
-        <AudienceEngagementBars score={row.original.engagementScore} />
-      ),
-      size: 80,
-      enableSorting: true,
-    }),
-    memberColumnHelper.accessor('lastSeenAt', {
-      id: 'last',
-      header: 'Last',
-      cell: ({ row }) => (
-        <AudienceLastCell lastSeenAt={row.original.lastSeenAt} />
-      ),
-      size: 56,
-      enableSorting: true,
-    }),
-    memberColumnHelper.display({
-      id: 'action',
-      header: () => <div className='text-right'>Action</div>,
-      cell: ({ row }) => <AudienceActionCell member={row.original} />,
-      size: 120,
-      enableSorting: false,
-      meta: { className: 'text-right' },
-    }),
-  ];
-}
-
-type AudienceTableLayout = 'narrow' | 'medium' | 'wide';
-
-function getAudienceTableLayout(width: number): AudienceTableLayout {
-  if (width < 720) {
-    return 'narrow';
-  }
-  if (width < 960) {
-    return 'medium';
-  }
-  return 'wide';
-}
-
-/** Responsive column visibility by viewport width.
- *
- * Progressive hiding is based on the measured desktop table container width,
- * not the window width, so the layout adapts correctly with the shell sidebar
- * and right drawer both open and closed. Hide order at narrow widths:
- * ALERTS → ENGAGEMENT → STATE → LAST. (FAN + ACTION + select always render.)
- */
-function getColumnVisibility(width: number): VisibilityState {
-  switch (getAudienceTableLayout(width)) {
-    case 'narrow':
-      return {
-        alerts: false,
-        engagement: false,
-        state: false,
-        last: false,
-      };
-    case 'medium':
-      return { alerts: false, engagement: false };
-    case 'wide':
-    default:
-      return {};
-  }
-}
-
-function getTableMinWidth(width: number): number {
-  switch (getAudienceTableLayout(width)) {
-    case 'narrow':
-      return 480;
-    case 'medium':
-      return 640;
-    case 'wide':
-    default:
-      return TABLE_MIN_WIDTHS.SMALL;
-  }
 }
 
 /** Mobile card list — plain rendering (no virtualization needed for paginated data). */
@@ -382,7 +254,7 @@ export const DashboardAudienceTableUnified = memo(
     }, [desktopTableNode]);
 
     const columnVisibility = React.useMemo(
-      () => getColumnVisibility(desktopTableWidth),
+      () => getAudienceColumnVisibility(desktopTableWidth),
       [desktopTableWidth]
     );
 
@@ -400,7 +272,7 @@ export const DashboardAudienceTableUnified = memo(
       hiddenMetadataColumns.engagement || hiddenMetadataColumns.lastSeen;
 
     const tableMinWidth = React.useMemo(
-      () => `${getTableMinWidth(desktopTableWidth)}px`,
+      () => `${getAudienceTableMinWidth(desktopTableWidth)}px`,
       [desktopTableWidth]
     );
 
@@ -756,7 +628,7 @@ export const DashboardAudienceTableUnified = memo(
       ]
     );
 
-    const columns = useMemo(() => buildMemberColumns(mode), [mode]);
+    const columns = useMemo(() => buildAudienceMemberColumns(mode), [mode]);
 
     // Stable context: callbacks that rarely change — consumers won't re-render on selection/menu toggle
     const stableContextValue = useMemo(
@@ -1050,7 +922,7 @@ export const DashboardAudienceTableUnified = memo(
                           hasNextPage={hasNextPage}
                           isFetchingNextPage={isFetchingNextPage}
                           onLoadMore={onLoadMore}
-                          containerClassName='h-full px-2.5 pb-2.5 pt-0.5 md:px-3 md:pb-3 md:pt-1'
+                          containerClassName={AUDIENCE_TABLE_CONTAINER_CLASS}
                         />
                       </div>
                     </>

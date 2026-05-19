@@ -3,42 +3,15 @@
 import dynamic from 'next/dynamic';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
-import { useAppFlag } from '@/lib/flags/client';
 import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
 import { primaryProviderKeys, providerConfig } from './config';
 import { ReleaseTableSkeleton } from './loading';
-
-export type ReleasesViewMode = 'designV1ShellReleases' | 'legacyProviderMatrix';
-
-export interface ReleasesFlagState {
-  readonly shellChatV1Enabled: boolean;
-  readonly designV1ReleasesEnabled: boolean;
-}
-
-export function resolveReleasesViewMode({
-  designV1ReleasesEnabled,
-}: ReleasesFlagState): ReleasesViewMode {
-  // DESIGN_V1 owns both shell chrome and the releases view selection.
-  return designV1ReleasesEnabled
-    ? 'designV1ShellReleases'
-    : 'legacyProviderMatrix';
-}
 
 const ReleasesExperience = dynamic(
   () =>
     import('@/features/dashboard/organisms/release-provider-matrix').then(
       mod => mod.ReleasesExperience
     ),
-  {
-    loading: () => <ReleaseTableSkeleton showHeader={false} />,
-  }
-);
-
-const ShellReleasesView = dynamic(
-  () =>
-    import(
-      '@/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView'
-    ).then(mod => mod.ShellReleasesView),
   {
     loading: () => <ReleaseTableSkeleton showHeader={false} />,
   }
@@ -56,11 +29,6 @@ const ShellReleasesView = dynamic(
 export function ReleasesPageClient() {
   const { selectedProfile } = useDashboardData();
   const profileId = selectedProfile?.id ?? '';
-  const releasesViewMode = resolveReleasesViewMode({
-    shellChatV1Enabled: useAppFlag('DESIGN_V1'),
-    designV1ReleasesEnabled: useAppFlag('DESIGN_V1'),
-  });
-
   const { data: releases, isError } = useReleasesQuery(profileId);
 
   const settings =
@@ -92,22 +60,6 @@ export function ReleasesPageClient() {
 
   if (releases === undefined) {
     return <ReleaseTableSkeleton showHeader={false} />;
-  }
-
-  if (releasesViewMode === 'designV1ShellReleases') {
-    return (
-      <ShellReleasesView
-        releases={releases ?? []}
-        providerConfig={providerConfig}
-        primaryProviders={primaryProviderKeys}
-        artistName={spotifyArtistName}
-        allowArtworkDownloads={allowArtworkDownloads}
-        spotifyConnected={spotifyConnected}
-        appleMusicConnected={appleMusicConnected}
-        initialImporting={spotifyImportStatus === 'importing'}
-        initialTotalCount={spotifyImportTotal}
-      />
-    );
   }
 
   return (

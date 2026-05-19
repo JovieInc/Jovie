@@ -71,7 +71,7 @@ export function SidebarSection({
         type='button'
         onClick={onToggle}
         className={cn(
-          'relative w-full flex items-center gap-2.5 pl-3 pr-2 rounded-md hover:bg-surface-1/70 transition-colors duration-150 ease-out',
+          'relative w-full flex items-center gap-2.5 pl-3 pr-2 rounded-md hover:bg-surface-1/70 transition-colors duration-subtle ease-out',
           tight ? 'h-6' : 'h-7'
         )}
         aria-expanded={open}
@@ -79,12 +79,12 @@ export function SidebarSection({
         <ChevronDown
           aria-hidden='true'
           className={cn(
-            'h-3.5 w-3.5 shrink-0 text-tertiary-token transition-transform duration-150 ease-out',
+            'h-3.5 w-3.5 shrink-0 text-tertiary-token transition-transform duration-subtle ease-out',
             !open && '-rotate-90'
           )}
           strokeWidth={2.25}
         />
-        <span className='text-[13px] font-caption truncate text-primary-token tracking-[-0.015em]'>
+        <span className='text-[13px] font-caption truncate text-primary-token'>
           {name}
         </span>
       </button>
@@ -93,7 +93,7 @@ export function SidebarSection({
         style={{
           maxHeight: bodyMaxHeight,
           opacity: open ? 1 : 0,
-          transition: `max-height ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, opacity 200ms ease-out`,
+          transition: `max-height ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, opacity var(--ds-motion-subtle-duration) ease-out`,
         }}
       >
         <div className='relative space-y-px pt-1 pb-0.5 [&_a:hover]:bg-surface-1/50'>

@@ -512,6 +512,26 @@ function OnboardingMessageList({
   );
 }
 
+function OnboardingInitialIntro({ hidden }: { readonly hidden: boolean }) {
+  return (
+    <div
+      className={cn(
+        'mx-auto flex w-full max-w-[34rem] flex-col items-center pb-1 text-center transition-opacity duration-fast',
+        hidden && 'pointer-events-none opacity-0'
+      )}
+      aria-hidden={hidden ? 'true' : undefined}
+      data-testid='onboarding-intro-message'
+    >
+      <p className='text-[2rem] font-semibold leading-[1.08] tracking-[-0.035em] text-primary-token sm:text-[2.4rem]'>
+        Hey, I&apos;m Jovie.
+      </p>
+      <p className='mt-2 max-w-[24rem] text-[15px] leading-6 text-secondary-token'>
+        What are you working on?
+      </p>
+    </div>
+  );
+}
+
 export function OnboardingChat({
   onConversationActivity,
   onProfileBuilderChange,
@@ -676,6 +696,25 @@ export function OnboardingChat({
         <p className='mt-0.5 text-secondary-token'>{chatError.message}</p>
       </div>
     ) : null;
+  const showInitialComposer = messages.length === 0 && !hasSentFirst;
+  const onboardingChatInputProps = {
+    value: input,
+    onChange: setInput,
+    onSubmit: handleSubmit,
+    isLoading: isBusy,
+    isSubmitting: isSubmitted || isAwaitingFirstToken,
+    isStreaming,
+    onStop: stop,
+    placeholder: isAwaitingFirstToken ? 'Securing chat...' : 'Ask Jovie...',
+    onPickerOpenChange: setComposerPickerOpen,
+    chips: chipTray.chips,
+    onRemoveChipAt: chipTray.removeAt,
+    onRemoveLastChip: chipTray.removeLast,
+    onAddSkill: chipTray.addSkill,
+    onAddEntity: chipTray.addEntity,
+    shellChatV1: true,
+    statusBanner: composerStatusBanner,
+  } as const;
 
   return (
     <section
@@ -705,53 +744,62 @@ export function OnboardingChat({
       >
         <div
           ref={totalSizeRef}
-          className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col'
+          className={cn(
+            'mx-auto flex min-h-full w-full max-w-[44rem] flex-col',
+            showInitialComposer && 'justify-center gap-3 pb-8'
+          )}
         >
-          <OnboardingMessageList
-            displayMessages={displayMessages}
-            hideIntroMessage={composerPickerOpen}
-            isStreaming={isStreaming}
-            lastAssistantMessageId={lastAssistantMessageId}
-            isBusy={isBusy}
-            onSelectArtist={handleArtistSelect}
-          />
-        </div>
-      </div>
+          {showInitialComposer ? (
+            <OnboardingInitialIntro hidden={composerPickerOpen} />
+          ) : (
+            <OnboardingMessageList
+              displayMessages={displayMessages}
+              hideIntroMessage={composerPickerOpen}
+              isStreaming={isStreaming}
+              lastAssistantMessageId={lastAssistantMessageId}
+              isBusy={isBusy}
+              onSelectArtist={handleArtistSelect}
+            />
+          )}
 
-      <div className='shrink-0 bg-(--linear-app-content-surface) px-4 pb-4 pt-2 sm:px-6 sm:pb-5 sm:pt-2.5 lg:px-8'>
-        <div className='mx-auto w-full max-w-[45rem]'>
-          {isAwaitingFirstToken ? (
-            <p
-              className='mb-1.5 text-center text-xs text-tertiary-token'
-              role='status'
-              aria-live='polite'
+          {showInitialComposer ? (
+            <div
+              className='mx-auto flex w-full max-w-[45rem] flex-col gap-2'
+              data-testid='onboarding-empty-composer-region'
             >
-              Securing chat...
-            </p>
-          ) : null}
+              {isAwaitingFirstToken ? (
+                <p
+                  className='text-center text-xs text-tertiary-token'
+                  role='status'
+                  aria-live='polite'
+                >
+                  Securing chat...
+                </p>
+              ) : null}
 
-          <ChatInput
-            value={input}
-            onChange={setInput}
-            onSubmit={handleSubmit}
-            isLoading={isBusy}
-            isSubmitting={isSubmitted || isAwaitingFirstToken}
-            isStreaming={isStreaming}
-            onStop={stop}
-            placeholder={
-              isAwaitingFirstToken ? 'Securing chat...' : 'Ask Jovie...'
-            }
-            onPickerOpenChange={setComposerPickerOpen}
-            chips={chipTray.chips}
-            onRemoveChipAt={chipTray.removeAt}
-            onRemoveLastChip={chipTray.removeLast}
-            onAddSkill={chipTray.addSkill}
-            onAddEntity={chipTray.addEntity}
-            shellChatV1
-            statusBanner={composerStatusBanner}
-          />
+              <ChatInput {...onboardingChatInputProps} />
+            </div>
+          ) : null}
         </div>
       </div>
+
+      {!showInitialComposer ? (
+        <div className='shrink-0 bg-(--linear-app-content-surface) px-4 pb-4 pt-2 sm:px-6 sm:pb-5 sm:pt-2.5 lg:px-8'>
+          <div className='mx-auto w-full max-w-[45rem]'>
+            {isAwaitingFirstToken ? (
+              <p
+                className='mb-1.5 text-center text-xs text-tertiary-token'
+                role='status'
+                aria-live='polite'
+              >
+                Securing chat...
+              </p>
+            ) : null}
+
+            <ChatInput {...onboardingChatInputProps} />
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

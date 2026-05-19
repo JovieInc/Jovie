@@ -59,14 +59,14 @@ export function SuggestionCard({
       style={{
         boxShadow:
           'inset 0 1px 0 rgba(255,255,255,0.04), 0 1px 2px rgba(0,0,0,0.18), 0 16px 40px -16px rgba(0,0,0,0.4)',
-        transition: `transform 240ms ${EASE_CINEMATIC}, box-shadow 240ms ${EASE_CINEMATIC}`,
+        transition: `transform var(--ds-motion-cinematic-duration) ${EASE_CINEMATIC}, box-shadow var(--ds-motion-cinematic-duration) ${EASE_CINEMATIC}`,
       }}
     >
       <div className='px-7 py-6'>
-        <h2 className='text-[17px] font-semibold leading-[1.3] text-primary-token tracking-[-0.024em]'>
+        <h2 className='text-[17px] font-semibold leading-[1.3] text-primary-token'>
           {title}
         </h2>
-        <p className='mt-2 text-[12.5px] leading-[1.6] text-tertiary-token tracking-[-0.003em]'>
+        <p className='mt-2 text-[12.5px] leading-[1.6] text-tertiary-token'>
           {body}
         </p>
 
@@ -75,7 +75,7 @@ export function SuggestionCard({
             <button
               type='button'
               onClick={onDismiss}
-              className='inline-flex items-center h-7 px-3 rounded-full text-[11.5px] text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token transition-colors duration-150 ease-out'
+              className='inline-flex items-center h-7 px-3 rounded-full text-[11.5px] text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token transition-colors duration-subtle ease-out'
             >
               {dismissLabel}
             </button>
@@ -84,7 +84,7 @@ export function SuggestionCard({
             type='button'
             onClick={onAct}
             disabled={!onAct}
-            className='inline-flex items-center gap-1.5 h-7 px-3.5 rounded-full text-[12px] font-medium bg-white text-black hover:brightness-110 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 shadow-[0_4px_14px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.45)] transition-all duration-150 ease-out'
+            className='inline-flex items-center gap-1.5 h-7 px-3.5 rounded-full text-[12px] font-medium bg-white text-black hover:brightness-110 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 shadow-[0_4px_14px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.45)] transition-[filter,transform,box-shadow,opacity] duration-subtle ease-out'
           >
             {actionLabel}
             <ArrowRight className='h-3 w-3' strokeWidth={2.5} />

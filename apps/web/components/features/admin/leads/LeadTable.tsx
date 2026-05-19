@@ -1,11 +1,12 @@
 'use client';
 
-import { Badge } from '@jovie/ui';
+import { Badge, Button } from '@jovie/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { AlertTriangle, Check, ExternalLink, Loader2, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { HeaderSearchAction } from '@/components/molecules/HeaderSearchAction';
 import {
   createMultiFieldFilterFn,
@@ -16,6 +17,7 @@ import {
 import { APP_ROUTES } from '@/constants/routes';
 import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { useSearchUrlSync } from '@/hooks/useSearchUrlSync';
+import { SKELETON_ROW_COUNT, TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
 import {
   type AdminLead,
   type AdminLeadsSortBy,
@@ -265,6 +267,7 @@ export function LeadTable({
     hasNextPage,
     isFetchingNextPage,
     fetchNextPage,
+    refetch,
   } = useLeadsInfiniteQuery({
     sortBy,
     status: statusFilter || undefined,
@@ -345,9 +348,19 @@ export function LeadTable({
     fetchNextPage().catch(() => {}); // NOSONAR — fire-and-forget, errors handled by React Query
   }, [fetchNextPage]);
 
+  const handleRetry = useCallback(() => {
+    refetch().catch(() => {});
+  }, [refetch]);
+
+  const getRowClassName = useCallback(
+    () => 'group bg-transparent hover:bg-(--linear-row-hover)',
+    []
+  );
+
   return (
-    <section className='flex flex-col'>
+    <ContentSurfaceCard surface='table' className='overflow-hidden'>
       <PageToolbar
+        className='border-b border-subtle'
         start={STATUS_OPTIONS.map(opt => {
           const count =
             funnelCounts && opt.value ? funnelCounts[opt.value] : undefined;
@@ -376,7 +389,17 @@ export function LeadTable({
       {isError && leads.length > 0 && (
         <div className='flex items-center gap-2 border-b border-subtle bg-warning/5 px-4 py-2 text-app text-warning'>
           <AlertTriangle className='h-3.5 w-3.5 shrink-0' />
-          Unable to refresh leads. Showing cached data.
+          <span className='min-w-0 flex-1'>
+            Unable to refresh leads. Showing cached data.
+          </span>
+          <Button
+            type='button'
+            variant='secondary'
+            size='sm'
+            onClick={handleRetry}
+          >
+            Retry
+          </Button>
         </div>
       )}
       <AdminDataTable
@@ -388,6 +411,9 @@ export function LeadTable({
         enableFiltering
         globalFilterFn={leadFilterFn}
         getRowId={row => row.id}
+        getRowClassName={getRowClassName}
+        rowHeight={TABLE_ROW_HEIGHTS.STANDARD}
+        skeletonRows={SKELETON_ROW_COUNT.TABLE}
         hasNextPage={hasNextPage}
         isFetchingNextPage={isFetchingNextPage}
         onLoadMore={handleLoadMore}
@@ -396,6 +422,17 @@ export function LeadTable({
             <TableEmptyState
               title='Unable to load leads'
               description='Try again in a moment.'
+              icon={<AlertTriangle className='h-4 w-4' />}
+              action={
+                <Button
+                  type='button'
+                  variant='secondary'
+                  size='sm'
+                  onClick={handleRetry}
+                >
+                  Retry
+                </Button>
+              }
             />
           ) : (
             <TableEmptyState
@@ -405,6 +442,6 @@ export function LeadTable({
           )
         }
       />
-    </section>
+    </ContentSurfaceCard>
   );
 }

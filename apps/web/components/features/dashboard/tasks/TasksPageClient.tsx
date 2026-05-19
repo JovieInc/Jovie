@@ -14,7 +14,6 @@ import {
   ChevronDown,
   Disc3,
   FileText,
-  MoreHorizontal,
   Plus,
   Trash2,
 } from 'lucide-react';
@@ -34,7 +33,6 @@ import {
 import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { providerConfig } from '@/app/app/(shell)/dashboard/releases/config';
-import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import { DashboardHeaderActionButton } from '@/components/features/dashboard/atoms/DashboardHeaderActionButton';
 import { DashboardHeaderActionGroup } from '@/components/features/dashboard/atoms/DashboardHeaderActionGroup';
 import { ReleaseTaskDueBadge } from '@/components/features/dashboard/release-tasks/ReleaseTaskDueBadge';
@@ -44,6 +42,7 @@ import {
   PriorityBars,
   TaskListRow,
 } from '@/components/features/dashboard/tasks/TaskListRow';
+import { TaskRowActionMenu } from '@/components/features/dashboard/tasks/TaskRowActionMenu';
 import {
   HIDDEN_DIV_STYLES,
   useTextareaAutosize,
@@ -60,7 +59,6 @@ import { PageShell } from '@/components/organisms/PageShell';
 import { ReleaseSidebar } from '@/components/organisms/release-sidebar';
 import {
   type ContextMenuItemType,
-  convertContextMenuItems,
   ShellListRowButton,
 } from '@/components/organisms/table';
 import { rowState } from '@/components/organisms/table/table.styles';
@@ -1870,21 +1868,9 @@ export function TasksPageClient() {
         artistName={artistName}
         isSelected={info.row.original.id === effectiveSelectedTaskId}
         actionSlot={
-          <TableActionMenu
-            items={convertContextMenuItems(
-              getTaskContextMenuItems(info.row.original)
-            )}
-            trigger='custom'
-          >
-            <button
-              type='button'
-              onClick={event => event.stopPropagation()}
-              aria-label='Open task actions'
-              className='inline-flex h-7 w-7 items-center justify-center rounded-md bg-transparent text-tertiary-token transition-[background-color,color] duration-subtle hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_56%,transparent)] hover:text-primary-token focus-visible:outline-none focus-visible:bg-[color-mix(in_oklab,var(--linear-row-hover)_60%,transparent)] focus-visible:text-primary-token'
-            >
-              <MoreHorizontal className='h-3.5 w-3.5' />
-            </button>
-          </TableActionMenu>
+          <TaskRowActionMenu
+            items={getTaskContextMenuItems(info.row.original)}
+          />
         }
       />
     ),

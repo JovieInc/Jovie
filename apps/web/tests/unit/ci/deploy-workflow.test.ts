@@ -309,8 +309,18 @@ describe('canary health gate workflow', () => {
     expect(canaryStep).toContain(
       'verified_deployment_url=${public_deployment_url}'
     );
+    expect(canaryStep).toContain(
+      'Checking onboarding chat reaches the bot gate'
+    );
+    expect(canaryStep).toContain('"errorCode":"ONBOARDING_CHAT_DISABLED"');
+    expect(canaryStep).toContain('"errorCode":"TURNSTILE_REQUIRED"');
+    expect(canaryStep).toContain('canary_status=failed_onboarding_chat');
     expect(authSmokeStep).toContain(
       'DEPLOYMENT_URL: ${{ steps.canary-check.outputs.verified_deployment_url || inputs.deployment_url }}'
+    );
+    expect(authSmokeStep).not.toContain('VERCEL_AUTOMATION_BYPASS_SECRET');
+    expect(authSmokeStep).toContain(
+      'this browser\n          # smoke must match real public user traffic'
     );
     expect(authSmokeStep).toContain('auth_smoke_attempt=1');
     expect(authSmokeStep).toContain('auth_smoke_max_attempts=3');

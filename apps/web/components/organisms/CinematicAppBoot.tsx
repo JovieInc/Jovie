@@ -29,6 +29,8 @@ interface CinematicAppBootProps {
    * renders its default skeleton body.
    */
   readonly main?: ReactNode;
+  /** Existing shell audio player node passed through the direct skeleton path. */
+  readonly audioPlayer?: ReactNode;
   /** AppShellSkeleton variant — preserved across cinematic + skeleton fallbacks. */
   readonly variant: AppShellFrameVariant;
 }
@@ -50,7 +52,11 @@ interface CinematicAppBootProps {
  * cinematic is skipped and the route-specific AppShellSkeleton renders
  * directly — identical to today's loading state.
  */
-export function CinematicAppBoot({ main, variant }: CinematicAppBootProps) {
+export function CinematicAppBoot({
+  main,
+  audioPlayer,
+  variant,
+}: CinematicAppBootProps) {
   const [mounted, setMounted] = useState(false);
   const [shouldPlay, setShouldPlay] = useState(false);
   const prefersReducedMotion = useReducedMotion();
@@ -79,7 +85,13 @@ export function CinematicAppBoot({ main, variant }: CinematicAppBootProps) {
   }, []);
 
   if (!mounted || prefersReducedMotion || !shouldPlay) {
-    return <AppShellSkeleton main={main} variant={variant} />;
+    return (
+      <AppShellSkeleton
+        main={main}
+        audioPlayer={audioPlayer}
+        variant={variant}
+      />
+    );
   }
 
   const kfLogo = `jvf-logo-${safeId}`;

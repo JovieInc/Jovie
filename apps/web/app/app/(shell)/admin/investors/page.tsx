@@ -1,4 +1,5 @@
 import { Badge, Button } from '@jovie/ui';
+import type { ColumnDef } from '@tanstack/react-table';
 import {
   CheckCircle2,
   CircleSlash,
@@ -12,6 +13,7 @@ import { Suspense } from 'react';
 import { AdminToolPage } from '@/components/features/admin/layout/AdminToolPage';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { UnifiedTableSkeleton } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
 import { cn } from '@/lib/utils';
 import {
@@ -31,6 +33,73 @@ export const metadata: Metadata = {
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+type InvestorPipelineSkeletonRow = {
+  readonly label: string;
+  readonly investor: string;
+  readonly stage: string;
+  readonly score: string;
+  readonly views: string;
+  readonly lastViewed: string;
+  readonly status: string;
+};
+
+const INVESTOR_TABLE_MIN_WIDTH = '760px';
+
+const INVESTOR_TABLE_SKELETON_COLUMNS = [
+  {
+    id: 'label',
+    header: 'Label',
+    size: 200,
+    minSize: 180,
+  },
+  {
+    id: 'investor',
+    header: 'Investor',
+    size: 150,
+    minSize: 140,
+  },
+  {
+    id: 'stage',
+    header: 'Stage',
+    size: 100,
+    minSize: 96,
+  },
+  {
+    id: 'score',
+    header: 'Score',
+    size: 64,
+    minSize: 56,
+  },
+  {
+    id: 'views',
+    header: 'Views',
+    size: 64,
+    minSize: 56,
+  },
+  {
+    id: 'lastViewed',
+    header: 'Last viewed',
+    size: 110,
+    minSize: 96,
+  },
+  {
+    id: 'status',
+    header: 'Status',
+    size: 72,
+    minSize: 64,
+  },
+] satisfies ColumnDef<InvestorPipelineSkeletonRow, unknown>[];
+
+const INVESTOR_TABLE_SKELETON_COLUMN_CONFIG = [
+  { variant: 'release' as const, width: '100%' },
+  { variant: 'text' as const, width: '100%' },
+  { variant: 'badge' as const, width: '72px' },
+  { variant: 'text' as const, width: '40px' },
+  { variant: 'text' as const, width: '40px' },
+  { variant: 'meta' as const, width: '100%' },
+  { variant: 'badge' as const, width: '72px' },
+];
 
 /**
  * Admin investor pipeline dashboard.
@@ -115,22 +184,36 @@ async function InvestorPipelineTable() {
         title='Active investor links'
         subtitle={`${links.length} tracked link${links.length === 1 ? '' : 's'} across your pipeline.`}
       />
-      <InvestorTable>
+      <InvestorTable minWidth='min-w-[760px]'>
         <InvestorTableHead>
           <InvestorTableHeaderRow>
-            <InvestorTableHeaderCell>Label</InvestorTableHeaderCell>
-            <InvestorTableHeaderCell>Investor</InvestorTableHeaderCell>
-            <InvestorTableHeaderCell>Stage</InvestorTableHeaderCell>
-            <InvestorTableHeaderCell>Score</InvestorTableHeaderCell>
-            <InvestorTableHeaderCell>Views</InvestorTableHeaderCell>
-            <InvestorTableHeaderCell>Last viewed</InvestorTableHeaderCell>
-            <InvestorTableHeaderCell>Status</InvestorTableHeaderCell>
+            <InvestorTableHeaderCell className='w-[200px]'>
+              Label
+            </InvestorTableHeaderCell>
+            <InvestorTableHeaderCell className='w-[150px]'>
+              Investor
+            </InvestorTableHeaderCell>
+            <InvestorTableHeaderCell className='w-[100px]'>
+              Stage
+            </InvestorTableHeaderCell>
+            <InvestorTableHeaderCell className='w-[64px]'>
+              Score
+            </InvestorTableHeaderCell>
+            <InvestorTableHeaderCell className='w-[64px]'>
+              Views
+            </InvestorTableHeaderCell>
+            <InvestorTableHeaderCell className='w-[110px]'>
+              Last viewed
+            </InvestorTableHeaderCell>
+            <InvestorTableHeaderCell className='w-[72px]'>
+              Status
+            </InvestorTableHeaderCell>
           </InvestorTableHeaderRow>
         </InvestorTableHead>
         <tbody>
           {links.map(link => (
             <InvestorTableRow key={link.id}>
-              <InvestorTableCell>
+              <InvestorTableCell className='w-[200px]'>
                 <div className='flex min-w-0 flex-col'>
                   <span className='truncate font-semibold text-primary-token'>
                     {link.label}
@@ -138,24 +221,24 @@ async function InvestorPipelineTable() {
                   <TokenDisplay token={link.token} />
                 </div>
               </InvestorTableCell>
-              <InvestorTableCell className='text-secondary-token'>
+              <InvestorTableCell className='w-[150px]'>
                 {link.investorName || 'Unknown investor'}
               </InvestorTableCell>
-              <InvestorTableCell>
+              <InvestorTableCell className='w-[100px]'>
                 <StageBadge stage={link.stage} />
               </InvestorTableCell>
-              <InvestorTableCell>
+              <InvestorTableCell className='w-[64px]'>
                 <ScoreBadge score={link.engagementScore} />
               </InvestorTableCell>
-              <InvestorTableCell className='text-secondary-token'>
+              <InvestorTableCell className='w-[64px]'>
                 {link.viewCount}
               </InvestorTableCell>
-              <InvestorTableCell className='text-secondary-token'>
+              <InvestorTableCell className='w-[110px]'>
                 {link.lastViewed
                   ? new Date(link.lastViewed).toLocaleDateString()
                   : 'No views yet'}
               </InvestorTableCell>
-              <InvestorTableCell>
+              <InvestorTableCell className='w-[72px]'>
                 <StatusBadge isActive={link.isActive} />
               </InvestorTableCell>
             </InvestorTableRow>
@@ -265,14 +348,6 @@ function TokenDisplay({ token }: { readonly token: string }) {
   return <TokenCopyButton token={token} />;
 }
 
-const TABLE_SKELETON_KEYS = [
-  'investor-skeleton-1',
-  'investor-skeleton-2',
-  'investor-skeleton-3',
-  'investor-skeleton-4',
-  'investor-skeleton-5',
-];
-
 function TableSkeleton() {
   return (
     <ContentSurfaceCard className='overflow-hidden p-0'>
@@ -280,14 +355,14 @@ function TableSkeleton() {
         title='Loading investor links'
         subtitle='Preparing the latest pipeline state.'
       />
-      <div className='space-y-2 px-3 py-3'>
-        {TABLE_SKELETON_KEYS.map(skeletonKey => (
-          <div
-            key={skeletonKey}
-            className='h-11 animate-pulse rounded-lg bg-surface-0'
-          />
-        ))}
-      </div>
+      <UnifiedTableSkeleton<InvestorPipelineSkeletonRow>
+        columns={INVESTOR_TABLE_SKELETON_COLUMNS}
+        skeletonRows={5}
+        skeletonColumnConfig={INVESTOR_TABLE_SKELETON_COLUMN_CONFIG}
+        rowHeight={40}
+        minWidth={INVESTOR_TABLE_MIN_WIDTH}
+        containerClassName='px-3 pb-3 pt-0'
+      />
     </ContentSurfaceCard>
   );
 }

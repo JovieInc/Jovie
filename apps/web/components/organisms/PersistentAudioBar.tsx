@@ -2,8 +2,8 @@
 
 import { Pause, Play, X } from 'lucide-react';
 import Image from 'next/image';
-import { usePathname, useRouter } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { SeekBar } from '@/components/atoms/SeekBar';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
@@ -11,7 +11,11 @@ import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useT
 import { AudioBar, type AudioBarTrack } from '@/components/shell/AudioBar';
 import { SidebarBottomNowPlaying } from '@/components/shell/SidebarBottomNowPlaying';
 import { SidebarNowPlaying } from '@/components/shell/SidebarNowPlaying';
-import { APP_ROUTES, buildLyricsRoute } from '@/constants/routes';
+import {
+  APP_ROUTES,
+  buildLyricsRoute,
+  resolveLyricsReturnRoute,
+} from '@/constants/routes';
 import { useAppFlag } from '@/lib/flags/client';
 import { cn } from '@/lib/utils';
 import { formatDuration } from '@/lib/utils/formatDuration';
@@ -42,6 +46,7 @@ export function PersistentAudioBar({
 }: Readonly<PersistentAudioBarProps>) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const designV1LyricsEnabled = useAppFlag('DESIGN_V1');
   const { playbackState, toggleTrack, seek, stop, onError } =
     useTrackAudioPlayer();
@@ -49,6 +54,12 @@ export function PersistentAudioBar({
   const [barCollapsed, setBarCollapsed] = useState(false);
   const [waveformOn, setWaveformOn] = useState(true);
   const lastNonLyricsPathRef = useRef<string>(APP_ROUTES.LIBRARY);
+  const currentPathWithSearch = useMemo(() => {
+    if (!pathname) return APP_ROUTES.LIBRARY;
+
+    const query = searchParams.toString();
+    return query ? `${pathname}?${query}` : pathname;
+  }, [pathname, searchParams]);
 
   useEffect(() => {
     return onError(() => {
@@ -66,9 +77,9 @@ export function PersistentAudioBar({
 
   useEffect(() => {
     if (!isLyricsRoutePath(pathname) && pathname) {
-      lastNonLyricsPathRef.current = pathname;
+      lastNonLyricsPathRef.current = currentPathWithSearch;
     }
-  }, [pathname]);
+  }, [currentPathWithSearch, pathname]);
 
   const handleToggle = useCallback(() => {
     if (playbackState.playbackStatus === 'loading') return;
@@ -85,18 +96,33 @@ export function PersistentAudioBar({
   ]);
 
   const handleCloseLyrics = useCallback(() => {
-    router.push(lastNonLyricsPathRef.current);
-  }, [router]);
+    router.push(
+      resolveLyricsReturnRoute(
+        searchParams.get('from'),
+        lastNonLyricsPathRef.current
+      )
+    );
+  }, [router, searchParams]);
 
   const handleOpenLyrics = useCallback(() => {
     if (!playbackState.activeTrackId) return;
-    const lyricsPath = buildLyricsRoute(playbackState.activeTrackId);
-    if (pathname === lyricsPath) {
+    const lyricsBasePath = buildLyricsRoute(playbackState.activeTrackId);
+    if (pathname === lyricsBasePath) {
       handleCloseLyrics();
       return;
     }
-    router.push(lyricsPath);
-  }, [handleCloseLyrics, pathname, playbackState.activeTrackId, router]);
+    router.push(
+      buildLyricsRoute(playbackState.activeTrackId, {
+        from: currentPathWithSearch,
+      })
+    );
+  }, [
+    currentPathWithSearch,
+    handleCloseLyrics,
+    pathname,
+    playbackState.activeTrackId,
+    router,
+  ]);
 
   const activeTrackId = playbackState.activeTrackId;
   const isShellAudioBar = variant === 'shellChatV1';

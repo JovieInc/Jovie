@@ -17,6 +17,9 @@ interface HeaderSearchSurfaceProps {
   readonly className?: string;
 }
 
+const headerSearchSurfaceChrome =
+  'rounded-[10px] border border-(--linear-app-shell-border) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))]';
+
 /**
  * Shell-owned search surface that morphs between a compact trigger button
  * (closed) and a full PillSearch panel (open).
@@ -50,7 +53,8 @@ export function HeaderSearchSurface({
         data-app-search-trigger='true'
         onClick={onOpen}
         className={cn(
-          'inline-flex h-7 items-center gap-1.5 rounded-md border border-(--linear-app-shell-border) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_94%,transparent)] px-2 text-[12px] text-secondary-token transition-[background-color,border-color,color] duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
+          headerSearchSurfaceChrome,
+          'inline-flex h-7 min-w-0 items-center gap-1.5 px-2.5 text-[12px] text-secondary-token transition-[background-color,border-color,color] duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
           className
         )}
         aria-label={adapter.ariaLabel ?? adapter.triggerLabel}
@@ -69,7 +73,8 @@ export function HeaderSearchSurface({
   return (
     <div
       className={cn(
-        'w-full max-w-[min(560px,calc(100vw-2rem))] rounded-lg border border-(--linear-app-shell-border) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] px-2 py-1 shadow-[0_10px_32px_rgba(0,0,0,0.16)] sm:w-[440px] lg:w-[520px]',
+        headerSearchSurfaceChrome,
+        'w-full max-w-[min(560px,calc(100vw-2rem))] px-2 py-1 shadow-[0_10px_32px_rgba(0,0,0,0.16)] sm:w-[440px] lg:w-[520px]',
         className
       )}
     >
