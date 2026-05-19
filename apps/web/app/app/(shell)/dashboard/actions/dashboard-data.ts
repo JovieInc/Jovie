@@ -482,6 +482,14 @@ async function fetchDashboardBaseWithSession(
   sessionUserId: string,
   options?: {
     readonly includeSettings?: boolean;
+    /**
+     * When true, skip the auth reconciliation branch that calls Clerk's
+     * `auth()` / `currentUser()`. Those APIs access `headers()` and cannot
+     * run inside an `unstable_cache` scope (ClerkUseCacheError). Cached
+     * callers must pass `true`; the fresh-fetch path leaves it `false` so
+     * a missing DB user can still be auto-created.
+     */
+    readonly skipAuthReconciliation?: boolean;
   }
 ): Promise<CoreData> {
   const selectUser = () =>
@@ -497,7 +505,7 @@ async function fetchDashboardBaseWithSession(
 
   let [userData] = await dashboardQuery(selectUser, 'User lookup query');
 
-  if (!userData?.id) {
+  if (!userData?.id && !options?.skipAuthReconciliation) {
     try {
       const resolvedUserState = await resolveUserState({
         createDbUserIfMissing: true,
@@ -617,12 +625,15 @@ async function fetchDashboardBaseWithSession(
  * then augments with slow supplementary queries (links, avatar, tipping).
  */
 async function fetchDashboardCoreWithSession(
-  clerkUserId: string
+  clerkUserId: string,
+  options: { skipAuthReconciliation?: boolean } = {}
 ): Promise<CoreData> {
   try {
     return await withDbSessionTx(
       async (tx, sessionUserId) => {
-        const base = await fetchDashboardBaseWithSession(tx, sessionUserId);
+        const base = await fetchDashboardBaseWithSession(tx, sessionUserId, {
+          skipAuthReconciliation: options.skipAuthReconciliation,
+        });
 
         // If no profile resolved, return the base result (onboarding/error state)
         if (!base.selectedProfile) {
@@ -854,12 +865,15 @@ async function resolveDashboardData(): Promise<DashboardData> {
  * ~3 fast single-row queries vs ~6 sequential queries in the full fetch.
  */
 async function fetchDashboardEssentialWithSession(
-  clerkUserId: string
+  clerkUserId: string,
+  options: { skipAuthReconciliation?: boolean } = {}
 ): Promise<CoreData> {
   try {
     return await withDbSessionTx(
       async (tx, sessionUserId) =>
-        fetchDashboardBaseWithSession(tx, sessionUserId),
+        fetchDashboardBaseWithSession(tx, sessionUserId, {
+          skipAuthReconciliation: options.skipAuthReconciliation,
+        }),
       { clerkUserId }
     );
   } catch (error) {
@@ -901,7 +915,8 @@ async function fetchDashboardEssentialWithSession(
  * provides selectedProfile + creatorProfiles for the sidebar shell.
  */
 async function fetchDashboardShellWithSession(
-  clerkUserId: string
+  clerkUserId: string,
+  options: { skipAuthReconciliation?: boolean } = {}
 ): Promise<CoreData> {
   try {
     // Keep shell reads inside the transaction-scoped session. RLS depends on
@@ -912,6 +927,7 @@ async function fetchDashboardShellWithSession(
       async (tx, sessionUserId) =>
         fetchDashboardBaseWithSession(tx, sessionUserId, {
           includeSettings: false,
+          skipAuthReconciliation: options.skipAuthReconciliation,
         }),
       { clerkUserId }
     );
@@ -949,9 +965,19 @@ async function fetchDashboardShellWithSession(
  * Cached essential dashboard data (fast path).
  * Only user + profiles + settings. No tipping/links/avatar.
  */
+// NOTE: `skipAuthReconciliation: true` is required inside every
+// `unstableCache` wrapper. The reconciliation branch calls Clerk's `auth()` /
+// `currentUser()`, which read request `headers()` — a dynamic API that is
+// forbidden inside `unstable_cache` (throws ClerkUseCacheError, see
+// JOVIE-WEB-KS). If a missing DB user needs to be created, the outer
+// resolvers detect the empty result via `shouldRefreshUnstableDashboardState`
+// and re-invoke the fresh fetcher (which runs outside the cache scope and is
+// free to reconcile via `auth()`).
 const getCachedDashboardEssential = unstableCache(
   async (clerkUserId: string) =>
-    fetchDashboardEssentialWithSession(clerkUserId),
+    fetchDashboardEssentialWithSession(clerkUserId, {
+      skipAuthReconciliation: true,
+    }),
   ['dashboard-essential'],
   {
     revalidate: CACHE_TTL.MEDIUM,
@@ -960,7 +986,10 @@ const getCachedDashboardEssential = unstableCache(
 );
 
 const getCachedDashboardShell = unstableCache(
-  async (clerkUserId: string) => fetchDashboardShellWithSession(clerkUserId),
+  async (clerkUserId: string) =>
+    fetchDashboardShellWithSession(clerkUserId, {
+      skipAuthReconciliation: true,
+    }),
   ['dashboard-shell'],
   {
     revalidate: CACHE_TTL.MEDIUM,
@@ -974,7 +1003,10 @@ const getCachedDashboardShell = unstableCache(
  * within fetchDashboardCoreWithSession to avoid pool exhaustion.
  */
 const getCachedDashboardCore = unstableCache(
-  async (clerkUserId: string) => fetchDashboardCoreWithSession(clerkUserId),
+  async (clerkUserId: string) =>
+    fetchDashboardCoreWithSession(clerkUserId, {
+      skipAuthReconciliation: true,
+    }),
   ['dashboard-core'],
   {
     revalidate: CACHE_TTL.MEDIUM,
