@@ -65,7 +65,6 @@ export function HeaderSearchSurface({
           {visibleCount}
           {showFilteredOf ? ` of ${adapter.totalCount}` : ''}
         </span>
-        <span className='hidden text-tertiary-token lg:inline'>/</span>
       </button>
     );
   }
