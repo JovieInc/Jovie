@@ -24,11 +24,11 @@ import { ShellListRowFrame } from '@/components/organisms/table';
 import { ArtworkThumb } from '@/components/shell/ArtworkThumb';
 import { DropDateChip } from '@/components/shell/DropDateChip';
 import { DspAvatarStack } from '@/components/shell/DspAvatarStack';
-import { StatusBadge } from '@/components/shell/StatusBadge';
 import {
   EntityHoverLink,
   type EntityPopoverData,
 } from '@/components/shell/EntityPopover';
+import { StatusBadge } from '@/components/shell/StatusBadge';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { dropDateMeta } from '@/lib/format-drop-date';
 import { cn } from '@/lib/utils';
