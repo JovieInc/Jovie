@@ -436,6 +436,10 @@ function openPreferences(): void {
   showWindow(win);
 }
 
+function checkForUpdates(): void {
+  autoUpdater.checkForUpdates();
+}
+
 function buildViewMenu(): MenuItemConstructorOptions[] {
   const viewMenu: MenuItemConstructorOptions[] = [];
 
@@ -473,6 +477,10 @@ function buildApplicationMenu(): Menu {
         label: app.name,
         submenu: [
           { role: 'about' },
+          {
+            label: 'Check for Updates...',
+            click: checkForUpdates,
+          },
           { type: 'separator' },
           {
             label: 'Preferences...',
