@@ -5,7 +5,6 @@ import {
   MarketingHero,
   MarketingPageShell,
 } from '@/components/marketing';
-import { QueryProvider } from '@/components/providers/QueryProvider';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { AiDemo } from '@/features/home/AiDemo';
@@ -219,9 +218,7 @@ export default function LaunchPage() {
 
           <div className='mt-4 w-full max-w-[520px]'>
             <QueryProvider>
-              <HeroSpotifySearch />
-            </QueryProvider>
-          </div>
+            <HeroSpotifySearch />
 
           <a
             href='#how-it-works'
