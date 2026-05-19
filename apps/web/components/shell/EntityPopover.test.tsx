@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { act, fireEvent, screen } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -82,8 +83,12 @@ describe('EntityHoverLink', () => {
 
 describe('EntityPopover source contract', () => {
   it('keeps floating surface chrome on the shared token', () => {
+    // Robust path: resolve relative to this test file (same dir as the source).
+    // Prevents cwd-dependent breakage (package vs repo root invocation contexts).
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
     const source = readFileSync(
-      resolve(process.cwd(), 'components/shell/EntityPopover.tsx'),
+      resolve(__dirname, 'EntityPopover.tsx'),
       'utf8'
     );
 
