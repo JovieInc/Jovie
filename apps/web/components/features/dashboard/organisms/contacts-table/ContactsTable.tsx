@@ -7,6 +7,7 @@ import {
   convertToCommonDropdownItems,
   PAGE_TOOLBAR_META_TEXT_CLASS,
   PageToolbar,
+  rowState,
   UnifiedTable,
 } from '@/components/organisms/table';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
@@ -181,8 +182,7 @@ export const ContactsTable = memo(function ContactsTable({
 
   const getRowClassName = useCallback(
     (contact: EditableContact) => {
-      // Selected row: solid bg (override base hover)
-      return selectedContactId === contact.id ? 'bg-white/[0.04]' : '';
+      return selectedContactId === contact.id ? rowState.selected : '';
     },
     [selectedContactId]
   );

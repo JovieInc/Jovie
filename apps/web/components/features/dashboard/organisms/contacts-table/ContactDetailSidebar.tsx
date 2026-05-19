@@ -241,6 +241,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
       onClose={hasContact ? undefined : handleClose}
       headerMode='minimal'
       hideMinimalHeaderBar={hasContact}
+      entityHeaderSurface='flat'
       contextMenuItems={contextMenuItems}
       isEmpty={!hasContact}
       emptyMessage='Select a contact to view details'
@@ -248,7 +249,6 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
         contact ? (
           <DrawerSurfaceCard variant='card' className='overflow-hidden p-3'>
             <EntityHeaderCard
-              eyebrow='Contact'
               title={contactDisplayName}
               subtitle={roleLabel}
               actions={
@@ -418,7 +418,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                         aria-pressed={isSelected}
                         title={territory}
                         className={cn(
-                          'inline-flex h-6 max-w-full shrink-0 items-center whitespace-nowrap rounded-md border px-2 text-2xs font-caption leading-none transition-[background-color,border-color,color] duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
+                          'inline-flex h-6 max-w-full shrink-0 items-center whitespace-nowrap rounded-md border px-2 text-2xs font-caption leading-none transition-[background-color,border-color,color] duration-subtle focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
                           isSelected
                             ? 'border-(--linear-border-focus)/35 bg-surface-1 text-primary-token'
                             : 'border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token hover:bg-surface-1 hover:text-primary-token'
