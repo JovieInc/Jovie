@@ -296,11 +296,19 @@ export function SuggestedPrompts({
       inert={dimmed}
     >
       <div
-        className={cn(CHAT_PROMPT_RAIL_SCROLL_CLASS, 'overscroll-x-contain')}
+        className={cn(
+          CHAT_PROMPT_RAIL_SCROLL_CLASS,
+          'overscroll-x-contain px-1 sm:px-0'
+        )}
         style={CHAT_PROMPT_RAIL_MASK_STYLE}
         data-testid='suggested-prompts-rail'
       >
-        <div className={cn(CHAT_PROMPT_RAIL_CLASS, 'snap-x snap-mandatory')}>
+        <div
+          className={cn(
+            CHAT_PROMPT_RAIL_CLASS,
+            'snap-x snap-mandatory whitespace-nowrap'
+          )}
+        >
           {promptSuggestionsWithCapabilities.map(suggestion => (
             <SuggestionPill
               key={suggestion.label}

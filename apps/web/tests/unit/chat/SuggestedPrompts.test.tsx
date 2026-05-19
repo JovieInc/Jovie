@@ -37,6 +37,7 @@ describe('SuggestedPrompts', () => {
     const row = rail.firstElementChild;
     expect(row?.className).toContain('snap-x');
     expect(row?.className).not.toContain('flex-wrap');
+    expect(row?.className).toContain('whitespace-nowrap');
   });
 
   it('renders a grid layout when requested', () => {

@@ -50,7 +50,7 @@ export interface ChatInputProps {
   readonly isLoading: boolean;
   readonly isSubmitting: boolean;
   readonly placeholder?: string;
-  readonly variant?: 'default' | 'compact';
+  readonly variant?: 'default' | 'compact' | 'hero';
   readonly onImageAttach?: () => void;
   readonly isImageProcessing?: boolean;
   readonly pendingImages?: PendingImage[];
@@ -95,10 +95,18 @@ interface SurfaceGeometry {
   readonly borderRadius: number;
 }
 
-function geometryFor(mode: SurfaceMode, stacked: boolean): SurfaceGeometry {
+function geometryFor(
+  mode: SurfaceMode,
+  stacked: boolean,
+  variant: NonNullable<ChatInputProps['variant']>
+): SurfaceGeometry {
   const width = '100%';
-  const maxWidth = 'min(calc(100vw - 32px), 720px)';
+  const isHero = variant === 'hero';
+  const maxWidth = isHero
+    ? 'min(calc(100vw - 32px), 840px)'
+    : 'min(calc(100vw - 32px), 720px)';
   if (stacked) return { width, maxWidth, borderRadius: 28 };
+  if (isHero && mode === 'empty') return { width, maxWidth, borderRadius: 32 };
   if (mode === 'entity') return { width, maxWidth, borderRadius: 24 };
   return { width, maxWidth, borderRadius: 28 };
 }
@@ -179,6 +187,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     }, []);
 
     const isCompact = variant === 'compact';
+    const isHero = variant === 'hero';
     const isStacked = isCompact || isViewportNarrow;
     const maxHeight = 168;
     const minHeight = 24;
@@ -373,7 +382,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     )
       surfaceMode = 'typing';
 
-    const geometry = geometryFor(surfaceMode, isStacked);
+    const geometry = geometryFor(surfaceMode, isStacked, variant);
     const showInlinePicker = picker.state.status === 'root';
     const showEntitySurface = picker.state.status === 'entity';
     const dockClass =
@@ -443,6 +452,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             data-testid='chat-composer-surface'
             data-surface-mode={surfaceMode}
             data-compact={isCompact ? 'true' : 'false'}
+            data-variant={variant}
             animate={
               reducedMotion
                 ? undefined
@@ -536,6 +546,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                       pickerListId={pickerListId}
                       pickerActiveRowId={pickerActiveRowId}
                       attachDisabledForPicker={isPickerOpen}
+                      isHero={isHero}
                     />
                   </div>
                 </div>
@@ -618,6 +629,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   pickerListId={pickerListId}
                   pickerActiveRowId={pickerActiveRowId}
                   attachDisabledForPicker={isPickerOpen}
+                  isHero={isHero}
                 />
               </>
             )}
@@ -688,6 +700,7 @@ interface InputRowProps {
   readonly pickerActiveRowId: string | null;
   /** Disable the attach dropdown trigger while the picker owns the keyboard. */
   readonly attachDisabledForPicker: boolean;
+  readonly isHero: boolean;
 }
 
 function InputRow({
@@ -728,6 +741,7 @@ function InputRow({
   pickerListId,
   pickerActiveRowId,
   attachDisabledForPicker,
+  isHero,
 }: InputRowProps) {
   return (
     <div className={cn(hasBorderTop && 'border-t border-white/[0.065]')}>
@@ -743,13 +757,19 @@ function InputRow({
       <div
         ref={containerRef}
         className={cn(
-          'relative grid min-h-[88px] grid-rows-[minmax(24px,auto)_40px] gap-2 px-3 py-2.5'
+          'relative grid gap-2',
+          isHero
+            ? 'min-h-[116px] grid-rows-[minmax(32px,auto)_44px] px-4 py-3'
+            : 'min-h-[88px] grid-rows-[minmax(24px,auto)_40px] px-3 py-2.5'
         )}
       >
         <div ref={hiddenDivRef} style={HIDDEN_DIV_STYLES} aria-hidden />
         <div
           data-testid='chat-input-inline-field'
-          className='flex min-h-7 w-full min-w-0 flex-wrap items-start gap-x-1.5 gap-y-1.5 px-1 pt-0.5'
+          className={cn(
+            'flex w-full min-w-0 flex-wrap items-start gap-x-1.5 gap-y-1.5',
+            isHero ? 'min-h-8 px-2 pt-1' : 'min-h-7 px-1 pt-0.5'
+          )}
         >
           {chips && chips.length > 0 && onRemoveChipAt ? (
             <ChipTray chips={chips} onRemoveAt={onRemoveChipAt} />
@@ -764,8 +784,10 @@ function InputRow({
             animate={reducedMotion ? undefined : { height: measuredHeight }}
             transition={reducedMotion ? undefined : SPRING_HEIGHT}
             className={cn(
-              'min-h-6 min-w-[min(13rem,100%)] flex-[1_1_13rem] resize-none bg-transparent',
-              'px-1 py-[1px] text-[16px] leading-6 text-white/92 placeholder:text-quaternary-token',
+              'min-w-[min(13rem,100%)] flex-[1_1_13rem] resize-none bg-transparent placeholder:text-quaternary-token',
+              isHero
+                ? 'min-h-8 px-2 py-0.5 text-[18px] font-[450] leading-7 text-primary-token sm:text-[19px]'
+                : 'min-h-6 px-1 py-[1px] text-[16px] leading-6 text-white/92',
               // Remove the browser's default focus outline. The surrounding
               // surface provides the focus affordance (border glow via
               // isFocused→isExpanded). Using focus-visible:outline-none keeps
@@ -802,7 +824,12 @@ function InputRow({
           />
         </div>
 
-        <div className='flex min-h-10 items-center justify-between gap-2'>
+        <div
+          className={cn(
+            'flex items-center justify-between gap-2',
+            isHero ? 'min-h-11' : 'min-h-10'
+          )}
+        >
           <div className='flex min-w-0 items-center gap-2'>
             {hasAttachButton && onImageAttach ? (
               <ComposerAttachButton

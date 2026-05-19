@@ -246,6 +246,32 @@ describe('ChatInput', () => {
     }
   });
 
+  it('renders the larger hero composer geometry for the empty state', () => {
+    fastRender(
+      withProviders(
+        <ChatInput
+          {...baseProps}
+          value=''
+          onImageAttach={vi.fn()}
+          variant='hero'
+        />
+      )
+    );
+
+    const surface = screen.getByTestId('chat-composer-surface');
+    expect(surface.getAttribute('data-variant')).toBe('hero');
+    expect(surface.style.maxWidth).toBe('min(calc(100vw - 32px), 840px)');
+
+    const inlineField = screen.getByTestId('chat-input-inline-field');
+    expect(inlineField.className).toContain('min-h-8');
+
+    const textarea = screen.getByRole('textbox', {
+      name: /chat message input/i,
+    });
+    expect(textarea.className).toContain('text-[18px]');
+    expect(textarea.className).toContain('leading-7');
+  });
+
   it('keeps a quiet disabled dictation control when speech input is unavailable', () => {
     fastRender(withProviders(<ChatInput {...baseProps} />));
 
