@@ -60,6 +60,8 @@ import { ReleaseSidebar } from '@/components/organisms/release-sidebar';
 import {
   type ContextMenuItemType,
   ShellListRowButton,
+  ShellListRowFrame,
+  TableEmptyState,
 } from '@/components/organisms/table';
 import { rowState } from '@/components/organisms/table/table.styles';
 import {
@@ -177,6 +179,13 @@ const MOBILE_TASK_SCOPE_OPTIONS = [
   ['open', 'Open'],
   ['done', 'Closed'],
 ] as const satisfies ReadonlyArray<readonly [MobileTaskScope, string]>;
+
+const TASK_LOADING_ROWS = [
+  { key: 'task-loading-1', titleWidth: '72%', metaWidth: '40%' },
+  { key: 'task-loading-2', titleWidth: '56%', metaWidth: '30%' },
+  { key: 'task-loading-3', titleWidth: '84%', metaWidth: '48%' },
+  { key: 'task-loading-4', titleWidth: '64%', metaWidth: '34%' },
+] as const;
 
 function getTaskSubviewForAssigneeFilter(
   assigneeFilter: TaskAssigneeKind | 'all'
@@ -900,21 +909,18 @@ function TaskEmptyState({
   onOpenReleases: () => void;
 }>) {
   return (
-    <div className='flex min-h-[360px] flex-col items-center justify-center gap-3 px-6 text-center'>
-      <div className='space-y-1'>
-        <h2 className='text-lg font-semibold tracking-[-0.025em] text-primary-token'>
-          {hasFilters
-            ? 'No tasks match your filters'
-            : 'Your task list is empty'}
-        </h2>
-        <p className='max-w-[520px] text-app text-secondary-token'>
-          {hasFilters
-            ? 'Try widening the filters or search query.'
-            : 'Create your first task, or tasks will appear automatically when you set up a release.'}
-        </p>
-      </div>
-      <div className='flex items-center gap-2'>
-        {hasFilters ? (
+    <TableEmptyState
+      title={
+        hasFilters ? 'No Tasks Match Your Filters' : 'Your Task List Is Empty'
+      }
+      description={
+        hasFilters
+          ? 'Try widening the filters or search query.'
+          : 'Create your first task, or tasks will appear automatically when you set up a release.'
+      }
+      className='min-h-[360px]'
+      action={
+        hasFilters ? (
           <Button
             type='button'
             variant='secondary'
@@ -924,21 +930,76 @@ function TaskEmptyState({
             Clear Filters
           </Button>
         ) : (
-          <>
-            <Button type='button' size='sm' onClick={onOpenComposer}>
-              New Task
-            </Button>
-            <Button
-              type='button'
-              variant='secondary'
-              size='sm'
-              onClick={onOpenReleases}
-            >
-              Set Up Release
-            </Button>
-          </>
-        )}
-      </div>
+          <Button type='button' size='sm' onClick={onOpenComposer}>
+            New Task
+          </Button>
+        )
+      }
+      secondaryAction={
+        hasFilters ? null : (
+          <Button
+            type='button'
+            variant='secondary'
+            size='sm'
+            onClick={onOpenReleases}
+          >
+            Set Up Release
+          </Button>
+        )
+      }
+    />
+  );
+}
+
+function TaskLoadingState() {
+  return (
+    <div
+      role='status'
+      aria-busy='true'
+      className='flex min-h-0 flex-1 flex-col gap-1.5 px-3 pb-4 pt-2'
+    >
+      <span className='sr-only'>Loading tasks</span>
+      {TASK_LOADING_ROWS.map(row => (
+        <ShellListRowFrame
+          key={row.key}
+          interaction='none'
+          className='grid min-h-16 grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-3 px-2.5 py-1.5'
+        >
+          <div className='skeleton h-4 w-4 rounded-full' />
+          <div className='min-w-0 space-y-2'>
+            <div
+              className='skeleton h-3.5 rounded'
+              style={{ width: row.titleWidth }}
+            />
+            <div
+              className='skeleton h-3 rounded'
+              style={{ width: row.metaWidth }}
+            />
+          </div>
+          <div className='skeleton h-5 w-14 rounded-full' />
+        </ShellListRowFrame>
+      ))}
+    </div>
+  );
+}
+
+function TaskErrorState({
+  onRetry,
+}: Readonly<{
+  onRetry: () => void;
+}>) {
+  return (
+    <div className='flex min-h-0 flex-1 items-center justify-center px-3 py-4'>
+      <TableEmptyState
+        title="Couldn't Load Tasks"
+        description='Try reloading the task list.'
+        className='min-h-[240px] max-w-[28rem]'
+        action={
+          <Button type='button' variant='secondary' size='sm' onClick={onRetry}>
+            Retry
+          </Button>
+        }
+      />
     </div>
   );
 }
@@ -1870,6 +1931,8 @@ export function TasksPageClient() {
         actionSlot={
           <TaskRowActionMenu
             items={getTaskContextMenuItems(info.row.original)}
+            selected={info.row.original.id === effectiveSelectedTaskId}
+            visibility='hover'
           />
         }
       />
@@ -1953,7 +2016,7 @@ export function TasksPageClient() {
       <TaskDataTable
         data={visibleTasks}
         columns={columns}
-        isLoading={isLoading}
+        isLoading={isActiveListLoading}
         getRowId={row => row.id}
         onRowClick={row => openTaskDocument(row)}
         getRowClassName={getTaskRowClassName}
@@ -1973,7 +2036,9 @@ export function TasksPageClient() {
   }
 
   let mobileTaskContent: React.ReactNode;
-  if (mobileScopedTasks.length === 0) {
+  if (isActiveListLoading) {
+    mobileTaskContent = <TaskLoadingState />;
+  } else if (mobileScopedTasks.length === 0) {
     mobileTaskContent = (
       <div className='px-4 pt-6'>
         <TaskEmptyState
@@ -2071,24 +2136,7 @@ export function TasksPageClient() {
           data-testid='tasks-content-panel'
         >
           {activeIsError ? (
-            <div className='flex min-h-[240px] flex-1 flex-col items-center justify-center gap-3 px-6 text-center'>
-              <div className='space-y-1'>
-                <h2 className='text-mid font-semibold text-primary-token'>
-                  Couldn&apos;t Load Tasks
-                </h2>
-                <p className='text-app text-secondary-token'>
-                  Try reloading the task list.
-                </p>
-              </div>
-              <Button
-                type='button'
-                variant='secondary'
-                size='sm'
-                onClick={() => refetchActiveTasks()}
-              >
-                Retry
-              </Button>
-            </div>
+            <TaskErrorState onRetry={() => void refetchActiveTasks()} />
           ) : (
             <div className='flex min-h-0 flex-1 overflow-hidden'>
               <div

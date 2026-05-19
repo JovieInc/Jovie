@@ -17,6 +17,7 @@ describe('TaskRowActionMenu', () => {
     expect(className).toContain(
       'group-hover/task-board-card-shell:opacity-100'
     );
+    expect(className).toContain('group-hover/task-row:opacity-100');
     expect(className).toContain('data-[state=open]:opacity-100');
   });
 
