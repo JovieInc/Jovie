@@ -374,7 +374,7 @@ export function OnboardingCheckoutClient({
         variant='shellChatV1'
         sidebar={null}
         containerClassName='[color-scheme:dark]'
-        contentClassName='!overflow-hidden'
+        contentClassName='overflow-hidden!'
         main={checkoutContent}
         rightPanel={null}
       />

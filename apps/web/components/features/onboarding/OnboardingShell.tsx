@@ -50,7 +50,7 @@ export function OnboardingShell({ sessionLabel }: OnboardingShellProps) {
         variant='shellChatV1'
         sidebar={null}
         containerClassName='[color-scheme:dark]'
-        contentClassName='!overflow-hidden'
+        contentClassName='overflow-hidden!'
         main={
           <div
             className='relative flex min-h-0 flex-1'
