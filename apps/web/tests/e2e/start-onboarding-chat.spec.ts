@@ -441,8 +441,12 @@ test.describe('canonical /start onboarding chat', () => {
     ).toBeEnabled();
 
     const firstChatResponse = page.waitForResponse('**/api/chat');
+    const yBefore =
+      (await page.locator(COMPOSER_SURFACE).boundingBox())?.y ?? 0;
     await page.getByRole('button', { name: 'Send message' }).click();
     await firstChatResponse;
+    const yAfter = (await page.locator(COMPOSER_SURFACE).boundingBox())?.y ?? 0;
+    expect(Math.abs(yAfter - yBefore)).toBeLessThanOrEqual(5); // Addresses journey jank audit 20260519 + testing.md explicit CLS requirement for conditional UI (composer morph, row replace, cinematic fallback)
 
     await expect(
       page.getByText('find the exact Spotify profile')
