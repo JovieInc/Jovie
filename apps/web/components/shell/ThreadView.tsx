@@ -97,7 +97,7 @@ export function ThreadView({
       >
         <div className='mx-auto w-full max-w-[44rem] px-(--linear-app-header-padding-x) pb-[9rem] pt-5 sm:pt-6'>
           <header>
-            <h1 className='text-[24px] font-semibold leading-tight text-primary-token tracking-[-0.018em]'>
+            <h1 className='text-[24px] font-semibold leading-tight text-primary-token'>
               {thread.title}
             </h1>
             {thread.entityKind && thread.entityId && (

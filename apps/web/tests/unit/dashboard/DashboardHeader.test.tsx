@@ -67,6 +67,23 @@ describe('DashboardHeader', () => {
     ).toBeInTheDocument();
   });
 
+  it('prefers the breadcrumb suffix for the mobile title when present', () => {
+    const { container } = render(
+      <DashboardHeader
+        breadcrumbs={[{ label: 'New thread', href: '/app/chat/conv-123' }]}
+        breadcrumbSuffix={<span>Release planning thread</span>}
+      />
+    );
+
+    const mobileHeader = container.querySelector('.hidden.max-sm\\:flex');
+
+    expect(mobileHeader).not.toBeNull();
+    expect(
+      within(mobileHeader!).getByText('Release planning thread')
+    ).toBeInTheDocument();
+    expect(within(mobileHeader!).queryByText('New thread')).toBeNull();
+  });
+
   it('collapses the breadcrumb when the search surface takes over', () => {
     const { container } = render(
       <DashboardHeader

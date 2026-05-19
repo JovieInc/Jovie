@@ -34,4 +34,16 @@ describe('admin interviews shell normalization', () => {
     expect(source).not.toContain('bg-white/[0.03]');
     expect(source).not.toContain('bg-white/[0.05]');
   });
+
+  it('keeps interview route data outside the page module', () => {
+    const source = readFileSync(ADMIN_INTERVIEWS_ROUTE, 'utf8');
+
+    expect(source).toContain('loadAdminInterviewRows');
+    expect(source).not.toContain('@/lib/db');
+    expect(source).not.toContain('@/lib/db/schema/auth');
+    expect(source).not.toContain('@/lib/db/schema/profiles');
+    expect(source).not.toContain('@/lib/db/schema/user-interviews');
+    expect(source).not.toContain('userInterviews');
+    expect(source).not.toContain('creatorProfiles');
+  });
 });

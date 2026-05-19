@@ -9,7 +9,7 @@
  * @see apps/web/proxy.ts
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProxyUserState } from '@/lib/auth/proxy-state';
 
 // ============================================================================
@@ -164,10 +164,149 @@ function apiRequest(pathname: string, hostname = 'jov.ie') {
 }
 
 // ============================================================================
+// Site 1: /__clerk proxy — FAPI host decode failure (JSON only — not browser nav)
+// ============================================================================
+
+describe('proxy.ts 503 path: /__clerk FAPI host decode failure', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.resolveClerkKeys.mockReturnValue({
+      publishableKey: '',
+      secretKey: '',
+      status: 'missing',
+    });
+    mocks.isStagingHost.mockReturnValue(false);
+    mocks.isTestAuthBypassEnabled.mockReturnValue(false);
+    mocks.resolveTestBypassUserId.mockReturnValue(null);
+    mocks.shouldBypassClerkForRequest.mockReturnValue(false);
+    // The /__clerk path hits the FAPI proxy branch which always returns JSON
+    // because it is never a browser navigation (it is always a JS/FAPI fetch).
+    mocks.decodeFapiHostFromPublishableKey.mockReturnValue(null);
+    mocks.captureErrorWithHostnameLimit.mockResolvedValue(true);
+  });
+
+  it('returns a 503 JSON response when FAPI host cannot be decoded from publishable key', async () => {
+    const req = createTestRequest({
+      pathname: '/__clerk/v1/client',
+      hostname: 'jov.ie',
+      method: 'GET',
+      headers: {
+        // The /__clerk proxy is always called by Clerk JS (XHR/fetch), not browser nav
+        accept: 'application/json',
+      },
+    });
+    const res = await middleware(req, createFetchEvent());
+
+    expect(res.status).toBe(503);
+    const contentType = res.headers.get('content-type') ?? '';
+    expect(contentType).toContain('application/json');
+    const body = await res.text();
+    const parsed = JSON.parse(body) as Record<string, unknown>;
+    expect(parsed).toHaveProperty('error');
+  });
+
+  it('does NOT fire captureErrorWithHostnameLimit for the /__clerk proxy path (handled upstream)', async () => {
+    const req = createTestRequest({
+      pathname: '/__clerk/v1/client',
+      hostname: 'jov.ie',
+      method: 'GET',
+      headers: { accept: 'application/json' },
+    });
+    await middleware(req, createFetchEvent());
+    // The /__clerk path returns early before captureErrorWithHostnameLimit is reached
+    expect(mocks.captureErrorWithHostnameLimit).not.toHaveBeenCalled();
+  });
+});
+
+// ============================================================================
+// Site 2: clerkConfigMissing for protected routes
+//
+// In test mode (NODE_ENV=test) proxy.ts short-circuits via:
+//   if (process.env.NODE_ENV === 'test' && clerkConfigMissing) return handleRequest(req, null);
+//
+// This means the clerkConfigMissing 503 branch cannot be triggered by running
+// the middleware in unit test mode. The mock below overrides NODE_ENV to
+// 'production' by temporarily reassigning process.env.NODE_ENV so the test
+// exercise the production code path.
+// ============================================================================
+
+describe('proxy.ts 503 paths: clerkConfigMissing for protected routes (Site 2)', () => {
+  const origNodeEnv = process.env.NODE_ENV;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Simulate missing Clerk config (empty keys trigger isMockOrMissingClerkConfig)
+    mocks.resolveClerkKeys.mockReturnValue({
+      publishableKey: '',
+      secretKey: '',
+      status: 'missing',
+    });
+    mocks.isStagingHost.mockReturnValue(false);
+    mocks.isTestAuthBypassEnabled.mockReturnValue(false);
+    mocks.resolveTestBypassUserId.mockReturnValue(null);
+    mocks.shouldBypassClerkForRequest.mockReturnValue(false);
+    mocks.captureErrorWithHostnameLimit.mockResolvedValue(true);
+    // Override NODE_ENV so the test-mode early-return does NOT fire
+    (process.env as any).NODE_ENV = 'production';
+  });
+
+  afterEach(() => {
+    // Restore original NODE_ENV
+    (process.env as any).NODE_ENV = origNodeEnv;
+  });
+
+  it('returns HTML for browser navigation to /app/dashboard when Clerk config is missing', async () => {
+    const req = browserRequest('/app/dashboard');
+    const res = await middleware(req, createFetchEvent());
+
+    expect(res.status).toBe(503);
+    const contentType = res.headers.get('content-type') ?? '';
+    expect(contentType).toContain('text/html');
+    const body = await res.text();
+    expect(body).toContain('<h1>');
+    expect(body).toContain('temporarily unavailable');
+    expect(body).toContain('<html');
+  });
+
+  it('returns JSON for API/fetch caller to /app/dashboard when Clerk config is missing', async () => {
+    const req = apiRequest('/app/dashboard');
+    const res = await middleware(req, createFetchEvent());
+
+    expect(res.status).toBe(503);
+    const contentType = res.headers.get('content-type') ?? '';
+    expect(contentType).toContain('application/json');
+    const body = await res.text();
+    const parsed = JSON.parse(body) as Record<string, unknown>;
+    expect(parsed).toHaveProperty('error');
+  });
+
+  it('fires captureErrorWithHostnameLimit on clerkConfigMissing 503 (not raw captureError)', async () => {
+    const req = browserRequest('/app/dashboard');
+    await middleware(req, createFetchEvent());
+
+    expect(mocks.captureErrorWithHostnameLimit).toHaveBeenCalledWith(
+      expect.stringContaining('[middleware]'),
+      expect.any(Error),
+      'jov.ie',
+      expect.any(Object)
+    );
+    expect(mocks.captureError).not.toHaveBeenCalled();
+  });
+
+  it('passes auth/public paths through even when Clerk config is missing (canProceedWithoutClerk)', async () => {
+    const req = browserRequest('/signin');
+    const res = await middleware(req, createFetchEvent());
+
+    // /signin is an auth path — canProceedWithoutClerk=true, so 503 must NOT fire
+    expect(res.status).not.toBe(503);
+  });
+});
+
+// ============================================================================
 // Site 3: !selectedMiddleware for protected routes
 // (Site 2 — clerkConfigMissing — short-circuits in test mode via
 //  `if (process.env.NODE_ENV === 'test' && clerkConfigMissing)` bypass,
-//  so it is tested via integration / manual verification instead.)
+//  so the production path is tested in the "Site 2" describe above.)
 // ============================================================================
 
 describe('proxy.ts 503 paths: !selectedMiddleware for protected routes', () => {

@@ -22,13 +22,27 @@
  * @stability @smoke
  */
 
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 import { assertDomStable } from '../helpers/dom-stability';
 
 const BYPASS_URL =
   '/api/dev/test-auth/enter?persona=creator-ready&redirect=/app/releases';
 
 test.use({ storageState: { cookies: [], origins: [] } });
+
+async function findFirstReleaseTrigger(page: Page) {
+  const taggedRow = page.getByTestId('release-row').first();
+  if (await taggedRow.isVisible()) {
+    return taggedRow;
+  }
+
+  const desktopRow = page.locator('tbody tr').first();
+  if (await desktopRow.isVisible()) {
+    return desktopRow;
+  }
+
+  return page.locator('[role="listbox"] [role="option"]').first();
+}
 
 test('release sidebar stays stable during background query invalidation', async ({
   page,
@@ -51,8 +65,7 @@ test('release sidebar stays stable during background query invalidation', async 
   );
 
   // Open the first release row to show the sidebar.
-  // ShellReleasesView renders rows in a listbox; click the first option.
-  const firstRow = page.locator('[role="listbox"] [role="option"]').first();
+  const firstRow = await findFirstReleaseTrigger(page);
   const hasRows = await firstRow.count();
 
   if (hasRows === 0) {

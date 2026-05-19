@@ -51,19 +51,25 @@ vi.mock('./dashboard/actions', () => ({
   getDashboardShellData: getDashboardShellDataMock,
 }));
 
-import { loadAppShellRouteContext } from './app-shell-route-context';
+import {
+  loadAppShellRouteContext,
+  loadAuthenticatedAppShellUserId,
+  requireAppShellDashboardUserId,
+} from './app-shell-route-context';
 
 function shellData(
   overrides: Partial<{
     readonly dashboardLoadError: unknown;
     readonly needsOnboarding: boolean;
     readonly selectedProfile: { readonly id: string } | null;
+    readonly user: { readonly id: string } | null;
   }> = {}
 ): DashboardData {
   return {
     dashboardLoadError: undefined,
     needsOnboarding: false,
     selectedProfile: { id: 'profile_1' },
+    user: { id: 'dashboard_user_1' },
     ...overrides,
   } as unknown as DashboardData;
 }
@@ -87,6 +93,60 @@ describe('loadAppShellRouteContext', () => {
     ).rejects.toThrow('NEXT_REDIRECT:/signin?redirect_url=%2Fapp%2Freleases');
 
     expect(getDashboardShellDataMock).not.toHaveBeenCalled();
+  });
+
+  it('centralizes early auth redirects for routes that stream after auth', async () => {
+    getCachedAuthMock.mockResolvedValue({ userId: null });
+
+    await expect(
+      loadAuthenticatedAppShellUserId({ route: '/app/audience' })
+    ).rejects.toThrow('NEXT_REDIRECT:/signin?redirect_url=%2Fapp%2Faudience');
+
+    expect(getDashboardShellDataMock).not.toHaveBeenCalled();
+  });
+
+  it('returns early authenticated user ids without loading shell data', async () => {
+    getCachedAuthMock.mockResolvedValue({ userId: 'user_early' });
+
+    await expect(
+      loadAuthenticatedAppShellUserId({ route: '/app/audience' })
+    ).resolves.toBe('user_early');
+
+    expect(getDashboardShellDataMock).not.toHaveBeenCalled();
+  });
+
+  it('returns the dashboard database user id from shared route context', () => {
+    const dashboardData = shellData({
+      user: { id: 'dashboard_user_2' },
+    });
+
+    expect(
+      requireAppShellDashboardUserId(
+        {
+          ok: true,
+          userId: 'clerk_user_1',
+          dashboardData,
+          profileId: 'profile_1',
+        },
+        '/app/audience'
+      )
+    ).toBe('dashboard_user_2');
+  });
+
+  it('centralizes missing dashboard user signin redirects', () => {
+    const dashboardData = shellData({ user: null });
+
+    expect(() =>
+      requireAppShellDashboardUserId(
+        {
+          ok: true,
+          userId: 'clerk_user_1',
+          dashboardData,
+          profileId: 'profile_1',
+        },
+        '/app/audience'
+      )
+    ).toThrow('NEXT_REDIRECT:/signin?redirect_url=%2Fapp%2Faudience');
   });
 
   it('preserves route search params in shared signin redirects', async () => {
@@ -187,6 +247,26 @@ describe('loadAppShellRouteContext', () => {
       userId: 'user_1',
       dashboardData: data,
       profileId: 'profile_2',
+    });
+  });
+
+  it('uses a caller-provided authenticated user id without a second auth lookup', async () => {
+    const data = shellData({ selectedProfile: { id: 'profile_3' } });
+    getDashboardShellDataMock.mockResolvedValue(data);
+
+    const result = await loadAppShellRouteContext({
+      route: '/app/audience',
+      authenticatedUserId: 'user_from_page',
+      dashboardErrorMessage: 'Failed to load audience data.',
+    });
+
+    expect(getCachedAuthMock).not.toHaveBeenCalled();
+    expect(getDashboardShellDataMock).toHaveBeenCalledWith('user_from_page');
+    expect(result).toMatchObject({
+      ok: true,
+      userId: 'user_from_page',
+      dashboardData: data,
+      profileId: 'profile_3',
     });
   });
 });

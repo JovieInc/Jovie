@@ -448,11 +448,7 @@ export function DashboardNav(_: DashboardNavProps) {
                 {/* Section divider for visual separation (except for first section) */}
                 {index > 0 && <div className='my-1.5' />}
                 {section.label ? (
-                  <SidebarCollapsibleGroup
-                    label={section.label}
-                    defaultOpen
-                    className='-mx-0.5'
-                  >
+                  <SidebarCollapsibleGroup label={section.label} defaultOpen>
                     {renderSection(section.items)}
                   </SidebarCollapsibleGroup>
                 ) : (
@@ -489,7 +485,6 @@ export function DashboardNav(_: DashboardNavProps) {
           <SidebarCollapsibleGroup
             label={artistWorkspaceSection.label}
             defaultOpen
-            className='-mx-0.5'
           >
             {renderSection(artistWorkspaceSection.items)}
           </SidebarCollapsibleGroup>

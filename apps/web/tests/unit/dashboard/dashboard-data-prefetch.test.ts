@@ -442,45 +442,6 @@ describe('dashboard data prefetch', () => {
     expect(result.isAdmin).toBe(true);
     expect(result.needsOnboarding).toBe(false);
   });
-
-  it('loads dashboard overview supplement without full dashboard fields', async () => {
-    const selectMock = vi.fn().mockReturnValueOnce({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi
-            .fn()
-            .mockResolvedValue([{ hasLinks: 't', hasMusicLinks: '0' }]),
-        }),
-      }),
-    } as never);
-
-    withDbSessionTxMock.mockImplementationOnce(async handler =>
-      handler({ select: selectMock }, 'user_123')
-    );
-
-    const { getDashboardOverviewSupplement } = await import(
-      '@/app/app/(shell)/dashboard/actions/dashboard-data'
-    );
-
-    const result = await getDashboardOverviewSupplement({
-      clerkUserId: 'user_123',
-      onboardingCompletedAt: null,
-      profileId: 'profile_1',
-      userId: 'user_db_1',
-    });
-
-    expect(withDbSessionTxMock).toHaveBeenCalledTimes(1);
-    expect(withDbSessionTxMock).toHaveBeenCalledWith(expect.any(Function), {
-      clerkUserId: 'user_123',
-    });
-    expect(withDbSessionMock).not.toHaveBeenCalled();
-    expect(selectMock).toHaveBeenCalledTimes(1);
-    expect(result).toEqual({
-      hasSocialLinks: true,
-      hasMusicLinks: false,
-      bioLinkActivation: null,
-    });
-  });
 });
 
 // Separate describe block for pure utility tests — no module reset needed,

@@ -39,6 +39,14 @@ const RETARGETING_ROUTE_CANDIDATES = [
   ),
 ] as const;
 
+const RETARGETING_LAYOUT = findSourceFile(
+  resolve(process.cwd(), 'app/app/(shell)/settings/retargeting-ads/layout.tsx'),
+  resolve(
+    process.cwd(),
+    'apps/web/app/app/(shell)/settings/retargeting-ads/layout.tsx'
+  )
+);
+
 const SETTINGS_ALIAS_ROUTES = [
   {
     route: 'settings root',
@@ -112,6 +120,17 @@ const SETTINGS_SHARED_ROUTE_CONTEXT_FILES = [
       'apps/web/app/app/(shell)/settings/artist-profile/page.tsx'
     )
   ),
+  findSourceFile(
+    resolve(process.cwd(), 'app/app/(shell)/settings/admin/page.tsx'),
+    resolve(process.cwd(), 'apps/web/app/app/(shell)/settings/admin/page.tsx')
+  ),
+  findSourceFile(
+    resolve(process.cwd(), 'app/app/(shell)/settings/payments/page.tsx'),
+    resolve(
+      process.cwd(),
+      'apps/web/app/app/(shell)/settings/payments/page.tsx'
+    )
+  ),
 ] as const;
 
 const SETTINGS_SHARED_ROUTE_CONTEXT_CANDIDATES = [
@@ -119,6 +138,40 @@ const SETTINGS_SHARED_ROUTE_CONTEXT_CANDIDATES = [
   resolve(process.cwd(), 'app/app/(shell)/settings/touring/page.tsx'),
   resolve(process.cwd(), 'app/app/(shell)/settings/connectors/page.tsx'),
   resolve(process.cwd(), 'app/app/(shell)/settings/artist-profile/page.tsx'),
+  resolve(process.cwd(), 'app/app/(shell)/settings/admin/page.tsx'),
+  resolve(process.cwd(), 'app/app/(shell)/settings/payments/page.tsx'),
+] as const;
+
+const SETTINGS_CONNECTORS_PAGE = findSourceFile(
+  resolve(process.cwd(), 'app/app/(shell)/settings/connectors/page.tsx'),
+  resolve(
+    process.cwd(),
+    'apps/web/app/app/(shell)/settings/connectors/page.tsx'
+  )
+);
+
+const GATED_SETTINGS_ROUTE_FILES = [
+  {
+    route: 'settings admin',
+    filePath: findSourceFile(
+      resolve(process.cwd(), 'app/app/(shell)/settings/admin/page.tsx'),
+      resolve(process.cwd(), 'apps/web/app/app/(shell)/settings/admin/page.tsx')
+    ),
+    expectedGate: 'routeContext.dashboardData.isAdmin',
+    expectedDestination: 'APP_ROUTES.SETTINGS_ARTIST_PROFILE',
+  },
+  {
+    route: 'settings payments',
+    filePath: findSourceFile(
+      resolve(process.cwd(), 'app/app/(shell)/settings/payments/page.tsx'),
+      resolve(
+        process.cwd(),
+        'apps/web/app/app/(shell)/settings/payments/page.tsx'
+      )
+    ),
+    expectedGate: 'getAppFlagValue',
+    expectedDestination: 'APP_ROUTES.SETTINGS_BILLING',
+  },
 ] as const;
 
 describe('settings shell normalization', () => {
@@ -149,6 +202,21 @@ describe('settings shell normalization', () => {
       expect(source).not.toMatch(/<PageContent\b/);
       expect(source).not.toMatch(/import\s*\{[^}]*PageContent/);
     }
+  });
+
+  it('keeps retargeting admin auth on the shared shell route context path', () => {
+    expect(RETARGETING_LAYOUT).toBeDefined();
+
+    if (!RETARGETING_LAYOUT) {
+      throw new Error('Could not find retargeting settings layout source');
+    }
+
+    const source = readFileSync(RETARGETING_LAYOUT, 'utf8');
+    expect(source).toContain('loadAppShellRouteContext');
+    expect(source).toContain('getCurrentUserEntitlements');
+    expect(source).not.toContain('getCachedAuth');
+    expect(source).not.toContain('getDashboardDataEssential');
+    expect(source).not.toContain('getDashboardShellData');
   });
 
   it('keeps legacy settings aliases as lightweight route redirects', () => {
@@ -187,6 +255,43 @@ describe('settings shell normalization', () => {
       expect(source).not.toContain('getDashboardData');
       expect(source).not.toContain('getCachedAuth');
       expect(source).not.toContain('getDashboardShellData');
+    }
+  });
+
+  it('keeps connector queries outside the settings connectors page', () => {
+    expect(SETTINGS_CONNECTORS_PAGE).toBeDefined();
+
+    if (!SETTINGS_CONNECTORS_PAGE) {
+      throw new Error('Could not find settings connectors source');
+    }
+
+    const source = readFileSync(SETTINGS_CONNECTORS_PAGE, 'utf8');
+    expect(source).toContain('loadAppShellRouteContext');
+    expect(source).toContain('loadSettingsConnectorsData');
+    expect(source).not.toContain('@/lib/db');
+    expect(source).not.toContain('@/lib/db/queries/shared');
+    expect(source).not.toContain('@/lib/db/schema/connectors');
+    expect(source).not.toContain('getUserByClerkId');
+    expect(source).not.toContain('connectorAccounts');
+  });
+
+  it('keeps gated settings pages on server redirects instead of client effects', () => {
+    for (const gatedRoute of GATED_SETTINGS_ROUTE_FILES) {
+      expect(gatedRoute.filePath).toBeDefined();
+
+      if (!gatedRoute.filePath) {
+        throw new Error(`Could not find ${gatedRoute.route} source`);
+      }
+
+      const source = readFileSync(gatedRoute.filePath, 'utf8');
+      expect(source).toContain('loadAppShellRouteContext');
+      expect(source).toContain(gatedRoute.expectedGate);
+      expect(source).toContain(`redirect(${gatedRoute.expectedDestination})`);
+      expect(source).not.toContain("'use client'");
+      expect(source).not.toContain('useRouter');
+      expect(source).not.toContain('useEffect');
+      expect(source).not.toContain('router.replace');
+      expect(source).not.toContain('useAppFlag');
     }
   });
 });

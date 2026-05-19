@@ -106,7 +106,7 @@ export function ChatMessage({
             </div>
           )}
           {messageText && (
-            <div className='text-[13px] leading-5 tracking-[-0.011em]'>
+            <div className='text-[13px] leading-5'>
               <TokenizedText content={messageText} tone='onLight' />
             </div>
           )}
@@ -134,7 +134,7 @@ export function ChatMessage({
               {messageText ? (
                 <div
                   data-testid='chat-message-reply'
-                  className='text-[15px] leading-7 text-primary-token tracking-[-0.008em] sm:text-[15.5px]'
+                  className='text-[15px] leading-7 text-primary-token sm:text-[15.5px]'
                 >
                   <ChatMarkdown
                     content={messageText}

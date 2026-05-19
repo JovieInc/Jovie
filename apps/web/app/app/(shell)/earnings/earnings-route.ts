@@ -1,13 +1,16 @@
 import { redirect } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
-import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
-import { getCachedAuth } from '@/lib/auth/cached';
+import { loadAppShellRouteContext } from '../app-shell-route-context';
 
 export async function redirectFromEarningsRoute(returnPath: string) {
-  const { userId } = await getCachedAuth();
-
-  if (!userId) {
-    redirect(buildAppShellSignInUrl(returnPath));
+  const routeContext = await loadAppShellRouteContext({
+    route: returnPath,
+    dashboardErrorLogMessage: 'Dashboard data load failed on earnings page',
+    dashboardErrorMessage:
+      'Failed to load earnings settings. Please refresh the page.',
+  });
+  if (!routeContext.ok) {
+    return routeContext.error;
   }
 
   redirect(`${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn#pay`);

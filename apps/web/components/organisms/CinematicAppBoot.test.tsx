@@ -9,13 +9,16 @@ vi.mock('@/lib/hooks/useReducedMotion', () => ({
 vi.mock('@/components/organisms/AppShellSkeleton', () => ({
   AppShellSkeleton: ({
     main,
+    audioPlayer,
     variant,
   }: {
     main?: React.ReactNode;
+    audioPlayer?: React.ReactNode;
     variant?: string;
   }) => (
     <div data-testid='app-shell-skeleton' data-variant={variant}>
       {main}
+      {audioPlayer}
     </div>
   ),
 }));
@@ -88,5 +91,19 @@ describe('CinematicAppBoot', () => {
       <CinematicAppBoot main={undefined} variant='shellChatV1' />
     );
     expect(queryByTestId('app-shell-skeleton')).not.toBeNull();
+  });
+
+  it('passes the audio player through to the direct skeleton fallback', () => {
+    globalThis.sessionStorage.setItem(STORAGE_KEY, '1');
+    const { getByTestId } = render(
+      <CinematicAppBoot
+        audioPlayer={<div data-testid='audio-player' />}
+        variant='shellChatV1'
+      />
+    );
+
+    expect(getByTestId('app-shell-skeleton')).toContainElement(
+      getByTestId('audio-player')
+    );
   });
 });

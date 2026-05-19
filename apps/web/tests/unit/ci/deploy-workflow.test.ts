@@ -260,6 +260,87 @@ describe('canary health gate workflow', () => {
       'canary_status=verified" >> "$GITHUB_OUTPUT"\n                    exit 0'
     );
   });
+
+  it('waits for the public alias to serve the target build before auth smoke', () => {
+    const workflow = readFileSync(canaryWorkflowPath, 'utf8');
+    const canaryStep = getStepBlock(workflow, 'Canary health check');
+    const authSmokeStep = getStepBlock(
+      workflow,
+      'Verify public auth controls are interactive'
+    );
+    const directFallbackStart = canaryStep.indexOf(
+      'Retrying commit deployment URL'
+    );
+    const directFallbackEnd = canaryStep.indexOf(
+      'if [ "$response_code" != "200" ]; then',
+      directFallbackStart
+    );
+    const directFallbackBlock = canaryStep.slice(
+      directFallbackStart,
+      directFallbackEnd
+    );
+    const canaryCurlProbes =
+      canaryStep.match(
+        /curl -sS? -L[\s\S]*?(?:\|\| printf '\\n000'|\|\| echo "")/g
+      ) ?? [];
+
+    expect(directFallbackStart).toBeGreaterThanOrEqual(0);
+    expect(directFallbackEnd).toBeGreaterThan(directFallbackStart);
+    expect(workflow).toContain('verified_deployment_url:');
+    expect(workflow).toContain(
+      'value: ${{ jobs.canary-health-gate.outputs.verified_deployment_url }}'
+    );
+    expect(canaryStep).toContain('/api/health/build-info');
+    expect(canaryStep).toContain('local max_attempts=30');
+    expect(canaryStep).toContain(
+      'CURL_TIMEOUT_ARGS=(--connect-timeout 5 --max-time 15)'
+    );
+    expect(canaryStep).toContain('public_deployment_url="${deployment_url%/}"');
+    expect(directFallbackBlock).toContain(
+      'diagnostic_deployment_url="$resolved_commit_deployment_url"'
+    );
+    expect(directFallbackBlock).not.toMatch(
+      /^\s*deployment_url="\$resolved_commit_deployment_url"/m
+    );
+    expect(canaryStep).toContain(
+      'verify_build_info_serves_commit "$public_deployment_url"'
+    );
+    expect(canaryStep).toContain('canary_status=failed_build_info');
+    expect(canaryStep).toContain(
+      'verified_deployment_url=${public_deployment_url}'
+    );
+    expect(canaryStep).toContain(
+      'Checking onboarding chat reaches the bot gate'
+    );
+    expect(canaryStep).toContain('"errorCode":"ONBOARDING_CHAT_DISABLED"');
+    expect(canaryStep).toContain('"errorCode":"TURNSTILE_REQUIRED"');
+    expect(canaryStep).toContain('canary_status=failed_onboarding_chat');
+    expect(authSmokeStep).toContain(
+      'DEPLOYMENT_URL: ${{ steps.canary-check.outputs.verified_deployment_url || inputs.deployment_url }}'
+    );
+    expect(authSmokeStep).not.toContain('VERCEL_AUTOMATION_BYPASS_SECRET');
+    expect(authSmokeStep).toContain(
+      'this browser\n          # smoke must match real public user traffic'
+    );
+    expect(authSmokeStep).toContain('auth_smoke_attempt=1');
+    expect(authSmokeStep).toContain('auth_smoke_max_attempts=3');
+    expect(authSmokeStep).toContain(
+      'until CI=true SMOKE_ONLY=1 BASE_URL="${DEPLOYMENT_URL}" pnpm exec playwright test tests/e2e/auth-public-ready.spec.ts --project=chromium --reporter=line; do'
+    );
+    expect(authSmokeStep).toContain(
+      'Public auth controls failed after ${auth_smoke_max_attempts} attempts.'
+    );
+    expect(authSmokeStep).toContain(
+      'sleep_seconds=$((auth_smoke_attempt * 30))'
+    );
+
+    expect(canaryCurlProbes.length).toBeGreaterThanOrEqual(9);
+    for (const probe of canaryCurlProbes) {
+      expect(probe).toMatch(
+        /("\$\{CURL_TIMEOUT_ARGS\[@\]\}"|--connect-timeout 5[\s\S]*--max-time (10|15))/
+      );
+    }
+  });
 });
 
 describe('CI public a11y workflow', () => {

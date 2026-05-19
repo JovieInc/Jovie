@@ -20,14 +20,10 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { UserAvatar } from '@jovie/ui';
-import { Disc3, MoreHorizontal, Plus } from 'lucide-react';
+import { Disc3, Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import { ReleaseDueBadge } from '@/components/molecules/ReleaseDueBadge';
-import {
-  type ContextMenuItemType,
-  convertContextMenuItems,
-} from '@/components/organisms/table';
+import { type ContextMenuItemType } from '@/components/organisms/table';
 import { TASK_BOARD_STATUSES } from '@/lib/tasks/task-board';
 import type {
   MoveTaskInput,
@@ -39,6 +35,7 @@ import type {
 import { getAccentCssVars } from '@/lib/ui/accent-palette';
 import { cn } from '@/lib/utils';
 import { PriorityBars } from './TaskListRow';
+import { TaskRowActionMenu } from './TaskRowActionMenu';
 import {
   getTaskAssigneeVisual,
   getTaskPriorityVisual,
@@ -461,20 +458,11 @@ function SortableTaskBoardCard({
         />
       </button>
       <div className='absolute right-2 top-2'>
-        <TableActionMenu
-          items={convertContextMenuItems(getTaskContextMenuItems(task))}
-          trigger='custom'
-        >
-          <button
-            type='button'
-            onClick={event => event.stopPropagation()}
-            onPointerDown={event => event.stopPropagation()}
-            aria-label='Open task actions'
-            className='inline-flex h-7 w-7 items-center justify-center rounded-md text-tertiary-token opacity-0 transition-[background-color,color,opacity] hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_68%,transparent)] hover:text-primary-token focus-visible:opacity-100 focus-visible:outline-none focus-visible:bg-[color-mix(in_oklab,var(--linear-row-hover)_70%,transparent)] group-hover/task-board-card-shell:opacity-100'
-          >
-            <MoreHorizontal className='h-3.5 w-3.5' />
-          </button>
-        </TableActionMenu>
+        <TaskRowActionMenu
+          items={getTaskContextMenuItems(task)}
+          selected={selected}
+          visibility='hover'
+        />
       </div>
     </div>
   );

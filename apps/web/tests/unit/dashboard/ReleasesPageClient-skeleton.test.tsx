@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const useReleasesQueryMock = vi.fn();
 const useDashboardDataMock = vi.fn();
-const useAppFlagMock = vi.fn();
 
 vi.mock('next/dynamic', () => ({
   default: (
@@ -27,24 +26,11 @@ vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
   useDashboardData: () => useDashboardDataMock(),
 }));
 
-vi.mock('@/lib/flags/client', () => ({
-  useAppFlag: (flag: string) => useAppFlagMock(flag),
-}));
-
 vi.mock('@/features/dashboard/organisms/release-provider-matrix', () => ({
   ReleasesExperience: ({ releases }: { readonly releases: unknown[] }) => (
     <div data-testid='releases-experience' data-count={releases.length} />
   ),
 }));
-
-vi.mock(
-  '@/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView',
-  () => ({
-    ShellReleasesView: ({ releases }: { readonly releases: unknown[] }) => (
-      <div data-testid='shell-releases-view' data-count={releases.length} />
-    ),
-  })
-);
 
 vi.mock('@/app/app/(shell)/dashboard/releases/loading', () => ({
   ReleaseTableSkeleton: () => <div data-testid='release-table-skeleton' />,
@@ -60,7 +46,6 @@ describe('ReleasesPageClient skeleton behavior', () => {
     useDashboardDataMock.mockReturnValue({
       selectedProfile: { id: 'p1', settings: {} },
     });
-    useAppFlagMock.mockReturnValue(false);
   });
 
   afterEach(() => cleanup());

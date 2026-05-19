@@ -1,30 +1,12 @@
 import { Badge } from '@jovie/ui';
-import { desc, eq } from 'drizzle-orm';
 import type { Metadata } from 'next';
-import { redirect } from 'next/navigation';
 import { AdminToolPage } from '@/components/features/admin/layout/AdminToolPage';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { APP_ROUTES } from '@/constants/routes';
-import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
-import { getCachedAuth } from '@/lib/auth/cached';
-import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema/auth';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
-import {
-  type InterviewTranscriptEntry,
-  userInterviews,
-} from '@/lib/db/schema/user-interviews';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
+import { loadAdminInterviewRows } from './interviews-data';
 
 export const metadata: Metadata = { title: 'Interviews — Admin' };
 export const runtime = 'nodejs';
-
-async function requireAdminOrRedirect(): Promise<void> {
-  const { userId } = await getCachedAuth();
-  if (!userId || !(await checkAdminRole(userId))) {
-    redirect(APP_ROUTES.DASHBOARD);
-  }
-}
 
 function formatDate(iso: Date | string): string {
   const d = typeof iso === 'string' ? new Date(iso) : iso;
@@ -49,25 +31,7 @@ function statusBadgeTone(status: string) {
 }
 
 export default async function AdminInterviewsPage() {
-  await requireAdminOrRedirect();
-
-  const rows = await db
-    .select({
-      id: userInterviews.id,
-      source: userInterviews.source,
-      status: userInterviews.status,
-      summary: userInterviews.summary,
-      transcript: userInterviews.transcript,
-      createdAt: userInterviews.createdAt,
-      attempts: userInterviews.summaryAttempts,
-      userEmail: users.email,
-      userHandle: creatorProfiles.username,
-    })
-    .from(userInterviews)
-    .innerJoin(users, eq(users.id, userInterviews.userId))
-    .leftJoin(creatorProfiles, eq(creatorProfiles.userId, users.id))
-    .orderBy(desc(userInterviews.createdAt))
-    .limit(200);
+  const rows = await loadAdminInterviewRows();
 
   return (
     <AdminToolPage
@@ -83,8 +47,7 @@ export default async function AdminInterviewsPage() {
         ) : (
           <div className='divide-y divide-subtle'>
             {rows.map(row => {
-              const transcript =
-                (row.transcript as InterviewTranscriptEntry[] | null) ?? [];
+              const transcript = row.transcript ?? [];
               const answered = transcript.filter(t => !t.skipped).length;
               const label =
                 row.userHandle !== null && row.userHandle !== undefined

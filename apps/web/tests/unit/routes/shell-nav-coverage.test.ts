@@ -21,6 +21,7 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
   '/app/admin/investors/links': 'Sub-tool reached from Investors workspace',
   '/app/admin/investors/settings':
     'Sub-tool reached from Investors workspace actions',
+  '/app/admin/interviews': 'Internal admin review workspace (manual entry)',
   '/app/admin/playlists': 'Internal admin workflow (manual entry)',
   '/app/dashboard/releases/[releaseId]/tasks':
     'Dynamic workflow route reached from releases actions',

@@ -1,5 +1,7 @@
 # Jovie AI Pricing Strategy
 
+> This document is the **current snapshot**: prices, quotas, costs. The principles that govern how this snapshot changes live in [`PRICING-PHILOSOPHY.md`](./PRICING-PHILOSOPHY.md). The Stripe data behind those principles lives in [`pricing-trends-summary.md`](./pricing-trends-summary.md). Read those before proposing a price or packaging change.
+
 ## Pricing Model: AI as the Upgrade Lever
 
 Jovie uses a **tiered subscription model** where AI capabilities are the primary driver

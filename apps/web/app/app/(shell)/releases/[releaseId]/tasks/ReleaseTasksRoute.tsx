@@ -1,16 +1,14 @@
-import { and, eq } from 'drizzle-orm';
 import { notFound, redirect } from 'next/navigation';
 import { Suspense } from 'react';
+import { loadAppShellRouteContext } from '@/app/app/(shell)/app-shell-route-context';
 import {
   ReleaseTaskPage,
   ReleaseTaskPageSkeleton,
 } from '@/components/features/dashboard/release-tasks';
 import { ReleasePlanUpgradeInterstitial } from '@/components/features/dashboard/tasks/TasksUpgradeInterstitial';
-import { APP_ROUTES } from '@/constants/routes';
-import { getCurrentUserProfile } from '@/lib/auth/session';
-import { db } from '@/lib/db';
-import { discogReleases } from '@/lib/db/schema/content';
+import { APP_ROUTES, buildReleaseTasksRoute } from '@/constants/routes';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { loadReleaseTaskRouteRelease } from './release-tasks-data';
 
 interface ReleaseTasksRouteProps {
   readonly params: Promise<{ releaseId: string }>;
@@ -29,31 +27,28 @@ export async function ReleaseTasksRoute({ params }: ReleaseTasksRouteProps) {
 async function ReleaseTasksContent({
   releaseId,
 }: Readonly<{ releaseId: string }>) {
-  const profilePromise = getCurrentUserProfile();
-  const entitlementsPromise = getCurrentUserEntitlements();
-  const [profile, entitlements] = await Promise.all([
-    profilePromise,
-    entitlementsPromise,
+  const route = buildReleaseTasksRoute(releaseId);
+  const [routeContext, entitlements] = await Promise.all([
+    loadAppShellRouteContext({
+      route,
+      dashboardErrorLogMessage:
+        'Dashboard data load failed on release tasks page',
+      dashboardErrorMessage:
+        'Failed to load release task data. Please refresh the page.',
+    }),
+    getCurrentUserEntitlements(),
   ]);
-  const profileId = profile?.id;
 
-  if (!profileId || !profile.onboardingCompletedAt) {
+  if (!routeContext.ok) {
+    return routeContext.error;
+  }
+
+  const { profileId } = routeContext;
+  if (!profileId) {
     redirect(APP_ROUTES.START);
   }
 
-  const [release] = await db
-    .select({
-      title: discogReleases.title,
-      releaseDate: discogReleases.releaseDate,
-    })
-    .from(discogReleases)
-    .where(
-      and(
-        eq(discogReleases.id, releaseId),
-        eq(discogReleases.creatorProfileId, profileId)
-      )
-    )
-    .limit(1);
+  const release = await loadReleaseTaskRouteRelease({ releaseId, profileId });
 
   if (!release) {
     notFound();

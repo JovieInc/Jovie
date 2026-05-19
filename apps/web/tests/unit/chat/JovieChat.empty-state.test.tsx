@@ -1,3 +1,4 @@
+import { screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { JovieChat } from '@/components/jovie/JovieChat';
@@ -116,7 +117,22 @@ vi.mock('@/components/jovie/components', async () => {
 
   return {
     ...actual,
-    ChatInput: () => <div data-testid='chat-input' />,
+    ChatInput: ({
+      placeholder,
+      quickActions,
+      variant,
+    }: {
+      readonly placeholder?: string;
+      readonly quickActions?: readonly { readonly label: string }[];
+      readonly variant?: string;
+    }) => (
+      <div
+        data-placeholder={placeholder}
+        data-quick-actions={quickActions?.map(action => action.label).join('|')}
+        data-variant={variant}
+        data-testid='chat-input'
+      />
+    ),
     ChatMessage: () => <div data-testid='chat-message' />,
     ChatMessageSkeleton: () => <div data-testid='chat-message-skeleton' />,
     ErrorDisplay: () => <div data-testid='chat-error' />,
@@ -130,6 +146,7 @@ vi.mock('@/components/jovie/components/ChatUsageAlert', () => ({
 
 describe('JovieChat empty state', () => {
   beforeEach(() => {
+    mockChatState.input = '';
     mockChatState.messages = [];
     mockChatState.hasMessages = false;
     mockChatState.isLoading = false;
@@ -157,7 +174,15 @@ describe('JovieChat empty state', () => {
     expect(queryByText("Hey, I'm Jovie")).toBeNull();
     expect(queryByText('Jovie Assistant')).toBeNull();
     expect(queryByText('Ask anything or tell Jovie what you need')).toBeNull();
+    expect(getByTestId('chat-empty-state-composer-region')).toBeTruthy();
     expect(getByTestId('chat-input')).toBeTruthy();
+    expect(getByTestId('chat-input').getAttribute('data-placeholder')).toBe(
+      'Ask Jovie...'
+    );
+    expect(getByTestId('chat-input').getAttribute('data-variant')).toBe('hero');
+    expect(getByTestId('chat-input').getAttribute('data-quick-actions')).toBe(
+      'Plan a release|Generate album art|Pitch playlists|Send feedback'
+    );
     // New hero-style pills sourced from DEFAULT_SUGGESTIONS (mirrors homepage).
     expect(getByText('Plan a release')).toBeTruthy();
     expect(getByRole('button', { name: 'Generate album art' })).toBeDisabled();
@@ -166,6 +191,19 @@ describe('JovieChat empty state', () => {
     expect(queryByText('Preview profile')).toBeNull();
     expect(queryByText('Change photo')).toBeNull();
     expect(queryByText('Release link')).toBeNull();
+  });
+
+  it('hides starter prompt pills while the empty composer has typed text', () => {
+    mockChatState.input = 'Help me with';
+
+    const { getByTestId, queryByText } = renderWithQueryClient(
+      <JovieChat profileId='profile-1' />
+    );
+
+    expect(getByTestId('chat-empty-state-composer-region')).toBeTruthy();
+    expect(getByTestId('chat-input')).toBeTruthy();
+    expect(queryByText('Plan a release')).toBeNull();
+    expect(queryByText('Pitch playlists')).toBeNull();
   });
 
   it('shows an enabled draft brief action when album art is unavailable', () => {
@@ -240,5 +278,11 @@ describe('JovieChat empty state', () => {
     expect(queryByText('What are we working on?')).toBeNull();
     expect(queryByText('Welcome back')).toBeNull();
     expect(getAllByTestId('chat-message')).toHaveLength(2);
+    expect(
+      screen.getByTestId('chat-input').getAttribute('data-placeholder')
+    ).toBe('Ask a follow-up...');
+    expect(screen.getByTestId('chat-input').getAttribute('data-variant')).toBe(
+      'compact'
+    );
   });
 });

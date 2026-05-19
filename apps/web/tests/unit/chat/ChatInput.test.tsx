@@ -170,7 +170,7 @@ describe('ChatInput', () => {
     expect(getByRole('menu')).toBeInTheDocument();
   });
 
-  it('reveals quick actions when the composer is focused', () => {
+  it('renders quick actions inside the slash menu instead of below the composer', () => {
     const onQuickActionSelect = vi.fn();
     fastRender(
       withProviders(
@@ -191,11 +191,23 @@ describe('ChatInput', () => {
     fireEvent.focus(
       screen.getByRole('textbox', { name: /chat message input/i })
     );
+    fireEvent.change(
+      screen.getByRole('textbox', { name: /chat message input/i }),
+      {
+        target: { value: '/' },
+      }
+    );
 
-    expect(screen.getByTestId('chat-input-quick-actions')).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'Summarize this thread' })
-    ).toBeInTheDocument();
+    expect(screen.queryByTestId('chat-input-quick-actions')).toBeNull();
+    expect(screen.getByTestId('slash-command-menu')).toBeInTheDocument();
+    expect(screen.getByText('Suggestions')).toBeInTheDocument();
+
+    const action = screen.getByText('Summarize this thread').closest('button');
+    expect(action).toBeTruthy();
+    fireEvent.mouseDown(action!);
+    expect(onQuickActionSelect).toHaveBeenCalledWith(
+      'Summarize this thread in three concise bullets.'
+    );
   });
 
   it('renders the elevated no-shadow composer geometry', () => {
@@ -232,6 +244,32 @@ describe('ChatInput', () => {
         screen.getByRole('button', { name: buttonName }).className
       ).toMatch(/h-9 w-9/);
     }
+  });
+
+  it('renders the larger hero composer geometry for the empty state', () => {
+    fastRender(
+      withProviders(
+        <ChatInput
+          {...baseProps}
+          value=''
+          onImageAttach={vi.fn()}
+          variant='hero'
+        />
+      )
+    );
+
+    const surface = screen.getByTestId('chat-composer-surface');
+    expect(surface.getAttribute('data-variant')).toBe('hero');
+    expect(surface.style.maxWidth).toBe('min(calc(100vw - 32px), 840px)');
+
+    const inlineField = screen.getByTestId('chat-input-inline-field');
+    expect(inlineField.className).toContain('min-h-8');
+
+    const textarea = screen.getByRole('textbox', {
+      name: /chat message input/i,
+    });
+    expect(textarea.className).toContain('text-[18px]');
+    expect(textarea.className).toContain('leading-7');
   });
 
   it('keeps a quiet disabled dictation control when speech input is unavailable', () => {

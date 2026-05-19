@@ -63,6 +63,7 @@ export const APP_ROUTES = {
   SETTINGS_AUDIENCE: '/app/settings/audience',
   SETTINGS_ANALYTICS: '/app/settings/analytics',
   SETTINGS_ADMIN: '/app/settings/admin',
+  SETTINGS_RETARGETING_ADS: '/app/settings/retargeting-ads',
   /** @deprecated Use SETTINGS_DATA_PRIVACY instead */
   SETTINGS_DELETE_ACCOUNT: '/app/settings/delete-account',
 
@@ -104,6 +105,7 @@ export const APP_ROUTES = {
   ADMIN_PLATFORM_CONNECTIONS: '/app/admin/platform-connections',
   ADMIN_AGENT_RUN: '/app/admin/agent-runs',
   ADMIN_AGENT_RUN_DETAIL: '/app/admin/agent-runs/[id]',
+  FEATURE_FLAGS: '/app/feature-flags',
 
   // System
   UNAVAILABLE: '/unavailable',
@@ -162,8 +164,53 @@ export const APP_ROUTES = {
 
 export type AppRoute = (typeof APP_ROUTES)[keyof typeof APP_ROUTES];
 
-export function buildLyricsRoute(trackId: string): string {
-  return `${APP_ROUTES.LYRICS}/${encodeURIComponent(trackId)}`;
+function normalizeLyricsReturnRoute(
+  candidate: string | null | undefined
+): string | null {
+  if (!candidate) return null;
+
+  try {
+    const url = new URL(candidate, 'https://jovie.local');
+    const route = `${url.pathname}${url.search}`;
+
+    if (!url.pathname.startsWith('/app')) {
+      return null;
+    }
+
+    if (
+      url.pathname === APP_ROUTES.LYRICS ||
+      url.pathname.startsWith(`${APP_ROUTES.LYRICS}/`)
+    ) {
+      return null;
+    }
+
+    return route;
+  } catch {
+    return null;
+  }
+}
+
+export function resolveLyricsReturnRoute(
+  candidate: string | null | undefined,
+  fallback: string = APP_ROUTES.LIBRARY
+): string {
+  return normalizeLyricsReturnRoute(candidate) ?? fallback;
+}
+
+export function buildLyricsRoute(
+  trackId: string,
+  options?: {
+    readonly from?: string | null;
+  }
+): string {
+  const route = `${APP_ROUTES.LYRICS}/${encodeURIComponent(trackId)}`;
+  const returnTo = normalizeLyricsReturnRoute(options?.from);
+
+  if (!returnTo) {
+    return route;
+  }
+
+  return `${route}?from=${encodeURIComponent(returnTo)}`;
 }
 
 export function buildReleaseTasksRoute(releaseId: string): string {
