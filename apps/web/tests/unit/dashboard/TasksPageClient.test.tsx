@@ -202,12 +202,18 @@ let mockIsXlUp = true;
 let mockIs2xlUp = true;
 let mockTasksData: TaskView[] = [mockTask, mockTaskTwo];
 let mockListQueryData: TaskView[] | undefined | null = null;
+let mockListQueryIsLoading = false;
+let mockListQueryIsError = false;
+let mockBoardQueryIsLoading = false;
+let mockBoardQueryIsError = false;
 let mockViewMode: 'board' | 'list' = 'list';
 let mockCanShowTaskDocumentAlongsideReleaseSidebar = true;
 const mockUnifiedTable = vi.fn();
 const mockSetViewMode = vi.fn((viewMode: 'board' | 'list') => {
   mockViewMode = viewMode;
 });
+const mockRefetchTasks = vi.fn();
+const mockRefetchTaskBoard = vi.fn();
 
 function createMockTaskBoardResult(
   tasks: ReadonlyArray<TaskView>
@@ -334,9 +340,9 @@ vi.mock('@/lib/queries/useTasksQuery', () => ({
           : mockListQueryData
             ? { tasks: mockListQueryData }
             : undefined,
-      isLoading: false,
-      isError: false,
-      refetch: vi.fn(),
+      isLoading: mockListQueryIsLoading,
+      isError: mockListQueryIsError,
+      refetch: mockRefetchTasks,
     };
   },
   useTaskBoardQuery: (
@@ -348,9 +354,9 @@ vi.mock('@/lib/queries/useTasksQuery', () => ({
 
     return {
       data: createMockTaskBoardResult(mockTasksData as TaskView[]),
-      isLoading: false,
-      isError: false,
-      refetch: vi.fn(),
+      isLoading: mockBoardQueryIsLoading,
+      isError: mockBoardQueryIsError,
+      refetch: mockRefetchTaskBoard,
     };
   },
   useTaskQuery: (taskId: string | null) => ({
@@ -517,13 +523,53 @@ vi.mock('@/components/organisms/table', () => ({
       {children}
     </button>
   ),
-  UnifiedTable: (props: { minWidth?: string; containerClassName?: string }) => {
+  ShellListRowFrame: ({
+    children,
+    className,
+    isSelected,
+    ...props
+  }: React.HTMLAttributes<HTMLDivElement> & {
+    isSelected?: boolean;
+  }) => (
+    <div
+      data-shell-list-row='true'
+      data-selected={isSelected ? 'true' : undefined}
+      className={className}
+      {...props}
+    >
+      {children}
+    </div>
+  ),
+  TableEmptyState: ({
+    title,
+    description,
+    action,
+    secondaryAction,
+  }: {
+    title: string;
+    description?: string;
+    action?: React.ReactNode;
+    secondaryAction?: React.ReactNode;
+  }) => (
+    <div>
+      <p>{title}</p>
+      {description ? <p>{description}</p> : null}
+      {action}
+      {secondaryAction}
+    </div>
+  ),
+  UnifiedTable: (props: {
+    minWidth?: string;
+    containerClassName?: string;
+    isLoading?: boolean;
+  }) => {
     mockUnifiedTable(props);
     return (
       <div
         data-testid='tasks-table'
         data-min-width={props.minWidth ?? ''}
         data-container-class-name={props.containerClassName ?? ''}
+        data-loading={props.isLoading ? 'true' : 'false'}
       />
     );
   },
@@ -605,12 +651,18 @@ describe('TasksPageClient', () => {
     mockUseReleaseEntityQuery.mockClear();
     mockUseTaskBoardQuery.mockClear();
     mockUseTasksQuery.mockClear();
+    mockRefetchTasks.mockReset();
+    mockRefetchTaskBoard.mockReset();
     mockUseAppFlag.mockReturnValue(false);
     mockUnifiedTable.mockReset();
     mockIsXlUp = true;
     mockIs2xlUp = true;
     mockTasksData = [mockTask, mockTaskTwo];
     mockListQueryData = null;
+    mockListQueryIsLoading = false;
+    mockListQueryIsError = false;
+    mockBoardQueryIsLoading = false;
+    mockBoardQueryIsError = false;
     mockViewMode = 'list';
     mockCanShowTaskDocumentAlongsideReleaseSidebar = true;
   });
@@ -878,6 +930,46 @@ describe('TasksPageClient', () => {
       'data-container-class-name',
       'h-full overflow-y-auto overflow-x-hidden px-2.5 pb-2 pt-0.5'
     );
+  });
+
+  it('keeps the list pane in loading mode through the responsive-layout handoff', () => {
+    mockListQueryData = undefined;
+
+    renderPage();
+
+    const firstTableProps = mockUnifiedTable.mock.calls[0]?.[0] as
+      | {
+          readonly isLoading?: boolean;
+        }
+      | undefined;
+
+    expect(firstTableProps?.isLoading).toBe(true);
+  });
+
+  it('shows shell loading rows on mobile instead of flashing the empty state', () => {
+    mockIsXlUp = false;
+    mockListQueryData = undefined;
+    mockListQueryIsLoading = true;
+
+    renderPage();
+
+    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(screen.getByText('Loading tasks')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Your Task List Is Empty')
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders the shared retry state when the task query fails', () => {
+    mockListQueryIsError = true;
+
+    renderPage();
+
+    expect(screen.getByText("Couldn't Load Tasks")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+    expect(mockRefetchTasks).toHaveBeenCalledTimes(1);
   });
 
   it('hides the task document when the right panel opens on constrained desktop widths', () => {
