@@ -33,6 +33,21 @@ vi.mock('drizzle-orm', () => ({
   sql: vi.fn(),
 }));
 
+// Mocks for the new Redis + observability layer in settings.ts (gate cache hardening).
+// Redis returns null so tests exercise the mem-cache + DB fallback paths exactly
+// as before; breadcrumbs and warnings are no-ops.
+vi.mock('@sentry/nextjs', () => ({
+  addBreadcrumb: vi.fn(),
+}));
+
+vi.mock('@/lib/redis', () => ({
+  getRedis: vi.fn().mockReturnValue(null),
+}));
+
+vi.mock('@/lib/error-tracking', () => ({
+  captureWarning: vi.fn(),
+}));
+
 function createMockSettings(
   overrides: Partial<{
     gateEnabled: boolean;
@@ -121,7 +136,7 @@ describe('isWaitlistGateEnabled', () => {
 
     // Invalidate cache and change DB mock to return true
     const mod = await import('@/lib/waitlist/settings');
-    mod.invalidateWaitlistGateCache();
+    await mod.invalidateWaitlistGateCache();
     setupDbSelectMock(createMockSettings({ gateEnabled: true }));
 
     const result = await isWaitlistGateEnabled();
@@ -300,7 +315,7 @@ describe('updateWaitlistSettings invalidates cache', () => {
     updateWaitlistSettings = mod.updateWaitlistSettings;
     invalidateWaitlistGateCache = mod.invalidateWaitlistGateCache;
 
-    invalidateWaitlistGateCache();
+    await invalidateWaitlistGateCache();
   });
 
   it('clears the gate cache after settings are updated', async () => {
