@@ -1385,7 +1385,7 @@ export function LibrarySurface({
             visibleCount: visibleAssets.length,
             triggerLabel: 'Filter',
             ariaLabel: 'Filter library assets',
-            placeholder: 'Filter library - / for fields',
+            placeholder: 'Filter library',
             allowedFields: ['artist', 'title', 'status', 'has'] as const,
           },
     [

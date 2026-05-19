@@ -87,7 +87,7 @@ export function HeaderSearchSurface({
         statusOptions={adapter.statusOptions}
         hasOptions={adapter.hasOptions}
         ariaLabel={adapter.ariaLabel ?? `Filter ${adapter.triggerLabel}`}
-        placeholder={adapter.placeholder ?? 'Type to filter — / for fields'}
+        placeholder={adapter.placeholder ?? 'Type to filter'}
         allowedFields={adapter.allowedFields}
         onClose={handleCloseAndClear}
       />
