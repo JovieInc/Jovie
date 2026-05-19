@@ -4,6 +4,7 @@ import { redirect, unstable_rethrow } from 'next/navigation';
 import { Suspense } from 'react';
 import { CinematicAppBoot } from '@/components/organisms/CinematicAppBoot';
 import { PersistentAudioBar } from '@/components/organisms/PersistentAudioBar';
+import { NuqsProvider } from '@/components/providers/NuqsProvider';
 import { LyricsRouteSkeleton } from '@/components/shell/LyricsRouteSkeleton';
 import { TasksRouteSkeleton } from '@/components/shell/TasksRouteSkeleton';
 import { APP_ROUTES } from '@/constants/routes';
@@ -94,12 +95,17 @@ export default async function AppShellLayout({
 
     // Stream the shell: the route-aware skeleton renders at first byte while
     // DashboardShellContent resolves dashboard data + feature flags.
+    // Mount NuqsProvider at the shell layer so every client component under
+    // /app/(shell)/* (e.g. DashboardAudienceClient) has a NuqsAdapter context
+    // during SSR and hydration, regardless of how CoreProviders resolves above.
     return (
-      <Suspense fallback={shellFallback}>
-        <DashboardShellContent userId={auth.userId} pathname={pathname}>
-          {children}
-        </DashboardShellContent>
-      </Suspense>
+      <NuqsProvider>
+        <Suspense fallback={shellFallback}>
+          <DashboardShellContent userId={auth.userId} pathname={pathname}>
+            {children}
+          </DashboardShellContent>
+        </Suspense>
+      </NuqsProvider>
     );
   } catch (error) {
     unstable_rethrow(error);
