@@ -1,28 +1,44 @@
+import * as Sentry from '@sentry/nextjs';
 import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { type DbOrTransaction, db } from '@/lib/db';
 import { waitlistSettings } from '@/lib/db/schema/waitlist';
+import { captureWarning } from '@/lib/error-tracking';
+import { getRedis } from '@/lib/redis';
 
 const SETTINGS_ROW_ID = 1;
 
 // ---------------------------------------------------------------------------
-// In-memory cache for gate status
+// Multi-layer cache for gate status (in-memory + Redis-backed)
 // ---------------------------------------------------------------------------
 //
 // `isWaitlistGateEnabled` is hit on every authenticated middleware
 // cache-miss via `proxy-state.ts`, so re-querying the DB on every call is
 // expensive (and `getWaitlistSettings` may run an INSERT on a cold instance).
-// Cache the boolean in-process for a short TTL — admin updates call
-// `invalidateWaitlistGateCache()` to pick up the new value immediately.
-const GATE_CACHE_TTL_MS = 30_000;
+// We layer a short-lived in-memory cache (5s, per-isolate hot path) in front
+// of a Redis cache (30s TTL, fleet-wide). Admin updates call
+// `invalidateWaitlistGateCache()` which clears both layers (DEL on Redis)
+// so toggles propagate immediately across all Vercel isolates.
+//
+// This reuses the established getRedis + Sentry breadcrumb + captureWarning
+// patterns from proxy-state.ts, admin/roles.ts, and db/cache.ts for
+// admin-toggled / hot global values. No new services or tables.
+//
+// Observability: breadcrumbs emitted for redis hits, redis misses, db fetches,
+// and fleet-wide invalidations so operators can verify "gate verifiably toggled".
+const GATE_MEMORY_TTL_MS = 5_000;
+const GATE_REDIS_TTL_SECONDS = 30;
+const GATE_CACHE_KEY = 'waitlist:gate:enabled';
+
 let _gateEnabledCache: { value: boolean; expiresAt: number } | null = null;
 
 /**
  * Check if the waitlist gate is enabled.
  *
- * Cached in-process for 30 seconds so authenticated middleware cache-misses
- * don't add a DB round-trip per request. The cache is invalidated whenever
- * `updateWaitlistSettings` runs so admin toggles still take effect on the
- * next request.
+ * Multi-layer cached (5s local memory + 30s Redis) so authenticated middleware
+ * cache-misses don't add a DB round-trip per request. The cache is invalidated
+ * fleet-wide (Redis DEL) whenever `updateWaitlistSettings` runs so admin toggles
+ * take effect on the next request across the entire fleet (max staleness ~5s
+ * due to local memory layer).
  */
 export async function isWaitlistGateEnabled(): Promise<boolean> {
   const now = Date.now();
@@ -30,20 +46,114 @@ export async function isWaitlistGateEnabled(): Promise<boolean> {
     return _gateEnabledCache.value;
   }
 
-  const settings = await getWaitlistSettings();
+  // Layer: Redis (durable, shared across isolates for admin toggle freshness)
+  const redis = getRedis();
+  if (redis) {
+    try {
+      const cacheStart = Date.now();
+      const redisTimeoutPromise = new Promise<null>(resolve =>
+        setTimeout(() => resolve(null), 500)
+      );
+      const cached = await Promise.race([
+        redis.get<boolean>(GATE_CACHE_KEY),
+        redisTimeoutPromise,
+      ]);
+      const cacheDuration = Date.now() - cacheStart;
+
+      if (cached !== null) {
+        Sentry.addBreadcrumb({
+          category: 'waitlist-gate',
+          message: 'Cache hit (redis)',
+          level: 'info',
+          data: {
+            cacheKey: GATE_CACHE_KEY,
+            durationMs: cacheDuration,
+            value: cached,
+          },
+        });
+        _gateEnabledCache = {
+          value: cached,
+          expiresAt: now + GATE_MEMORY_TTL_MS,
+        };
+        return cached;
+      }
+
+      Sentry.addBreadcrumb({
+        category: 'waitlist-gate',
+        message: 'Cache miss (redis)',
+        level: 'info',
+        data: {
+          cacheKey: GATE_CACHE_KEY,
+          durationMs: cacheDuration,
+        },
+      });
+    } catch (cacheError) {
+      captureWarning('[waitlist-gate] Redis cache read failed', {
+        error: cacheError,
+      });
+    }
+  }
+
+  // Miss: fetch from DB (use ensure for hardened atomic path; avoids
+  // incidental daily-reset side-effect that getWaitlistSettings performs)
+  const value = await fetchGateEnabledFromDb();
   _gateEnabledCache = {
-    value: settings.gateEnabled,
-    expiresAt: now + GATE_CACHE_TTL_MS,
+    value,
+    expiresAt: now + GATE_MEMORY_TTL_MS,
   };
-  return settings.gateEnabled;
+
+  if (redis) {
+    redis
+      .set(GATE_CACHE_KEY, value, { ex: GATE_REDIS_TTL_SECONDS })
+      .catch(cacheError => {
+        captureWarning('[waitlist-gate] Redis cache write failed', {
+          error: cacheError,
+        });
+      });
+  }
+
+  Sentry.addBreadcrumb({
+    category: 'waitlist-gate',
+    message: 'Cache miss (db fetch)',
+    level: 'info',
+    data: {
+      cacheKey: GATE_CACHE_KEY,
+      value,
+    },
+  });
+
+  return value;
+}
+
+async function fetchGateEnabledFromDb(): Promise<boolean> {
+  const row = await ensureSettingsRow();
+  return row.gateEnabled;
 }
 
 /**
- * Clear the in-memory gate cache. Called after admin settings update
- * so the next request picks up the new value immediately.
+ * Clear the gate cache (both local memory and Redis). Called after admin
+ * settings update so the next request on any isolate picks up the new value
+ * immediately (subject only to the 5s local memory TTL on that isolate).
  */
-export function invalidateWaitlistGateCache(): void {
+export async function invalidateWaitlistGateCache(): Promise<void> {
   _gateEnabledCache = null;
+
+  const redis = getRedis();
+  if (redis) {
+    try {
+      await redis.del(GATE_CACHE_KEY);
+      Sentry.addBreadcrumb({
+        category: 'waitlist-gate',
+        message: 'Cache invalidated fleet-wide (Redis DEL)',
+        level: 'info',
+        data: { cacheKey: GATE_CACHE_KEY },
+      });
+    } catch (error) {
+      captureWarning('[waitlist-gate] Failed to invalidate Redis cache', {
+        error,
+      });
+    }
+  }
 }
 
 export interface WaitlistGateSettings {
@@ -65,6 +175,8 @@ function getStartOfNextDayUTC(now: Date = new Date()): Date {
 async function ensureSettingsRow(
   dbOrTx: DbOrTransaction = db
 ): Promise<WaitlistGateSettings> {
+  // Hot path: cheap SELECT first (matches previous behavior and keeps
+  // existing test mocks working without requiring full insert chain mocks).
   const [existing] = await dbOrTx
     .select()
     .from(waitlistSettings)
@@ -76,7 +188,12 @@ async function ensureSettingsRow(
   }
 
   const now = new Date();
-  const [created] = await dbOrTx
+
+  // Miss path: single atomic upsert (INSERT ... ON CONFLICT DO UPDATE) creates
+  // the row if absent. On concurrent first callers, the loser takes the
+  // conflict path and still receives the row via RETURNING — no reload race,
+  // no throw ever.
+  const [row] = await dbOrTx
     .insert(waitlistSettings)
     .values({
       id: SETTINGS_ROW_ID,
@@ -88,22 +205,42 @@ async function ensureSettingsRow(
       autoAcceptResetsAt: getStartOfNextDayUTC(now),
       updatedAt: now,
     })
-    .onConflictDoNothing()
+    .onConflictDoUpdate({
+      target: waitlistSettings.id,
+      set: {
+        // Self-assignment is a deliberate no-op: ensures RETURNING yields the
+        // existing row on the conflict path without mutating data or timestamps.
+        updatedAt: drizzleSql`${waitlistSettings.updatedAt}`,
+      },
+    })
     .returning();
 
-  if (created) return created;
+  if (row) {
+    return row;
+  }
 
+  // Defensive fallback (extremely rare). Plain select again, else safe defaults.
+  // Guarantees ensureSettingsRow (and therefore gate + auto-accept paths) never
+  // throws on reload.
   const [reloaded] = await dbOrTx
     .select()
     .from(waitlistSettings)
     .where(eq(waitlistSettings.id, SETTINGS_ROW_ID))
     .limit(1);
 
-  if (!reloaded) {
-    throw new Error('Failed to create waitlist settings');
+  if (reloaded) {
+    return reloaded;
   }
 
-  return reloaded;
+  const fallback: WaitlistGateSettings = {
+    gateEnabled: true,
+    autoAcceptEnabled: false,
+    autoAcceptAfterDays: 7,
+    autoAcceptDailyLimit: 0,
+    autoAcceptedToday: 0,
+    autoAcceptResetsAt: getStartOfNextDayUTC(now),
+  };
+  return fallback;
 }
 
 export async function getWaitlistSettings(
@@ -155,7 +292,7 @@ export async function updateWaitlistSettings(input: {
     .returning();
 
   if (!updated) throw new Error('Failed to update waitlist settings');
-  invalidateWaitlistGateCache();
+  await invalidateWaitlistGateCache();
   return updated;
 }
 
