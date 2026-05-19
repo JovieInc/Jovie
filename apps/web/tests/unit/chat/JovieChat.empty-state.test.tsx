@@ -1,3 +1,4 @@
+import { screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { JovieChat } from '@/components/jovie/JovieChat';
@@ -119,13 +120,16 @@ vi.mock('@/components/jovie/components', async () => {
     ChatInput: ({
       placeholder,
       quickActions,
+      variant,
     }: {
       readonly placeholder?: string;
       readonly quickActions?: readonly { readonly label: string }[];
+      readonly variant?: string;
     }) => (
       <div
         data-placeholder={placeholder}
         data-quick-actions={quickActions?.map(action => action.label).join('|')}
+        data-variant={variant}
         data-testid='chat-input'
       />
     ),
@@ -175,6 +179,7 @@ describe('JovieChat empty state', () => {
     expect(getByTestId('chat-input').getAttribute('data-placeholder')).toBe(
       'Ask Jovie...'
     );
+    expect(getByTestId('chat-input').getAttribute('data-variant')).toBe('hero');
     expect(getByTestId('chat-input').getAttribute('data-quick-actions')).toBe(
       'Plan a release|Generate album art|Pitch playlists|Send feedback'
     );
@@ -273,5 +278,11 @@ describe('JovieChat empty state', () => {
     expect(queryByText('What are we working on?')).toBeNull();
     expect(queryByText('Welcome back')).toBeNull();
     expect(getAllByTestId('chat-message')).toHaveLength(2);
+    expect(
+      screen.getByTestId('chat-input').getAttribute('data-placeholder')
+    ).toBe('Ask a follow-up...');
+    expect(screen.getByTestId('chat-input').getAttribute('data-variant')).toBe(
+      'compact'
+    );
   });
 });

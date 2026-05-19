@@ -492,7 +492,7 @@ export function JovieChat({
                   strokeWidth={2.25}
                 />
                 <div>
-                  <p className='text-sm font-semibold tracking-[-0.01em] text-primary-token'>
+                  <p className='text-sm font-semibold text-primary-token'>
                     Drop images to attach
                   </p>
                   <p className='mt-1 text-xs leading-5 text-secondary-token'>
@@ -696,7 +696,7 @@ export function JovieChat({
               >
                 <h1
                   className={cn(
-                    'text-balance text-center text-[2rem] font-semibold leading-[1.1] tracking-[-0.035em] text-primary-token sm:text-[2.5rem] md:text-[3rem]',
+                    'text-balance text-center text-[2rem] font-semibold leading-[1.1] text-primary-token sm:text-[2.5rem] md:text-[3rem]',
                     composerPickerOpen && 'pointer-events-none opacity-0'
                   )}
                   aria-hidden={composerPickerOpen ? 'true' : undefined}
@@ -720,6 +720,7 @@ export function JovieChat({
                   <ChatInput
                     {...chatInputProps}
                     placeholder='Ask Jovie...'
+                    variant='hero'
                     shellChatV1={shellChatV1Enabled}
                     quickActions={starterQuickActions}
                     onQuickActionSelect={handleSuggestedPromptWithJank}
