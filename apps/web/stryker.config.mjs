@@ -68,6 +68,10 @@ export default {
     'tests/unit/lib/entitlements.server.test.ts',
     'tests/unit/lib/queries/useBillingMutations.test.tsx',
     'tests/unit/lib/social-platform.property.test.ts',
+    // Gate + waitlist negative-path tests for lib/auth/gate.ts mutate target
+    'tests/unit/lib/auth/gate.test.ts',
+    'tests/unit/lib/auth/gate.critical.test.ts',
+    'tests/unit/auth/waitlist-gating.test.ts',
   ],
   ignorePatterns: [
     '.next',
