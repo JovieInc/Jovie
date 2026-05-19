@@ -10,6 +10,7 @@ Controller file for AI agents working in this repo. `AGENTS.md` is a symlink to 
 - Don't invent commands, env vars, routes, tables, services, or design tokens.
 - Don't hide failing checks. Report exact failures and the likely cause.
 - Ask before destructive operations: data deletion, irreversible migrations, credential changes, dependency replacement, auth/payment changes, or production-impacting scripts.
+- **Decisions are systems, not events** (when quantifiable). For decisions whose cost or benefit is measurable, format as **Ship now / Re-evaluate when / Then** with the trigger tied to revenue/cost/perf unit economics (per-unit cost OR build cost = CI minutes × runner $/min + agent minutes × $/hr-of-intelligence). For taste, identity, security, or "this is just wrong" decisions, tag `EVENT:` and skip the trigger — some decisions are permanent. Reject phrasing like "premature", "later", "future work" without a Linear ID. See `.claude/rules/code-style.md` → "Conditional decisions" (added 2026-05-18) and `~/.claude/projects/.../memory/feedback_conditional_decisions.md`. Enforcement hook: `.claude/hooks/conditional-decision-lint.sh` (warn-mode through 2026-06-01, then error).
 
 ## Agent Role Boundary
 
