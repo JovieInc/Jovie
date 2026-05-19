@@ -28,6 +28,7 @@ import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentMetricRow } from '@/components/molecules/ContentMetricRow';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { QRCode } from '@/components/molecules/QRCode';
+import { ShellListRowFrame } from '@/components/organisms/table';
 import { AGENT_OS_ADMIN_FIXTURE_ARTIFACTS } from '@/lib/agent-os/fixtures';
 import {
   getDefaultStatusTone,
@@ -239,7 +240,7 @@ function CompactDeploymentRow({
   readonly run: HudMetrics['deployments']['recent'][number];
 }>) {
   return (
-    <div className='grid gap-1.5 border-subtle border-b py-2.5 last:border-b-0'>
+    <ShellListRowFrame className='grid gap-1.5 border-b border-subtle px-0 py-2.5 last:border-b-0'>
       <div className='flex min-w-0 items-center justify-between gap-3'>
         <div className='flex min-w-0 items-center gap-2'>
           <span
@@ -266,7 +267,7 @@ function CompactDeploymentRow({
       <p className='text-[11px] text-tertiary-token'>
         {formatDeploymentTime(run.createdAtIso)}
       </p>
-    </div>
+    </ShellListRowFrame>
   );
 }
 
@@ -276,7 +277,7 @@ function DeploymentRow({
   readonly run: HudMetrics['deployments']['recent'][number];
 }>) {
   return (
-    <div className='flex items-center justify-between gap-3 rounded-xl border border-subtle bg-surface-0 px-3 py-2.5'>
+    <ShellListRowFrame className='flex items-center justify-between gap-3 border border-subtle bg-surface-0 px-3 py-2.5'>
       <div className='min-w-0'>
         <p className='truncate text-[13px] font-semibold text-primary-token'>
           #{run.runNumber}
@@ -296,7 +297,7 @@ function DeploymentRow({
         </div>
         <DeploymentActionsMenu run={run} />
       </div>
-    </div>
+    </ShellListRowFrame>
   );
 }
 
@@ -345,7 +346,7 @@ function AiOpsItemRow({
   readonly onUndismiss?: () => void;
 }>) {
   return (
-    <div className='flex items-start justify-between gap-3 rounded-xl border border-subtle bg-surface-0 px-3 py-2.5'>
+    <ShellListRowFrame className='flex items-start justify-between gap-3 border border-subtle bg-surface-0 px-3 py-2.5'>
       <div className='min-w-0'>
         <p className='truncate text-[13px] font-semibold text-primary-token'>
           {item.summary}
@@ -376,7 +377,7 @@ function AiOpsItemRow({
           </button>
         ) : null}
       </div>
-    </div>
+    </ShellListRowFrame>
   );
 }
 

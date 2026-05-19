@@ -4,6 +4,7 @@ import { Check, ExternalLink } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { ShellListRowFrame } from '@/components/organisms/table';
 import type {
   TimActionIssue,
   TimActionsResponse,
@@ -67,7 +68,7 @@ function ActionRow({ issue, onClose, isClosing }: Readonly<ActionRowProps>) {
   const priorityConfig = getPriorityConfig(issue.priority);
 
   return (
-    <div className='flex items-center gap-3 rounded-xl border border-subtle bg-surface-0 px-3 py-2.5'>
+    <ShellListRowFrame className='flex items-center gap-3 border border-subtle bg-surface-0 px-3 py-2.5'>
       {/* Title + Linear link */}
       <div className='min-w-0 flex-1'>
         <a
@@ -109,7 +110,7 @@ function ActionRow({ issue, onClose, isClosing }: Readonly<ActionRowProps>) {
       >
         <Check className='h-3.5 w-3.5' aria-hidden='true' />
       </button>
-    </div>
+    </ShellListRowFrame>
   );
 }
 
