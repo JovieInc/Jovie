@@ -25,6 +25,10 @@ import { ArtworkThumb } from '@/components/shell/ArtworkThumb';
 import { DropDateChip } from '@/components/shell/DropDateChip';
 import { DspAvatarStack } from '@/components/shell/DspAvatarStack';
 import { StatusBadge } from '@/components/shell/StatusBadge';
+import {
+  EntityHoverLink,
+  type EntityPopoverData,
+} from '@/components/shell/EntityPopover';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { dropDateMeta } from '@/lib/format-drop-date';
 import { cn } from '@/lib/utils';
@@ -226,6 +230,21 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
   const { playbackState } = useTrackAudioPlayer();
   const isActiveTrack = playbackState.activeTrackId === release.id;
 
+  const releaseEntity: EntityPopoverData = {
+    kind: 'release',
+    id: release.id,
+    label: release.title,
+    thumbnail: release.artworkUrl,
+    artist: artistLabel || undefined,
+    releaseType: release.releaseType,
+    releaseDate: release.releaseDate,
+    totalTracks: release.totalTracks > 0 ? release.totalTracks : undefined,
+    durationSec: release.totalDurationMs
+      ? Math.floor(release.totalDurationMs / 1000)
+      : undefined,
+    status: release.status,
+  };
+
   function handleKeyDown(e: KeyboardEvent<HTMLDivElement>) {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
@@ -250,7 +269,15 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
       <ArtworkCell release={release} />
 
       <div className='min-w-0 flex-1'>
-        <div className={shellReleaseRowTypography.title}>{release.title}</div>
+        <EntityHoverLink
+          entity={releaseEntity}
+          className={cn(
+            shellReleaseRowTypography.title,
+            'inline-flex w-full max-w-full hover:no-underline'
+          )}
+        >
+          {release.title}
+        </EntityHoverLink>
         <div className={shellReleaseRowTypography.subtitle}>{artistLabel}</div>
       </div>
 
