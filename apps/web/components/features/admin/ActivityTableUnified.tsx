@@ -70,9 +70,6 @@ interface ActivityTableUnifiedProps {
   readonly items: AdminActivityItem[];
 }
 
-/** Standard row class for activity table */
-const getRowClassName = () => 'group hover:bg-(--linear-row-hover)';
-
 const columnHelper = createColumnHelper<AdminActivityItem>();
 
 // Column definitions are shared between the live table and its skeleton so that
@@ -165,7 +162,6 @@ export function ActivityTableUnified({
             </div>
           }
           getRowId={row => row.id}
-          getRowClassName={getRowClassName}
         />
       </div>
     </div>
