@@ -22,6 +22,7 @@ export interface AuthRouteConfig {
   isChatRoute: boolean;
   isDemoRoute: boolean;
   showChatUsageIndicator: boolean;
+  isLyricsRoute: boolean;
 }
 
 function isChatThreadPath(parts: readonly string[]): boolean {
@@ -173,6 +174,13 @@ export function useAuthRouteConfig(): AuthRouteConfig {
     [pathname]
   );
 
+  const isLyricsRoute = useMemo(
+    () =>
+      pathname === APP_ROUTES.LYRICS ||
+      Boolean(pathname?.startsWith(`${APP_ROUTES.LYRICS}/`)),
+    [pathname]
+  );
+
   return {
     section,
     breadcrumbs,
@@ -182,5 +190,6 @@ export function useAuthRouteConfig(): AuthRouteConfig {
     isChatRoute,
     isDemoRoute,
     showChatUsageIndicator: isChatRoute,
+    isLyricsRoute,
   };
 }

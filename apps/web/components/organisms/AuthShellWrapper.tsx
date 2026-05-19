@@ -260,6 +260,7 @@ function AuthShellWrapperInner({
               headerAction={headerAction}
               showMobileTabs={config.showMobileTabs}
               isTableRoute={config.isTableRoute}
+              isLyricsRoute={config.isLyricsRoute}
               onSidebarOpenChange={
                 persistSidebarCollapsed ? handleSidebarOpenChange : undefined
               }

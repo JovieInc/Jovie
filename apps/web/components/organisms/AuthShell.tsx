@@ -26,6 +26,7 @@ export interface AuthShellProps {
   readonly headerAction?: ReactNode;
   readonly showMobileTabs?: boolean;
   readonly isTableRoute?: boolean;
+  readonly isLyricsRoute?: boolean;
   readonly onSidebarOpenChange?: (open: boolean) => void;
   readonly sidebarDefaultOpen?: boolean;
   readonly children: ReactNode;
@@ -43,6 +44,7 @@ function AuthShellInner({
   headerAction,
   showMobileTabs = false,
   isTableRoute = false,
+  isLyricsRoute = false,
   children,
 }: Readonly<Omit<AuthShellProps, 'children'> & { children: ReactNode }>) {
   const { isMobile } = useSidebar();
@@ -54,6 +56,7 @@ function AuthShellInner({
   const sidebarTrigger = isMobile ? null : <SidebarTrigger />;
 
   const isInSettings = section === 'settings';
+  const hideTopHeader = isInSettings || isLyricsRoute;
 
   // Memoize the sidebar so it doesn't re-render on breadcrumb/header changes.
   // The sidebar only depends on `section` — it shouldn't remount when
@@ -85,7 +88,7 @@ function AuthShellInner({
     <AppShellFrame
       sidebar={sidebar}
       header={
-        isInSettings ? null : (
+        hideTopHeader ? null : (
           <DashboardHeader
             breadcrumbs={breadcrumbs}
             sidebarTrigger={sidebarTrigger}
