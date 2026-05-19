@@ -214,7 +214,7 @@ export function AdminWaitlistTableUnified({
 
   // Get row className - uses unified hover token
   const getRowClassName = useCallback(() => {
-    return 'group bg-transparent hover:bg-(--linear-row-hover)';
+    return 'group hover:bg-(--linear-row-hover)';
   }, []);
 
   // Render unified table with optional grouping
@@ -225,11 +225,13 @@ export function AdminWaitlistTableUnified({
       isLoading={false}
       getContextMenuItems={createContextMenuItems}
       emptyState={
-        <div className='px-4 py-10 text-center text-sm text-secondary-token flex flex-col items-center gap-3'>
-          <ClipboardList className='h-6 w-6' />
+        <div className='flex flex-col items-center gap-3 px-4 py-10 text-center text-sm text-secondary-token'>
+          <ClipboardList className='h-6 w-6 text-tertiary-token' />
           <div>
-            <div className='font-medium'>No waitlist entries</div>
-            <div className='text-xs'>
+            <div className='font-medium text-primary-token'>
+              No waitlist entries
+            </div>
+            <div className='text-xs text-secondary-token'>
               New waitlist signups will appear here.
             </div>
           </div>
