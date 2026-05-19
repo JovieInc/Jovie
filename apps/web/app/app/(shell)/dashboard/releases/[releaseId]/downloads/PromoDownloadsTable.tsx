@@ -1,12 +1,9 @@
 'use client';
 
+import { type ColumnDef } from '@tanstack/react-table';
 import { Music, Trash2 } from 'lucide-react';
-import {
-  TableCell,
-  TableEmptyState,
-  TableHeaderCell,
-  TableHeaderRow,
-} from '@/components/organisms/table';
+import { useMemo } from 'react';
+import { TableEmptyState, UnifiedTable } from '@/components/organisms/table';
 import { cn } from '@/lib/utils';
 
 export interface PromoDownloadFile {
@@ -57,6 +54,91 @@ export function PromoDownloadsTable({
   onToggleActive,
   onDelete,
 }: Readonly<PromoDownloadsTableProps>) {
+  const columns = useMemo<ColumnDef<PromoDownloadFile, unknown>[]>(
+    () => [
+      {
+        id: 'file',
+        accessorFn: row => row.title,
+        header: 'File',
+        cell: ({ row }) => {
+          const file = row.original;
+          const fileMeta = getFileMeta(file);
+
+          return (
+            <div className='flex min-w-0 items-center gap-2'>
+              <span className='truncate font-medium text-primary-token'>
+                {file.title}
+              </span>
+              <span className='shrink-0 text-tertiary-token'>·</span>
+              <span className='shrink-0 text-2xs text-tertiary-token'>
+                {fileMeta}
+              </span>
+            </div>
+          );
+        },
+        size: 320,
+        minSize: 220,
+        meta: {
+          className: 'pl-4 pr-2',
+        },
+      },
+      {
+        id: 'status',
+        accessorFn: row => row.isActive,
+        header: 'Status',
+        cell: ({ row }) => {
+          const file = row.original;
+
+          return (
+            <button
+              type='button'
+              onClick={() => onToggleActive(file.id, !file.isActive)}
+              aria-pressed={file.isActive}
+              className={cn(
+                'inline-flex h-6 items-center rounded-full border px-2 text-2xs font-medium transition-colors',
+                file.isActive
+                  ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-500'
+                  : 'border-subtle bg-surface-0 text-tertiary-token'
+              )}
+            >
+              {file.isActive ? 'Active' : 'Hidden'}
+            </button>
+          );
+        },
+        size: 96,
+        minSize: 88,
+        meta: {
+          className: 'px-2',
+        },
+      },
+      {
+        id: 'actions',
+        accessorFn: row => row.id,
+        header: 'Actions',
+        cell: ({ row }) => {
+          const file = row.original;
+
+          return (
+            <button
+              type='button'
+              onClick={() => onDelete(file.id)}
+              className='inline-flex h-6 w-6 items-center justify-center rounded-full text-tertiary-token transition-colors hover:text-red-400'
+              aria-label={`Delete ${file.title}`}
+            >
+              <Trash2 className='h-3.5 w-3.5' aria-hidden='true' />
+            </button>
+          );
+        },
+        size: 72,
+        minSize: 72,
+        meta: {
+          className: 'pr-4 text-right',
+        },
+      },
+    ],
+    [onDelete, onToggleActive]
+  );
+
   if (!loaded && files.length === 0) {
     return null;
   }
@@ -74,73 +156,14 @@ export function PromoDownloadsTable({
 
   return (
     <div className='overflow-hidden rounded-xl border border-subtle bg-surface-1'>
-      <table className='min-w-full border-separate border-spacing-0'>
-        <thead>
-          <TableHeaderRow>
-            <TableHeaderCell sticky={false} className='w-[68%] pl-4'>
-              File
-            </TableHeaderCell>
-            <TableHeaderCell sticky={false} className='w-[16%]'>
-              Status
-            </TableHeaderCell>
-            <TableHeaderCell
-              sticky={false}
-              align='right'
-              className='w-[16%] pr-4'
-            >
-              Actions
-            </TableHeaderCell>
-          </TableHeaderRow>
-        </thead>
-        <tbody>
-          {files.map(file => {
-            const fileMeta = getFileMeta(file);
-
-            return (
-              <tr key={file.id} className='group'>
-                <TableCell className='pl-4 pr-2'>
-                  <div className='flex min-w-0 items-center gap-2'>
-                    <span className='truncate font-medium text-primary-token'>
-                      {file.title}
-                    </span>
-                    <span className='shrink-0 text-tertiary-token'>·</span>
-                    <span className='shrink-0 text-2xs text-tertiary-token'>
-                      {fileMeta}
-                    </span>
-                  </div>
-                </TableCell>
-
-                <TableCell className='px-2'>
-                  <button
-                    type='button'
-                    onClick={() => onToggleActive(file.id, !file.isActive)}
-                    aria-pressed={file.isActive}
-                    className={cn(
-                      'inline-flex h-6 items-center rounded-full border px-2 text-2xs font-medium transition-colors',
-                      file.isActive
-                        ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-500'
-                        : 'border-subtle bg-surface-0 text-tertiary-token'
-                    )}
-                  >
-                    {file.isActive ? 'Active' : 'Hidden'}
-                  </button>
-                </TableCell>
-
-                <TableCell className='pr-4 text-right'>
-                  <button
-                    type='button'
-                    onClick={() => onDelete(file.id)}
-                    className='inline-flex h-6 w-6 items-center justify-center rounded-full text-tertiary-token transition-colors hover:text-red-400'
-                    aria-label={`Delete ${file.title}`}
-                  >
-                    <Trash2 className='h-3.5 w-3.5' aria-hidden='true' />
-                  </button>
-                </TableCell>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      <UnifiedTable
+        data={files}
+        columns={columns}
+        getRowId={file => file.id}
+        enableVirtualization={false}
+        minWidth='100%'
+        className='text-[12.5px] [&_thead_th]:py-1 [&_thead_th]:text-3xs [&_thead_th]:tracking-normal'
+      />
     </div>
   );
 }
