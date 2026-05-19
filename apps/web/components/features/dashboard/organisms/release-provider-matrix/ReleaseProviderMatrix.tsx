@@ -1,14 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import {
-  memo,
-  Suspense,
-  useCallback,
-  useDeferredValue,
-  useMemo,
-  useState,
-} from 'react';
+import { memo, Suspense, useCallback, useMemo, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import {
   DrawerButton,
@@ -190,10 +183,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     DEFAULT_RELEASE_FILTERS
   );
 
-  // Search state
-  const [searchQuery, setSearchQuery] = useState('');
-  const deferredSearchQuery = useDeferredValue(searchQuery);
-
   // Deduplicate rows by ID before filtering (prevents inflated counts and double highlights)
   const dedupedRows = useMemo(() => {
     const seen = new Set<string>();
@@ -209,10 +198,11 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     });
   }, [rows]);
 
-  // Apply filters and search to deduped rows
+  // Apply filters (searchQuery kept as '' — text search UI + state removed from
+  // this surface to eliminate duplicate competing with global command palette)
   const filteredRows = useMemo(() => {
-    return filterReleases(dedupedRows, filters, deferredSearchQuery);
-  }, [dedupedRows, filters, deferredSearchQuery]);
+    return filterReleases(dedupedRows, filters, '');
+  }, [dedupedRows, filters]);
 
   // Smart link gating
   const planGate = usePlanGate();
@@ -527,7 +517,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           width={RELEASE_DETAIL_PANEL_WIDTH}
           providerConfig={providerConfig}
           artistName={artistName}
-          onArtistClick={name => setSearchQuery(name)}
           canGenerateAlbumArt={showGenerateAlbumArtAction}
           onGenerateAlbumArt={handleGenerateAlbumArt}
           onClose={closeEditor}
@@ -655,8 +644,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                   onFiltersChange={setFilters}
                   releaseView={releaseView}
                   onReleaseViewChange={setReleaseView}
-                  searchQuery={searchQuery}
-                  onSearchQueryChange={setSearchQuery}
                   onCreateRelease={handleNewRelease}
                   canCreateManualReleases={canCreateManualReleases}
                 />
