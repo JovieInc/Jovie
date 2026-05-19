@@ -286,7 +286,7 @@ export function ReleaseFilterDropdown({
   return (
     <div className='flex items-center gap-2'>
       <DropdownMenu open={isOpen} onOpenChange={handleOpenChange}>
-        <TooltipShortcut label='Filter' shortcut='F' side='bottom'>
+        <TooltipShortcut label='Filter' side='bottom'>
           <DropdownMenuTrigger asChild>
             <Button
               variant='ghost'
