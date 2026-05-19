@@ -1,34 +1,81 @@
+'use client';
+
+import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
+import { UnifiedTableSkeleton } from '@/components/organisms/table';
 import { SKELETON_ROW_COUNT } from '@/lib/constants/layout';
 
-const CONTACTS_HEADER_KEYS = [
-  'col-role',
-  'col-name',
-  'col-territories',
-  'col-email',
-  'col-phone',
-  'col-actions',
-] as const;
+type ContactsLoadingRow = {
+  readonly role: string;
+  readonly name: string;
+  readonly territories: string;
+  readonly email: string;
+  readonly phone: string;
+  readonly actions: string;
+};
 
-const CONTACTS_ROW_KEYS = Array.from(
-  { length: SKELETON_ROW_COUNT.TABLE },
-  (_, i) => `contacts-row-${i + 1}`
-);
+const contactLoadingColumnHelper = createColumnHelper<ContactsLoadingRow>();
+
+function createLoadingHeader(width: string) {
+  function ContactsLoadingHeader() {
+    return <LoadingSkeleton height='h-4' width={width} rounded='md' />;
+  }
+
+  return ContactsLoadingHeader;
+}
+
+const CONTACTS_LOADING_COLUMNS = [
+  contactLoadingColumnHelper.accessor('role', {
+    id: 'role',
+    header: createLoadingHeader('w-[112px]'),
+    size: 180,
+    minSize: 180,
+  }),
+  contactLoadingColumnHelper.accessor('name', {
+    id: 'name',
+    header: createLoadingHeader('w-[128px]'),
+    size: 200,
+    minSize: 200,
+  }),
+  contactLoadingColumnHelper.accessor('territories', {
+    id: 'territories',
+    header: createLoadingHeader('w-[96px]'),
+    size: 140,
+    minSize: 140,
+  }),
+  contactLoadingColumnHelper.accessor('email', {
+    id: 'email',
+    header: createLoadingHeader('w-[144px]'),
+    size: 200,
+    minSize: 200,
+  }),
+  contactLoadingColumnHelper.accessor('phone', {
+    id: 'phone',
+    header: createLoadingHeader('w-[96px]'),
+    size: 160,
+    minSize: 160,
+  }),
+  contactLoadingColumnHelper.accessor('actions', {
+    id: 'actions',
+    header: createLoadingHeader('w-[24px]'),
+    size: 48,
+    minSize: 48,
+  }),
+] as ColumnDef<ContactsLoadingRow, unknown>[];
+
+const CONTACTS_LOADING_SKELETON_CONFIG = [
+  { width: '112px', variant: 'text' as const },
+  { width: '128px', variant: 'text' as const },
+  { width: '96px', variant: 'badge' as const },
+  { width: '144px', variant: 'text' as const },
+  { width: '96px', variant: 'text' as const },
+  { width: '24px', variant: 'avatar' as const },
+];
 
 const CONTACTS_MOBILE_ROW_KEYS = Array.from(
   { length: SKELETON_ROW_COUNT.MOBILE },
   (_, i) => `contacts-mobile-${i + 1}`
 );
-
-/** Column widths matching the actual contacts table columns */
-const COLUMN_WIDTHS: Record<string, string> = {
-  'col-role': 'w-28',
-  'col-name': 'w-32',
-  'col-territories': 'w-24',
-  'col-email': 'w-36',
-  'col-phone': 'w-24',
-  'col-actions': 'w-6',
-};
 
 export default function ContactsLoading() {
   return (
@@ -38,20 +85,17 @@ export default function ContactsLoading() {
         <div className='divide-y divide-subtle'>
           {CONTACTS_MOBILE_ROW_KEYS.map(key => (
             <div key={key} className='flex items-center gap-3 px-4 py-3'>
-              {/* Avatar placeholder */}
               <LoadingSkeleton
                 height='h-10'
                 width='w-10'
                 rounded='full'
                 className='shrink-0'
               />
-              {/* Contact info */}
               <div className='flex-1 min-w-0 space-y-1.5'>
                 <LoadingSkeleton height='h-4' width='w-32' rounded='md' />
                 <LoadingSkeleton height='h-3' width='w-24' rounded='sm' />
                 <LoadingSkeleton height='h-3' width='w-40' rounded='sm' />
               </div>
-              {/* Action */}
               <LoadingSkeleton
                 height='h-8'
                 width='w-8'
@@ -65,40 +109,15 @@ export default function ContactsLoading() {
 
       {/* Desktop: table layout (hidden below sm) */}
       <div className='max-sm:hidden flex-1 min-h-0 overflow-hidden'>
-        <table className='w-full border-collapse text-app'>
-          <thead className='sticky top-0 z-10 bg-(--linear-app-content-surface) shadow-inset-divider'>
-            <tr className='border-b border-subtle'>
-              {CONTACTS_HEADER_KEYS.map(key => (
-                <th key={key} className='px-4 py-3 text-left'>
-                  <LoadingSkeleton
-                    height='h-4'
-                    width={COLUMN_WIDTHS[key] ?? 'w-20'}
-                    rounded='md'
-                  />
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {CONTACTS_ROW_KEYS.map(rowKey => (
-              <tr
-                key={rowKey}
-                className='border-b border-subtle'
-                style={{ height: 44 }}
-              >
-                {CONTACTS_HEADER_KEYS.map(colKey => (
-                  <td key={`${rowKey}-${colKey}`} className='px-4 py-2'>
-                    <LoadingSkeleton
-                      height='h-4'
-                      width={COLUMN_WIDTHS[colKey] ?? 'w-20'}
-                      rounded='md'
-                    />
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <UnifiedTableSkeleton<ContactsLoadingRow>
+          columns={CONTACTS_LOADING_COLUMNS}
+          skeletonRows={SKELETON_ROW_COUNT.TABLE}
+          skeletonColumnConfig={CONTACTS_LOADING_SKELETON_CONFIG}
+          rowHeight={44}
+          minWidth='0'
+          containerClassName='h-full'
+          hideHeader={false}
+        />
       </div>
 
       {/* Footer matching actual contacts footer */}
