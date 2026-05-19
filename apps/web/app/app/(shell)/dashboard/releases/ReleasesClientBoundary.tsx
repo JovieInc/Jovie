@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { useEffect } from 'react';
+import { useLayoutEffect } from 'react';
 import { usePendingShell } from '@/components/organisms/PendingShellContext';
 
 interface ReleasesClientBoundaryProps {
@@ -13,7 +13,7 @@ export function ReleasesClientBoundary({
 }: ReleasesClientBoundaryProps) {
   const { clearPendingShell } = usePendingShell();
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     clearPendingShell('releases');
   }, [clearPendingShell]);
 

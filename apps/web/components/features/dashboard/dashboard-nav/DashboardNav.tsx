@@ -252,6 +252,7 @@ export function DashboardNav(_: DashboardNavProps) {
   // Debounced prefetch: avoid firing on fast mouse sweeps across nav items
   const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const releasesPrefetchedProfileIdRef = useRef<string | null>(null);
+  const releasesWarmReadyProfileIdRef = useRef<string | null>(null);
   useEffect(
     () => () => {
       if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
@@ -260,11 +261,47 @@ export function DashboardNav(_: DashboardNavProps) {
   );
 
   useEffect(() => {
+    releasesPrefetchedProfileIdRef.current = null;
+    releasesWarmReadyProfileIdRef.current = null;
+  }, [profileId]);
+
+  const warmReleasesRoute = useCallback(async () => {
+    if (isDemo || !profileId) {
+      return;
+    }
+
+    if (releasesPrefetchedProfileIdRef.current === profileId) {
+      router.prefetch(APP_ROUTES.RELEASES);
+      return;
+    }
+
+    releasesPrefetchedProfileIdRef.current = profileId;
+    router.prefetch(APP_ROUTES.RELEASES);
+
+    try {
+      await Promise.all([
+        import('@/features/dashboard/organisms/release-provider-matrix'),
+        import('@/lib/queries/prefetch-dashboard').then(
+          ({ prefetchForRoute }) =>
+            prefetchForRoute('releases', queryClient, profileId)
+        ),
+      ]);
+
+      releasesPrefetchedProfileIdRef.current = profileId;
+      releasesWarmReadyProfileIdRef.current = profileId;
+    } catch {
+      releasesPrefetchedProfileIdRef.current = null;
+      releasesWarmReadyProfileIdRef.current = null;
+    }
+  }, [isDemo, profileId, queryClient, router]);
+
+  useEffect(() => {
     if (
       isDemo ||
       !profileId ||
-      releasesPrefetchedProfileIdRef.current === profileId ||
-      pathname !== APP_ROUTES.DASHBOARD
+      releasesWarmReadyProfileIdRef.current === profileId ||
+      pathname === APP_ROUTES.RELEASES ||
+      pathname === APP_ROUTES.DASHBOARD_RELEASES
     ) {
       return;
     }
@@ -276,24 +313,11 @@ export function DashboardNav(_: DashboardNavProps) {
     // the timer so a cleanup that fires before the timer runs (fast route
     // change) leaves the ref null and a later visit will retry.
     const handle = setTimeout(() => {
-      releasesPrefetchedProfileIdRef.current = profileId;
-      router.prefetch(APP_ROUTES.RELEASES);
-      void import(
-        '@/features/dashboard/organisms/release-provider-matrix'
-      ).catch(() => {
-        releasesPrefetchedProfileIdRef.current = null;
-      });
-      void import('@/lib/queries/prefetch-dashboard')
-        .then(({ prefetchForRoute }) =>
-          prefetchForRoute('releases', queryClient, profileId)
-        )
-        .catch(() => {
-          releasesPrefetchedProfileIdRef.current = null;
-        });
+      void warmReleasesRoute();
     }, 300);
 
     return () => clearTimeout(handle);
-  }, [isDemo, pathname, profileId, queryClient, router]);
+  }, [isDemo, pathname, profileId, warmReleasesRoute]);
 
   const handlePrefetch = useCallback(
     (itemId: string) => {
@@ -301,9 +325,8 @@ export function DashboardNav(_: DashboardNavProps) {
       const prefetchDelayMs = itemId === 'releases' ? 0 : 150;
       prefetchTimerRef.current = setTimeout(() => {
         if (itemId === 'releases') {
-          void import(
-            '@/features/dashboard/organisms/release-provider-matrix'
-          ).catch(() => {});
+          void warmReleasesRoute();
+          return;
         }
         void import('@/lib/queries/prefetch-dashboard')
           .then(({ prefetchForRoute }) =>
@@ -312,8 +335,24 @@ export function DashboardNav(_: DashboardNavProps) {
           .catch(() => {});
       }, prefetchDelayMs);
     },
-    [queryClient, profileId]
+    [profileId, queryClient, warmReleasesRoute]
   );
+
+  const showPendingReleasesShell = useCallback(() => {
+    if (releasesWarmReadyProfileIdRef.current === profileId) {
+      return;
+    }
+
+    showPendingShell('releases');
+  }, [profileId, showPendingShell]);
+
+  const clearPendingReleasesShell = useCallback(() => {
+    if (releasesWarmReadyProfileIdRef.current === profileId) {
+      return;
+    }
+
+    clearPendingShell('releases');
+  }, [clearPendingShell, profileId]);
 
   // In demo mode, intercept nav clicks for tabs without demo data
   const handleDemoNavClick = useCallback((item: NavItem) => {
@@ -391,14 +430,10 @@ export function DashboardNav(_: DashboardNavProps) {
           renderAsButton={renderAsButton}
           useShellNavItem={shellChatV1Enabled}
           onNavigate={
-            isReleasesItem && !isActive
-              ? () => showPendingShell('releases')
-              : undefined
+            isReleasesItem && !isActive ? showPendingReleasesShell : undefined
           }
           onCancelNavigate={
-            isReleasesItem && !isActive
-              ? () => clearPendingShell('releases')
-              : undefined
+            isReleasesItem && !isActive ? clearPendingReleasesShell : undefined
           }
           onPrefetch={() => handlePrefetch(item.id)}
         />
@@ -411,8 +446,8 @@ export function DashboardNav(_: DashboardNavProps) {
       handleDemoNavClick,
       handlePrefetch,
       handleSearchClick,
-      clearPendingShell,
-      showPendingShell,
+      clearPendingReleasesShell,
+      showPendingReleasesShell,
       isPreviewOpen,
       isDemo,
       shellChatV1Enabled,
