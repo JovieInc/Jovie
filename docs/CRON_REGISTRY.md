@@ -107,7 +107,6 @@ These have their own Vercel schedule OR exist as callable endpoints (also invoke
 | `/api/cron/schedule-release-notifications` | 60s | Schedules release-day notifications | `daily-maintenance` |
 | `/api/cron/send-release-notifications` | 120s | Sends notifications; recovers stuck rows >10min; max 100/run | `frequent` |
 | `/api/cron/public-profile-canary` | 30s | Lightweight HTTP health check: GET /tim, /tim/alerts, /tim/pay, POST /api/audience/visit; emits Sentry breadcrumb + writes Redis key for admin ops panel (JOV-1872) | — |
-| `/api/cron/clerk-config-audit` | 60s | Polls Clerk FAPI environment endpoint for prod + staging and alerts (captureError fatal + Slack) if forbidden first-factor strategies (`password`, `email_code`, `email_link`, `phone_code`, `username`) are enabled. Closes the curl-to-FAPI bypass that defense-in-depth appearance hiding does not cover (JOV-2446) | — |
 
 ## LLM Model Usage in Web App Crons
 

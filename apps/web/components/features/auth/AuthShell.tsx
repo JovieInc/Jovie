@@ -62,6 +62,16 @@ const CREDENTIAL_HIDE_ELEMENTS: Record<string, string> = {
   formFieldLabel__identifier: 'hidden',
   formFieldLabel__emailAddress: 'hidden',
   formFieldLabel__password: 'hidden',
+  // Username/phone (forbidden in clerk-config-audit; complete defense-in-depth)
+  formFieldRow__username: 'hidden',
+  formField__username: 'hidden',
+  formFieldInput__username: 'hidden',
+  formFieldLabel__username: 'hidden',
+  formFieldRow__phoneNumber: 'hidden',
+  formField__phoneNumber: 'hidden',
+  formFieldInput__phoneNumber: 'hidden',
+  formFieldLabel__phoneNumber: 'hidden',
+  formattedPhoneNumberInput: 'hidden',
   // Verification-step fields (factor-one / verifications routes — only render
   // if Clerk advances past start with email re-enabled; hide pre-emptively).
   formFieldInput__code: 'hidden',
@@ -316,7 +326,7 @@ export function AuthShell({
         data-auth-shell-providers='0'
         className='relative min-h-[280px]'
       >
-        <AuthProvidersUnavailable />
+        <AuthProvidersUnavailable mode={mode} />
         <AuthLegalText mode={mode} />
       </div>
     );
@@ -406,7 +416,9 @@ function AuthStableStartPlaceholder({
       data-auth-stable-placeholder
       data-loading='true'
       className='block animate-pulse'
-      aria-label='Loading sign-in options'
+      aria-label={
+        isSignUp ? 'Loading sign-up options' : 'Loading sign-in options'
+      }
       aria-busy='true'
     >
       <div className='mb-4 text-center'>
@@ -428,7 +440,8 @@ function AuthStableStartPlaceholder({
   );
 }
 
-function AuthProvidersUnavailable() {
+function AuthProvidersUnavailable({ mode }: Readonly<{ mode: AuthShellMode }>) {
+  const isSignUp = mode === 'sign-up';
   return (
     <div
       data-auth-providers-unavailable
@@ -436,7 +449,9 @@ function AuthProvidersUnavailable() {
       role='status'
     >
       <p className='text-[clamp(1.25rem,2.2vw,1.625rem)] font-[680] leading-[1.15] tracking-[-0.02em] text-white'>
-        Sign-in is temporarily unavailable
+        {isSignUp
+          ? 'Sign-up is temporarily unavailable'
+          : 'Sign-in is temporarily unavailable'}
       </p>
       <p className='mt-3 text-[0.9rem] leading-[1.5] text-white/72'>
         Our sign-in providers are offline. Please try again in a few minutes, or{' '}

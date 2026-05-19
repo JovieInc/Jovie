@@ -206,7 +206,7 @@ describe('clerk-config-audit cron', () => {
 
     const outcome = await audit();
 
-    expect(outcome.ok).toBe(true); // No violations — one instance just failed to probe.
+    expect(outcome.ok).toBe(false); // Probe failure means loss of audit coverage (no longer silently reports success).
     const prod = outcome.results.find(r => r.label === 'production');
     expect(prod?.probed).toBe(false);
     expect(prod?.error).toMatch(/HTTP 500/);
@@ -225,7 +225,7 @@ describe('clerk-config-audit cron', () => {
 
     const outcome = await audit();
 
-    expect(outcome.ok).toBe(true);
+    expect(outcome.ok).toBe(false);
     const staging = outcome.results.find(r => r.label === 'staging');
     expect(staging?.probed).toBe(false);
     expect(staging?.error).toBe('publishable_key_missing');

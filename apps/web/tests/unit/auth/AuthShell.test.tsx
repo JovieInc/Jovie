@@ -166,6 +166,16 @@ describe('AuthShell — JOV-2446 SSO-only contract', () => {
     expect(elements?.formFieldLabel__identifier).toBe('hidden');
     expect(elements?.formFieldLabel__emailAddress).toBe('hidden');
     expect(elements?.formFieldLabel__password).toBe('hidden');
+    // Username/phone (forbidden by audit; assert defense-in-depth hides)
+    expect(elements?.formFieldRow__username).toBe('hidden');
+    expect(elements?.formField__username).toBe('hidden');
+    expect(elements?.formFieldInput__username).toBe('hidden');
+    expect(elements?.formFieldLabel__username).toBe('hidden');
+    expect(elements?.formFieldRow__phoneNumber).toBe('hidden');
+    expect(elements?.formField__phoneNumber).toBe('hidden');
+    expect(elements?.formFieldInput__phoneNumber).toBe('hidden');
+    expect(elements?.formFieldLabel__phoneNumber).toBe('hidden');
+    expect(elements?.formattedPhoneNumberInput).toBe('hidden');
     // Verification-step fields
     expect(elements?.formFieldInput__code).toBe('hidden');
     expect(elements?.otpCodeFieldInput).toBe('hidden');

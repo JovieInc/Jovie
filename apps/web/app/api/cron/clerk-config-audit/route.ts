@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { decodeFapiHostFromPublishableKey } from '@/lib/auth/decode-fapi-host';
 import { verifyCronRequest } from '@/lib/cron/auth';
+import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 
@@ -68,12 +69,11 @@ function getInstances(): readonly ClerkInstance[] {
     {
       label: 'production',
       publishableKey:
-        process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.trim() || undefined,
+        env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.trim() || undefined,
     },
     {
       label: 'staging',
-      publishableKey:
-        process.env.CLERK_PUBLISHABLE_KEY_STAGING?.trim() || undefined,
+      publishableKey: env.CLERK_PUBLISHABLE_KEY_STAGING?.trim() || undefined,
     },
   ];
 }
@@ -83,32 +83,25 @@ async function fetchEnvironmentJson(
   publishableKey: string
 ): Promise<Record<string, unknown>> {
   const url = `https://${fapiHost}/v1/environment?_clerk_js_version=5.0.0`;
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10_000);
+  const response = await fetch(url, {
+    headers: {
+      Accept: 'application/json',
+      // Clerk FAPI accepts the publishable key in both Authorization and
+      // the `Clerk-Frontend-Api-Key` style; Authorization works for both
+      // live and test instances and is what `@clerk/clerk-js` sends.
+      Authorization: publishableKey,
+    },
+    signal: AbortSignal.timeout(10_000),
+    cache: 'no-store',
+  });
 
-  try {
-    const response = await fetch(url, {
-      headers: {
-        Accept: 'application/json',
-        // Clerk FAPI accepts the publishable key in both Authorization and
-        // the `Clerk-Frontend-Api-Key` style; Authorization works for both
-        // live and test instances and is what `@clerk/clerk-js` sends.
-        Authorization: publishableKey,
-      },
-      signal: controller.signal,
-      cache: 'no-store',
-    });
-
-    if (!response.ok) {
-      throw new Error(
-        `Clerk FAPI environment returned HTTP ${response.status}: ${response.statusText}`
-      );
-    }
-
-    return (await response.json()) as Record<string, unknown>;
-  } finally {
-    clearTimeout(timeout);
+  if (!response.ok) {
+    throw new Error(
+      `Clerk FAPI environment returned HTTP ${response.status}: ${response.statusText}`
+    );
   }
+
+  return (await response.json()) as Record<string, unknown>;
 }
 
 function asStringArray(value: unknown): readonly string[] {
@@ -253,8 +246,10 @@ export async function auditClerkInstances(
       result.forbiddenIdentifications.length > 0
   );
 
+  const ok = violations.length === 0 && results.every(r => r.probed);
+
   return {
-    ok: violations.length === 0,
+    ok,
     results,
     violations,
   };
@@ -293,7 +288,7 @@ export async function GET(request: Request) {
       })),
     });
 
-    if (!outcome.ok) {
+    if (outcome.violations.length > 0) {
       const message = formatViolationMessage(outcome.violations);
       logger.error('[clerk-config-audit] VIOLATION', { message });
       await captureError(
