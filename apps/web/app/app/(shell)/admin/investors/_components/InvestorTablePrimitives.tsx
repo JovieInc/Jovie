@@ -1,4 +1,13 @@
 import type { ReactNode } from 'react';
+import {
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableHeaderRow,
+  TableRoot,
+  TableRow,
+} from '@/components/organisms/table';
 import { cn } from '@/lib/utils';
 
 export function InvestorTable({
@@ -10,9 +19,9 @@ export function InvestorTable({
 }>) {
   return (
     <div className='overflow-x-auto'>
-      <table className={cn('w-full border-collapse text-app', minWidth)}>
+      <TableRoot className={cn('w-full border-collapse text-app', minWidth)}>
         {children}
-      </table>
+      </TableRoot>
     </div>
   );
 }
@@ -20,16 +29,22 @@ export function InvestorTable({
 export function InvestorTableHead({
   children,
 }: Readonly<{ children: ReactNode }>) {
-  return <thead className='bg-surface-0'>{children}</thead>;
+  return <TableHead className='bg-surface-0'>{children}</TableHead>;
+}
+
+export function InvestorTableBody({
+  children,
+}: Readonly<{ children: ReactNode }>) {
+  return <TableBody>{children}</TableBody>;
 }
 
 export function InvestorTableHeaderRow({
   children,
 }: Readonly<{ children: ReactNode }>) {
   return (
-    <tr className='border-b border-subtle text-left text-2xs font-caption text-secondary-token'>
+    <TableHeaderRow className='border-b border-subtle text-left text-2xs font-caption text-secondary-token'>
       {children}
-    </tr>
+    </TableHeaderRow>
   );
 }
 
@@ -43,15 +58,13 @@ export function InvestorTableHeaderCell({
   className?: string;
 }>) {
   return (
-    <th
-      className={cn(
-        'px-4 py-2.5 font-medium',
-        align === 'right' && 'text-right',
-        className
-      )}
+    <TableHeaderCell
+      align={align}
+      sticky={false}
+      className={cn('px-4 py-2.5 font-medium', className)}
     >
       {children}
-    </th>
+    </TableHeaderCell>
   );
 }
 
@@ -59,9 +72,9 @@ export function InvestorTableRow({
   children,
 }: Readonly<{ children: ReactNode }>) {
   return (
-    <tr className='border-b border-subtle bg-transparent transition-colors duration-subtle hover:bg-surface-0'>
+    <TableRow className='border-b border-subtle bg-transparent transition-colors duration-subtle hover:bg-surface-0'>
       {children}
-    </tr>
+    </TableRow>
   );
 }
 
@@ -75,14 +88,11 @@ export function InvestorTableCell({
   className?: string;
 }>) {
   return (
-    <td
-      className={cn(
-        'px-4 py-3 align-middle',
-        align === 'right' && 'text-right',
-        className
-      )}
+    <TableCell
+      align={align}
+      className={cn('px-4 py-3 align-middle', className)}
     >
       {children}
-    </td>
+    </TableCell>
   );
 }

@@ -31,6 +31,7 @@ import { BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   InvestorTable,
+  InvestorTableBody,
   InvestorTableCell,
   InvestorTableHead,
   InvestorTableHeaderCell,
@@ -593,7 +594,7 @@ export function InvestorLinksManager() {
                 </InvestorTableHeaderCell>
               </InvestorTableHeaderRow>
             </InvestorTableHead>
-            <tbody>
+            <InvestorTableBody>
               {links.map(link => (
                 <InvestorTableRow key={link.id}>
                   <InvestorTableCell>
@@ -631,7 +632,7 @@ export function InvestorLinksManager() {
                   </InvestorTableCell>
                 </InvestorTableRow>
               ))}
-            </tbody>
+            </InvestorTableBody>
           </InvestorTable>
         )}
       </ContentSurfaceCard>
