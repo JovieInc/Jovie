@@ -9,6 +9,8 @@ import {
   useSidebar,
 } from '@/components/organisms/Sidebar';
 import { UnifiedSidebar } from '@/components/organisms/UnifiedSidebar';
+import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurface';
+import { useOptionalHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useRightPanel } from '@/contexts/RightPanelContext';
 import { DashboardHeader } from '@/features/dashboard/organisms/DashboardHeader';
 import { DashboardMobileTabs } from '@/features/dashboard/organisms/DashboardMobileTabs';
@@ -46,6 +48,7 @@ function AuthShellInner({
   const { isMobile } = useSidebar();
   const rightPanel = useRightPanel();
   const previewPanelState = usePreviewPanelState();
+  const headerActionsState = useOptionalHeaderActions();
   const shellChatV1Enabled = useAppFlag('DESIGN_V1');
 
   const sidebarTrigger = isMobile ? null : <SidebarTrigger />;
@@ -65,6 +68,13 @@ function AuthShellInner({
     () => (showMobileTabs ? <DashboardMobileTabs /> : null),
     [showMobileTabs]
   );
+  const searchSurface = useMemo(() => {
+    if (!headerActionsState?.headerSearchAdapter) {
+      return null;
+    }
+
+    return <HeaderSearchSurfaceFromContext className='w-full sm:w-auto' />;
+  }, [headerActionsState?.headerSearchAdapter]);
   const shellVariant = shellChatV1Enabled ? 'shellChatV1' : 'legacy';
   const audioPlayer = useMemo(
     () => <PersistentAudioBar variant={shellVariant} />,
@@ -81,6 +91,8 @@ function AuthShellInner({
             sidebarTrigger={sidebarTrigger}
             breadcrumbSuffix={headerBadge}
             action={headerAction}
+            searchSurface={searchSurface}
+            isSearchActive={headerActionsState?.isSearchOpen ?? false}
             mobileProfileSlot={
               <MobileProfileDrawer onOpen={previewPanelState.toggle} />
             }

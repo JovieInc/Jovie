@@ -39,7 +39,10 @@ export function SidebarBottomNowPlayingBridge() {
   }
 
   return (
-    <div className='px-2 pb-2'>
+    <div
+      data-shell-audio-surface='sidebar-compact'
+      className='px-2 pb-2 pt-1 transition-[opacity,transform] duration-cinematic ease-cinematic'
+    >
       <SidebarBottomNowPlaying
         track={{
           trackTitle: playbackState.trackTitle,
@@ -48,6 +51,7 @@ export function SidebarBottomNowPlayingBridge() {
         }}
         isPlaying={playbackState.isPlaying}
         onPlay={handlePlay}
+        className='border border-(--linear-app-shell-border)/75 bg-[color-mix(in_oklab,var(--linear-app-content-surface)_94%,var(--linear-bg-surface-0))] shadow-[0_10px_24px_rgba(0,0,0,0.12)] transition-[opacity,transform,border-color,background-color] duration-cinematic ease-cinematic'
       />
     </div>
   );

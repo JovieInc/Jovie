@@ -277,6 +277,14 @@ describe('PersistentAudioBar', () => {
     expect(
       screen.getByRole('button', { name: 'Hide waveform' })
     ).toBeInTheDocument();
+    expect(screen.getByTestId('audio-surface-expanded-shell')).toHaveAttribute(
+      'aria-hidden',
+      'false'
+    );
+    expect(screen.getByTestId('audio-surface-compact-shell')).toHaveAttribute(
+      'aria-hidden',
+      'true'
+    );
   });
 
   it('links the shell V1 lyrics button to the active track when DESIGN_V1 is enabled', async () => {
@@ -392,6 +400,24 @@ describe('PersistentAudioBar', () => {
       id: 'track-1',
       title: 'Midnight Drive',
     });
+  });
+
+  it('swaps shell audio surfaces when the player is minimized', async () => {
+    const user = userEvent.setup();
+    setPlaying({ artistName: 'DJ Cool' });
+
+    render(<PersistentAudioBar variant='shellChatV1' />);
+
+    const expandedSurface = screen.getByTestId('audio-surface-expanded-shell');
+    const compactSurface = screen.getByTestId('audio-surface-compact-shell');
+
+    expect(expandedSurface).toHaveAttribute('aria-hidden', 'false');
+    expect(compactSurface).toHaveAttribute('aria-hidden', 'true');
+
+    await user.click(screen.getByRole('button', { name: 'Minimize player' }));
+
+    expect(expandedSurface).toHaveAttribute('aria-hidden', 'true');
+    expect(compactSurface).toHaveAttribute('aria-hidden', 'false');
   });
 
   it('publishes compact shell V1 chrome state while minimized and clears on unmount', async () => {
