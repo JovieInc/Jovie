@@ -140,21 +140,27 @@ describe('@critical DashboardShellContent behavior contracts', () => {
     });
   });
 
-  describe('essential shell skips HydrateClient wrapper', () => {
-    it('chat route is essential (no HydrateClient/FeatureFlagsProvider)', () => {
+  describe('shell hydration wrapper is stable for frame persistence (Wave 3)', () => {
+    it('all shell routes (essential or full) now share identical client tree root via HydrateClient for no-remount warm nav', () => {
+      // Critical for shell frame persistence: DashboardShellContent always returns
+      // <HydrateClient> <AppFlagProvider> ... <AuthShellWrapper> <AppShellFrame> ...
+      // regardless of useEssentialShell. This prevents remount of the chrome on
+      // transitions between lightweight routes (chat/library/releases/...) and
+      // full-data routes (earnings, etc.). Sidebar state, audio, and shell UI
+      // survive client-side /app/* navigation with no blank/dark frames.
+      expect(shouldUseEssentialShellData('/app/chat')).toBe(true);
+      expect(shouldUseEssentialShellData(APP_ROUTES.EARNINGS)).toBe(false);
       expect(isChatShellRoute('/app/chat')).toBe(true);
-      // The component renders shellContents directly for essential routes
-      // instead of wrapping in HydrateClient + FeatureFlagsProvider
     });
 
-    it('optimized settings route is essential but not a chat route', () => {
+    it('optimized settings route is essential (fast path) but still gets stable wrapper', () => {
       expect(shouldUseEssentialShellData(APP_ROUTES.SETTINGS_CONTACTS)).toBe(
         true
       );
       expect(isChatShellRoute(APP_ROUTES.SETTINGS_CONTACTS)).toBe(false);
     });
 
-    it('artist profile settings route uses route-owned hydration', () => {
+    it('artist profile settings route uses essential data + stable hydration root', () => {
       expect(
         shouldUseEssentialShellData(APP_ROUTES.SETTINGS_ARTIST_PROFILE)
       ).toBe(true);
