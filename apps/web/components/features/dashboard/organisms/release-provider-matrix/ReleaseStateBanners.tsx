@@ -1,26 +1,10 @@
 'use client';
 
-import { lazy, Suspense } from 'react';
 import type { ReleaseViewModel } from '@/lib/discography/types';
+import { AppleMusicSyncBanner } from './AppleMusicSyncBanner';
+import { ImportProgressBanner } from './ImportProgressBanner';
+import { SmartLinkGateBanner } from './SmartLinkGateBanner';
 import { SMART_LINK_SOFT_CAP } from './smart-link-gating';
-
-const ImportProgressBanner = lazy(() =>
-  import('./ImportProgressBanner').then(m => ({
-    default: m.ImportProgressBanner,
-  }))
-);
-
-const AppleMusicSyncBanner = lazy(() =>
-  import('./AppleMusicSyncBanner').then(m => ({
-    default: m.AppleMusicSyncBanner,
-  }))
-);
-
-const SmartLinkGateBanner = lazy(() =>
-  import('./SmartLinkGateBanner').then(m => ({
-    default: m.SmartLinkGateBanner,
-  }))
-);
 
 interface ReleaseStateBannersProps {
   readonly rows: ReleaseViewModel[];
@@ -64,14 +48,12 @@ export function ReleaseStateBanners({
     <>
       {showImportProgress && (
         <div className='mx-3 lg:mx-4 mt-3'>
-          <Suspense fallback={null}>
-            <ImportProgressBanner
-              artistName={artistName}
-              importedCount={importedCount}
-              totalCount={totalCount}
-              visible={showImportProgress}
-            />
-          </Suspense>
+          <ImportProgressBanner
+            artistName={artistName}
+            importedCount={importedCount}
+            totalCount={totalCount}
+            visible={showImportProgress}
+          />
         </div>
       )}
 
@@ -79,39 +61,33 @@ export function ReleaseStateBanners({
         firstProfileId &&
         !isAppleMusicConnected &&
         !isImporting && (
-          <Suspense fallback={null}>
-            <AppleMusicSyncBanner
-              profileId={firstProfileId}
-              spotifyConnected={isSpotifyConnected}
-              releases={rows}
-              onMatchStatusChange={onAppleMusicMatchStatusChange}
-              className='mx-3 lg:mx-4 mt-3'
-            />
-          </Suspense>
+          <AppleMusicSyncBanner
+            profileId={firstProfileId}
+            spotifyConnected={isSpotifyConnected}
+            releases={rows}
+            onMatchStatusChange={onAppleMusicMatchStatusChange}
+            className='mx-3 lg:mx-4 mt-3'
+          />
         )}
 
       {showReleasesTable && !isPro && releasedCount > SMART_LINK_SOFT_CAP && (
-        <Suspense fallback={null}>
-          <SmartLinkGateBanner
-            mode='soft-cap'
-            releasedCount={releasedCount}
-            softCap={SMART_LINK_SOFT_CAP}
-            className='mx-3 lg:mx-4 mt-3'
-          />
-        </Suspense>
+        <SmartLinkGateBanner
+          mode='soft-cap'
+          releasedCount={releasedCount}
+          softCap={SMART_LINK_SOFT_CAP}
+          className='mx-3 lg:mx-4 mt-3'
+        />
       )}
 
       {showReleasesTable &&
         !isPro &&
         !canAccessFutureReleases &&
         unreleasedCount > 0 && (
-          <Suspense fallback={null}>
-            <SmartLinkGateBanner
-              mode='unreleased'
-              unreleasedCount={unreleasedCount}
-              className='mx-3 lg:mx-4 mt-3'
-            />
-          </Suspense>
+          <SmartLinkGateBanner
+            mode='unreleased'
+            unreleasedCount={unreleasedCount}
+            className='mx-3 lg:mx-4 mt-3'
+          />
         )}
     </>
   );
