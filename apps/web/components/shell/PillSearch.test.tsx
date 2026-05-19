@@ -25,9 +25,7 @@ function setup(
 describe('PillSearch', () => {
   it('renders the search input with the empty placeholder', () => {
     setup();
-    expect(
-      screen.getByPlaceholderText('Type to filter — / for fields')
-    ).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Type to filter')).toBeInTheDocument();
   });
 
   it('uses a quiet tokenized focus ring instead of the cyan input ring', () => {
@@ -44,9 +42,7 @@ describe('PillSearch', () => {
     setup({
       pills: [{ id: '1', field: 'artist', op: 'is', values: ['Frank Ocean'] }],
     });
-    expect(
-      screen.getByPlaceholderText('and… (/ for fields)')
-    ).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('and…')).toBeInTheDocument();
   });
 
   it('opens suggestions and commits a fuzzy artist match on Enter', () => {

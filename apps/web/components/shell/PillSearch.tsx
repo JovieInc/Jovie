@@ -157,7 +157,7 @@ export function PillSearch({
   hasOptions = HAS_VALUES,
   onClose,
   ariaLabel = 'Filter tracks',
-  placeholder = 'Type to filter — / for fields',
+  placeholder = 'Type to filter',
   allowedFields,
 }: PillSearchProps) {
   const [text, setText] = useState('');
@@ -401,7 +401,7 @@ export function PillSearch({
           aria-controls={listboxId}
           aria-autocomplete='list'
           aria-activedescendant={activeOptionId}
-          placeholder={pills.length === 0 ? placeholder : 'and… (/ for fields)'}
+          placeholder={pills.length === 0 ? placeholder : 'and…'}
           className='flex-1 min-w-[120px] rounded-sm bg-transparent text-[13px] text-primary-token outline-none placeholder:text-tertiary-token focus:outline-none focus:ring-0 focus:shadow-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/25 focus-visible:ring-offset-0 focus-visible:shadow-none'
         />
         <button

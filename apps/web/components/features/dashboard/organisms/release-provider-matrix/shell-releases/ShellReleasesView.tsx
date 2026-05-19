@@ -800,7 +800,7 @@ export function ShellReleasesView({
       visibleCount: visibleReleases.length,
       triggerLabel: 'Filter',
       ariaLabel: 'Filter releases',
-      placeholder: 'Filter releases - / for fields',
+      placeholder: 'Filter releases',
       allowedFields: ['artist', 'title', 'album', 'status', 'has'] as const,
     }),
     [
