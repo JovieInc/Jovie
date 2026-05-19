@@ -33,6 +33,12 @@ interface PersistentAudioBarProps {
 
 const SHELL_AUDIO_BAR_TRANSITION =
   'max-height var(--duration-cinematic) var(--ease-cinematic), opacity var(--duration-cinematic) var(--ease-cinematic), transform var(--duration-cinematic) var(--ease-cinematic)';
+const SHELL_AUDIO_CHROME_TRANSITION_CLASSNAME =
+  'transition-[max-height,opacity,transform,border-color,background-color] duration-cinematic ease-cinematic';
+const SHELL_NOW_PLAYING_CARD_CLASSNAME =
+  'max-w-56 rounded-lg border border-(--linear-app-shell-border)/75 bg-[color-mix(in_oklab,var(--linear-app-content-surface)_94%,var(--linear-bg-surface-0))] px-2 py-2 shadow-[0_10px_24px_rgba(0,0,0,0.12)] transition-[opacity,transform] duration-cinematic ease-cinematic';
+const SHELL_NOW_PLAYING_ROW_CLASSNAME =
+  'max-w-64 border border-(--linear-app-shell-border)/75 bg-[color-mix(in_oklab,var(--linear-app-content-surface)_94%,var(--linear-bg-surface-0))] shadow-[0_10px_24px_rgba(0,0,0,0.12)] transition-[opacity,transform,border-color,background-color] duration-cinematic ease-cinematic';
 
 function isLyricsRoutePath(pathname: string | null): boolean {
   return (
@@ -352,8 +358,13 @@ export function PersistentAudioBar({
   return (
     <>
       <div
+        data-testid='audio-surface-expanded-shell'
+        data-shell-audio-surface='persistent-expanded'
         aria-hidden={barCollapsed}
-        className='hidden shrink-0 overflow-hidden border-t border-(--linear-app-shell-border) bg-(--linear-bg-page) lg:block'
+        className={cn(
+          'hidden shrink-0 overflow-hidden border-t border-(--linear-app-shell-border) bg-(--linear-bg-page) lg:block',
+          SHELL_AUDIO_CHROME_TRANSITION_CLASSNAME
+        )}
         style={{
           maxHeight: barCollapsed
             ? 0
@@ -370,7 +381,7 @@ export function PersistentAudioBar({
             isPlaying={playbackState.isPlaying}
             onPlay={handleToggle}
             playOverlayVisible={false}
-            className='max-w-56'
+            className={SHELL_NOW_PLAYING_CARD_CLASSNAME}
           />
         </div>
         <AudioBar
@@ -391,8 +402,13 @@ export function PersistentAudioBar({
         />
       </div>
       <div
+        data-testid='audio-surface-compact-shell'
+        data-shell-audio-surface='persistent-compact'
         aria-hidden={!barCollapsed}
-        className='hidden shrink-0 overflow-hidden border-t border-(--linear-app-shell-border) bg-(--linear-app-content-surface) px-3 lg:block'
+        className={cn(
+          'hidden shrink-0 overflow-hidden border-t border-(--linear-app-shell-border) bg-(--linear-app-content-surface) px-3 lg:block',
+          SHELL_AUDIO_CHROME_TRANSITION_CLASSNAME
+        )}
         style={{
           maxHeight: barCollapsed
             ? 'var(--linear-app-audio-compact-height)'
@@ -407,7 +423,7 @@ export function PersistentAudioBar({
           track={nowPlayingTrack}
           isPlaying={playbackState.isPlaying}
           onPlay={handleToggle}
-          className='my-2 max-w-64'
+          className={cn('my-2', SHELL_NOW_PLAYING_ROW_CLASSNAME)}
         />
       </div>
       {legacyBar('lg:hidden')}

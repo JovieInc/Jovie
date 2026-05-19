@@ -18,7 +18,7 @@ interface HeaderSearchSurfaceProps {
 }
 
 const headerSearchSurfaceChrome =
-  'rounded-[10px] border border-(--linear-app-shell-border) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))]';
+  'rounded-[12px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) shadow-[0_0_0_1px_color-mix(in_oklab,var(--linear-app-frame-seam)_18%,transparent)]';
 
 /**
  * Shell-owned search surface that morphs between a compact trigger button
@@ -54,7 +54,7 @@ export function HeaderSearchSurface({
         onClick={onOpen}
         className={cn(
           headerSearchSurfaceChrome,
-          'inline-flex h-7 min-w-0 items-center gap-1.5 px-2.5 text-[12px] text-secondary-token transition-[background-color,border-color,color] duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
+          'inline-flex h-7 min-w-0 items-center gap-1.5 px-2.5 text-[12px] text-secondary-token transition-[background-color,border-color,color,box-shadow] duration-cinematic ease-cinematic hover:border-default hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
           className
         )}
         aria-label={adapter.ariaLabel ?? adapter.triggerLabel}
@@ -74,7 +74,7 @@ export function HeaderSearchSurface({
     <div
       className={cn(
         headerSearchSurfaceChrome,
-        'w-full max-w-[min(560px,calc(100vw-2rem))] px-2 py-1 shadow-[0_10px_32px_rgba(0,0,0,0.16)] sm:w-[440px] lg:w-[520px]',
+        'w-full max-w-[min(560px,calc(100vw-2rem))] px-2 py-1 shadow-popover sm:w-[440px] lg:w-[520px]',
         className
       )}
     >

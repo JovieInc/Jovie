@@ -60,4 +60,19 @@ describe('SidebarNowPlaying', () => {
     );
     expect(container.querySelector('span.bg-emerald-400')).toBeInTheDocument();
   });
+
+  it('merges shell chrome classes from the caller', () => {
+    const { container } = render(
+      <SidebarNowPlaying
+        track={fullTrack}
+        isPlaying={false}
+        onPlay={() => {}}
+        playOverlayVisible={false}
+        className='ring-1 ring-primary'
+      />
+    );
+
+    expect(container.firstChild).toHaveClass('ring-1');
+    expect(container.firstChild).toHaveClass('ring-primary');
+  });
 });
