@@ -147,7 +147,7 @@ export function ContextMenuOverlay({
                 onClose();
               }}
               className={cn(
-                'relative group/mi w-full flex items-center gap-2.5 h-7 px-2 rounded-md text-[12.5px] font-caption text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token transition-colors duration-150 ease-out',
+                'relative group/mi w-full flex items-center gap-2.5 h-7 px-2 rounded-md text-[12.5px] font-caption text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token transition-colors duration-subtle ease-subtle',
                 item.disabled
                   ? 'opacity-50 cursor-not-allowed text-secondary-token'
                   : item.tone === 'danger'

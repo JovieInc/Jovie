@@ -41,7 +41,7 @@ export function PickerAction({
       onClick={onClick}
       aria-pressed={Boolean(active)}
       className={cn(
-        'w-full flex items-center justify-between h-6 px-1.5 rounded text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token transition-colors duration-150 ease-out',
+        'w-full flex items-center justify-between h-6 px-1.5 rounded text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token transition-colors duration-subtle ease-subtle',
         active
           ? 'bg-surface-1 text-primary-token'
           : 'text-secondary-token hover:bg-surface-1 hover:text-primary-token',

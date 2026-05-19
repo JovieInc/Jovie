@@ -48,7 +48,7 @@ export function Tooltip({
         className={cn(
           'pointer-events-none absolute z-50 whitespace-nowrap',
           'opacity-0 group-hover/tip:opacity-100 group-focus-within/tip:opacity-100',
-          'transition-[opacity,transform] duration-150 ease-out delay-[400ms] group-hover/tip:delay-[400ms] group-focus-within/tip:delay-[80ms]',
+          'transition-[opacity,transform] duration-subtle ease-subtle delay-[400ms] group-hover/tip:delay-[400ms] group-focus-within/tip:delay-[80ms]',
           sideClasses
         )}
       >

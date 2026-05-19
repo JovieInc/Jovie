@@ -65,7 +65,7 @@ export function LyricsList({
           <button
             type='button'
             onClick={onEdit}
-            className='text-[10.5px] uppercase tracking-[0.06em] text-quaternary-token hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token rounded transition-colors duration-150 ease-out'
+            className='text-[10.5px] uppercase tracking-[0.06em] text-quaternary-token hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token rounded transition-colors duration-subtle ease-subtle'
           >
             {editLabel}
           </button>
@@ -78,9 +78,9 @@ export function LyricsList({
               type='button'
               onClick={() => onSeek?.(line.at)}
               disabled={!onSeek}
-              className='group/lyric w-full flex items-start gap-2 px-2 py-1.5 rounded-md text-[12.5px] text-secondary-token hover:bg-surface-1/40 hover:text-primary-token disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token transition-colors duration-150 ease-out text-left'
+              className='group/lyric w-full flex items-start gap-2 px-2 py-1.5 rounded-md text-[12.5px] text-secondary-token hover:bg-surface-1/40 hover:text-primary-token disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token transition-colors duration-subtle ease-subtle text-left'
             >
-              <span className='shrink-0 w-9 pt-0.5 text-[10.5px] tabular-nums text-quaternary-token group-hover/lyric:text-tertiary-token transition-colors duration-150 ease-out'>
+              <span className='shrink-0 w-9 pt-0.5 text-[10.5px] tabular-nums text-quaternary-token group-hover/lyric:text-tertiary-token transition-colors duration-subtle ease-subtle'>
                 {formatLyricsTime(line.at)}
               </span>
               <span className='flex-1 leading-snug'>{line.text}</span>

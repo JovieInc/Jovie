@@ -153,7 +153,7 @@ export function SidebarThreadsSection({
                 type='button'
                 onClick={onRetry}
                 aria-label='Retry threads'
-                className='grid h-5 w-5 shrink-0 place-items-center rounded text-quaternary-token transition-[background-color] duration-fast ease-interactive hover:bg-sidebar-accent/55 hover:text-primary-token'
+                className='grid h-5 w-5 shrink-0 place-items-center rounded text-quaternary-token transition-[background-color] duration-subtle ease-subtle hover:bg-sidebar-accent/55 hover:text-primary-token'
               >
                 <RefreshCw
                   className='h-3 w-3'
@@ -169,7 +169,7 @@ export function SidebarThreadsSection({
             type='button'
             onClick={onNewThread}
             className={cn(
-              'flex items-center gap-2 rounded-md px-3 text-left text-tertiary-token transition-[background-color] duration-fast ease-interactive hover:bg-sidebar-accent/55 hover:text-primary-token',
+              'flex items-center gap-2 rounded-md px-3 text-left text-tertiary-token transition-[background-color] duration-subtle ease-subtle hover:bg-sidebar-accent/55 hover:text-primary-token',
               tight ? 'h-6 text-[12px]' : 'h-6.5 text-[12.5px]'
             )}
           >
@@ -186,7 +186,7 @@ export function SidebarThreadsSection({
           const unread = !!t.unread && !active;
           const hasThreadActions = Boolean(onThreadContextMenu);
           const rowClasses = cn(
-            'flex w-full min-w-0 items-center gap-2 rounded-md text-left transition-[background-color] duration-fast ease-interactive focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/35',
+            'flex w-full min-w-0 items-center gap-2 rounded-md text-left transition-[background-color] duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/35',
             tight ? 'h-6 pl-2.5' : 'h-6.5 pl-2.5',
             hasThreadActions ? 'pr-7' : 'pr-2',
             active
@@ -257,7 +257,7 @@ export function SidebarThreadsSection({
                     onClick={e => onThreadContextMenu(e, t)}
                     aria-label={`Thread actions for ${t.title}`}
                     className={cn(
-                      'absolute right-1 top-1/2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-md text-quaternary-token transition-[background-color,color,opacity] duration-subtle ease-out hover:bg-surface-1 hover:text-primary-token focus-visible:bg-surface-1 focus-visible:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/35',
+                      'absolute right-1 top-1/2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-md text-quaternary-token transition-[background-color,color,opacity] duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:bg-surface-1 focus-visible:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/35',
                       'opacity-0 group-hover/thread:opacity-100 focus-visible:opacity-100'
                     )}
                   >
@@ -278,7 +278,7 @@ export function SidebarThreadsSection({
         <button
           type='button'
           onClick={() => setExpanded(v => !v)}
-          className='w-full px-3 py-1 text-left text-[11px] font-medium text-quaternary-token transition-[background-color] duration-fast ease-interactive hover:text-secondary-token'
+          className='w-full px-3 py-1 text-left text-[11px] font-medium text-quaternary-token transition-[background-color] duration-subtle ease-subtle hover:text-secondary-token'
         >
           {expanded ? 'Show less' : 'View all'}
         </button>

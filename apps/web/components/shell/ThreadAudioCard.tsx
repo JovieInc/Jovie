@@ -41,7 +41,7 @@ export function ThreadAudioCard({
         type='button'
         onClick={onPlay}
         disabled={!onPlay}
-        className='h-8 w-8 rounded-full grid place-items-center bg-white text-black hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors duration-150 ease-out'
+        className='h-8 w-8 rounded-full grid place-items-center bg-white text-black hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors duration-subtle ease-subtle'
         aria-label='Play in global player'
       >
         <Play
