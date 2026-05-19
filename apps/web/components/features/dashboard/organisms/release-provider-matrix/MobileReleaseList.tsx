@@ -7,12 +7,14 @@ import {
   SwipeToRevealGroup,
 } from '@/components/atoms/SwipeToReveal';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
+import { ShellListRowButton } from '@/components/organisms/table';
 import { TypeBadge } from '@/components/shell/TypeBadge';
 import { mobileReleaseTokens } from '@/features/dashboard/tokens';
 import { formatCompactReleaseArtistLine } from '@/lib/discography/formatting';
 import { getReleaseTypeStyle } from '@/lib/discography/release-type-styles';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
+import { shellReleaseRowTypography } from './shell-releases/ShellReleaseRow';
 
 type SmartLinkLockReason = 'scheduled' | 'cap' | null;
 
@@ -225,16 +227,19 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
       className='border-b border-(--linear-app-frame-seam) last:border-b-0'
       contentClassName='bg-transparent'
     >
-      <button
+      <ShellListRowButton
         type='button'
         onClick={() => onEdit(release)}
-        className={mobileReleaseTokens.row.container}
+        className='flex h-14 w-full items-center gap-3 px-4 text-left'
         data-testid={`mobile-release-row-${release.id}`}
       >
         {/* Title + subtitle stacked — artwork hidden on mobile for density */}
         <div className='min-w-0 flex-1'>
           <div className='flex items-center gap-1.5'>
-            <TruncatedText lines={1} className={mobileReleaseTokens.row.title}>
+            <TruncatedText
+              lines={1}
+              className={shellReleaseRowTypography.title}
+            >
               {release.title}
             </TruncatedText>
             {/* Release type badge */}
@@ -243,7 +248,7 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
               className={mobileReleaseTokens.row.typeBadge}
             />
           </div>
-          <div className={mobileReleaseTokens.row.subtitle}>
+          <div className={shellReleaseRowTypography.subtitle}>
             {artistLine && <span>{artistLine}</span>}
             {artistLine && year && (
               <span className={mobileReleaseTokens.row.dot}>{' \u00B7 '}</span>
@@ -258,7 +263,7 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
           className={mobileReleaseTokens.row.chevron}
           aria-hidden='true'
         />
-      </button>
+      </ShellListRowButton>
     </SwipeToReveal>
   );
 });
