@@ -563,260 +563,244 @@ export function JovieChat({
           )}
         </AnimatePresence>
 
-        {showThreadView ? (
-          <div className='flex flex-1 flex-col overflow-hidden'>
-            {/* Messages area */}
-            <div
-              ref={scrollContainerRef}
-              className='relative flex flex-1 flex-col overflow-y-auto px-4 py-5 sm:px-5'
-              onScroll={onScroll}
-            >
-              {shouldVirtualizeMessages ? (
-                <div
-                  ref={totalSizeRef}
-                  className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col'
-                  style={{
-                    position: 'relative',
-                    height: Math.max(
-                      virtualizer.getTotalSize(),
-                      scrollContainerRef.current?.clientHeight ?? 0
-                    ),
-                  }}
-                >
-                  {virtualizer.getVirtualItems().map(virtualItem => {
-                    const message = displayMessages[virtualItem.index];
-                    const index = virtualItem.index;
-                    const isThinking = message.id === THINKING_PLACEHOLDER_ID;
-                    return (
-                      <div
-                        key={message.id}
-                        data-index={virtualItem.index}
-                        ref={virtualizer.measureElement}
+        {/* Persistent scroll viewport (flex-1) + morphing upper content.
+            The former hard switch (showThreadView ? thread-with-dock : centered-empty-with-dupe-composer)
+            is replaced by always-present bottom dock + AnimatePresence on the upper
+            (signals+heading+ornament+suggested vs. messages list). This is the exact
+            mechanical mirror of the OnboardingChat first-turn stabilization.
+            layoutId on ChatInput surface + dock position lock the geometry so hero↔compact
+            and empty↔thread transitions have zero jump or flicker. */}
+        <div className='flex flex-1 flex-col overflow-hidden'>
+          <div
+            ref={scrollContainerRef}
+            className='relative flex flex-1 flex-col overflow-y-auto px-4 py-5 sm:px-5'
+            onScroll={onScroll}
+          >
+            <AnimatePresence mode='popLayout' initial={false}>
+              {!showThreadView ? (
+                <div key='joviechat-empty-upper'>
+                  {/* Giant Jovie circle mark behind empty thread.
+                      Positioned absolute so it doesn't shift the welcome heading. */}
+                  <div
+                    aria-hidden
+                    className='pointer-events-none absolute inset-0 flex items-center justify-center select-none'
+                    data-testid='chat-empty-thread-ornament'
+                  >
+                    {shellChatV1Enabled ? (
+                      <JovieMarkElectric
+                        className='opacity-70'
                         style={{
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          width: '100%',
-                          transform: `translateY(${virtualItem.start}px)`,
+                          width: 'clamp(180px, 34vw, 360px)',
+                          height: 'clamp(180px, 34vw, 360px)',
+                          transform: 'translateY(-16px)',
+                          WebkitMaskImage:
+                            'radial-gradient(circle, rgba(0,0,0,1) 55%, rgba(0,0,0,0.75) 75%, rgba(0,0,0,0) 95%)',
+                          maskImage:
+                            'radial-gradient(circle, rgba(0,0,0,1) 55%, rgba(0,0,0,0.75) 75%, rgba(0,0,0,0) 95%)',
+                        }}
+                      />
+                    ) : (
+                      <span
+                        style={{
+                          fontFamily:
+                            'var(--font-display, "Satoshi", -apple-system, system-ui, sans-serif)',
+                          fontWeight: 600,
+                          fontSize: 'clamp(180px, 38vw, 360px)',
+                          color: 'rgba(255,255,255,0.018)',
+                          letterSpacing: '-0.08em',
+                          lineHeight: 0.8,
+                          transform: 'translateY(-12px)',
                         }}
                       >
-                        <div className='pb-4'>
-                          <ChatMessage
-                            id={message.id}
-                            role={message.role}
-                            parts={message.parts}
-                            isStreaming={
-                              isStreaming && index === lastAssistantIndex
-                            }
-                            isThinking={isThinking}
-                            avatarUrl={
-                              message.role === 'user' ? avatarUrl : undefined
-                            }
-                            profileId={profileId}
-                            skipEntrance={knownMessageIdsRef.current.has(
-                              message.id
-                            )}
+                        j
+                      </span>
+                    )}
+                  </div>
+
+                  <div
+                    className='relative mx-auto flex min-h-full w-full max-w-[52rem] flex-col gap-6 py-8'
+                    data-testid='chat-empty-state-composer-region'
+                  >
+                    <EmptyStateSignalCards dimmed={composerPickerOpen} />
+
+                    <h1
+                      className={cn(
+                        'text-balance text-center text-[2rem] font-semibold leading-[1.1] text-primary-token sm:text-[2.5rem] md:text-[3rem]',
+                        composerPickerOpen && 'pointer-events-none opacity-0'
+                      )}
+                      aria-hidden={composerPickerOpen ? 'true' : undefined}
+                    >
+                      {emptyStateHeading}
+                    </h1>
+
+                    <div className='mx-auto flex w-full max-w-[45rem] flex-col items-center gap-3'>
+                      {/* Suggested prompts rail lives in upper morph area (above persistent dock).
+                          Alerts, rate-limit, and errors are unified into the always-rendered dock
+                          below for parity with thread view and to remove duplicate composer chrome. */}
+                      {showStarterPrompts ? (
+                        <div
+                          className='w-full'
+                          data-testid='chat-empty-state-prompt-rail'
+                        >
+                          <SuggestedPrompts
+                            onSelect={handleSuggestedPromptWithJank}
+                            isFirstSession={isFirstSession}
+                            latestReleaseTitle={latestReleaseTitle}
+                            albumArtCapability={albumArtCapability}
+                            layout='rail'
                           />
                         </div>
-                      </div>
-                    );
-                  })}
+                      ) : null}
+                    </div>
+                  </div>
                 </div>
               ) : (
-                <div
-                  ref={totalSizeRef}
-                  className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col'
-                >
-                  {displayMessages.map((message, index) => {
-                    const isThinking = message.id === THINKING_PLACEHOLDER_ID;
-                    return (
-                      <div key={message.id} className='pb-4'>
-                        <ChatMessage
-                          id={message.id}
-                          role={message.role}
-                          parts={message.parts}
-                          isStreaming={
-                            isStreaming && index === lastAssistantIndex
-                          }
-                          isThinking={isThinking}
-                          avatarUrl={
-                            message.role === 'user' ? avatarUrl : undefined
-                          }
-                          profileId={profileId}
-                          skipEntrance={knownMessageIdsRef.current.has(
-                            message.id
-                          )}
-                        />
-                      </div>
-                    );
-                  })}
+                <div key='joviechat-messages'>
+                  {shouldVirtualizeMessages ? (
+                    <div
+                      ref={totalSizeRef}
+                      className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col'
+                      style={{
+                        position: 'relative',
+                        height: Math.max(
+                          virtualizer.getTotalSize(),
+                          scrollContainerRef.current?.clientHeight ?? 0
+                        ),
+                      }}
+                    >
+                      {virtualizer.getVirtualItems().map(virtualItem => {
+                        const message = displayMessages[virtualItem.index];
+                        const index = virtualItem.index;
+                        const isThinking =
+                          message.id === THINKING_PLACEHOLDER_ID;
+                        return (
+                          <div
+                            key={message.id}
+                            data-index={virtualItem.index}
+                            ref={virtualizer.measureElement}
+                            style={{
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              width: '100%',
+                              transform: `translateY(${virtualItem.start}px)`,
+                            }}
+                          >
+                            <div className='pb-4'>
+                              <ChatMessage
+                                id={message.id}
+                                role={message.role}
+                                parts={message.parts}
+                                isStreaming={
+                                  isStreaming && index === lastAssistantIndex
+                                }
+                                isThinking={isThinking}
+                                avatarUrl={
+                                  message.role === 'user'
+                                    ? avatarUrl
+                                    : undefined
+                                }
+                                profileId={profileId}
+                                skipEntrance={knownMessageIdsRef.current.has(
+                                  message.id
+                                )}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div
+                      ref={totalSizeRef}
+                      className='mx-auto flex min-h-full w-full max-w-[44rem] flex-col'
+                    >
+                      {displayMessages.map((message, index) => {
+                        const isThinking =
+                          message.id === THINKING_PLACEHOLDER_ID;
+                        return (
+                          <div key={message.id} className='pb-4'>
+                            <ChatMessage
+                              id={message.id}
+                              role={message.role}
+                              parts={message.parts}
+                              isStreaming={
+                                isStreaming && index === lastAssistantIndex
+                              }
+                              isThinking={isThinking}
+                              avatarUrl={
+                                message.role === 'user' ? avatarUrl : undefined
+                              }
+                              profileId={profileId}
+                              skipEntrance={knownMessageIdsRef.current.has(
+                                message.id
+                              )}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Scroll to bottom button */}
+                  <ScrollToBottom
+                    visible={!isStuckToBottom}
+                    onClick={scrollToBottom}
+                  />
+                </div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/*
+            Persistent always-bottom composer dock.
+            No more conditional + justify-center teleport for the input on first message.
+            Variant (hero/compact) changes are smoothed by the layoutId on the inner
+            motion surface. All transient chrome (alerts, rate, error) lives here for both
+            empty and thread states.
+          */}
+          <div className={CHAT_COMPOSER_DOCK_CLASSNAME}>
+            <div className='mx-auto w-full max-w-[45rem]'>
+              {/* Transient alerts stack above the input. Each contributes its
+                own bottom margin only when rendered. */}
+              <ChatUsageAlert />
+
+              {chatError && (
+                <div className='mb-2'>
+                  <ErrorDisplay
+                    chatError={chatError}
+                    onRetry={handleRetry}
+                    isLoading={isLoading}
+                    isSubmitting={isSubmitting}
+                  />
                 </div>
               )}
 
-              {/* Scroll to bottom button */}
-              <ScrollToBottom
-                visible={!isStuckToBottom}
-                onClick={scrollToBottom}
+              {isRateLimited && (
+                <p
+                  className='mb-1.5 text-xs text-tertiary-token'
+                  aria-live='polite'
+                >
+                  Sending too fast. Please wait a second before your next
+                  message.
+                </p>
+              )}
+
+              <ChatInput
+                {...chatInputProps}
+                placeholder={
+                  showThreadView ? 'Ask a follow-up...' : 'Ask Jovie...'
+                }
+                variant={showThreadView ? 'compact' : 'hero'}
+                shellChatV1={shellChatV1Enabled}
+                quickActions={
+                  showThreadView ? followUpQuickActions : starterQuickActions
+                }
+                onQuickActionSelect={handleSuggestedPromptWithJank}
               />
             </div>
-
-            {/*
-            Composer region anchors at the bottom (shrink-0 keeps it from
-            collapsing under flex-1 siblings). Wrapper padding is fixed, so
-            the input never jumps when transient alerts appear/disappear:
-            previously, ChatUsageAlert was wrapped in an always-rendered
-            `pt-3` div even when the alert returned null, leaving permanent
-            empty chrome that flipped to actual content the moment the alert
-            mounted. Now each alert opts in to its own bottom margin and is
-            unmounted entirely when empty.
-          */}
-            <div className={CHAT_COMPOSER_DOCK_CLASSNAME}>
-              <div className='mx-auto w-full max-w-[45rem]'>
-                {/* Transient alerts stack above the input. Each contributes its
-                  own bottom margin only when rendered, so toggling them does
-                  not leave residual padding behind. */}
-                <ChatUsageAlert />
-
-                {chatError && (
-                  <div className='mb-2'>
-                    <ErrorDisplay
-                      chatError={chatError}
-                      onRetry={handleRetry}
-                      isLoading={isLoading}
-                      isSubmitting={isSubmitting}
-                    />
-                  </div>
-                )}
-
-                {isRateLimited && (
-                  <p
-                    className='mb-1.5 text-xs text-tertiary-token'
-                    aria-live='polite'
-                  >
-                    Sending too fast. Please wait a second before your next
-                    message.
-                  </p>
-                )}
-
-                <ChatInput
-                  {...chatInputProps}
-                  placeholder='Ask a follow-up...'
-                  variant='compact'
-                  shellChatV1={shellChatV1Enabled}
-                  quickActions={followUpQuickActions}
-                  onQuickActionSelect={handleSuggestedPromptWithJank}
-                />
-              </div>
-            </div>
           </div>
-        ) : (
-          <div className='flex flex-1 flex-col overflow-hidden'>
-            <div className='relative flex-1 overflow-y-auto px-4 sm:px-6'>
-              {/* Giant Jovie circle mark behind empty thread.
-                Positioned absolute so it doesn't shift the welcome heading. */}
-              <div
-                aria-hidden
-                className='pointer-events-none absolute inset-0 flex items-center justify-center select-none'
-                data-testid='chat-empty-thread-ornament'
-              >
-                {shellChatV1Enabled ? (
-                  <JovieMarkElectric
-                    className='opacity-70'
-                    style={{
-                      width: 'clamp(180px, 34vw, 360px)',
-                      height: 'clamp(180px, 34vw, 360px)',
-                      transform: 'translateY(-16px)',
-                      WebkitMaskImage:
-                        'radial-gradient(circle, rgba(0,0,0,1) 55%, rgba(0,0,0,0.75) 75%, rgba(0,0,0,0) 95%)',
-                      maskImage:
-                        'radial-gradient(circle, rgba(0,0,0,1) 55%, rgba(0,0,0,0.75) 75%, rgba(0,0,0,0) 95%)',
-                    }}
-                  />
-                ) : (
-                  <span
-                    style={{
-                      fontFamily:
-                        'var(--font-display, "Satoshi", -apple-system, system-ui, sans-serif)',
-                      fontWeight: 600,
-                      fontSize: 'clamp(180px, 38vw, 360px)',
-                      color: 'rgba(255,255,255,0.018)',
-                      letterSpacing: '-0.08em',
-                      lineHeight: 0.8,
-                      transform: 'translateY(-12px)',
-                    }}
-                  >
-                    j
-                  </span>
-                )}
-              </div>
-              <div
-                className='relative mx-auto flex min-h-full w-full max-w-[52rem] flex-col items-center justify-center gap-6 py-8'
-                data-testid='chat-empty-state-composer-region'
-              >
-                <EmptyStateSignalCards dimmed={composerPickerOpen} />
-
-                <h1
-                  className={cn(
-                    'text-balance text-center text-[2rem] font-semibold leading-[1.1] text-primary-token sm:text-[2.5rem] md:text-[3rem]',
-                    composerPickerOpen && 'pointer-events-none opacity-0'
-                  )}
-                  aria-hidden={composerPickerOpen ? 'true' : undefined}
-                >
-                  {emptyStateHeading}
-                </h1>
-
-                <div className='mx-auto flex w-full max-w-[45rem] flex-col items-center gap-3'>
-                  <ChatUsageAlert />
-
-                  {isRateLimited && (
-                    <p
-                      className='text-center text-xs text-tertiary-token'
-                      aria-live='polite'
-                    >
-                      Sending too fast. Please wait a second before your next
-                      message.
-                    </p>
-                  )}
-
-                  <ChatInput
-                    {...chatInputProps}
-                    placeholder='Ask Jovie...'
-                    variant='hero'
-                    shellChatV1={shellChatV1Enabled}
-                    quickActions={starterQuickActions}
-                    onQuickActionSelect={handleSuggestedPromptWithJank}
-                  />
-
-                  {chatError && (
-                    <div className='w-full'>
-                      <ErrorDisplay
-                        chatError={chatError}
-                        onRetry={handleRetry}
-                        isLoading={isLoading}
-                        isSubmitting={isSubmitting}
-                      />
-                    </div>
-                  )}
-
-                  {showStarterPrompts ? (
-                    <div
-                      className='w-full'
-                      data-testid='chat-empty-state-prompt-rail'
-                    >
-                      <SuggestedPrompts
-                        onSelect={handleSuggestedPromptWithJank}
-                        isFirstSession={isFirstSession}
-                        latestReleaseTitle={latestReleaseTitle}
-                        albumArtCapability={albumArtCapability}
-                        layout='rail'
-                      />
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        </div>
       </div>
     </EntityResolutionProvider>
   );
