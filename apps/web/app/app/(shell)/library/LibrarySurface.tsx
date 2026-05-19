@@ -951,7 +951,7 @@ function AssetGrid({
   readonly onSelect: (id: string) => void;
 }) {
   return (
-    <div className='grid gap-3 p-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'>
+    <div className='grid gap-2.5 px-2.5 pb-2.5 pt-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'>
       {assets.map(asset => (
         <AssetCard
           key={asset.id}
