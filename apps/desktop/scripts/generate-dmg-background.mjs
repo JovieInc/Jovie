@@ -50,14 +50,6 @@ export function buildDmgBackgroundSvg({ year = getDesktopBuildYear() } = {}) {
       <stop offset="0.52" stop-color="#0B0D12"/>
       <stop offset="1" stop-color="#12101B"/>
     </linearGradient>
-    <radialGradient id="accent-left" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(204 184) rotate(52) scale(148 112)">
-      <stop stop-color="#715CFF" stop-opacity="0.20"/>
-      <stop offset="1" stop-color="#715CFF" stop-opacity="0"/>
-    </radialGradient>
-    <radialGradient id="accent-right" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(558 180) rotate(116) scale(156 112)">
-      <stop stop-color="#D76DFF" stop-opacity="0.14"/>
-      <stop offset="1" stop-color="#D76DFF" stop-opacity="0"/>
-    </radialGradient>
     <filter id="soft-shadow" x="-20%" y="-20%" width="140%" height="150%" color-interpolation-filters="sRGB">
       <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#000000" flood-opacity="0.34"/>
     </filter>
@@ -65,8 +57,6 @@ export function buildDmgBackgroundSvg({ year = getDesktopBuildYear() } = {}) {
   <rect width="${WIDTH}" height="${HEIGHT}" fill="#080A0D"/>
   <rect x="32" y="30" width="696" height="366" rx="22" fill="url(#stage-glow)" stroke="#242A33"/>
   <rect x="32" y="30" width="696" height="366" rx="22" fill="url(#jovie-grid)" opacity="0.66"/>
-  <rect x="32" y="30" width="696" height="366" rx="22" fill="url(#accent-left)"/>
-  <rect x="32" y="30" width="696" height="366" rx="22" fill="url(#accent-right)"/>
   <rect x="68" y="66" width="624" height="294" rx="18" fill="#090B0F" opacity="0.42"/>
   ${renderJovieMark({ x: 474, y: 86, size: 228, fill: '#F7F8FA', opacity: 0.055 })}
   <text x="380" y="86" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="24" font-weight="700" letter-spacing="0" fill="#F5F7FA">Install Jovie</text>
