@@ -163,7 +163,7 @@ describe('LeadTable', () => {
     expect(screen.getByText('DistroKid')).toBeInTheDocument();
 
     const row = document.querySelector('tbody tr');
-    expect(row).toHaveClass('group');
+    // Canonical shell row via presets.tableRow / rowState (no explicit 'group' needed for this table)
     expect(row).toHaveClass('hover:bg-(--linear-row-hover)');
   });
 

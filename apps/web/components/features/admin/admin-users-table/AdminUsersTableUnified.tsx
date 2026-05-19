@@ -30,6 +30,7 @@ import {
   ExportCSVButton,
   PAGE_TOOLBAR_END_GROUP_CLASS,
   PAGE_TOOLBAR_META_TEXT_CLASS,
+  rowState,
   TableBulkActionsToolbar,
   useRowSelection,
 } from '@/components/organisms/table';
@@ -586,8 +587,8 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
   const getRowClassName = useCallback(
     (row: AdminUserRow) =>
       row.id === selectedUser?.id
-        ? 'group cursor-pointer bg-(--linear-row-selected) hover:bg-(--linear-row-selected)'
-        : 'group cursor-pointer bg-transparent hover:bg-(--linear-row-hover)',
+        ? `group cursor-pointer ${rowState.selected}`
+        : `group cursor-pointer ${rowState.hover}`,
     [selectedUser?.id]
   );
 

@@ -24,7 +24,7 @@ import {
 } from 'react';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { TableEmptyState } from '@/components/organisms/table';
+import { rowState, TableEmptyState } from '@/components/organisms/table';
 import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import type { AgentRunArtifact, AgentRunStatus } from '@/lib/agent-os/artifact';
 import { cn } from '@/lib/utils';
@@ -415,9 +415,10 @@ const AGENT_OS_COLUMNS: ColumnDef<AgentRunArtifact, unknown>[] = [
 ];
 
 function getRowClassName(artifact: AgentRunArtifact) {
+  const hover = rowState.hover;
   return artifact.status === 'blocked' || artifact.status === 'failed'
-    ? 'group bg-surface-0 hover:bg-(--linear-row-hover)'
-    : 'group hover:bg-(--linear-row-hover)';
+    ? `group bg-surface-0 ${hover}`
+    : `group ${hover}`;
 }
 
 function ViewModeButton({

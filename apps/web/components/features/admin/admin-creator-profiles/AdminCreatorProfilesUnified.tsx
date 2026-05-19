@@ -18,6 +18,7 @@ import {
   ExportCSVButton,
   PAGE_TOOLBAR_END_GROUP_CLASS,
   PAGE_TOOLBAR_META_TEXT_CLASS,
+  rowState,
   TableBulkActionsToolbar,
   useRowSelection,
 } from '@/components/organisms/table';
@@ -419,14 +420,10 @@ export function AdminCreatorProfilesUnified({
     const isSelected = profile.id === selectedIdRef.current;
 
     if (isChecked || isSelected) {
-      return cn(
-        'group cursor-pointer bg-(--linear-row-selected) shadow-[inset_1px_0_0_0_var(--linear-border-focus)] hover:bg-(--linear-row-selected)'
-      );
+      return cn('group cursor-pointer', rowState.selected);
     }
 
-    return cn(
-      'group cursor-pointer bg-transparent transition-colors duration-100 ease-out hover:bg-(--linear-row-hover)'
-    );
+    return cn('group cursor-pointer', rowState.hover);
   }, []);
 
   // Register right panel with AuthShell instead of rendering inline.
