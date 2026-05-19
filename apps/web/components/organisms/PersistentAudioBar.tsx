@@ -32,13 +32,13 @@ interface PersistentAudioBarProps {
 }
 
 const SHELL_AUDIO_BAR_TRANSITION =
-  'max-height var(--duration-cinematic) var(--ease-cinematic), opacity var(--duration-cinematic) var(--ease-cinematic), transform var(--duration-cinematic) var(--ease-cinematic)';
+  'max-height var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), opacity var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), transform var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing)';
 const SHELL_AUDIO_CHROME_TRANSITION_CLASSNAME =
   'transition-[max-height,opacity,transform,border-color,background-color] duration-cinematic ease-cinematic';
 const SHELL_NOW_PLAYING_CARD_CLASSNAME =
-  'max-w-56 rounded-lg border border-(--linear-app-shell-border)/75 bg-[color-mix(in_oklab,var(--linear-app-content-surface)_94%,var(--linear-bg-surface-0))] px-2 py-2 shadow-[0_10px_24px_rgba(0,0,0,0.12)] transition-[opacity,transform] duration-cinematic ease-cinematic';
+  'max-w-56 rounded-lg border border-(--linear-app-shell-border)/75 bg-(--linear-app-content-surface) px-2 py-2 shadow-[0_10px_24px_rgba(0,0,0,0.12)] transition-[opacity,transform] duration-cinematic ease-cinematic';
 const SHELL_NOW_PLAYING_ROW_CLASSNAME =
-  'max-w-64 border border-(--linear-app-shell-border)/75 bg-[color-mix(in_oklab,var(--linear-app-content-surface)_94%,var(--linear-bg-surface-0))] shadow-[0_10px_24px_rgba(0,0,0,0.12)] transition-[opacity,transform,border-color,background-color] duration-cinematic ease-cinematic';
+  'max-w-64 border border-(--linear-app-shell-border)/75 bg-(--linear-app-content-surface) shadow-[0_10px_24px_rgba(0,0,0,0.12)] transition-[opacity,transform,border-color,background-color] duration-cinematic ease-cinematic';
 
 function isLyricsRoutePath(pathname: string | null): boolean {
   return (
