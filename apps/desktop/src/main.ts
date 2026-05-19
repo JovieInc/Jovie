@@ -436,6 +436,12 @@ function openPreferences(): void {
   showWindow(win);
 }
 
+function checkForUpdates(): void {
+  autoUpdater.checkForUpdates().catch(() => {
+    // Silent for manual menu trigger; background interval already covers logging / notifications
+  });
+}
+
 function buildViewMenu(): MenuItemConstructorOptions[] {
   const viewMenu: MenuItemConstructorOptions[] = [];
 
@@ -473,6 +479,10 @@ function buildApplicationMenu(): Menu {
         label: app.name,
         submenu: [
           { role: 'about' },
+          {
+            label: 'Check for Updates...',
+            click: checkForUpdates,
+          },
           { type: 'separator' },
           {
             label: 'Preferences...',
