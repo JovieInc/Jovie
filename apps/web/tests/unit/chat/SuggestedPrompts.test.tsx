@@ -36,6 +36,7 @@ describe('SuggestedPrompts', () => {
     expect(rail.className).not.toContain('md:overflow-visible');
     const row = rail.firstElementChild;
     expect(row?.className).toContain('snap-x');
+    expect(row?.className).toContain('flex-nowrap');
     expect(row?.className).not.toContain('flex-wrap');
     expect(row?.className).toContain('whitespace-nowrap');
   });
