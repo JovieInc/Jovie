@@ -108,7 +108,7 @@ export function SidebarThreadsSection({
 
   return (
     <div className='space-y-1'>
-      <div className='flex items-center justify-between px-3 pb-1 pt-1.5'>
+      <div className='flex items-center justify-between px-2.5 pb-1 pt-1.5'>
         <span className='text-[11px] font-medium text-quaternary-token'>
           Threads
         </span>
@@ -144,7 +144,7 @@ export function SidebarThreadsSection({
           <div
             className={cn(
               'flex items-center gap-2 rounded-md px-3 text-tertiary-token',
-              tight ? 'h-6 text-[12px]' : 'h-7 text-[12.5px]'
+              tight ? 'h-6 text-[12px]' : 'h-6.5 text-[12.5px]'
             )}
           >
             <span className='min-w-0 flex-1 truncate'>Threads unavailable</span>
@@ -153,7 +153,7 @@ export function SidebarThreadsSection({
                 type='button'
                 onClick={onRetry}
                 aria-label='Retry threads'
-                className='grid h-5 w-5 shrink-0 place-items-center rounded text-quaternary-token transition-colors duration-subtle ease-out hover:bg-sidebar-accent/55 hover:text-primary-token'
+                className='grid h-5 w-5 shrink-0 place-items-center rounded text-quaternary-token transition-[background-color] duration-fast ease-interactive hover:bg-sidebar-accent/55 hover:text-primary-token'
               >
                 <RefreshCw
                   className='h-3 w-3'
@@ -169,8 +169,8 @@ export function SidebarThreadsSection({
             type='button'
             onClick={onNewThread}
             className={cn(
-              'flex items-center gap-2 rounded-md px-3 text-left text-tertiary-token transition-colors duration-subtle ease-out hover:bg-sidebar-accent/55 hover:text-primary-token',
-              tight ? 'h-6 text-[12px]' : 'h-7 text-[12.5px]'
+              'flex items-center gap-2 rounded-md px-3 text-left text-tertiary-token transition-[background-color] duration-fast ease-interactive hover:bg-sidebar-accent/55 hover:text-primary-token',
+              tight ? 'h-6 text-[12px]' : 'h-6.5 text-[12.5px]'
             )}
           >
             <MessageSquarePlus
@@ -186,8 +186,8 @@ export function SidebarThreadsSection({
           const unread = !!t.unread && !active;
           const hasThreadActions = Boolean(onThreadContextMenu);
           const rowClasses = cn(
-            'flex w-full min-w-0 items-center gap-2 rounded-md text-left transition-colors duration-subtle ease-out focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/35',
-            tight ? 'h-6 pl-2.5' : 'h-7 pl-3',
+            'flex w-full min-w-0 items-center gap-2 rounded-md text-left transition-[background-color] duration-fast ease-interactive focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/35',
+            tight ? 'h-6 pl-2.5' : 'h-6.5 pl-2.5',
             hasThreadActions ? 'pr-7' : 'pr-2',
             active
               ? 'bg-surface-1 text-primary-token'
@@ -278,7 +278,7 @@ export function SidebarThreadsSection({
         <button
           type='button'
           onClick={() => setExpanded(v => !v)}
-          className='w-full px-3 py-1 text-left text-[11px] font-medium text-quaternary-token transition-colors duration-subtle ease-out hover:text-secondary-token'
+          className='w-full px-3 py-1 text-left text-[11px] font-medium text-quaternary-token transition-[background-color] duration-fast ease-interactive hover:text-secondary-token'
         >
           {expanded ? 'Show less' : 'View all'}
         </button>
