@@ -349,6 +349,7 @@ The helper now prefers the local dev auth route on loopback/private hosts and on
 - Auth and billing flows
 - Musicfetch integration behavior
 - Structural accessibility (roles, semantic hierarchy, keyboard reachability)
+- **Layout stability / zero-shift invariants on all state transitions** (loading, securing/awaiting, empty, error, auth, mobile, composer states, banners, progressive UI). See the mandatory "Layout Shift Prevention" rule in `DESIGN.md`, `.claude/rules/ui.md`, and `docs/TESTING_GUIDELINES.md`. Use bounding-box guards, dom-stability helpers, or visual regression for non-trivial surfaces. The OnboardingChat `/start` fix is the canonical reference.
 
 ### We do not test in CI
 
