@@ -122,12 +122,19 @@ export async function DashboardShellContent({
     </AppFlagProvider>
   );
 
-  if (useEssentialShell) {
-    return flaggedShellContents;
-  }
+  // Always wrap with HydrateClient (even for essential-shell routes with undefined state).
+  // This guarantees a stable client component tree root for *all* /app/* routes.
+  // Previously the conditional caused <HydrateClient> vs direct <AppFlagProvider>
+  // root on warm nav between lightweight and full-data routes, which remounted
+  // AuthShellWrapper + AppShellFrame + providers (losing transient sidebar UI state
+  // until cookie restore, and risking blank/dark chrome flashes).
+  // With a fixed top-level client boundary, AppShellFrame/AuthShell/sidebar/audio
+  // chrome now survive all normal client-side navigations inside the shell.
+  // Empty state on essential routes is a no-op; pages needing hydration still work.
+  const dehydratedState = useEssentialShell ? undefined : getDehydratedState();
 
   return (
-    <HydrateClient state={getDehydratedState()}>
+    <HydrateClient state={dehydratedState}>
       {flaggedShellContents}
     </HydrateClient>
   );
