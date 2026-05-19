@@ -22,7 +22,7 @@
     },
     {
       "path": "/api/cron/process-ingestion-jobs",
-      "schedule": "* * * * *"
+      "schedule": "*/6 * * * *"
     },
     {
       "path": "/api/cron/summarize-interviews",
@@ -46,7 +46,7 @@
     },
     {
       "path": "/api/cron/process-workflow-runs",
-      "schedule": "* * * * *"
+      "schedule": "*/6 * * * *"
     },
     {
       "path": "/api/cron/public-profile-canary",
