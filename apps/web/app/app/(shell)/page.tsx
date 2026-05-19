@@ -27,7 +27,9 @@ function readFirstParam(
   return Array.isArray(value) ? value[0] : value;
 }
 
-export default async function AppRootPage({ searchParams }: AppRootPageProps) {
+export default async function AppRootPage({
+  searchParams,
+}: AppRootPageProps = {}) {
   const params = (await searchParams) ?? {};
   const interviewRequested = readFirstParam(params.interview) === '1';
 
