@@ -46,6 +46,26 @@ vi.mock('@/components/molecules/ContentSurfaceCard', () => ({
   }) => <div {...props}>{children}</div>,
 }));
 
+vi.mock('@/components/organisms/AppShellFrame', () => ({
+  AppShellFrame: ({
+    main,
+    ...props
+  }: {
+    readonly main?: React.ReactNode;
+    readonly [key: string]: unknown;
+  }) => (
+    <div data-testid='app-shell-frame' {...props}>
+      {main}
+    </div>
+  ),
+}));
+
+vi.mock('@/components/organisms/Sidebar', () => ({
+  SidebarProvider: ({ children }: { readonly children: React.ReactNode }) => (
+    <div data-testid='sidebar-provider'>{children}</div>
+  ),
+}));
+
 vi.mock('@/lib/analytics', () => ({ track: trackMock }));
 
 vi.mock('@/lib/auth/plan-intent', () => ({
@@ -104,7 +124,7 @@ describe('OnboardingCheckoutClient', () => {
     expect(
       screen.getByRole('button', { name: 'Upgrade to Pro' })
     ).toBeInTheDocument();
-    expect(screen.getByText('$39')).toBeInTheDocument();
+    expect(screen.getByText('$39.00')).toBeInTheDocument();
     expect(screen.getByText('/mo')).toBeInTheDocument();
     expect(trackMock).toHaveBeenCalledWith(
       'onboarding_checkout_shown',
@@ -123,7 +143,7 @@ describe('OnboardingCheckoutClient', () => {
 
     await user.click(screen.getByRole('radio', { name: /annual/i }));
 
-    expect(screen.getByText('$390')).toBeInTheDocument();
+    expect(screen.getByText('$390.00')).toBeInTheDocument();
     expect(screen.getByText('/yr')).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: /annual/i })).toBeChecked();
   });
