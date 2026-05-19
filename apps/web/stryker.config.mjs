@@ -43,6 +43,13 @@ export default {
     'lib/auth/decode-fapi-host.ts',
     'lib/auth/staging-clerk-keys.ts',
     'lib/auth/test-mode.ts',
+    // Waitlist gate + determine logic + proxy enforcement (canAccessApp,
+    // canAccessOnboarding, requiresRedirect, getRedirectForState). Critical
+    // for journey entry and negative paths (waitlist_pending, banned, needs
+    // onboarding). Per register, proxy surface (68% line vs 85% target, blast
+    // 5/rev 5) + claim-onboarding gaps; gate covers under-mutated failure modes
+    // for waitlist/claim flows (high reversibility/visibility).
+    'lib/auth/gate.ts',
     // Social-link dedupe + handle parser. Mutating these surfaces the
     // assertions in tests/unit/lib/social-platform.property.test.ts;
     // a passing-but-mutation-survives suite means duplicate rows or
