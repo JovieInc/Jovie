@@ -124,7 +124,7 @@ export function TaskListRow({
       isSelected={isSelected}
       interaction='task-row-group'
       className={cn(
-        'grid h-full grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-3 px-2.5 py-1.5 transition-[opacity]',
+        'group/row grid h-full grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-3 px-3 py-1.5 transition-[opacity]',
         isDone && !isSelected && 'opacity-75',
         isCancelled && !isSelected && 'opacity-60'
       )}

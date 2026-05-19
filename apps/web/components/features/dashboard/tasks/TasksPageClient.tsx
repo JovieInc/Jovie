@@ -963,7 +963,7 @@ function TaskLoadingState() {
         <ShellListRowFrame
           key={row.key}
           interaction='none'
-          className='grid min-h-16 grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-3 px-2.5 py-1.5'
+          className='group/row grid min-h-16 grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-3 px-3 py-1.5'
         >
           <div className='skeleton h-4 w-4 rounded-full' />
           <div className='min-w-0 space-y-2'>
