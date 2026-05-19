@@ -449,6 +449,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             </div>
           ) : null}
           <motion.div
+            layoutId='jovie-composer-surface'
             data-testid='chat-composer-surface'
             data-surface-mode={surfaceMode}
             data-compact={isCompact ? 'true' : 'false'}
