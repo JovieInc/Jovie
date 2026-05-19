@@ -68,7 +68,7 @@ export function InstallBanner({
           type='button'
           onClick={onDismiss}
           aria-label='Dismiss prompt'
-          className='absolute top-1.5 right-1.5 h-5 w-5 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-subtle ease-out'
+          className='absolute top-1.5 right-1.5 h-5 w-5 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-subtle ease-subtle'
         >
           <X className='h-3 w-3' strokeWidth={2.25} />
         </button>
@@ -91,7 +91,7 @@ export function InstallBanner({
           type='button'
           onClick={onCta}
           disabled={ctaDisabled}
-          className='w-full inline-flex items-center justify-center gap-1.5 h-7 rounded-full text-[12px] font-medium bg-white text-black hover:brightness-110 transition-[filter,background-color,color] duration-subtle ease-out disabled:cursor-not-allowed disabled:opacity-60'
+          className='w-full inline-flex items-center justify-center gap-1.5 h-7 rounded-full text-[12px] font-medium bg-white text-black hover:brightness-110 transition-[filter,background-color,color] duration-subtle ease-subtle disabled:cursor-not-allowed disabled:opacity-60'
         >
           {ctaLabel}
           {CtaIcon ? <CtaIcon className='h-3 w-3' strokeWidth={2.5} /> : null}

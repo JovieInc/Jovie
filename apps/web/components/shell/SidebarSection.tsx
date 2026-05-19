@@ -71,7 +71,7 @@ export function SidebarSection({
         type='button'
         onClick={onToggle}
         className={cn(
-          'relative w-full flex items-center gap-2.5 pl-2.5 pr-2 rounded-md hover:bg-[color-mix(in_oklab,var(--color-sidebar-accent)_82%,transparent)] transition-[background-color] duration-fast ease-interactive',
+          'relative w-full flex items-center gap-2.5 pl-2.5 pr-2 rounded-md hover:bg-[color-mix(in_oklab,var(--color-sidebar-accent)_82%,transparent)] transition-[background-color] duration-subtle ease-subtle',
           tight ? 'h-6' : 'h-6.5'
         )}
         aria-expanded={open}
@@ -79,7 +79,7 @@ export function SidebarSection({
         <ChevronDown
           aria-hidden='true'
           className={cn(
-            'h-3.5 w-3.5 shrink-0 text-tertiary-token transition-transform duration-subtle ease-out',
+            'h-3.5 w-3.5 shrink-0 text-tertiary-token transition-transform duration-subtle ease-subtle',
             !open && '-rotate-90'
           )}
           strokeWidth={2.25}
@@ -93,7 +93,7 @@ export function SidebarSection({
         style={{
           maxHeight: bodyMaxHeight,
           opacity: open ? 1 : 0,
-          transition: `max-height ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, opacity var(--ds-motion-subtle-duration) ease-out`,
+          transition: `max-height ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, opacity var(--ds-motion-subtle-duration) var(--ease-subtle)`,
         }}
       >
         <div className='relative space-y-px pt-1 pb-0.5 [&_a:hover]:bg-surface-1/50'>

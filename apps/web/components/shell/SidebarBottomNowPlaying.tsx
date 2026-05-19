@@ -42,7 +42,7 @@ export function SidebarBottomNowPlaying({
   return (
     <div
       className={cn(
-        'flex items-center gap-2.5 h-11 px-2.5 rounded-[10px] hover:bg-[color-mix(in_oklab,var(--color-sidebar-accent)_82%,transparent)] transition-[background-color] duration-fast ease-interactive',
+        'flex items-center gap-2.5 h-11 px-2.5 rounded-[10px] hover:bg-[color-mix(in_oklab,var(--color-sidebar-accent)_82%,transparent)] transition-[background-color] duration-subtle ease-subtle',
         className
       )}
     >
@@ -73,7 +73,7 @@ export function SidebarBottomNowPlaying({
         type='button'
         onClick={onPlay}
         aria-label={isPlaying ? 'Pause' : 'Play'}
-        className='shrink-0 h-7 w-7 rounded-md grid place-items-center text-primary-token hover:bg-[color-mix(in_oklab,var(--color-sidebar-accent)_82%,transparent)] transition-[background-color] duration-fast ease-interactive'
+        className='shrink-0 h-7 w-7 rounded-md grid place-items-center text-primary-token hover:bg-[color-mix(in_oklab,var(--color-sidebar-accent)_82%,transparent)] transition-[background-color] duration-subtle ease-subtle'
       >
         {isPlaying ? (
           <Pause className='h-3 w-3' strokeWidth={2.5} fill='currentColor' />

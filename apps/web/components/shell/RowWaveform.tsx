@@ -167,7 +167,7 @@ export function RowWaveform({
 
         <g
           className={cn(
-            'transition-opacity duration-150 ease-out',
+            'transition-opacity duration-subtle ease-subtle',
             isCurrentTrack
               ? 'opacity-50'
               : 'opacity-35 group-hover/wf:opacity-55'
@@ -244,13 +244,13 @@ export function RowWaveform({
             >
               <span
                 className={cn(
-                  'absolute inset-y-0 w-px transition-opacity duration-150 ease-out opacity-50 group-hover/wf:opacity-90',
+                  'absolute inset-y-0 w-px transition-opacity duration-subtle ease-subtle opacity-50 group-hover/wf:opacity-90',
                   CUE_TONE_LINE[c.kind]
                 )}
               />
               <span
                 className={cn(
-                  'absolute -top-px h-[3px] w-[3px] rounded-full -translate-x-[1px] transition-opacity duration-150 ease-out opacity-80 group-hover/wf:opacity-100',
+                  'absolute -top-px h-[3px] w-[3px] rounded-full -translate-x-[1px] transition-opacity duration-subtle ease-subtle opacity-80 group-hover/wf:opacity-100',
                   CUE_TONE_DOT[c.kind]
                 )}
               />

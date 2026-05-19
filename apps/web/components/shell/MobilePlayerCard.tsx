@@ -88,7 +88,7 @@ export function MobilePlayerCard({
         <button
           type='button'
           onClick={onPlay}
-          className='h-9 w-9 rounded-full grid place-items-center bg-primary text-on-primary shrink-0 transition-transform duration-subtle ease-out active:scale-95'
+          className='h-9 w-9 rounded-full grid place-items-center bg-primary text-on-primary shrink-0 transition-transform duration-subtle ease-subtle active:scale-95'
           aria-label={isPlaying ? 'Pause' : 'Play'}
         >
           {isPlaying ? (

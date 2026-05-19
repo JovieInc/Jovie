@@ -57,7 +57,7 @@ export function ThreadVideoCard({
           <span
             className={
               onPlay
-                ? 'h-12 w-12 rounded-full bg-white/95 text-black grid place-items-center group-hover/vid:scale-105 transition-transform duration-200 ease-out'
+                ? 'h-12 w-12 rounded-full bg-white/95 text-black grid place-items-center transition-colors duration-subtle ease-subtle group-hover/vid:bg-white'
                 : 'h-12 w-12 rounded-full bg-white/40 text-black grid place-items-center'
             }
           >

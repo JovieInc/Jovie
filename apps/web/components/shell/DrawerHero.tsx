@@ -102,7 +102,7 @@ export function DrawerHero({
               {artwork}
               <span
                 aria-hidden='true'
-                className='absolute inset-0 grid place-items-center bg-black/45 opacity-0 group-hover/art:opacity-100 transition-opacity duration-subtle ease-out'
+                className='absolute inset-0 grid place-items-center bg-black/45 opacity-0 group-hover/art:opacity-100 transition-opacity duration-subtle ease-subtle'
               >
                 <span className='h-8 w-8 rounded-full bg-white text-black grid place-items-center'>
                   <Play
@@ -130,7 +130,7 @@ export function DrawerHero({
                     <button
                       type='button'
                       onClick={onMenu}
-                      className='h-6 w-6 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1/70 transition-colors duration-subtle ease-out opacity-0 group-hover/drawer:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100'
+                      className='h-6 w-6 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1/70 transition-colors duration-subtle ease-subtle opacity-0 group-hover/drawer:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100'
                       aria-label={menuLabel}
                       aria-haspopup='menu'
                     >

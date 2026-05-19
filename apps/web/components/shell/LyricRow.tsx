@@ -15,7 +15,7 @@ const SELECTED_ROW_CLASSES = [
   'before:h-3.5 before:w-[3px] before:rounded-full before:bg-cyan-300/0',
   'data-[focused]:before:bg-cyan-300/85',
   'data-[selected]:before:bg-cyan-300/85',
-  'before:transition-colors before:duration-subtle before:ease-out',
+  'before:transition-colors before:duration-subtle before:ease-subtle',
 ].join(' ');
 
 /**
@@ -71,7 +71,7 @@ export function LyricRow({
           data-focused={isFocused && !isActive ? '' : undefined}
           className={cn(
             'group/lyric block w-full text-center cursor-pointer select-none bg-transparent border-0 p-0',
-            'transition-[color,opacity,transform] duration-[250ms] ease-out',
+            'transition-[color,opacity,transform] duration-subtle ease-subtle',
             isActive
               ? 'text-primary-token text-[28px] leading-[1.25] font-display opacity-100'
               : 'text-tertiary-token text-[20px] leading-[1.35] font-display opacity-60 hover:opacity-90 hover:text-secondary-token'
@@ -90,14 +90,14 @@ export function LyricRow({
       data-focused={isFocused && !isActive ? '' : undefined}
       data-selected={isActive ? '' : undefined}
       className={cn(
-        'group/lyricedit relative flex items-center gap-3 rounded-md px-2 py-1.5 transition-colors duration-subtle ease-out',
+        'group/lyricedit relative flex items-center gap-3 rounded-md px-2 py-1.5 transition-colors duration-subtle ease-subtle',
         !isFocused && !isActive && 'hover:bg-surface-1/40',
         SELECTED_ROW_CLASSES
       )}
     >
       <span
         aria-hidden='true'
-        className='shrink-0 text-quaternary-token/70 hover:text-secondary-token cursor-grab active:cursor-grabbing transition-colors duration-subtle ease-out'
+        className='shrink-0 text-quaternary-token/70 hover:text-secondary-token cursor-grab active:cursor-grabbing transition-colors duration-subtle ease-subtle'
         title={`Drag to reorder line ${index + 1}`}
       >
         <GripVertical className='h-3.5 w-3.5' strokeWidth={2.25} />
@@ -106,7 +106,7 @@ export function LyricRow({
         type='button'
         onClick={onStamp}
         className={cn(
-          'shrink-0 h-6 px-1.5 rounded text-[10.5px] tabular-nums font-caption transition-colors duration-subtle ease-out',
+          'shrink-0 h-6 px-1.5 rounded text-[10.5px] tabular-nums font-caption transition-colors duration-subtle ease-subtle',
           isActive
             ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
             : 'text-tertiary-token bg-surface-1 border border-(--linear-app-shell-border) hover:text-primary-token hover:border-cyan-500/40'

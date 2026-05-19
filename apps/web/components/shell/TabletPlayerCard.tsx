@@ -102,7 +102,7 @@ export function TabletPlayerCard({
             <button
               type='button'
               onClick={onPrevious}
-              className='h-8 w-8 rounded grid place-items-center text-quaternary-token hover:text-primary-token transition-colors duration-subtle ease-out'
+              className='h-8 w-8 rounded grid place-items-center text-quaternary-token hover:text-primary-token transition-colors duration-subtle ease-subtle'
               aria-label='Previous'
             >
               <SkipBack
@@ -114,7 +114,7 @@ export function TabletPlayerCard({
             <button
               type='button'
               onClick={onPlay}
-              className='h-9 w-9 rounded-full grid place-items-center bg-primary text-on-primary transition-transform duration-subtle ease-out active:scale-95'
+              className='h-9 w-9 rounded-full grid place-items-center bg-primary text-on-primary transition-transform duration-subtle ease-subtle active:scale-95'
               aria-label={isPlaying ? 'Pause' : 'Play'}
             >
               {isPlaying ? (
@@ -134,7 +134,7 @@ export function TabletPlayerCard({
             <button
               type='button'
               onClick={onNext}
-              className='h-8 w-8 rounded grid place-items-center text-quaternary-token hover:text-primary-token transition-colors duration-subtle ease-out'
+              className='h-8 w-8 rounded grid place-items-center text-quaternary-token hover:text-primary-token transition-colors duration-subtle ease-subtle'
               aria-label='Next'
             >
               <SkipForward

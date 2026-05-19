@@ -27,7 +27,7 @@ export function ArtworkPlayOverlay({
       type='button'
       onClick={onPlay}
       className={cn(
-        'absolute inset-0 grid place-items-center bg-black/50 text-white transition-opacity duration-150 ease-out hover:opacity-100',
+        'absolute inset-0 grid place-items-center bg-black/50 text-white transition-opacity duration-subtle ease-subtle hover:opacity-100',
         visible ? 'opacity-100' : 'opacity-0',
         className
       )}

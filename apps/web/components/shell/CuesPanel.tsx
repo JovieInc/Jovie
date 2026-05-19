@@ -83,20 +83,20 @@ export function CuesPanel({
               type='button'
               onClick={() => onSeek?.(c.at)}
               disabled={!onSeek}
-              className='group/cue w-full flex items-center gap-2 h-8 px-2 rounded-md text-[12.5px] text-secondary-token hover:bg-surface-1/40 hover:text-primary-token disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token transition-colors duration-150 ease-out'
+              className='group/cue w-full flex items-center gap-2 h-8 px-2 rounded-md text-[12.5px] text-secondary-token hover:bg-surface-1/40 hover:text-primary-token disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token transition-colors duration-subtle ease-subtle'
             >
               <span className='relative w-9 shrink-0'>
                 <span
                   className={cn(
                     'absolute inset-0 grid place-items-start tabular-nums text-[10.5px] text-quaternary-token',
                     onSeek &&
-                      'opacity-100 group-hover/cue:opacity-0 transition-opacity duration-150 ease-out'
+                      'opacity-100 group-hover/cue:opacity-0 transition-opacity duration-subtle ease-subtle'
                   )}
                 >
                   {formatCueTime(c.at)}
                 </span>
                 {onSeek && (
-                  <span className='absolute inset-0 grid place-items-center text-primary-token opacity-0 group-hover/cue:opacity-100 transition-opacity duration-150 ease-out'>
+                  <span className='absolute inset-0 grid place-items-center text-primary-token opacity-0 group-hover/cue:opacity-100 transition-opacity duration-subtle ease-subtle'>
                     <Play
                       className='h-3 w-3 translate-x-px'
                       strokeWidth={2.5}

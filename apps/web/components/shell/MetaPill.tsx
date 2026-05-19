@@ -31,7 +31,7 @@ export function MetaPill({
     <span
       className={cn(
         'inline-flex items-center gap-1.5 h-[24px] px-2 rounded-md text-[11.5px] border whitespace-nowrap',
-        'border-transparent bg-transparent transition-[background-color,border-color] duration-subtle ease-out cursor-default',
+        'border-transparent bg-transparent transition-[background-color,border-color] duration-subtle ease-subtle cursor-default',
         tone === 'amber'
           ? 'text-amber-300/85 hover:border-amber-500/30 hover:bg-amber-500/10'
           : tone === 'cyan'
