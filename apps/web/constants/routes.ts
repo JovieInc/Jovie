@@ -105,6 +105,7 @@ export const APP_ROUTES = {
   ADMIN_PLATFORM_CONNECTIONS: '/app/admin/platform-connections',
   ADMIN_AGENT_RUN: '/app/admin/agent-runs',
   ADMIN_AGENT_RUN_DETAIL: '/app/admin/agent-runs/[id]',
+  ADMIN_COSTS: '/app/admin/costs',
   FEATURE_FLAGS: '/app/feature-flags',
 
   // System
