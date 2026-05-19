@@ -212,7 +212,7 @@ export function TableFilterDropdown<T extends string = string>({
 
   return (
     <DropdownMenu open={isOpen} onOpenChange={handleOpenChange}>
-      <TooltipShortcut label='Filter' shortcut='F' side='bottom'>
+      <TooltipShortcut label='Filter' side='bottom'>
         <DropdownMenuTrigger asChild>
           <Button
             variant='ghost'
