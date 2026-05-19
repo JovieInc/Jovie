@@ -43,7 +43,7 @@ export function SidebarNavItem({
       type='button'
       onClick={item.onActivate}
       className={cn(
-        'relative flex items-center rounded-md w-full transition-colors duration-subtle ease-out tracking-[-0.005em]',
+        'relative flex items-center rounded-md w-full transition-colors duration-subtle ease-out',
         tight ? 'gap-2 text-[12.5px]' : 'gap-2.5 text-[13px]',
         collapsed ? 'h-8 w-10 mx-auto justify-center' : nonCollapsedSize,
         item.active ? 'text-primary-token bg-surface-1' : inactiveColor

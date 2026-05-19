@@ -102,7 +102,7 @@ export function DrawerHero({
               {artwork}
               <span
                 aria-hidden='true'
-                className='absolute inset-0 grid place-items-center bg-black/45 opacity-0 group-hover/art:opacity-100 transition-opacity duration-150 ease-out'
+                className='absolute inset-0 grid place-items-center bg-black/45 opacity-0 group-hover/art:opacity-100 transition-opacity duration-subtle ease-out'
               >
                 <span className='h-8 w-8 rounded-full bg-white text-black grid place-items-center'>
                   <Play
@@ -119,7 +119,7 @@ export function DrawerHero({
 
         <div className='flex-1 min-w-0 pt-1'>
           <div className='flex items-start gap-2'>
-            <h2 className='flex-1 min-w-0 text-[17px] font-semibold text-primary-token leading-tight tracking-[-0.018em]'>
+            <h2 className='flex-1 min-w-0 text-[17px] font-semibold text-primary-token leading-tight'>
               {title}
             </h2>
             {hasTopRight && (
@@ -130,7 +130,7 @@ export function DrawerHero({
                     <button
                       type='button'
                       onClick={onMenu}
-                      className='h-6 w-6 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1/70 transition-colors duration-150 ease-out opacity-0 group-hover/drawer:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100'
+                      className='h-6 w-6 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1/70 transition-colors duration-subtle ease-out opacity-0 group-hover/drawer:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100'
                       aria-label={menuLabel}
                       aria-haspopup='menu'
                     >

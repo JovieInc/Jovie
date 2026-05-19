@@ -109,11 +109,11 @@ export function SidebarThreadsSection({
   return (
     <div className='space-y-1'>
       <div className='flex items-center justify-between px-3 pb-1 pt-1.5'>
-        <span className='text-[11px] font-medium tracking-[-0.01em] text-quaternary-token'>
+        <span className='text-[11px] font-medium text-quaternary-token'>
           Threads
         </span>
         {unreadCount > 0 && (
-          <span className='inline-flex items-center gap-1 text-[11px] font-medium tracking-[-0.01em] text-quaternary-token'>
+          <span className='inline-flex items-center gap-1 text-[11px] font-medium text-quaternary-token'>
             <span className='h-1.5 w-1.5 rounded-full bg-cyan-300/85' />
             {unreadCount}
           </span>
@@ -278,7 +278,7 @@ export function SidebarThreadsSection({
         <button
           type='button'
           onClick={() => setExpanded(v => !v)}
-          className='w-full px-3 py-1 text-left text-[11px] font-medium tracking-[-0.01em] text-quaternary-token transition-colors duration-subtle ease-out hover:text-secondary-token'
+          className='w-full px-3 py-1 text-left text-[11px] font-medium text-quaternary-token transition-colors duration-subtle ease-out hover:text-secondary-token'
         >
           {expanded ? 'Show less' : 'View all'}
         </button>
