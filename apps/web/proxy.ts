@@ -10,31 +10,22 @@ import {
   shouldBypassClerk,
   shouldDisableClerkProxyForLocation,
 } from '@/components/providers/clerkAvailability';
-import {
-  AUDIENCE_ANON_COOKIE,
-  AUDIENCE_IDENTIFIED_COOKIE,
-  COUNTRY_CODE_COOKIE,
-  HOMEPAGE_CITY_COOKIE,
-  HOMEPAGE_REGION_COOKIE,
-} from '@/constants/app';
-import { BASE_URL, HOSTNAME } from '@/constants/domains';
+import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   buildAuthDegradedHtmlResponse,
   isBrowserNavigation,
 } from '@/lib/auth/auth-degraded-fallback';
 import { buildProtectedAuthRedirectUrl } from '@/lib/auth/build-auth-route-url';
+import { handleClerkFapiProxy } from '@/lib/auth/clerk-fapi-proxy';
 import {
   type ClerkBypassPathInfo,
   isClerkRequiredPath,
   shouldBypassClerkForRequest,
 } from '@/lib/auth/clerk-middleware-bypass';
 import { sanitizeRedirectUrl } from '@/lib/auth/constants';
-import { decodeFapiHostFromPublishableKey } from '@/lib/auth/decode-fapi-host';
-import {
-  releaseInvestorViewDedup,
-  shouldRecordInvestorView,
-} from '@/lib/auth/investor-view-dedup';
+import { buildFinalResponse } from '@/lib/auth/final-response';
+import { handleInvestorRequest } from '@/lib/auth/investor-portal';
 import type { ProxyUserState } from '@/lib/auth/proxy-state';
 import { getUserState, isKnownActiveUser } from '@/lib/auth/proxy-state';
 import { captureErrorWithHostnameLimit } from '@/lib/auth/sentry-rate-limit';
@@ -43,32 +34,14 @@ import {
   isTestAuthBypassEnabled,
   resolveTestBypassUserId,
 } from '@/lib/auth/test-mode';
-import {
-  COOKIE_BANNER_REQUIRED_COOKIE,
-  isCookieBannerRequired,
-} from '@/lib/cookies/consent-regions';
-import {
-  CONSENT_COOKIE_NAME,
-  hasAnalyticsConsent,
-} from '@/lib/cookies/consent-state';
-import { NONESSENTIAL_PROXY_COOKIE_NAMES } from '@/lib/cookies/registry';
 import { captureError } from '@/lib/error-tracking';
 import {
   analyzeHost,
   categorizePath,
   DASHBOARD_URL,
-  type PathCategory,
+  isProxyRewriteExempt,
 } from '@/lib/routing/proxy-routing';
-import {
-  buildContentSecurityPolicy,
-  buildContentSecurityPolicyReportOnly,
-  SCRIPT_NONCE_HEADER,
-} from '@/lib/security/content-security-policy';
-import {
-  buildReportingEndpointsHeader,
-  buildReportToHeader,
-  getCspReportUri,
-} from '@/lib/security/csp-reporting';
+import { SCRIPT_NONCE_HEADER } from '@/lib/security/content-security-policy';
 import {
   createProbeDropResponse,
   isMaliciousProbePath,
@@ -100,31 +73,6 @@ function isWaitlistInviteRedirect(redirectUrl: string | null): boolean {
     redirectUrl === '/waitlist/invite' ||
     redirectUrl?.startsWith('/waitlist/invite?') === true
   );
-}
-
-/**
- * Paths the proxy must NOT rewrite based on user state. The page component
- * handles its own auth/state logic.
- *
- *  - /api/* — API handlers do their own auth checks.
- *  - /app, /app/* — app shell layout handles waitlist/onboarding gating.
- *  - /start — anonymous onboarding (JOV-2132). For authenticated visitors
- *    the page mounts OnboardingShell, which fires useOnboardingClaim once
- *    Clerk reports the user is signed in and hands off to /onboarding/checkout.
- *    Rewriting /start orphans the anonymous conversation; combined with
- *    /waitlist's anonymous → /start redirect it produces a server-side
- *    redirect loop (JOV-2161).
- *  - /onboarding/checkout — has its own resolveUserState() gating and is the
- *    handoff target for useOnboardingClaim. Rewriting it to /onboarding
- *    breaks the post-claim flow.
- */
-function isProxyRewriteExempt(pathname: string): boolean {
-  if (pathname.startsWith('/api/')) return true;
-  if (pathname === '/app' || pathname.startsWith('/app/')) return true;
-  if (pathname === APP_ROUTES.START) return true;
-  if (pathname === APP_ROUTES.ONBOARDING) return true;
-  if (pathname === APP_ROUTES.ONBOARDING_CHECKOUT) return true;
-  return false;
 }
 
 /** Max consecutive state-based rewrites before the circuit breaker fires. */
@@ -219,67 +167,6 @@ async function createFingerprintEdge(
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-// Single-segment path segments that are Next.js / system routes, not usernames.
-// Complements the RESERVED_USERNAMES list in lib/validation/username-core.ts
-// which prevents these being registered as profile handles in the first place.
-const MIDDLEWARE_SYSTEM_SEGMENTS = new Set([
-  '.env',
-  '_next',
-  'favicon.ico',
-  'og',
-  'go',
-  'out',
-  '__clerk',
-  'clerk',
-  'phpmyadmin',
-  'sidebar-demo',
-  'sentry-example-page',
-  'sentry-example-api',
-  'investor-portal',
-  'wordpress',
-  'wp',
-  'wp-admin',
-  'xmlrpc.php',
-  // Auth routes — single-segment paths that must never be treated as usernames
-  'signin',
-  'signup',
-  'sign-in',
-  'sign-up',
-  'waitlist',
-  'onboarding',
-  'account',
-  'billing',
-  'support',
-  'sso-callback',
-  'unavailable',
-  'app',
-  'api',
-]);
-
-/**
- * Returns the username for public profile paths (/username) or null for
- * non-profile paths. Uses a length-and-character pre-filter; the DB query
- * will naturally return no rows for non-existent usernames.
- */
-function extractPublicProfileUsername(pathname: string): string | null {
-  const parts = pathname.split('/').filter(Boolean);
-  // Profile routes are a single path segment (no subroutes like /username/claim)
-  if (parts.length !== 1) return null;
-
-  const segment = parts[0];
-  if (MIDDLEWARE_SYSTEM_SEGMENTS.has(segment)) return null;
-
-  // Username bounds from lib/validation/username-core.ts
-  if (segment.length < 3 || segment.length > 30) return null;
-
-  // Basic character check (mirrors USERNAME_PATTERN) — no content filter needed
-  // here; invalid/non-existent usernames simply return no DB rows.
-  if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*[a-zA-Z0-9]$|^[a-zA-Z0-9]{3}$/.test(segment))
-    return null;
-
-  return segment;
-}
-
 /**
  * Check if a public profile visitor should be blocked.
  *
@@ -334,236 +221,6 @@ async function checkProfileVisitorBlocked(
 }
 
 // ============================================================================
-// Investor Portal — Path-based token auth (/investor-portal?t=TOKEN)
-// ============================================================================
-// Bypasses Clerk entirely. Auth is via a secret token in URL param or cookie.
-// Token validated against investor_links table on every request (volume is tiny).
-// Legacy subdomain (investors.jov.ie) redirects to /investor-portal.
-// ============================================================================
-
-const INVESTOR_TOKEN_COOKIE = '__investor_token';
-const INVESTOR_TOKEN_PARAM = 't';
-
-/**
- * Handle investor portal requests.
- *
- * 1. Legacy subdomain (investors.jov.ie) → 301 redirect to /investor-portal
- * 2. /investor-portal?t=TOKEN → validate, set cookie, strip param
- * 3. /investor-portal with cookie → validate, record view, continue
- */
-async function handleInvestorRequest(
-  req: NextRequest,
-  event?: NextFetchEvent
-): Promise<NextResponse | null> {
-  const hostname = req.nextUrl.hostname;
-  const hostInfo = analyzeHost(hostname);
-  const pathname = req.nextUrl.pathname;
-
-  // --- Legacy subdomain redirect ---
-  if (hostInfo.isInvestorPortal) {
-    // Allow Next.js internals and static files to pass through
-    if (
-      pathname.startsWith('/_next') ||
-      pathname.startsWith('/favicon') ||
-      pathname.endsWith('.ico') ||
-      pathname.endsWith('.png') ||
-      pathname.endsWith('.jpg') ||
-      pathname.endsWith('.svg')
-    ) {
-      return NextResponse.next();
-    }
-
-    // Redirect to main host /investor-portal, preserving token param
-    const redirectUrl = req.nextUrl.clone();
-    redirectUrl.hostname = HOSTNAME;
-    redirectUrl.port = '';
-    const subPath = pathname === '/' ? '' : pathname;
-    redirectUrl.pathname = `/investor-portal${subPath}`;
-
-    return NextResponse.redirect(redirectUrl, 301);
-  }
-
-  // --- Path-based investor portal ---
-  if (
-    !pathname.startsWith('/investor-portal') ||
-    pathname.startsWith('/_next')
-  ) {
-    return null;
-  }
-
-  // Check for token in URL param (first visit from shared link)
-  const tokenParam = req.nextUrl.searchParams.get(INVESTOR_TOKEN_PARAM);
-
-  if (tokenParam) {
-    const isValid = await validateInvestorToken(tokenParam);
-
-    if (!isValid) {
-      return new NextResponse(null, { status: 404 });
-    }
-
-    // Valid token: set cookie and redirect to strip ?t= from URL
-    const cleanUrl = req.nextUrl.clone();
-    cleanUrl.searchParams.delete(INVESTOR_TOKEN_PARAM);
-
-    const res = NextResponse.redirect(cleanUrl);
-    res.cookies.set(INVESTOR_TOKEN_COOKIE, tokenParam, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 30, // 30 days
-      path: '/',
-    });
-
-    return res;
-  }
-
-  // Check for token in cookie (return visits)
-  const tokenCookie = req.cookies.get(INVESTOR_TOKEN_COOKIE)?.value;
-
-  if (!tokenCookie) {
-    return new NextResponse(null, { status: 404 });
-  }
-
-  // Validate cookie token against DB
-  const isValid = await validateInvestorToken(tokenCookie);
-
-  if (!isValid) {
-    const res = new NextResponse(null, { status: 404 });
-    res.cookies.delete(INVESTOR_TOKEN_COOKIE);
-    return res;
-  }
-
-  const res = NextResponse.next();
-
-  // Anti-scraping headers
-  res.headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet');
-  res.headers.set('Cache-Control', 'private, no-store');
-
-  // Record view — use waitUntil for edge runtime reliability
-  if (event) {
-    event.waitUntil(recordInvestorView(tokenCookie, pathname, req));
-  } else {
-    await recordInvestorView(tokenCookie, pathname, req);
-  }
-
-  return res;
-}
-
-/**
- * Validate an investor token against the database.
- * Checks: exists, is_active, not expired.
- * Returns true if valid.
- */
-async function validateInvestorToken(token: string): Promise<boolean> {
-  try {
-    // Lazy import to avoid loading DB in every middleware invocation
-    const { db } = await import('@/lib/db');
-    const { investorLinks } = await import('@/lib/db/schema/investors');
-    const { eq, and } = await import('drizzle-orm');
-
-    const [link] = await db
-      .select({
-        id: investorLinks.id,
-        isActive: investorLinks.isActive,
-        expiresAt: investorLinks.expiresAt,
-      })
-      .from(investorLinks)
-      .where(
-        and(eq(investorLinks.token, token), eq(investorLinks.isActive, true))
-      )
-      .limit(1);
-
-    if (!link) return false;
-
-    // Check expiry
-    if (link.expiresAt && new Date(link.expiresAt) < new Date()) {
-      return false;
-    }
-
-    return true;
-  } catch (error) {
-    // Fail closed: if DB is down, deny access
-    await captureError('Investor token validation failed', error, {
-      context: 'investor_portal',
-    });
-    return false;
-  }
-}
-
-/**
- * Record an investor page view (fire-and-forget).
- * Also updates stage from 'shared' to 'viewed' on first view.
- *
- * Dedup: skips the DB write if the same (token, pagePath) pair was already
- * recorded within the last 5 minutes. Redis-backed; fail-open if Redis is
- * unreachable (records the view rather than dropping it).
- */
-async function recordInvestorView(
-  token: string,
-  pagePath: string,
-  req: NextRequest
-): Promise<void> {
-  try {
-    // 5-minute dedup: same investor hitting the same route generates at most
-    // one view row per window. visitorKey = token (uniquely identifies the
-    // investor link). route = pagePath (already query-string-free — callers
-    // pass req.nextUrl.pathname).
-    const shouldRecord = await shouldRecordInvestorView({
-      visitorKey: token,
-      route: pagePath,
-    });
-
-    if (!shouldRecord) return;
-
-    // Wrap DB writes so we can release the dedup lock on failure.
-    // If the DB write fails and we leave the Redis key set, the view
-    // would be silently lost for the remainder of the 5-min window.
-    try {
-      const { db } = await import('@/lib/db');
-      const { investorLinks, investorViews } = await import(
-        '@/lib/db/schema/investors'
-      );
-      const { eq } = await import('drizzle-orm');
-
-      // Find the link
-      const [link] = await db
-        .select({ id: investorLinks.id, stage: investorLinks.stage })
-        .from(investorLinks)
-        .where(eq(investorLinks.token, token))
-        .limit(1);
-
-      if (!link) return;
-
-      // Insert view record
-      await db.insert(investorViews).values({
-        investorLinkId: link.id,
-        pagePath,
-        userAgent: req.headers.get('user-agent') ?? undefined,
-        referrer: req.headers.get('referer') ?? undefined,
-      });
-
-      // Auto-advance stage: shared → viewed on first view
-      if (link.stage === 'shared') {
-        await db
-          .update(investorLinks)
-          .set({ stage: 'viewed', updatedAt: new Date() })
-          .where(eq(investorLinks.id, link.id));
-      }
-    } catch (dbError) {
-      // DB write failed after dedup lock was acquired — release the lock
-      // so the next request within the 5-min window can retry the write.
-      await releaseInvestorViewDedup({ visitorKey: token, route: pagePath });
-      throw dbError; // re-throw so the outer catch can log it
-    }
-  } catch (error) {
-    // Swallow errors — view tracking should never block the response
-    await captureError('Investor view tracking failed', error, {
-      context: 'investor_portal',
-      pagePath,
-    });
-  }
-}
-
 const CLERK_SENSITIVE_PATTERNS = [
   'dummy',
   'mock',
@@ -719,7 +376,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     // page avoid calling headers() (which opts the page into dynamic rendering).
     // ========================================================================
     if (isNavigationMethod) {
-      const profileUsername = extractPublicProfileUsername(pathname);
+      const profileUsername = pathInfo.publicProfileCandidate;
       if (profileUsername) {
         // Mirror extractClientIP() priority: cf-connecting-ip > x-real-ip > x-forwarded-for > true-client-ip
         const rawIp =
@@ -992,7 +649,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
  * Here we set it on response headers for the CSP policy.
  */
 
-function getGeoFromRequest(req: NextRequest): {
+function _getGeoFromRequest(req: NextRequest): {
   city: string | null;
   region: string | null;
 } {
@@ -1009,174 +666,6 @@ function getGeoFromRequest(req: NextRequest): {
     city: cityFromHeader || geoRequest.geo?.city?.trim() || null,
     region: regionFromHeader || geoRequest.geo?.region?.trim() || null,
   };
-}
-
-function buildFinalResponse(
-  req: NextRequest,
-  res: NextResponse,
-  pathInfo: PathCategory,
-  startTime: number,
-  userId: string | null,
-  nonce: string | null
-): NextResponse {
-  const pathname = req.nextUrl.pathname;
-
-  // Set CSP headers using the pre-generated nonce
-  // The nonce was already set on request headers for Server Components
-  if (nonce && pathInfo.needsNonce) {
-    const allowTestRuntimeRelaxations = process.env.E2E_ALLOW_DEV_CSP === '1';
-    res.headers.set(SCRIPT_NONCE_HEADER, nonce);
-    res.headers.set(
-      'Content-Security-Policy',
-      buildContentSecurityPolicy({ nonce, allowTestRuntimeRelaxations })
-    );
-
-    const cspReportUri = getCspReportUri();
-    if (cspReportUri) {
-      const reportOnlyPolicy = buildContentSecurityPolicyReportOnly({
-        nonce,
-        allowTestRuntimeRelaxations,
-        reportUri: cspReportUri,
-      });
-      if (reportOnlyPolicy) {
-        res.headers.set(
-          'Content-Security-Policy-Report-Only',
-          reportOnlyPolicy
-        );
-        res.headers.set('Report-To', buildReportToHeader(cspReportUri));
-        res.headers.set(
-          'Reporting-Endpoints',
-          buildReportingEndpointsHeader(cspReportUri)
-        );
-      }
-    }
-  }
-
-  const geo = getGeoFromRequest(req);
-  const countryCode =
-    req.headers.get('x-vercel-ip-country') ?? req.headers.get('cf-ipcountry');
-  const normalizedCountryCode = countryCode?.trim().toUpperCase() ?? null;
-  const requiresCookieConsent = isCookieBannerRequired(
-    normalizedCountryCode,
-    geo.region
-  );
-  const currentCookieRequirement = req.cookies.get(
-    COOKIE_BANNER_REQUIRED_COOKIE
-  )?.value;
-  const currentCountryCode =
-    req.cookies.get(COUNTRY_CODE_COOKIE)?.value ?? null;
-  const nextCookieRequirement = requiresCookieConsent ? '1' : '0';
-  const canSetAnalyticsProxyCookies =
-    !requiresCookieConsent ||
-    hasAnalyticsConsent(req.cookies.get(CONSENT_COOKIE_NAME)?.value);
-
-  if (normalizedCountryCode && currentCountryCode !== normalizedCountryCode) {
-    res.cookies.set(COUNTRY_CODE_COOKIE, normalizedCountryCode, {
-      // httpOnly: false so StaticArtistPage can read country code on mount
-      // for DSP geo-sorting, replacing the server-side headers() read that
-      // prevented ISR caching of public profile pages.
-      httpOnly: false,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 30,
-      path: '/',
-    });
-  }
-
-  if (currentCookieRequirement !== nextCookieRequirement) {
-    res.cookies.set(COOKIE_BANNER_REQUIRED_COOKIE, nextCookieRequirement, {
-      httpOnly: false, // Readable by client JS so CookieBannerSection can check without headers()
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 30,
-      path: '/',
-    });
-  }
-
-  if (requiresCookieConsent && !canSetAnalyticsProxyCookies) {
-    for (const cookieName of NONESSENTIAL_PROXY_COOKIE_NAMES) {
-      if (req.cookies.get(cookieName)?.value) {
-        res.cookies.set(cookieName, '', {
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          maxAge: 0,
-          path: '/',
-        });
-      }
-    }
-  }
-
-  if (canSetAnalyticsProxyCookies) {
-    if (geo.city && req.cookies.get(HOMEPAGE_CITY_COOKIE)?.value !== geo.city) {
-      res.cookies.set(HOMEPAGE_CITY_COOKIE, geo.city, {
-        httpOnly: false,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 7,
-        path: '/',
-      });
-    }
-
-    if (
-      geo.region &&
-      req.cookies.get(HOMEPAGE_REGION_COOKIE)?.value !== geo.region
-    ) {
-      res.cookies.set(HOMEPAGE_REGION_COOKIE, geo.region, {
-        httpOnly: false,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 7,
-        path: '/',
-      });
-    }
-
-    // Set audience tracking cookies.
-    if (!req.cookies.get(AUDIENCE_ANON_COOKIE)?.value) {
-      res.cookies.set(AUDIENCE_ANON_COOKIE, crypto.randomUUID(), {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 365,
-        path: '/',
-      });
-    }
-
-    if (userId && req.cookies.get(AUDIENCE_IDENTIFIED_COOKIE)?.value !== '1') {
-      res.cookies.set(AUDIENCE_IDENTIFIED_COOKIE, '1', {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 365,
-        path: '/',
-      });
-    }
-  }
-
-  // Performance monitoring
-  const duration = Date.now() - startTime;
-  res.headers.set('Server-Timing', `middleware;dur=${duration}`);
-
-  if (pathname.startsWith('/api/')) {
-    res.headers.set('X-API-Response-Time', `${duration}`);
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`[API] ${req.method} ${pathname} - ${duration}ms`);
-    }
-  }
-
-  // Anti-indexing headers for link and API routes
-  if (
-    pathname.startsWith('/go/') ||
-    pathname.startsWith('/out/') ||
-    pathname.startsWith('/api/')
-  ) {
-    res.headers.set('X-Robots-Tag', 'noindex, nofollow, nosnippet, noarchive');
-    res.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.headers.set('Pragma', 'no-cache');
-    res.headers.set('Expires', '0');
-    res.headers.set('Referrer-Policy', 'no-referrer');
-  }
-
-  return res;
 }
 
 // Production Clerk middleware (default keys from env)
@@ -1285,159 +774,9 @@ export default async function middleware(
 
   const hostname = req.nextUrl.hostname;
 
-  // ========================================================================
-  // Clerk FAPI proxy: fetch-based proxy using the hostname-resolved Clerk
-  // publishable key. Staging and production use different Clerk instances,
-  // so the FAPI host must be decoded from the active host's key at runtime.
-  // We use fetch() because NextResponse.rewrite() and vercel.json rewrites
-  // forward the original Host header, causing Clerk to return 400 "Invalid host".
-  // ========================================================================
-  if (
-    pathname.startsWith('/__clerk/') ||
-    pathname === '/__clerk' ||
-    pathname.startsWith('/clerk/') ||
-    pathname === '/clerk'
-  ) {
-    // Resolve the FAPI host from the active publishable key. Staging and
-    // production live on different Clerk instances (different keys), so the
-    // host MUST be decoded at runtime — never hardcoded.
-    // See: .claude/rules/auth.md → Clerk Auth Proxy Architecture.
-    const pk = resolveClerkKeys(hostname).publishableKey;
-    const fapiHost = decodeFapiHostFromPublishableKey(pk);
-    if (!fapiHost) {
-      // This path is always an API/JS fetch (/__clerk is the FAPI proxy,
-      // never a direct browser navigation), so always return JSON here.
-      return NextResponse.json(
-        {
-          error: 'Clerk proxy unavailable: missing or invalid publishable key',
-        },
-        { status: 503 }
-      );
-    }
-
-    const subpath = pathname.replace(/^\/__clerk\/?|^\/clerk\/?/, '');
-    const targetUrl = `https://${fapiHost}/${subpath}${req.nextUrl.search}`;
-
-    let body: ArrayBuffer | null = null;
-    if (req.method !== 'GET' && req.method !== 'HEAD') {
-      try {
-        body = await req.arrayBuffer();
-      } catch {
-        // empty body
-      }
-    }
-
-    // Build clean headers — only forward what Clerk needs.
-    // Do NOT set `host` (fetch sets it from URL; manual setting is rejected by
-    // Edge fetch on POST bodies in some undici builds) or `content-length`
-    // (undici computes from body; manual override throws TypeError on POST).
-    // This was the root cause of Apple OAuth `response_mode=form_post` callbacks
-    // 502'ing while Google's GET callbacks worked.
-    const headers = new Headers();
-    headers.set('origin', `https://${fapiHost}`);
-    const ct = req.headers.get('content-type');
-    if (ct) headers.set('content-type', ct);
-    const accept = req.headers.get('accept');
-    if (accept) headers.set('accept', accept);
-    const cookie = req.headers.get('cookie');
-    if (cookie) headers.set('cookie', cookie);
-    const ua = req.headers.get('user-agent');
-    if (ua) headers.set('user-agent', ua);
-    const auth = req.headers.get('authorization');
-    if (auth) headers.set('authorization', auth);
-    // Forward Referer ONLY for OAuth callback paths — Apple's form_post chain
-    // sets it to https://appleid.apple.com and FAPI may use it to validate the
-    // callback. Other Clerk endpoints don't need it; keep blast radius small.
-    if (pathname.includes('/oauth_callback')) {
-      const referer = req.headers.get('referer');
-      if (referer) headers.set('referer', referer);
-    }
-
-    try {
-      const proxyRes = await fetch(targetUrl, {
-        method: req.method,
-        headers,
-        body: body && body.byteLength > 0 ? body : undefined,
-        redirect: 'manual',
-      });
-
-      // Streaming a raw 3xx Response with a non-null body through Next.js
-      // middleware on Vercel Edge crashes the runtime *before* this try/catch
-      // can intercept (surfaces as opaque "500 Internal Server Error"). Use
-      // NextResponse.redirect for redirects — the only middleware-supported
-      // redirect primitive — and forward Set-Cookie headers explicitly.
-      const isRedirect = proxyRes.status >= 300 && proxyRes.status < 400;
-      const upstreamLocation = proxyRes.headers.get('location');
-
-      if (isRedirect && upstreamLocation) {
-        const fapiOrigin = `https://${fapiHost}`;
-        // NextResponse.redirect requires an absolute URL. Clerk FAPI can
-        // return three kinds of Location headers during OAuth:
-        //   1. Absolute FAPI URL (https://clerk.jov.ie/v1/...) — route through
-        //      our /__clerk proxy so cookies and CSP stay scoped to our origin.
-        //   2. FAPI-relative path (/v1/...) — Apple's intra-FAPI redirects do
-        //      this. Resolve it against our /__clerk proxy origin so the
-        //      browser follows it through the proxy.
-        //   3. Absolute non-FAPI URL (https://other.example/...) — third-party
-        //      OAuth provider redirects. Pass through unchanged.
-        let rewrittenLocation: string;
-        if (upstreamLocation.startsWith(fapiOrigin)) {
-          rewrittenLocation = upstreamLocation.replace(
-            fapiOrigin,
-            `${req.nextUrl.origin}/__clerk`
-          );
-        } else if (upstreamLocation.startsWith('/')) {
-          rewrittenLocation = `${req.nextUrl.origin}/__clerk${upstreamLocation}`;
-        } else {
-          rewrittenLocation = upstreamLocation;
-        }
-
-        const redirectStatus = proxyRes.status as 301 | 302 | 303 | 307 | 308;
-        const redirect = NextResponse.redirect(
-          rewrittenLocation,
-          redirectStatus
-        );
-
-        const setCookies =
-          proxyRes.headers.getSetCookie?.() ??
-          proxyRes.headers.get('set-cookie')?.split(/,(?=[^;]+=)/) ??
-          [];
-        for (const cookie of setCookies) {
-          if (cookie) redirect.headers.append('set-cookie', cookie);
-        }
-
-        return redirect;
-      }
-
-      const resHeaders = new Headers(proxyRes.headers);
-      resHeaders.delete('content-encoding');
-
-      return new NextResponse(proxyRes.body, {
-        status: proxyRes.status,
-        statusText: proxyRes.statusText,
-        headers: resHeaders,
-      });
-    } catch (err) {
-      const errName = err instanceof Error ? err.name : 'UnknownError';
-      const errMessage = err instanceof Error ? err.message : String(err);
-      await captureError('[clerk-proxy] fetch failed', err, {
-        pathname,
-        hostname,
-        context: 'clerk_proxy_fetch',
-        errName,
-        errMessage,
-        method: req.method,
-      });
-      return NextResponse.json(
-        {
-          error: 'Clerk proxy error',
-          code: errName,
-          hint: errMessage,
-        },
-        { status: 502 }
-      );
-    }
-  }
+  // Clerk FAPI proxy (extracted)
+  const clerkProxyRes = await handleClerkFapiProxy(req);
+  if (clerkProxyRes) return clerkProxyRes;
 
   const pathInfo = categorizePath(pathname);
   const isNavigationMethod = req.method === 'GET' || req.method === 'HEAD';
