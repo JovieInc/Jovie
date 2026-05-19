@@ -150,28 +150,34 @@ export function EntityResolutionProvider({
       return () => NULL_RESOLUTION;
     }
     return (kind, id) => {
-      if (kind === 'release') {
-        const releases = queryClient.getQueryData<ReleaseViewModel[]>(
-          queryKeys.releases.matrix(profileId)
-        );
-        if (!releases) return NULL_RESOLUTION;
-        const row = releases.find(r => r.id === id);
-        if (!row) return NULL_RESOLUTION;
-        return { ref: releaseRowToEntityRef(row), isLoading: false };
+      try {
+        if (kind === 'release') {
+          const releases = queryClient.getQueryData<ReleaseViewModel[]>(
+            queryKeys.releases.matrix(profileId)
+          );
+          if (!releases) return NULL_RESOLUTION;
+          const row = releases.find(r => r.id === id);
+          if (!row) return NULL_RESOLUTION;
+          return { ref: releaseRowToEntityRef(row), isLoading: false };
+        }
+        if (kind === 'event') {
+          const events = queryClient.getQueryData<EventRecord[]>(
+            queryKeys.events.list(profileId)
+          );
+          if (!events) return NULL_RESOLUTION;
+          const row = events.find(e => e.id === id);
+          if (!row) return NULL_RESOLUTION;
+          return { ref: eventToEntityRef(row), isLoading: false };
+        }
+        // artist (search-result-scoped, no profile matrix) and track (no query
+        // hook yet) — degrade gracefully. EntityChip falls back to accent dot
+        // + label, which is identical to today's empty-thumbnail behavior.
+        return NULL_RESOLUTION;
+      } catch {
+        // Improved failure handling: never let resolution errors surface to
+        // chat transcript chips or onboarding surfaces; degrade to label-only.
+        return NULL_RESOLUTION;
       }
-      if (kind === 'event') {
-        const events = queryClient.getQueryData<EventRecord[]>(
-          queryKeys.events.list(profileId)
-        );
-        if (!events) return NULL_RESOLUTION;
-        const row = events.find(e => e.id === id);
-        if (!row) return NULL_RESOLUTION;
-        return { ref: eventToEntityRef(row), isLoading: false };
-      }
-      // artist (search-result-scoped, no profile matrix) and track (no query
-      // hook yet) — degrade gracefully. EntityChip falls back to accent dot
-      // + label, which is identical to today's empty-thumbnail behavior.
-      return NULL_RESOLUTION;
     };
     // cacheSnapshot participates so consumers re-derive on cache change.
     // queryClient is stable from React Query's provider.
