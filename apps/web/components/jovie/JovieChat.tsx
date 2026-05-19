@@ -21,6 +21,10 @@ import {
 } from './components';
 import { ChatProvidersRegistrar } from './components/ChatProvidersRegistrar';
 import { ChatUsageAlert } from './components/ChatUsageAlert';
+import {
+  CHAT_PROMPT_RAIL_MASK_STYLE,
+  CHAT_PROMPT_RAIL_SCROLL_CLASS,
+} from './components/chat-prompt-styles';
 import { EntityResolutionProvider } from './components/EntityResolutionProvider';
 import {
   useChatImageAttachments,
@@ -33,6 +37,61 @@ import type { JovieChatProps, MessagePart } from './types';
 /** Sentinel ID for the synthetic thinking placeholder */
 const THINKING_PLACEHOLDER_ID = 'thinking-placeholder';
 const VIRTUALIZATION_THRESHOLD = 12;
+const EMPTY_STATE_SIGNAL_CARDS = [
+  {
+    headline: 'Release plan',
+    body: 'Rollout, timing, and blockers at a glance.',
+  },
+  {
+    headline: 'Asset brief',
+    body: 'Creative direction, copy, and next steps.',
+  },
+  {
+    headline: 'Context',
+    body: 'Releases, contacts, and references stay attached.',
+  },
+] as const;
+
+function EmptyStateSignalCards({
+  dimmed = false,
+}: {
+  readonly dimmed?: boolean;
+}) {
+  return (
+    <div
+      className={cn('w-full max-w-[52rem]', dimmed && 'pointer-events-none')}
+      aria-hidden={dimmed ? 'true' : undefined}
+      data-testid='chat-empty-state-top-signals'
+    >
+      <div
+        className={cn(
+          CHAT_PROMPT_RAIL_SCROLL_CLASS,
+          'overscroll-x-contain px-1 sm:px-0 lg:overflow-visible'
+        )}
+        style={CHAT_PROMPT_RAIL_MASK_STYLE}
+      >
+        <div
+          className='flex flex-nowrap gap-3 lg:grid lg:grid-cols-3'
+          data-testid='chat-empty-state-top-signals-row'
+        >
+          {EMPTY_STATE_SIGNAL_CARDS.map(card => (
+            <article
+              key={card.headline}
+              className='min-h-[108px] min-w-[16.5rem] flex-1 rounded-[20px] border border-subtle bg-surface-1 px-4 py-4 shadow-[0_16px_40px_-28px_rgba(0,0,0,0.9)] lg:min-w-0'
+            >
+              <p className='text-[15px] font-semibold leading-5 text-primary-token'>
+                {card.headline}
+              </p>
+              <p className='mt-2 max-w-[22ch] text-[12.5px] leading-5 text-secondary-token'>
+                {card.body}
+              </p>
+            </article>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function getFirstNameForGreeting(
   name: string | null | undefined
@@ -691,9 +750,11 @@ export function JovieChat({
                 )}
               </div>
               <div
-                className='relative mx-auto flex min-h-full w-full max-w-[48rem] flex-col items-center justify-center gap-5 py-8'
+                className='relative mx-auto flex min-h-full w-full max-w-[52rem] flex-col items-center justify-center gap-6 py-8'
                 data-testid='chat-empty-state-composer-region'
               >
+                <EmptyStateSignalCards dimmed={composerPickerOpen} />
+
                 <h1
                   className={cn(
                     'text-balance text-center text-[2rem] font-semibold leading-[1.1] text-primary-token sm:text-[2.5rem] md:text-[3rem]',
@@ -738,13 +799,18 @@ export function JovieChat({
                   )}
 
                   {showStarterPrompts ? (
-                    <SuggestedPrompts
-                      onSelect={handleSuggestedPromptWithJank}
-                      isFirstSession={isFirstSession}
-                      latestReleaseTitle={latestReleaseTitle}
-                      albumArtCapability={albumArtCapability}
-                      layout='rail'
-                    />
+                    <div
+                      className='w-full'
+                      data-testid='chat-empty-state-prompt-rail'
+                    >
+                      <SuggestedPrompts
+                        onSelect={handleSuggestedPromptWithJank}
+                        isFirstSession={isFirstSession}
+                        latestReleaseTitle={latestReleaseTitle}
+                        albumArtCapability={albumArtCapability}
+                        layout='rail'
+                      />
+                    </div>
                   ) : null}
                 </div>
               </div>

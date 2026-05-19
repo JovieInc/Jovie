@@ -168,6 +168,13 @@ describe('JovieChat empty state', () => {
     const { getByRole, getByTestId, getByText, queryByText } =
       renderWithQueryClient(<JovieChat profileId='profile-1' />);
 
+    expect(getByTestId('chat-empty-state-top-signals')).toBeTruthy();
+    expect(getByTestId('chat-empty-state-top-signals-row').className).toContain(
+      'lg:grid-cols-3'
+    );
+    expect(getByText('Release plan')).toBeTruthy();
+    expect(getByText('Asset brief')).toBeTruthy();
+    expect(getByText('Context')).toBeTruthy();
     expect(getByText('What are we working on?')).toBeTruthy();
     expect(queryByText('Welcome back')).toBeNull();
     expect(queryByText('Welcome back, Tim')).toBeNull();
@@ -175,6 +182,7 @@ describe('JovieChat empty state', () => {
     expect(queryByText('Jovie Assistant')).toBeNull();
     expect(queryByText('Ask anything or tell Jovie what you need')).toBeNull();
     expect(getByTestId('chat-empty-state-composer-region')).toBeTruthy();
+    expect(getByTestId('chat-empty-state-prompt-rail')).toBeTruthy();
     expect(getByTestId('chat-input')).toBeTruthy();
     expect(getByTestId('chat-input').getAttribute('data-placeholder')).toBe(
       'Ask Jovie...'
@@ -196,12 +204,14 @@ describe('JovieChat empty state', () => {
   it('hides starter prompt pills while the empty composer has typed text', () => {
     mockChatState.input = 'Help me with';
 
-    const { getByTestId, queryByText } = renderWithQueryClient(
+    const { getByTestId, queryByTestId, queryByText } = renderWithQueryClient(
       <JovieChat profileId='profile-1' />
     );
 
     expect(getByTestId('chat-empty-state-composer-region')).toBeTruthy();
+    expect(getByTestId('chat-empty-state-top-signals')).toBeTruthy();
     expect(getByTestId('chat-input')).toBeTruthy();
+    expect(queryByTestId('chat-empty-state-prompt-rail')).toBeNull();
     expect(queryByText('Plan a release')).toBeNull();
     expect(queryByText('Pitch playlists')).toBeNull();
   });
