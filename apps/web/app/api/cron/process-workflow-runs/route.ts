@@ -1,5 +1,5 @@
 /**
- * Cron: /api/cron/process-workflow-runs (every minute)
+ * Cron: /api/cron/process-workflow-runs (every 6 minutes)
  *
  * Decision hierarchy compliance (per .claude/rules/infra.md):
  * 1. Webhook/event: N/A — workflow runs are triggered by the approve endpoint
@@ -11,13 +11,20 @@
  *    workflow_runs has different semantics (concurrent, multi-step).
  * 5. New cron: Required here because calendar API calls are external and slow.
  *
+ * Cadence: 6 minutes (JOV-2500). The original every-minute cadence kept Neon's
+ * production compute warm 24/7 (5-minute autosuspend never fired between ticks),
+ * adding ~$10-25/month of compute overage at zero users. The 6-minute cadence
+ * gives the compute a ~1-minute idle window to autosuspend between ticks. The
+ * tradeoff is up to ~6 minutes between approval and execution; acceptable until
+ * we move to event-driven enqueue (see JOV-2500 follow-on).
+ *
  * Design:
  * - CAS claim: UPDATE ... SET status='running' WHERE status='pending' AND runAt<=now()
  * - Process MAX_RUNS_PER_TICK runs, MAX_CONCURRENT_RUNS in parallel
  * - Unknown workflow kinds are failed immediately (fail-closed)
  *
  * Cost impact: 1 DB query/tick + up to 20 Google Calendar API calls/tick
- * at 1440 ticks/day = max 28,800 Google API calls/day at full load.
+ * at 240 ticks/day = max 4,800 Google API calls/day at full load.
  * In practice: only runs when there are pending workflow_runs rows.
  */
 

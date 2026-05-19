@@ -1,10 +1,15 @@
 /**
  * Cron handler for processing ingestion jobs.
  *
- * Runs every minute to claim and process pending ingestion jobs (e.g. MusicFetch enrichment).
+ * Runs every 6 minutes to claim and process pending ingestion jobs (e.g. MusicFetch enrichment).
  * Mirrors the logic in /api/ingestion/jobs but triggered by Vercel Cron instead of manual POST.
  *
- * Schedule: every 1 minute (configured in vercel.json)
+ * Schedule: every 6 minutes (configured in vercel.json). The 6-minute cadence
+ * lets Neon's 5-minute autosuspend reclaim the production compute between
+ * ticks instead of keeping it warm 24/7 (JOV-2500). Latency cost: up to
+ * ~6 minutes between enqueue and processing — acceptable for background
+ * enrichment. If a workflow needs faster turnaround, prefer event-driven
+ * enqueue over reducing this cadence.
  */
 
 import { NextResponse } from 'next/server';

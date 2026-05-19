@@ -33,7 +33,7 @@ Source of truth: `vercel.json` (repo root — Vercel reads this file; `apps/web/
 | `/api/cron/frequent` | `*/15 * * * *` | Every 15 minutes |
 | `/api/cron/daily-maintenance` | `0 0 * * *` | Daily at midnight UTC |
 | `/api/cron/generate-insights` | `0 5 * * *` | Daily at 05:00 UTC |
-| `/api/cron/process-ingestion-jobs` | `* * * * *` | Every minute |
+| `/api/cron/process-ingestion-jobs` | `*/6 * * * *` | Every 6 minutes (JOV-2500: lets Neon 5min autosuspend reclaim compute) |
 | `/api/cron/purge-pixel-ips` | `0 3 * * *` | Daily at 03:00 UTC |
 | `/api/cron/summarize-interviews` | `*/5 * * * *` | Every 5 minutes |
 | `/api/cron/generate-playlist` | `0 6 * * *` | Daily at 06:00 UTC |
