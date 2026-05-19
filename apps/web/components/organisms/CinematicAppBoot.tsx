@@ -33,29 +33,46 @@ interface CinematicAppBootProps {
   readonly audioPlayer?: ReactNode;
   /** AppShellSkeleton variant — preserved across cinematic + skeleton fallbacks. */
   readonly variant: AppShellFrameVariant;
+  /**
+   * Set to false for unauthenticated onboarding front-door surfaces (/start)
+   * that render AppShellFrame with sidebar={null}. When false:
+   * - No sidebar stub is rendered in cinematic mode.
+   * - Frame animation keeps symmetric inset (no left-shift to accommodate sidebar).
+   * - AppShellSkeleton fallback receives sidebar={null}.
+   * Defaults to true for standard authenticated shells.
+   */
+  readonly hasSidebar?: boolean;
 }
 
 /**
  * Cinematic app boot loader.
  *
- * Mounts as the (shell) layout's Suspense fallback. On the FIRST shell mount
- * per tab (no `jovie:cinematic-boot-played` sessionStorage flag), plays a
- * forward-only cinematic timeline (logo cinematic → reverse spin → frame
- * fade-in → sidebar slide-in → welcome content fade-up) over ~2.4s. The
- * underlying tree resolves whenever it resolves — when React unmounts the
- * Suspense fallback, the real shell appears underneath. Because the cinematic
- * ends in a composition that matches the post-resolve AppShellFrame layout,
- * the hard-cut unmount is visually seamless.
+ * Mounts as the (shell) layout's Suspense fallback (or equivalent for
+ * unauth /start via loading.tsx). On the FIRST shell mount per tab (no
+ * `jovie:cinematic-boot-played` sessionStorage flag), plays a forward-only
+ * cinematic timeline (logo cinematic → reverse spin → frame fade-in →
+ * optional sidebar slide-in → welcome content fade-up) over ~2.4s.
+ *
+ * The underlying tree resolves whenever it resolves — when React unmounts
+ * the Suspense fallback, the real shell appears underneath. Because the
+ * cinematic ends in a composition that matches the post-resolve AppShellFrame
+ * layout (respecting hasSidebar), the hard-cut unmount is visually seamless.
  *
  * On SUBSEQUENT shell mounts in the same tab (the flag is set), or under
  * `prefers-reduced-motion`, or during SSR (the hook defaults true), the
  * cinematic is skipped and the route-specific AppShellSkeleton renders
  * directly — identical to today's loading state.
+ *
+ * Supports unauth onboarding entry via hasSidebar={false} for zero layout
+ * shift on the no-sidebar /start path while preserving the premium per-tab
+ * cinematic where it makes sense (lightweight skeleton fallback always
+ * available).
  */
 export function CinematicAppBoot({
   main,
   audioPlayer,
   variant,
+  hasSidebar = true,
 }: CinematicAppBootProps) {
   const [mounted, setMounted] = useState(false);
   const [shouldPlay, setShouldPlay] = useState(false);
@@ -84,20 +101,27 @@ export function CinematicAppBoot({
     }
   }, []);
 
+  const skeletonSidebar = hasSidebar === false ? null : undefined;
+
   if (!mounted || prefersReducedMotion || !shouldPlay) {
     return (
       <AppShellSkeleton
         main={main}
         audioPlayer={audioPlayer}
         variant={variant}
+        sidebar={skeletonSidebar}
       />
     );
   }
 
   const kfLogo = `jvf-logo-${safeId}`;
   const kfFrame = `jvf-frame-${safeId}`;
+  const kfFrameNoSidebar = `jvf-frame-nosb-${safeId}`;
   const kfSidebar = `jvf-sidebar-${safeId}`;
   const kfContent = `jvf-content-${safeId}`;
+
+  const useNoSidebarFrame = !hasSidebar;
+  const frameAnimationName = useNoSidebarFrame ? kfFrameNoSidebar : kfFrame;
 
   return (
     <div
@@ -133,6 +157,11 @@ export function CinematicAppBoot({
           78%      { opacity: 1; left: 252px; }
           100%     { opacity: 1; left: 252px; }
         }
+        @keyframes ${kfFrameNoSidebar} {
+          0%, 56%  { opacity: 0; left: 12px; }
+          66%      { opacity: 1; left: 12px; }
+          100%     { opacity: 1; left: 12px; }
+        }
         @keyframes ${kfSidebar} {
           0%, 70% { opacity: 0; transform: translateX(-14px); }
           84%     { opacity: 1; transform: translateX(0); }
@@ -144,22 +173,24 @@ export function CinematicAppBoot({
         }
       `}</style>
 
-      <div
-        style={{
-          position: 'absolute',
-          left: 0,
-          top: 0,
-          bottom: 0,
-          width: 244,
-          animationName: kfSidebar,
-          animationDuration: `${TIMELINE_MS}ms`,
-          animationTimingFunction: 'var(--ds-motion-subtle-easing)',
-          animationFillMode: 'forwards',
-          willChange: 'opacity, transform',
-        }}
-      >
-        <CinematicSidebarStub />
-      </div>
+      {hasSidebar && (
+        <div
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: 244,
+            animationName: kfSidebar,
+            animationDuration: `${TIMELINE_MS}ms`,
+            animationTimingFunction: 'var(--ds-motion-subtle-easing)',
+            animationFillMode: 'forwards',
+            willChange: 'opacity, transform',
+          }}
+        >
+          <CinematicSidebarStub />
+        </div>
+      )}
 
       <div
         style={{
@@ -174,11 +205,11 @@ export function CinematicAppBoot({
           boxShadow:
             '0 0 0 1px rgba(0,0,0,0.25), inset 0 0 18px rgba(0,0,0,0.25), 0 24px 60px rgba(0,0,0,0.45)',
           overflow: 'hidden',
-          animationName: kfFrame,
+          animationName: frameAnimationName,
           animationDuration: `${TIMELINE_MS}ms`,
           animationTimingFunction: 'var(--ds-motion-subtle-easing)',
           animationFillMode: 'forwards',
-          willChange: 'opacity, left',
+          willChange: hasSidebar ? 'opacity, left' : 'opacity',
         }}
       >
         <div

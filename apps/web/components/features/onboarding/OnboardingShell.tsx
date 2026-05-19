@@ -1,5 +1,6 @@
 'use client';
 
+import { Skeleton } from '@jovie/ui';
 import { useCallback, useState } from 'react';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
 import { SidebarProvider } from '@/components/organisms/Sidebar';
@@ -95,16 +96,28 @@ function OnboardingShellStatus({
 }>) {
   if (!visible || !message) return null;
 
+  if (kind === 'status') {
+    return (
+      <div
+        className='pointer-events-none absolute right-3 top-3 z-40 max-w-[min(28rem,calc(100%-1.5rem))] rounded-full border border-subtle bg-surface-0 px-3 py-1.5 shadow-card sm:right-4 sm:top-4'
+        role='status'
+        aria-live='polite'
+        aria-busy='true'
+        data-testid='onboarding-linking-skeleton'
+      >
+        <Skeleton className='h-3.5 w-44 rounded' />
+      </div>
+    );
+  }
+
   return (
     <p
       className={cn(
         'pointer-events-none absolute right-3 top-3 z-40 max-w-[min(28rem,calc(100%-1.5rem))] rounded-full border bg-surface-0 px-3 py-1.5 text-[12px] leading-5 shadow-card sm:right-4 sm:top-4',
-        kind === 'error'
-          ? 'border-red-500/20 text-error'
-          : 'border-subtle text-secondary-token'
+        'border-red-500/20 text-error'
       )}
-      role={kind === 'error' ? 'alert' : 'status'}
-      aria-live={kind === 'error' ? 'assertive' : 'polite'}
+      role='alert'
+      aria-live='assertive'
     >
       {message}
     </p>
