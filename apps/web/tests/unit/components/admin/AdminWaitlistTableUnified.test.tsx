@@ -63,7 +63,7 @@ const entry = {
 };
 
 describe('AdminWaitlistTableUnified', () => {
-  it('uses the shared row hover token and shell-colored empty state chrome', () => {
+  it('relies on canonical shell row primitives (no custom getRowClassName override) and shell-colored empty state chrome', () => {
     render(
       <AdminWaitlistTableUnified
         entries={[entry]}
@@ -73,9 +73,8 @@ describe('AdminWaitlistTableUnified', () => {
       />
     );
 
-    expect(capturedGetRowClassName?.(entry, 0)).toBe(
-      'group hover:bg-(--linear-row-hover)'
-    );
+    // Converged: no explicit getRowClassName; presets.tableRow + rowState provide hover
+    expect(capturedGetRowClassName).toBeUndefined();
 
     expect(screen.getByText('No waitlist entries').className).toContain(
       'text-primary-token'

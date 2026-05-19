@@ -19,6 +19,7 @@ import {
   type ContextMenuItemType,
   PAGE_TOOLBAR_META_TEXT_CLASS,
   PageToolbarActionButton,
+  rowState,
   TableEmptyState,
 } from '@/components/organisms/table';
 import { convertContextMenuItems } from '@/components/organisms/table/molecules/TableContextMenu';
@@ -289,8 +290,8 @@ export function AdminFeedbackTable({
   const getRowClassName = useCallback(
     (row: FeedbackRow) =>
       row.id === selectedId
-        ? 'group cursor-pointer bg-(--linear-row-selected) hover:bg-(--linear-row-selected)'
-        : 'group cursor-pointer bg-transparent hover:bg-(--linear-row-hover)',
+        ? `group cursor-pointer ${rowState.selected}`
+        : `group cursor-pointer ${rowState.hover}`,
     [selectedId]
   );
 

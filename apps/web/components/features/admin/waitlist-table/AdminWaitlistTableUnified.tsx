@@ -212,11 +212,6 @@ export function AdminWaitlistTableUnified({
     ]
   );
 
-  // Get row className - uses unified hover token
-  const getRowClassName = useCallback(() => {
-    return 'group hover:bg-(--linear-row-hover)';
-  }, []);
-
   // Render unified table with optional grouping
   return (
     <AdminDataTable
@@ -238,7 +233,6 @@ export function AdminWaitlistTableUnified({
         </div>
       }
       getRowId={row => row.id}
-      getRowClassName={getRowClassName}
       rowHeight={TABLE_ROW_HEIGHTS.STANDARD}
       overscan={5}
       minWidth={`${TABLE_MIN_WIDTHS.LARGE}px`}

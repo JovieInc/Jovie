@@ -352,11 +352,6 @@ export function LeadTable({
     refetch().catch(() => {});
   }, [refetch]);
 
-  const getRowClassName = useCallback(
-    () => 'group bg-transparent hover:bg-(--linear-row-hover)',
-    []
-  );
-
   return (
     <ContentSurfaceCard surface='table' className='overflow-hidden'>
       <PageToolbar
@@ -411,7 +406,6 @@ export function LeadTable({
         enableFiltering
         globalFilterFn={leadFilterFn}
         getRowId={row => row.id}
-        getRowClassName={getRowClassName}
         rowHeight={TABLE_ROW_HEIGHTS.STANDARD}
         skeletonRows={SKELETON_ROW_COUNT.TABLE}
         hasNextPage={hasNextPage}
