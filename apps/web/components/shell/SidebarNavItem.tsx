@@ -43,7 +43,7 @@ export function SidebarNavItem({
       type='button'
       onClick={item.onActivate}
       className={cn(
-        'relative flex items-center rounded-md w-full transition-[background-color] duration-subtle ease-subtle',
+        'relative flex items-center rounded-md w-full transition-[background-color] duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)',
         tight ? 'gap-2 text-[12px]' : 'gap-2.5 text-[12.5px]',
         collapsed ? 'h-7 w-10 mx-auto justify-center' : nonCollapsedSize,
         item.active ? 'text-primary-token bg-surface-1' : inactiveColor

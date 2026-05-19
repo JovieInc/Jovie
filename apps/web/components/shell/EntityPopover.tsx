@@ -759,7 +759,7 @@ export function EntityHoverLink({
         className={cn(
           'inline-flex items-center rounded-md transition-colors duration-subtle ease-subtle hover:text-primary-token',
           'no-underline hover:underline focus-visible:underline underline-offset-2',
-          'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus/35',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)',
           className
         )}
       >
