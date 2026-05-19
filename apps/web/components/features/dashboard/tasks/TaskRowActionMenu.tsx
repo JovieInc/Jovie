@@ -22,7 +22,7 @@ export function getTaskRowActionTriggerClassName({
     'hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_68%,transparent)] hover:text-primary-token',
     'focus-visible:outline-none focus-visible:bg-[color-mix(in_oklab,var(--linear-row-hover)_70%,transparent)] focus-visible:text-primary-token',
     visibility === 'hover' && [
-      'opacity-0 group-hover/task-board-card-shell:opacity-100 group-focus-visible/task-board-card-shell:opacity-100 group-hover/task-row:opacity-100 group-focus-visible/task-row:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100',
+      'opacity-0 group-hover/row:opacity-100 group-focus-visible/row:opacity-100 group-hover/task-board-card-shell:opacity-100 group-focus-visible/task-board-card-shell:opacity-100 group-hover/task-row:opacity-100 group-focus-visible/task-row:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100',
       selected && 'opacity-100',
     ]
   );
