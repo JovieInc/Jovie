@@ -3,9 +3,7 @@ import { expect, test } from './setup';
 test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe('public /pitch route', () => {
-  test('renders the deck, is NOINDEX, exposes the PDF link', async ({
-    page,
-  }) => {
+  test('renders the deck iframe, is NOINDEX', async ({ page }) => {
     const consoleErrors: string[] = [];
     page.on('console', msg => {
       if (msg.type() === 'error') {
@@ -18,41 +16,47 @@ test.describe('public /pitch route', () => {
     });
     expect(response?.status()).toBe(200);
 
-    // NOINDEX_ROBOTS contract — the page must never be indexed.
+    // NOINDEX contract — both the wrapper page AND the deck HTML must be noindex.
     const robotsMeta = await page
       .locator('meta[name="robots"]')
       .getAttribute('content');
     expect(robotsMeta).toMatch(/noindex/i);
     expect(robotsMeta).toMatch(/nofollow/i);
 
-    // Deck renders — first slide title is visible (manifest's first slide is
-    // 01-cover.md whose first H1 is rendered as the slide title).
-    const firstSlideTitle = page.getByRole('heading', { level: 2 }).first();
-    await expect(firstSlideTitle).toBeVisible();
-    const titleText = (await firstSlideTitle.textContent())?.trim();
-    expect(titleText).toBeTruthy();
+    // Iframe is present and points at the canonical static deck.
+    const iframeEl = page.locator('iframe[title="Jovie Pitch Deck"]');
+    await expect(iframeEl).toHaveAttribute('src', '/pitch/index.html');
 
-    // Navigation control: at least the Next button is reachable when more
-    // than one slide exists. There must always be a slide counter ("1 / N").
-    await expect(page.getByText(/^\d+ \/ \d+$/)).toBeVisible();
+    // Deck content renders inside the iframe.
+    const deck = page.frameLocator('iframe[title="Jovie Pitch Deck"]');
+    await expect(deck.locator('deck-stage')).toBeAttached();
+    await expect(
+      deck.locator('section[data-label="Meet Jovie"]')
+    ).toBeAttached();
 
-    // PDF download anchor points at the manifest's static asset.
-    const pdfLink = page.getByRole('link', {
-      name: /download deck as pdf/i,
-    });
-    await expect(pdfLink).toBeVisible();
-    const href = await pdfLink.getAttribute('href');
-    expect(href).toBe('/Jovie-Pitch-Deck.pdf');
-
-    // No client-side console errors on first paint.
     expect(consoleErrors, consoleErrors.join('\n')).toHaveLength(0);
   });
 
-  test('PDF asset is reachable from public/', async ({ request }) => {
-    const res = await request.head('/Jovie-Pitch-Deck.pdf');
-    expect(
-      res.status(),
-      'Run `pnpm deck:pdf` (or regenerate via Playwright) and commit apps/web/public/Jovie-Pitch-Deck.pdf'
-    ).toBe(200);
+  test('canonical deck HTML serves directly with NOINDEX', async ({ page }) => {
+    const response = await page.goto('/pitch/index.html', {
+      waitUntil: 'domcontentloaded',
+    });
+    expect(response?.status()).toBe(200);
+
+    const robotsMeta = await page
+      .locator('meta[name="robots"]')
+      .getAttribute('content');
+    expect(robotsMeta).toMatch(/noindex/i);
+
+    // The custom element registers and the first slide is mounted.
+    await expect(page.locator('deck-stage')).toBeAttached();
+    await expect(
+      page.locator('section[data-label="Meet Jovie"]')
+    ).toBeAttached();
+  });
+
+  test('deck-stage.js is reachable', async ({ request }) => {
+    const res = await request.head('/pitch/deck-stage.js');
+    expect(res.status()).toBe(200);
   });
 });

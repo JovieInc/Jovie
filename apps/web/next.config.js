@@ -234,6 +234,18 @@ const nextConfig = {
         source: '/(.*)',
         headers: [...securityHeaders, cacheHeaders.revalidate],
       },
+      // Canonical pitch-deck static HTML (apps/web/public/pitch/**) is
+      // embedded as a same-origin iframe from the /pitch wrapper page.
+      // Override X-Frame-Options DENY → SAMEORIGIN for these assets only,
+      // AFTER the catch-all (Next.js merges headers; later rules win).
+      // The wrapper page itself (/pitch) stays DENY via the catch-all.
+      {
+        source: '/pitch/:path+',
+        headers: [
+          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+          { key: 'Cache-Control', value: cacheHeaders.immutable.value },
+        ],
+      },
     ];
   },
   async redirects() {

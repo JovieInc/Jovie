@@ -67,9 +67,13 @@ const STATIC_CSP_PARTS = {
   objectSrc: "object-src 'none'",
   frameAncestors: "frame-ancestors 'none'",
   formAction: "form-action 'self'",
-  styleSrc: "style-src 'self' 'unsafe-inline'",
+  // Google Fonts (fonts.googleapis.com for the stylesheet, fonts.gstatic.com
+  // for the woff2 files) are loaded by /pitch/index.html (Manrope + JetBrains
+  // Mono — not in the self-hosted font set). The marketing app otherwise uses
+  // next/font and self-hosted Geist/DM Sans/Satoshi.
+  styleSrc: "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   fontSrc:
-    "font-src 'self' data: https://vercel.live https://assets.vercel.com",
+    "font-src 'self' data: https://fonts.gstatic.com https://vercel.live https://assets.vercel.com",
   // Pre-computed media-src from canonical media domain registry
   // @see constants/platforms/cdn-domains.ts
   mediaSrc: ["media-src 'self'", ...getCspMediaSrcDomains()].join(' '),
