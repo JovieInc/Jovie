@@ -33,6 +33,7 @@ import { useImportPolling } from './hooks/useImportPolling';
 import { useReleaseTablePreferences } from './hooks/useReleaseTablePreferences';
 import { NewReleaseHeaderAction } from './NewReleaseHeaderAction';
 import { ReleaseStateBanners } from './ReleaseStateBanners';
+import { ReleasesEmptyState } from './ReleasesEmptyState';
 import { ReleaseTable } from './ReleaseTable';
 import {
   DEFAULT_RELEASE_FILTERS,
@@ -49,7 +50,6 @@ import { useReleaseDeletion } from './release-deletion';
 import {
   AddReleaseSidebar,
   ReleaseSidebar,
-  ReleasesEmptyState,
   TrackSidebar,
 } from './release-lazy-components';
 import { usePostCreateReleasePlan } from './release-plan-generation';
@@ -634,11 +634,9 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         />
         {showEmptyState && (
           <PageShell className='mt-2.5' data-testid='release-table-shell'>
-            <Suspense fallback={null}>
-              <ReleasesEmptyState
-                onConnectSpotify={() => setSpotifySearchOpen(true)}
-              />
-            </Suspense>
+            <ReleasesEmptyState
+              onConnectSpotify={() => setSpotifySearchOpen(true)}
+            />
           </PageShell>
         )}
 
