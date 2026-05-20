@@ -713,17 +713,20 @@ body {
    ============================================ */
 
 @layer components {
-  /* Focus ring utilities */
+  /* Focus ring utilities — canonical recipe (see design-system.css global + STYLES.md)
+     Subtle visible gray ring for shell/chrome consistency (post smallwin-4 / a11y polish).
+     Use /55 + page offset for most interactive chrome. Stronger variants (higher %,
+     accent purple, or double box-shadow) reserved for primary CTAs / marketing. */
   .focus-ring {
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-focus/50 focus-visible:ring-offset-(--linear-bg-page);
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-(--linear-bg-page);
   }
   .focus-ring-transparent-offset {
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/50 focus-visible:ring-offset-transparent;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-transparent;
   }
   /* Button component styles */
   .btn {
     @apply inline-flex items-center justify-center rounded-full text-[13px] font-medium transition-colors duration-normal disabled:opacity-50 disabled:pointer-events-none;
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-focus/50 focus-visible:ring-offset-(--linear-bg-page);
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-(--linear-bg-page);
   }
   .btn-primary {
     background-color: var(--color-btn-primary-bg);
