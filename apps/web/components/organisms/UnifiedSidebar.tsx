@@ -8,11 +8,11 @@ import {
 } from '@jovie/ui';
 import {
   ArrowLeft,
-  ChevronDown,
   Copy,
   PanelLeftClose,
   Plus,
   RefreshCw,
+  Settings,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -238,7 +238,7 @@ function SidebarDockButton() {
   );
 }
 
-/** Workspace button (logo + name) or back button for settings */
+/** Logo (clean header) or back button for settings/library */
 function SidebarHeaderNav({
   isRouteSidebar,
   isAdmin,
@@ -317,35 +317,22 @@ function SidebarHeaderNav({
         if (hasMultipleProfiles && !isAdmin) {
           return <ProfileSwitcher />;
         }
+        // Clean header: just the Jovie logo (no workspace button / chevron).
+        // The user menu is now accessed via the bottom Settings button.
         return (
-          <UserButton
-            profileHref={profileHref}
-            settingsHref={APP_ROUTES.SETTINGS}
-            trigger={
-              <button
-                type='button'
-                aria-label='Open workspace menu'
-                className={cn(
-                  'flex h-7 w-full items-center gap-1.5 rounded-[10px] px-2.5 transition-[background,border-color,color] duration-normal ease-interactive hover:bg-sidebar-accent/60 focus-visible:outline-none focus-visible:bg-sidebar-accent/60',
-                  'group-data-[collapsible=icon]:justify-center'
-                )}
-              >
-                <BrandLogo
-                  size={14}
-                  tone='auto'
-                  rounded={false}
-                  className='rounded-sm shrink-0'
-                />
-                <span className='truncate flex-1 text-left text-app tracking-tight text-sidebar-item-foreground group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
-                  {isAdmin ? 'Admin' : 'Jovie'}
-                </span>
-                <ChevronDown
-                  className='size-2.5 shrink-0 text-sidebar-item-icon group-data-[collapsible=icon]:hidden'
-                  aria-hidden='true'
-                />
-              </button>
-            }
-          />
+          <div
+            className={cn(
+              'flex h-7 w-full items-center gap-1.5 px-2.5',
+              'group-data-[collapsible=icon]:justify-center'
+            )}
+          >
+            <BrandLogo
+              size={14}
+              tone='auto'
+              rounded={false}
+              className='rounded-sm shrink-0'
+            />
+          </div>
         );
       })()}
 
@@ -444,12 +431,14 @@ function ShellSidebarInstallBanner() {
 /**
  * UnifiedSidebar - Single sidebar component for all post-auth sections
  *
- * Header workspace button (logo + name) opens user menu dropdown (Linear-style).
- * Settings section shows a back button instead.
- * No footer — user menu lives in the header.
+ * Header now shows a clean Jovie logo only (no workspace/user button).
+ * The user menu (with profile, settings, billing, sign out, etc.) is opened
+ * via a native "Settings" button at the bottom of the sidebar (above Now Playing).
+ * The version string (vX.Y.Z + optional sha) is now rendered inside the user
+ * menu (visible to everyone) instead of the previous admin-only footer.
  */
 export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
-  const { isAdmin: isUserAdmin, creatorProfiles } = useDashboardData();
+  const { creatorProfiles } = useDashboardData();
   const shellChatV1Enabled = useAppFlag('DESIGN_V1');
   const sidebarOverride = useShellSidebarOverride();
   const pathname = usePathname();
@@ -512,23 +501,34 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
 
       {isRouteSidebar ? null : (
         <div className='mt-auto shrink-0'>
+          {/* Bottom Settings button opens the existing user menu via UserButton.
+              Uses Sidebar atoms for native feel (icon + label, tooltip in icon mode).
+              Placed above Now Playing / audio area. */}
+          <div className='px-2.5 py-0.5'>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <UserButton
+                  profileHref={profileHref}
+                  settingsHref={APP_ROUTES.SETTINGS}
+                  trigger={
+                    <SidebarMenuButton tooltip='Settings'>
+                      <Settings className='size-3.5' />
+                      <span className='truncate group-data-[collapsible=icon]:hidden'>
+                        Settings
+                      </span>
+                    </SidebarMenuButton>
+                  }
+                />
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </div>
+
           <SidebarBottomNowPlayingBridge />
           {isDemoRoute ? null : <SidebarUpgradeBanner />}
           {shellChatV1Enabled ? (
             <ShellSidebarInstallBanner />
           ) : (
             <SidebarInstallBanner />
-          )}
-
-          {isUserAdmin && (
-            <div className='pl-2 pr-3.5 pb-2 pt-1'>
-              <span className='text-2xs text-sidebar-muted select-none'>
-                v{process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
-                {process.env.NEXT_PUBLIC_BUILD_SHA
-                  ? ` (${process.env.NEXT_PUBLIC_BUILD_SHA})`
-                  : ''}
-              </span>
-            </div>
           )}
         </div>
       )}
