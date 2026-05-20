@@ -761,12 +761,12 @@ function InputRow({
         className={cn(
           'relative',
           useHeroPill
-            ? 'flex min-h-[68px] items-center gap-2 px-3 py-2 sm:min-h-[72px] sm:px-4'
+            ? 'flex min-h-[52px] items-center gap-1.5 px-3 py-1.5 sm:min-h-[56px] sm:px-3'
             : [
                 'grid gap-2',
                 isHero
-                  ? 'min-h-[96px] grid-rows-[minmax(32px,auto)_40px] px-4 py-2.5'
-                  : 'min-h-[88px] grid-rows-[minmax(24px,auto)_40px] px-3 py-2.5',
+                  ? 'min-h-[64px] grid-rows-[minmax(28px,auto)_36px] px-3 py-1.5'
+                  : 'min-h-[56px] grid-rows-[minmax(24px,auto)_36px] px-3 py-1.5',
               ]
         )}
       >
@@ -776,10 +776,10 @@ function InputRow({
           className={cn(
             'flex w-full min-w-0 flex-wrap items-start gap-x-1.5 gap-y-1.5',
             useHeroPill
-              ? 'min-h-10 flex-1 items-center px-1 pt-0'
+              ? 'min-h-8 flex-1 items-center px-1.5 pt-0'
               : isHero
-                ? 'min-h-8 px-2 pt-1'
-                : 'min-h-7 px-1 pt-0.5'
+                ? 'min-h-7 px-2 pt-0.5'
+                : 'min-h-6 px-1.5 pt-0'
           )}
         >
           {chips && chips.length > 0 && onRemoveChipAt ? (
@@ -797,8 +797,8 @@ function InputRow({
             className={cn(
               'min-w-[min(13rem,100%)] flex-[1_1_13rem] resize-none bg-transparent placeholder:text-quaternary-token',
               isHero
-                ? 'min-h-8 px-2 py-0.5 text-[18px] font-[450] leading-7 text-primary-token sm:text-[19px]'
-                : 'min-h-6 px-1 py-[1px] text-[16px] leading-6 text-white/92',
+                ? 'min-h-7 px-2 py-0.5 text-[15px] font-[450] leading-6 text-primary-token sm:text-[16px]'
+                : 'min-h-6 px-1.5 py-[1px] text-[15px] leading-6 text-white/92',
               // Remove the browser's default focus outline. The surrounding
               // surface provides the focus affordance (border glow via
               // isFocused→isExpanded). Using focus-visible:outline-none keeps
@@ -839,8 +839,8 @@ function InputRow({
           className={cn(
             'flex items-center gap-2',
             useHeroPill
-              ? 'min-h-10 shrink-0 justify-end'
-              : ['justify-between', isHero ? 'min-h-10' : 'min-h-10']
+              ? 'min-h-8 shrink-0 justify-end'
+              : ['justify-between', isHero ? 'min-h-9' : 'min-h-9']
           )}
         >
           <div className='flex min-w-0 items-center gap-2'>
