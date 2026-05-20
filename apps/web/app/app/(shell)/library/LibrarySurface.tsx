@@ -901,7 +901,7 @@ function AssetCard({
           <Artwork asset={asset} />
           <span
             className={cn(
-              'absolute left-2 top-2 rounded-md border px-1.5 py-0.5 text-[11px] leading-4 shadow-[0_6px_16px_rgba(0,0,0,0.18)] backdrop-blur',
+              'absolute left-2 top-2 rounded-md border px-1.5 py-0.5 text-[11px] leading-4 shadow-[0_6px_16px_rgba(0,0,0,0.18)]',
               releaseStatusClasses(asset.status)
             )}
           >
@@ -1099,7 +1099,7 @@ function AssetDrawer({
       inert={open ? undefined : true}
       className={cn(
         'overflow-hidden border-l border-subtle bg-surface-0 transition-[opacity,transform] duration-cinematic ease-cinematic',
-        'fixed inset-x-3 bottom-3 top-16 z-40 rounded-lg border shadow-[0_18px_48px_rgba(0,0,0,0.28)] lg:static lg:z-auto lg:rounded-none lg:border-y-0 lg:border-r-0 lg:shadow-none',
+        'fixed inset-x-3 bottom-20 top-16 z-40 rounded-lg border shadow-[0_18px_48px_rgba(0,0,0,0.28)] lg:bottom-3 lg:static lg:z-auto lg:rounded-none lg:border-y-0 lg:border-r-0 lg:shadow-none',
         open
           ? 'translate-y-0 opacity-100'
           : 'pointer-events-none translate-y-2 opacity-0 max-lg:hidden'
@@ -1451,7 +1451,7 @@ export function LibrarySurface({
           } as CSSProperties
         }
       >
-        <div className='min-w-0 overflow-y-auto'>
+        <div className='min-w-0 overflow-y-auto pb-20 lg:pb-0'>
           {visibleAssets.length === 0 ? (
             <NoResults onReset={resetView} />
           ) : view === 'grid' ? (
