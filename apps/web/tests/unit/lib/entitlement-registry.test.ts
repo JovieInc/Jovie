@@ -29,7 +29,10 @@ describe('Entitlement Registry Consistency', () => {
       'canAccessAdPixels',
       'canBeVerified',
       'aiCanUseTools',
+      'canGenerateAlbumArt',
       'canCreateManualReleases',
+      'canAccessTasksWorkspace',
+      'canGenerateReleasePlans',
       'canAccessMetadataSubmissionAgent',
       'canAccessFutureReleases',
       'canSendNotifications',
@@ -46,6 +49,7 @@ describe('Entitlement Registry Consistency', () => {
       'canAccessWebhooks',
       'canAccessWhiteLabel',
       'canAccessAbTesting',
+      'canAccessAiRetouching',
     ];
 
     for (const planId of planIds) {
@@ -64,6 +68,7 @@ describe('Entitlement Registry Consistency', () => {
       'smartLinksLimit',
       'aiDailyMessageLimit',
       'aiPitchGenPerRelease',
+      'aiRetouchDailyLimit',
     ];
 
     for (const planId of planIds) {
