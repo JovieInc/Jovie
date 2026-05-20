@@ -42,11 +42,14 @@ export function sanitizeMetadataText(value: string | null | undefined): string {
 }
 
 function stripHtmlTags(value: string): string {
+  const htmlTagStartChars =
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!/';
   let output = '';
   let insideTag = false;
 
-  for (const char of value) {
-    if (char === '<') {
+  for (let index = 0; index < value.length; index += 1) {
+    const char = value[index];
+    if (char === '<' && htmlTagStartChars.includes(value[index + 1] ?? '')) {
       insideTag = true;
       output += ' ';
       continue;
