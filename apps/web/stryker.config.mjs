@@ -98,6 +98,24 @@ export default {
     'app/api/onboarding/intake/route.ts',
     'lib/claim/context.ts',
     'lib/claim/finalize.ts',
+    // Public profile ISR (public-profile-isr YELLOW surface per TEST_RISK_REGISTER.md + heatmap).
+    // 1h revalidate + cache-tag invalidation (tags: 'profiles-all', `profile:${username}`).
+    // Covers fetchProfileAndLinks + getCachedProfileAndLinks (unstable_cache, NODE_ENV bypass,
+    // NonCacheableProfileResultError for not_found/error to avoid sticky stale on revalidate),
+    // venmo synthetic link injection, error logging, calculateProfileCompletion, mapper contract.
+    // Also profile-static-params (build-time getTopProfilesForStaticGeneration, fail-closed []),
+    // public-profile-qa bypass flag, page.tsx server logic (generateMetadata, tour/playlist fallbacks,
+    // claim banner separation from ISR, accent non-derivation), layout + opengraph-image for public SEO.
+    // Mutation wiring closes the "no mut score" gap for this high-visibility (5) surface (risk 27.9).
+    // Existing public-profile-page.test.ts (source separation + logic assertions) now drives kills
+    // on loader branches, cache paths, error shapes, mapper variants. Complements E2E visual regression.
+    'app/[[]username[]]/_lib/public-profile-loader.ts',
+    'app/[[]username[]]/_lib/profile-mapper.ts',
+    'app/[[]username[]]/_lib/profile-static-params.ts',
+    'app/[[]username[]]/_lib/public-profile-qa.ts',
+    'app/[[]username[]]/page.tsx',
+    'app/[[]username[]]/layout.tsx',
+    'app/[[]username[]]/opengraph-image.tsx',
     // Social-link dedupe + handle parser. Mutating these surfaces the
     // assertions in tests/unit/lib/social-platform.property.test.ts;
     // a passing-but-mutation-survives suite means duplicate rows or
@@ -184,6 +202,14 @@ export default {
     'tests/unit/app/claim-token-route.test.ts',
     'tests/unit/api/onboarding/intake.test.ts',
     'tests/unit/api/onboarding/claim.test.ts',
+    // Public profile ISR surface (public-profile-isr YELLOW per TEST_RISK_REGISTER + heatmap, risk 27.9).
+    // Wires the existing public-profile-page.test.ts (exercises loader cache bypass, error/not_found/ok
+    // shapes, venmo injection, mapper, static params safety, generateMetadata fallbacks, claim banner
+    // delegation, accent non-derivation in public ISR path, mode subtitle registry). Provides mutation
+    // evidence for the surface (previously no mut score despite 83.6% line cov). Target 75% already met
+    // on line; this closes the assertion-strength gap for high-visibility public profile rendering.
+    // E2E visual regression covers light/dark/mobile; unit + mut now covers the server loader logic.
+    'tests/unit/profile/public-profile-page.test.ts',
     // Stripe webhooks surface (high blast_radius 5 / reversibility 5 per TEST_RISK_REGISTER + AGENTS.md).
     // Wires the dedicated contract tests (sig verification, idempotency via durable DB unique constraint (CAS),
     // delegation, error/negative paths, method guard, retry, outer catch, config guard for missing secret).
