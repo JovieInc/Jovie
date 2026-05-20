@@ -9,7 +9,7 @@ exports[`ChatMessageSkeleton > matches snapshot 1`] = `
     class="flex justify-end"
   >
     <div
-      class="flex min-h-7 max-w-[78%] items-center rounded-full border border-(--linear-app-frame-seam) bg-surface-2 px-3 py-1"
+      class="flex min-h-7 max-w-[78%] items-center rounded-full border border-(--linear-app-frame-seam) bg-surface-2 px-3 py-1.5"
     >
       <div
         aria-hidden="true"

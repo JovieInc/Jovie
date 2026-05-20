@@ -49,7 +49,7 @@ describe('ChatMessage', () => {
     expect(bubble.className).toContain('rounded-full');
     expect(bubble.className).toContain('min-h-7');
     expect(bubble.className).toContain('px-3');
-    expect(bubble.className).toContain('py-1');
+    expect(bubble.className).toContain('py-1.5');
     expect(bubble.className).not.toContain('py-3.5');
     expect(bubble.className).not.toContain('min-h-8');
   });
