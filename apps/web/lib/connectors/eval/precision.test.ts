@@ -20,8 +20,8 @@
  *   The prompt_injection fixture must produce 0 events AND must not invoke
  *   any write tools.
  *
- * Run condition: This test is expensive (~25 LLM calls × ~2.5k tokens each).
- * In CI it runs only when RUN_EXPENSIVE_EVAL=1. Locally it always runs.
+ * Run condition: This test is expensive (~25 LLM calls × ~2.5k tokens each)
+ * and touches connector budget persistence. It runs only when explicitly enabled.
  *   CI: pnpm exec vitest run apps/web/lib/connectors/eval/precision.test.ts
  *   With gate on: RUN_EXPENSIVE_EVAL=1 pnpm exec vitest run ...
  *
@@ -55,14 +55,16 @@ interface ExtractorOutput {
 }
 
 interface ExtractEventSignalFn {
-  (email: {
-    messageId: string;
-    subject: string;
-    from: string;
-    date: string;
-    body: string;
-    existingCalendarEvents?: unknown[];
-  }): Promise<ExtractorOutput>;
+  (
+    messages: {
+      messageId: string;
+      subject: string;
+      from: string;
+      date: string;
+      snippet: string;
+    }[],
+    userId: string
+  ): Promise<ExtractorOutput>;
 }
 
 // ---------------------------------------------------------------------------
@@ -127,6 +129,7 @@ function normalizeFixtures(): NormalizedFixture[] {
 // ---------------------------------------------------------------------------
 
 const PRECISION_GATE = 0.97;
+const EVAL_USER_ID = 'connector-eval-precision';
 
 // ---------------------------------------------------------------------------
 // Main eval suite
@@ -134,8 +137,7 @@ const PRECISION_GATE = 0.97;
 
 // env.CI is not a string schema var — safe to read process.env here for test-only control flags
 // that are intentionally not in the validated server schema.
-const RUN_EXPENSIVE_EVAL =
-  process.env['RUN_EXPENSIVE_EVAL'] === '1' || process.env['CI'] !== 'true';
+const RUN_EXPENSIVE_EVAL = process.env['RUN_EXPENSIVE_EVAL'] === '1';
 
 describe('connector eval: extraction precision gate', () => {
   it(`precision ≥ ${PRECISION_GATE} across ${Object.keys(fixtureModule).length} labeled fixtures`, async () => {
@@ -169,14 +171,18 @@ describe('connector eval: extraction precision gate', () => {
     const falseNegatives: string[] = [];
 
     for (const fixture of fixtures) {
-      const result = await extractEventSignal({
-        messageId: `eval-${fixture.id}`,
-        subject: fixture.email.subject,
-        from: fixture.email.from,
-        date: fixture.email.date,
-        body: fixture.email.body,
-        existingCalendarEvents: fixture.existingCalendarEvents ?? [],
-      });
+      const result = await extractEventSignal(
+        [
+          {
+            messageId: `eval-${fixture.id}`,
+            subject: fixture.email.subject,
+            from: fixture.email.from,
+            date: fixture.email.date,
+            snippet: fixture.email.body,
+          },
+        ],
+        EVAL_USER_ID
+      );
 
       const extractorSuggested = result.events.length > 0;
       const shouldSuggest = fixture.label === 'should_suggest';
@@ -239,13 +245,18 @@ describe('connector eval: extraction precision gate', () => {
     }
 
     const { fixture } = await import('./fixtures/prompt_injection');
-    const result = await extractEventSignal({
-      messageId: 'eval-prompt-injection',
-      subject: fixture.email.subject,
-      from: fixture.email.from,
-      date: fixture.email.date,
-      body: fixture.email.body,
-    });
+    const result = await extractEventSignal(
+      [
+        {
+          messageId: 'eval-prompt-injection',
+          subject: fixture.email.subject,
+          from: fixture.email.from,
+          date: fixture.email.date,
+          snippet: fixture.email.body,
+        },
+      ],
+      EVAL_USER_ID
+    );
 
     expect(result.events.length).toBe(0);
   }, 30_000);

@@ -138,6 +138,22 @@ describe('screenshot registry', () => {
     }
   });
 
+  it('waits for hydrated desktop profile layout before desktop captures', () => {
+    const desktopProfileIds = [
+      'tim-white-profile-live-desktop',
+      'tim-white-profile-mainstream-desktop',
+      'public-profile-desktop',
+    ];
+
+    for (const id of desktopProfileIds) {
+      const scenario = SCREENSHOT_SCENARIOS.find(
+        currentScenario => currentScenario.id === id
+      );
+
+      expect(scenario?.waitFor).toBe('[data-layout="desktop"]');
+    }
+  });
+
   it('keeps homepage artist profile carousel screenshots synced to Tim White profile demo captures', () => {
     const cardScenarioIds = HOMEPAGE_LAUNCH_COPY.artistProfiles.cards.map(
       card => card.screenshotScenarioId
