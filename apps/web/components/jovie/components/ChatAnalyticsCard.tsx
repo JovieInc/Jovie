@@ -2,7 +2,6 @@
 
 import { Sparkles } from 'lucide-react';
 import { InsightCategoryIcon } from '@/components/features/dashboard/insights/InsightCategoryIcon';
-import { LINEAR_SURFACE } from '@/components/features/dashboard/tokens';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { cn } from '@/lib/utils';
 import type { ChatInsightsToolResult } from '../types';
@@ -22,11 +21,11 @@ export function ChatAnalyticsCard({ result }: ChatAnalyticsCardProps) {
       data-testid='chat-analytics-card'
     >
       <div className='flex items-start gap-3'>
-        <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0'>
-          <Sparkles className='h-3.5 w-3.5 text-secondary-token' />
+        <div className='flex h-5 w-5 shrink-0 items-center justify-center text-tertiary-token'>
+          <Sparkles className='h-4 w-4' strokeWidth={2.2} />
         </div>
         <div className='min-w-0'>
-          <p className='text-app font-medium text-primary-token'>
+          <p className='text-[14px] font-semibold leading-5 text-primary-token'>
             {result.title}
           </p>
           <p className='mt-1 text-[12px] leading-5 text-tertiary-token'>
@@ -45,24 +44,23 @@ export function ChatAnalyticsCard({ result }: ChatAnalyticsCardProps) {
           <li
             key={insight.id}
             className={cn(
-              LINEAR_SURFACE.drawerCardSm,
-              'flex min-h-[148px] min-w-[min(19.5rem,82vw)] snap-start flex-col justify-between p-4 md:min-w-0'
+              'flex min-h-[136px] min-w-[min(20rem,84vw)] snap-start flex-col justify-between rounded-[20px] border border-subtle bg-surface-1 p-4 shadow-[0_16px_44px_-30px_rgba(0,0,0,0.92)] md:min-w-0'
             )}
             data-testid='chat-analytics-signal-card'
           >
             <div className='flex items-center gap-2'>
-              <span className='flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0'>
+              <span className='flex h-4 w-4 shrink-0 items-center justify-center text-tertiary-token'>
                 <InsightCategoryIcon category={insight.category} size='sm' />
               </span>
-              <span className='text-[11px] font-medium capitalize leading-4 text-tertiary-token'>
+              <span className='text-[11.5px] font-medium capitalize leading-4 text-tertiary-token'>
                 {insight.category.replaceAll('_', ' ')}
               </span>
             </div>
-            <div className='mt-5 min-w-0'>
-              <p className='text-pretty text-[15px] font-semibold leading-[1.28] text-primary-token'>
+            <div className='mt-4 min-w-0'>
+              <p className='text-pretty text-[17px] font-semibold leading-[1.18] text-primary-token'>
                 {insight.title}
               </p>
-              <p className='mt-2 line-clamp-2 text-[12.5px] leading-5 text-secondary-token'>
+              <p className='mt-3 line-clamp-2 text-[12.5px] leading-5 text-tertiary-token'>
                 {insight.actionSuggestion ?? insight.description}
               </p>
             </div>

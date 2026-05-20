@@ -40,11 +40,11 @@ const VIRTUALIZATION_THRESHOLD = 12;
 const EMPTY_STATE_SIGNAL_CARDS = [
   {
     headline: 'Release plan',
-    body: 'Rollout, timing, and blockers at a glance.',
+    body: 'Turn a song into a launch sequence.',
   },
   {
     headline: 'Asset brief',
-    body: 'Creative direction, copy, and next steps.',
+    body: 'Creative direction and copy, ready to use.',
   },
   {
     headline: 'Context',
@@ -71,18 +71,18 @@ function EmptyStateSignalCards({
         style={CHAT_PROMPT_RAIL_MASK_STYLE}
       >
         <div
-          className='flex flex-nowrap gap-3 lg:grid lg:grid-cols-3'
+          className='flex snap-x snap-mandatory flex-nowrap gap-3 lg:grid lg:grid-cols-3'
           data-testid='chat-empty-state-top-signals-row'
         >
           {EMPTY_STATE_SIGNAL_CARDS.map(card => (
             <article
               key={card.headline}
-              className='min-h-[108px] min-w-[16.5rem] flex-1 rounded-[20px] border border-subtle bg-surface-1 px-4 py-4 shadow-[0_16px_40px_-28px_rgba(0,0,0,0.9)] lg:min-w-0'
+              className='min-h-[124px] min-w-[min(19rem,84vw)] flex-1 snap-start rounded-[22px] border border-subtle bg-surface-1 px-4 py-4 shadow-[0_16px_44px_-30px_rgba(0,0,0,0.92)] lg:min-w-0'
             >
-              <p className='text-[15px] font-semibold leading-5 text-primary-token'>
+              <p className='text-pretty text-[17px] font-semibold leading-[1.2] text-primary-token'>
                 {card.headline}
               </p>
-              <p className='mt-2 max-w-[22ch] text-[12.5px] leading-5 text-secondary-token'>
+              <p className='mt-3 max-w-[24ch] text-[12.5px] leading-5 text-tertiary-token'>
                 {card.body}
               </p>
             </article>
@@ -93,6 +93,10 @@ function EmptyStateSignalCards({
   );
 }
 
+/**
+ * Extracts the first name token for use in the empty-state greeting (e.g. "What are we working on, Alex?").
+ * Handles null/undefined/blank by returning null. Splits on whitespace.
+ */
 export function getFirstNameForGreeting(
   name: string | null | undefined
 ): string | null {

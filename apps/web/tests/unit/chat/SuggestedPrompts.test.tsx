@@ -33,12 +33,27 @@ describe('SuggestedPrompts', () => {
 
     const rail = getByTestId('suggested-prompts-rail');
     expect(rail.className).toContain('overflow-x-auto');
+    expect(rail.className).not.toContain('scroll-smooth');
     expect(rail.className).not.toContain('md:overflow-visible');
     const row = rail.firstElementChild;
     expect(row?.className).toContain('snap-x');
     expect(row?.className).toContain('flex-nowrap');
     expect(row?.className).not.toContain('flex-wrap');
     expect(row?.className).toContain('whitespace-nowrap');
+  });
+
+  it('uses flat prompt icons without always-on icon backgrounds', () => {
+    const onSelect = vi.fn();
+    const { getByRole } = fastRender(<SuggestedPrompts onSelect={onSelect} />);
+
+    const iconShell = getByRole('button', {
+      name: 'Plan a release',
+    }).firstElementChild;
+
+    expect(iconShell?.className).toContain('text-tertiary-token');
+    expect(iconShell?.className).not.toContain('rounded-full');
+    expect(iconShell?.className).not.toContain('bg-black');
+    expect(iconShell?.className).not.toContain('dark:bg-white');
   });
 
   it('renders a grid layout when requested', () => {

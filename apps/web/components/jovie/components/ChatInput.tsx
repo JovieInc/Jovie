@@ -106,7 +106,7 @@ function geometryFor(
     ? 'min(calc(100vw - 32px), 840px)'
     : 'min(calc(100vw - 32px), 720px)';
   if (stacked) return { width, maxWidth, borderRadius: 28 };
-  if (isHero && mode === 'empty') return { width, maxWidth, borderRadius: 32 };
+  if (isHero && mode !== 'entity') return { width, maxWidth, borderRadius: 36 };
   if (mode === 'entity') return { width, maxWidth, borderRadius: 24 };
   return { width, maxWidth, borderRadius: 28 };
 }
@@ -743,6 +743,8 @@ function InputRow({
   attachDisabledForPicker,
   isHero,
 }: InputRowProps) {
+  const useHeroPill = isHero && !hasPendingImages;
+
   return (
     <div className={cn(hasBorderTop && 'border-t border-white/[0.065]')}>
       {hasPendingImages && onRemoveImage ? (
@@ -757,10 +759,15 @@ function InputRow({
       <div
         ref={containerRef}
         className={cn(
-          'relative grid gap-2',
-          isHero
-            ? 'min-h-[116px] grid-rows-[minmax(32px,auto)_44px] px-4 py-3'
-            : 'min-h-[88px] grid-rows-[minmax(24px,auto)_40px] px-3 py-2.5'
+          'relative',
+          useHeroPill
+            ? 'flex min-h-[68px] items-center gap-2 px-3 py-2 sm:min-h-[72px] sm:px-4'
+            : [
+                'grid gap-2',
+                isHero
+                  ? 'min-h-[96px] grid-rows-[minmax(32px,auto)_40px] px-4 py-2.5'
+                  : 'min-h-[88px] grid-rows-[minmax(24px,auto)_40px] px-3 py-2.5',
+              ]
         )}
       >
         <div ref={hiddenDivRef} style={HIDDEN_DIV_STYLES} aria-hidden />
@@ -768,7 +775,11 @@ function InputRow({
           data-testid='chat-input-inline-field'
           className={cn(
             'flex w-full min-w-0 flex-wrap items-start gap-x-1.5 gap-y-1.5',
-            isHero ? 'min-h-8 px-2 pt-1' : 'min-h-7 px-1 pt-0.5'
+            useHeroPill
+              ? 'min-h-10 flex-1 items-center px-1 pt-0'
+              : isHero
+                ? 'min-h-8 px-2 pt-1'
+                : 'min-h-7 px-1 pt-0.5'
           )}
         >
           {chips && chips.length > 0 && onRemoveChipAt ? (
@@ -826,8 +837,10 @@ function InputRow({
 
         <div
           className={cn(
-            'flex items-center justify-between gap-2',
-            isHero ? 'min-h-11' : 'min-h-10'
+            'flex items-center gap-2',
+            useHeroPill
+              ? 'min-h-10 shrink-0 justify-end'
+              : ['justify-between', isHero ? 'min-h-10' : 'min-h-10']
           )}
         >
           <div className='flex min-w-0 items-center gap-2'>

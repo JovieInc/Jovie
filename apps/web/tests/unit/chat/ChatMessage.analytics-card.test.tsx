@@ -95,7 +95,9 @@ describe('ChatMessage analytics cards', () => {
     const carousel = screen.getByTestId('chat-analytics-signal-carousel');
     expect(carousel).toBeTruthy();
     expect(carousel.className).toContain('md:grid-cols-3');
-    expect(screen.getByTestId('chat-analytics-signal-card')).toBeTruthy();
+    const signalCard = screen.getByTestId('chat-analytics-signal-card');
+    expect(signalCard).toBeTruthy();
+    expect(signalCard.className).toContain('min-w-[min(20rem,84vw)]');
     expect(screen.getByText('Top signals')).toBeTruthy();
     expect(
       screen.getByText('Subscribers are picking up in Chicago')
