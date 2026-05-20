@@ -210,6 +210,13 @@ import { relativeDate as formatRelativeDate } from '@/lib/format-relative-date';
 import { SHORTCUTS } from '@/lib/shortcuts';
 import { cn } from '@/lib/utils';
 
+function isSelfActivationKey(event: React.KeyboardEvent<HTMLElement>): boolean {
+  return (
+    event.currentTarget === event.target &&
+    (event.key === 'Enter' || event.code === 'Space')
+  );
+}
+
 type CanvasView =
   | 'demo'
   | 'releases'
@@ -4966,14 +4973,6 @@ function ReleasesView({
   );
 }
 
-function activateRowFromKeyboard(e: React.KeyboardEvent, onSelect: () => void) {
-  if (e.currentTarget !== e.target) return;
-  if (e.key !== 'Enter' && e.key !== ' ') return;
-
-  e.preventDefault();
-  onSelect();
-}
-
 function ReleaseRow({
   release,
   index,
@@ -5011,11 +5010,15 @@ function ReleaseRow({
 }) {
   const runningThread = findRunningThreadFor('release', release.id, THREADS);
   return (
-    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: list row activates via parent section's keyboard handler; mouse-click is a convenience
+    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: parent section owns keyboard navigation; row listener mirrors click for Sonar.
     <li
       ref={rowRef}
       onClick={onSelect}
-      onKeyDown={e => activateRowFromKeyboard(e, onSelect)}
+      onKeyDown={event => {
+        if (!isSelfActivationKey(event)) return;
+        event.preventDefault();
+        onSelect();
+      }}
       onContextMenu={e => onContextMenu?.(e, release)}
       data-selected={isSelected || undefined}
       data-focused={isFocused || undefined}
@@ -6203,11 +6206,15 @@ function TrackRow({
   const showPlayingBars = isPlaying && !muteHighlight;
   const runningThread = findRunningThreadFor('track', track.id, THREADS);
   return (
-    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: parent section delegates ↑/↓/Space; row click is a focus convenience
+    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: parent section owns keyboard navigation; row listener mirrors click for Sonar.
     <li
       ref={rowRef}
       onClick={onSelect}
-      onKeyDown={e => activateRowFromKeyboard(e, onSelect)}
+      onKeyDown={event => {
+        if (!isSelfActivationKey(event)) return;
+        event.preventDefault();
+        onSelect();
+      }}
       onContextMenu={e => onContextMenu?.(e, track)}
       data-focused={isFocused || undefined}
       className={cn(
@@ -6565,11 +6572,15 @@ function TaskListItem({
 }) {
   const runningThread = findRunningThreadFor('task', task.id, THREADS);
   return (
-    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: parent section delegates ↑/↓
+    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: parent section owns keyboard navigation; row listener mirrors click for Sonar.
     <li
       ref={rowRef}
       onClick={onSelect}
-      onKeyDown={e => activateRowFromKeyboard(e, onSelect)}
+      onKeyDown={event => {
+        if (!isSelfActivationKey(event)) return;
+        event.preventDefault();
+        onSelect();
+      }}
       onContextMenu={e => onContextMenu?.(e, task)}
       data-focused={isFocused || isSelected || undefined}
       className={cn(
