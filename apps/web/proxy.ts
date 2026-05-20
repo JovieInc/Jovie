@@ -133,7 +133,7 @@ function applyStateRewrite(
  * Mirrors maskIpAddress() in app/api/audience/lib/audience-utils.ts.
  * Edge-compatible (no Node.js modules).
  */
-function maskIpForFingerprint(ip: string | null): string {
+export function maskIpForFingerprint(ip: string | null): string {
   if (!ip) return 'unknown_ip';
   if (ip.includes(':')) {
     // IPv6: keep first 4 groups
@@ -154,7 +154,7 @@ function maskIpForFingerprint(ip: string | null): string {
  * Create visitor fingerprint using the Web Crypto API (edge-compatible).
  * Produces the same hex digest as createFingerprint() in audience-utils.ts.
  */
-async function createFingerprintEdge(
+export async function createFingerprintEdge(
   ip: string | null,
   ua: string | null
 ): Promise<string> {
