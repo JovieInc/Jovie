@@ -138,7 +138,7 @@ describe('screenshot registry', () => {
     }
   });
 
-  it('waits for hydrated desktop profile layout before desktop captures', () => {
+  it('waits for compact profile shell on desktop captures (stable post-shell-migration selector)', () => {
     const desktopProfileIds = [
       'tim-white-profile-live-desktop',
       'tim-white-profile-mainstream-desktop',
@@ -150,7 +150,7 @@ describe('screenshot registry', () => {
         currentScenario => currentScenario.id === id
       );
 
-      expect(scenario?.waitFor).toBe('[data-layout="desktop"]');
+      expect(scenario?.waitFor).toBe('[data-testid="profile-compact-shell"]');
     }
   });
 
