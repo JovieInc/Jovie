@@ -456,4 +456,52 @@ describe('dev test-auth routes', () => {
       error: 'Redirect must be app-relative',
     });
   });
+
+  // Smallest addition for fail-closed prod paths (RED 35.7 critical per register + PR):
+  // exercises the !enabled / !trusted early returns (403 for enter/POST, disabled json for GET)
+  // in route handlers when getDevTestAuthAvailability reports production-disabled.
+  // This kills mutants on the disabled branches, outer json/error paths, 400/403 contracts.
+  it('returns disabled (403) on POST /session when availability reports prod/not-enabled (fail-closed)', async () => {
+    mockGetDevTestAuthAvailability.mockReturnValueOnce({
+      enabled: false,
+      trustedHost: false,
+      reason: 'Not available in production',
+    });
+
+    const { POST } = await import('@/app/api/dev/test-auth/session/route');
+    const response = await POST(
+      new NextRequest('http://localhost:3000/api/dev/test-auth/session', {
+        method: 'POST',
+        body: JSON.stringify({ persona: 'creator' }),
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: 'Not available in production',
+    });
+  });
+
+  it('returns disabled (403) on GET /enter when availability reports not-enabled (fail-closed)', async () => {
+    mockGetDevTestAuthAvailability.mockReturnValueOnce({
+      enabled: false,
+      trustedHost: false,
+      reason: 'Not available in production',
+    });
+
+    const { GET } = await import('@/app/api/dev/test-auth/enter/route');
+    const response = await GET(
+      new NextRequest(
+        'http://localhost:3000/api/dev/test-auth/enter?persona=creator&redirect=/app'
+      )
+    );
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: 'Not available in production',
+    });
+  });
 });

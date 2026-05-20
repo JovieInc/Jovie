@@ -105,6 +105,7 @@ export type EntityPopoverData =
 // ---------------------------------------------------------------------------
 
 export function formatEntitySubtitle(entity: EntityPopoverData): string | null {
+  if (!entity || typeof entity.label !== 'string') return null;
   switch (entity.kind) {
     case 'release': {
       const parts: string[] = [];
@@ -113,8 +114,12 @@ export function formatEntitySubtitle(entity: EntityPopoverData): string | null {
       return parts.join(' · ') || null;
     }
     case 'artist': {
-      // Token cleanup: never surface raw Spotify URLs in subtitles (entity matching in chat/onboarding)
-      if (entity.handle && !/open\.spotify\.com/i.test(entity.handle))
+      // Token cleanup + no raw Spotify URLs (entity matching in chat/onboarding)
+      // Never surface open.spotify.com in UI; use icon + clean label instead.
+      if (
+        entity.handle &&
+        !/open\.spotify\.com|spotify\.com\/artist/i.test(entity.handle)
+      )
         return `@${entity.handle}${entity.isYou ? ' · You' : ''}`;
       if (entity.followers)
         return `${compactNumber(entity.followers)} followers`;
@@ -156,6 +161,25 @@ function compactNumber(value: number): string {
   return value.toString();
 }
 
+/** Sanitize artist label/handle for display: never render raw Spotify URLs; prefer premium icon label. (Per Wave 5: Spotify logo/icon instead of open.spotify.com) */
+function getSpotifyArtistDisplay(entity: EntityPopoverData): {
+  displayLabel: string;
+  useSpotifyIcon: boolean;
+} {
+  if (entity.kind !== 'artist') {
+    return { displayLabel: entity.label || '', useSpotifyIcon: false };
+  }
+  const label = entity.label || '';
+  const handle = entity.handle || '';
+  const isSpotifyUrl =
+    /open\.spotify\.com|spotify\.com\/artist/i.test(label) ||
+    /open\.spotify\.com|spotify\.com\/artist/i.test(handle);
+  if (isSpotifyUrl) {
+    return { displayLabel: 'Spotify artist', useSpotifyIcon: true };
+  }
+  return { displayLabel: label, useSpotifyIcon: false };
+}
+
 function formatLongDate(iso: string | undefined): string | null {
   if (!iso) return null;
   const d = new Date(iso);
@@ -183,6 +207,7 @@ export function EntityRowArt({
 }: {
   readonly entity: EntityPopoverData;
 }) {
+  if (!entity || typeof entity.label !== 'string') return null;
   if (entity.kind === 'event' && !entity.thumbnail) {
     const stamp = stampParts(entity.eventDate);
     if (stamp) {
@@ -250,6 +275,7 @@ interface StatChip {
 }
 
 function buildStats(entity: EntityPopoverData): StatChip[] {
+  if (!entity) return [];
   const out: StatChip[] = [];
   switch (entity.kind) {
     case 'release': {
@@ -275,7 +301,10 @@ function buildStats(entity: EntityPopoverData): StatChip[] {
       break;
     }
     case 'artist': {
-      if (entity.handle && !/open\.spotify\.com/i.test(entity.handle))
+      if (
+        entity.handle &&
+        !/open\.spotify\.com|spotify\.com\/artist/i.test(entity.handle)
+      )
         out.push({ key: 'handle', node: `@${entity.handle}` });
       if (entity.followers) {
         out.push({
@@ -380,6 +409,7 @@ function buildStats(entity: EntityPopoverData): StatChip[] {
 }
 
 function eyebrowOf(entity: EntityPopoverData): string {
+  if (!entity) return '';
   switch (entity.kind) {
     case 'release':
       return entity.releaseType ? `Release · ${entity.releaseType}` : 'Release';
@@ -422,6 +452,7 @@ function stampParts(iso: string | undefined): DateStampParts | null {
 
 // 48px hero artwork inside the card.
 function CardArtwork({ entity }: { readonly entity: EntityPopoverData }) {
+  if (!entity) return null;
   if (entity.kind === 'event' && !entity.thumbnail) {
     const stamp = stampParts(entity.eventDate);
     if (stamp) {
@@ -478,6 +509,7 @@ interface EntityCardProps {
 }
 
 function EntityCard({ entity, onActivate }: EntityCardProps) {
+  if (!entity || typeof entity.label !== 'string') return null;
   const stats = buildStats(entity);
   const eyebrow = eyebrowOf(entity);
 
@@ -487,6 +519,8 @@ function EntityCard({ entity, onActivate }: EntityCardProps) {
       ? entity.artist
       : null;
 
+  const artistDisp = getSpotifyArtistDisplay(entity);
+
   return (
     <div className='flex items-start gap-2.5'>
       <CardArtwork entity={entity} />
@@ -495,15 +529,14 @@ function EntityCard({ entity, onActivate }: EntityCardProps) {
           {eyebrow}
         </div>
         <h3 className='m-0 mb-1 truncate text-app font-caption leading-tight text-primary-token'>
-          {entity.kind === 'artist' &&
-          /open\.spotify\.com|spotify\.com\/artist/i.test(entity.label) ? (
+          {artistDisp.useSpotifyIcon ? (
             <span className='inline-flex items-center gap-1.5'>
               <Music
                 className='h-3.5 w-3.5 shrink-0'
                 style={{ color: '#1DB954' }}
                 aria-hidden='true'
               />
-              Spotify artist
+              {artistDisp.displayLabel}
             </span>
           ) : (
             entity.label
@@ -552,6 +585,8 @@ function EntityCard({ entity, onActivate }: EntityCardProps) {
 
 // ---------------------------------------------------------------------------
 // Popover surface — fixed-positioned, anchored to a row, collision-flips.
+// Token/padding cleanup: inner content uses rail-aligned px-3 py-2.5 for premium compact feel (matches ReleaseSidebar / table rows).
+// Failure handling guards placed AFTER all hooks to satisfy react-hooks/rules-of-hooks.
 // ---------------------------------------------------------------------------
 
 interface EntityPopoverProps {
@@ -618,6 +653,9 @@ export function EntityPopover({
     };
   }, [anchor]);
 
+  if (!entity || !entity.kind || typeof entity.label !== 'string') {
+    return null;
+  }
   if (!mounted) return null;
 
   return createPortal(
@@ -643,7 +681,7 @@ export function EntityPopover({
         'motion-reduce:transition-opacity motion-reduce:transform-none'
       )}
     >
-      <div className='p-3'>
+      <div className='px-3 py-2.5'>
         <EntityCard entity={entity} onActivate={onActivate} />
       </div>
     </div>,
@@ -657,6 +695,7 @@ export function EntityPopover({
 // @-mentions and any other inline entity reference. Manages its own 200ms /
 // 120ms hover-bridge state so the popover stays open while the cursor moves
 // diagonally onto the popover surface.
+// Failure handling guard placed AFTER all hooks.
 // ---------------------------------------------------------------------------
 
 const HOVER_OPEN_MS = 200;
@@ -734,6 +773,11 @@ export function EntityHoverLink({
     },
     [closeNow]
   );
+
+  if (!entity || !entity.kind || typeof entity.label !== 'string') {
+    // Failure handling: render children without popover affordance on bad data
+    return <>{children}</>;
+  }
 
   return (
     <>

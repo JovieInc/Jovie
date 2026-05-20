@@ -506,7 +506,7 @@ export function JovieChat({
     chipTray.chips.length === 0;
   let emptyStateHeading: string;
   if (isFirstSession) {
-    emptyStateHeading = "Hey, I'm Jovie";
+    emptyStateHeading = "Hey, I'm Jovie.";
   } else {
     emptyStateHeading = greetingName
       ? `What are we working on, ${greetingName}?`

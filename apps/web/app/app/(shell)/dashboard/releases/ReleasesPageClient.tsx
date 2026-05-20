@@ -32,7 +32,7 @@ export function ReleasesPageClient() {
   const { selectedProfile } = useDashboardData();
   const profileId = selectedProfile?.id ?? '';
   const { data: releases, isError } = useReleasesQuery(profileId);
-  const designV1ReleasesEnabled = useAppFlag('DESIGN_V1');
+  const designV1ReleasesEnabled = useAppFlag('DESIGN_V1_RELEASES');
 
   const settings =
     (selectedProfile?.settings as Record<string, unknown> | null) ?? {};
