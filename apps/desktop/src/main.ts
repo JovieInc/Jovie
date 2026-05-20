@@ -21,7 +21,7 @@ if (APP_ENV === 'staging') {
 const APP_ORIGIN = new URL(APP_URL).origin;
 const APP_ENTRY_URL = buildAppUrl('/app/chat');
 const SETTINGS_URL = buildAppUrl('/app/settings');
-const APP_BACKGROUND_COLOR = '#09090b';
+const APP_BACKGROUND_COLOR = '#08090a';
 const NAVIGATION_ABORTED_ERROR_CODE = -3;
 const APP_ICON_FILENAME =
   APP_ENV === 'staging' ? 'icon-staging.png' : 'icon.png';
@@ -244,9 +244,9 @@ function buildDesktopLoadFailureUrl(): string {
     <title>Jovie Desktop</title>
     <style>
       :root { color-scheme: dark; }
-      html, body { margin: 0; min-height: 100%; background: #07080b; color: #f4f6fa; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, sans-serif; }
+      html, body { margin: 0; min-height: 100%; background: #08090a; color: #f4f6fa; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, sans-serif; }
       body { display: grid; place-items: center; overflow: hidden; }
-      .shell { position: relative; display: grid; width: min(520px, calc(100vw - 48px)); gap: 22px; padding: 40px; border: 1px solid rgba(255,255,255,0.08); border-radius: 28px; background: linear-gradient(145deg, rgba(14,17,24,0.94), rgba(7,9,13,0.98)); box-shadow: 0 30px 120px rgba(0,0,0,0.42); }
+      .shell { position: relative; display: grid; width: min(520px, calc(100vw - 48px)); gap: 22px; padding: 40px; border: 1px solid rgba(255,255,255,0.08); border-radius: 28px; background: linear-gradient(145deg, rgba(15,16,17,0.94), rgba(8,9,10,0.98)); box-shadow: 0 30px 120px rgba(0,0,0,0.42); }
       .mark { position: absolute; right: -52px; top: -46px; width: 220px; height: 220px; opacity: 0.055; }
       .brand { display: flex; align-items: center; gap: 14px; }
       .icon { display: grid; width: 42px; height: 42px; place-items: center; border-radius: 14px; background: #f4f6fa; color: #080a0d; }
@@ -334,11 +334,17 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
 
   win.webContents.on(
     'did-fail-load',
-    (_event, errorCode, _errorDescription, _validatedURL, isMainFrame) => {
+    (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
       if (!isMainFrame || errorCode === NAVIGATION_ABORTED_ERROR_CODE) {
         return;
       }
 
+      console.error('[Jovie Desktop] Shell load failure (graceful recovery)', {
+        errorCode,
+        errorDescription,
+        validatedURL,
+        appEntry: APP_ENTRY_URL,
+      });
       showDesktopLoadFailure(win);
     }
   );

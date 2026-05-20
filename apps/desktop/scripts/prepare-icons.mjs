@@ -1,13 +1,16 @@
 #!/usr/bin/env node
 /**
- * Prepares all desktop app icons from the canonical desktop icon source.
+ * Prepares all desktop app icons from the *canonical* Jovie brand asset.
  *
- * - Copies and resizes apps/desktop/assets/icon-source.png to
- *   apps/desktop/assets/icon.png (512×512)
- * - Generates the staging variant with an orange "S" badge at the
- *   bottom-right corner → apps/desktop/assets/icon-staging.png
+ * Sources the real Jovie app icon (not placeholder) from the brand generator output:
+ *   apps/web/public/Jovie-logo.png  (1024×1024 cream mark on ink, padded per DESIGN.md)
  *
- * Usage: node apps/desktop/scripts/prepare-icons.mjs
+ * - Produces apps/desktop/assets/icon.png (512×512 production)
+ * - Produces apps/desktop/assets/icon-staging.png (with orange "S" badge)
+ *
+ * This ensures the Electron app + DMG always ship the real Jovie icon.
+ *
+ * Run via: pnpm --filter @jovie/desktop run prepare:assets
  *
  * NOTE: CI (desktop-release.yml) calls gen-staging-icon.mjs, NOT this script.
  * Run this manually when you need to regenerate both icons at once locally.
@@ -23,7 +26,7 @@ import sharp from 'sharp';
 const REPO_ROOT = path.resolve(fileURLToPath(import.meta.url), '../../../..');
 
 const ASSETS_DIR = path.join(REPO_ROOT, 'apps/desktop/assets');
-const SOURCE_ICON = path.join(ASSETS_DIR, 'icon-source.png');
+const CANONICAL_SOURCE = path.join(REPO_ROOT, 'apps/web/public/Jovie-logo.png');
 const ICON_PATH = path.join(ASSETS_DIR, 'icon.png');
 const STAGING_ICON_PATH = path.join(ASSETS_DIR, 'icon-staging.png');
 
@@ -43,8 +46,8 @@ const BADGE_SVG = `<svg width="${BADGE_SIZE}" height="${BADGE_SIZE}" xmlns="http
   >S</text>
 </svg>`;
 
-// 1. Production icon — resize source icon to 512×512
-await sharp(SOURCE_ICON)
+// 1. Production icon — resize canonical real Jovie icon (cream mark on dark) to 512×512
+await sharp(CANONICAL_SOURCE)
   .resize(ICON_SIZE, ICON_SIZE, {
     fit: 'contain',
     background: { r: 0, g: 0, b: 0, alpha: 0 },
@@ -53,7 +56,7 @@ await sharp(SOURCE_ICON)
   .png()
   .toFile(ICON_PATH);
 
-console.log(`Production icon written: ${ICON_PATH}`);
+console.log(`Production icon written (from real brand asset): ${ICON_PATH}`);
 
 // 2. Staging icon — add orange "S" badge in bottom-right
 const baseBuffer = await sharp(ICON_PATH).toBuffer();

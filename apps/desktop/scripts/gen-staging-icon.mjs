@@ -2,13 +2,17 @@
 /**
  * Generates the staging variant of the Jovie desktop icon.
  *
- * Reads the canonical desktop icon source from apps/desktop/assets/,
- * composites an orange "S" badge in the bottom-right corner,
+ * Reads the *canonical real Jovie app icon* (brand-generated, not placeholder/sailboat)
+ * from apps/web/public/Jovie-logo.png (the single source of truth per brand assets generator).
+ *
+ * Composites an orange "S" badge in the bottom-right corner,
  * and writes the result to apps/desktop/assets/icon-staging.png.
  *
- * Also ensures the base production icon.png is up to date.
+ * Also ensures the base production icon.png is up to date from the real asset.
  *
  * Usage: node apps/desktop/scripts/gen-staging-icon.mjs
+ *
+ * This guarantees Electron (dock, window, DMG drag) and installer always use the real Jovie icon.
  */
 
 import path from 'node:path';
@@ -18,7 +22,7 @@ import sharp from 'sharp';
 const REPO_ROOT = path.resolve(fileURLToPath(import.meta.url), '../../../..');
 
 const ASSETS_DIR = path.join(REPO_ROOT, 'apps/desktop/assets');
-const SOURCE_ICON = path.join(ASSETS_DIR, 'icon-source.png');
+const CANONICAL_SOURCE = path.join(REPO_ROOT, 'apps/web/public/Jovie-logo.png');
 const ICON_PATH = path.join(ASSETS_DIR, 'icon.png');
 const OUTPUT_PATH = path.join(ASSETS_DIR, 'icon-staging.png');
 
@@ -38,8 +42,8 @@ const BADGE_SVG = `<svg width="${BADGE_SIZE}" height="${BADGE_SIZE}" xmlns="http
   >S</text>
 </svg>`;
 
-// Ensure the base icon is present and correctly sized
-await sharp(SOURCE_ICON)
+// Ensure the base icon is present and correctly sized from the real canonical brand asset
+await sharp(CANONICAL_SOURCE)
   .resize(ICON_SIZE, ICON_SIZE, {
     fit: 'contain',
     background: { r: 0, g: 0, b: 0, alpha: 0 },
@@ -48,7 +52,7 @@ await sharp(SOURCE_ICON)
   .png()
   .toFile(ICON_PATH);
 
-console.log(`Base icon written: ${ICON_PATH}`);
+console.log(`Base icon written (from real Jovie brand asset): ${ICON_PATH}`);
 
 // Composite the staging badge
 const badgeBuffer = await sharp(Buffer.from(BADGE_SVG))
