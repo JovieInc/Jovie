@@ -47,7 +47,9 @@ function readDatabaseUrl(): string {
   return databaseUrl;
 }
 
-function isScreenshotWorkflowPlaceholderDatabaseUrl(databaseUrl: string): boolean {
+function isScreenshotWorkflowPlaceholderDatabaseUrl(
+  databaseUrl: string
+): boolean {
   return (
     databaseUrl === 'postgresql://localhost/noop' ||
     databaseUrl === 'postgres://localhost/noop'
