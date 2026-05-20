@@ -286,7 +286,7 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
   });
 });
 
-describe('claim route invariants (property tests for idempotency, ordering, failure paths)', () => {
+describe('claim route invariants (property tests for recency, idempotency, data races, 409)', () => {
   const timestampArb = fc.integer({
     min: Date.UTC(2020, 0, 1),
     max: Date.UTC(2026, 5, 1),
@@ -339,6 +339,56 @@ describe('claim route invariants (property tests for idempotency, ordering, fail
         expect(primary).toBeUndefined();
         expect(others).toEqual([]);
       })
+    );
+  });
+
+  it('recency with timestamp ties: primary time is a maximum (covers sort in recency ordering)', () => {
+    fc.assert(
+      fc.property(
+        fc.array(candidateArb, { minLength: 2, maxLength: 6 }),
+        cands => {
+          if (cands.length >= 2) {
+            cands[1] = { ...cands[1], createdAt: cands[0].createdAt };
+          }
+          const { primary, others } = pickPrimaryAndOthers(cands);
+          if (primary) {
+            const maxT = Math.max(...cands.map(c => c.createdAt.getTime()));
+            expect(primary.createdAt.getTime()).toBe(maxT);
+            expect(others.length).toBe(cands.length - 1);
+          }
+        }
+      )
+    );
+  });
+
+  it('409 error classification (data race to different user): messages with "unique" or idx string yield 409 SESSION_ALREADY_CLAIMED (property over varied error strings)', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.oneof(
+          fc.constant(
+            'duplicate key value violates unique constraint "idx_chat_conversations_session_id_claimed_unique"'
+          ),
+          fc
+            .string({ minLength: 3, maxLength: 40 })
+            .map(s => `foo ${s} unique bar`),
+          fc.constant('unique constraint violation on session claim')
+        ),
+        async msg => {
+          vi.clearAllMocks();
+          mockGetCachedAuth.mockResolvedValue({ userId: 'clerk_user_123' });
+          mockGetCurrentOnboardingSessionId.mockResolvedValue('sess_409_prop');
+          setupDbSelectForUsers('user_1');
+          setupDbSelectForCandidates([{ id: 'c1', createdAt: new Date() }]);
+          setupUpdateForPrimary(1);
+          const values = vi.fn().mockRejectedValue(new Error(msg));
+          mockDbInsert.mockReturnValueOnce({ values });
+          const res = await POST(makeRequest());
+          expect(res.status).toBe(409);
+          const body = await res.json();
+          expect(body.errorCode).toBe('SESSION_ALREADY_CLAIMED');
+        }
+      ),
+      { numRuns: 15 }
     );
   });
 });
