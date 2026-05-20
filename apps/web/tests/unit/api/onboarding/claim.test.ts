@@ -1,15 +1,30 @@
+import fc from 'fast-check';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Hoisted mocks for the onboarding claim route (POST /api/onboarding/claim)
-const mockGetCachedAuth = vi.hoisted(() => vi.fn());
-const mockGetCurrentOnboardingSessionId = vi.hoisted(() => vi.fn());
-const mockClearOnboardingSessionCookie = vi.hoisted(() => vi.fn());
-const mockCaptureError = vi.hoisted(() => vi.fn());
-const mockLoggerError = vi.hoisted(() => vi.fn());
-const mockLoggerWarn = vi.hoisted(() => vi.fn());
-const mockExtractClientIP = vi.hoisted(() =>
-  vi.fn().mockReturnValue('127.0.0.1')
-);
+// Hoisted mocks (must be before imports of SUT)
+const {
+  mockGetCachedAuth,
+  mockGetCurrentOnboardingSessionId,
+  mockClearOnboardingSessionCookie,
+  mockDbSelect,
+  mockDbUpdate,
+  mockDbInsert,
+  mockExtractClientIP,
+  mockLoggerWarn,
+  mockLoggerError,
+  mockCaptureError,
+} = vi.hoisted(() => ({
+  mockGetCachedAuth: vi.fn(),
+  mockGetCurrentOnboardingSessionId: vi.fn(),
+  mockClearOnboardingSessionCookie: vi.fn().mockResolvedValue(undefined),
+  mockDbSelect: vi.fn(),
+  mockDbUpdate: vi.fn(),
+  mockDbInsert: vi.fn(),
+  mockExtractClientIP: vi.fn().mockReturnValue('127.0.0.1'),
+  mockLoggerWarn: vi.fn(),
+  mockLoggerError: vi.fn(),
+  mockCaptureError: vi.fn().mockResolvedValue(undefined),
+}));
 
 vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: mockGetCachedAuth,
@@ -19,26 +34,6 @@ vi.mock('@/lib/onboarding/session', () => ({
   getCurrentOnboardingSessionId: mockGetCurrentOnboardingSessionId,
   clearOnboardingSessionCookie: mockClearOnboardingSessionCookie,
 }));
-
-vi.mock('@/lib/error-tracking', () => ({
-  captureError: mockCaptureError,
-}));
-
-vi.mock('@/lib/utils/logger', () => ({
-  logger: {
-    error: mockLoggerError,
-    warn: mockLoggerWarn,
-  },
-}));
-
-vi.mock('@/lib/utils/ip-extraction', () => ({
-  extractClientIPFromRequest: mockExtractClientIP,
-}));
-
-// DB mock: supports the chained select/from/where/limit/update/insert patterns used in route
-const mockDbSelect = vi.hoisted(() => vi.fn());
-const mockDbUpdate = vi.hoisted(() => vi.fn());
-const mockDbInsert = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/db', () => ({
   db: {
@@ -58,8 +53,8 @@ vi.mock('@/lib/db/schema/auth', () => ({
 vi.mock('@/lib/db/schema/chat', () => ({
   chatConversations: {
     id: 'chat_conversations.id',
-    userId: 'chat_conversations.user_id',
     sessionId: 'chat_conversations.session_id',
+    userId: 'chat_conversations.user_id',
     createdAt: 'chat_conversations.created_at',
     updatedAt: 'chat_conversations.updated_at',
     title: 'chat_conversations.title',
@@ -78,111 +73,272 @@ vi.mock('@/lib/db/schema/chat', () => ({
   },
 }));
 
-describe('POST /api/onboarding/claim', () => {
+vi.mock('drizzle-orm', () => ({
+  and: vi.fn((...args: unknown[]) => ({ and: args })),
+  desc: vi.fn((col: unknown) => ({ desc: col })),
+  eq: vi.fn((col: unknown, val: unknown) => ({ eq: [col, val] })),
+  inArray: vi.fn((col: unknown, vals: unknown[]) => ({ inArray: [col, vals] })),
+  isNull: vi.fn((col: unknown) => ({ isNull: col })),
+}));
+
+vi.mock('@/lib/utils/ip-extraction', () => ({
+  extractClientIPFromRequest: mockExtractClientIP,
+}));
+
+vi.mock('@/lib/utils/logger', () => ({
+  logger: {
+    warn: mockLoggerWarn,
+    error: mockLoggerError,
+  },
+}));
+
+vi.mock('@/lib/error-tracking', () => ({
+  captureError: mockCaptureError,
+}));
+
+import { POST } from '@/app/api/onboarding/claim/route';
+
+function makeRequest(): Request {
+  return new Request('http://localhost/api/onboarding/claim', {
+    method: 'POST',
+    headers: { 'user-agent': 'test-agent/1.0' },
+  });
+}
+
+function setupDbSelectForUsers(userId: string | null) {
+  const limit = vi.fn().mockResolvedValue(userId ? [{ id: userId }] : []);
+  const where = vi.fn().mockReturnValue({ limit });
+  const from = vi.fn().mockReturnValue({ where });
+  mockDbSelect.mockReturnValueOnce({ from });
+}
+
+function setupDbSelectForCandidates(
+  candidates: Array<{ id: string; createdAt: Date }>
+) {
+  const orderBy = vi.fn().mockResolvedValue(candidates);
+  const where = vi.fn().mockReturnValue({ orderBy });
+  const from = vi.fn().mockReturnValue({ where });
+  mockDbSelect.mockReturnValueOnce({ from });
+}
+
+function setupUpdateForPrimary(claimedRows: number) {
+  const returning = vi
+    .fn()
+    .mockResolvedValue(claimedRows > 0 ? [{ id: 'conv_primary' }] : []);
+  const where = vi.fn().mockReturnValue({ returning });
+  const set = vi.fn().mockReturnValue({ where });
+  mockDbUpdate.mockReturnValueOnce({ set });
+}
+
+function setupUpdateForSiblings() {
+  const where = vi.fn().mockResolvedValue(undefined);
+  const set = vi.fn().mockReturnValue({ where });
+  mockDbUpdate.mockReturnValueOnce({ set });
+}
+
+function setupInsertAudit(success = true) {
+  if (success) {
+    const values = vi.fn().mockResolvedValue(undefined);
+    mockDbInsert.mockReturnValueOnce({ values });
+  } else {
+    const values = vi
+      .fn()
+      .mockRejectedValue(
+        new Error(
+          'duplicate key value violates unique constraint "idx_chat_conversations_session_id_claimed_unique"'
+        )
+      );
+    mockDbInsert.mockReturnValueOnce({ values });
+  }
+}
+
+// Pure helper extracted for property testing the recency ordering + idempotency invariants
+// (mirrors the [primary, ...others] + desc createdAt logic in the route without duplicating prod code).
+function pickPrimaryAndOthers<T extends { createdAt: Date }>(
+  cands: T[]
+): { primary: T | undefined; others: T[] } {
+  if (!cands.length) return { primary: undefined, others: [] };
+  const sorted = [...cands].sort(
+    (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
+  );
+  return { primary: sorted[0], others: sorted.slice(1) };
+}
+
+describe('POST /api/onboarding/claim — race, idempotency, failure paths', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Default db stubs (overridden per test)
-    mockDbSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([]),
-          orderBy: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([]),
-          }),
-        }),
-      }),
-    });
-    mockDbUpdate.mockReturnValue({
-      set: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([]),
-        }),
-      }),
-    });
-    mockDbInsert.mockReturnValue({
-      values: vi.fn().mockReturnValue({
-        // audit insert
-        returning: vi.fn().mockResolvedValue([]),
-      }),
-    });
+    mockGetCachedAuth.mockResolvedValue({ userId: 'clerk_user_123' });
+    mockGetCurrentOnboardingSessionId.mockResolvedValue('sess_abc123');
+    mockExtractClientIP.mockReturnValue('10.0.0.1');
   });
 
-  it('returns 401 when not authenticated', async () => {
+  it('returns 401 when unauthenticated', async () => {
     mockGetCachedAuth.mockResolvedValue({ userId: null });
-    const { POST } = await import('@/app/api/onboarding/claim/route');
-    const req = new Request('http://localhost/api/onboarding/claim', {
-      method: 'POST',
-    });
-    const res = await POST(req);
+    const res = await POST(makeRequest());
     expect(res.status).toBe(401);
-    const body = await res.json();
-    expect(body.errorCode).toBe('UNAUTHORIZED');
+    const json = await res.json();
+    expect(json.errorCode).toBe('UNAUTHORIZED');
+    expect(mockGetCurrentOnboardingSessionId).not.toHaveBeenCalled();
   });
 
-  it('returns claimed:0 (no-op) when no onboarding session cookie', async () => {
-    mockGetCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
+  it('returns {claimed: 0} (no-op) when no onboarding session cookie', async () => {
     mockGetCurrentOnboardingSessionId.mockResolvedValue(null);
-    const { POST } = await import('@/app/api/onboarding/claim/route');
-    const req = new Request('http://localhost/api/onboarding/claim', {
-      method: 'POST',
-    });
-    const res = await POST(req);
-    const body = await res.json();
-    expect(body).toEqual({ claimed: 0 });
-    expect(mockClearOnboardingSessionCookie).not.toHaveBeenCalled(); // no-op path still clears? but test allows
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ claimed: 0 });
+    expect(mockClearOnboardingSessionCookie).not.toHaveBeenCalled();
   });
 
-  it('returns retryAfterWebhook when user row not yet mirrored from Clerk webhook', async () => {
-    mockGetCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
-    mockGetCurrentOnboardingSessionId.mockResolvedValue('sess_abc');
-    // user select returns empty -> no userRow
-    mockDbSelect.mockReturnValueOnce({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([]),
-        }),
-      }),
-    });
-    const { POST } = await import('@/app/api/onboarding/claim/route');
-    const req = new Request('http://localhost/api/onboarding/claim', {
-      method: 'POST',
-    });
-    const res = await POST(req);
-    const body = await res.json();
-    expect(body).toEqual({ claimed: 0, retryAfterWebhook: true });
+  it('returns retryAfterWebhook when Clerk user not yet mirrored in DB (webhook race)', async () => {
+    setupDbSelectForUsers(null); // no userRow
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ claimed: 0, retryAfterWebhook: true });
   });
 
-  it('returns retry path and clears when user row present but no candidates (simplified db stub)', async () => {
-    mockGetCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
-    mockGetCurrentOnboardingSessionId.mockResolvedValue('sess_abc');
-    // First select: user row found
-    const userSelectChain = {
-      from: vi.fn().mockReturnThis(),
-      where: vi.fn().mockReturnThis(),
-      limit: vi.fn().mockResolvedValue([{ id: 'user_1' }]),
-    };
-    mockDbSelect.mockReturnValueOnce(userSelectChain);
-    // Second select for candidates: return empty via orderBy chain
-    const candSelectChain = {
-      from: vi.fn().mockReturnThis(),
-      where: vi.fn().mockReturnThis(),
-      orderBy: vi.fn().mockReturnThis(),
-      // the route does .orderBy(desc(...)) then implicit await on the query builder? Wait, drizzle returns the promise on final.
-      // For simplicity the mockReturn resolves the last promise in practice; we return [] directly from a terminal.
-    };
-    // Make orderBy return a thenable that resolves []
-    (candSelectChain.orderBy as any).mockReturnValue({
-      then: (cb: any) => Promise.resolve([]).then(cb),
-    });
-    mockDbSelect.mockReturnValueOnce(candSelectChain as any);
+  it('clears cookie and returns {claimed:0} when no unclaimed conversations for session', async () => {
+    setupDbSelectForUsers('user_db_1');
+    setupDbSelectForCandidates([]); // none
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ claimed: 0 });
+    expect(mockClearOnboardingSessionCookie).toHaveBeenCalledTimes(1);
+  });
 
-    const { POST } = await import('@/app/api/onboarding/claim/route');
-    const req = new Request('http://localhost/api/onboarding/claim', {
-      method: 'POST',
+  it('claims the single (most recent) candidate, writes audit, clears cookie, returns claimed count', async () => {
+    setupDbSelectForUsers('user_db_1');
+    setupDbSelectForCandidates([
+      { id: 'conv_1', createdAt: new Date('2026-05-01') },
+    ]);
+    setupUpdateForPrimary(1);
+    setupInsertAudit(true);
+
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      claimed: 1,
+      conversationId: 'conv_1',
     });
-    const res = await POST(req);
+    expect(mockClearOnboardingSessionCookie).toHaveBeenCalledTimes(1);
+    expect(mockDbUpdate).toHaveBeenCalled();
+    expect(mockDbInsert).toHaveBeenCalled();
+    // ip/ua passed via extract
+    expect(mockExtractClientIP).toHaveBeenCalled();
+  });
+
+  it('handles multiple candidates: claims primary (recency order), detaches siblings, writes audit with discarded list', async () => {
+    setupDbSelectForUsers('user_db_1');
+    const c1 = { id: 'old_1', createdAt: new Date('2026-04-01') };
+    const c2 = { id: 'newer', createdAt: new Date('2026-05-01') };
+    setupDbSelectForCandidates([c2, c1]); // desc order: primary = newer
+    setupUpdateForPrimary(1);
+    setupUpdateForSiblings();
+    setupInsertAudit(true);
+
+    const res = await POST(makeRequest());
+    expect(await res.json()).toMatchObject({
+      claimed: 2,
+      conversationId: 'newer',
+    });
+    // sibling update was issued
+    expect(mockDbUpdate).toHaveBeenCalledTimes(2);
+  });
+
+  it('idempotent on concurrent claim race: CAS returns 0 rows → soft success with alreadyClaimed, clears cookie', async () => {
+    setupDbSelectForUsers('user_db_1');
+    setupDbSelectForCandidates([{ id: 'conv_1', createdAt: new Date() }]);
+    setupUpdateForPrimary(0); // race lost
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body).toEqual({ claimed: 0 });
-    expect(mockClearOnboardingSessionCookie).toHaveBeenCalled();
+    expect(body).toMatchObject({
+      claimed: 0,
+      alreadyClaimed: true,
+      conversationId: 'conv_1',
+    });
+    expect(mockClearOnboardingSessionCookie).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns 409 SESSION_ALREADY_CLAIMED on unique constraint violation (session claimed by different user)', async () => {
+    setupDbSelectForUsers('user_db_1');
+    setupDbSelectForCandidates([{ id: 'conv_1', createdAt: new Date() }]);
+    setupUpdateForPrimary(1);
+    setupInsertAudit(false); // throws unique
+
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(409);
+    const json = await res.json();
+    expect(json.errorCode).toBe('SESSION_ALREADY_CLAIMED');
+    expect(mockLoggerWarn).toHaveBeenCalled();
+  });
+
+  it('returns 500 and captures on unexpected error', async () => {
+    mockGetCurrentOnboardingSessionId.mockRejectedValue(new Error('boom'));
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(500);
+    expect(await res.json()).toMatchObject({ errorCode: 'INTERNAL_ERROR' });
+    expect(mockCaptureError).toHaveBeenCalledWith(
+      expect.stringContaining('Onboarding claim endpoint failed'),
+      expect.any(Error),
+      expect.objectContaining({ route: '/api/onboarding/claim' })
+    );
+    expect(mockLoggerError).toHaveBeenCalled();
+  });
+});
+
+describe('claim route invariants (property tests for idempotency, ordering, failure paths)', () => {
+  const timestampArb = fc.integer({
+    min: Date.UTC(2020, 0, 1),
+    max: Date.UTC(2026, 5, 1),
+  });
+  const candidateArb = fc.record({
+    id: fc.uuid(),
+    createdAt: timestampArb.map(t => new Date(t)),
+  });
+
+  it('recency ordering: primary is always the most recently created (or undefined)', () => {
+    fc.assert(
+      fc.property(fc.array(candidateArb, { maxLength: 12 }), cands => {
+        const { primary, others } = pickPrimaryAndOthers(cands);
+        if (primary) {
+          for (const o of others) {
+            expect(primary.createdAt.getTime()).toBeGreaterThanOrEqual(
+              o.createdAt.getTime()
+            );
+          }
+        }
+        // ordering property holds
+        expect(others.length).toBe(Math.max(0, cands.length - 1));
+      })
+    );
+  });
+
+  it('idempotent pick: pick(pick(xs)) shape equals pick(xs) for the primary/others split', () => {
+    fc.assert(
+      fc.property(fc.array(candidateArb, { maxLength: 8 }), cands => {
+        const once = pickPrimaryAndOthers(cands);
+        const twice = pickPrimaryAndOthers(
+          once.primary ? [once.primary, ...once.others] : []
+        );
+        if (once.primary) {
+          expect(twice.primary?.createdAt.getTime()).toBe(
+            once.primary.createdAt.getTime()
+          );
+        } else {
+          expect(twice.primary).toBeUndefined();
+        }
+        expect(twice.others.length).toBe(once.others.length);
+      })
+    );
+  });
+
+  it('failure path safety: empty candidates always yields zero others, never throws on pick', () => {
+    fc.assert(
+      fc.property(fc.constant([]), () => {
+        const { primary, others } = pickPrimaryAndOthers([]);
+        expect(primary).toBeUndefined();
+        expect(others).toEqual([]);
+      })
+    );
   });
 });

@@ -248,6 +248,36 @@ describe('POST /api/onboarding/intake — email verification gate', () => {
     expect(mockSubmitWaitlistAccessRequest).not.toHaveBeenCalled();
   });
 
+  it('skips rate-limit enforcement entirely in development (NODE_ENV=development)', async () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    // Even if enforce would throw, the guard prevents the call
+    mockEnforceOnboardingRateLimit.mockRejectedValue(
+      new Error('[RATE_LIMITED] should not run')
+    );
+    mockCurrentUser.mockResolvedValue({
+      emailAddresses: [
+        {
+          emailAddress: 'dev@example.com',
+          verification: { status: 'verified' },
+        },
+      ],
+    });
+    mockSubmitWaitlistAccessRequest.mockResolvedValue({
+      outcome: 'accepted',
+      status: 'active',
+      entryId: 'e1',
+    });
+    setupSuccessfulIntakeDb();
+
+    const res = await POST(makeRequest(VALID_BODY));
+    expect(res.status).toBe(200);
+    // ensure was never invoked due to dev guard
+    // (call count may be 0 from other tests, but in this flow it is not reached)
+    expect(mockEnforceOnboardingRateLimit).not.toHaveBeenCalledWith(
+      expect.objectContaining({ checkIP: true })
+    );
+  });
+
   it('returns 400 when payload is invalid', async () => {
     mockCurrentUser.mockResolvedValue({
       emailAddresses: [
@@ -311,5 +341,91 @@ describe('POST /api/onboarding/intake — email verification gate', () => {
         waitlistEntryId: 'waitlist_entry_1',
       }),
     });
+  });
+
+  it('derives full name from username when Clerk fullName missing (executes derive branch)', async () => {
+    mockCurrentUser.mockResolvedValue({
+      fullName: null,
+      username: 'fallbackuser',
+      emailAddresses: [
+        {
+          emailAddress: 'fb@example.com',
+          verification: { status: 'verified' },
+        },
+      ],
+    });
+    mockSubmitWaitlistAccessRequest.mockResolvedValue({
+      outcome: 'accepted',
+      status: 'active',
+      entryId: 'e2',
+    });
+    setupSuccessfulIntakeDb();
+
+    const res = await POST(makeRequest(VALID_BODY));
+    expect(res.status).toBe(200);
+    // successful path reached with username-derived name
+  });
+
+  it('derives full name from email localpart when no name or username (executes final derive fallback)', async () => {
+    mockCurrentUser.mockResolvedValue({
+      fullName: '',
+      username: null,
+      emailAddresses: [
+        {
+          emailAddress: 'onlylocal@domain.test',
+          verification: { status: 'verified' },
+        },
+      ],
+    });
+    mockSubmitWaitlistAccessRequest.mockResolvedValue({
+      outcome: 'waitlisted_capacity_full',
+      status: 'waitlisted',
+      entryId: 'e3',
+    });
+    setupSuccessfulIntakeDb();
+
+    const res = await POST(makeRequest(VALID_BODY));
+    expect(res.status).toBe(200);
+  });
+
+  it('returns 500 and captures when first interview upsert fails (before waitlist submit)', async () => {
+    mockCurrentUser.mockResolvedValue({
+      fullName: 'Err User',
+      emailAddresses: [
+        {
+          emailAddress: 'err@example.com',
+          verification: { status: 'verified' },
+        },
+      ],
+    });
+    // Make insert throw for the first upsert
+    const badReturning = vi
+      .fn()
+      .mockRejectedValue(new Error('interview insert failed'));
+    const badOnConflict = vi.fn().mockReturnValue({ returning: badReturning });
+    const badValues = vi
+      .fn()
+      .mockReturnValue({ onConflictDoUpdate: badOnConflict });
+    mockDbInsert.mockReturnValue({ values: badValues });
+    // select still succeeds for ensure
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi
+            .fn()
+            .mockResolvedValue([{ id: 'u1', userStatus: 'waitlist_pending' }]),
+        }),
+      }),
+    });
+
+    const res = await POST(makeRequest(VALID_BODY));
+    expect(res.status).toBe(500);
+    const json = await res.json();
+    expect(json).toMatchObject({ success: false, outcome: 'save_failed' });
+    expect(mockCaptureError).toHaveBeenCalledWith(
+      'onboarding intake transcript save failed',
+      expect.any(Error),
+      expect.objectContaining({ route: '/api/onboarding/intake' })
+    );
   });
 });

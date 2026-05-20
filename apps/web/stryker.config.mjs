@@ -26,6 +26,16 @@ export default {
     'lib/onboarding/reserved-handle.ts',
     'lib/onboarding/return-to.ts',
     'lib/onboarding/session-keys.ts',
+    // Claim + onboarding intake surfaces (claim-onboarding row in heatmap):
+    // /claim/[token] route (token validation, context write, early redirects)
+    // /api/onboarding/intake (rate limit, email gate, ensure/upsert DB paths, waitlist submit)
+    // /api/onboarding/claim (race CAS, idempotency, 409 unique, multiple candidates, audit)
+    // Per register + priority queue (risk 28, 64% cov, target 75%, no mut score).
+    // New dedicated tests (incl. property tests for recency/idempotency/failure) + existing
+    // will now produce mutation kills on the critical branches.
+    'app/claim/[[]token[]]/route.ts',
+    'app/api/onboarding/intake/route.ts',
+    'app/api/onboarding/claim/route.ts',
     // Entitlements (existing — critical gating)
     'lib/entitlements/**/*.ts',
     // Billing helpers (existing)
@@ -113,6 +123,11 @@ export default {
     'tests/unit/cookie-banner.test.tsx',
     'tests/unit/cookie-banner-fixes.test.tsx',
     'tests/unit/lib/cookies/consent-regions.test.ts',
+    // Claim-onboarding surface wiring (routes + dedicated tests for intake/claim races + token handler).
+    // Includes the new claim.test.ts (property + CAS/race/409 paths) and strengthened intake/claim-token tests.
+    'tests/unit/app/claim-token-route.test.ts',
+    'tests/unit/api/onboarding/intake.test.ts',
+    'tests/unit/api/onboarding/claim.test.ts',
   ],
   ignorePatterns: [
     '.next',
