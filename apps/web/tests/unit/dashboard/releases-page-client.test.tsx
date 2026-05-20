@@ -63,6 +63,10 @@ vi.mock('@/app/app/(shell)/dashboard/releases/config', () => ({
   providerConfig: {},
 }));
 
+vi.mock('@/lib/flags/client', () => ({
+  useAppFlag: () => false,
+}));
+
 vi.mock('@/app/app/(shell)/dashboard/releases/loading', () => ({
   ReleaseTableSkeleton: () => (
     <div data-testid='release-skeleton'>Loading...</div>
