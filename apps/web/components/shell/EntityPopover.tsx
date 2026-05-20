@@ -27,6 +27,7 @@ import {
 import { createPortal } from 'react-dom';
 import { LINEAR_SURFACE } from '@/components/tokens/linear-surface';
 import { cn } from '@/lib/utils';
+import { getInitials } from '@/lib/utils/initials';
 
 // ---------------------------------------------------------------------------
 // Data shapes
@@ -173,15 +174,6 @@ function formatClock(durationSec: number | undefined): string | null {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-function initialsOf(label: string): string {
-  return label
-    .split(/\s+/)
-    .slice(0, 2)
-    .map(p => p.charAt(0))
-    .join('')
-    .toUpperCase();
-}
-
 // ---------------------------------------------------------------------------
 // Row art — small 28×28 leading element rendered inside ShellDropdown.EntityItem.
 // ---------------------------------------------------------------------------
@@ -242,7 +234,7 @@ export function EntityRowArt({
         isCircular ? 'rounded-full' : 'rounded-md'
       )}
     >
-      {initialsOf(entity.label) || '·'}
+      {getInitials(entity.label) || '·'}
     </span>
   );
 }
@@ -475,7 +467,7 @@ function CardArtwork({ entity }: { readonly entity: EntityPopoverData }) {
         isCircular ? 'rounded-full' : 'rounded-md'
       )}
     >
-      {initialsOf(entity.label) || '·'}
+      {getInitials(entity.label) || '·'}
     </div>
   );
 }
@@ -647,7 +639,8 @@ export function EntityPopover({
         LINEAR_SURFACE.popover,
         'text-primary-token',
         'animate-in fade-in-0 zoom-in-95 duration-subtle ease-subtle',
-        pos?.side === 'left' ? 'slide-in-from-right-1' : 'slide-in-from-left-1'
+        pos?.side === 'left' ? 'slide-in-from-right-1' : 'slide-in-from-left-1',
+        'motion-reduce:transition-opacity motion-reduce:transform-none'
       )}
     >
       <div className='p-3'>
@@ -759,7 +752,7 @@ export function EntityHoverLink({
         className={cn(
           'inline-flex items-center rounded-md transition-colors duration-subtle ease-subtle hover:text-primary-token',
           'no-underline hover:underline focus-visible:underline underline-offset-2',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)',
+          'focus-ring-themed',
           className
         )}
       >
