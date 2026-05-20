@@ -8,18 +8,23 @@
 // Admin
 export {
   type AdminAuditLog,
+  type AdminCost,
   type AdminSystemSettings,
   adminAuditLog,
+  adminCosts,
   adminSystemSettings,
   type CampaignSettings,
   campaignSettings,
   insertAdminAuditLogSchema,
+  insertAdminCostsSchema,
   insertAdminSystemSettingsSchema,
   insertCampaignSettingsSchema,
   type NewAdminAuditLog,
+  type NewAdminCost,
   type NewAdminSystemSettings,
   type NewCampaignSettings,
   selectAdminAuditLogSchema,
+  selectAdminCostsSchema,
   selectAdminSystemSettingsSchema,
   selectCampaignSettingsSchema,
 } from './admin';
