@@ -268,6 +268,21 @@ describe('buildPublicProfileMetadata', () => {
     expect(String(meta.title)).toContain('myartist');
   });
 
+  it('does not fall back to raw username when it sanitizes to empty', () => {
+    const meta = buildPublicProfileMetadata({
+      profile: {
+        ...minimalProfile,
+        username: '<img src=x onerror=alert(1)>',
+        username_normalized: 'artist',
+        display_name: null,
+      },
+      genres: null,
+    });
+
+    expect(meta.title).toBe('Jovie');
+    expect(String(meta.openGraph?.title)).not.toContain('<img');
+  });
+
   it('sets alternates.canonical to the normalized profile URL', () => {
     const meta = buildPublicProfileMetadata({
       profile: minimalProfile,

@@ -179,7 +179,7 @@ export function buildPublicProfileMetadata(
   const artistName =
     sanitizeMetadataText(profile.display_name) ||
     sanitizeMetadataText(profile.username) ||
-    profile.username;
+    APP_NAME;
 
   const canonicalUrl = buildProfileCanonicalUrl(profile);
   const socialTitle = `${artistName} | ${APP_NAME}`;
