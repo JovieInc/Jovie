@@ -2,7 +2,9 @@
 
 import dynamic from 'next/dynamic';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { ShellReleasesView } from '@/components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
+import { useAppFlag } from '@/lib/flags/client';
 import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
 import { primaryProviderKeys, providerConfig } from './config';
 import { ReleaseTableSkeleton } from './loading';
@@ -30,6 +32,7 @@ export function ReleasesPageClient() {
   const { selectedProfile } = useDashboardData();
   const profileId = selectedProfile?.id ?? '';
   const { data: releases, isError } = useReleasesQuery(profileId);
+  const designV1ReleasesEnabled = useAppFlag('DESIGN_V1');
 
   const settings =
     (selectedProfile?.settings as Record<string, unknown> | null) ?? {};
@@ -60,6 +63,22 @@ export function ReleasesPageClient() {
 
   if (releases === undefined) {
     return <ReleaseTableSkeleton showHeader={false} />;
+  }
+
+  if (designV1ReleasesEnabled) {
+    return (
+      <ShellReleasesView
+        releases={releases ?? []}
+        providerConfig={providerConfig}
+        primaryProviders={primaryProviderKeys}
+        artistName={spotifyArtistName ?? appleMusicArtistName ?? null}
+        allowArtworkDownloads={allowArtworkDownloads}
+        spotifyConnected={spotifyConnected}
+        appleMusicConnected={appleMusicConnected}
+        initialImporting={spotifyImportStatus === 'importing'}
+        initialTotalCount={spotifyImportTotal}
+      />
+    );
   }
 
   return (
