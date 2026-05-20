@@ -172,6 +172,9 @@ describe('JovieChat empty state', () => {
     expect(getByTestId('chat-empty-state-top-signals-row').className).toContain(
       'lg:grid-cols-3'
     );
+    expect(getByTestId('chat-empty-state-top-signals-row').className).toContain(
+      'snap-x'
+    );
     expect(getByText('Release plan')).toBeTruthy();
     expect(getByText('Asset brief')).toBeTruthy();
     expect(getByText('Context')).toBeTruthy();

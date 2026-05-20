@@ -261,15 +261,73 @@ describe('ChatInput', () => {
     const surface = screen.getByTestId('chat-composer-surface');
     expect(surface.getAttribute('data-variant')).toBe('hero');
     expect(surface.style.maxWidth).toBe('min(calc(100vw - 32px), 840px)');
+    expect(surface.style.borderRadius).toBe('36px');
+
+    expect(surface.firstElementChild?.firstElementChild?.className).toContain(
+      'min-h-[68px]'
+    );
 
     const inlineField = screen.getByTestId('chat-input-inline-field');
-    expect(inlineField.className).toContain('min-h-8');
+    expect(inlineField.className).toContain('min-h-10');
 
     const textarea = screen.getByRole('textbox', {
       name: /chat message input/i,
     });
     expect(textarea.className).toContain('text-[18px]');
     expect(textarea.className).toContain('leading-7');
+  });
+
+  it('renders the larger hero pill geometry even while typing the first message in an empty chat', () => {
+    fastRender(
+      withProviders(
+        <ChatInput
+          {...baseProps}
+          value='draft message'
+          onImageAttach={vi.fn()}
+          variant='hero'
+        />
+      )
+    );
+
+    const surface = screen.getByTestId('chat-composer-surface');
+    expect(surface.style.borderRadius).toBe('36px');
+
+    expect(surface.firstElementChild?.firstElementChild?.className).toContain(
+      'min-h-[68px]'
+    );
+  });
+
+  it('renders the grid layout (not pill) for hero variant when pending images are present', () => {
+    const pendingImages = [
+      {
+        id: 'p1',
+        name: 'preview.png',
+        mediaType: 'image/png',
+        previewUrl: 'blob:mock',
+        dataUrl: 'data:image/png;base64,AAAA',
+      },
+    ];
+    fastRender(
+      withProviders(
+        <ChatInput
+          {...baseProps}
+          value=''
+          onImageAttach={vi.fn()}
+          pendingImages={pendingImages}
+          onRemoveImage={vi.fn()}
+          variant='hero'
+        />
+      )
+    );
+
+    const surface = screen.getByTestId('chat-composer-surface');
+    expect(surface.style.borderRadius).toBe('36px'); // geometry still 36 for hero non-entity
+
+    const inlineField = screen.getByTestId('chat-input-inline-field');
+    const container = inlineField.parentElement;
+    expect(container?.className).toContain('min-h-[96px]');
+    expect(container?.className).toContain('grid');
+    expect(container?.className).not.toContain('min-h-[68px]');
   });
 
   it('keeps a quiet disabled dictation control when speech input is unavailable', () => {

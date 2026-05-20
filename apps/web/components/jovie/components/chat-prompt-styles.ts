@@ -1,5 +1,5 @@
 export const CHAT_PROMPT_RAIL_SCROLL_CLASS =
-  'w-full overflow-x-auto overflow-y-hidden scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden';
+  'w-full overflow-x-auto overflow-y-hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden';
 
 export const CHAT_PROMPT_RAIL_CLASS =
   'flex min-w-full flex-nowrap items-stretch gap-1.5';
