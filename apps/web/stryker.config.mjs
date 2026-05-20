@@ -55,6 +55,15 @@ export default {
     // a passing-but-mutation-survives suite means duplicate rows or
     // "YouTube YouTube" labels could ship again (JOV-2149).
     'lib/utils/social-platform.ts',
+    // Cookie consent banner (high-risk privacy/trust surface on marketing/public/onboarding paths;
+    // floating bottom-right card redesign + full mutation coverage). Per plan: one high-risk
+    // surface per quarter. Exercises geo mount, visibility, actions (compact + full), height
+    // observer for toasts/profiles, error paths, Customize modal, persistence.
+    'components/organisms/CookieBannerSection.tsx',
+    'components/organisms/CookieBannerMount.tsx',
+    'components/molecules/CookieActions.tsx',
+    'lib/hooks/useCookieBannerHeight.ts',
+    'lib/cookies/consent-regions.ts',
     // Standard exclusions
     '!**/*.test.ts',
     '!**/*.test.tsx',
@@ -72,6 +81,10 @@ export default {
     'tests/unit/lib/auth/gate.test.ts',
     'tests/unit/lib/auth/gate.critical.test.ts',
     'tests/unit/auth/waitlist-gating.test.ts',
+    // Cookie banner unit + regions (exercises the new floating card surface + geo decision branches)
+    'tests/unit/cookie-banner.test.tsx',
+    'tests/unit/cookie-banner-fixes.test.tsx',
+    'tests/unit/lib/cookies/consent-regions.test.ts',
   ],
   ignorePatterns: [
     '.next',

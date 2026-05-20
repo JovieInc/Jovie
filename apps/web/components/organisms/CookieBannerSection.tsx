@@ -1,5 +1,7 @@
 'use client';
 
+import { Shield } from 'lucide-react';
+import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { CookieActions } from '@/components/molecules/CookieActions';
@@ -42,7 +44,7 @@ export function CookieBannerSection() {
 
   const [visible, setVisible] = useState(false);
   const [customize, setCustomize] = useState(false);
-  const [isMobileExpanded, setIsMobileExpanded] = useState(false);
+  const [_isMobileExpanded, setIsMobileExpanded] = useState(false);
   const [isSavingConsent, setIsSavingConsent] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -93,11 +95,11 @@ export function CookieBannerSection() {
     }
   }, [visible]);
 
-  // Publish banner height as a CSS custom property on :root so that layout
-  // regions with overflow-hidden (e.g. the profile compact shell) can shrink
-  // themselves to avoid the fixed banner covering their bottom chrome.
-  // Cleared when the banner is hidden so there is zero layout impact once
-  // the visitor consents.
+  // Publish banner height + 16px bottom offset as CSS custom property on :root
+  // so layout regions (profile shells, QR coordination) reserve the exact space
+  // occupied by the fixed bottom-right card (bottom-4 + measured h).
+  // Cleared on hide/consent for zero layout impact. Matches useCookieBannerHeight
+  // total offset for toasts.
   useEffect(() => {
     if (typeof document === 'undefined') return;
 
@@ -116,7 +118,7 @@ export function CookieBannerSection() {
     const update = () => {
       root.style.setProperty(
         '--cookie-banner-h',
-        `${banner.getBoundingClientRect().height}px`
+        `${banner.getBoundingClientRect().height + 16}px`
       );
     };
 
@@ -199,62 +201,43 @@ export function CookieBannerSection() {
         <aside
           aria-label='Cookie consent'
           data-testid='cookie-banner'
-          className='fixed inset-x-0 bottom-0 z-[60] px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-md sm:px-6 md:flex md:items-center md:justify-between md:gap-4'
-          style={{
-            backgroundColor: 'var(--linear-bg-surface-1)',
-            borderTop: '1px solid var(--linear-border-default)',
-            boxShadow: 'var(--linear-shadow-card)',
-          }}
+          className='fixed bottom-4 right-4 z-[60] w-[calc(100vw-2rem)] max-w-[340px] sm:max-w-[380px]'
         >
-          <div className='mb-2 flex items-center justify-between gap-3 md:mb-0 md:flex-1'>
-            <p
-              style={{
-                fontSize: '12px',
-                lineHeight: '1.5',
-                color: 'var(--linear-text-secondary)',
-              }}
-            >
-              We use cookies to improve your experience.
-            </p>
-            <button
-              type='button'
-              className='md:hidden shrink-0 transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent'
-              style={{
-                backgroundColor: 'var(--linear-bg-button)',
-                color: 'var(--linear-text-primary)',
-                border: '1px solid var(--linear-border-default)',
-                borderRadius: 'var(--linear-radius-sm)',
-                fontSize: '12px',
-                fontWeight: 'var(--linear-font-weight-medium)',
-                padding: '6px 10px',
-                height: '28px',
-              }}
-              aria-expanded={isMobileExpanded}
-              aria-controls='cookie-actions'
-              onClick={() => setIsMobileExpanded(prev => !prev)}
-            >
-              {isMobileExpanded ? 'Hide' : 'Manage'}
-            </button>
-          </div>
-
-          <div
-            id='cookie-actions'
-            className={isMobileExpanded ? 'block' : 'max-md:hidden'}
-          >
-            <CookieActions
-              onAcceptAll={acceptAll}
-              onReject={reject}
-              onCustomize={() => setCustomize(true)}
-              disabled={isSavingConsent}
-            />
-            {saveError ? (
-              <p
-                role='alert'
-                className='mt-2 text-center text-[11px] leading-snug text-secondary-token'
-              >
-                {saveError}
-              </p>
-            ) : null}
+          <div className='rounded-[18px] border border-(--linear-app-frame-seam) bg-surface-1 shadow-card px-4 py-4'>
+            <div className='flex items-start gap-3'>
+              <div className='mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-0 text-secondary-token'>
+                <Shield className='h-3.5 w-3.5' aria-hidden='true' />
+              </div>
+              <div className='min-w-0 flex-1'>
+                <p className='text-[12px] leading-[1.5] text-secondary-token'>
+                  We use cookies for essential functionality and to improve your
+                  experience.{' '}
+                  <Link
+                    href='/privacy'
+                    className='underline hover:opacity-80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent'
+                  >
+                    Privacy
+                  </Link>
+                </p>
+                <div className='mt-3'>
+                  <CookieActions
+                    compact
+                    onAcceptAll={acceptAll}
+                    onReject={reject}
+                    onCustomize={() => setCustomize(true)}
+                    disabled={isSavingConsent}
+                  />
+                </div>
+                {saveError ? (
+                  <p
+                    role='alert'
+                    className='mt-2 text-[11px] leading-snug text-secondary-token'
+                  >
+                    {saveError}
+                  </p>
+                ) : null}
+              </div>
+            </div>
           </div>
         </aside>
       ) : null}
