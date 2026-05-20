@@ -54,6 +54,8 @@ function splitCombinedSetCookieHeader(header: string | null) {
   return cookies.filter(Boolean);
 }
 
+export { splitCombinedSetCookieHeader as splitSetCookieHeader };
+
 /**
  * Clerk FAPI proxy handler — dedicated helper extracted from proxy.ts.
  *
