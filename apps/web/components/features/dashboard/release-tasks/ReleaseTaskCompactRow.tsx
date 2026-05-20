@@ -1,4 +1,5 @@
 'use client';
+import { memo } from 'react';
 import { ShellListRowFrame } from '@/components/organisms/table/atoms/ShellListRowFrame';
 import type { ReleaseTaskView } from '@/lib/release-tasks/types';
 import { cn } from '@/lib/utils';
@@ -17,7 +18,7 @@ interface ReleaseTaskCompactRowProps {
   readonly onNavigate: (taskId: string) => void;
 }
 
-export function ReleaseTaskCompactRow({
+export const ReleaseTaskCompactRow = memo(function ReleaseTaskCompactRow({
   task,
   onToggle,
   onNavigate,
@@ -57,4 +58,4 @@ export function ReleaseTaskCompactRow({
       />
     </ShellListRowFrame>
   );
-}
+});

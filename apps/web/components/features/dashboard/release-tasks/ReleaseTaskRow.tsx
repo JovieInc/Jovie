@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { ShellListRowFrame } from '@/components/organisms/table/atoms/ShellListRowFrame';
 import type { ReleaseTaskView } from '@/lib/release-tasks/types';
 import {
@@ -30,7 +31,10 @@ const PRIORITY_DISPLAY: Record<string, { dots: string }> = {
   none: { dots: '' },
 };
 
-export function ReleaseTaskRow({ task, onToggle }: ReleaseTaskRowProps) {
+export const ReleaseTaskRow = memo(function ReleaseTaskRow({
+  task,
+  onToggle,
+}: ReleaseTaskRowProps) {
   const isDone = isReleaseTaskDone(task);
   const isAi = isReleaseTaskAutomated(task);
   const priority = PRIORITY_DISPLAY[task.priority] ?? PRIORITY_DISPLAY.medium;
@@ -95,4 +99,4 @@ export function ReleaseTaskRow({ task, onToggle }: ReleaseTaskRowProps) {
       )}
     </ShellListRowFrame>
   );
-}
+});
