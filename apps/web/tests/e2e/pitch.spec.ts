@@ -34,6 +34,11 @@ test.describe('public /pitch route', () => {
       deck.locator('section[data-label="Meet Jovie"]')
     ).toBeAttached();
 
+    // PDF download button (one-click static asset, replaces print flow)
+    const pdfLink = page.locator('a[download="Jovie-Pitch-Deck.pdf"]');
+    await expect(pdfLink).toBeVisible();
+    await expect(pdfLink).toHaveAttribute('href', '/Jovie-Pitch-Deck.pdf');
+
     expect(consoleErrors, consoleErrors.join('\n')).toHaveLength(0);
   });
 
@@ -57,6 +62,13 @@ test.describe('public /pitch route', () => {
 
   test('deck-stage.js is reachable', async ({ request }) => {
     const res = await request.head('/pitch/deck-stage.js');
+    expect(res.status()).toBe(200);
+  });
+
+  test('static PDF asset serves with 200 (pre-generated once from deck)', async ({
+    request,
+  }) => {
+    const res = await request.head('/Jovie-Pitch-Deck.pdf');
     expect(res.status()).toBe(200);
   });
 });
