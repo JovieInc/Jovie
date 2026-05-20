@@ -40,6 +40,7 @@ const FORBIDDEN_FIRST_FACTOR_STRATEGIES = new Set([
 ]);
 
 const FORBIDDEN_IDENTIFICATION_REQUIREMENTS = new Set([
+  'email',
   'email_address',
   'phone_number',
   'username',

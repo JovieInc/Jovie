@@ -150,41 +150,42 @@ describe('AuthShell — JOV-2446 SSO-only contract', () => {
       }
     ).appearance?.elements;
 
+    const HIDE_ELEMENT_STYLE = { display: 'none !important' };
     // Row containers
-    expect(elements?.formFieldRow__identifier).toBe('hidden');
-    expect(elements?.formFieldRow__emailAddress).toBe('hidden');
-    expect(elements?.formFieldRow__password).toBe('hidden');
+    expect(elements?.formFieldRow__identifier).toEqual(HIDE_ELEMENT_STYLE);
+    expect(elements?.formFieldRow__emailAddress).toEqual(HIDE_ELEMENT_STYLE);
+    expect(elements?.formFieldRow__password).toEqual(HIDE_ELEMENT_STYLE);
     // Field wrappers
-    expect(elements?.formField__identifier).toBe('hidden');
-    expect(elements?.formField__emailAddress).toBe('hidden');
-    expect(elements?.formField__password).toBe('hidden');
+    expect(elements?.formField__identifier).toEqual(HIDE_ELEMENT_STYLE);
+    expect(elements?.formField__emailAddress).toEqual(HIDE_ELEMENT_STYLE);
+    expect(elements?.formField__password).toEqual(HIDE_ELEMENT_STYLE);
     // Inputs themselves
-    expect(elements?.formFieldInput__identifier).toBe('hidden');
-    expect(elements?.formFieldInput__emailAddress).toBe('hidden');
-    expect(elements?.formFieldInput__password).toBe('hidden');
+    expect(elements?.formFieldInput__identifier).toEqual(HIDE_ELEMENT_STYLE);
+    expect(elements?.formFieldInput__emailAddress).toEqual(HIDE_ELEMENT_STYLE);
+    expect(elements?.formFieldInput__password).toEqual(HIDE_ELEMENT_STYLE);
     // Labels
-    expect(elements?.formFieldLabel__identifier).toBe('hidden');
-    expect(elements?.formFieldLabel__emailAddress).toBe('hidden');
-    expect(elements?.formFieldLabel__password).toBe('hidden');
+    expect(elements?.formFieldLabel__identifier).toEqual(HIDE_ELEMENT_STYLE);
+    expect(elements?.formFieldLabel__emailAddress).toEqual(HIDE_ELEMENT_STYLE);
+    expect(elements?.formFieldLabel__password).toEqual(HIDE_ELEMENT_STYLE);
     // Username/phone (forbidden by audit; assert defense-in-depth hides)
-    expect(elements?.formFieldRow__username).toBe('hidden');
-    expect(elements?.formField__username).toBe('hidden');
-    expect(elements?.formFieldInput__username).toBe('hidden');
-    expect(elements?.formFieldLabel__username).toBe('hidden');
-    expect(elements?.formFieldRow__phoneNumber).toBe('hidden');
-    expect(elements?.formField__phoneNumber).toBe('hidden');
-    expect(elements?.formFieldInput__phoneNumber).toBe('hidden');
-    expect(elements?.formFieldLabel__phoneNumber).toBe('hidden');
-    expect(elements?.formattedPhoneNumberInput).toBe('hidden');
+    expect(elements?.formFieldRow__username).toEqual(HIDE_ELEMENT_STYLE);
+    expect(elements?.formField__username).toEqual(HIDE_ELEMENT_STYLE);
+    expect(elements?.formFieldInput__username).toEqual(HIDE_ELEMENT_STYLE);
+    expect(elements?.formFieldLabel__username).toEqual(HIDE_ELEMENT_STYLE);
+    expect(elements?.formFieldRow__phoneNumber).toEqual(HIDE_ELEMENT_STYLE);
+    expect(elements?.formField__phoneNumber).toEqual(HIDE_ELEMENT_STYLE);
+    expect(elements?.formFieldInput__phoneNumber).toEqual(HIDE_ELEMENT_STYLE);
+    expect(elements?.formFieldLabel__phoneNumber).toEqual(HIDE_ELEMENT_STYLE);
+    expect(elements?.formattedPhoneNumberInput).toEqual(HIDE_ELEMENT_STYLE);
     // Verification-step fields
-    expect(elements?.formFieldInput__code).toBe('hidden');
-    expect(elements?.otpCodeFieldInput).toBe('hidden');
-    expect(elements?.formResendCodeLink).toBe('hidden');
+    expect(elements?.formFieldInput__code).toEqual(HIDE_ELEMENT_STYLE);
+    expect(elements?.otpCodeFieldInput).toEqual(HIDE_ELEMENT_STYLE);
+    expect(elements?.formResendCodeLink).toEqual(HIDE_ELEMENT_STYLE);
     // Form chrome
-    expect(elements?.formButtonPrimary).toBe('hidden');
-    expect(elements?.dividerRow).toBe('hidden');
-    expect(elements?.alternativeMethods).toBe('hidden');
-    expect(elements?.alternativeMethodsBlockButton).toBe('hidden');
+    expect(elements?.formButtonPrimary).toEqual(HIDE_ELEMENT_STYLE);
+    expect(elements?.dividerRow).toEqual(HIDE_ELEMENT_STYLE);
+    expect(elements?.alternativeMethods).toEqual(HIDE_ELEMENT_STYLE);
+    expect(elements?.alternativeMethodsBlockButton).toEqual(HIDE_ELEMENT_STYLE);
   });
 
   it('renders stable full-label provider slots before Clerk is ready', () => {
@@ -242,13 +243,14 @@ describe('AuthShell — JOV-2446 SSO-only contract', () => {
 
     const { container } = render(<AuthShell mode='sign-in' />);
 
-    // Wait long enough for any MutationObserver pass; ready must stay false.
-    await new Promise(resolve => setTimeout(resolve, 50));
-
-    expect(container.firstElementChild).toHaveAttribute(
-      'data-auth-shell-ready',
-      'false'
+    // Wait deterministically for MutationObserver-driven ready state to settle false (JOV-2446 Clerk regression guard).
+    await waitFor(() =>
+      expect(container.firstElementChild).toHaveAttribute(
+        'data-auth-shell-ready',
+        'false'
+      )
     );
+
     expect(
       container.querySelector('[data-auth-stable-placeholder]')
     ).not.toBeNull();

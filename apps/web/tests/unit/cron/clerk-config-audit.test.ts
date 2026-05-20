@@ -92,7 +92,7 @@ describe('clerk-config-audit cron', () => {
         body: {
           auth_config: {
             first_factors: ['oauth_google', 'oauth_apple', 'password'],
-            identification_requirements: ['email_address'],
+            identification_requirements: ['email', 'email_address'],
           },
         },
       },
@@ -113,6 +113,7 @@ describe('clerk-config-audit cron', () => {
     expect(outcome.violations).toHaveLength(1);
     expect(outcome.violations[0]?.label).toBe('production');
     expect(outcome.violations[0]?.forbiddenStrategies).toContain('password');
+    expect(outcome.violations[0]?.forbiddenIdentifications).toContain('email');
     expect(outcome.violations[0]?.forbiddenIdentifications).toContain(
       'email_address'
     );

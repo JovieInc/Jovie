@@ -39,49 +39,51 @@ const REQUIRED_CLERK_AUTH_ELEMENTS = {
   },
 } as const satisfies ClerkAppearanceElements;
 
+const HIDE_ELEMENT_STYLE = { display: 'none !important' } as const;
+
 // Jovie is SSO-only (JOV-2446). Even if the Clerk dashboard regresses and
 // re-enables email/password or email-OTP strategies, every credential surface
 // must stay invisible at the rendering layer. The cron at
 // `/api/cron/clerk-config-audit` is the primary regression alarm; this map is
 // defense in depth so a regression doesn't render a usable credential form
 // between the time the dashboard flips and the next cron tick.
-const CREDENTIAL_HIDE_ELEMENTS: Record<string, string> = {
+const CREDENTIAL_HIDE_ELEMENTS: Record<string, typeof HIDE_ELEMENT_STYLE> = {
   // Row containers (signIn-start and signUp-start)
-  formFieldRow__identifier: 'hidden',
-  formFieldRow__emailAddress: 'hidden',
-  formFieldRow__password: 'hidden',
+  formFieldRow__identifier: HIDE_ELEMENT_STYLE,
+  formFieldRow__emailAddress: HIDE_ELEMENT_STYLE,
+  formFieldRow__password: HIDE_ELEMENT_STYLE,
   // Field wrappers
-  formField__identifier: 'hidden',
-  formField__emailAddress: 'hidden',
-  formField__password: 'hidden',
+  formField__identifier: HIDE_ELEMENT_STYLE,
+  formField__emailAddress: HIDE_ELEMENT_STYLE,
+  formField__password: HIDE_ELEMENT_STYLE,
   // Inputs themselves
-  formFieldInput__identifier: 'hidden',
-  formFieldInput__emailAddress: 'hidden',
-  formFieldInput__password: 'hidden',
+  formFieldInput__identifier: HIDE_ELEMENT_STYLE,
+  formFieldInput__emailAddress: HIDE_ELEMENT_STYLE,
+  formFieldInput__password: HIDE_ELEMENT_STYLE,
   // Labels
-  formFieldLabel__identifier: 'hidden',
-  formFieldLabel__emailAddress: 'hidden',
-  formFieldLabel__password: 'hidden',
+  formFieldLabel__identifier: HIDE_ELEMENT_STYLE,
+  formFieldLabel__emailAddress: HIDE_ELEMENT_STYLE,
+  formFieldLabel__password: HIDE_ELEMENT_STYLE,
   // Username/phone (forbidden in clerk-config-audit; complete defense-in-depth)
-  formFieldRow__username: 'hidden',
-  formField__username: 'hidden',
-  formFieldInput__username: 'hidden',
-  formFieldLabel__username: 'hidden',
-  formFieldRow__phoneNumber: 'hidden',
-  formField__phoneNumber: 'hidden',
-  formFieldInput__phoneNumber: 'hidden',
-  formFieldLabel__phoneNumber: 'hidden',
-  formattedPhoneNumberInput: 'hidden',
+  formFieldRow__username: HIDE_ELEMENT_STYLE,
+  formField__username: HIDE_ELEMENT_STYLE,
+  formFieldInput__username: HIDE_ELEMENT_STYLE,
+  formFieldLabel__username: HIDE_ELEMENT_STYLE,
+  formFieldRow__phoneNumber: HIDE_ELEMENT_STYLE,
+  formField__phoneNumber: HIDE_ELEMENT_STYLE,
+  formFieldInput__phoneNumber: HIDE_ELEMENT_STYLE,
+  formFieldLabel__phoneNumber: HIDE_ELEMENT_STYLE,
+  formattedPhoneNumberInput: HIDE_ELEMENT_STYLE,
   // Verification-step fields (factor-one / verifications routes — only render
   // if Clerk advances past start with email re-enabled; hide pre-emptively).
-  formFieldInput__code: 'hidden',
-  otpCodeFieldInput: 'hidden',
-  formResendCodeLink: 'hidden',
+  formFieldInput__code: HIDE_ELEMENT_STYLE,
+  otpCodeFieldInput: HIDE_ELEMENT_STYLE,
+  formResendCodeLink: HIDE_ELEMENT_STYLE,
   // Form chrome that only makes sense around a credential form.
-  formButtonPrimary: 'hidden',
-  dividerRow: 'hidden',
-  alternativeMethods: 'hidden',
-  alternativeMethodsBlockButton: 'hidden',
+  formButtonPrimary: HIDE_ELEMENT_STYLE,
+  dividerRow: HIDE_ELEMENT_STYLE,
+  alternativeMethods: HIDE_ELEMENT_STYLE,
+  alternativeMethodsBlockButton: HIDE_ELEMENT_STYLE,
 };
 
 const AUTH_LEGAL_FALLBACK_HREFS = {
@@ -273,8 +275,8 @@ export function AuthShell({
           baseElements.lastAuthenticationStrategyBadge,
           REQUIRED_CLERK_AUTH_ELEMENTS.lastAuthenticationStrategyBadge
         ),
-        footer: 'hidden',
-        footerAction: 'hidden',
+        footer: HIDE_ELEMENT_STYLE,
+        footerAction: HIDE_ELEMENT_STYLE,
         ...CREDENTIAL_HIDE_ELEMENTS,
         ...providerGuard,
       },
