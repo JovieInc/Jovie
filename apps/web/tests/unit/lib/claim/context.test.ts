@@ -75,23 +75,41 @@ describe('readPendingClaimContext', () => {
   });
 
   it('returns null (no clear) on expired cookie', async () => {
-    // We will produce a real signed cookie via write, then tamper expiresAt
-    // For this case, construct a minimal payload that parses but expires
-    const { readPendingClaimContext } = await import('@/lib/claim/context');
-    getMock.mockReturnValue({
-      value:
-        'eyJtb2RlIjoiZGlyZWN0X3Byb2ZpbGUiLCJjcmVhdG9yUHJvZmlsZUlkIjoiY2lkIiwiZXhwaXJlc0F0IjoxLCJ1c2VybmFtZSI6InUiLCJpc3N1ZWRBdCI6MX0=.0000000000000000000000000000000000000000000000000000000000000000',
+    // Produce legitimately signed cookie via write, then advance fake time past TTL
+    // so parse succeeds (sig+fields) but expiry branch returns null without delete.
+    vi.useFakeTimers();
+    const { writePendingClaimContext, readPendingClaimContext } = await import(
+      '@/lib/claim/context'
+    );
+    await writePendingClaimContext({
+      mode: 'direct_profile',
+      creatorProfileId: 'cid',
+      username: 'u',
     });
+    const serialized = setMock.mock.calls[0]?.[1] as string;
+    // advance past 7d TTL
+    vi.setSystemTime(Date.now() + 7 * 24 * 60 * 60 * 1000 + 10000);
+    getMock.mockReturnValue({ value: serialized });
     const result = await readPendingClaimContext();
     expect(result).toBeNull();
-    // expired path deletes too in some branches
+    vi.useRealTimers();
+    // expiry path returns null without calling delete (unlike parse failures)
   });
 
   it('respects username filter option (case-insensitive)', async () => {
-    // This exercises the username guard branch without full valid sig (will fail parse but tests option path)
-    getMock.mockReturnValue({ value: 'bad' });
-    const { readPendingClaimContext } = await import('@/lib/claim/context');
-    const result = await readPendingClaimContext({ username: 'TestUser' });
+    // Well-formed signed cookie with 'testuser'; non-matching filter 'OtherUser' hits
+    // the username guard branch and returns null WITHOUT delete (the filter-respect behavior).
+    const { writePendingClaimContext, readPendingClaimContext } = await import(
+      '@/lib/claim/context'
+    );
+    await writePendingClaimContext({
+      mode: 'direct_profile',
+      creatorProfileId: 'p',
+      username: 'testuser',
+    });
+    const serialized = setMock.mock.calls[0]?.[1] as string;
+    getMock.mockReturnValue({ value: serialized });
+    const result = await readPendingClaimContext({ username: 'OtherUser' });
     expect(result).toBeNull();
   });
 });

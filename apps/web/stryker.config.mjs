@@ -107,6 +107,7 @@ export default {
     'tests/unit/app/[[]username[]]/claim/route.test.ts',
     'tests/unit/lib/claim/context.test.ts',
     'tests/unit/api/onboarding/intake.test.ts',
+    'tests/unit/api/onboarding/claim.test.ts',
     'tests/components/features/onboarding/useOnboardingClaim.test.tsx',
     // Cookie banner unit + regions (exercises the new floating card surface + geo decision branches)
     'tests/unit/cookie-banner.test.tsx',
