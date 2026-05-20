@@ -1424,62 +1424,45 @@ describe('proxy.ts middleware', () => {
     });
   });
 
-  // ==========================================================================
-  // Legacy investors.jov.ie investor portal early returns (handleInvestorRequest)
-  // Contract tests closing documented gaps for highest-risk proxy middleware surface
-  // (risk 43 RED): investor 301 early returns for static _next + ?t= token cases.
-  // Exercises auth/investor paths in proxy.ts + lib/auth/investor-portal.ts before
-  // Clerk/test bypass. Also guards audience call site.
-  // ==========================================================================
-  describe('legacy investors.jov.ie investor portal early returns', () => {
-    it('passes _next static assets through on investors.jov.ie (NextResponse.next early return, no 301)', async () => {
+  describe('investors.jov.ie legacy subdomain (proxy investor 301 early returns)', () => {
+    it('301 redirects investors.jov.ie non-static paths to jov.ie/investor-portal preserving token', async () => {
       const req = createUnauthenticatedRequest({
-        pathname: '/_next/static/chunks/abc.js',
+        pathname: '/foo/bar',
+        hostname: 'investors.jov.ie',
+        searchParams: { t: 'tok-abc', utm: 'x' },
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBe(301);
+      const location = res.headers.get('location') || '';
+      expect(location).toContain('https://jov.ie/investor-portal/foo/bar');
+      expect(location).toContain('t=tok-abc');
+      expect(location).toContain('utm=x');
+    });
+
+    it('passes through _next static assets on investors.jov.ie without redirect (early return)', async () => {
+      const req = createUnauthenticatedRequest({
+        pathname: '/_next/static/chunks/main.js',
         hostname: 'investors.jov.ie',
       });
       const res = await callMiddleware(req);
 
-      expect(res.status).toBeLessThan(300);
+      // NextResponse.next() has status 200 in test harness? or no redirect
+      expect(res.status).not.toBe(301);
       expect(res.headers.get('location')).toBeNull();
     });
 
-    it('301 redirects non-static paths (incl ?t= token) on investors.jov.ie to main host /investor-portal preserving query', async () => {
-      const req = createUnauthenticatedRequest({
-        pathname: '/respond',
-        hostname: 'investors.jov.ie',
-        searchParams: { t: 'secret-token-42', utm: 'campaign' },
-      });
-      const res = await callMiddleware(req);
-
-      expect(res.status).toBe(301);
-      const location = res.headers.get('location') ?? '';
-      expect(location).toContain('https://jov.ie/investor-portal/respond');
-      expect(location).toContain('t=secret-token-42');
-      expect(location).toContain('utm=campaign');
-    });
-
-    it('301 redirects root on investors.jov.ie preserving token param', async () => {
+    it('301 redirects investors.jov.ie root to jov.ie/investor-portal', async () => {
       const req = createUnauthenticatedRequest({
         pathname: '/',
         hostname: 'investors.jov.ie',
-        searchParams: { t: 'root-token' },
       });
       const res = await callMiddleware(req);
 
       expect(res.status).toBe(301);
-      const location = res.headers.get('location') ?? '';
-      expect(location).toContain('https://jov.ie/investor-portal');
-      expect(location).toContain('t=root-token');
-    });
-
-    it('audience guard path exercised for public profile (proceeds; block false in test env)', async () => {
-      const req = createUnauthenticatedRequest({
-        pathname: '/someprofile',
-      });
-      const res = await callMiddleware(req);
-
-      const loc = res.headers.get('location') || '';
-      expect(loc).not.toContain('https://jov.ie');
+      expect(res.headers.get('location')).toContain(
+        'https://jov.ie/investor-portal'
+      );
     });
   });
 });

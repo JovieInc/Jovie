@@ -58,8 +58,7 @@ export default {
     // persona allowlist (only creator/creator-ready/admin), trusted hosts only (no *.vercel.app).
     // Covers enter/session routes + dev-test-auth.server (availability, ensure actor, cached session,
     // cookie builders, redirect sanitize, outer catch paths with logger.warn).
-    // Extended contract tests for bypass scenarios/failure modes + Stryker wiring (matches prior
-    // webhook signatures, claim-onboarding, entitlements, proxy, Stripe, rls patterns).
+    // Contract tests for bypass scenarios/failure modes + Stryker wiring (matches webhook, claim, rls patterns).
     'app/api/dev/test-auth/**/*.ts',
     'lib/auth/dev-test-auth.server.ts',
     // RLS access control (highest remaining risk RED surface 42.1 per heatmap + register):
