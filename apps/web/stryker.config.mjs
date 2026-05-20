@@ -53,6 +53,15 @@ export default {
     'lib/auth/decode-fapi-host.ts',
     'lib/auth/staging-clerk-keys.ts',
     'lib/auth/test-mode.ts',
+    // Dev test-auth bypass (RED 35.7 per TEST_RISK_REGISTER.md + HEATMAP mutation warning).
+    // High trust E2E surface: must fail closed on prod (NODE_ENV+VERCEL_ENV), spoofed headers,
+    // persona allowlist (only creator/creator-ready/admin), trusted hosts only (no *.vercel.app).
+    // Covers enter/session routes + dev-test-auth.server (availability, ensure actor, cached session,
+    // cookie builders, redirect sanitize, outer catch paths with logger.warn).
+    // Extended contract tests for bypass scenarios/failure modes + Stryker wiring (matches prior
+    // webhook signatures, claim-onboarding, entitlements, proxy, Stripe, rls patterns).
+    'app/api/dev/test-auth/**/*.ts',
+    'lib/auth/dev-test-auth.server.ts',
     // RLS access control (highest remaining risk RED surface 42.1 per heatmap + register):
     // lib/auth/session.ts covers validateClerkUserId, setupDbSession, withDbSession*,
     // getSessionContext (tenant/user resolution, throws for USER_NOT_FOUND/PROFILE/UNAUTHORIZED),
@@ -71,6 +80,13 @@ export default {
     // 5/rev 5) + claim-onboarding gaps; gate covers under-mutated failure modes
     // for waitlist/claim flows (high reversibility/visibility).
     'lib/auth/gate.ts',
+    // Investor portal (handleInvestorRequest early returns for legacy
+    // investors.jov.ie static _next + ?t= 301 redirects, token/cookie flows,
+    // DB fail-closed validation, Redis dedup/idempotency for views).
+    // Directly targets highest-risk proxy middleware surface (risk 43 RED,
+    // auth + investor + audience per TEST_RISK_REGISTER + heatmap).
+    // Contract tests in proxy-behavioral + dedup unit now kill mutants here.
+    'lib/auth/investor-portal.ts',
     // Claim-onboarding surface (per docs/TEST_RISK_REGISTER.md claim-onboarding row + heatmap priority).
     // Token-backed + direct claim routes, username claim handler (validation, auth checks, pending claim,
     // next=auth redirect matrix), onboarding intake (email verify gate, rate limit, ensure/upsert user+interview,
@@ -121,6 +137,18 @@ export default {
     'tests/unit/lib/auth/gate.test.ts',
     'tests/unit/lib/auth/gate.critical.test.ts',
     'tests/unit/auth/waitlist-gating.test.ts',
+    // Dev test-auth bypass contract + server tests (bypass scenarios, prod fail-closed,
+    // persona guards, trusted host override, json catch, redirect/enter paths, outer catches).
+    // Wires mutation for the RED 35.7 surface (dev-test-auth-bypass) + test-mode.ts.
+    'tests/unit/api/dev/test-auth-routes.test.ts',
+    'tests/unit/lib/auth/dev-test-auth.server.test.ts',
+    'tests/unit/lib/auth/test-mode.test.ts',
+    // Investor portal dedup + proxy behavioral contracts for lib/auth/investor-portal.ts
+    // + proxy.ts investor/audience paths (legacy 301 early returns for _next + ?t=,
+    // token flows, view idempotency, guard call sites, durable coordination).
+    // Highest risk proxy surface closure + mutation evidence.
+    'lib/auth/investor-view-dedup.test.ts',
+    'tests/unit/middleware/proxy-behavioral.test.ts',
     // RLS access control (rls-access-control row, risk 42.1 RED, mutation gap closure):
     // Wires the new contract tests for RLS failure modes (unauthorized tenant access via
     // session errors, auth bypass test paths, 401/403/404 responses, outer catch in
