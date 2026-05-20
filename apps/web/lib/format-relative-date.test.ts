@@ -21,11 +21,13 @@ describe('relativeDate', () => {
   it('formats older past dates without raw multi-year day counts', () => {
     expect(relativeDate('2026-04-04T12:00:00Z', NOW)).toBe('3w ago');
     expect(relativeDate('2026-01-15T12:00:00Z', NOW)).toBe('3mo ago');
-    // >1y uses exact month+year per convention (truthful label, no approx "Ny ago")
+    // >1y uses exact month+year per convention (truthful label, no approx "Ny ago"; never "2193d ago" per handoff)
     expect(relativeDate('2024-04-19T12:00:00Z', NOW)).toBe('Apr 2024');
     const multiYear = relativeDate('2020-04-24T12:00:00Z', NOW);
     expect(multiYear).toBe('Apr 2020');
     expect(multiYear).not.toMatch(/^\d{4,}d ago$/u);
+    // extra >1y case for coverage (JOV-2496 wave / shell-v1 relative-date polish)
+    expect(relativeDate('2023-06-10T12:00:00Z', NOW)).toBe('Jun 2023');
   });
 
   it('formats short future inside a week as "in Nd"', () => {
