@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -39,6 +38,10 @@ function renderJovieMark({ x, y, size, fill, opacity = 1 }) {
 }
 
 export function buildDmgBackgroundSvg({ year = getDesktopBuildYear() } = {}) {
+  // DESIGN.md (System B dark): #08090a base, #0f1011 / #17171a surfaces.
+  // Restrained premium dark, no sloppy green-blue gradients. Subtle purple-tinted
+  // low-opacity oversized Jovie mark in background per Wave 2 handoff + ui/ux feedback.
+  // Matches Jovie design system (dark-first, Apple-meets-Rekordbox restraint).
   return `<svg width="${WIDTH}" height="${HEIGHT}" viewBox="0 0 ${WIDTH} ${HEIGHT}" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <pattern id="jovie-grid" width="24" height="24" patternUnits="userSpaceOnUse">
@@ -46,19 +49,19 @@ export function buildDmgBackgroundSvg({ year = getDesktopBuildYear() } = {}) {
       <path d="M12 7V17M7 12H17" stroke="#2B323D" stroke-width="1" stroke-linecap="round" opacity="0.52"/>
     </pattern>
     <linearGradient id="stage-glow" x1="68" y1="60" x2="692" y2="374" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#11131A"/>
-      <stop offset="0.52" stop-color="#0B0D12"/>
-      <stop offset="1" stop-color="#12101B"/>
+      <stop stop-color="#0f1011"/>
+      <stop offset="0.5" stop-color="#11131a"/>
+      <stop offset="1" stop-color="#12101b"/>
     </linearGradient>
     <filter id="soft-shadow" x="-20%" y="-20%" width="140%" height="150%" color-interpolation-filters="sRGB">
       <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#000000" flood-opacity="0.34"/>
     </filter>
   </defs>
-  <rect width="${WIDTH}" height="${HEIGHT}" fill="#080A0D"/>
+  <rect width="${WIDTH}" height="${HEIGHT}" fill="#08090a"/>
   <rect x="32" y="30" width="696" height="366" rx="22" fill="url(#stage-glow)" stroke="#242A33"/>
   <rect x="32" y="30" width="696" height="366" rx="22" fill="url(#jovie-grid)" opacity="0.66"/>
-  <rect x="68" y="66" width="624" height="294" rx="18" fill="#090B0F" opacity="0.42"/>
-  ${renderJovieMark({ x: 474, y: 86, size: 228, fill: '#F7F8FA', opacity: 0.055 })}
+  <rect x="68" y="66" width="624" height="294" rx="18" fill="#0f1011" opacity="0.42"/>
+  ${renderJovieMark({ x: 460, y: 70, size: 260, fill: '#F7F8FA', opacity: 0.048 })}
   <text x="380" y="86" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="24" font-weight="700" letter-spacing="0" fill="#F5F7FA">Install Jovie</text>
   <text x="380" y="112" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif" font-size="13" font-weight="500" letter-spacing="0" fill="#9AA4B2">Drag Jovie to Applications</text>
   <rect x="${APP_ZONE_X}" y="${ZONE_Y}" width="${DROP_ZONE_SIZE}" height="${DROP_ZONE_SIZE}" rx="30" fill="#141922" fill-opacity="0.82" stroke="#2E3743" filter="url(#soft-shadow)"/>
@@ -67,7 +70,7 @@ export function buildDmgBackgroundSvg({ year = getDesktopBuildYear() } = {}) {
   <path d="M338 226L356 244L338 262" fill="none" stroke="#596270" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0.42"/>
   <path d="M373 226L391 244L373 262" fill="none" stroke="#717A87" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0.58"/>
   <path d="M408 226L426 244L408 262" fill="none" stroke="#BFC7D2" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0.88"/>
-  <rect x="0" y="396" width="${WIDTH}" height="84" fill="#0E1116" stroke="#242A33"/>
+  <rect x="0" y="396" width="${WIDTH}" height="84" fill="#0f1011" stroke="#242A33"/>
   ${renderJovieMark({ x: 50, y: 424, size: 44, fill: '#F5F7FA' })}
   <text x="104" y="436" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif" font-size="15" font-weight="650" letter-spacing="0" fill="#F2F5F8">Jovie Technology Inc.</text>
   <text x="104" y="460" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif" font-size="13" font-weight="500" letter-spacing="0" fill="#9CA6B4">&#169; ${year}</text>
