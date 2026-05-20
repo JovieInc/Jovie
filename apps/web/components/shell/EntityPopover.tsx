@@ -647,7 +647,8 @@ export function EntityPopover({
         LINEAR_SURFACE.popover,
         'text-primary-token',
         'animate-in fade-in-0 zoom-in-95 duration-subtle ease-subtle',
-        pos?.side === 'left' ? 'slide-in-from-right-1' : 'slide-in-from-left-1'
+        pos?.side === 'left' ? 'slide-in-from-right-1' : 'slide-in-from-left-1',
+        'motion-reduce:transition-opacity motion-reduce:transform-none'
       )}
     >
       <div className='p-3'>
@@ -759,7 +760,7 @@ export function EntityHoverLink({
         className={cn(
           'inline-flex items-center rounded-md transition-colors duration-subtle ease-subtle hover:text-primary-token',
           'no-underline hover:underline focus-visible:underline underline-offset-2',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)',
+          'focus-ring-themed',
           className
         )}
       >

@@ -153,7 +153,7 @@ export function EntityChipPopover({
           onKeyDown={handleKeyDown}
           className={cn(
             'm-0 inline-flex cursor-pointer appearance-none items-baseline align-baseline border-0 bg-transparent p-0',
-            'rounded-(--linear-app-radius-item) focus:outline-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/35'
+            'rounded-md focus:outline-none focus-visible:outline-none focus-ring'
           )}
           data-testid='entity-chip-popover-trigger'
         >
@@ -209,7 +209,7 @@ function EntityChipPopoverBody({
   const thumbnail = entity?.thumbnail;
 
   return (
-    <div className='flex gap-2.5 p-2'>
+    <div className='flex gap-2.5 p-3'>
       <div className='shrink-0'>
         {thumbnail ? (
           <Image
@@ -217,15 +217,15 @@ function EntityChipPopoverBody({
             alt=''
             width={48}
             height={48}
-            className='h-12 w-12 rounded-(--linear-app-radius-item) border border-subtle object-cover shadow-app-control'
+            className='h-12 w-12 rounded-md border border-subtle object-cover shadow-app-control'
             aria-hidden
           />
         ) : (
           <div
             aria-hidden
-            className='flex h-12 w-12 items-center justify-center rounded-(--linear-app-radius-item) border border-subtle bg-surface-1 shadow-app-control'
+            className='flex h-12 w-12 items-center justify-center rounded-md border border-subtle bg-surface-1 text-app font-caption text-primary-token shadow-app-control'
           >
-            <span className='h-2 w-2 rounded-full bg-tertiary-token' />
+            {initialsOf(label) || '·'}
           </div>
         )}
       </div>
@@ -248,7 +248,7 @@ function EntityChipPopoverBody({
           <button
             type='button'
             onClick={onOpenEntity}
-            className='mt-2 inline-flex items-center gap-1 rounded-(--linear-app-radius-item) px-1 py-0.5 text-2xs font-caption text-secondary-token transition-colors duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token focus:outline-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/35'
+            className='mt-2 inline-flex items-center gap-1 rounded-md px-1 py-0.5 text-2xs font-caption text-secondary-token transition-colors duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token focus:outline-none focus-visible:outline-none focus-ring'
           >
             Open {KIND_PREFIX[kind].toLowerCase()}
             <ArrowUpRight className='h-3 w-3' />
@@ -312,4 +312,13 @@ function compactNumber(value: number): string {
   if (value >= 10_000) return `${Math.round(value / 1000)}k`;
   if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
   return value.toString();
+}
+
+function initialsOf(label: string): string {
+  return label
+    .split(/\s+/)
+    .slice(0, 2)
+    .map(p => p.charAt(0))
+    .join('')
+    .toUpperCase();
 }
