@@ -583,12 +583,13 @@ export function JovieChat({
                       Positioned absolute so it doesn't shift the welcome heading. */}
                   <div
                     aria-hidden
-                    className='pointer-events-none absolute inset-0 flex items-center justify-center select-none'
+                    className='pointer-events-none absolute inset-0 flex items-center justify-center select-none anim-calm-breath opacity-45'
                     data-testid='chat-empty-thread-ornament'
                   >
                     {shellChatV1Enabled ? (
                       <JovieMarkElectric
-                        className='opacity-70'
+                        spark={false}
+                        className='opacity-100'
                         style={{
                           width: 'clamp(180px, 34vw, 360px)',
                           height: 'clamp(180px, 34vw, 360px)',
