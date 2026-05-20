@@ -210,6 +210,13 @@ import { relativeDate as formatRelativeDate } from '@/lib/format-relative-date';
 import { SHORTCUTS } from '@/lib/shortcuts';
 import { cn } from '@/lib/utils';
 
+function isSelfActivationKey(event: React.KeyboardEvent<HTMLElement>): boolean {
+  return (
+    event.currentTarget === event.target &&
+    (event.key === 'Enter' || event.code === 'Space')
+  );
+}
+
 type CanvasView =
   | 'demo'
   | 'releases'
@@ -4860,7 +4867,7 @@ function ReleasesView({
 }) {
   const [focusedIndex, setFocusedIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
-  const rowRefs = useRef<Array<HTMLLIElement | null>>([]);
+  const rowRefs = useRef<Array<HTMLDivElement | null>>([]);
 
   // While the user is keyboard-navigating, suppress mouse-hover styles
   // so only the focused row reads as active. Mouse movement re-enables
@@ -4927,7 +4934,7 @@ function ReleasesView({
       aria-label='Releases'
     >
       <div className='flex-1 min-h-0 overflow-y-auto px-3 pb-6 pt-3'>
-        <ul className='space-y-px'>
+        <div className='space-y-px' role='listbox' aria-label='Releases'>
           {releases.map((r, i) => (
             <ReleaseRow
               key={r.id}
@@ -4960,7 +4967,7 @@ function ReleasesView({
               onOpenThread={onOpenThread}
             />
           ))}
-        </ul>
+        </div>
       </div>
     </section>
   );
@@ -4993,7 +5000,7 @@ function ReleaseRow({
   isFocused: boolean;
   drawerOpen: boolean;
   kbActive?: boolean;
-  rowRef?: (el: HTMLLIElement | null) => void;
+  rowRef?: (el: HTMLDivElement | null) => void;
   onSelect: () => void;
   onPlay: () => void;
   onSeek: (sec: number) => void;
@@ -5003,11 +5010,17 @@ function ReleaseRow({
 }) {
   const runningThread = findRunningThreadFor('release', release.id, THREADS);
   return (
-    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: list row activates via parent section's keyboard handler; mouse-click is a convenience
-    // biome-ignore lint/a11y/useKeyWithClickEvents: see above — parent section handles ↑/↓/Enter/Space/Esc
-    <li
+    <div
       ref={rowRef}
+      role='option'
+      aria-selected={isSelected}
+      tabIndex={-1}
       onClick={onSelect}
+      onKeyDown={event => {
+        if (!isSelfActivationKey(event)) return;
+        event.preventDefault();
+        onSelect();
+      }}
       onContextMenu={e => onContextMenu?.(e, release)}
       data-selected={isSelected || undefined}
       data-focused={isFocused || undefined}
@@ -5134,7 +5147,7 @@ function ReleaseRow({
         <DspAvatarStack dsps={releaseDspItems(release)} />
         <ReleaseRowMoreMenu release={release} />
       </div>
-    </li>
+    </div>
   );
 }
 
@@ -6027,7 +6040,7 @@ function TracksView({
   }, []);
 
   // Scroll the focused row into view as the user navigates.
-  const rowRefs = useRef<Array<HTMLLIElement | null>>([]);
+  const rowRefs = useRef<Array<HTMLDivElement | null>>([]);
   useEffect(() => {
     rowRefs.current[focusedIndex]?.scrollIntoView({ block: 'nearest' });
   }, [focusedIndex]);
@@ -6114,7 +6127,11 @@ function TracksView({
           </span>
         </div>
 
-        <ul className='space-y-px pb-3 pt-1'>
+        <div
+          className='space-y-px pb-3 pt-1'
+          role='listbox'
+          aria-label='Tracks'
+        >
           {sorted.map((t, i) => (
             <TrackRow
               key={t.id}
@@ -6145,11 +6162,11 @@ function TracksView({
             />
           ))}
           {sorted.length === 0 && (
-            <li className='px-3 py-8 text-center text-[12px] text-tertiary-token'>
+            <div className='px-3 py-8 text-center text-[12px] text-tertiary-token'>
               No tracks match your filters.
-            </li>
+            </div>
           )}
-        </ul>
+        </div>
       </div>
     </section>
   );
@@ -6180,7 +6197,7 @@ function TrackRow({
   isFocused: boolean;
   muteHighlight: boolean;
   kbActive?: boolean;
-  rowRef?: (el: HTMLLIElement | null) => void;
+  rowRef?: (el: HTMLDivElement | null) => void;
   currentTimeSec: number;
   keyMode: 'normal' | 'camelot';
   onSelect: () => void;
@@ -6195,11 +6212,17 @@ function TrackRow({
   const showPlayingBars = isPlaying && !muteHighlight;
   const runningThread = findRunningThreadFor('track', track.id, THREADS);
   return (
-    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: parent section delegates ↑/↓/Space; row click is a focus convenience
-    // biome-ignore lint/a11y/useKeyWithClickEvents: same
-    <li
+    <div
       ref={rowRef}
+      role='option'
+      aria-selected={isFocused}
+      tabIndex={-1}
       onClick={onSelect}
+      onKeyDown={event => {
+        if (!isSelfActivationKey(event)) return;
+        event.preventDefault();
+        onSelect();
+      }}
       onContextMenu={e => onContextMenu?.(e, track)}
       data-focused={isFocused || undefined}
       className={cn(
@@ -6317,7 +6340,7 @@ function TrackRow({
           />
         )}
       </div>
-    </li>
+    </div>
   );
 }
 
@@ -6400,7 +6423,7 @@ function TasksView({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [focusedIndex, setFocusedIndex] = useState(0);
   const selected = selectedId ? tasks.find(t => t.id === selectedId) : null;
-  const rowRefs = useRef<Array<HTMLLIElement | null>>([]);
+  const rowRefs = useRef<Array<HTMLDivElement | null>>([]);
 
   // Suppress mouse-hover styles while keyboard nav is active (resumes
   // on next mousemove). Same pattern as Releases/Tracks lists.
@@ -6474,7 +6497,11 @@ function TasksView({
             Filter
           </button>
         </div>
-        <ul className='flex-1 min-h-0 overflow-y-auto pb-3 px-1'>
+        <div
+          className='flex-1 min-h-0 overflow-y-auto pb-3 px-1'
+          role='listbox'
+          aria-label='Tasks'
+        >
           {tasks.map((t, i) => (
             <TaskListItem
               key={t.id}
@@ -6494,7 +6521,7 @@ function TasksView({
               onOpenThread={onOpenThread}
             />
           ))}
-        </ul>
+        </div>
       </div>
 
       {/* Detail pane — empty until the user picks a task. Calm
@@ -6549,7 +6576,7 @@ function TaskListItem({
   isSelected: boolean;
   isFocused: boolean;
   kbActive?: boolean;
-  rowRef?: (el: HTMLLIElement | null) => void;
+  rowRef?: (el: HTMLDivElement | null) => void;
   onSelect: () => void;
   onContextMenu?: (e: React.MouseEvent, task: Task) => void;
   onOpenRelease?: (id: string) => void;
@@ -6557,11 +6584,17 @@ function TaskListItem({
 }) {
   const runningThread = findRunningThreadFor('task', task.id, THREADS);
   return (
-    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: parent section delegates ↑/↓
-    // biome-ignore lint/a11y/useKeyWithClickEvents: same
-    <li
+    <div
       ref={rowRef}
+      role='option'
+      aria-selected={isSelected}
+      tabIndex={-1}
       onClick={onSelect}
+      onKeyDown={event => {
+        if (!isSelfActivationKey(event)) return;
+        event.preventDefault();
+        onSelect();
+      }}
       onContextMenu={e => onContextMenu?.(e, task)}
       data-focused={isFocused || isSelected || undefined}
       className={cn(
@@ -6616,7 +6649,7 @@ function TaskListItem({
           </span>
         </div>
       </div>
-    </li>
+    </div>
   );
 }
 

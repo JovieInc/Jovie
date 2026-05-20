@@ -131,6 +131,7 @@
     "commitizen": "^4.3.1",
     "csv-parse": "^6.2.1",
     "cz-conventional-changelog": "^3.3.0",
+    "eslint": "^10.2.1",
     "husky": "^9.1.7",
     "knip": "^6.0.4",
     "lint-staged": "^17.0.4",
@@ -159,5 +160,8 @@
     "*.{json,css}": [
       "biome format --write --no-errors-on-unmatched"
     ]
+  },
+  "dependencies": {
+    "@trigger.dev/sdk": "^4.4.6"
   }
 }

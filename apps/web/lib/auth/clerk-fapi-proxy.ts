@@ -8,6 +8,81 @@ import { decodeFapiHostFromPublishableKey } from '@/lib/auth/decode-fapi-host';
 import { resolveClerkKeys } from '@/lib/auth/staging-clerk-keys';
 import { captureError } from '@/lib/error-tracking';
 
+export function splitSetCookieHeader(header: string | null | undefined) {
+  if (!header) return [];
+
+  const cookies: string[] = [];
+  let start = 0;
+  let inExpires = false;
+
+  for (let i = 0; i < header.length; i++) {
+    if (header.slice(i, i + 8).toLowerCase() === 'expires=') {
+      inExpires = true;
+      i += 7;
+      continue;
+    }
+
+    const char = header[i];
+    if (char === ';') {
+      inExpires = false;
+      continue;
+    }
+
+    if (char === ',' && !inExpires && startsCookieName(header, i + 1)) {
+      const cookie = header.slice(start, i).trim();
+      if (cookie) cookies.push(cookie);
+      start = i + 1;
+    }
+  }
+
+  const cookie = header.slice(start).trim();
+  if (cookie) cookies.push(cookie);
+  return cookies;
+}
+
+function startsCookieName(header: string, offset: number): boolean {
+  let sawNameChar = false;
+
+  for (let i = offset; i < header.length; i++) {
+    const char = header[i];
+    if (char === ' ' || char === '\t') {
+      if (sawNameChar) return false;
+      continue;
+    }
+
+    if (char === '=') return sawNameChar;
+    if (!isCookieNameChar(char)) return false;
+    sawNameChar = true;
+  }
+
+  return false;
+}
+
+function isCookieNameChar(char: string | undefined): boolean {
+  if (!char) return false;
+  const code = char.charCodeAt(0);
+  return (
+    (code >= 48 && code <= 57) ||
+    (code >= 65 && code <= 90) ||
+    (code >= 97 && code <= 122) ||
+    char === '!' ||
+    char === '#' ||
+    char === '$' ||
+    char === '%' ||
+    char === '&' ||
+    char === "'" ||
+    char === '*' ||
+    char === '+' ||
+    char === '-' ||
+    char === '.' ||
+    char === '^' ||
+    char === '_' ||
+    char === '`' ||
+    char === '|' ||
+    char === '~'
+  );
+}
+
 /**
  * Clerk FAPI proxy handler — dedicated helper extracted from proxy.ts.
  *
@@ -136,8 +211,7 @@ export async function handleClerkFapiProxy(
 
       const setCookies =
         proxyRes.headers.getSetCookie?.() ??
-        proxyRes.headers.get('set-cookie')?.split(/,(?=[^;]+=)/) ??
-        [];
+        splitSetCookieHeader(proxyRes.headers.get('set-cookie'));
       for (const cookie of setCookies) {
         if (cookie) redirect.headers.append('set-cookie', cookie);
       }

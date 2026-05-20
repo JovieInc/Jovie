@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { randomInt } from 'node:crypto';
 import { unwrapDatabaseError } from '@/lib/errors/onboarding';
 
 /**
@@ -41,7 +42,7 @@ function isRetryableTransactionError(error: unknown): boolean {
  * Postgres serialization/deadlock failures. Re-throws immediately on any
  * non-retryable error.
  *
- * Backoff is exponential with jitter: baseDelayMs * 2^i + Math.random()*25.
+ * Backoff is exponential with jitter: baseDelayMs * 2^i + randomInt(25).
  */
 export async function withSerializableRetry<T>(
   fn: () => Promise<T>,
@@ -59,7 +60,7 @@ export async function withSerializableRetry<T>(
       lastError = error;
       if (!isRetryableTransactionError(error)) throw error;
       if (i < attempts - 1) {
-        const delay = baseDelayMs * 2 ** i + Math.random() * 25;
+        const delay = baseDelayMs * 2 ** i + randomInt(25);
         await sleep(delay);
       }
     }

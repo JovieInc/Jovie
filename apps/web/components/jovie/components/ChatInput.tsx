@@ -840,7 +840,7 @@ function InputRow({
             'flex items-center gap-2',
             useHeroPill
               ? 'min-h-8 shrink-0 justify-end'
-              : ['justify-between', isHero ? 'min-h-9' : 'min-h-9']
+              : 'min-h-9 justify-between'
           )}
         >
           <div className='flex min-w-0 items-center gap-2'>
