@@ -75,10 +75,27 @@ Run `pnpm tailwind:check` to verify configuration integrity.
 }
 ```
 
-### Focus Ring Utility
+### Focus Ring Utility (Canonical Recipe)
+The single source of truth for focus rings is the global `:where(:focus-visible)` fallback
+in `apps/web/styles/design-system.css` + the `.focus-ring` / `.btn` definitions in
+`apps/web/app/globals.css`. Both implement the design-system consistent visible ring:
+
+```css
+/* Canonical for shell/chrome (a11y + smallwin polish) — visible, no defaults, consistent */
+focus-visible:outline-none
+focus-visible:ring-2
+focus-visible:ring-(--linear-border-focus)/55
+focus-visible:ring-offset-2
+focus-visible:ring-offset-(--linear-bg-page)
+```
+
+Use the `@apply focus-ring` (or the long form) on interactive elements for explicit control.
+Primary CTAs and marketing surfaces may layer stronger rings or use `public-action-*` explicit
+box-shadow doubles. Never use browser defaults or ad-hoc colors/opacities.
+See also: DESIGN.md, docs/ACCESSIBILITY.md, and the :where rule for the global guarantee.
 ```css
 @utility focus-ring {
-  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-500/50 dark:focus-visible:ring-white/40 dark:focus-visible:ring-offset-gray-900;
+  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-(--linear-bg-page);
 }
 ```
 
