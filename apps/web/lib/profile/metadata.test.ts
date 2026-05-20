@@ -61,6 +61,10 @@ describe('sanitizeMetadataText', () => {
     );
   });
 
+  it('drops text inside an unterminated tag', () => {
+    expect(sanitizeMetadataText('Visible <broken hidden text')).toBe('Visible');
+  });
+
   it('returns plain text unchanged (modulo trim)', () => {
     expect(sanitizeMetadataText('Taylor Swift')).toBe('Taylor Swift');
   });
