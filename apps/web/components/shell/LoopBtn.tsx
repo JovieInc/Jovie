@@ -32,7 +32,7 @@ export function LoopBtn({
       type='button'
       onClick={onClick}
       className={cn(
-        'relative h-7 w-7 rounded-md grid place-items-center transition-colors duration-subtle ease-subtle focus-ring',
+        'relative h-7 w-7 rounded-md grid place-items-center transition-colors duration-subtle ease-subtle focus-ring-themed',
         active
           ? 'text-primary-token'
           : 'text-quaternary-token hover:text-primary-token',
