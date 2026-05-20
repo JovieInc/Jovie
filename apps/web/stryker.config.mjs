@@ -125,6 +125,8 @@ export default {
     'tests/unit/lib/cookies/consent-regions.test.ts',
     // Claim-onboarding surface wiring (routes + dedicated tests for intake/claim races + token handler).
     // Includes the new claim.test.ts (property + CAS/race/409 paths) and strengthened intake/claim-token tests.
+    // v2: expanded claim.test.ts with additional fast-check properties exercising 409
+    // error message variants and recency ties for improved Stryker kill rate.
     'tests/unit/app/claim-token-route.test.ts',
     'tests/unit/api/onboarding/intake.test.ts',
     'tests/unit/api/onboarding/claim.test.ts',
