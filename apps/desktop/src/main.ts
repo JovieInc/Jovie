@@ -342,7 +342,7 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
       console.error('[Jovie Desktop] Shell load failure (graceful recovery)', {
         errorCode,
         errorDescription,
-        validatedURL,
+        validatedURL: typeof validatedURL === 'string' ? validatedURL.split('?')[0] : validatedURL,
         appEntry: APP_ENTRY_URL,
       });
       showDesktopLoadFailure(win);
