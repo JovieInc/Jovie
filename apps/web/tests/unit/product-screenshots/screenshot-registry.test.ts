@@ -167,6 +167,22 @@ describe('screenshot registry', () => {
     }
   });
 
+  it('waits for the compact public profile shell on desktop profile captures', () => {
+    const compactProfileScenarioIds = [
+      'tim-white-profile-live-desktop',
+      'tim-white-profile-mainstream-desktop',
+      'public-profile-desktop',
+    ];
+
+    for (const id of compactProfileScenarioIds) {
+      const scenario = SCREENSHOT_SCENARIOS.find(
+        currentScenario => currentScenario.id === id
+      );
+
+      expect(scenario?.waitFor).toBe('[data-testid="profile-compact-shell"]');
+    }
+  });
+
   it('opens the Shell v1 releases hero screenshot on a seeded release detail rail', () => {
     const scenario = SCREENSHOT_SCENARIOS.find(
       currentScenario => currentScenario.id === 'shell-v1-releases-desktop'
