@@ -126,7 +126,11 @@ function ChatReleaseEntityPanel({
       </div>
 
       {loading ? (
-        <div className='flex flex-1 items-center justify-center px-6 text-center text-[13px] text-tertiary-token'>
+        <div
+          role='status'
+          aria-live='polite'
+          className='flex flex-1 items-center justify-center px-6 text-center text-[13px] text-tertiary-token'
+        >
           Loading release…
         </div>
       ) : release ? (
@@ -319,7 +323,11 @@ function ChatSimpleEntityPanel({
         </Button>
       </div>
       {loading ? (
-        <div className='flex flex-1 items-center justify-center px-6 text-center text-[13px] text-tertiary-token'>
+        <div
+          role='status'
+          aria-live='polite'
+          className='flex flex-1 items-center justify-center px-6 text-center text-[13px] text-tertiary-token'
+        >
           Loading…
         </div>
       ) : hasContent ? (

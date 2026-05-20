@@ -119,8 +119,8 @@ export function ChatMessage({
               className='flex min-h-7 w-full max-w-[78%] flex-col gap-2 text-[15px] leading-7'
               role='status'
               aria-live='polite'
-              aria-label='Jovie is thinking'
             >
+              <span className='sr-only'>Jovie is thinking</span>
               {/* Assistant thinking shimmer — ChatMessageSkeleton-style reserved space */}
               <div className='flex items-center gap-2 pl-0.5'>
                 <Skeleton

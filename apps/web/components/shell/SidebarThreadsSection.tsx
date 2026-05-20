@@ -131,7 +131,7 @@ export function SidebarThreadsSection({
             tight={tight}
             icon={
               <Loader2
-                className='h-3 w-3 animate-spin'
+                className='h-3.5 w-3.5 animate-spin'
                 aria-hidden='true'
                 strokeWidth={2.25}
               />
