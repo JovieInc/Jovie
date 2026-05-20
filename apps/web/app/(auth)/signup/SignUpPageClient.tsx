@@ -1,5 +1,6 @@
 'use client';
 
+import { Skeleton } from '@jovie/ui';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
@@ -96,9 +97,12 @@ function SignUpClaimDataPersistence() {
       aria-live='polite'
     >
       {availability === 'checking' && (
-        <p className='text-app font-book text-secondary-token'>
-          Checking if @{normalizedHandle} is available...
-        </p>
+        <div className='flex items-center justify-center lg:justify-start'>
+          <Skeleton className='h-5 w-64 rounded' />
+          <span className='sr-only'>
+            Checking if @{normalizedHandle} is available...
+          </span>
+        </div>
       )}
       {availability === 'available' && (
         <p className='text-app font-book text-primary-token'>
