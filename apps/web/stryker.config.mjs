@@ -128,6 +128,12 @@ export default {
     'tests/unit/app/claim-token-route.test.ts',
     'tests/unit/api/onboarding/intake.test.ts',
     'tests/unit/api/onboarding/claim.test.ts',
+    // Stripe webhooks surface (high blast_radius 5 / reversibility 5 per TEST_RISK_REGISTER + AGENTS.md).
+    // Wires the dedicated contract tests (sig verification, idempotency via durable DB unique constraint (CAS),
+    // delegation, error/negative paths, method guard, retry, outer catch, config guard for missing secret).
+    // Achieves 100% line coverage on route.ts + exercises CAS/retry/409-style/idempotency/outer paths for mutation kills.
+    // Closes the mutation warning + lifts effective coverage on money/trust surface (RED Priority Queue #5, risk 37.8, target 90%).
+    'tests/unit/api/stripe/webhooks*.test.ts',
   ],
   ignorePatterns: [
     '.next',
