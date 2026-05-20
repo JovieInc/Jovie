@@ -12,7 +12,7 @@ clerk --version  # verify
 ## Authentication
 
 ```bash
-clerk login   # opens browser OAuth flow — log in with the Jovie account
+clerk auth login   # opens browser OAuth flow (under auth subcommand) — log in with the Jovie account
 clerk whoami  # confirm active session before running write operations
 ```
 
@@ -55,14 +55,14 @@ clerk users delete <user_id>             # delete user — IRREVERSIBLE, confirm
 ### Session management
 
 ```bash
-clerk sessions list                      # list active sessions
-clerk sessions revoke <session_id>       # revoke a session
+clerk api /sessions                     # list active sessions via Backend API
+clerk api /sessions/<session_id> -X DELETE  # revoke a session (or use --yes)
 ```
 
 ### Instance info
 
 ```bash
-clerk instances list                     # list instances in the active application
+clerk apps list                        # list Clerk applications (the "instances" concept in UI)
 ```
 
 ## Safety Rules for Agents
