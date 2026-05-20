@@ -62,7 +62,8 @@ describe('EntityHoverLink', () => {
     expect(tooltip.className).not.toContain(
       'rounded-(--linear-app-radius-menu)'
     );
-    expect(tooltip.firstElementChild).toHaveClass('p-3');
+    // Padding cleanup: rail-aligned px-3 py-2.5 for premium compact popover
+    expect(tooltip.firstElementChild).toHaveClass('px-3', 'py-2.5');
   });
 
   it('opens on focus and closes on Escape', () => {
@@ -98,6 +99,5 @@ describe('EntityPopover source contract', () => {
     expect(source).toContain('LINEAR_SURFACE.popover');
     expect(source).not.toContain("'rounded-lg border border-default'");
     expect(source).not.toContain("'bg-surface-0 text-primary-token");
-    expect(source).not.toContain("'p-2.5'");
   });
 });
