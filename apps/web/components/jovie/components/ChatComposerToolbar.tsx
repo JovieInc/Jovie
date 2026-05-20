@@ -40,10 +40,10 @@ function getButtonIcon(
   if (isLoading || isSubmitting) {
     return {
       key: 'loading',
-      icon: <Loader2 className='h-4 w-4 animate-spin' />,
+      icon: <Loader2 className='h-3.5 w-3.5 animate-spin' />,
     };
   }
-  return { key: 'send', icon: <ArrowUp className='h-4 w-4' /> };
+  return { key: 'send', icon: <ArrowUp className='h-3.5 w-3.5' /> };
 }
 
 export interface ComposerSendButtonProps {
@@ -78,7 +78,7 @@ export function ComposerSendButton({
         onClick={showStop ? onStop : undefined}
         disabled={!showStop && !canSend}
         className={cn(
-          'flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-[background-color,color,box-shadow] duration-fast',
+          'flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-[background-color,color,box-shadow] duration-fast',
           isInteractive
             ? 'bg-gradient-to-b from-white to-[#e8e8eb] text-black shadow-[inset_0_0.5px_0_rgba(255,255,255,0.68),inset_0_-0.5px_0_rgba(0,0,0,0.1),0_1px_3px_rgba(0,0,0,0.42)] hover:shadow-[inset_0_0.5px_0_rgba(255,255,255,0.78),inset_0_-0.5px_0_rgba(0,0,0,0.12),0_4px_14px_-4px_rgba(0,0,0,0.62)]'
             : 'cursor-not-allowed bg-white/[0.045] text-quaternary-token shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.045)]'
@@ -136,16 +136,16 @@ export function ComposerAttachButton({
           onMouseDown={onMouseDown}
           disabled={isImageProcessing || isLoading || isSubmitting || disabled}
           className={cn(
-            'flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-tertiary-token transition-[background-color,color,box-shadow] duration-fast',
+            'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-tertiary-token transition-[background-color,color,box-shadow] duration-fast',
             'hover:bg-white/[0.055] hover:text-primary-token hover:shadow-[inset_0_0_0_0.5px_rgba(255,255,255,0.055)]',
             'disabled:cursor-not-allowed disabled:opacity-50'
           )}
           aria-label='Attachment options'
         >
           {isImageProcessing ? (
-            <Loader2 className='h-4 w-4 animate-spin' />
+            <Loader2 className='h-3.5 w-3.5 animate-spin' />
           ) : (
-            <Plus className='h-4 w-4' strokeWidth={1.6} />
+            <Plus className='h-3.5 w-3.5' strokeWidth={1.6} />
           )}
         </button>
       </DropdownMenuTrigger>
@@ -166,7 +166,7 @@ export function ComposerAttachButton({
             onImageAttach();
           }}
         >
-          <ImagePlus className='h-4 w-4' />
+          <ImagePlus className='h-3.5 w-3.5' />
           Attach image
         </DropdownMenuItem>
         <DropdownMenuSeparator className='my-1' />
@@ -209,7 +209,7 @@ export function ComposerMicButton({
         onClick={onToggle}
         disabled={isLoading || isSubmitting || !isSupported}
         className={cn(
-          'flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-[background-color,color,box-shadow] duration-fast',
+          'flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-[background-color,color,box-shadow] duration-fast',
           !isSupported
             ? 'text-quaternary-token'
             : isListening
@@ -221,9 +221,9 @@ export function ComposerMicButton({
         aria-pressed={isListening}
       >
         {isListening ? (
-          <MicOff className='h-4 w-4' />
+          <MicOff className='h-3.5 w-3.5' />
         ) : (
-          <Mic className='h-4 w-4' />
+          <Mic className='h-3.5 w-3.5' />
         )}
       </button>
     </SimpleTooltip>

@@ -226,7 +226,7 @@ describe('ChatInput', () => {
     const textarea = screen.getByRole('textbox', {
       name: /chat message input/i,
     });
-    expect(textarea.className).toContain('text-[16px]');
+    expect(textarea.className).toContain('text-[15px]');
     expect(textarea.className).toContain('leading-6');
     expect(textarea.className).toContain('text-white/92');
     expect(textarea.className).toContain('focus-visible:shadow-none!');
@@ -242,7 +242,7 @@ describe('ChatInput', () => {
     ]) {
       expect(
         screen.getByRole('button', { name: buttonName }).className
-      ).toMatch(/h-9 w-9/);
+      ).toMatch(/h-8 w-8/);
     }
   });
 
@@ -264,17 +264,17 @@ describe('ChatInput', () => {
     expect(surface.style.borderRadius).toBe('36px');
 
     expect(surface.firstElementChild?.firstElementChild?.className).toContain(
-      'min-h-[68px]'
+      'min-h-[52px]'
     );
 
     const inlineField = screen.getByTestId('chat-input-inline-field');
-    expect(inlineField.className).toContain('min-h-10');
+    expect(inlineField.className).toContain('min-h-8');
 
     const textarea = screen.getByRole('textbox', {
       name: /chat message input/i,
     });
-    expect(textarea.className).toContain('text-[18px]');
-    expect(textarea.className).toContain('leading-7');
+    expect(textarea.className).toContain('text-[15px]');
+    expect(textarea.className).toContain('leading-6');
   });
 
   it('renders the larger hero pill geometry even while typing the first message in an empty chat', () => {
@@ -293,7 +293,7 @@ describe('ChatInput', () => {
     expect(surface.style.borderRadius).toBe('36px');
 
     expect(surface.firstElementChild?.firstElementChild?.className).toContain(
-      'min-h-[68px]'
+      'min-h-[52px]'
     );
   });
 
@@ -325,9 +325,9 @@ describe('ChatInput', () => {
 
     const inlineField = screen.getByTestId('chat-input-inline-field');
     const container = inlineField.parentElement;
-    expect(container?.className).toContain('min-h-[96px]');
+    expect(container?.className).toContain('min-h-[64px]');
     expect(container?.className).toContain('grid');
-    expect(container?.className).not.toContain('min-h-[68px]');
+    expect(container?.className).not.toContain('min-h-[52px]');
   });
 
   it('keeps a quiet disabled dictation control when speech input is unavailable', () => {
