@@ -6,8 +6,10 @@ import {
   getEntitlements,
   hasAdvancedFeatures,
   isProPlan,
+  isValidPlanId,
   type NumericEntitlement,
   type PlanId,
+  resolveCanonicalPlanId,
 } from '@/lib/entitlements/registry';
 
 describe('Entitlement Registry Consistency', () => {
@@ -220,5 +222,86 @@ describe('Entitlement Registry Consistency', () => {
 
   it('hasAdvancedFeatures("growth") returns true (backward compat)', () => {
     expect(hasAdvancedFeatures('growth')).toBe(true);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Matrix / property-style + negative-path tests for resolver/guard logic.
+  // Exercises resolveCanonicalPlanId, isValidPlanId, getEntitlements, check paths
+  // for legacy, trial, invalid, nullish, prototype-pollution attempts. Kills
+  // branch/equality/string mutants that happy-path tests miss.
+  // ---------------------------------------------------------------------------
+
+  describe('resolver and guard matrix (edge cases, plan transitions, negative paths)', () => {
+    const matrixInputs = [
+      'free',
+      'trial',
+      'pro',
+      'max',
+      'founding',
+      'growth',
+      null,
+      undefined,
+      '',
+      ' ',
+      'invalid-plan',
+      'enterprise',
+      'toString',
+      '__proto__',
+      'constructor',
+    ] as const;
+
+    it.each(
+      matrixInputs
+    )('getEntitlements / isValidPlanId / resolveCanonicalPlanId handle input %s without throwing and consistently', input => {
+      // All paths must return defined entitlements (never throw, degrade to free)
+      const ents = getEntitlements(input as any);
+      expect(ents).toBeDefined();
+      expect(ents.booleans).toBeDefined();
+      expect(ents.limits).toBeDefined();
+
+      const valid = isValidPlanId(input as any);
+      const canon = resolveCanonicalPlanId(input as any);
+
+      // Property: valid inputs produce non-null canon for canonical/legacy
+      if (valid) {
+        expect(canon).not.toBeNull();
+        if (['founding', 'pro'].includes(input as string)) {
+          expect(canon).toBe('pro');
+        }
+        if (['growth', 'max'].includes(input as string)) {
+          expect(canon).toBe('max');
+        }
+        if (input === 'trial') {
+          expect(canon).toBe('trial');
+        }
+      } else {
+        expect(canon).toBeNull();
+      }
+    });
+
+    it('resolveCanonicalPlanId and isValidPlanId reject non-string and empty falsy', () => {
+      expect(resolveCanonicalPlanId(null)).toBeNull();
+      expect(resolveCanonicalPlanId(undefined)).toBeNull();
+      expect(resolveCanonicalPlanId('')).toBeNull();
+      expect(isValidPlanId(null)).toBe(false);
+      expect(isValidPlanId(undefined)).toBe(false);
+      expect(isValidPlanId('')).toBe(false);
+      // non-string types (guard)
+      expect(resolveCanonicalPlanId(42 as any)).toBeNull();
+      expect(isValidPlanId(42 as any)).toBe(false);
+    });
+
+    it('getEntitlements falls back to free for all unrecognized inputs (negative path)', () => {
+      expect(getEntitlements('foo')).toBe(ENTITLEMENT_REGISTRY.free);
+      expect(getEntitlements('__proto__')).toBe(ENTITLEMENT_REGISTRY.free);
+      expect(getEntitlements(null)).toBe(ENTITLEMENT_REGISTRY.free);
+    });
+
+    it('plan transition aliases resolve correctly (founding→pro, growth→max, trial preserved)', () => {
+      expect(resolveCanonicalPlanId('founding')).toBe('pro');
+      expect(resolveCanonicalPlanId('growth')).toBe('max');
+      expect(resolveCanonicalPlanId('trial')).toBe('trial');
+      expect(isValidPlanId('trial')).toBe(true);
+    });
   });
 });

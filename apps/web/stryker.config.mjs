@@ -75,6 +75,13 @@ export default {
     'lib/stripe/connect-readiness.test.ts',
     'tests/unit/actions/onboarding/**/*.test.ts',
     'tests/unit/lib/entitlements.server.test.ts',
+    // Expanded wiring for entitlements-registry surface (blast 5, target 95%).
+    // Includes registry consistency + boundary helpers (for resolve/guard mutants)
+    // and state transitions (plan changes, trial paths) so Stryker can kill more
+    // survivors in registry.ts + server.ts + creator-plan.ts.
+    'tests/unit/lib/entitlement-registry.test.ts',
+    'tests/unit/lib/entitlement-boundary-helpers.test.ts',
+    'tests/unit/lib/entitlements-state-transitions.test.ts',
     'tests/unit/lib/queries/useBillingMutations.test.tsx',
     'tests/unit/lib/social-platform.property.test.ts',
     // Gate + waitlist negative-path tests for lib/auth/gate.ts mutate target
