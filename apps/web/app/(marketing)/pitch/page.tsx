@@ -24,13 +24,15 @@ export default function PitchPage() {
   return (
     <main className='flex flex-col bg-base text-primary-token'>
       <h1 className='sr-only'>Jovie Pitch Deck</h1>
-      <iframe
-        src={DECK_SRC}
-        title='Jovie Pitch Deck'
-        className='block h-[calc(100svh-var(--marketing-header-height,72px))] w-full border-0'
-        allow='fullscreen'
-        loading='eager'
-      />
+      <div className='relative w-full overflow-visible h-[calc(100svh-var(--marketing-header-height,72px))] shadow-[0_0_0_1px_rgba(255,255,255,0.015),0_0_110px_-15px_rgba(77,125,255,0.065),0_0_180px_-25px_rgba(124,58,237,0.055)]'>
+        <iframe
+          src={DECK_SRC}
+          title='Jovie Pitch Deck'
+          className='block h-full w-full border-0'
+          allow='fullscreen'
+          loading='eager'
+        />
+      </div>
     </main>
   );
 }
