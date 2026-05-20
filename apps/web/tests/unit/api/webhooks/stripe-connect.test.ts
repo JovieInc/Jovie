@@ -67,4 +67,37 @@ describe('POST /api/webhooks/stripe-connect', () => {
       })
     );
   });
+
+  it('returns 400 when Stripe signature header is missing (contract test for constructEvent path)', async () => {
+    const { POST } = await import('@/app/api/webhooks/stripe-connect/route');
+    const response = await POST(
+      new Request('https://example.com/api/webhooks/stripe-connect', {
+        method: 'POST',
+        body: '{}',
+      }) as never
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'Missing signature' });
+  });
+
+  it('returns 400 on replay (timestamp outside tolerance) via stripe.webhooks.constructEvent (contract test)', async () => {
+    mockConstructEvent.mockImplementation(() => {
+      const err = new Error('timestamp outside the tolerance zone');
+      (err as any).type = 'StripeSignatureVerificationError';
+      throw err;
+    });
+
+    const { POST } = await import('@/app/api/webhooks/stripe-connect/route');
+    const response = await POST(
+      new Request('https://example.com/api/webhooks/stripe-connect', {
+        method: 'POST',
+        headers: { 'stripe-signature': 'sig_replay' },
+        body: '{}',
+      }) as never
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'Invalid signature' });
+  });
 });

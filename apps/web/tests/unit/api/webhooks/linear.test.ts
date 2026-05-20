@@ -232,4 +232,33 @@ describe('POST /api/webhooks/linear', () => {
     );
     expect(mockServerFetch.mock.calls[0]?.[1]).not.toHaveProperty('retry');
   });
+
+  it('returns 400 when linear-signature header is missing (contract test)', async () => {
+    const { POST } = await import('@/app/api/webhooks/linear/route');
+    const body = JSON.stringify({ type: 'Issue', data: { id: 'x' } });
+    const request = new Request('https://example.com/api/webhooks/linear', {
+      method: 'POST',
+      body,
+    });
+
+    const response = await POST(request as never);
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: 'Missing signature header',
+    });
+  });
+
+  it('returns 401 when linear-signature is invalid (contract test)', async () => {
+    const { POST } = await import('@/app/api/webhooks/linear/route');
+    const body = JSON.stringify({ type: 'Issue', data: { id: 'x' } });
+    const request = new Request('https://example.com/api/webhooks/linear', {
+      method: 'POST',
+      headers: { 'linear-signature': 'invalid' },
+      body,
+    });
+
+    const response = await POST(request as never);
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: 'Invalid signature' });
+  });
 });

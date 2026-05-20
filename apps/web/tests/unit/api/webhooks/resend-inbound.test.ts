@@ -173,4 +173,66 @@ describe('POST /api/webhooks/resend-inbound', () => {
       }
     );
   });
+
+  it('returns 400 when SVix signature headers are missing (contract test)', async () => {
+    const { POST } = await import('@/app/api/webhooks/resend-inbound/route');
+    const response = await POST(
+      new NextRequest('http://localhost/api/webhooks/resend-inbound', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'email.received', data: {} }),
+      })
+    );
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({
+      error: 'Missing signature headers',
+    });
+  });
+
+  it('returns 401 on replay attack (old svix-timestamp) (contract test)', async () => {
+    const oldTs = Math.floor((Date.now() - 10 * 60 * 1000) / 1000).toString();
+    const rawBody = JSON.stringify({
+      type: 'email.received',
+      data: { email_id: 'e1' },
+    });
+    const sig = signPayload(rawBody, oldTs, 'whsec_test');
+
+    const { POST } = await import('@/app/api/webhooks/resend-inbound/route');
+    const response = await POST(
+      new NextRequest('http://localhost/api/webhooks/resend-inbound', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'svix-timestamp': oldTs,
+          'svix-signature': sig,
+        },
+        body: rawBody,
+      })
+    );
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: 'Invalid signature' });
+  });
+
+  it('returns 401 when SVix signature invalid (contract test)', async () => {
+    const ts = Math.floor(Date.now() / 1000).toString();
+    const rawBody = JSON.stringify({ type: 'email.received', data: {} });
+
+    const { POST } = await import('@/app/api/webhooks/resend-inbound/route');
+    const response = await POST(
+      new NextRequest('http://localhost/api/webhooks/resend-inbound', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'svix-timestamp': ts,
+          'svix-signature': 'v1,badsig',
+        },
+        body: rawBody,
+      })
+    );
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: 'Invalid signature' });
+  });
 });

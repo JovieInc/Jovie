@@ -211,4 +211,19 @@ describe('POST /api/webhooks/stripe-tips', () => {
     // Duplicate tip should NOT call processTipCompleted
     expect(mockProcessTipCompleted).not.toHaveBeenCalled();
   });
+
+  it('returns 400 on replay via stripe.webhooks.constructEvent (timestamp tolerance) (contract test)', async () => {
+    const { stripe } = await import('@/lib/stripe/client');
+    vi.mocked(stripe.webhooks.constructEvent).mockImplementation(() => {
+      const err = new Error('timestamp outside the tolerance zone');
+      (err as any).type = 'StripeSignatureVerificationError';
+      throw err;
+    });
+
+    const { POST } = await import('@/app/api/webhooks/stripe-tips/route');
+    const response = await POST(makeRequest('{}'));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'Invalid signature' });
+  });
 });

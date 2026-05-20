@@ -213,4 +213,38 @@ describe('POST /api/webhooks/sentry', () => {
     );
     expect(mockServerFetch.mock.calls[0]?.[1]).not.toHaveProperty('retry');
   });
+
+  it('returns 400 when sentry-hook-signature header is missing (contract test)', async () => {
+    const { POST } = await import('@/app/api/webhooks/sentry/route');
+    const body = JSON.stringify({ data: { issue: { id: 'x' } } });
+    const request = new Request('https://example.com/api/webhooks/sentry', {
+      method: 'POST',
+      body,
+    });
+
+    const response = await POST(request as never);
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: 'Missing signature header',
+    });
+  });
+
+  it('returns 401 when sentry-hook-signature is invalid (contract test)', async () => {
+    const { POST } = await import('@/app/api/webhooks/sentry/route');
+    const body = JSON.stringify({ data: { issue: { id: 'x' } } });
+    const request = new Request('https://example.com/api/webhooks/sentry', {
+      method: 'POST',
+      headers: { 'sentry-hook-signature': 'bad' },
+      body,
+    });
+
+    const response = await POST(request as never);
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: 'Invalid signature' });
+    expect(mockCaptureCriticalError).toHaveBeenCalledWith(
+      'Invalid Sentry webhook signature',
+      expect.any(Error),
+      expect.objectContaining({ route: '/api/webhooks/sentry' })
+    );
+  });
 });
