@@ -48,6 +48,12 @@ export default {
     // collisions). Mutation testing will surface assertions that don't
     // exercise these branches.
     'app/api/stripe/webhooks/route.ts',
+    // Webhook signature verification surface (webhook-signatures row, YELLOW risk 29.2,
+    // PQ #1 with 33.5pp gap). Covers linear/resend/sentry/sms/stripe-connect/stripe-tips
+    // routes for missing-signature, invalid-signature, replay (timestamp), malformed body,
+    // and durable dedupe (onConflictDoNothing + processed flag). Complements stripe row;
+    // enables mutation evidence on verification + idempotency branches per register notes.
+    'app/api/webhooks/**/route.ts',
     // FAPI host decoding + Clerk env key resolution — broken auth here
     // locks out every user across all three Clerk environments.
     'lib/auth/decode-fapi-host.ts',
@@ -190,6 +196,12 @@ export default {
     // Achieves 100% line coverage on route.ts + exercises CAS/retry/409-style/idempotency/outer paths for mutation kills.
     // Closes the mutation warning + lifts effective coverage on money/trust surface (RED Priority Queue #5, risk 37.8, target 90%).
     'tests/unit/api/stripe/webhooks*.test.ts',
+    // Webhook signatures verification surface (YELLOW 29.2, PQ #1 largest gap 33.5pp per heatmap/register).
+    // Wires sms.test.ts (new contract tests for Twilio sig missing/invalid ->401 exact 'Unauthorized',
+    // malformed 400, dup idempotent 200, unprocessed replay, 5xx fail-closed without mark, outer-catch 500)
+    // + all other /webhooks/* tests (linear/resend/sentry/stripe-*) for sig/replay/dedupe paths.
+    // Enables Stryker mutation kills on the critical verification + durable dedupe branches.
+    'tests/unit/api/webhooks/**/*.test.ts',
   ],
   ignorePatterns: [
     '.next',
