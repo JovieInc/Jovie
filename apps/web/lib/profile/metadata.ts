@@ -34,10 +34,36 @@ import type { CreatorProfile } from '@/types/db';
  * This is intentionally minimal — it replaces `<tags>` and normalizes
  * whitespace. It does NOT attempt to allow any subset of HTML.
  */
+function stripHtmlTags(value: string) {
+  let result = '';
+  let index = 0;
+
+  while (index < value.length) {
+    const char = value.charAt(index);
+    if (char === '<') {
+      const closeIndex = value.indexOf('>', index + 1);
+      if (closeIndex === -1) {
+        result += char;
+        index += 1;
+        continue;
+      }
+
+      result += ' ';
+      index = closeIndex + 1;
+      continue;
+    }
+
+    result += char;
+    index += 1;
+  }
+
+  return result;
+}
+
 export function sanitizeMetadataText(value: string | null | undefined): string {
   if (!value) return '';
   // Remove HTML tags
-  const stripped = value.replace(/<[^>]*>/g, ' ');
+  const stripped = stripHtmlTags(value);
   // Collapse multiple whitespace chars into a single space and trim
   return stripped.replace(/\s+/g, ' ').trim();
 }

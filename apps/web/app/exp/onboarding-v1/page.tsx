@@ -100,6 +100,12 @@ export default function OnboardingC() {
   });
   const [textInput, setTextInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const messageIdRef = useRef(0);
+
+  function nextMessageId(prefix: 'j' | 'u') {
+    messageIdRef.current += 1;
+    return `${prefix}-${Date.now()}-${messageIdRef.current}`;
+  }
 
   // Auto-scroll on new messages.
   useEffect(() => {
@@ -116,16 +122,13 @@ export default function OnboardingC() {
       setTyping(false);
       setMessages(m => [
         ...m,
-        { id: `j-${Date.now()}-${Math.random()}`, role: 'jovie', text: line },
+        { id: nextMessageId('j'), role: 'jovie', text: line },
       ]);
       await sleep(180);
     }
   }
   function sendUser(text: string) {
-    setMessages(m => [
-      ...m,
-      { id: `u-${Date.now()}-${Math.random()}`, role: 'user', text },
-    ]);
+    setMessages(m => [...m, { id: nextMessageId('u'), role: 'user', text }]);
   }
 
   // Initial Jovie greeting.

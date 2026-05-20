@@ -8,6 +8,52 @@ import { decodeFapiHostFromPublishableKey } from '@/lib/auth/decode-fapi-host';
 import { resolveClerkKeys } from '@/lib/auth/staging-clerk-keys';
 import { captureError } from '@/lib/error-tracking';
 
+function hasCookieNameAfterComma(header: string, commaIndex: number) {
+  let index = commaIndex + 1;
+  while (header.charAt(index) === ' ') {
+    index += 1;
+  }
+
+  const nextComma = header.indexOf(',', index);
+  const nextSemicolon = header.indexOf(';', index);
+  const nextEquals = header.indexOf('=', index);
+  if (nextEquals === -1) {
+    return false;
+  }
+
+  const nextBoundary =
+    nextComma === -1
+      ? nextSemicolon
+      : nextSemicolon === -1
+        ? nextComma
+        : Math.min(nextComma, nextSemicolon);
+
+  return nextBoundary === -1 || nextEquals < nextBoundary;
+}
+
+function splitCombinedSetCookieHeader(header: string | null) {
+  if (!header) {
+    return [];
+  }
+
+  const cookies: string[] = [];
+  let start = 0;
+  for (let index = 0; index < header.length; index += 1) {
+    if (
+      header.charAt(index) !== ',' ||
+      !hasCookieNameAfterComma(header, index)
+    ) {
+      continue;
+    }
+
+    cookies.push(header.slice(start, index).trim());
+    start = index + 1;
+  }
+
+  cookies.push(header.slice(start).trim());
+  return cookies.filter(Boolean);
+}
+
 /**
  * Clerk FAPI proxy handler — dedicated helper extracted from proxy.ts.
  *
@@ -136,8 +182,7 @@ export async function handleClerkFapiProxy(
 
       const setCookies =
         proxyRes.headers.getSetCookie?.() ??
-        proxyRes.headers.get('set-cookie')?.split(/,(?=[^;]+=)/) ??
-        [];
+        splitCombinedSetCookieHeader(proxyRes.headers.get('set-cookie'));
       for (const cookie of setCookies) {
         if (cookie) redirect.headers.append('set-cookie', cookie);
       }
