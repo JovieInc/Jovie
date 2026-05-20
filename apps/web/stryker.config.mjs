@@ -86,6 +86,11 @@ export default {
     // auth + investor + audience per TEST_RISK_REGISTER + heatmap).
     // Contract tests in proxy-behavioral + dedup unit now kill mutants here.
     'lib/auth/investor-portal.ts',
+    // proxy.ts (core middleware router + Clerk /__clerk proxy fetch logic + matcher).
+    // Wired in gap-6 (after #9406 rls) to close mutation evidence gap on the top
+    // risk RED 43 surface. Existing proxy-*.test.ts + behavioral now produce Stryker kills
+    // for the remaining proxy.ts branches (post-extraction).
+    'proxy.ts',
     // Claim-onboarding surface (per docs/TEST_RISK_REGISTER.md claim-onboarding row + heatmap priority).
     // Token-backed + direct claim routes, username claim handler (validation, auth checks, pending claim,
     // next=auth redirect matrix), onboarding intake (email verify gate, rate limit, ensure/upsert user+interview,
