@@ -181,7 +181,7 @@ describe('JovieChat empty state', () => {
     expect(getByText('What are we working on?')).toBeTruthy();
     expect(queryByText('Welcome back')).toBeNull();
     expect(queryByText('Welcome back, Tim')).toBeNull();
-    expect(queryByText("Hey, I'm Jovie")).toBeNull();
+    expect(queryByText("Hey, I'm Jovie.")).toBeNull();
     expect(queryByText('Jovie Assistant')).toBeNull();
     expect(queryByText('Ask anything or tell Jovie what you need')).toBeNull();
     expect(getByTestId('chat-empty-state-composer-region')).toBeTruthy();
@@ -235,7 +235,7 @@ describe('JovieChat empty state', () => {
       <JovieChat profileId='profile-1' isFirstSession />
     );
 
-    expect(getByText("Hey, I'm Jovie")).toBeTruthy();
+    expect(getByText("Hey, I'm Jovie.")).toBeTruthy();
   });
 
   it('uses only the first name in the returning-user welcome heading', () => {
