@@ -41,6 +41,10 @@ describe('sanitizeMetadataText', () => {
     expect(sanitizeMetadataText('Hello   world')).toBe('Hello world');
   });
 
+  it('keeps plain text less-than symbols', () => {
+    expect(sanitizeMetadataText('I <3 music')).toBe('I <3 music');
+  });
+
   it('trims leading and trailing whitespace', () => {
     expect(sanitizeMetadataText('  Hello  ')).toBe('Hello');
   });
