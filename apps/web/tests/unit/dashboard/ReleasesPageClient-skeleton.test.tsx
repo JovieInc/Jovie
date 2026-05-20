@@ -40,6 +40,10 @@ vi.mock('@/features/feedback/PageErrorState', () => ({
   PageErrorState: () => <div data-testid='page-error-state' />,
 }));
 
+vi.mock('@/lib/flags/client', () => ({
+  useAppFlag: () => false,
+}));
+
 describe('ReleasesPageClient skeleton behavior', () => {
   beforeEach(() => {
     vi.clearAllMocks();

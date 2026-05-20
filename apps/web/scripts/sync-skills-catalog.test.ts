@@ -164,9 +164,8 @@ describe('sync-skills-catalog', () => {
     expect(mockInsert).not.toHaveBeenCalled();
   });
 
-  it('skips DB writes when catalog sync is explicitly disabled', async () => {
+  it('skips DB writes for the screenshot workflow placeholder DATABASE_URL', async () => {
     vi.stubEnv('DATABASE_URL', 'postgresql://localhost/noop');
-    vi.stubEnv('SKIP_SKILLS_CATALOG_SYNC', '1');
 
     await expect(main()).resolves.toBe('skipped');
     expect(mockInsert).not.toHaveBeenCalled();
