@@ -13,7 +13,7 @@ export function ChatMessageSkeleton() {
     >
       {/* User message skeleton */}
       <div className='flex justify-end'>
-        <div className='flex min-h-8 max-w-[78%] items-center rounded-full border border-(--linear-app-frame-seam) bg-surface-2 px-3 py-1.5'>
+        <div className='flex min-h-7 max-w-[78%] items-center rounded-full border border-(--linear-app-frame-seam) bg-surface-2 px-3 py-1'>
           <Skeleton className='h-3.5 w-36' rounded='full' />
         </div>
       </div>
