@@ -132,9 +132,12 @@ jobs:
 
       - name: Parse test results
         id: test-results
+        env:
+          LEGACY_CANARY_ENABLED: ${{ vars.E2E_PROD_LEGACY_CANARY != '0' && '1' || '0' }}
         run: |
           node <<'NODE'
           const fs = require('node:fs');
+          const legacyCanaryEnabled = process.env.LEGACY_CANARY_ENABLED === '1';
 
           const resultFiles = [
             {
@@ -159,7 +162,7 @@ jobs:
               // error.
               name: 'synthetic-legacy-otp',
               path: 'apps/web/test-results/synthetic-legacy-otp-results.json',
-              required: false,
+              required: legacyCanaryEnabled,
             },
           ];
           const outputFile = process.env.GITHUB_OUTPUT;

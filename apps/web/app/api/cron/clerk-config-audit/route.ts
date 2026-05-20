@@ -3,6 +3,7 @@ import { decodeFapiHostFromPublishableKey } from '@/lib/auth/decode-fapi-host';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
+import { serverFetch } from '@/lib/http/server-fetch';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -83,7 +84,7 @@ async function fetchEnvironmentJson(
   publishableKey: string
 ): Promise<Record<string, unknown>> {
   const url = `https://${fapiHost}/v1/environment?_clerk_js_version=5.0.0`;
-  const response = await fetch(url, {
+  const response = await serverFetch(url, {
     headers: {
       Accept: 'application/json',
       // Clerk FAPI accepts the publishable key in both Authorization and
@@ -91,8 +92,10 @@ async function fetchEnvironmentJson(
       // live and test instances and is what `@clerk/clerk-js` sends.
       Authorization: publishableKey,
     },
-    signal: AbortSignal.timeout(10_000),
+    timeoutMs: 10_000,
     cache: 'no-store',
+    context: `clerk-fapi-environment-${fapiHost}`,
+    retry: { maxRetries: 2, baseDelayMs: 250, maxDelayMs: 1000 },
   });
 
   if (!response.ok) {
