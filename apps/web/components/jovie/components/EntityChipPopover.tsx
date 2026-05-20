@@ -18,6 +18,7 @@ import type { EntityKind } from '@/lib/chat/tokens';
 import type { EntityRef, EntityRefMeta } from '@/lib/commands/entities';
 import { useAppFlag } from '@/lib/flags/client';
 import { cn } from '@/lib/utils';
+import { getInitials } from '@/lib/utils/initials';
 
 const HOVER_OPEN_DELAY_MS = 200;
 const HOVER_CLOSE_DELAY_MS = 120;
@@ -225,7 +226,7 @@ function EntityChipPopoverBody({
             aria-hidden
             className='flex h-12 w-12 items-center justify-center rounded-md border border-subtle bg-surface-1 text-app font-caption text-primary-token shadow-app-control'
           >
-            {initialsOf(label) || '·'}
+            {getInitials(label) || '·'}
           </div>
         )}
       </div>
@@ -312,13 +313,4 @@ function compactNumber(value: number): string {
   if (value >= 10_000) return `${Math.round(value / 1000)}k`;
   if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
   return value.toString();
-}
-
-function initialsOf(label: string): string {
-  return label
-    .split(/\s+/)
-    .slice(0, 2)
-    .map(p => p.charAt(0))
-    .join('')
-    .toUpperCase();
 }

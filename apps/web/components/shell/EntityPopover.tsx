@@ -27,6 +27,7 @@ import {
 import { createPortal } from 'react-dom';
 import { LINEAR_SURFACE } from '@/components/tokens/linear-surface';
 import { cn } from '@/lib/utils';
+import { getInitials } from '@/lib/utils/initials';
 
 // ---------------------------------------------------------------------------
 // Data shapes
@@ -173,15 +174,6 @@ function formatClock(durationSec: number | undefined): string | null {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-function initialsOf(label: string): string {
-  return label
-    .split(/\s+/)
-    .slice(0, 2)
-    .map(p => p.charAt(0))
-    .join('')
-    .toUpperCase();
-}
-
 // ---------------------------------------------------------------------------
 // Row art — small 28×28 leading element rendered inside ShellDropdown.EntityItem.
 // ---------------------------------------------------------------------------
@@ -242,7 +234,7 @@ export function EntityRowArt({
         isCircular ? 'rounded-full' : 'rounded-md'
       )}
     >
-      {initialsOf(entity.label) || '·'}
+      {getInitials(entity.label) || '·'}
     </span>
   );
 }
@@ -475,7 +467,7 @@ function CardArtwork({ entity }: { readonly entity: EntityPopoverData }) {
         isCircular ? 'rounded-full' : 'rounded-md'
       )}
     >
-      {initialsOf(entity.label) || '·'}
+      {getInitials(entity.label) || '·'}
     </div>
   );
 }
