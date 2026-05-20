@@ -6,12 +6,15 @@ import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { Avatar } from '@/components/molecules/Avatar/Avatar';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { AppShellFrame } from '@/components/organisms/AppShellFrame';
+import { SidebarProvider } from '@/components/organisms/Sidebar';
 import { track } from '@/lib/analytics';
 import { AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
 import { clearPlanIntent, type PlanIntentTier } from '@/lib/auth/plan-intent';
 import { getEntitlements } from '@/lib/entitlements/registry';
 import { normalizeOnboardingReturnTo } from '@/lib/onboarding/return-to';
 import { cn } from '@/lib/utils';
+import { formatAmount } from '@/lib/utils/format-number';
 
 interface OnboardingCheckoutClientProps {
   readonly plan: PlanIntentTier;
@@ -26,9 +29,7 @@ interface OnboardingCheckoutClientProps {
   readonly isDefaultUpsell: boolean;
 }
 
-function formatPrice(cents: number): string {
-  return `$${(cents / 100).toFixed(0)}`;
-}
+// formatPrice replaced by formatAmount per @jovie/no-ad-hoc-currency rule
 
 function getAnnualSavingsPercent(
   monthlyAmount: number,
@@ -269,8 +270,8 @@ export function OnboardingCheckoutClient({
     globalThis.location.href = returnTo;
   }, [isDefaultUpsell, plan, returnTo]);
 
-  return (
-    <div className='flex flex-col items-center justify-center'>
+  const checkoutContent = (
+    <div className='flex flex-col items-center justify-center py-8'>
       <div className={`w-full max-w-md ${FORM_LAYOUT.formContainer}`}>
         <div className={FORM_LAYOUT.headerSection}>
           <h1 className={FORM_LAYOUT.title}>
@@ -321,7 +322,7 @@ export function OnboardingCheckoutClient({
         {/* Price display */}
         <div className='mb-6 text-center'>
           <span className='text-3xl font-semibold tracking-tight text-primary-token'>
-            {formatPrice(currentAmount)}
+            {formatAmount(currentAmount)}
           </span>
           <span className='text-sm text-tertiary-token'>
             /{interval === 'year' ? 'yr' : 'mo'}
@@ -365,5 +366,18 @@ export function OnboardingCheckoutClient({
         </button>
       </div>
     </div>
+  );
+
+  return (
+    <SidebarProvider defaultOpen={false}>
+      <AppShellFrame
+        variant='shellChatV1'
+        sidebar={null}
+        containerClassName='[color-scheme:dark]'
+        contentClassName='overflow-hidden!'
+        main={checkoutContent}
+        rightPanel={null}
+      />
+    </SidebarProvider>
   );
 }

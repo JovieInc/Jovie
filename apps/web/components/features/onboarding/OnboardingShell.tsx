@@ -51,7 +51,7 @@ export function OnboardingShell({ sessionLabel }: OnboardingShellProps) {
         variant='shellChatV1'
         sidebar={null}
         containerClassName='[color-scheme:dark]'
-        contentClassName='!overflow-hidden'
+        contentClassName='overflow-hidden!'
         main={
           <div
             className='relative flex min-h-0 flex-1'
@@ -120,17 +120,7 @@ function OnboardingShellStatus({
       role='alert'
       aria-live='assertive'
     >
-      {kind === 'status' ? (
-        <>
-          <span className='sr-only'>{message}</span>
-          <span
-            className='inline-block h-3 w-44 rounded-full skeleton motion-reduce:animate-none align-middle'
-            aria-hidden='true'
-          />
-        </>
-      ) : (
-        message
-      )}
+      {message}
     </p>
   );
 }
