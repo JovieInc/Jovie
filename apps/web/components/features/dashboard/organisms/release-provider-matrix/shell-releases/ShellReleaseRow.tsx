@@ -91,7 +91,11 @@ function useArtworkPlayback(release: ReleaseViewModel) {
   return { previewUrl, isActiveTrack, isTrackPlaying, handleTogglePlayback };
 }
 
-function ArtworkCell({ release }: { readonly release: ReleaseViewModel }) {
+const ArtworkCell = memo(function ArtworkCell({
+  release,
+}: {
+  readonly release: ReleaseViewModel;
+}) {
   const { previewUrl, isTrackPlaying, handleTogglePlayback } =
     useArtworkPlayback(release);
   const hasPreview = Boolean(previewUrl);
@@ -114,7 +118,7 @@ function ArtworkCell({ release }: { readonly release: ReleaseViewModel }) {
           aria-pressed={isTrackPlaying}
           data-testid={`shell-release-play-${release.id}`}
           className={cn(
-            'absolute inset-0 grid place-items-center rounded-sm bg-black/50 text-white transition-opacity duration-subtle ease-out focus-visible:outline-none focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
+            'absolute inset-0 grid place-items-center rounded-sm bg-black/50 text-white transition-opacity duration-subtle ease-subtle focus-visible:outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55',
             isTrackPlaying
               ? 'opacity-100'
               : 'opacity-0 group-hover/row:opacity-100'
@@ -139,9 +143,9 @@ function ArtworkCell({ release }: { readonly release: ReleaseViewModel }) {
       ) : null}
     </div>
   );
-}
+});
 
-function SmartLinkCell({
+const SmartLinkCell = memo(function SmartLinkCell({
   release,
   smartLinkLockReason,
   smartLinkPath,
@@ -188,12 +192,12 @@ function SmartLinkCell({
       onClick={e => e.stopPropagation()}
       title={`Open smart link · ${smartLinkPath}`}
       aria-label={`Open smart link for ${release.title}`}
-      className='shrink-0 h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-colors duration-subtle ease-out'
+      className='shrink-0 h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-colors duration-subtle ease-subtle'
     >
       <ExternalLink className='h-3 w-3' strokeWidth={2.25} />
     </Link>
   );
-}
+});
 
 // ── Main row component ─────────────────────────────────────────────────────────
 
@@ -309,7 +313,7 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
             onKeyDown={e => e.stopPropagation()}
             aria-label={`Release actions for ${release.title}`}
             className={cn(
-              'shrink-0 h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-[opacity,color,background-color] duration-subtle ease-out',
+              'shrink-0 h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-[opacity,color,background-color] duration-subtle ease-subtle',
               'opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100',
               isSelected && 'opacity-100'
             )}
