@@ -160,3 +160,23 @@ doppler run --project jovie-web --config dev -- pnpm tsx scripts/browse-auth.ts 
 Then import the exported cookies into browse.
 
 Full docs: `apps/web/tests/TESTING.md`.
+
+## Clerk CLI
+
+Use the `clerk` CLI for user management, instance inspection, and auth debugging from the terminal. The `/clerk-cli` skill wraps common workflows.
+
+Full reference: `docs/CLERK_CLI.md`.
+
+**Quick one-liners:**
+
+```bash
+clerk whoami                            # confirm active instance before any write op
+clerk users list --query email@example  # find a user by email
+clerk users delete <user_id>            # delete a user (irreversible — confirm first)
+```
+
+**Account structure (two Clerk applications):**
+- Main application (Account A): dev (`pk_test_...`) + production (`pk_live_...`) → jov.ie
+- Staging application (Account B): staging (`pk_live_...`) → staging.jov.ie
+
+Always confirm `clerk whoami` shows the correct instance before running write operations. For bulk E2E test-user cleanup, prefer `apps/web/scripts/cleanup-e2e-users.ts` over direct CLI deletion.
