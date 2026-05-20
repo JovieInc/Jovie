@@ -2,7 +2,7 @@
 
 import { UserAvatar } from '@jovie/ui';
 import { Disc3 } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { memo, type ReactNode } from 'react';
 import { ShellListRowFrame } from '@/components/organisms/table';
 import { DueChip } from '@/components/shell/DueChip';
 import type { TaskView } from '@/lib/tasks/types';
@@ -107,7 +107,7 @@ function TaskAssigneeInline({
   );
 }
 
-export function TaskListRow({
+export const TaskListRow = memo(function TaskListRow({
   task,
   artistName,
   onOpenRelease,
@@ -124,7 +124,7 @@ export function TaskListRow({
       isSelected={isSelected}
       interaction='task-row-group'
       className={cn(
-        'group/row grid h-full grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-3 px-3 py-1.5 transition-[opacity]',
+        'group/row grid h-full grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-3 px-3 py-1.5 transition-[opacity] duration-subtle ease-subtle',
         isDone && !isSelected && 'opacity-75',
         isCancelled && !isSelected && 'opacity-60'
       )}
@@ -165,7 +165,7 @@ export function TaskListRow({
                 event.stopPropagation();
                 onOpenRelease(task);
               }}
-              className='inline-flex min-w-0 max-w-full items-center gap-1 text-secondary-token transition-colors hover:text-primary-token focus-visible:outline-none focus-visible:text-primary-token'
+              className='inline-flex min-w-0 max-w-full items-center gap-1 text-secondary-token transition-colors duration-subtle ease-subtle hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) focus-visible:text-primary-token'
               title={task.releaseTitle}
             >
               <Disc3 className='h-3 w-3 shrink-0 text-tertiary-token' />
@@ -188,4 +188,4 @@ export function TaskListRow({
       </div>
     </ShellListRowFrame>
   );
-}
+});
