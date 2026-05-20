@@ -35,7 +35,7 @@ export function IconBtn({
         type='button'
         onClick={onClick}
         className={cn(
-          'h-7 w-7 rounded-md grid place-items-center transition-colors duration-subtle ease-subtle',
+          'h-7 w-7 rounded-md grid place-items-center transition-colors duration-subtle ease-subtle focus-ring-themed',
           isGhost
             ? active
               ? 'text-primary-token'
