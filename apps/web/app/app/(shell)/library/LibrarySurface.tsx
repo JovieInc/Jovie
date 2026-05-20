@@ -465,7 +465,10 @@ export function LibraryLoadingState() {
         <PageToolbar
           start={
             <span className={PAGE_TOOLBAR_META_TEXT_CLASS}>
-              Loading library assets
+              <span
+                className='inline-block h-3 w-36 rounded-sm skeleton motion-reduce:animate-none align-middle'
+                aria-hidden='true'
+              />
             </span>
           }
         />
