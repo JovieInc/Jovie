@@ -181,6 +181,8 @@ export const settingsNavigation: NavItem[] = [
   ...artistSettingsNavigation,
 ];
 
+/** Admin settings item — shown only to admin users */
+
 const adminIconById = {
   overview: LayoutDashboard,
   ops: Gauge,
@@ -190,6 +192,7 @@ const adminIconById = {
   activity: Activity,
   investors: Briefcase,
   screenshots: ImageIcon,
+  costs: Banknote,
   share_studio: Share2,
 } as const;
 
