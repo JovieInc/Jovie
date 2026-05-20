@@ -34,38 +34,37 @@ import type { CreatorProfile } from '@/types/db';
  * This is intentionally minimal — it replaces `<tags>` and normalizes
  * whitespace. It does NOT attempt to allow any subset of HTML.
  */
-function stripHtmlTags(value: string) {
-  let result = '';
-  let index = 0;
-
-  while (index < value.length) {
-    const char = value.charAt(index);
-    if (char === '<') {
-      const closeIndex = value.indexOf('>', index + 1);
-      if (closeIndex === -1) {
-        result += char;
-        index += 1;
-        continue;
-      }
-
-      result += ' ';
-      index = closeIndex + 1;
-      continue;
-    }
-
-    result += char;
-    index += 1;
-  }
-
-  return result;
-}
-
 export function sanitizeMetadataText(value: string | null | undefined): string {
   if (!value) return '';
-  // Remove HTML tags
   const stripped = stripHtmlTags(value);
   // Collapse multiple whitespace chars into a single space and trim
   return stripped.replace(/\s+/g, ' ').trim();
+}
+
+function stripHtmlTags(value: string): string {
+  const htmlTagStartChars =
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!/';
+  let output = '';
+  let insideTag = false;
+
+  for (let index = 0; index < value.length; index += 1) {
+    const char = value[index];
+    if (char === '<' && htmlTagStartChars.includes(value[index + 1] ?? '')) {
+      insideTag = true;
+      output += ' ';
+      continue;
+    }
+
+    if (char === '>') {
+      insideTag = false;
+      output += ' ';
+      continue;
+    }
+
+    if (!insideTag) output += char;
+  }
+
+  return output;
 }
 
 /**
@@ -183,7 +182,7 @@ export function buildPublicProfileMetadata(
   const artistName =
     sanitizeMetadataText(profile.display_name) ||
     sanitizeMetadataText(profile.username) ||
-    profile.username;
+    APP_NAME;
 
   const canonicalUrl = buildProfileCanonicalUrl(profile);
   const socialTitle = `${artistName} | ${APP_NAME}`;

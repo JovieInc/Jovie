@@ -98,4 +98,18 @@ describe('withSerializableRetry', () => {
     expect(second).toBeGreaterThanOrEqual(20);
     expect(second).toBeLessThan(20 + 25);
   });
+
+  it('does not rely on Math.random for retry jitter', async () => {
+    const randomSpy = vi.spyOn(Math, 'random');
+    const sleep = vi.fn().mockResolvedValue(undefined);
+    const fn = vi
+      .fn()
+      .mockRejectedValueOnce(makePgError('40001'))
+      .mockResolvedValue('ok');
+
+    await withSerializableRetry(fn, { sleep, baseDelayMs: 10 });
+
+    expect(randomSpy).not.toHaveBeenCalled();
+    randomSpy.mockRestore();
+  });
 });
