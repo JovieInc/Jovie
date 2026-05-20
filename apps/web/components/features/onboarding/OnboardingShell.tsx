@@ -106,6 +106,7 @@ function OnboardingShellStatus({
         data-testid='onboarding-linking-skeleton'
       >
         <Skeleton className='h-3.5 w-44 rounded' />
+        <span className='sr-only'>{message}</span>
       </div>
     );
   }

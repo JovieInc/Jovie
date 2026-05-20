@@ -99,6 +99,9 @@ function SignUpClaimDataPersistence() {
       {availability === 'checking' && (
         <div className='flex items-center justify-center lg:justify-start'>
           <Skeleton className='h-5 w-64 rounded' />
+          <span className='sr-only'>
+            Checking if @{normalizedHandle} is available...
+          </span>
         </div>
       )}
       {availability === 'available' && (
