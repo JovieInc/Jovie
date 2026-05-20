@@ -60,6 +60,10 @@ interface TooltipContentProps
 
 /**
  * Tooltip content with tokenized surface styling.
+ * z-[100] to sit above new shell chrome (sidebar, audio bar, now playing, drawers).
+ * Pure opacity reveal only (fade-in/out) — no decorative zoom or slide/translate
+ * per DESIGN.md + .claude/rules/ui.md "No Decorative Hover Motion" + subtraction.
+ * Complements shell Tooltip (support-8) + DspAvatarStack pure opacity updates.
  * Includes reduced motion support and accessibility features.
  */
 const TooltipContent = React.forwardRef<
@@ -84,18 +88,16 @@ const TooltipContent = React.forwardRef<
         data-testid={testId}
         className={cn(
           // Base layout + spacing
-          'z-50 overflow-hidden rounded-md border border-(--linear-border-subtle)',
+          'z-[100] overflow-hidden rounded-md border border-(--linear-border-subtle)',
           'bg-(--linear-bg-surface-0) px-2 py-1 text-[12px] font-[400] tracking-[-0.011em]',
           'text-(--linear-text-primary) shadow-(--linear-shadow-card-elevated)',
           'max-w-[220px]',
-          // Animation: fade-in/out 100ms with subtle zoom + slide
-          'animate-in fade-in-0 zoom-in-95',
-          'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
-          'data-[side=bottom]:slide-in-from-top-2',
-          'data-[side=left]:slide-in-from-right-2',
-          'data-[side=right]:slide-in-from-left-2',
-          'data-[side=top]:slide-in-from-bottom-2',
-          // Reduced motion override
+          // Pure opacity reveal (fade only) — subtract decorative zoom + slide-ins.
+          // Matches parallel support work on shell Tooltip / Dsp for visual parity.
+          // No layout shift; cursor-near friendly.
+          'animate-in fade-in-0',
+          'data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
+          // Reduced motion override (already present; strengthened for parity)
           'motion-reduce:animate-none motion-reduce:data-[state=closed]:animate-none',
           'motion-reduce:transition-opacity motion-reduce:duration-150',
           className
