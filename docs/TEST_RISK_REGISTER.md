@@ -181,10 +181,8 @@ surfaces:
     last_incident: null
     lessons_ref: null
     notes: >-
-      Includes profile claim race condition handling. Plan assignment correctness
-      at onboarding completion. Already has e2e/onboarding.spec.ts as golden path.
-      Source: apps/web/app/onboarding/** + apps/web/app/claim/** + apps/web/app/api/onboarding/**.
-    last_reviewed: 2026-05-10
+      Includes profile claim race condition handling (CAS on chat claim, concurrent 409 on partial unique, alreadyClaimed soft success, retryAfterWebhook for clerk mirror race). Plan assignment correctness at onboarding completion. Contract tests cover key paths in claim/[token], api/onboarding/{intake,claim} (auth, zod parse failure, rate limit dev/prod, email verify gate, best-effort outcome attach non-fatal, deriveFullName fallbacks, 500 paths, property tests for recency/idempotency/races/409). e2e/onboarding.spec.ts golden path + unit matrix. Source: apps/web/app/onboarding/** + apps/web/app/claim/** + apps/web/app/api/onboarding/**.
+    last_reviewed: 2026-05-20
 
   - id: marketing-static
     surface: Marketing pages (must be fully static)
