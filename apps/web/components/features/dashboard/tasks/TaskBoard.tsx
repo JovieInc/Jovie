@@ -21,7 +21,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { UserAvatar } from '@jovie/ui';
 import { Disc3, Plus } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { ReleaseDueBadge } from '@/components/molecules/ReleaseDueBadge';
 import { type ContextMenuItemType } from '@/components/organisms/table';
 import { TASK_BOARD_STATUSES } from '@/lib/tasks/task-board';
@@ -449,7 +449,7 @@ function SortableTaskBoardCard({
         {...listeners}
         data-testid={`task-board-card-${task.id}`}
         onClick={() => onOpenTask(task)}
-        className='block w-full cursor-grab text-left active:cursor-grabbing focus-visible:outline-none'
+        className='block w-full cursor-grab text-left active:cursor-grabbing focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)'
       >
         <TaskBoardCard
           task={task}
@@ -468,7 +468,7 @@ function SortableTaskBoardCard({
   );
 }
 
-function TaskBoardCard({
+const TaskBoardCard = memo(function TaskBoardCard({
   task,
   artistName,
   selected,
@@ -490,7 +490,7 @@ function TaskBoardCard({
   return (
     <div
       className={cn(
-        'group/task-board-card min-h-[7.25rem] w-full rounded-lg border border-subtle bg-surface-1 px-3 py-2.5 text-left shadow-card transition-[background-color,border-color,box-shadow,opacity]',
+        'group/task-board-card min-h-[7.25rem] w-full rounded-lg border border-subtle bg-surface-1 px-3 py-2.5 text-left shadow-card transition-[background-color,border-color,box-shadow,opacity] duration-subtle ease-subtle',
         draggingOverlay ? 'cursor-grabbing' : 'cursor-grab',
         'hover:border-subtle hover:bg-surface-2 hover:shadow-card-elevated',
         'focus-visible:outline-none focus-visible:border-[color-mix(in_oklab,var(--linear-border-focus)_74%,transparent)] focus-visible:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]',
@@ -565,7 +565,7 @@ function TaskBoardCard({
       </div>
     </div>
   );
-}
+});
 
 function TaskBoardSkeleton() {
   return (
