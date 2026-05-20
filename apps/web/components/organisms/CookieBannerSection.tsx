@@ -95,11 +95,11 @@ export function CookieBannerSection() {
     }
   }, [visible]);
 
-  // Publish banner height as a CSS custom property on :root so that layout
-  // regions with overflow-hidden (e.g. the profile compact shell) can shrink
-  // themselves to avoid the fixed banner covering their bottom chrome.
-  // Cleared when the banner is hidden so there is zero layout impact once
-  // the visitor consents.
+  // Publish banner height + 16px bottom offset as CSS custom property on :root
+  // so layout regions (profile shells, QR coordination) reserve the exact space
+  // occupied by the fixed bottom-right card (bottom-4 + measured h).
+  // Cleared on hide/consent for zero layout impact. Matches useCookieBannerHeight
+  // total offset for toasts.
   useEffect(() => {
     if (typeof document === 'undefined') return;
 
@@ -118,7 +118,7 @@ export function CookieBannerSection() {
     const update = () => {
       root.style.setProperty(
         '--cookie-banner-h',
-        `${banner.getBoundingClientRect().height}px`
+        `${banner.getBoundingClientRect().height + 16}px`
       );
     };
 
@@ -201,7 +201,7 @@ export function CookieBannerSection() {
         <aside
           aria-label='Cookie consent'
           data-testid='cookie-banner'
-          className='fixed bottom-4 right-4 z-[60] w-full max-w-[340px] sm:max-w-[380px]'
+          className='fixed bottom-4 right-4 z-[60] w-[calc(100vw-2rem)] max-w-[340px] sm:max-w-[380px]'
         >
           <div className='rounded-[18px] border border-(--linear-app-frame-seam) bg-surface-1 shadow-card px-4 py-4'>
             <div className='flex items-start gap-3'>

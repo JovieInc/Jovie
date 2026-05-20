@@ -10,15 +10,15 @@ const GAP = 16;
  * Returns the bottom offset (in px) that the Sonner toaster should use
  * to avoid overlapping the cookie consent banner.
  *
- * When the banner is visible: banner height + gap (so toasts float above it).
+ * When the banner is visible: banner height + 16px bottom offset (GAP) so toasts
+ * float above the fixed bottom-right card without overlap.
  * When hidden: the default 16px offset.
  *
- * Uses MutationObserver to detect banner mount/unmount and a ResizeObserver
- * to track height changes across breakpoints.
+ * Also, the offset value (h + 16) is the correct value for --cookie-banner-h CSS var
+ * (see CookieBannerSection) so profile shells + QR cards reserve full occupied space.
  *
- * With the floating card redesign (bottom-right, compact), measured height is smaller
- * so toasts sit closer to the card in the bottom-right stack (still non-overlapping via offset).
- * The data-testid selector and measurement logic are unchanged.
+ * Uses MutationObserver + ResizeObserver. Floating card redesign keeps the same
+ * measurement contract.
  */
 export function useCookieBannerHeight(): number {
   const [offset, setOffset] = useState(DEFAULT_OFFSET);
