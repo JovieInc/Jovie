@@ -971,10 +971,13 @@ export function ReleaseSidebar({
         <div data-testid='release-tasks-card'>
           {isTasksWorkspaceGateLoading ? (
             <div
-              className='animate-pulse px-1 py-1.5 text-xs text-secondary-token'
+              className='px-1 py-1.5'
               data-testid='release-tasks-loading-state'
             >
-              Loading tasks...
+              <div
+                className='h-3 w-24 rounded skeleton motion-reduce:animate-none'
+                aria-hidden='true'
+              />
             </div>
           ) : null}
           {!isTasksWorkspaceGateLoading && canAccessTasksWorkspace ? (

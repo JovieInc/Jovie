@@ -272,7 +272,8 @@ describe('DashboardNav interactions', () => {
       appFlags: { DESIGN_V1: true },
     });
 
-    expect(screen.getByText('Loading threads')).toBeInTheDocument();
+    expect(document.querySelector('.skeleton')).toBeInTheDocument();
+    expect(screen.queryByText('Loading threads')).not.toBeInTheDocument();
     unmount();
 
     mockUseChatConversationsQuery.mockReturnValueOnce({

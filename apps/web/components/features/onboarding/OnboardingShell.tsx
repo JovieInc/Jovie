@@ -120,7 +120,17 @@ function OnboardingShellStatus({
       role='alert'
       aria-live='assertive'
     >
-      {message}
+      {kind === 'status' ? (
+        <>
+          <span className='sr-only'>{message}</span>
+          <span
+            className='inline-block h-3 w-44 rounded-full skeleton motion-reduce:animate-none align-middle'
+            aria-hidden='true'
+          />
+        </>
+      ) : (
+        message
+      )}
     </p>
   );
 }

@@ -83,7 +83,10 @@ export function ReleaseTablePendingShell({
           <PageToolbar
             start={
               <span className={PAGE_TOOLBAR_META_TEXT_CLASS}>
-                Loading releases
+                <span
+                  className='inline-block h-3 w-28 rounded-sm skeleton motion-reduce:animate-none align-middle'
+                  aria-hidden='true'
+                />
               </span>
             }
           />

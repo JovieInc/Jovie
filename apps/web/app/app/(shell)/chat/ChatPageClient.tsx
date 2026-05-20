@@ -26,7 +26,6 @@ import {
   usePreviewPanelState,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
-import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { ChatWorkspaceSurface } from '@/components/jovie/ChatWorkspaceSurface';
 import { JovieChat } from '@/components/jovie/JovieChat';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
@@ -119,10 +118,14 @@ function ChatProfileFallback({
       <ChatWorkspaceSurface>
         <div className='flex h-full items-center justify-center p-6'>
           <ContentSurfaceCard className='flex max-w-sm flex-col items-center gap-3 px-6 py-8 text-center'>
-            <LoadingSpinner size='lg' tone='muted' />
-            <p className='text-sm text-secondary-token'>
-              Taking you to onboarding…
-            </p>
+            <div
+              className='h-8 w-8 rounded-full skeleton motion-reduce:animate-none'
+              aria-hidden='true'
+            />
+            <div
+              className='h-4 w-44 rounded skeleton motion-reduce:animate-none'
+              aria-hidden='true'
+            />
           </ContentSurfaceCard>
         </div>
       </ChatWorkspaceSurface>
@@ -138,26 +141,38 @@ function ChatProfileFallback({
       <div className='flex h-full items-center justify-center p-6'>
         <ContentSurfaceCard className='flex max-w-sm flex-col items-center gap-3 px-6 py-8 text-center'>
           {isProfileSetupRace ? (
-            <LoadingSpinner size='lg' tone='muted' />
+            <>
+              <div
+                className='h-8 w-8 rounded-full skeleton motion-reduce:animate-none'
+                aria-hidden='true'
+              />
+              <div
+                className='h-4 w-48 rounded skeleton motion-reduce:animate-none'
+                aria-hidden='true'
+              />
+              {canAutoRetry && (
+                <div
+                  className='h-3 w-60 rounded skeleton motion-reduce:animate-none'
+                  aria-hidden='true'
+                />
+              )}
+            </>
           ) : (
             <AlertCircle className='h-8 w-8 text-tertiary-token' />
           )}
-          <p className='text-sm text-secondary-token'>{profileMessage}</p>
-          {isProfileSetupRace && canAutoRetry && (
-            <p className='text-xs text-tertiary-token'>
-              Retrying automatically in 3 seconds ({autoRetryCount + 1}/3)…
-            </p>
-          )}
           {!isProfileSetupRace && (
-            <Button
-              onClick={onRetry}
-              variant='secondary'
-              size='sm'
-              className='gap-2'
-            >
-              <RefreshCw className='h-4 w-4' />
-              Retry
-            </Button>
+            <>
+              <p className='text-sm text-secondary-token'>{profileMessage}</p>
+              <Button
+                onClick={onRetry}
+                variant='secondary'
+                size='sm'
+                className='gap-2'
+              >
+                <RefreshCw className='h-4 w-4' />
+                Retry
+              </Button>
+            </>
           )}
         </ContentSurfaceCard>
       </div>

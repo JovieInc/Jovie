@@ -1,11 +1,6 @@
 'use client';
 
-import {
-  Loader2,
-  MessageSquarePlus,
-  MoreHorizontal,
-  RefreshCw,
-} from 'lucide-react';
+import { MessageSquarePlus, MoreHorizontal, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { useMemo, useState } from 'react';
@@ -130,14 +125,16 @@ export function SidebarThreadsSection({
           <SidebarThreadStatusRow
             tight={tight}
             icon={
-              <Loader2
-                className='h-3 w-3 animate-spin'
+              <div
+                className='h-3.5 w-3.5 rounded-full skeleton motion-reduce:animate-none'
                 aria-hidden='true'
-                strokeWidth={2.25}
               />
             }
           >
-            Loading threads
+            <div
+              className='h-3 w-20 rounded-sm skeleton motion-reduce:animate-none'
+              aria-hidden='true'
+            />
           </SidebarThreadStatusRow>
         ) : null}
         {state === 'error' && !hasThreads ? (

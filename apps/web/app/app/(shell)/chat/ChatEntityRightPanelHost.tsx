@@ -126,8 +126,16 @@ function ChatReleaseEntityPanel({
       </div>
 
       {loading ? (
-        <div className='flex flex-1 items-center justify-center px-6 text-center text-[13px] text-tertiary-token'>
-          Loading release…
+        <div
+          className='flex flex-1 items-center justify-center px-6'
+          role='status'
+          aria-live='polite'
+        >
+          <span className='sr-only'>Loading release…</span>
+          <div
+            className='h-4 w-28 rounded skeleton motion-reduce:animate-none'
+            aria-hidden='true'
+          />
         </div>
       ) : release ? (
         <div className='min-h-0 flex-1 overflow-y-auto'>
