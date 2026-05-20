@@ -47,6 +47,13 @@ function readDatabaseUrl(): string {
   return databaseUrl;
 }
 
+function isScreenshotWorkflowPlaceholderDatabaseUrl(databaseUrl: string): boolean {
+  return (
+    databaseUrl === 'postgresql://localhost/noop' ||
+    databaseUrl === 'postgres://localhost/noop'
+  );
+}
+
 function isMissingCatalogTableError(error: unknown): boolean {
   if (!error || typeof error !== 'object') {
     return false;
@@ -192,6 +199,13 @@ export async function main(
   if (!scriptEnv.DATABASE_URL) {
     console.log(
       '[sync-skills-catalog] DATABASE_URL not set — skipping catalog sync (no-op in lint/type-check CI)'
+    );
+    return 'skipped';
+  }
+
+  if (isScreenshotWorkflowPlaceholderDatabaseUrl(scriptEnv.DATABASE_URL)) {
+    console.log(
+      '[sync-skills-catalog] screenshot workflow placeholder DATABASE_URL detected — skipping catalog sync'
     );
     return 'skipped';
   }

@@ -164,6 +164,13 @@ describe('sync-skills-catalog', () => {
     expect(mockInsert).not.toHaveBeenCalled();
   });
 
+  it('skips DB writes for the screenshot workflow placeholder DATABASE_URL', async () => {
+    vi.stubEnv('DATABASE_URL', 'postgresql://localhost/noop');
+
+    await expect(main()).resolves.toBe('skipped');
+    expect(mockInsert).not.toHaveBeenCalled();
+  });
+
   it('skips deploy-time sync when catalog tables are not migrated yet', async () => {
     const missingTableError = {
       cause: {
