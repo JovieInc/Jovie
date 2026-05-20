@@ -87,6 +87,14 @@ export default {
     // auth + investor + audience per TEST_RISK_REGISTER + heatmap).
     // Contract tests in proxy-behavioral + dedup unit now kill mutants here.
     'lib/auth/investor-portal.ts',
+    // Proxy lib surfaces completing the RED 43 proxy.ts wiring (clerk FAPI proxy for
+    // /__clerk + /clerk paths, proxy-state decision matrix for audience/waitlist/investor,
+    // proxy-routing for categorize/301/rewrites). + 301 contracts + outer catch paths.
+    // Enables Stryker mutation on the extracted proxy regions (fapi decode, host routing,
+    // state guards, policy) for full coverage of the highest risk surface.
+    'lib/auth/clerk-fapi-proxy.ts',
+    'lib/auth/proxy-state.ts',
+    'lib/routing/proxy-routing.ts',
     // Claim-onboarding surface (per docs/TEST_RISK_REGISTER.md claim-onboarding row + heatmap priority).
     // Token-backed + direct claim routes, username claim handler (validation, auth checks, pending claim,
     // next=auth redirect matrix), onboarding intake (email verify gate, rate limit, ensure/upsert user+interview,
@@ -149,6 +157,14 @@ export default {
     // Highest risk proxy surface closure + mutation evidence.
     'lib/auth/investor-view-dedup.test.ts',
     'tests/unit/middleware/proxy-behavioral.test.ts',
+    // Proxy lib dedicated tests (completes Stryker wiring for RED 43 proxy surface):
+    // clerk-fapi-proxy.test exercises FAPI host decode, fetch proxy, 503/outer-catch, GET/405 paths;
+    // proxy-state.test + route-policy + url-mapping cover state machine, 301 contracts, policy decisions.
+    // Combined with behavioral, enables full mutation evidence on proxy regions + dev-test overlaps.
+    'lib/auth/clerk-fapi-proxy.test.ts',
+    'tests/unit/lib/auth/proxy-state.test.ts',
+    'tests/unit/lib/proxy-url-mapping.test.ts',
+    'tests/unit/middleware/route-policy.test.ts',
     // RLS access control (rls-access-control row, risk 42.1 RED, mutation gap closure):
     // Wires the new contract tests for RLS failure modes (unauthorized tenant access via
     // session errors, auth bypass test paths, 401/403/404 responses, outer catch in
