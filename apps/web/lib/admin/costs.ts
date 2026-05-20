@@ -139,8 +139,20 @@ export async function upsertAdminCost(input: {
   externalUrl?: string | null;
 }): Promise<void> {
   const now = new Date();
+
+  // Validate decimal strings for numeric columns (per CodeRabbit review)
+  const decimalRe = /^-?\d+(\.\d+)?$/;
+  if (
+    !decimalRe.test(input.monthlyUsd) ||
+    !decimalRe.test(input.observed30dUsd)
+  ) {
+    throw new Error(
+      'monthlyUsd and observed30dUsd must be valid decimal strings (e.g. "0", "123.45")'
+    );
+  }
+
   if (input.id) {
-    await db
+    const result = await db
       .update(adminCosts)
       .set({
         label: input.label,
@@ -152,6 +164,11 @@ export async function upsertAdminCost(input: {
         updatedAt: now,
       })
       .where(eq(adminCosts.id, input.id));
+
+    // Verify update affected a row (per CodeRabbit); throw on missing id
+    if ((result as { rowCount?: number | null }).rowCount === 0) {
+      throw new Error(`Admin cost with id ${input.id} not found`);
+    }
   } else {
     await db.insert(adminCosts).values({
       label: input.label,

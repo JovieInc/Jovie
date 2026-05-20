@@ -15,7 +15,7 @@ interface AdminCostRow {
   readonly monthlyUsd: string | number | null;
   readonly observed30dUsd: string | number | null;
   readonly period: string;
-  readonly notes: string | null;
+  readonly notes: string;
   readonly externalUrl?: string | null;
   readonly lastUpdatedLabel: string;
 }

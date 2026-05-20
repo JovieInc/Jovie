@@ -103,7 +103,7 @@ export const adminCosts = pgTable(
       .default('0')
       .notNull(),
     period: text('period').default('monthly').notNull(),
-    notes: text('notes').default(''),
+    notes: text('notes').default('').notNull(),
     externalUrl: text('external_url'),
     isActive: boolean('is_active').default(true).notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
