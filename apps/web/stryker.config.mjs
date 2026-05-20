@@ -53,6 +53,17 @@ export default {
     'lib/auth/decode-fapi-host.ts',
     'lib/auth/staging-clerk-keys.ts',
     'lib/auth/test-mode.ts',
+    // RLS access control (highest remaining risk RED surface 42.1 per heatmap + register):
+    // lib/auth/session.ts covers validateClerkUserId, setupDbSession, withDbSession*,
+    // getSessionContext (tenant/user resolution, throws for USER_NOT_FOUND/PROFILE/UNAUTHORIZED),
+    // resolve + outer error paths. lib/api/with-dashboard-route.ts owns the standardized
+    // outer catch for RLS-related failures (401/404/500, capture, NO_STORE on auth errors).
+    // lib/auth/require-auth.ts handles test auth bypass + 401 contract responses.
+    // Directly targets auth bypass, unauthorized tenant access, row-level violation
+    // reporting, outer catch, 401/403 paths for the RLS surface.
+    'lib/auth/session.ts',
+    'lib/api/with-dashboard-route.ts',
+    'lib/auth/require-auth.ts',
     // Waitlist gate + determine logic + proxy enforcement (canAccessApp,
     // canAccessOnboarding, requiresRedirect, getRedirectForState). Critical
     // for journey entry and negative paths (waitlist_pending, banned, needs
@@ -110,6 +121,17 @@ export default {
     'tests/unit/lib/auth/gate.test.ts',
     'tests/unit/lib/auth/gate.critical.test.ts',
     'tests/unit/auth/waitlist-gating.test.ts',
+    // RLS access control (rls-access-control row, risk 42.1 RED, mutation gap closure):
+    // Wires the new contract tests for RLS failure modes (unauthorized tenant access via
+    // session errors, auth bypass test paths, 401/403/404 responses, outer catch in
+    // dashboard guard, withDbSessionTx failure, getSessionContext tenant resolution).
+    // Also includes db usage guard and require-auth bypass/401 contracts.
+    // Combined with existing rls-access-control.test.ts (DB policy enforcement) and
+    // session.critical.test.ts for comprehensive mutation evidence on the surface.
+    'tests/unit/lib/auth/session.critical.test.ts',
+    'tests/unit/lib/db-session-guard.test.ts',
+    'tests/unit/lib/api/with-dashboard-route.test.ts',
+    'tests/unit/lib/auth/require-auth.test.ts',
     // Claim + onboarding claim flow tests (exercises claim token routes, username claim matrix/redirects,
     // context cookie crypto+parse errors, intake gates/rate/email, onboarding chat claim hook; note:
     // api/onboarding/claim/route.ts wired for mutation, dedicated route test added to cover CAS/409/error paths)
