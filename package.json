@@ -159,5 +159,8 @@
     "*.{json,css}": [
       "biome format --write --no-errors-on-unmatched"
     ]
+  },
+  "dependencies": {
+    "@trigger.dev/sdk": "^4.4.6"
   }
 }
