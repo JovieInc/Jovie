@@ -50,6 +50,18 @@ export default {
     // 5/rev 5) + claim-onboarding gaps; gate covers under-mutated failure modes
     // for waitlist/claim flows (high reversibility/visibility).
     'lib/auth/gate.ts',
+    // Claim-onboarding surface (per docs/TEST_RISK_REGISTER.md claim-onboarding row + heatmap priority).
+    // Token-backed + direct claim routes, username claim handler (validation, auth checks, pending claim,
+    // next=auth redirect matrix), onboarding intake (email verify gate, rate limit, ensure/upsert user+interview,
+    // waitlist submit), onboarding claim (CAS race handling, 409 unique, audit, cookie clear), lib/claim
+    // (crypto signed cookies, parse/expiry/validation error paths), finalize claim ops. Enables mutation
+    // on high blast/reversibility claim + profile creation flows. See added matrix/negative-path tests.
+    'app/claim/[[]token[]]/route.ts',
+    'app/[[]username[]]/claim/route.ts',
+    'app/api/onboarding/claim/route.ts',
+    'app/api/onboarding/intake/route.ts',
+    'lib/claim/context.ts',
+    'lib/claim/finalize.ts',
     // Social-link dedupe + handle parser. Mutating these surfaces the
     // assertions in tests/unit/lib/social-platform.property.test.ts;
     // a passing-but-mutation-survives suite means duplicate rows or
@@ -88,6 +100,14 @@ export default {
     'tests/unit/lib/auth/gate.test.ts',
     'tests/unit/lib/auth/gate.critical.test.ts',
     'tests/unit/auth/waitlist-gating.test.ts',
+    // Claim + onboarding claim flow tests (exercises claim token routes, username claim matrix/redirects,
+    // context cookie crypto+parse errors, intake gates/rate/email, onboarding chat claim hook; note:
+    // api/onboarding/claim/route.ts wired for mutation, dedicated route test added to cover CAS/409/error paths)
+    'tests/unit/app/claim-token-route.test.ts',
+    'tests/unit/app/[[]username[]]/claim/route.test.ts',
+    'tests/unit/lib/claim/context.test.ts',
+    'tests/unit/api/onboarding/intake.test.ts',
+    'tests/components/features/onboarding/useOnboardingClaim.test.tsx',
     // Cookie banner unit + regions (exercises the new floating card surface + geo decision branches)
     'tests/unit/cookie-banner.test.tsx',
     'tests/unit/cookie-banner-fixes.test.tsx',
