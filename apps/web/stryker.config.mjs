@@ -131,6 +131,11 @@ export default {
     'tests/unit/lib/entitlement-registry.test.ts',
     'tests/unit/lib/entitlement-boundary-helpers.test.ts',
     'tests/unit/lib/entitlements-state-transitions.test.ts',
+    // New exhaustive matrix contract test (entitlements-matrix.test.ts) for
+    // the full 4×27 boolean + 6 limits plan matrix + all legacy alias branches
+    // + additional server resolver catch coverage. Wires Stryker mutation
+    // killing for entitlements-registry RED surface (risk 37.7, 20.8pp gap).
+    'tests/unit/lib/entitlements-matrix.test.ts',
     'tests/unit/lib/queries/useBillingMutations.test.tsx',
     'tests/unit/lib/social-platform.property.test.ts',
     // Gate + waitlist negative-path tests for lib/auth/gate.ts mutate target
