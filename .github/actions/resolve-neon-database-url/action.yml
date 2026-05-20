@@ -99,19 +99,23 @@ runs:
           : null;
         const source = new URL(process.env.CREDENTIAL_SOURCE);
 
-        // Keep the ephemeral branch host/database from the candidate URL, but
-        // source credentials from the stable secret when present. The Neon
-        // branch action can emit credentials that are not accepted for the
-        // project role in this repo, while the stable role password works across
-        // branches.
-        const credentialSources = [source, fallbackCandidate].filter(Boolean);
+        // Keep the ephemeral branch host/database and prefer the credentials
+        // returned for that branch. Stable secrets are only a fallback when the
+        // action output is missing a credential component.
+        const credentialSources = [candidate, fallbackCandidate, source].filter(
+          Boolean
+        );
 
-        const usernameSource = credentialSources.find((url) => url.username);
+        const usernameSource = !candidate.username
+          ? credentialSources.find((url) => url.username)
+          : null;
         if (usernameSource) {
           candidate.username = usernameSource.username;
         }
 
-        const passwordSource = credentialSources.find((url) => url.password);
+        const passwordSource = !candidate.password
+          ? credentialSources.find((url) => url.password)
+          : null;
         if (passwordSource) {
           candidate.password = passwordSource.password;
         }
