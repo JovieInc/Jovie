@@ -31,6 +31,10 @@ describe('sanitizeMetadataText', () => {
     expect(sanitizeMetadataText('<b>Hello</b>')).toBe('Hello');
   });
 
+  it('strips unterminated tags without regex backtracking', () => {
+    expect(sanitizeMetadataText('Hello <img src=x'.repeat(100))).toBe('Hello');
+  });
+
   it('strips nested HTML tags', () => {
     expect(sanitizeMetadataText('<p>Hello <em>world</em></p>')).toBe(
       'Hello world'

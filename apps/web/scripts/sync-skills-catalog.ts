@@ -25,6 +25,9 @@ const scriptEnv = {
   get DATABASE_URL(): string | undefined {
     return process.env.DATABASE_URL;
   },
+  get SKIP_SKILLS_CATALOG_SYNC(): string | undefined {
+    return process.env.SKIP_SKILLS_CATALOG_SYNC;
+  },
 };
 
 function createScriptDb(databaseUrl: string) {
@@ -187,6 +190,16 @@ export async function syncSkillsCatalog(
 export async function main(
   syncCatalog: () => Promise<void> = syncSkillsCatalog
 ): Promise<SyncResult> {
+  if (
+    scriptEnv.SKIP_SKILLS_CATALOG_SYNC === '1' ||
+    scriptEnv.SKIP_SKILLS_CATALOG_SYNC === 'true'
+  ) {
+    console.log(
+      '[sync-skills-catalog] SKIP_SKILLS_CATALOG_SYNC set — skipping catalog sync'
+    );
+    return 'skipped';
+  }
+
   // Skip gracefully when DATABASE_URL is unavailable (e.g., lint-only CI builds).
   // Real deploys (Vercel, db:web:migrate) always have DATABASE_URL injected by Doppler.
   if (!scriptEnv.DATABASE_URL) {
