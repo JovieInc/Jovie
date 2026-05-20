@@ -110,7 +110,7 @@ const ENTITY_CLOSE_DELAY_MS = 120;
 // ---------------------------------------------------------------------------
 
 const CONTENT_CLASSES = cn(
-  'z-[70] min-w-[--w] max-w-[calc(100vw-16px)]',
+  'z-[90] min-w-[--w] max-w-[calc(100vw-16px)]',
   'rounded-xl border border-(--linear-app-shell-border)',
   'bg-(--linear-app-content-surface)/95 backdrop-blur-xl',
   'shadow-[0_12px_40px_rgba(0,0,0,0.32)] p-1',
