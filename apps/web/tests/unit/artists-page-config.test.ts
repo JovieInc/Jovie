@@ -1,10 +1,15 @@
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 describe('/artists route segment config', () => {
   it('keeps ISR revalidate and does not force dynamic rendering', () => {
-    const pagePath = resolve(process.cwd(), 'app/artists/page.tsx');
+    // Robust path: resolve relative to this test file (not process.cwd()).
+    // Prevents cwd-dependent breakage (package vs repo root invocation contexts).
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    const pagePath = resolve(__dirname, '../../app/artists/page.tsx');
     const pageSource = readFileSync(pagePath, 'utf8');
 
     // Match revalidate export with any valid formatting
