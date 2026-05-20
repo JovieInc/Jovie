@@ -238,7 +238,7 @@
     "vaul": "^1.1.2",
     "web-vitals": "^5.2.0",
     "workflow": "4.2.4",
-    "ws": "^8.20.0",
+    "ws": "^8.20.1",
     "zod": "^4.3.6"
   },
   "devDependencies": {
@@ -287,7 +287,7 @@
     "next-sitemap": "^4.2.3",
     "playwright": "1.60.0",
     "plop": "^4.0.5",
-    "postcss": "^8.5.13",
+    "postcss": "^8.5.15",
     "storybook": "^10.3.3",
     "tailwindcss": "^4.2.2",
     "tsx": "^4.21.0",
