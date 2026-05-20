@@ -36,10 +36,44 @@ import type { CreatorProfile } from '@/types/db';
  */
 export function sanitizeMetadataText(value: string | null | undefined): string {
   if (!value) return '';
-  // Remove HTML tags
-  const stripped = value.replace(/<[^>]*>/g, ' ');
-  // Collapse multiple whitespace chars into a single space and trim
-  return stripped.replace(/\s+/g, ' ').trim();
+  return collapseWhitespace(stripHtmlTags(value));
+}
+
+function stripHtmlTags(value: string): string {
+  let result = '';
+  let inTag = false;
+
+  for (const char of value) {
+    if (char === '<') {
+      if (result && !result.endsWith(' ')) result += ' ';
+      inTag = true;
+      continue;
+    }
+    if (inTag) {
+      if (char === '>') inTag = false;
+      continue;
+    }
+    result += char;
+  }
+
+  return result;
+}
+
+function collapseWhitespace(value: string): string {
+  let result = '';
+  let pendingSpace = false;
+
+  for (const char of value) {
+    if (char.trim() === '') {
+      pendingSpace = true;
+      continue;
+    }
+    if (pendingSpace && result) result += ' ';
+    result += char;
+    pendingSpace = false;
+  }
+
+  return result;
 }
 
 /**

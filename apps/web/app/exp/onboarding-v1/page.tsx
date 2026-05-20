@@ -22,7 +22,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 const EASE_CINEMATIC = 'cubic-bezier(0.32, 0.72, 0, 1)';
@@ -100,6 +100,7 @@ export default function OnboardingC() {
   });
   const [textInput, setTextInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const messageIdCounterRef = useRef(0);
 
   // Auto-scroll on new messages.
   useEffect(() => {
@@ -109,23 +110,29 @@ export default function OnboardingC() {
     });
   }, [messages, typing]);
 
-  async function sendJovie(lines: string[]) {
-    for (const line of lines) {
-      setTyping(true);
-      await sleep(400 + line.length * 8);
-      setTyping(false);
-      setMessages(m => [
-        ...m,
-        { id: `j-${Date.now()}-${Math.random()}`, role: 'jovie', text: line },
-      ]);
-      await sleep(180);
-    }
-  }
+  const nextMessageId = useCallback((prefix: 'j' | 'u') => {
+    messageIdCounterRef.current += 1;
+    return `${prefix}-${messageIdCounterRef.current}`;
+  }, []);
+
+  const sendJovie = useCallback(
+    async (lines: string[]) => {
+      for (const line of lines) {
+        setTyping(true);
+        await sleep(400 + line.length * 8);
+        setTyping(false);
+        setMessages(m => [
+          ...m,
+          { id: nextMessageId('j'), role: 'jovie', text: line },
+        ]);
+        await sleep(180);
+      }
+    },
+    [nextMessageId]
+  );
+
   function sendUser(text: string) {
-    setMessages(m => [
-      ...m,
-      { id: `u-${Date.now()}-${Math.random()}`, role: 'user', text },
-    ]);
+    setMessages(m => [...m, { id: nextMessageId('u'), role: 'user', text }]);
   }
 
   // Initial Jovie greeting.
@@ -134,7 +141,7 @@ export default function OnboardingC() {
       "Hey. I'm Jovie — I'll help you set up your home and figure out the best way I can help you this quarter.",
       "Let's start simple. What handle do you want? It'll be jov.ie/yourname.",
     ]).then(() => setStep('handle'));
-  }, []);
+  }, [sendJovie]);
 
   async function submitHandle() {
     const v = handle.trim().replace(/^@/, '');

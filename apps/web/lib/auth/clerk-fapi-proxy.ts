@@ -8,6 +8,9 @@ import { decodeFapiHostFromPublishableKey } from '@/lib/auth/decode-fapi-host';
 import { resolveClerkKeys } from '@/lib/auth/staging-clerk-keys';
 import { captureError } from '@/lib/error-tracking';
 
+const COOKIE_NAME_CHARS =
+  "!#$%&'*+-.^_`|~0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
 /**
  * Clerk FAPI proxy handler — dedicated helper extracted from proxy.ts.
  *
@@ -136,7 +139,7 @@ export async function handleClerkFapiProxy(
 
       const setCookies =
         proxyRes.headers.getSetCookie?.() ??
-        proxyRes.headers.get('set-cookie')?.split(/,(?=[^;]+=)/) ??
+        splitCombinedSetCookieHeader(proxyRes.headers.get('set-cookie')) ??
         [];
       for (const cookie of setCookies) {
         if (cookie) redirect.headers.append('set-cookie', cookie);
@@ -173,4 +176,42 @@ export async function handleClerkFapiProxy(
       { status: 502 }
     );
   }
+}
+
+export function splitCombinedSetCookieHeader(
+  header: string | null
+): string[] | null {
+  if (!header) return null;
+
+  const cookies: string[] = [];
+  let start = 0;
+
+  for (let index = 0; index < header.length; index += 1) {
+    if (header[index] === ',' && startsCookiePair(header, index + 1)) {
+      cookies.push(header.slice(start, index).trim());
+      start = index + 1;
+    }
+  }
+
+  cookies.push(header.slice(start).trim());
+  return cookies.filter(Boolean);
+}
+
+function startsCookiePair(header: string, index: number): boolean {
+  let cursor = index;
+  while (header[cursor] === ' ' || header[cursor] === '\t') cursor += 1;
+
+  let hasName = false;
+  while (cursor < header.length) {
+    const char = header[cursor];
+    if (char === '=') return hasName;
+    if (char === ',' || char === ';' || char === ' ' || char === '\t') {
+      return false;
+    }
+    if (!COOKIE_NAME_CHARS.includes(char)) return false;
+    hasName = true;
+    cursor += 1;
+  }
+
+  return false;
 }

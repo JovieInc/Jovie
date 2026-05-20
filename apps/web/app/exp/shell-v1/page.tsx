@@ -5003,11 +5003,16 @@ function ReleaseRow({
 }) {
   const runningThread = findRunningThreadFor('release', release.id, THREADS);
   return (
-    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: list row activates via parent section's keyboard handler; mouse-click is a convenience
-    // biome-ignore lint/a11y/useKeyWithClickEvents: see above — parent section handles ↑/↓/Enter/Space/Esc
+    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: parent list owns keyboard navigation; row click mirrors focus selection
     <li
       ref={rowRef}
       onClick={onSelect}
+      onKeyDown={event => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key !== 'Enter') return;
+        event.preventDefault();
+        onSelect();
+      }}
       onContextMenu={e => onContextMenu?.(e, release)}
       data-selected={isSelected || undefined}
       data-focused={isFocused || undefined}
@@ -6195,11 +6200,16 @@ function TrackRow({
   const showPlayingBars = isPlaying && !muteHighlight;
   const runningThread = findRunningThreadFor('track', track.id, THREADS);
   return (
-    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: parent section delegates ↑/↓/Space; row click is a focus convenience
-    // biome-ignore lint/a11y/useKeyWithClickEvents: same
+    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: parent section delegates keyboard navigation
     <li
       ref={rowRef}
       onClick={onSelect}
+      onKeyDown={event => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key !== 'Enter') return;
+        event.preventDefault();
+        onSelect();
+      }}
       onContextMenu={e => onContextMenu?.(e, track)}
       data-focused={isFocused || undefined}
       className={cn(
@@ -6557,11 +6567,16 @@ function TaskListItem({
 }) {
   const runningThread = findRunningThreadFor('task', task.id, THREADS);
   return (
-    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: parent section delegates ↑/↓
-    // biome-ignore lint/a11y/useKeyWithClickEvents: same
+    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: parent section delegates keyboard navigation
     <li
       ref={rowRef}
       onClick={onSelect}
+      onKeyDown={event => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key !== 'Enter') return;
+        event.preventDefault();
+        onSelect();
+      }}
       onContextMenu={e => onContextMenu?.(e, task)}
       data-focused={isFocused || isSelected || undefined}
       className={cn(

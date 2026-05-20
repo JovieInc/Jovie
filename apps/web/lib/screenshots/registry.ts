@@ -7,6 +7,9 @@ import type {
   ScreenshotScenario,
 } from './types';
 
+const PROFILE_DESKTOP_LAYOUT_SELECTOR =
+  '[data-testid="public-profile-layout-shell"] [data-layout="desktop"]';
+
 export const SCREENSHOT_VIEWPORTS = {
   desktop: { width: 1440, height: 900 },
   mobile: { width: 390, height: 844 },
@@ -244,14 +247,14 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       id: 'tim-white-profile-live-desktop',
       title: 'Tim White Profile — Latest Release Desktop',
       route: '/demo/showcase/tim-white-profile?release=live',
-      waitFor: '[data-testid="profile-desktop-surface"]',
+      waitFor: PROFILE_DESKTOP_LAYOUT_SELECTOR,
       publicExportPath: 'tim-white-profile-live-desktop.png',
     },
     {
       id: 'tim-white-profile-mainstream-desktop',
       title: 'Tim White Profile — Mainstream Desktop',
       route: '/demo/showcase/tim-white-profile?archetype=mainstream',
-      waitFor: '[data-testid="profile-desktop-surface"]',
+      waitFor: PROFILE_DESKTOP_LAYOUT_SELECTOR,
       publicExportPath: 'tim-white-profile-mainstream-desktop.png',
     },
     {
@@ -524,10 +527,9 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       id: 'public-profile-desktop',
       title: 'Public Profile',
       route: '/demo/showcase/public-profile',
-      // The desktop-layout switch happens in a useEffect (matchMedia >=1180px)
-      // after first paint. Wait for the desktop surface specifically so the
-      // capture isn't of the pre-hydration phone-shaped fallback.
-      waitFor: '[data-testid="profile-desktop-surface"]',
+      // The desktop-layout switch happens in a useEffect after first paint.
+      // Wait for the hydrated desktop frame, not the pre-hydration fallback.
+      waitFor: PROFILE_DESKTOP_LAYOUT_SELECTOR,
       publicExportPath: 'profile-desktop.png',
     },
     {
