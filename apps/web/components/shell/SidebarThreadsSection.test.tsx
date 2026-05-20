@@ -45,7 +45,7 @@ describe('SidebarThreadsSection', () => {
     expect(activeThread).toHaveClass('text-primary-token');
     expect(inactiveThread).toHaveClass('text-secondary-token');
     expect(inactiveThread).toHaveClass('hover:bg-surface-1');
-    expect(inactiveThread).toHaveClass('focus-visible:ring-1');
+    expect(inactiveThread).toHaveClass('focus-visible:ring-2');
   });
 
   it('keeps thread action affordances opt-in and wired to the row thread', () => {
