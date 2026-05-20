@@ -41,7 +41,7 @@ function isRetryableTransactionError(error: unknown): boolean {
  * Postgres serialization/deadlock failures. Re-throws immediately on any
  * non-retryable error.
  *
- * Backoff is exponential with jitter: baseDelayMs * 2^i + Math.random()*25.
+ * Backoff is exponential with jitter: baseDelayMs * 2^i + random 0-25ms.
  */
 export async function withSerializableRetry<T>(
   fn: () => Promise<T>,
@@ -59,10 +59,16 @@ export async function withSerializableRetry<T>(
       lastError = error;
       if (!isRetryableTransactionError(error)) throw error;
       if (i < attempts - 1) {
-        const delay = baseDelayMs * 2 ** i + Math.random() * 25;
+        const delay = baseDelayMs * 2 ** i + getRetryJitterMs();
         await sleep(delay);
       }
     }
   }
   throw lastError;
+}
+
+function getRetryJitterMs(): number {
+  const randomValue = new Uint32Array(1);
+  globalThis.crypto.getRandomValues(randomValue);
+  return ((randomValue[0] ?? 0) / 0x1_0000_0000) * 25;
 }

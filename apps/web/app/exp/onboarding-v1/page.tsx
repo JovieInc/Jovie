@@ -116,16 +116,13 @@ export default function OnboardingC() {
       setTyping(false);
       setMessages(m => [
         ...m,
-        { id: `j-${Date.now()}-${Math.random()}`, role: 'jovie', text: line },
+        { id: createMessageId('j'), role: 'jovie', text: line },
       ]);
       await sleep(180);
     }
   }
   function sendUser(text: string) {
-    setMessages(m => [
-      ...m,
-      { id: `u-${Date.now()}-${Math.random()}`, role: 'user', text },
-    ]);
+    setMessages(m => [...m, { id: createMessageId('u'), role: 'user', text }]);
   }
 
   // Initial Jovie greeting.
@@ -916,4 +913,8 @@ function planUnlock(goal: string): string {
 
 function sleep(ms: number) {
   return new Promise<void>(r => setTimeout(r, ms));
+}
+
+function createMessageId(prefix: 'j' | 'u') {
+  return `${prefix}-${globalThis.crypto.randomUUID()}`;
 }
