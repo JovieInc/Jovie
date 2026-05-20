@@ -40,3 +40,6 @@ export function CookieBannerMount() {
 
   return Banner ? <Banner /> : null;
 }
+
+// Note: The rendered banner is a compact floating bottom-right card (see CookieBannerSection).
+// All mount/visibility/geo/persistence logic is unchanged. Visual redesign is internal to the lazy Section.

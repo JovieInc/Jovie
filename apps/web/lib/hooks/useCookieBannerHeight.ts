@@ -15,6 +15,10 @@ const GAP = 16;
  *
  * Uses MutationObserver to detect banner mount/unmount and a ResizeObserver
  * to track height changes across breakpoints.
+ *
+ * With the floating card redesign (bottom-right, compact), measured height is smaller
+ * so toasts sit closer to the card in the bottom-right stack (still non-overlapping via offset).
+ * The data-testid selector and measurement logic are unchanged.
  */
 export function useCookieBannerHeight(): number {
   const [offset, setOffset] = useState(DEFAULT_OFFSET);

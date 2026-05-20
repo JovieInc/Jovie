@@ -26,6 +26,9 @@ function setCookie(value: string) {
 }
 
 describe('CookieBannerSection consent sync', () => {
+  // Floating card redesign (bottom-right compact surface) preserves all action handlers,
+  // persistence, error paths, and modal open. New render tested in sibling cookie-banner.test.tsx
+  // (positioning, classes, height var, no Manage chrome, compact actions prop).
   beforeEach(() => {
     vi.resetModules();
     mockSaveConsent.mockResolvedValue(undefined);
