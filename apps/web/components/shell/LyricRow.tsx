@@ -1,6 +1,7 @@
 'use client';
 
 import { GripVertical } from 'lucide-react';
+import React from 'react';
 import { formatTime } from '@/lib/format-time';
 import { cn } from '@/lib/utils';
 import type { LyricLine } from './LyricsView.types';
@@ -28,8 +29,12 @@ const SELECTED_ROW_CLASSES = [
  * focus event drives the row's `onFocus`; no row-level click handler.
  *
  * Pure presentational — caller owns line state, focus, edit mode.
+ *
+ * Memoized for shell handoff rot 9 (high-churn over real timed LyricLine
+ * data from prod tracks). DS subtle motion + canonical focus rings applied
+ * to interactive controls.
  */
-export function LyricRow({
+export const LyricRow = React.memo(function LyricRow({
   line,
   index,
   isActive,
@@ -71,7 +76,7 @@ export function LyricRow({
           data-focused={isFocused && !isActive ? '' : undefined}
           className={cn(
             'group/lyric block w-full text-center cursor-pointer select-none bg-transparent border-0 p-0',
-            'transition-[color,opacity,transform] duration-subtle ease-subtle',
+            'transition-[color,opacity,transform] duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55',
             isActive
               ? 'text-primary-token text-[28px] leading-[1.25] font-display opacity-100'
               : 'text-tertiary-token text-[20px] leading-[1.35] font-display opacity-60 hover:opacity-90 hover:text-secondary-token'
@@ -106,7 +111,7 @@ export function LyricRow({
         type='button'
         onClick={onStamp}
         className={cn(
-          'shrink-0 h-6 px-1.5 rounded text-[10.5px] tabular-nums font-caption transition-colors duration-subtle ease-subtle',
+          'shrink-0 h-6 px-1.5 rounded text-[10.5px] tabular-nums font-caption transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55',
           isActive
             ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
             : 'text-tertiary-token bg-surface-1 border border-(--linear-app-shell-border) hover:text-primary-token hover:border-cyan-500/40'
@@ -129,4 +134,4 @@ export function LyricRow({
       />
     </li>
   );
-}
+});
