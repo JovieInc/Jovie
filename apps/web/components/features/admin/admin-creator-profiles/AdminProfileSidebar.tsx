@@ -8,11 +8,11 @@ import {
   DrawerSurfaceCard,
   DrawerTabbedCard,
   DrawerTabs,
-  EntityHeaderCard,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { useProfileHeaderParts } from '@/components/organisms/profile-sidebar/ProfileSidebarHeader';
+import { DrawerHero } from '@/components/shell/DrawerHero';
 import { BASE_URL } from '@/constants/domains';
 import { CopyLinkInput } from '@/features/dashboard/atoms/CopyLinkInput';
 import { ProfileAboutTab } from '@/features/dashboard/organisms/profile-contact-sidebar/ProfileAboutTab';
@@ -96,28 +96,27 @@ export function AdminProfileSidebar({
       ariaLabel='Creator profile'
       headerMode='minimal'
       hideMinimalHeaderBar
+      entityHeaderSurface='flat'
       entityHeader={
-        <DrawerSurfaceCard variant='card' className='relative overflow-hidden'>
-          <div className='space-y-3 p-3'>
-            <EntityHeaderCard
-              eyebrow='Creator profile'
+        <DrawerSurfaceCard variant='card' className='overflow-hidden'>
+          <div className='relative'>
+            <DrawerCardActionBar
+              primaryActions={primaryActions}
+              menuItems={contextMenuItems}
+              onClose={onClose}
+              overflowTriggerPlacement='card-top-right'
+              className='border-0 bg-transparent px-0 py-0'
+            />
+            <DrawerHero
               title={profile.displayName ?? profile.username}
               subtitle={`@${profile.username}`}
-              image={
+              artwork={
                 <AvatarUploadable
                   src={profile.avatarUrl}
                   alt={`${profile.displayName ?? profile.username} avatar`}
                   name={profile.displayName ?? profile.username}
                   size='2xl'
                   rounded='md'
-                />
-              }
-              actions={
-                <DrawerCardActionBar
-                  primaryActions={primaryActions}
-                  menuItems={contextMenuItems}
-                  onClose={onClose}
-                  overflowTriggerPlacement='card-top-right'
                 />
               }
               meta={
@@ -129,7 +128,7 @@ export function AdminProfileSidebar({
                   {profile.location ? <span>{profile.location}</span> : null}
                 </div>
               }
-              footer={
+              trailing={
                 <div className='grid grid-cols-[72px,minmax(0,1fr)] items-center gap-3'>
                   <Label className='text-2xs font-medium text-secondary-token'>
                     Profile link
@@ -142,7 +141,7 @@ export function AdminProfileSidebar({
                   />
                 </div>
               }
-              bodyClassName='pr-9'
+              className='[&_h2]:pr-9'
             />
           </div>
         </DrawerSurfaceCard>
