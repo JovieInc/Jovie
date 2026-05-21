@@ -62,13 +62,6 @@ export default function StartLoading() {
               </div>
             </div>
           </div>
-
-          {/* Subtle prompt hint row to match empty state density */}
-          <div className='flex flex-wrap justify-center gap-2 pt-1'>
-            <Skeleton className='h-8 w-28 rounded-full' rounded='full' />
-            <Skeleton className='h-8 w-24 rounded-full' rounded='full' />
-            <Skeleton className='h-8 w-32 rounded-full' rounded='full' />
-          </div>
         </div>
       </div>
     </div>

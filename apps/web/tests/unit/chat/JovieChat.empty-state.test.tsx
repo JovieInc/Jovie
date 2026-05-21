@@ -139,20 +139,14 @@ describe('JovieChat empty state', () => {
     mockChatState.isSubmitting = false;
   });
 
-  it('renders the minimal welcome state without prompt pills', () => {
+  it('renders the minimal welcome state without prompt pills or competing suggestion cards', () => {
     const { getByTestId, getByText, queryByTestId, queryByText } =
       renderWithQueryClient(<JovieChat profileId='profile-1' />);
 
-    expect(getByTestId('chat-empty-state-top-signals')).toBeTruthy();
-    expect(getByTestId('chat-empty-state-top-signals-row').className).toContain(
-      'lg:grid-cols-3'
-    );
-    expect(getByTestId('chat-empty-state-top-signals-row').className).toContain(
-      'snap-x'
-    );
-    expect(getByText('Release plan')).toBeTruthy();
-    expect(getByText('Asset brief')).toBeTruthy();
-    expect(getByText('Context')).toBeTruthy();
+    expect(queryByTestId('chat-empty-state-top-signals')).toBeNull();
+    expect(queryByText('Release plan')).toBeNull();
+    expect(queryByText('Asset brief')).toBeNull();
+    expect(queryByText('Context')).toBeNull();
     expect(getByText('What are we working on?')).toBeTruthy();
     expect(queryByText('Welcome back')).toBeNull();
     expect(queryByText('Welcome back, Tim')).toBeNull();
@@ -160,6 +154,10 @@ describe('JovieChat empty state', () => {
     expect(queryByText('Jovie Assistant')).toBeNull();
     expect(queryByText('Ask anything or tell Jovie what you need')).toBeNull();
     expect(getByTestId('chat-empty-state-composer-region')).toBeTruthy();
+    expect(getByTestId('chat-empty-state-action-card-slot')).toBeTruthy();
+    expect(
+      getByTestId('chat-empty-state-action-card-slot').className
+    ).toContain('h-[172px]');
     expect(queryByTestId('chat-empty-state-prompt-rail')).toBeNull();
     expect(getByTestId('chat-input')).toBeTruthy();
     expect(getByTestId('chat-input').getAttribute('data-placeholder')).toBe(
@@ -207,7 +205,7 @@ describe('JovieChat empty state', () => {
   it('hides the contextual action card while the empty composer has typed text', () => {
     mockChatState.input = 'Help me with';
 
-    const { getByTestId, queryByText } = renderWithQueryClient(
+    const { getByTestId, queryByTestId, queryByText } = renderWithQueryClient(
       <JovieChat
         profileId='profile-1'
         actionCards={[
@@ -223,7 +221,8 @@ describe('JovieChat empty state', () => {
     );
 
     expect(getByTestId('chat-empty-state-composer-region')).toBeTruthy();
-    expect(getByTestId('chat-empty-state-top-signals')).toBeTruthy();
+    expect(getByTestId('chat-empty-state-action-card-slot')).toBeTruthy();
+    expect(queryByTestId('chat-empty-state-top-signals')).toBeNull();
     expect(getByTestId('chat-input')).toBeTruthy();
     expect(queryByText('Connect Your Music Catalog')).toBeNull();
   });
