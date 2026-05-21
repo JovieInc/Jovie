@@ -438,6 +438,7 @@ export function useSubscriptionForm({
           ...analyticsBase,
           source,
           channel: 'email',
+          alert_opt_in_variant: experimentVariant,
         });
 
         return 'subscribed' as const;
@@ -451,6 +452,7 @@ export function useSubscriptionForm({
           ...analyticsBase,
           source,
           channel: 'email',
+          alert_opt_in_variant: experimentVariant,
         });
 
         return 'error' as const;
@@ -463,6 +465,7 @@ export function useSubscriptionForm({
       artist.id,
       clearError,
       emailInput,
+      experimentVariant,
       isSubmitting,
       otpCode,
       setNotificationsState,

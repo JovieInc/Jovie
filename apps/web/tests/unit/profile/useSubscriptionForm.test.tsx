@@ -127,7 +127,11 @@ describe('useSubscriptionForm', () => {
     mockVerifyOtpMutateAsync.mockResolvedValueOnce({ success: true });
 
     const { result } = renderHook(() =>
-      useSubscriptionForm({ artist, source: 'subscribe_tab' })
+      useSubscriptionForm({
+        artist,
+        source: 'subscribe_tab',
+        experimentVariant: 'toggle',
+      })
     );
 
     await act(async () => {
@@ -144,6 +148,7 @@ describe('useSubscriptionForm', () => {
         source: 'subscribe_tab',
         channel: 'email',
         handle: artist.handle,
+        alert_opt_in_variant: 'toggle',
       })
     );
   });
@@ -154,7 +159,11 @@ describe('useSubscriptionForm', () => {
     );
 
     const { result } = renderHook(() =>
-      useSubscriptionForm({ artist, source: 'hero_alerts_button' })
+      useSubscriptionForm({
+        artist,
+        source: 'hero_alerts_button',
+        experimentVariant: 'control',
+      })
     );
 
     await act(async () => {
@@ -171,6 +180,7 @@ describe('useSubscriptionForm', () => {
         source: 'hero_alerts_button',
         channel: 'email',
         handle: artist.handle,
+        alert_opt_in_variant: 'control',
       })
     );
   });
