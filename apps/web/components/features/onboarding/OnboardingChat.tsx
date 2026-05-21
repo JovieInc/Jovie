@@ -716,7 +716,9 @@ export function OnboardingChat({
     onConversationActivity?.();
   }, [messages, onConversationActivity, status]);
 
-  const composerStatusBanner =
+  const shouldShowTurnstileBanner =
+    Boolean(turnstilePanel) && isAwaitingFirstToken;
+  const chatErrorStatusBanner =
     chatError && composerPickerOpen ? (
       <div
         role='alert'
@@ -726,6 +728,15 @@ export function OnboardingChat({
       >
         <p className='font-medium text-primary-token'>Message paused</p>
         <p className='mt-0.5 text-secondary-token'>{chatError.message}</p>
+      </div>
+    ) : null;
+  const composerStatusBanner =
+    shouldShowTurnstileBanner || chatErrorStatusBanner ? (
+      <div className='divide-y divide-white/[0.065]'>
+        {shouldShowTurnstileBanner ? (
+          <div data-testid='onboarding-turnstile-slot'>{turnstilePanel}</div>
+        ) : null}
+        {chatErrorStatusBanner}
       </div>
     ) : null;
 
@@ -813,9 +824,6 @@ export function OnboardingChat({
           position guarantees zero layout shift on first user message. */}
       <div className='shrink-0 bg-(--linear-app-content-surface) px-4 pb-4 pt-2 sm:px-6 sm:pb-5 sm:pt-2.5 lg:px-8'>
         <div className='mx-auto w-full max-w-[45rem]'>
-          {turnstilePanel ? (
-            <div data-testid='onboarding-turnstile-slot'>{turnstilePanel}</div>
-          ) : null}
           <ChatInput {...onboardingChatInputProps} />
         </div>
       </div>
