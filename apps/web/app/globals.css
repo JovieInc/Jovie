@@ -126,6 +126,22 @@ html[data-desktop-runtime="electron"] [data-electron-update-pill="true"] {
   box-shadow: none;
 }
 
+/* Titlebar rail alignment for shellChatV1 — the app-shell-body has
+   p-[--linear-app-shell-gap] on all sides, so the sidebar column starts at
+   gap offset from the left edge. Mirror that offset in the titlebar so the
+   sidebar-cell left edge aligns with the sidebar rail. */
+html[data-desktop-runtime="electron"] [data-shell-design="shellChatV1"]
+  [data-electron-titlebar="true"] {
+  padding-left: var(--linear-app-shell-gap);
+  grid-template-columns: var(--linear-app-sidebar-width) minmax(0, 1fr);
+}
+
+/* Hide the in-sidebar dock/collapse button in Electron — the titlebar carries
+   the single canonical sidebar toggle so there is never a duplicate affordance. */
+html[data-desktop-runtime="electron"] [data-sidebar-dock-button="true"] {
+  display: none;
+}
+
 /* Marketing pages use document scrolling rather than app-shell scroll panes.
    Only override html — setting overflow-y:auto on body promotes overflow-x:clip
    to overflow-x:hidden, which creates a scroll container that breaks sticky. */
