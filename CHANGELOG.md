@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.32] - 2026-05-21
+
+> [internal] Loading and error surfaces now use the canonical JovieMarkElectric component, removing duplicated ad-hoc brand mark implementations.
+
+### Changed
+
+- **[internal] Loading/error brand marks (JOV-2365)**: replaced ad-hoc `BrandLogo` usages and a 67-line inline SVG with the canonical `JovieMarkElectric` component across five surfaces — shell cold-start bloom, authenticated page loader, SSO callback, unavailable page, and public error fallback. Also fixed pre-existing motion token violations (`duration-300` → `duration-subtle`, raw millisecond values → `var(--ds-motion-cinematic-duration)`).
+
 ## [26.5.29] - 2026-05-18
 
 > [internal] Profile music/releases scroll is now hardware-accelerated for smooth native-feel scrolling on touch devices.
