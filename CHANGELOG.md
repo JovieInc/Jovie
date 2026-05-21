@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.32] - 2026-05-21
+
+> [internal] Keyboard navigation in the releases shell view now supports J/K row selection, Enter to open the track sidebar, and focus-scoped navigation so keys don't fire when focus is elsewhere.
+
+### Added
+
+- **Keyboard navigation for shell releases (JOV-1823)**: J/K and arrow keys now select releases in the shell list; Enter opens the release sidebar for the selected row. Navigation is scoped to the list region — keys don't fire when focus is in a search input, drawer, or other panel.
+
 ## [26.5.29] - 2026-05-18
 
 > [internal] Profile music/releases scroll is now hardware-accelerated for smooth native-feel scrolling on touch devices.
