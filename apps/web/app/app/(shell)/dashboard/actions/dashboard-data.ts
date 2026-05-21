@@ -499,8 +499,13 @@ async function fetchDashboardBaseWithSession(
 
   if (!userData?.id) {
     try {
+      // Pass knownClerkUserId so resolveUserState does not call auth() or
+      // currentUser() — both access headers() and will throw ClerkUseCacheError
+      // when this function is invoked inside an unstable_cache boundary.
+      // (JOV-2441)
       const resolvedUserState = await resolveUserState({
         createDbUserIfMissing: true,
+        knownClerkUserId: sessionUserId,
       });
 
       if (
