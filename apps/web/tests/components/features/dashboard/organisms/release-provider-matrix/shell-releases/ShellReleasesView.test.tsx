@@ -775,4 +775,103 @@ describe('ShellReleasesView', () => {
       ).not.toBeInTheDocument();
     });
   });
+
+  describe('keyboard navigation (JOV-1823)', () => {
+    it('selects the first release on J key when nothing is selected', async () => {
+      renderShell([
+        fakeRelease({ id: 'r1', title: 'Alpha' }),
+        fakeRelease({ id: 'r2', title: 'Beta' }),
+      ]);
+
+      const rows = screen.getAllByRole('option');
+      expect(rows[0]).toHaveAttribute('aria-selected', 'false');
+
+      fireEvent.keyDown(document, { key: 'j' });
+
+      await waitFor(() => {
+        expect(rows[0]).toHaveAttribute('aria-selected', 'true');
+      });
+    });
+
+    it('moves selection down on J key and up on K key', async () => {
+      renderShell([
+        fakeRelease({ id: 'r1', title: 'Alpha' }),
+        fakeRelease({ id: 'r2', title: 'Beta' }),
+        fakeRelease({ id: 'r3', title: 'Gamma' }),
+      ]);
+
+      const rows = screen.getAllByRole('option');
+
+      // J selects first
+      fireEvent.keyDown(document, { key: 'j' });
+      await waitFor(() =>
+        expect(rows[0]).toHaveAttribute('aria-selected', 'true')
+      );
+
+      // J again moves to second
+      fireEvent.keyDown(document, { key: 'j' });
+      await waitFor(() => {
+        expect(rows[0]).toHaveAttribute('aria-selected', 'false');
+        expect(rows[1]).toHaveAttribute('aria-selected', 'true');
+      });
+
+      // K moves back to first
+      fireEvent.keyDown(document, { key: 'k' });
+      await waitFor(() => {
+        expect(rows[0]).toHaveAttribute('aria-selected', 'true');
+        expect(rows[1]).toHaveAttribute('aria-selected', 'false');
+      });
+    });
+
+    it('opens the release sidebar on Enter when a release is selected', async () => {
+      renderShell([
+        fakeRelease({ id: 'r1', title: 'Lost in the Light' }),
+        fakeRelease({ id: 'r2', title: 'Take Me Over' }),
+      ]);
+
+      // Navigate to first release with J
+      fireEvent.keyDown(document, { key: 'j' });
+      await waitFor(() => {
+        expect(screen.getAllByRole('option')[0]).toHaveAttribute(
+          'aria-selected',
+          'true'
+        );
+      });
+
+      // Enter should open the release sidebar
+      fireEvent.keyDown(document, { key: 'Enter' });
+
+      expect(await screen.findByTestId('release-sidebar')).toHaveTextContent(
+        'Lost in the Light'
+      );
+    });
+
+    it('does not fire J/K navigation when focus is inside a form element', () => {
+      renderShell([
+        fakeRelease({ id: 'r1', title: 'Alpha' }),
+        fakeRelease({ id: 'r2', title: 'Beta' }),
+      ]);
+
+      const rows = screen.getAllByRole('option');
+      const input = document.createElement('input');
+      document.body.appendChild(input);
+      input.focus();
+
+      fireEvent.keyDown(input, { key: 'j' });
+
+      // Selection should not change because focus is in a form element
+      expect(rows[0]).toHaveAttribute('aria-selected', 'false');
+      document.body.removeChild(input);
+    });
+
+    it('does not fire J/K when a modifier key is held', () => {
+      renderShell([fakeRelease({ id: 'r1', title: 'Alpha' })]);
+
+      const rows = screen.getAllByRole('option');
+
+      fireEvent.keyDown(document, { key: 'j', metaKey: true });
+
+      expect(rows[0]).toHaveAttribute('aria-selected', 'false');
+    });
+  });
 });

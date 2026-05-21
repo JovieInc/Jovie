@@ -36,7 +36,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
  * with restrained light, calmer chrome, and an embedded header.
  */
 .home-viewport {
-  --linear-header-height: 72px;
+  --linear-header-height: 56px;
   --homepage-page-gutter: clamp(1.25rem, 2.2vw, 2rem);
   --homepage-header-gutter: clamp(1.25rem, 2.2vw, 2rem);
   --homepage-radius: 1rem;
@@ -332,8 +332,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
   /* Match --linear-h1-weight 800 from Claude Design home-page-hero spec. */
   font-weight: 800;
   line-height: 1.04;
-  letter-spacing: -0.025em;
-  text-wrap: normal;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
   margin-left: auto;
   margin-right: auto;
   max-width: min(20ch, var(--homepage-hero-copy-max));
@@ -354,16 +354,16 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-hero-subhead {
-  margin-top: 0.75rem;
+  margin-top: 0.85rem;
   margin-left: auto;
   margin-right: auto;
   max-width: var(--homepage-hero-subhead-max);
   font-size: 18px;
   font-weight: 400;
-  line-height: 1.45;
-  letter-spacing: 0;
+  line-height: 1.55;
+  letter-spacing: -0.008em;
   text-wrap: balance;
-  color: rgba(234, 234, 255, 0.5);
+  color: rgba(234, 234, 255, 0.62);
 }
 
 .homepage-hero-actions {
@@ -1257,7 +1257,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 @media (max-width: 767px) {
   .home-viewport {
-    --linear-header-height: 72px;
+    --linear-header-height: 52px;
     --homepage-page-gutter: 1.5rem;
     --homepage-header-gutter: 1.5rem;
     --homepage-hero-top: calc(var(--linear-header-height) + 8.15rem);
@@ -2091,7 +2091,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 /* Frame.io-rhythm homepage cleanup: sparse hero, wide media, slower sections. */
 .home-viewport {
-  --linear-header-height: 80px;
+  --linear-header-height: 56px;
   --homepage-hero-top: calc(
     var(--linear-header-height) +
     clamp(4.9rem, 11.5vh, 7.8rem)
@@ -4323,7 +4323,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 @media (max-width: 767px) {
   .home-viewport {
-    --linear-header-height: 60px;
+    --linear-header-height: 52px;
     --homepage-hero-top: calc(var(--linear-header-height) + 3.9rem);
     --homepage-carousel-stage-height: clamp(22rem, 92vw, 28rem);
     --homepage-section-space: clamp(4.8rem, 15vw, 6.2rem);
