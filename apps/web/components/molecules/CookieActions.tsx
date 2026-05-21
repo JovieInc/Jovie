@@ -51,17 +51,17 @@ export function CookieActions({
   const secStyle: CSSProperties = compact
     ? {
         ...secondaryButtonStyle,
-        fontSize: '11px',
-        padding: '4px 8px',
-        height: '26px',
+        fontSize: '12px',
+        padding: '6px 10px',
+        height: '36px',
       }
     : secondaryButtonStyle;
   const priStyle: CSSProperties = compact
     ? {
         ...primaryButtonStyle,
-        fontSize: '11px',
-        padding: '4px 10px',
-        height: '26px',
+        fontSize: '12px',
+        padding: '6px 12px',
+        height: '36px',
       }
     : primaryButtonStyle;
 
