@@ -13,7 +13,9 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './tests/e2e',
   testMatch: [
+    '**/synthetic-auth-ui.spec.ts',
     '**/synthetic-golden-path.spec.ts',
+    '**/synthetic-legacy-otp.spec.ts',
     '**/public-profile-smoke.spec.ts',
   ],
   fullyParallel: false, // Sequential for stability in prod

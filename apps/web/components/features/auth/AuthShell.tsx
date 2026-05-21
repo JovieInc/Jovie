@@ -39,6 +39,53 @@ const REQUIRED_CLERK_AUTH_ELEMENTS = {
   },
 } as const satisfies ClerkAppearanceElements;
 
+const HIDE_ELEMENT_STYLE = { display: 'none !important' } as const;
+
+// Jovie is SSO-only (JOV-2446). Even if the Clerk dashboard regresses and
+// re-enables email/password or email-OTP strategies, every credential surface
+// must stay invisible at the rendering layer. The cron at
+// `/api/cron/clerk-config-audit` is the primary regression alarm; this map is
+// defense in depth so a regression doesn't render a usable credential form
+// between the time the dashboard flips and the next cron tick.
+const CREDENTIAL_HIDE_ELEMENTS: Record<string, typeof HIDE_ELEMENT_STYLE> = {
+  // Row containers (signIn-start and signUp-start)
+  formFieldRow__identifier: HIDE_ELEMENT_STYLE,
+  formFieldRow__emailAddress: HIDE_ELEMENT_STYLE,
+  formFieldRow__password: HIDE_ELEMENT_STYLE,
+  // Field wrappers
+  formField__identifier: HIDE_ELEMENT_STYLE,
+  formField__emailAddress: HIDE_ELEMENT_STYLE,
+  formField__password: HIDE_ELEMENT_STYLE,
+  // Inputs themselves
+  formFieldInput__identifier: HIDE_ELEMENT_STYLE,
+  formFieldInput__emailAddress: HIDE_ELEMENT_STYLE,
+  formFieldInput__password: HIDE_ELEMENT_STYLE,
+  // Labels
+  formFieldLabel__identifier: HIDE_ELEMENT_STYLE,
+  formFieldLabel__emailAddress: HIDE_ELEMENT_STYLE,
+  formFieldLabel__password: HIDE_ELEMENT_STYLE,
+  // Username/phone (forbidden in clerk-config-audit; complete defense-in-depth)
+  formFieldRow__username: HIDE_ELEMENT_STYLE,
+  formField__username: HIDE_ELEMENT_STYLE,
+  formFieldInput__username: HIDE_ELEMENT_STYLE,
+  formFieldLabel__username: HIDE_ELEMENT_STYLE,
+  formFieldRow__phoneNumber: HIDE_ELEMENT_STYLE,
+  formField__phoneNumber: HIDE_ELEMENT_STYLE,
+  formFieldInput__phoneNumber: HIDE_ELEMENT_STYLE,
+  formFieldLabel__phoneNumber: HIDE_ELEMENT_STYLE,
+  formattedPhoneNumberInput: HIDE_ELEMENT_STYLE,
+  // Verification-step fields (factor-one / verifications routes — only render
+  // if Clerk advances past start with email re-enabled; hide pre-emptively).
+  formFieldInput__code: HIDE_ELEMENT_STYLE,
+  otpCodeFieldInput: HIDE_ELEMENT_STYLE,
+  formResendCodeLink: HIDE_ELEMENT_STYLE,
+  // Form chrome that only makes sense around a credential form.
+  formButtonPrimary: HIDE_ELEMENT_STYLE,
+  dividerRow: HIDE_ELEMENT_STYLE,
+  alternativeMethods: HIDE_ELEMENT_STYLE,
+  alternativeMethodsBlockButton: HIDE_ELEMENT_STYLE,
+};
+
 const AUTH_LEGAL_FALLBACK_HREFS = {
   privacy: '/legal/privacy',
   terms: '/legal/terms',
@@ -80,20 +127,12 @@ function hasEnabledButtonMatching(
   });
 }
 
-function hasReadyClerkCredentialStart(root: HTMLDivElement | null) {
-  if (!root) return false;
-
-  const hasCredentialInput = root.querySelector(
-    'input[type="email"], input[name="identifier"], input[name="emailAddress"], input[type="password"], input[name="password"]'
-  );
-  if (!hasCredentialInput) return false;
-
-  return hasEnabledButtonMatching(root, text =>
-    /^(continue|sign in|sign up|verify)$/i.test(text)
-  );
-}
-
-function hasReadyClerkProviderStart(
+// Provider-only readiness check (JOV-2446). Jovie is SSO-only, so Clerk's
+// credential surface should never render. We do NOT fall back to detecting
+// `input[type="email"]` like the pre-2446 code did — a regression that
+// re-enables credentials must be visible (placeholder stays up), not silently
+// accepted.
+function hasReadyClerkAuthStart(
   root: HTMLDivElement | null,
   expectedProviderLabels: readonly string[]
 ) {
@@ -106,16 +145,6 @@ function hasReadyClerkProviderStart(
   }
 
   return hasEnabledButtonMatching(root, text => /^continue with /i.test(text));
-}
-
-function hasReadyClerkAuthStart(
-  root: HTMLDivElement | null,
-  expectedProviderLabels: readonly string[]
-) {
-  return (
-    hasReadyClerkCredentialStart(root) ||
-    hasReadyClerkProviderStart(root, expectedProviderLabels)
-  );
 }
 
 interface AuthShellProps {
@@ -168,11 +197,12 @@ interface AuthShellProps {
  * content frame so the full-page route and the intercepted modal route share
  * the exact same content model, typography, links, and provider list.
  *
- * Provider buttons are gated by `lib/auth/oauth-providers.ts`; otherwise the
- * appearance config hides them. This is the prevention test for JOV-2062
- * (Apple "invalid client" in production).
+ * Jovie is SSO-only (Google + Apple via Clerk) — see JOV-2446. Email/password
+ * is disabled in the Clerk dashboard and additionally hidden via
+ * `CREDENTIAL_HIDE_ELEMENTS` as defense in depth. Provider buttons are gated
+ * by `lib/auth/oauth-providers.ts` (JOV-2062 prevention).
  *
- * See JOV-2064.
+ * See JOV-2064, JOV-2437, JOV-2446.
  */
 export function AuthShell({
   mode,
@@ -197,12 +227,14 @@ export function AuthShell({
 
   const isSignUp = mode === 'sign-up';
 
-  // Sign-in cross-link → /waitlist (Jovie is invite-only; /signup is not a
-  // publicly navigable destination). Sign-up cross-link → /signin. #48
+  // Sign-in cross-link → Need help (/support). Sign-up cross-link → /signin.
+  // Pre-JOV-2446 the sign-in side pointed at /waitlist, which was a dead end
+  // for returnees who lost their SSO session. With email/password gone, a
+  // generic Need help link is the right escape hatch.
   const crossLinkUrl =
     oppositeModeUrl ??
     buildAuthRouteUrl(
-      isSignUp ? APP_ROUTES.SIGNIN : APP_ROUTES.WAITLIST,
+      isSignUp ? APP_ROUTES.SIGNIN : APP_ROUTES.SUPPORT,
       searchParams
     );
   const clerkCrossLinkUrl =
@@ -222,9 +254,11 @@ export function AuthShell({
     [enabledOAuthProviders]
   );
 
-  // Combine caller-supplied Clerk appearance with the provider guard so a
-  // disabled OAuth button (e.g. Apple while credentials are invalid) cannot
-  // leak through even if the caller forgets the guard.
+  // Combine caller-supplied Clerk appearance with the provider guard, the
+  // credential-hiding map (JOV-2446 defense in depth), and the required
+  // layout guards so disabled providers stay hidden, credential rows can
+  // never render, and Clerk's "Last used" badge cannot overlap the provider
+  // button row when callers pass their own appearance.
   const mergedAppearance = useMemo(() => {
     const providerGuard = buildDisabledOAuthProviderElements();
     const baseElements =
@@ -241,8 +275,9 @@ export function AuthShell({
           baseElements.lastAuthenticationStrategyBadge,
           REQUIRED_CLERK_AUTH_ELEMENTS.lastAuthenticationStrategyBadge
         ),
-        footer: 'hidden',
-        footerAction: 'hidden',
+        footer: HIDE_ELEMENT_STYLE,
+        footerAction: HIDE_ELEMENT_STYLE,
+        ...CREDENTIAL_HIDE_ELEMENTS,
         ...providerGuard,
       },
     } as Record<string, unknown>;
@@ -276,7 +311,28 @@ export function AuthShell({
     return () => observer.disconnect();
   }, [expectedProviderLabels, isMounted]);
 
+  const hasNoEnabledProviders = enabledOAuthProviders.length === 0;
   const showStablePlaceholder = !isMounted || !isClerkStartReady;
+
+  // If absolutely no providers are gated on, render the unavailable card
+  // instead of an indefinite placeholder. This prevents the auth surface
+  // from looking broken during a provider-wide incident (e.g., both Apple
+  // and Google credentials disabled simultaneously).
+  if (hasNoEnabledProviders) {
+    return (
+      <div
+        ref={containerRef}
+        data-auth-shell-mode={mode}
+        data-auth-shell-compact={compact ? 'true' : undefined}
+        data-auth-shell-ready='false'
+        data-auth-shell-providers='0'
+        className='relative min-h-[280px]'
+      >
+        <AuthProvidersUnavailable mode={mode} />
+        <AuthLegalText mode={mode} />
+      </div>
+    );
+  }
 
   return (
     <div
@@ -284,7 +340,7 @@ export function AuthShell({
       data-auth-shell-mode={mode}
       data-auth-shell-compact={compact ? 'true' : undefined}
       data-auth-shell-ready={isClerkStartReady ? 'true' : 'false'}
-      className='relative min-h-[480px]'
+      className='relative min-h-[360px]'
     >
       {showStablePlaceholder ? (
         <AuthStableStartPlaceholder
@@ -360,8 +416,11 @@ function AuthStableStartPlaceholder({
   return (
     <output
       data-auth-stable-placeholder
-      className='block'
-      aria-label='Loading authentication form'
+      data-loading='true'
+      className='block animate-pulse'
+      aria-label={
+        isSignUp ? 'Loading sign-up options' : 'Loading sign-in options'
+      }
       aria-busy='true'
     >
       <div className='mb-4 text-center'>
@@ -372,20 +431,6 @@ function AuthStableStartPlaceholder({
 
       <AuthProviderButtonSlots providers={providers} />
 
-      <div className='my-4 flex items-center gap-4' aria-hidden='true'>
-        <span className='h-px flex-1 bg-white/10' />
-        <span className='text-xs font-medium tracking-[-0.01em] text-white/42'>
-          or
-        </span>
-        <span className='h-px flex-1 bg-white/10' />
-      </div>
-
-      <div className='space-y-3 text-left' aria-hidden='true'>
-        <span className='block h-3 w-24 rounded-full bg-white/[0.08]' />
-        <span className='block h-10 w-full rounded-full border border-white/[0.08] bg-white/[0.035]' />
-        <span className='block h-10 w-full rounded-full bg-white' />
-      </div>
-
       <AuthModeSwitchLink
         mode={mode}
         oppositeModeUrl={oppositeModeUrl}
@@ -394,6 +439,33 @@ function AuthStableStartPlaceholder({
 
       <AuthLegalText mode={mode} />
     </output>
+  );
+}
+
+function AuthProvidersUnavailable({ mode }: Readonly<{ mode: AuthShellMode }>) {
+  const isSignUp = mode === 'sign-up';
+  return (
+    <div
+      data-auth-providers-unavailable
+      className='mx-auto max-w-[22rem] text-center'
+      role='status'
+    >
+      <p className='text-[clamp(1.25rem,2.2vw,1.625rem)] font-[680] leading-[1.15] tracking-[-0.02em] text-white'>
+        {isSignUp
+          ? 'Sign-up is temporarily unavailable'
+          : 'Sign-in is temporarily unavailable'}
+      </p>
+      <p className='mt-3 text-[0.9rem] leading-[1.5] text-white/72'>
+        Our sign-in providers are offline. Please try again in a few minutes, or{' '}
+        <a
+          href='mailto:support@jov.ie'
+          className='focus-ring-themed rounded-md text-white underline underline-offset-2'
+        >
+          contact support
+        </a>
+        .
+      </p>
+    </div>
   );
 }
 
@@ -407,8 +479,10 @@ function AuthModeSwitchLink({
   forceHardNavigation: boolean;
 }>) {
   const isSignUp = mode === 'sign-up';
-  const prompt = isSignUp ? 'Have an account?' : "Don't have access?";
-  const label = isSignUp ? 'Sign in' : 'Join the waitlist';
+  // Sign-in side: generic Need help link (no waitlist dead-end for returnees).
+  // Sign-up side: still cross-links to /signin for the "have an account" case.
+  const prompt = isSignUp ? 'Have an account?' : 'Need help?';
+  const label = isSignUp ? 'Sign in' : 'Get help';
   const className =
     'focus-ring-themed rounded-md text-white underline underline-offset-2';
 

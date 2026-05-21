@@ -50,6 +50,8 @@ export const ServerEnvSchema = z.object({
   // Clerk server-side configuration
   CLERK_SECRET_KEY: z.string().optional(),
   CLERK_WEBHOOK_SECRET: z.string().optional(),
+  CLERK_PUBLISHABLE_KEY_STAGING: z.string().optional(),
+  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().optional(),
 
   // Email / notifications
   RESEND_API_KEY: z.string().optional(),
@@ -291,6 +293,8 @@ export const ENV_KEYS = [
   'VERCEL_AUTOMATION_BYPASS_SECRET',
   'CLERK_SECRET_KEY',
   'CLERK_WEBHOOK_SECRET',
+  'CLERK_PUBLISHABLE_KEY_STAGING',
+  'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY',
   'RESEND_API_KEY',
   'RESEND_FROM_EMAIL',
   'RESEND_REPLY_TO_EMAIL',

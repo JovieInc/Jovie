@@ -51,6 +51,10 @@
     {
       "path": "/api/cron/public-profile-canary",
       "schedule": "13 6 * * *"
+    },
+    {
+      "path": "/api/cron/clerk-config-audit",
+      "schedule": "*/30 * * * *"
     }
   ],
   "functions": {

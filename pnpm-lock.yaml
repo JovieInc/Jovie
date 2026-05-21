@@ -474,13 +474,13 @@ importers:
         specifier: ^5.1.2
         version: 5.1.2(storybook@10.3.3(@testing-library/dom@10.4.1)(bufferutil@4.1.0)(prettier@3.8.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(utf-8-validate@6.0.6))
       '@clerk/backend':
-        specifier: ^3.4.1
+        specifier: 3.4.1
         version: 3.4.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@clerk/clerk-js':
-        specifier: ^6.7.7
+        specifier: 6.7.7
         version: 6.7.7(@solana/web3.js@1.98.4(bufferutil@4.1.0)(encoding@0.1.13)(typescript@6.0.3)(utf-8-validate@6.0.6))(@types/react@19.2.14)(bs58@6.0.0)(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(immer@11.1.4)(react-dom@19.2.4(react@19.2.4))(react-native@0.83.1(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.4)(utf-8-validate@6.0.6))(react@19.2.4)(typescript@6.0.3)(use-sync-external-store@1.6.0(react@19.2.4))(utf-8-validate@6.0.6)(zod@4.3.6)
       '@clerk/testing':
-        specifier: ^2.0.27
+        specifier: 2.0.27
         version: 2.0.27(@playwright/test@1.60.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@lhci/cli':
         specifier: ^0.15.1

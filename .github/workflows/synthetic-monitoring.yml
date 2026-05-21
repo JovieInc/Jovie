@@ -57,7 +57,20 @@ jobs:
         run: |
           doppler run -- pnpm --filter=@jovie/web exec tsx scripts/check-signup-readiness.ts --target=prd --source=env
 
-      - name: Run Golden Path Test
+      - name: Run Layer A Auth UI Canary (JOV-2446)
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          BASE_URL: https://jov.ie
+          PLAYWRIGHT_TEST_BASE_URL: https://jov.ie
+          E2E_SKIP_WEB_SERVER: '1'
+          E2E_SYNTHETIC_MODE: 'true'
+          E2E_ENVIRONMENT: production
+          SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/synthetic-auth-ui-results.json
+        run: |
+          doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-auth-ui.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-auth-ui
+        continue-on-error: true
+
+      - name: Run Golden Path Health + Performance
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
           BASE_URL: https://jov.ie
@@ -68,6 +81,25 @@ jobs:
           SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/synthetic-golden-path-results.json
         run: |
           doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-golden-path.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-golden-path
+        continue-on-error: true
+
+      - name: Run Legacy OTP Signup Canary (gated, JOV-2446 cutover)
+        # Skip this step entirely once Layer A is proven green and the Clerk
+        # dashboard has flipped to SSO-only — set repo variable
+        # `E2E_PROD_LEGACY_CANARY=0` to disable. Default is to run during the
+        # cutover window so monitoring does not go dark between merge and
+        # dashboard flip.
+        if: ${{ vars.E2E_PROD_LEGACY_CANARY != '0' }}
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          BASE_URL: https://jov.ie
+          PLAYWRIGHT_TEST_BASE_URL: https://jov.ie
+          E2E_SKIP_WEB_SERVER: '1'
+          E2E_SYNTHETIC_MODE: 'true'
+          E2E_ENVIRONMENT: production
+          SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/synthetic-legacy-otp-results.json
+        run: |
+          doppler run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-legacy-otp.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-legacy-otp
         continue-on-error: true
 
       - name: Run Public Profile Smoke Test (JOV-1653)
@@ -100,18 +132,37 @@ jobs:
 
       - name: Parse test results
         id: test-results
+        env:
+          LEGACY_CANARY_ENABLED: ${{ vars.E2E_PROD_LEGACY_CANARY != '0' && '1' || '0' }}
         run: |
           node <<'NODE'
           const fs = require('node:fs');
+          const legacyCanaryEnabled = process.env.LEGACY_CANARY_ENABLED === '1';
 
           const resultFiles = [
             {
+              name: 'synthetic-auth-ui',
+              path: 'apps/web/test-results/synthetic-auth-ui-results.json',
+              required: true,
+            },
+            {
               name: 'synthetic-golden-path',
               path: 'apps/web/test-results/synthetic-golden-path-results.json',
+              required: true,
             },
             {
               name: 'public-profile-smoke',
               path: 'apps/web/test-results/public-profile-smoke-results.json',
+              required: true,
+            },
+            {
+              // Optional — legacy OTP canary is gated at the workflow level on
+              // `E2E_PROD_LEGACY_CANARY` (JOV-2446). When the step is skipped,
+              // no results file is produced and we must NOT treat that as an
+              // error.
+              name: 'synthetic-legacy-otp',
+              path: 'apps/web/test-results/synthetic-legacy-otp-results.json',
+              required: legacyCanaryEnabled,
             },
           ];
           const outputFile = process.env.GITHUB_OUTPUT;
@@ -144,9 +195,15 @@ jobs:
 
           for (const resultFile of resultFiles) {
             if (!fs.existsSync(resultFile.path)) {
-              missingResults.push(
-                `${resultFile.name}: Test results file not found (${resultFile.path})`
-              );
+              if (resultFile.required !== false) {
+                missingResults.push(
+                  `${resultFile.name}: Test results file not found (${resultFile.path})`
+                );
+              } else {
+                console.log(
+                  `${resultFile.name}: optional results not produced (step likely skipped); ignoring.`
+                );
+              }
               continue;
             }
 
