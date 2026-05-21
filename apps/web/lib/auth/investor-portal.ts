@@ -29,6 +29,7 @@ export async function handleInvestorRequest(
   const hostname = req.nextUrl.hostname;
   const hostInfo = analyzeHost(hostname);
   const pathname = req.nextUrl.pathname;
+  const isResponseActionPath = pathname === '/investor-portal/respond';
 
   // --- Legacy subdomain redirect ---
   if (hostInfo.isInvestorPortal) {
@@ -66,6 +67,19 @@ export async function handleInvestorRequest(
   const tokenParam = req.nextUrl.searchParams.get(INVESTOR_TOKEN_PARAM);
 
   if (tokenParam) {
+    // Response links consume the token and action together in the page handler.
+    // Stripping ?t= here turns valid email links into 404s, and falling
+    // through to Clerk would make token-only links depend on session state.
+    if (isResponseActionPath) {
+      const res = NextResponse.next();
+      res.headers.set(
+        'X-Robots-Tag',
+        'noindex, nofollow, noarchive, nosnippet'
+      );
+      res.headers.set('Cache-Control', 'private, no-store');
+      return res;
+    }
+
     const isValid = await validateInvestorToken(tokenParam);
     if (!isValid) {
       return new NextResponse(null, { status: 404 });
