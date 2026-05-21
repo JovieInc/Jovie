@@ -237,7 +237,6 @@ function AgentOsBoardCard({
           </div>
         </button>
         <div className='flex shrink-0 items-center gap-1'>
-          <WorkflowStatusPill status={artifact.status} />
           <AgentRunDetailPopover artifact={artifact} />
         </div>
       </div>
@@ -269,7 +268,7 @@ function AgentOsBoard({
   }
 
   return (
-    <div className='grid gap-2 md:grid-cols-2 xl:grid-cols-3'>
+    <div className='grid gap-2 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'>
       {BOARD_STATUSES.map(status => {
         const laneRows = rows.filter(artifact => artifact.status === status);
 
