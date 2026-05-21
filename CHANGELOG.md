@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.32] - 2026-05-21
+
+> Homepage header tightened, hero copy sharpened, and FAQ streamlined for cleaner first impression.
+
+### Changed
+
+- **Homepage premium polish (JOV-1924)**: tightened header vertical padding (72px → 56px desktop, 60px → 52px mobile) for a more compact, premium feel; sharpened hero headline and subhead copy for conversion-clarity; updated hero subhead letter-spacing and opacity for better readability; shortened FAQ heading from "Frequently Asked Questions" to "Questions".
+
 ## [26.5.29] - 2026-05-18
 
 > [internal] Profile music/releases scroll is now hardware-accelerated for smooth native-feel scrolling on touch devices.
