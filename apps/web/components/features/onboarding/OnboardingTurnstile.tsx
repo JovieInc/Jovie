@@ -71,14 +71,14 @@ interface OnboardingTurnstileProps {
 const LOCAL_DEV_BYPASS_TOKEN = 'local-dev-turnstile-bypass';
 const DEFAULT_STATE: OnboardingTurnstileState = {
   status: 'loading',
-  message: 'Checking your browser before the first message.',
+  message: 'Checking your browser before your first message.',
 };
 
 function getStateCopy(state: OnboardingTurnstileState) {
   if (state.message) return state.message;
   switch (state.status) {
     case 'interactive':
-      return 'Complete the Cloudflare check to send your message.';
+      return 'Required before your first message.';
     case 'verified':
       return 'Verification complete.';
     case 'expired':
@@ -102,12 +102,12 @@ function getStateCopy(state: OnboardingTurnstileState) {
 function getHeading(status: OnboardingTurnstileStatus) {
   if (status === 'verified' || status === 'bypassed') return 'Verified';
   if (status === 'error' || status === 'timeout' || status === 'expired') {
-    return 'Verification needed';
+    return 'Verification Needed';
   }
   if (status === 'unsupported' || status === 'unconfigured') {
-    return 'Verification unavailable';
+    return 'Verification Unavailable';
   }
-  return 'Security check';
+  return 'Security Check';
 }
 
 export function OnboardingTurnstile({
@@ -196,7 +196,7 @@ export function OnboardingTurnstile({
         'before-interactive-callback': () =>
           commitState({
             status: 'interactive',
-            message: 'Complete the Cloudflare check to send your message.',
+            message: 'Required before your first message.',
           }),
         'after-interactive-callback': () =>
           commitState({
@@ -290,19 +290,19 @@ export function OnboardingTurnstile({
         data-testid='onboarding-turnstile-panel'
         data-turnstile-status={state.status}
         className={cn(
-          'mb-2 rounded-[16px] border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_84%,transparent)] bg-[linear-gradient(180deg,rgba(255,255,255,0.052)_0%,rgba(255,255,255,0.016)_100%),var(--linear-app-content-surface)] px-3.5 py-3 text-primary-token shadow-[0_12px_32px_-26px_rgba(0,0,0,0.82)] outline-none',
-          'focus-visible:border-[color-mix(in_oklab,var(--linear-border-focus)_70%,transparent)] focus-visible:ring-1 focus-visible:ring-[color-mix(in_oklab,var(--linear-border-focus)_38%,transparent)]'
+          'px-3 py-2.5 text-primary-token outline-none sm:px-3.5 sm:py-3',
+          'focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
         )}
       >
-        <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
+        <div className='flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between'>
           <div className='min-w-0'>
             <p
               id={headingId}
-              className='text-[12.5px] font-medium leading-5 text-primary-token'
+              className='text-app font-medium leading-5 text-primary-token'
             >
               {getHeading(state.status)}
             </p>
-            <p className='mt-0.5 text-[12px] leading-5 text-secondary-token'>
+            <p className='mt-0.5 max-w-[34rem] text-2xs leading-5 text-secondary-token sm:text-[12px]'>
               {panelCopy}
             </p>
           </div>
@@ -310,18 +310,23 @@ export function OnboardingTurnstile({
             <button
               type='button'
               onClick={() => resetWidget()}
-              className='h-8 shrink-0 rounded-[10px] border border-[color-mix(in_oklab,var(--linear-app-frame-seam)_84%,transparent)] px-3 text-[11px] font-medium text-primary-token transition-[border-color,color,background-color] duration-fast hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[color-mix(in_oklab,var(--linear-border-focus)_42%,transparent)]'
+              className='h-7 shrink-0 rounded-full border border-subtle px-2.5 text-2xs font-medium text-secondary-token transition-[background-color,border-color,color] duration-subtle hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
             >
-              Retry verification
+              Retry Verification
             </button>
           ) : null}
         </div>
         {siteKey ? (
           <div
-            ref={containerRef}
-            id={`cf-turnstile-${widgetDomId}`}
-            className='mt-3 min-h-0'
-          />
+            className='mt-2.5 overflow-hidden rounded-[10px] border border-subtle bg-surface-0'
+            data-testid='onboarding-turnstile-widget-frame'
+          >
+            <div
+              ref={containerRef}
+              id={`cf-turnstile-${widgetDomId}`}
+              className='min-h-[64px]'
+            />
+          </div>
         ) : null}
       </section>
     </>
