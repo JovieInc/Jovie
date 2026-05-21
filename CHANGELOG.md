@@ -5,6 +5,15 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.32] - 2026-05-20
+
+> [internal] Release task checklist animations now use the DS subtle-motion spec (0.15 s cubic-bezier), and the screenshot registry selector comment is expanded for clarity.
+
+### Changed
+
+- **[internal] ReleaseTaskChecklist motion timing**: aligned all three entrance transitions to the design-system subtle-motion spec — 0.15 s duration with `[0.4, 0, 0.2, 1]` cubic-bezier instead of 0.3 s / 0.25 s `easeOut`.
+- **[internal] Screenshot registry comment**: expanded the `public-profile-desktop` waitFor comment to document why `profile-compact-shell` is the stable post-hydration selector across shell migration waves.
+
 ## [26.5.29] - 2026-05-18
 
 > [internal] Profile music/releases scroll is now hardware-accelerated for smooth native-feel scrolling on touch devices.
