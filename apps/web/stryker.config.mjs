@@ -54,6 +54,14 @@ export default {
     // and durable dedupe (onConflictDoNothing + processed flag). Complements stripe row;
     // enables mutation evidence on verification + idempotency branches per register notes.
     'app/api/webhooks/**/route.ts',
+    // API route schema contracts (YELLOW 25.6 per TEST_RISK_REGISTER + heatmap, after public-profile-isr YELLOW #9409 + priors: webhook-signatures #9405, claim-onboarding #9401 series, rls #9406, proxy #9407, dev-test #9399, entitlements).
+    // Parametric contract coverage: dedicated per-route tests assert auth checks (getCachedAuth → 401 'Unauthorized'), zod.safeParse / json parse failures (400 'Invalid input'/'Invalid JSON'), success paths.
+    // Representative routes (excludes /cron, /webhooks/**, /dev/*, claim-onboarding/* covered by dedicated surfaces). Provides mutation evidence on common schema/auth branches for the api-routes-contract surface (glob app/api/**/route.ts).
+    // Matches exact contract patterns + stryker wiring from predecessors (#9405 sms/webhook sig+idempotency+outer-catch+400/401/500, #9399 dev-test 403/persona, #9406 withDashboardRoute 401/outer-catch/captureError).
+    'app/api/waitlist/route.ts',
+    'app/api/verification/request/route.ts',
+    'app/api/pre-save/apple/route.ts',
+    'app/api/wrap-link/route.ts',
     // FAPI host decoding + Clerk env key resolution — broken auth here
     // locks out every user across all three Clerk environments.
     'lib/auth/decode-fapi-host.ts',
@@ -242,6 +250,13 @@ export default {
     // + all other /webhooks/* tests (linear/resend/sentry/stripe-*) for sig/replay/dedupe paths.
     // Enables Stryker mutation kills on the critical verification + durable dedupe branches.
     'tests/unit/api/webhooks/**/*.test.ts',
+    // API route schema contracts (YELLOW 25.6 gap-8 closure after public-profile-isr #9409).
+    // Includes dedicated route contract tests exercising auth (401), parse failures (400 zod/json), success shapes for waitlist/verification/pre-save/wrap-link etc.
+    // Wires Stryker mutation on the api-routes-contract surface (common validation + auth contract branches); excludes specials per register.
+    'tests/unit/api/waitlist/waitlist.test.ts',
+    'tests/unit/api/verification/request.test.ts',
+    'tests/unit/api/pre-save/apple.test.ts',
+    'tests/unit/api/wrap-link/wrap-link.test.ts',
   ],
   ignorePatterns: [
     '.next',
