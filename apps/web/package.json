@@ -289,7 +289,7 @@
     "plop": "^4.0.5",
     "postcss": "^8.5.15",
     "storybook": "^10.3.3",
-    "tailwindcss": "^4.2.2",
+    "tailwindcss": "^4.3.0",
     "tsx": "^4.21.0",
     "typescript": "^6.0.3",
     "vite": "8.0.9",
