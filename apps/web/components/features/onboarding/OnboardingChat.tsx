@@ -48,6 +48,7 @@ import {
   type SocialLinkOutput,
   useArtistSelectionMessage,
 } from './OnboardingToolArtifacts';
+import type { OnboardingTurnstileStatus } from './OnboardingTurnstile';
 
 /**
  * Anonymous onboarding chat client (JOV-2132 PR 3).
@@ -61,6 +62,14 @@ import {
 interface OnboardingChatProps {
   /** Turnstile token from the widget. Required on first message. */
   readonly turnstileToken: string | null;
+  /** Current Turnstile widget state for first-message gating. */
+  readonly turnstileStatus?: OnboardingTurnstileStatus;
+  /** Visible Turnstile challenge panel rendered near the composer. */
+  readonly turnstilePanel?: ReactNode;
+  /** Requests the visible Turnstile panel when a send needs verification. */
+  readonly onTurnstileRequired?: (message?: string) => void;
+  /** Clears stale verification after the server rejects a token. */
+  readonly onTurnstileRejected?: () => void;
   /** Fires after a submitted user turn reaches the ready state. */
   readonly onConversationActivity?: () => void;
   /** Emits selected/matched profile state for the progressive builder rail. */
@@ -536,6 +545,10 @@ function OnboardingInitialIntro({ hidden }: { readonly hidden: boolean }) {
 export function OnboardingChat({
   onConversationActivity,
   onProfileBuilderChange,
+  onTurnstileRejected,
+  onTurnstileRequired,
+  turnstilePanel,
+  turnstileStatus,
   turnstileToken,
 }: OnboardingChatProps) {
   const [input, setInput] = useState('');
@@ -585,6 +598,10 @@ export function OnboardingChat({
       if (lastAttemptedMessageRef.current) {
         setInput(lastAttemptedMessageRef.current);
       }
+      if (metadata.errorCode === 'TURNSTILE_REQUIRED') {
+        setHasSentFirst(false);
+        onTurnstileRejected?.();
+      }
     },
   });
 
@@ -592,8 +609,15 @@ export function OnboardingChat({
   const isStreaming = status === 'streaming';
   const isBusy = isSubmitted || isStreaming;
   const requiresTurnstile = process.env.NODE_ENV !== 'development';
+  const isTurnstileTokenUsable =
+    Boolean(turnstileToken) &&
+    turnstileStatus !== 'expired' &&
+    turnstileStatus !== 'timeout' &&
+    turnstileStatus !== 'error' &&
+    turnstileStatus !== 'unsupported' &&
+    turnstileStatus !== 'unconfigured';
   const isAwaitingFirstToken =
-    requiresTurnstile && !hasSentFirst && !turnstileToken;
+    requiresTurnstile && !hasSentFirst && !isTurnstileTokenUsable;
   const lastMessage = messages[messages.length - 1];
   const shouldShowThinking = isBusy && lastMessage?.role === 'user';
   const displayMessages: readonly UIMessage[] = shouldShowThinking
@@ -625,8 +649,8 @@ export function OnboardingChat({
       const text = composeMessage(chipTray.chips, rawText).trim();
       if (!text || isBusy) return;
       if (isAwaitingFirstToken) {
-        // Turnstile hasn't issued a token yet; the widget normally resolves
-        // within ~500ms. Silently no-op so the user can retry.
+        setChatError(null);
+        onTurnstileRequired?.('Verify you are human to send');
         return;
       }
       lastAttemptedMessageRef.current = text;
@@ -637,7 +661,14 @@ export function OnboardingChat({
       setHasSentFirst(true);
       setInput('');
     },
-    [chipTray, isAwaitingFirstToken, isBusy, notifyJankSend, sendMessage]
+    [
+      chipTray,
+      isAwaitingFirstToken,
+      isBusy,
+      notifyJankSend,
+      onTurnstileRequired,
+      sendMessage,
+    ]
   );
 
   const handleSubmit = useCallback(
@@ -708,7 +739,7 @@ export function OnboardingChat({
     onChange: setInput,
     onSubmit: handleSubmit,
     isLoading: isBusy,
-    isSubmitting: isSubmitted || isAwaitingFirstToken,
+    isSubmitting: isSubmitted,
     isStreaming,
     onStop: stop,
     // Raw "Securing chat..." text is replaced in follow-up pass with
@@ -782,6 +813,9 @@ export function OnboardingChat({
           position guarantees zero layout shift on first user message. */}
       <div className='shrink-0 bg-(--linear-app-content-surface) px-4 pb-4 pt-2 sm:px-6 sm:pb-5 sm:pt-2.5 lg:px-8'>
         <div className='mx-auto w-full max-w-[45rem]'>
+          {turnstilePanel ? (
+            <div data-testid='onboarding-turnstile-slot'>{turnstilePanel}</div>
+          ) : null}
           <ChatInput {...onboardingChatInputProps} />
         </div>
       </div>
