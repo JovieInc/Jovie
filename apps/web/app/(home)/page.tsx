@@ -322,7 +322,7 @@ function HomepageFaq() {
     <div id='faq' className='homepage-faq-section' data-testid='homepage-faq'>
       <FaqSection
         items={HOMEPAGE_LAUNCH_COPY.faq}
-        heading='Frequently Asked Questions'
+        heading='Questions'
         headingClassName='homepage-story-heading'
         className='mx-auto w-full max-w-[760px] px-[var(--homepage-page-gutter)] py-[var(--homepage-section-space)]'
         analyticsEventName='homepage_faq_opened'
