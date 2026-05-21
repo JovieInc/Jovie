@@ -6,18 +6,7 @@ import { useDesktopUpdate } from '@/lib/desktop/electron-bridge';
 import { cn } from '@/lib/utils';
 import { useWebUpdate } from '@/lib/version/use-web-update';
 
-interface UpdateAvailablePillProps {
-  /**
-   * Compact mode — collapses to an icon-only circle.
-   * Used in the Electron titlebar when the sidebar is open to conserve space.
-   * Transitions smoothly to the full text pill when false.
-   */
-  readonly compact?: boolean;
-}
-
-export function UpdateAvailablePill({
-  compact = false,
-}: UpdateAvailablePillProps) {
+export function UpdateAvailablePill() {
   const desktop = useDesktopUpdate();
   const web = useWebUpdate();
   const [updating, setUpdating] = useState(false);
@@ -48,10 +37,8 @@ export function UpdateAvailablePill({
       aria-label='Update available — click to install'
       style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       className={cn(
-        'inline-flex h-7 min-w-[28px] items-center justify-center rounded-full bg-white text-black',
-        'overflow-hidden transition-[max-width,padding,gap] duration-subtle',
-        'hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-1 disabled:opacity-70',
-        compact ? 'max-w-[28px] gap-0 px-0' : 'max-w-[100px] gap-1.5 px-3'
+        'inline-flex h-7 items-center justify-center gap-1.5 rounded-full bg-white px-3 text-black',
+        'hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-1 disabled:opacity-70'
       )}
     >
       {updating ? (
@@ -62,13 +49,7 @@ export function UpdateAvailablePill({
       ) : (
         <Download className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
       )}
-      <span
-        className={cn(
-          'whitespace-nowrap text-[12px] font-medium',
-          'transition-opacity duration-subtle',
-          compact ? 'opacity-0' : 'opacity-100'
-        )}
-      >
+      <span className='whitespace-nowrap text-[12px] font-medium'>
         {updating ? 'Updating…' : 'Update'}
       </span>
     </button>

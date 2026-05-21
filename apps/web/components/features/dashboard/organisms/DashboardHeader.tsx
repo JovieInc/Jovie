@@ -143,7 +143,6 @@ export function DashboardHeader({
   return (
     <header
       data-testid='dashboard-header'
-      data-electron-drag-region='true'
       className={cn('z-20 bg-(--linear-app-content-surface)', className)}
     >
       <MobileHeader

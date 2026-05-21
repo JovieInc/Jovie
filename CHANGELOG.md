@@ -5,6 +5,27 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.35] - 2026-05-21
+
+> The page header now lives inside the elevated content card and moves with the sidebar when you collapse it — matching Linear's layout. The "Update available" button in the desktop app is no longer a tiny featureless circle; it shows the full "Update" pill with icon and label.
+
+### Changed
+
+- **Electron desktop shell: header inside content card.** Moved `DashboardHeader` out of the top reserved titlebar and into the elevated content card so the entire card (header + body) collapses/expands with the sidebar. Removed the duplicate-render hack that previously rendered the header twice (one copy hidden via `display: none`) and zeroed `#main-content`'s top radius to fake a stitched surface. Net `−94` lines across 9 files.
+- **[internal] Sidebar header identity**: added a "Jovie" wordmark next to the BrandLogo in the default single-profile sidebar header so the header has a clear identity anchor instead of just a 14px logo.
+- **[internal] Titlebar height**: reduced `--electron-titlebar-height` from 52px to 40px now that the header no longer occupies the titlebar.
+
+### Fixed
+
+- **Update pill no longer renders as an empty circle.** Removed `UpdateAvailablePill`'s `compact` prop entirely so the pill is always full text+icon when an update is available. The 28px compact circle was rendering as a featureless white dot in the squished sidebar-cell.
+- **[internal] In-card header drag region (regression prevention)**: removed `data-electron-drag-region='true'` from `DashboardHeader` so the now-in-card header is not a window drag handle. The titlebar above remains the drag region.
+
+### Removed
+
+- **[internal] Back/forward nav pill in the Electron titlebar**: removed the visible pill. Cmd+[ / Cmd+] still navigate via `useDesktopNavigation`.
+- **[internal] Stitched-surface CSS hacks**: deleted four rule blocks from `globals.css` plus the `[data-sidebar-dock-button]` hide-in-Electron rule (now dead because the button is no longer rendered in Electron).
+- **[internal] `SidebarDockButton` in Electron**: conditionally skipped via `useIsElectronRuntime()` instead of rendered-then-hidden via CSS.
+
 ## [26.5.34] - 2026-05-21
 
 > Fixed a layout shift on public artist profile pages that caused Lighthouse CLS scores of 0.317, unblocking the Lighthouse CI gate.

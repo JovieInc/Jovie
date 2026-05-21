@@ -24,12 +24,20 @@ describe('AppShellFrame', () => {
     expect(mainContent).toHaveClass(
       'lg:shadow-[var(--linear-app-shell-shadow)]'
     );
+    // #main-content keeps its full rounded shell radius — no Electron override
+    // strips the top corners now that the header lives inside the card.
+    expect(mainContent).toHaveClass(
+      'lg:rounded-[var(--linear-app-shell-radius)]'
+    );
     expect(mainContent.querySelector('div.flex.flex-1')).toHaveClass(
       'lg:gap-[var(--linear-app-shell-gap)]'
     );
     expect(screen.getByText('Sidebar')).toBeInTheDocument();
-    expect(screen.getByText('Header')).toBeInTheDocument();
     expect(screen.getByText('Main Content')).toBeInTheDocument();
+    // Header renders exactly once inside main (no duplicate-render hack).
+    const headers = screen.getAllByText('Header');
+    expect(headers).toHaveLength(1);
+    expect(mainContent).toContainElement(headers[0] as HTMLElement);
   });
 
   it('defaults to the legacy variant so flag-off callers match production', () => {

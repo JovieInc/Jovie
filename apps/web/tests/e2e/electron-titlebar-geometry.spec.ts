@@ -3,7 +3,8 @@
  *
  * These tests run in the browser (not in an actual Electron shell) and verify:
  * 1. The titlebar DOM structure — sidebar-cell contains sidebar toggle + update pill;
- *    main-cell contains the nav pill group.
+ *    main-cell is a plain drag region (no nav pill, no header — those moved into
+ *    the elevated content card below).
  * 2. No duplicate sidebar toggles — only one [data-sidebar-dock-button] per page and
  *    it must not also have [data-testid="electron-sidebar-toggle"] as a sibling.
  * 3. The sidebar-cell width equals the CSS sidebar-width token, confirming rail alignment.
@@ -65,7 +66,7 @@ async function gotoChatRoute(page: Page): Promise<void> {
   }
 }
 
-test('titlebar DOM has a single sidebar toggle and nav pill group', async ({
+test('titlebar DOM has a single sidebar toggle and an empty main-cell drag region', async ({
   page,
 }) => {
   test.skip(
@@ -93,7 +94,7 @@ test('titlebar DOM has a single sidebar toggle and nav pill group', async ({
   const titlebarRow = page.locator('[data-testid="electron-titlebar-row"]');
   await expect(titlebarRow).toBeAttached({ timeout: 10_000 });
 
-  // Sidebar cell: must contain the canonical sidebar toggle and the update-pill slot.
+  // Sidebar cell: must contain the canonical sidebar toggle.
   const sidebarCell = titlebarRow.locator(
     '[data-testid="electron-titlebar-sidebar-cell"]'
   );
@@ -102,29 +103,21 @@ test('titlebar DOM has a single sidebar toggle and nav pill group', async ({
     sidebarCell.locator('[data-testid="electron-sidebar-toggle"]')
   ).toBeAttached();
 
-  // Main cell: must contain the nav pill group with back + forward inside it.
+  // Main cell exists as a drag region but contains no chrome — the page header
+  // and any nav controls now live inside the elevated content card below.
   const mainCell = titlebarRow.locator(
     '[data-testid="electron-titlebar-main-cell"]'
   );
   await expect(mainCell).toBeAttached();
-  const navPill = mainCell.locator('[data-testid="electron-nav-pill"]');
-  await expect(navPill).toBeAttached();
   await expect(
-    navPill.locator('[data-testid="electron-nav-back"]')
-  ).toBeAttached();
+    mainCell.locator('[data-testid="electron-nav-pill"]')
+  ).toHaveCount(0);
   await expect(
-    navPill.locator('[data-testid="electron-nav-forward"]')
-  ).toBeAttached();
-
-  // Back + forward must NOT be inside the sidebar cell (they moved to the main cell).
-  const backInSidebarCell = sidebarCell.locator(
-    '[data-testid="electron-nav-back"]'
-  );
-  await expect(backInSidebarCell).toHaveCount(0);
-  const forwardInSidebarCell = sidebarCell.locator(
-    '[data-testid="electron-nav-forward"]'
-  );
-  await expect(forwardInSidebarCell).toHaveCount(0);
+    mainCell.locator('[data-testid="electron-nav-back"]')
+  ).toHaveCount(0);
+  await expect(
+    mainCell.locator('[data-testid="electron-nav-forward"]')
+  ).toHaveCount(0);
 });
 
 test('no duplicate sidebar dock button and titlebar toggle on the same page', async ({
