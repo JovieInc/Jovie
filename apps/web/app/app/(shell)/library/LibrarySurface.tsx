@@ -27,6 +27,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import {
   type CSSProperties,
+  memo,
   type ReactNode,
   useEffect,
   useId,
@@ -65,11 +66,11 @@ import {
 const LIBRARY_TABLE_ROW_HEIGHT = 56;
 const LIBRARY_TABLE_MIN_WIDTH = '0';
 const LIBRARY_CARD_FOCUS_CLASS =
-  'focus-visible:outline-none focus-visible:bg-(--linear-row-hover) focus-visible:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_45%,transparent)]';
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface) outline-none';
 const LIBRARY_BUTTON_FOCUS_CLASS =
-  'focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1 focus-visible:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_35%,transparent)]';
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface) outline-none';
 const LIBRARY_ICON_FOCUS_CLASS =
-  'focus-visible:outline-none focus-visible:bg-surface-1 focus-visible:text-primary-token focus-visible:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_45%,transparent)]';
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface) outline-none';
 
 const LIBRARY_TABLE_SKELETON_CONFIG: Array<{
   readonly width?: string;
@@ -358,7 +359,11 @@ function Artwork({
   );
 }
 
-function ReleaseCell({ asset }: { readonly asset: LibraryReleaseAsset }) {
+const ReleaseCell = memo(function ReleaseCell({
+  asset,
+}: {
+  readonly asset: LibraryReleaseAsset;
+}) {
   return (
     <div className='flex min-w-0 items-center gap-2.5'>
       <span className='h-10 w-10 shrink-0 overflow-hidden rounded-md bg-black'>
@@ -374,9 +379,13 @@ function ReleaseCell({ asset }: { readonly asset: LibraryReleaseAsset }) {
       </span>
     </div>
   );
-}
+});
 
-function StatusCell({ asset }: { readonly asset: LibraryReleaseAsset }) {
+const StatusCell = memo(function StatusCell({
+  asset,
+}: {
+  readonly asset: LibraryReleaseAsset;
+}) {
   return (
     <span
       className={cn(
@@ -387,15 +396,19 @@ function StatusCell({ asset }: { readonly asset: LibraryReleaseAsset }) {
       {formatReleaseStatus(asset.status)}
     </span>
   );
-}
+});
 
-function ProvidersCell({ asset }: { readonly asset: LibraryReleaseAsset }) {
+const ProvidersCell = memo(function ProvidersCell({
+  asset,
+}: {
+  readonly asset: LibraryReleaseAsset;
+}) {
   return (
     <span className='inline-flex h-6 min-w-7 items-center justify-center rounded-md border border-subtle bg-surface-0 px-2 text-xs tabular-nums text-secondary-token'>
       {formatCompactCount(asset.providerCount)}
     </span>
   );
-}
+});
 
 const libraryColumnHelper = createColumnHelper<LibraryReleaseAsset>();
 
@@ -554,7 +567,7 @@ function LibraryRail({
                 type='button'
                 onClick={() => onPreset(view.id)}
                 className={cn(
-                  'flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-[12.5px] transition-colors duration-subtle',
+                  'flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-[12.5px] transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface) outline-none',
                   active
                     ? 'bg-surface-1 text-primary-token'
                     : 'text-secondary-token hover:bg-surface-1 hover:text-primary-token'
@@ -577,7 +590,7 @@ function LibraryRail({
             <button
               type='button'
               onClick={onClearFilters}
-              className='rounded px-1.5 py-0.5 text-2xs text-tertiary-token transition-colors duration-subtle hover:bg-surface-1 hover:text-primary-token'
+              className='rounded px-1.5 py-0.5 text-2xs text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token'
             >
               Clear {activeFilterCount}
             </button>
@@ -682,12 +695,12 @@ function FilterSection({
         aria-controls={panelId}
         aria-expanded={open}
         onClick={() => setOpen(value => !value)}
-        className='flex h-6 w-full items-center justify-between rounded-md px-1 text-[11px] font-medium text-tertiary-token transition-colors duration-subtle hover:bg-surface-1 hover:text-primary-token'
+        className='flex h-6 w-full items-center justify-between rounded-md px-1 text-[11px] font-medium text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token'
       >
         <span>{label}</span>
         <ChevronDown
           className={cn(
-            'h-3 w-3 transition-transform duration-subtle',
+            'h-3 w-3 transition-transform duration-subtle ease-subtle',
             !open && '-rotate-90'
           )}
           aria-hidden='true'
@@ -726,7 +739,7 @@ function FilterRow({
       type='button'
       onClick={onClick}
       className={cn(
-        'flex h-7 w-full items-center gap-2 rounded-md px-2 text-[12px] transition-colors duration-subtle',
+        'flex h-7 w-full items-center gap-2 rounded-md px-2 text-[12px] transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface) outline-none',
         active
           ? 'bg-surface-1 text-primary-token'
           : 'text-secondary-token hover:bg-surface-1 hover:text-primary-token'
@@ -861,7 +874,11 @@ function LibraryToolbar({
   );
 }
 
-function AssetKindPill({ kind }: { readonly kind: LibraryAssetKind }) {
+const AssetKindPill = memo(function AssetKindPill({
+  kind,
+}: {
+  readonly kind: LibraryAssetKind;
+}) {
   const Icon = ASSET_KIND_ICONS[kind];
   return (
     <span className='inline-flex h-6 items-center gap-1 rounded-md bg-surface-1 px-2 text-xs text-secondary-token'>
@@ -869,9 +886,9 @@ function AssetKindPill({ kind }: { readonly kind: LibraryAssetKind }) {
       {ASSET_KIND_LABELS[kind]}
     </span>
   );
-}
+});
 
-function AssetCard({
+const AssetCard = memo(function AssetCard({
   asset,
   selected,
   onSelect,
@@ -883,7 +900,7 @@ function AssetCard({
   return (
     <article
       className={cn(
-        'group relative min-w-0 overflow-hidden rounded-lg border bg-surface-0 transition-[border-color,background-color] duration-subtle',
+        'group relative min-w-0 overflow-hidden rounded-lg border bg-surface-0 transition-[border-color,background-color] duration-subtle ease-subtle',
         selected
           ? 'border-(--linear-border-focus) bg-surface-1'
           : 'border-subtle hover:border-default'
@@ -893,7 +910,7 @@ function AssetCard({
         type='button'
         onClick={onSelect}
         className={cn(
-          'flex h-full w-full flex-col text-left transition-[background-color,box-shadow] duration-subtle',
+          'flex h-full w-full flex-col text-left transition-[background-color,box-shadow] duration-subtle ease-subtle',
           LIBRARY_CARD_FOCUS_CLASS
         )}
       >
@@ -942,7 +959,7 @@ function AssetCard({
       </button>
     </article>
   );
-}
+});
 
 function AssetGrid({
   assets,
