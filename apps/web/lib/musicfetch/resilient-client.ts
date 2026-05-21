@@ -26,6 +26,7 @@ const inFlightRequests = new Map<string, Promise<unknown>>();
 
 interface MusicfetchRequestOptions {
   timeoutMs: number;
+  signal?: AbortSignal;
 }
 
 interface MusicfetchErrorBody {
@@ -211,8 +212,20 @@ async function requestWithRetries<T>(
 
     await reserveMusicfetchBudget();
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), options.timeoutMs);
+    const timeoutController = new AbortController();
+    const timeoutId = setTimeout(
+      () => timeoutController.abort(),
+      options.timeoutMs
+    );
+
+    let fetchSignal: AbortSignal;
+    if (options.signal) {
+      // Combine caller-provided signal (for unmount/navigation cancellation) with internal timeout.
+      // AbortSignal.any is available on Node 22.13+ (repo requirement).
+      fetchSignal = AbortSignal.any([options.signal, timeoutController.signal]);
+    } else {
+      fetchSignal = timeoutController.signal;
+    }
 
     try {
       const response = await fetch(url, {
@@ -221,7 +234,7 @@ async function requestWithRetries<T>(
           'x-token': token,
           Accept: 'application/json',
         },
-        signal: controller.signal,
+        signal: fetchSignal,
       });
 
       const handled = await handleHttpResponse<T>(response, attempt);
@@ -237,7 +250,7 @@ async function requestWithRetries<T>(
 
       throw wrapUnknownError(error);
     } finally {
-      clearTimeout(timeout);
+      clearTimeout(timeoutId);
     }
   }
 
