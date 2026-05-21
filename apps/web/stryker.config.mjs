@@ -135,6 +135,12 @@ export default {
     // + additional server resolver catch coverage. Wires Stryker mutation
     // killing for entitlements-registry RED surface (risk 37.7, 20.8pp gap).
     'tests/unit/lib/entitlements-matrix.test.ts',
+    // Billing unavailable error class contract (deprecated compat ctor for
+    // billing edge + fail-closed shape). Covers the remaining uncovered lines
+    // in server.ts (BillingUnavailableError) for 100% on the registry surface
+    // after prior wiring PRs. Contract style per webhook/rls/claim patterns.
+    // Dedicated test placed under tests/unit/lib/entitlements/ per task.
+    'tests/unit/lib/entitlements/billing-unavailable.contract.test.ts',
     'tests/unit/lib/queries/useBillingMutations.test.tsx',
     'tests/unit/lib/social-platform.property.test.ts',
     // Gate + waitlist negative-path tests for lib/auth/gate.ts mutate target
