@@ -53,7 +53,7 @@ export function SuggestionCard({
   return (
     <article
       className={cn(
-        'group/sug relative w-full rounded-[18px] overflow-hidden border border-white/[0.05] bg-(--linear-app-content-surface)',
+        'group/sug relative min-h-[148px] w-full overflow-hidden rounded-[18px] border border-white/[0.05] bg-(--linear-app-content-surface)',
         className
       )}
       style={{
@@ -62,15 +62,17 @@ export function SuggestionCard({
         transition: `box-shadow var(--ds-motion-cinematic-duration) ${EASE_CINEMATIC}`,
       }}
     >
-      <div className='px-7 py-6'>
-        <h2 className='text-[17px] font-semibold leading-[1.3] text-primary-token'>
-          {title}
-        </h2>
-        <p className='mt-2 text-[12.5px] leading-[1.6] text-tertiary-token'>
-          {body}
-        </p>
+      <div className='grid min-h-[inherit] grid-cols-1 items-center gap-4 px-5 py-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:px-7'>
+        <div className='min-w-0'>
+          <h2 className='text-pretty text-[16px] font-semibold leading-[1.3] text-primary-token sm:text-[17px]'>
+            {title}
+          </h2>
+          <p className='mt-2 max-w-[48ch] text-pretty text-[12.5px] leading-[1.55] text-tertiary-token'>
+            {body}
+          </p>
+        </div>
 
-        <div className='mt-6 flex items-center justify-end gap-1'>
+        <div className='flex shrink-0 items-center justify-start gap-1 sm:justify-end'>
           {onDismiss && (
             <button
               type='button'
