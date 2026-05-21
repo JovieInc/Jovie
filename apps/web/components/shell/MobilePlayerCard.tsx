@@ -2,6 +2,7 @@
 
 import { Pause, Play } from 'lucide-react';
 import Image from 'next/image';
+import React from 'react';
 import { cn } from '@/lib/utils';
 import type { NowPlayingTrack } from './SidebarNowPlaying';
 
@@ -17,6 +18,8 @@ import type { NowPlayingTrack } from './SidebarNowPlaying';
  * supplies a `NowPlayingTrack` so the card can pull from
  * `useTrackAudioPlayer().playbackState` directly.
  *
+ * Memoized high-churn mobile now-playing renderer over real prod audio state.
+ *
  * @example
  * ```tsx
  * const { playbackState, toggleTrack } = useTrackAudioPlayer();
@@ -28,7 +31,7 @@ import type { NowPlayingTrack } from './SidebarNowPlaying';
  * />
  * ```
  */
-export function MobilePlayerCard({
+export const MobilePlayerCard = React.memo(function MobilePlayerCard({
   track,
   isPlaying,
   pct,
@@ -88,7 +91,7 @@ export function MobilePlayerCard({
         <button
           type='button'
           onClick={onPlay}
-          className='h-9 w-9 rounded-full grid place-items-center bg-primary text-on-primary shrink-0 transition-transform duration-subtle ease-subtle active:scale-95'
+          className='h-9 w-9 rounded-full grid place-items-center bg-primary text-on-primary shrink-0 transition-transform duration-subtle ease-subtle active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) outline-none'
           aria-label={isPlaying ? 'Pause' : 'Play'}
         >
           {isPlaying ? (
@@ -104,4 +107,4 @@ export function MobilePlayerCard({
       </div>
     </div>
   );
-}
+});
