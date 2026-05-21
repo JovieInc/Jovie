@@ -73,6 +73,8 @@ export default {
     // resolve + outer error paths. lib/api/with-dashboard-route.ts owns the standardized
     // outer catch for RLS-related failures (401/404/500, capture, NO_STORE on auth errors).
     // lib/auth/require-auth.ts handles test auth bypass + 401 contract responses.
+    // Dedicated contract tests added (with-dashboard-route.test.ts) for auth/zod-style error
+    // taxonomy, fail-closed, outer-catch + captureError paths (matching #9405 webhook-sig + #9399 dev-test patterns).
     // Directly targets auth bypass, unauthorized tenant access, row-level violation
     // reporting, outer catch, 401/403 paths for the RLS surface.
     'lib/auth/session.ts',

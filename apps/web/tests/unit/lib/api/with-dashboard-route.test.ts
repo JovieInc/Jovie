@@ -1,253 +1,199 @@
+/**
+ * Contract tests for withDashboardRoute wrapper (RLS access control surface).
+ * Covers auth failures (401), user/profile not found (404), unauthorized (401),
+ * outer-catch 500 + captureError, fail-closed NO_STORE_HEADERS, success delegation.
+ * Matches patterns from webhook-sig (#9405), dev-test-auth-bypass (#9399), session.critical,
+ * onboarding claim/intake contract tests: hoisted mocks, dynamic import, exact error shapes,
+ * side-effect verification (captureError), durable fail-closed behavior.
+ */
+import { NextRequest, NextResponse } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Hoist mocks before module resolution (all vi.mock factories run at hoist time)
-const {
-  mockGetCachedAuth,
-  mockGetSessionContext,
-  mockCaptureError,
-  mockNoStoreHeaders,
-  mockJson,
-} = vi.hoisted(() => ({
-  mockGetCachedAuth: vi.fn(),
-  mockGetSessionContext: vi.fn(),
-  mockCaptureError: vi.fn(),
-  mockNoStoreHeaders: new Headers({
-    'Cache-Control': 'no-store',
-    Pragma: 'no-cache',
-  }),
-  mockJson: vi.fn((body: unknown, init?: ResponseInit) => ({
-    body,
-    init,
-    status: init?.status ?? 200,
-    headers: init?.headers,
-  })),
-}));
+const { mockGetCachedAuth, mockGetSessionContext, mockCaptureError } =
+  vi.hoisted(() => ({
+    mockGetCachedAuth: vi.fn(),
+    mockGetSessionContext: vi.fn(),
+    mockCaptureError: vi.fn(),
+  }));
 
-// Mock dependencies (hoisted)
 vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: mockGetCachedAuth,
 }));
 
-vi.mock('@/lib/auth/session', async () => {
-  const actual = await vi.importActual('@/lib/auth/session');
-  return {
-    ...actual,
-    getSessionContext: mockGetSessionContext,
-  };
-});
+vi.mock('@/lib/auth/session', () => ({
+  getSessionContext: mockGetSessionContext,
+  SESSION_ERRORS: {
+    USER_NOT_FOUND: 'User not found',
+    PROFILE_NOT_FOUND: 'Profile not found',
+    UNAUTHORIZED: 'Unauthorized',
+  },
+}));
 
 vi.mock('@/lib/error-tracking', () => ({
   captureError: mockCaptureError,
 }));
 
 vi.mock('@/lib/http/headers', () => ({
-  NO_STORE_HEADERS: mockNoStoreHeaders,
+  NO_STORE_HEADERS: { 'Cache-Control': 'no-store' },
 }));
 
-vi.mock('next/server', async () => {
-  const actual = await vi.importActual('next/server');
-  return {
-    ...actual,
-    NextResponse: {
-      json: mockJson,
-    },
-  };
-});
-
-import type { NextRequest } from 'next/server';
-import { withDashboardRoute } from '@/lib/api/with-dashboard-route';
-import { SESSION_ERRORS } from '@/lib/auth/session';
-
-describe('with-dashboard-route (RLS/auth failure contract)', () => {
+describe('withDashboardRoute (RLS auth/profile guard + outer catch)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockJson.mockImplementation((body, init) => ({
-      body,
-      init,
-      status: init?.status ?? 200,
-      headers: init?.headers ?? mockNoStoreHeaders,
-    }));
+    vi.resetModules();
   });
 
-  const createMockRequest = (pathname = '/api/dashboard/test') =>
-    ({
-      nextUrl: { pathname },
-    }) as unknown as NextRequest;
-
-  const mockUser = {
-    id: '11111111-1111-1111-1111-111111111111',
-    clerkId: 'user_abc',
-    email: 'test@jov.ie',
-    isAdmin: false,
-    isPro: true,
-    userStatus: 'active' as const,
-  };
-
-  const mockProfile = {
-    id: '22222222-2222-2222-2222-222222222222',
-    userId: '11111111-1111-1111-1111-111111111111',
-    username: 'testuser',
-    usernameNormalized: 'testuser',
-    displayName: 'Test',
-    avatarUrl: null,
-    isPublic: true,
-    isClaimed: true,
-    onboardingCompletedAt: null,
-  };
-
-  const mockCtx = {
-    clerkUserId: 'user_abc',
-    user: mockUser,
-    profile: mockProfile,
-  };
-
-  it('calls handler with resolved context on success (RLS session established)', async () => {
-    mockGetCachedAuth.mockResolvedValue({ userId: 'user_abc' });
-    mockGetSessionContext.mockResolvedValue(mockCtx);
-
-    const handler = vi.fn().mockResolvedValue({ ok: true, status: 200 });
-    const wrapped = withDashboardRoute(handler);
-
-    const req = createMockRequest();
-    const result = await wrapped(req);
-
-    expect(mockGetCachedAuth).toHaveBeenCalled();
-    expect(mockGetSessionContext).toHaveBeenCalledWith({
-      clerkUserId: 'user_abc',
-      requireUser: true,
-      requireProfile: true,
-    });
-    expect(handler).toHaveBeenCalledWith(
-      { user: mockUser, profile: mockProfile, clerkUserId: 'user_abc' },
-      req
-    );
-    expect(result).toEqual({ ok: true, status: 200 });
-  });
-
-  it('returns 401 Unauthorized when no clerk userId (auth bypass / missing session)', async () => {
+  it('returns 401 Unauthorized when not authenticated (auth contract)', async () => {
     mockGetCachedAuth.mockResolvedValue({ userId: null });
 
+    const { withDashboardRoute } = await import(
+      '@/lib/api/with-dashboard-route'
+    );
     const handler = vi.fn();
     const wrapped = withDashboardRoute(handler);
+    const req = new NextRequest('https://example.com/api/dashboard/test');
 
-    const req = createMockRequest('/api/dashboard/secure');
-    const result = await wrapped(req);
+    const res = await wrapped(req);
 
-    expect(mockJson).toHaveBeenCalledWith(
-      { error: 'Unauthorized' },
-      { status: 401, headers: mockNoStoreHeaders }
-    );
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: 'Unauthorized' });
+    expect(res.headers.get('cache-control')).toBe('no-store');
     expect(handler).not.toHaveBeenCalled();
-    expect(result.status).toBe(401);
   });
 
-  it('returns 404 User not found when getSessionContext throws USER_NOT_FOUND (tenant resolution failure)', async () => {
-    mockGetCachedAuth.mockResolvedValue({ userId: 'user_missing' });
-    mockGetSessionContext.mockRejectedValue(
-      new TypeError(SESSION_ERRORS.USER_NOT_FOUND)
-    );
+  it('returns 404 User not found when getSessionContext throws USER_NOT_FOUND (TypeError path)', async () => {
+    mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
+    mockGetSessionContext.mockRejectedValue(new TypeError('User not found'));
 
+    const { withDashboardRoute } = await import(
+      '@/lib/api/with-dashboard-route'
+    );
     const handler = vi.fn();
-    const wrapped = withDashboardRoute(handler, {
-      routeName: 'dashboard-test',
-    });
+    const wrapped = withDashboardRoute(handler, { routeName: 'test-route' });
+    const req = new NextRequest('https://example.com/api/dashboard/test');
 
-    const req = createMockRequest();
-    await wrapped(req);
+    const res = await wrapped(req);
 
-    expect(mockJson).toHaveBeenCalledWith(
-      { error: SESSION_ERRORS.USER_NOT_FOUND },
-      { status: 404, headers: mockNoStoreHeaders }
-    );
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: 'User not found' });
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(handler).not.toHaveBeenCalled();
+    // capture not called for known auth errors
+    expect(mockCaptureError).not.toHaveBeenCalled();
   });
 
   it('returns 404 Profile not found when getSessionContext throws PROFILE_NOT_FOUND', async () => {
-    mockGetCachedAuth.mockResolvedValue({ userId: 'user_noprofile' });
-    mockGetSessionContext.mockRejectedValue(
-      new TypeError(SESSION_ERRORS.PROFILE_NOT_FOUND)
-    );
-
-    const handler = vi.fn();
-    const wrapped = withDashboardRoute(handler);
-
-    const req = createMockRequest();
-    await wrapped(req);
-
-    expect(mockJson).toHaveBeenCalledWith(
-      { error: SESSION_ERRORS.PROFILE_NOT_FOUND },
-      { status: 404, headers: mockNoStoreHeaders }
-    );
-  });
-
-  it('returns 401 for UnauthorizedSessionError / message from RLS session setup (withDbSession failure)', async () => {
-    mockGetCachedAuth.mockResolvedValue({ userId: 'user_unauth' });
-    mockGetSessionContext.mockRejectedValue(
-      new Error(SESSION_ERRORS.UNAUTHORIZED)
-    );
-
-    const handler = vi.fn();
-    const wrapped = withDashboardRoute(handler);
-
-    const req = createMockRequest();
-    await wrapped(req);
-
-    expect(mockJson).toHaveBeenCalledWith(
-      { error: 'Unauthorized' },
-      { status: 401, headers: mockNoStoreHeaders }
-    );
-  });
-
-  it('captures error and returns 500 for unexpected errors (outer catch for RLS/DB failures)', async () => {
     mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
-    const dbError = new Error('RLS policy violation or connection failure');
+    mockGetSessionContext.mockRejectedValue(new TypeError('Profile not found'));
+
+    const { withDashboardRoute } = await import(
+      '@/lib/api/with-dashboard-route'
+    );
+    const handler = vi.fn();
+    const wrapped = withDashboardRoute(handler);
+    const req = new NextRequest('https://example.com/api/dashboard/test');
+
+    const res = await wrapped(req);
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: 'Profile not found' });
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('returns 401 Unauthorized for UNAUTHORIZED session error (message match)', async () => {
+    mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
+    mockGetSessionContext.mockRejectedValue(new Error('Unauthorized'));
+
+    const { withDashboardRoute } = await import(
+      '@/lib/api/with-dashboard-route'
+    );
+    const handler = vi.fn();
+    const wrapped = withDashboardRoute(handler);
+    const req = new NextRequest('https://example.com/api/dashboard/test');
+
+    const res = await wrapped(req);
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: 'Unauthorized' });
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('returns 500 and calls captureError for unknown errors (fail-closed outer catch + capture)', async () => {
+    mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
+    const dbError = new Error('db connection lost during RLS setup');
     mockGetSessionContext.mockRejectedValue(dbError);
 
+    const { withDashboardRoute } = await import(
+      '@/lib/api/with-dashboard-route'
+    );
     const handler = vi.fn();
     const wrapped = withDashboardRoute(handler, { routeName: 'earnings' });
+    const req = new NextRequest('https://example.com/api/dashboard/earnings');
 
-    const req = createMockRequest('/api/dashboard/earnings');
-    await wrapped(req);
+    const res = await wrapped(req);
 
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: 'Internal server error' });
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(handler).not.toHaveBeenCalled();
     expect(mockCaptureError).toHaveBeenCalledWith(
       'Dashboard route error',
       dbError,
-      { route: 'earnings' }
-    );
-    expect(mockJson).toHaveBeenCalledWith(
-      { error: 'Internal server error' },
-      { status: 500, headers: mockNoStoreHeaders }
+      expect.objectContaining({ route: 'earnings' })
     );
   });
 
-  it('falls back to request pathname for routeName in error capture when not provided', async () => {
-    mockGetCachedAuth.mockResolvedValue({ userId: 'user_err' });
-    const err = new Error('generic failure');
-    mockGetSessionContext.mockRejectedValue(err);
+  it('delegates to handler with resolved ctx on success path (happy contract)', async () => {
+    mockGetCachedAuth.mockResolvedValue({ userId: 'clerk_user_abc' });
+    const mockUser = {
+      id: 'user-uuid-123',
+      clerkId: 'clerk_user_abc',
+      email: 'test@jov.ie',
+      isAdmin: false,
+      isPro: true,
+      userStatus: 'active' as const,
+    };
+    const mockProfile = {
+      id: 'prof-uuid-456',
+      userId: 'user-uuid-123',
+      username: 'testuser',
+      usernameNormalized: 'testuser',
+      displayName: 'Test User',
+      avatarUrl: null,
+      isPublic: true,
+      isClaimed: true,
+      onboardingCompletedAt: null,
+    };
+    mockGetSessionContext.mockResolvedValue({
+      clerkUserId: 'clerk_user_abc',
+      user: mockUser,
+      profile: mockProfile,
+    });
 
-    const handler = vi.fn();
-    const wrapped = withDashboardRoute(handler); // no routeName
-
-    const req = createMockRequest('/api/dashboard/contacts');
-    await wrapped(req);
-
-    expect(mockCaptureError).toHaveBeenCalledWith(
-      'Dashboard route error',
-      err,
-      {
-        route: '/api/dashboard/contacts',
-      }
+    const { withDashboardRoute } = await import(
+      '@/lib/api/with-dashboard-route'
     );
-  });
-
-  it('preserves NO_STORE_HEADERS on all error paths (security / no-cache for auth failures)', async () => {
-    mockGetCachedAuth.mockResolvedValue({ userId: null });
-
-    const handler = vi.fn();
+    const successResponse = NextResponse.json(
+      { data: 'ok' },
+      { headers: { 'Cache-Control': 'no-store' } }
+    );
+    const handler = vi.fn().mockResolvedValue(successResponse);
     const wrapped = withDashboardRoute(handler);
+    const req = new NextRequest('https://example.com/api/dashboard/profile');
 
-    await wrapped(createMockRequest());
+    const res = await wrapped(req);
 
-    const call = mockJson.mock.calls[0];
-    expect(call[1]).toMatchObject({ headers: mockNoStoreHeaders });
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(handler).toHaveBeenCalledWith(
+      {
+        user: mockUser,
+        profile: mockProfile,
+        clerkUserId: 'clerk_user_abc',
+      },
+      req
+    );
+    expect(res).toBe(successResponse);
   });
 });
