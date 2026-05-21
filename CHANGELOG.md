@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.31.1] - 2026-05-21
+
+> [internal] Ops HUD dashboard now uses full horizontal space on wide monitors — no max-width cap in shell or kiosk mode.
+
+### Changed
+
+- **[internal] Ops widescreen density (JOV-2113)**: removed `max-w-[1680px]` and `mx-auto` from shell mode, `max-w-[1560px]` from kiosk mode, and `max-w-[560px]` from the deployments panel so the HUD metrics row fills the full container width at any viewport. Kiosk TV padding preserved.
+
 ## [26.5.29] - 2026-05-18
 
 > [internal] Profile music/releases scroll is now hardware-accelerated for smooth native-feel scrolling on touch devices.
