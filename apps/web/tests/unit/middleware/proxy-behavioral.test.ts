@@ -1487,7 +1487,7 @@ describe('proxy.ts middleware', () => {
     });
   });
 
-  describe('investors.jov.ie legacy subdomain (proxy investor 301 early returns)', () => {
+  describe('path-based investor portal (proxy investor early returns)', () => {
     it('lets investor response links bypass Clerk without stripping token params', async () => {
       const req = createUnauthenticatedRequest({
         pathname: '/investor-portal/respond',
@@ -1504,7 +1504,9 @@ describe('proxy.ts middleware', () => {
       expect(res.headers.get('Cache-Control')).toBe('private, no-store');
       expect(mocks.clerkMiddleware).not.toHaveBeenCalled();
     });
+  });
 
+  describe('investors.jov.ie legacy subdomain (proxy investor 301 early returns)', () => {
     it('301 redirects investors.jov.ie non-static paths to jov.ie/investor-portal preserving token', async () => {
       const req = createUnauthenticatedRequest({
         pathname: '/foo/bar',

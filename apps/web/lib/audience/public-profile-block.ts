@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { createFingerprintEdge } from '@/lib/audience/fingerprint';
+import { env } from '@/lib/env-server';
 
 /**
  * Mirror extractClientIP() priority for the middleware audience-block check.
@@ -29,8 +30,8 @@ export async function checkProfileVisitorBlocked(
   ip: string | null,
   ua: string | null
 ): Promise<boolean> {
-  if (process.env.NODE_ENV === 'test') return false;
-  if (process.env.PUBLIC_NOAUTH_SMOKE === '1') return false;
+  if (env.NODE_ENV === 'test') return false;
+  if (env.PUBLIC_NOAUTH_SMOKE === '1') return false;
 
   try {
     const fingerprint = await createFingerprintEdge(ip, ua);

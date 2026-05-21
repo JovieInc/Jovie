@@ -86,6 +86,17 @@ describe('investor portal proxy helper', () => {
     expect(mocks.select).not.toHaveBeenCalled();
   });
 
+  it('lets token-only response links reach the page before DB validation', async () => {
+    const res = await handleInvestorRequest(
+      createInvestorRequest('/investor-portal/respond?t=token-123')
+    );
+
+    expect(res?.status).toBe(200);
+    expect(res?.headers.get('X-Robots-Tag')).toContain('noindex');
+    expect(res?.headers.get('Cache-Control')).toBe('private, no-store');
+    expect(mocks.select).not.toHaveBeenCalled();
+  });
+
   it('still validates regular portal token links and strips the token into a cookie', async () => {
     mockSelectRows([{ id: 'link-1', isActive: true, expiresAt: null }]);
 
