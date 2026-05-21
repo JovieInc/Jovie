@@ -137,6 +137,15 @@ export function SuggestedPrompts({
   const albumArtDisabled =
     resolvedAlbumArtCapability.availability === 'unknown' ||
     resolvedAlbumArtCapability.availability === 'unavailable';
+  // Provider-down ('PROVIDER_UNAVAILABLE') and Statsig-killed
+  // ('FEATURE_DISABLED') reason codes are genuinely broken — surface no entry
+  // point. Plan-gated ('PLAN_UNAVAILABLE') and profile-pending
+  // ('PROFILE_REQUIRED') reasons remain visible-but-disabled because the user
+  // has an action to take (upgrade, finish onboarding).
+  const isAlbumArtProviderBroken =
+    resolvedAlbumArtCapability.availability === 'unavailable' &&
+    (resolvedAlbumArtCapability.reasonCode === 'PROVIDER_UNAVAILABLE' ||
+      resolvedAlbumArtCapability.reasonCode === 'FEATURE_DISABLED');
   const draftAlbumArtBriefSuggestion: ChatSuggestion | null =
     resolvedAlbumArtCapability.availability === 'unavailable'
       ? {
@@ -149,10 +158,22 @@ export function SuggestedPrompts({
       : null;
 
   const promptSuggestionsWithCapabilities = promptSuggestions.flatMap(
-    suggestion =>
-      suggestion.label === 'Generate album art' && draftAlbumArtBriefSuggestion
-        ? [suggestion, draftAlbumArtBriefSuggestion]
-        : [suggestion]
+    suggestion => {
+      if (suggestion.label !== 'Generate album art') return [suggestion];
+      // Provider broken → drop the album-art pill entirely; surface the brief
+      // fallback in its place so the row keeps a creative-direction action.
+      if (isAlbumArtProviderBroken) {
+        return draftAlbumArtBriefSuggestion
+          ? [draftAlbumArtBriefSuggestion]
+          : [];
+      }
+      // Other unavailable reasons keep the disabled pill (upsell / onboarding
+      // affordance) and append the brief as an additional path.
+      if (draftAlbumArtBriefSuggestion) {
+        return [suggestion, draftAlbumArtBriefSuggestion];
+      }
+      return [suggestion];
+    }
   );
 
   // Build the pitch suggestion (personalized if release title available)
