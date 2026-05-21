@@ -14,6 +14,7 @@ import {
   LayoutDashboard,
   Library as LibraryIcon,
   Lock,
+  type LucideIcon,
   MailCheck,
   Music,
   PieChart,
@@ -183,7 +184,11 @@ export const settingsNavigation: NavItem[] = [
 
 /** Admin settings item — shown only to admin users */
 
-const adminIconById = {
+// Exhaustive map of AdminWorkspaceId → icon. Typed as Record so adding a new
+// workspace id to `AdminWorkspaceId` without a matching icon entry fails
+// typecheck — silent `undefined` returns would otherwise show up as missing
+// icons in the admin sidebar at runtime.
+const adminIconById: Record<AdminWorkspaceId, LucideIcon> = {
   overview: LayoutDashboard,
   ops: Gauge,
   people: Users,
@@ -194,7 +199,7 @@ const adminIconById = {
   screenshots: ImageIcon,
   costs: Banknote,
   share_studio: Share2,
-} as const;
+};
 
 function buildAdminNavigationItems(
   ids: readonly AdminWorkspaceId[]

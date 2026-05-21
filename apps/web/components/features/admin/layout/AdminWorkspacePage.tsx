@@ -1,10 +1,6 @@
 import type { ReactNode } from 'react';
-import { PageContent, PageShell } from '@/components/organisms/PageShell';
-import {
-  type WorkspaceTabOption,
-  WorkspaceTabsSurface,
-} from '@/components/organisms/WorkspaceTabsSurface';
-import { cn } from '@/lib/utils';
+import type { WorkspaceTabOption } from '@/components/organisms/WorkspaceTabsSurface';
+import { AdminPage } from './AdminPage';
 
 interface AdminWorkspacePageProps<
   TPrimary extends string,
@@ -26,6 +22,16 @@ interface AdminWorkspacePageProps<
   readonly className?: string;
 }
 
+/**
+ * @deprecated Use `AdminPage` from `@/components/features/admin/layout/AdminPage`
+ * with the `tabs` prop instead.
+ *
+ * Preserved as a thin shim so the 4+ existing tabbed admin pages continue to
+ * render while they migrate. New code MUST import `AdminPage` directly. The
+ * deprecation ratchet
+ * (`apps/web/tests/unit/admin-shell-deprecation.test.ts`) enforces that the
+ * importer count of this module only decreases.
+ */
 export function AdminWorkspacePage<
   TPrimary extends string,
   TSecondary extends string = never,
@@ -46,33 +52,24 @@ export function AdminWorkspacePage<
   className,
 }: Readonly<AdminWorkspacePageProps<TPrimary, TSecondary>>) {
   return (
-    <PageShell>
-      <PageContent noPadding>
-        <div
-          className={cn(
-            'space-y-4 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)',
-            className
-          )}
-          data-testid={testId}
-        >
-          <WorkspaceTabsSurface
-            title={title}
-            description={description}
-            primaryParam={primaryParam}
-            primaryValue={primaryValue}
-            primaryOptions={primaryOptions}
-            secondaryParam={secondaryParam}
-            secondaryValue={secondaryValue}
-            secondaryOptions={secondaryOptions}
-            clearOnPrimaryChange={clearOnPrimaryChange}
-            actions={actions}
-          >
-            <div className='space-y-4' data-testid={viewTestId}>
-              {children}
-            </div>
-          </WorkspaceTabsSurface>
-        </div>
-      </PageContent>
-    </PageShell>
+    <AdminPage<TPrimary, TSecondary>
+      title={title}
+      description={description}
+      actions={actions}
+      testId={testId}
+      viewTestId={viewTestId}
+      className={className}
+      tabs={{
+        param: primaryParam,
+        value: primaryValue,
+        options: primaryOptions,
+        secondaryParam,
+        secondaryValue,
+        secondaryOptions,
+        clearOnPrimaryChange,
+      }}
+    >
+      {children}
+    </AdminPage>
   );
 }
