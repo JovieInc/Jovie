@@ -5,13 +5,21 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.33] - 2026-05-21
+
+> [internal] Removed a duplicate search button from the admin panel header; the sidebar search is now the single entry point for admin search.
+
+### Fixed
+
+- **Admin header duplicate search (JOV-2121)**: removed the `HeaderSearchAction` injection from the three admin table wrappers (`AdminUsersTableUnified`, `AdminReleasesPageWrapper`, `AdminCreatorsPageWrapper`) that duplicated the sidebar's search entry point. `DrawerToggleButton`, `BatchIngestButton`, and `IngestProfileDropdown` are preserved.
+
 ## [26.5.32] - 2026-05-21
 
-> [internal] Loading and error surfaces now use the canonical JovieMarkElectric component, removing duplicated ad-hoc brand mark implementations.
+> [internal] Electron desktop titlebar now has a single unified sidebar toggle and pill-style nav controls, with the sidebar rail correctly aligned to the titlebar column.
 
 ### Changed
 
-- **[internal] Loading/error brand marks (JOV-2365)**: replaced ad-hoc `BrandLogo` usages and a 67-line inline SVG with the canonical `JovieMarkElectric` component across five surfaces — shell cold-start bloom, authenticated page loader, SSO callback, unavailable page, and public error fallback. Also fixed pre-existing motion token violations (`duration-300` → `duration-subtle`, raw millisecond values → `var(--ds-motion-cinematic-duration)`).
+- **[internal] Electron titlebar unification (JOV-2504)**: sidebar toggle is now the single canonical toggle in Electron mode — the in-sidebar dock button is hidden via CSS when inside the desktop runtime. Back/forward navigation buttons are grouped in a pill-shaped container in the main titlebar cell. Titlebar sidebar-cell `padding-left` is aligned to the shell gap so the column precisely tracks the sidebar rail in shellChatV1 mode. Geometry Playwright tests added to verify DOM structure, no-duplicate-toggle invariant, and sidebar-cell width vs CSS token.
 
 ## [26.5.29] - 2026-05-18
 
