@@ -37,6 +37,7 @@ export { parseWindowToMs, RATE_LIMITERS } from './config';
 // Pre-configured Limiter Instances
 export {
   accountDeleteLimiter,
+  accountEmailLimiter,
   accountExportLimiter,
   adminCreatorIngestLimiter,
   adminFitScoresLimiter,
@@ -62,6 +63,7 @@ export {
   bioImportFromUrlLimiter,
   changelogSubscribeLimiter,
   checkAccountDeleteRateLimit,
+  checkAccountEmailRateLimit,
   checkAccountExportRateLimit,
   checkAdminCreatorIngestRateLimit,
   checkAdminFitScoresRateLimit,

@@ -885,6 +885,14 @@ export const accountExportLimiter = createRateLimiter(
 );
 
 /**
+ * Rate limiter for account email sync
+ * Limit: 5 requests per minute per IP - prevents abuse and enumeration
+ */
+export const accountEmailLimiter = createRateLimiter(
+  RATE_LIMITERS.accountEmail
+);
+
+/**
  * Check account deletion rate limit
  * Returns the first failure or success if pass
  */
@@ -909,6 +917,20 @@ export async function checkAccountExportRateLimit(
     accountExportLimiter,
     userId,
     'Too many export requests. Please try again later.'
+  );
+}
+
+/**
+ * Check account email sync rate limit.
+ * Returns the first failure or success if pass.
+ */
+export async function checkAccountEmailRateLimit(
+  clientIp: string
+): Promise<RateLimitResult> {
+  return checkRateLimit(
+    accountEmailLimiter,
+    clientIp,
+    'Too many email sync requests. Please try again later.'
   );
 }
 
@@ -1027,6 +1049,7 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     releaseRefreshPaid: _releaseRefreshPaidLimiter,
     accountDelete: accountDeleteLimiter,
     accountExport: accountExportLimiter,
+    accountEmail: accountEmailLimiter,
     wrapLink: wrapLinkLimiter,
     wrapLinkAnonymous: wrapLinkAnonymousLimiter,
     verificationRequest: verificationRequestLimiter,
