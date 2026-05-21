@@ -310,7 +310,7 @@ function DeploymentsPanel({
 }>) {
   return (
     <div
-      className='max-w-[560px] space-y-2 border-subtle border-t pt-3'
+      className='space-y-2 border-subtle border-t pt-3'
       data-testid='ops-deployments-panel'
     >
       <div className='flex items-center justify-between gap-3'>
@@ -586,8 +586,10 @@ export function HudDashboardClient({
 
   // Outer layout: kiosk gets the wide centered TV layout; shell defers width
   // to the AdminToolPage container that already provides app-shell padding.
+  // Shell uses full width — no max-w constraint; the board benefits from all
+  // available horizontal space at wide monitor widths.
   const outerClass = isShell
-    ? 'mx-auto flex w-full max-w-[1680px] flex-col gap-3'
+    ? 'flex w-full flex-col gap-3'
     : 'mx-auto flex w-full max-w-[1560px] flex-col gap-3 px-4 py-4 sm:px-6 sm:py-6 xl:px-8';
 
   // MRR scale: shell matches Overview KPIs (~28-32px); kiosk keeps the
