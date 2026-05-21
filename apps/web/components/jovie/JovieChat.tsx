@@ -20,10 +20,6 @@ import {
 } from './components';
 import { ChatProvidersRegistrar } from './components/ChatProvidersRegistrar';
 import { ChatUsageAlert } from './components/ChatUsageAlert';
-import {
-  CHAT_PROMPT_RAIL_MASK_STYLE,
-  CHAT_PROMPT_RAIL_SCROLL_CLASS,
-} from './components/chat-prompt-styles';
 import { EntityResolutionProvider } from './components/EntityResolutionProvider';
 import {
   useChatImageAttachments,
@@ -36,61 +32,6 @@ import type { JovieChatProps, MessagePart } from './types';
 /** Sentinel ID for the synthetic thinking placeholder */
 const THINKING_PLACEHOLDER_ID = 'thinking-placeholder';
 const VIRTUALIZATION_THRESHOLD = 12;
-const EMPTY_STATE_SIGNAL_CARDS = [
-  {
-    headline: 'Release plan',
-    body: 'Turn a song into a launch sequence.',
-  },
-  {
-    headline: 'Asset brief',
-    body: 'Creative direction and copy, ready to use.',
-  },
-  {
-    headline: 'Context',
-    body: 'Releases, contacts, and references stay attached.',
-  },
-] as const;
-
-function EmptyStateSignalCards({
-  dimmed = false,
-}: {
-  readonly dimmed?: boolean;
-}) {
-  return (
-    <div
-      className={cn('w-full max-w-[52rem]', dimmed && 'pointer-events-none')}
-      aria-hidden={dimmed ? 'true' : undefined}
-      data-testid='chat-empty-state-top-signals'
-    >
-      <div
-        className={cn(
-          CHAT_PROMPT_RAIL_SCROLL_CLASS,
-          'overscroll-x-contain px-1 sm:px-0 lg:overflow-visible'
-        )}
-        style={CHAT_PROMPT_RAIL_MASK_STYLE}
-      >
-        <div
-          className='flex snap-x snap-mandatory flex-nowrap gap-3 lg:grid lg:grid-cols-3'
-          data-testid='chat-empty-state-top-signals-row'
-        >
-          {EMPTY_STATE_SIGNAL_CARDS.map(card => (
-            <article
-              key={card.headline}
-              className='min-h-[124px] min-w-[min(19rem,84vw)] flex-1 snap-start rounded-[22px] border border-subtle bg-surface-1 px-4 py-4 shadow-[0_16px_44px_-30px_rgba(0,0,0,0.92)] lg:min-w-0'
-            >
-              <p className='text-pretty text-[17px] font-semibold leading-[1.2] text-primary-token'>
-                {card.headline}
-              </p>
-              <p className='mt-3 max-w-[24ch] text-[12.5px] leading-5 text-tertiary-token'>
-                {card.body}
-              </p>
-            </article>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 /**
  * Extracts the first name token for use in the empty-state greeting (e.g. "What are we working on, Alex?").
@@ -137,8 +78,7 @@ export function JovieChat({
   const imageFileInputRef = useRef<HTMLInputElement>(null);
   // Track message IDs that were loaded from persistence to skip entrance animation
   const knownMessageIdsRef = useRef<Set<string>>(new Set());
-  // Variant F: dim suggestion chips while the slash picker is open so they
-  // don't compete with the morphing surface.
+  // Hide neighbouring affordances while the slash picker owns the composer.
   const [composerPickerOpen, setComposerPickerOpen] = useState(false);
   const {
     input,
@@ -434,7 +374,7 @@ export function JovieChat({
   const greetingName =
     getFirstNameForGreeting(displayName) ?? getFirstNameForGreeting(username);
   const primaryActionCard = actionCards[0] ?? null;
-  const showActionCard =
+  const showActionCardContent =
     primaryActionCard !== null &&
     input.trim().length === 0 &&
     !composerPickerOpen &&
@@ -559,14 +499,12 @@ export function JovieChat({
                   </div>
 
                   <div
-                    className='relative mx-auto flex min-h-full w-full max-w-[52rem] flex-col gap-6 py-8'
+                    className='relative mx-auto flex min-h-full w-full max-w-[52rem] flex-col items-center justify-center gap-5 py-8'
                     data-testid='chat-empty-state-composer-region'
                   >
-                    <EmptyStateSignalCards dimmed={composerPickerOpen} />
-
                     <h1
                       className={cn(
-                        'text-balance text-center text-[2rem] font-semibold leading-[1.1] text-primary-token sm:text-[2.5rem] md:text-[3rem]',
+                        'text-balance text-center text-[2rem] font-semibold leading-[1.1] text-primary-token sm:text-[2.35rem] md:text-[2.65rem]',
                         composerPickerOpen && 'pointer-events-none opacity-0'
                       )}
                       aria-hidden={composerPickerOpen ? 'true' : undefined}
@@ -574,9 +512,13 @@ export function JovieChat({
                       {emptyStateHeading}
                     </h1>
 
-                    <div className='mx-auto flex w-full max-w-[38rem] flex-col items-center gap-3'>
-                      {showActionCard ? (
+                    <div
+                      className='mx-auto flex h-[172px] w-full max-w-[38rem] items-center justify-center sm:h-[148px]'
+                      data-testid='chat-empty-state-action-card-slot'
+                    >
+                      {showActionCardContent ? (
                         <SuggestionCard
+                          className='h-full'
                           title={primaryActionCard.title}
                           body={primaryActionCard.body}
                           actionLabel={primaryActionCard.actionLabel}
