@@ -6,7 +6,10 @@ import { AppShellFrame } from '@/components/organisms/AppShellFrame';
 import { SidebarProvider } from '@/components/organisms/Sidebar';
 import { cn } from '@/lib/utils';
 import { OnboardingChat } from './OnboardingChat';
-import { OnboardingTurnstile } from './OnboardingTurnstile';
+import {
+  OnboardingTurnstile,
+  type OnboardingTurnstileState,
+} from './OnboardingTurnstile';
 import { useOnboardingClaim } from './useOnboardingClaim';
 
 /**
@@ -21,7 +24,16 @@ interface OnboardingShellProps {
 
 export function OnboardingShell({ sessionLabel }: OnboardingShellProps) {
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
-  const [turnstileError, setTurnstileError] = useState<string | null>(null);
+  const [turnstileState, setTurnstileState] =
+    useState<OnboardingTurnstileState>({
+      status: 'loading',
+      message: 'Checking your browser before the first message.',
+    });
+  const [turnstileInstruction, setTurnstileInstruction] = useState<
+    string | null
+  >(null);
+  const [turnstileFocusSignal, setTurnstileFocusSignal] = useState(0);
+  const [turnstileResetSignal, setTurnstileResetSignal] = useState(0);
   const [claimTrigger, setClaimTrigger] = useState(0);
 
   const handleConversationActivity = useCallback(() => {
@@ -30,12 +42,69 @@ export function OnboardingShell({ sessionLabel }: OnboardingShellProps) {
 
   const handleTurnstileToken = useCallback((token: string) => {
     setTurnstileToken(token);
-    setTurnstileError(null);
+    setTurnstileInstruction(null);
   }, []);
 
-  const handleTurnstileError = useCallback((message: string) => {
-    setTurnstileError(message);
-  }, []);
+  const handleTurnstileStateChange = useCallback(
+    (nextState: OnboardingTurnstileState) => {
+      setTurnstileState(nextState);
+      if (nextState.status !== 'verified' && nextState.status !== 'bypassed') {
+        setTurnstileToken(null);
+      }
+      if (nextState.status === 'verified' || nextState.status === 'bypassed') {
+        setTurnstileInstruction(null);
+      }
+    },
+    []
+  );
+
+  const requestTurnstileVerification = useCallback(
+    (message = 'Verify you are human to send') => {
+      setTurnstileInstruction(message);
+      setTurnstileFocusSignal(current => current + 1);
+    },
+    []
+  );
+
+  const resetTurnstileVerification = useCallback(
+    (message = 'Verify you are human to send') => {
+      setTurnstileToken(null);
+      setTurnstileInstruction(message);
+      setTurnstileResetSignal(current => current + 1);
+      setTurnstileFocusSignal(current => current + 1);
+    },
+    []
+  );
+
+  const turnstilePanel = (
+    <OnboardingTurnstile
+      onToken={handleTurnstileToken}
+      onStateChange={handleTurnstileStateChange}
+      instruction={turnstileInstruction}
+      focusSignal={turnstileFocusSignal}
+      resetSignal={turnstileResetSignal}
+    />
+  );
+
+  const isTurnstileUnavailable =
+    turnstileState.status === 'error' ||
+    turnstileState.status === 'timeout' ||
+    turnstileState.status === 'unsupported' ||
+    turnstileState.status === 'unconfigured';
+  const turnstileFailureMessage = isTurnstileUnavailable
+    ? (turnstileState.message ?? 'Verification failed. Try again.')
+    : null;
+
+  const handleTurnstileRequired = useCallback(
+    (message?: string) => {
+      requestTurnstileVerification(message);
+    },
+    [requestTurnstileVerification]
+  );
+
+  const handleTurnstileRejected = useCallback(() => {
+    resetTurnstileVerification('Verify you are human to send');
+  }, [resetTurnstileVerification]);
 
   // Auto-claim any anonymous transcript onto the user the moment Clerk
   // reports they're authenticated, then retry after completed chat turns.
@@ -60,12 +129,16 @@ export function OnboardingShell({ sessionLabel }: OnboardingShellProps) {
             <OnboardingChat
               onConversationActivity={handleConversationActivity}
               turnstileToken={turnstileToken}
+              turnstileStatus={turnstileState.status}
+              turnstilePanel={turnstilePanel}
+              onTurnstileRequired={handleTurnstileRequired}
+              onTurnstileRejected={handleTurnstileRejected}
             />
 
             <OnboardingShellStatus
               kind='error'
-              message={turnstileError}
-              visible={Boolean(turnstileError)}
+              message={turnstileFailureMessage}
+              visible={Boolean(turnstileFailureMessage)}
             />
             <OnboardingShellStatus
               kind='status'
@@ -75,11 +148,6 @@ export function OnboardingShell({ sessionLabel }: OnboardingShellProps) {
           </div>
         }
         rightPanel={null}
-      />
-
-      <OnboardingTurnstile
-        onToken={handleTurnstileToken}
-        onError={handleTurnstileError}
       />
     </SidebarProvider>
   );
