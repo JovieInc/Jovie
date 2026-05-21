@@ -139,7 +139,7 @@
     "turbo": "^2.9.14",
     "typescript": "^6.0.3",
     "vercel": "53.1.1",
-    "vitest": "4.1.4"
+    "vitest": "4.1.7"
   },
   "lint-staged": {
     "apps/web/drizzle/migrations/**/*.{sql,ts}": [
