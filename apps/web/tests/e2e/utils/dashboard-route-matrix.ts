@@ -52,7 +52,7 @@ const ADMIN_DEFAULT_BUDGET_MS = 15_000;
 const PUBLIC_DEFAULT_BUDGET_MS = 15_000;
 
 const CHAT_CONTENT_SELECTOR =
-  '[placeholder*="ask jovie" i], [placeholder*="Ask Jovie" i], button[aria-label="New thread"], textarea, [contenteditable="true"], main';
+  '[placeholder*="ask jovie" i], [placeholder*="Ask Jovie" i], button[aria-label="New chat"], textarea, [contenteditable="true"], main';
 const DASHBOARD_RELEASE_TASKS_ROUTE = `${APP_ROUTES.DASHBOARD_RELEASES}/[releaseId]/tasks`;
 const DASHBOARD_TIPPING_ROUTE = `${APP_ROUTES.DASHBOARD}/tipping`;
 const DASHBOARD_CONTACTS_ROUTE = `${APP_ROUTES.DASHBOARD}/contacts`;
@@ -159,6 +159,16 @@ const settingsRoutes = [
     surface: 'settings',
     authRole: 'user',
     contentSelector: 'section#account',
+    requiresUserButton: true,
+    performanceBudgetMs: SETTINGS_DEFAULT_BUDGET_MS,
+  },
+  {
+    path: APP_ROUTES.SETTINGS_USAGE,
+    name: 'Settings Usage Stats',
+    kind: 'render',
+    surface: 'settings',
+    authRole: 'user',
+    contentSelector: 'section#usage',
     requiresUserButton: true,
     performanceBudgetMs: SETTINGS_DEFAULT_BUDGET_MS,
   },
@@ -579,6 +589,8 @@ export const EXCLUDED_ROUTES: Record<string, string> = {
   '/signup': 'Covered by visual-regression.spec.ts',
   '/signin/sso-callback': 'Clerk internal',
   '/signup/sso-callback': 'Clerk internal',
+  '/auth-return': 'Desktop auth return page',
+  '/desktop-auth': 'Desktop auth handoff page',
   '/account': 'Clerk account page',
   '/investor-portal': 'Investor portal (admin-managed)',
   '/investor-portal/:slug': 'Investor portal detail',
@@ -599,6 +611,7 @@ const fastHealthPaths = new Set([
   APP_ROUTES.DASHBOARD_AUDIENCE,
   APP_ROUTES.DASHBOARD_RELEASES,
   APP_ROUTES.SETTINGS_ACCOUNT,
+  APP_ROUTES.SETTINGS_USAGE,
   APP_ROUTES.LEGACY_DASHBOARD,
 ]);
 

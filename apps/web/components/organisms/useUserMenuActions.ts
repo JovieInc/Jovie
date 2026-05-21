@@ -34,6 +34,7 @@ interface UseUserMenuActionsParams {
   billingStatus: BillingStatus;
   profileUrl?: string;
   settingsUrl?: string;
+  usageStatsUrl?: string;
   redirectToUrl: (url: string) => void;
   signOut: ClerkSignOut;
 }
@@ -42,6 +43,7 @@ export function useUserMenuActions({
   billingStatus,
   profileUrl,
   settingsUrl,
+  usageStatsUrl,
   redirectToUrl,
   signOut,
 }: UseUserMenuActionsParams) {
@@ -89,6 +91,7 @@ export function useUserMenuActions({
 
   const handleProfile = () => navigateTo(profileUrl);
   const handleSettings = () => navigateTo(settingsUrl);
+  const handleUsageStats = () => navigateTo(usageStatsUrl);
   const handleSignOut = async () => {
     if (derivedLoading.signOut) return;
 
@@ -228,6 +231,7 @@ export function useUserMenuActions({
   return {
     handleProfile,
     handleSettings,
+    handleUsageStats,
     // Wrap async handlers to prevent promise leakage in onClick handlers
     handleUpgrade: () => void handleUpgrade(),
     handleManageBilling: () => void handleManageBilling(),

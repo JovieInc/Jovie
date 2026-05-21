@@ -7,6 +7,11 @@ import { AuthFormSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { SignInTimeoutEscape } from '@/components/molecules/SignInTimeoutEscape';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthLayout, AuthRoutePrefetch, AuthShell } from '@/features/auth';
+import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
+import {
+  buildAuthRouteUrlWithDesktopReturn,
+  sanitizeDesktopReturnRoute,
+} from '@/lib/desktop/auth-return';
 
 /**
  * Sign-in page using the canonical AuthShell (JOV-2064).
@@ -54,6 +59,12 @@ function SignInPageContent() {
   const searchParams = useSearchParams();
   const email = searchParams.get('email')?.trim() ?? '';
   const resetConfirmed = searchParams.get('reset') === '1';
+  const desktopReturnRoute = sanitizeDesktopReturnRoute(
+    searchParams.get('desktop_return')
+  );
+  const signUpUrl = desktopReturnRoute
+    ? buildAuthRouteUrlWithDesktopReturn(APP_ROUTES.SIGNUP, searchParams)
+    : buildAuthRouteUrl(APP_ROUTES.SIGNUP, searchParams);
   const initialValues = useMemo(
     () => (isValidEmail(email) ? { emailAddress: email } : undefined),
     [email]
@@ -69,7 +80,7 @@ function SignInPageContent() {
 
   return (
     <>
-      <AuthRoutePrefetch href={APP_ROUTES.SIGNUP} />
+      <AuthRoutePrefetch href={signUpUrl} />
       <AuthShell mode='sign-in' initialValues={initialValues} />
       <SignInTimeoutEscape />
     </>

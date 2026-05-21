@@ -59,9 +59,9 @@ test.describe
       await waitForHydration(page);
 
       // Navigate to a fresh chat thread
-      const newThreadLink = page.getByRole('link', { name: /new thread/i });
-      if (await newThreadLink.isVisible()) {
-        await newThreadLink.click();
+      const newChatLink = page.getByRole('link', { name: /new chat/i });
+      if (await newChatLink.isVisible()) {
+        await newChatLink.click();
         await waitForHydration(page);
       }
 

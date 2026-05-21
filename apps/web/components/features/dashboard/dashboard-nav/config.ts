@@ -44,7 +44,7 @@ export const dashboardHome: NavItem = {
   href: APP_ROUTES.CHAT,
   id: 'overview',
   icon: Home,
-  description: 'Start a new thread',
+  description: 'Start a new chat',
 };
 
 export const profileNavItem: NavItem = {
@@ -102,6 +102,12 @@ export const userSettingsNavigation: NavItem[] = [
     href: APP_ROUTES.SETTINGS_ACCOUNT,
     id: 'account',
     icon: ShieldCheck,
+  },
+  {
+    name: 'Usage Stats',
+    href: APP_ROUTES.SETTINGS_USAGE,
+    id: 'usage',
+    icon: Gauge,
   },
   {
     name: 'Billing & Subscription',

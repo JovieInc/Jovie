@@ -145,6 +145,7 @@ export function useUserButton({
     profileUrl = APP_ROUTES.SETTINGS;
   }
   const settingsUrl = settingsHref ?? APP_ROUTES.SETTINGS;
+  const usageStatsUrl = APP_ROUTES.SETTINGS_USAGE;
 
   const jovieUsername =
     user?.username || artist?.handle || contactEmail?.split('@')[0] || null;
@@ -155,6 +156,7 @@ export function useUserButton({
     profileUrl,
     redirectToUrl,
     settingsUrl,
+    usageStatsUrl,
     signOut,
   });
 

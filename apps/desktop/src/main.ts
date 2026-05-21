@@ -27,6 +27,13 @@ const QUIT_AND_INSTALL_CHANNEL = 'quit-and-install';
 const GO_BACK_CHANNEL = 'go-back';
 const GO_FORWARD_CHANNEL = 'go-forward';
 const NAV_STATE_CHANNEL = 'nav-state-changed';
+const START_DESKTOP_AUTH_HANDOFF_CHANNEL = 'start-desktop-auth-handoff';
+const OPEN_DESKTOP_AUTH_URL_CHANNEL = 'open-desktop-auth-url';
+const CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL = 'close-desktop-auth-window';
+const DESKTOP_AUTH_HANDOFF_PATH = '/desktop-auth';
+const DESKTOP_RETURN_PARAM = 'desktop_return';
+const AUTH_RETURN_PROTOCOL = 'jovie:';
+const AUTH_RETURN_HOST = 'auth-return';
 
 type UpdateChannel =
   | typeof UPDATE_AVAILABLE_CHANNEL
@@ -38,22 +45,14 @@ interface NavState {
 }
 
 let updateReadyToInstall = false;
+let mainWindow: BrowserWindow | null = null;
+let authHandoffWindow: BrowserWindow | null = null;
+let pendingAuthReturnRoute: string | null = null;
 
-// Explicit allowlist of OAuth/Clerk hosts permitted to load inside the app.
-// Using endsWith() rather than includes() prevents hostname spoofing via
-// strings like "clerk.evil.com" or "evilclerk.com".
-const ALLOWED_AUTH_HOSTS = new Set<string>([
-  'accounts.google.com',
-  'appleid.apple.com',
-]);
-const ALLOWED_HOST_SUFFIXES = ['.clerk.accounts.dev', '.clerk.com'];
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
 
-function isAllowedAuthHost(hostname: string): boolean {
-  const normalizedHostname = hostname.toLowerCase();
-  if (ALLOWED_AUTH_HOSTS.has(normalizedHostname)) return true;
-  return ALLOWED_HOST_SUFFIXES.some(suffix =>
-    normalizedHostname.endsWith(suffix)
-  );
+if (!gotSingleInstanceLock) {
+  app.quit();
 }
 
 function parseUrl(urlString: string): URL | null {
@@ -66,7 +65,9 @@ function parseUrl(urlString: string): URL | null {
 
 function isAllowedInAppUrl(parsed: URL): boolean {
   if (parsed.protocol !== 'https:') return false;
-  return parsed.origin === APP_ORIGIN || isAllowedAuthHost(parsed.hostname);
+  return (
+    parsed.origin === APP_ORIGIN && !isBrowserOnlyInAppPath(parsed.pathname)
+  );
 }
 
 function isAllowedExternalUrl(parsed: URL): boolean {
@@ -96,6 +97,138 @@ function getIpcSenderUrl(event: IpcMainInvokeEvent): string {
 function isTrustedIpcSender(event: IpcMainInvokeEvent): boolean {
   const parsed = parseUrl(getIpcSenderUrl(event));
   return parsed?.origin === APP_ORIGIN;
+}
+
+function isTrustedDesktopAuthSender(event: IpcMainInvokeEvent): boolean {
+  const parsed = parseUrl(getIpcSenderUrl(event));
+  return (
+    parsed?.origin === APP_ORIGIN &&
+    parsed.pathname === DESKTOP_AUTH_HANDOFF_PATH
+  );
+}
+
+function matchesPathPrefix(pathname: string, prefix: string): boolean {
+  return pathname === prefix || pathname.startsWith(`${prefix}/`);
+}
+
+const AUTH_ROUTE_PREFIXES = [
+  '/signin',
+  '/signup',
+  '/sign-in',
+  '/sign-up',
+  '/sso-callback',
+] as const;
+
+const BROWSER_ONLY_IN_APP_PREFIXES = ['/auth-return'] as const;
+
+const BLOCKED_RETURN_PREFIXES = [
+  ...AUTH_ROUTE_PREFIXES,
+  '/auth-return',
+  DESKTOP_AUTH_HANDOFF_PATH,
+  '/__clerk',
+  '/clerk',
+  '/api',
+] as const;
+
+function isDesktopAuthPath(pathname: string): boolean {
+  return AUTH_ROUTE_PREFIXES.some(prefix =>
+    matchesPathPrefix(pathname, prefix)
+  );
+}
+
+function isBrowserOnlyInAppPath(pathname: string): boolean {
+  return BROWSER_ONLY_IN_APP_PREFIXES.some(prefix =>
+    matchesPathPrefix(pathname, prefix)
+  );
+}
+
+function sanitizeDesktopReturnRoute(
+  route: string | null | undefined
+): string | null {
+  if (!route) return null;
+  if (!route.startsWith('/') || route.startsWith('//')) return null;
+
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(route);
+  } catch {
+    return null;
+  }
+
+  if (decoded.includes('\\') || decoded.startsWith('//')) return null;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(route, APP_URL);
+  } catch {
+    return null;
+  }
+
+  const normalized = `${parsed.pathname}${parsed.search}`;
+  if (normalized === '/') return null;
+  if (
+    BLOCKED_RETURN_PREFIXES.some(prefix =>
+      matchesPathPrefix(parsed.pathname, prefix)
+    )
+  ) {
+    return null;
+  }
+
+  return normalized;
+}
+
+function getDefaultDesktopReturnRoute(pathname: string): string {
+  return matchesPathPrefix(pathname, '/signup') ||
+    matchesPathPrefix(pathname, '/sign-up')
+    ? '/start'
+    : '/app';
+}
+
+function buildDesktopBrowserAuthUrl(urlString: string): string | null {
+  const parsed = parseUrl(urlString);
+  if (
+    !parsed ||
+    parsed.origin !== APP_ORIGIN ||
+    !isDesktopAuthPath(parsed.pathname)
+  ) {
+    return null;
+  }
+
+  const desktopReturn =
+    sanitizeDesktopReturnRoute(parsed.searchParams.get(DESKTOP_RETURN_PARAM)) ??
+    sanitizeDesktopReturnRoute(parsed.searchParams.get('redirect_url')) ??
+    getDefaultDesktopReturnRoute(parsed.pathname);
+
+  parsed.searchParams.delete('oauth_error');
+  parsed.searchParams.set(DESKTOP_RETURN_PARAM, desktopReturn);
+  return parsed.toString();
+}
+
+function buildDesktopAuthHandoffUrl(authUrl: string): string {
+  const url = new URL(DESKTOP_AUTH_HANDOFF_PATH, APP_URL);
+  url.searchParams.set('auth_url', authUrl);
+  return url.toString();
+}
+
+function parseAuthReturnDeepLink(urlString: string): string | null {
+  const parsed = parseUrl(urlString);
+  if (
+    !parsed ||
+    parsed.protocol !== AUTH_RETURN_PROTOCOL ||
+    parsed.hostname !== AUTH_RETURN_HOST
+  ) {
+    return null;
+  }
+
+  return sanitizeDesktopReturnRoute(parsed.searchParams.get('route'));
+}
+
+function findAuthReturnRouteInArgv(argv: readonly string[]): string | null {
+  for (const arg of argv) {
+    const route = parseAuthReturnDeepLink(arg);
+    if (route) return route;
+  }
+  return null;
 }
 
 interface WindowState {
@@ -154,8 +287,114 @@ function showWindow(win: BrowserWindow): void {
   win.focus();
 }
 
+function loadReturnedRoute(route: string): void {
+  const targetUrl = new URL(route, APP_URL).toString();
+  const win =
+    mainWindow && !mainWindow.isDestroyed()
+      ? mainWindow
+      : createWindow(targetUrl);
+
+  if (win.webContents.getURL() !== targetUrl) {
+    void win.loadURL(targetUrl);
+  }
+
+  showWindow(win);
+
+  if (authHandoffWindow && !authHandoffWindow.isDestroyed()) {
+    authHandoffWindow.close();
+  }
+}
+
+function handleAuthReturnRoute(route: string): void {
+  if (app.isReady()) {
+    loadReturnedRoute(route);
+    return;
+  }
+
+  pendingAuthReturnRoute = route;
+}
+
+function showDesktopAuthHandoff(authUrl: string): void {
+  const handoffUrl = buildDesktopAuthHandoffUrl(authUrl);
+
+  if (authHandoffWindow && !authHandoffWindow.isDestroyed()) {
+    void authHandoffWindow.loadURL(handoffUrl);
+    showWindow(authHandoffWindow);
+    return;
+  }
+
+  authHandoffWindow = new BrowserWindow({
+    show: false,
+    width: 420,
+    height: 360,
+    minWidth: 360,
+    minHeight: 320,
+    resizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    title: 'Jovie Sign In',
+    backgroundColor: APP_BACKGROUND_COLOR,
+    parent: mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined,
+    modal: false,
+    webPreferences: {
+      contextIsolation: true,
+      devTools: ENABLE_DEVTOOLS,
+      nodeIntegration: false,
+      nodeIntegrationInSubFrames: false,
+      nodeIntegrationInWorker: false,
+      preload: path.join(__dirname, 'preload.js'),
+      sandbox: true,
+      webSecurity: true,
+      webviewTag: false,
+    },
+  });
+
+  authHandoffWindow.once('ready-to-show', () => {
+    if (authHandoffWindow) showWindow(authHandoffWindow);
+  });
+
+  authHandoffWindow.on('closed', () => {
+    authHandoffWindow = null;
+  });
+
+  authHandoffWindow.webContents.session.setPermissionRequestHandler(
+    (_webContents, _permission, callback) => {
+      callback(false);
+    }
+  );
+  authHandoffWindow.webContents.session.setPermissionCheckHandler(() => false);
+
+  authHandoffWindow.webContents.on('will-navigate', event => {
+    const parsed = parseUrl(event.url);
+    if (
+      parsed?.origin === APP_ORIGIN &&
+      parsed.pathname === DESKTOP_AUTH_HANDOFF_PATH
+    ) {
+      return;
+    }
+    event.preventDefault();
+    openExternalUrl(event.url);
+  });
+
+  authHandoffWindow.webContents.setWindowOpenHandler(({ url }) => {
+    openExternalUrl(url);
+    return { action: 'deny' };
+  });
+
+  void authHandoffWindow.loadURL(handoffUrl);
+}
+
+function maybeShowDesktopAuthHandoff(urlString: string): boolean {
+  const authUrl = buildDesktopBrowserAuthUrl(urlString);
+  if (!authUrl) return false;
+
+  showDesktopAuthHandoff(authUrl);
+  return true;
+}
+
 function createWindow(initialUrl = APP_URL): BrowserWindow {
   const windowState = loadWindowState();
+  let lastNonAuthAppUrl = APP_URL;
 
   const win = new BrowserWindow({
     show: false,
@@ -187,7 +426,16 @@ function createWindow(initialUrl = APP_URL): BrowserWindow {
     showWindow(win);
   });
 
-  void win.loadURL(initialUrl);
+  mainWindow = win;
+
+  const initialAuthUrl = buildDesktopBrowserAuthUrl(initialUrl);
+  if (initialAuthUrl) {
+    showDesktopAuthHandoff(initialAuthUrl);
+    void win.loadURL(APP_URL);
+  } else {
+    lastNonAuthAppUrl = initialUrl;
+    void win.loadURL(initialUrl);
+  }
 
   win.webContents.session.setPermissionRequestHandler(
     (_webContents, _permission, callback) => {
@@ -197,8 +445,14 @@ function createWindow(initialUrl = APP_URL): BrowserWindow {
 
   win.webContents.session.setPermissionCheckHandler(() => false);
 
-  // Navigation guard — keep browsing inside the app host + Clerk auth flows
+  // Navigation guard: app-host routes stay in-window; auth routes get the
+  // dedicated handoff; all other safe URLs open in the system browser.
   win.webContents.on('will-navigate', event => {
+    if (maybeShowDesktopAuthHandoff(event.url)) {
+      event.preventDefault();
+      return;
+    }
+
     const disposition = getUrlDisposition(event.url);
     if (disposition === 'in-app') return;
 
@@ -214,6 +468,11 @@ function createWindow(initialUrl = APP_URL): BrowserWindow {
   });
 
   win.webContents.on('will-redirect', event => {
+    if (maybeShowDesktopAuthHandoff(event.url)) {
+      event.preventDefault();
+      return;
+    }
+
     const disposition = getUrlDisposition(event.url);
     if (disposition === 'in-app') return;
 
@@ -227,6 +486,10 @@ function createWindow(initialUrl = APP_URL): BrowserWindow {
   // navigation guards. Internal targets stay in the app, safe external links
   // open in the system browser, and unsafe protocols are silently dropped.
   win.webContents.setWindowOpenHandler(({ url }) => {
+    if (maybeShowDesktopAuthHandoff(url)) {
+      return { action: 'deny' };
+    }
+
     const disposition = getUrlDisposition(url);
     if (disposition === 'in-app') {
       void win.loadURL(url);
@@ -241,6 +504,12 @@ function createWindow(initialUrl = APP_URL): BrowserWindow {
     saveWindowState(win);
   });
 
+  win.on('closed', () => {
+    if (mainWindow === win) {
+      mainWindow = null;
+    }
+  });
+
   function sendNavState(): void {
     if (win.isDestroyed()) return;
     const state: NavState = {
@@ -251,14 +520,39 @@ function createWindow(initialUrl = APP_URL): BrowserWindow {
   }
 
   win.webContents.on('did-navigate-in-page', sendNavState);
-  win.webContents.on('did-navigate', sendNavState);
+  win.webContents.on('did-navigate-in-page', (_event, url, isMainFrame) => {
+    if (!isMainFrame) return;
+    if (maybeShowDesktopAuthHandoff(url)) {
+      void win.loadURL(lastNonAuthAppUrl);
+      return;
+    }
+    const disposition = getUrlDisposition(url);
+    if (disposition === 'external') {
+      openExternalUrl(url);
+      void win.loadURL(lastNonAuthAppUrl);
+      return;
+    }
+    const parsed = parseUrl(url);
+    if (parsed?.origin === APP_ORIGIN && !isBrowserOnlyInAppPath(parsed.pathname)) {
+      lastNonAuthAppUrl = url;
+    }
+  });
+  win.webContents.on('did-navigate', (_event, url) => {
+    const parsed = parseUrl(url);
+    if (parsed?.origin === APP_ORIGIN && !isDesktopAuthPath(parsed.pathname)) {
+      lastNonAuthAppUrl = url;
+    }
+    sendNavState();
+  });
 
   return win;
 }
 
 function openPreferences(): void {
   const win =
-    BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
+    mainWindow && !mainWindow.isDestroyed()
+      ? mainWindow
+      : BrowserWindow.getFocusedWindow();
   if (!win) {
     createWindow(SETTINGS_URL);
     return;
@@ -266,6 +560,30 @@ function openPreferences(): void {
 
   void win.loadURL(SETTINGS_URL);
   showWindow(win);
+}
+
+function refreshApplicationMenu(): void {
+  Menu.setApplicationMenu(buildApplicationMenu());
+}
+
+function checkForUpdatesFromMenu(): void {
+  if (updateReadyToInstall) {
+    autoUpdater.quitAndInstall();
+    return;
+  }
+
+  autoUpdater.checkForUpdatesAndNotify().catch(() => {
+    // Network unavailable or no update server configured yet — non-fatal
+  });
+}
+
+function buildUpdateMenuItem(): MenuItemConstructorOptions {
+  return {
+    label: updateReadyToInstall
+      ? 'Restart to install update…'
+      : 'Check for updates…',
+    click: checkForUpdatesFromMenu,
+  };
 }
 
 function buildViewMenu(): MenuItemConstructorOptions[] {
@@ -306,6 +624,8 @@ function buildApplicationMenu(): Menu {
         submenu: [
           { role: 'about' },
           { type: 'separator' },
+          buildUpdateMenuItem(),
+          { type: 'separator' },
           {
             label: 'Preferences...',
             accelerator: 'Command+,',
@@ -335,6 +655,7 @@ function buildApplicationMenu(): Menu {
           accelerator: 'Ctrl+,',
           click: openPreferences,
         },
+        buildUpdateMenuItem(),
         { type: 'separator' },
         { role: 'quit' },
       ],
@@ -356,11 +677,13 @@ function sendToAppWindows(channel: UpdateChannel): void {
 // Wire auto-updater events to renderer IPC so the web UI can show the update pill.
 autoUpdater.on('update-available', () => {
   updateReadyToInstall = false;
+  refreshApplicationMenu();
   sendToAppWindows(UPDATE_AVAILABLE_CHANNEL);
 });
 
 autoUpdater.on('update-downloaded', () => {
   updateReadyToInstall = true;
+  refreshApplicationMenu();
   sendToAppWindows(UPDATE_DOWNLOADED_CHANNEL);
 });
 
@@ -395,9 +718,114 @@ ipcMain.handle(GO_FORWARD_CHANNEL, (event: IpcMainInvokeEvent) => {
     win.webContents.goForward();
 });
 
+ipcMain.handle(
+  START_DESKTOP_AUTH_HANDOFF_CHANNEL,
+  (event: IpcMainInvokeEvent, authUrl: unknown, ...args: unknown[]) => {
+    if (
+      !isTrustedIpcSender(event) ||
+      args.length !== 0 ||
+      typeof authUrl !== 'string'
+    ) {
+      return { ok: false, reason: 'invalid-request' };
+    }
+
+    const browserAuthUrl = buildDesktopBrowserAuthUrl(authUrl);
+    if (!browserAuthUrl) {
+      return { ok: false, reason: 'invalid-auth-url' };
+    }
+
+    showDesktopAuthHandoff(browserAuthUrl);
+    return { ok: true };
+  }
+);
+
+ipcMain.handle(
+  OPEN_DESKTOP_AUTH_URL_CHANNEL,
+  (event: IpcMainInvokeEvent, authUrl: unknown, ...args: unknown[]) => {
+    if (
+      !isTrustedDesktopAuthSender(event) ||
+      args.length !== 0 ||
+      typeof authUrl !== 'string'
+    ) {
+      return { ok: false, reason: 'invalid-request' };
+    }
+
+    const browserAuthUrl = buildDesktopBrowserAuthUrl(authUrl);
+    if (!browserAuthUrl) {
+      return { ok: false, reason: 'invalid-auth-url' };
+    }
+
+    openExternalUrl(browserAuthUrl);
+    return { ok: true };
+  }
+);
+
+ipcMain.handle(
+  CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL,
+  (event: IpcMainInvokeEvent) => {
+    if (!isTrustedDesktopAuthSender(event)) {
+      return { ok: false, reason: 'invalid-request' };
+    }
+
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win && !win.isDestroyed()) {
+      win.close();
+    }
+
+    return { ok: true };
+  }
+);
+
+function registerAuthReturnProtocol(): void {
+  const defaultAppProcess = process as NodeJS.Process & {
+    readonly defaultApp?: boolean;
+  };
+
+  if (defaultAppProcess.defaultApp && process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient('jovie', process.execPath, [
+      path.resolve(process.argv[1]),
+    ]);
+    return;
+  }
+
+  app.setAsDefaultProtocolClient('jovie');
+}
+
+if (gotSingleInstanceLock) {
+  app.on('second-instance', (_event, argv) => {
+    const route = findAuthReturnRouteInArgv(argv);
+    if (route) {
+      handleAuthReturnRoute(route);
+      return;
+    }
+
+    const win =
+      mainWindow && !mainWindow.isDestroyed() ? mainWindow : createWindow();
+    showWindow(win);
+  });
+
+  app.on('open-url', (event, url) => {
+    event.preventDefault();
+    const route = parseAuthReturnDeepLink(url);
+    if (route) {
+      handleAuthReturnRoute(route);
+    }
+  });
+
+  pendingAuthReturnRoute = findAuthReturnRouteInArgv(process.argv);
+}
+
 app.whenReady().then(() => {
-  Menu.setApplicationMenu(buildApplicationMenu());
-  createWindow();
+  if (!gotSingleInstanceLock) return;
+
+  registerAuthReturnProtocol();
+  refreshApplicationMenu();
+  createWindow(
+    pendingAuthReturnRoute
+      ? new URL(pendingAuthReturnRoute, APP_URL).toString()
+      : APP_URL
+  );
+  pendingAuthReturnRoute = null;
 
   // Auto-update: check on launch then every 30 minutes
   autoUpdater.checkForUpdatesAndNotify().catch(() => {
@@ -412,8 +840,10 @@ app.whenReady().then(() => {
   }, UPDATE_INTERVAL_MS);
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
+    if (!mainWindow || mainWindow.isDestroyed()) {
       createWindow();
+    } else {
+      showWindow(mainWindow);
     }
   });
 });

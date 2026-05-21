@@ -9,6 +9,15 @@ import { APP_ROUTES } from '@/constants/routes';
 import { useNormalizeClerkHomeLink } from '@/features/auth/useNormalizeClerkHomeLink';
 import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
 import { buildDisabledOAuthProviderElements } from '@/lib/auth/oauth-providers';
+import {
+  buildAuthRouteUrlWithDesktopReturn,
+  buildDesktopAuthReturnPath,
+  sanitizeDesktopReturnRoute,
+} from '@/lib/desktop/auth-return';
+import {
+  isElectronRuntime,
+  startDesktopAuthHandoff,
+} from '@/lib/desktop/electron-bridge';
 
 export type AuthShellMode = 'sign-in' | 'sign-up';
 
@@ -72,24 +81,44 @@ export function AuthShell({
   const containerRef = useRef<HTMLDivElement>(null);
   const searchParams = useSearchParams();
   const [isMounted, setIsMounted] = useState(false);
+  const [isDesktopHandoff, setIsDesktopHandoff] = useState(false);
 
   useNormalizeClerkHomeLink(containerRef);
 
   useEffect(() => {
+    if (isElectronRuntime()) {
+      setIsDesktopHandoff(true);
+      void startDesktopAuthHandoff(globalThis.location.href);
+      return;
+    }
+
     setIsMounted(true);
   }, []);
 
   const isSignUp = mode === 'sign-up';
 
+  const desktopReturnRoute = sanitizeDesktopReturnRoute(
+    searchParams.get('desktop_return')
+  );
+  const desktopFallbackRedirectUrl = desktopReturnRoute
+    ? buildDesktopAuthReturnPath(desktopReturnRoute)
+    : null;
+
   const crossLinkUrl =
     oppositeModeUrl ??
-    buildAuthRouteUrl(
-      isSignUp ? APP_ROUTES.SIGNIN : APP_ROUTES.SIGNUP,
-      searchParams
-    );
+    (desktopFallbackRedirectUrl
+      ? buildAuthRouteUrlWithDesktopReturn(
+          isSignUp ? APP_ROUTES.SIGNIN : APP_ROUTES.SIGNUP,
+          searchParams
+        )
+      : buildAuthRouteUrl(
+          isSignUp ? APP_ROUTES.SIGNIN : APP_ROUTES.SIGNUP,
+          searchParams
+        ));
 
   const defaultRedirect = isSignUp ? APP_ROUTES.WAITLIST : APP_ROUTES.DASHBOARD;
-  const resolvedRedirect = fallbackRedirectUrl ?? defaultRedirect;
+  const resolvedRedirect =
+    fallbackRedirectUrl ?? desktopFallbackRedirectUrl ?? defaultRedirect;
 
   // Combine caller-supplied Clerk appearance with the provider guard so a
   // disabled OAuth button (e.g. Apple while credentials are invalid) cannot
@@ -114,7 +143,7 @@ export function AuthShell({
   const crossLinkPrompt = isSignUp ? 'Have an account?' : "Don't have access?";
   const crossLinkLabel = isSignUp ? 'Sign in' : 'Join the waitlist';
 
-  if (!isMounted) {
+  if (!isMounted || isDesktopHandoff) {
     return <AuthFormSkeleton />;
   }
 

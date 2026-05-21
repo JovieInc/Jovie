@@ -114,12 +114,12 @@ async function assertDashboardPageContent(
   if (pageConfig.name === 'Chat') {
     const chatReady = page
       .locator(
-        'textarea, [contenteditable="true"], button:has-text("New thread")'
+        'textarea, [contenteditable="true"], button[aria-label="New chat"]'
       )
       .first();
     await expect(
       chatReady,
-      'Dashboard/Chat: composer or new thread CTA should be visible'
+      'Dashboard/Chat: composer or new chat CTA should be visible'
     ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
     return;
   }

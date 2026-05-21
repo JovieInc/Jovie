@@ -79,7 +79,7 @@ function CommandPaletteInner({ profileId }: CommandPaletteInnerProps) {
     enabled: open,
   });
 
-  // Recent threads + standalone "New thread" action are not part of the
+  // Recent threads + standalone "New chat" action are not part of the
   // command registry — they're palette-local. We fold them into a synthetic
   // entity section so the shared list+keyboard machinery picks them up.
   const additionalSections = useMemo<PaletteSection[]>(() => {

@@ -31,6 +31,21 @@ export interface ElectronAPI {
   readonly onNavStateChanged: (
     cb: (state: { canGoBack: boolean; canGoForward: boolean }) => void
   ) => () => void;
+  /** Ask the main process to show the dedicated auth handoff window. */
+  readonly startDesktopAuthHandoff?: (authUrl: string) => Promise<{
+    readonly ok: boolean;
+    readonly reason?: string;
+  }>;
+  /** Open the desktop auth URL in the system browser from the handoff window. */
+  readonly openDesktopAuthUrl?: (authUrl: string) => Promise<{
+    readonly ok: boolean;
+    readonly reason?: string;
+  }>;
+  /** Close the dedicated desktop auth handoff window. */
+  readonly closeDesktopAuthWindow?: () => Promise<{
+    readonly ok: boolean;
+    readonly reason?: string;
+  }>;
 }
 
 type InstallUpdateResult = Awaited<
@@ -150,6 +165,12 @@ function openManualDownload(): void {
   }
 }
 
+function openBrowserFallback(url: string): void {
+  if (typeof window !== 'undefined') {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+}
+
 function reportInstallFailure(error: unknown): void {
   void captureWarning(
     'installUpdateAndRestart threw — falling back to manual download',
@@ -254,6 +275,36 @@ export function useDesktopUpdate(): DesktopUpdateState {
   };
 }
 
+export async function startDesktopAuthHandoff(authUrl: string): Promise<void> {
+  const api = getRawElectronAPI();
+  if (api && typeof api.startDesktopAuthHandoff === 'function') {
+    await api.startDesktopAuthHandoff(authUrl);
+    return;
+  }
+  if (api) {
+    reportMissingBridgeMethod('startDesktopAuthHandoff');
+  }
+  openBrowserFallback(authUrl);
+}
+
+export async function openDesktopAuthUrl(authUrl: string): Promise<void> {
+  const api = getRawElectronAPI();
+  if (api && typeof api.openDesktopAuthUrl === 'function') {
+    const result = await api.openDesktopAuthUrl(authUrl);
+    if (result.ok) return;
+  } else if (api) {
+    reportMissingBridgeMethod('openDesktopAuthUrl');
+  }
+  openBrowserFallback(authUrl);
+}
+
+export async function closeDesktopAuthWindow(): Promise<void> {
+  const api = getRawElectronAPI();
+  if (api && typeof api.closeDesktopAuthWindow === 'function') {
+    await api.closeDesktopAuthWindow();
+  }
+}
+
 export interface DesktopNavState {
   readonly canGoBack: boolean;
   readonly canGoForward: boolean;
@@ -298,5 +349,8 @@ export const __testing = {
   safeInstallUpdateAndRestart,
   safeOnUpdateAvailable,
   safeOnUpdateDownloaded,
+  startDesktopAuthHandoff,
+  openDesktopAuthUrl,
+  closeDesktopAuthWindow,
   RELEASE_DOWNLOAD_URL,
 };

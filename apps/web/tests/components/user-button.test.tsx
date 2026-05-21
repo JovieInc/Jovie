@@ -51,6 +51,7 @@ vi.mock('@/lib/analytics', () => ({
 
 import { useRouter } from 'next/navigation';
 import { UserButton } from '@/components/organisms/user-button';
+import { APP_ROUTES } from '@/constants/routes';
 import { useAuthSafe, useUserSafe } from '@/hooks/useClerkSafe';
 import { track } from '@/lib/analytics';
 import {
@@ -377,5 +378,21 @@ describe('UserButton billing actions', () => {
 
     expect(screen.getByText('Jovie Menu')).toBeInTheDocument();
     expect(document.querySelector('.animate-pulse')).toBeNull();
+  });
+
+  it('shows a usage stats entry and routes there from the user menu', async () => {
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: { isPro: false, plan: null, hasStripeCustomer: false },
+      isLoading: false,
+      error: null,
+    } as any);
+
+    const user = userEvent.setup();
+    render(<UserButton showUserInfo />);
+
+    await user.click(screen.getByText('Adele Adkins'));
+    await user.click(await screen.findByText('Usage Stats'));
+
+    expect(pushMock).toHaveBeenCalledWith(APP_ROUTES.SETTINGS_USAGE);
   });
 });

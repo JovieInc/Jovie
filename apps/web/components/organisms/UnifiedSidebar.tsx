@@ -254,10 +254,10 @@ function SidebarHeaderNav({
   isDemoRoute: boolean;
 }>) {
   const shellChatV1Enabled = useAppFlag('DESIGN_V1');
-  const newThreadLink = (
+  const newChatLink = (
     <Link
       href={APP_ROUTES.CHAT}
-      aria-label='New thread'
+      aria-label='New chat'
       className={cn(
         'flex size-7 shrink-0 items-center justify-center rounded-[10px] bg-transparent text-sidebar-item-icon transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/60 hover:text-sidebar-item-foreground focus-visible:outline-none focus-visible:bg-sidebar-accent/60 focus-visible:text-sidebar-item-foreground',
         !shellChatV1Enabled && 'ml-auto group-data-[collapsible=icon]:hidden'
@@ -351,13 +351,13 @@ function SidebarHeaderNav({
         isDashboardOrAdmin &&
         (shellChatV1Enabled ? (
           <div className='ml-auto flex items-center gap-0.5 group-data-[collapsible=icon]:hidden'>
-            <Tooltip label='New thread' side='bottom'>
-              {newThreadLink}
+            <Tooltip label='New chat' side='bottom'>
+              {newChatLink}
             </Tooltip>
             <SidebarDockButton />
           </div>
         ) : (
-          newThreadLink
+          newChatLink
         ))}
     </div>
   );

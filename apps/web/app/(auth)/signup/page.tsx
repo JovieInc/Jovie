@@ -16,6 +16,10 @@ import {
   SIGNUP_SPOTIFY_EXPECTED_KEY,
   SIGNUP_SPOTIFY_URL_KEY,
 } from '@/lib/auth/signup-claim-storage';
+import {
+  buildAuthRouteUrlWithDesktopReturn,
+  sanitizeDesktopReturnRoute,
+} from '@/lib/desktop/auth-return';
 
 /**
  * Persist pre-signup claim data from the homepage hero into sessionStorage,
@@ -125,6 +129,12 @@ function SignUpClaimDataPersistence() {
 function SignUpOauthErrorBanner() {
   const searchParams = useSearchParams();
   const oauthError = searchParams.get('oauth_error');
+  const desktopReturnRoute = sanitizeDesktopReturnRoute(
+    searchParams.get('desktop_return')
+  );
+  const signInUrl = desktopReturnRoute
+    ? buildAuthRouteUrlWithDesktopReturn(APP_ROUTES.SIGNIN, searchParams)
+    : buildAuthRouteUrl(APP_ROUTES.SIGNIN, searchParams);
 
   useEffect(() => {
     if (!oauthError) return;
@@ -159,7 +169,7 @@ function SignUpOauthErrorBanner() {
       {isAccountExists ? (
         <p className='mt-2 text-sm text-secondary-token'>
           <Link
-            href={buildAuthRouteUrl(APP_ROUTES.SIGNIN, searchParams)}
+            href={signInUrl}
             className='text-primary-token underline focus-ring-themed rounded-md'
           >
             Sign in instead
