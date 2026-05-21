@@ -429,27 +429,50 @@ export function useSubscriptionForm({
         setSubscriptionDetails(prev => ({ ...prev, email: normalizedEmail }));
         setNotificationsState('success');
         showSuccess("You're all set. We'll keep you in the loop.");
+
+        // Canary: record source intent at OTP verification time so we can
+        // attribute confirmed subscriptions back to the originating profile page
+        // (JOV-2360). The source was already stored server-side at subscribe
+        // time, but this client event lets us measure completion rate per source.
+        track('otp_verified', {
+          ...analyticsBase,
+          source,
+          channel: 'email',
+          alert_opt_in_variant: experimentVariant,
+        });
+
         return 'subscribed' as const;
       } catch (err) {
         updateError(
           resolveInlineErrorMessage(err, NOTIFICATION_COPY.errors.generic),
           'verify'
         );
+
+        track('otp_verify_error', {
+          ...analyticsBase,
+          source,
+          channel: 'email',
+          alert_opt_in_variant: experimentVariant,
+        });
+
         return 'error' as const;
       } finally {
         setIsSubmitting(false);
       }
     },
     [
+      analyticsBase,
       artist.id,
       clearError,
       emailInput,
+      experimentVariant,
       isSubmitting,
       otpCode,
       setNotificationsState,
       setSubscribedChannels,
       setSubscriptionDetails,
       showSuccess,
+      source,
       updateError,
       verifyEmailOtpMutation,
     ]
