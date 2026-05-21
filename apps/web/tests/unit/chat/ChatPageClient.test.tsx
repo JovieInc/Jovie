@@ -8,6 +8,7 @@ import {
 } from '@/app/app/(shell)/chat/ChatPageClient';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import type { ChatActionCard } from '@/components/jovie/types';
 import { fastRender } from '@/tests/utils/fast-render';
 
 // Controllable mocks
@@ -81,15 +82,7 @@ vi.mock('@/contexts/HeaderActionsContext', () => ({
 
 // Track the onTitleChange callback from JovieChat
 let capturedOnTitleChange: ((title: string | null) => void) | undefined;
-let capturedActionCards:
-  | readonly {
-      readonly id: string;
-      readonly title: string;
-      readonly body: string;
-      readonly actionLabel: string;
-      readonly prompt: string;
-    }[]
-  | undefined;
+let capturedActionCards: readonly ChatActionCard[] | undefined;
 
 vi.mock('@/components/jovie/JovieChat', () => ({
   JovieChat: (props: {
@@ -99,13 +92,7 @@ vi.mock('@/components/jovie/JovieChat', () => ({
     onTitleChange?: (title: string | null) => void;
     initialQuery?: string;
     isFirstSession?: boolean;
-    actionCards?: readonly {
-      readonly id: string;
-      readonly title: string;
-      readonly body: string;
-      readonly actionLabel: string;
-      readonly prompt: string;
-    }[];
+    actionCards?: readonly ChatActionCard[];
   }) => {
     capturedOnTitleChange = props.onTitleChange;
     capturedActionCards = props.actionCards;
@@ -242,6 +229,8 @@ describe('ChatPageClient', () => {
         id: 'connect-music-catalog',
         title: 'Connect Your Music Catalog',
         actionLabel: 'Plan Setup',
+        prompt:
+          'Help me connect my music catalog for Test Artist. Use the current profile context and give me the next setup step.',
       })
     );
   });
@@ -273,6 +262,9 @@ describe('ChatPageClient', () => {
       expect.objectContaining({
         id: 'plan-next-move',
         title: 'Plan Your Next Move',
+        actionLabel: 'Plan Move',
+        prompt:
+          'Use my artist profile, music catalog, and dashboard context for Test Artist to recommend the single most useful action I should take this week. Include the first step.',
       })
     );
   });
