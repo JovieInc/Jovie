@@ -584,13 +584,14 @@ export function HudDashboardClient({
   const showDispatch = presentationMode !== 'token';
   const showQrPanel = presentationMode === 'token' && Boolean(hudUrl);
 
-  // Outer layout: kiosk gets the wide centered TV layout; shell defers width
-  // to the AdminToolPage container that already provides app-shell padding.
-  // Shell uses full width — no max-w constraint; the board benefits from all
-  // available horizontal space at wide monitor widths.
+  // Outer layout: shell defers width to the AdminToolPage container (no
+  // additional centering or max-width so metrics fill the full horizontal
+  // space at any viewport). Kiosk keeps its own padding for breathing room
+  // on TV displays but also removes the max-width cap so wide monitors get
+  // full-bleed density.
   const outerClass = isShell
     ? 'flex w-full flex-col gap-3'
-    : 'mx-auto flex w-full max-w-[1560px] flex-col gap-3 px-4 py-4 sm:px-6 sm:py-6 xl:px-8';
+    : 'flex w-full flex-col gap-3 px-4 py-4 sm:px-6 sm:py-6 xl:px-8';
 
   // MRR scale: shell matches Overview KPIs (~28-32px); kiosk keeps the
   // TV-readable 44/56/72 ramp.
@@ -800,7 +801,7 @@ export function HudDashboardClient({
             valueClassName={mrrValueClass}
           />
 
-          <div className='grid grid-cols-2 xl:grid-cols-2 gap-3'>
+          <div className='grid grid-cols-2 gap-3'>
             <ContentMetricCard
               label='Runway'
               value={

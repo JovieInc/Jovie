@@ -22,14 +22,14 @@ export interface HomepageHeroCarouselSlide {
 
 export const HOMEPAGE_LAUNCH_COPY = {
   seo: {
-    title: 'Jovie | Monetize your music catalog with AI',
+    title: 'Jovie | Your AI artist manager',
     description:
       'Jovie is the AI artist workspace that surfaces opportunities in your catalog — fan paths, presaves, pitches — and helps you ship the next one.',
   },
   hero: {
-    headline: 'Monetize your music catalog with AI',
+    headline: 'Your AI artist manager.',
     subhead:
-      'Connect your catalog. Jovie turns each release into the next fan path, presave, or playlist pitch.',
+      'Jovie watches your catalog, surfaces what to do next, and helps you ship the presave, fan path, or playlist pitch.',
     primaryCta: HOMEPAGE_FRONT_DOOR_CTA.primary,
     secondaryCta: {
       label: 'See a live profile',
