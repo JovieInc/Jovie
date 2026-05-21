@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.36] - 2026-05-21
+
+> Chat home no longer advertises album-art generation when the provider is down or feature-flagged off — the suggestion pill is hidden instead of showing as a disabled button, and the "Draft album-art brief" fallback takes its place. Pro upsells stay visible.
+
+### Changed
+
+- **Chat suggestions: hide unavailable album-art capability (JOV-2524)**: `SuggestedPrompts` now omits the "Generate album art" pill entirely when `albumArtCapability.reasonCode` is `PROVIDER_UNAVAILABLE` or `FEATURE_DISABLED`, surfacing the "Draft album-art brief" suggestion in its place. Plan-gated (`PLAN_UNAVAILABLE`) and onboarding-pending (`PROFILE_REQUIRED`) reasons retain the existing disabled-with-tooltip behavior so the upsell affordance is preserved. Sourced from prod chat audit (JOV-2524).
+
 ## [26.5.34] - 2026-05-21
 
 > Fixed a layout shift on public artist profile pages that caused Lighthouse CLS scores of 0.317, unblocking the Lighthouse CI gate.
