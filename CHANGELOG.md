@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.32] - 2026-05-21
+
+> [internal] OTP verification on public artist profile pages now fires source-attributed analytics events so confirmed subscriptions can be measured back to the originating signup surface.
+
+### Added
+
+- **[internal] OTP verification source canary (JOV-2360)**: `useSubscriptionForm` now fires `otp_verified` and `otp_verify_error` analytics events at OTP confirmation time, carrying the originating `source` (e.g., `subscribe_tab`, `hero_alerts_button`) and the artist handle. Closes the measurement gap between subscribe intent and confirmed email verification.
+
 ## [26.5.29] - 2026-05-18
 
 > [internal] Profile music/releases scroll is now hardware-accelerated for smooth native-feel scrolling on touch devices.
