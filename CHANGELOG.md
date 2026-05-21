@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.32.0] - 2026-05-21
+
+> [internal] Admin profile, dashboard profile, and contact detail sidebars now use the unified DrawerHero header component, completing the EntitySidebarShell migration started in JOV-2018.
+
+### Changed
+
+- **[internal] DrawerHero migration (JOV-2136)**: wired `<DrawerHero>` into the 3 remaining EntitySidebarShell callers — AdminProfileSidebar, ProfileContactSidebar, and ContactDetailSidebar — replacing the legacy `EntityHeaderCard` pattern. Each sidebar now uses `entityHeaderSurface='flat'` with its own `DrawerSurfaceCard` wrapper, a `DrawerCardActionBar` with `border-0 bg-transparent px-0 py-0` to prevent a border strip above the hero, and `className='[&_h2]:pr-9'` to keep the title clear of floating action buttons. The intermediate `ProfileEntityHeader` helper component was collapsed into `ProfileSidebarHeaderCard`. All 9 existing sidebar tests pass.
+
 ## [26.5.29] - 2026-05-18
 
 > [internal] Profile music/releases scroll is now hardware-accelerated for smooth native-feel scrolling on touch devices.
