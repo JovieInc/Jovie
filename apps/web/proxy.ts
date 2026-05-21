@@ -12,6 +12,7 @@ import {
 } from '@/components/providers/clerkAvailability';
 import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
+import { createFingerprintEdge } from '@/lib/audience/fingerprint';
 import {
   buildAuthDegradedHtmlResponse,
   isBrowserNavigation,
@@ -133,39 +134,6 @@ function applyStateRewrite(
  * Mirrors maskIpAddress() in app/api/audience/lib/audience-utils.ts.
  * Edge-compatible (no Node.js modules).
  */
-function maskIpForFingerprint(ip: string | null): string {
-  if (!ip) return 'unknown_ip';
-  if (ip.includes(':')) {
-    // IPv6: keep first 4 groups
-    return ip
-      .split(':')
-      .slice(0, 4)
-      .map(segment => segment || '0')
-      .join(':');
-  }
-  const parts = ip.split('.');
-  if (parts.length >= 3) {
-    return `${parts.slice(0, 3).join('.')}.0`;
-  }
-  return ip;
-}
-
-/**
- * Create visitor fingerprint using the Web Crypto API (edge-compatible).
- * Produces the same hex digest as createFingerprint() in audience-utils.ts.
- */
-async function createFingerprintEdge(
-  ip: string | null,
-  ua: string | null
-): Promise<string> {
-  const maskedIp = maskIpForFingerprint(ip);
-  const uaStr = (ua || 'unknown_ua').slice(0, 128);
-  const input = `${maskedIp}|${uaStr}`;
-  const encoded = new TextEncoder().encode(input);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', encoded);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
 
 /**
  * Check if a public profile visitor should be blocked.

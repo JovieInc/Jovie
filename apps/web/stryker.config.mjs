@@ -48,6 +48,20 @@ export default {
     // collisions). Mutation testing will surface assertions that don't
     // exercise these branches.
     'app/api/stripe/webhooks/route.ts',
+    // Webhook signature verification surface (webhook-signatures row, YELLOW risk 29.2,
+    // PQ #1 with 33.5pp gap). Covers linear/resend/sentry/sms/stripe-connect/stripe-tips
+    // routes for missing-signature, invalid-signature, replay (timestamp), malformed body,
+    // and durable dedupe (onConflictDoNothing + processed flag). Complements stripe row;
+    // enables mutation evidence on verification + idempotency branches per register notes.
+    'app/api/webhooks/**/route.ts',
+    // API route schema contracts (YELLOW 25.6 per TEST_RISK_REGISTER + heatmap, after public-profile-isr YELLOW #9409 + priors: webhook-signatures #9405, claim-onboarding #9401 series, rls #9406, proxy #9407, dev-test #9399, entitlements).
+    // Parametric contract coverage: dedicated per-route tests assert auth checks (getCachedAuth → 401 'Unauthorized'), zod.safeParse / json parse failures (400 'Invalid input'/'Invalid JSON'), success paths.
+    // Representative routes (excludes /cron, /webhooks/**, /dev/*, claim-onboarding/* covered by dedicated surfaces). Provides mutation evidence on common schema/auth branches for the api-routes-contract surface (glob app/api/**/route.ts).
+    // Matches exact contract patterns + stryker wiring from predecessors (#9405 sms/webhook sig+idempotency+outer-catch+400/401/500, #9399 dev-test 403/persona, #9406 withDashboardRoute 401/outer-catch/captureError).
+    'app/api/waitlist/route.ts',
+    'app/api/verification/request/route.ts',
+    'app/api/pre-save/apple/route.ts',
+    'app/api/wrap-link/route.ts',
     // FAPI host decoding + Clerk env key resolution — broken auth here
     // locks out every user across all three Clerk environments.
     'lib/auth/decode-fapi-host.ts',
@@ -67,6 +81,8 @@ export default {
     // resolve + outer error paths. lib/api/with-dashboard-route.ts owns the standardized
     // outer catch for RLS-related failures (401/404/500, capture, NO_STORE on auth errors).
     // lib/auth/require-auth.ts handles test auth bypass + 401 contract responses.
+    // Dedicated contract tests added (with-dashboard-route.test.ts) for auth/zod-style error
+    // taxonomy, fail-closed, outer-catch + captureError paths (matching #9405 webhook-sig + #9399 dev-test patterns).
     // Directly targets auth bypass, unauthorized tenant access, row-level violation
     // reporting, outer catch, 401/403 paths for the RLS surface.
     'lib/auth/session.ts',
@@ -86,6 +102,11 @@ export default {
     // auth + investor + audience per TEST_RISK_REGISTER + heatmap).
     // Contract tests in proxy-behavioral + dedup unit now kill mutants here.
     'lib/auth/investor-portal.ts',
+    // proxy.ts (core middleware router + Clerk /__clerk proxy fetch logic + matcher).
+    // Wired in gap-6 (after #9406 rls) to close mutation evidence gap on the top
+    // risk RED 43 surface. Existing proxy-*.test.ts + behavioral now produce Stryker kills
+    // for the remaining proxy.ts branches (post-extraction).
+    'proxy.ts',
     // Claim-onboarding surface (per docs/TEST_RISK_REGISTER.md claim-onboarding row + heatmap priority).
     // Token-backed + direct claim routes, username claim handler (validation, auth checks, pending claim,
     // next=auth redirect matrix), onboarding intake (email verify gate, rate limit, ensure/upsert user+interview,
@@ -98,6 +119,25 @@ export default {
     'app/api/onboarding/intake/route.ts',
     'lib/claim/context.ts',
     'lib/claim/finalize.ts',
+    // Public profile ISR (public-profile-isr YELLOW surface per TEST_RISK_REGISTER.md + heatmap).
+    // 1h revalidate + cache-tag invalidation (tags: 'profiles-all', `profile:${username}`).
+    // Covers fetchProfileAndLinks + getCachedProfileAndLinks (unstable_cache, NODE_ENV bypass,
+    // NonCacheableProfileResultError for not_found/error to avoid sticky stale on revalidate),
+    // venmo synthetic link injection, error logging, calculateProfileCompletion, mapper contract.
+    // Also profile-static-params (build-time getTopProfilesForStaticGeneration, fail-closed []),
+    // public-profile-qa bypass flag, page.tsx server logic (generateMetadata, tour/playlist fallbacks,
+    // claim banner separation from ISR, accent non-derivation), layout + opengraph-image for public SEO.
+    // Wired in gap-7 (after #9407 proxy RED) to close mutation evidence gap on this high-visibility (5)
+    // YELLOW 27.9 surface (risk* gap from PQ). Existing public-profile-page.test.ts (42/42) + contract guard
+    // + e2e visual now drive Stryker kills on loader/cache/error/mapper branches. Matches exact pattern
+    // from public-profile-isr predecessor + proxy gap-6 stryker wiring. Source: #9407 rotation.
+    'app/[[]username[]]/_lib/public-profile-loader.ts',
+    'app/[[]username[]]/_lib/profile-mapper.ts',
+    'app/[[]username[]]/_lib/profile-static-params.ts',
+    'app/[[]username[]]/_lib/public-profile-qa.ts',
+    'app/[[]username[]]/page.tsx',
+    'app/[[]username[]]/layout.tsx',
+    'app/[[]username[]]/opengraph-image.tsx',
     // Social-link dedupe + handle parser. Mutating these surfaces the
     // assertions in tests/unit/lib/social-platform.property.test.ts;
     // a passing-but-mutation-survives suite means duplicate rows or
@@ -135,6 +175,12 @@ export default {
     // + additional server resolver catch coverage. Wires Stryker mutation
     // killing for entitlements-registry RED surface (risk 37.7, 20.8pp gap).
     'tests/unit/lib/entitlements-matrix.test.ts',
+    // Billing unavailable error class contract (deprecated compat ctor for
+    // billing edge + fail-closed shape). Covers the remaining uncovered lines
+    // in server.ts (BillingUnavailableError) for 100% on the registry surface
+    // after prior wiring PRs. Contract style per webhook/rls/claim patterns.
+    // Dedicated test placed under tests/unit/lib/entitlements/ per task.
+    'tests/unit/lib/entitlements/billing-unavailable.contract.test.ts',
     'tests/unit/lib/queries/useBillingMutations.test.tsx',
     'tests/unit/lib/social-platform.property.test.ts',
     // Gate + waitlist negative-path tests for lib/auth/gate.ts mutate target
@@ -184,12 +230,33 @@ export default {
     'tests/unit/app/claim-token-route.test.ts',
     'tests/unit/api/onboarding/intake.test.ts',
     'tests/unit/api/onboarding/claim.test.ts',
+    // Public profile ISR surface (public-profile-isr YELLOW per TEST_RISK_REGISTER + heatmap, risk 27.9).
+    // Wires the existing public-profile-page.test.ts (exercises loader cache bypass, error/not_found/ok
+    // shapes, venmo injection, mapper, static params safety, generateMetadata fallbacks, claim banner
+    // delegation, accent non-derivation in public ISR path, mode subtitle registry). Provides mutation
+    // evidence for the surface (previously no mut score despite 83.6% line cov). Target 75% already met
+    // on line; this closes the assertion-strength gap for high-visibility public profile rendering.
+    // Wired in gap-7 (after #9407 proxy) per drain rotation. E2E visual regression covers light/dark/mobile.
+    'tests/unit/profile/public-profile-page.test.ts',
     // Stripe webhooks surface (high blast_radius 5 / reversibility 5 per TEST_RISK_REGISTER + AGENTS.md).
     // Wires the dedicated contract tests (sig verification, idempotency via durable DB unique constraint (CAS),
     // delegation, error/negative paths, method guard, retry, outer catch, config guard for missing secret).
     // Achieves 100% line coverage on route.ts + exercises CAS/retry/409-style/idempotency/outer paths for mutation kills.
     // Closes the mutation warning + lifts effective coverage on money/trust surface (RED Priority Queue #5, risk 37.8, target 90%).
     'tests/unit/api/stripe/webhooks*.test.ts',
+    // Webhook signatures verification surface (YELLOW 29.2, PQ #1 largest gap 33.5pp per heatmap/register).
+    // Wires sms.test.ts (new contract tests for Twilio sig missing/invalid ->401 exact 'Unauthorized',
+    // malformed 400, dup idempotent 200, unprocessed replay, 5xx fail-closed without mark, outer-catch 500)
+    // + all other /webhooks/* tests (linear/resend/sentry/stripe-*) for sig/replay/dedupe paths.
+    // Enables Stryker mutation kills on the critical verification + durable dedupe branches.
+    'tests/unit/api/webhooks/**/*.test.ts',
+    // API route schema contracts (YELLOW 25.6 gap-8 closure after public-profile-isr #9409).
+    // Includes dedicated route contract tests exercising auth (401), parse failures (400 zod/json), success shapes for waitlist/verification/pre-save/wrap-link etc.
+    // Wires Stryker mutation on the api-routes-contract surface (common validation + auth contract branches); excludes specials per register.
+    'tests/unit/api/waitlist/waitlist.test.ts',
+    'tests/unit/api/verification/request.test.ts',
+    'tests/unit/api/pre-save/apple.test.ts',
+    'tests/unit/api/wrap-link/wrap-link.test.ts',
   ],
   ignorePatterns: [
     '.next',

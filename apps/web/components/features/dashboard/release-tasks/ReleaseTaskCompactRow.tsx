@@ -1,4 +1,6 @@
 'use client';
+
+import React from 'react';
 import { ShellListRowFrame } from '@/components/organisms/table/atoms/ShellListRowFrame';
 import type { ReleaseTaskView } from '@/lib/release-tasks/types';
 import { cn } from '@/lib/utils';
@@ -17,7 +19,13 @@ interface ReleaseTaskCompactRowProps {
   readonly onNavigate: (taskId: string) => void;
 }
 
-export function ReleaseTaskCompactRow({
+/**
+ * ReleaseTaskCompactRow — compact list row renderer for release tasks.
+ * High-churn over real production ReleaseTaskView data (status toggles, due dates, AI badges).
+ *
+ * Memoized + canonical focus rings + DS subtle motion only (shell handoff rot 20).
+ */
+export const ReleaseTaskCompactRow = React.memo(function ReleaseTaskCompactRow({
   task,
   onToggle,
   onNavigate,
@@ -37,7 +45,7 @@ export function ReleaseTaskCompactRow({
         type='button'
         onClick={() => onNavigate(task.id)}
         className={cn(
-          'flex-1 text-left text-[11.5px] truncate transition-colors',
+          'flex-1 text-left text-[11.5px] truncate transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) outline-none',
           isAi ? 'opacity-70' : 'hover:text-accent'
         )}
       >
@@ -57,4 +65,4 @@ export function ReleaseTaskCompactRow({
       />
     </ShellListRowFrame>
   );
-}
+});

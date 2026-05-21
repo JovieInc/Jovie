@@ -108,6 +108,23 @@ describe('dev-test-auth.server', () => {
     });
   });
 
+  it('ignores spoofed x-vercel-env header for production guard (only real process.env is honored)', async () => {
+    vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.stubEnv('VERCEL_ENV', 'development');
+    const { getDevTestAuthAvailability } = await import(
+      '@/lib/auth/dev-test-auth.server'
+    );
+
+    // Spoofed headers (e.g. x-vercel-env in request) have no effect —
+    // the production check reads process.env only (defence in depth per register).
+    expect(getDevTestAuthAvailability('localhost')).toEqual({
+      enabled: true,
+      trustedHost: true,
+      reason: null,
+    });
+  });
+
   it('provisions the creator persona with a claimed profile baseline', async () => {
     const { ensureDevTestAuthActor } = await import(
       '@/lib/auth/dev-test-auth.server'

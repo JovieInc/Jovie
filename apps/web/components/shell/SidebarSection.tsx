@@ -4,8 +4,8 @@ import { ChevronDown } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
-const EASE_CINEMATIC = 'cubic-bezier(0.32, 0.72, 0, 1)';
-const DURATION_CINEMATIC = 420;
+const EASE_SUBTLE = 'var(--ds-motion-subtle-easing)';
+const DURATION_SUBTLE = 'var(--ds-motion-subtle-duration)';
 
 const TIGHT_ITEM_HEIGHT = 26;
 const DEFAULT_ITEM_HEIGHT = 30;
@@ -15,8 +15,10 @@ const SECTION_PADDING = 12;
  * SidebarSection — collapsible header + body for a sidebar group.
  *
  * Header is a single row: rotating chevron + section name. Click toggles
- * `open`. Body collapses to height 0 with a cinematic ease so the parent
- * layout doesn't reflow visibly mid-transition.
+ * `open`. Body collapses to height 0 with a restrained subtle DS motion
+ * (~150ms) so the parent layout doesn't reflow visibly mid-transition.
+ * Honors the shell migration handoff rule: only DS subtle tokens for
+ * interactive chrome, never cinematic/long decorative.
  *
  * `collapsed` flips the section into icon mode: when open, only the body
  * children render (no chevron header). When collapsed AND closed, nothing
@@ -93,7 +95,7 @@ export function SidebarSection({
         style={{
           maxHeight: bodyMaxHeight,
           opacity: open ? 1 : 0,
-          transition: `max-height ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}, opacity var(--ds-motion-subtle-duration) var(--ease-subtle)`,
+          transition: `max-height ${DURATION_SUBTLE} ${EASE_SUBTLE}, opacity ${DURATION_SUBTLE} ${EASE_SUBTLE}`,
         }}
       >
         <div className='relative space-y-px pt-1 pb-0.5 [&_a:hover]:bg-surface-1/50'>

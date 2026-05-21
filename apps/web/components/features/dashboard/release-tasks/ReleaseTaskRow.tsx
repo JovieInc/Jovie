@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { ShellListRowFrame } from '@/components/organisms/table/atoms/ShellListRowFrame';
 import type { ReleaseTaskView } from '@/lib/release-tasks/types';
 import {
@@ -30,7 +31,17 @@ const PRIORITY_DISPLAY: Record<string, { dots: string }> = {
   none: { dots: '' },
 };
 
-export function ReleaseTaskRow({ task, onToggle }: ReleaseTaskRowProps) {
+/**
+ * ReleaseTaskRow — full list row renderer for release tasks in checklists / tables.
+ * High-churn over real production ReleaseTaskView data (status, priority, due, assignee).
+ *
+ * Memoized + canonical focus rings + DS subtle motion only (shell handoff rot 20).
+ * Container-aware via ShellListRowFrame (subtraction).
+ */
+export const ReleaseTaskRow = React.memo(function ReleaseTaskRow({
+  task,
+  onToggle,
+}: ReleaseTaskRowProps) {
   const isDone = isReleaseTaskDone(task);
   const isAi = isReleaseTaskAutomated(task);
   const priority = PRIORITY_DISPLAY[task.priority] ?? PRIORITY_DISPLAY.medium;
@@ -95,4 +106,4 @@ export function ReleaseTaskRow({ task, onToggle }: ReleaseTaskRowProps) {
       )}
     </ShellListRowFrame>
   );
-}
+});

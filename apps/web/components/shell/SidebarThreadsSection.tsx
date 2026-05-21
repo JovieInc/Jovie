@@ -3,7 +3,7 @@
 import { MessageSquarePlus, MoreHorizontal, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Tooltip } from './Tooltip';
 
@@ -67,6 +67,116 @@ function SidebarThreadStatusRow({
     </div>
   );
 }
+
+// Memoized high-churn row renderer for real SidebarThread data (used in
+// global shell sidebar + dashboard nav). Applies DS subtle motion and
+// canonical focus rings. Prevents unnecessary re-renders on thread list churn.
+const SidebarThreadRow = React.memo(function SidebarThreadRow({
+  thread,
+  active,
+  unread,
+  hasThreadActions,
+  tight,
+  onSelect,
+  onThreadContextMenu,
+}: {
+  readonly thread: SidebarThread;
+  readonly active: boolean;
+  readonly unread: boolean;
+  readonly hasThreadActions: boolean;
+  readonly tight?: boolean;
+  readonly onSelect?: (id: string) => void;
+  readonly onThreadContextMenu?: (
+    e: React.MouseEvent,
+    thread: SidebarThread
+  ) => void;
+}) {
+  const rowClasses = cn(
+    'flex w-full min-w-0 items-center gap-2 rounded-md text-left transition-[background-color] duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55',
+    tight ? 'h-6 pl-2.5' : 'h-6.5 pl-2.5',
+    hasThreadActions ? 'pr-7' : 'pr-2',
+    active
+      ? 'bg-surface-1 text-primary-token'
+      : unread
+        ? 'text-primary-token hover:bg-surface-1 focus-visible:bg-surface-1'
+        : 'text-secondary-token hover:bg-surface-1 hover:text-primary-token focus-visible:bg-surface-1 focus-visible:text-primary-token'
+  );
+  const rowContent = (
+    <>
+      <span
+        className={cn(
+          'h-1.5 w-1.5 rounded-full shrink-0',
+          thread.status === 'running'
+            ? 'bg-cyan-300/85 anim-calm-breath'
+            : thread.status === 'errored'
+              ? 'bg-rose-400/85'
+              : unread
+                ? 'bg-cyan-300/85'
+                : 'bg-white/25'
+        )}
+      />
+      <span
+        className={cn(
+          'flex-1 truncate',
+          'text-[12.5px]',
+          unread && 'font-medium'
+        )}
+      >
+        {thread.title}
+      </span>
+    </>
+  );
+  return (
+    <div
+      className={cn(
+        'group/thread relative flex items-center',
+        tight ? 'h-6' : 'h-7'
+      )}
+    >
+      <Tooltip label={thread.title} side='right' block>
+        {thread.href ? (
+          <Link
+            href={thread.href}
+            aria-current={active ? 'page' : undefined}
+            className={rowClasses}
+            onContextMenu={e => onThreadContextMenu?.(e, thread)}
+          >
+            {rowContent}
+          </Link>
+        ) : (
+          <button
+            type='button'
+            onClick={() => onSelect?.(thread.id)}
+            onContextMenu={e => onThreadContextMenu?.(e, thread)}
+            aria-pressed={active}
+            className={rowClasses}
+          >
+            {rowContent}
+          </button>
+        )}
+      </Tooltip>
+      {onThreadContextMenu ? (
+        <Tooltip label='Thread actions' side='right'>
+          <button
+            type='button'
+            onClick={e => onThreadContextMenu(e, thread)}
+            aria-label={`Thread actions for ${thread.title}`}
+            className={cn(
+              'absolute right-1 top-1/2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-md text-quaternary-token transition-[background-color,color,opacity] duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:bg-surface-1 focus-visible:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55',
+              'opacity-0 group-hover/thread:opacity-100 focus-visible:opacity-100'
+            )}
+          >
+            <MoreHorizontal
+              className='h-3 w-3'
+              strokeWidth={2.25}
+              aria-hidden='true'
+            />
+          </button>
+        </Tooltip>
+      ) : null}
+    </div>
+  );
+});
 
 // Status dot tones:
 //   running → cyan, anim-calm-breath
@@ -182,91 +292,17 @@ export function SidebarThreadsSection({
           const active = activeThreadId === t.id;
           const unread = !!t.unread && !active;
           const hasThreadActions = Boolean(onThreadContextMenu);
-          const rowClasses = cn(
-            'flex w-full min-w-0 items-center gap-2 rounded-md text-left transition-[background-color] duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/35',
-            tight ? 'h-6 pl-2.5' : 'h-6.5 pl-2.5',
-            hasThreadActions ? 'pr-7' : 'pr-2',
-            active
-              ? 'bg-surface-1 text-primary-token'
-              : unread
-                ? 'text-primary-token hover:bg-surface-1 focus-visible:bg-surface-1'
-                : 'text-secondary-token hover:bg-surface-1 hover:text-primary-token focus-visible:bg-surface-1 focus-visible:text-primary-token'
-          );
-          const rowContent = (
-            <>
-              <span
-                className={cn(
-                  'h-1.5 w-1.5 rounded-full shrink-0',
-                  t.status === 'running'
-                    ? 'bg-cyan-300/85 anim-calm-breath'
-                    : t.status === 'errored'
-                      ? 'bg-rose-400/85'
-                      : unread
-                        ? 'bg-cyan-300/85'
-                        : 'bg-white/25'
-                )}
-              />
-              <span
-                className={cn(
-                  'flex-1 truncate',
-                  'text-[12.5px]',
-                  unread && 'font-medium'
-                )}
-              >
-                {t.title}
-              </span>
-            </>
-          );
           return (
-            <div
+            <SidebarThreadRow
               key={t.id}
-              className={cn(
-                'group/thread relative flex items-center',
-                tight ? 'h-6' : 'h-7'
-              )}
-            >
-              <Tooltip label={t.title} side='right' block>
-                {t.href ? (
-                  <Link
-                    href={t.href}
-                    aria-current={active ? 'page' : undefined}
-                    className={rowClasses}
-                    onContextMenu={e => onThreadContextMenu?.(e, t)}
-                  >
-                    {rowContent}
-                  </Link>
-                ) : (
-                  <button
-                    type='button'
-                    onClick={() => onSelect?.(t.id)}
-                    onContextMenu={e => onThreadContextMenu?.(e, t)}
-                    aria-pressed={active}
-                    className={rowClasses}
-                  >
-                    {rowContent}
-                  </button>
-                )}
-              </Tooltip>
-              {onThreadContextMenu ? (
-                <Tooltip label='Thread actions' side='right'>
-                  <button
-                    type='button'
-                    onClick={e => onThreadContextMenu(e, t)}
-                    aria-label={`Thread actions for ${t.title}`}
-                    className={cn(
-                      'absolute right-1 top-1/2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-md text-quaternary-token transition-[background-color,color,opacity] duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:bg-surface-1 focus-visible:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/35',
-                      'opacity-0 group-hover/thread:opacity-100 focus-visible:opacity-100'
-                    )}
-                  >
-                    <MoreHorizontal
-                      className='h-3 w-3'
-                      strokeWidth={2.25}
-                      aria-hidden='true'
-                    />
-                  </button>
-                </Tooltip>
-              ) : null}
-            </div>
+              thread={t}
+              active={active}
+              unread={unread}
+              hasThreadActions={hasThreadActions}
+              tight={tight}
+              onSelect={onSelect}
+              onThreadContextMenu={onThreadContextMenu}
+            />
           );
         })}
       </div>

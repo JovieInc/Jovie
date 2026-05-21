@@ -2,7 +2,7 @@
 
 import { Badge, Button } from '@jovie/ui';
 import { Plus, UserPlus } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { SettingsPanel } from '@/components/features/dashboard/molecules/SettingsPanel';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
@@ -259,7 +259,7 @@ function ContactsListInner({
   );
 }
 
-function ContactRow({
+const ContactRow = memo(function ContactRow({
   contact,
   isSelected,
   onClick,
@@ -278,7 +278,7 @@ function ContactRow({
       type='button'
       onClick={onClick}
       aria-pressed={isSelected}
-      className={`flex w-full items-center gap-3 rounded-lg border px-3 py-3 text-left transition-[background-color,border-color,box-shadow] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/35 ${
+      className={`flex w-full items-center gap-3 rounded-lg border px-3 py-3 text-left transition-[background-color,border-color,box-shadow] duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) ${
         isSelected
           ? 'border-subtle bg-surface-0'
           : 'border-transparent hover:bg-surface-0'
@@ -310,4 +310,4 @@ function ContactRow({
       )}
     </button>
   );
-}
+});

@@ -185,4 +185,127 @@ describe('/api/stripe/webhooks - Handler Delegation', () => {
     expect(mockGetHandler).toHaveBeenCalledWith('invoice.payment_failed');
     expect(mockHandlerHandle).toHaveBeenCalled();
   });
+
+  it('handles customer.subscription.created events via handler delegation', async () => {
+    const event = {
+      id: 'evt_sub_created',
+      type: 'customer.subscription.created',
+      created: Math.floor(Date.now() / 1000),
+      data: {
+        object: {
+          id: 'sub_new',
+          status: 'active',
+          customer: 'cus_123',
+          items: { data: [{ price: { id: 'price_123' } }] },
+          metadata: { clerk_user_id: 'user_123' },
+        },
+      },
+    } as any;
+
+    mockConstructEvent.mockReturnValue(event);
+
+    const mockHandler = {
+      eventTypes: ['customer.subscription.created'] as const,
+      handle: mockHandlerHandle,
+    };
+    mockGetHandler.mockReturnValue(mockHandler);
+    mockHandlerHandle.mockResolvedValue({ success: true, isActive: true });
+
+    const request = new NextRequest(
+      'http://localhost:3000/api/stripe/webhooks',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'sig_test' },
+        body: 'test-body',
+      }
+    );
+
+    const response = await (await getPost())(request);
+    expect(response.status).toBe(200);
+
+    expect(mockGetHandler).toHaveBeenCalledWith(
+      'customer.subscription.created'
+    );
+    expect(mockHandlerHandle).toHaveBeenCalled();
+  });
+
+  it('handles customer.subscription.deleted events via handler delegation', async () => {
+    const event = {
+      id: 'evt_sub_deleted',
+      type: 'customer.subscription.deleted',
+      created: Math.floor(Date.now() / 1000),
+      data: {
+        object: {
+          id: 'sub_del',
+          status: 'canceled',
+          customer: 'cus_123',
+        },
+      },
+    } as any;
+
+    mockConstructEvent.mockReturnValue(event);
+
+    const mockHandler = {
+      eventTypes: ['customer.subscription.deleted'] as const,
+      handle: mockHandlerHandle,
+    };
+    mockGetHandler.mockReturnValue(mockHandler);
+    mockHandlerHandle.mockResolvedValue({ success: true, isActive: false });
+
+    const request = new NextRequest(
+      'http://localhost:3000/api/stripe/webhooks',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'sig_test' },
+        body: 'test-body',
+      }
+    );
+
+    const response = await (await getPost())(request);
+    expect(response.status).toBe(200);
+
+    expect(mockGetHandler).toHaveBeenCalledWith(
+      'customer.subscription.deleted'
+    );
+    expect(mockHandlerHandle).toHaveBeenCalled();
+  });
+
+  it('handles invoice.payment_succeeded events via handler delegation', async () => {
+    const event = {
+      id: 'evt_invoice_succeeded',
+      type: 'invoice.payment_succeeded',
+      created: Math.floor(Date.now() / 1000),
+      data: {
+        object: {
+          id: 'in_succ',
+          subscription: 'sub_123',
+          customer: 'cus_123',
+        },
+      },
+    } as any;
+
+    mockConstructEvent.mockReturnValue(event);
+
+    const mockHandler = {
+      eventTypes: ['invoice.payment_succeeded'] as const,
+      handle: mockHandlerHandle,
+    };
+    mockGetHandler.mockReturnValue(mockHandler);
+    mockHandlerHandle.mockResolvedValue({ success: true, isActive: true });
+
+    const request = new NextRequest(
+      'http://localhost:3000/api/stripe/webhooks',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'sig_test' },
+        body: 'test-body',
+      }
+    );
+
+    const response = await (await getPost())(request);
+    expect(response.status).toBe(200);
+
+    expect(mockGetHandler).toHaveBeenCalledWith('invoice.payment_succeeded');
+    expect(mockHandlerHandle).toHaveBeenCalled();
+  });
 });

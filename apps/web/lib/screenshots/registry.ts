@@ -30,7 +30,6 @@ const ADMIN_MARKETING_AND_INVESTOR = [
   'marketing-export',
   'investor-ready',
 ] as const satisfies readonly ScreenshotConsumer[];
-const DESKTOP_PROFILE_LAYOUT_SELECTOR = '[data-layout="desktop"]';
 
 const ARTIST_PROFILE_SECTION_SCREENSHOT_SCENARIOS =
   ARTIST_PROFILE_SECTION_SCREENSHOT_ORDER.map(section => {
@@ -245,14 +244,14 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       id: 'tim-white-profile-live-desktop',
       title: 'Tim White Profile — Latest Release Desktop',
       route: '/demo/showcase/tim-white-profile?release=live',
-      waitFor: DESKTOP_PROFILE_LAYOUT_SELECTOR,
+      waitFor: '[data-testid="profile-compact-shell"]',
       publicExportPath: 'tim-white-profile-live-desktop.png',
     },
     {
       id: 'tim-white-profile-mainstream-desktop',
       title: 'Tim White Profile — Mainstream Desktop',
       route: '/demo/showcase/tim-white-profile?archetype=mainstream',
-      waitFor: DESKTOP_PROFILE_LAYOUT_SELECTOR,
+      waitFor: '[data-testid="profile-compact-shell"]',
       publicExportPath: 'tim-white-profile-mainstream-desktop.png',
     },
     {
@@ -525,10 +524,9 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       id: 'public-profile-desktop',
       title: 'Public Profile',
       route: '/demo/showcase/public-profile',
-      // The desktop-layout switch happens in a useEffect (matchMedia >=1180px)
-      // after first paint. Wait for the layout state specifically so the
-      // capture isn't of the pre-hydration phone-shaped fallback.
-      waitFor: DESKTOP_PROFILE_LAYOUT_SELECTOR,
+      // StaticArtistPage now renders the compact public shell at every width.
+      // Wait on that stable shell instead of the removed desktop-only surface.
+      waitFor: '[data-testid="profile-compact-shell"]',
       publicExportPath: 'profile-desktop.png',
     },
     {

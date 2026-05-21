@@ -103,7 +103,7 @@ export function ContextMenuOverlay({
   if (!state) return null;
 
   return (
-    <div className='fixed inset-0 z-[60]'>
+    <div className='fixed inset-0 z-[110]'>
       <button
         type='button'
         aria-label='Close menu'
