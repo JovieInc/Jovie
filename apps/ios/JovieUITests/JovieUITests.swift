@@ -1,10 +1,21 @@
 import XCTest
 
 final class JovieUITests: XCTestCase {
+  func testCinematicSplashLaunchShowsLoadingState() {
+    let app = launchMockApp(launchArgument: "-ui-testing-splash", expectedElementDescription: "\"Jovie is loading\"") {
+      $0.staticTexts["Jovie"]
+    }
+
+    XCTAssertTrue(app.staticTexts["Syncing profile"].exists || app.staticTexts["Preparing QR"].exists || app.staticTexts["Opening workspace"].exists)
+    attachScreenshot(named: "cinematic-loading", app: app)
+  }
+
   func testSignedOutLaunchShowsAuthScreen() {
-    _ = launchMockApp(launchArgument: "-ui-testing-signed-out", expectedElementDescription: "\"Sign In\"") {
+    let app = launchMockApp(launchArgument: "-ui-testing-signed-out", expectedElementDescription: "\"Sign In\"") {
       $0.staticTexts["Sign In"]
     }
+
+    attachScreenshot(named: "signed-out", app: app)
   }
 
   func testReadyLaunchShowsDashboard() {
@@ -12,16 +23,62 @@ final class JovieUITests: XCTestCase {
       $0.buttons["Copy URL"]
     }
 
-    XCTAssertTrue(app.staticTexts["DJ Shadow"].exists)
+    XCTAssertTrue(app.staticTexts["Tim White"].exists)
+    attachScreenshot(named: "dashboard", app: app)
   }
 
   func testNeedsOnboardingLaunchShowsContinueOnWeb() {
-    _ = launchMockApp(
+    let app = launchMockApp(
       launchArgument: "-ui-testing-needs-onboarding",
       expectedElementDescription: "\"Continue On Web\""
     ) {
       $0.buttons["Continue On Web"]
     }
+
+    attachScreenshot(named: "needs-onboarding", app: app)
+  }
+
+  func testSettingsPanelLogsOutToSignedOut() {
+    let app = launchMockApp(launchArgument: "-ui-testing-settings", expectedElementDescription: "\"Settings\"") {
+      $0.staticTexts["Settings"]
+    }
+
+    attachScreenshot(named: "settings", app: app)
+    app.buttons["Log Out"].tap()
+
+    XCTAssertTrue(
+      app.staticTexts["Sign In"].waitForExistence(timeout: 5),
+      "Logout did not return to signed-out state.\n\(app.debugDescription)"
+    )
+  }
+
+  func testShellSwipesRevealSidebarAndSettings() {
+    let app = launchMockApp(launchArgument: "-ui-testing-ready", expectedElementDescription: "\"Copy URL\"") {
+      $0.buttons["Copy URL"]
+    }
+    let window = app.windows.element(boundBy: 0)
+
+    edgeDrag(in: window, from: CGVector(dx: 0.01, dy: 0.5), to: CGVector(dx: 0.72, dy: 0.5))
+    XCTAssertTrue(
+      app.buttons["Dashboard"].waitForExistence(timeout: 3),
+      "Right swipe did not reveal sidebar.\n\(app.debugDescription)"
+    )
+
+    app.buttons["Close Sidebar"].tap()
+    edgeDrag(in: window, from: CGVector(dx: 0.99, dy: 0.5), to: CGVector(dx: 0.28, dy: 0.5))
+    XCTAssertTrue(
+      app.staticTexts["Settings"].waitForExistence(timeout: 3),
+      "Left swipe did not reveal settings.\n\(app.debugDescription)"
+    )
+  }
+
+  func testVenueModeLaunchShowsFullscreenQR() {
+    let app = launchMockApp(launchArgument: "-ui-testing-venue-mode", expectedElementDescription: "\"Done\"") {
+      $0.buttons["Done"]
+    }
+
+    XCTAssertTrue(app.images["Fullscreen Profile QR Code"].exists || app.buttons["Done"].exists)
+    attachScreenshot(named: "fullscreen-qr", app: app)
   }
 
   func testCopyURLButtonShowsCopiedState() throws {
@@ -132,5 +189,18 @@ final class JovieUITests: XCTestCase {
       line: line
     )
     return app
+  }
+
+  private func attachScreenshot(named name: String, app: XCUIApplication) {
+    let attachment = XCTAttachment(screenshot: app.screenshot())
+    attachment.name = "iOS \(name)"
+    attachment.lifetime = .keepAlways
+    add(attachment)
+  }
+
+  private func edgeDrag(in element: XCUIElement, from start: CGVector, to end: CGVector) {
+    let startCoordinate = element.coordinate(withNormalizedOffset: start)
+    let endCoordinate = element.coordinate(withNormalizedOffset: end)
+    startCoordinate.press(forDuration: 0.08, thenDragTo: endCoordinate)
   }
 }

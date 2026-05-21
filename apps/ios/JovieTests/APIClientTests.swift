@@ -58,6 +58,7 @@ struct APIClientTests {
     let tokenProvider = MockTokenProvider(tokens: ["token-1"])
     MockURLProtocol.requestHandler = { request in
       #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer token-1")
+      #expect(request.timeoutInterval == 12)
       let response = HTTPURLResponse(
         url: request.url!,
         statusCode: 200,
@@ -71,7 +72,8 @@ struct APIClientTests {
     let client = APIClient(
       baseURL: URL(string: "https://jov.ie")!,
       session: makeSession(),
-      tokenProvider: tokenProvider
+      tokenProvider: tokenProvider,
+      requestTimeout: 12
     )
 
     let response = try await client.fetchMe()
@@ -112,6 +114,30 @@ struct APIClientTests {
 
     #expect(response.state == .ready)
     #expect(await tokenProvider.recordedForceRefreshValues() == [false, true])
+  }
+
+  @Test func mapsInvalidJSONToDecodingFailed() async throws {
+    let tokenProvider = MockTokenProvider(tokens: ["token-1"])
+    MockURLProtocol.requestHandler = { request in
+      let response = HTTPURLResponse(
+        url: request.url!,
+        statusCode: 200,
+        httpVersion: nil,
+        headerFields: nil
+      )!
+
+      return (response, Data("{".utf8))
+    }
+
+    let client = APIClient(
+      baseURL: URL(string: "https://jov.ie")!,
+      session: makeSession(),
+      tokenProvider: tokenProvider
+    )
+
+    await #expect(throws: APIClientError.decodingFailed) {
+      _ = try await client.fetchMe()
+    }
   }
 }
 

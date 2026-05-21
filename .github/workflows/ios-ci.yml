@@ -5,11 +5,17 @@ on:
     branches: [main]
     paths:
       - "apps/ios/**"
+      - "fastlane/**"
+      - "Gemfile"
+      - "Gemfile.lock"
       - ".github/workflows/ios-ci.yml"
   push:
     branches: [main]
     paths:
       - "apps/ios/**"
+      - "fastlane/**"
+      - "Gemfile"
+      - "Gemfile.lock"
       - ".github/workflows/ios-ci.yml"
   workflow_dispatch:
 
@@ -23,40 +29,20 @@ concurrency:
 jobs:
   test:
     name: Build And Test
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Ensure iOS local configuration exists
-        run: |
-          python3 <<'PY'
-          import os
-          import plistlib
-          from pathlib import Path
-
-          target = Path("apps/ios/Jovie/Configuration.local.plist")
-          if target.exists():
-              raise SystemExit(0)
-
-          target.parent.mkdir(parents=True, exist_ok=True)
-          payload = {
-              # UI tests default to non-live launch modes in CI, so a placeholder
-              # publishable key is sufficient to satisfy app bundle resources.
-              "ClerkPublishableKey": os.environ.get(
-                  "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY", "pk_test_ci_placeholder"
-              ),
-              "ApiBaseUrl": "http://localhost:3100",
-              "WebBaseUrl": "https://jov.ie",
-          }
-
-          with target.open("wb") as file_handle:
-              plistlib.dump(payload, file_handle, sort_keys=False)
-          PY
+        run: bash apps/ios/scripts/ensure-configuration.sh
 
       - name: Show Xcode version
         run: xcodebuild -version
+
+      - name: Validate app icon
+        run: bash apps/ios/scripts/validate-app-icon.sh
 
       - name: Resolve Swift package dependencies
         run: |
@@ -118,3 +104,13 @@ jobs:
             -scheme Jovie \
             -destination '${{ steps.simulator.outputs.destination }}' \
             CODE_SIGNING_ALLOWED=NO
+
+      - name: Capture simulator screenshots
+        run: bash apps/ios/scripts/capture-screenshots.sh
+
+      - name: Upload simulator screenshots
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ios-screenshots
+          path: artifacts/ios-screenshots/*.png
+          if-no-files-found: error

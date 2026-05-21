@@ -26,10 +26,10 @@ struct MobileMeResponse: Codable, Equatable, Sendable {
 
   static let previewReady = MobileMeResponse(
     state: .ready,
-    displayName: "DJ Shadow",
-    username: "djshadow",
-    publicProfileURL: "https://jov.ie/djshadow",
-    qrPayload: "https://jov.ie/djshadow",
+    displayName: "Tim White",
+    username: "tim",
+    publicProfileURL: "https://jov.ie/tim",
+    qrPayload: "https://jov.ie/tim",
     avatarURL: nil,
     continueOnWebURL: "https://jov.ie/app"
   )

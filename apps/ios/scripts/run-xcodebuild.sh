@@ -33,9 +33,17 @@ pick_destination() {
   '
 }
 
+PREFERRED_IOS_PREFIX="${JOVIE_IOS_PREFER_OS_PREFIX:-26.}"
+
 DESTINATION="$(
-  PREFER_IOS_PREFIX="18." PREFER_NAME_PATTERN="^iPhone" pick_destination
+  PREFER_IOS_PREFIX="$PREFERRED_IOS_PREFIX" PREFER_NAME_PATTERN="^iPhone" pick_destination
 )"
+
+if [[ -z "$DESTINATION" && "$PREFERRED_IOS_PREFIX" != "18." ]]; then
+  DESTINATION="$(
+    PREFER_IOS_PREFIX="18." PREFER_NAME_PATTERN="^iPhone" pick_destination
+  )"
+fi
 
 if [[ -z "$DESTINATION" ]]; then
   DESTINATION="$(

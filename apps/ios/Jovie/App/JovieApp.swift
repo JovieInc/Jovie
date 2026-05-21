@@ -47,7 +47,11 @@ struct JovieApp: App {
           LiveRootContainer(appState: appState)
             .environment(Clerk.shared)
         } else {
-          RootView(appState: appState, liveUserID: nil)
+          RootView(
+            appState: appState,
+            liveUserID: nil,
+            onLogout: { await appState.signOut() }
+          )
         }
       }
       .preferredColorScheme(.dark)

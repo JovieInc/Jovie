@@ -1,0 +1,224 @@
+default_platform(:ios)
+opt_out_usage
+
+require "shellwords"
+require "time"
+
+REPO_ROOT = File.expand_path("..", __dir__)
+IOS_PROJECT = File.join(REPO_ROOT, "apps/ios/Jovie.xcodeproj")
+IOS_SCHEME = "Jovie"
+APP_IDENTIFIER = "ie.jov.Jovie"
+APP_NAME = "Jovie"
+APP_SKU = "jovie-ios"
+APP_VERSION = "1.0"
+APP_PRIMARY_LOCALE = "en-US"
+DEFAULT_ARTIFACT_DIR = File.join(REPO_ROOT, "artifacts/ios-build")
+
+def require_env!(name)
+  value = ENV[name].to_s
+  UI.user_error!("Missing required environment variable #{name}") if value.empty?
+  value
+end
+
+def repo_path(path)
+  File.join(REPO_ROOT, path)
+end
+
+def app_store_api_key_from_env
+  key_content = require_env!("APPLE_API_KEY")
+
+  app_store_connect_api_key(
+    key_id: require_env!("APPLE_API_KEY_ID"),
+    issuer_id: require_env!("APPLE_API_ISSUER"),
+    key_content: key_content,
+    is_key_content_base64: !key_content.include?("BEGIN PRIVATE KEY"),
+    duration: 1200
+  )
+end
+
+def require_match_git_auth!
+  return unless ENV["MATCH_GIT_PRIVATE_KEY"].to_s.empty? && ENV["MATCH_GIT_BASIC_AUTHORIZATION"].to_s.empty?
+
+  UI.user_error!("Missing match git authentication: set MATCH_GIT_PRIVATE_KEY or MATCH_GIT_BASIC_AUTHORIZATION")
+end
+
+def match_git_auth_options
+  options = {}
+  options[:git_private_key] = ENV["MATCH_GIT_PRIVATE_KEY"] unless ENV["MATCH_GIT_PRIVATE_KEY"].to_s.empty?
+  options[:git_basic_authorization] = ENV["MATCH_GIT_BASIC_AUTHORIZATION"] unless ENV["MATCH_GIT_BASIC_AUTHORIZATION"].to_s.empty?
+  options
+end
+
+def build_number
+  ENV["IOS_BUILD_NUMBER"].to_s.empty? ? ENV.fetch("GITHUB_RUN_NUMBER", Time.now.utc.strftime("%Y%m%d%H%M")) : ENV["IOS_BUILD_NUMBER"]
+end
+
+def write_ios_configuration(api_base_url:, web_base_url:, clerk_publishable_key:)
+  sh(
+    [
+      "API_BASE_URL=#{api_base_url.shellescape}",
+      "WEB_BASE_URL=#{web_base_url.shellescape}",
+      "CLERK_PUBLISHABLE_KEY=#{clerk_publishable_key.shellescape}",
+      "bash #{repo_path("apps/ios/scripts/write-configuration.sh").shellescape}"
+    ].join(" ")
+  )
+end
+
+def ensure_app_store_assets!(api_key:, apple_team_id:)
+  Spaceship::ConnectAPI.token = api_key
+
+  bundle_id = Spaceship::ConnectAPI::BundleId.find(APP_IDENTIFIER)
+  if bundle_id
+    UI.message("Found Apple bundle identifier #{APP_IDENTIFIER}")
+  else
+    UI.message("Creating Apple bundle identifier #{APP_IDENTIFIER}")
+    bundle_id = Spaceship::ConnectAPI::BundleId.create(
+      name: APP_NAME,
+      platform: Spaceship::ConnectAPI::BundleIdPlatform::IOS,
+      identifier: APP_IDENTIFIER,
+      seed_id: apple_team_id
+    )
+  end
+
+  associated_domains = Spaceship::ConnectAPI::BundleIdCapability::Type::ASSOCIATED_DOMAINS
+  capabilities = bundle_id.get_capabilities
+  unless capabilities.any? { |capability| capability.is_type?(associated_domains) }
+    UI.message("Enabling Associated Domains for #{APP_IDENTIFIER}")
+    bundle_id.create_capability(associated_domains)
+  end
+
+  app = Spaceship::ConnectAPI::App.find(APP_IDENTIFIER)
+  if app
+    UI.message("Found App Store Connect app record for #{APP_IDENTIFIER}")
+    app.ensure_version!(APP_VERSION, platform: Spaceship::ConnectAPI::Platform::IOS)
+  else
+    UI.message("Creating App Store Connect app record for #{APP_IDENTIFIER}")
+    Spaceship::ConnectAPI::App.create(
+      name: APP_NAME,
+      version_string: APP_VERSION,
+      sku: APP_SKU,
+      primary_locale: APP_PRIMARY_LOCALE,
+      bundle_id: APP_IDENTIFIER,
+      platforms: [Spaceship::ConnectAPI::Platform::IOS],
+      company_name: ENV["APP_STORE_COMPANY_NAME"]
+    )
+  end
+end
+
+platform :ios do
+  desc "Run unsigned iOS simulator tests"
+  lane :ios_tests do
+    sh("bash #{repo_path("apps/ios/scripts/ensure-configuration.sh").shellescape}")
+    sh("bash #{repo_path("apps/ios/scripts/validate-app-icon.sh").shellescape}")
+
+    scan(
+      project: IOS_PROJECT,
+      scheme: IOS_SCHEME,
+      clean: true,
+      devices: ["iPhone 17"],
+      output_directory: repo_path("artifacts/ios-test-results"),
+      result_bundle: true,
+      xcargs: "CODE_SIGNING_ALLOWED=NO"
+    )
+  end
+
+  desc "Capture core iOS flow screenshots from simulator"
+  lane :screenshots do
+    sh("bash #{repo_path("apps/ios/scripts/capture-screenshots.sh").shellescape}")
+  end
+
+  desc "Create or refresh App Store signing assets in match storage"
+  lane :bootstrap_signing do
+    api_key = app_store_api_key_from_env
+    apple_team_id = require_env!("APPLE_TEAM_ID")
+    require_env!("MATCH_GIT_URL")
+    require_env!("MATCH_PASSWORD")
+    require_match_git_auth!
+
+    setup_ci if ENV["CI"].to_s.downcase == "true"
+    ensure_app_store_assets!(api_key: api_key, apple_team_id: apple_team_id)
+
+    match(
+      **{
+        type: "appstore",
+        app_identifier: APP_IDENTIFIER,
+        team_id: apple_team_id,
+        api_key: api_key,
+        readonly: false
+      }.merge(match_git_auth_options)
+    )
+  end
+
+  desc "Archive and upload an internal TestFlight build"
+  lane :beta do
+    api_key = app_store_api_key_from_env
+    apple_team_id = require_env!("APPLE_TEAM_ID")
+    require_env!("MATCH_GIT_URL")
+    require_env!("MATCH_PASSWORD")
+    require_match_git_auth!
+
+    clerk_domain = require_env!("CLERK_ASSOCIATED_DOMAIN")
+    clerk_publishable_key = require_env!("CLERK_PUBLISHABLE_KEY")
+    api_base_url = ENV.fetch("API_BASE_URL", "https://jov.ie")
+    web_base_url = ENV.fetch("WEB_BASE_URL", "https://jov.ie")
+    current_build_number = build_number
+
+    write_ios_configuration(
+      api_base_url: api_base_url,
+      web_base_url: web_base_url,
+      clerk_publishable_key: clerk_publishable_key
+    )
+
+    setup_ci if ENV["CI"].to_s.downcase == "true"
+
+    ensure_app_store_assets!(api_key: api_key, apple_team_id: apple_team_id)
+
+    match(
+      **{
+        type: "appstore",
+        app_identifier: APP_IDENTIFIER,
+        team_id: apple_team_id,
+        api_key: api_key,
+        readonly: ENV["CI"].to_s.downcase == "true"
+      }.merge(match_git_auth_options)
+    )
+
+    profile_name = "match AppStore #{APP_IDENTIFIER}"
+    signing_xcargs = [
+      "CODE_SIGNING_ALLOWED=YES",
+      "CODE_SIGNING_REQUIRED=YES",
+      "CODE_SIGN_STYLE=Manual",
+      "DEVELOPMENT_TEAM=#{apple_team_id.shellescape}",
+      "CURRENT_PROJECT_VERSION=#{current_build_number.shellescape}",
+      "CLERK_ASSOCIATED_DOMAIN=#{clerk_domain.shellescape}",
+      "PROVISIONING_PROFILE_SPECIFIER=#{profile_name.shellescape}"
+    ].join(" ")
+
+    gym(
+      project: IOS_PROJECT,
+      scheme: IOS_SCHEME,
+      configuration: "Release",
+      clean: true,
+      output_directory: DEFAULT_ARTIFACT_DIR,
+      output_name: "Jovie.ipa",
+      export_method: "app-store",
+      xcargs: signing_xcargs,
+      export_options: {
+        method: "app-store",
+        signingStyle: "manual",
+        provisioningProfiles: {
+          APP_IDENTIFIER => profile_name
+        }
+      }
+    )
+
+    upload_to_testflight(
+      api_key: api_key,
+      app_identifier: APP_IDENTIFIER,
+      ipa: File.join(DEFAULT_ARTIFACT_DIR, "Jovie.ipa"),
+      skip_waiting_for_build_processing: true,
+      distribute_external: false,
+      changelog: ENV.fetch("TESTFLIGHT_CHANGELOG", "Internal iOS foundation build #{current_build_number}")
+    )
+  end
+end

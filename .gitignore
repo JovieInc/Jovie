@@ -3,6 +3,8 @@
 # dependencies
 /node_modules
 apps/web/node_modules
+/.bundle/
+/vendor/bundle/
 /.pnp
 .pnp.js
 
@@ -26,6 +28,7 @@ apps/web/artifacts/
 
 # production
 /build
+/.build/
 
 # misc
 .DS_Store
@@ -98,6 +101,7 @@ DerivedData/
 *.xcworkspace/xcuserdata/
 *.xcodeproj/xcuserdata/
 apps/ios/Jovie/Configuration.local.plist
+fastlane/report.xml
 
 # Auto Claude generated files
 .auto-claude/
