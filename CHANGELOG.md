@@ -5,13 +5,21 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.33] - 2026-05-21
+
+> [internal] Removed a duplicate search button from the admin panel header; the sidebar search is now the single entry point for admin search.
+
+### Fixed
+
+- **Admin header duplicate search (JOV-2121)**: removed the `HeaderSearchAction` injection from the three admin table wrappers (`AdminUsersTableUnified`, `AdminReleasesPageWrapper`, `AdminCreatorsPageWrapper`) that duplicated the sidebar's search entry point. `DrawerToggleButton`, `BatchIngestButton`, and `IngestProfileDropdown` are preserved.
+
 ## [26.5.32] - 2026-05-21
 
-> [internal] Keyboard navigation in the releases shell view now supports J/K row selection, Enter to open the track sidebar, and focus-scoped navigation so keys don't fire when focus is elsewhere.
+> [internal] Electron desktop titlebar now has a single unified sidebar toggle and pill-style nav controls, with the sidebar rail correctly aligned to the titlebar column.
 
-### Added
+### Changed
 
-- **Keyboard navigation for shell releases (JOV-1823)**: J/K and arrow keys now select releases in the shell list; Enter opens the release sidebar for the selected row. Navigation is scoped to the list region — keys don't fire when focus is in a search input, drawer, or other panel.
+- **[internal] Electron titlebar unification (JOV-2504)**: sidebar toggle is now the single canonical toggle in Electron mode — the in-sidebar dock button is hidden via CSS when inside the desktop runtime. Back/forward navigation buttons are grouped in a pill-shaped container in the main titlebar cell. Titlebar sidebar-cell `padding-left` is aligned to the shell gap so the column precisely tracks the sidebar rail in shellChatV1 mode. Geometry Playwright tests added to verify DOM structure, no-duplicate-toggle invariant, and sidebar-cell width vs CSS token.
 
 ## [26.5.29] - 2026-05-18
 
