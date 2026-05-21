@@ -143,8 +143,13 @@
 }
 
 @media (min-width: 1180px) {
+  /* Match desktop max-width so SSR compact class produces the same frame width
+     as the JS-switched desktop class, eliminating layout shift on hydration. */
   .public-profile-layout-frame--compact {
-    max-width: 1540px;
+    max-width: min(
+      100%,
+      calc(var(--profile-shell-max-width) + (var(--page-pad) * 2))
+    );
     padding-block: clamp(16px, 2vw, 24px);
   }
 }

@@ -5,6 +5,14 @@
      5|The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
      6|and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.5.34] - 2026-05-21
+
+> Fixed a layout shift on public artist profile pages that caused Lighthouse CLS scores of 0.317, unblocking the Lighthouse CI gate.
+
+### Fixed
+
+- **[internal] Profile page CLS regression (JOV-2514)**: three `useState` calls in `ProfileCompactTemplate` were initializing with SSR-safe defaults (`'standalone'`, `false`, `'profile'`) and updating via `useEffect` after first paint. At Lighthouse's 1350×940 desktop viewport, the hero switched from ~500px to ~56px tall on `?mode=listen` routes. Converted all three to lazy initializers that read `matchMedia` and `location.search` synchronously on the client, eliminating the post-paint layout shift.
+
 ## [26.5.33] - 2026-05-21
 
 > [internal] Removed a duplicate search button from the admin panel header; the sidebar search is now the single entry point for admin search.
