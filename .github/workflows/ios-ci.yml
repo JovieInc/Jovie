@@ -65,7 +65,7 @@ jobs:
             LAST_DESTINATIONS="$(xcodebuild -showdestinations -project "$PROJECT_PATH" -scheme "$SCHEME" 2>/dev/null || true)"
 
             DESTINATION="$(
-              printf '%s\n' "$LAST_DESTINATIONS" | ruby -e 'preferred=nil;fallback=nil;STDIN.each_line do |line|; next unless line.include?("platform:iOS Simulator"); next if line.include?("name:Any iOS Simulator Device"); id=line[/id:([^,}]+)/, 1]&.strip; next unless id; os_version=line[/OS:([^,}]+)/, 1]&.strip.to_s; destination="platform=iOS Simulator,id=#{id}"; if os_version.start_with?("18."); preferred=destination; break; end; fallback ||= destination; end; print(preferred || fallback || "")'
+              printf '%s\n' "$LAST_DESTINATIONS" | ruby -e 'preferred=nil;fallback=nil;STDIN.each_line do |line|; next unless line.include?("platform:iOS Simulator"); next unless line.include?("name:iPhone"); next if line.include?("name:Any iOS Simulator Device"); id=line[/id:([^,}]+)/, 1]&.strip; next unless id; os_version=line[/OS:([^,}]+)/, 1]&.strip.to_s; destination="platform=iOS Simulator,id=#{id}"; if os_version.start_with?("18."); preferred=destination; break; end; fallback ||= destination; end; print(preferred || fallback || "")'
             )"
 
             if [[ -n "$DESTINATION" ]]; then
