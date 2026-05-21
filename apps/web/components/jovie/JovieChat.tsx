@@ -3,11 +3,11 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { ImagePlus } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { JovieMarkElectric } from '@/components/atoms/JovieMarkElectric';
+import { SuggestionCard } from '@/components/shell/SuggestionCard';
 import { useAppFlag } from '@/lib/flags/client';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
-import { useChatCapabilitiesQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 
 import { CHAT_COMPOSER_DOCK_CLASSNAME } from './chat-layout';
@@ -17,7 +17,6 @@ import {
   ChatMessageSkeleton,
   ErrorDisplay,
   ScrollToBottom,
-  SuggestedPrompts,
 } from './components';
 import { ChatProvidersRegistrar } from './components/ChatProvidersRegistrar';
 import { ChatUsageAlert } from './components/ChatUsageAlert';
@@ -131,7 +130,7 @@ export function JovieChat({
   username,
   displayName,
   isFirstSession = false,
-  latestReleaseTitle,
+  actionCards = [],
 }: JovieChatProps) {
   const initialQuerySubmitted = useRef(false);
   const initialSkillApplied = useRef(false);
@@ -169,71 +168,6 @@ export function JovieChat({
     onConversationCreate,
     username,
   });
-  const {
-    data: chatCapabilities,
-    isLoading: isLoadingCapabilities,
-    isError: isCapabilitiesError,
-  } = useChatCapabilitiesQuery({
-    profileId,
-    enabled: Boolean(profileId),
-  });
-  const albumArtCapability =
-    chatCapabilities?.tools.albumArt ??
-    (isCapabilitiesError
-      ? {
-          availability: 'unavailable' as const,
-          reason: 'Album art availability could not be verified.',
-          reasonCode: 'CAPABILITY_CHECK_FAILED',
-        }
-      : {
-          availability:
-            profileId && isLoadingCapabilities
-              ? ('unknown' as const)
-              : ('unavailable' as const),
-          reason: profileId
-            ? 'Checking album art availability...'
-            : 'Album art generation needs an artist profile.',
-          reasonCode: profileId ? 'CHECKING' : 'PROFILE_REQUIRED',
-        });
-
-  const followUpQuickActions = useMemo(
-    () => [
-      {
-        label: 'Summarize this thread',
-        prompt: 'Summarize this thread in three concise bullets.',
-      },
-      {
-        label: 'What should I do next?',
-        prompt: 'Based on this conversation, what should I do next?',
-      },
-      {
-        label: 'Turn it into a checklist',
-        prompt: 'Turn this conversation into a short checklist I can follow.',
-      },
-    ],
-    []
-  );
-  const starterQuickActions = useMemo(
-    () => [
-      {
-        label: 'Plan a release',
-        prompt: 'Help me plan my next release.',
-      },
-      {
-        label: 'Generate album art',
-        prompt: 'Generate album art ideas for my next release.',
-      },
-      {
-        label: 'Pitch playlists',
-        prompt: 'Help me pitch this release to playlists.',
-      },
-      {
-        label: 'Send feedback',
-        prompt: '/feedback ',
-      },
-    ],
-    []
-  );
 
   // Image attachments for chat messages
   const {
@@ -499,7 +433,9 @@ export function JovieChat({
 
   const greetingName =
     getFirstNameForGreeting(displayName) ?? getFirstNameForGreeting(username);
-  const showStarterPrompts =
+  const primaryActionCard = actionCards[0] ?? null;
+  const showActionCard =
+    primaryActionCard !== null &&
     input.trim().length === 0 &&
     !composerPickerOpen &&
     (pendingImages?.length ?? 0) === 0 &&
@@ -638,23 +574,18 @@ export function JovieChat({
                       {emptyStateHeading}
                     </h1>
 
-                    <div className='mx-auto flex w-full max-w-[45rem] flex-col items-center gap-3'>
-                      {/* Suggested prompts rail lives in upper morph area (above persistent dock).
-                          Alerts, rate-limit, and errors are unified into the always-rendered dock
-                          below for parity with thread view and to remove duplicate composer chrome. */}
-                      {showStarterPrompts ? (
-                        <div
-                          className='w-full'
-                          data-testid='chat-empty-state-prompt-rail'
-                        >
-                          <SuggestedPrompts
-                            onSelect={handleSuggestedPromptWithJank}
-                            isFirstSession={isFirstSession}
-                            latestReleaseTitle={latestReleaseTitle}
-                            albumArtCapability={albumArtCapability}
-                            layout='rail'
-                          />
-                        </div>
+                    <div className='mx-auto flex w-full max-w-[38rem] flex-col items-center gap-3'>
+                      {showActionCard ? (
+                        <SuggestionCard
+                          title={primaryActionCard.title}
+                          body={primaryActionCard.body}
+                          actionLabel={primaryActionCard.actionLabel}
+                          onAct={() =>
+                            handleSuggestedPromptWithJank(
+                              primaryActionCard.prompt
+                            )
+                          }
+                        />
                       ) : null}
                     </div>
                   </div>
@@ -798,10 +729,6 @@ export function JovieChat({
                 }
                 variant={showThreadView ? 'compact' : 'hero'}
                 shellChatV1={shellChatV1Enabled}
-                quickActions={
-                  showThreadView ? followUpQuickActions : starterQuickActions
-                }
-                onQuickActionSelect={handleSuggestedPromptWithJank}
               />
             </div>
           </div>
