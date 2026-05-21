@@ -11,6 +11,7 @@ import {
   Zap,
 } from 'lucide-react';
 import Link from 'next/link';
+import { memo } from 'react';
 import { ActivityFeedSkeleton } from '@/components/molecules/ActivityFeed';
 import { normalizeDashboardActivityIcon } from '@/lib/activity/dashboard-feed';
 import { useActivityFeedQuery } from '@/lib/queries';
@@ -68,7 +69,11 @@ function ActivityList({
   );
 }
 
-function ActivityItem({ activity }: { readonly activity: Activity }) {
+const ActivityItem = memo(function ActivityItem({
+  activity,
+}: {
+  readonly activity: Activity;
+}) {
   const content = (
     <>
       <span
@@ -98,7 +103,7 @@ function ActivityItem({ activity }: { readonly activity: Activity }) {
         />
         <Link
           href={activity.href}
-          className='group relative flex items-start gap-2.5 rounded-md px-1.5 py-1.5 transition-[background-color] duration-150 hover:bg-surface-1 focus-visible:bg-surface-1 focus-visible:outline-none'
+          className='group relative flex items-start gap-2.5 rounded-md px-1.5 py-1.5 transition-[background-color] duration-subtle ease-subtle hover:bg-surface-1 focus-visible:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)'
         >
           {content}
         </Link>
@@ -117,7 +122,7 @@ function ActivityItem({ activity }: { readonly activity: Activity }) {
       </div>
     </li>
   );
-}
+});
 
 export function DashboardActivityFeed({
   profileId,
