@@ -19,6 +19,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChatEntityPanelProvider } from '@/app/app/(shell)/chat/ChatEntityPanelContext';
 import { ChatEntityRightPanelHost } from '@/app/app/(shell)/chat/ChatEntityRightPanelHost';
+import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
   type PreviewPanelLink,
@@ -28,6 +29,7 @@ import {
 import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { ChatWorkspaceSurface } from '@/components/jovie/ChatWorkspaceSurface';
 import { JovieChat } from '@/components/jovie/JovieChat';
+import type { ChatActionCard } from '@/components/jovie/types';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import { APP_ROUTES } from '@/constants/routes';
@@ -62,6 +64,91 @@ type WelcomeChatBootstrapState =
   | 'scheduled'
   | 'done'
   | 'failed';
+
+type ChatActionProfile = NonNullable<DashboardData['selectedProfile']>;
+type ChatActionProfileCompletionSteps =
+  DashboardData['profileCompletion']['steps'];
+
+function normalizeCompletionPercentage(percentage: number): number {
+  if (!Number.isFinite(percentage)) {
+    return 0;
+  }
+
+  return Math.min(100, Math.max(0, Math.round(percentage)));
+}
+
+function profileDisplayName(profile: ChatActionProfile): string {
+  return (
+    profile.displayName?.trim() || profile.username?.trim() || 'this artist'
+  );
+}
+
+function hasProfileValue(value: string | null | undefined): boolean {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function hasConnectedMusicCatalog(profile: ChatActionProfile): boolean {
+  return (
+    hasProfileValue(profile.spotifyUrl) ||
+    hasProfileValue(profile.appleMusicUrl) ||
+    hasProfileValue(profile.youtubeUrl) ||
+    hasProfileValue(profile.spotifyId) ||
+    hasProfileValue(profile.appleMusicId) ||
+    hasProfileValue(profile.youtubeMusicId)
+  );
+}
+
+function buildChatActionCards({
+  profile,
+  profileCompletionPercentage,
+  profileCompletionSteps,
+}: {
+  readonly profile: ChatActionProfile;
+  readonly profileCompletionPercentage: number;
+  readonly profileCompletionSteps: ChatActionProfileCompletionSteps;
+}): readonly ChatActionCard[] {
+  const artistName = profileDisplayName(profile);
+  const completion = normalizeCompletionPercentage(profileCompletionPercentage);
+  const nextSetupStep = profileCompletionSteps[0]?.label;
+
+  if (!hasConnectedMusicCatalog(profile)) {
+    return [
+      {
+        id: 'connect-music-catalog',
+        title: 'Connect Your Music Catalog',
+        body: 'Add Spotify, Apple Music, or YouTube Music so Jovie can plan from real releases.',
+        actionLabel: 'Plan Setup',
+        prompt: `Help me connect my music catalog for ${artistName}. Use the current profile context and give me the next setup step.`,
+      },
+    ];
+  }
+
+  if (completion < 100) {
+    const body = nextSetupStep
+      ? `Your profile is ${completion}% complete. Next setup step: ${nextSetupStep}.`
+      : `Your profile is ${completion}% complete. Tighten the missing setup steps before the next share.`;
+
+    return [
+      {
+        id: 'finish-artist-profile',
+        title: 'Complete Your Artist Profile',
+        body,
+        actionLabel: 'Review Gaps',
+        prompt: `Review my artist profile for ${artistName}. Prioritize the missing setup steps and tell me the single highest-impact update to make next.`,
+      },
+    ];
+  }
+
+  return [
+    {
+      id: 'plan-next-move',
+      title: 'Plan Your Next Move',
+      body: `Use ${artistName}'s profile and catalog context to choose one concrete action for this week.`,
+      actionLabel: 'Plan Move',
+      prompt: `Use my artist profile, music catalog, and dashboard context for ${artistName} to recommend the single most useful action I should take this week. Include the first step.`,
+    },
+  ];
+}
 
 export function shouldRetryWelcomeChatBootstrap(
   status: number | null
@@ -191,6 +278,7 @@ export function ChatPageClient({
     needsOnboarding,
     dashboardLoadError,
     isFirstSession: dashboardIsFirstSession,
+    profileCompletion,
   } = useDashboardData();
   const { setPreviewData } = usePreviewPanelData();
   const { open: openPreviewPanel } = usePreviewPanelState();
@@ -463,6 +551,18 @@ export function ChatPageClient({
   // We pass it as initialQuery so JovieChat can auto-submit it.
   const initialQuery =
     !env.IS_E2E && !initialQueryHandled && !conversationId ? rawQuery : null;
+
+  const chatActionCards = useMemo(
+    () =>
+      activeProfile
+        ? buildChatActionCards({
+            profile: activeProfile,
+            profileCompletionPercentage: profileCompletion.percentage,
+            profileCompletionSteps: profileCompletion.steps,
+          })
+        : [],
+    [activeProfile, profileCompletion.percentage, profileCompletion.steps]
+  );
 
   // Mark as handled after first render so re-renders don't re-submit
   useEffect(() => {
@@ -741,6 +841,7 @@ export function ChatPageClient({
             avatarUrl={activeProfile.avatarUrl}
             username={activeProfile.username ?? undefined}
             isFirstSession={isFirstSession || dashboardIsFirstSession || false}
+            actionCards={chatActionCards}
           />
         </ChatWorkspaceSurface>
       </ErrorBoundary>

@@ -55,8 +55,16 @@ export interface JovieChatProps {
   readonly username?: string;
   /** Whether the user is in their first post-onboarding chat session */
   readonly isFirstSession?: boolean;
-  /** Optional latest release title for contextual first-session prompts */
-  readonly latestReleaseTitle?: string | null;
+  /** Contextual, production-backed actions surfaced in an empty thread */
+  readonly actionCards?: readonly ChatActionCard[];
+}
+
+export interface ChatActionCard {
+  readonly id: string;
+  readonly title: string;
+  readonly body: string;
+  readonly actionLabel: string;
+  readonly prompt: string;
 }
 
 export type ChatConversationCreatePhase = 'reserved' | 'completed';
