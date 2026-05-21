@@ -243,6 +243,12 @@ async function requestWithRetries<T>(
     } catch (error) {
       if (error instanceof MusicfetchRequestError) throw error;
 
+      // Do not retry on abort (caller cancellation via signal or internal timeout).
+      // Fail fast so navigation/unmount does not waste retries/backoff.
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw wrapUnknownError(error);
+      }
+
       if (attempt < MAX_RETRY_ATTEMPTS - 1) {
         await delay(backoffMs(attempt));
         continue;
