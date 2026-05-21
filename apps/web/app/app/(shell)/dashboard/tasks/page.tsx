@@ -1,5 +1,6 @@
-import { TasksRoute } from './TasksRoute';
+import { redirect } from 'next/navigation';
+import { APP_ROUTES } from '@/constants/routes';
 
-export default async function TasksPage() {
-  return TasksRoute();
+export default function LegacyDashboardTasksPage() {
+  redirect(APP_ROUTES.TASKS);
 }
